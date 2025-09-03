@@ -1,0 +1,12 @@
+package kz.aita.model.dataModel
+
+data class UserAuthSignUpOwnerDataModel(
+  val email: String,
+  val phoneNumber: String,
+  val password: String,
+  val firstName: String,
+  val lastName: String,
+  val country: CountryDataModel,
+  val city: BoxLocationDataModel,
+  val store: StoreDataModel
+)
