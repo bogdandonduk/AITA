@@ -57,6 +57,16 @@ kotlin {
         }
         jvmMain.dependencies {
             implementation("io.ktor:ktor-client-java:${property("ktor.version")}")
+            implementation("io.ktor:ktor-server-core:${property("ktor.version")}")
+            implementation("io.ktor:ktor-server-netty:${property("ktor.version")}")
+            implementation("io.ktor:ktor-server-content-negotiation:${property("ktor.version")}")
+            implementation("io.ktor:ktor-serialization-kotlinx-json:${property("ktor.version")}")
+            implementation("io.ktor:ktor-server-cors:${property("ktor.version")}")
+            implementation("io.ktor:ktor-server-compression:${property("ktor.version")}")
+            implementation("io.ktor:ktor-server-auto-head-response:${property("ktor.version")}")
+            implementation("io.ktor:ktor-server-conditional-headers:${property("ktor.version")}")
+            implementation("io.ktor:ktor-server-call-logging:${property("ktor.version")}")
+            implementation(libs.logback) // logging
         }
         iosMain.dependencies {
             implementation("io.ktor:ktor-client-darwin:${property("ktor.version")}")

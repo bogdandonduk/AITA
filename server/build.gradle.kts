@@ -14,6 +14,17 @@ application {
 }
 
 dependencies {
+    // ContentNegotiation + kotlinx.serialization
+    implementation("io.ktor:ktor-server-content-negotiation:${property("ktor.version")}")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:${property("ktor.version")}")
+
+    // Useful server plugins (optional but nice)
+    implementation("io.ktor:ktor-server-cors:${property("ktor.version")}")
+    implementation("io.ktor:ktor-server-compression:${property("ktor.version")}")
+    implementation("io.ktor:ktor-server-auto-head-response:${property("ktor.version")}")
+    implementation("io.ktor:ktor-server-call-logging:${property("ktor.version")}")
+    implementation("io.ktor:ktor-server-conditional-headers:${property("ktor.version")}")
+
     implementation(projects.shared)
     implementation(libs.logback)
     implementation(libs.ktor.serverCore)

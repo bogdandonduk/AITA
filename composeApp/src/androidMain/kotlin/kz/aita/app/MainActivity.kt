@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import kz.aita.core.configuration.AppConfiguration
+import kz.aita.screen.UserAuthLogInScreen
 
 class MainActivity : ComponentActivity() {
 
@@ -12,7 +13,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             AppConfiguration {
-
+                UserAuthLogInScreen()
             }
         }
     }
