@@ -10,6 +10,7 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.composeHotReload)
+
 }
 
 kotlin {
@@ -59,6 +60,23 @@ kotlin {
             implementation(libs.androidx.activity.compose)
         }
         commonMain.dependencies {
+            implementation(libs.kamel.image)
+
+            // Note: When using `kamel-image` a ktor engine is not included.
+            // To fetch remote images you also must ensure you add your own
+            // ktor engine for each target.
+
+            // optional modules (choose what you need and add them to your kamel config)
+            implementation(libs.kamel.decoder.image.bitmap)
+            implementation(libs.kamel.decoder.image.bitmap.resizing) // android only right now
+            implementation(libs.kamel.decoder.image.vector)
+            implementation(libs.kamel.decoder.svg.batik)
+            implementation(libs.kamel.decoder.svg.std)
+            implementation(libs.kamel.decoder.animated.image) // .gif support
+
+            implementation(libs.kamel.fetcher.resources.jvm)
+            implementation(libs.kamel.fetcher.resources.android)
+
             implementation(compose.components.resources)
             implementation(compose.runtime)
             implementation(compose.foundation)
@@ -70,6 +88,7 @@ kotlin {
             implementation(libs.androidx.lifecycle.runtimeCompose)
 
             implementation(projects.shared)
+
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

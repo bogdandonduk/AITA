@@ -1,8 +1,8 @@
-package kz.aita.core.http
+package kz.aita.core.remote
 
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.engine.darwin.Darwin
 
-actual fun platformHttpClientEngine(): HttpClientEngine {
+actual fun getHttpClientEngine(): HttpClientEngine {
   return Darwin.create()
 }

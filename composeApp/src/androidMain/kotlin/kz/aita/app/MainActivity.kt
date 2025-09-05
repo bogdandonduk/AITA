@@ -3,7 +3,7 @@ package kz.aita.app
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import kz.aita.core.configuration.AppConfiguration
+import kz.aita.core.configuration.AppUIConfiguration
 import kz.aita.screen.UserAuthLogInScreen
 
 class MainActivity : ComponentActivity() {
@@ -12,7 +12,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         setContent {
-            AppConfiguration {
+            AppUIConfiguration {
                 UserAuthLogInScreen()
             }
         }

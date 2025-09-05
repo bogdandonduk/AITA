@@ -8,12 +8,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import kz.aita.core.configuration.AppConfiguration
+import kz.aita.core.configuration.AppUIConfiguration
 import kz.aita.widget.LargeIconWithTitleWidget
 import org.jetbrains.compose.resources.painterResource
 
 @Composable
-fun AppConfiguration.UserAuthLogInScreen() {
+fun AppUIConfiguration.UserAuthLogInScreen() {
   LazyColumn(
     modifier = Modifier
       .background(BackgroundColor)
@@ -21,6 +21,7 @@ fun AppConfiguration.UserAuthLogInScreen() {
   ) {
     item {
       Column {
+
         LargeIconWithTitleWidget(
           icon = painterResource(Res.drawable.aita_logo)
         )

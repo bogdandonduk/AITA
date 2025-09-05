@@ -8,4 +8,6 @@ import kz.aita.model.wrapper.DataState
 interface UserRepository {
 
   suspend fun logIn(userAuthLogIn: UserAuthLogInDataModel): Flow<DataState<UserAuthAccountDataModel>>
+
+
 }

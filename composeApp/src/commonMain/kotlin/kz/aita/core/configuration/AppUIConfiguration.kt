@@ -6,7 +6,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,7 +14,7 @@ import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import kotlin.properties.Delegates
 
-object AppConfiguration {
+object AppUIConfiguration {
   var isLandscape by Delegates.notNull<Boolean>()
 
   var screenWidth by Delegates.notNull<Int>()
@@ -161,7 +160,7 @@ object AppConfiguration {
 
   @Composable
   operator fun invoke(
-    content: @Composable AppConfiguration.() -> Unit
+    content: @Composable AppUIConfiguration.() -> Unit
   ) {
     val appLocale by appLocale.collectAsState()
     val appTheme by appTheme.collectAsState()

@@ -1,8 +1,9 @@
 package kz.aita.model.dataModel.response
 
+import kotlinx.serialization.Serializable
 import kz.aita.model.dataModel.LocalizedStringGroupDataModel
 
+@Serializable
 data class GetStringsResponseDataModel(
-  val code: String,
-  val values: List<LocalizedStringGroupDataModel>
+  val payload: List<LocalizedStringGroupDataModel>
 )

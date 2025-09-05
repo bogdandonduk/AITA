@@ -1,8 +1,8 @@
-package kz.aita.core.http
+package kz.aita.core.remote
 
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.engine.js.Js
 
-actual fun platformHttpClientEngine(): HttpClientEngine {
+actual fun getHttpClientEngine(): HttpClientEngine {
   return Js.create()
 }
