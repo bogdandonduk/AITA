@@ -15,7 +15,6 @@ import io.ktor.server.http.content.*
 import io.ktor.server.plugins.calllogging.CallLogging
 import kotlinx.serialization.json.Json
 import java.io.File
-import java.nio.file.Paths
 
 fun main() {
     val port = System.getenv("AITA_PORT")?.toIntOrNull() ?: 8080
@@ -42,11 +41,9 @@ fun main() {
         }
 
         routing {
-            staticFiles("/drawable/android", File("AITA/server/assets/drawable/android"))
-            staticFiles("/drawable/svg", File("AITA/server/assets/drawable/svg"))
-        }
-
-        routing {
+            staticFiles("res/drawable/svg", File("AITA/server/assets/drawable/svg"))
+            staticFiles("res/values/string", File("AITA/server/assets/values/string"))
+            staticFiles("config", File("AITA/server/config"))
 
         }
     }.start(wait = true)
