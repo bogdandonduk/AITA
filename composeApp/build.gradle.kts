@@ -20,7 +20,7 @@ kotlin {
             jvmTarget.set(JvmTarget.JVM_11)
         }
     }
-    
+
     listOf(
         iosX64(),
         iosArm64(),
@@ -31,9 +31,9 @@ kotlin {
             isStatic = true
         }
     }
-    
+
     jvm()
-    
+
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
         outputModuleName.set("composeApp")
@@ -53,29 +53,32 @@ kotlin {
         }
         binaries.executable()
     }
-    
+
     sourceSets {
         androidMain.dependencies {
-            implementation(compose.preview)
-            implementation(libs.androidx.activity.compose)
+          implementation(libs.kamel.fetcher.resources.android)
+          implementation(compose.preview)
+          implementation(libs.androidx.activity.compose)
         }
         commonMain.dependencies {
-            implementation(libs.kamel.image)
 
+//            implementation(libs.kamel.image.default)
+
+            implementation(libs.kamel.image)
+            implementation("io.ktor:ktor-client-core:${property("ktor.version")}")
+            implementation("io.ktor:ktor-http:${property("ktor.version")}")
+//            implementation(libs.kamel.fetcher.ktor)
             // Note: When using `kamel-image` a ktor engine is not included.
             // To fetch remote images you also must ensure you add your own
             // ktor engine for each target.
 
             // optional modules (choose what you need and add them to your kamel config)
             implementation(libs.kamel.decoder.image.bitmap)
-            implementation(libs.kamel.decoder.image.bitmap.resizing) // android only right now
+//            implementation(libs.kamel.decoder.image.bitmap.resizing) // android only right now
             implementation(libs.kamel.decoder.image.vector)
-            implementation(libs.kamel.decoder.svg.batik)
+//            implementation(libs.kamel.decoder.svg.batik)
             implementation(libs.kamel.decoder.svg.std)
-            implementation(libs.kamel.decoder.animated.image) // .gif support
-
-            implementation(libs.kamel.fetcher.resources.jvm)
-            implementation(libs.kamel.fetcher.resources.android)
+//            implementation(libs.kamel.decoder.animated.image) // .gif support
 
             implementation(compose.components.resources)
             implementation(compose.runtime)
@@ -94,7 +97,10 @@ kotlin {
             implementation(libs.kotlin.test)
         }
         jvmMain.dependencies {
-            implementation(compose.desktop.currentOs)
+          implementation(libs.kamel.decoder.svg.batik)
+
+          implementation(libs.kamel.fetcher.resources.jvm)
+          implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutinesSwing)
         }
     }

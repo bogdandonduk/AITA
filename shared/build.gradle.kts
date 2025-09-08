@@ -6,6 +6,7 @@ import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidLibrary)
+    alias(libs.plugins.kotlinSerialization)
 }
 
 kotlin {
@@ -41,6 +42,9 @@ kotlin {
     
     sourceSets {
         commonMain.dependencies {
+//            api(libs.kotlinx.serialization.core)
+//            api(libs.kotlinx.serialization.json)
+
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${property("coroutines.version")}")
             implementation("io.ktor:ktor-client-core:${property("ktor.version")}")
             implementation("io.ktor:ktor-client-content-negotiation:${property("ktor.version")}")
@@ -53,6 +57,8 @@ kotlin {
 
         }
         androidMain.dependencies {
+
+            implementation("io.ktor:ktor-client-android:${property("ktor.version")}")
             implementation("io.ktor:ktor-client-okhttp:${property("ktor.version")}")
         }
         jvmMain.dependencies {

@@ -1,5 +1,8 @@
 package kz.aita.model.dataModel
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 sealed interface StoreJobDataModel {
   
   data object Cashier : StoreJobDataModel

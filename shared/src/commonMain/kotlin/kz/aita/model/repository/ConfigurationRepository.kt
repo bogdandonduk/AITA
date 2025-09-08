@@ -12,7 +12,7 @@ interface ConfigurationRepository {
 
   fun getStrings(): Flow<DataState<List<LocalizedStringGroupDataModel>>>
 
-  fun getDrawableConfig(): Flow<DataState<List<StylizedDrawablePathsGroupDataModel>>>
+  fun getDrawableConfiguration(): Flow<DataState<List<StylizedDrawablePathsGroupDataModel>>>
 
   fun getSvgDrawable(key: Long, themeId: Long): Flow<DataState<String>>
 }

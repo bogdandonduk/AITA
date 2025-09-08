@@ -24,6 +24,7 @@ class GenericRemoteService(
   ) : Response {
     return httpClient
       .request(serverUrl + endpointUrl) {
+        print("url is $serverUrl$endpointUrl ")
         this.method = method
 
         headers.forEach { (key, value) ->

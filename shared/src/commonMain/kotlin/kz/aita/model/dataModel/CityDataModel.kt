@@ -1,7 +1,10 @@
 package kz.aita.model.dataModel
 
-data class BoxLocationDataModel(
-  val translatedNames: List<LocalizedStringDataModel>,
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class CityDataModel(
+  val name: List<LocalizedStringDataModel>,
   var centerLatitude: Double,
   var centerLongitude: Double,
   val swLatitude: Double,

@@ -1,0 +1,86 @@
+{
+  "payload": {
+    "stringResourcesPath": "res/values/string/",
+    "drawableConfigurationPath": "config/Drawable.json",
+    "drawableResourcesPath": "res/drawable/",
+    "drawableSvgResourcesPath": "res/drawable/svg/",
+    "drawablePngResourcesPath": "res/drawable/png/",
+    "companyForms": [
+      {
+        "id": 0,
+        "name": "TOO",
+        "parameters": []
+      }
+    ],
+    "countries": [
+      {
+        "locale": "kz",
+        "language": "kk",
+        "name": [
+          {
+            "language": "en",
+            "value": "Kazakhstan"
+          },
+          {
+            "language": "ru",
+            "value": "Казахстан"
+          },
+          {
+            "language": "kk",
+            "value": "Казакстан"
+          }
+        ],
+        "flagDrawablePath": "/png/flag_kz.png",
+        "cities": [
+          {
+            "name": [
+              {
+                "language": "en",
+                "value": "Astana"
+              },
+              {
+                "language": "ru",
+                "value": "Астана"
+              },
+              {
+                "language": "kk",
+                "value": "Астана"
+              }
+            ],
+            "centerLatitude": 51.1667,
+            "centerLongitude": 71.4333,
+            "swLatitude": 51.0230,
+            "swLongitude": 71.2660,
+            "neLatitude": 51.250071,
+            "neLongitude": 71.5500
+          },
+          {
+            "name": [
+              {
+                "language": "en",
+                "value": "Almaty"
+              },
+              {
+                "language": "ru",
+                "value": "Алматы"
+              },
+              {
+                "language": "kk",
+                "value": "Алматы"
+              }
+            ],
+            "centerLatitude": 43.2775,
+            "centerLongitude": 76.8936,
+            "swLatitude": 43.0975,
+            "swLongitude": 76.7950,
+            "neLatitude": 43.3600,
+            "neLongitude": 77.0800
+          }
+        ],
+        "phoneNumberCode": "7",
+        "phoneNumberSize": 10,
+        "currency": "KZT"
+      }
+    ]
+  }
+}

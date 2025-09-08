@@ -1,5 +1,8 @@
 package kz.aita.model.dataModel
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class TransactionDataModel(
   val id: Long,
   val workshiftId: Long,

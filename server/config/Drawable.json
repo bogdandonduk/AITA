@@ -1,0 +1,17 @@
+[
+  {
+    "id": 1,
+    "values": [
+      {
+        "locale": "",
+        "theme": 0,
+        "path": "svg/110.svg"
+      },
+      {
+        "locale": "",
+        "theme": 1,
+        "path": "svg/111.svg"
+      }
+    ]
+  }
+]

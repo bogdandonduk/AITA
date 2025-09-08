@@ -1,8 +1,9 @@
 package kz.aita.core.di
 
-import io.ktor.client.HttpClient
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.serialization.kotlinx.json.json
+import io.ktor.client.*
+import io.ktor.client.plugins.cache.HttpCache
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 import kz.aita.core.remote.getHttpClientEngine
 import kz.aita.model.repository.ConfigurationRepository
@@ -20,6 +21,10 @@ val httpClient by lazy {
         ignoreUnknownKeys = true
       })
     }
+
+//    install(HttpCache) {
+//      // Default is in-memory. For disk persistence, see platform notes below.
+//    }
   }
 }
 

@@ -8,7 +8,7 @@ sealed interface DataState<T> {
 
   class Empty<T> : DataState<T>
 
-  class Failure<T>(val exception: Exception?) : DataState<T>
+  data class Failure<T>(val exception: Exception?) : DataState<T>
 }
 
 fun <From, To> DataState<From>.map(

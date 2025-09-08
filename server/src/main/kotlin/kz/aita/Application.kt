@@ -44,7 +44,6 @@ fun main() {
             staticFiles("res/drawable/svg", File("AITA/server/assets/drawable/svg"))
             staticFiles("res/values/string", File("AITA/server/assets/values/string"))
             staticFiles("config", File("AITA/server/config"))
-
         }
     }.start(wait = true)
 }

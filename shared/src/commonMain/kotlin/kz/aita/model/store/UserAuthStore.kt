@@ -13,16 +13,20 @@ import kz.aita.model.wrapper.DataState
 
 object UserStore: Store() {
 
-  private val _userAuthStateFlow = MutableStateFlow<DataState<UserAuthAccountDataModel>>(DataState.Empty())
-  val userAuthStateFlow = _userAuthStateFlow.asStateFlow()
+  private val _userAuthState = MutableStateFlow<DataState<UserAuthAccountDataModel>>(DataState.Empty())
+  val userAuthState = _userAuthState.asStateFlow()
 
   fun logIn(userAuthLogIn: UserAuthLogInDataModel) {
     coroutineScope.launch(Dispatchers.io) {
       userRepository
         .logIn(userAuthLogIn)
         .collect {
-          _userAuthStateFlow.emit(it)
+          _userAuthState.emit(it)
         }
     }
+  }
+
+  override fun initialize() {
+
   }
 }
