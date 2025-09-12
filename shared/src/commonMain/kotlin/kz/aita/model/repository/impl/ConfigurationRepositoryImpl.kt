@@ -35,14 +35,16 @@ class ConfigurationRepositoryImpl(
     }
   }
 
-  override fun getStrings(): Flow<DataState<List<LocalizedStringGroupDataModel>>> {
+  override fun getStrings(
+    language: String
+  ): Flow<DataState<List<LocalizedStringGroupDataModel>>> {
     return flow {
       try {
         val response = genericRemoteService
           .request<GetStringsResponseDataModel, Unit>(
             method = HttpMethod.Get,
             RemoteConfiguration.SERVER_URL,
-            RemoteConfiguration.STRING_RESOURCES_PATH
+            RemoteConfiguration.STRING_RESOURCES_PATH + "strings_${language}.json"
           )
 
         emit(DataState.Success(response.payload))

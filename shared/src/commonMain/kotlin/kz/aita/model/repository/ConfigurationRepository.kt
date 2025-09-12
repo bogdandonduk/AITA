@@ -10,7 +10,7 @@ interface ConfigurationRepository {
 
   fun getGlobalConfiguration(): Flow<DataState<GlobalConfigurationDataModel>>
 
-  fun getStrings(): Flow<DataState<List<LocalizedStringGroupDataModel>>>
+  fun getStrings(language: String): Flow<DataState<List<LocalizedStringGroupDataModel>>>
 
   fun getDrawableConfiguration(): Flow<DataState<List<StylizedDrawablePathsGroupDataModel>>>
 

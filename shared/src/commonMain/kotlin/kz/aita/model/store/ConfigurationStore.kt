@@ -9,21 +9,35 @@ import kz.aita.core.async.coroutines.io
 import kz.aita.core.di.configurationRepository
 import kz.aita.core.remote.RemoteConfiguration
 import kz.aita.model.dataModel.GlobalConfigurationDataModel
+import kz.aita.model.dataModel.LocalizedStringGroupDataModel
 import kz.aita.model.dataModel.StylizedDrawablePathsGroupDataModel
 import kz.aita.model.store.base.Store
 import kz.aita.model.wrapper.DataState
 
 object ConfigurationStore : Store() {
 
-  init {
-    initialize()
-  }
-
   private val _globalAppConfigurationState = MutableStateFlow<DataState<GlobalConfigurationDataModel>>(DataState.Empty())
   val globalAppConfigurationState = _globalAppConfigurationState.asStateFlow()
 
   private val _drawableConfigurationState = MutableStateFlow<DataState<List<StylizedDrawablePathsGroupDataModel>>>(DataState.Empty())
   val drawableConfigurationState = _drawableConfigurationState.asStateFlow()
+
+  private val _stringsState = MutableStateFlow<DataState<List<LocalizedStringGroupDataModel>>>(DataState.Empty())
+  val stringsState = _stringsState.asStateFlow()
+
+  private val _strings = MutableStateFlow<List<LocalizedStringGroupDataModel>>(emptyList())
+  val strings = _strings.asStateFlow()
+
+  init {
+    initialize()
+
+    coroutineScope.launch(Dispatchers.io) {
+      stringsState.collect {
+        if (it is DataState.Success)
+          _strings.emit(it.payload)
+      }
+    }
+  }
 
   override fun initialize() {
     coroutineScope.launch(Dispatchers.io) {
@@ -40,19 +54,22 @@ object ConfigurationStore : Store() {
 
           _globalAppConfigurationState.emit(globalConfigurationDataState)
 
-          configurationRepository
-            .getDrawableConfiguration()
-            .collect { drawableConfiguration ->
-              _drawableConfigurationState.emit(drawableConfiguration)
-            }
+          launch {
+            configurationRepository
+              .getStrings("en")
+              .collect { strings ->
+                println("strings $strings")
+                _stringsState.emit(strings)
+              }
+          }
 
-          configurationRepository
-            .getSvgDrawable(1, 0)
-            .collect {
-              println(
-                it
-              )
-            }
+          launch {
+            configurationRepository
+              .getDrawableConfiguration()
+              .collect { drawableConfiguration ->
+                _drawableConfigurationState.emit(drawableConfiguration)
+              }
+          }
         }
     }
   }

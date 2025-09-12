@@ -4,7 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import kz.aita.core.configuration.AppUIConfiguration
-import kz.aita.screen.UserAuthLogInScreen
+import kz.aita.screen.UserAuthLogInScreenNarrow
 
 class MainActivity : ComponentActivity() {
 
@@ -13,7 +13,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             AppUIConfiguration {
-                UserAuthLogInScreen()
+                UserAuthLogInScreenNarrow()
             }
         }
     }
