@@ -1,0 +1,38 @@
+[
+  {
+    "id": 0,
+    "values": [
+      {
+        "sizeModeId": 0,
+        "screenWidthDivisor": "70"
+      }
+    ]
+  },
+  {
+    "id": 1,
+    "values": [
+      {
+        "sizeModeId": 0,
+        "screenWidthDivisor": "50"
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "values": [
+      {
+        "sizeModeId": 0,
+        "screenWidthDivisor": "60"
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "values": [
+      {
+        "sizeModeId": 0,
+        "screenWidthDivisor": "90"
+      }
+    ]
+  }
+]

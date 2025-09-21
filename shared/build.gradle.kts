@@ -1,3 +1,4 @@
+import org.gradle.kotlin.dsl.provideDelegate
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
@@ -7,6 +8,16 @@ plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidLibrary)
     alias(libs.plugins.kotlinSerialization)
+    alias(libs.plugins.sqldelight)
+}
+
+sqldelight {
+    databases {
+        create("AppDatabase") {
+            packageName.set("kz.aita")
+            generateAsync.set(true)
+        }
+    }
 }
 
 kotlin {
@@ -20,9 +31,9 @@ kotlin {
     iosX64()
     iosArm64()
     iosSimulatorArm64()
-    
+
     jvm()
-    
+
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
         browser {
@@ -45,10 +56,14 @@ kotlin {
 //            api(libs.kotlinx.serialization.core)
 //            api(libs.kotlinx.serialization.json)
 
+            implementation(libs.sqlDelightRuntime)
+            implementation(libs.sqlDelightCoroutinesExtensions)
+
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${property("coroutines.version")}")
             implementation("io.ktor:ktor-client-core:${property("ktor.version")}")
             implementation("io.ktor:ktor-client-content-negotiation:${property("ktor.version")}")
             implementation("io.ktor:ktor-serialization-kotlinx-json:${property("ktor.version")}")
+
         }
         commonTest.dependencies {
 

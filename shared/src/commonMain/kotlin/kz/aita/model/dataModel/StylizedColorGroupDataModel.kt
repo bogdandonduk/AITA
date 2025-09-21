@@ -3,7 +3,7 @@ package kz.aita.model.dataModel
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class LocalizedStringGroupDataModel(
+data class StylizedColorGroupDataModel(
   val id: Long,
-  val values: List<LocalizedStringDataModel>
+  val values: List<StylizedColorDataModel>
 )

@@ -3,7 +3,7 @@ package kz.aita.app
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import kz.aita.core.configuration.AppUIConfiguration
+import kz.aita.AppUIConfiguration
 import kz.aita.screen.UserAuthLogInScreenNarrow
 
 class MainActivity : ComponentActivity() {

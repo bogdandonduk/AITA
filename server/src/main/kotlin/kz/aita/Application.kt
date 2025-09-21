@@ -17,7 +17,8 @@ import kotlinx.serialization.json.Json
 import java.io.File
 
 fun main() {
-    val port = System.getenv("AITA_PORT")?.toIntOrNull() ?: 8080
+//    val port = System.getenv("AITA_PORT")?.toIntOrNull() ?: 8080
+    val port = 8080
     val host = System.getenv("AITA_HOST") ?: "0.0.0.0"
 
     embeddedServer(Netty, port = port, host = host) {
@@ -41,9 +42,12 @@ fun main() {
         }
 
         routing {
-            staticFiles("res/drawable/svg", File("AITA/server/assets/drawable/svg"))
-            staticFiles("res/values/string", File("AITA/server/assets/values/string"))
-            staticFiles("config", File("AITA/server/config"))
+            staticFiles("res/string", File("AITA/server/assets/values/strings.json"))
+            staticFiles("res/dimension", File("AITA/server/assets/values/dimensions.json"))
+            staticFiles("res/color", File("AITA/server/assets/values/colors.json"))
+            staticFiles("res/drawable/", File("AITA/server/assets/drawable/"))
+
+            staticFiles("config/global", File("AITA/server/config/global.json"))
         }
     }.start(wait = true)
 }
