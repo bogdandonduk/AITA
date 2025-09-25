@@ -1,8 +1,11 @@
 {
-  "stringResourcesPath": "res/values/strings.json",
-  "dimensionResourcesPath": "res/values/dimensions.json",
-  "colorResourcesPath": "res/values/colors.json",
-  "drawableResourcesPath": "res/drawable/drawables.json",
+  "serverUrl": "http://127.0.0.1:8080/",
+  "globalConfigurationPath": "config/global",
+  "stringResourcesPath": "res/string",
+  "dimensionResourcesPath": "res/dimension",
+  "colorResourcesPath": "res/color",
+  "drawableResourcesConfigurationPath": "res/drawableConfig",
+  "drawableResourcesPath": "res/drawable",
   "companyForms": [
     {
       "id": 0,

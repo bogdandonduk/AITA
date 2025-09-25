@@ -3,14 +3,12 @@
     "id": 0,
     "values": [
       {
-        "locale": "",
-        "theme": 0,
-        "path": "svg/110.svg"
+        "themeId": 0,
+        "path": "svg/10.svg"
       },
       {
-        "locale": "",
-        "theme": 1,
-        "path": "svg/111.svg"
+        "themeId": 1,
+        "path": "svg/11.svg"
       }
     ]
   }

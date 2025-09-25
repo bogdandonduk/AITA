@@ -5,5 +5,5 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class StylizedDimensionDataModel(
   val sizeModeId: Long,
-  val screenWidthDivisor: Float
+  val value: Float
 )

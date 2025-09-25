@@ -3,8 +3,8 @@
     "id": 0,
     "values": [
       {
-        "themeId": 0,
-        "valueHex": "0xffffba24"
+        "themeId": -1,
+        "valueHex": "ffffba24"
       }
     ]
   },
@@ -13,11 +13,11 @@
     "values": [
       {
         "themeId": 0,
-        "valueHex": "0xffffffff"
+        "valueHex": "ffffffff"
       },
       {
         "themeId": 1,
-        "valueHex": "0x00000000"
+        "valueHex": "00000000"
       }
     ]
   },
@@ -26,24 +26,33 @@
     "values": [
       {
         "themeId": 0,
-        "valueHex": "0xffffffff"
+        "valueHex": "ff000000"
       },
       {
         "themeId": 1,
-        "valueHex": "0xff000000"
+        "valueHex": "ffffffff"
       }
     ]
   },
   {
-    "id": 2,
+    "id": 3,
+    "values": [
+      {
+        "themeId": -1,
+        "valueHex": "ffffffff"
+      }
+    ]
+  },
+  {
+    "id": 4,
     "values": [
       {
         "themeId": 0,
-        "valueHex": "0xff000000"
+        "valueHex": "aa000000"
       },
       {
         "themeId": 1,
-        "valueHex": "0xffffffff"
+        "valueHex": "aaffffff"
       }
     ]
   }

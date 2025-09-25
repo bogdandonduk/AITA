@@ -1,8 +1,8 @@
 [versions]
 agp = "8.12.0"
-android-compileSdk = "35"
+android-compileSdk = "36"
 android-minSdk = "24"
-android-targetSdk = "35"
+android-targetSdk = "36"
 androidx-activity = "1.11.0"
 androidx-appcompat = "1.7.1"
 androidx-core = "1.17.0"
@@ -16,6 +16,7 @@ junit = "4.13.2"
 kamelImage = "1.0.8"
 kotlin = "2.2.20"
 kotlinx-coroutines = "1.10.2"
+kotlinxBrowser = "0.5.0"
 kotlinxSerializationCore = "1.9.0"
 ktor = "3.3.0"
 logback = "1.5.18"
@@ -44,6 +45,7 @@ androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "a
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
 androidx-lifecycle-viewmodelCompose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "androidx-lifecycle" }
 androidx-lifecycle-runtimeCompose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose", version.ref = "androidx-lifecycle" }
+kotlinx-browser = { module = "org.jetbrains.kotlinx:kotlinx-browser", version.ref = "kotlinxBrowser" }
 kotlinx-coroutinesSwing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
 kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinxSerializationCore" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationCore" }
@@ -52,8 +54,14 @@ ktor-serverCore = { module = "io.ktor:ktor-server-core-jvm", version.ref = "ktor
 ktor-serverNetty = { module = "io.ktor:ktor-server-netty-jvm", version.ref = "ktor" }
 ktor-serverTestHost = { module = "io.ktor:ktor-server-test-host-jvm", version.ref = "ktor" }
 constraintlayout-compose = { group = "androidx.constraintlayout", name = "constraintlayout-compose", version.ref = "constraintlayoutCompose"}
+sqlDelightWasmJsDriver = { module = "app.cash.sqldelight:web-worker-driver-wasm-js", version.ref = "sqldelight" }
+sqlDelightWasmJsCoroutinesExtensions = { module = "app.cash.sqldelight:coroutines-extensions-wasm-js", version.ref = "sqldelight" }
+sqlDelightJvmDriver = { module = "app.cash.sqldelight:sqlite-driver", version.ref = "sqldelight" }
+sqlDelightAndroidDriver = { module = "app.cash.sqldelight:android-driver", version.ref = "sqldelight" }
+sqlDelightNativeDriver = { module = "app.cash.sqldelight:native-driver", version.ref = "sqldelight" }
 sqlDelightRuntime = { module = "app.cash.sqldelight:runtime", version.ref = "sqldelight" }
 sqlDelightCoroutinesExtensions = { module = "app.cash.sqldelight:coroutines-extensions", version.ref = "sqldelight" }
+sqlDelightAsyncExtensions = { module = "app.cash.sqldelight:async-extensions", version.ref = "sqldelight" }
 
 
 [plugins]

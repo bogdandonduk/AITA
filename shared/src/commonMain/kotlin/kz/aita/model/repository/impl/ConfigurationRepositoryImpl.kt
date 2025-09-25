@@ -27,10 +27,11 @@ class ConfigurationRepositoryImpl(
     coroutineScope = this,
     initial = GlobalConfigurationDataModel(
       serverUrl = "http://127.0.0.1:8080/",
-      globalConfigurationPath = "config/global.json",
+      globalConfigurationPath = "config/global",
       stringResourcesPath = "res/string",
       dimensionResourcesPath = "res/dimension",
       colorResourcesPath = "res/color",
+      drawableResourcesConfigurationPath = "res/drawableConfig",
       drawableResourcesPath = "res/drawable",
       companyForms = emptyList(),
       countries = emptyList()
@@ -104,7 +105,7 @@ class ConfigurationRepositoryImpl(
           .request<List<StylizedDimensionGroupDataModel>, Unit>(
             method = HttpMethod.Get,
             globalAppConfigurationState.payloadValueNonNull.serverUrl,
-            globalAppConfigurationState.payloadValueNonNull.stringResourcesPath
+            globalAppConfigurationState.payloadValueNonNull.dimensionResourcesPath
           )
 
         _dimensionsState.emit(DataState.Success(response))
@@ -122,7 +123,7 @@ class ConfigurationRepositoryImpl(
           .request<List<StylizedColorGroupDataModel>, Unit>(
             method = HttpMethod.Get,
             globalAppConfigurationState.payloadValueNonNull.serverUrl,
-            globalAppConfigurationState.payloadValueNonNull.stringResourcesPath
+            globalAppConfigurationState.payloadValueNonNull.colorResourcesPath
           )
 
         _colorsState.emit(DataState.Success(response))
@@ -140,7 +141,7 @@ class ConfigurationRepositoryImpl(
           .request<List<StylizedDrawablePathsGroupDataModel>, Unit>(
             method = HttpMethod.Get,
             globalAppConfigurationState.payloadValueNonNull.serverUrl,
-            globalAppConfigurationState.payloadValueNonNull.drawableResourcesPath
+            globalAppConfigurationState.payloadValueNonNull.drawableResourcesConfigurationPath
           )
 
         _drawablesState.emit(DataState.Success(response))
@@ -183,7 +184,7 @@ class ConfigurationRepositoryImpl(
           .request<String, Unit>(
             method = HttpMethod.Get,
             globalAppConfigurationState.payloadValueNonNull.serverUrl,
-            "${globalAppConfigurationState.payloadValueNonNull.drawableResourcesPath}/$format/name.$format"
+            "${globalAppConfigurationState.payloadValueNonNull.drawableResourcesPath}/$format/$name.$format"
           )
 
         emit(DataState.Success(response))

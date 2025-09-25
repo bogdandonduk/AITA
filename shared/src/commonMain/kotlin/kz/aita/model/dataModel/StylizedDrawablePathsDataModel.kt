@@ -4,7 +4,6 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class StylizedDrawablePathsDataModel(
-  val locale: String,
-  val theme: Long,
+  val themeId: Long,
   val path: String
 )

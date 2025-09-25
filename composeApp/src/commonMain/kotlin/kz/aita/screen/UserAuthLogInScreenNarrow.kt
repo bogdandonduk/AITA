@@ -1,10 +1,8 @@
 package kz.aita.screen
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
@@ -15,45 +13,34 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.TextFieldValue
 import kz.aita.AppUIConfiguration
+import kz.aita.core.getFullDrawableResourceUrl
+import kz.aita.widget.genericTextField
+import kz.aita.widget.LargeIconWithTitleWidget
 
 @Composable
 fun AppUIConfiguration.UserAuthLogInScreenNarrow() {
-  LazyColumn(
-    modifier = Modifier
-      .background(stateValues.BackgroundColor)
-      .fillMaxSize(),
-    horizontalAlignment = Alignment.CenterHorizontally
-  ) {
-    item {
-      Spacer(
-        modifier = Modifier
-          .height(stateValues.screenHeight / 6)
-      )
+    LazyColumn(
+      modifier = Modifier.fillMaxSize(),
+      horizontalAlignment = Alignment.CenterHorizontally,
+      verticalArrangement = Arrangement.Center
+    ) {
+      item {
+        Column(
+          modifier = Modifier
+            .width(stateValues.screenWidth / 4),
+          horizontalAlignment = Alignment.CenterHorizontally,
+          verticalArrangement = Arrangement.Center
+        ) {
+          LargeIconWithTitleWidget(
+            imageUrl = getFullDrawableResourceUrl(stateValues.drawablePathAITALogo),
+            title = stateValues.stringLogIn
+          )
 
-      println(stateValues.strings)
-
-//      LargeIconWithTitleWidget(
-//        imageUrl = "${RemoteConfiguration.SERVER_URL}${RemoteConfiguration.DRAWABLE_SVG_RESOURCES_PATH}10.svg",
-//        title = stateValues.strings.find { it.id == 1L }?.values?.find { it.language == "kk" }?.value ?: "Not found"
-//      )
-    }
-
-    item {
-      Spacer(
-        modifier = Modifier
-          .height(stateValues.screenHeight / 6)
-      )
-
-      val tv by rememberSaveable(stateSaver = TextFieldValue.Saver) {
-        mutableStateOf(TextFieldValue())
+          val loginTextFieldContext =
+            genericTextField(
+              titleText = stateValues.stringPhoneNumber
+            )
+        }
       }
-
-//      GenericTextField(
-//        value = tv,
-//        onValueChange = {
-//
-//        }
-//      )
     }
-  }
 }

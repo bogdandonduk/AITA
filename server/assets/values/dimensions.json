@@ -4,7 +4,7 @@
     "values": [
       {
         "sizeModeId": 0,
-        "screenWidthDivisor": "70"
+        "value": -1
       }
     ]
   },
@@ -13,7 +13,7 @@
     "values": [
       {
         "sizeModeId": 0,
-        "screenWidthDivisor": "50"
+        "value": -1
       }
     ]
   },
@@ -22,7 +22,7 @@
     "values": [
       {
         "sizeModeId": 0,
-        "screenWidthDivisor": "60"
+        "value": -1
       }
     ]
   },
@@ -31,8 +31,54 @@
     "values": [
       {
         "sizeModeId": 0,
-        "screenWidthDivisor": "90"
+        "value": -1
+      }
+    ]
+  },
+  {
+    "id": 4,
+    "values": [
+      {
+        "sizeModeId": -1,
+        "value": 600
+      }
+    ]
+  },
+  {
+    "id": 5,
+    "values": [
+      {
+        "sizeModeId": -1,
+        "value": 1
+      }
+    ]
+  },
+  {
+    "id": 6,
+    "values": [
+      {
+        "sizeModeId": -1,
+        "value": 0.5
+      }
+    ]
+  },
+  {
+    "id": 7,
+    "values": [
+      {
+        "sizeModeId": 0,
+        "value": 14
+      }
+    ]
+  },
+  {
+    "id": 8,
+    "values": [
+      {
+        "sizeModeId": 0,
+        "value": -1
       }
     ]
   }
+
 ]

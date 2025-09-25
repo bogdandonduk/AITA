@@ -9,6 +9,7 @@ data class GlobalConfigurationDataModel(
   val stringResourcesPath: String,
   val dimensionResourcesPath: String,
   val colorResourcesPath: String,
+  val drawableResourcesConfigurationPath: String,
   val drawableResourcesPath: String,
   val companyForms: List<CompanyFormDataModel>,
   val countries: List<CountryDataModel>

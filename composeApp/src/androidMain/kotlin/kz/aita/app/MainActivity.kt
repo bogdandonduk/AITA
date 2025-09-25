@@ -12,9 +12,14 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         setContent {
-            AppUIConfiguration {
-                UserAuthLogInScreenNarrow()
-            }
+            AppUIConfiguration(
+              {
+
+              },
+              {
+
+              }
+            )
         }
     }
 }

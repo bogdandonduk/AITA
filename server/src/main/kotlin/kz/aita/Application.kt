@@ -45,7 +45,8 @@ fun main() {
             staticFiles("res/string", File("AITA/server/assets/values/strings.json"))
             staticFiles("res/dimension", File("AITA/server/assets/values/dimensions.json"))
             staticFiles("res/color", File("AITA/server/assets/values/colors.json"))
-            staticFiles("res/drawable/", File("AITA/server/assets/drawable/"))
+            staticFiles("res/drawableConfig", File("AITA/server/assets/drawable/drawables.json"))
+            staticFiles("res/drawable", File("AITA/server/assets/drawable"))
 
             staticFiles("config/global", File("AITA/server/config/global.json"))
         }

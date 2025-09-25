@@ -1,0 +1,36 @@
+[
+  {
+    "id": 0,
+    "values": [
+      {
+        "language": "en",
+        "value": "AITA"
+      },
+      {
+        "language": "ru",
+        "value": "AITA"
+      },
+      {
+        "language": "kk",
+        "value": "AITA"
+      }
+    ]
+  },
+  {
+    "id": 1,
+    "values": [
+      {
+        "language": "en",
+        "value": "Log In"
+      },
+      {
+        "language": "ru",
+        "value": "Войти"
+      },
+      {
+        "language": "kk",
+        "value": "Кіру"
+      }
+    ]
+  }
+]

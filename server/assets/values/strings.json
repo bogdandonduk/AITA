@@ -32,5 +32,73 @@
         "value": "Кіру"
       }
     ]
+  },
+  {
+    "id": 2,
+    "values": [
+      {
+        "language": "en",
+        "value": "Phone number"
+      },
+      {
+        "language": "ru",
+        "value": "Номер телефона"
+      },
+      {
+        "language": "kk",
+        "value": "Вход"
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "values": [
+      {
+        "language": "en",
+        "value": "Phone number"
+      },
+      {
+        "language": "ru",
+        "value": "Номер телефона"
+      },
+      {
+        "language": "kk",
+        "value": "Телефон нөмірі"
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "values": [
+      {
+        "language": "en",
+        "value": "Email"
+      },
+      {
+        "language": "ru",
+        "value": "Email"
+      },
+      {
+        "language": "kk",
+        "value": "Email"
+      }
+    ]
+  },
+  {
+    "id": 4,
+    "values": [
+      {
+        "language": "en",
+        "value": "Password"
+      },
+      {
+        "language": "ru",
+        "value": "Пароль"
+      },
+      {
+        "language": "kk",
+        "value": "Құпия сөз"
+      }
+    ]
   }
 ]

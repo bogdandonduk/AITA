@@ -8,3 +8,6 @@ INSERT OR REPLACE INTO key_value(key, value) VALUES (?, ?);
 
 selectByKey:
 SELECT value FROM key_value WHERE key = ?;
+
+delete:
+DELETE FROM key_value WHERE key = ?;

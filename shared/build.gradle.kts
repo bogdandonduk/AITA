@@ -58,6 +58,7 @@ kotlin {
 
             implementation(libs.sqlDelightRuntime)
             implementation(libs.sqlDelightCoroutinesExtensions)
+            implementation(libs.sqlDelightAsyncExtensions)
 
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${property("coroutines.version")}")
             implementation("io.ktor:ktor-client-core:${property("ktor.version")}")
@@ -72,11 +73,14 @@ kotlin {
 
         }
         androidMain.dependencies {
+            implementation(libs.sqlDelightAndroidDriver)
 
             implementation("io.ktor:ktor-client-android:${property("ktor.version")}")
             implementation("io.ktor:ktor-client-okhttp:${property("ktor.version")}")
         }
         jvmMain.dependencies {
+            implementation(libs.sqlDelightJvmDriver)
+
             implementation("io.ktor:ktor-client-java:${property("ktor.version")}")
             implementation("io.ktor:ktor-server-core:${property("ktor.version")}")
             implementation("io.ktor:ktor-server-netty:${property("ktor.version")}")
@@ -90,7 +94,15 @@ kotlin {
             implementation(libs.logback) // logging
         }
         iosMain.dependencies {
+            implementation(libs.sqlDelightNativeDriver)
             implementation("io.ktor:ktor-client-darwin:${property("ktor.version")}")
+        }
+        wasmJsMain.dependencies {
+            implementation(libs.kotlinx.browser)
+            implementation(npm("@cashapp/sqldelight-sqljs-worker", "2.1.0"))
+            implementation(npm("sql.js", "1.8.0"))
+            implementation(libs.sqlDelightWasmJsDriver)
+            implementation(libs.sqlDelightWasmJsCoroutinesExtensions)
         }
     }
 }
