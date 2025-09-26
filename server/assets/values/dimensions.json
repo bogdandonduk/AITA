@@ -4,7 +4,7 @@
     "values": [
       {
         "sizeModeId": 0,
-        "value": -1
+        "value": 14
       }
     ]
   },
@@ -13,7 +13,7 @@
     "values": [
       {
         "sizeModeId": 0,
-        "value": -1
+        "value": 20
       }
     ]
   },
@@ -22,7 +22,7 @@
     "values": [
       {
         "sizeModeId": 0,
-        "value": -1
+        "value": 16
       }
     ]
   },
@@ -31,7 +31,7 @@
     "values": [
       {
         "sizeModeId": 0,
-        "value": -1
+        "value": 12
       }
     ]
   },
@@ -76,9 +76,17 @@
     "values": [
       {
         "sizeModeId": 0,
-        "value": -1
+        "value": 12
+      }
+    ]
+  },
+  {
+    "id": 9,
+    "values": [
+      {
+        "sizeModeId": 0,
+        "value": 300
       }
     ]
   }
-
 ]

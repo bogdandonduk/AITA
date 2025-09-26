@@ -1,19 +1,20 @@
 package kz.aita.util
 
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.TextUnit
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 
 fun String.toColor(): Color {
   return Color(toULong(radix = 16).toInt())
 }
 
-fun Float.screenWidthDivideAsSp(screenWidth: Dp): TextUnit {
-  return (screenWidth.value / this).sp
+fun String.checkAsEmail(): Boolean {
+  return isNotEmpty() && isNotBlank() && !contains(" ") &&
+      contains("@") && contains(".") &&
+      Regex("^[a-zA-Z0-9]").matches(first().toString()) &&
+      filter { it == '@' }.length == 1 && lastIndexOf(".") > lastIndexOf("@") &&
+      lastIndexOf(".") != lastIndex
 }
 
-fun Float.screenWidthDivideAsDp(screenWidth: Dp): Dp {
-  return (screenWidth.value / this).dp
+fun String.checkAsPassword(): Boolean {
+  return length >= 8
 }
+

@@ -3,7 +3,6 @@ package kz.aita.widget
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -19,6 +18,7 @@ import io.kamel.image.asyncPainterResource
 import io.kamel.image.config.LocalKamelConfig
 import io.ktor.http.Url
 import kz.aita.AppUIConfiguration
+import kz.aita.core.getFullDrawableResourceUrl
 import kz.aita.render.kamelConfig
 
 @Composable
@@ -37,11 +37,9 @@ fun AppUIConfiguration.LargeIconWithTitleWidget(
   ) {
     CompositionLocalProvider(LocalKamelConfig provides kamelConfig) {
       KamelImage(
-        modifier = Modifier
-          .width(stateValues.screenWidth / 8),
         resource = {
           asyncPainterResource(
-            data = Url(imageUrl)
+            data = Url(getFullDrawableResourceUrl(imageUrl))
           )
         },
         contentScale = ContentScale.FillWidth,

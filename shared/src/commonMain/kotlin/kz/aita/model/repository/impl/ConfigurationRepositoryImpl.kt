@@ -26,7 +26,7 @@ class ConfigurationRepositoryImpl(
   private val _globalAppConfigurationState = MutableDataStateFlow(
     coroutineScope = this,
     initial = GlobalConfigurationDataModel(
-      serverUrl = "http://127.0.0.1:8080/",
+      serverUrl = "http://192.168.100.9:8080/",
       globalConfigurationPath = "config/global",
       stringResourcesPath = "res/string",
       dimensionResourcesPath = "res/dimension",

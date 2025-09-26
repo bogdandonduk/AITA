@@ -9,10 +9,6 @@ fun List<LocalizedStringGroupDataModel>?.extractString(id: Long, language: Strin
   return this?.run { find { it.id == id }?.values?.find { it.language == language }?.value } ?: ""
 }
 
-fun List<StylizedDimensionGroupDataModel>.extractDimensionScreenWidthDivisor(id: Long, sizeModeId: Long): Float {
-  return find { it.id == id }!!.values.find { it.sizeModeId == -1L || it.sizeModeId == sizeModeId }!!.screenWidthDivisor
-}
-
 fun List<StylizedDimensionGroupDataModel>.extractValue(id: Long, sizeModeId: Long): Float {
   return find { it.id == id }!!.values.find { it.sizeModeId == -1L || it.sizeModeId == sizeModeId }!!.value
 }

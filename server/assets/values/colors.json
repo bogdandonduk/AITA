@@ -55,5 +55,31 @@
         "valueHex": "aaffffff"
       }
     ]
+  },
+  {
+    "id": 5,
+    "values": [
+      {
+        "themeId": 0,
+        "valueHex": "ffa7a7a7"
+      },
+      {
+        "themeId": 1,
+        "valueHex": "ffa7a7a7"
+      }
+    ]
+  },
+  {
+    "id": 6,
+    "values": [
+      {
+        "themeId": 0,
+        "valueHex": "ffff0000"
+      },
+      {
+        "themeId": 1,
+        "valueHex": "ffff0000"
+      }
+    ]
   }
 ]

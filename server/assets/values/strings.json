@@ -46,23 +46,6 @@
       },
       {
         "language": "kk",
-        "value": "Вход"
-      }
-    ]
-  },
-  {
-    "id": 2,
-    "values": [
-      {
-        "language": "en",
-        "value": "Phone number"
-      },
-      {
-        "language": "ru",
-        "value": "Номер телефона"
-      },
-      {
-        "language": "kk",
         "value": "Телефон нөмірі"
       }
     ]
@@ -72,6 +55,23 @@
     "values": [
       {
         "language": "en",
+        "value": "Enter phone number"
+      },
+      {
+        "language": "ru",
+        "value": "Введите номер телефона"
+      },
+      {
+        "language": "kk",
+        "value": "Телефон нөміріңізді енгізіңіз"
+      }
+    ]
+  },
+  {
+    "id": 4,
+    "values": [
+      {
+        "language": "en",
         "value": "Email"
       },
       {
@@ -85,7 +85,24 @@
     ]
   },
   {
-    "id": 4,
+    "id": 5,
+    "values": [
+      {
+        "language": "en",
+        "value": "Enter email"
+      },
+      {
+        "language": "ru",
+        "value": "Введите email"
+      },
+      {
+        "language": "kk",
+        "value": "Электрондық поштаңызды енгізіңіз"
+      }
+    ]
+  },
+  {
+    "id": 6,
     "values": [
       {
         "language": "en",
@@ -98,6 +115,57 @@
       {
         "language": "kk",
         "value": "Құпия сөз"
+      }
+    ]
+  },
+  {
+    "id": 7,
+    "values": [
+      {
+        "language": "en",
+        "value": "Enter password"
+      },
+      {
+        "language": "ru",
+        "value": "Введите пароль"
+      },
+      {
+        "language": "kk",
+        "value": "Құпия сөзді енгізіңіз"
+      }
+    ]
+  },
+  {
+    "id": 8,
+    "values": [
+      {
+        "language": "en",
+        "value": "Cancel"
+      },
+      {
+        "language": "ru",
+        "value": "Отменить"
+      },
+      {
+        "language": "kk",
+        "value": "Болдырмау"
+      }
+    ]
+  },
+  {
+    "id": 9,
+    "values": [
+      {
+        "language": "en",
+        "value": "Clear"
+      },
+      {
+        "language": "ru",
+        "value": "Очистить"
+      },
+      {
+        "language": "kk",
+        "value": "Таза"
       }
     ]
   }

@@ -14,10 +14,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             AppUIConfiguration(
               {
-
+                UserAuthLogInScreenNarrow()
               },
               {
-
+                UserAuthLogInScreenNarrow()
               }
             )
         }

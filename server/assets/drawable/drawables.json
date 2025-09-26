@@ -4,11 +4,76 @@
     "values": [
       {
         "themeId": 0,
+        "path": "svg/00.svg"
+      },
+      {
+        "themeId": 1,
+        "path": "svg/01.svg"
+      }
+    ]
+  },
+  {
+    "id": 1,
+    "values": [
+      {
+        "themeId": 0,
         "path": "svg/10.svg"
       },
       {
         "themeId": 1,
         "path": "svg/11.svg"
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "values": [
+      {
+        "themeId": 0,
+        "path": "svg/20.svg"
+      },
+      {
+        "themeId": 1,
+        "path": "svg/21.svg"
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "values": [
+      {
+        "themeId": 0,
+        "path": "svg/30.svg"
+      },
+      {
+        "themeId": 1,
+        "path": "svg/31.svg"
+      }
+    ]
+  },
+  {
+    "id": 4,
+    "values": [
+      {
+        "themeId": 0,
+        "path": "svg/40.svg"
+      },
+      {
+        "themeId": 1,
+        "path": "svg/41.svg"
+      }
+    ]
+  },
+  {
+    "id": 5,
+    "values": [
+      {
+        "themeId": 0,
+        "path": "svg/50.svg"
+      },
+      {
+        "themeId": 1,
+        "path": "svg/51.svg"
       }
     ]
   }
