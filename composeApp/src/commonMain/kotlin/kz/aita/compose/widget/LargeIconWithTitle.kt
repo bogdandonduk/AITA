@@ -1,4 +1,4 @@
-package kz.aita.widget
+package kz.aita.compose.widget
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -19,7 +19,7 @@ import io.kamel.image.config.LocalKamelConfig
 import io.ktor.http.Url
 import kz.aita.AppUIConfiguration
 import kz.aita.core.getFullDrawableResourceUrl
-import kz.aita.render.kamelConfig
+import kz.aita.compose.render.kamelConfig
 
 @Composable
 fun AppUIConfiguration.LargeIconWithTitleWidget(

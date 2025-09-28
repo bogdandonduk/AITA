@@ -3,7 +3,7 @@ package kz.aita.model.dataModel
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class GlobalConfigurationDataModel(
+data class GlobalAppConfigurationDataModel(
   val serverUrl: String,
   val globalConfigurationPath: String,
   val stringResourcesPath: String,

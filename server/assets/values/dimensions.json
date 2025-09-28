@@ -88,5 +88,23 @@
         "value": 300
       }
     ]
+  },
+  {
+    "id": 10,
+    "values": [
+      {
+        "sizeModeId": 0,
+        "value": 2.6
+      }
+    ]
+  },
+  {
+    "id": 11,
+    "values": [
+      {
+        "sizeModeId": 0,
+        "value": 9
+      }
+    ]
   }
 ]

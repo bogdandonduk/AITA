@@ -76,5 +76,57 @@
         "path": "svg/51.svg"
       }
     ]
+  },
+  {
+    "id": 6,
+    "values": [
+      {
+        "themeId": 0,
+        "path": "svg/60.svg"
+      },
+      {
+        "themeId": 1,
+        "path": "svg/61.svg"
+      }
+    ]
+  },
+  {
+    "id": 7,
+    "values": [
+      {
+        "themeId": 0,
+        "path": "svg/70.svg"
+      },
+      {
+        "themeId": 1,
+        "path": "svg/71.svg"
+      }
+    ]
+  },
+  {
+    "id": 8,
+    "values": [
+      {
+        "themeId": 0,
+        "path": "svg/80.svg"
+      },
+      {
+        "themeId": 1,
+        "path": "svg/81.svg"
+      }
+    ]
+  },
+  {
+    "id": 9,
+    "values": [
+      {
+        "themeId": 0,
+        "path": "svg/90.svg"
+      },
+      {
+        "themeId": 1,
+        "path": "svg/91.svg"
+      }
+    ]
   }
 ]

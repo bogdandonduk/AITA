@@ -22,7 +22,7 @@ fun List<StylizedDrawablePathsGroupDataModel>.extractPath(id: Long, themeId: Lon
 }
 
 fun getFullDrawableResourceUrl(path: String): String {
-  return configurationRepository.globalAppConfigurationState.payloadValueNonNull.run {
+  return configurationRepository.globalAppConfigurationState.payloadValue.run {
     serverUrl + drawableResourcesPath
   } + "/$path"
 }

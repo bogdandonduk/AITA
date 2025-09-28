@@ -1,4 +1,4 @@
-package kz.aita.widget
+package kz.aita.compose.widget
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -56,10 +56,9 @@ import io.kamel.image.config.LocalKamelConfig
 import io.ktor.http.Url
 import kz.aita.AppUIConfiguration
 import kz.aita.core.getFullDrawableResourceUrl
-import kz.aita.render.kamelConfig
-import kz.aita.util.getTransformedTextWithSelectionFocusTextColor
-import kz.aita.model.ImeWithAction
-import kz.aita.model.TextFieldContent
+import kz.aita.compose.render.kamelConfig
+import kz.aita.compose.util.getTransformedTextWithSelectionFocusTextColor
+import kz.aita.compose.wrapper.ImeWithAction
 
 @Composable
 fun AppUIConfiguration.genericTextField(
@@ -100,6 +99,7 @@ fun AppUIConfiguration.genericTextField(
   imeWithAction: ImeWithAction = ImeWithAction(ime = ImeAction.Default),
 
   leadingIconPath: String? = null,
+  leadingIcon: @Composable (() -> Unit)? = null,
   leadingIconContentDescription: String = placeholderText,
   trailingIconExtraPath: String? = null,
   trailingIconExtraContentDescription: String = placeholderText,
@@ -109,8 +109,9 @@ fun AppUIConfiguration.genericTextField(
   },
   contentInvalidText: String = "",
   onContentValidityCheck: ((String) -> Boolean)? = null,
+  onFilterValue: ((String) -> Boolean)? = null,
   onValueChange: ((updateAction: () -> Unit) -> Unit)? = null
-): TextFieldContent {
+): GenericTextFieldContent {
 
   var value by rememberSaveable(stateSaver = TextFieldValue.Saver) {
     mutableStateOf(TextFieldValue(valueInitial))
@@ -157,15 +158,18 @@ fun AppUIConfiguration.genericTextField(
         value = value,
         onValueChange = {
           if (onValueChange != null) {
-            onValueChange.run {
-              value = it
+            onValueChange {
+              if (onFilterValue == null || onFilterValue(it.text))
+                value = it
             }
-          } else
-            value = it
+          } else {
+            if (onFilterValue == null || onFilterValue(it.text))
+              value = it
+          }
         },
         enabled = enabled,
         modifier = Modifier
-          .height(36.dp)
+          .height(stateValues.textFieldHeight)
           .clip(RoundedCornerShape(cornerRadius))
           .background(backgroundColor)
           .border(
@@ -204,13 +208,11 @@ fun AppUIConfiguration.genericTextField(
               verticalAlignment = Alignment.CenterVertically,
               horizontalArrangement = Arrangement.SpaceBetween
             ) {
-              val iconPadding = 9.dp
-
-              leadingIconPath?.run {
+              leadingIcon?.invoke() ?: leadingIconPath?.run {
                 CompositionLocalProvider(LocalKamelConfig provides kamelConfig) {
                   KamelImage(
                     modifier = Modifier
-                      .padding(iconPadding)
+                      .padding(stateValues.textFieldIconPadding)
                       .fillMaxHeight()
                       .aspectRatio(1f, matchHeightConstraintsFirst = true),
                     resource = {
@@ -258,7 +260,7 @@ fun AppUIConfiguration.genericTextField(
                     ) {
                       KamelImage(
                         modifier = Modifier
-                          .padding(iconPadding)
+                          .padding(stateValues.textFieldIconPadding)
                           .fillMaxHeight()
                           .aspectRatio(1f, matchHeightConstraintsFirst = true),
                         resource = {
@@ -286,7 +288,7 @@ fun AppUIConfiguration.genericTextField(
                     ) {
                       KamelImage(
                         modifier = Modifier
-                          .padding(iconPadding)
+                          .padding(stateValues.textFieldIconPadding)
                           .fillMaxHeight()
                           .aspectRatio(1f, matchHeightConstraintsFirst = true),
                         resource = {
@@ -329,7 +331,7 @@ fun AppUIConfiguration.genericTextField(
     }
   }
 
-  val content = TextFieldContent(
+  val content = GenericTextFieldContent(
     value = value,
     isFocused = isFocused,
     isContentValid = isContentValid,
@@ -351,4 +353,16 @@ fun AppUIConfiguration.genericTextField(
   }
 
   return content
+}
+
+class GenericTextFieldContent(
+  var value: TextFieldValue,
+  var isFocused: Boolean,
+  var isContentValid: Boolean,
+  val onContentValidityCheck: ((String) -> Boolean)? = null
+) {
+
+  fun checkContentValidity() {
+    isContentValid = onContentValidityCheck?.invoke(value.text) ?: true
+  }
 }

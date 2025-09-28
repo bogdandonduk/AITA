@@ -1,4 +1,4 @@
-package kz.aita.widget
+package kz.aita.compose.widget
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
@@ -36,9 +36,8 @@ import io.kamel.image.asyncPainterResource
 import io.kamel.image.config.LocalKamelConfig
 import io.ktor.http.Url
 import kz.aita.AppUIConfiguration
+import kz.aita.compose.render.kamelConfig
 import kz.aita.core.getFullDrawableResourceUrl
-import kz.aita.render.kamelConfig
-import kz.aita.model.ButtonContent
 
 @Composable
 fun AppUIConfiguration.actionButton(
@@ -60,7 +59,7 @@ fun AppUIConfiguration.actionButton(
 
   onLongClick: (() -> Unit)? = null,
   onClick: () -> Unit
-): ButtonContent {
+): ActionButtonContent {
   var enabled by rememberSaveable {
     mutableStateOf(true)
   }
@@ -155,5 +154,9 @@ fun AppUIConfiguration.actionButton(
     }
   }
 
-  return ButtonContent(enabled)
+  return ActionButtonContent(enabled)
 }
+
+data class ActionButtonContent(
+  var enabled: Boolean
+)

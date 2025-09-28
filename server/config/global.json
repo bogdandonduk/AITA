@@ -31,7 +31,7 @@
           "value": "Казакстан"
         }
       ],
-      "flagDrawablePath": "/png/flag_kz.png",
+      "flagDrawablePath": "png/flag_kz.png",
       "cities": [
         {
           "name": [
@@ -81,6 +81,74 @@
       "phoneNumberCode": "7",
       "phoneNumberSize": 10,
       "currency": "KZT"
+    },
+    {
+      "locale": "tj",
+      "language": "tj",
+      "name": [
+        {
+          "language": "en",
+          "value": "Tajikistan"
+        },
+        {
+          "language": "ru",
+          "value": "Таджикистан"
+        },
+        {
+          "language": "kk",
+          "value": "Тәжікстан"
+        }
+      ],
+      "flagDrawablePath": "png/flag_tj.png",
+      "cities": [
+        {
+          "name": [
+            {
+              "language": "en",
+              "value": "Dushanbe"
+            },
+            {
+              "language": "ru",
+              "value": "Душанбе"
+            },
+            {
+              "language": "kk",
+              "value": "Душанбе"
+            }
+          ],
+          "centerLatitude": 38.5606,
+          "centerLongitude": 68.7778,
+          "swLatitude": 38.4950,
+          "swLongitude": 68.6800,
+          "neLatitude": 38.6100,
+          "neLongitude": 68.8800
+        },
+        {
+          "name": [
+            {
+              "language": "en",
+              "value": "Khujand"
+            },
+            {
+              "language": "ru",
+              "value": "Худжанд"
+            },
+            {
+              "language": "kk",
+              "value": "Худжанд"
+            }
+          ],
+          "centerLatitude": 40.2894,
+          "centerLongitude": 69.6270,
+          "swLatitude": 40.2560,
+          "swLongitude": 69.5900,
+          "neLatitude": 40.3050,
+          "neLongitude": 69.7300
+        }
+      ],
+      "phoneNumberCode": "992",
+      "phoneNumberSize": 9,
+      "currency": "SM"
     }
   ]
 }

@@ -1,4 +1,4 @@
-package kz.aita.widget
+package kz.aita.compose.widget
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
@@ -29,8 +29,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import kz.aita.AppUIConfiguration
-import kz.aita.model.TabContent
-import kz.aita.model.TabRowContent
 
 @Composable
 fun AppUIConfiguration.tabRowWidget(
@@ -117,3 +115,12 @@ fun AppUIConfiguration.tabRowWidget(
 
   return TabRowContent(index)
 }
+
+data class TabRowContent(
+  var index: Int
+)
+
+class TabContent(
+  val text: String,
+  val onClick: ((Int) -> Unit)? = null
+)

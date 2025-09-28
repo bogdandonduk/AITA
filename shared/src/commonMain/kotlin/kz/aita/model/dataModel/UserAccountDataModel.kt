@@ -3,7 +3,7 @@ package kz.aita.model.dataModel
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class UserAuthAccountDataModel(
+data class UserAccountDataModel(
   val id: Long,
   val email: String,
   val countryCode: String,

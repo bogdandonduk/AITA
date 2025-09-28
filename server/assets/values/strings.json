@@ -89,15 +89,15 @@
     "values": [
       {
         "language": "en",
-        "value": "Enter email"
+        "value": "Enter email address"
       },
       {
         "language": "ru",
-        "value": "Введите email"
+        "value": "Введите адрес email"
       },
       {
         "language": "kk",
-        "value": "Электрондық поштаңызды енгізіңіз"
+        "value": "Электрондық пошта мекенжайыңызды енгізіңіз"
       }
     ]
   },
@@ -166,6 +166,227 @@
       {
         "language": "kk",
         "value": "Таза"
+      }
+    ]
+  },
+  {
+    "id": 10,
+    "values": [
+      {
+        "language": "en",
+        "value": "Login and/or password incorrect"
+      },
+      {
+        "language": "ru",
+        "value": "Неправильный логин и/или пароль"
+      },
+      {
+        "language": "kk",
+        "value": "Қате логин және/немесе құпия сөз"
+      }
+    ]
+  },
+  {
+    "id": 11,
+    "values": [
+      {
+        "language": "en",
+        "value": "Incorrect phone number length"
+      },
+      {
+        "language": "ru",
+        "value": "Неправильная длина номера телефона"
+      },
+      {
+        "language": "kk",
+        "value": "Телефон нөмірі дұрыс емес"
+      }
+    ]
+  },
+  {
+    "id": 12,
+    "values": [
+      {
+        "language": "en",
+        "value": "Incorrect email address format"
+      },
+      {
+        "language": "ru",
+        "value": "Неправильный формат email адреса"
+      },
+      {
+        "language": "kk",
+        "value": "Қате электрондық пошта мекенжайы пішімі"
+      }
+    ]
+  },
+  {
+    "id": 13,
+    "values": [
+      {
+        "language": "en",
+        "value": "Password must be 8 or more symbols long"
+      },
+      {
+        "language": "ru",
+        "value": "Пароль должен быть длиной 8 или более символов"
+      },
+      {
+        "language": "kk",
+        "value": "Құпия сөз 8 немесе одан көп таңбадан тұруы керек"
+      }
+    ]
+  },
+  {
+    "id": 14,
+    "values": [
+      {
+        "language": "en",
+        "value": "Repeat password"
+      },
+      {
+        "language": "ru",
+        "value": "Повторите пароль"
+      },
+      {
+        "language": "kk",
+        "value": "Құпия сөзді қайталаңыз"
+      }
+    ]
+  },
+  {
+    "id": 15,
+    "values": [
+      {
+        "language": "en",
+        "value": "Passwords must match"
+      },
+      {
+        "language": "ru",
+        "value": "Пароли должны совпадать"
+      },
+      {
+        "language": "kk",
+        "value": "Құпия сөздер бірдей болуы тиіс"
+      }
+    ]
+  },
+  {
+    "id": 16,
+    "values": [
+      {
+        "language": "en",
+        "value": "First name"
+      },
+      {
+        "language": "ru",
+        "value": "Имя"
+      },
+      {
+        "language": "kk",
+        "value": "Аты"
+      }
+    ]
+  },
+  {
+    "id": 17,
+    "values": [
+      {
+        "language": "en",
+        "value": "Last name"
+      },
+      {
+        "language": "ru",
+        "value": "Фамилия"
+      },
+      {
+        "language": "kk",
+        "value": "Фамилиясы"
+      }
+    ]
+  },
+  {
+    "id": 18,
+    "values": [
+      {
+        "language": "en",
+        "value": "Enter first name"
+      },
+      {
+        "language": "ru",
+        "value": "Введите имя"
+      },
+      {
+        "language": "kk",
+        "value": "Атын енгізіңіз"
+      }
+    ]
+  },
+  {
+    "id": 19,
+    "values": [
+      {
+        "language": "en",
+        "value": "Enter last name"
+      },
+      {
+        "language": "ru",
+        "value": "Введите фамилию"
+      },
+      {
+        "language": "kk",
+        "value": "Фамилиясын енгізіңіз"
+      }
+    ]
+  },
+  {
+    "id": 20,
+    "values": [
+      {
+        "language": "en",
+        "value": "User with this phone number is already registered"
+      },
+      {
+        "language": "ru",
+        "value": "Пользователь с этим номером телефона уже зарегистрирован"
+      },
+      {
+        "language": "kk",
+        "value": "Бұл телефон нөмірі бар пайдаланушы әлдеқашан тіркелген"
+      }
+    ]
+  },
+  {
+    "id": 21,
+    "values": [
+      {
+        "language": "en",
+        "value": "User with this email address is already registered"
+      },
+      {
+        "language": "ru",
+        "value": "Пользователь с этим email адресом уже зарегистрирован"
+      },
+      {
+        "language": "kk",
+        "value": "Бұл электрондық пошта мекенжайы бар пайдаланушы әлдеқашан тіркелген"
+      }
+    ]
+  },
+  {
+    "id": 22,
+    "values": [
+      {
+        "language": "en",
+        "value": "Sign Up"
+      },
+      {
+        "language": "ru",
+        "value": "Зарегистрироваться"
+      },
+      {
+        "language": "kk",
+        "value": "Тіркелу"
       }
     ]
   }

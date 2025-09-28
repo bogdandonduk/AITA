@@ -1,4 +1,4 @@
-package kz.aita.widget
+package kz.aita.compose.widget
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -8,17 +8,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import kz.aita.AppUIConfiguration
-import kz.aita.util.checkAsPassword
-import kz.aita.util.getPasswordTransformedTextWithSelectionFocusTextColor
-import kz.aita.util.getTransformedTextWithSelectionFocusTextColor
-import kz.aita.model.ImeWithAction
-import kz.aita.model.TextFieldContent
+import kz.aita.compose.util.checkAsPassword
+import kz.aita.compose.util.getPasswordTransformedTextWithSelectionFocusTextColor
+import kz.aita.compose.util.getTransformedTextWithSelectionFocusTextColor
+import kz.aita.compose.wrapper.ImeWithAction
 
 @Composable
 fun AppUIConfiguration.passwordTextField(
   modifier: Modifier = Modifier,
   imeWithAction: ImeWithAction? = null
-): TextFieldContent {
+): GenericTextFieldContent {
 
   var showPassword by rememberSaveable {
     mutableStateOf(false)
@@ -35,7 +34,7 @@ fun AppUIConfiguration.passwordTextField(
     trailingIconExtraOnClick = {
       showPassword = !showPassword
     },
-    contentInvalidText = "Fucking invalid",
+    contentInvalidText = stateValues.stringPasswordMustBe,
     onContentValidityCheck = {
       it.checkAsPassword()
     },

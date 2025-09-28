@@ -1,4 +1,4 @@
-package kz.aita.model
+package kz.aita.compose.wrapper
 
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.ui.text.input.ImeAction

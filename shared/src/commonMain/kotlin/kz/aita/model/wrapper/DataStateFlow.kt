@@ -36,6 +36,36 @@ class MutableDataStateFlow<T>(
   }
 }
 
+class MutableDataStateFlowNonNull<T>(
+  private val coroutineScope: CoroutineScope,
+  initial: T
+) : DataStateFlowNonNull<T> {
+
+  private val _state = MutableStateFlow<DataState<T>>(DataState.Success(initial))
+  override val value = _state.asStateFlow()
+  private val _payload = MutableStateFlow(initial)
+  override val payload = _payload.asStateFlow()
+
+  init {
+    coroutineScope.launch {
+      value.collect {
+        if (it is DataState.Success)
+          _payload.emit(it.payload)
+      }
+    }
+  }
+
+  fun emit(newValue: DataState<T>) {
+    coroutineScope.launch {
+      _state.emit(newValue)
+    }
+  }
+
+  fun asDataStateFlow(): DataStateFlowNonNull<T> {
+    return this as DataStateFlowNonNull<T>
+  }
+}
+
 interface DataStateFlow<T> {
 
   val value: StateFlow<DataState<T>>
@@ -45,3 +75,14 @@ interface DataStateFlow<T> {
   val payloadValueNonNull: T
     get() = payloadValue!!
 }
+
+interface DataStateFlowNonNull<T> {
+
+  val value: StateFlow<DataState<T>>
+  val payload: StateFlow<T>
+
+  val payloadValue: T
+    get() = payload.value
+}
+
+

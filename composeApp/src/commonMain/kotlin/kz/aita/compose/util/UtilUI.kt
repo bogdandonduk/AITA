@@ -1,4 +1,4 @@
-package kz.aita.util
+package kz.aita.compose.util
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
