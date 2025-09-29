@@ -1,9 +1,11 @@
 package kz.aita.model.repository.impl
 
 import io.ktor.http.HttpMethod
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
+import kz.aita.core.io
 import kz.aita.model.dataModel.CityDataModel
 import kz.aita.model.dataModel.CountryDataModel
 import kz.aita.model.wrapper.MutableDataStateFlow
@@ -100,7 +102,7 @@ class ConfigurationRepositoryImpl(
   }
 
   override fun getGlobalConfiguration(loadAll: Boolean) {
-    launch {
+    launch(Dispatchers.io) {
       try {
         val response = genericRemoteService
           .request<GlobalAppConfigurationDataModel, Unit>(
@@ -121,11 +123,12 @@ class ConfigurationRepositoryImpl(
         _globalAppConfigurationState.emit(DataState.Failure(exception))
         exception.printStackTrace()
       }
+
     }
   }
 
   override fun getStrings() {
-    launch {
+    launch(Dispatchers.io) {
       try {
         val response = genericRemoteService
           .request<List<LocalizedStringGroupDataModel>, Unit>(
@@ -143,7 +146,7 @@ class ConfigurationRepositoryImpl(
   }
 
   override fun getDimensions() {
-    launch {
+    launch(Dispatchers.io) {
       try {
         val response = genericRemoteService
           .request<List<StylizedDimensionGroupDataModel>, Unit>(
@@ -161,7 +164,7 @@ class ConfigurationRepositoryImpl(
   }
 
   override fun getColors() {
-    launch {
+    launch(Dispatchers.io) {
       try {
         val response = genericRemoteService
           .request<List<StylizedColorGroupDataModel>, Unit>(
@@ -179,7 +182,7 @@ class ConfigurationRepositoryImpl(
   }
 
   override fun getDrawables() {
-    launch {
+    launch(Dispatchers.io) {
       try {
         val response = genericRemoteService
           .request<List<StylizedDrawablePathsGroupDataModel>, Unit>(

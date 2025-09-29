@@ -1,10 +1,12 @@
 package kz.aita.model.wrapper
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kz.aita.core.io
 
 class MutableDataStateFlow<T>(
   private val coroutineScope: CoroutineScope,
@@ -17,7 +19,7 @@ class MutableDataStateFlow<T>(
   override val payload = _payload.asStateFlow()
 
   init {
-    coroutineScope.launch {
+    coroutineScope.launch(Dispatchers.io) {
       value.collect {
         if (it is DataState.Success)
           _payload.emit(it.payload)
@@ -26,7 +28,7 @@ class MutableDataStateFlow<T>(
   }
 
   fun emit(newValue: DataState<T>) {
-    coroutineScope.launch {
+    coroutineScope.launch(Dispatchers.io) {
       _state.emit(newValue)
     }
   }
@@ -47,7 +49,7 @@ class MutableDataStateFlowNonNull<T>(
   override val payload = _payload.asStateFlow()
 
   init {
-    coroutineScope.launch {
+    coroutineScope.launch(Dispatchers.io) {
       value.collect {
         if (it is DataState.Success)
           _payload.emit(it.payload)
@@ -56,7 +58,7 @@ class MutableDataStateFlowNonNull<T>(
   }
 
   fun emit(newValue: DataState<T>) {
-    coroutineScope.launch {
+    coroutineScope.launch(Dispatchers.io) {
       _state.emit(newValue)
     }
   }

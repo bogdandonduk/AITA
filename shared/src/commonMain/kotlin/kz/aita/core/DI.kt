@@ -4,7 +4,6 @@ import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
-import kz.aita.AppDatabase
 import kz.aita.model.repository.ConfigurationRepository
 import kz.aita.model.repository.UserRepository
 import kz.aita.model.repository.impl.ConfigurationRepositoryImpl
@@ -35,7 +34,7 @@ val genericRemoteService: GenericRemoteService by lazy {
 }
 
 val genericLocalService: GenericLocalService by lazy {
-  GenericLocalService(getAppDatabase())
+  GenericLocalService(getKeyValueDatabase())
 }
 
 val userRepository: UserRepository by lazy {

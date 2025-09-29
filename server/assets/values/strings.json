@@ -389,5 +389,107 @@
         "value": "Тіркелу"
       }
     ]
+  },
+  {
+    "id": 23,
+    "values": [
+      {
+        "language": "en",
+        "value": "Confirm"
+      },
+      {
+        "language": "ru",
+        "value": "Подтвердить"
+      },
+      {
+        "language": "kk",
+        "value": "Растау"
+      }
+    ]
+  },
+  {
+    "id": 24,
+    "values": [
+      {
+        "language": "en",
+        "value": "Sale"
+      },
+      {
+        "language": "ru",
+        "value": "Продажа"
+      },
+      {
+        "language": "kk",
+        "value": "Cату"
+      }
+    ]
+  },
+  {
+    "id": 25,
+    "values": [
+      {
+        "language": "en",
+        "value": "Return"
+      },
+      {
+        "language": "ru",
+        "value": "Возврат"
+      },
+      {
+        "language": "kk",
+        "value": "Қайту"
+      }
+    ]
+  },
+  {
+    "id": 26,
+    "values": [
+      {
+        "language": "en",
+        "value": "Supply"
+      },
+      {
+        "language": "ru",
+        "value": "Поставка"
+      },
+      {
+        "language": "kk",
+        "value": "Жеткізу"
+      }
+    ]
+  },
+  {
+    "id": 27,
+    "values": [
+      {
+        "language": "en",
+        "value": "Stock"
+      },
+      {
+        "language": "ru",
+        "value": "Склад"
+      },
+      {
+        "language": "kk",
+        "value": "Қор"
+      }
+    ]
+  },
+  {
+    "id": 28,
+    "values": [
+      {
+        "language": "en",
+        "value": "Menu"
+      },
+      {
+        "language": "ru",
+        "value": "Меню"
+      },
+      {
+        "language": "kk",
+        "value": "Мәзір"
+      }
+    ]
   }
 ]

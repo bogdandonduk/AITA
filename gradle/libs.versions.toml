@@ -21,9 +21,12 @@ kotlinxSerializationCore = "1.9.0"
 ktor = "3.3.0"
 logback = "1.5.18"
 constraintlayoutCompose = "1.1.1"
+sqlcipherAndroid = "4.10.0"
 sqldelight = "2.1.0"
+sqlite = "2.6.1"
 
 [libraries]
+androidx-sqlite = { module = "androidx.sqlite:sqlite", version.ref = "sqlite" }
 kamel-decoder-animated-image = { module = "media.kamel:kamel-decoder-animated-image", version.ref = "kamelImage" }
 kamel-decoder-image-bitmap = { module = "media.kamel:kamel-decoder-image-bitmap", version.ref = "kamelImage" }
 kamel-decoder-image-bitmap-resizing = { module = "media.kamel:kamel-decoder-image-bitmap-resizing", version.ref = "kamelImage" }
@@ -54,6 +57,7 @@ ktor-serverCore = { module = "io.ktor:ktor-server-core-jvm", version.ref = "ktor
 ktor-serverNetty = { module = "io.ktor:ktor-server-netty-jvm", version.ref = "ktor" }
 ktor-serverTestHost = { module = "io.ktor:ktor-server-test-host-jvm", version.ref = "ktor" }
 constraintlayout-compose = { group = "androidx.constraintlayout", name = "constraintlayout-compose", version.ref = "constraintlayoutCompose"}
+sqlcipher-android = { module = "net.zetetic:sqlcipher-android", version.ref = "sqlcipherAndroid" }
 sqlDelightWasmJsDriver = { module = "app.cash.sqldelight:web-worker-driver-wasm-js", version.ref = "sqldelight" }
 sqlDelightWasmJsCoroutinesExtensions = { module = "app.cash.sqldelight:coroutines-extensions-wasm-js", version.ref = "sqldelight" }
 sqlDelightJvmDriver = { module = "app.cash.sqldelight:sqlite-driver", version.ref = "sqldelight" }

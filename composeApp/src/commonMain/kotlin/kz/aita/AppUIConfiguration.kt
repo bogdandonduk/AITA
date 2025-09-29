@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kz.aita.compose.navigation.Navigation
 import kz.aita.compose.util.toColor
 import kz.aita.core.configurationRepository
 import kz.aita.core.extractColor
@@ -69,6 +70,13 @@ object AppUIConfiguration {
     val stringUserWithThisPhoneNumberIsAlreadyRegistered: String
     val stringUserWithThisEmailAddressIsAlreadyRegistered: String
     val stringSignUp: String
+    val stringConfirm: String
+
+    val stringSale: String
+    val stringReturn: String
+    val stringSupply: String
+    val stringStock: String
+    val stringMenu: String
 
     val screenWidth: Dp
     val screenHeight: Dp
@@ -98,6 +106,8 @@ object AppUIConfiguration {
     val DisabledColor: Color
     val ErrorColor: Color
 
+    val IconTintColor: Color
+
     val drawablePathAITALogo: String
     val drawablePathIconPassword: String
     val drawablePathIconCancel: String
@@ -109,6 +119,11 @@ object AppUIConfiguration {
     val drawablePathIconExpandMore: String
     val drawablePathIconExpandLess: String
     val drawablePathIconPerson: String
+    val drawablePathIconTransactionSale: String
+    val drawablePathIconTransactionReturn: String
+    val drawablePathIconTransactionSupply: String
+    val drawablePathIconStock: String
+    val drawablePathIconMenu: String
   }
 
   private val _appLocaleLanguageState = MutableStateFlow("ru")
@@ -138,6 +153,12 @@ object AppUIConfiguration {
   private val _stringUserWithThisPhoneNumberIsAlreadyRegisteredState = MutableStateFlow("User with this phone number is already registered")
   private val _stringUserWithThisEmailAddressIsAlreadyRegisteredState = MutableStateFlow("User with this email address is already registered")
   private val _stringSignUpState = MutableStateFlow("Sign Up")
+  private val _stringConfirmState = MutableStateFlow("Confirm")
+  private val _stringSaleState = MutableStateFlow("Sale")
+  private val _stringReturnState = MutableStateFlow("Return")
+  private val _stringSupplyState = MutableStateFlow("Supply")
+  private val _stringStockState = MutableStateFlow("Stock")
+  private val _stringMenuState = MutableStateFlow("Menu")
 
   private val _screenWidthState = MutableStateFlow(0f.dp)
   private val _screenHeightState = MutableStateFlow(0f.dp)
@@ -165,6 +186,7 @@ object AppUIConfiguration {
   private val _PlaceholderTextColorState = MutableStateFlow(Color(0xaa000000))
   private val _DisabledColorState = MutableStateFlow(Color(0xffa7a7a7))
   private val _ErrorColorState = MutableStateFlow(Color(0xffff0000))
+  private val _IconTintColorState = MutableStateFlow(Color(0xff000000))
 
   private val _drawablePathAITALogoState = MutableStateFlow("svg/00.svg")
   private val _drawablePathIconPasswordState = MutableStateFlow("svg/10.svg")
@@ -175,7 +197,12 @@ object AppUIConfiguration {
   private val _drawablePathIconPhoneState = MutableStateFlow("svg/60.svg")
   private val _drawablePathIconExpandMoreState = MutableStateFlow("svg/70.svg")
   private val _drawablePathIconExpandLessState = MutableStateFlow("svg/80.svg")
-  private val _drawablePathIconPersonState = MutableStateFlow("svg/80.svg")
+  private val _drawablePathIconPersonState = MutableStateFlow("svg/90.svg")
+  private val _drawablePathIconTransactionSaleState = MutableStateFlow("svg/100.svg")
+  private val _drawablePathIconTransactionReturnState = MutableStateFlow("svg/110.svg")
+  private val _drawablePathIconTransactionSupplyState = MutableStateFlow("svg/120.svg")
+  private val _drawablePathIconStockState = MutableStateFlow("svg/130.svg")
+  private val _drawablePathIconMenuState = MutableStateFlow("svg/140.svg")
 
   lateinit var stateValues: StateValues
 
@@ -193,8 +220,7 @@ object AppUIConfiguration {
 
   @Composable
   operator fun invoke(
-    narrowScreenContent: @Composable AppUIConfiguration.() -> Unit,
-    wideScreenContent: @Composable AppUIConfiguration.() -> Unit,
+    content: @Composable AppUIConfiguration.() -> Unit,
     vararg keys: Any
   ) {
 
@@ -233,6 +259,12 @@ object AppUIConfiguration {
       override val stringUserWithThisPhoneNumberIsAlreadyRegistered: String by _stringUserWithThisPhoneNumberIsAlreadyRegisteredState.collectAsState()
       override val stringUserWithThisEmailAddressIsAlreadyRegistered: String by _stringUserWithThisEmailAddressIsAlreadyRegisteredState.collectAsState()
       override val stringSignUp: String by _stringSignUpState.collectAsState()
+      override val stringConfirm: String by _stringConfirmState.collectAsState()
+      override val stringSale: String by _stringSaleState.collectAsState()
+      override val stringReturn: String by _stringReturnState.collectAsState()
+      override val stringSupply: String by _stringSupplyState.collectAsState()
+      override val stringStock: String by _stringStockState.collectAsState()
+      override val stringMenu: String by _stringMenuState.collectAsState()
 
       override val screenWidth: Dp by _screenWidthState.collectAsState()
       override val screenHeight: Dp by _screenHeightState.collectAsState()
@@ -258,6 +290,7 @@ object AppUIConfiguration {
       override val PlaceholderTextColor: Color by _PlaceholderTextColorState.collectAsState()
       override val DisabledColor: Color by _DisabledColorState.collectAsState()
       override val ErrorColor: Color by _ErrorColorState.collectAsState()
+      override val IconTintColor: Color by _IconTintColorState.collectAsState()
 
       override val drawablePathAITALogo: String by _drawablePathAITALogoState.collectAsState()
       override val drawablePathIconPassword: String by _drawablePathIconPasswordState.collectAsState()
@@ -269,6 +302,11 @@ object AppUIConfiguration {
       override val drawablePathIconExpandMore: String by _drawablePathIconExpandMoreState.collectAsState()
       override val drawablePathIconExpandLess: String by _drawablePathIconExpandLessState.collectAsState()
       override val drawablePathIconPerson: String by _drawablePathIconPersonState.collectAsState()
+      override val drawablePathIconTransactionSale: String by _drawablePathIconTransactionSaleState.collectAsState()
+      override val drawablePathIconTransactionReturn: String by _drawablePathIconTransactionReturnState.collectAsState()
+      override val drawablePathIconTransactionSupply: String by _drawablePathIconTransactionSupplyState.collectAsState()
+      override val drawablePathIconStock: String by _drawablePathIconStockState.collectAsState()
+      override val drawablePathIconMenu: String by _drawablePathIconMenuState.collectAsState()
     }
 
     coroutineScope = rememberCoroutineScope()
@@ -278,10 +316,7 @@ object AppUIConfiguration {
         modifier = Modifier
           .fillMaxSize()
       ) {
-        if (!stateValues.isNarrowScreen)
-          narrowScreenContent()
-        else
-          wideScreenContent()
+        content()
 
         coroutineScope.launch {
           _screenWidthState.emit(maxWidth)
@@ -335,6 +370,12 @@ object AppUIConfiguration {
                 _stringUserWithThisPhoneNumberIsAlreadyRegisteredState.emit(it.extractString(20, stateValues.appLocaleLanguage))
                 _stringUserWithThisEmailAddressIsAlreadyRegisteredState.emit(it.extractString(21, stateValues.appLocaleLanguage))
                 _stringSignUpState.emit(it.extractString(22, stateValues.appLocaleLanguage))
+                _stringConfirmState.emit(it.extractString(23, stateValues.appLocaleLanguage))
+                _stringSaleState.emit(it.extractString(24, stateValues.appLocaleLanguage))
+                _stringReturnState.emit(it.extractString(25, stateValues.appLocaleLanguage))
+                _stringSupplyState.emit(it.extractString(26, stateValues.appLocaleLanguage))
+                _stringStockState.emit(it.extractString(27, stateValues.appLocaleLanguage))
+                _stringMenuState.emit(it.extractString(28, stateValues.appLocaleLanguage))
               }
           }
 
@@ -377,6 +418,7 @@ object AppUIConfiguration {
                   _PlaceholderTextColorState.emit(it.extractColor(4, stateValues.appThemeId).toColor())
                   _DisabledColorState.emit(it.extractColor(5, stateValues.appThemeId).toColor())
                   _ErrorColorState.emit(it.extractColor(6, stateValues.appThemeId).toColor())
+                  _IconTintColorState.emit(it.extractColor(7, stateValues.appThemeId).toColor())
                 }
               }
           }
@@ -396,6 +438,11 @@ object AppUIConfiguration {
                   _drawablePathIconExpandMoreState.emit(it.extractPath(7, stateValues.appThemeId))
                   _drawablePathIconExpandLessState.emit(it.extractPath(8, stateValues.appThemeId))
                   _drawablePathIconPersonState.emit(it.extractPath(9, stateValues.appThemeId))
+                  _drawablePathIconTransactionSaleState.emit(it.extractPath(10, stateValues.appThemeId))
+                  _drawablePathIconTransactionReturnState.emit(it.extractPath(11, stateValues.appThemeId))
+                  _drawablePathIconTransactionSupplyState.emit(it.extractPath(12, stateValues.appThemeId))
+                  _drawablePathIconStockState.emit(it.extractPath(13, stateValues.appThemeId))
+                  _drawablePathIconMenuState.emit(it.extractPath(14, stateValues.appThemeId))
                 }
               }
           }

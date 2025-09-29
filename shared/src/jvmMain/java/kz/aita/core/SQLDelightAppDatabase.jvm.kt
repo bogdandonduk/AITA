@@ -5,26 +5,23 @@ import app.cash.sqldelight.db.QueryResult
 import app.cash.sqldelight.db.SqlCursor
 import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
-import kz.aita.AppDatabase
-import java.io.File
+import kz.aita.KeyValueDatabase
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
-
 
 actual fun getSqlDelightDriver(): SqlDriver {
   // Use ONE explicit, stable path
   val dir: Path = Paths.get(System.getProperty("user.home"), ".aita")
   Files.createDirectories(dir)
-  val dbPath = dir.resolve("app.db").toAbsolutePath()
+  val dbPath = dir.resolve("key_value.db").toAbsolutePath()
 
   val url = "jdbc:sqlite:$dbPath"
   val firstRun = !Files.exists(dbPath)
-  println("SQLDelight (JVM): opening $url (firstRun=$firstRun)")
 
   val driver: SqlDriver = JdbcSqliteDriver(url)
 
-  val schema = AppDatabase.Schema.synchronous()
+  val schema = KeyValueDatabase.Schema.synchronous()
   if (firstRun) {
     schema.create(driver)
   } else {
@@ -43,7 +40,7 @@ actual fun getSqlDelightDriver(): SqlDriver {
         }
       )
     val currentVersion = cursor.value
-    val targetVersion = AppDatabase.Schema.version.toInt()
+    val targetVersion = KeyValueDatabase.Schema.version.toInt()
     if (currentVersion < targetVersion) {
       schema.migrate(driver, currentVersion.toLong(), schema.version)
     }
@@ -52,8 +49,7 @@ actual fun getSqlDelightDriver(): SqlDriver {
   return driver
 }
 
-actual fun getAppDatabase(): AppDatabase {
-  // Reuse the SAME driver created above
+actual fun getKeyValueDatabase(): KeyValueDatabase {
   val driver = getSqlDelightDriver()
-  return AppDatabase(driver)
+  return KeyValueDatabase(driver)
 }

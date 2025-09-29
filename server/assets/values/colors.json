@@ -48,11 +48,11 @@
     "values": [
       {
         "themeId": 0,
-        "valueHex": "aa000000"
+        "valueHex": "66000000"
       },
       {
         "themeId": 1,
-        "valueHex": "aaffffff"
+        "valueHex": "66ffffff"
       }
     ]
   },
@@ -79,6 +79,19 @@
       {
         "themeId": 1,
         "valueHex": "ffff0000"
+      }
+    ]
+  },
+  {
+    "id": 7,
+    "values": [
+      {
+        "themeId": 0,
+        "valueHex": "aa000000"
+      },
+      {
+        "themeId": 1,
+        "valueHex": "aaffffff"
       }
     ]
   }

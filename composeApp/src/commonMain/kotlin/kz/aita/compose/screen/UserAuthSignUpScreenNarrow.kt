@@ -76,9 +76,7 @@ fun AppUIConfiguration.UserAuthSignUpScreenNarrow() {
 
         val (passwordTextFieldContent, repeatedPasswordTextFieldContent) = repeatedPasswordTextFieldGroup()
 
-        errorText(
-          stateValues.stringUserWithThisPhoneNumberIsAlreadyRegistered
-        ) {
+        errorText(stateValues.stringUserWithThisPhoneNumberIsAlreadyRegistered) {
           true
         }
 

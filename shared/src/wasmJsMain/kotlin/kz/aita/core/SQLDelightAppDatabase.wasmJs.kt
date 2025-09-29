@@ -2,7 +2,7 @@ package kz.aita.core
 
 import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.worker.WebWorkerDriver
-import kz.aita.AppDatabase
+import kz.aita.KeyValueDatabase
 import org.w3c.dom.Worker
 
 @OptIn(ExperimentalWasmJsInterop::class)
@@ -16,6 +16,6 @@ actual fun getSqlDelightDriver(): SqlDriver {
   )
 }
 
-actual fun getAppDatabase(): AppDatabase {
-  return AppDatabase(getSqlDelightDriver())
+actual fun getKeyValueDatabase(): KeyValueDatabase {
+  return KeyValueDatabase(getSqlDelightDriver())
 }
