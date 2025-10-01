@@ -33,6 +33,7 @@ sealed class NavigationScreenModel(
 
     data object Cart: Transaction("TransactionCartScreenNavigationScreenModelRoute")
 
+    data object Selection: Transaction("TransactionSelectionNavigationScreenModelRoute")
     data object QuickItems: Transaction("TransactionQuickItemsNavigationScreenModelRoute")
 
     data object Checkout: Transaction("TransactionCheckoutNavigationScreenModelRoute")
@@ -55,10 +56,7 @@ sealed class NavigationScreenModel(
 
     data object Warehouse: Stock("StockWarehouseNavigationScreenModelRoute")
 
-    data object AddGoodsItem: Stock("StockAddGoodsItemNavigationScreenModelRoute")
-    data object EditGoodsItem: Stock("StockEditGoodsItemNavigationScreenModelRoute")
-
-    data object Map: Stock("StockMapNavigationScreenModelRoute")
+    data object AddEditGoodsItem: Stock("StockAddGoodsItemNavigationScreenModelRoute")
   }
 
   sealed class Menu(route: String): NavigationScreenModel(route) {
@@ -72,34 +70,89 @@ sealed class NavigationScreenModel(
 
     data object List: Menu("MenuListNavigationScreenModelRoute")
 
-    data object UserAccount: Menu("MenuMapNavigationScreenModelRoute")
+    data object UserAccount: Menu("MenuMapNavigationScreenModelRoute") {
+      override val iconPath: String
+        get() = AppUIConfiguration.stateValues.drawablePathIconMenu
+      override val name: String
+        get() = AppUIConfiguration.stateValues.stringUserAccount
+    }
 
-    data object Subscription: Menu("MenuSubscriptionNavigationScreenModelRoute")
-    data object SubscriptionPlans: Menu("MenuSubscriptionPlansNavigationScreenModelRoute")
+    data object StoreSubscription: Menu("MenuStoreSubscriptionNavigationScreenModelRoute")
+    data object StoreSubscriptionPlans: Menu("MenuStoreSubscriptionPlansNavigationScreenModelRoute")
 
-    data object Employees: Menu("MenuEmployeesNavigationScreenModelRoute")
-    data object AddEmployee: Menu("MenuAddEmployeeNavigationScreenModelRoute")
+    data object Workers: Menu("MenuWorkersNavigationScreenModelRoute") {
+      override val iconPath: String
+        get() = AppUIConfiguration.stateValues.drawablePathIconMenu
+      override val name: String
+        get() = AppUIConfiguration.stateValues.stringWorkers
+    }
+    data object AddEditWorker: Menu("MenuAddEditWorkerNavigationScreenModelRoute")
 
-    data object Stores: Menu("MenuStoresNavigationScreenModelRoute")
-    data object AddStore: Menu("MenuAddStoreNavigationScreenModelRoute")
+    data object Stores: Menu("MenuStoresNavigationScreenModelRoute") {
+      override val iconPath: String
+        get() = AppUIConfiguration.stateValues.drawablePathIconMenu
+      override val name: String
+        get() = AppUIConfiguration.stateValues.stringStores
+    }
+    data object AddEditStore: Menu("MenuAddEditStoreNavigationScreenModelRoute")
 
-    data object Map: Menu("MenuMapNavigationScreenModelRoute")
-    data object Analytics: Menu("MenuAnalyticsNavigationScreenModelRoute")
+    data object Analytics: Menu("MenuAnalyticsNavigationScreenModelRoute") {
+      override val iconPath: String
+        get() = AppUIConfiguration.stateValues.drawablePathIconMenu
+      override val name: String
+        get() = AppUIConfiguration.stateValues.stringAnalytics
+    }
 
-    data object TransactionHistory: Menu("MenuTransactionHistoryNavigationScreenModelRoute")
+    data object TransactionHistory: Menu("MenuTransactionHistoryNavigationScreenModelRoute") {
+      override val iconPath: String
+        get() = AppUIConfiguration.stateValues.drawablePathIconMenu
+      override val name: String
+        get() = AppUIConfiguration.stateValues.stringTransactionHistory
+    }
     data object TransactionHistoryReceiptPreview: Menu("MenuTransactionHistoryReceiptPreviewNavigationScreenModelRoute")
 
-    data object Debtors: Menu("MenuDebtorsNavigationScreenModelRoute")
-    data object CheckoutDebtor: Menu("MenuCheckoutDebtorNavigationScreenModelRoute")
+    data object Debtors: Menu("MenuDebtorsNavigationScreenModelRoute") {
+      override val iconPath: String
+        get() = AppUIConfiguration.stateValues.drawablePathIconMenu
+      override val name: String
+        get() = AppUIConfiguration.stateValues.stringDebtors
+    }
+    data object CloseDebt: Menu("MenuCloseDebtNavigationScreenModelRoute")
 
-    data object Suppliers: Menu("MenuSuppliersNavigationScreenModelRoute")
+    data object Suppliers: Menu("MenuSuppliersNavigationScreenModelRoute") {
+      override val iconPath: String
+        get() = AppUIConfiguration.stateValues.drawablePathIconMenu
+      override val name: String
+        get() = AppUIConfiguration.stateValues.stringSuppliers
+    }
+    data object AddEditSupplier: Menu("MenuAddEditSupplierNavigationScreenModelRoute")
 
-    data object Categories: Menu("MenuCategoriesNavigationScreenModelRoute")
-    data object GoodsCategories: Menu("MenuGoodsCategoriesCategoriesNavigationScreenModelRoute")
+    data object GoodsCategories: Menu("MenuGoodsCategoriesNavigationScreenModelRoute") {
+      override val iconPath: String
+        get() = AppUIConfiguration.stateValues.drawablePathIconMenu
+      override val name: String
+        get() = AppUIConfiguration.stateValues.stringGoodsCategories
+    }
+    data object AddEditGoodsCategory: Menu("MenuAddEditGoodsCategoryNavigationScreenModelRoute")
 
-    data object Accessories: Menu("MenuAccessoriesNavigationScreenModelRoute")
-    data object AppLanguage: Menu("MenuAppLanguageNavigationScreenModelRoute")
-    data object AppTheme: Menu("MenuAppThemeNavigationScreenModelRoute")
+    data object Devices: Menu("MenuDevicesNavigationScreenModelRoute") {
+      override val iconPath: String
+        get() = AppUIConfiguration.stateValues.drawablePathIconMenu
+      override val name: String
+        get() = AppUIConfiguration.stateValues.stringDevices
+    }
+    data object AppLanguage: Menu("MenuAppLanguageNavigationScreenModelRoute") {
+      override val iconPath: String
+        get() = AppUIConfiguration.stateValues.drawablePathIconMenu
+      override val name: String
+        get() = AppUIConfiguration.stateValues.stringAppLanguage
+    }
+    data object AppTheme: Menu("MenuAppThemeNavigationScreenModelRoute") {
+      override val iconPath: String
+        get() = AppUIConfiguration.stateValues.drawablePathIconMenu
+      override val name: String
+        get() = AppUIConfiguration.stateValues.stringAppTheme
+    }
   }
 
   sealed class UserAuth(route: String): NavigationScreenModel(route) {

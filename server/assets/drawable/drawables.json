@@ -193,5 +193,31 @@
         "path": "svg/141.svg"
       }
     ]
+  },
+  {
+    "id": 15,
+    "values": [
+      {
+        "themeId": 0,
+        "path": "svg/150.svg"
+      },
+      {
+        "themeId": 1,
+        "path": "svg/151.svg"
+      }
+    ]
+  },
+  {
+    "id": 16,
+    "values": [
+      {
+        "themeId": 0,
+        "path": "svg/160.svg"
+      },
+      {
+        "themeId": 1,
+        "path": "svg/161.svg"
+      }
+    ]
   }
 ]

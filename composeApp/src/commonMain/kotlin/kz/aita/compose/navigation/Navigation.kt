@@ -3,7 +3,6 @@ package kz.aita.compose.navigation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kz.aita.AppUIConfiguration
 
 object Navigation {
 
@@ -18,6 +17,10 @@ object Navigation {
   private val _Main =
     MutableStateFlow<List<NavigationScreenModel>>(listOf(NavigationScreenModel.Splash))
   val Main = _Main.asStateFlow()
+
+  fun isVeryFirstScreen(): Boolean {
+    return _Main.value.size == 2
+  }
 
   suspend fun goMain(model: NavigationScreenModel, remove: Boolean = false) {
     if (model::class != _Main.value.last()::class) {
@@ -196,27 +199,27 @@ object Navigation {
       _LeftClient5.asStateFlow()
 
     private val _RightClient1 =
-      MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.QuickItems))
+      MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.Selection))
     val RightClient1 =
       _RightClient1.asStateFlow()
 
     private val _RightClient2 =
-      MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.QuickItems))
+      MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.Selection))
     val RightClient2 =
       _RightClient2.asStateFlow()
 
     private val _RightClient3 =
-      MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.QuickItems))
+      MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.Selection))
     val RightClient3 =
       _RightClient3.asStateFlow()
 
     private val _RightClient4 =
-      MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.QuickItems))
+      MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.Selection))
     val RightClient4 =
       _RightClient4.asStateFlow()
 
     private val _RightClient5 =
-      MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.QuickItems))
+      MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.Selection))
     val RightClient5 =
       _RightClient5.asStateFlow()
 
@@ -493,7 +496,7 @@ object Navigation {
       }
     }
 
-    suspend fun clearRightClient1(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.QuickItems) {
+    suspend fun clearRightClient1(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.Selection) {
       _RightClient1.emit(
         listOf(model)
       )
@@ -537,7 +540,7 @@ object Navigation {
       }
     }
 
-    suspend fun clearRightClient2(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.QuickItems) {
+    suspend fun clearRightClient2(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.Selection) {
       _RightClient1.emit(
         listOf(model)
       )
@@ -581,7 +584,7 @@ object Navigation {
       }
     }
 
-    suspend fun clearRightClient3(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.QuickItems) {
+    suspend fun clearRightClient3(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.Selection) {
       _RightClient3.emit(
         listOf(model)
       )
@@ -625,7 +628,7 @@ object Navigation {
       }
     }
 
-    suspend fun clearRightClient4(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.QuickItems) {
+    suspend fun clearRightClient4(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.Selection) {
       _RightClient4.emit(
         listOf(model)
       )
@@ -669,15 +672,15 @@ object Navigation {
       }
     }
 
-    suspend fun clearRightClient5(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.QuickItems) {
+    suspend fun clearRightClient5(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.Selection) {
       _RightClient5.emit(
         listOf(model)
       )
     }
 
-    suspend fun AppUIConfiguration.init() {
+    suspend fun init(isNarrowScreen: Boolean) {
       TransactionSale.run {
-        if (stateValues.isNarrowScreen) {
+        if (isNarrowScreen) {
           if (RightClient1.value.size > 1) {
             _LeftClient1.emit(
               mutableListOf<NavigationScreenModel.Transaction>().apply {
@@ -742,7 +745,7 @@ object Navigation {
           if (LeftClient1.value.size > 1) {
             _RightClient1.emit(
               mutableListOf<NavigationScreenModel.Transaction>().apply {
-                add(NavigationScreenModel.Transaction.QuickItems)
+                add(NavigationScreenModel.Transaction.Selection)
                 addAll(
                   LeftClient1.value.subList(1, LeftClient1.value.size)
                 )
@@ -754,7 +757,7 @@ object Navigation {
           if (LeftClient2.value.size > 1) {
             _RightClient2.emit(
               mutableListOf<NavigationScreenModel.Transaction>().apply {
-                add(NavigationScreenModel.Transaction.QuickItems)
+                add(NavigationScreenModel.Transaction.Selection)
                 addAll(
                   LeftClient2.value.subList(1, LeftClient2.value.size)
                 )
@@ -766,7 +769,7 @@ object Navigation {
           if (LeftClient3.value.size > 1) {
             _RightClient3.emit(
               mutableListOf<NavigationScreenModel.Transaction>().apply {
-                add(NavigationScreenModel.Transaction.QuickItems)
+                add(NavigationScreenModel.Transaction.Selection)
                 addAll(
                   LeftClient3.value.subList(1, LeftClient3.value.size)
                 )
@@ -778,7 +781,7 @@ object Navigation {
           if (LeftClient4.value.size > 1) {
             _RightClient4.emit(
               mutableListOf<NavigationScreenModel.Transaction>().apply {
-                add(NavigationScreenModel.Transaction.QuickItems)
+                add(NavigationScreenModel.Transaction.Selection)
                 addAll(
                   LeftClient4.value.subList(1, LeftClient4.value.size)
                 )
@@ -790,7 +793,7 @@ object Navigation {
           if (LeftClient5.value.size > 1) {
             _RightClient5.emit(
               mutableListOf<NavigationScreenModel.Transaction>().apply {
-                add(NavigationScreenModel.Transaction.QuickItems)
+                add(NavigationScreenModel.Transaction.Selection)
                 addAll(
                   LeftClient5.value.subList(1, LeftClient5.value.size)
                 )
@@ -840,27 +843,27 @@ object Navigation {
       _LeftClient5.asStateFlow()
 
     private val _RightClient1 =
-      MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.Cart))
+      MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.Selection))
     val RightClient1 =
       _RightClient1.asStateFlow()
 
     private val _RightClient2 =
-      MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.Cart))
+      MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.Selection))
     val RightClient2 =
       _RightClient2.asStateFlow()
 
     private val _RightClient3 =
-      MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.Cart))
+      MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.Selection))
     val RightClient3 =
       _RightClient3.asStateFlow()
 
     private val _RightClient4 =
-      MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.Cart))
+      MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.Selection))
     val RightClient4 =
       _RightClient4.asStateFlow()
 
     private val _RightClient5 =
-      MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.Cart))
+      MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.Selection))
     val RightClient5 =
       _RightClient5.asStateFlow()
 
@@ -1137,7 +1140,7 @@ object Navigation {
       }
     }
 
-    suspend fun clearRightClient1(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.QuickItems) {
+    suspend fun clearRightClient1(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.Selection) {
       _RightClient1.emit(
         listOf(model)
       )
@@ -1181,7 +1184,7 @@ object Navigation {
       }
     }
 
-    suspend fun clearRightClient2(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.QuickItems) {
+    suspend fun clearRightClient2(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.Selection) {
       _RightClient1.emit(
         listOf(model)
       )
@@ -1225,7 +1228,7 @@ object Navigation {
       }
     }
 
-    suspend fun clearRightClient3(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.QuickItems) {
+    suspend fun clearRightClient3(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.Selection) {
       _RightClient3.emit(
         listOf(model)
       )
@@ -1269,7 +1272,7 @@ object Navigation {
       }
     }
 
-    suspend fun clearRightClient4(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.QuickItems) {
+    suspend fun clearRightClient4(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.Selection) {
       _RightClient4.emit(
         listOf(model)
       )
@@ -1313,15 +1316,15 @@ object Navigation {
       }
     }
 
-    suspend fun clearRightClient5(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.QuickItems) {
+    suspend fun clearRightClient5(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.Selection) {
       _RightClient5.emit(
         listOf(model)
       )
     }
 
-    suspend fun AppUIConfiguration.init() {
+    suspend fun init(isNarrowScreen: Boolean) {
       TransactionSupply.run {
-        if (stateValues.isNarrowScreen) {
+        if (isNarrowScreen) {
           if (RightClient1.value.size > 1) {
             _LeftClient1.emit(
               mutableListOf<NavigationScreenModel.Transaction>().apply {
@@ -1386,7 +1389,7 @@ object Navigation {
           if (LeftClient1.value.size > 1) {
             _RightClient1.emit(
               mutableListOf<NavigationScreenModel.Transaction>().apply {
-                add(NavigationScreenModel.Transaction.QuickItems)
+                add(NavigationScreenModel.Transaction.Selection)
                 addAll(
                   LeftClient1.value.subList(1, LeftClient1.value.size)
                 )
@@ -1398,7 +1401,7 @@ object Navigation {
           if (LeftClient2.value.size > 1) {
             _RightClient2.emit(
               mutableListOf<NavigationScreenModel.Transaction>().apply {
-                add(NavigationScreenModel.Transaction.QuickItems)
+                add(NavigationScreenModel.Transaction.Selection)
                 addAll(
                   LeftClient2.value.subList(1, LeftClient2.value.size)
                 )
@@ -1410,7 +1413,7 @@ object Navigation {
           if (LeftClient3.value.size > 1) {
             _RightClient3.emit(
               mutableListOf<NavigationScreenModel.Transaction>().apply {
-                add(NavigationScreenModel.Transaction.QuickItems)
+                add(NavigationScreenModel.Transaction.Selection)
                 addAll(
                   LeftClient3.value.subList(1, LeftClient3.value.size)
                 )
@@ -1422,7 +1425,7 @@ object Navigation {
           if (LeftClient4.value.size > 1) {
             _RightClient4.emit(
               mutableListOf<NavigationScreenModel.Transaction>().apply {
-                add(NavigationScreenModel.Transaction.QuickItems)
+                add(NavigationScreenModel.Transaction.Selection)
                 addAll(
                   LeftClient4.value.subList(1, LeftClient4.value.size)
                 )
@@ -1434,7 +1437,7 @@ object Navigation {
           if (LeftClient5.value.size > 1) {
             _RightClient5.emit(
               mutableListOf<NavigationScreenModel.Transaction>().apply {
-                add(NavigationScreenModel.Transaction.QuickItems)
+                add(NavigationScreenModel.Transaction.Selection)
                 addAll(
                   LeftClient5.value.subList(1, LeftClient5.value.size)
                 )
@@ -1483,27 +1486,27 @@ object Navigation {
       _LeftClient5.asStateFlow()
 
     private val _RightClient1 =
-      MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.QuickItems))
+      MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.Selection))
     val RightClient1 =
       _RightClient1.asStateFlow()
 
     private val _RightClient2 =
-      MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.QuickItems))
+      MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.Selection))
     val RightClient2 =
       _RightClient2.asStateFlow()
 
     private val _RightClient3 =
-      MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.QuickItems))
+      MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.Selection))
     val RightClient3 =
       _RightClient3.asStateFlow()
 
     private val _RightClient4 =
-      MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.QuickItems))
+      MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.Selection))
     val RightClient4 =
       _RightClient4.asStateFlow()
 
     private val _RightClient5 =
-      MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.QuickItems))
+      MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.Selection))
     val RightClient5 =
       _RightClient5.asStateFlow()
 
@@ -1780,7 +1783,7 @@ object Navigation {
       }
     }
 
-    suspend fun clearRightClient1(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.QuickItems) {
+    suspend fun clearRightClient1(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.Selection) {
       _RightClient1.emit(
         listOf(model)
       )
@@ -1824,7 +1827,7 @@ object Navigation {
       }
     }
 
-    suspend fun clearRightClient2(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.QuickItems) {
+    suspend fun clearRightClient2(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.Selection) {
       _RightClient1.emit(
         listOf(model)
       )
@@ -1868,7 +1871,7 @@ object Navigation {
       }
     }
 
-    suspend fun clearRightClient3(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.QuickItems) {
+    suspend fun clearRightClient3(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.Selection) {
       _RightClient3.emit(
         listOf(model)
       )
@@ -1912,7 +1915,7 @@ object Navigation {
       }
     }
 
-    suspend fun clearRightClient4(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.QuickItems) {
+    suspend fun clearRightClient4(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.Selection) {
       _RightClient4.emit(
         listOf(model)
       )
@@ -1956,15 +1959,15 @@ object Navigation {
       }
     }
 
-    suspend fun clearRightClient5(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.QuickItems) {
+    suspend fun clearRightClient5(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.Selection) {
       _RightClient5.emit(
         listOf(model)
       )
     }
 
-    suspend fun AppUIConfiguration.init() {
+    suspend fun init(isNarrowScreen: Boolean) {
       TransactionSupply.run {
-        if (stateValues.isNarrowScreen) {
+        if (isNarrowScreen) {
           if (RightClient1.value.size > 1) {
             _LeftClient1.emit(
               mutableListOf<NavigationScreenModel.Transaction>().apply {
@@ -2029,7 +2032,7 @@ object Navigation {
           if (LeftClient1.value.size > 1) {
             _RightClient1.emit(
               mutableListOf<NavigationScreenModel.Transaction>().apply {
-                add(NavigationScreenModel.Transaction.QuickItems)
+                add(NavigationScreenModel.Transaction.Selection)
                 addAll(
                   LeftClient1.value.subList(1, LeftClient1.value.size)
                 )
@@ -2041,7 +2044,7 @@ object Navigation {
           if (LeftClient2.value.size > 1) {
             _RightClient2.emit(
               mutableListOf<NavigationScreenModel.Transaction>().apply {
-                add(NavigationScreenModel.Transaction.QuickItems)
+                add(NavigationScreenModel.Transaction.Selection)
                 addAll(
                   LeftClient2.value.subList(1, LeftClient2.value.size)
                 )
@@ -2053,7 +2056,7 @@ object Navigation {
           if (LeftClient3.value.size > 1) {
             _RightClient3.emit(
               mutableListOf<NavigationScreenModel.Transaction>().apply {
-                add(NavigationScreenModel.Transaction.QuickItems)
+                add(NavigationScreenModel.Transaction.Selection)
                 addAll(
                   LeftClient3.value.subList(1, LeftClient3.value.size)
                 )
@@ -2065,7 +2068,7 @@ object Navigation {
           if (LeftClient4.value.size > 1) {
             _RightClient4.emit(
               mutableListOf<NavigationScreenModel.Transaction>().apply {
-                add(NavigationScreenModel.Transaction.QuickItems)
+                add(NavigationScreenModel.Transaction.Selection)
                 addAll(
                   LeftClient4.value.subList(1, LeftClient4.value.size)
                 )
@@ -2077,7 +2080,7 @@ object Navigation {
           if (LeftClient5.value.size > 1) {
             _RightClient5.emit(
               mutableListOf<NavigationScreenModel.Transaction>().apply {
-                add(NavigationScreenModel.Transaction.QuickItems)
+                add(NavigationScreenModel.Transaction.Selection)
                 addAll(
                   LeftClient5.value.subList(1, LeftClient5.value.size)
                 )
@@ -2098,7 +2101,7 @@ object Navigation {
       _Left.asStateFlow()
 
     private val _Right =
-      MutableStateFlow<List<NavigationScreenModel.Stock>>(listOf(NavigationScreenModel.Stock.AddGoodsItem))
+      MutableStateFlow<List<NavigationScreenModel.Stock>>(listOf(NavigationScreenModel.Stock.AddEditGoodsItem))
     val Right =
       _Right.asStateFlow()
 
@@ -2187,15 +2190,15 @@ object Navigation {
       }
     }
 
-    suspend fun clearRight(model: NavigationScreenModel.Stock = NavigationScreenModel.Stock.AddGoodsItem) {
+    suspend fun clearRight(model: NavigationScreenModel.Stock = NavigationScreenModel.Stock.AddEditGoodsItem) {
       _Right.emit(
         listOf(model)
       )
     }
 
-    suspend fun AppUIConfiguration.init() {
+    suspend fun init(isNarrowScreen: Boolean) {
       Stock.run {
-        if (stateValues.isNarrowScreen) {
+        if (isNarrowScreen) {
           if (Right.value.size > 1) {
             _Left.emit(
               mutableListOf<NavigationScreenModel.Stock>().apply {
@@ -2209,7 +2212,7 @@ object Navigation {
           if (_Left.value.size > 1) {
             _Right.emit(
               mutableListOf<NavigationScreenModel.Stock>().apply {
-                add(NavigationScreenModel.Stock.AddGoodsItem)
+                add(NavigationScreenModel.Stock.AddEditGoodsItem)
                 addAll(_Left.value.subList(1, _Left.value.size))
               }
             )
@@ -2222,6 +2225,20 @@ object Navigation {
 
   object Menu {
 
+    val listScreens = listOf(
+      NavigationScreenModel.Menu.UserAccount,
+      NavigationScreenModel.Menu.GoodsCategories,
+      NavigationScreenModel.Menu.Stores,
+      NavigationScreenModel.Menu.TransactionHistory,
+      NavigationScreenModel.Menu.Analytics,
+      NavigationScreenModel.Menu.Workers,
+      NavigationScreenModel.Menu.Suppliers,
+      NavigationScreenModel.Menu.Debtors,
+      NavigationScreenModel.Menu.Devices,
+      NavigationScreenModel.Menu.AppLanguage,
+      NavigationScreenModel.Menu.AppTheme
+    )
+
     private val _Left =
       MutableStateFlow<List<NavigationScreenModel.Menu>>(listOf(NavigationScreenModel.Menu.List))
     val Left =
@@ -2231,6 +2248,13 @@ object Navigation {
       MutableStateFlow<List<NavigationScreenModel.Menu>>(listOf(NavigationScreenModel.Menu.UserAccount))
     val Right =
       _Right.asStateFlow()
+
+    suspend fun go(model: NavigationScreenModel.Menu, isNarrowScreen: Boolean) {
+      if (isNarrowScreen)
+        goLeft(model)
+      else
+        goRight(model)
+    }
 
     suspend fun goLeft(
       model: NavigationScreenModel.Menu,
@@ -2323,9 +2347,9 @@ object Navigation {
       )
     }
 
-    suspend fun AppUIConfiguration.init() {
+    suspend fun init(isNarrowScreen: Boolean) {
       Menu.run {
-        if (stateValues.isNarrowScreen) {
+        if (isNarrowScreen) {
           if (Right.value.size > 1) {
             _Left.emit(
               mutableListOf<NavigationScreenModel.Menu>().apply {
@@ -2340,6 +2364,136 @@ object Navigation {
             _Right.emit(
               mutableListOf<NavigationScreenModel.Menu>().apply {
                 add(NavigationScreenModel.Menu.UserAccount)
+                addAll(_Left.value.subList(1, _Left.value.size))
+              }
+            )
+          }
+          clearLeft()
+        }
+      }
+    }
+  }
+
+  object UserAuth {
+
+    private val _Left =
+      MutableStateFlow<List<NavigationScreenModel.UserAuth>>(listOf(NavigationScreenModel.UserAuth.LogIn))
+    val Left =
+      _Left.asStateFlow()
+
+    private val _Right =
+      MutableStateFlow<List<NavigationScreenModel.UserAuth>>(listOf(NavigationScreenModel.UserAuth.SignUp))
+    val Right =
+      _Right.asStateFlow()
+
+    suspend fun goLeft(
+      model: NavigationScreenModel.UserAuth,
+      remove: Boolean = false
+    ) {
+      if (model::class != _Left.value.last()::class)
+        _Left.emit(
+          _Left
+            .value.toMutableList()
+            .apply {
+              if (remove)
+                removeAt(lastIndex)
+
+              add(model)
+            }
+        )
+    }
+
+    suspend fun popLeft(navigateAfterwards: NavigationScreenModel.UserAuth? = null) {
+      if (_Right.value.last()::class == _Left.value.last()::class)
+        popRight()
+
+      val oldSize = _Left.value.size
+
+      _Left.emit(
+        _Left.value.toMutableList()
+          .apply {
+            if (_Left.value.size > 1)
+              removeAt(lastIndex)
+          }
+      )
+
+      navigateAfterwards?.run {
+        while (_Left.value.size == oldSize)
+          delay(30)
+
+        delay(300)
+
+        goLeft(this@run)
+      }
+    }
+
+    suspend fun clearLeft(model: NavigationScreenModel.UserAuth = NavigationScreenModel.UserAuth.LogIn) {
+      _Left.emit(
+        listOf(model)
+      )
+    }
+
+    suspend fun goRight(
+      model: NavigationScreenModel.UserAuth,
+      remove: Boolean = false
+    ) {
+      if (model::class != _Right.value.last()::class)
+        _Right.emit(
+          _Right
+            .value.toMutableList()
+            .apply {
+              if (remove)
+                removeAt(lastIndex)
+
+              add(model)
+            }
+        )
+    }
+
+    suspend fun popRight(navigateAfterwards: NavigationScreenModel.UserAuth? = null) {
+      val oldSize = _Right.value.size
+
+      _Right.emit(
+        _Right.value.toMutableList()
+          .apply {
+            if (_Right.value.size > 1)
+              removeAt(lastIndex)
+          }
+      )
+
+      navigateAfterwards?.run {
+        while (_Right.value.size == oldSize)
+          delay(30)
+
+        delay(300)
+
+        goLeft(this@run)
+      }
+    }
+
+    suspend fun clearRight(model: NavigationScreenModel.UserAuth = NavigationScreenModel.UserAuth.SignUp) {
+      _Right.emit(
+        listOf(model)
+      )
+    }
+
+    suspend fun init(isNarrowScreen: Boolean) {
+      UserAuth.run {
+        if (isNarrowScreen) {
+          if (Right.value.size > 1) {
+            _Left.emit(
+              mutableListOf<NavigationScreenModel.UserAuth>().apply {
+                add(NavigationScreenModel.UserAuth.LogIn)
+                addAll(Right.value.subList(1, Right.value.size))
+              }
+            )
+          }
+          clearRight()
+        } else {
+          if (Left.value.size > 1) {
+            _Right.emit(
+              mutableListOf<NavigationScreenModel.UserAuth>().apply {
+                add(NavigationScreenModel.UserAuth.SignUp)
                 addAll(_Left.value.subList(1, _Left.value.size))
               }
             )

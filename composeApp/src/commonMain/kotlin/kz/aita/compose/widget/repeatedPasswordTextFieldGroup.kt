@@ -39,7 +39,6 @@ fun AppUIConfiguration.repeatedPasswordTextFieldGroup(
     },
     contentInvalidText = stateValues.stringPasswordMustBe,
     onContentValidityCheck = {
-      println("check 1")
       it.checkAsPassword()
     },
     visualTransformation =
@@ -73,8 +72,6 @@ fun AppUIConfiguration.repeatedPasswordTextFieldGroup(
     imeWithAction = imeWithAction ?: ImeWithAction.Default,
     contentInvalidText = stateValues.stringPasswordsMustMatch,
     onContentValidityCheck = {
-      println("check 2 '$it' == '${passwordTextFieldContent.value.text}'")
-
       it == passwordTextFieldContent.value.text
     },
     visualTransformation =

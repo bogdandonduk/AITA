@@ -1,18 +1,23 @@
-package kz.aita.compose.screen
+package kz.aita.compose.screen.userAuth
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import kz.aita.AppUIConfiguration
+import kz.aita.compose.navigation.Navigation
+import kz.aita.compose.navigation.NavigationScreenModel
 import kz.aita.compose.widget.GenericTextFieldContent
 import kz.aita.compose.widget.LargeIconWithTitleWidget
 import kz.aita.compose.widget.PhoneNumberWithCountrySelectionTextFieldContent
@@ -25,16 +30,17 @@ import kz.aita.compose.widget.errorText
 import kz.aita.compose.widget.phoneNumberWithCountrySelectionTextField
 
 @Composable
-fun AppUIConfiguration.UserAuthLogInScreenNarrow() {
+fun AppUIConfiguration.UserAuthLogInScreen() {
   LazyColumn(
     modifier = Modifier.fillMaxSize(),
     horizontalAlignment = Alignment.CenterHorizontally
   ) {
     item {
-      Spacer(
-        modifier = Modifier
-          .height(stateValues.screenHeight / 6)
-      )
+      if (stateValues.isNarrowScreen)
+        Spacer(
+          modifier = Modifier
+            .height(stateValues.screenHeight / 6)
+        )
 
       Column(
         modifier = Modifier
@@ -42,10 +48,21 @@ fun AppUIConfiguration.UserAuthLogInScreenNarrow() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
       ) {
-        LargeIconWithTitleWidget(
-          imageUrl = stateValues.drawablePathAITALogo,
-          title = stateValues.stringLogIn
-        )
+        if (stateValues.isNarrowScreen)
+          LargeIconWithTitleWidget(
+            imageUrl = stateValues.drawablePathAITALogo,
+            title = stateValues.stringLogIn
+          )
+
+        if (!stateValues.isNarrowScreen)
+          Text(
+            text = stateValues.stringLogIn,
+            style = TextStyle(
+              color = stateValues.TextColor,
+              fontSize = stateValues.titleTextSize,
+              fontWeight = FontWeight.Bold
+            )
+          )
 
         val outerSpace = 16.dp
         val innerSpace = 8.dp
@@ -94,6 +111,20 @@ fun AppUIConfiguration.UserAuthLogInScreenNarrow() {
 
           passwordTextFieldContent.checkContentValidity()
         }
+
+        if (stateValues.isNarrowScreen) {
+          Spacer(modifier = Modifier.height(2.dp))
+
+          actionButton(
+            text = stateValues.stringSignUp,
+            enabledColor = stateValues.DisabledColor
+          ) {
+            coroutineScope.launch {
+              Navigation.UserAuth.goLeft(NavigationScreenModel.UserAuth.SignUp)
+            }
+          }
+        }
+
       }
 
       Spacer(

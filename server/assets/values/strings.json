@@ -491,5 +491,464 @@
         "value": "Мәзір"
       }
     ]
+  },
+  {
+    "id": 29,
+    "values": [
+      {
+        "language": "en",
+        "value": "Back"
+      },
+      {
+        "language": "ru",
+        "value": "Назад"
+      },
+      {
+        "language": "kk",
+        "value": "Артқа"
+      }
+    ]
+  },
+  {
+    "id": 30,
+    "values": [
+      {
+        "language": "en",
+        "value": "Add goods item"
+      },
+      {
+        "language": "ru",
+        "value": "Добавить товар"
+      },
+      {
+        "language": "kk",
+        "value": "Өнімді қосыңыз"
+      }
+    ]
+  },
+  {
+    "id": 31,
+    "values": [
+      {
+        "language": "en",
+        "value": "Edit goods item"
+      },
+      {
+        "language": "ru",
+        "value": "Редактировать товар"
+      },
+      {
+        "language": "kk",
+        "value": "Өнімді өңдеу"
+      }
+    ]
+  },
+  {
+    "id": 32,
+    "values": [
+      {
+        "language": "en",
+        "value": "User account"
+      },
+      {
+        "language": "ru",
+        "value": "Аккаунт пользователя"
+      },
+      {
+        "language": "kk",
+        "value": "Пайдаланушы тіркелгісі"
+      }
+    ]
+  },
+  {
+    "id": 33,
+    "values": [
+      {
+        "language": "en",
+        "value": "Goods categories"
+      },
+      {
+        "language": "ru",
+        "value": "Категории товаров"
+      },
+      {
+        "language": "kk",
+        "value": "Өнім санаттары"
+      }
+    ]
+  },
+  {
+    "id": 34,
+    "values": [
+      {
+        "language": "en",
+        "value": "Add goods category"
+      },
+      {
+        "language": "ru",
+        "value": "Добавить категорию товаров"
+      },
+      {
+        "language": "kk",
+        "value": "Өнім санатын қосыңыз"
+      }
+    ]
+  },
+  {
+    "id": 35,
+    "values": [
+      {
+        "language": "en",
+        "value": "Edit goods category"
+      },
+      {
+        "language": "ru",
+        "value": "Редактировать категорию товаров"
+      },
+      {
+        "language": "kk",
+        "value": "Өнім санатын өңдеу"
+      }
+    ]
+  },
+  {
+    "id": 36,
+    "values": [
+      {
+        "language": "en",
+        "value": "Stores"
+      },
+      {
+        "language": "ru",
+        "value": "Магазины"
+      },
+      {
+        "language": "kk",
+        "value": "Дүкендер"
+      }
+    ]
+  },
+  {
+    "id": 37,
+    "values": [
+      {
+        "language": "en",
+        "value": "Add store"
+      },
+      {
+        "language": "ru",
+        "value": "Добавить магазин"
+      },
+      {
+        "language": "kk",
+        "value": ""
+      }
+    ]
+  },
+  {
+    "id": 38,
+    "values": [
+      {
+        "language": "en",
+        "value": "Edit store"
+      },
+      {
+        "language": "ru",
+        "value": "Редактировать магазин"
+      },
+      {
+        "language": "kk",
+        "value": "Өнім санатын өңдеу"
+      }
+    ]
+  },
+  {
+    "id": 39,
+    "values": [
+      {
+        "language": "en",
+        "value": "Subscription"
+      },
+      {
+        "language": "ru",
+        "value": "Подписка"
+      },
+      {
+        "language": "kk",
+        "value": "Жазылым"
+      }
+    ]
+  },
+  {
+    "id": 40,
+    "values": [
+      {
+        "language": "en",
+        "value": "Subscription plans"
+      },
+      {
+        "language": "ru",
+        "value": "Планы подписки"
+      },
+      {
+        "language": "kk",
+        "value": "Жазылым жоспарлары"
+      }
+    ]
+  },
+  {
+    "id": 41,
+    "values": [
+      {
+        "language": "en",
+        "value": "Transaction history"
+      },
+      {
+        "language": "ru",
+        "value": "История транзакций"
+      },
+      {
+        "language": "kk",
+        "value": "Транзакция тарихы"
+      }
+    ]
+  },
+  {
+    "id": 42,
+    "values": [
+      {
+        "language": "en",
+        "value": "Receipt"
+      },
+      {
+        "language": "ru",
+        "value": "Чек"
+      },
+      {
+        "language": "kk",
+        "value": "Тексеру"
+      }
+    ]
+  },
+  {
+    "id": 43,
+    "values": [
+      {
+        "language": "en",
+        "value": "Analytics"
+      },
+      {
+        "language": "ru",
+        "value": "Аналитика"
+      },
+      {
+        "language": "kk",
+        "value": "Аналитика"
+      }
+    ]
+  },
+  {
+    "id": 44,
+    "values": [
+      {
+        "language": "en",
+        "value": "Workers"
+      },
+      {
+        "language": "ru",
+        "value": "Сотрудники"
+      },
+      {
+        "language": "kk",
+        "value": "Қызметкерлер"
+      }
+    ]
+  },
+  {
+    "id": 45,
+    "values": [
+      {
+        "language": "en",
+        "value": "Add worker"
+      },
+      {
+        "language": "ru",
+        "value": "Добавить сотрудника"
+      },
+      {
+        "language": "kk",
+        "value": "Қызметкерді қосыңыз"
+      }
+    ]
+  },
+  {
+    "id": 46,
+    "values": [
+      {
+        "language": "en",
+        "value": "Edit worker"
+      },
+      {
+        "language": "ru",
+        "value": "Редактировать сотрудника"
+      },
+      {
+        "language": "kk",
+        "value": "Қызметкерді өңдеу"
+      }
+    ]
+  },
+  {
+    "id": 47,
+    "values": [
+      {
+        "language": "en",
+        "value": "Suppliers"
+      },
+      {
+        "language": "ru",
+        "value": "Поставщики"
+      },
+      {
+        "language": "kk",
+        "value": "Жабдықтаушылар"
+      }
+    ]
+  },
+  {
+    "id": 48,
+    "values": [
+      {
+        "language": "en",
+        "value": "Add supplier"
+      },
+      {
+        "language": "ru",
+        "value": "Добавить поставщика"
+      },
+      {
+        "language": "kk",
+        "value": "Жеткізуші қосыңыз"
+      }
+    ]
+  },
+  {
+    "id": 49,
+    "values": [
+      {
+        "language": "en",
+        "value": "Edit supplier"
+      },
+      {
+        "language": "ru",
+        "value": "Редактировать поставщика"
+      },
+      {
+        "language": "kk",
+        "value": "Жеткізушіні өңдеу"
+      }
+    ]
+  },
+  {
+    "id": 50,
+    "values": [
+      {
+        "language": "en",
+        "value": "Debtors"
+      },
+      {
+        "language": "ru",
+        "value": "Должники"
+      },
+      {
+        "language": "kk",
+        "value": "Борышкерлер"
+      }
+    ]
+  },
+  {
+    "id": 51,
+    "values": [
+      {
+        "language": "en",
+        "value": "Close debt"
+      },
+      {
+        "language": "ru",
+        "value": "Погасить долг"
+      },
+      {
+        "language": "kk",
+        "value": "Қарызды өтеу"
+      }
+    ]
+  },
+  {
+    "id": 52,
+    "values": [
+      {
+        "language": "en",
+        "value": "Devices"
+      },
+      {
+        "language": "ru",
+        "value": "Устройства"
+      },
+      {
+        "language": "kk",
+        "value": "Құрылғылар"
+      }
+    ]
+  },
+  {
+    "id": 53,
+    "values": [
+      {
+        "language": "en",
+        "value": "App language"
+      },
+      {
+        "language": "ru",
+        "value": "Язык приложения"
+      },
+      {
+        "language": "kk",
+        "value": "Қолданба тілі"
+      }
+    ]
+  },
+  {
+    "id": 54,
+    "values": [
+      {
+        "language": "en",
+        "value": "App theme"
+      },
+      {
+        "language": "ru",
+        "value": "Тема приложения"
+      },
+      {
+        "language": "kk",
+        "value": "Қолданба тақырыбы"
+      }
+    ]
+  },
+  {
+    "id": 55,
+    "values": [
+      {
+        "language": "en",
+        "value": "Select"
+      },
+      {
+        "language": "ru",
+        "value": "Выбрать"
+      },
+      {
+        "language": "kk",
+        "value": "Таңдаңыз"
+      }
+    ]
   }
 ]

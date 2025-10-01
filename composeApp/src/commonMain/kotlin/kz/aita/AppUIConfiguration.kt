@@ -17,6 +17,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kz.aita.compose.navigation.Navigation
+import kz.aita.compose.navigation.NavigationScreenModel
 import kz.aita.compose.util.toColor
 import kz.aita.core.configurationRepository
 import kz.aita.core.extractColor
@@ -36,6 +37,48 @@ object AppUIConfiguration {
   const val KEY_APP_LOCALE = "key_appLocale"
 
   interface StateValues {
+
+    val navigationScreensMain: List<NavigationScreenModel>
+    val navigationTransactionSaleClientId: Int
+    val navigationTransactionReturnClientId: Int
+    val navigationTransactionSupplyClientId: Int
+    val navigationScreensTransactionSaleLeftClient1: List<NavigationScreenModel>
+    val navigationScreensTransactionSaleLeftClient2: List<NavigationScreenModel>
+    val navigationScreensTransactionSaleLeftClient3: List<NavigationScreenModel>
+    val navigationScreensTransactionSaleLeftClient4: List<NavigationScreenModel>
+    val navigationScreensTransactionSaleLeftClient5: List<NavigationScreenModel>
+    val navigationScreensTransactionSaleRightClient1: List<NavigationScreenModel>
+    val navigationScreensTransactionSaleRightClient2: List<NavigationScreenModel>
+    val navigationScreensTransactionSaleRightClient3: List<NavigationScreenModel>
+    val navigationScreensTransactionSaleRightClient4: List<NavigationScreenModel>
+    val navigationScreensTransactionSaleRightClient5: List<NavigationScreenModel>
+    val navigationScreensTransactionReturnLeftClient1: List<NavigationScreenModel>
+    val navigationScreensTransactionReturnLeftClient2: List<NavigationScreenModel>
+    val navigationScreensTransactionReturnLeftClient3: List<NavigationScreenModel>
+    val navigationScreensTransactionReturnLeftClient4: List<NavigationScreenModel>
+    val navigationScreensTransactionReturnLeftClient5: List<NavigationScreenModel>
+    val navigationScreensTransactionReturnRightClient1: List<NavigationScreenModel>
+    val navigationScreensTransactionReturnRightClient2: List<NavigationScreenModel>
+    val navigationScreensTransactionReturnRightClient3: List<NavigationScreenModel>
+    val navigationScreensTransactionReturnRightClient4: List<NavigationScreenModel>
+    val navigationScreensTransactionReturnRightClient5: List<NavigationScreenModel>
+    val navigationScreensTransactionSupplyLeftClient1: List<NavigationScreenModel>
+    val navigationScreensTransactionSupplyLeftClient2: List<NavigationScreenModel>
+    val navigationScreensTransactionSupplyLeftClient3: List<NavigationScreenModel>
+    val navigationScreensTransactionSupplyLeftClient4: List<NavigationScreenModel>
+    val navigationScreensTransactionSupplyLeftClient5: List<NavigationScreenModel>
+    val navigationScreensTransactionSupplyRightClient1: List<NavigationScreenModel>
+    val navigationScreensTransactionSupplyRightClient2: List<NavigationScreenModel>
+    val navigationScreensTransactionSupplyRightClient3: List<NavigationScreenModel>
+    val navigationScreensTransactionSupplyRightClient4: List<NavigationScreenModel>
+    val navigationScreensTransactionSupplyRightClient5: List<NavigationScreenModel>
+    val navigationScreensStockLeft: List<NavigationScreenModel>
+    val navigationScreensStockRight: List<NavigationScreenModel>
+    val navigationScreensMenuLeft: List<NavigationScreenModel>
+    val navigationScreensMenuRight: List<NavigationScreenModel>
+
+    val navigationScreensUserAuthLeft: List<NavigationScreenModel>
+    val navigationScreensUserAuthRight: List<NavigationScreenModel>
 
     val globalAppConfiguration: GlobalAppConfigurationDataModel
     val strings: List<LocalizedStringGroupDataModel>?
@@ -77,6 +120,34 @@ object AppUIConfiguration {
     val stringSupply: String
     val stringStock: String
     val stringMenu: String
+    val stringBack: String
+    val stringAddGoodsItem: String
+    val stringEditGoodsItem: String
+
+    val stringUserAccount: String
+    val stringGoodsCategories: String
+    val stringAddGoodsCategory: String
+    val stringEditGoodsCategory: String
+    val stringStores: String
+    val stringAddStore: String
+    val stringEditStore: String
+    val stringSubscription: String
+    val stringSubscriptionPlans: String
+    val stringTransactionHistory: String
+    val stringReceipt: String
+    val stringAnalytics: String
+    val stringWorkers: String
+    val stringAddWorker: String
+    val stringEditWorker: String
+    val stringSuppliers: String
+    val stringAddSupplier: String
+    val stringEditSupplier: String
+    val stringDebtors: String
+    val stringCloseDebt: String
+    val stringDevices: String
+    val stringAppLanguage: String
+    val stringAppTheme: String
+    val stringSelect: String
 
     val screenWidth: Dp
     val screenHeight: Dp
@@ -124,14 +195,16 @@ object AppUIConfiguration {
     val drawablePathIconTransactionSupply: String
     val drawablePathIconStock: String
     val drawablePathIconMenu: String
+    val drawablePathIconBackArrow: String
+    val drawablePathIconAdd: String
   }
 
   private val _appLocaleLanguageState = MutableStateFlow("ru")
-  private val _appThemeIdState = MutableStateFlow(0L)
+  private val _appThemeIdState = MutableStateFlow(1L)
   private val _appSizeModeIdState = MutableStateFlow(0L)
 
   private val _stringAppNameState = MutableStateFlow("AITAA")
-  private val _stringLogInState = MutableStateFlow("Log Innnn")
+  private val _stringLogInState = MutableStateFlow("Log In")
   private val _stringPhoneNumberState = MutableStateFlow("Phone number")
   private val _stringEnterPhoneNumberState = MutableStateFlow("Enter phone number")
   private val _stringEmailState = MutableStateFlow("Email")
@@ -159,6 +232,33 @@ object AppUIConfiguration {
   private val _stringSupplyState = MutableStateFlow("Supply")
   private val _stringStockState = MutableStateFlow("Stock")
   private val _stringMenuState = MutableStateFlow("Menu")
+  private val _stringBackState = MutableStateFlow("Back")
+  private val _stringAddGoodsItemState = MutableStateFlow("Add goods item")
+  private val _stringEditGoodsItemState = MutableStateFlow("Edit goods item")
+  private val _stringUserAccountState = MutableStateFlow("User account")
+  private val _stringGoodsCategoriesState = MutableStateFlow("Goods categories")
+  private val _stringAddGoodsCategoryState = MutableStateFlow("Add goods category")
+  private val _stringEditGoodsCategoryState = MutableStateFlow("Edit goods category")
+  private val _stringStoresState = MutableStateFlow("Stores")
+  private val _stringAddStoreState = MutableStateFlow("Add store")
+  private val _stringEditStoreState = MutableStateFlow("Edit store")
+  private val _stringSubscriptionState = MutableStateFlow("Subscription")
+  private val _stringSubscriptionPlansState = MutableStateFlow("Subscription plans")
+  private val _stringTransactionHistoryState = MutableStateFlow("Transaction history")
+  private val _stringReceiptState = MutableStateFlow("Receipt")
+  private val _stringAnalyticsState = MutableStateFlow("Analytics")
+  private val _stringWorkersState = MutableStateFlow("Workers")
+  private val _stringAddWorkerState = MutableStateFlow("Add worker")
+  private val _stringEditWorkerState = MutableStateFlow("Edit worker")
+  private val _stringSuppliersState = MutableStateFlow("Suppliers")
+  private val _stringAddSupplierState = MutableStateFlow("Add supplier")
+  private val _stringEditSupplierState = MutableStateFlow("Edit supplier")
+  private val _stringDebtorsState = MutableStateFlow("Debtors")
+  private val _stringCloseDebtState = MutableStateFlow("Close debt")
+  private val _stringDevicesState = MutableStateFlow("Devices")
+  private val _stringAppLanguageState = MutableStateFlow("App language")
+  private val _stringAppThemeState = MutableStateFlow("App theme")
+  private val _stringSelectState = MutableStateFlow("Select")
 
   private val _screenWidthState = MutableStateFlow(0f.dp)
   private val _screenHeightState = MutableStateFlow(0f.dp)
@@ -203,6 +303,8 @@ object AppUIConfiguration {
   private val _drawablePathIconTransactionSupplyState = MutableStateFlow("svg/120.svg")
   private val _drawablePathIconStockState = MutableStateFlow("svg/130.svg")
   private val _drawablePathIconMenuState = MutableStateFlow("svg/140.svg")
+  private val _drawablePathIconBackArrowState = MutableStateFlow("svg/150.svg")
+  private val _drawablePathIconAddState = MutableStateFlow("svg/160.svg")
 
   lateinit var stateValues: StateValues
 
@@ -225,6 +327,55 @@ object AppUIConfiguration {
   ) {
 
     stateValues = object : StateValues {
+      override val navigationScreensMain: List<NavigationScreenModel> by Navigation.Main.collectAsState()
+      override val navigationTransactionSaleClientId: Int by Navigation.TransactionSale.ClientId.collectAsState()
+      override val navigationTransactionReturnClientId: Int by Navigation.TransactionReturn.ClientId.collectAsState()
+      override val navigationTransactionSupplyClientId: Int by Navigation.TransactionSupply.ClientId.collectAsState()
+
+      override val navigationScreensTransactionSaleLeftClient1: List<NavigationScreenModel> by Navigation.TransactionSale.LeftClient1.collectAsState()
+      override val navigationScreensTransactionSaleLeftClient2: List<NavigationScreenModel> by Navigation.TransactionSale.LeftClient2.collectAsState()
+      override val navigationScreensTransactionSaleLeftClient3: List<NavigationScreenModel> by Navigation.TransactionSale.LeftClient3.collectAsState()
+      override val navigationScreensTransactionSaleLeftClient4: List<NavigationScreenModel> by Navigation.TransactionSale.LeftClient4.collectAsState()
+      override val navigationScreensTransactionSaleLeftClient5: List<NavigationScreenModel> by Navigation.TransactionSale.LeftClient5.collectAsState()
+
+      override val navigationScreensTransactionSaleRightClient1: List<NavigationScreenModel> by Navigation.TransactionSale.RightClient1.collectAsState()
+      override val navigationScreensTransactionSaleRightClient2: List<NavigationScreenModel> by Navigation.TransactionSale.RightClient2.collectAsState()
+      override val navigationScreensTransactionSaleRightClient3: List<NavigationScreenModel> by Navigation.TransactionSale.RightClient3.collectAsState()
+      override val navigationScreensTransactionSaleRightClient4: List<NavigationScreenModel> by Navigation.TransactionSale.RightClient4.collectAsState()
+      override val navigationScreensTransactionSaleRightClient5: List<NavigationScreenModel> by Navigation.TransactionSale.RightClient5.collectAsState()
+
+      override val navigationScreensTransactionReturnLeftClient1: List<NavigationScreenModel> by Navigation.TransactionReturn.LeftClient1.collectAsState()
+      override val navigationScreensTransactionReturnLeftClient2: List<NavigationScreenModel> by Navigation.TransactionReturn.LeftClient2.collectAsState()
+      override val navigationScreensTransactionReturnLeftClient3: List<NavigationScreenModel> by Navigation.TransactionReturn.LeftClient3.collectAsState()
+      override val navigationScreensTransactionReturnLeftClient4: List<NavigationScreenModel> by Navigation.TransactionReturn.LeftClient4.collectAsState()
+      override val navigationScreensTransactionReturnLeftClient5: List<NavigationScreenModel> by Navigation.TransactionReturn.LeftClient5.collectAsState()
+
+      override val navigationScreensTransactionReturnRightClient1: List<NavigationScreenModel> by Navigation.TransactionReturn.RightClient1.collectAsState()
+      override val navigationScreensTransactionReturnRightClient2: List<NavigationScreenModel> by Navigation.TransactionReturn.RightClient2.collectAsState()
+      override val navigationScreensTransactionReturnRightClient3: List<NavigationScreenModel> by Navigation.TransactionReturn.RightClient3.collectAsState()
+      override val navigationScreensTransactionReturnRightClient4: List<NavigationScreenModel> by Navigation.TransactionReturn.RightClient4.collectAsState()
+      override val navigationScreensTransactionReturnRightClient5: List<NavigationScreenModel> by Navigation.TransactionReturn.RightClient5.collectAsState()
+
+      override val navigationScreensTransactionSupplyLeftClient1: List<NavigationScreenModel> by Navigation.TransactionSupply.LeftClient1.collectAsState()
+      override val navigationScreensTransactionSupplyLeftClient2: List<NavigationScreenModel> by Navigation.TransactionSupply.LeftClient2.collectAsState()
+      override val navigationScreensTransactionSupplyLeftClient3: List<NavigationScreenModel> by Navigation.TransactionSupply.LeftClient3.collectAsState()
+      override val navigationScreensTransactionSupplyLeftClient4: List<NavigationScreenModel> by Navigation.TransactionSupply.LeftClient4.collectAsState()
+      override val navigationScreensTransactionSupplyLeftClient5: List<NavigationScreenModel> by Navigation.TransactionSupply.LeftClient5.collectAsState()
+
+      override val navigationScreensTransactionSupplyRightClient1: List<NavigationScreenModel> by Navigation.TransactionSupply.RightClient1.collectAsState()
+      override val navigationScreensTransactionSupplyRightClient2: List<NavigationScreenModel> by Navigation.TransactionSupply.RightClient2.collectAsState()
+      override val navigationScreensTransactionSupplyRightClient3: List<NavigationScreenModel> by Navigation.TransactionSupply.RightClient3.collectAsState()
+      override val navigationScreensTransactionSupplyRightClient4: List<NavigationScreenModel> by Navigation.TransactionSupply.RightClient4.collectAsState()
+      override val navigationScreensTransactionSupplyRightClient5: List<NavigationScreenModel> by Navigation.TransactionSupply.RightClient5.collectAsState()
+
+
+      override val navigationScreensStockLeft: List<NavigationScreenModel> by Navigation.Stock.Left.collectAsState()
+      override val navigationScreensStockRight: List<NavigationScreenModel> by Navigation.Stock.Right.collectAsState()
+
+      override val navigationScreensMenuLeft: List<NavigationScreenModel> by Navigation.Menu.Left.collectAsState()
+      override val navigationScreensMenuRight: List<NavigationScreenModel> by Navigation.Menu.Right.collectAsState()
+      override val navigationScreensUserAuthLeft: List<NavigationScreenModel> by Navigation.UserAuth.Left.collectAsState()
+      override val navigationScreensUserAuthRight: List<NavigationScreenModel> by Navigation.UserAuth.Right.collectAsState()
 
       override val globalAppConfiguration: GlobalAppConfigurationDataModel by configurationRepository.globalAppConfigurationState.payload.collectAsState()
       override val strings: List<LocalizedStringGroupDataModel>? by configurationRepository.stringsState.payload.collectAsState()
@@ -265,6 +416,33 @@ object AppUIConfiguration {
       override val stringSupply: String by _stringSupplyState.collectAsState()
       override val stringStock: String by _stringStockState.collectAsState()
       override val stringMenu: String by _stringMenuState.collectAsState()
+      override val stringBack: String by _stringBackState.collectAsState()
+      override val stringAddGoodsItem: String by _stringAddGoodsItemState.collectAsState()
+      override val stringEditGoodsItem: String by _stringEditGoodsItemState.collectAsState()
+      override val stringUserAccount: String by _stringUserAccountState.collectAsState()
+      override val stringGoodsCategories: String by _stringGoodsCategoriesState.collectAsState()
+      override val stringAddGoodsCategory: String by _stringAddGoodsCategoryState.collectAsState()
+      override val stringEditGoodsCategory: String by _stringEditGoodsCategoryState.collectAsState()
+      override val stringStores: String by _stringStoresState.collectAsState()
+      override val stringAddStore: String by _stringAddStoreState.collectAsState()
+      override val stringEditStore: String by _stringEditStoreState.collectAsState()
+      override val stringSubscription: String by _stringSubscriptionState.collectAsState()
+      override val stringSubscriptionPlans: String by _stringSubscriptionPlansState.collectAsState()
+      override val stringTransactionHistory: String by _stringTransactionHistoryState.collectAsState()
+      override val stringReceipt: String by _stringReceiptState.collectAsState()
+      override val stringAnalytics: String by _stringAnalyticsState.collectAsState()
+      override val stringWorkers: String by _stringWorkersState.collectAsState()
+      override val stringAddWorker: String by _stringAddWorkerState.collectAsState()
+      override val stringEditWorker: String by _stringEditWorkerState.collectAsState()
+      override val stringSuppliers: String by _stringSuppliersState.collectAsState()
+      override val stringAddSupplier: String by _stringAddSupplierState.collectAsState()
+      override val stringEditSupplier: String by _stringEditSupplierState.collectAsState()
+      override val stringDebtors: String by _stringDebtorsState.collectAsState()
+      override val stringCloseDebt: String by _stringCloseDebtState.collectAsState()
+      override val stringDevices: String by _stringDevicesState.collectAsState()
+      override val stringAppLanguage: String by _stringAppLanguageState.collectAsState()
+      override val stringAppTheme: String by _stringAppThemeState.collectAsState()
+      override val stringSelect: String by _stringSelectState.collectAsState()
 
       override val screenWidth: Dp by _screenWidthState.collectAsState()
       override val screenHeight: Dp by _screenHeightState.collectAsState()
@@ -307,6 +485,8 @@ object AppUIConfiguration {
       override val drawablePathIconTransactionSupply: String by _drawablePathIconTransactionSupplyState.collectAsState()
       override val drawablePathIconStock: String by _drawablePathIconStockState.collectAsState()
       override val drawablePathIconMenu: String by _drawablePathIconMenuState.collectAsState()
+      override val drawablePathIconBackArrow: String by _drawablePathIconBackArrowState.collectAsState()
+      override val drawablePathIconAdd: String by _drawablePathIconAddState.collectAsState()
     }
 
     coroutineScope = rememberCoroutineScope()
@@ -321,6 +501,19 @@ object AppUIConfiguration {
         coroutineScope.launch {
           _screenWidthState.emit(maxWidth)
           _screenHeightState.emit(maxHeight)
+          _isNarrowScreenState.emit(maxWidth.value < stateValues.wideScreenMinWidth)
+
+          launch {
+            _isNarrowScreenState
+              .collect {
+                Navigation.TransactionSale.init(it)
+                Navigation.TransactionReturn.init(it)
+                Navigation.TransactionSupply.init(it)
+                Navigation.Stock.init(it)
+                Navigation.Menu.init(it)
+                Navigation.UserAuth.init(it)
+              }
+          }
 
           launch {
             genericLocalService
@@ -376,6 +569,33 @@ object AppUIConfiguration {
                 _stringSupplyState.emit(it.extractString(26, stateValues.appLocaleLanguage))
                 _stringStockState.emit(it.extractString(27, stateValues.appLocaleLanguage))
                 _stringMenuState.emit(it.extractString(28, stateValues.appLocaleLanguage))
+                _stringBackState.emit(it.extractString(29, stateValues.appLocaleLanguage))
+                _stringAddGoodsItemState.emit(it.extractString(30, stateValues.appLocaleLanguage))
+                _stringEditGoodsItemState.emit(it.extractString(31, stateValues.appLocaleLanguage))
+                _stringUserAccountState.emit(it.extractString(32, stateValues.appLocaleLanguage))
+                _stringGoodsCategoriesState.emit(it.extractString(33, stateValues.appLocaleLanguage))
+                _stringAddGoodsCategoryState.emit(it.extractString(34, stateValues.appLocaleLanguage))
+                _stringEditGoodsCategoryState.emit(it.extractString(35, stateValues.appLocaleLanguage))
+                _stringStoresState.emit(it.extractString(36, stateValues.appLocaleLanguage))
+                _stringAddStoreState.emit(it.extractString(37, stateValues.appLocaleLanguage))
+                _stringEditStoreState.emit(it.extractString(38, stateValues.appLocaleLanguage))
+                _stringSubscriptionState.emit(it.extractString(39, stateValues.appLocaleLanguage))
+                _stringSubscriptionPlansState.emit(it.extractString(40, stateValues.appLocaleLanguage))
+                _stringTransactionHistoryState.emit(it.extractString(41, stateValues.appLocaleLanguage))
+                _stringReceiptState.emit(it.extractString(42, stateValues.appLocaleLanguage))
+                _stringAnalyticsState.emit(it.extractString(43, stateValues.appLocaleLanguage))
+                _stringWorkersState.emit(it.extractString(44, stateValues.appLocaleLanguage))
+                _stringAddWorkerState.emit(it.extractString(45, stateValues.appLocaleLanguage))
+                _stringEditWorkerState.emit(it.extractString(46, stateValues.appLocaleLanguage))
+                _stringSuppliersState.emit(it.extractString(47, stateValues.appLocaleLanguage))
+                _stringAddSupplierState.emit(it.extractString(48, stateValues.appLocaleLanguage))
+                _stringEditSupplierState.emit(it.extractString(49, stateValues.appLocaleLanguage))
+                _stringDebtorsState.emit(it.extractString(50, stateValues.appLocaleLanguage))
+                _stringCloseDebtState.emit(it.extractString(51, stateValues.appLocaleLanguage))
+                _stringDevicesState.emit(it.extractString(52, stateValues.appLocaleLanguage))
+                _stringAppLanguageState.emit(it.extractString(53, stateValues.appLocaleLanguage))
+                _stringAppThemeState.emit(it.extractString(54, stateValues.appLocaleLanguage))
+                _stringSelectState.emit(it.extractString(55, stateValues.appLocaleLanguage))
               }
           }
 
@@ -443,11 +663,11 @@ object AppUIConfiguration {
                   _drawablePathIconTransactionSupplyState.emit(it.extractPath(12, stateValues.appThemeId))
                   _drawablePathIconStockState.emit(it.extractPath(13, stateValues.appThemeId))
                   _drawablePathIconMenuState.emit(it.extractPath(14, stateValues.appThemeId))
+                  _drawablePathIconBackArrowState.emit(it.extractPath(15, stateValues.appThemeId))
+                  _drawablePathIconAddState.emit(it.extractPath(16, stateValues.appThemeId))
                 }
               }
           }
-
-          _isNarrowScreenState.emit(stateValues.screenWidth.value < stateValues.wideScreenMinWidth)
         }
       }
     }
