@@ -16,9 +16,10 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
+import kz.aita.model.dataModel.UserAccountDataModel
+import kz.aita.model.dataModel.UserAuthSignUpDataModel
 import kz.aita.server.dataModel.request.RefreshTokenRequestBody
 import kz.aita.server.dataModel.request.UserAuthLogInRequestBody
-import kz.aita.server.dataModel.request.UserAuthSignUpRequestBody
 import kz.aita.server.db.Users
 import kz.aita.server.encrypt.Pw
 import kz.aita.server.jwt.TokenService
@@ -39,11 +40,11 @@ fun Application.routes() {
   routing {
     route("/auth") {
 
-      post("/register") {
-        val body = call.receive<UserAuthSignUpRequestBody>()                 // Parse JSON: email + password
+      post("/signUp") {
+        val body = call.receive<UserAuthSignUpDataModel>()
+        val phoneNumber = body.phoneNumber.trim().lowercase()
         val email = body.email.trim().lowercase()
 
-        // If user exists → 409 (conflict)
         val exists = transaction {
           val cond = Users.email eq email
           Users.selectAll().where { cond }.count()
@@ -53,18 +54,32 @@ fun Application.routes() {
         // Hash the password and save new user
         val userId = UUID.randomUUID()
         val hash = Pw.hash(body.password.toCharArray())
+        println("creating $userId ${body.phoneNumber} $email ${body.firstName} ${body.lastName} ${body.countryLocale} $hash")
         transaction {
           Users.insert {
             it[id] = userId
+            it[Users.phoneNumber] = body.phoneNumber
             it[Users.email] = email
+            it[Users.firstName] = body.firstName
+            it[Users.lastName] = body.lastName
+            it[Users.countryLocale] = body.countryLocale
             it[passwordHash] = hash
             // createdAt defaults to now; isActive defaults to true
           }
         }
-        call.respond(HttpStatusCode.Created, mapOf("user_id" to userId))
+        call.respond(
+          HttpStatusCode.Created,
+          UserAccountDataModel(
+            phoneNumber = body.phoneNumber,
+            email = body.email,
+            firstName = body.firstName,
+            lastName = body.lastName,
+            countryLocale = body.countryLocale
+          )
+        )
       }
 
-      post("/login") {
+      post("/logIn") {
         val body = call.receive<UserAuthLogInRequestBody>()
         val login = body.login.trim().lowercase()
 
@@ -113,13 +128,13 @@ fun Application.routes() {
       // ...add more protected endpoints here...
     }
 
+    staticFiles("config/app/global", File("AITA/server/config/app/global.json"))
+
     staticFiles("res/string", File("AITA/server/assets/values/strings.json"))
     staticFiles("res/dimension", File("AITA/server/assets/values/dimensions.json"))
     staticFiles("res/color", File("AITA/server/assets/values/colors.json"))
     staticFiles("res/drawableConfig", File("AITA/server/assets/drawable/drawables.json"))
     staticFiles("res/drawable", File("AITA/server/assets/drawable"))
-
-    staticFiles("config/app/global", File("AITA/server/config/app/global.json"))
   }
 }
 

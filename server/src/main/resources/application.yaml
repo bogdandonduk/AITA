@@ -1,0 +1,22 @@
+ktor:
+  deployment:
+    host: "0.0.0.0"
+    port: 8080
+  application:
+    modules:
+      - kz.aita.server.ApplicationKt.module
+  security:
+    jwt:
+      issuer: "http://localhost:8080"
+      audience: "aita-client"
+      realm: "AITA API"
+      secret: ${?JWT_SECRET}
+      access_ttl_sec: 600
+      refresh_ttl_days: 30
+
+db:
+  url: ${?DB_URL}
+  user: ${?DB_USER}
+  pass: ${?DB_PASS}
+
+

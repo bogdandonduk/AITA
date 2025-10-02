@@ -1,11 +1,11 @@
-package kz.aita.server.dataModel.request
+package kz.aita.model.dataModel
 
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class UserAuthSignUpRequestBody(
-  val email: String,
+data class UserAuthSignUpDataModel(
   val phoneNumber: String,
+  val email: String,
   val password: String,
   val firstName: String,
   val lastName: String,

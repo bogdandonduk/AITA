@@ -6,6 +6,8 @@ import kotlinx.serialization.Serializable
 data class GlobalAppConfigurationDataModel(
   val serverUrl: String,
   val globalConfigurationPath: String,
+  val logInPath: String,
+  val signUpPath: String,
   val stringResourcesPath: String,
   val dimensionResourcesPath: String,
   val colorResourcesPath: String,

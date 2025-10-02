@@ -23,13 +23,6 @@ import org.jetbrains.exposed.sql.transactions.transaction
 fun main() = EngineMain.main(emptyArray())
 
 fun Application.module() {
-  val cfg = environment.config
-  val host = cfg.propertyOrNull("ktor.deployment.host")?.getString()
-  val port = cfg.propertyOrNull("ktor.deployment.port")?.getString()
-  val url = Thread.currentThread().contextClassLoader.getResource("application.yaml")
-  println("Ktor read host=$host port=$port")
-  println("application.yaml loaded from: $url")
-
   install(CallLogging)
   install(AutoHeadResponse)
   install(Compression) {
@@ -46,14 +39,16 @@ fun Application.module() {
     json(Json {
       prettyPrint = true
       ignoreUnknownKeys = true
+      explicitNulls = false
+      encodeDefaults = true
     })
   }
 
   Database.connect(
-    url = System.getenv("DB_URL") ?: "jdbc:postgresql://localhost:5432/aita",
+    url = System.getenv("DB_URL"),
     driver = "org.postgresql.Driver",
-    user = System.getenv("DB_USER") ?: "postgres",
-    password = System.getenv("DB_PASS") ?: "postgres"
+    user = System.getenv("DB_USER"),
+    password = System.getenv("DB_PASS"),
   )
 
   transaction { SchemaUtils.create(Users, RefreshSessions) }
@@ -62,31 +57,3 @@ fun Application.module() {
 
   routes()
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

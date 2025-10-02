@@ -7,7 +7,7 @@ import org.jetbrains.exposed.sql.javatime.CurrentTimestamp
 object Users : Table("users") {
   val id = uuid("id")                             // We'll set UUIDs in code
   val email = varchar("email", 255).uniqueIndex()
-  val phoneNumber = varchar("phoneNumber", 255).uniqueIndex()
+  val phoneNumber = varchar("phone_number", 255).uniqueIndex()
   val firstName = varchar("first_name", 255).uniqueIndex()
   val lastName = varchar("last_name", 255).uniqueIndex()
   val countryLocale = varchar("country_locale", 255).uniqueIndex()

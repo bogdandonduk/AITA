@@ -38,7 +38,7 @@ val genericLocalService: GenericLocalService by lazy {
 }
 
 val userRepository: UserRepository by lazy {
-  UserRepositoryImpl(genericRemoteService)
+  UserRepositoryImpl(genericRemoteService, configurationRepository)
 }
 
 val configurationRepository: ConfigurationRepository by lazy {

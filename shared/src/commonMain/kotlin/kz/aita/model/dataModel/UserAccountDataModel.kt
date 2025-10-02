@@ -4,11 +4,9 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class UserAccountDataModel(
-  val id: Long,
-  val email: String,
   val phoneNumber: String,
+  val email: String,
   val firstName: String,
   val lastName: String,
   val countryLocale: String
-
 )

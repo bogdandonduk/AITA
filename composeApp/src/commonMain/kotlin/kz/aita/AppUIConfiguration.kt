@@ -214,7 +214,7 @@ object AppUIConfiguration {
   private val _appThemeIdState = MutableStateFlow(0L)
   private val _appSizeModeIdState = MutableStateFlow(0L)
 
-  private val _stringAppNameState = MutableStateFlow("AITAA")
+  private val _stringAppNameState = MutableStateFlow("AITA")
   private val _stringLogInState = MutableStateFlow("Log In")
   private val _stringPhoneNumberState = MutableStateFlow("Phone number")
   private val _stringEnterPhoneNumberState = MutableStateFlow("Enter phone number")

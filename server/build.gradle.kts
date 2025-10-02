@@ -13,15 +13,6 @@ application {
     applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
 }
 
-kotlin {
-    sourceSets {
-        val main by getting {
-            // keep the default src/main/resources *and* add your custom config folder
-            resources.srcDir("config")
-        }
-    }
-}
-
 dependencies {
     // ContentNegotiation + kotlinx.serialization
     implementation("io.ktor:ktor-server-content-negotiation:${property("ktor.version")}")
@@ -61,4 +52,7 @@ dependencies {
     implementation(libs.ktor.serverNetty)
     testImplementation(libs.ktor.serverTestHost)
     testImplementation(libs.kotlin.testJunit)
+
+    implementation(projects.shared)
+
 }

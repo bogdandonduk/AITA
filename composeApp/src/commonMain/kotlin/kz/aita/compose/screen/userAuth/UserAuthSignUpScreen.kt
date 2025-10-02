@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kz.aita.AppUIConfiguration
 import kz.aita.compose.navigation.Navigation
@@ -24,9 +25,14 @@ import kz.aita.compose.widget.errorText
 import kz.aita.compose.widget.genericTextField
 import kz.aita.compose.widget.phoneNumberWithCountrySelectionTextField
 import kz.aita.compose.widget.repeatedPasswordTextFieldGroup
+import kz.aita.core.io
+import kz.aita.model.dataModel.UserAuthSignUpDataModel
+import kz.aita.model.repository.UserRepository
 
 @Composable
-fun AppUIConfiguration.UserAuthSignUpScreen() {
+fun AppUIConfiguration.UserAuthSignUpScreen(
+  userRepository: UserRepository
+) {
   LazyColumn(
     modifier = Modifier.fillMaxSize(),
     horizontalAlignment = Alignment.CenterHorizontally
@@ -107,6 +113,21 @@ fun AppUIConfiguration.UserAuthSignUpScreen() {
 
           passwordTextFieldContent.checkContentValidity()
           repeatedPasswordTextFieldContent.checkContentValidity()
+
+          if (phoneNumberTextFieldContent.isContentValid && emailTextFieldContent.isContentValid && passwordTextFieldContent.isContentValid && repeatedPasswordTextFieldContent.isContentValid)
+            coroutineScope.launch(Dispatchers.io) {
+              userRepository
+                .signUp(
+                  UserAuthSignUpDataModel(
+                    phoneNumberTextFieldContent.value.text,
+                    emailTextFieldContent.value.text,
+                    passwordTextFieldContent.value.text,
+                    firstNameTextFieldContent.value.text,
+                    lastNameTextFieldContent.value.text,
+                    phoneNumberTextFieldContent.selectedCountryLocale
+                  )
+                )
+            }
         }
 
         if (stateValues.isNarrowScreen) {
