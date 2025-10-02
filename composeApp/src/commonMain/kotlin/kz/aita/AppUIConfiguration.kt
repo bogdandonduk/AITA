@@ -197,10 +197,21 @@ object AppUIConfiguration {
     val drawablePathIconMenu: String
     val drawablePathIconBackArrow: String
     val drawablePathIconAdd: String
+    val drawablePathIconUserAccount: String
+    val drawablePathIconGoodsCategories: String
+    val drawablePathIconStores: String
+    val drawablePathIconTransactionHistory: String
+    val drawablePathIconAnalytics: String
+    val drawablePathIconWorkers: String
+    val drawablePathIconSuppliers: String
+    val drawablePathIconDebtors: String
+    val drawablePathIconDevices: String
+    val drawablePathIconAppLanguage: String
+    val drawablePathIconAppTheme: String
   }
 
   private val _appLocaleLanguageState = MutableStateFlow("ru")
-  private val _appThemeIdState = MutableStateFlow(1L)
+  private val _appThemeIdState = MutableStateFlow(0L)
   private val _appSizeModeIdState = MutableStateFlow(0L)
 
   private val _stringAppNameState = MutableStateFlow("AITAA")
@@ -288,23 +299,34 @@ object AppUIConfiguration {
   private val _ErrorColorState = MutableStateFlow(Color(0xffff0000))
   private val _IconTintColorState = MutableStateFlow(Color(0xff000000))
 
-  private val _drawablePathAITALogoState = MutableStateFlow("svg/00.svg")
-  private val _drawablePathIconPasswordState = MutableStateFlow("svg/10.svg")
-  private val _drawablePathIconCancelState = MutableStateFlow("svg/20.svg")
-  private val _drawablePathIconEyeHideState = MutableStateFlow("svg/30.svg")
-  private val _drawablePathIconEyeShowState = MutableStateFlow("svg/40.svg")
-  private val _drawablePathIconEmailState = MutableStateFlow("svg/50.svg")
-  private val _drawablePathIconPhoneState = MutableStateFlow("svg/60.svg")
-  private val _drawablePathIconExpandMoreState = MutableStateFlow("svg/70.svg")
-  private val _drawablePathIconExpandLessState = MutableStateFlow("svg/80.svg")
-  private val _drawablePathIconPersonState = MutableStateFlow("svg/90.svg")
-  private val _drawablePathIconTransactionSaleState = MutableStateFlow("svg/100.svg")
-  private val _drawablePathIconTransactionReturnState = MutableStateFlow("svg/110.svg")
-  private val _drawablePathIconTransactionSupplyState = MutableStateFlow("svg/120.svg")
-  private val _drawablePathIconStockState = MutableStateFlow("svg/130.svg")
-  private val _drawablePathIconMenuState = MutableStateFlow("svg/140.svg")
-  private val _drawablePathIconBackArrowState = MutableStateFlow("svg/150.svg")
-  private val _drawablePathIconAddState = MutableStateFlow("svg/160.svg")
+  private val _drawablePathAITALogoState = MutableStateFlow("svg/0_0.svg")
+  private val _drawablePathIconPasswordState = MutableStateFlow("svg/1_0.svg")
+  private val _drawablePathIconCancelState = MutableStateFlow("svg/2_0.svg")
+  private val _drawablePathIconEyeHideState = MutableStateFlow("svg/3_0.svg")
+  private val _drawablePathIconEyeShowState = MutableStateFlow("svg/4_0.svg")
+  private val _drawablePathIconEmailState = MutableStateFlow("svg/5_0.svg")
+  private val _drawablePathIconPhoneState = MutableStateFlow("svg/6_0.svg")
+  private val _drawablePathIconExpandMoreState = MutableStateFlow("svg/7_0.svg")
+  private val _drawablePathIconExpandLessState = MutableStateFlow("svg/8_0.svg")
+  private val _drawablePathIconPersonState = MutableStateFlow("svg/9_0.svg")
+  private val _drawablePathIconTransactionSaleState = MutableStateFlow("svg/10_0.svg")
+  private val _drawablePathIconTransactionReturnState = MutableStateFlow("svg/11_0.svg")
+  private val _drawablePathIconTransactionSupplyState = MutableStateFlow("svg/12_0.svg")
+  private val _drawablePathIconStockState = MutableStateFlow("svg/13_0.svg")
+  private val _drawablePathIconMenuState = MutableStateFlow("svg/14_0.svg")
+  private val _drawablePathIconBackArrowState = MutableStateFlow("svg/15_0.svg")
+  private val _drawablePathIconAddState = MutableStateFlow("svg/16_0.svg")
+  private val _drawablePathIconUserAccountState = MutableStateFlow("svg/17_0.svg")
+  private val _drawablePathIconGoodsCategoriesState = MutableStateFlow("svg/18_0.svg")
+  private val _drawablePathIconStoresState = MutableStateFlow("svg/19_0.svg")
+  private val _drawablePathIconTransactionHistoryState = MutableStateFlow("svg/20_0.svg")
+  private val _drawablePathIconAnalyticsState = MutableStateFlow("svg/21_0.svg")
+  private val _drawablePathIconWorkersState = MutableStateFlow("svg/22_0.svg")
+  private val _drawablePathIconSuppliersState = MutableStateFlow("svg/23_0.svg")
+  private val _drawablePathIconDebtorsState = MutableStateFlow("svg/24_0.svg")
+  private val _drawablePathIconDevicesState = MutableStateFlow("svg/25_0.svg")
+  private val _drawablePathIconAppLanguageState = MutableStateFlow("svg/26_0.svg")
+  private val _drawablePathIconAppThemeState = MutableStateFlow("svg/27_0.svg")
 
   lateinit var stateValues: StateValues
 
@@ -367,7 +389,6 @@ object AppUIConfiguration {
       override val navigationScreensTransactionSupplyRightClient3: List<NavigationScreenModel> by Navigation.TransactionSupply.RightClient3.collectAsState()
       override val navigationScreensTransactionSupplyRightClient4: List<NavigationScreenModel> by Navigation.TransactionSupply.RightClient4.collectAsState()
       override val navigationScreensTransactionSupplyRightClient5: List<NavigationScreenModel> by Navigation.TransactionSupply.RightClient5.collectAsState()
-
 
       override val navigationScreensStockLeft: List<NavigationScreenModel> by Navigation.Stock.Left.collectAsState()
       override val navigationScreensStockRight: List<NavigationScreenModel> by Navigation.Stock.Right.collectAsState()
@@ -487,6 +508,17 @@ object AppUIConfiguration {
       override val drawablePathIconMenu: String by _drawablePathIconMenuState.collectAsState()
       override val drawablePathIconBackArrow: String by _drawablePathIconBackArrowState.collectAsState()
       override val drawablePathIconAdd: String by _drawablePathIconAddState.collectAsState()
+      override val drawablePathIconUserAccount: String by _drawablePathIconUserAccountState.collectAsState()
+      override val drawablePathIconGoodsCategories: String by _drawablePathIconGoodsCategoriesState.collectAsState()
+      override val drawablePathIconStores: String by _drawablePathIconStoresState.collectAsState()
+      override val drawablePathIconTransactionHistory: String by _drawablePathIconTransactionHistoryState.collectAsState()
+      override val drawablePathIconAnalytics: String by _drawablePathIconAnalyticsState.collectAsState()
+      override val drawablePathIconWorkers: String by _drawablePathIconWorkersState.collectAsState()
+      override val drawablePathIconSuppliers: String by _drawablePathIconSuppliersState.collectAsState()
+      override val drawablePathIconDebtors: String by _drawablePathIconDebtorsState.collectAsState()
+      override val drawablePathIconDevices: String by _drawablePathIconDevicesState.collectAsState()
+      override val drawablePathIconAppLanguage: String by _drawablePathIconAppLanguageState.collectAsState()
+      override val drawablePathIconAppTheme: String by _drawablePathIconAppThemeState.collectAsState()
     }
 
     coroutineScope = rememberCoroutineScope()
@@ -665,6 +697,17 @@ object AppUIConfiguration {
                   _drawablePathIconMenuState.emit(it.extractPath(14, stateValues.appThemeId))
                   _drawablePathIconBackArrowState.emit(it.extractPath(15, stateValues.appThemeId))
                   _drawablePathIconAddState.emit(it.extractPath(16, stateValues.appThemeId))
+                  _drawablePathIconUserAccountState.emit(it.extractPath(17, stateValues.appThemeId))
+                  _drawablePathIconGoodsCategoriesState.emit(it.extractPath(18, stateValues.appThemeId))
+                  _drawablePathIconStoresState.emit(it.extractPath(19, stateValues.appThemeId))
+                  _drawablePathIconTransactionHistoryState.emit(it.extractPath(20, stateValues.appThemeId))
+                  _drawablePathIconAnalyticsState.emit(it.extractPath(21, stateValues.appThemeId))
+                  _drawablePathIconWorkersState.emit(it.extractPath(22, stateValues.appThemeId))
+                  _drawablePathIconSuppliersState.emit(it.extractPath(23, stateValues.appThemeId))
+                  _drawablePathIconDebtorsState.emit(it.extractPath(24, stateValues.appThemeId))
+                  _drawablePathIconDevicesState.emit(it.extractPath(25, stateValues.appThemeId))
+                  _drawablePathIconAppLanguageState.emit(it.extractPath(26, stateValues.appThemeId))
+                  _drawablePathIconAppThemeState.emit(it.extractPath(27, stateValues.appThemeId))
                 }
               }
           }

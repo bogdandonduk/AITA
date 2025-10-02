@@ -16,12 +16,24 @@ fun AppUIConfiguration.TransactionSelectionScreen() {
     modifier = Modifier
       .fillMaxSize()
   ) {
+    val clientId = when(stateValues.navigationScreensMain.last()) {
+      is NavigationScreenModel.Transaction.MainReturn -> {
+        stateValues.navigationTransactionReturnClientId
+      }
+      is NavigationScreenModel.Transaction.MainSupply -> {
+        stateValues.navigationTransactionSupplyClientId
+      }
+      else -> {
+        stateValues.navigationTransactionSaleClientId
+      }
+    }
+
     ScreenAppBarWidget(
       title = stateValues.stringSelect,
-      onBack = if (stateValues.isNarrowScreen) {
+      onBack = if (!Navigation.TransactionSale.isVeryFirstScreen(stateValues.isNarrowScreen, clientId)) {
         {
           coroutineScope.launch {
-            Navigation.popMain()
+            Navigation.Menu.pop(stateValues.isNarrowScreen)
           }
         }
       } else null

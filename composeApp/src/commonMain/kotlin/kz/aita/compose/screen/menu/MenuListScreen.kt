@@ -17,6 +17,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.unit.dp
 import io.kamel.image.KamelImage
 import io.kamel.image.asyncPainterResource
@@ -77,7 +78,10 @@ fun AppUIConfiguration.MenuListScreen() {
                     data = Url(getFullDrawableResourceUrl(model.iconPath))
                   )
                 },
-                contentDescription = stateValues.stringBack
+                contentDescription = stateValues.stringBack,
+                colorFilter = if (!stateValues.isNarrowScreen && stateValues.navigationScreensMenuRight.last().route == model.route)
+                  ColorFilter.tint(stateValues.AccentColor)
+                else null
               )
             }
 

@@ -72,7 +72,7 @@ sealed class NavigationScreenModel(
 
     data object UserAccount: Menu("MenuMapNavigationScreenModelRoute") {
       override val iconPath: String
-        get() = AppUIConfiguration.stateValues.drawablePathIconMenu
+        get() = AppUIConfiguration.stateValues.drawablePathIconUserAccount
       override val name: String
         get() = AppUIConfiguration.stateValues.stringUserAccount
     }
@@ -82,7 +82,7 @@ sealed class NavigationScreenModel(
 
     data object Workers: Menu("MenuWorkersNavigationScreenModelRoute") {
       override val iconPath: String
-        get() = AppUIConfiguration.stateValues.drawablePathIconMenu
+        get() = AppUIConfiguration.stateValues.drawablePathIconWorkers
       override val name: String
         get() = AppUIConfiguration.stateValues.stringWorkers
     }
@@ -90,7 +90,7 @@ sealed class NavigationScreenModel(
 
     data object Stores: Menu("MenuStoresNavigationScreenModelRoute") {
       override val iconPath: String
-        get() = AppUIConfiguration.stateValues.drawablePathIconMenu
+        get() = AppUIConfiguration.stateValues.drawablePathIconStores
       override val name: String
         get() = AppUIConfiguration.stateValues.stringStores
     }
@@ -98,14 +98,14 @@ sealed class NavigationScreenModel(
 
     data object Analytics: Menu("MenuAnalyticsNavigationScreenModelRoute") {
       override val iconPath: String
-        get() = AppUIConfiguration.stateValues.drawablePathIconMenu
+        get() = AppUIConfiguration.stateValues.drawablePathIconAnalytics
       override val name: String
         get() = AppUIConfiguration.stateValues.stringAnalytics
     }
 
     data object TransactionHistory: Menu("MenuTransactionHistoryNavigationScreenModelRoute") {
       override val iconPath: String
-        get() = AppUIConfiguration.stateValues.drawablePathIconMenu
+        get() = AppUIConfiguration.stateValues.drawablePathIconTransactionHistory
       override val name: String
         get() = AppUIConfiguration.stateValues.stringTransactionHistory
     }
@@ -113,7 +113,7 @@ sealed class NavigationScreenModel(
 
     data object Debtors: Menu("MenuDebtorsNavigationScreenModelRoute") {
       override val iconPath: String
-        get() = AppUIConfiguration.stateValues.drawablePathIconMenu
+        get() = AppUIConfiguration.stateValues.drawablePathIconDebtors
       override val name: String
         get() = AppUIConfiguration.stateValues.stringDebtors
     }
@@ -121,7 +121,7 @@ sealed class NavigationScreenModel(
 
     data object Suppliers: Menu("MenuSuppliersNavigationScreenModelRoute") {
       override val iconPath: String
-        get() = AppUIConfiguration.stateValues.drawablePathIconMenu
+        get() = AppUIConfiguration.stateValues.drawablePathIconSuppliers
       override val name: String
         get() = AppUIConfiguration.stateValues.stringSuppliers
     }
@@ -129,7 +129,7 @@ sealed class NavigationScreenModel(
 
     data object GoodsCategories: Menu("MenuGoodsCategoriesNavigationScreenModelRoute") {
       override val iconPath: String
-        get() = AppUIConfiguration.stateValues.drawablePathIconMenu
+        get() = AppUIConfiguration.stateValues.drawablePathIconGoodsCategories
       override val name: String
         get() = AppUIConfiguration.stateValues.stringGoodsCategories
     }
@@ -137,19 +137,19 @@ sealed class NavigationScreenModel(
 
     data object Devices: Menu("MenuDevicesNavigationScreenModelRoute") {
       override val iconPath: String
-        get() = AppUIConfiguration.stateValues.drawablePathIconMenu
+        get() = AppUIConfiguration.stateValues.drawablePathIconDevices
       override val name: String
         get() = AppUIConfiguration.stateValues.stringDevices
     }
     data object AppLanguage: Menu("MenuAppLanguageNavigationScreenModelRoute") {
       override val iconPath: String
-        get() = AppUIConfiguration.stateValues.drawablePathIconMenu
+        get() = AppUIConfiguration.stateValues.drawablePathIconAppLanguage
       override val name: String
         get() = AppUIConfiguration.stateValues.stringAppLanguage
     }
     data object AppTheme: Menu("MenuAppThemeNavigationScreenModelRoute") {
       override val iconPath: String
-        get() = AppUIConfiguration.stateValues.drawablePathIconMenu
+        get() = AppUIConfiguration.stateValues.drawablePathIconAppTheme
       override val name: String
         get() = AppUIConfiguration.stateValues.stringAppTheme
     }

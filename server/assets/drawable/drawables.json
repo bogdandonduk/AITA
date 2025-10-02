@@ -4,11 +4,11 @@
     "values": [
       {
         "themeId": 0,
-        "path": "svg/00.svg"
+        "path": "svg/0_0.svg"
       },
       {
         "themeId": 1,
-        "path": "svg/01.svg"
+        "path": "svg/0_1.svg"
       }
     ]
   },
@@ -17,11 +17,11 @@
     "values": [
       {
         "themeId": 0,
-        "path": "svg/10.svg"
+        "path": "svg/1_0.svg"
       },
       {
         "themeId": 1,
-        "path": "svg/11.svg"
+        "path": "svg/1_1.svg"
       }
     ]
   },
@@ -30,11 +30,11 @@
     "values": [
       {
         "themeId": 0,
-        "path": "svg/20.svg"
+        "path": "svg/2_0.svg"
       },
       {
         "themeId": 1,
-        "path": "svg/21.svg"
+        "path": "svg/2_1.svg"
       }
     ]
   },
@@ -43,11 +43,11 @@
     "values": [
       {
         "themeId": 0,
-        "path": "svg/30.svg"
+        "path": "svg/3_0.svg"
       },
       {
         "themeId": 1,
-        "path": "svg/31.svg"
+        "path": "svg/3_1.svg"
       }
     ]
   },
@@ -56,11 +56,11 @@
     "values": [
       {
         "themeId": 0,
-        "path": "svg/40.svg"
+        "path": "svg/4_0.svg"
       },
       {
         "themeId": 1,
-        "path": "svg/41.svg"
+        "path": "svg/4_1.svg"
       }
     ]
   },
@@ -69,11 +69,11 @@
     "values": [
       {
         "themeId": 0,
-        "path": "svg/50.svg"
+        "path": "svg/5_0.svg"
       },
       {
         "themeId": 1,
-        "path": "svg/51.svg"
+        "path": "svg/5_1.svg"
       }
     ]
   },
@@ -82,11 +82,11 @@
     "values": [
       {
         "themeId": 0,
-        "path": "svg/60.svg"
+        "path": "svg/6_0.svg"
       },
       {
         "themeId": 1,
-        "path": "svg/61.svg"
+        "path": "svg/6_1.svg"
       }
     ]
   },
@@ -95,11 +95,11 @@
     "values": [
       {
         "themeId": 0,
-        "path": "svg/70.svg"
+        "path": "svg/7_0.svg"
       },
       {
         "themeId": 1,
-        "path": "svg/71.svg"
+        "path": "svg/7_1.svg"
       }
     ]
   },
@@ -108,11 +108,11 @@
     "values": [
       {
         "themeId": 0,
-        "path": "svg/80.svg"
+        "path": "svg/8_0.svg"
       },
       {
         "themeId": 1,
-        "path": "svg/81.svg"
+        "path": "svg/8_1.svg"
       }
     ]
   },
@@ -121,11 +121,11 @@
     "values": [
       {
         "themeId": 0,
-        "path": "svg/90.svg"
+        "path": "svg/9_0.svg"
       },
       {
         "themeId": 1,
-        "path": "svg/91.svg"
+        "path": "svg/9_1.svg"
       }
     ]
   },
@@ -134,11 +134,11 @@
     "values": [
       {
         "themeId": 0,
-        "path": "svg/100.svg"
+        "path": "svg/10_0.svg"
       },
       {
         "themeId": 1,
-        "path": "svg/101.svg"
+        "path": "svg/10_1.svg"
       }
     ]
   },
@@ -147,11 +147,11 @@
     "values": [
       {
         "themeId": 0,
-        "path": "svg/110.svg"
+        "path": "svg/11_0.svg"
       },
       {
         "themeId": 1,
-        "path": "svg/111.svg"
+        "path": "svg/11_1.svg"
       }
     ]
   },
@@ -160,11 +160,11 @@
     "values": [
       {
         "themeId": 0,
-        "path": "svg/120.svg"
+        "path": "svg/12_0.svg"
       },
       {
         "themeId": 1,
-        "path": "svg/121.svg"
+        "path": "svg/12_1.svg"
       }
     ]
   },
@@ -173,11 +173,11 @@
     "values": [
       {
         "themeId": 0,
-        "path": "svg/130.svg"
+        "path": "svg/13_0.svg"
       },
       {
         "themeId": 1,
-        "path": "svg/131.svg"
+        "path": "svg/13_1.svg"
       }
     ]
   },
@@ -186,11 +186,11 @@
     "values": [
       {
         "themeId": 0,
-        "path": "svg/140.svg"
+        "path": "svg/14_0.svg"
       },
       {
         "themeId": 1,
-        "path": "svg/141.svg"
+        "path": "svg/14_1.svg"
       }
     ]
   },
@@ -199,11 +199,11 @@
     "values": [
       {
         "themeId": 0,
-        "path": "svg/150.svg"
+        "path": "svg/15_0.svg"
       },
       {
         "themeId": 1,
-        "path": "svg/151.svg"
+        "path": "svg/15_1.svg"
       }
     ]
   },
@@ -212,11 +212,154 @@
     "values": [
       {
         "themeId": 0,
-        "path": "svg/160.svg"
+        "path": "svg/16_0.svg"
       },
       {
         "themeId": 1,
-        "path": "svg/161.svg"
+        "path": "svg/16_1.svg"
+      }
+    ]
+  },
+  {
+    "id": 17,
+    "values": [
+      {
+        "themeId": 0,
+        "path": "svg/17_0.svg"
+      },
+      {
+        "themeId": 1,
+        "path": "svg/17_1.svg"
+      }
+    ]
+  },
+  {
+    "id": 18,
+    "values": [
+      {
+        "themeId": 0,
+        "path": "svg/18_0.svg"
+      },
+      {
+        "themeId": 1,
+        "path": "svg/18_1.svg"
+      }
+    ]
+  },
+  {
+    "id": 19,
+    "values": [
+      {
+        "themeId": 0,
+        "path": "svg/19_0.svg"
+      },
+      {
+        "themeId": 1,
+        "path": "svg/19_1.svg"
+      }
+    ]
+  },
+  {
+    "id": 20,
+    "values": [
+      {
+        "themeId": 0,
+        "path": "svg/20_0.svg"
+      },
+      {
+        "themeId": 1,
+        "path": "svg/20_1.svg"
+      }
+    ]
+  },
+  {
+    "id": 21,
+    "values": [
+      {
+        "themeId": 0,
+        "path": "svg/21_0.svg"
+      },
+      {
+        "themeId": 1,
+        "path": "svg/22_1.svg"
+      }
+    ]
+  },
+  {
+    "id": 22,
+    "values": [
+      {
+        "themeId": 0,
+        "path": "svg/22_0.svg"
+      },
+      {
+        "themeId": 1,
+        "path": "svg/22_1.svg"
+      }
+    ]
+  },
+  {
+    "id": 23,
+    "values": [
+      {
+        "themeId": 0,
+        "path": "svg/23_0.svg"
+      },
+      {
+        "themeId": 1,
+        "path": "svg/23_1.svg"
+      }
+    ]
+  },
+  {
+    "id": 24,
+    "values": [
+      {
+        "themeId": 0,
+        "path": "svg/24_0.svg"
+      },
+      {
+        "themeId": 1,
+        "path": "svg/24_1.svg"
+      }
+    ]
+  },
+  {
+    "id": 25,
+    "values": [
+      {
+        "themeId": 0,
+        "path": "svg/25_0.svg"
+      },
+      {
+        "themeId": 1,
+        "path": "svg/25_1.svg"
+      }
+    ]
+  },
+  {
+    "id": 26,
+    "values": [
+      {
+        "themeId": 0,
+        "path": "svg/26_0.svg"
+      },
+      {
+        "themeId": 1,
+        "path": "svg/26_1.svg"
+      }
+    ]
+  },
+  {
+    "id": 27,
+    "values": [
+      {
+        "themeId": 0,
+        "path": "svg/27_0.svg"
+      },
+      {
+        "themeId": 1,
+        "path": "svg/27_1.svg"
       }
     ]
   }

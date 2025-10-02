@@ -3,6 +3,8 @@ package kz.aita.compose.navigation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kz.aita.compose.navigation.Navigation.Menu._Left
+import kz.aita.compose.navigation.Navigation.Menu._Right
 
 object Navigation {
 
@@ -164,6 +166,46 @@ object Navigation {
   }
 
   object TransactionSale {
+    fun isVeryFirstScreen(isNarrowScreen: Boolean, clientId: Int): Boolean {
+      return (
+          if (isNarrowScreen)
+            when (clientId) {
+              0 -> _LeftClient1
+              1 -> _LeftClient2
+              2 -> _LeftClient3
+              3 -> _LeftClient4
+              else -> _LeftClient5
+            }
+          else
+            when (clientId) {
+              0 -> _RightClient1
+              1 -> _RightClient2
+              2 -> _RightClient3
+              3 -> _RightClient4
+              else -> _RightClient5
+            }
+          ).value.size == 1
+    }
+
+    fun isVeryFirstScreenLeft(clientId: Int): Boolean {
+      return (when (clientId) {
+        0 -> _LeftClient1
+        1 -> _LeftClient2
+        2 -> _LeftClient3
+        3 -> _LeftClient4
+        else -> _LeftClient5
+      }).value.size == 1
+    }
+
+    fun isVeryFirstScreenRight(clientId: Int): Boolean {
+      return (when (clientId) {
+        0 -> _RightClient1
+        1 -> _RightClient2
+        2 -> _RightClient3
+        3 -> _RightClient4
+        else -> _RightClient5
+      }).value.size == 1
+    }
 
     private val _ClientId =
       MutableStateFlow(0)
@@ -173,6 +215,7 @@ object Navigation {
     suspend fun setClientId(id: Int) {
       _ClientId.emit(id)
     }
+
     private val _LeftClient1 =
       MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.Cart))
     val LeftClient1 =
@@ -807,6 +850,47 @@ object Navigation {
   }
 
   object TransactionReturn {
+
+    fun isVeryFirstScreen(isNarrowScreen: Boolean, clientId: Int): Boolean {
+      return (
+          if (isNarrowScreen)
+            when (clientId) {
+              0 -> _LeftClient1
+              1 -> _LeftClient2
+              2 -> _LeftClient3
+              3 -> _LeftClient4
+              else -> _LeftClient5
+            }
+          else
+            when (clientId) {
+              0 -> _RightClient1
+              1 -> _RightClient2
+              2 -> _RightClient3
+              3 -> _RightClient4
+              else -> _RightClient5
+            }
+          ).value.size == 1
+    }
+
+    fun isVeryFirstScreenLeft(clientId: Int): Boolean {
+      return (when (clientId) {
+        0 -> _LeftClient1
+        1 -> _LeftClient2
+        2 -> _LeftClient3
+        3 -> _LeftClient4
+        else -> _LeftClient5
+      }).value.size == 1
+    }
+
+    fun isVeryFirstScreenRight(clientId: Int): Boolean {
+      return (when (clientId) {
+        0 -> _RightClient1
+        1 -> _RightClient2
+        2 -> _RightClient3
+        3 -> _RightClient4
+        else -> _RightClient5
+      }).value.size == 1
+    }
 
     private val _ClientId =
       MutableStateFlow(0)
@@ -1452,6 +1536,47 @@ object Navigation {
 
   object TransactionSupply {
 
+    fun isVeryFirstScreen(isNarrowScreen: Boolean, clientId: Int): Boolean {
+      return (
+          if (isNarrowScreen)
+            when (clientId) {
+              0 -> _LeftClient1
+              1 -> _LeftClient2
+              2 -> _LeftClient3
+              3 -> _LeftClient4
+              else -> _LeftClient5
+            }
+          else
+            when (clientId) {
+              0 -> _RightClient1
+              1 -> _RightClient2
+              2 -> _RightClient3
+              3 -> _RightClient4
+              else -> _RightClient5
+            }
+          ).value.size == 1
+    }
+
+    fun isVeryFirstScreenLeft(clientId: Int): Boolean {
+      return (when (clientId) {
+        0 -> _LeftClient1
+        1 -> _LeftClient2
+        2 -> _LeftClient3
+        3 -> _LeftClient4
+        else -> _LeftClient5
+      }).value.size == 1
+    }
+
+    fun isVeryFirstScreenRight(clientId: Int): Boolean {
+      return (when (clientId) {
+        0 -> _RightClient1
+        1 -> _RightClient2
+        2 -> _RightClient3
+        3 -> _RightClient4
+        else -> _RightClient5
+      }).value.size == 1
+    }
+
     private val _ClientId =
       MutableStateFlow(0)
     val ClientId =
@@ -1460,6 +1585,7 @@ object Navigation {
     suspend fun setClientId(id: Int) {
       _ClientId.emit(id)
     }
+
     private val _LeftClient1 =
       MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.Cart))
     val LeftClient1 =
@@ -2095,6 +2221,18 @@ object Navigation {
 
   object Stock {
 
+    fun isVeryFirstScreen(isNarrowScreen: Boolean): Boolean {
+      return (if (isNarrowScreen) _Left else _Right).value.size == 1
+    }
+
+    fun isVeryFirstScreenLeft(): Boolean {
+      return _Left.value.size == 1
+    }
+
+    fun isVeryFirstScreenRight(): Boolean {
+      return _Right.value.size == 1
+    }
+
     private val _Left =
       MutableStateFlow<List<NavigationScreenModel.Stock>>(listOf(NavigationScreenModel.Stock.Warehouse))
     val Left =
@@ -2244,6 +2382,18 @@ object Navigation {
     val Left =
       _Left.asStateFlow()
 
+    fun isVeryFirstScreen(isNarrowScreen: Boolean): Boolean {
+      return (if (isNarrowScreen) _Left else _Right).value.size == 1
+    }
+
+    fun isVeryFirstScreenLeft(): Boolean {
+      return _Left.value.size == 1
+    }
+
+    fun isVeryFirstScreenRight(): Boolean {
+      return _Right.value.size == 1
+    }
+
     private val _Right =
       MutableStateFlow<List<NavigationScreenModel.Menu>>(listOf(NavigationScreenModel.Menu.UserAccount))
     val Right =
@@ -2254,6 +2404,13 @@ object Navigation {
         goLeft(model)
       else
         goRight(model)
+    }
+
+    suspend fun pop(isNarrowScreen: Boolean, navigateAfterwards: NavigationScreenModel.Menu? = null) {
+      if (isNarrowScreen)
+        popLeft(navigateAfterwards)
+      else
+        popRight(navigateAfterwards)
     }
 
     suspend fun goLeft(
@@ -2375,6 +2532,18 @@ object Navigation {
   }
 
   object UserAuth {
+
+    fun isVeryFirstScreen(isNarrowScreen: Boolean): Boolean {
+      return (if (isNarrowScreen) _Left else _Right).value.size == 1
+    }
+
+    fun isVeryFirstScreenLeft(): Boolean {
+      return _Left.value.size == 1
+    }
+
+    fun isVeryFirstScreenRight(): Boolean {
+      return _Right.value.size == 1
+    }
 
     private val _Left =
       MutableStateFlow<List<NavigationScreenModel.UserAuth>>(listOf(NavigationScreenModel.UserAuth.LogIn))

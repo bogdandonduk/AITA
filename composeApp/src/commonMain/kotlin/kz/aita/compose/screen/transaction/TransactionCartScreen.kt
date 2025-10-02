@@ -3,6 +3,7 @@ package kz.aita.compose.screen.transaction
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import kotlinx.coroutines.launch
 import kz.aita.AppUIConfiguration
@@ -25,6 +26,18 @@ fun AppUIConfiguration.TransactionCartScreen() {
       }
       else -> {
         0
+      }
+    }
+
+    val clientId = when(transactionTypeIndex) {
+      0 -> {
+        stateValues.navigationTransactionReturnClientId
+      }
+      1 -> {
+        stateValues.navigationTransactionSupplyClientId
+      }
+      else -> {
+        stateValues.navigationTransactionSaleClientId
       }
     }
 

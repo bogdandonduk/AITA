@@ -16,11 +16,11 @@ fun AppUIConfiguration.MenuDevicesScreen() {
       .fillMaxSize()
   ) {
     ScreenAppBarWidget(
-      title = stateValues.stringStock,
-      iconPath = stateValues.drawablePathIconStock,
+      title = stateValues.stringDevices,
+      iconPath = stateValues.drawablePathIconDevices,
       onBack = {
         coroutineScope.launch {
-          Navigation.popMain()
+          Navigation.Menu.pop(stateValues.isNarrowScreen)
         }
       }
     )
