@@ -1,0 +1,15 @@
+ktor:
+  application:
+    modules:
+      - kz.aita.server.ApplicationKt.module
+  deployment:
+    host: "0.0.0.0"
+    port: 8080                 # Server will listen on http://localhost:8080
+  security:
+    jwt:
+      issuer: "https://aita.kz"   # Who signs tokens (your API’s URL)
+      audience: "aita-client"             # Who the tokens are meant for (your clients)
+      realm: "AITA API"                   # Realm shown on auth challenges
+      secret: ${?JWT_SECRET} # Loaded from env var in prod
+      access_ttl_sec: 600      # Access token lifetime (10 minutes)
+      refresh_ttl_days: 30     # Refresh token lifetime (30 days)

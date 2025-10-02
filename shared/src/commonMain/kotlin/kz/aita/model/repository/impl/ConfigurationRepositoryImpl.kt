@@ -29,7 +29,7 @@ class ConfigurationRepositoryImpl(
     coroutineScope = this,
     initial = GlobalAppConfigurationDataModel(
       serverUrl = "http://192.168.100.9:8080/",
-      globalConfigurationPath = "config/global",
+      globalConfigurationPath = "config/app/global",
       stringResourcesPath = "res/string",
       dimensionResourcesPath = "res/dimension",
       colorResourcesPath = "res/color",

@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.flow
 import kz.aita.model.dataModel.LocalizedStringGroupDataModel
 import kz.aita.model.dataModel.UserAccountDataModel
 import kz.aita.model.dataModel.UserAuthLogInDataModel
+import kz.aita.model.dataModel.UserSettingsDataModel
 import kz.aita.model.repository.Repository
 import kz.aita.model.repository.UserRepository
 import kz.aita.model.service.GenericRemoteService
@@ -22,11 +23,16 @@ class UserRepositoryImpl(
       0,
       "bogdan.donduk@gmail.com",
       "7714047737",
-      "kz",
       "Bogdan",
       "Donduk",
-      "DevaHello1515!",
-      1759232357
+      "kz",
+//      UserSettingsDataModel(
+//        1759232357,
+//        "en",
+//        0,
+//        0
+//      )
+
     )
   )
   override val userAccountState = _userAccountState.asDataStateFlow()

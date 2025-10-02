@@ -13,6 +13,15 @@ application {
     applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
 }
 
+kotlin {
+    sourceSets {
+        val main by getting {
+            // keep the default src/main/resources *and* add your custom config folder
+            resources.srcDir("config")
+        }
+    }
+}
+
 dependencies {
     // ContentNegotiation + kotlinx.serialization
     implementation("io.ktor:ktor-server-content-negotiation:${property("ktor.version")}")
@@ -22,8 +31,29 @@ dependencies {
     implementation("io.ktor:ktor-server-cors:${property("ktor.version")}")
     implementation("io.ktor:ktor-server-compression:${property("ktor.version")}")
     implementation("io.ktor:ktor-server-auto-head-response:${property("ktor.version")}")
+
     implementation("io.ktor:ktor-server-call-logging:${property("ktor.version")}")
+    implementation("io.ktor:ktor-server-status-pages:${property("ktor.version")}")
+
     implementation("io.ktor:ktor-server-conditional-headers:${property("ktor.version")}")
+
+    // Password hashing
+    implementation(libs.bcrypt)                         // BCrypt hash & verify
+
+    // Read YAML config (so we can keep secrets out of code)
+    implementation(libs.ktor.server.config.yaml)
+
+    implementation(libs.exposed.core)          // Exposed base
+    implementation(libs.exposed.dao)           // (optional) DAO layer
+    implementation(libs.exposed.jdbc)          // JDBC support
+    implementation(libs.exposed.java.time)     // java.time columns (Instant, etc.)
+    implementation(libs.exposed.json)          // JSON/JSONB columns
+    implementation(libs.postgresql)
+
+    implementation(libs.ktor.server.auth)
+    implementation(libs.ktor.server.auth.jwt)
+    implementation(libs.java.jwt)
+
 
     implementation(projects.shared)
     implementation(libs.logback)

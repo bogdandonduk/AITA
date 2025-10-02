@@ -9,7 +9,5 @@ data class UserAuthSignUpOwnerDataModel(
   val password: String,
   val firstName: String,
   val lastName: String,
-  val country: CountryDataModel,
-  val city: CityDataModel,
-  val store: StoreDataModel
+  val countryLocale: String
 )
