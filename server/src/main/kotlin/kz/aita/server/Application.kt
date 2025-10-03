@@ -16,6 +16,7 @@ import kotlinx.serialization.json.Json
 import kz.aita.server.db.RefreshSessions
 import kz.aita.server.db.Users
 import kz.aita.server.jwt.configureJwtAuth
+import org.flywaydb.core.Flyway
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -44,14 +45,25 @@ fun Application.module() {
     })
   }
 
+  val config = environment.config
+  val url  = config.property("db.url").getString()
+  val user = config.property("db.user").getString()
+  val pass = config.property("db.pass").getString()
+
+  Flyway.configure()
+    .dataSource(url, user, pass)
+    .locations(config.propertyOrNull("flyway.locations")?.getString() ?: "classpath:db/migration")
+    .baselineOnMigrate(true)
+    .validateOnMigrate(true)
+    .load()
+    .migrate()
+
   Database.connect(
-    url = System.getenv("DB_URL"),
+    url = System.getenv("AITA_DB_URL"),
     driver = "org.postgresql.Driver",
     user = System.getenv("DB_USER"),
     password = System.getenv("DB_PASS"),
   )
-
-  transaction { SchemaUtils.create(Users, RefreshSessions) }
 
   configureJwtAuth()
 

@@ -22,20 +22,19 @@ data class TokenPair(
 
 class TokenService(private val cfg: JwtCfg) {
 
-  fun signAccess(userId: UUID, deviceId: String?): String {
+  fun signAccess(userId: UUID): String {
     val now = Instant.now()
     val exp = now.plusSeconds(cfg.access_ttl_sec)
     return JWT.create()
       .withIssuer(cfg.issuer)
       .withAudience(cfg.audience)
       .withSubject(userId.toString())
-      .withClaim("device_id", deviceId)
       .withIssuedAt(Date.from(now))
       .withExpiresAt(Date.from(exp))
       .sign(Algorithm.HMAC256(cfg.secret))
   }
 
-  fun newRefreshPair(userId: UUID, deviceIdParam: String?, metaParam: Map<String, String>?): TokenPair = transaction {
+  fun newRefreshPair(userId: UUID, metaParam: Map<String, String>?): TokenPair = transaction {
     val refreshPlain = Refresh.newPlainToken()
     val refreshHash = Refresh.hash(refreshPlain)
     val now = Instant.now()
@@ -45,17 +44,16 @@ class TokenService(private val cfg: JwtCfg) {
       it[id] = UUID.randomUUID()
       it[RefreshSessions.userId] = userId
       it[tokenHash] = refreshHash
-      it[deviceId] = deviceIdParam
       it[createdAt] = now
       it[expiresAt] = expires
       it[meta] = metaParam
     }
 
-    val access = signAccess(userId, deviceIdParam)
+    val access = signAccess(userId)
     TokenPair(access, cfg.access_ttl_sec, refreshPlain)
   }
 
-  fun rotate(refreshPlain: String, deviceId: String?, metaParam: Map<String, String>?): TokenPair = transaction {
+  fun rotate(refreshPlain: String, metaParam: Map<String, String>?): TokenPair = transaction {
     val hash = Refresh.hash(refreshPlain)
 
     val cond = (RefreshSessions.tokenHash eq hash) and RefreshSessions.revokedAt.isNull()
@@ -80,14 +78,13 @@ class TokenService(private val cfg: JwtCfg) {
       it[id] = UUID.randomUUID()
       it[userId] = session[RefreshSessions.userId]
       it[tokenHash] = newHash
-      it[RefreshSessions.deviceId] = deviceId
       it[createdAt] = now
       it[expiresAt] = expires
       it[rotatedFrom] = session[RefreshSessions.id]
       it[meta] = metaParam
     }
 
-    val access = signAccess(session[RefreshSessions.userId], deviceId)
+    val access = signAccess(session[RefreshSessions.userId])
     TokenPair(access, cfg.access_ttl_sec, newPlain)
   }
 

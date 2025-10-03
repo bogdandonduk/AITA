@@ -40,7 +40,8 @@ dependencies {
     implementation(libs.exposed.java.time)     // java.time columns (Instant, etc.)
     implementation(libs.exposed.json)          // JSON/JSONB columns
     implementation(libs.postgresql)
-
+    implementation(libs.flyway.core)
+    implementation(libs.flyway.database.postgresql)
     implementation(libs.ktor.server.auth)
     implementation(libs.ktor.server.auth.jwt)
     implementation(libs.java.jwt)

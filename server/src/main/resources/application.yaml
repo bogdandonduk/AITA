@@ -1,22 +1,28 @@
 ktor:
   deployment:
     host: "0.0.0.0"
-    port: 8080
+    port: ${?AITA_PORT}
   application:
     modules:
       - kz.aita.server.ApplicationKt.module
   security:
     jwt:
-      issuer: "http://localhost:8080"
-      audience: "aita-client"
+      issuer: ${?AITA_JWT_ISSUER}
+      audience: ${?AITA_JWT_AUDIENCE}
       realm: "AITA API"
-      secret: ${?JWT_SECRET}
+      secret: ${?AITA_JWT_SECRET}
       access_ttl_sec: 600
       refresh_ttl_days: 30
 
 db:
-  url: ${?DB_URL}
+  url: ${?AITA_DB_URL}
   user: ${?DB_USER}
   pass: ${?DB_PASS}
 
+flyway:
+  locations: "classpath:db/migration"
+  baselineOnMigrate: true
+  validateOnMigrate: ${?AITA_FLYWAY_VALIDATE_ON_MIGRATE}
+  runOnStart: ${?AITA_FLYWAY_RUN_ON_START}
+  cleanDisabled: ${?AITA_FLYWAY_CLEAN_DISABLED}
 

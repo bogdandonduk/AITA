@@ -96,14 +96,14 @@ fun Application.routes() {
         }
 
         // Issue tokens (+ create refresh session)
-        val pair = tokens.newRefreshPair(user[Users.id], body.deviceId, metaFrom(call))
+        val pair = tokens.newRefreshPair(user[Users.id], metaFrom(call))
         call.respond(pair)
       }
 
       post("/refresh") {
         val body = call.receive<RefreshTokenRequestBody>()
         try {
-          val pair = tokens.rotate(body.refresh_token, body.deviceId, metaFrom(call))
+          val pair = tokens.rotate(body.refresh_token, metaFrom(call))
           call.respond(pair)
         } catch (e: Unauthorized) {
           call.respond(HttpStatusCode.Unauthorized, mapOf("error" to e.message))

@@ -12,7 +12,6 @@ object RefreshSessions : Table("refresh_sessions") {
   val id = uuid("id")
   val userId = uuid("user_id").references(Users.id, onDelete = ReferenceOption.CASCADE)
   val tokenHash = char("token_hash", 64).index()  // hex(sha256) = 64 chars
-  val deviceId = varchar("device_id", 64).nullable()
   val createdAt = timestamp("created_at").defaultExpression(CurrentTimestamp)
   val expiresAt = timestamp("expires_at")
   val rotatedFrom = uuid("rotated_from").nullable()
