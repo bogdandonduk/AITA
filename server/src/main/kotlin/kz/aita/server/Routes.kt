@@ -16,7 +16,7 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
-import kz.aita.model.dataModel.UserAccountDataModel
+import kz.aita.model.dataModel.AdminUserAccountDataModel
 import kz.aita.model.dataModel.UserAuthSignUpDataModel
 import kz.aita.server.dataModel.request.RefreshTokenRequestBody
 import kz.aita.server.dataModel.request.UserAuthLogInRequestBody
@@ -26,8 +26,6 @@ import kz.aita.server.jwt.TokenService
 import kz.aita.server.jwt.Unauthorized
 import kz.aita.server.jwt.jwtCfg
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.io.File
@@ -69,7 +67,7 @@ fun Application.routes() {
         }
         call.respond(
           HttpStatusCode.Created,
-          UserAccountDataModel(
+          AdminUserAccountDataModel(
             phoneNumber = body.phoneNumber,
             email = body.email,
             firstName = body.firstName,

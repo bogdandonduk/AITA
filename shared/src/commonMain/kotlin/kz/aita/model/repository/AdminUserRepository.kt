@@ -1,18 +1,17 @@
 package kz.aita.model.repository
 
-import kotlinx.coroutines.flow.Flow
-import kz.aita.model.dataModel.LocalizedStringGroupDataModel
-import kz.aita.model.dataModel.UserAccountDataModel
+import kz.aita.model.dataModel.AdminUserAccountDataModel
 import kz.aita.model.dataModel.UserAuthLogInDataModel
 import kz.aita.model.dataModel.UserAuthSignUpDataModel
-import kz.aita.model.wrapper.DataState
 import kz.aita.model.wrapper.DataStateFlow
 
-interface UserRepository {
+interface AdminUserRepository {
 
-  val userAccountState: DataStateFlow<UserAccountDataModel>
+  val userAccountState: DataStateFlow<AdminUserAccountDataModel>
 
   suspend fun logIn(userAuthLogIn: UserAuthLogInDataModel)
 
   suspend fun signUp(userAuthSignUp: UserAuthSignUpDataModel)
+
+  suspend fun logOut()
 }

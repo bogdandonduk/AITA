@@ -1,24 +1,21 @@
 package kz.aita.model.repository.impl
 
 import io.ktor.http.HttpMethod
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kz.aita.model.dataModel.UserAccountDataModel
+import kz.aita.model.dataModel.AdminUserAccountDataModel
 import kz.aita.model.dataModel.UserAuthLogInDataModel
 import kz.aita.model.dataModel.UserAuthSignUpDataModel
 import kz.aita.model.repository.ConfigurationRepository
 import kz.aita.model.repository.Repository
-import kz.aita.model.repository.UserRepository
+import kz.aita.model.repository.AdminUserRepository
 import kz.aita.model.service.GenericRemoteService
-import kz.aita.model.wrapper.DataState
 import kz.aita.model.wrapper.MutableDataStateFlow
 
-class UserRepositoryImpl(
+class AdminUserRepositoryImpl(
   private val genericRemoteService: GenericRemoteService,
   private val configurationRepository: ConfigurationRepository
-) : Repository(), UserRepository {
+) : Repository(), AdminUserRepository {
 
-  private val _userAccountState = MutableDataStateFlow<UserAccountDataModel>(
+  private val _userAccountState = MutableDataStateFlow<AdminUserAccountDataModel>(
     this,
 //    initial = UserAccountDataModel(
 //      0,
@@ -45,7 +42,7 @@ class UserRepositoryImpl(
   override suspend fun signUp(userAuthSignUp: UserAuthSignUpDataModel) {
 
     val response = genericRemoteService
-      .request<UserAccountDataModel, UserAuthSignUpDataModel>(
+      .request<AdminUserAccountDataModel, UserAuthSignUpDataModel>(
         HttpMethod.Post,
         configurationRepository.globalAppConfigurationState.payloadValue.serverUrl,
         configurationRepository.globalAppConfigurationState.payloadValue.signUpPath,

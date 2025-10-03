@@ -11,7 +11,7 @@ import androidx.compose.ui.Modifier
 import kz.aita.AppUIConfiguration
 import kz.aita.compose.navigation.NavigationScreenModel
 import kz.aita.compose.widget.LargeIconWithTitleWidget
-import kz.aita.core.userRepository
+import kz.aita.core.adminUserRepository
 
 @Composable
 fun AppUIConfiguration.UserAuthScreen() {
@@ -28,7 +28,7 @@ fun AppUIConfiguration.UserAuthScreen() {
           }
 
           else -> {
-            UserAuthSignUpScreen(userRepository = userRepository)
+            UserAuthSignUpScreen(adminUserRepository = adminUserRepository)
           }
         }
       }
@@ -55,7 +55,7 @@ fun AppUIConfiguration.UserAuthScreen() {
             }
 
             else -> {
-              UserAuthSignUpScreen(userRepository)
+              UserAuthSignUpScreen(adminUserRepository)
             }
           }
         }
@@ -67,7 +67,7 @@ fun AppUIConfiguration.UserAuthScreen() {
         ) { model ->
           when (model) {
             is NavigationScreenModel.UserAuth.SignUp -> {
-              UserAuthSignUpScreen(userRepository)
+              UserAuthSignUpScreen(adminUserRepository)
             }
             else -> {}
           }

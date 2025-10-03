@@ -30,7 +30,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -51,7 +50,7 @@ import kz.aita.compose.screen.transaction.TransactionScreen
 import kz.aita.compose.screen.userAuth.UserAuthScreen
 import kz.aita.core.getFullDrawableResourceUrl
 import kz.aita.core.io
-import kz.aita.core.userRepository
+import kz.aita.core.adminUserRepository
 import kz.aita.model.wrapper.DataState
 
 @Composable
@@ -67,7 +66,7 @@ fun AppUIConfiguration.MainScreen() {
     }
 
     coroutineScope.launch(Dispatchers.io) {
-      userRepository
+      adminUserRepository
         .userAccountState
         .value
         .collect {

@@ -3,7 +3,7 @@ package kz.aita.model.dataModel
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class UserAccountDataModel(
+data class AdminUserAccountDataModel(
   val phoneNumber: String,
   val email: String,
   val firstName: String,

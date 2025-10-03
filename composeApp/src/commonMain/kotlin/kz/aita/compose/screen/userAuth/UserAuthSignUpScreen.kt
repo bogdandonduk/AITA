@@ -27,11 +27,11 @@ import kz.aita.compose.widget.phoneNumberWithCountrySelectionTextField
 import kz.aita.compose.widget.repeatedPasswordTextFieldGroup
 import kz.aita.core.io
 import kz.aita.model.dataModel.UserAuthSignUpDataModel
-import kz.aita.model.repository.UserRepository
+import kz.aita.model.repository.AdminUserRepository
 
 @Composable
 fun AppUIConfiguration.UserAuthSignUpScreen(
-  userRepository: UserRepository
+  adminUserRepository: AdminUserRepository
 ) {
   LazyColumn(
     modifier = Modifier.fillMaxSize(),
@@ -116,7 +116,7 @@ fun AppUIConfiguration.UserAuthSignUpScreen(
 
           if (phoneNumberTextFieldContent.isContentValid && emailTextFieldContent.isContentValid && passwordTextFieldContent.isContentValid && repeatedPasswordTextFieldContent.isContentValid)
             coroutineScope.launch(Dispatchers.io) {
-              userRepository
+              adminUserRepository
                 .signUp(
                   UserAuthSignUpDataModel(
                     phoneNumberTextFieldContent.value.text,
