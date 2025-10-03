@@ -3,9 +3,7 @@ package kz.aita.model.dataModel
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class StoreDataModel(
+data class GoodsItemCategoryDataModel(
   val id: Long,
-  val subId: Long,
-  val name: String,
-  val location: LocationDataModel
+  val name: String
 )

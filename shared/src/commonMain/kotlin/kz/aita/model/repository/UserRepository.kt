@@ -1,13 +1,13 @@
 package kz.aita.model.repository
 
-import kz.aita.model.dataModel.AdminUserAccountDataModel
+import kz.aita.model.dataModel.UserAccountDataModel
 import kz.aita.model.dataModel.UserAuthLogInDataModel
 import kz.aita.model.dataModel.UserAuthSignUpDataModel
 import kz.aita.model.wrapper.DataStateFlow
 
-interface AdminUserRepository {
+interface UserRepository {
 
-  val userAccountState: DataStateFlow<AdminUserAccountDataModel>
+  val userAccountState: DataStateFlow<UserAccountDataModel>
 
   suspend fun logIn(userAuthLogIn: UserAuthLogInDataModel)
 

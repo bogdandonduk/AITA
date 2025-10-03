@@ -16,7 +16,7 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
-import kz.aita.model.dataModel.AdminUserAccountDataModel
+import kz.aita.model.dataModel.UserAccountDataModel
 import kz.aita.model.dataModel.UserAuthSignUpDataModel
 import kz.aita.server.dataModel.request.RefreshTokenRequestBody
 import kz.aita.server.dataModel.request.UserAuthLogInRequestBody
@@ -67,7 +67,7 @@ fun Application.routes() {
         }
         call.respond(
           HttpStatusCode.Created,
-          AdminUserAccountDataModel(
+          UserAccountDataModel(
             phoneNumber = body.phoneNumber,
             email = body.email,
             firstName = body.firstName,

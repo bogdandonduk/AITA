@@ -50,7 +50,7 @@ import kz.aita.compose.screen.transaction.TransactionScreen
 import kz.aita.compose.screen.userAuth.UserAuthScreen
 import kz.aita.core.getFullDrawableResourceUrl
 import kz.aita.core.io
-import kz.aita.core.adminUserRepository
+import kz.aita.core.userRepository
 import kz.aita.model.wrapper.DataState
 
 @Composable
@@ -66,7 +66,7 @@ fun AppUIConfiguration.MainScreen() {
     }
 
     coroutineScope.launch(Dispatchers.io) {
-      adminUserRepository
+      userRepository
         .userAccountState
         .value
         .collect {
