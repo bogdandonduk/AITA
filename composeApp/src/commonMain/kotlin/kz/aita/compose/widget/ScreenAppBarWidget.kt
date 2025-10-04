@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
@@ -33,12 +32,12 @@ import io.kamel.image.KamelImage
 import io.kamel.image.asyncPainterResource
 import io.kamel.image.config.LocalKamelConfig
 import io.ktor.http.Url
-import kz.aita.AppUIConfiguration
+import kz.aita.AppConfiguration
 import kz.aita.compose.render.kamelConfig
 import kz.aita.core.getFullDrawableResourceUrl
 
 @Composable
-fun AppUIConfiguration.ScreenAppBarWidget(
+fun AppConfiguration.ScreenAppBarWidget(
   modifier: Modifier = Modifier,
   title: String,
   iconPath: String? = null,

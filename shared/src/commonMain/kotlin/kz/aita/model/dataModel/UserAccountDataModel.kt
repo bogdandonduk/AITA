@@ -4,12 +4,14 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class UserAccountDataModel(
-  val id: Long,
+  val id: String,
   val phoneNumber: String,
   val email: String,
   val firstName: String,
   val lastName: String,
   val countryLocale: String,
-  val storeWorkerAccount: StoreWorkerDataModel?,
-  val storeSupplierAccount: StoreSupplierDataModel?
+  val storeWorkerAccountId: String?,
+  val storeSupplierAccountId: String?,
+  val createdAt: Long,
+  val isActive: Boolean
 )

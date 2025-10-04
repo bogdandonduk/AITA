@@ -5,12 +5,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import kotlinx.coroutines.launch
-import kz.aita.AppUIConfiguration
+import kz.aita.AppConfiguration
 import kz.aita.compose.navigation.Navigation
 import kz.aita.compose.widget.ScreenAppBarWidget
 
 @Composable
-fun AppUIConfiguration.MenuDevicesScreen() {
+fun AppConfiguration.MenuDevicesScreen() {
   Column(
     modifier = Modifier
       .fillMaxSize()

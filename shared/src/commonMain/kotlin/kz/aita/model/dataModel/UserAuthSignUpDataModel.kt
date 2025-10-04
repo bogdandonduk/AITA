@@ -6,8 +6,8 @@ import kotlinx.serialization.Serializable
 data class UserAuthSignUpDataModel(
   val phoneNumber: String,
   val email: String,
-  val password: String,
   val firstName: String,
   val lastName: String,
-  val countryLocale: String
+  val countryLocale: String,
+  val password: String
 )

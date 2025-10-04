@@ -1,6 +1,7 @@
 package kz.aita.model.repository
 
 import kotlinx.coroutines.flow.Flow
+import kz.aita.model.dataModel.ExceptionDataModel
 import kz.aita.model.wrapper.DataStateFlow
 import kz.aita.model.dataModel.GlobalAppConfigurationDataModel
 import kz.aita.model.dataModel.LocalizedStringGroupDataModel
@@ -17,6 +18,7 @@ interface ConfigurationRepository {
   val dimensionsState: DataStateFlow<List<StylizedDimensionGroupDataModel>>
   val colorsState: DataStateFlow<List<StylizedColorGroupDataModel>>
   val drawablesState: DataStateFlow<List<StylizedDrawablePathsGroupDataModel>>
+  val exceptionsState: DataStateFlow<List<ExceptionDataModel>>
 
   fun getGlobalConfiguration(loadAll: Boolean = true)
 
@@ -31,4 +33,6 @@ interface ConfigurationRepository {
   fun getDrawable(key: Long, themeId: Long, format: String): Flow<DataState<String>>
 
   fun getDrawable(name: String, format: String): Flow<DataState<String>>
+
+  fun getExceptions()
 }

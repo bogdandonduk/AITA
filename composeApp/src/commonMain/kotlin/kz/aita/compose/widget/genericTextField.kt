@@ -54,14 +54,14 @@ import io.kamel.image.KamelImage
 import io.kamel.image.asyncPainterResource
 import io.kamel.image.config.LocalKamelConfig
 import io.ktor.http.Url
-import kz.aita.AppUIConfiguration
+import kz.aita.AppConfiguration
 import kz.aita.core.getFullDrawableResourceUrl
 import kz.aita.compose.render.kamelConfig
 import kz.aita.compose.util.getTransformedTextWithSelectionFocusTextColor
 import kz.aita.compose.wrapper.ImeWithAction
 
 @Composable
-fun AppUIConfiguration.genericTextField(
+fun AppConfiguration.genericTextField(
   modifier: Modifier = Modifier,
 
   enabled: Boolean = true,

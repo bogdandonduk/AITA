@@ -4,11 +4,11 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class StoreWorkerDataModel(
-  val privilegeModeId: Long,
+  val privilegeModeId: Int,
   val isActive: Boolean,
-  val storeId: Long,
-  val storeSubId: Long,
-  val salary: Double,
+  val storeId: String,
+  val storeSubId: String,
+  val salary: String,
   val salaryCurrency: String,
   val addedAt: Long
 )

@@ -1,6 +1,8 @@
 {
-  "serverUrl": "http://127.0.0.1:8080/",
+  "appName": "AITA",
+  "serverUrl": "http://127.0.0.1:8080",
   "globalConfigurationPath": "config/app/global",
+  "exceptionConfigurationPath": "config/app/exception",
   "logInPath": "auth/logIn",
   "signUpPath": "auth/signUp",
   "stringResourcesPath": "res/string",
@@ -151,6 +153,62 @@
       "phoneNumberCode": "992",
       "phoneNumberSize": 9,
       "currency": "SM"
+    }
+  ],
+  "languages": [
+    {
+      "language": "en",
+      "name": [
+        {
+          "language": "en",
+          "value": "English"
+        },
+        {
+          "language": "ru",
+          "value": "Английский"
+        },
+        {
+          "language": "kk",
+          "value": "Ағылшынша"
+        }
+      ],
+      "flagDrawablePath": "png/flag_en.png"
+    },
+    {
+      "language": "ru",
+      "name": [
+        {
+          "language": "en",
+          "value": "Russian"
+        },
+        {
+          "language": "ru",
+          "value": "Русский"
+        },
+        {
+          "language": "kk",
+          "value": "Орысша"
+        }
+      ],
+      "flagDrawablePath": "png/flag_ru.png"
+    },
+    {
+      "language": "kk",
+      "name": [
+        {
+          "language": "en",
+          "value": "Kazakh"
+        },
+        {
+          "language": "ru",
+          "value": "Казахский"
+        },
+        {
+          "language": "kk",
+          "value": "Қазақша"
+        }
+      ],
+      "flagDrawablePath": "png/flag_kz.png"
     }
   ]
 }

@@ -10,14 +10,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import kz.aita.AppUIConfiguration
+import kz.aita.AppConfiguration
 import kz.aita.compose.util.checkAsPassword
 import kz.aita.compose.util.getPasswordTransformedTextWithSelectionFocusTextColor
 import kz.aita.compose.util.getTransformedTextWithSelectionFocusTextColor
 import kz.aita.compose.wrapper.ImeWithAction
 
 @Composable
-fun AppUIConfiguration.repeatedPasswordTextFieldGroup(
+fun AppConfiguration.repeatedPasswordTextFieldGroup(
   modifier: Modifier = Modifier,
   imeWithAction: ImeWithAction? = null
 ): Pair<GenericTextFieldContent, GenericTextFieldContent> {

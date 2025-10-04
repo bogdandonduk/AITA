@@ -4,8 +4,10 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class GlobalAppConfigurationDataModel(
+  val appName: String,
   val serverUrl: String,
   val globalConfigurationPath: String,
+  val exceptionConfigurationPath: String,
   val logInPath: String,
   val signUpPath: String,
   val stringResourcesPath: String,
@@ -14,5 +16,6 @@ data class GlobalAppConfigurationDataModel(
   val drawableResourcesConfigurationPath: String,
   val drawableResourcesPath: String,
   val companyForms: List<CompanyFormDataModel>,
-  val countries: List<CountryDataModel>
+  val countries: List<CountryDataModel>,
+  val languages: List<LanguageDataModel>
 )

@@ -1,5 +1,6 @@
 package kz.aita.core
 
+import kz.aita.model.dataModel.ExceptionDataModel
 import kz.aita.model.dataModel.LocalizedStringGroupDataModel
 import kz.aita.model.dataModel.StylizedColorGroupDataModel
 import kz.aita.model.dataModel.StylizedDimensionGroupDataModel
@@ -23,8 +24,12 @@ fun List<StylizedDrawablePathsGroupDataModel>.extractPath(id: Long, themeId: Lon
 
 fun getFullDrawableResourceUrl(path: String): String {
   return configurationRepository.globalAppConfigurationState.payloadValue.run {
-    serverUrl + drawableResourcesPath
+    "$serverUrl/$drawableResourcesPath"
   } + "/$path"
+}
+
+fun List<ExceptionDataModel>.extractExceptionMessage(id: Long): String {
+  return find { it.id == id }!!.message
 }
 
 

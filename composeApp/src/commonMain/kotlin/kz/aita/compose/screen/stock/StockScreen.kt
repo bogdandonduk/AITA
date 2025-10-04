@@ -6,11 +6,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import kz.aita.AppUIConfiguration
+import kz.aita.AppConfiguration
 import kz.aita.compose.navigation.NavigationScreenModel
 
 @Composable
-fun AppUIConfiguration.StockScreen() {
+fun AppConfiguration.StockScreen() {
   Column(
     horizontalAlignment = Alignment.CenterHorizontally
   ) {

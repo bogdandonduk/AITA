@@ -15,7 +15,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
-import kz.aita.AppUIConfiguration
+import kz.aita.AppConfiguration
 import kz.aita.compose.navigation.Navigation
 import kz.aita.compose.navigation.NavigationScreenModel
 import kz.aita.compose.widget.GenericTextFieldContent
@@ -30,7 +30,7 @@ import kz.aita.compose.widget.errorText
 import kz.aita.compose.widget.phoneNumberWithCountrySelectionTextField
 
 @Composable
-fun AppUIConfiguration.UserAuthLogInScreen() {
+fun AppConfiguration.UserAuthLogInScreen() {
   LazyColumn(
     modifier = Modifier.fillMaxSize(),
     horizontalAlignment = Alignment.CenterHorizontally
@@ -98,7 +98,7 @@ fun AppUIConfiguration.UserAuthLogInScreen() {
         errorText(
           stateValues.stringLoginAndOrPasswordIncorrect
         ) {
-          true
+          false
         }
 
         Spacer(modifier = Modifier.height(outerSpace))

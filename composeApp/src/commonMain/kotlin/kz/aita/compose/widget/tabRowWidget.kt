@@ -28,10 +28,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
-import kz.aita.AppUIConfiguration
+import kz.aita.AppConfiguration
 
 @Composable
-fun AppUIConfiguration.tabRowWidget(
+fun AppConfiguration.tabRowWidget(
   modifier: Modifier = Modifier,
   tabs: List<TabContent>,
 

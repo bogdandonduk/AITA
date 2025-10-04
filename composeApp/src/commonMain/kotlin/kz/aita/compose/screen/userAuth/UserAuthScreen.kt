@@ -8,13 +8,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import kz.aita.AppUIConfiguration
+import kz.aita.AppConfiguration
 import kz.aita.compose.navigation.NavigationScreenModel
 import kz.aita.compose.widget.LargeIconWithTitleWidget
 import kz.aita.core.userRepository
 
 @Composable
-fun AppUIConfiguration.UserAuthScreen() {
+fun AppConfiguration.UserAuthScreen() {
   Column(
     horizontalAlignment = Alignment.CenterHorizontally
   ) {

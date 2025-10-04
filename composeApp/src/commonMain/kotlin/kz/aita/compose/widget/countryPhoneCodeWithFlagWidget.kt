@@ -3,11 +3,12 @@ package kz.aita.compose.widget
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
@@ -19,23 +20,22 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.kamel.image.KamelImage
 import io.kamel.image.asyncPainterResource
 import io.kamel.image.config.LocalKamelConfig
 import io.ktor.http.Url
-import kz.aita.AppUIConfiguration
+import kz.aita.AppConfiguration
 import kz.aita.compose.render.kamelConfig
 import kz.aita.core.getFullDrawableResourceUrl
 import kz.aita.model.dataModel.CountryDataModel
 
 @Composable
-fun AppUIConfiguration.countryPhoneCodeWithFlagWidget(
+fun AppConfiguration.countryPhoneCodeWithFlagWidget(
   modifier: Modifier = Modifier,
   country: CountryDataModel,
+  showCountryName: Boolean = false,
   textColor: Color = stateValues.TextColor,
   onClick: (() -> Unit)? = null
   ): CountryPhoneCodeWithFlagWidgetContent {
@@ -100,8 +100,17 @@ fun AppUIConfiguration.countryPhoneCodeWithFlagWidget(
       text = "+${country.phoneNumberCode}",
       color = textColor,
       modifier = Modifier
-        .padding(end = 8.dp)
+        .padding(8.dp)
     )
+
+    if (showCountryName) {
+      Spacer(modifier = Modifier.width(8.dp))
+
+      Text(
+        text = country.name.find { it.language == stateValues.appLocaleLanguage }?.value ?: "",
+        color = textColor
+      )
+    }
   }
 
   return CountryPhoneCodeWithFlagWidgetContent(expanded)

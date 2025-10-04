@@ -51,15 +51,22 @@ kotlin {
   }
 
   sourceSets {
+    sourceSets.all {
+      languageSettings.optIn("kotlin.time.ExperimentalTime")
+    }
+
     commonMain.dependencies {
 //            api(libs.kotlinx.serialization.core)
-//            api(libs.kotlinx.serialization.json)
+      implementation(libs.kotlinx.serialization.json)
+
+//      implementation(libs.kotlinx.datetime)
+
+      implementation(libs.ktor.client.auth)
 
       implementation(libs.sqlDelightRuntime)
       implementation(libs.sqlDelightCoroutinesExtensions)
       implementation(libs.sqlDelightAsyncExtensions)
 
-      implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${property("coroutines.version")}")
       implementation("io.ktor:ktor-client-core:${property("ktor.version")}")
       implementation("io.ktor:ktor-client-content-negotiation:${property("ktor.version")}")
       implementation("io.ktor:ktor-serialization-kotlinx-json:${property("ktor.version")}")
@@ -72,18 +79,19 @@ kotlin {
 
     }
     androidMain.dependencies {
+
       implementation(libs.sqlcipher.android)
       implementation(libs.androidx.sqlite)
 
       implementation(libs.sqlDelightAndroidDriver)
 
-      implementation("io.ktor:ktor-client-android:${property("ktor.version")}")
       implementation("io.ktor:ktor-client-okhttp:${property("ktor.version")}")
+      implementation("io.ktor:ktor-client-android:${property("ktor.version")}")
     }
     jvmMain.dependencies {
       implementation(libs.sqlDelightJvmDriver)
 
-      implementation("io.ktor:ktor-client-java:${property("ktor.version")}")
+      implementation("io.ktor:ktor-client-okhttp:${property("ktor.version")}")
       implementation("io.ktor:ktor-server-core:${property("ktor.version")}")
       implementation("io.ktor:ktor-server-netty:${property("ktor.version")}")
       implementation("io.ktor:ktor-server-content-negotiation:${property("ktor.version")}")
@@ -93,6 +101,7 @@ kotlin {
       implementation("io.ktor:ktor-server-auto-head-response:${property("ktor.version")}")
       implementation("io.ktor:ktor-server-conditional-headers:${property("ktor.version")}")
       implementation("io.ktor:ktor-server-call-logging:${property("ktor.version")}")
+      implementation("io.ktor:ktor-client-logging:${property("ktor.version")}")
       implementation(libs.logback) // logging
     }
     iosMain.dependencies {

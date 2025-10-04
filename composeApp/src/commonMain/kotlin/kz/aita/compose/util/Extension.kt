@@ -19,10 +19,24 @@ fun String.checkAsPhoneNumber(country: CountryDataModel): Boolean {
   return length == country.phoneNumberSize
 }
 
+fun String.filterAsPhoneNumber(country: CountryDataModel): Boolean {
+  return isNumericalString() && length <= country.phoneNumberSize
+}
+
 fun String.checkAsPassword(): Boolean {
-  return length >= 8
+  return length >= 8 && isNotBlank()
 }
 
 fun String.isNumericalString(): Boolean {
   return all { it.isDigit() }
 }
+
+fun String.checkAsPersonName(): Boolean {
+  return isNotEmpty() && isNotBlank() && matches(Regex("""^[\p{L}\p{M} .-]+$"""))
+}
+
+fun String.filterAsPersonName(): Boolean {
+  return isEmpty() || matches(Regex("""^[\p{L}\p{M} .-]+$"""))
+}
+
+

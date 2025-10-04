@@ -225,15 +225,15 @@
     "values": [
       {
         "language": "en",
-        "value": "Password must be 8 or more symbols long"
+        "value": "Password must be 8 or more symbols long and not just whitespaces"
       },
       {
         "language": "ru",
-        "value": "Пароль должен быть длиной 8 или более символов"
+        "value": "Пароль должен быть длиной 8 или более символов и не только пробелов"
       },
       {
         "language": "kk",
-        "value": "Құпия сөз 8 немесе одан көп таңбадан тұруы керек"
+        "value": "Құпия сөз 8 немесе одан көп таңбадан тұруы керек және бос орындар болмауы керек."
       }
     ]
   },
@@ -948,6 +948,57 @@
       {
         "language": "kk",
         "value": "Таңдаңыз"
+      }
+    ]
+  },
+  {
+    "id": 56,
+    "values": [
+      {
+        "language": "en",
+        "value": "User with this phone number and email address is already registered"
+      },
+      {
+        "language": "ru",
+        "value": "Пользователь с этим номером телефона и email адресом уже зарегистрирован"
+      },
+      {
+        "language": "kk",
+        "value": "Осы телефон нөмірі мен электрондық пошта мекенжайы бар пайдаланушы әлдеқашан тіркелген"
+      }
+    ]
+  },
+  {
+    "id": 57,
+    "values": [
+      {
+        "language": "en",
+        "value": "First name cannot be empty or just whitespaces"
+      },
+      {
+        "language": "ru",
+        "value": "Имя не может быть пустым или только пробелами"
+      },
+      {
+        "language": "kk",
+        "value": "Атау бос болмауы немесе тек бос орындардан тұруы мүмкін емес."
+      }
+    ]
+  },
+  {
+    "id": 58,
+    "values": [
+      {
+        "language": "en",
+        "value": "Last name cannot be empty or just whitespaces"
+      },
+      {
+        "language": "ru",
+        "value": "Фамилия не может быть пустой или только пробелами"
+      },
+      {
+        "language": "kk",
+        "value": "Тегі бос болмауы немесе тек бос орындар болуы мүмкін емес."
       }
     ]
   }

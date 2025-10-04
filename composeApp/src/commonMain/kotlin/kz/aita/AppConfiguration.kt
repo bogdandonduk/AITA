@@ -21,22 +21,28 @@ import kz.aita.compose.navigation.NavigationScreenModel
 import kz.aita.compose.util.toColor
 import kz.aita.core.configurationRepository
 import kz.aita.core.extractColor
+import kz.aita.core.extractExceptionMessage
 import kz.aita.core.extractPath
 import kz.aita.core.extractString
 import kz.aita.core.extractValue
 import kz.aita.core.genericLocalService
+import kz.aita.core.userRepository
 import kz.aita.model.dataModel.GlobalAppConfigurationDataModel
 import kz.aita.model.dataModel.LocalizedStringGroupDataModel
 import kz.aita.model.dataModel.StylizedColorGroupDataModel
 import kz.aita.model.dataModel.StylizedDimensionGroupDataModel
 import kz.aita.model.dataModel.StylizedDrawablePathsGroupDataModel
+import kz.aita.model.dataModel.UserAccountDataModel
+import kz.aita.model.wrapper.DataState
 
-object AppUIConfiguration {
+object AppConfiguration {
 
   const val KEY_APP_THEME = "key_appTheme"
   const val KEY_APP_LOCALE = "key_appLocale"
 
   interface StateValues {
+    val userAccountState: DataState<UserAccountDataModel>
+    val userAccount: UserAccountDataModel?
 
     val navigationScreensMain: List<NavigationScreenModel>
     val navigationTransactionSaleClientId: Int
@@ -114,7 +120,6 @@ object AppUIConfiguration {
     val stringUserWithThisEmailAddressIsAlreadyRegistered: String
     val stringSignUp: String
     val stringConfirm: String
-
     val stringSale: String
     val stringReturn: String
     val stringSupply: String
@@ -148,6 +153,9 @@ object AppUIConfiguration {
     val stringAppLanguage: String
     val stringAppTheme: String
     val stringSelect: String
+    val stringUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered: String
+    val stringFirstNameCannotBeEmptyOrJustWhitespaces: String
+    val stringLastNameCannotBeEmptyOrJustWhitespaces: String
 
     val screenWidth: Dp
     val screenHeight: Dp
@@ -208,6 +216,11 @@ object AppUIConfiguration {
     val drawablePathIconDevices: String
     val drawablePathIconAppLanguage: String
     val drawablePathIconAppTheme: String
+    val drawablePathIconCheck: String
+
+    val exceptionMessageUserWithThisPhoneNumberIsAlreadyRegistered: String
+    val exceptionMessageUserWithThisEmailAddressIsAlreadyRegistered: String
+    val exceptionMessageUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered: String
   }
 
   private val _appLocaleLanguageState = MutableStateFlow("ru")
@@ -271,6 +284,10 @@ object AppUIConfiguration {
   private val _stringAppThemeState = MutableStateFlow("App theme")
   private val _stringSelectState = MutableStateFlow("Select")
 
+  private val _stringUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered = MutableStateFlow("User with this phone number and email address is already registered")
+  private val _stringFirstNameCannotBeEmptyOrJustWhitespaces = MutableStateFlow("First name cannot be empty or just whitespaces")
+  private val _stringLastNameCannotBeEmptyOrJustWhitespaces = MutableStateFlow("Last cannot be empty or just whitespaces")
+
   private val _screenWidthState = MutableStateFlow(0f.dp)
   private val _screenHeightState = MutableStateFlow(0f.dp)
   private val _wideScreenMinWidthState = MutableStateFlow(600f)
@@ -327,6 +344,11 @@ object AppUIConfiguration {
   private val _drawablePathIconDevicesState = MutableStateFlow("svg/25_0.svg")
   private val _drawablePathIconAppLanguageState = MutableStateFlow("svg/26_0.svg")
   private val _drawablePathIconAppThemeState = MutableStateFlow("svg/27_0.svg")
+  private val _drawablePathIconCheckState = MutableStateFlow("svg/28_0.svg")
+
+  private val _exceptionMessageUserWithThisPhoneNumberIsAlreadyRegistered = MutableStateFlow("User with this phone number is already registered")
+  private val _exceptionMessageUserWithThisEmailAddressIsAlreadyRegistered = MutableStateFlow("User with this email address is already registered")
+  private val _exceptionMessageUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered = MutableStateFlow("User with this phone number and email address is already registered")
 
   lateinit var stateValues: StateValues
 
@@ -344,11 +366,14 @@ object AppUIConfiguration {
 
   @Composable
   operator fun invoke(
-    content: @Composable AppUIConfiguration.() -> Unit,
+    content: @Composable AppConfiguration.() -> Unit,
     vararg keys: Any
   ) {
 
     stateValues = object : StateValues {
+      override val userAccountState: DataState<UserAccountDataModel> by userRepository.userAccountState.value.collectAsState()
+      override val userAccount: UserAccountDataModel? by userRepository.userAccountState.payload.collectAsState()
+
       override val navigationScreensMain: List<NavigationScreenModel> by Navigation.Main.collectAsState()
       override val navigationTransactionSaleClientId: Int by Navigation.TransactionSale.ClientId.collectAsState()
       override val navigationTransactionReturnClientId: Int by Navigation.TransactionReturn.ClientId.collectAsState()
@@ -464,6 +489,9 @@ object AppUIConfiguration {
       override val stringAppLanguage: String by _stringAppLanguageState.collectAsState()
       override val stringAppTheme: String by _stringAppThemeState.collectAsState()
       override val stringSelect: String by _stringSelectState.collectAsState()
+      override val stringUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered: String by _stringUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered.collectAsState()
+      override val stringFirstNameCannotBeEmptyOrJustWhitespaces: String by _stringFirstNameCannotBeEmptyOrJustWhitespaces.collectAsState()
+      override val stringLastNameCannotBeEmptyOrJustWhitespaces: String by _stringLastNameCannotBeEmptyOrJustWhitespaces.collectAsState()
 
       override val screenWidth: Dp by _screenWidthState.collectAsState()
       override val screenHeight: Dp by _screenHeightState.collectAsState()
@@ -519,6 +547,11 @@ object AppUIConfiguration {
       override val drawablePathIconDevices: String by _drawablePathIconDevicesState.collectAsState()
       override val drawablePathIconAppLanguage: String by _drawablePathIconAppLanguageState.collectAsState()
       override val drawablePathIconAppTheme: String by _drawablePathIconAppThemeState.collectAsState()
+      override val drawablePathIconCheck: String by _drawablePathIconCheckState.collectAsState()
+
+      override val exceptionMessageUserWithThisPhoneNumberIsAlreadyRegistered: String by _exceptionMessageUserWithThisPhoneNumberIsAlreadyRegistered.collectAsState()
+      override val exceptionMessageUserWithThisEmailAddressIsAlreadyRegistered: String by _exceptionMessageUserWithThisEmailAddressIsAlreadyRegistered.collectAsState()
+      override val exceptionMessageUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered: String by _exceptionMessageUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered.collectAsState()
     }
 
     coroutineScope = rememberCoroutineScope()
@@ -628,6 +661,9 @@ object AppUIConfiguration {
                 _stringAppLanguageState.emit(it.extractString(53, stateValues.appLocaleLanguage))
                 _stringAppThemeState.emit(it.extractString(54, stateValues.appLocaleLanguage))
                 _stringSelectState.emit(it.extractString(55, stateValues.appLocaleLanguage))
+                _stringUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered.emit(it.extractString(56, stateValues.appLocaleLanguage))
+                _stringFirstNameCannotBeEmptyOrJustWhitespaces.emit(it.extractString(57, stateValues.appLocaleLanguage))
+                _stringLastNameCannotBeEmptyOrJustWhitespaces.emit(it.extractString(58, stateValues.appLocaleLanguage))
               }
           }
 
@@ -708,6 +744,20 @@ object AppUIConfiguration {
                   _drawablePathIconDevicesState.emit(it.extractPath(25, stateValues.appThemeId))
                   _drawablePathIconAppLanguageState.emit(it.extractPath(26, stateValues.appThemeId))
                   _drawablePathIconAppThemeState.emit(it.extractPath(27, stateValues.appThemeId))
+                  _drawablePathIconCheckState.emit(it.extractPath(28, stateValues.appThemeId))
+                }
+              }
+          }
+
+          launch {
+            configurationRepository
+              .exceptionsState
+              .payload
+              .collect {
+                it?.let {
+                  _exceptionMessageUserWithThisPhoneNumberIsAlreadyRegistered.emit(it.extractExceptionMessage(0))
+                  _exceptionMessageUserWithThisEmailAddressIsAlreadyRegistered.emit(it.extractExceptionMessage(1))
+                  _exceptionMessageUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered.emit(it.extractExceptionMessage(2))
                 }
               }
           }

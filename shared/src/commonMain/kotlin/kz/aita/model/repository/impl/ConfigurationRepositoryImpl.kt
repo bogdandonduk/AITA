@@ -8,8 +8,10 @@ import kotlinx.coroutines.launch
 import kz.aita.core.io
 import kz.aita.model.dataModel.CityDataModel
 import kz.aita.model.dataModel.CountryDataModel
+import kz.aita.model.dataModel.ExceptionDataModel
 import kz.aita.model.wrapper.MutableDataStateFlow
 import kz.aita.model.dataModel.GlobalAppConfigurationDataModel
+import kz.aita.model.dataModel.LanguageDataModel
 import kz.aita.model.dataModel.LocalizedStringDataModel
 import kz.aita.model.dataModel.LocalizedStringGroupDataModel
 import kz.aita.model.dataModel.StylizedColorGroupDataModel
@@ -28,8 +30,10 @@ class ConfigurationRepositoryImpl(
   private val _globalAppConfigurationState = MutableDataStateFlowNonNull(
     coroutineScope = this,
     initial = GlobalAppConfigurationDataModel(
-      serverUrl = "http://127.0.0.1:8080/",
+      appName = "AITA",
+      serverUrl = "http://127.0.0.1:8080",
       globalConfigurationPath = "config/app/global",
+      exceptionConfigurationPath = "config/app/exception",
       logInPath = "auth/logIn",
       signUpPath = "auth/signUp",
       stringResourcesPath = "res/string",
@@ -78,9 +82,65 @@ class ConfigurationRepositoryImpl(
               ),
               51.1667, 71.4333,
               51.0230, 71.2660,
-              51.250071,71.5500
+              51.250071, 71.5500
             ),
           )
+        )
+      ),
+      languages = listOf(
+        LanguageDataModel(
+          "en",
+          listOf(
+            LocalizedStringDataModel(
+              "en",
+              "English"
+            ),
+            LocalizedStringDataModel(
+              "ru",
+              "Английский"
+            ),
+            LocalizedStringDataModel(
+              "kk",
+              "Ағылшынша"
+            )
+          ),
+          "png/flag_en.png"
+        ),
+        LanguageDataModel(
+          "ru",
+          listOf(
+            LocalizedStringDataModel(
+              "en",
+              "Russian"
+            ),
+            LocalizedStringDataModel(
+              "ru",
+              "Русский"
+            ),
+            LocalizedStringDataModel(
+              "kk",
+              "Орысша"
+            )
+          ),
+          "png/flag_ru.png"
+        ),
+        LanguageDataModel(
+          "kk",
+          listOf(
+            LocalizedStringDataModel(
+              "en",
+              "Kazakh"
+            ),
+            LocalizedStringDataModel(
+              "ru",
+              "Казахский"
+            ),
+            LocalizedStringDataModel(
+              "kk",
+              "Қазақша"
+            )
+          ),
+          "png/flag_kz.png"
         )
       )
     )
@@ -99,105 +159,104 @@ class ConfigurationRepositoryImpl(
   private val _drawablesState = MutableDataStateFlow<List<StylizedDrawablePathsGroupDataModel>>(this)
   override val drawablesState = _drawablesState.asDataStateFlow()
 
+  private val _exceptionsState = MutableDataStateFlow<List<ExceptionDataModel>>(this)
+  override val exceptionsState = _exceptionsState.asDataStateFlow()
+
   init {
     getGlobalConfiguration()
   }
 
   override fun getGlobalConfiguration(loadAll: Boolean) {
     launch(Dispatchers.io) {
-      try {
-        val response = genericRemoteService
-          .request<GlobalAppConfigurationDataModel, Unit>(
-            method = HttpMethod.Get,
-            globalAppConfigurationState.payloadValue.serverUrl,
-            globalAppConfigurationState.payloadValue.globalConfigurationPath
-          )
+      genericRemoteService
+        .request<GlobalAppConfigurationDataModel, Unit>(
+          method = HttpMethod.Get,
+          serverUrl = globalAppConfigurationState.payloadValue.serverUrl,
+          endpointUrl = globalAppConfigurationState.payloadValue.globalConfigurationPath,
+          onFailure = {
+            _globalAppConfigurationState.emit(DataState.Failure(it))
+          }
+        )?.run {
+          _globalAppConfigurationState.emit(DataState.Success(this))
 
-        _globalAppConfigurationState.emit(DataState.Success(response))
-
-        if (loadAll) {
-          getStrings()
-          getDimensions()
-          getColors()
-          getDrawables()
+          if (loadAll) {
+            getStrings()
+            getDimensions()
+            getColors()
+            getDrawables()
+            getExceptions()
+          }
         }
-      } catch (exception: Exception) {
-        _globalAppConfigurationState.emit(DataState.Failure(exception))
-        exception.printStackTrace()
-      }
-
     }
   }
 
   override fun getStrings() {
     launch(Dispatchers.io) {
-      try {
-        val response = genericRemoteService
-          .request<List<LocalizedStringGroupDataModel>, Unit>(
-            method = HttpMethod.Get,
-            globalAppConfigurationState.payloadValue.serverUrl,
-            globalAppConfigurationState.payloadValue.stringResourcesPath
-          )
-
-        _stringsState.emit(DataState.Success(response))
-      } catch (exception: Exception) {
-        _stringsState.emit(DataState.Failure(exception))
-        exception.printStackTrace()
-      }
+      genericRemoteService
+        .request<List<LocalizedStringGroupDataModel>, Unit>(
+          method = HttpMethod.Get,
+          serverUrl = globalAppConfigurationState.payloadValue.serverUrl,
+          endpointUrl = globalAppConfigurationState.payloadValue.stringResourcesPath,
+          onFailure = {
+            _stringsState.emit(DataState.Failure(it))
+          }
+        )?.run {
+          _stringsState.emit(DataState.Success(this))
+        }
     }
   }
 
   override fun getDimensions() {
     launch(Dispatchers.io) {
-      try {
-        val response = genericRemoteService
-          .request<List<StylizedDimensionGroupDataModel>, Unit>(
-            method = HttpMethod.Get,
-            globalAppConfigurationState.payloadValue.serverUrl,
-            globalAppConfigurationState.payloadValue.dimensionResourcesPath
-          )
-
-        _dimensionsState.emit(DataState.Success(response))
-      } catch (exception: Exception) {
-        _dimensionsState.emit(DataState.Failure(exception))
-        exception.printStackTrace()
-      }
+      genericRemoteService
+        .request<List<StylizedDimensionGroupDataModel>, Unit>(
+          method = HttpMethod.Get,
+          serverUrl = globalAppConfigurationState.payloadValue.serverUrl,
+          endpointUrl = globalAppConfigurationState.payloadValue.dimensionResourcesPath,
+          onFailure = {
+            _dimensionsState.emit(DataState.Failure(it))
+          }
+        )?.run {
+          _dimensionsState.emit(DataState.Success(this))
+        }
     }
   }
 
   override fun getColors() {
     launch(Dispatchers.io) {
-      try {
-        val response = genericRemoteService
-          .request<List<StylizedColorGroupDataModel>, Unit>(
-            method = HttpMethod.Get,
-            globalAppConfigurationState.payloadValue.serverUrl,
-            globalAppConfigurationState.payloadValue.colorResourcesPath
-          )
-
-        _colorsState.emit(DataState.Success(response))
-      } catch (exception: Exception) {
-        _colorsState.emit(DataState.Failure(exception))
-        exception.printStackTrace()
-      }
+      genericRemoteService
+        .request<List<StylizedColorGroupDataModel>, Unit>(
+          method = HttpMethod.Get,
+          serverUrl = globalAppConfigurationState.payloadValue.serverUrl,
+          endpointUrl = globalAppConfigurationState.payloadValue.colorResourcesPath,
+          onFailure = {
+            _colorsState.emit(DataState.Failure(it))
+          }
+        )?.run {
+          _colorsState.emit(DataState.Success(this))
+        }
     }
   }
 
   override fun getDrawables() {
     launch(Dispatchers.io) {
-      try {
-        val response = genericRemoteService
-          .request<List<StylizedDrawablePathsGroupDataModel>, Unit>(
-            method = HttpMethod.Get,
-            globalAppConfigurationState.payloadValue.serverUrl,
-            globalAppConfigurationState.payloadValue.drawableResourcesConfigurationPath
-          )
+      genericRemoteService
+        .request<List<StylizedDrawablePathsGroupDataModel>, Unit>(
+          method = HttpMethod.Get,
+          serverUrl = globalAppConfigurationState.payloadValue.serverUrl,
+          endpointUrl = globalAppConfigurationState.payloadValue.drawableResourcesConfigurationPath,
+          onFailure = {
+            println("drawable onFailure $it")
 
-        _drawablesState.emit(DataState.Success(response))
-      } catch (exception: Exception) {
-        _drawablesState.emit(DataState.Failure(exception))
-        exception.printStackTrace()
-      }
+            _drawablesState.emit(DataState.Failure(it))
+          }
+        )?.run {
+          forEach {
+            println("drawable ${it.id} ${it.values}")
+          }
+
+          _drawablesState.emit(DataState.Success(this))
+        }
     }
   }
 
@@ -207,19 +266,17 @@ class ConfigurationRepositoryImpl(
     format: String
   ): Flow<DataState<String>> {
     return flow {
-      try {
-        val response = genericRemoteService
-          .request<String, Unit>(
-            method = HttpMethod.Get,
-            globalAppConfigurationState.payloadValue.serverUrl,
-            "${globalAppConfigurationState.payloadValue.drawableResourcesPath}/$format/$key/$themeId.$format"
-          )
-
-        emit(DataState.Success(response))
-      } catch (exception: Exception) {
-        emit(DataState.Failure(exception))
-        exception.printStackTrace()
-      }
+      genericRemoteService
+        .request<String, Unit>(
+          method = HttpMethod.Get,
+          serverUrl = globalAppConfigurationState.payloadValue.serverUrl,
+          endpointUrl = "${globalAppConfigurationState.payloadValue.drawableResourcesPath}/$format/$key/$themeId.$format",
+          onFailure = {
+            emit(DataState.Failure(it))
+          }
+        )?.run {
+          emit(DataState.Success(this))
+        }
     }
   }
 
@@ -228,19 +285,33 @@ class ConfigurationRepositoryImpl(
     format: String
   ): Flow<DataState<String>> {
     return flow {
-      try {
-        val response = genericRemoteService
-          .request<String, Unit>(
-            method = HttpMethod.Get,
-            globalAppConfigurationState.payloadValue.serverUrl,
-            "${globalAppConfigurationState.payloadValue.drawableResourcesPath}/$format/$name.$format"
-          )
+      genericRemoteService
+        .request<String, Unit>(
+          method = HttpMethod.Get,
+          serverUrl = globalAppConfigurationState.payloadValue.serverUrl,
+          endpointUrl = "${globalAppConfigurationState.payloadValue.drawableResourcesPath}/$format/$name.$format",
+          onFailure = {
+            emit(DataState.Failure(it))
+          }
+        )?.run {
+          emit(DataState.Success(this))
+        }
+    }
+  }
 
-        emit(DataState.Success(response))
-      } catch (exception: Exception) {
-        emit(DataState.Failure(exception))
-        exception.printStackTrace()
-      }
+  override fun getExceptions() {
+    launch(Dispatchers.io) {
+      genericRemoteService
+        .request<List<ExceptionDataModel>, Unit>(
+          method = HttpMethod.Get,
+          serverUrl = globalAppConfigurationState.payloadValue.serverUrl,
+          endpointUrl = globalAppConfigurationState.payloadValue.exceptionConfigurationPath,
+          onFailure = {
+            _exceptionsState.emit(DataState.Failure(it))
+          }
+        )?.run {
+          _exceptionsState.emit(DataState.Success(this))
+        }
     }
   }
 }

@@ -17,12 +17,12 @@ import io.kamel.image.KamelImage
 import io.kamel.image.asyncPainterResource
 import io.kamel.image.config.LocalKamelConfig
 import io.ktor.http.Url
-import kz.aita.AppUIConfiguration
+import kz.aita.AppConfiguration
 import kz.aita.core.getFullDrawableResourceUrl
 import kz.aita.compose.render.kamelConfig
 
 @Composable
-fun AppUIConfiguration.LargeIconWithTitleWidget(
+fun AppConfiguration.LargeIconWithTitleWidget(
   modifier: Modifier = Modifier,
   imageUrl: String,
   title: String = "",

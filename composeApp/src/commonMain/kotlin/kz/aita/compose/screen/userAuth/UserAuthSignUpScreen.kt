@@ -16,8 +16,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kz.aita.AppUIConfiguration
+import kz.aita.AppConfiguration
 import kz.aita.compose.navigation.Navigation
+import kz.aita.compose.util.checkAsPersonName
+import kz.aita.compose.util.filterAsPersonName
 import kz.aita.compose.widget.LargeIconWithTitleWidget
 import kz.aita.compose.widget.actionButton
 import kz.aita.compose.widget.emailTextField
@@ -28,9 +30,10 @@ import kz.aita.compose.widget.repeatedPasswordTextFieldGroup
 import kz.aita.core.io
 import kz.aita.model.dataModel.UserAuthSignUpDataModel
 import kz.aita.model.repository.UserRepository
+import kz.aita.model.wrapper.DataState
 
 @Composable
-fun AppUIConfiguration.UserAuthSignUpScreen(
+fun AppConfiguration.UserAuthSignUpScreen(
   userRepository: UserRepository
 ) {
   LazyColumn(
@@ -84,7 +87,14 @@ fun AppUIConfiguration.UserAuthSignUpScreen(
         val firstNameTextFieldContent = genericTextField(
           titleText = stateValues.stringFirstName,
           placeholderText = stateValues.stringEnterFirstName,
-          leadingIconPath = stateValues.drawablePathIconPerson
+          leadingIconPath = stateValues.drawablePathIconPerson,
+          contentInvalidText = stateValues.stringFirstNameCannotBeEmptyOrJustWhitespaces,
+          onContentValidityCheck = {
+            it.checkAsPersonName()
+          },
+          onFilterValue = {
+            it.filterAsPersonName()
+          }
         )
 
         Spacer(modifier = Modifier.height(innerSpace))
@@ -92,16 +102,40 @@ fun AppUIConfiguration.UserAuthSignUpScreen(
         val lastNameTextFieldContent = genericTextField(
           titleText = stateValues.stringLastName,
           placeholderText = stateValues.stringEnterLastName,
-          leadingIconPath = stateValues.drawablePathIconPerson
+          leadingIconPath = stateValues.drawablePathIconPerson,
+          contentInvalidText = stateValues.stringLastNameCannotBeEmptyOrJustWhitespaces,
+          onContentValidityCheck = {
+            it.checkAsPersonName()
+          },
+          onFilterValue = {
+            it.filterAsPersonName()
+          }
         )
 
         Spacer(modifier = Modifier.height(innerSpace))
 
         val (passwordTextFieldContent, repeatedPasswordTextFieldContent) = repeatedPasswordTextFieldGroup()
 
-        errorText(stateValues.stringUserWithThisPhoneNumberIsAlreadyRegistered) {
-          true
-        }
+        errorText(
+          stateValues.stringUserWithThisPhoneNumberIsAlreadyRegistered,
+          showIf = {
+            (stateValues.userAccountState as? DataState.Failure)?.exception?.message?.equals(stateValues.exceptionMessageUserWithThisPhoneNumberIsAlreadyRegistered, true) == true
+          }
+        )
+
+        errorText(
+          stateValues.stringUserWithThisEmailAddressIsAlreadyRegistered,
+          showIf = {
+            (stateValues.userAccountState as? DataState.Failure)?.exception?.message?.equals(stateValues.exceptionMessageUserWithThisEmailAddressIsAlreadyRegistered, true) == true
+          }
+        )
+
+        errorText(
+          stateValues.stringUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered,
+          showIf = {
+            (stateValues.userAccountState as? DataState.Failure)?.exception?.message?.equals(stateValues.exceptionMessageUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered, true) == true
+          }
+        )
 
         Spacer(modifier = Modifier.height(outerSpace))
 
@@ -111,20 +145,29 @@ fun AppUIConfiguration.UserAuthSignUpScreen(
           phoneNumberTextFieldContent.checkContentValidity()
           emailTextFieldContent.checkContentValidity()
 
+          firstNameTextFieldContent.checkContentValidity()
+          lastNameTextFieldContent.checkContentValidity()
+
           passwordTextFieldContent.checkContentValidity()
           repeatedPasswordTextFieldContent.checkContentValidity()
-
-          if (phoneNumberTextFieldContent.isContentValid && emailTextFieldContent.isContentValid && passwordTextFieldContent.isContentValid && repeatedPasswordTextFieldContent.isContentValid)
+          if (
+            phoneNumberTextFieldContent.isContentValid
+            && emailTextFieldContent.isContentValid
+            && firstNameTextFieldContent.isContentValid
+            && lastNameTextFieldContent.isContentValid
+            && passwordTextFieldContent.isContentValid
+            && repeatedPasswordTextFieldContent.isContentValid
+          )
             coroutineScope.launch(Dispatchers.io) {
               userRepository
                 .signUp(
                   UserAuthSignUpDataModel(
-                    phoneNumberTextFieldContent.value.text,
-                    emailTextFieldContent.value.text,
-                    passwordTextFieldContent.value.text,
-                    firstNameTextFieldContent.value.text,
-                    lastNameTextFieldContent.value.text,
-                    phoneNumberTextFieldContent.selectedCountryLocale
+                    phoneNumber = phoneNumberTextFieldContent.value.text.trim(),
+                    email = emailTextFieldContent.value.text.trim(),
+                    firstName = firstNameTextFieldContent.value.text.trim(),
+                    lastName = lastNameTextFieldContent.value.text.trim(),
+                    countryLocale = phoneNumberTextFieldContent.selectedCountryLocale,
+                    password = passwordTextFieldContent.value.text
                   )
                 )
             }

@@ -6,11 +6,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import kz.aita.AppUIConfiguration
+import kz.aita.AppConfiguration
 import kz.aita.compose.navigation.NavigationScreenModel
 
 @Composable
-fun AppUIConfiguration.TransactionScreen() {
+fun AppConfiguration.TransactionScreen() {
   Column(
     horizontalAlignment = Alignment.CenterHorizontally
   ) {
@@ -144,7 +144,6 @@ fun AppUIConfiguration.TransactionScreen() {
             .weight(1f),
           targetState = navigationScreensRight.last()
         ) { model ->
-          println("model is $model")
           when (model) {
             is NavigationScreenModel.Transaction.Cart -> {
               TransactionCartScreen()

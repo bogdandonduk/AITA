@@ -10,7 +10,7 @@ fun main() {
       onCloseRequest = ::exitApplication,
       title = "AITA",
     ) {
-      AppUIConfiguration(
+      AppConfiguration(
         content = {
           MainScreen()
         }

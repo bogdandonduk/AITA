@@ -13,18 +13,20 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import kz.aita.AppUIConfiguration
+import kz.aita.AppConfiguration
 
 @Composable
-fun AppUIConfiguration.errorText(
+fun AppConfiguration.errorText(
   invalidText: String,
-  onValidityCheck: () -> Boolean
+  showIf: () -> Boolean
 ): ErrorTextContent {
-  var isValid by rememberSaveable {
-    mutableStateOf(onValidityCheck())
+  var show by rememberSaveable {
+    mutableStateOf(false)
   }
 
-  if (!isValid) {
+  show = showIf()
+
+  if (show) {
     Text(
       modifier = Modifier
         .fillMaxWidth()
@@ -40,10 +42,10 @@ fun AppUIConfiguration.errorText(
   }
 
   return ErrorTextContent(
-    isValid = isValid,
+    isValid = !show,
     onValidityCheck = {
-      val value = onValidityCheck.invoke()
-      isValid = value
+      val value = showIf()
+      show = value
       value
     }
   )

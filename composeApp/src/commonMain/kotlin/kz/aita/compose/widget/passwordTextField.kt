@@ -7,14 +7,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
-import kz.aita.AppUIConfiguration
+import kz.aita.AppConfiguration
 import kz.aita.compose.util.checkAsPassword
 import kz.aita.compose.util.getPasswordTransformedTextWithSelectionFocusTextColor
 import kz.aita.compose.util.getTransformedTextWithSelectionFocusTextColor
 import kz.aita.compose.wrapper.ImeWithAction
 
 @Composable
-fun AppUIConfiguration.passwordTextField(
+fun AppConfiguration.passwordTextField(
   modifier: Modifier = Modifier,
   imeWithAction: ImeWithAction? = null
 ): GenericTextFieldContent {

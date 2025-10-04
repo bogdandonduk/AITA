@@ -5,7 +5,6 @@ import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,19 +25,20 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import kz.aita.AppUIConfiguration
+import kz.aita.AppConfiguration
 import kz.aita.compose.util.checkAsPhoneNumber
+import kz.aita.compose.util.filterAsPhoneNumber
 import kz.aita.compose.util.isNumericalString
 import kz.aita.compose.wrapper.ImeWithAction
 import kz.aita.model.dataModel.CountryDataModel
 
 @Composable
-fun AppUIConfiguration.phoneNumberWithCountrySelectionTextField(
+fun AppConfiguration.phoneNumberWithCountrySelectionTextField(
   modifier: Modifier = Modifier,
   countries: List<CountryDataModel>,
   countrySelectionEnabled: Boolean = true,
   imeWithAction: ImeWithAction? = null,
-  cornerRadius: Dp = stateValues.cornerRadius
+  cornerRadius: Dp = stateValues.cornerRadius,
 ): PhoneNumberWithCountrySelectionTextFieldContent {
   var selectedCountryLocale by rememberSaveable {
     mutableStateOf(countries.first().locale)
@@ -84,12 +84,13 @@ fun AppUIConfiguration.phoneNumberWithCountrySelectionTextField(
         it.checkAsPhoneNumber(selectedCountry)
       },
       onFilterValue = {
-        it.isNumericalString() && it.length <= selectedCountry.phoneNumberSize
+        it.filterAsPhoneNumber(selectedCountry)
       }
     )
 
     if (countrySelectionEnabled) {
       Spacer(modifier = Modifier.height(1.dp))
+
       AnimatedVisibility(
         modifier = modifier,
         visibleState = isCountrySelectionDropdownExpandedState,
@@ -111,7 +112,8 @@ fun AppUIConfiguration.phoneNumberWithCountrySelectionTextField(
             countryPhoneCodeWithFlagWidget(
               modifier = Modifier
                 .fillParentMaxWidth(),
-              country = country
+              country = country,
+              showCountryName = true
             ) {
               selectedCountryLocale = countries[index].locale
 

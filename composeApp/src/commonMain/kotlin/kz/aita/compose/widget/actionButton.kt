@@ -35,12 +35,12 @@ import io.kamel.image.KamelImage
 import io.kamel.image.asyncPainterResource
 import io.kamel.image.config.LocalKamelConfig
 import io.ktor.http.Url
-import kz.aita.AppUIConfiguration
+import kz.aita.AppConfiguration
 import kz.aita.compose.render.kamelConfig
 import kz.aita.core.getFullDrawableResourceUrl
 
 @Composable
-fun AppUIConfiguration.actionButton(
+fun AppConfiguration.actionButton(
   modifier: Modifier = Modifier,
 
   enabledColor: Color = stateValues.AccentColor,

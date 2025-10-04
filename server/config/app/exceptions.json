@@ -1,0 +1,22 @@
+[
+  {
+    "id": 0,
+    "message": "User with this phone number is already registered"
+  },
+  {
+    "id": 1,
+    "message": "User with this email address is already registered"
+  },
+  {
+    "id": 2,
+    "message": "User with this phone number and email address is already registered"
+  },
+  {
+    "id": 3,
+    "message": "Refresh token expired"
+  },
+  {
+    "id": 4,
+    "message": "Login or password incorrect"
+  }
+]

@@ -21,7 +21,7 @@ object Navigation {
   val Main = _Main.asStateFlow()
 
   fun isVeryFirstScreen(): Boolean {
-    return _Main.value.size == 2
+    return _Main.value.size == 1
   }
 
   suspend fun goMain(model: NavigationScreenModel, remove: Boolean = false) {

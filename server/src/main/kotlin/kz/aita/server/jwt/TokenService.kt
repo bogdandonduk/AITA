@@ -1,6 +1,5 @@
 package kz.aita.server.jwt
 
-import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.Instant
@@ -8,17 +7,12 @@ import java.time.temporal.ChronoUnit
 import java.util.*
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
+import kz.aita.model.wrapper.TokenPair
 import kz.aita.server.db.RefreshSessions
 import kz.aita.server.encrypt.Refresh
+import kz.aita.server.util.getException
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
-
-@Serializable
-data class TokenPair(
-  val access_token: String,
-  val access_expires_in: Long,     // seconds
-  val refresh_token: String
-)
 
 class TokenService(private val cfg: JwtCfg) {
 
@@ -34,7 +28,7 @@ class TokenService(private val cfg: JwtCfg) {
       .sign(Algorithm.HMAC256(cfg.secret))
   }
 
-  fun newRefreshPair(userId: UUID, metaParam: Map<String, String>?): TokenPair = transaction {
+  fun newPair(userId: UUID, metaParam: Map<String, String>?): TokenPair = transaction {
     val refreshPlain = Refresh.newPlainToken()
     val refreshHash = Refresh.hash(refreshPlain)
     val now = Instant.now()
@@ -61,7 +55,7 @@ class TokenService(private val cfg: JwtCfg) {
     val session = RefreshSessions.selectAll().where { cond }.singleOrNull() ?: throw Unauthorized("invalid_refresh")
 
     if (session[RefreshSessions.expiresAt].isBefore(Instant.now()))
-      throw Unauthorized("refresh_expired")
+      throw Unauthorized(getException(3)?.message ?: "Refresh token expired")
 
     // Revoke old session (so it cannot be used again)
     RefreshSessions.update({ RefreshSessions.id eq session[RefreshSessions.id] }) {

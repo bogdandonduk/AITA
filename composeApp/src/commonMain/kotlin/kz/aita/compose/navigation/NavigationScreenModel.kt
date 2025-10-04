@@ -1,6 +1,6 @@
 package kz.aita.compose.navigation
 
-import kz.aita.AppUIConfiguration
+import kz.aita.AppConfiguration
 
 sealed class NavigationScreenModel(
   val route: String,
@@ -12,23 +12,23 @@ sealed class NavigationScreenModel(
 
     data object MainSale: Transaction("TransactionMainSaleNavigationScreenModelRoute") {
       override val iconPath: String
-        get() = AppUIConfiguration.stateValues.drawablePathIconTransactionSale
+        get() = AppConfiguration.stateValues.drawablePathIconTransactionSale
       override val name: String
-        get() = AppUIConfiguration.stateValues.stringSale
+        get() = AppConfiguration.stateValues.stringSale
     }
 
     data object MainReturn: Transaction("TransactionMainReturnNavigationScreenModelRoute") {
       override val iconPath: String
-        get() = AppUIConfiguration.stateValues.drawablePathIconTransactionReturn
+        get() = AppConfiguration.stateValues.drawablePathIconTransactionReturn
       override val name: String
-        get() = AppUIConfiguration.stateValues.stringReturn
+        get() = AppConfiguration.stateValues.stringReturn
     }
 
     data object MainSupply: Transaction("TransactionMainSupplyNavigationScreenModelRoute") {
       override val iconPath: String
-        get() = AppUIConfiguration.stateValues.drawablePathIconTransactionSupply
+        get() = AppConfiguration.stateValues.drawablePathIconTransactionSupply
       override val name: String
-        get() = AppUIConfiguration.stateValues.stringSupply
+        get() = AppConfiguration.stateValues.stringSupply
     }
 
     data object Cart: Transaction("TransactionCartScreenNavigationScreenModelRoute")
@@ -49,9 +49,9 @@ sealed class NavigationScreenModel(
 
     data object Main: Stock("StockNavigationScreenModelRoute") {
       override val iconPath: String
-        get() = AppUIConfiguration.stateValues.drawablePathIconStock
+        get() = AppConfiguration.stateValues.drawablePathIconStock
       override val name: String
-        get() = AppUIConfiguration.stateValues.stringStock
+        get() = AppConfiguration.stateValues.stringStock
     }
 
     data object Warehouse: Stock("StockWarehouseNavigationScreenModelRoute")
@@ -63,18 +63,18 @@ sealed class NavigationScreenModel(
 
     data object Main: Menu("MenuNavigationScreenModelRoute") {
       override val iconPath: String
-        get() = AppUIConfiguration.stateValues.drawablePathIconMenu
+        get() = AppConfiguration.stateValues.drawablePathIconMenu
       override val name: String
-        get() = AppUIConfiguration.stateValues.stringMenu
+        get() = AppConfiguration.stateValues.stringMenu
     }
 
     data object List: Menu("MenuListNavigationScreenModelRoute")
 
     data object UserAccount: Menu("MenuMapNavigationScreenModelRoute") {
       override val iconPath: String
-        get() = AppUIConfiguration.stateValues.drawablePathIconUserAccount
+        get() = AppConfiguration.stateValues.drawablePathIconUserAccount
       override val name: String
-        get() = AppUIConfiguration.stateValues.stringUserAccount
+        get() = AppConfiguration.stateValues.stringUserAccount
     }
 
     data object StoreSubscription: Menu("MenuStoreSubscriptionNavigationScreenModelRoute")
@@ -82,76 +82,76 @@ sealed class NavigationScreenModel(
 
     data object Workers: Menu("MenuWorkersNavigationScreenModelRoute") {
       override val iconPath: String
-        get() = AppUIConfiguration.stateValues.drawablePathIconWorkers
+        get() = AppConfiguration.stateValues.drawablePathIconWorkers
       override val name: String
-        get() = AppUIConfiguration.stateValues.stringWorkers
+        get() = AppConfiguration.stateValues.stringWorkers
     }
     data object AddEditWorker: Menu("MenuAddEditWorkerNavigationScreenModelRoute")
 
     data object Stores: Menu("MenuStoresNavigationScreenModelRoute") {
       override val iconPath: String
-        get() = AppUIConfiguration.stateValues.drawablePathIconStores
+        get() = AppConfiguration.stateValues.drawablePathIconStores
       override val name: String
-        get() = AppUIConfiguration.stateValues.stringStores
+        get() = AppConfiguration.stateValues.stringStores
     }
     data object AddEditStore: Menu("MenuAddEditStoreNavigationScreenModelRoute")
 
     data object Analytics: Menu("MenuAnalyticsNavigationScreenModelRoute") {
       override val iconPath: String
-        get() = AppUIConfiguration.stateValues.drawablePathIconAnalytics
+        get() = AppConfiguration.stateValues.drawablePathIconAnalytics
       override val name: String
-        get() = AppUIConfiguration.stateValues.stringAnalytics
+        get() = AppConfiguration.stateValues.stringAnalytics
     }
 
     data object TransactionHistory: Menu("MenuTransactionHistoryNavigationScreenModelRoute") {
       override val iconPath: String
-        get() = AppUIConfiguration.stateValues.drawablePathIconTransactionHistory
+        get() = AppConfiguration.stateValues.drawablePathIconTransactionHistory
       override val name: String
-        get() = AppUIConfiguration.stateValues.stringTransactionHistory
+        get() = AppConfiguration.stateValues.stringTransactionHistory
     }
     data object TransactionHistoryReceiptPreview: Menu("MenuTransactionHistoryReceiptPreviewNavigationScreenModelRoute")
 
     data object Debtors: Menu("MenuDebtorsNavigationScreenModelRoute") {
       override val iconPath: String
-        get() = AppUIConfiguration.stateValues.drawablePathIconDebtors
+        get() = AppConfiguration.stateValues.drawablePathIconDebtors
       override val name: String
-        get() = AppUIConfiguration.stateValues.stringDebtors
+        get() = AppConfiguration.stateValues.stringDebtors
     }
     data object CloseDebt: Menu("MenuCloseDebtNavigationScreenModelRoute")
 
     data object Suppliers: Menu("MenuSuppliersNavigationScreenModelRoute") {
       override val iconPath: String
-        get() = AppUIConfiguration.stateValues.drawablePathIconSuppliers
+        get() = AppConfiguration.stateValues.drawablePathIconSuppliers
       override val name: String
-        get() = AppUIConfiguration.stateValues.stringSuppliers
+        get() = AppConfiguration.stateValues.stringSuppliers
     }
     data object AddEditSupplier: Menu("MenuAddEditSupplierNavigationScreenModelRoute")
 
     data object GoodsCategories: Menu("MenuGoodsCategoriesNavigationScreenModelRoute") {
       override val iconPath: String
-        get() = AppUIConfiguration.stateValues.drawablePathIconGoodsCategories
+        get() = AppConfiguration.stateValues.drawablePathIconGoodsCategories
       override val name: String
-        get() = AppUIConfiguration.stateValues.stringGoodsCategories
+        get() = AppConfiguration.stateValues.stringGoodsCategories
     }
     data object AddEditGoodsCategory: Menu("MenuAddEditGoodsCategoryNavigationScreenModelRoute")
 
     data object Devices: Menu("MenuDevicesNavigationScreenModelRoute") {
       override val iconPath: String
-        get() = AppUIConfiguration.stateValues.drawablePathIconDevices
+        get() = AppConfiguration.stateValues.drawablePathIconDevices
       override val name: String
-        get() = AppUIConfiguration.stateValues.stringDevices
+        get() = AppConfiguration.stateValues.stringDevices
     }
     data object AppLanguage: Menu("MenuAppLanguageNavigationScreenModelRoute") {
       override val iconPath: String
-        get() = AppUIConfiguration.stateValues.drawablePathIconAppLanguage
+        get() = AppConfiguration.stateValues.drawablePathIconAppLanguage
       override val name: String
-        get() = AppUIConfiguration.stateValues.stringAppLanguage
+        get() = AppConfiguration.stateValues.stringAppLanguage
     }
     data object AppTheme: Menu("MenuAppThemeNavigationScreenModelRoute") {
       override val iconPath: String
-        get() = AppUIConfiguration.stateValues.drawablePathIconAppTheme
+        get() = AppConfiguration.stateValues.drawablePathIconAppTheme
       override val name: String
-        get() = AppUIConfiguration.stateValues.stringAppTheme
+        get() = AppConfiguration.stateValues.stringAppTheme
     }
   }
 

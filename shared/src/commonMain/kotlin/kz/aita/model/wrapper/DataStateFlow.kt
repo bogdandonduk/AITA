@@ -11,7 +11,7 @@ import kz.aita.core.io
 class MutableDataStateFlow<T>(
   private val coroutineScope: CoroutineScope,
   initial: T? = null
-  ) : DataStateFlow<T> {
+  ): DataStateFlow<T> {
 
   private val _state = MutableStateFlow<DataState<T>>(initial?.run { DataState.Success(initial) } ?: DataState.Empty())
   override val value = _state.asStateFlow()

@@ -24,14 +24,14 @@ import io.kamel.image.asyncPainterResource
 import io.kamel.image.config.LocalKamelConfig
 import io.ktor.http.Url
 import kotlinx.coroutines.launch
-import kz.aita.AppUIConfiguration
+import kz.aita.AppConfiguration
 import kz.aita.compose.navigation.Navigation
 import kz.aita.compose.render.kamelConfig
 import kz.aita.compose.widget.ScreenAppBarWidget
 import kz.aita.core.getFullDrawableResourceUrl
 
 @Composable
-fun AppUIConfiguration.MenuListScreen() {
+fun AppConfiguration.MenuListScreen() {
   Column(
     modifier = Modifier
       .fillMaxSize()
@@ -48,7 +48,7 @@ fun AppUIConfiguration.MenuListScreen() {
 
     LazyColumn(
       modifier = Modifier
-        .fillMaxSize()
+        .weight(1f)
     ) {
       Navigation.Menu.listScreens.forEach { model ->
         item {

@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
-import kz.aita.AppUIConfiguration
+import kz.aita.AppConfiguration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 
 @Composable
-fun AppUIConfiguration.ModalDialogWidget(
+fun AppConfiguration.ModalDialogWidget(
   title: String,
   subTitle: String? = null,
   negativeButtonText: String = stateValues.stringCancel,

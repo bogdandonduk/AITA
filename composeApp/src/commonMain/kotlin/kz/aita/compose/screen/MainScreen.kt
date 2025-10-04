@@ -40,7 +40,7 @@ import io.kamel.image.config.LocalKamelConfig
 import io.ktor.http.Url
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kz.aita.AppUIConfiguration
+import kz.aita.AppConfiguration
 import kz.aita.compose.navigation.Navigation
 import kz.aita.compose.navigation.NavigationScreenModel
 import kz.aita.compose.render.kamelConfig
@@ -54,7 +54,7 @@ import kz.aita.core.userRepository
 import kz.aita.model.wrapper.DataState
 
 @Composable
-fun AppUIConfiguration.MainScreen() {
+fun AppConfiguration.MainScreen() {
   Column(
     modifier = Modifier
       .background(stateValues.BackgroundColor)
@@ -70,10 +70,10 @@ fun AppUIConfiguration.MainScreen() {
         .userAccountState
         .value
         .collect {
-          if (it is DataState.Empty || it is DataState.Failure)
-            Navigation.goMain(NavigationScreenModel.UserAuth.Main)
-          else if (it is DataState.Success && Navigation.Main.value.last().run { this is NavigationScreenModel.UserAuth || this is NavigationScreenModel.Splash} )
-            Navigation.goMain(NavigationScreenModel.Transaction.MainSale)
+          if (it is DataState.Empty || it is DataState.Failure) {
+            Navigation.clearMain(NavigationScreenModel.UserAuth.Main)
+          } else if (it is DataState.Success && Navigation.Main.value.last().run { this is NavigationScreenModel.UserAuth || this is NavigationScreenModel.Splash} )
+            Navigation.clearMain(NavigationScreenModel.Transaction.MainSale)
         }
     }
 
