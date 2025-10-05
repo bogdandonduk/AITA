@@ -15,7 +15,7 @@ import kz.aita.model.wrapper.TokenPair
 class UserRepositoryImpl(
   private val genericRemoteService: GenericRemoteService,
   private val configurationRepository: ConfigurationRepository
-) : Repository(), UserRepository {
+): Repository(), UserRepository {
 
   private val _userAccountState = MutableDataStateFlow(
     this,

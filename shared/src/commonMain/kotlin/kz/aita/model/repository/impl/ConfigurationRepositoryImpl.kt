@@ -26,7 +26,7 @@ import kz.aita.model.wrapper.MutableDataStateFlowNonNull
 
 class ConfigurationRepositoryImpl(
   private val genericRemoteService: GenericRemoteService
-) : Repository(), ConfigurationRepository {
+): Repository(), ConfigurationRepository {
 
   private val _globalAppConfigurationState = MutableDataStateFlowNonNull(
     coroutineScope = this,

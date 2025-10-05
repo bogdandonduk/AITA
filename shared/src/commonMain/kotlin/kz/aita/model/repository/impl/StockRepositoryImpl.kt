@@ -10,7 +10,7 @@ import kz.aita.model.wrapper.MutableDataStateFlow
 class StockRepositoryImpl(
     private val genericRemoteService: GenericRemoteService,
     private val genericLocalService: GenericLocalService
-) : Repository(), StockRepository {
+): Repository(), StockRepository {
 
     private val _stockState = MutableDataStateFlow<List<GoodsItemDataModel>>(this)
     override val stockState = _stockState.asDataStateFlow()

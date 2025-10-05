@@ -2,18 +2,18 @@ package kz.aita.model.wrapper
 
 sealed interface DataState<T> {
 
-  data class Success<T>(val payload: T) : DataState<T>
+  data class Success<T>(val payload: T): DataState<T>
 
-  class Progress<T> : DataState<T>
+  class Progress<T>: DataState<T>
 
-  class Empty<T> : DataState<T>
+  class Empty<T>: DataState<T>
 
   data class Failure<T>(val exception: Exception) : DataState<T>
 }
 
 fun <From, To> DataState<From>.map(
   action: (From) -> To
-) : DataState<To>  {
+): DataState<To>  {
 
   return when (this) {
     is DataState.Success -> DataState.Success(action(payload))

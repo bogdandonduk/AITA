@@ -1018,5 +1018,90 @@
         "value": "Жүйе тілі"
       }
     ]
+  },
+  {
+    "id": 60,
+    "values": [
+      {
+        "language": "en",
+        "value": "Bluetooth permission required"
+      },
+      {
+        "language": "ru",
+        "value": "Необходимо разрешение на Bluetooth"
+      },
+      {
+        "language": "kk",
+        "value": "Bluetooth рұқсаты қажет"
+      }
+    ]
+  },
+  {
+    "id": 61,
+    "values": [
+      {
+        "language": "en",
+        "value": "For search and connection to Bluetooth barcode scanners and receipt printers"
+      },
+      {
+        "language": "ru",
+        "value": "Для поиска и соединения с Bluetooth сканерами штрих-кодов и принтеров чеков"
+      },
+      {
+        "language": "kk",
+        "value": "Bluetooth штрих-код сканерлері мен түбіртек принтерлерін іздеуге және оларға қосылуға арналған"
+      }
+    ]
+  },
+  {
+    "id": 62,
+    "values": [
+      {
+        "language": "en",
+        "value": "For search and connection to Bluetooth barcode scanners and receipt printers. You can grant it in app settings"
+      },
+      {
+        "language": "ru",
+        "value": "Для поиска и соединения с Bluetooth сканерами штрих-кодов и принтеров чеков. Вы можете предоставить его в настройках приложения"
+      },
+      {
+        "language": "kk",
+        "value": "Bluetooth штрих-код сканерлері мен түбіртек принтерлерін іздеу және қосу үшін. Оны қолданба параметрлерінде қамтамасыз етуге болады"
+      }
+    ]
+  },
+  {
+    "id": 63,
+    "values": [
+      {
+        "language": "en",
+        "value": "Bluetooth disabled"
+      },
+      {
+        "language": "ru",
+        "value": "Bluetooth выключен"
+      },
+      {
+        "language": "kk",
+        "value": "Bluetooth өшірілген"
+      }
+    ]
+  },
+  {
+    "id": 64,
+    "values": [
+      {
+        "language": "en",
+        "value": "Enable for search and connection to Bluetooth barcode scanners and receipt printers"
+      },
+      {
+        "language": "ru",
+        "value": "Включите для поиска и соединения с Bluetooth сканерами штрих-кодов и принтеров чеков"
+      },
+      {
+        "language": "kk",
+        "value": "Bluetooth штрих-код сканерлері мен түбіртек принтерлерін іздеуді және оларға қосылуды қосыңыз"
+      }
+    ]
   }
 ]

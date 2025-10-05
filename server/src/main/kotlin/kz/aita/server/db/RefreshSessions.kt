@@ -8,7 +8,7 @@ import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 
-object RefreshSessions : Table("refresh_sessions") {
+object RefreshSessions: Table("refresh_sessions") {
   val id = uuid("id")
   val userId = uuid("user_id").references(Users.id, onDelete = ReferenceOption.CASCADE)
   val tokenHash = char("token_hash", 64).index()  // hex(sha256) = 64 chars

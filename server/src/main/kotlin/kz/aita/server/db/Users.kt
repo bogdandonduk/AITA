@@ -4,7 +4,7 @@ import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.javatime.timestamp
 import org.jetbrains.exposed.sql.javatime.CurrentTimestamp
 
-object Users : Table("users") {
+object Users: Table("users") {
   val id = uuid("id").uniqueIndex()
   val phoneNumber = varchar("phone_number", 255).uniqueIndex()
   val email = varchar("email", 255).uniqueIndex()

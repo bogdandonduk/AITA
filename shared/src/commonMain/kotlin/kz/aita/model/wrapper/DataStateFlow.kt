@@ -41,7 +41,7 @@ class MutableDataStateFlow<T>(
 class MutableDataStateFlowNonNull<T>(
   private val coroutineScope: CoroutineScope,
   initial: T
-) : DataStateFlowNonNull<T> {
+): DataStateFlowNonNull<T> {
 
   private val _state = MutableStateFlow<DataState<T>>(DataState.Success(initial))
   override val value = _state.asStateFlow()

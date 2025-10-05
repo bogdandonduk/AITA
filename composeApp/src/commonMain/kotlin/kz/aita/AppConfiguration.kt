@@ -157,6 +157,11 @@ object AppConfiguration {
     val stringFirstNameCannotBeEmptyOrJustWhitespaces: String
     val stringLastNameCannotBeEmptyOrJustWhitespaces: String
     val stringSystemLanguage: String
+    val stringBluetoothPermissionRequired: String
+    val stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrinters: String
+    val stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersYouCanGrantItInAppSettings: String
+    val stringBluetoothDisabled: String
+    val stringEnableForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrinters: String
 
     val screenWidth: Dp
     val screenHeight: Dp
@@ -292,6 +297,12 @@ object AppConfiguration {
   private val _stringLastNameCannotBeEmptyOrJustWhitespacesState = MutableStateFlow("Last cannot be empty or just whitespaces")
   private val _stringSystemLanguageState = MutableStateFlow("System language")
 
+  private val _stringBluetoothPermissionRequiredState = MutableStateFlow("Bluetooth permission required")
+  private val _stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersState = MutableStateFlow("For search and connection to Bluetooth barcode scanners and receipt printers")
+  private val _stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersYouCanGrantItInAppSettingsState = MutableStateFlow("For search and connection to Bluetooth barcode scanners and receipt printers. You can grant it in app settings")
+  private val _stringBluetoothDisabledState = MutableStateFlow("Bluetooth disabled")
+  private val _stringEnableForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersState = MutableStateFlow("Enable for search and connection to Bluetooth barcode scanners and receipt printers")
+
   private val _screenWidthState = MutableStateFlow(0f.dp)
   private val _screenHeightState = MutableStateFlow(0f.dp)
   private val _wideScreenMinWidthState = MutableStateFlow(600f)
@@ -375,7 +386,7 @@ object AppConfiguration {
     content: @Composable AppConfiguration.() -> Unit,
     vararg keys: Any
   ) {
-    stateValues = object : StateValues {
+    stateValues = object: StateValues {
       override val userAccountState: DataState<UserAccountDataModel> by userRepository.userAccountState.value.collectAsState()
       override val userAccount: UserAccountDataModel? by userRepository.userAccountState.payload.collectAsState()
 
@@ -498,6 +509,11 @@ object AppConfiguration {
       override val stringFirstNameCannotBeEmptyOrJustWhitespaces: String by _stringFirstNameCannotBeEmptyOrJustWhitespacesState.collectAsState()
       override val stringLastNameCannotBeEmptyOrJustWhitespaces: String by _stringLastNameCannotBeEmptyOrJustWhitespacesState.collectAsState()
       override val stringSystemLanguage: String by _stringSystemLanguageState.collectAsState()
+      override val stringBluetoothPermissionRequired: String by _stringBluetoothPermissionRequiredState.collectAsState()
+      override val stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrinters: String by _stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersState.collectAsState()
+      override val stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersYouCanGrantItInAppSettings: String by _stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersYouCanGrantItInAppSettingsState.collectAsState()
+      override val stringBluetoothDisabled: String by _stringBluetoothDisabledState.collectAsState()
+      override val stringEnableForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrinters: String by _stringEnableForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersState.collectAsState()
 
       override val screenWidth: Dp by _screenWidthState.collectAsState()
       override val screenHeight: Dp by _screenHeightState.collectAsState()
@@ -773,6 +789,11 @@ object AppConfiguration {
     _stringFirstNameCannotBeEmptyOrJustWhitespacesState.emit(strings.extractString(57, stateValues.appLocaleLanguage))
     _stringLastNameCannotBeEmptyOrJustWhitespacesState.emit(strings.extractString(58, stateValues.appLocaleLanguage))
     _stringSystemLanguageState.emit(strings.extractString(59, stateValues.appLocaleLanguage))
+    _stringBluetoothPermissionRequiredState.emit(strings.extractString(60, stateValues.appLocaleLanguage))
+    _stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersState.emit(strings.extractString(61, stateValues.appLocaleLanguage))
+    _stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersYouCanGrantItInAppSettingsState.emit(strings.extractString(62, stateValues.appLocaleLanguage))
+    _stringBluetoothDisabledState.emit(strings.extractString(63, stateValues.appLocaleLanguage))
+    _stringEnableForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersState.emit(strings.extractString(64, stateValues.appLocaleLanguage))
   }
 
   private suspend fun updateColors(colors: List<StylizedColorGroupDataModel>) {

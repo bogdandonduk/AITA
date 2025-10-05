@@ -5,11 +5,11 @@ import kotlinx.serialization.Serializable
 @Serializable
 sealed interface StoreJobDataModel {
   
-  data object Cashier : StoreJobDataModel
+  data object Cashier: StoreJobDataModel
   
-  data object WarehouseManager : StoreJobDataModel
+  data object WarehouseManager: StoreJobDataModel
   
-  data object Administrator : StoreJobDataModel
+  data object Administrator: StoreJobDataModel
   
   fun serialize(): String {
     return when (this) {

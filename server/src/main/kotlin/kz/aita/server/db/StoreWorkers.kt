@@ -4,7 +4,7 @@ import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.javatime.CurrentTimestamp
 import org.jetbrains.exposed.sql.javatime.timestamp
 
-object StoreWorkers : Table("store_workers") {
+object StoreWorkers: Table("store_workers") {
   val id = uuid("id").uniqueIndex()
   val privilegeModeId = integer("privilege_mode_id")
   val isActive = bool("is_active")

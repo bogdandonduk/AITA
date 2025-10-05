@@ -8,6 +8,9 @@ plugins {
   alias(libs.plugins.androidLibrary)
   alias(libs.plugins.kotlinSerialization)
   alias(libs.plugins.sqldelight)
+  alias(libs.plugins.hilt)
+  alias(libs.plugins.ksp)
+
 }
 
 sqldelight {
@@ -79,6 +82,7 @@ kotlin {
 
     }
     androidMain.dependencies {
+      implementation(libs.hilt.android)
       implementation(libs.androidx.core.ktx)
 
       implementation(libs.sqlcipher.android)
@@ -92,7 +96,7 @@ kotlin {
 
     }
     jvmMain.dependencies {
-      implementation("com.fazecast:jSerialComm:2.10.4")
+      implementation(libs.jserialcomm)
 
       implementation(libs.sqlDelightJvmDriver)
 
@@ -121,6 +125,10 @@ kotlin {
       implementation(libs.sqlDelightWasmJsCoroutinesExtensions)
     }
   }
+}
+
+dependencies {
+  add("kspAndroid", libs.hilt.android.compiler)
 }
 
 android {

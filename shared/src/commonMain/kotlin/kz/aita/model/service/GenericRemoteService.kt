@@ -26,7 +26,7 @@ class GenericRemoteService(
     body: Body? = null,
     contentType: ContentType? = ContentType.Application.Json,
     onFailure: (Exception) -> Unit
-  ) : Response? {
+  ): Response? {
       return httpClient
         .request("$serverUrl/$endpointUrl") {
           this.method = method

@@ -1,7 +1,9 @@
 package kz.aita.app
 
 import android.app.Application
+import dagger.hilt.android.HiltAndroidApp
 
+@HiltAndroidApp
 class AITA : Application() {
 
   override fun onCreate() {

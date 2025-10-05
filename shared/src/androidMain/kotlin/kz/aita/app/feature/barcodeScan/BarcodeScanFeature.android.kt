@@ -5,19 +5,25 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothSocket
-import android.content.Context
 import android.content.Context.BLUETOOTH_SERVICE
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.provider.Settings
 import androidx.core.app.ActivityCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kz.aita.AppConfiguration
 import kz.aita.app.AITA
-import kz.aita.app.MainActivity
+import kz.aita.app.system.ui.activity.MainActivity
+import kz.aita.compose.navigation.NavigationScreenModel
 import kz.aita.core.genericLocalService
 import kz.aita.core.io
+import kz.aita.core.userRepository
+import kz.aita.model.wrapper.DataState
 
 actual val barcodeScanFeature: BarcodeScanFeature by lazy {
   object: BarcodeScanFeature(genericLocalService) {
@@ -62,40 +68,38 @@ actual val barcodeScanFeature: BarcodeScanFeature by lazy {
                   Manifest.permission.BLUETOOTH_CONNECT
                 ) != PackageManager.PERMISSION_GRANTED)
           ) {
-//            withContext(Dispatchers.Main) {
-//              while (
-//                MainActivity.ge == null ||
-//                MainActivity.instance!!.navigationViewModel.currentNavigationScreenModel.value !is NavigationScreenModel.UserAuthSignUpScreen &&
-//                MainActivity.instance!!.navigationViewModel.currentNavigationScreenModel.value !is NavigationScreenModel.UserAuthLogInScreen &&
-//                UserAuthStateViewModel.logInStateFlow.value !is DataState.Success
-//              )
-//                delay(1000)
-//
-//              MainActivity
-//                .instance
-//                ?.requestPermissions(
-//                  arrayOf(
-//                    Manifest.permission.BLUETOOTH_CONNECT,
-//                    Manifest.permission.BLUETOOTH_SCAN
-//                  ),
-//                  modifiedContext.value!!.getString(R.string.bluetooth_permission_required),
-//                  modifiedContext.value!!.getString(R.string.for_search_and_connection_to_bluetooth_barcode_scanners_and_receipt_printers),
-//                  modifiedContext.value!!.getString(R.string.bluetooth_permission_required),
-//                  modifiedContext.value!!.getString(R.string.for_search_and_connection_to_bluetooth_barcode_scanners_and_receipt_printers_you_can_grant_it_in_app_settings),
-//                )
-//            }
+            withContext(Dispatchers.Main) {
+              while (
+                AppConfiguration.stateValues.navigationScreensMain.last() !is NavigationScreenModel.UserAuth &&
+                userRepository.userAccountState.value.value !is DataState.Success
+              )
+                delay(1000)
+
+              MainActivity
+                .get()
+                .requestPermissions(
+                  arrayOf(
+                    Manifest.permission.BLUETOOTH_CONNECT,
+                    Manifest.permission.BLUETOOTH_SCAN
+                  ),
+                  AppConfiguration.stateValues.stringBluetoothPermissionRequired,
+                  AppConfiguration.stateValues.stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrinters,
+                  AppConfiguration.stateValues.stringBluetoothPermissionRequired,
+                  AppConfiguration.stateValues.stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersYouCanGrantItInAppSettings
+                )
+            }
           } else {
             if (bluetoothAdapter.isEnabled) {
               if (!bluetoothEnabled.value)
                 setBluetoothEnabled(true)
 
-//              MainActivity
-//                .instance
-//                ?.run {
-//                  if (viewModel.currentDialogWidget.value.first != "" || viewModel.currentDialogWidget.value.second != "") {
-//                    viewModel.postCurrentDialogWidget("", "", {}) {}
-//                  }
-//                }
+              MainActivity
+                .get()
+                .run {
+                  if (viewModel.currentDialogWidget.value.first != "" || viewModel.currentDialogWidget.value.second != "") {
+                    viewModel.postCurrentDialogWidget("", "", {}) {}
+                  }
+                }
 
               try {
                 if (scanner == null || scannerSocket == null || scannerSocket?.isConnected == false) {
@@ -120,26 +124,26 @@ actual val barcodeScanFeature: BarcodeScanFeature by lazy {
 
               setScannerConnectedState(false)
 
-//              if (!enableBluetoothOffered) {
-//                MainActivity
-//                  .instance
-//                  ?.run {
-//                    if (viewModel.currentDialogWidget.value.first == "" && viewModel.currentDialogWidget.value.second == "") {
-//                      viewModel.postCurrentDialogWidget(
-//                        modifiedContext.value!!.getString(R.string.bluetooth_disabled),
-//                        modifiedContext.value!!.getString(R.string.enable_for_search_and_connection_to_bluetooth_barcode_scanners_and_receipt_printers),
-//                        {
-//                          enableBluetoothOffered = true
-//                        }
-//                      ) {
-//                        val intent = Intent(Settings.ACTION_BLUETOOTH_SETTINGS)
-//                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-//                        startActivity(intent)
-//                        enableBluetoothOffered = true
-//                      }
-//                    }
-//                  }
-//              }
+              if (!enableBluetoothOffered) {
+                MainActivity
+                  .get()
+                  .run {
+                    if (viewModel.currentDialogWidget.value.first == "" && viewModel.currentDialogWidget.value.second == "") {
+                      viewModel.postCurrentDialogWidget(
+                        AppConfiguration.stateValues.stringBluetoothDisabled,
+                        AppConfiguration.stateValues.stringEnableForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrinters,
+                        {
+                          enableBluetoothOffered = true
+                        }
+                      ) {
+                        val intent = Intent(Settings.ACTION_BLUETOOTH_SETTINGS)
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        startActivity(intent)
+                        enableBluetoothOffered = true
+                      }
+                    }
+                  }
+              }
             }
           }
 

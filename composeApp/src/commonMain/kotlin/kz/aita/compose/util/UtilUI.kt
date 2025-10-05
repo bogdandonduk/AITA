@@ -34,7 +34,7 @@ fun getTransformedTextWithSelectionFocusTextColor(
 fun getPasswordTransformedTextWithSelectionFocusTextColor(
   textFieldValue: TextFieldValue,
   selectionFocusTextColor: Color
-) : TransformedText {
+): TransformedText {
   return AnnotatedString.Builder()
     .apply {
       val maskChar = '•'
