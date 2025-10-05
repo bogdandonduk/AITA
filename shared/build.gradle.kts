@@ -79,6 +79,7 @@ kotlin {
 
     }
     androidMain.dependencies {
+      implementation(libs.androidx.core.ktx)
 
       implementation(libs.sqlcipher.android)
       implementation(libs.androidx.sqlite)
@@ -87,8 +88,12 @@ kotlin {
 
       implementation("io.ktor:ktor-client-okhttp:${property("ktor.version")}")
       implementation("io.ktor:ktor-client-android:${property("ktor.version")}")
+      implementation(projects.composeApp)
+
     }
     jvmMain.dependencies {
+      implementation("com.fazecast:jSerialComm:2.10.4")
+
       implementation(libs.sqlDelightJvmDriver)
 
       implementation("io.ktor:ktor-client-okhttp:${property("ktor.version")}")

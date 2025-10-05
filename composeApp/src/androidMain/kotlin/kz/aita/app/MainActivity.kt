@@ -11,6 +11,8 @@ class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
 
+    instance = this
+
     setContent {
       AppConfiguration(
         {
@@ -18,5 +20,12 @@ class MainActivity : ComponentActivity() {
         }
       )
     }
+  }
+
+  companion object {
+    private lateinit var instance: MainActivity
+
+    fun get() = instance
+
   }
 }

@@ -92,7 +92,6 @@ sqlDelightCoroutinesExtensions = { module = "app.cash.sqldelight:coroutines-exte
 sqlDelightAsyncExtensions = { module = "app.cash.sqldelight:async-extensions", version.ref = "sqldelight" }
 androidx-security-crypto = { module = "androidx.security:security-crypto", version.ref = "securityCrypto" }
 
-
 [plugins]
 kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 androidApplication = { id = "com.android.application", version.ref = "agp" }
