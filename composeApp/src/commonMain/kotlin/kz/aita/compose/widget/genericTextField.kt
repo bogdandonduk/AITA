@@ -39,6 +39,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -54,6 +55,8 @@ import io.kamel.image.KamelImage
 import io.kamel.image.asyncPainterResource
 import io.kamel.image.config.LocalKamelConfig
 import io.ktor.http.Url
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kz.aita.AppConfiguration
 import kz.aita.core.getFullDrawableResourceUrl
 import kz.aita.compose.render.kamelConfig
@@ -66,7 +69,7 @@ fun AppConfiguration.genericTextField(
 
   enabled: Boolean = true,
 
-  valueInitial: String = "",
+  valueInitial: String? = null,
   titleText: String = "",
 
   textSize: TextUnit = stateValues.textSize,
@@ -110,11 +113,12 @@ fun AppConfiguration.genericTextField(
   contentInvalidText: String = "",
   onContentValidityCheck: ((String) -> Boolean)? = null,
   onFilterValue: ((String) -> Boolean)? = null,
-  onValueChange: ((updateAction: () -> Unit) -> Unit)? = null
+  onValueChange: ((String, () -> Unit) -> Unit)? = null
 ): GenericTextFieldContent {
 
   var value by rememberSaveable(stateSaver = TextFieldValue.Saver) {
-    mutableStateOf(TextFieldValue(valueInitial))
+    val initial = valueInitial ?: ""
+    mutableStateOf(TextFieldValue(initial, selection = TextRange(initial.length)))
   }
 
   var isFocused by rememberSaveable {
@@ -158,7 +162,7 @@ fun AppConfiguration.genericTextField(
         value = value,
         onValueChange = {
           if (onValueChange != null) {
-            onValueChange {
+            onValueChange(it.text) {
               if (onFilterValue == null || onFilterValue(it.text))
                 value = it
             }
@@ -177,12 +181,12 @@ fun AppConfiguration.genericTextField(
             color = if (isFocused) focusedBorderColor else unfocusedBorderColor,
             shape = RoundedCornerShape(cornerRadius)
           )
+          .focusRequester(focusRequester)
           .onFocusChanged {
             isFocused = it.isFocused
 
             updateIsFocusedAction?.invoke(it)
-          }
-          .focusRequester(focusRequester),
+          },
         keyboardOptions = KeyboardOptions.Default.copy(
           keyboardType = keyboardType,
           imeAction = imeWithAction.ime
@@ -212,7 +216,7 @@ fun AppConfiguration.genericTextField(
                 CompositionLocalProvider(LocalKamelConfig provides kamelConfig) {
                   KamelImage(
                     modifier = Modifier
-                      .padding(stateValues.textFieldIconPadding)
+                      .padding(start = 12.dp, top = stateValues.textFieldIconPadding, bottom = stateValues.textFieldIconPadding)
                       .fillMaxHeight()
                       .aspectRatio(1f, matchHeightConstraintsFirst = true),
                     resource = {
@@ -228,6 +232,7 @@ fun AppConfiguration.genericTextField(
               Box(
                 Modifier
                   .weight(1f)
+                  .padding(start = stateValues.textFieldIconPadding)
               ) {
                 Text(
                   text = if (value.text.isEmpty()) placeholderText else "",
@@ -260,7 +265,7 @@ fun AppConfiguration.genericTextField(
                     ) {
                       KamelImage(
                         modifier = Modifier
-                          .padding(stateValues.textFieldIconPadding)
+                          .padding(horizontal = 12.dp, vertical = stateValues.textFieldIconPadding)
                           .fillMaxHeight()
                           .aspectRatio(1f, matchHeightConstraintsFirst = true),
                         resource = {
@@ -288,7 +293,7 @@ fun AppConfiguration.genericTextField(
                     ) {
                       KamelImage(
                         modifier = Modifier
-                          .padding(stateValues.textFieldIconPadding)
+                          .padding(start = 4.dp, top = stateValues.textFieldIconPadding, bottom = stateValues.textFieldIconPadding, end = 12.dp)
                           .fillMaxHeight()
                           .aspectRatio(1f, matchHeightConstraintsFirst = true),
                         resource = {
@@ -323,17 +328,26 @@ fun AppConfiguration.genericTextField(
       )
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(isFocused) {
       if (isFocused)
         focusRequester.requestFocus()
       else
         focusManager.clearFocus()
+    }
+
+    LaunchedEffect(isFocusedInitial) {
+      if (isFocusedInitial) {
+        delay(300)
+
+        isFocused = true
+      }
     }
   }
 
   val content = GenericTextFieldContent(
     value = value,
     isFocused = isFocused,
+    focusRequester = focusRequester,
     isContentValid = isContentValid,
     onContentValidityCheck = onContentValidityCheck?.run {
       {
@@ -358,6 +372,7 @@ fun AppConfiguration.genericTextField(
 class GenericTextFieldContent(
   var value: TextFieldValue,
   var isFocused: Boolean,
+  var focusRequester: FocusRequester,
   var isContentValid: Boolean,
   val onContentValidityCheck: ((String) -> Boolean)? = null
 ) {

@@ -36,7 +36,7 @@ fun AppConfiguration.MenuAppLanguageScreen() {
       item {
         AppLanguageSettingsItemWidget(
             "system",
-            flagDrawablePath = stateValues.drawablePathSettings,
+            flagDrawablePath = stateValues.drawablePathIconSettings,
             name = stateValues.stringSystemLanguage,
             isActive = stateValues.appLocaleLanguage == "system"
         )

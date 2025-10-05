@@ -39,6 +39,7 @@ import io.kamel.image.asyncPainterResource
 import io.kamel.image.config.LocalKamelConfig
 import io.ktor.http.Url
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kz.aita.AppConfiguration
 import kz.aita.compose.navigation.Navigation
@@ -71,9 +72,9 @@ fun AppConfiguration.MainScreen() {
         .value
         .collect {
           if (it is DataState.Empty || it is DataState.Failure) {
-            Navigation.clearMain(NavigationScreenModel.UserAuth.Main)
+            Navigation.goMain(NavigationScreenModel.UserAuth.Main)
           } else if (it is DataState.Success && Navigation.Main.value.last().run { this is NavigationScreenModel.UserAuth || this is NavigationScreenModel.Splash} )
-            Navigation.clearMain(NavigationScreenModel.Transaction.MainSale)
+            Navigation.goMain(NavigationScreenModel.Transaction.MainSale)
         }
     }
 

@@ -9,5 +9,5 @@ import okhttp3.OkHttpClient
 import java.io.File
 
 actual fun getHttpClientEngine(): HttpClientEngine {
-  return OkHttp.create { preconfigured = OkHttpClient.Builder().cache(Cache(File(AITA.get().cacheDir, "http"), 4000L * 1024 * 1024)).build() }
+  return OkHttp.create { preconfigured = OkHttpClient.Builder().cache(Cache(File(AITA.get().cacheDir, "http"), cacheSize)).build() }
 }

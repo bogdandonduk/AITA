@@ -3,11 +3,8 @@ package kz.aita.compose.navigation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kz.aita.compose.navigation.Navigation.Menu._Left
-import kz.aita.compose.navigation.Navigation.Menu._Right
 
 object Navigation {
-
   val bottomNavBarScreens = listOf(
     NavigationScreenModel.Transaction.MainSale,
     NavigationScreenModel.Transaction.MainReturn,
@@ -17,152 +14,16 @@ object Navigation {
   )
 
   private val _Main =
-    MutableStateFlow<List<NavigationScreenModel>>(listOf(NavigationScreenModel.Splash))
+    MutableStateFlow<List<NavigationScreenModel>>(
+      listOf(
+        NavigationScreenModel.Splash
+      )
+    )
   val Main = _Main.asStateFlow()
 
-  fun isVeryFirstScreen(): Boolean {
-    return _Main.value.size == 1
-  }
-
-  suspend fun goMain(model: NavigationScreenModel, remove: Boolean = false) {
-    if (model::class != _Main.value.last()::class) {
-      _Main.emit(
-        _Main
-          .value.toMutableList()
-          .apply {
-            if (remove)
-              removeAt(lastIndex)
-
-            add(model)
-          }
-      )
-    } else {
-      when (_Main.value.last()) {
-        is NavigationScreenModel.Menu.Main -> {
-          Menu.clearLeft()
-          Menu.clearRight()
-        }
-
-        is NavigationScreenModel.Stock.Main -> {
-          Stock.clearLeft()
-          Stock.clearRight()
-        }
-
-        is NavigationScreenModel.Transaction.MainSale -> {
-
-          when (TransactionSale.ClientId.value) {
-            0 -> {
-              TransactionSale.clearLeftClient1()
-              TransactionSale.clearRightClient1()
-            }
-
-            1 -> {
-              TransactionSale.clearLeftClient2()
-              TransactionSale.clearRightClient2()
-            }
-
-            2 -> {
-              TransactionSale.clearLeftClient3()
-              TransactionSale.clearRightClient3()
-            }
-
-            3 -> {
-              TransactionSale.clearLeftClient4()
-              TransactionSale.clearRightClient4()
-            }
-
-            4 -> {
-              TransactionSale.clearLeftClient5()
-              TransactionSale.clearRightClient5()
-            }
-          }
-        }
-
-        is NavigationScreenModel.Transaction.MainSupply -> {
-
-          when (TransactionSupply.ClientId.value) {
-            0 -> {
-              TransactionSupply.clearLeftClient1()
-              TransactionSupply.clearRightClient1()
-            }
-
-            1 -> {
-              TransactionSupply.clearLeftClient2()
-              TransactionSupply.clearRightClient2()
-            }
-
-            2 -> {
-              TransactionSupply.clearLeftClient3()
-              TransactionSupply.clearRightClient3()
-            }
-
-            3 -> {
-              TransactionSupply.clearLeftClient4()
-              TransactionSupply.clearRightClient4()
-            }
-
-            4 -> {
-              TransactionSupply.clearLeftClient5()
-              TransactionSupply.clearRightClient5()
-            }
-          }
-        }
-
-        is NavigationScreenModel.Transaction.MainReturn -> {
-
-          when (TransactionReturn.ClientId.value) {
-            0 -> {
-              TransactionReturn.clearLeftClient1()
-              TransactionReturn.clearRightClient1()
-            }
-
-            1 -> {
-              TransactionReturn.clearLeftClient2()
-              TransactionReturn.clearRightClient2()
-            }
-
-            2 -> {
-              TransactionReturn.clearLeftClient3()
-              TransactionReturn.clearRightClient3()
-            }
-
-            3 -> {
-              TransactionReturn.clearLeftClient4()
-              TransactionReturn.clearRightClient4()
-            }
-
-            4 -> {
-              TransactionReturn.clearLeftClient5()
-              TransactionReturn.clearRightClient5()
-            }
-          }
-        }
-
-        else -> {
-        }
-      }
-    }
-  }
-
-  suspend fun popMain(navigateAfterwards: NavigationScreenModel? = null) {
-    val oldSize = _Main.value.size
-
-    _Main.emit(
-      _Main.value.toMutableList()
-        .apply { if (_Main.value.size > 1) removeAt(lastIndex) })
-
-    navigateAfterwards?.run {
-      while (_Main.value.size == oldSize)
-        delay(30)
-
-      delay(300)
-
-      goMain(this@run)
-    }
-  }
-
-  suspend fun clearMain(model: NavigationScreenModel) {
-    _Main.emit(listOf(model))
+  suspend fun goMain(model: NavigationScreenModel) {
+    if (model::class != _Main.value.last()::class)
+      _Main.emit(listOf(model))
   }
 
   object TransactionSale {

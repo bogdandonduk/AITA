@@ -17,7 +17,7 @@ class UserRepositoryImpl(
   private val configurationRepository: ConfigurationRepository
 ): Repository(), UserRepository {
 
-  private val _userAccountState = MutableDataStateFlow(
+  private val _userAccountState = MutableDataStateFlow<UserAccountDataModel>(
     this,
     initial = UserAccountDataModel(
       "0",

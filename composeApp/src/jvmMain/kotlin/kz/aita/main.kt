@@ -5,7 +5,6 @@ import androidx.compose.ui.window.application
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
-import kz.aita.app.feature.barcodeScan.barcodeScanFeature
 import kz.aita.compose.screen.MainScreen
 import kz.aita.core.io
 
@@ -20,10 +19,6 @@ fun main() {
           MainScreen()
         }
       )
-    }
-
-    GlobalScope.launch(Dispatchers.io) {
-      barcodeScanFeature.startBarcodeScanning()
     }
   }
 }

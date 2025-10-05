@@ -95,9 +95,6 @@ fun AppConfiguration.TransactionScreen() {
           is NavigationScreenModel.Transaction.Selection -> {
             TransactionSelectionScreen()
           }
-          is NavigationScreenModel.Transaction.QuickItems -> {
-            TransactionQuickItemsScreen()
-          }
           is NavigationScreenModel.Transaction.Checkout -> {
             TransactionCheckoutScreen()
           }
@@ -125,9 +122,7 @@ fun AppConfiguration.TransactionScreen() {
             is NavigationScreenModel.Transaction.Selection -> {
               TransactionSelectionScreen()
             }
-            is NavigationScreenModel.Transaction.QuickItems -> {
-              TransactionQuickItemsScreen()
-            }
+
             is NavigationScreenModel.Transaction.Checkout -> {
               TransactionCheckoutScreen()
             }
@@ -150,9 +145,6 @@ fun AppConfiguration.TransactionScreen() {
             }
             is NavigationScreenModel.Transaction.Selection -> {
               TransactionSelectionScreen()
-            }
-            is NavigationScreenModel.Transaction.QuickItems -> {
-              TransactionQuickItemsScreen()
             }
             is NavigationScreenModel.Transaction.Checkout -> {
               TransactionCheckoutScreen()

@@ -401,5 +401,31 @@
         "path": "svg/30_1.svg"
       }
     ]
+  },
+  {
+    "id": 31,
+    "values": [
+      {
+        "themeId": 0,
+        "path": "svg/31_0.svg"
+      },
+      {
+        "themeId": 1,
+        "path": "svg/31_1.svg"
+      }
+    ]
+  },
+  {
+    "id": 32,
+    "values": [
+      {
+        "themeId": 0,
+        "path": "svg/32_0.svg"
+      },
+      {
+        "themeId": 1,
+        "path": "svg/32_1.svg"
+      }
+    ]
   }
 ]

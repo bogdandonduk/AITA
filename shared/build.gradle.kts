@@ -92,8 +92,6 @@ kotlin {
 
       implementation("io.ktor:ktor-client-okhttp:${property("ktor.version")}")
       implementation("io.ktor:ktor-client-android:${property("ktor.version")}")
-      implementation(projects.composeApp)
-
     }
     jvmMain.dependencies {
       implementation(libs.jserialcomm)
@@ -129,6 +127,18 @@ kotlin {
 
 dependencies {
   add("kspAndroid", libs.hilt.android.compiler)
+}
+
+afterEvaluate {
+  val genCommon = tasks.named("generateCommonMainKeyValueDatabaseInterface")
+
+  // Android KSP tasks (Debug/Release etc.)
+  tasks.matching { it.name.startsWith("ksp") && it.name.endsWith("KotlinAndroid") }
+    .configureEach { dependsOn(genCommon) }
+
+  // (optional) If you also run KSP for other targets, add similar lines:
+  // tasks.matching { it.name.startsWith("ksp") && it.name.endsWith("KotlinJvm") }
+  //     .configureEach { dependsOn(genCommon) }
 }
 
 android {

@@ -94,5 +94,23 @@
         "valueHex": "aaffffff"
       }
     ]
+  },
+  {
+    "id": 8,
+    "values": [
+      {
+        "themeId": -1,
+        "valueHex": "ff6bb522"
+      }
+    ]
+  },
+  {
+    "id": 9,
+    "values": [
+      {
+        "themeId": -1,
+        "valueHex": "ffffa500"
+      }
+    ]
   }
 ]

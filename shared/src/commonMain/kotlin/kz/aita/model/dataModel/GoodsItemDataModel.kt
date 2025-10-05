@@ -6,5 +6,6 @@ import kotlinx.serialization.Serializable
 data class GoodsItemDataModel(
   val id: Long,
   val barcode: String,
-  val name: String
+  val name: String,
+  val quantity: QuantityDataModel
 )

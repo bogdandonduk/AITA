@@ -41,7 +41,7 @@ fun Application.module() {
         ContentType.Image.PNG,
         ContentType.Image.JPEG,
         ContentType("image","webp") ->
-          CachingOptions(CacheControl.MaxAge(cacheMaxAgeSec))
+          CachingOptions(CacheControl.NoCache(null))
 
         else -> CachingOptions(CacheControl.NoCache(null))
       }

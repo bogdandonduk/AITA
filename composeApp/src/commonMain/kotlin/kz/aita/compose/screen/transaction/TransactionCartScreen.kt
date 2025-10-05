@@ -50,13 +50,6 @@ fun AppConfiguration.TransactionCartScreen() {
         1 -> stateValues.drawablePathIconTransactionReturn
         2 -> stateValues.drawablePathIconTransactionSupply
         else -> stateValues.drawablePathIconTransactionSale
-      },
-      onBack = Navigation.isVeryFirstScreen().takeIf { !it }?.run {
-        {
-          coroutineScope.launch {
-            Navigation.popMain()
-          }
-        }
       }
     )
   }

@@ -18,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.kamel.image.KamelImage
 import io.kamel.image.asyncPainterResource
@@ -38,12 +39,7 @@ fun AppConfiguration.MenuListScreen() {
   ) {
     ScreenAppBarWidget(
       title = stateValues.stringMenu,
-      iconPath = stateValues.drawablePathIconMenu,
-      onBack = {
-        coroutineScope.launch {
-          Navigation.popMain()
-        }
-      }
+      iconPath = stateValues.drawablePathIconMenu
     )
 
     LazyColumn(
@@ -68,6 +64,13 @@ fun AppConfiguration.MenuListScreen() {
               },
             verticalAlignment = Alignment.CenterVertically
           ) {
+            val isActive = stateValues.run {
+              if (isNarrowScreen)
+                navigationScreensMenuLeft
+              else
+                navigationScreensMenuRight
+            }.last().route == model.route
+
             CompositionLocalProvider(LocalKamelConfig provides kamelConfig) {
               KamelImage(
                 modifier = Modifier
@@ -79,7 +82,7 @@ fun AppConfiguration.MenuListScreen() {
                   )
                 },
                 contentDescription = stateValues.stringBack,
-                colorFilter = if (!stateValues.isNarrowScreen && stateValues.navigationScreensMenuRight.last().route == model.route)
+                colorFilter = if (isActive)
                   ColorFilter.tint(stateValues.AccentColor)
                 else null
               )
@@ -87,7 +90,14 @@ fun AppConfiguration.MenuListScreen() {
 
             Text(
               text = model.name,
-              color = stateValues.TextColor
+              color = if (isActive)
+                stateValues.AccentColor
+              else
+                stateValues.TextColor,
+              fontWeight = if (isActive)
+                FontWeight.Bold
+              else
+                FontWeight.Normal
             )
           }
         }

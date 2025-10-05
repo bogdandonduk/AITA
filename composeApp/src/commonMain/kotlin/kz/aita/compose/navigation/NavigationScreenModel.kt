@@ -8,6 +8,21 @@ sealed class NavigationScreenModel(
   open val iconPath: String = ""
 ) {
 
+  private val _state = mutableMapOf<String, String>()
+  val state = _state as Map<String, String>
+
+  fun setState(pair: Pair<String, String>) {
+    _state[pair.first] = pair.second
+  }
+
+  fun removeStockWarehouse(key: String) {
+    _state.remove(key)
+  }
+
+  fun clearStockWarehouse() {
+    _state.clear()
+  }
+
   sealed class Transaction(route: String): NavigationScreenModel(route) {
 
     data object MainSale: Transaction("TransactionMainSaleNavigationScreenModelRoute") {
@@ -34,15 +49,10 @@ sealed class NavigationScreenModel(
     data object Cart: Transaction("TransactionCartScreenNavigationScreenModelRoute")
 
     data object Selection: Transaction("TransactionSelectionNavigationScreenModelRoute")
-    data object QuickItems: Transaction("TransactionQuickItemsNavigationScreenModelRoute")
 
     data object Checkout: Transaction("TransactionCheckoutNavigationScreenModelRoute")
 
     data object ReceiptPreview: Transaction("TransactionReceiptPreviewNavigationScreenModelRoute")
-
-    companion object {
-      const val PARENT_GRAPH_ROUTE = "CashRegisterScreenParentGraphRoute"
-    }
   }
 
   sealed class Stock(route: String): NavigationScreenModel(route) {

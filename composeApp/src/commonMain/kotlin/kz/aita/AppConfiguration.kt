@@ -162,6 +162,7 @@ object AppConfiguration {
     val stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersYouCanGrantItInAppSettings: String
     val stringBluetoothDisabled: String
     val stringEnableForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrinters: String
+    val stringSearchByAnyData: String
 
     val screenWidth: Dp
     val screenHeight: Dp
@@ -192,6 +193,8 @@ object AppConfiguration {
     val ErrorColor: Color
 
     val IconTintColor: Color
+    val OkayColor: Color
+    val BorderlineBadColor: Color
 
     val drawablePathAITALogo: String
     val drawablePathIconPassword: String
@@ -224,7 +227,9 @@ object AppConfiguration {
     val drawablePathIconAppTheme: String
     val drawablePathIconCheck: String
     val drawablePathIconCreate: String
-    val drawablePathSettings: String
+    val drawablePathIconSettings: String
+    val drawablePathIconSearch: String
+    val drawablePathIconBarcodeCamScanner: String
 
     val exceptionMessageUserWithThisPhoneNumberIsAlreadyRegistered: String
     val exceptionMessageUserWithThisEmailAddressIsAlreadyRegistered: String
@@ -302,6 +307,7 @@ object AppConfiguration {
   private val _stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersYouCanGrantItInAppSettingsState = MutableStateFlow("For search and connection to Bluetooth barcode scanners and receipt printers. You can grant it in app settings")
   private val _stringBluetoothDisabledState = MutableStateFlow("Bluetooth disabled")
   private val _stringEnableForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersState = MutableStateFlow("Enable for search and connection to Bluetooth barcode scanners and receipt printers")
+  private val _stringSearchByAnyDataState = MutableStateFlow("Search by any data")
 
   private val _screenWidthState = MutableStateFlow(0f.dp)
   private val _screenHeightState = MutableStateFlow(0f.dp)
@@ -330,6 +336,9 @@ object AppConfiguration {
   private val _DisabledColorState = MutableStateFlow(Color(0xffa7a7a7))
   private val _ErrorColorState = MutableStateFlow(Color(0xffff0000))
   private val _IconTintColorState = MutableStateFlow(Color(0xff000000))
+
+  private val _OkayColorState = MutableStateFlow(Color(0xff6bb522))
+  private val _BorderlineBadColorState = MutableStateFlow(Color(0xffffa500))
 
   private val _drawablePathAITALogoState = MutableStateFlow("svg/0_0.svg")
   private val _drawablePathIconPasswordState = MutableStateFlow("svg/1_0.svg")
@@ -361,7 +370,9 @@ object AppConfiguration {
   private val _drawablePathIconAppThemeState = MutableStateFlow("svg/27_0.svg")
   private val _drawablePathIconCheckState = MutableStateFlow("svg/28_0.svg")
   private val _drawablePathIconCreateState = MutableStateFlow("svg/29_0.svg")
-  private val _drawablePathSettingsState = MutableStateFlow("svg/30_0.svg")
+  private val _drawablePathIconSettingsState = MutableStateFlow("svg/30_0.svg")
+  private val _drawablePathIconSearchState = MutableStateFlow("svg/31_0.svg")
+  private val _drawablePathIconBarcodeCamScannerState = MutableStateFlow("svg/32_0.svg")
 
   private val _exceptionMessageUserWithThisPhoneNumberIsAlreadyRegistered = MutableStateFlow("User with this phone number is already registered")
   private val _exceptionMessageUserWithThisEmailAddressIsAlreadyRegistered = MutableStateFlow("User with this email address is already registered")
@@ -514,6 +525,7 @@ object AppConfiguration {
       override val stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersYouCanGrantItInAppSettings: String by _stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersYouCanGrantItInAppSettingsState.collectAsState()
       override val stringBluetoothDisabled: String by _stringBluetoothDisabledState.collectAsState()
       override val stringEnableForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrinters: String by _stringEnableForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersState.collectAsState()
+      override val stringSearchByAnyData: String by _stringSearchByAnyDataState.collectAsState()
 
       override val screenWidth: Dp by _screenWidthState.collectAsState()
       override val screenHeight: Dp by _screenHeightState.collectAsState()
@@ -540,6 +552,8 @@ object AppConfiguration {
       override val DisabledColor: Color by _DisabledColorState.collectAsState()
       override val ErrorColor: Color by _ErrorColorState.collectAsState()
       override val IconTintColor: Color by _IconTintColorState.collectAsState()
+      override val OkayColor: Color by _OkayColorState.collectAsState()
+      override val BorderlineBadColor: Color by _BackgroundColorState.collectAsState()
 
       override val drawablePathAITALogo: String by _drawablePathAITALogoState.collectAsState()
       override val drawablePathIconPassword: String by _drawablePathIconPasswordState.collectAsState()
@@ -571,7 +585,9 @@ object AppConfiguration {
       override val drawablePathIconAppTheme: String by _drawablePathIconAppThemeState.collectAsState()
       override val drawablePathIconCheck: String by _drawablePathIconCheckState.collectAsState()
       override val drawablePathIconCreate: String by _drawablePathIconCreateState.collectAsState()
-      override val drawablePathSettings: String by _drawablePathSettingsState.collectAsState()
+      override val drawablePathIconSettings: String by _drawablePathIconSettingsState.collectAsState()
+      override val drawablePathIconSearch: String by _drawablePathIconSearchState.collectAsState()
+      override val drawablePathIconBarcodeCamScanner: String by _drawablePathIconBarcodeCamScannerState.collectAsState()
 
       override val exceptionMessageUserWithThisPhoneNumberIsAlreadyRegistered: String by _exceptionMessageUserWithThisPhoneNumberIsAlreadyRegistered.collectAsState()
       override val exceptionMessageUserWithThisEmailAddressIsAlreadyRegistered: String by _exceptionMessageUserWithThisEmailAddressIsAlreadyRegistered.collectAsState()
@@ -794,6 +810,7 @@ object AppConfiguration {
     _stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersYouCanGrantItInAppSettingsState.emit(strings.extractString(62, stateValues.appLocaleLanguage))
     _stringBluetoothDisabledState.emit(strings.extractString(63, stateValues.appLocaleLanguage))
     _stringEnableForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersState.emit(strings.extractString(64, stateValues.appLocaleLanguage))
+    _stringSearchByAnyDataState.emit(strings.extractString(65, stateValues.appLocaleLanguage))
   }
 
   private suspend fun updateColors(colors: List<StylizedColorGroupDataModel>) {
@@ -805,6 +822,8 @@ object AppConfiguration {
     _DisabledColorState.emit(colors.extractColor(5, stateValues.appThemeId).toColor())
     _ErrorColorState.emit(colors.extractColor(6, stateValues.appThemeId).toColor())
     _IconTintColorState.emit(colors.extractColor(7, stateValues.appThemeId).toColor())
+    _OkayColorState.emit(colors.extractColor(8, stateValues.appThemeId).toColor())
+    _BorderlineBadColorState.emit(colors.extractColor(9, stateValues.appThemeId).toColor())
   }
 
   private suspend fun updateDrawables(drawables: List<StylizedDrawablePathsGroupDataModel>) {
@@ -837,6 +856,8 @@ object AppConfiguration {
     _drawablePathIconAppThemeState.emit(drawables.extractPath(27, stateValues.appThemeId))
     _drawablePathIconCheckState.emit(drawables.extractPath(28, stateValues.appThemeId))
     _drawablePathIconCreateState.emit(drawables.extractPath(29, stateValues.appThemeId))
-    _drawablePathSettingsState.emit(drawables.extractPath(30, stateValues.appThemeId))
+    _drawablePathIconSettingsState.emit(drawables.extractPath(30, stateValues.appThemeId))
+    _drawablePathIconSearchState.emit(drawables.extractPath(31, stateValues.appThemeId))
+    _drawablePathIconBarcodeCamScannerState.emit(drawables.extractPath(32, stateValues.appThemeId))
   }
 }
