@@ -17,5 +17,6 @@ data class GlobalAppConfigurationDataModel(
   val drawableResourcesPath: String,
   val companyForms: List<CompanyFormDataModel>,
   val countries: List<CountryDataModel>,
-  val languages: List<LanguageDataModel>
+  val languages: List<AppLanguageDataModel>,
+  val themes: List<AppThemeDataModel>,
 )

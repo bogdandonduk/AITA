@@ -12,41 +12,40 @@ actual fun getHttpClientEngine(): HttpClientEngine {
   return OkHttp.create {
     preconfigured = OkHttpClient.Builder()
       .cache(
-        null
-//        Cache(
-//          Files.createDirectories(
-//            System.getProperty("os.name").lowercase().run {
-//              when {
-//                contains("win") -> {
-//                  val base = System.getenv("LOCALAPPDATA") ?: System.getProperty("user.home")
-//                  Paths.get(
-//                    base,
-//                    "AITA",
-//                    "Cache",
-//                    "http"
-//                  )
-//                }
-//
-//                contains("mac") -> {
-//                  Paths.get(
-//                    System.getProperty("user.home"),
-//                    "Library",
-//                    "Caches",
-//                    "AITA",
-//                    "http"
-//                  )
-//                }
-//
-//                else -> {
-//                  Paths.get(
-//                    System.getenv("XDG_CACHE_HOME") ?: "${System.getProperty("user.home")}/.cache",
-//                    configurationRepository.globalAppConfigurationState.payloadValue.appName, "http"
-//                  )
-//                }
-//              }
-//            }
-//          ).toFile(),
-//          4000L * 1024 * 1024)
+        Cache(
+          Files.createDirectories(
+            System.getProperty("os.name").lowercase().run {
+              when {
+                contains("win") -> {
+                  val base = System.getenv("LOCALAPPDATA") ?: System.getProperty("user.home")
+                  Paths.get(
+                    base,
+                    "AITA",
+                    "Cache",
+                    "http"
+                  )
+                }
+
+                contains("mac") -> {
+                  Paths.get(
+                    System.getProperty("user.home"),
+                    "Library",
+                    "Caches",
+                    "AITA",
+                    "http"
+                  )
+                }
+
+                else -> {
+                  Paths.get(
+                    System.getenv("XDG_CACHE_HOME") ?: "${System.getProperty("user.home")}/.cache",
+                    "AITA", "http"
+                  )
+                }
+              }
+            }
+          ).toFile(),
+          cacheSize)
       ).build()
   }
 

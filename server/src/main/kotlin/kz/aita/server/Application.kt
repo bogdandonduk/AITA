@@ -12,10 +12,10 @@ import io.ktor.server.plugins.conditionalheaders.*
 import io.ktor.server.plugins.calllogging.CallLogging
 import io.ktor.server.plugins.compression.Compression
 import io.ktor.server.plugins.cors.routing.CORS
-import io.ktor.server.routing.routing
 import io.netty.handler.codec.compression.StandardCompressionOptions.deflate
 import io.netty.handler.codec.compression.StandardCompressionOptions.gzip
 import kotlinx.serialization.json.Json
+import kz.aita.core.cacheMaxAgeSec
 import kz.aita.server.jwt.TokenService
 import kz.aita.server.jwt.configureJwtAuth
 import kz.aita.server.jwt.jwtCfg
@@ -37,17 +37,13 @@ fun Application.module() {
   install(CachingHeaders) {
     options { _, outgoing ->
       when (outgoing.contentType?.withoutParameters()) {
-        ContentType.Application.Json ->
-          CachingOptions(CacheControl.NoStore(null))
-
         ContentType.Image.SVG,
         ContentType.Image.PNG,
         ContentType.Image.JPEG,
         ContentType("image","webp") ->
-          CachingOptions(
-            CacheControl.MaxAge(30 * 24 * 3600)
-          )
-        else -> CachingOptions(CacheControl.NoStore(null))
+          CachingOptions(CacheControl.MaxAge(cacheMaxAgeSec))
+
+        else -> CachingOptions(CacheControl.NoCache(null))
       }
     }
   }

@@ -156,6 +156,7 @@ object AppConfiguration {
     val stringUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered: String
     val stringFirstNameCannotBeEmptyOrJustWhitespaces: String
     val stringLastNameCannotBeEmptyOrJustWhitespaces: String
+    val stringSystemLanguage: String
 
     val screenWidth: Dp
     val screenHeight: Dp
@@ -217,13 +218,15 @@ object AppConfiguration {
     val drawablePathIconAppLanguage: String
     val drawablePathIconAppTheme: String
     val drawablePathIconCheck: String
+    val drawablePathIconCreate: String
+    val drawablePathSettings: String
 
     val exceptionMessageUserWithThisPhoneNumberIsAlreadyRegistered: String
     val exceptionMessageUserWithThisEmailAddressIsAlreadyRegistered: String
     val exceptionMessageUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered: String
   }
 
-  private val _appLocaleLanguageState = MutableStateFlow("ru")
+  private val _appLocaleLanguageState = MutableStateFlow("system")
   private val _appThemeIdState = MutableStateFlow(0L)
   private val _appSizeModeIdState = MutableStateFlow(0L)
 
@@ -284,9 +287,10 @@ object AppConfiguration {
   private val _stringAppThemeState = MutableStateFlow("App theme")
   private val _stringSelectState = MutableStateFlow("Select")
 
-  private val _stringUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered = MutableStateFlow("User with this phone number and email address is already registered")
-  private val _stringFirstNameCannotBeEmptyOrJustWhitespaces = MutableStateFlow("First name cannot be empty or just whitespaces")
-  private val _stringLastNameCannotBeEmptyOrJustWhitespaces = MutableStateFlow("Last cannot be empty or just whitespaces")
+  private val _stringUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegisteredState = MutableStateFlow("User with this phone number and email address is already registered")
+  private val _stringFirstNameCannotBeEmptyOrJustWhitespacesState = MutableStateFlow("First name cannot be empty or just whitespaces")
+  private val _stringLastNameCannotBeEmptyOrJustWhitespacesState = MutableStateFlow("Last cannot be empty or just whitespaces")
+  private val _stringSystemLanguageState = MutableStateFlow("System language")
 
   private val _screenWidthState = MutableStateFlow(0f.dp)
   private val _screenHeightState = MutableStateFlow(0f.dp)
@@ -345,6 +349,8 @@ object AppConfiguration {
   private val _drawablePathIconAppLanguageState = MutableStateFlow("svg/26_0.svg")
   private val _drawablePathIconAppThemeState = MutableStateFlow("svg/27_0.svg")
   private val _drawablePathIconCheckState = MutableStateFlow("svg/28_0.svg")
+  private val _drawablePathIconCreateState = MutableStateFlow("svg/29_0.svg")
+  private val _drawablePathSettingsState = MutableStateFlow("svg/30_0.svg")
 
   private val _exceptionMessageUserWithThisPhoneNumberIsAlreadyRegistered = MutableStateFlow("User with this phone number is already registered")
   private val _exceptionMessageUserWithThisEmailAddressIsAlreadyRegistered = MutableStateFlow("User with this email address is already registered")
@@ -369,7 +375,6 @@ object AppConfiguration {
     content: @Composable AppConfiguration.() -> Unit,
     vararg keys: Any
   ) {
-
     stateValues = object : StateValues {
       override val userAccountState: DataState<UserAccountDataModel> by userRepository.userAccountState.value.collectAsState()
       override val userAccount: UserAccountDataModel? by userRepository.userAccountState.payload.collectAsState()
@@ -489,9 +494,10 @@ object AppConfiguration {
       override val stringAppLanguage: String by _stringAppLanguageState.collectAsState()
       override val stringAppTheme: String by _stringAppThemeState.collectAsState()
       override val stringSelect: String by _stringSelectState.collectAsState()
-      override val stringUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered: String by _stringUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered.collectAsState()
-      override val stringFirstNameCannotBeEmptyOrJustWhitespaces: String by _stringFirstNameCannotBeEmptyOrJustWhitespaces.collectAsState()
-      override val stringLastNameCannotBeEmptyOrJustWhitespaces: String by _stringLastNameCannotBeEmptyOrJustWhitespaces.collectAsState()
+      override val stringUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered: String by _stringUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegisteredState.collectAsState()
+      override val stringFirstNameCannotBeEmptyOrJustWhitespaces: String by _stringFirstNameCannotBeEmptyOrJustWhitespacesState.collectAsState()
+      override val stringLastNameCannotBeEmptyOrJustWhitespaces: String by _stringLastNameCannotBeEmptyOrJustWhitespacesState.collectAsState()
+      override val stringSystemLanguage: String by _stringSystemLanguageState.collectAsState()
 
       override val screenWidth: Dp by _screenWidthState.collectAsState()
       override val screenHeight: Dp by _screenHeightState.collectAsState()
@@ -548,6 +554,8 @@ object AppConfiguration {
       override val drawablePathIconAppLanguage: String by _drawablePathIconAppLanguageState.collectAsState()
       override val drawablePathIconAppTheme: String by _drawablePathIconAppThemeState.collectAsState()
       override val drawablePathIconCheck: String by _drawablePathIconCheckState.collectAsState()
+      override val drawablePathIconCreate: String by _drawablePathIconCreateState.collectAsState()
+      override val drawablePathSettings: String by _drawablePathSettingsState.collectAsState()
 
       override val exceptionMessageUserWithThisPhoneNumberIsAlreadyRegistered: String by _exceptionMessageUserWithThisPhoneNumberIsAlreadyRegistered.collectAsState()
       override val exceptionMessageUserWithThisEmailAddressIsAlreadyRegistered: String by _exceptionMessageUserWithThisEmailAddressIsAlreadyRegistered.collectAsState()
@@ -605,65 +613,20 @@ object AppConfiguration {
               .stringsState
               .payload
               .collect {
-                _stringAppNameState.emit(it.extractString(0, stateValues.appLocaleLanguage))
-                _stringLogInState.emit(it.extractString(1, stateValues.appLocaleLanguage))
-                _stringPhoneNumberState.emit(it.extractString(2, stateValues.appLocaleLanguage))
-                _stringEnterPhoneNumberState.emit(it.extractString(3, stateValues.appLocaleLanguage))
-                _stringEmailState.emit(it.extractString(4, stateValues.appLocaleLanguage))
-                _stringEnterEmailAddressState.emit(it.extractString(5, stateValues.appLocaleLanguage))
-                _stringPasswordState.emit(it.extractString(6, stateValues.appLocaleLanguage))
-                _stringEnterPasswordState.emit(it.extractString(7, stateValues.appLocaleLanguage))
-                _stringCancelState.emit(it.extractString(8, stateValues.appLocaleLanguage))
-                _stringClearState.emit(it.extractString(9, stateValues.appLocaleLanguage))
-                _stringLoginAndOrPasswordIncorrectState.emit(it.extractString(10, stateValues.appLocaleLanguage))
-                _stringPhoneNumberMustBeState.emit(it.extractString(11, stateValues.appLocaleLanguage))
-                _stringEmailMustBeState.emit(it.extractString(12, stateValues.appLocaleLanguage))
-                _stringPasswordMustBeState.emit(it.extractString(13, stateValues.appLocaleLanguage))
-                _stringRepeatPasswordState.emit(it.extractString(14, stateValues.appLocaleLanguage))
-                _stringPasswordsMustMatchState.emit(it.extractString(15, stateValues.appLocaleLanguage))
-                _stringFirstNameState.emit(it.extractString(16, stateValues.appLocaleLanguage))
-                _stringLastNameState.emit(it.extractString(17, stateValues.appLocaleLanguage))
-                _stringEnterFirstNameState.emit(it.extractString(18, stateValues.appLocaleLanguage))
-                _stringEnterLastNameState.emit(it.extractString(19, stateValues.appLocaleLanguage))
-                _stringUserWithThisPhoneNumberIsAlreadyRegisteredState.emit(it.extractString(20, stateValues.appLocaleLanguage))
-                _stringUserWithThisEmailAddressIsAlreadyRegisteredState.emit(it.extractString(21, stateValues.appLocaleLanguage))
-                _stringSignUpState.emit(it.extractString(22, stateValues.appLocaleLanguage))
-                _stringConfirmState.emit(it.extractString(23, stateValues.appLocaleLanguage))
-                _stringSaleState.emit(it.extractString(24, stateValues.appLocaleLanguage))
-                _stringReturnState.emit(it.extractString(25, stateValues.appLocaleLanguage))
-                _stringSupplyState.emit(it.extractString(26, stateValues.appLocaleLanguage))
-                _stringStockState.emit(it.extractString(27, stateValues.appLocaleLanguage))
-                _stringMenuState.emit(it.extractString(28, stateValues.appLocaleLanguage))
-                _stringBackState.emit(it.extractString(29, stateValues.appLocaleLanguage))
-                _stringAddGoodsItemState.emit(it.extractString(30, stateValues.appLocaleLanguage))
-                _stringEditGoodsItemState.emit(it.extractString(31, stateValues.appLocaleLanguage))
-                _stringUserAccountState.emit(it.extractString(32, stateValues.appLocaleLanguage))
-                _stringGoodsCategoriesState.emit(it.extractString(33, stateValues.appLocaleLanguage))
-                _stringAddGoodsCategoryState.emit(it.extractString(34, stateValues.appLocaleLanguage))
-                _stringEditGoodsCategoryState.emit(it.extractString(35, stateValues.appLocaleLanguage))
-                _stringStoresState.emit(it.extractString(36, stateValues.appLocaleLanguage))
-                _stringAddStoreState.emit(it.extractString(37, stateValues.appLocaleLanguage))
-                _stringEditStoreState.emit(it.extractString(38, stateValues.appLocaleLanguage))
-                _stringSubscriptionState.emit(it.extractString(39, stateValues.appLocaleLanguage))
-                _stringSubscriptionPlansState.emit(it.extractString(40, stateValues.appLocaleLanguage))
-                _stringTransactionHistoryState.emit(it.extractString(41, stateValues.appLocaleLanguage))
-                _stringReceiptState.emit(it.extractString(42, stateValues.appLocaleLanguage))
-                _stringAnalyticsState.emit(it.extractString(43, stateValues.appLocaleLanguage))
-                _stringWorkersState.emit(it.extractString(44, stateValues.appLocaleLanguage))
-                _stringAddWorkerState.emit(it.extractString(45, stateValues.appLocaleLanguage))
-                _stringEditWorkerState.emit(it.extractString(46, stateValues.appLocaleLanguage))
-                _stringSuppliersState.emit(it.extractString(47, stateValues.appLocaleLanguage))
-                _stringAddSupplierState.emit(it.extractString(48, stateValues.appLocaleLanguage))
-                _stringEditSupplierState.emit(it.extractString(49, stateValues.appLocaleLanguage))
-                _stringDebtorsState.emit(it.extractString(50, stateValues.appLocaleLanguage))
-                _stringCloseDebtState.emit(it.extractString(51, stateValues.appLocaleLanguage))
-                _stringDevicesState.emit(it.extractString(52, stateValues.appLocaleLanguage))
-                _stringAppLanguageState.emit(it.extractString(53, stateValues.appLocaleLanguage))
-                _stringAppThemeState.emit(it.extractString(54, stateValues.appLocaleLanguage))
-                _stringSelectState.emit(it.extractString(55, stateValues.appLocaleLanguage))
-                _stringUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered.emit(it.extractString(56, stateValues.appLocaleLanguage))
-                _stringFirstNameCannotBeEmptyOrJustWhitespaces.emit(it.extractString(57, stateValues.appLocaleLanguage))
-                _stringLastNameCannotBeEmptyOrJustWhitespaces.emit(it.extractString(58, stateValues.appLocaleLanguage))
+                it?.let {
+                  updateStringsState(it)
+                }
+              }
+          }
+
+          launch {
+            _appLocaleLanguageState
+              .collect {
+                configurationRepository
+                  .stringsState
+                  .payloadValue?.let {
+                    updateStringsState(it)
+                  }
               }
           }
 
@@ -699,14 +662,7 @@ object AppConfiguration {
               .payload
               .collect {
                 it?.let {
-                  _AccentColorState.emit(it.extractColor(0, stateValues.appThemeId).toColor())
-                  _BackgroundColorState.emit(it.extractColor(1, stateValues.appThemeId).toColor())
-                  _TextColorState.emit(it.extractColor(2, stateValues.appThemeId).toColor())
-                  _AccentTextColorState.emit(it.extractColor(3, stateValues.appThemeId).toColor())
-                  _PlaceholderTextColorState.emit(it.extractColor(4, stateValues.appThemeId).toColor())
-                  _DisabledColorState.emit(it.extractColor(5, stateValues.appThemeId).toColor())
-                  _ErrorColorState.emit(it.extractColor(6, stateValues.appThemeId).toColor())
-                  _IconTintColorState.emit(it.extractColor(7, stateValues.appThemeId).toColor())
+                  updateColors(it)
                 }
               }
           }
@@ -717,35 +673,25 @@ object AppConfiguration {
               .payload
               .collect {
                 it?.let {
-                  _drawablePathAITALogoState.emit(it.extractPath(0, stateValues.appThemeId))
-                  _drawablePathIconPasswordState.emit(it.extractPath(1, stateValues.appThemeId))
-                  _drawablePathIconCancelState.emit(it.extractPath(2, stateValues.appThemeId))
-                  _drawablePathIconEyeHideState.emit(it.extractPath(3, stateValues.appThemeId))
-                  _drawablePathIconEyeShowState.emit(it.extractPath(4, stateValues.appThemeId))
-                  _drawablePathIconEmailState.emit(it.extractPath(5, stateValues.appThemeId))
-                  _drawablePathIconExpandMoreState.emit(it.extractPath(7, stateValues.appThemeId))
-                  _drawablePathIconExpandLessState.emit(it.extractPath(8, stateValues.appThemeId))
-                  _drawablePathIconPersonState.emit(it.extractPath(9, stateValues.appThemeId))
-                  _drawablePathIconTransactionSaleState.emit(it.extractPath(10, stateValues.appThemeId))
-                  _drawablePathIconTransactionReturnState.emit(it.extractPath(11, stateValues.appThemeId))
-                  _drawablePathIconTransactionSupplyState.emit(it.extractPath(12, stateValues.appThemeId))
-                  _drawablePathIconStockState.emit(it.extractPath(13, stateValues.appThemeId))
-                  _drawablePathIconMenuState.emit(it.extractPath(14, stateValues.appThemeId))
-                  _drawablePathIconBackArrowState.emit(it.extractPath(15, stateValues.appThemeId))
-                  _drawablePathIconAddState.emit(it.extractPath(16, stateValues.appThemeId))
-                  _drawablePathIconUserAccountState.emit(it.extractPath(17, stateValues.appThemeId))
-                  _drawablePathIconGoodsCategoriesState.emit(it.extractPath(18, stateValues.appThemeId))
-                  _drawablePathIconStoresState.emit(it.extractPath(19, stateValues.appThemeId))
-                  _drawablePathIconTransactionHistoryState.emit(it.extractPath(20, stateValues.appThemeId))
-                  _drawablePathIconAnalyticsState.emit(it.extractPath(21, stateValues.appThemeId))
-                  _drawablePathIconWorkersState.emit(it.extractPath(22, stateValues.appThemeId))
-                  _drawablePathIconSuppliersState.emit(it.extractPath(23, stateValues.appThemeId))
-                  _drawablePathIconDebtorsState.emit(it.extractPath(24, stateValues.appThemeId))
-                  _drawablePathIconDevicesState.emit(it.extractPath(25, stateValues.appThemeId))
-                  _drawablePathIconAppLanguageState.emit(it.extractPath(26, stateValues.appThemeId))
-                  _drawablePathIconAppThemeState.emit(it.extractPath(27, stateValues.appThemeId))
-                  _drawablePathIconCheckState.emit(it.extractPath(28, stateValues.appThemeId))
+                  updateDrawables(it)
                 }
+              }
+          }
+
+          launch {
+            _appThemeIdState
+              .collect {
+                configurationRepository
+                  .colorsState
+                  .payloadValue?.let {
+                    updateColors(it)
+                  }
+
+                configurationRepository
+                  .drawablesState
+                  .payloadValue?.let {
+                    updateDrawables(it)
+                  }
               }
           }
 
@@ -764,5 +710,112 @@ object AppConfiguration {
         }
       }
     }
+  }
+
+  private suspend fun updateStringsState(strings: List<LocalizedStringGroupDataModel>) {
+    _stringAppNameState.emit(strings.extractString(0, stateValues.appLocaleLanguage))
+    _stringLogInState.emit(strings.extractString(1, stateValues.appLocaleLanguage))
+    _stringPhoneNumberState.emit(strings.extractString(2, stateValues.appLocaleLanguage))
+    _stringEnterPhoneNumberState.emit(strings.extractString(3, stateValues.appLocaleLanguage))
+    _stringEmailState.emit(strings.extractString(4, stateValues.appLocaleLanguage))
+    _stringEnterEmailAddressState.emit(strings.extractString(5, stateValues.appLocaleLanguage))
+    _stringPasswordState.emit(strings.extractString(6, stateValues.appLocaleLanguage))
+    _stringEnterPasswordState.emit(strings.extractString(7, stateValues.appLocaleLanguage))
+    _stringCancelState.emit(strings.extractString(8, stateValues.appLocaleLanguage))
+    _stringClearState.emit(strings.extractString(9, stateValues.appLocaleLanguage))
+    _stringLoginAndOrPasswordIncorrectState.emit(strings.extractString(10, stateValues.appLocaleLanguage))
+    _stringPhoneNumberMustBeState.emit(strings.extractString(11, stateValues.appLocaleLanguage))
+    _stringEmailMustBeState.emit(strings.extractString(12, stateValues.appLocaleLanguage))
+    _stringPasswordMustBeState.emit(strings.extractString(13, stateValues.appLocaleLanguage))
+    _stringRepeatPasswordState.emit(strings.extractString(14, stateValues.appLocaleLanguage))
+    _stringPasswordsMustMatchState.emit(strings.extractString(15, stateValues.appLocaleLanguage))
+    _stringFirstNameState.emit(strings.extractString(16, stateValues.appLocaleLanguage))
+    _stringLastNameState.emit(strings.extractString(17, stateValues.appLocaleLanguage))
+    _stringEnterFirstNameState.emit(strings.extractString(18, stateValues.appLocaleLanguage))
+    _stringEnterLastNameState.emit(strings.extractString(19, stateValues.appLocaleLanguage))
+    _stringUserWithThisPhoneNumberIsAlreadyRegisteredState.emit(strings.extractString(20, stateValues.appLocaleLanguage))
+    _stringUserWithThisEmailAddressIsAlreadyRegisteredState.emit(strings.extractString(21, stateValues.appLocaleLanguage))
+    _stringSignUpState.emit(strings.extractString(22, stateValues.appLocaleLanguage))
+    _stringConfirmState.emit(strings.extractString(23, stateValues.appLocaleLanguage))
+    _stringSaleState.emit(strings.extractString(24, stateValues.appLocaleLanguage))
+    _stringReturnState.emit(strings.extractString(25, stateValues.appLocaleLanguage))
+    _stringSupplyState.emit(strings.extractString(26, stateValues.appLocaleLanguage))
+    _stringStockState.emit(strings.extractString(27, stateValues.appLocaleLanguage))
+    _stringMenuState.emit(strings.extractString(28, stateValues.appLocaleLanguage))
+    _stringBackState.emit(strings.extractString(29, stateValues.appLocaleLanguage))
+    _stringAddGoodsItemState.emit(strings.extractString(30, stateValues.appLocaleLanguage))
+    _stringEditGoodsItemState.emit(strings.extractString(31, stateValues.appLocaleLanguage))
+    _stringUserAccountState.emit(strings.extractString(32, stateValues.appLocaleLanguage))
+    _stringGoodsCategoriesState.emit(strings.extractString(33, stateValues.appLocaleLanguage))
+    _stringAddGoodsCategoryState.emit(strings.extractString(34, stateValues.appLocaleLanguage))
+    _stringEditGoodsCategoryState.emit(strings.extractString(35, stateValues.appLocaleLanguage))
+    _stringStoresState.emit(strings.extractString(36, stateValues.appLocaleLanguage))
+    _stringAddStoreState.emit(strings.extractString(37, stateValues.appLocaleLanguage))
+    _stringEditStoreState.emit(strings.extractString(38, stateValues.appLocaleLanguage))
+    _stringSubscriptionState.emit(strings.extractString(39, stateValues.appLocaleLanguage))
+    _stringSubscriptionPlansState.emit(strings.extractString(40, stateValues.appLocaleLanguage))
+    _stringTransactionHistoryState.emit(strings.extractString(41, stateValues.appLocaleLanguage))
+    _stringReceiptState.emit(strings.extractString(42, stateValues.appLocaleLanguage))
+    _stringAnalyticsState.emit(strings.extractString(43, stateValues.appLocaleLanguage))
+    _stringWorkersState.emit(strings.extractString(44, stateValues.appLocaleLanguage))
+    _stringAddWorkerState.emit(strings.extractString(45, stateValues.appLocaleLanguage))
+    _stringEditWorkerState.emit(strings.extractString(46, stateValues.appLocaleLanguage))
+    _stringSuppliersState.emit(strings.extractString(47, stateValues.appLocaleLanguage))
+    _stringAddSupplierState.emit(strings.extractString(48, stateValues.appLocaleLanguage))
+    _stringEditSupplierState.emit(strings.extractString(49, stateValues.appLocaleLanguage))
+    _stringDebtorsState.emit(strings.extractString(50, stateValues.appLocaleLanguage))
+    _stringCloseDebtState.emit(strings.extractString(51, stateValues.appLocaleLanguage))
+    _stringDevicesState.emit(strings.extractString(52, stateValues.appLocaleLanguage))
+    _stringAppLanguageState.emit(strings.extractString(53, stateValues.appLocaleLanguage))
+    _stringAppThemeState.emit(strings.extractString(54, stateValues.appLocaleLanguage))
+    _stringSelectState.emit(strings.extractString(55, stateValues.appLocaleLanguage))
+    _stringUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegisteredState.emit(strings.extractString(56, stateValues.appLocaleLanguage))
+    _stringFirstNameCannotBeEmptyOrJustWhitespacesState.emit(strings.extractString(57, stateValues.appLocaleLanguage))
+    _stringLastNameCannotBeEmptyOrJustWhitespacesState.emit(strings.extractString(58, stateValues.appLocaleLanguage))
+    _stringSystemLanguageState.emit(strings.extractString(59, stateValues.appLocaleLanguage))
+  }
+
+  private suspend fun updateColors(colors: List<StylizedColorGroupDataModel>) {
+    _AccentColorState.emit(colors.extractColor(0, stateValues.appThemeId).toColor())
+    _BackgroundColorState.emit(colors.extractColor(1, stateValues.appThemeId).toColor())
+    _TextColorState.emit(colors.extractColor(2, stateValues.appThemeId).toColor())
+    _AccentTextColorState.emit(colors.extractColor(3, stateValues.appThemeId).toColor())
+    _PlaceholderTextColorState.emit(colors.extractColor(4, stateValues.appThemeId).toColor())
+    _DisabledColorState.emit(colors.extractColor(5, stateValues.appThemeId).toColor())
+    _ErrorColorState.emit(colors.extractColor(6, stateValues.appThemeId).toColor())
+    _IconTintColorState.emit(colors.extractColor(7, stateValues.appThemeId).toColor())
+  }
+
+  private suspend fun updateDrawables(drawables: List<StylizedDrawablePathsGroupDataModel>) {
+    _drawablePathAITALogoState.emit(drawables.extractPath(0, stateValues.appThemeId))
+    _drawablePathIconPasswordState.emit(drawables.extractPath(1, stateValues.appThemeId))
+    _drawablePathIconCancelState.emit(drawables.extractPath(2, stateValues.appThemeId))
+    _drawablePathIconEyeHideState.emit(drawables.extractPath(3, stateValues.appThemeId))
+    _drawablePathIconEyeShowState.emit(drawables.extractPath(4, stateValues.appThemeId))
+    _drawablePathIconEmailState.emit(drawables.extractPath(5, stateValues.appThemeId))
+    _drawablePathIconExpandMoreState.emit(drawables.extractPath(7, stateValues.appThemeId))
+    _drawablePathIconExpandLessState.emit(drawables.extractPath(8, stateValues.appThemeId))
+    _drawablePathIconPersonState.emit(drawables.extractPath(9, stateValues.appThemeId))
+    _drawablePathIconTransactionSaleState.emit(drawables.extractPath(10, stateValues.appThemeId))
+    _drawablePathIconTransactionReturnState.emit(drawables.extractPath(11, stateValues.appThemeId))
+    _drawablePathIconTransactionSupplyState.emit(drawables.extractPath(12, stateValues.appThemeId))
+    _drawablePathIconStockState.emit(drawables.extractPath(13, stateValues.appThemeId))
+    _drawablePathIconMenuState.emit(drawables.extractPath(14, stateValues.appThemeId))
+    _drawablePathIconBackArrowState.emit(drawables.extractPath(15, stateValues.appThemeId))
+    _drawablePathIconAddState.emit(drawables.extractPath(16, stateValues.appThemeId))
+    _drawablePathIconUserAccountState.emit(drawables.extractPath(17, stateValues.appThemeId))
+    _drawablePathIconGoodsCategoriesState.emit(drawables.extractPath(18, stateValues.appThemeId))
+    _drawablePathIconStoresState.emit(drawables.extractPath(19, stateValues.appThemeId))
+    _drawablePathIconTransactionHistoryState.emit(drawables.extractPath(20, stateValues.appThemeId))
+    _drawablePathIconAnalyticsState.emit(drawables.extractPath(21, stateValues.appThemeId))
+    _drawablePathIconWorkersState.emit(drawables.extractPath(22, stateValues.appThemeId))
+    _drawablePathIconSuppliersState.emit(drawables.extractPath(23, stateValues.appThemeId))
+    _drawablePathIconDebtorsState.emit(drawables.extractPath(24, stateValues.appThemeId))
+    _drawablePathIconDevicesState.emit(drawables.extractPath(25, stateValues.appThemeId))
+    _drawablePathIconAppLanguageState.emit(drawables.extractPath(26, stateValues.appThemeId))
+    _drawablePathIconAppThemeState.emit(drawables.extractPath(27, stateValues.appThemeId))
+    _drawablePathIconCheckState.emit(drawables.extractPath(28, stateValues.appThemeId))
+    _drawablePathIconCreateState.emit(drawables.extractPath(29, stateValues.appThemeId))
+    _drawablePathSettingsState.emit(drawables.extractPath(30, stateValues.appThemeId))
   }
 }

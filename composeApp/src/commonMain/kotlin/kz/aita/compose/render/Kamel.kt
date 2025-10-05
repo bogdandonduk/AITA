@@ -10,10 +10,11 @@ import io.ktor.client.plugins.HttpRequestRetry
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.http.HttpHeaders
 import io.ktor.http.isSuccess
+import kz.aita.core.cacheSize
 
 val kamelConfig = KamelConfig {
   httpUrlFetcher {
-    httpCache(4000 * 1024 * 1024)
+    httpCache(cacheSize)
 
     defaultRequest {
       headers.append(HttpHeaders.CacheControl, "no-cache")

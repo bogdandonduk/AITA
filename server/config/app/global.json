@@ -210,5 +210,41 @@
       ],
       "flagDrawablePath": "png/flag_kz.png"
     }
+  ],
+  "themes": [
+    {
+      "id": 0,
+      "name": [
+        {
+          "language": "en",
+          "value": "Light"
+        },
+        {
+          "language": "ru",
+          "value": "Светлая"
+        },
+        {
+          "language": "kk",
+          "value": "Жарық"
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "name": [
+        {
+          "language": "en",
+          "value": "Dark"
+        },
+        {
+          "language": "ru",
+          "value": "Темная"
+        },
+        {
+          "language": "kk",
+          "value": "Қараңғы"
+        }
+      ]
+    }
   ]
 }

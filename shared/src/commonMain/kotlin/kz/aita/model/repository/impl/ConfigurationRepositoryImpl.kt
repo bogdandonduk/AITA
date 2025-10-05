@@ -11,7 +11,8 @@ import kz.aita.model.dataModel.CountryDataModel
 import kz.aita.model.dataModel.ExceptionDataModel
 import kz.aita.model.wrapper.MutableDataStateFlow
 import kz.aita.model.dataModel.GlobalAppConfigurationDataModel
-import kz.aita.model.dataModel.LanguageDataModel
+import kz.aita.model.dataModel.AppLanguageDataModel
+import kz.aita.model.dataModel.AppThemeDataModel
 import kz.aita.model.dataModel.LocalizedStringDataModel
 import kz.aita.model.dataModel.LocalizedStringGroupDataModel
 import kz.aita.model.dataModel.StylizedColorGroupDataModel
@@ -88,7 +89,7 @@ class ConfigurationRepositoryImpl(
         )
       ),
       languages = listOf(
-        LanguageDataModel(
+        AppLanguageDataModel(
           "en",
           listOf(
             LocalizedStringDataModel(
@@ -106,7 +107,7 @@ class ConfigurationRepositoryImpl(
           ),
           "png/flag_en.png"
         ),
-        LanguageDataModel(
+        AppLanguageDataModel(
           "ru",
           listOf(
             LocalizedStringDataModel(
@@ -124,7 +125,7 @@ class ConfigurationRepositoryImpl(
           ),
           "png/flag_ru.png"
         ),
-        LanguageDataModel(
+        AppLanguageDataModel(
           "kk",
           listOf(
             LocalizedStringDataModel(
@@ -141,6 +142,42 @@ class ConfigurationRepositoryImpl(
             )
           ),
           "png/flag_kz.png"
+        )
+      ),
+      themes = listOf(
+        AppThemeDataModel(
+          0,
+          listOf(
+            LocalizedStringDataModel(
+              "en",
+              "Light"
+            ),
+            LocalizedStringDataModel(
+              "ru",
+              "Светлая"
+            ),
+            LocalizedStringDataModel(
+              "kk",
+              "Жарық"
+            )
+          )
+        ),
+        AppThemeDataModel(
+          1,
+          listOf(
+            LocalizedStringDataModel(
+              "en",
+              "Dark"
+            ),
+            LocalizedStringDataModel(
+              "ru",
+              "Темная"
+            ),
+            LocalizedStringDataModel(
+              "kk",
+              "Қараңғы"
+            )
+          )
         )
       )
     )
@@ -246,15 +283,9 @@ class ConfigurationRepositoryImpl(
           serverUrl = globalAppConfigurationState.payloadValue.serverUrl,
           endpointUrl = globalAppConfigurationState.payloadValue.drawableResourcesConfigurationPath,
           onFailure = {
-            println("drawable onFailure $it")
-
             _drawablesState.emit(DataState.Failure(it))
           }
         )?.run {
-          forEach {
-            println("drawable ${it.id} ${it.values}")
-          }
-
           _drawablesState.emit(DataState.Success(this))
         }
     }

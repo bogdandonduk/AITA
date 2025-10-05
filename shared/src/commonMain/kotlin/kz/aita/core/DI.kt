@@ -13,6 +13,9 @@ import kz.aita.model.repository.impl.UserRepositoryImpl
 import kz.aita.model.service.GenericLocalService
 import kz.aita.model.service.GenericRemoteService
 
+val cacheSize = 4000L * 1024 * 1024
+val cacheMaxAgeSec = 30 * 24 * 3600
+
 val tokenRefreshMutex = Mutex()
 
 val httpClient by lazy {
@@ -28,6 +31,8 @@ val httpClient by lazy {
     }
 
     expectSuccess = false
+
+    install(HttpCache)
 
 //    install(Auth) {
 //      bearer {
