@@ -12,6 +12,7 @@ import io.ktor.server.plugins.conditionalheaders.*
 import io.ktor.server.plugins.calllogging.CallLogging
 import io.ktor.server.plugins.compression.Compression
 import io.ktor.server.plugins.cors.routing.CORS
+import io.ktor.server.plugins.defaultheaders.DefaultHeaders
 import io.netty.handler.codec.compression.StandardCompressionOptions.deflate
 import io.netty.handler.codec.compression.StandardCompressionOptions.gzip
 import kotlinx.serialization.json.Json
@@ -29,9 +30,12 @@ fun main() = EngineMain.main(emptyArray())
 fun Application.module() {
   install(CallLogging)
   install(AutoHeadResponse)
-  install(Compression) {
-    gzip()
-    deflate()
+//  install(Compression) {
+//    gzip()
+//    deflate()
+//  }
+  install(DefaultHeaders) {
+    header(HttpHeaders.Vary, "Accept-Encoding")
   }
   install(ConditionalHeaders) // adds ETag/Last-Modified when possible
   install(CachingHeaders) {

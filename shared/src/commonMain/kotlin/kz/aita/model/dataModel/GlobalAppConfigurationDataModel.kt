@@ -19,4 +19,5 @@ data class GlobalAppConfigurationDataModel(
   val countries: List<CountryDataModel>,
   val languages: List<AppLanguageDataModel>,
   val themes: List<AppThemeDataModel>,
+  val goodsItemsQuantityUnits: List<QuantityDataModel>
 )

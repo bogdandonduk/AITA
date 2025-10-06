@@ -169,6 +169,10 @@ object AppConfiguration {
     val stringBluetoothDisabled: String
     val stringEnableForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrinters: String
     val stringSearchByAnyData: String
+    val stringListEmpty: String
+    val stringNoMatches: String
+    val stringName: String
+    val stringBarcode: String
 
     val screenWidth: Dp
     val screenHeight: Dp
@@ -316,6 +320,10 @@ object AppConfiguration {
   private val _stringBluetoothDisabledState = MutableStateFlow("Bluetooth disabled")
   private val _stringEnableForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersState = MutableStateFlow("Enable for search and connection to Bluetooth barcode scanners and receipt printers")
   private val _stringSearchByAnyDataState = MutableStateFlow("Search by any data")
+  private val _stringListEmptyState = MutableStateFlow("List empty")
+  private val _stringNoMatchesState = MutableStateFlow("No matches")
+  private val _stringNameState = MutableStateFlow("Name")
+  private val _stringBarcodeState = MutableStateFlow("Barcode")
 
   private val _screenWidthState = MutableStateFlow(0f.dp)
   private val _screenHeightState = MutableStateFlow(0f.dp)
@@ -537,6 +545,10 @@ object AppConfiguration {
       override val stringBluetoothDisabled: String by _stringBluetoothDisabledState.collectAsState()
       override val stringEnableForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrinters: String by _stringEnableForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersState.collectAsState()
       override val stringSearchByAnyData: String by _stringSearchByAnyDataState.collectAsState()
+      override val stringListEmpty: String by _stringListEmptyState.collectAsState()
+      override val stringNoMatches: String by _stringNoMatchesState.collectAsState()
+      override val stringName: String by _stringNameState.collectAsState()
+      override val stringBarcode: String by _stringBarcodeState.collectAsState()
 
       override val screenWidth: Dp by _screenWidthState.collectAsState()
       override val screenHeight: Dp by _screenHeightState.collectAsState()
@@ -823,6 +835,10 @@ object AppConfiguration {
     _stringBluetoothDisabledState.emit(strings.extractString(63, stateValues.appLocaleLanguage))
     _stringEnableForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersState.emit(strings.extractString(64, stateValues.appLocaleLanguage))
     _stringSearchByAnyDataState.emit(strings.extractString(65, stateValues.appLocaleLanguage))
+    _stringListEmptyState.emit(strings.extractString(66, stateValues.appLocaleLanguage))
+    _stringNoMatchesState.emit(strings.extractString(67, stateValues.appLocaleLanguage))
+    _stringNameState.emit(strings.extractString(68, stateValues.appLocaleLanguage))
+    _stringBarcodeState.emit(strings.extractString(69, stateValues.appLocaleLanguage))
   }
 
   private suspend fun updateColors(colors: List<StylizedColorGroupDataModel>) {

@@ -1120,5 +1120,73 @@
         "value": "Кез келген деректер бойынша іздеу"
       }
     ]
+  },
+  {
+    "id": 66,
+    "values": [
+      {
+        "language": "en",
+        "value": "List empty"
+      },
+      {
+        "language": "ru",
+        "value": "Список пуст"
+      },
+      {
+        "language": "kk",
+        "value": "Тізім бос"
+      }
+    ]
+  },
+  {
+    "id": 67,
+    "values": [
+      {
+        "language": "en",
+        "value": "No matches"
+      },
+      {
+        "language": "ru",
+        "value": "Нет совпадений"
+      },
+      {
+        "language": "kk",
+        "value": "Сәйкестік жоқ"
+      }
+    ]
+  },
+  {
+    "id": 68,
+    "values": [
+      {
+        "language": "en",
+        "value": "Name"
+      },
+      {
+        "language": "ru",
+        "value": "Название"
+      },
+      {
+        "language": "kk",
+        "value": "Аты"
+      }
+    ]
+  },
+  {
+    "id": 69,
+    "values": [
+      {
+        "language": "en",
+        "value": "Barcode"
+      },
+      {
+        "language": "ru",
+        "value": "Штрих-код"
+      },
+      {
+        "language": "kk",
+        "value": "Штрих-код"
+      }
+    ]
   }
 ]

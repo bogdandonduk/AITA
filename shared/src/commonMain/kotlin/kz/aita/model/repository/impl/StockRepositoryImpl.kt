@@ -4,6 +4,7 @@ import kotlinx.coroutines.launch
 import kz.aita.model.dataModel.GoodsItemDataModel
 import kz.aita.model.dataModel.LocalizedStringDataModel
 import kz.aita.model.dataModel.QuantityDataModel
+import kz.aita.model.repository.ConfigurationRepository
 import kz.aita.model.repository.Repository
 import kz.aita.model.repository.StockRepository
 import kz.aita.model.service.GenericLocalService
@@ -13,7 +14,8 @@ import kz.aita.model.wrapper.MutableDataStateFlow
 
 class StockRepositoryImpl(
   private val genericRemoteService: GenericRemoteService,
-  private val genericLocalService: GenericLocalService
+  private val genericLocalService: GenericLocalService,
+  private val configurationRepository: ConfigurationRepository
 ): Repository(), StockRepository {
 
   private val _stockState = MutableDataStateFlow<List<GoodsItemDataModel>>(
@@ -33,24 +35,13 @@ class StockRepositoryImpl(
               0,
               "792649190623",
               "Yoghurt кокосовый",
-              QuantityDataModel(
-                listOf(
-                  LocalizedStringDataModel(
-                    "en",
-                    "pc."
-                  ),
-                  LocalizedStringDataModel(
-                    "ru",
-                    "шт."
-                  ),
-                  LocalizedStringDataModel(
-                    "kk",
-                    "шт"
-                  )
-                ),
-                total = 30.0,
-                roundTotal = true
-              ),
+              quantity = configurationRepository
+                .globalAppConfigurationState
+                .payloadValue
+                .goodsItemsQuantityUnits
+                .find {
+                  it.matchesName("pc.")
+                }!!.copy(total = 19.0),
               categoryName = "Category",
               supplierName = "Supplier",
               salePrice = 500.0,
@@ -62,24 +53,13 @@ class StockRepositoryImpl(
               1,
               "5411188081852",
               "Alpro молоко соевое ванильное",
-              QuantityDataModel(
-                listOf(
-                  LocalizedStringDataModel(
-                    "en",
-                    "pc."
-                  ),
-                  LocalizedStringDataModel(
-                    "ru",
-                    "шт."
-                  ),
-                  LocalizedStringDataModel(
-                    "kk",
-                    "шт"
-                  )
-                ),
-                total = 12.0,
-                roundTotal = true
-              ),
+              quantity = configurationRepository
+                .globalAppConfigurationState
+                .payloadValue
+                .goodsItemsQuantityUnits
+                .find {
+                  it.matchesName("pc.")
+                }!!.copy(total = 43.0),
               categoryName = "Category",
               supplierName = "Supplier",
               salePrice = 1800.0,

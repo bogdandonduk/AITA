@@ -7,8 +7,8 @@ import java.io.File
 
 fun Application.filesRoutes() {
   routing {
-    staticFiles("config/app/global", File("AITA/server/config/app/global.json"))
-    staticFiles("config/app/exception", File("AITA/server/config/app/exceptions.json"))
+    staticFiles("config/global", File("AITA/server/config/app/global.json"))
+    staticFiles("config/exception", File("AITA/server/config/app/exceptions.json"))
 
     staticFiles("res/string", File("AITA/server/assets/values/strings.json"))
     staticFiles("res/dimension", File("AITA/server/assets/values/dimensions.json"))

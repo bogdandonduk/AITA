@@ -73,5 +73,5 @@ val configurationRepository: ConfigurationRepository by lazy {
 }
 
 val stockRepository: StockRepository by lazy {
-  StockRepositoryImpl(genericRemoteService, genericLocalService)
+  StockRepositoryImpl(genericRemoteService, genericLocalService, configurationRepository)
 }

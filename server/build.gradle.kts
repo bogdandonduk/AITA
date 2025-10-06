@@ -14,6 +14,8 @@ application {
 }
 
 dependencies {
+
+    implementation("io.ktor:ktor-server-default-headers:${property("ktor.version")}")
     implementation("io.ktor:ktor-server-caching-headers:${property("ktor.version")}")
     // ContentNegotiation + kotlinx.serialization
     implementation("io.ktor:ktor-server-content-negotiation:${property("ktor.version")}")

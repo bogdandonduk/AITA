@@ -15,6 +15,7 @@ import kz.aita.model.dataModel.AppLanguageDataModel
 import kz.aita.model.dataModel.AppThemeDataModel
 import kz.aita.model.dataModel.LocalizedStringDataModel
 import kz.aita.model.dataModel.LocalizedStringGroupDataModel
+import kz.aita.model.dataModel.QuantityDataModel
 import kz.aita.model.dataModel.StylizedColorGroupDataModel
 import kz.aita.model.dataModel.StylizedDimensionGroupDataModel
 import kz.aita.model.dataModel.StylizedDrawablePathsGroupDataModel
@@ -33,8 +34,8 @@ class ConfigurationRepositoryImpl(
     initial = GlobalAppConfigurationDataModel(
       appName = "AITA",
       serverUrl = "http://192.168.100.9:8080",
-      globalConfigurationPath = "config/app/global",
-      exceptionConfigurationPath = "config/app/exception",
+      globalConfigurationPath = "config/global",
+      exceptionConfigurationPath = "config/exception",
       logInPath = "auth/logIn",
       signUpPath = "auth/signUp",
       stringResourcesPath = "res/string",
@@ -178,6 +179,44 @@ class ConfigurationRepositoryImpl(
               "Қараңғы"
             )
           )
+        )
+      ),
+      goodsItemsQuantityUnits = listOf(
+        QuantityDataModel(
+          id = 0,
+          listOf(
+            LocalizedStringDataModel(
+              "en",
+              "pc."
+            ),
+            LocalizedStringDataModel(
+              "ru",
+              "шт."
+            ),
+            LocalizedStringDataModel(
+              "kk",
+              "шт."
+            )
+          ),
+          roundTotal = true
+        ),
+        QuantityDataModel(
+          id = 1,
+          listOf(
+            LocalizedStringDataModel(
+              "en",
+              "kg."
+            ),
+            LocalizedStringDataModel(
+              "ru",
+              "кг."
+            ),
+            LocalizedStringDataModel(
+              "kk",
+              "кг."
+            )
+          ),
+          roundTotal = false
         )
       )
     )

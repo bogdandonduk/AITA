@@ -246,5 +246,47 @@
         }
       ]
     }
+  ],
+  "goodsItemQuantityUnits": [
+    {
+      "id": 0,
+      "immutableUnitName": [
+        {
+          "language": "en",
+          "value": "pc."
+        },
+        {
+          "language": "ru",
+          "value": "шт."
+        },
+        {
+          "language": "kk",
+          "value": "шт."
+        }
+      ],
+      "total": 1.0,
+      "pricedAmount": 1.0,
+      "roundTotal": true
+    },
+    {
+      "id": 1,
+      "immutableUnitName": [
+        {
+          "language": "en",
+          "value": "kg."
+        },
+        {
+          "language": "ru",
+          "value": "кг."
+        },
+        {
+          "language": "kk",
+          "value": "кг."
+        }
+      ],
+      "total": 1.0,
+      "pricedAmount": 1.0,
+      "roundTotal": false
+    }
   ]
 }
