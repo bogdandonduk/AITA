@@ -130,15 +130,25 @@ dependencies {
 }
 
 afterEvaluate {
-  val genCommon = tasks.named("generateCommonMainKeyValueDatabaseInterface")
+  // tasks we need to finish before KSP touches their outputs
+  val prereqNames = listOf(
+    "generateComposeResClass",
+    "generateResourceAccessorsForCommonMain",
+    "generateCommonMainKeyValueDatabaseInterface",
+    "generateExpectResourceCollectorsForCommonMain",
+    "generateResourceAccessorsForAndroidMain",
+    "generateActualResourceCollectorsForAndroidMain",
+    "generateResourceAccessorsForAndroidDebug" // debug variant
+  )
 
-  // Android KSP tasks (Debug/Release etc.)
+  val prereqs = prereqNames.mapNotNull { tasks.findByName(it) }
+
+  // make ALL Android KSP tasks wait for those
   tasks.matching { it.name.startsWith("ksp") && it.name.endsWith("KotlinAndroid") }
-    .configureEach { dependsOn(genCommon) }
-
-  // (optional) If you also run KSP for other targets, add similar lines:
-  // tasks.matching { it.name.startsWith("ksp") && it.name.endsWith("KotlinJvm") }
-  //     .configureEach { dependsOn(genCommon) }
+    .configureEach {
+      dependsOn(prereqs)
+      mustRunAfter(prereqs)
+    }
 }
 
 android {

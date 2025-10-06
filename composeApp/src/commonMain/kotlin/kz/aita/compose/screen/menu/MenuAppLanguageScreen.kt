@@ -31,7 +31,7 @@ fun AppConfiguration.MenuAppLanguageScreen() {
 
     LazyColumn(
       modifier = Modifier
-        .fillMaxSize()
+        .weight(1f)
     ) {
       item {
         AppLanguageSettingsItemWidget(

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
@@ -46,60 +47,58 @@ fun AppConfiguration.MenuListScreen() {
       modifier = Modifier
         .weight(1f)
     ) {
-      Navigation.Menu.listScreens.forEach { model ->
-        item {
-          Row(
-            modifier = Modifier
-              .fillMaxWidth()
-              .height(42.dp)
-              .clickable(
-                interactionSource = remember {
-                  MutableInteractionSource()
-                },
-                indication = ripple(color = stateValues.TextColor)
-              ) {
-                coroutineScope.launch {
-                  Navigation.Menu.go(model, stateValues.isNarrowScreen)
-                }
+      items(Navigation.Menu.listScreens) { model ->
+        Row(
+          modifier = Modifier
+            .fillMaxWidth()
+            .height(42.dp)
+            .clickable(
+              interactionSource = remember {
+                MutableInteractionSource()
               },
-            verticalAlignment = Alignment.CenterVertically
-          ) {
-            val isActive = stateValues.run {
-              if (isNarrowScreen)
-                navigationScreensMenuLeft
-              else
-                navigationScreensMenuRight
-            }.last().route == model.route
+              indication = ripple(color = stateValues.TextColor)
+            ) {
+              coroutineScope.launch {
+                Navigation.Menu.go(model, stateValues.isNarrowScreen)
+              }
+            },
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          val isActive = stateValues.run {
+            if (isNarrowScreen)
+              navigationScreensMenuLeft
+            else
+              navigationScreensMenuRight
+          }.last().route == model.route
 
-            CompositionLocalProvider(LocalKamelConfig provides kamelConfig) {
-              KamelImage(
-                modifier = Modifier
-                  .padding(vertical = 8.dp, horizontal = 16.dp)
-                  .aspectRatio(1f, matchHeightConstraintsFirst = true),
-                resource = {
-                  asyncPainterResource(
-                    data = Url(getFullDrawableResourceUrl(model.iconPath))
-                  )
-                },
-                contentDescription = stateValues.stringBack,
-                colorFilter = if (isActive)
-                  ColorFilter.tint(stateValues.AccentColor)
-                else null
-              )
-            }
-
-            Text(
-              text = model.name,
-              color = if (isActive)
-                stateValues.AccentColor
-              else
-                stateValues.TextColor,
-              fontWeight = if (isActive)
-                FontWeight.Bold
-              else
-                FontWeight.Normal
+          CompositionLocalProvider(LocalKamelConfig provides kamelConfig) {
+            KamelImage(
+              modifier = Modifier
+                .padding(vertical = 8.dp, horizontal = 16.dp)
+                .aspectRatio(1f, matchHeightConstraintsFirst = true),
+              resource = {
+                asyncPainterResource(
+                  data = Url(getFullDrawableResourceUrl(model.iconPath))
+                )
+              },
+              contentDescription = stateValues.stringBack,
+              colorFilter = if (isActive)
+                ColorFilter.tint(stateValues.AccentColor)
+              else null
             )
           }
+
+          Text(
+            text = model.name,
+            color = if (isActive)
+              stateValues.AccentColor
+            else
+              stateValues.TextColor,
+            fontWeight = if (isActive)
+              FontWeight.Bold
+            else
+              FontWeight.Normal
+          )
         }
       }
     }

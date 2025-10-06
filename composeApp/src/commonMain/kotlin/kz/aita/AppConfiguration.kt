@@ -26,8 +26,10 @@ import kz.aita.core.extractPath
 import kz.aita.core.extractString
 import kz.aita.core.extractValue
 import kz.aita.core.genericLocalService
+import kz.aita.core.stockRepository
 import kz.aita.core.userRepository
 import kz.aita.model.dataModel.GlobalAppConfigurationDataModel
+import kz.aita.model.dataModel.GoodsItemDataModel
 import kz.aita.model.dataModel.LocalizedStringGroupDataModel
 import kz.aita.model.dataModel.StylizedColorGroupDataModel
 import kz.aita.model.dataModel.StylizedDimensionGroupDataModel
@@ -43,6 +45,10 @@ object AppConfiguration {
   interface StateValues {
     val userAccountState: DataState<UserAccountDataModel>
     val userAccount: UserAccountDataModel?
+
+    val stockState: DataState<List<GoodsItemDataModel>>
+    val stock: List<GoodsItemDataModel>?
+
 
     val navigationScreensMain: List<NavigationScreenModel>
     val navigationTransactionSaleClientId: Int
@@ -230,6 +236,8 @@ object AppConfiguration {
     val drawablePathIconSettings: String
     val drawablePathIconSearch: String
     val drawablePathIconBarcodeCamScanner: String
+    val drawablePathIconDelete: String
+
 
     val exceptionMessageUserWithThisPhoneNumberIsAlreadyRegistered: String
     val exceptionMessageUserWithThisEmailAddressIsAlreadyRegistered: String
@@ -373,6 +381,7 @@ object AppConfiguration {
   private val _drawablePathIconSettingsState = MutableStateFlow("svg/30_0.svg")
   private val _drawablePathIconSearchState = MutableStateFlow("svg/31_0.svg")
   private val _drawablePathIconBarcodeCamScannerState = MutableStateFlow("svg/32_0.svg")
+  private val _drawablePathIconDeleteState = MutableStateFlow("svg/33_0.svg")
 
   private val _exceptionMessageUserWithThisPhoneNumberIsAlreadyRegistered = MutableStateFlow("User with this phone number is already registered")
   private val _exceptionMessageUserWithThisEmailAddressIsAlreadyRegistered = MutableStateFlow("User with this email address is already registered")
@@ -400,6 +409,8 @@ object AppConfiguration {
     stateValues = object: StateValues {
       override val userAccountState: DataState<UserAccountDataModel> by userRepository.userAccountState.value.collectAsState()
       override val userAccount: UserAccountDataModel? by userRepository.userAccountState.payload.collectAsState()
+      override val stockState: DataState<List<GoodsItemDataModel>> by stockRepository.stockState.value.collectAsState()
+      override val stock: List<GoodsItemDataModel>? by stockRepository.stockState.payload.collectAsState()
 
       override val navigationScreensMain: List<NavigationScreenModel> by Navigation.Main.collectAsState()
       override val navigationTransactionSaleClientId: Int by Navigation.TransactionSale.ClientId.collectAsState()
@@ -553,7 +564,7 @@ object AppConfiguration {
       override val ErrorColor: Color by _ErrorColorState.collectAsState()
       override val IconTintColor: Color by _IconTintColorState.collectAsState()
       override val OkayColor: Color by _OkayColorState.collectAsState()
-      override val BorderlineBadColor: Color by _BackgroundColorState.collectAsState()
+      override val BorderlineBadColor: Color by _BorderlineBadColorState.collectAsState()
 
       override val drawablePathAITALogo: String by _drawablePathAITALogoState.collectAsState()
       override val drawablePathIconPassword: String by _drawablePathIconPasswordState.collectAsState()
@@ -588,6 +599,7 @@ object AppConfiguration {
       override val drawablePathIconSettings: String by _drawablePathIconSettingsState.collectAsState()
       override val drawablePathIconSearch: String by _drawablePathIconSearchState.collectAsState()
       override val drawablePathIconBarcodeCamScanner: String by _drawablePathIconBarcodeCamScannerState.collectAsState()
+      override val drawablePathIconDelete: String by _drawablePathIconDeleteState.collectAsState()
 
       override val exceptionMessageUserWithThisPhoneNumberIsAlreadyRegistered: String by _exceptionMessageUserWithThisPhoneNumberIsAlreadyRegistered.collectAsState()
       override val exceptionMessageUserWithThisEmailAddressIsAlreadyRegistered: String by _exceptionMessageUserWithThisEmailAddressIsAlreadyRegistered.collectAsState()
@@ -859,5 +871,6 @@ object AppConfiguration {
     _drawablePathIconSettingsState.emit(drawables.extractPath(30, stateValues.appThemeId))
     _drawablePathIconSearchState.emit(drawables.extractPath(31, stateValues.appThemeId))
     _drawablePathIconBarcodeCamScannerState.emit(drawables.extractPath(32, stateValues.appThemeId))
+    _drawablePathIconDeleteState.emit(drawables.extractPath(33, stateValues.appThemeId))
   }
 }

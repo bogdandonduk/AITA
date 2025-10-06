@@ -1,29 +1,131 @@
 package kz.aita.model.repository.impl
 
+import kotlinx.coroutines.launch
 import kz.aita.model.dataModel.GoodsItemDataModel
+import kz.aita.model.dataModel.LocalizedStringDataModel
+import kz.aita.model.dataModel.QuantityDataModel
 import kz.aita.model.repository.Repository
 import kz.aita.model.repository.StockRepository
 import kz.aita.model.service.GenericLocalService
 import kz.aita.model.service.GenericRemoteService
+import kz.aita.model.wrapper.DataState
 import kz.aita.model.wrapper.MutableDataStateFlow
 
 class StockRepositoryImpl(
-    private val genericRemoteService: GenericRemoteService,
-    private val genericLocalService: GenericLocalService
+  private val genericRemoteService: GenericRemoteService,
+  private val genericLocalService: GenericLocalService
 ): Repository(), StockRepository {
 
-    private val _stockState = MutableDataStateFlow<List<GoodsItemDataModel>>(this)
-    override val stockState = _stockState.asDataStateFlow()
+  private val _stockState = MutableDataStateFlow<List<GoodsItemDataModel>>(
+    this
+  )
+  override val stockState = _stockState.asDataStateFlow()
 
-    override suspend fun getStock() {
-        TODO("Not yet implemented")
+  init {
+    getStock()
+  }
+  override fun getStock() {
+    launch {
+      _stockState.emit(
+        DataState.Success(
+          listOf(
+            GoodsItemDataModel(
+              0,
+              "792649190623",
+              "Yoghurt кокосовый",
+              QuantityDataModel(
+                listOf(
+                  LocalizedStringDataModel(
+                    "en",
+                    "pc."
+                  ),
+                  LocalizedStringDataModel(
+                    "ru",
+                    "шт."
+                  ),
+                  LocalizedStringDataModel(
+                    "kk",
+                    "шт"
+                  )
+                ),
+                total = 30.0,
+                roundTotal = true
+              ),
+              categoryName = "Category",
+              supplierName = "Supplier",
+              salePrice = 500.0,
+              supplyPrice = 300.0,
+              saleCurrency = "₸",
+              supplyCurrency = "₸"
+            ),
+            GoodsItemDataModel(
+              1,
+              "5411188081852",
+              "Alpro молоко соевое ванильное",
+              QuantityDataModel(
+                listOf(
+                  LocalizedStringDataModel(
+                    "en",
+                    "pc."
+                  ),
+                  LocalizedStringDataModel(
+                    "ru",
+                    "шт."
+                  ),
+                  LocalizedStringDataModel(
+                    "kk",
+                    "шт"
+                  )
+                ),
+                total = 12.0,
+                roundTotal = true
+              ),
+              categoryName = "Category",
+              supplierName = "Supplier",
+              salePrice = 1800.0,
+              supplyPrice = 1200.0,
+              saleCurrency = "₸",
+              supplyCurrency = "₸"
+            )
+          )
+        )
+      )
     }
+  }
 
-    override suspend fun addGoodsItem() {
-        TODO("Not yet implemented")
+  override fun addGoodsItem(
+    goodsItem: GoodsItemDataModel
+  ) {
+    launch {
+      _stockState.emit(
+        DataState.Success(
+          stockState.payloadValue?.let { payload ->
+            mutableListOf<GoodsItemDataModel>().apply {
+              addAll(payload)
+              add(goodsItem)
+            }
+          } ?: listOf(goodsItem)
+        )
+      )
     }
+  }
 
-    override suspend fun deleteGoodsItem() {
-        TODO("Not yet implemented")
+  override fun deleteGoodsItem(id: Long) {
+    launch {
+      _stockState.payloadValue?.let { payload ->
+        payload.indexOfFirst { it.id == id }
+          .takeIf { it != -1 }
+          ?.let { index ->
+            _stockState.emit(
+              DataState.Success(
+                mutableListOf<GoodsItemDataModel>().apply {
+                  addAll(payload)
+                  removeAt(index)
+                }.toList()
+              )
+            )
+          }
+      }
     }
+  }
 }

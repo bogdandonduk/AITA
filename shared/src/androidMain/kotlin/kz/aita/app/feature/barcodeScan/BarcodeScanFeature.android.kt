@@ -17,7 +17,7 @@
 //import kotlinx.coroutines.launch
 //import kotlinx.coroutines.withContext
 //import kz.aita.AppConfiguration
-//import kz.aita.app.AITA
+//import kz.aita.app.system.AITA
 //import kz.aita.app.system.ui.activity.MainActivity
 //import kz.aita.compose.navigation.NavigationScreenModel
 //import kz.aita.core.genericLocalService

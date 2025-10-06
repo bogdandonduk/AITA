@@ -31,7 +31,7 @@ fun AppConfiguration.MenuAppThemeScreen() {
 
     LazyColumn(
       modifier = Modifier
-        .fillMaxSize()
+        .weight(1f)
     ) {
       items(stateValues.globalAppConfiguration.themes) { theme ->
         AppThemeSettingsItemWidget(

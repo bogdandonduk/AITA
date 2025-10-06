@@ -1,15 +1,30 @@
 package kz.aita.compose.screen.stock
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import kotlinx.coroutines.delay
+import androidx.compose.ui.unit.dp
 import kz.aita.AppConfiguration
 import kz.aita.compose.navigation.NavigationScreenModel
-import kz.aita.compose.widget.SearchTextFieldWithCamBarcodeScanner
+import kz.aita.compose.widget.GoodsItemInStockWidget
 import kz.aita.compose.widget.ScreenAppBarWidget
+import kz.aita.compose.widget.searchTextFieldWithCamBarcodeScanner
+import kz.aita.core.search
+import kz.aita.model.dataModel.GoodsItemDataModel
+import kz.aita.model.wrapper.DataState
 
 @Composable
 fun AppConfiguration.StockWarehouseScreen() {
@@ -22,17 +37,76 @@ fun AppConfiguration.StockWarehouseScreen() {
       iconPath = stateValues.drawablePathIconStock
     )
 
-    val searchTextFieldContent =
-      SearchTextFieldWithCamBarcodeScanner(
-        valueInitial = NavigationScreenModel.Stock.Warehouse.state["search_query"]
-      )
+    when (val state = stateValues.stockState) {
+      is DataState.Success -> {
+        if (state.payload.isEmpty()) {
+          Box(
+            modifier = Modifier
+              .fillMaxWidth()
+              .weight(1f),
+            contentAlignment = Alignment.Center
+          ) {
+            Text(
+              "No items",
+              color = stateValues.TextColor,
+              fontSize = stateValues.accentTextSize
+            )
+          }
+        } else {
+          val searchTextFieldContent =
+            searchTextFieldWithCamBarcodeScanner(
+              valueInitial = NavigationScreenModel.Stock.Warehouse.state["search_query"],
+              modifier = Modifier
+                .padding(start = 8.dp, top = 8.dp, end = 8.dp)
+            )
 
-    LaunchedEffect(searchTextFieldContent.value) {
-      println("are we even called bruh")
-      NavigationScreenModel.Stock.Warehouse.setState("search_query" to searchTextFieldContent.value.text)
+          val items = searchTextFieldContent
+            .value
+            .text
+            .takeIf {
+              it.isNotEmpty()
+            }?.let { query ->
+              state.payload.search<GoodsItemDataModel>(query).first
+            } ?: state.payload
 
-      delay(2000)
-      println("now bruh " + NavigationScreenModel.Stock.Warehouse.state["search_query"])
+          if (items.isEmpty()) {
+            Box(
+              modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+              contentAlignment = Alignment.Center
+            ) {
+              Text(
+                "No matches",
+                color = stateValues.TextColor,
+                fontSize = stateValues.accentTextSize
+              )
+            }
+          } else {
+            LazyColumn(
+              modifier = Modifier
+                .weight(1f)
+                .padding(start = 8.dp, top = 8.dp, end = 8.dp)
+            ) {
+              items(items) {
+                GoodsItemInStockWidget(
+                  goodsItem = it,
+                  onDelete = {
+
+                  },
+                  onEdit = {
+
+                  }
+                )
+              }
+            }
+          }
+        }
+      }
+
+      else -> {
+
+      }
     }
   }
 }

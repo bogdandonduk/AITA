@@ -260,7 +260,10 @@ fun AppConfiguration.genericTextField(
                             MutableInteractionSource()
                           },
                           indication = ripple(color = textColor, radius = cornerRadius),
-                          onClick = trailingIconExtraOnClick ?: {}
+                          onClick = {
+                            trailingIconExtraOnClick?.invoke()
+                            isFocused = true
+                          }
                         )
                     ) {
                       KamelImage(
@@ -289,6 +292,7 @@ fun AppConfiguration.genericTextField(
                           indication = ripple(color = textColor, radius = cornerRadius)
                         ) {
                           value = TextFieldValue("")
+                          isFocused = true
                         }
                     ) {
                       KamelImage(

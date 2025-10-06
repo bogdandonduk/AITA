@@ -6,10 +6,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -20,7 +17,7 @@ import androidx.compose.ui.unit.dp
 import kz.aita.AppConfiguration
 
 @Composable
-fun AppConfiguration.SearchTextFieldWithCamBarcodeScanner(
+fun AppConfiguration.searchTextFieldWithCamBarcodeScanner(
   modifier: Modifier = Modifier,
   valueInitial: String? = null,
 ): GenericTextFieldContent {
@@ -28,7 +25,6 @@ fun AppConfiguration.SearchTextFieldWithCamBarcodeScanner(
 
   Column(
     modifier = modifier
-      .padding(8.dp)
   ) {
     val barcodeCamScanningExpansionState = remember {
       MutableTransitionState(false)

@@ -4,7 +4,8 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class QuantityDataModel(
-  val immutableUnitName: String,
+  val immutableUnitName: List<LocalizedStringDataModel>,
   val total: Double,
-  val pricedAmount: Double = 1.0
+  val pricedAmount: Double = 1.0,
+  val roundTotal: Boolean
 )

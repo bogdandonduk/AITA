@@ -6,9 +6,12 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.serialization.json.Json
+import kz.aita.KeyValueDatabase
 import kz.aita.model.repository.ConfigurationRepository
+import kz.aita.model.repository.StockRepository
 import kz.aita.model.repository.UserRepository
 import kz.aita.model.repository.impl.ConfigurationRepositoryImpl
+import kz.aita.model.repository.impl.StockRepositoryImpl
 import kz.aita.model.repository.impl.UserRepositoryImpl
 import kz.aita.model.service.GenericLocalService
 import kz.aita.model.service.GenericRemoteService
@@ -58,7 +61,7 @@ val genericRemoteService: GenericRemoteService by lazy {
 }
 
 val genericLocalService: GenericLocalService by lazy {
-  GenericLocalService(getKeyValueDatabase())
+  GenericLocalService(KeyValueDatabase(sqlDelightDriver!!))
 }
 
 val userRepository: UserRepository by lazy {
@@ -67,4 +70,8 @@ val userRepository: UserRepository by lazy {
 
 val configurationRepository: ConfigurationRepository by lazy {
   ConfigurationRepositoryImpl(genericRemoteService)
+}
+
+val stockRepository: StockRepository by lazy {
+  StockRepositoryImpl(genericRemoteService, genericLocalService)
 }

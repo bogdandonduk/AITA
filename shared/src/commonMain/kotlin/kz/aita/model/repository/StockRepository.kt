@@ -7,9 +7,9 @@ interface StockRepository {
 
     val stockState: DataStateFlow<List<GoodsItemDataModel>>
 
-    suspend fun getStock()
+    fun getStock()
 
-    suspend fun addGoodsItem()
+    fun addGoodsItem(goodsItem: GoodsItemDataModel)
 
-    suspend fun deleteGoodsItem()
+    fun deleteGoodsItem(id: Long)
 }

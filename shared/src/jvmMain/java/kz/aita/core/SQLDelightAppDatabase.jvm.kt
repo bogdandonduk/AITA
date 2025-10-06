@@ -10,8 +10,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 
-actual fun getSqlDelightDriver(): SqlDriver {
-  // Use ONE explicit, stable path
+actual var sqlDelightDriver: SqlDriver? = Unit.run {
   val dir: Path = Paths.get(System.getProperty("user.home"), ".aita")
   Files.createDirectories(dir)
   val dbPath = dir.resolve("key_value.db").toAbsolutePath()
@@ -46,10 +45,5 @@ actual fun getSqlDelightDriver(): SqlDriver {
     }
   }
 
-  return driver
-}
-
-actual fun getKeyValueDatabase(): KeyValueDatabase {
-  val driver = getSqlDelightDriver()
-  return KeyValueDatabase(driver)
+  driver
 }

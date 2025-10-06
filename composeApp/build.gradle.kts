@@ -57,6 +57,8 @@ kotlin {
 
   sourceSets {
     androidMain.dependencies {
+      implementation(libs.sqlDelightAndroidDriver)
+
       implementation(libs.androidx.core.ktx)
 
       implementation(libs.hilt.android)
@@ -112,7 +114,7 @@ kotlin {
 }
 
 dependencies {
-  ksp(libs.hilt.android.compiler)
+  add("kspAndroid", libs.hilt.android.compiler)
 }
 
 android {
@@ -156,4 +158,22 @@ compose.desktop {
       packageVersion = "1.0.0"
     }
   }
+}
+
+afterEvaluate {
+  // Collect every generate*Resource* task in this module (debug/release/common/main)
+  val resourceGen = tasks.matching {
+    it.name.startsWith("generate") && it.name.contains("Resource")
+  }
+  // Also the common res class task used by compose-resources
+  val composeRes = tasks.matching { it.name == "generateComposeResClass" }
+
+  // Apply to *all* Android KSP tasks (debug/release, etc.)
+  tasks.matching { it.name.startsWith("ksp") && it.name.endsWith("KotlinAndroid") }
+    .configureEach {
+      dependsOn(resourceGen)
+      dependsOn(composeRes)
+      mustRunAfter(resourceGen)
+      mustRunAfter(composeRes)
+    }
 }

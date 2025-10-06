@@ -100,7 +100,7 @@ fun AppConfiguration.tabRowWidget(
             Text(
               text = tab.text,
               modifier = Modifier
-                .padding(8.dp),
+                .padding(6.dp),
               fontSize = textSize,
               color = textColor,
               textAlign = TextAlign.Center,

@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
@@ -26,10 +28,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import io.kamel.image.KamelImage
 import io.kamel.image.asyncPainterResource
@@ -48,14 +52,17 @@ fun AppConfiguration.actionButton(
 
   text: String,
   textColor: Color = stateValues.AccentTextColor,
+  textSize: TextUnit = stateValues.textSize,
 
   subText: String = "",
   subTextColor: Color = textColor,
+  subTextSize: TextUnit = stateValues.smallTextSize,
 
   cornerRadius: Dp = stateValues.cornerRadius,
 
   iconPath: String? = null,
   iconContentDescription: String = text,
+  iconTintColor: Color = stateValues.AccentTextColor,
 
   onLongClick: (() -> Unit)? = null,
   onClick: () -> Unit
@@ -74,9 +81,20 @@ fun AppConfiguration.actionButton(
   val subTextPresent =
     subText.isNotEmpty() && subText.isNotBlank()
 
+  val textHeight = if (!textPresent) 0f else textSize.value
+  val subTextHeight = if (subTextPresent) subTextSize.value else 0f
+
+  val height = (textHeight + subTextHeight + 24).dp
+
   Row(
     modifier = modifier
-      .fillMaxWidth()
+      .run {
+        if (!textPresent)
+          wrapContentWidth()
+        else
+          fillMaxWidth()
+      }
+      .height(height)
       .clip(RoundedCornerShape(cornerRadius))
       .background(backgroundColor)
       .run {
@@ -105,29 +123,25 @@ fun AppConfiguration.actionButton(
     horizontalArrangement = Arrangement.Center,
     verticalAlignment = Alignment.CenterVertically
   ) {
-    val iconPadding = 9.dp
-
     iconPath?.run {
       CompositionLocalProvider(LocalKamelConfig provides kamelConfig) {
         KamelImage(
           modifier = Modifier
-            .padding(iconPadding)
             .fillMaxHeight()
+            .padding(2.dp)
             .aspectRatio(1f, matchHeightConstraintsFirst = true),
           resource = {
             asyncPainterResource(
               data = Url(getFullDrawableResourceUrl(iconPath))
             )
           },
-          contentDescription = iconContentDescription
+          contentDescription = iconContentDescription,
+          colorFilter = ColorFilter.tint(iconTintColor)
         )
       }
     }
 
     Column(
-      modifier = Modifier
-        .fillMaxHeight()
-        .padding(12.dp),
       verticalArrangement = Arrangement.Center
     ) {
       if (textPresent) {
@@ -136,7 +150,7 @@ fun AppConfiguration.actionButton(
           text = text,
           color = textColor,
           fontWeight = FontWeight.Bold,
-          fontSize = stateValues.accentTextSize,
+          fontSize = textSize,
           textAlign = TextAlign.Center
         )
 
@@ -145,7 +159,7 @@ fun AppConfiguration.actionButton(
             modifier = Modifier.fillMaxWidth(),
             text = subText,
             color = subTextColor,
-            fontSize = stateValues.textSize,
+            fontSize = subTextSize,
             textAlign = TextAlign.Center
           )
         }

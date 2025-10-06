@@ -10,12 +10,7 @@ import org.w3c.dom.Worker
 private external fun createWorker(path: String): Worker
 
 @OptIn(ExperimentalWasmJsInterop::class)
-actual fun getSqlDelightDriver(): SqlDriver {
-  return WebWorkerDriver(
+actual var sqlDelightDriver: SqlDriver? =
+  WebWorkerDriver(
     createWorker("@cashapp/sqldelight-sqljs-worker/sqljs.worker.js")
   )
-}
-
-actual fun getKeyValueDatabase(): KeyValueDatabase {
-  return KeyValueDatabase(getSqlDelightDriver())
-}
