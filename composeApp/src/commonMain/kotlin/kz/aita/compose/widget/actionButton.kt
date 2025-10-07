@@ -19,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,6 +48,8 @@ import kz.aita.core.getFullDrawableResourceUrl
 fun AppConfiguration.actionButton(
   modifier: Modifier = Modifier,
 
+  enabled: Boolean = true,
+
   enabledColor: Color = stateValues.AccentColor,
   disabledColor: Color = stateValues.DisabledColor,
 
@@ -60,6 +63,8 @@ fun AppConfiguration.actionButton(
 
   cornerRadius: Dp = stateValues.cornerRadius,
 
+  icon: @Composable (() -> Unit)? = null,
+
   iconPath: String? = null,
   iconContentDescription: String = text,
   iconTintColor: Color = stateValues.AccentTextColor,
@@ -67,12 +72,16 @@ fun AppConfiguration.actionButton(
   onLongClick: (() -> Unit)? = null,
   onClick: () -> Unit
 ): ActionButtonContent {
-  var enabled by rememberSaveable {
-    mutableStateOf(true)
+  var isEnabled by rememberSaveable {
+    mutableStateOf(enabled)
+  }
+
+  LaunchedEffect(enabled) {
+    isEnabled = enabled
   }
 
   val backgroundColor by animateColorAsState(
-    targetValue = if (enabled) enabledColor else disabledColor
+    targetValue = if (isEnabled) enabledColor else disabledColor
   )
 
   val textPresent =
@@ -98,7 +107,7 @@ fun AppConfiguration.actionButton(
       .clip(RoundedCornerShape(cornerRadius))
       .background(backgroundColor)
       .run {
-        if (enabled)
+        if (isEnabled)
           clickable(
             onClick = onClick,
             interactionSource = remember {
@@ -123,7 +132,7 @@ fun AppConfiguration.actionButton(
     horizontalArrangement = Arrangement.Center,
     verticalAlignment = Alignment.CenterVertically
   ) {
-    iconPath?.run {
+    icon?.invoke() ?: iconPath?.run {
       CompositionLocalProvider(LocalKamelConfig provides kamelConfig) {
         KamelImage(
           modifier = Modifier
@@ -168,7 +177,7 @@ fun AppConfiguration.actionButton(
     }
   }
 
-  return ActionButtonContent(enabled)
+  return ActionButtonContent(isEnabled)
 }
 
 data class ActionButtonContent(

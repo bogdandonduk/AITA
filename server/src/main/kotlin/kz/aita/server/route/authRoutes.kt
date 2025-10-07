@@ -128,31 +128,27 @@ fun Application.authRoutes(tokenService: TokenService) {
 
         println("received8 $tokenPair")
 
-        call.respond(tokenPair)
+        call.respond(HttpStatusCode.OK,tokenPair)
       }
 
       post("/logOut") {
         val body = call.receive<String>()
-        tokenService.revoke(body)
-        call.respond(HttpStatusCode.OK)
+        try {
+          call.respond(HttpStatusCode.OK, tokenService.revoke(body))
+        } catch (throwable: Throwable) {
+          call.respond(HttpStatusCode.OK)
+          throwable.printStackTrace()
+        }
       }
 
       post("/refresh") {
         val body = call.receive<TokenPair>()
         try {
-          call.respond(tokenService.rotate(body.refreshToken, metaFrom(call)))
+          call.respond(HttpStatusCode.OK, tokenService.rotate(body.refreshToken, metaFrom(call)))
         } catch (throwable: Throwable) {
           call.respond(HttpStatusCode.Unauthorized,getException(5) ?: "Please log in first")
           throwable.printStackTrace()
         }
-      }
-    }
-
-    authenticate("auth-jwt") {
-      get("/me") {
-        val principal = call.principal<JWTPrincipal>()!!          // Provided by the JWT plugin
-        val userId = principal.subject!!                           // The "sub" claim we set
-        call.respond(mapOf("user_id" to userId))
       }
     }
   }

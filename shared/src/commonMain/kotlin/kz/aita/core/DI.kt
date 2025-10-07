@@ -58,7 +58,6 @@ val httpClient by lazy {
         }
 
         loadTokens {
-          print("fuck")
           tokenStore?.get()?.let { BearerTokens(it.accessToken, it.refreshToken) }
         }
 
@@ -109,7 +108,7 @@ val genericLocalService: GenericLocalService by lazy {
 }
 
 val userRepository: UserRepository by lazy {
-  UserRepositoryImpl(genericRemoteService, configurationRepository, tokenStore)
+  UserRepositoryImpl(genericRemoteService, configurationRepository, tokenStore, userAccountStore)
 }
 
 val configurationRepository: ConfigurationRepository by lazy {

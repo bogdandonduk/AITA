@@ -39,6 +39,7 @@ class ConfigurationRepositoryImpl(
       logInPath = "auth/logIn",
       signUpPath = "auth/signUp",
       refreshPath = "auth/refresh",
+      logOutPath = "auth/logOut",
       userAccountPath = "userAccount",
       stringResourcesPath = "res/string",
       dimensionResourcesPath = "res/dimension",

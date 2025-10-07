@@ -3,10 +3,14 @@ package kz.aita.compose.screen.userAuth
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -30,6 +34,7 @@ import kz.aita.compose.widget.errorText
 import kz.aita.compose.widget.phoneNumberWithCountrySelectionTextField
 import kz.aita.core.userRepository
 import kz.aita.model.dataModel.UserAuthLogInDataModel
+import kz.aita.model.wrapper.DataState
 
 @Composable
 fun AppConfiguration.UserAuthLogInScreen() {
@@ -106,7 +111,18 @@ fun AppConfiguration.UserAuthLogInScreen() {
         Spacer(modifier = Modifier.height(outerSpace))
 
         actionButton(
-          text = stateValues.stringLogIn
+          text = stateValues.stringLogIn,
+          enabled = stateValues.userAccountState !is DataState.Progress,
+          icon = if (stateValues.userAccountState is DataState.Progress) {
+            {
+              CircularProgressIndicator(
+                color = stateValues.AccentTextColor,
+                modifier = Modifier
+                  .padding(start = 20.dp)
+                  .size(20.dp)
+              )
+            }
+          } else null
         ) {
           passwordTextFieldContent.checkContentValidity()
 
@@ -133,7 +149,9 @@ fun AppConfiguration.UserAuthLogInScreen() {
                 userRepository
                   .logIn(
                     UserAuthLogInDataModel(
-                      login = this.value.text,
+                      login = stateValues.globalAppConfiguration.countries.run {
+                        find { it.locale.equals(loginTextFieldContent.selectedCountryLocale, true) } ?: first()
+                      }.phoneNumberCode + loginTextFieldContent.value.text.trim(),
                       password = passwordTextFieldContent.value.text
                     )
                   )
@@ -147,7 +165,7 @@ fun AppConfiguration.UserAuthLogInScreen() {
 
           actionButton(
             text = stateValues.stringSignUp,
-            enabledColor = stateValues.DisabledColor
+            enabled = stateValues.userAccountState !is DataState.Progress
           ) {
             coroutineScope.launch {
               Navigation.UserAuth.goLeft(NavigationScreenModel.UserAuth.SignUp)

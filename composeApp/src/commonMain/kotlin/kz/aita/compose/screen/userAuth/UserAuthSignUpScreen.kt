@@ -5,8 +5,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -14,7 +17,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kz.aita.AppConfiguration
 import kz.aita.compose.navigation.Navigation
@@ -27,7 +29,6 @@ import kz.aita.compose.widget.errorText
 import kz.aita.compose.widget.genericTextField
 import kz.aita.compose.widget.phoneNumberWithCountrySelectionTextField
 import kz.aita.compose.widget.repeatedPasswordTextFieldGroup
-import kz.aita.core.io
 import kz.aita.model.dataModel.UserAuthSignUpDataModel
 import kz.aita.model.repository.UserRepository
 import kz.aita.model.wrapper.DataState
@@ -149,7 +150,18 @@ fun AppConfiguration.UserAuthSignUpScreen(
         Spacer(modifier = Modifier.height(outerSpace))
 
         actionButton(
-          text = stateValues.stringSignUp
+          text = stateValues.stringSignUp,
+          enabled = stateValues.userAccountState !is DataState.Progress,
+          icon = if (stateValues.userAccountState is DataState.Progress) {
+            {
+              CircularProgressIndicator(
+                color = stateValues.AccentTextColor,
+                modifier = Modifier
+                  .padding(start = 20.dp)
+                  .size(20.dp)
+              )
+            }
+          } else null
         ) {
           phoneNumberTextFieldContent.checkContentValidity()
           emailTextFieldContent.checkContentValidity()
@@ -159,6 +171,7 @@ fun AppConfiguration.UserAuthSignUpScreen(
 
           passwordTextFieldContent.checkContentValidity()
           repeatedPasswordTextFieldContent.checkContentValidity()
+
           if (
             phoneNumberTextFieldContent.isContentValid
             && emailTextFieldContent.isContentValid
@@ -170,7 +183,9 @@ fun AppConfiguration.UserAuthSignUpScreen(
             userRepository
               .signUp(
                 UserAuthSignUpDataModel(
-                  phoneNumber = phoneNumberTextFieldContent.value.text.trim(),
+                  phoneNumber = stateValues.globalAppConfiguration.countries.run {
+                    find { it.locale.equals(phoneNumberTextFieldContent.selectedCountryLocale, true) } ?: first()
+                  }.phoneNumberCode + phoneNumberTextFieldContent.value.text.trim(),
                   email = emailTextFieldContent.value.text.trim(),
                   firstName = firstNameTextFieldContent.value.text.trim(),
                   lastName = lastNameTextFieldContent.value.text.trim(),

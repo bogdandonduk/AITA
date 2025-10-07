@@ -19,6 +19,9 @@ db:
   user: ${?DB_USER}
   pass: ${?DB_PASS}
 
+key:
+  refreshPepper: {$?AITA_REFRESH_PEPPER}
+
 flyway:
   locations: "classpath:db/migration"
   baselineOnMigrate: true

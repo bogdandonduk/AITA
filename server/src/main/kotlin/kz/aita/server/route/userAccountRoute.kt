@@ -45,6 +45,7 @@ fun Application.userAccountRoute() {
         println("fuckingReceived4 $user")
 
         call.respond(
+          HttpStatusCode.OK,
           UserAccountDataModel(
             id = user[Users.id].toString(),
             phoneNumber = user[Users.phoneNumber],

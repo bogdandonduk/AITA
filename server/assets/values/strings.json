@@ -225,15 +225,15 @@
     "values": [
       {
         "language": "en",
-        "value": "Password must be 8 or more symbols long and not just whitespaces"
+        "value": "Password must be 8 or more symbols long and contain at least one digit"
       },
       {
         "language": "ru",
-        "value": "Пароль должен быть длиной 8 или более символов и не только пробелов"
+        "value": "Пароль должен быть длиной 8 или более символов и содержать хотя бы одну цифру"
       },
       {
         "language": "kk",
-        "value": "Құпия сөз 8 немесе одан көп таңбадан тұруы керек және бос орындар болмауы керек"
+        "value": "Құпия сөз ұзындығы 8 немесе одан да көп таңбадан тұруы және кемінде бір саннан тұруы керек"
       }
     ]
   },

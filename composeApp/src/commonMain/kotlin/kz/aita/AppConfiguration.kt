@@ -277,7 +277,7 @@ object AppConfiguration {
   private val _stringLoginAndOrPasswordIncorrectState = MutableStateFlow("Login and/or password incorrect")
   private val _stringPhoneNumberMustBeState = MutableStateFlow("Incorrect phone number length")
   private val _stringEmailMustBeState = MutableStateFlow("Incorrect email address format")
-  private val _stringPasswordMustBeState = MutableStateFlow("Password must be 8 or more symbols long")
+  private val _stringPasswordMustBeState = MutableStateFlow("Password must be 8 or more symbols long and contain at least one digit")
   private val _stringRepeatPasswordState = MutableStateFlow("Repeat password")
   private val _stringPasswordsMustMatchState = MutableStateFlow("Passwords must match")
   private val _stringFirstNameState = MutableStateFlow("First name")

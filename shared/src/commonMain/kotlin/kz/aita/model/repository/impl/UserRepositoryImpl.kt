@@ -3,7 +3,8 @@ package kz.aita.model.repository.impl
 import io.ktor.http.HttpMethod
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kz.aita.core.TokenStore
+import kotlinx.coroutines.sync.Mutex
+import kz.aita.core.DataStore
 import kz.aita.core.io
 import kz.aita.model.dataModel.UserAccountDataModel
 import kz.aita.model.dataModel.UserAuthLogInDataModel
@@ -19,7 +20,8 @@ import kz.aita.model.wrapper.TokenPair
 class UserRepositoryImpl(
   private val genericRemoteService: GenericRemoteService,
   private val configurationRepository: ConfigurationRepository,
-  private val tokenStore: TokenStore?
+  private val tokenStore: DataStore<TokenPair>?,
+  private val userAccountDataStore: DataStore<UserAccountDataModel>?
 ): Repository(), UserRepository {
 
   private val _userAccountState = MutableDataStateFlow<UserAccountDataModel>(
@@ -27,8 +29,21 @@ class UserRepositoryImpl(
   )
   override val userAccountState = _userAccountState.asDataStateFlow()
 
+  private val loginMutex = Mutex()
+  private val signUpMutex = Mutex()
+  private val getUserAccountMutex = Mutex()
+
+  private val logOutMutex = Mutex()
+
+  init {
+    getUserAccount()
+  }
+
   override fun logIn(userAuthLogIn: UserAuthLogInDataModel) {
     launch(Dispatchers.io) {
+      if (!loginMutex.tryLock())
+        return@launch
+
       _userAccountState.emit(DataState.Progress())
 
       genericRemoteService
@@ -38,11 +53,12 @@ class UserRepositoryImpl(
           body = userAuthLogIn,
           onFailure = {
             _userAccountState.emit(DataState.Failure(it))
+            loginMutex.unlock()
             it.printStackTrace()
           }
         )?.run {
-          println("token key store is $tokenStore")
           tokenStore?.set(this)
+          loginMutex.unlock()
           getUserAccount()
         }
     }
@@ -51,6 +67,9 @@ class UserRepositoryImpl(
 
   override fun signUp(userAuthSignUp: UserAuthSignUpDataModel) {
     launch(Dispatchers.io) {
+      if (!signUpMutex.tryLock())
+        return@launch
+
       _userAccountState.emit(DataState.Progress())
 
       genericRemoteService
@@ -60,10 +79,12 @@ class UserRepositoryImpl(
           body = userAuthSignUp,
           onFailure = {
             _userAccountState.emit(DataState.Failure(it))
+            signUpMutex.unlock()
             it.printStackTrace()
           }
         )?.run {
           tokenStore?.set(this)
+          signUpMutex.unlock()
           getUserAccount()
         }
     }
@@ -71,21 +92,57 @@ class UserRepositoryImpl(
 
   override fun getUserAccount() {
     launch(Dispatchers.io) {
+      if (!getUserAccountMutex.tryLock())
+        return@launch
+
+      if (_userAccountState.value.value !is DataState.Progress)
+        _userAccountState.emit(DataState.Progress())
+
+      userAccountDataStore?.get()?.run {
+        _userAccountState.emit(DataState.Success(this))
+      }
+
       genericRemoteService
         .request<UserAccountDataModel, Unit>(
           HttpMethod.Get,
           endpointUrl = configurationRepository.globalAppConfigurationState.payloadValue.userAccountPath,
           onFailure = {
-            _userAccountState.emit(DataState.Failure(it))
+            getUserAccountMutex.unlock()
             it.printStackTrace()
           }
         )?.run {
           _userAccountState.emit(DataState.Success(this))
+          userAccountDataStore?.set(this)
+          getUserAccountMutex.unlock()
         }
     }
   }
 
   override fun logOut() {
-    TODO("Not yet implemented")
+    launch(Dispatchers.io) {
+      if (!logOutMutex.tryLock())
+        return@launch
+
+      _userAccountState.emit(DataState.Progress())
+
+      genericRemoteService
+        .request<Unit, String>(
+          HttpMethod.Post,
+          endpointUrl = configurationRepository.globalAppConfigurationState.payloadValue.logOutPath,
+          body = tokenStore?.get()?.refreshToken,
+          onFailure = {
+            _userAccountState.emit(DataState.Failure(it))
+            logOutMutex.unlock()
+            it.printStackTrace()
+          }
+        )?.run {
+          _userAccountState.emit(DataState.Empty())
+
+          tokenStore?.set(null)
+          userAccountDataStore?.set(null)
+
+          logOutMutex.unlock()
+        }
+    }
   }
 }

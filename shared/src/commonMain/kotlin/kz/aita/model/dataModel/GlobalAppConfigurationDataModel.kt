@@ -11,6 +11,7 @@ data class GlobalAppConfigurationDataModel(
   val logInPath: String,
   val signUpPath: String,
   val refreshPath: String,
+  val logOutPath: String,
   val userAccountPath: String,
   val stringResourcesPath: String,
   val dimensionResourcesPath: String,

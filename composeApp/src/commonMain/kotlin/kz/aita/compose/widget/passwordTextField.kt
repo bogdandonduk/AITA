@@ -25,7 +25,6 @@ fun AppConfiguration.passwordTextField(
 
   return genericTextField(
     modifier = modifier,
-    valueInitial = "Чинчишка",
     titleText = stateValues.stringPassword,
     placeholderText = stateValues.stringEnterPassword,
     leadingIconPath = stateValues.drawablePathIconPassword,

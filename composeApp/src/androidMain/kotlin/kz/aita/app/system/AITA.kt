@@ -6,11 +6,12 @@ import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 import dagger.hilt.android.HiltAndroidApp
 import kz.aita.KeyValueDatabase
 import kz.aita.app.system.core.EncryptedDataStore
-import kz.aita.core.TokenStore
 import kz.aita.core.jsonBase
 import kz.aita.core.osCacheDirPath
 import kz.aita.core.sqlDelightDriver
 import kz.aita.core.tokenStore
+import kz.aita.core.userAccountStore
+import kz.aita.model.dataModel.UserAccountDataModel
 import kz.aita.model.wrapper.TokenPair
 
 @HiltAndroidApp
@@ -28,16 +29,27 @@ class AITA : Application() {
         name = "key_value.db"
       )
 
-    tokenStore = object: TokenStore {
+    tokenStore = object: kz.aita.core.DataStore<TokenPair> {
+      private val key = "key_auth_tokens"
+
       override suspend fun get(): TokenPair? {
-        println("blyat")
-        return EncryptedDataStore.get("key_auth_tokens")?.run { jsonBase.decodeFromString<TokenPair>(this) }
+        return EncryptedDataStore.get(key)?.run { jsonBase.decodeFromString<TokenPair>(this) }
       }
 
-      override suspend fun set(tokens: TokenPair?) {
-        println("blyat2")
+      override suspend fun set(value: TokenPair?) {
+        EncryptedDataStore.set(key, value?.run { jsonBase.encodeToString(this) })
+      }
+    }
 
-        EncryptedDataStore.set("key_auth_tokens", tokens?.run { jsonBase.encodeToString(tokens) })
+    userAccountStore = object: kz.aita.core.DataStore<UserAccountDataModel> {
+      private val key = "key_user_account"
+
+      override suspend fun get(): UserAccountDataModel? {
+        return EncryptedDataStore.get(key)?.run { jsonBase.decodeFromString<UserAccountDataModel>(this) }
+      }
+
+      override suspend fun set(value: UserAccountDataModel?) {
+        EncryptedDataStore.set(key, value?.run { jsonBase.encodeToString(this) })
       }
     }
   }

@@ -77,7 +77,7 @@ fun AppConfiguration.phoneNumberWithCountrySelectionTextField(
           }
         )
       },
-      keyboardType = KeyboardType.Email,
+      keyboardType = KeyboardType.Phone,
       imeWithAction = imeWithAction ?: ImeWithAction.Default,
       contentInvalidText = stateValues.stringPhoneNumberMustBe,
       onContentValidityCheck = { it: String ->

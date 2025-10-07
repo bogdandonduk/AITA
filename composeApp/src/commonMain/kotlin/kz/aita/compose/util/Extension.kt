@@ -24,7 +24,7 @@ fun String.filterAsPhoneNumber(country: CountryDataModel): Boolean {
 }
 
 fun String.checkAsPassword(): Boolean {
-  return length >= 8 && isNotBlank()
+  return length >= 8 && isNotBlank() && any { it.isDigit() }
 }
 
 fun String.isNumericalString(): Boolean {
