@@ -114,13 +114,13 @@ fun AppConfiguration.GoodsItemInStockWidget(
       )
 
       Text(
-        text = goodsItem.categoryName,
+        text = goodsItem.categoryId,
         fontSize = stateValues.textSize,
         color = textColor
       )
 
       Text(
-        text = goodsItem.supplierName,
+        text = goodsItem.supplierId,
         fontSize = stateValues.textSize,
         color = textColor
       )

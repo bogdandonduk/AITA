@@ -173,6 +173,18 @@ object AppConfiguration {
     val stringNoMatches: String
     val stringName: String
     val stringBarcode: String
+    val stringSupplyPriceState: String
+    val stringSalePriceState: String
+    val stringReturnPriceState: String
+    val stringCategoryState: String
+    val stringSupplierState: String
+    val stringEnterName: String
+    val stringEnterBarcode: String
+    val stringEnterSupplyPriceState: String
+    val stringEnterSalePriceState: String
+    val stringEnterReturnPriceState: String
+    val stringEnterCategoryState: String
+    val stringEnterSupplierState: String
 
     val screenWidth: Dp
     val screenHeight: Dp
@@ -324,6 +336,18 @@ object AppConfiguration {
   private val _stringNoMatchesState = MutableStateFlow("No matches")
   private val _stringNameState = MutableStateFlow("Name")
   private val _stringBarcodeState = MutableStateFlow("Barcode")
+  private val _stringSupplyPriceState = MutableStateFlow("Supply price")
+  private val _stringSalePriceState = MutableStateFlow("Sale price")
+  private val _stringReturnPriceState = MutableStateFlow("Return price")
+  private val _stringCategoryState = MutableStateFlow("Category")
+  private val _stringSupplierState  = MutableStateFlow("Supplier")
+  private val _stringEnterNameState = MutableStateFlow("Enter name")
+  private val _stringEnterBarcodeState = MutableStateFlow("Enter barcode")
+  private val _stringEnterSupplyPriceState = MutableStateFlow("Enter supply price")
+  private val _stringEnterSalePriceState = MutableStateFlow("Enter sale price")
+  private val _stringEnterReturnPriceState = MutableStateFlow("Enter return price")
+  private val _stringSelectCategoryState = MutableStateFlow("Select category")
+  private val _stringSelectSupplierState  = MutableStateFlow("Select supplier")
 
   private val _screenWidthState = MutableStateFlow(0f.dp)
   private val _screenHeightState = MutableStateFlow(0f.dp)
@@ -549,6 +573,18 @@ object AppConfiguration {
       override val stringNoMatches: String by _stringNoMatchesState.collectAsState()
       override val stringName: String by _stringNameState.collectAsState()
       override val stringBarcode: String by _stringBarcodeState.collectAsState()
+      override val stringSupplyPriceState: String by _stringSupplyPriceState.collectAsState()
+      override val stringSalePriceState: String by _stringSalePriceState.collectAsState()
+      override val stringReturnPriceState: String by _stringReturnPriceState.collectAsState()
+      override val stringCategoryState: String by _stringCategoryState.collectAsState()
+      override val stringSupplierState: String by _stringSupplierState.collectAsState()
+      override val stringEnterName: String by _stringEnterNameState.collectAsState()
+      override val stringEnterBarcode: String by _stringEnterBarcodeState.collectAsState()
+      override val stringEnterSupplyPriceState: String by _stringEnterSupplyPriceState.collectAsState()
+      override val stringEnterSalePriceState: String by _stringEnterSalePriceState.collectAsState()
+      override val stringEnterReturnPriceState: String by _stringEnterReturnPriceState.collectAsState()
+      override val stringEnterCategoryState: String by _stringSelectCategoryState.collectAsState()
+      override val stringEnterSupplierState: String by _stringSelectSupplierState.collectAsState()
 
       override val screenWidth: Dp by _screenWidthState.collectAsState()
       override val screenHeight: Dp by _screenHeightState.collectAsState()
@@ -839,6 +875,18 @@ object AppConfiguration {
     _stringNoMatchesState.emit(strings.extractString(67, stateValues.appLocaleLanguage))
     _stringNameState.emit(strings.extractString(68, stateValues.appLocaleLanguage))
     _stringBarcodeState.emit(strings.extractString(69, stateValues.appLocaleLanguage))
+    _stringSupplyPriceState.emit(strings.extractString(70, stateValues.appLocaleLanguage))
+    _stringSalePriceState.emit(strings.extractString(71, stateValues.appLocaleLanguage))
+    _stringReturnPriceState.emit(strings.extractString(72, stateValues.appLocaleLanguage))
+    _stringCategoryState.emit(strings.extractString(73, stateValues.appLocaleLanguage))
+    _stringSupplierState.emit(strings.extractString(74, stateValues.appLocaleLanguage))
+    _stringEnterNameState.emit(strings.extractString(76, stateValues.appLocaleLanguage))
+    _stringEnterBarcodeState.emit(strings.extractString(75, stateValues.appLocaleLanguage))
+    _stringEnterSupplyPriceState.emit(strings.extractString(77, stateValues.appLocaleLanguage))
+    _stringEnterSalePriceState.emit(strings.extractString(78, stateValues.appLocaleLanguage))
+    _stringEnterReturnPriceState.emit(strings.extractString(79, stateValues.appLocaleLanguage))
+    _stringSelectCategoryState.emit(strings.extractString(80, stateValues.appLocaleLanguage))
+    _stringSelectSupplierState.emit(strings.extractString(81, stateValues.appLocaleLanguage))
   }
 
   private suspend fun updateColors(colors: List<StylizedColorGroupDataModel>) {

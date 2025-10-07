@@ -57,6 +57,8 @@ kotlin {
 
   sourceSets {
     androidMain.dependencies {
+      implementation(libs.androidx.datastore.preferences)
+
       implementation(libs.sqlDelightAndroidDriver)
 
       implementation(libs.androidx.core.ktx)
@@ -68,7 +70,7 @@ kotlin {
       implementation(libs.androidx.activity.compose)
     }
     commonMain.dependencies {
-
+      implementation(libs.kotlinx.serialization.json)
 //            implementation(libs.kamel.image.default)
 
       implementation(libs.kamel.image)

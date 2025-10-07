@@ -232,7 +232,7 @@ fun AppConfiguration.genericTextField(
               Box(
                 Modifier
                   .weight(1f)
-                  .padding(start = stateValues.textFieldIconPadding)
+                  .padding(start = 12.dp)
               ) {
                 Text(
                   text = if (value.text.isEmpty()) placeholderText else "",
@@ -332,18 +332,12 @@ fun AppConfiguration.genericTextField(
       )
     }
 
-    LaunchedEffect(isFocused) {
-      if (isFocused)
-        focusRequester.requestFocus()
-      else
-        focusManager.clearFocus()
-    }
-
     LaunchedEffect(isFocusedInitial) {
       if (isFocusedInitial) {
         delay(300)
 
         isFocused = true
+        focusRequester.requestFocus()
       }
     }
   }

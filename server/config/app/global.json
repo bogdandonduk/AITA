@@ -1,10 +1,12 @@
 {
   "appName": "AITA",
   "serverUrl": "http://192.168.100.9:8080",
-  "globalConfigurationPath": "config/app/global",
-  "exceptionConfigurationPath": "config/app/exception",
+  "globalConfigurationPath": "config/global",
+  "exceptionConfigurationPath": "config/exception",
   "logInPath": "auth/logIn",
   "signUpPath": "auth/signUp",
+  "refreshPath": "auth/refresh",
+  "userAccountPath": "userAccount",
   "stringResourcesPath": "res/string",
   "dimensionResourcesPath": "res/dimension",
   "colorResourcesPath": "res/color",
@@ -247,7 +249,7 @@
       ]
     }
   ],
-  "goodsItemQuantityUnits": [
+  "goodsItemsQuantityUnits": [
     {
       "id": 0,
       "immutableUnitName": [

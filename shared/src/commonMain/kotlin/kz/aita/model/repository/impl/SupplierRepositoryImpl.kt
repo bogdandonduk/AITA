@@ -13,9 +13,13 @@ class SupplierRepositoryImpl(
 ): Repository(), SupplierRepository {
 
   private val _storeSuppliersState = MutableDataStateFlow<List<UserAccountDataModel>>(this)
-  override val storeSuppliersState = _storeSuppliersState.asDataStateFlow()
+  override val suppliersState = _storeSuppliersState.asDataStateFlow()
 
-  override fun getStoreSuppliers() {
-    TODO("Not yet implemented")
+  init {
+    getSuppliers()
+  }
+
+  override fun getSuppliers() {
+
   }
 }

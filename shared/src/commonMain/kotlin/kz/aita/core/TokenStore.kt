@@ -7,6 +7,4 @@ interface TokenStore {
   suspend fun set(tokens: TokenPair?)
 }
 
-//expect val tokenStore: TokenStore
-
-
+expect var tokenStore: TokenStore?

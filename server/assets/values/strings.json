@@ -1188,5 +1188,209 @@
         "value": "Штрих-код"
       }
     ]
+  },
+  {
+    "id": 70,
+    "values": [
+      {
+        "language": "en",
+        "value": "Supply price"
+      },
+      {
+        "language": "ru",
+        "value": "Цена поставки"
+      },
+      {
+        "language": "kk",
+        "value": "Жеткізу бағасы"
+      }
+    ]
+  },
+  {
+    "id": 71,
+    "values": [
+      {
+        "language": "en",
+        "value": "Sale price"
+      },
+      {
+        "language": "ru",
+        "value": "Цена продажи"
+      },
+      {
+        "language": "kk",
+        "value": "Сату бағасы"
+      }
+    ]
+  },
+  {
+    "id": 72,
+    "values": [
+      {
+        "language": "en",
+        "value": "Return price"
+      },
+      {
+        "language": "ru",
+        "value": "Цена возврата"
+      },
+      {
+        "language": "kk",
+        "value": "Қайтару бағасы"
+      }
+    ]
+  },
+  {
+    "id": 73,
+    "values": [
+      {
+        "language": "en",
+        "value": "Category"
+      },
+      {
+        "language": "ru",
+        "value": "Категория"
+      },
+      {
+        "language": "kk",
+        "value": "Санат"
+      }
+    ]
+  },
+  {
+    "id": 74,
+    "values": [
+      {
+        "language": "en",
+        "value": "Supplier"
+      },
+      {
+        "language": "ru",
+        "value": "Поставщик"
+      },
+      {
+        "language": "kk",
+        "value": "Жеткізуші"
+      }
+    ]
+  },
+  {
+    "id": 75,
+    "values": [
+      {
+        "language": "en",
+        "value": "Enter barcode"
+      },
+      {
+        "language": "ru",
+        "value": "Введите штрих-код"
+      },
+      {
+        "language": "kk",
+        "value": "Штрих-кодты енгізіңіз"
+      }
+    ]
+  },
+  {
+    "id": 76,
+    "values": [
+      {
+        "language": "en",
+        "value": "Enter name"
+      },
+      {
+        "language": "ru",
+        "value": "Введите название"
+      },
+      {
+        "language": "kk",
+        "value": "Атын енгізіңіз"
+      }
+    ]
+  },
+  {
+    "id": 77,
+    "values": [
+      {
+        "language": "en",
+        "value": "Enter supply price"
+      },
+      {
+        "language": "ru",
+        "value": "Введите цену поставки"
+      },
+      {
+        "language": "kk",
+        "value": "Жеткізу бағасын енгізіңіз"
+      }
+    ]
+  },
+  {
+    "id": 78,
+    "values": [
+      {
+        "language": "en",
+        "value": "Enter sale price"
+      },
+      {
+        "language": "ru",
+        "value": "Введите цену продажи"
+      },
+      {
+        "language": "kk",
+        "value": "Сату бағасын енгізіңіз"
+      }
+    ]
+  },
+  {
+    "id": 79,
+    "values": [
+      {
+        "language": "en",
+        "value": "Enter return price"
+      },
+      {
+        "language": "ru",
+        "value": "Введите цену возврата"
+      },
+      {
+        "language": "kk",
+        "value": "Қайтару бағасын енгізіңіз"
+      }
+    ]
+  },
+  {
+    "id": 80,
+    "values": [
+      {
+        "language": "en",
+        "value": "Select category"
+      },
+      {
+        "language": "ru",
+        "value": "Выберите категорию"
+      },
+      {
+        "language": "kk",
+        "value": "Санатты таңдаңыз"
+      }
+    ]
+  },
+  {
+    "id": 81,
+    "values": [
+      {
+        "language": "en",
+        "value": "Select supplier"
+      },
+      {
+        "language": "ru",
+        "value": "Выберите поставщика"
+      },
+      {
+        "language": "kk",
+        "value": "Жеткізушіні таңдаңыз"
+      }
+    ]
   }
 ]

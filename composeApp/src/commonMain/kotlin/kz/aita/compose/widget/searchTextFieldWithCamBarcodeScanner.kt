@@ -38,7 +38,6 @@ fun AppConfiguration.searchTextFieldWithCamBarcodeScanner(
       placeholderText = stateValues.stringSearchByAnyData,
       leadingIconPath = stateValues.drawablePathIconSearch,
       trailingIconExtraPath = stateValues.drawablePathIconBarcodeCamScanner,
-      isFocusedInitial = true,
       trailingIconExtraOnClick = {
         barcodeCamScanningExpansionState.targetState =
           !barcodeCamScanningExpansionState.targetState

@@ -38,6 +38,8 @@ class ConfigurationRepositoryImpl(
       exceptionConfigurationPath = "config/exception",
       logInPath = "auth/logIn",
       signUpPath = "auth/signUp",
+      refreshPath = "auth/refresh",
+      userAccountPath = "userAccount",
       stringResourcesPath = "res/string",
       dimensionResourcesPath = "res/dimension",
       colorResourcesPath = "res/color",
@@ -247,7 +249,6 @@ class ConfigurationRepositoryImpl(
       genericRemoteService
         .request<GlobalAppConfigurationDataModel, Unit>(
           method = HttpMethod.Get,
-          serverUrl = globalAppConfigurationState.payloadValue.serverUrl,
           endpointUrl = globalAppConfigurationState.payloadValue.globalConfigurationPath,
           onFailure = {
             _globalAppConfigurationState.emit(DataState.Failure(it))
@@ -271,7 +272,6 @@ class ConfigurationRepositoryImpl(
       genericRemoteService
         .request<List<LocalizedStringGroupDataModel>, Unit>(
           method = HttpMethod.Get,
-          serverUrl = globalAppConfigurationState.payloadValue.serverUrl,
           endpointUrl = globalAppConfigurationState.payloadValue.stringResourcesPath,
           onFailure = {
             _stringsState.emit(DataState.Failure(it))
@@ -287,7 +287,6 @@ class ConfigurationRepositoryImpl(
       genericRemoteService
         .request<List<StylizedDimensionGroupDataModel>, Unit>(
           method = HttpMethod.Get,
-          serverUrl = globalAppConfigurationState.payloadValue.serverUrl,
           endpointUrl = globalAppConfigurationState.payloadValue.dimensionResourcesPath,
           onFailure = {
             _dimensionsState.emit(DataState.Failure(it))
@@ -303,7 +302,6 @@ class ConfigurationRepositoryImpl(
       genericRemoteService
         .request<List<StylizedColorGroupDataModel>, Unit>(
           method = HttpMethod.Get,
-          serverUrl = globalAppConfigurationState.payloadValue.serverUrl,
           endpointUrl = globalAppConfigurationState.payloadValue.colorResourcesPath,
           onFailure = {
             _colorsState.emit(DataState.Failure(it))
@@ -319,7 +317,6 @@ class ConfigurationRepositoryImpl(
       genericRemoteService
         .request<List<StylizedDrawablePathsGroupDataModel>, Unit>(
           method = HttpMethod.Get,
-          serverUrl = globalAppConfigurationState.payloadValue.serverUrl,
           endpointUrl = globalAppConfigurationState.payloadValue.drawableResourcesConfigurationPath,
           onFailure = {
             _drawablesState.emit(DataState.Failure(it))
@@ -339,7 +336,6 @@ class ConfigurationRepositoryImpl(
       genericRemoteService
         .request<String, Unit>(
           method = HttpMethod.Get,
-          serverUrl = globalAppConfigurationState.payloadValue.serverUrl,
           endpointUrl = "${globalAppConfigurationState.payloadValue.drawableResourcesPath}/$format/$key/$themeId.$format",
           onFailure = {
             emit(DataState.Failure(it))
@@ -358,7 +354,6 @@ class ConfigurationRepositoryImpl(
       genericRemoteService
         .request<String, Unit>(
           method = HttpMethod.Get,
-          serverUrl = globalAppConfigurationState.payloadValue.serverUrl,
           endpointUrl = "${globalAppConfigurationState.payloadValue.drawableResourcesPath}/$format/$name.$format",
           onFailure = {
             emit(DataState.Failure(it))
@@ -374,7 +369,6 @@ class ConfigurationRepositoryImpl(
       genericRemoteService
         .request<List<ExceptionDataModel>, Unit>(
           method = HttpMethod.Get,
-          serverUrl = globalAppConfigurationState.payloadValue.serverUrl,
           endpointUrl = globalAppConfigurationState.payloadValue.exceptionConfigurationPath,
           onFailure = {
             _exceptionsState.emit(DataState.Failure(it))

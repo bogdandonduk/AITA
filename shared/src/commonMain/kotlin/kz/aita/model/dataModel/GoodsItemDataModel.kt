@@ -5,12 +5,12 @@ import kz.aita.core.Searchable
 
 @Serializable
 data class GoodsItemDataModel(
-  val id: Long,
+  val id: String,
   val barcode: String,
   val name: String,
   val quantity: QuantityDataModel,
-  val categoryName: String,
-  val supplierName: String,
+  val categoryId: String,
+  val supplierId: String,
   val salePrice: Double,
   val returnPrice: Double = salePrice,
   val supplyPrice: Double,
@@ -22,8 +22,8 @@ data class GoodsItemDataModel(
   override fun searchExact(query: String): Boolean {
     return barcode.equals(query, true)
         || name.equals(query, true)
-        || categoryName.equals(query, true)
-        || supplierName.equals(query, true)
+        || categoryId.equals(query, true)
+        || supplierId.equals(query, true)
         || salePrice.toString().equals(query, true)
         || returnPrice.toString().equals(query, true)
         || supplyPrice.toString().equals(query, true)
@@ -35,8 +35,8 @@ data class GoodsItemDataModel(
   override fun searchContains(query: String): Boolean {
     return barcode.contains(query, true)
         || name.contains(query, true)
-        || categoryName.contains(query, true)
-        || supplierName.contains(query, true)
+        || categoryId.contains(query, true)
+        || supplierId.contains(query, true)
         || salePrice.toString().contains(query, true)
         || returnPrice.toString().contains(query, true)
         || supplyPrice.toString().contains(query, true)

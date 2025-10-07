@@ -11,5 +11,5 @@ interface StockRepository {
 
     fun addGoodsItem(goodsItem: GoodsItemDataModel)
 
-    fun deleteGoodsItem(id: Long)
+    fun deleteGoodsItem(id: String)
 }

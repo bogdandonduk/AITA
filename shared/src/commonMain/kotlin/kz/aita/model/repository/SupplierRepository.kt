@@ -5,7 +5,7 @@ import kz.aita.model.wrapper.DataStateFlow
 
 interface SupplierRepository {
 
-  val storeSuppliersState: DataStateFlow<List<UserAccountDataModel>>
+  val suppliersState: DataStateFlow<List<UserAccountDataModel>>
 
-  fun getStoreSuppliers()
+  fun getSuppliers()
 }

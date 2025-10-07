@@ -1,6 +1,10 @@
 package kz.aita.model.repository.impl
 
 import io.ktor.http.HttpMethod
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kz.aita.core.TokenStore
+import kz.aita.core.io
 import kz.aita.model.dataModel.UserAccountDataModel
 import kz.aita.model.dataModel.UserAuthLogInDataModel
 import kz.aita.model.dataModel.UserAuthSignUpDataModel
@@ -14,48 +18,74 @@ import kz.aita.model.wrapper.TokenPair
 
 class UserRepositoryImpl(
   private val genericRemoteService: GenericRemoteService,
-  private val configurationRepository: ConfigurationRepository
+  private val configurationRepository: ConfigurationRepository,
+  private val tokenStore: TokenStore?
 ): Repository(), UserRepository {
 
   private val _userAccountState = MutableDataStateFlow<UserAccountDataModel>(
-    this,
-    initial = UserAccountDataModel(
-      "0",
-      "bogdan.donduk@gmail.com",
-      "7714047737",
-      "Bogdan",
-      "Donduk",
-      "kz",
-      null,
-      null,
-      1759232357,
-      true
-    )
+    this
   )
   override val userAccountState = _userAccountState.asDataStateFlow()
 
-  override suspend fun logIn(userAuthLogIn: UserAuthLogInDataModel) {
+  override fun logIn(userAuthLogIn: UserAuthLogInDataModel) {
+    launch(Dispatchers.io) {
+      _userAccountState.emit(DataState.Progress())
 
-  }
-
-  override suspend fun signUp(userAuthSignUp: UserAuthSignUpDataModel) {
-    _userAccountState.emit(DataState.Progress())
-
-    genericRemoteService
-      .request<TokenPair, UserAuthSignUpDataModel>(
-        HttpMethod.Post,
-        configurationRepository.globalAppConfigurationState.payloadValue.serverUrl,
-        configurationRepository.globalAppConfigurationState.payloadValue.signUpPath,
-        body = userAuthSignUp,
-        onFailure = {
-//          _userAccountState.emit(DataState.Failure(it))
+      genericRemoteService
+        .request<TokenPair, UserAuthLogInDataModel>(
+          HttpMethod.Post,
+          endpointUrl = configurationRepository.globalAppConfigurationState.payloadValue.logInPath,
+          body = userAuthLogIn,
+          onFailure = {
+            _userAccountState.emit(DataState.Failure(it))
+            it.printStackTrace()
+          }
+        )?.run {
+          println("token key store is $tokenStore")
+          tokenStore?.set(this)
+          getUserAccount()
         }
-      )?.run {
-//        _userAccountState.emit(DataState.Success(this))
-      }
+    }
+
   }
 
-  override suspend fun logOut() {
+  override fun signUp(userAuthSignUp: UserAuthSignUpDataModel) {
+    launch(Dispatchers.io) {
+      _userAccountState.emit(DataState.Progress())
+
+      genericRemoteService
+        .request<TokenPair, UserAuthSignUpDataModel>(
+          HttpMethod.Post,
+          endpointUrl = configurationRepository.globalAppConfigurationState.payloadValue.signUpPath,
+          body = userAuthSignUp,
+          onFailure = {
+            _userAccountState.emit(DataState.Failure(it))
+            it.printStackTrace()
+          }
+        )?.run {
+          tokenStore?.set(this)
+          getUserAccount()
+        }
+    }
+  }
+
+  override fun getUserAccount() {
+    launch(Dispatchers.io) {
+      genericRemoteService
+        .request<UserAccountDataModel, Unit>(
+          HttpMethod.Get,
+          endpointUrl = configurationRepository.globalAppConfigurationState.payloadValue.userAccountPath,
+          onFailure = {
+            _userAccountState.emit(DataState.Failure(it))
+            it.printStackTrace()
+          }
+        )?.run {
+          _userAccountState.emit(DataState.Success(this))
+        }
+    }
+  }
+
+  override fun logOut() {
     TODO("Not yet implemented")
   }
 }

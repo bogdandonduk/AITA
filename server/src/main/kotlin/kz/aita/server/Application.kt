@@ -1,5 +1,7 @@
 package kz.aita.server
 
+import com.zaxxer.hikari.HikariConfig
+import com.zaxxer.hikari.HikariDataSource
 import io.ktor.server.application.*
 import io.ktor.server.netty.*
 import io.ktor.http.*
@@ -10,24 +12,22 @@ import io.ktor.server.plugins.autohead.*
 import io.ktor.server.plugins.cachingheaders.CachingHeaders
 import io.ktor.server.plugins.conditionalheaders.*
 import io.ktor.server.plugins.calllogging.CallLogging
-import io.ktor.server.plugins.compression.Compression
 import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.plugins.defaultheaders.DefaultHeaders
-import io.netty.handler.codec.compression.StandardCompressionOptions.deflate
-import io.netty.handler.codec.compression.StandardCompressionOptions.gzip
 import kotlinx.serialization.json.Json
-import kz.aita.core.cacheMaxAgeSec
 import kz.aita.server.jwt.TokenService
 import kz.aita.server.jwt.configureJwtAuth
-import kz.aita.server.jwt.jwtCfg
+import kz.aita.server.jwt.jwtConfig
 import kz.aita.server.route.authRoutes
 import kz.aita.server.route.filesRoutes
+import kz.aita.server.route.userAccountRoute
 import org.flywaydb.core.Flyway
 import org.jetbrains.exposed.sql.Database
 
 fun main() = EngineMain.main(emptyArray())
 
 fun Application.module() {
+
   install(CallLogging)
   install(AutoHeadResponse)
 //  install(Compression) {
@@ -44,7 +44,7 @@ fun Application.module() {
         ContentType.Image.SVG,
         ContentType.Image.PNG,
         ContentType.Image.JPEG,
-        ContentType("image","webp") ->
+        ContentType("image", "webp") ->
           CachingOptions(CacheControl.NoCache(null))
 
         else -> CachingOptions(CacheControl.NoCache(null))
@@ -59,35 +59,36 @@ fun Application.module() {
   install(ContentNegotiation) {
     json(Json {
       prettyPrint = true
+      isLenient = true
       ignoreUnknownKeys = true
       explicitNulls = true
       encodeDefaults = true
     })
   }
 
+  val ds = HikariDataSource(HikariConfig().apply {
+    jdbcUrl = environment.config.property("db.url").getString()
+    username = environment.config.property("db.user").getString()
+    password = environment.config.property("db.pass").getString()
+    driverClassName = "org.postgresql.Driver"
+    maximumPoolSize = 10
+    minimumIdle = 2
+    isAutoCommit = false
+  })
+
   Flyway.configure()
-    .dataSource(
-      environment.config.property("db.url").getString(),
-      environment.config.property("db.user").getString(),
-      environment.config.property("db.pass").getString()
-    )
+    .dataSource(ds)
     .locations(environment.config.propertyOrNull("flyway.locations")?.getString() ?: "classpath:db/migration")
     .baselineOnMigrate(true)
     .validateOnMigrate(true)
     .load()
     .migrate()
 
-  Database.connect(
-    url = System.getenv("AITA_DB_URL"),
-    driver = "org.postgresql.Driver",
-    user = System.getenv("DB_USER"),
-    password = System.getenv("DB_PASS"),
-  )
+  Database.connect(ds)
 
   configureJwtAuth()
 
   filesRoutes()
-
-  val tokenService = TokenService(jwtCfg())
-  authRoutes(tokenService)
+  authRoutes(TokenService(jwtConfig()))
+  userAccountRoute()
 }

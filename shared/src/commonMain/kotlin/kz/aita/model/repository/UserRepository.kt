@@ -4,14 +4,17 @@ import kz.aita.model.dataModel.UserAccountDataModel
 import kz.aita.model.dataModel.UserAuthLogInDataModel
 import kz.aita.model.dataModel.UserAuthSignUpDataModel
 import kz.aita.model.wrapper.DataStateFlow
+import kz.aita.model.wrapper.TokenPair
 
 interface UserRepository {
 
   val userAccountState: DataStateFlow<UserAccountDataModel>
 
-  suspend fun logIn(userAuthLogIn: UserAuthLogInDataModel)
+  fun logIn(userAuthLogIn: UserAuthLogInDataModel)
 
-  suspend fun signUp(userAuthSignUp: UserAuthSignUpDataModel)
+  fun signUp(userAuthSignUp: UserAuthSignUpDataModel)
 
-  suspend fun logOut()
+  fun getUserAccount()
+
+  fun logOut()
 }

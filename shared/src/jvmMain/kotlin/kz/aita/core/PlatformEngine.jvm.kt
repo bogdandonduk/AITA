@@ -12,7 +12,10 @@ actual fun getHttpClientEngine(): HttpClientEngine {
   return OkHttp.create {
     preconfigured = OkHttpClient.Builder()
       .cache(
-        null
+        Cache(
+          File(osCacheDirPath),
+          cacheSize
+        )
       ).build()
   }
 

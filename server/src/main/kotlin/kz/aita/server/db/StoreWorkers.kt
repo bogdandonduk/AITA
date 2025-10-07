@@ -9,7 +9,6 @@ object StoreWorkers: Table("store_workers") {
   val privilegeModeId = integer("privilege_mode_id")
   val isActive = bool("is_active")
   val storeId = varchar("store_id", 255)
-  val storeSubId = varchar("store_sub_id", 255)
   val salary = varchar("salary", 255)
   val salaryCurrency = double("salary_currency")
   val addedAt = timestamp("added_at").defaultExpression(CurrentTimestamp)

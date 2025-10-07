@@ -28,6 +28,8 @@ import kz.aita.compose.widget.passwordTextField
 import kz.aita.compose.widget.tabRowWidget
 import kz.aita.compose.widget.errorText
 import kz.aita.compose.widget.phoneNumberWithCountrySelectionTextField
+import kz.aita.core.userRepository
+import kz.aita.model.dataModel.UserAuthLogInDataModel
 
 @Composable
 fun AppConfiguration.UserAuthLogInScreen() {
@@ -106,10 +108,38 @@ fun AppConfiguration.UserAuthLogInScreen() {
         actionButton(
           text = stateValues.stringLogIn
         ) {
-          (loginTextFieldContent as? PhoneNumberWithCountrySelectionTextFieldContent)
-            ?.checkContentValidity() ?: (loginTextFieldContent as GenericTextFieldContent).checkContentValidity()
-
           passwordTextFieldContent.checkContentValidity()
+
+          val loginEmail = loginTextFieldContent !is PhoneNumberWithCountrySelectionTextFieldContent
+
+          if (loginEmail) {
+            (loginTextFieldContent as GenericTextFieldContent).run {
+              checkContentValidity()
+
+              if (isContentValid && passwordTextFieldContent.isContentValid)
+                userRepository
+                  .logIn(
+                    UserAuthLogInDataModel(
+                      login = this.value.text,
+                      password = passwordTextFieldContent.value.text
+                    )
+                  )
+            }
+          } else {
+            loginTextFieldContent.run {
+              checkContentValidity()
+
+              if (isContentValid && passwordTextFieldContent.isContentValid)
+                userRepository
+                  .logIn(
+                    UserAuthLogInDataModel(
+                      login = this.value.text,
+                      password = passwordTextFieldContent.value.text
+                    )
+                  )
+            }
+          }
+
         }
 
         if (stateValues.isNarrowScreen) {

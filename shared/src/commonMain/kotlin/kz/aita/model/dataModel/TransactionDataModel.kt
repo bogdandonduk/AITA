@@ -4,11 +4,10 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class TransactionDataModel(
-  val id: Long,
+  val id: String,
   val workshiftId: Long,
   val type: String,
-  val storeId: Long,
-  val storeSubId: Long,
+  val storeId: String,
   val goodsInTransaction: List<GoodsItemInTransactionDataModel>,
   val paidCash: Double,
   val paidCard: Double,

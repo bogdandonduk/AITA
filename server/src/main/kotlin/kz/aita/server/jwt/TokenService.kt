@@ -14,11 +14,11 @@ import kz.aita.server.util.getException
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
 
-class TokenService(private val cfg: JwtCfg) {
+class TokenService(private val cfg: JwtConfig) {
 
   fun signAccess(userId: UUID): String {
     val now = Instant.now()
-    val exp = now.plusSeconds(cfg.access_ttl_sec)
+    val exp = now.plusMillis(cfg.accessTTL)
     return JWT.create()
       .withIssuer(cfg.issuer)
       .withAudience(cfg.audience)
@@ -32,7 +32,7 @@ class TokenService(private val cfg: JwtCfg) {
     val refreshPlain = Refresh.newPlainToken()
     val refreshHash = Refresh.hash(refreshPlain)
     val now = Instant.now()
-    val expires = now.plus(cfg.refresh_ttl_days.toLong(), ChronoUnit.DAYS)
+    val expires = now.plus(cfg.refreshTTL, ChronoUnit.MILLIS)
 
     RefreshSessions.insert {
       it[id] = UUID.randomUUID()
@@ -44,7 +44,7 @@ class TokenService(private val cfg: JwtCfg) {
     }
 
     val access = signAccess(userId)
-    TokenPair(access, cfg.access_ttl_sec, refreshPlain)
+    TokenPair(access, cfg.accessTTL, refreshPlain, cfg.refreshTTL)
   }
 
   fun rotate(refreshPlain: String, metaParam: Map<String, String>?): TokenPair = transaction {
@@ -66,7 +66,8 @@ class TokenService(private val cfg: JwtCfg) {
     val newPlain = Refresh.newPlainToken()
     val newHash = Refresh.hash(newPlain)
     val now = Instant.now()
-    val expires = now.plus(cfg.refresh_ttl_days.toLong(), ChronoUnit.DAYS)
+    val nowMillis = now.toEpochMilli()
+    val expires = now.plus(cfg.refreshTTL, ChronoUnit.MILLIS)
 
     RefreshSessions.insert {
       it[id] = UUID.randomUUID()
@@ -79,7 +80,13 @@ class TokenService(private val cfg: JwtCfg) {
     }
 
     val access = signAccess(session[RefreshSessions.userId])
-    TokenPair(access, cfg.access_ttl_sec, newPlain)
+
+    TokenPair(
+      access,
+      nowMillis + cfg.accessTTL,
+      newPlain,
+      nowMillis + cfg.refreshTTL
+    )
   }
 
   fun revoke(refreshPlain: String) = transaction {

@@ -17,7 +17,6 @@ import kz.aita.model.wrapper.TokenPair
 import kz.aita.server.db.Users
 import kz.aita.server.encrypt.Pw
 import kz.aita.server.jwt.TokenService
-import kz.aita.server.jwt.Unauthorized
 import kz.aita.server.util.getException
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.insert
@@ -96,24 +95,38 @@ fun Application.authRoutes(tokenService: TokenService) {
 
       post("/logIn") {
         val body = call.receive<UserAuthLogInDataModel>()
+
+        println("received1 $body")
         val login = body.login.trim().lowercase()
+        println("received2")
 
         val cond = (Users.phoneNumber eq login) or (Users.email eq login)
+        println("received3")
 
-        val badCredentialsMessage = getException(4) ?: "Login or password incorrect"
+        val badCredentialsMessage = getException(4)?.message ?: "Login or password incorrect"
+
+        println("received4")
 
         val user = transaction {
           Users.selectAll().where { cond }.singleOrNull()
         } ?: return@post call.respond(HttpStatusCode.Unauthorized, badCredentialsMessage)
 
+        println("received5")
+
         // Verify password hash
         val ok = Pw.verify(body.password.toCharArray(), user[Users.passwordHash])
 
-        if (!ok) {
+        println("received6")
+
+        if (!ok)
           return@post call.respond(HttpStatusCode.Unauthorized, badCredentialsMessage)
-        }
+
+
+        println("received7")
 
         val tokenPair: TokenPair = tokenService.newPair(user[Users.id], metaFrom(call))
+
+        println("received8 $tokenPair")
 
         call.respond(tokenPair)
       }
@@ -127,10 +140,10 @@ fun Application.authRoutes(tokenService: TokenService) {
       post("/refresh") {
         val body = call.receive<TokenPair>()
         try {
-          val pair = tokenService.rotate(body.refreshToken, metaFrom(call))
-          call.respond(pair)
-        } catch (e: Unauthorized) {
-          call.respond(HttpStatusCode.Unauthorized, mapOf("error" to e.message))
+          call.respond(tokenService.rotate(body.refreshToken, metaFrom(call)))
+        } catch (throwable: Throwable) {
+          call.respond(HttpStatusCode.Unauthorized,getException(5) ?: "Please log in first")
+          throwable.printStackTrace()
         }
       }
     }

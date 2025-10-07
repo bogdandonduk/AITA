@@ -7,7 +7,6 @@ data class StoreWorkerDataModel(
   val privilegeModeId: Int,
   val isActive: Boolean,
   val storeId: String,
-  val storeSubId: String,
   val salary: String,
   val salaryCurrency: String,
   val addedAt: Long

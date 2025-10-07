@@ -14,6 +14,10 @@ application {
 }
 
 dependencies {
+    implementation(libs.hikaricp)
+
+    implementation("io.ktor:ktor-server-auth:${property("ktor.version")}")
+    implementation("io.ktor:ktor-server-auth-jwt:${property("ktor.version")}")
 
     implementation("io.ktor:ktor-server-default-headers:${property("ktor.version")}")
     implementation("io.ktor:ktor-server-caching-headers:${property("ktor.version")}")

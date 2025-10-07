@@ -15,6 +15,7 @@ fun AppConfiguration.emailTextField(
 
   return genericTextField(
     modifier = modifier,
+    valueInitial = "norbuchin@gmail.com",
     titleText = stateValues.stringEmail,
     placeholderText = stateValues.stringEnterEmailAddress,
     leadingIconPath = stateValues.drawablePathIconEmail,

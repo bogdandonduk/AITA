@@ -119,21 +119,30 @@ fun AppConfiguration.UserAuthSignUpScreen(
         errorText(
           stateValues.stringUserWithThisPhoneNumberIsAlreadyRegistered,
           showIf = {
-            (stateValues.userAccountState as? DataState.Failure)?.exception?.message?.equals(stateValues.exceptionMessageUserWithThisPhoneNumberIsAlreadyRegistered, true) == true
+            (stateValues.userAccountState as? DataState.Failure)?.exception?.message?.equals(
+              stateValues.exceptionMessageUserWithThisPhoneNumberIsAlreadyRegistered,
+              true
+            ) == true
           }
         )
 
         errorText(
           stateValues.stringUserWithThisEmailAddressIsAlreadyRegistered,
           showIf = {
-            (stateValues.userAccountState as? DataState.Failure)?.exception?.message?.equals(stateValues.exceptionMessageUserWithThisEmailAddressIsAlreadyRegistered, true) == true
+            (stateValues.userAccountState as? DataState.Failure)?.exception?.message?.equals(
+              stateValues.exceptionMessageUserWithThisEmailAddressIsAlreadyRegistered,
+              true
+            ) == true
           }
         )
 
         errorText(
           stateValues.stringUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered,
           showIf = {
-            (stateValues.userAccountState as? DataState.Failure)?.exception?.message?.equals(stateValues.exceptionMessageUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered, true) == true
+            (stateValues.userAccountState as? DataState.Failure)?.exception?.message?.equals(
+              stateValues.exceptionMessageUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered,
+              true
+            ) == true
           }
         )
 
@@ -158,19 +167,18 @@ fun AppConfiguration.UserAuthSignUpScreen(
             && passwordTextFieldContent.isContentValid
             && repeatedPasswordTextFieldContent.isContentValid
           )
-            coroutineScope.launch(Dispatchers.io) {
-              userRepository
-                .signUp(
-                  UserAuthSignUpDataModel(
-                    phoneNumber = phoneNumberTextFieldContent.value.text.trim(),
-                    email = emailTextFieldContent.value.text.trim(),
-                    firstName = firstNameTextFieldContent.value.text.trim(),
-                    lastName = lastNameTextFieldContent.value.text.trim(),
-                    countryLocale = phoneNumberTextFieldContent.selectedCountryLocale,
-                    password = passwordTextFieldContent.value.text
-                  )
+            userRepository
+              .signUp(
+                UserAuthSignUpDataModel(
+                  phoneNumber = phoneNumberTextFieldContent.value.text.trim(),
+                  email = emailTextFieldContent.value.text.trim(),
+                  firstName = firstNameTextFieldContent.value.text.trim(),
+                  lastName = lastNameTextFieldContent.value.text.trim(),
+                  countryLocale = phoneNumberTextFieldContent.selectedCountryLocale,
+                  password = passwordTextFieldContent.value.text
                 )
-            }
+              )
+
         }
 
         if (stateValues.isNarrowScreen) {

@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class DebtorDataModel(
-  val id: Long,
+  val id: String,
   val email: String,
   val debtAmount: Double,
   val currency: String,

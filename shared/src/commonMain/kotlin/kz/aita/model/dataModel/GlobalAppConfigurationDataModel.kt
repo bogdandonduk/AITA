@@ -10,6 +10,8 @@ data class GlobalAppConfigurationDataModel(
   val exceptionConfigurationPath: String,
   val logInPath: String,
   val signUpPath: String,
+  val refreshPath: String,
+  val userAccountPath: String,
   val stringResourcesPath: String,
   val dimensionResourcesPath: String,
   val colorResourcesPath: String,

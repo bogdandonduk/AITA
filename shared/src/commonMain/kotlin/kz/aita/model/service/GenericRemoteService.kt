@@ -13,13 +13,16 @@ import io.ktor.http.contentLength
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.sync.Mutex
+import kz.aita.core.configurationRepository
+import kz.aita.model.repository.ConfigurationRepository
+import kz.aita.model.repository.impl.ConfigurationRepositoryImpl
 
 class GenericRemoteService(
   val httpClient: HttpClient
 ) {
   suspend inline fun <reified Response, reified Body> request(
     method: HttpMethod,
-    serverUrl: String,
+    serverUrl: String = configurationRepository.globalAppConfigurationState.payloadValue.serverUrl,
     endpointUrl: String,
     query: Map<String, Any?> = emptyMap(),
     headers: Map<String, String> = emptyMap(),
@@ -54,7 +57,7 @@ class GenericRemoteService(
               onFailure(Exception(bodyAsText()))
               null
             } else {
-
+              println("body is ${bodyAsText()}")
               body<Response>()
             }
           } else {

@@ -1,9 +1,9 @@
 package kz.aita.model.repository.impl
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kz.aita.core.io
 import kz.aita.model.dataModel.GoodsItemDataModel
-import kz.aita.model.dataModel.LocalizedStringDataModel
-import kz.aita.model.dataModel.QuantityDataModel
 import kz.aita.model.repository.ConfigurationRepository
 import kz.aita.model.repository.Repository
 import kz.aita.model.repository.StockRepository
@@ -27,12 +27,12 @@ class StockRepositoryImpl(
     getStock()
   }
   override fun getStock() {
-    launch {
+    launch(Dispatchers.io) {
       _stockState.emit(
         DataState.Success(
           listOf(
             GoodsItemDataModel(
-              0,
+              "0",
               "792649190623",
               "Yoghurt кокосовый",
               quantity = configurationRepository
@@ -42,15 +42,15 @@ class StockRepositoryImpl(
                 .find {
                   it.matchesName("pc.")
                 }!!.copy(total = 19.0),
-              categoryName = "Category",
-              supplierName = "Supplier",
+              categoryId = "0",
+              supplierId = "0",
               salePrice = 500.0,
               supplyPrice = 300.0,
               saleCurrency = "₸",
               supplyCurrency = "₸"
             ),
             GoodsItemDataModel(
-              1,
+              "1",
               "5411188081852",
               "Alpro молоко соевое ванильное",
               quantity = configurationRepository
@@ -60,8 +60,8 @@ class StockRepositoryImpl(
                 .find {
                   it.matchesName("pc.")
                 }!!.copy(total = 43.0),
-              categoryName = "Category",
-              supplierName = "Supplier",
+              categoryId = "0",
+              supplierId = "0",
               salePrice = 1800.0,
               supplyPrice = 1200.0,
               saleCurrency = "₸",
@@ -76,7 +76,7 @@ class StockRepositoryImpl(
   override fun addGoodsItem(
     goodsItem: GoodsItemDataModel
   ) {
-    launch {
+    launch(Dispatchers.io) {
       _stockState.emit(
         DataState.Success(
           stockState.payloadValue?.let { payload ->
@@ -90,8 +90,8 @@ class StockRepositoryImpl(
     }
   }
 
-  override fun deleteGoodsItem(id: Long) {
-    launch {
+  override fun deleteGoodsItem(id: String) {
+    launch(Dispatchers.io) {
       _stockState.payloadValue?.let { payload ->
         payload.indexOfFirst { it.id == id }
           .takeIf { it != -1 }

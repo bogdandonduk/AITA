@@ -1,54 +1,65 @@
 package kz.aita.server.jwt
 
-
+import io.ktor.server.application.*
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
-import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
-import io.ktor.server.auth.authentication
+import io.ktor.server.auth.Authentication
+import io.ktor.server.auth.UnauthorizedResponse
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.jwt.jwt
 import io.ktor.server.response.respond
+import kz.aita.server.util.getException
 
 @kotlinx.serialization.Serializable
-data class JwtCfg(
+data class JwtConfig(
   val issuer: String,
   val audience: String,
   val realm: String,
   val secret: String,
-  val access_ttl_sec: Long,
-  val refresh_ttl_days: Int
+  val accessTTL: Long,
+  val refreshTTL: Long
 )
 
-fun Application.jwtCfg(): JwtCfg {
+fun Application.jwtConfig(): JwtConfig {
   val c = environment.config.config("ktor.security.jwt")
-  return JwtCfg(
+  return JwtConfig(
     issuer = c.property("issuer").getString(),
     audience = c.property("audience").getString(),
     realm = c.property("realm").getString(),
     secret = c.property("secret").getString(),
-    access_ttl_sec = c.property("access_ttl_sec").getString().toLong(),
-    refresh_ttl_days = c.property("refresh_ttl_days").getString().toInt()
+    accessTTL = c.property("accessTTL").getString().toLong(),
+    refreshTTL = c.property("refreshTTL").getString().toLong()
   )
 }
 
 fun Application.configureJwtAuth() {
-  val cfg = jwtCfg()
-  authentication {
+  val cfg = jwtConfig()
+
+  install(Authentication) {
     jwt("auth-jwt") {                                 // Named auth provider
       realm = cfg.realm
+
       verifier(                                       // Defines how to verify incoming JWTs
         JWT.require(Algorithm.HMAC256(cfg.secret))    // HS256 with our secret
           .withIssuer(cfg.issuer)                     // Must match issuer
           .withAudience(cfg.audience)                 // Must match audience
           .build()
       )
+
       validate { cred ->                              // If validation passes, build a Principal
-        val uid = cred.payload.subject                // "sub" claim → user id
-        if (uid.isNullOrBlank()) null else JWTPrincipal(cred.payload)
+        // Basic checks
+        if (
+          cred.payload.issuer != cfg.issuer
+          || !cred.payload.audience.contains(cfg.audience)
+          || cred.subject == null
+        ) return@validate null
+
+        JWTPrincipal(cred.payload)
       }
-      challenge { _, _ ->                             // What to reply on 401
-        call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "unauthorized"))
+
+      challenge { _, _ ->
+        call.respond(UnauthorizedResponse())
       }
     }
   }

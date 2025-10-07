@@ -4,6 +4,10 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class GoodsItemCategoryDataModel(
-  val id: Long,
-  val name: String
+  val id: String,
+  val name: String,
+  val imageUrl: String,
+  val quantityUnit: QuantityDataModel,
+  val universal: Boolean,
+  val storeId: String
 )

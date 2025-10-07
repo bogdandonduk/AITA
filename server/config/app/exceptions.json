@@ -18,5 +18,9 @@
   {
     "id": 4,
     "message": "Login or password incorrect"
+  },
+  {
+    "id": 5,
+    "message": "Please log in first"
   }
 ]

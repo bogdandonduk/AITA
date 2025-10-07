@@ -11,8 +11,8 @@ ktor:
       audience: ${?AITA_JWT_AUDIENCE}
       realm: "AITA API"
       secret: ${?AITA_JWT_SECRET}
-      access_ttl_sec: 600
-      refresh_ttl_days: 30
+      accessTTL: 600000
+      refreshTTL: 864000000
 
 db:
   url: ${?AITA_DB_URL}

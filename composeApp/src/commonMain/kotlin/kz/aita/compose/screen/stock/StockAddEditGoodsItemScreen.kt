@@ -29,12 +29,14 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
       modifier = Modifier
         .fillMaxWidth()
         .weight(1f)
-        .padding(horizontal = 8.dp, vertical = 16.dp)
+        .padding(start = 8.dp, top = 24.dp, end = 8.dp)
     ) {
       item {
         val barcodeTextFieldContent =
           genericTextField(
-            titleText = stateValues.stringBarcode
+            titleText = stateValues.stringBarcode,
+            placeholderText = stateValues.stringEnterBarcode,
+            isFocusedInitial = true
           )
 
         Spacer(
@@ -45,11 +47,52 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
         val nameTextFieldContent =
           genericTextField(
             titleText = stateValues.stringName,
+            placeholderText = stateValues.stringEnterName,
+          )
+
+        Spacer(
+          modifier = Modifier
+            .height(32.dp)
+        )
+
+        val supplyPriceTextFieldContent =
+          genericTextField(
+            titleText = stateValues.stringSupplyPriceState,
+            placeholderText = stateValues.stringEnterSupplyPriceState,
           )
 
         Spacer(
           modifier = Modifier
             .height(8.dp)
+        )
+
+        val salePriceTextFieldContent =
+          genericTextField(
+            titleText = stateValues.stringSalePriceState,
+            placeholderText = stateValues.stringEnterSalePriceState,
+          )
+
+        Spacer(
+          modifier = Modifier
+            .height(8.dp)
+        )
+
+        val returnPriceTextFieldContent =
+          genericTextField(
+            titleText = stateValues.stringReturnPriceState,
+            placeholderText = stateValues.stringEnterReturnPriceState,
+          )
+
+        Spacer(
+          modifier = Modifier
+            .height(8.dp)
+        )
+      }
+
+      item {
+        Spacer(
+          modifier = Modifier
+            .height(200.dp)
         )
       }
     }
