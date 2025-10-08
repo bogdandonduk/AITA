@@ -80,7 +80,7 @@ sealed class NavigationScreenModel(
 
     data object List: Menu("MenuListNavigationScreenModelRoute")
 
-    data object UserAccount: Menu("MenuMapNavigationScreenModelRoute") {
+    data object UserAccount: Menu("MenuUserAccountNavigationScreenModelRoute") {
       override val iconPath: String
         get() = AppConfiguration.stateValues.drawablePathIconUserAccount
       override val name: String

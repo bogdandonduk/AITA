@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
@@ -43,8 +44,8 @@ fun AppConfiguration.ScreenAppBarWidget(
   iconPath: String? = null,
   textColor: Color = stateValues.TextColor,
   cornerRadius: Dp = stateValues.cornerRadius,
-  onBack: (() -> Unit)? = null,
-  vararg trailingIcons: Pair<String, () -> Unit>
+  trailingIcons: List<Pair<String, () -> Unit>> = emptyList(),
+  onBack: (() -> Unit)? = null
 ) {
   Column(
     modifier = Modifier
@@ -141,12 +142,18 @@ fun AppConfiguration.ScreenAppBarWidget(
         )
       }
 
-      trailingIcons.forEach {
-        actionButton(
-          text = "",
-          iconPath = it.first,
-          onClick = it.second
-        )
+      trailingIcons.takeIf { it.isNotEmpty() }?.run {
+        forEach {
+          Spacer(modifier = Modifier.width(8.dp))
+
+          actionButton(
+            text = "",
+            iconPath = it.first,
+            onClick = it.second
+          )
+        }
+
+        Spacer(modifier = Modifier.width(16.dp))
       }
     }
 

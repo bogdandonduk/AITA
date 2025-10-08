@@ -58,7 +58,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
         val supplyPriceTextFieldContent =
           genericTextField(
             titleText = stateValues.stringSupplyPriceState,
-            placeholderText = stateValues.stringEnterSupplyPriceState,
+            placeholderText = stateValues.stringEnterSupplyPrice,
           )
 
         Spacer(
@@ -69,7 +69,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
         val salePriceTextFieldContent =
           genericTextField(
             titleText = stateValues.stringSalePriceState,
-            placeholderText = stateValues.stringEnterSalePriceState,
+            placeholderText = stateValues.stringEnterSalePrice,
           )
 
         Spacer(
@@ -80,7 +80,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
         val returnPriceTextFieldContent =
           genericTextField(
             titleText = stateValues.stringReturnPriceState,
-            placeholderText = stateValues.stringEnterReturnPriceState,
+            placeholderText = stateValues.stringEnterReturnPrice,
           )
 
         Spacer(

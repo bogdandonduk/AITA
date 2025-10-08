@@ -20,6 +20,7 @@ import kz.aita.server.jwt.configureJwtAuth
 import kz.aita.server.jwt.jwtConfig
 import kz.aita.server.route.authRoutes
 import kz.aita.server.route.filesRoutes
+import kz.aita.server.route.storesRoute
 import kz.aita.server.route.userAccountRoute
 import org.flywaydb.core.Flyway
 import org.jetbrains.exposed.sql.Database
@@ -91,4 +92,5 @@ fun Application.module() {
   filesRoutes()
   authRoutes(TokenService(jwtConfig()))
   userAccountRoute()
+  storesRoute()
 }

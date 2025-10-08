@@ -64,7 +64,9 @@ class TokenService(private val cfg: JwtConfig) {
 
     val cond = RefreshSessions.tokenHash eq hash and RefreshSessions.revokedAt.isNull()
 
-    val oldSession = RefreshSessions.selectAll().where { cond }.forUpdate().singleOrNull() ?: throw IllegalAccessException("No legitimate previous refresh token")
+    val oldSession = transaction {
+      RefreshSessions.selectAll().where { cond }.forUpdate().singleOrNull() ?: throw IllegalAccessException("No legitimate previous refresh token")
+    }
 
     val now = Instant.now()
 

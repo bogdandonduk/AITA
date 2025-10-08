@@ -107,13 +107,20 @@ class UserRepositoryImpl(
           HttpMethod.Get,
           endpointUrl = configurationRepository.globalAppConfigurationState.payloadValue.userAccountPath,
           onFailure = {
+            println("get account returned $it")
+            if (userAccountState.value.value !is DataState.Success)
+              _userAccountState.emit(DataState.Failure(it))
+
             getUserAccountMutex.unlock()
+
             it.printStackTrace()
           }
         )?.run {
           _userAccountState.emit(DataState.Success(this))
           userAccountDataStore?.set(this)
           getUserAccountMutex.unlock()
+
+          configurationRepository.getGlobalConfiguration()
         }
     }
   }

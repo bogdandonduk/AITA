@@ -3,7 +3,6 @@ package kz.aita.compose.screen.userAuth
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -24,14 +23,16 @@ import kz.aita.compose.navigation.Navigation
 import kz.aita.compose.navigation.NavigationScreenModel
 import kz.aita.compose.widget.GenericTextFieldContent
 import kz.aita.compose.widget.LargeIconWithTitleWidget
-import kz.aita.compose.widget.PhoneNumberWithCountrySelectionTextFieldContent
+import kz.aita.compose.widget.DomainSelectionTextFieldContent
+import kz.aita.compose.widget.SelectableDomain
 import kz.aita.compose.widget.TabContent
 import kz.aita.compose.widget.actionButton
+import kz.aita.compose.widget.countrySelectionTextField
 import kz.aita.compose.widget.emailTextField
 import kz.aita.compose.widget.passwordTextField
 import kz.aita.compose.widget.tabRowWidget
 import kz.aita.compose.widget.errorText
-import kz.aita.compose.widget.phoneNumberWithCountrySelectionTextField
+import kz.aita.compose.widget.domainSelectionTextField
 import kz.aita.core.userRepository
 import kz.aita.model.dataModel.UserAuthLogInDataModel
 import kz.aita.model.wrapper.DataState
@@ -88,9 +89,7 @@ fun AppConfiguration.UserAuthLogInScreen() {
 
         val loginTextFieldContent = when (loginMethodTabRowContent.index) {
           0 -> {
-            phoneNumberWithCountrySelectionTextField(
-              countries = stateValues.globalAppConfiguration.countries
-            )
+            countrySelectionTextField()
           }
 
           else -> {
@@ -126,7 +125,7 @@ fun AppConfiguration.UserAuthLogInScreen() {
         ) {
           passwordTextFieldContent.checkContentValidity()
 
-          val loginEmail = loginTextFieldContent !is PhoneNumberWithCountrySelectionTextFieldContent
+          val loginEmail = loginTextFieldContent !is DomainSelectionTextFieldContent
 
           if (loginEmail) {
             (loginTextFieldContent as GenericTextFieldContent).run {
@@ -150,7 +149,7 @@ fun AppConfiguration.UserAuthLogInScreen() {
                   .logIn(
                     UserAuthLogInDataModel(
                       login = stateValues.globalAppConfiguration.countries.run {
-                        find { it.locale.equals(loginTextFieldContent.selectedCountryLocale, true) } ?: first()
+                        find { it.locale.equals(loginTextFieldContent.selectedId, true) } ?: first()
                       }.phoneNumberCode + loginTextFieldContent.value.text.trim(),
                       password = passwordTextFieldContent.value.text
                     )

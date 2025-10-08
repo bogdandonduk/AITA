@@ -28,7 +28,7 @@ fun AppConfiguration.StockScreen() {
             StockAddEditGoodsItemScreen()
           }
 
-          else -> {}
+          else -> { }
         }
       }
     } else {
@@ -49,7 +49,7 @@ fun AppConfiguration.StockScreen() {
               StockAddEditGoodsItemScreen()
             }
 
-            else -> {}
+            else -> { }
           }
         }
 
@@ -66,7 +66,7 @@ fun AppConfiguration.StockScreen() {
               StockAddEditGoodsItemScreen()
             }
 
-            else -> {}
+            else -> { }
           }
         }
       }

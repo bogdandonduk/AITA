@@ -26,33 +26,41 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kz.aita.AppConfiguration
-import kz.aita.compose.util.checkAsPhoneNumber
-import kz.aita.compose.util.filterAsPhoneNumber
-import kz.aita.compose.util.isNumericalString
 import kz.aita.compose.wrapper.ImeWithAction
-import kz.aita.model.dataModel.CountryDataModel
+import kz.aita.model.dataModel.LocalizedStringDataModel
 
 @Composable
-fun AppConfiguration.phoneNumberWithCountrySelectionTextField(
+fun AppConfiguration.domainSelectionTextField(
   modifier: Modifier = Modifier,
-  countries: List<CountryDataModel>,
-  countrySelectionEnabled: Boolean = true,
+  titleText: String,
+  placeholderText: String,
+  domains: List<SelectableDomain>,
+  selectedInitial: String = domains.first().id,
+  selectionEnabled: Boolean = true,
   imeWithAction: ImeWithAction? = null,
   cornerRadius: Dp = stateValues.cornerRadius,
-): PhoneNumberWithCountrySelectionTextFieldContent {
-  var selectedCountryLocale by rememberSaveable {
-    mutableStateOf(countries.first().locale)
+  onContentValidityCheck: ((String, String) -> Boolean)? = null,
+  onFilterValue: ((String, String) -> Boolean)? = null,
+  onValueChange: ((String, () -> Unit) -> Unit)? = null
+): DomainSelectionTextFieldContent {
+
+  var selectedId by rememberSaveable {
+    mutableStateOf(selectedInitial)
   }
 
-  var selectedCountry by remember {
-    mutableStateOf(countries.find { it.locale.equals(selectedCountryLocale, true) } ?: countries.first())
+  var selected by remember {
+    mutableStateOf(domains.find { it.id.equals(selectedId, true) } ?: domains.first())
   }
 
-  LaunchedEffect(selectedCountryLocale) {
-    selectedCountry = countries.find { it.locale.equals(selectedCountryLocale, true) } ?: countries.first()
+  LaunchedEffect(selectedId) {
+    selected = domains.find { it.id.equals(selectedId, true) } ?: domains.first()
   }
 
-  val isCountrySelectionDropdownExpandedState = remember {
+  LaunchedEffect(selectedInitial) {
+    selectedId = selectedInitial
+  }
+
+  val isDomainSelectionDropdownExpandedState = remember {
     MutableTransitionState(false)
       .apply {
         targetState = false
@@ -64,15 +72,15 @@ fun AppConfiguration.phoneNumberWithCountrySelectionTextField(
   Column {
     genericTextFieldContent = genericTextField(
       modifier = modifier,
-      titleText = stateValues.stringPhoneNumber,
-      placeholderText = stateValues.stringEnterPhoneNumber,
+      titleText = titleText,
+      placeholderText = placeholderText,
       leadingIcon = {
-        countryPhoneCodeWithFlagWidget(
-          country = selectedCountry,
-          onClick = countrySelectionEnabled.takeIf { it }?.run {
+        selectableDomainWidget(
+          domain = selected,
+          onClick = selectionEnabled.takeIf { it }?.run {
             {
-              isCountrySelectionDropdownExpandedState.targetState =
-                !isCountrySelectionDropdownExpandedState.targetState
+              isDomainSelectionDropdownExpandedState.targetState =
+                !isDomainSelectionDropdownExpandedState.targetState
             }
           }
         )
@@ -80,20 +88,28 @@ fun AppConfiguration.phoneNumberWithCountrySelectionTextField(
       keyboardType = KeyboardType.Phone,
       imeWithAction = imeWithAction ?: ImeWithAction.Default,
       contentInvalidText = stateValues.stringPhoneNumberMustBe,
-      onContentValidityCheck = { it: String ->
-        it.checkAsPhoneNumber(selectedCountry)
+      onContentValidityCheck = onContentValidityCheck?.run {
+        {
+          invoke(it, selectedId)
+        }
       },
-      onFilterValue = {
-        it.filterAsPhoneNumber(selectedCountry)
-      }
+      onFilterValue = onFilterValue?.run {
+        {
+
+          invoke(it, selectedId).apply {
+            println("running right!!! $this")
+          }
+        }
+      },
+      onValueChange = onValueChange
     )
 
-    if (countrySelectionEnabled) {
+    if (selectionEnabled) {
       Spacer(modifier = Modifier.height(1.dp))
 
       AnimatedVisibility(
         modifier = modifier,
-        visibleState = isCountrySelectionDropdownExpandedState,
+        visibleState = isDomainSelectionDropdownExpandedState,
         enter = expandVertically(),
         exit = shrinkVertically()
       ) {
@@ -101,24 +117,24 @@ fun AppConfiguration.phoneNumberWithCountrySelectionTextField(
           modifier = Modifier
             .clip(RoundedCornerShape(cornerRadius))
             .fillMaxWidth()
-            .height((countries.size * stateValues.textFieldHeight.value).dp)
+            .height((domains.size * stateValues.textFieldHeight.value).dp)
             .border(
               width = stateValues.focusedBorderWidth,
               color = stateValues.AccentColor,
               shape = RoundedCornerShape(cornerRadius)
             )
         ) {
-          itemsIndexed(countries) { index, country ->
-            countryPhoneCodeWithFlagWidget(
+          itemsIndexed(domains) { index, country ->
+            selectableDomainWidget(
               modifier = Modifier
                 .fillParentMaxWidth(),
-              country = country,
-              showCountryName = true
+              domain = country,
+              showName = true
             ) {
-              selectedCountryLocale = countries[index].locale
+              selectedId = domains[index].id
 
-              isCountrySelectionDropdownExpandedState.targetState =
-                !isCountrySelectionDropdownExpandedState.targetState
+              isDomainSelectionDropdownExpandedState.targetState =
+                !isDomainSelectionDropdownExpandedState.targetState
             }
           }
         }
@@ -127,18 +143,18 @@ fun AppConfiguration.phoneNumberWithCountrySelectionTextField(
 
   }
 
-  return PhoneNumberWithCountrySelectionTextFieldContent(
+  return DomainSelectionTextFieldContent(
     value = genericTextFieldContent!!.value,
     isFocused = genericTextFieldContent.isFocused,
-    selectedCountryLocale = selectedCountryLocale,
+    selectedId = selectedId,
     isContentValid = genericTextFieldContent.isContentValid,
     onContentValidityCheck = genericTextFieldContent.onContentValidityCheck
   )
 }
 
-class PhoneNumberWithCountrySelectionTextFieldContent(
+class DomainSelectionTextFieldContent(
   var value: TextFieldValue,
-  var selectedCountryLocale: String,
+  var selectedId: String,
   var isFocused: Boolean,
   var isContentValid: Boolean,
   val onContentValidityCheck: ((String) -> Boolean)? = null

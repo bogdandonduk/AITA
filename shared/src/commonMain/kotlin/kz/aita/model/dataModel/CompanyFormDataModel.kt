@@ -5,6 +5,6 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class CompanyFormDataModel(
   val id: Long,
-  val name: String,
+  val name: List<LocalizedStringDataModel>,
   val parameters: List<Pair<String, String>>
 )

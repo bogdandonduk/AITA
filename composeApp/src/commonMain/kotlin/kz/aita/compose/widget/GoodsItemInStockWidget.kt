@@ -114,13 +114,13 @@ fun AppConfiguration.GoodsItemInStockWidget(
       )
 
       Text(
-        text = goodsItem.categoryId,
+        text = "Category",
         fontSize = stateValues.textSize,
         color = textColor
       )
 
       Text(
-        text = goodsItem.supplierId,
+        text = "Supplier",
         fontSize = stateValues.textSize,
         color = textColor
       )
@@ -131,15 +131,15 @@ fun AppConfiguration.GoodsItemInStockWidget(
       )
 
       Text(
-        text = "${stateValues.stringSale}: ${goodsItem.salePrice} ${goodsItem.saleCurrency}",
+        text = "${stateValues.stringSale}: ${goodsItem.salePricesToSupplierIds} ${goodsItem.saleCurrencyToSupplierIds}",
         fontSize = stateValues.accentTextSize,
         fontWeight = FontWeight.Bold,
         color = textColor
       )
 
-      if (goodsItem.returnPrice != goodsItem.salePrice) {
+      if (goodsItem.returnPricesToSupplierIds != goodsItem.salePricesToSupplierIds) {
         Text(
-          text = "${stateValues.stringReturn}: ${goodsItem.returnPrice} ${goodsItem.returnCurrency}",
+          text = "${stateValues.stringReturn}: ${goodsItem.returnPricesToSupplierIds} ${goodsItem.returnCurrencyToSupplierIds}",
           fontSize = stateValues.accentTextSize,
           fontWeight = FontWeight.Bold,
           color = textColor
@@ -147,7 +147,7 @@ fun AppConfiguration.GoodsItemInStockWidget(
       }
 
       Text(
-        text = "${stateValues.stringSupply}: ${goodsItem.supplyPrice} ${goodsItem.saleCurrency}",
+        text = "${stateValues.stringSupply}: ${goodsItem.supplyPricesToSupplierIds} ${goodsItem.saleCurrencyToSupplierIds}",
         fontSize = stateValues.accentTextSize,
         fontWeight = FontWeight.Bold,
         color = textColor
@@ -188,8 +188,8 @@ fun AppConfiguration.GoodsItemInStockWidget(
 
       actionButton(
         text = "",
-        iconPath = stateValues.drawablePathIconCreate,
-        iconContentDescription = stateValues.drawablePathIconCreate,
+        iconPath = stateValues.drawablePathIconEdit,
+        iconContentDescription = stateValues.drawablePathIconEdit,
       ) {
         onEdit(goodsItem)
       }

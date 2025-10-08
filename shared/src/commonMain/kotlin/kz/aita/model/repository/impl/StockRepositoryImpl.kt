@@ -1,9 +1,12 @@
 package kz.aita.model.repository.impl
 
+import io.ktor.http.HttpMethod
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import kz.aita.core.io
 import kz.aita.model.dataModel.GoodsItemDataModel
+import kz.aita.model.dataModel.StoreDataModel
 import kz.aita.model.repository.ConfigurationRepository
 import kz.aita.model.repository.Repository
 import kz.aita.model.repository.StockRepository
@@ -14,62 +17,37 @@ import kz.aita.model.wrapper.MutableDataStateFlow
 
 class StockRepositoryImpl(
   private val genericRemoteService: GenericRemoteService,
-  private val genericLocalService: GenericLocalService,
   private val configurationRepository: ConfigurationRepository
 ): Repository(), StockRepository {
 
-  private val _stockState = MutableDataStateFlow<List<GoodsItemDataModel>>(
-    this
-  )
+  private val _stockState = MutableDataStateFlow<List<GoodsItemDataModel>>(this)
   override val stockState = _stockState.asDataStateFlow()
+
+  private val getStockMutex = Mutex()
 
   init {
     getStock()
   }
   override fun getStock() {
     launch(Dispatchers.io) {
-      _stockState.emit(
-        DataState.Success(
-          listOf(
-            GoodsItemDataModel(
-              "0",
-              "792649190623",
-              "Yoghurt кокосовый",
-              quantity = configurationRepository
-                .globalAppConfigurationState
-                .payloadValue
-                .goodsItemsQuantityUnits
-                .find {
-                  it.matchesName("pc.")
-                }!!.copy(total = 19.0),
-              categoryId = "0",
-              supplierId = "0",
-              salePrice = 500.0,
-              supplyPrice = 300.0,
-              saleCurrency = "₸",
-              supplyCurrency = "₸"
-            ),
-            GoodsItemDataModel(
-              "1",
-              "5411188081852",
-              "Alpro молоко соевое ванильное",
-              quantity = configurationRepository
-                .globalAppConfigurationState
-                .payloadValue
-                .goodsItemsQuantityUnits
-                .find {
-                  it.matchesName("pc.")
-                }!!.copy(total = 43.0),
-              categoryId = "0",
-              supplierId = "0",
-              salePrice = 1800.0,
-              supplyPrice = 1200.0,
-              saleCurrency = "₸",
-              supplyCurrency = "₸"
-            )
-          )
-        )
-      )
+      if (!getStockMutex.tryLock())
+        return@launch
+
+      _stockState.emit(DataState.Progress())
+
+      genericRemoteService
+        .request<List<GoodsItemDataModel>, Unit>(
+          HttpMethod.Get,
+          endpointUrl = configurationRepository.globalAppConfigurationState.payloadValue.storesPath,
+          onFailure = {
+            _stockState.emit(DataState.Failure(it))
+            getStockMutex.unlock()
+            it.printStackTrace()
+          }
+        )?.run {
+          _stockState.emit(DataState.Success(this))
+          getStockMutex.unlock()
+        }
     }
   }
 

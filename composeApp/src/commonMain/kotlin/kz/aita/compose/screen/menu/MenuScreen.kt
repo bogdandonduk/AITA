@@ -93,7 +93,7 @@ fun AppConfiguration.MenuScreen() {
       ) {
         AnimatedContent(
           modifier = Modifier
-            .weight(1f),
+            .weight(0.2f),
           targetState = stateValues.navigationScreensMenuLeft.last()
         ) { model ->
           when (model) {

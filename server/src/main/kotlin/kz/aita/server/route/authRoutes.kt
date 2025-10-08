@@ -2,6 +2,7 @@ package kz.aita.server.route
 
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
+import io.ktor.server.auth.UnauthorizedResponse
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.principal
@@ -98,7 +99,6 @@ fun Application.authRoutes(tokenService: TokenService) {
 
         println("received1 $body")
         val login = body.login.trim().lowercase()
-        println("received2")
 
         val cond = (Users.phoneNumber eq login) or (Users.email eq login)
         println("received3")
@@ -142,11 +142,16 @@ fun Application.authRoutes(tokenService: TokenService) {
       }
 
       post("/refresh") {
-        val body = call.receive<TokenPair>()
+        println("refresh is called")
+        val body = call.receive<String>()
+        println("refresh is called2 $body")
         try {
-          call.respond(HttpStatusCode.OK, tokenService.rotate(body.refreshToken, metaFrom(call)))
+          val newTokens = tokenService.rotate(body, metaFrom(call))
+          call.respond(HttpStatusCode.OK, newTokens)
+          println("refresh is called3 $newTokens")
         } catch (throwable: Throwable) {
-          call.respond(HttpStatusCode.Unauthorized,getException(5) ?: "Please log in first")
+          println("refresh is called4 $throwable")
+          call.respond(UnauthorizedResponse())
           throwable.printStackTrace()
         }
       }

@@ -29,16 +29,17 @@ import io.ktor.http.Url
 import kz.aita.AppConfiguration
 import kz.aita.compose.render.kamelConfig
 import kz.aita.core.getFullDrawableResourceUrl
-import kz.aita.model.dataModel.CountryDataModel
+import kz.aita.model.dataModel.LocalizedStringDataModel
 
 @Composable
-fun AppConfiguration.countryPhoneCodeWithFlagWidget(
+fun AppConfiguration.selectableDomainWidget(
   modifier: Modifier = Modifier,
-  country: CountryDataModel,
-  showCountryName: Boolean = false,
+  domain: SelectableDomain,
+  showName: Boolean = false,
   textColor: Color = stateValues.TextColor,
   onClick: (() -> Unit)? = null
-  ): CountryPhoneCodeWithFlagWidgetContent {
+): SelectableDomainWidgetContent {
+
   var expanded by rememberSaveable {
     mutableStateOf(false)
   }
@@ -79,7 +80,7 @@ fun AppConfiguration.countryPhoneCodeWithFlagWidget(
             data = Url(getFullDrawableResourceUrl(if (expanded) stateValues.drawablePathIconExpandLess else stateValues.drawablePathIconExpandMore))
           )
         },
-        contentDescription = country.name.find { it.language == stateValues.appLocaleLanguage }?.value ?: country.locale
+        contentDescription = domain.name.find { it.language == stateValues.appLocaleLanguage }?.value ?: domain.id
       )
 
       KamelImage(
@@ -89,33 +90,39 @@ fun AppConfiguration.countryPhoneCodeWithFlagWidget(
           .aspectRatio(1f, matchHeightConstraintsFirst = true),
         resource = {
           asyncPainterResource(
-            data = Url(getFullDrawableResourceUrl(country.flagDrawablePath))
+            data = Url(getFullDrawableResourceUrl(domain.iconPath))
           )
         },
-        contentDescription = country.name.find { it.language == stateValues.appLocaleLanguage }?.value ?: country.locale
+        contentDescription = domain.name.find { it.language == stateValues.appLocaleLanguage }?.value ?: domain.id
       )
     }
 
     Text(
-      text = "+${country.phoneNumberCode}",
+      text = domain.id,
       color = textColor,
       modifier = Modifier
         .padding(8.dp)
     )
 
-    if (showCountryName) {
+    if (showName) {
       Spacer(modifier = Modifier.width(8.dp))
 
       Text(
-        text = country.name.find { it.language == stateValues.appLocaleLanguage }?.value ?: "",
+        text = domain.name.find { it.language == stateValues.appLocaleLanguage }?.value ?: "",
         color = textColor
       )
     }
   }
 
-  return CountryPhoneCodeWithFlagWidgetContent(expanded)
+  return SelectableDomainWidgetContent(expanded)
 }
 
-data class CountryPhoneCodeWithFlagWidgetContent(
+data class SelectableDomainWidgetContent(
   var expanded: Boolean
+)
+
+class SelectableDomain(
+  val id: String,
+  val name: List<LocalizedStringDataModel>,
+  val iconPath: String
 )

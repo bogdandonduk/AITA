@@ -1392,5 +1392,22 @@
         "value": "Жеткізушіні таңдаңыз"
       }
     ]
+  },
+  {
+    "id": 82,
+    "values": [
+      {
+        "language": "en",
+        "value": "Edit"
+      },
+      {
+        "language": "ru",
+        "value": "Редактировать"
+      },
+      {
+        "language": "kk",
+        "value": "Өңдеу"
+      }
+    ]
   }
 ]

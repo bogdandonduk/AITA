@@ -13,6 +13,9 @@ data class GlobalAppConfigurationDataModel(
   val refreshPath: String,
   val logOutPath: String,
   val userAccountPath: String,
+  val storesPath: String,
+  val stockPath: String,
+  val suppliersPath: String,
   val stringResourcesPath: String,
   val dimensionResourcesPath: String,
   val colorResourcesPath: String,
@@ -21,6 +24,7 @@ data class GlobalAppConfigurationDataModel(
   val companyForms: List<CompanyFormDataModel>,
   val countries: List<CountryDataModel>,
   val languages: List<AppLanguageDataModel>,
+  val currencies: List<CurrencyDataModel>,
   val themes: List<AppThemeDataModel>,
   val goodsItemsQuantityUnits: List<QuantityDataModel>
 )

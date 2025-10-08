@@ -106,6 +106,8 @@ kotlin {
       implementation(libs.kotlin.test)
     }
     jvmMain.dependencies {
+      implementation("com.github.javakeyring:java-keyring:1.0.3")
+
       implementation(libs.kamel.decoder.svg.batik)
 
       implementation(libs.kamel.fetcher.resources.jvm)

@@ -2,6 +2,7 @@ package kz.aita.server.route
 
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
+import io.ktor.server.auth.UnauthorizedResponse
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.principal
@@ -19,15 +20,9 @@ fun Application.userAccountRoute() {
   routing {
     authenticate("auth-jwt") {
       get("/userAccount") {
-        val defaultMsg = "Please log in first"
-        println("fuckingReceived1")
 
-        val principal = call.principal<JWTPrincipal>() ?: return@get call.respond(HttpStatusCode.Unauthorized,getException(5) ?: defaultMsg)
-        println("fuckingReceived2")
-
-        val uuid = runCatching { UUID.fromString(principal.subject) }.getOrNull() ?: return@get call.respond(HttpStatusCode.Unauthorized,getException(5) ?: defaultMsg)
-
-        println("fuckingReceived3 ${principal.subject}")
+        val principal = call.principal<JWTPrincipal>() ?: return@get call.respond(UnauthorizedResponse())
+        val uuid = runCatching { UUID.fromString(principal.subject) }.getOrNull() ?: return@get call.respond(UnauthorizedResponse())
 
         val user = transaction {
           Users
@@ -37,12 +32,7 @@ fun Application.userAccountRoute() {
             }
             .limit(1)
             .singleOrNull()
-            .apply {
-              println("here we go2 $this")
-            }
-        } ?: return@get call.respond(HttpStatusCode.Unauthorized,getException(5) ?: defaultMsg)
-
-        println("fuckingReceived4 $user")
+        } ?: return@get call.respond(UnauthorizedResponse())
 
         call.respond(
           HttpStatusCode.OK,
@@ -59,8 +49,6 @@ fun Application.userAccountRoute() {
             isActive = user[Users.isActive]
           )
         )
-
-        println("fuckingReceived5 $user")
       }
     }
   }

@@ -7,20 +7,25 @@ import io.ktor.client.plugins.auth.providers.bearer
 import io.ktor.client.plugins.cache.HttpCache
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.http.HttpMethod
+import io.ktor.http.Url
 import io.ktor.http.encodedPath
 import io.ktor.serialization.kotlinx.json.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kz.aita.KeyValueDatabase
 import kz.aita.model.repository.ConfigurationRepository
 import kz.aita.model.repository.GoodsCategoryRepository
 import kz.aita.model.repository.StockRepository
+import kz.aita.model.repository.StoreRepository
 import kz.aita.model.repository.SupplierRepository
 import kz.aita.model.repository.UserRepository
 import kz.aita.model.repository.impl.ConfigurationRepositoryImpl
 import kz.aita.model.repository.impl.GoodsCategoryRepositoryImpl
 import kz.aita.model.repository.impl.StockRepositoryImpl
+import kz.aita.model.repository.impl.StoreRepositoryImpl
 import kz.aita.model.repository.impl.SupplierRepositoryImpl
 import kz.aita.model.repository.impl.UserRepositoryImpl
 import kz.aita.model.service.GenericLocalService
@@ -53,44 +58,51 @@ val httpClient by lazy {
     install(Auth) {
       bearer {
         sendWithoutRequest {
-          it.url.host.equals(configurationRepository.globalAppConfigurationState.payloadValue.serverUrl, true)
+          it.url.host.equals(Url(configurationRepository.globalAppConfigurationState.payloadValue.serverUrl).host, true)
               && !it.url.encodedPath.startsWith("/auth")
         }
 
         loadTokens {
-          tokenStore?.get()?.let { BearerTokens(it.accessToken, it.refreshToken) }
+          withContext(Dispatchers.io) {
+            tokenStore?.get()?.let { BearerTokens(it.accessToken, it.refreshToken) }
+          }
         }
 
         refreshTokens {
-          tokenRefreshMutex.withLock {
-            val current = tokenStore?.get() ?: return@withLock null
+          withContext(Dispatchers.io) {
 
-            val httpClient = HttpClient(getHttpClientEngine()) {
-              install(ContentNegotiation) {
-                json(jsonBase)
+            tokenRefreshMutex.withLock {
+              val current = tokenStore?.get()
+
+              current ?: return@withLock null
+
+              val httpClient = HttpClient(getHttpClientEngine()) {
+                install(ContentNegotiation) {
+                  json(jsonBase)
+                }
               }
-            }
 
-            val newPair = runCatching {
-              GenericRemoteService(httpClient)
-                .request<TokenPair, String>(
-                  HttpMethod.Post,
-                  endpointUrl = configurationRepository.globalAppConfigurationState.payloadValue.refreshPath,
-                  body = current.refreshToken,
-                  onFailure = {
-                    it.printStackTrace()
-                  }
-                )
-            }.getOrNull()
+              val newPair = runCatching {
+                GenericRemoteService(httpClient)
+                  .request<TokenPair, String>(
+                    HttpMethod.Post,
+                    endpointUrl = configurationRepository.globalAppConfigurationState.payloadValue.refreshPath,
+                    body = current.refreshToken,
+                    onFailure = {
+                      it.printStackTrace()
+                    }
+                  )
+              }.getOrNull()
 
-            httpClient.close()
+              httpClient.close()
 
-            if (newPair != null) {
-              tokenStore?.set(newPair)
-              BearerTokens(newPair.accessToken, newPair.refreshToken)
-            } else {
-              tokenStore?.set(null)
-              null
+              if (newPair != null) {
+                tokenStore?.set(newPair)
+                BearerTokens(newPair.accessToken, newPair.refreshToken)
+              } else {
+                tokenStore?.set(null)
+                null
+              }
             }
           }
         }
@@ -116,11 +128,15 @@ val configurationRepository: ConfigurationRepository by lazy {
 }
 
 val stockRepository: StockRepository by lazy {
-  StockRepositoryImpl(genericRemoteService, genericLocalService, configurationRepository)
+  StockRepositoryImpl(genericRemoteService, configurationRepository)
 }
 
 val supplierRepository: SupplierRepository by lazy {
-  SupplierRepositoryImpl(genericRemoteService, genericLocalService)
+  SupplierRepositoryImpl(genericRemoteService, configurationRepository)
+}
+
+val storeRepository: StoreRepository by lazy {
+  StoreRepositoryImpl(genericRemoteService, configurationRepository)
 }
 
 val goodsCategoryRepository: GoodsCategoryRepository by lazy {

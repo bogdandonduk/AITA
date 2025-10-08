@@ -18,9 +18,7 @@ object EncryptedDataStore {
   private const val ALIAS_KEYSTORE = "aita_keystore"
 
   suspend fun get(key: String): String? {
-    println("here we are1")
     val preferencesKey = stringPreferencesKey(key)
-    println("here we are2")
 
     val base64: String = AITA.get()
       .tokensDataStore
@@ -28,12 +26,8 @@ object EncryptedDataStore {
       .map { it[preferencesKey] }
       .first() ?: return null
 
-    println("here we are3")
-
     val blob = Base64.decode(base64, Base64.DEFAULT)
     val key: SecretKey = getOrCreateKey()
-
-    println("here we are4")
 
     return try {
       val iv = blob.copyOfRange(0, 12)
@@ -47,20 +41,16 @@ object EncryptedDataStore {
 
       val plain = cipher.doFinal(ct)
 
-      plain.decodeToString().apply {
-        println("here we are5 $this")
-      }
+      plain.decodeToString()
     } catch (throwable: Throwable) {
       AITA.get().tokensDataStore.edit { it.remove(preferencesKey) }
       throwable.printStackTrace()
-      println("here we are6")
 
       null
     }
   }
 
   suspend fun set(key: String, value: String?) {
-    println("here we are11")
 
     val preferencesKey = stringPreferencesKey(key)
 
@@ -68,28 +58,22 @@ object EncryptedDataStore {
       AITA.get().tokensDataStore.edit { it.remove(preferencesKey) }
       return
     }
-    println("here we are12")
 
     val key: SecretKey = getOrCreateKey()
-    println("here we are13")
 
     val plain = value.encodeToByteArray()
-    println("here we are14")
 
     val cipher = Cipher
       .getInstance("AES/GCM/NoPadding")
       .apply {
         init(Cipher.ENCRYPT_MODE, key)
       }
-    println("here we are15")
 
     val iv = cipher.iv                                 // 12-byte nonce
     val ct = cipher.doFinal(plain)                     // ciphertext + 16-byte tag
-    println("here we are16")
 
     val blob = iv + ct
     val base64 = Base64.encodeToString(blob, Base64.NO_WRAP)
-    println("here we are17 $base64")
 
     AITA.get().tokensDataStore.edit { it[preferencesKey] = base64 }
   }

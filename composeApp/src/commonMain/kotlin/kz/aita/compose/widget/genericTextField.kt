@@ -129,8 +129,6 @@ fun AppConfiguration.genericTextField(
     mutableStateOf(FocusRequester())
   }
 
-  val focusManager = LocalFocusManager.current
-
   var isContentValid by rememberSaveable {
     mutableStateOf(true)
   }
@@ -163,12 +161,14 @@ fun AppConfiguration.genericTextField(
         onValueChange = {
           if (onValueChange != null) {
             onValueChange(it.text) {
-              if (onFilterValue == null || onFilterValue(it.text))
+              if (onFilterValue == null || onFilterValue(it.text)) {
                 value = it
+              }
             }
           } else {
-            if (onFilterValue == null || onFilterValue(it.text))
+            if (onFilterValue == null || onFilterValue(it.text)) {
               value = it
+            }
           }
         },
         enabled = enabled,

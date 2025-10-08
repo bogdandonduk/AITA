@@ -99,7 +99,7 @@ fun AppConfiguration.MainScreen() {
           is NavigationScreenModel.Menu ->
             MenuScreen()
 
-          else -> {}
+          else -> { }
         }
       }
     }

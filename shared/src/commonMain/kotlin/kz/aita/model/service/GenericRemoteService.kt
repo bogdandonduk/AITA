@@ -57,7 +57,6 @@ class GenericRemoteService(
               onFailure(Exception(bodyAsText()))
               null
             } else {
-              println("body is ${bodyAsText()}")
               body<Response>()
             }
           } else {

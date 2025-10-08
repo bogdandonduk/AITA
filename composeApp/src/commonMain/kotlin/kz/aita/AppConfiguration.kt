@@ -27,10 +27,12 @@ import kz.aita.core.extractString
 import kz.aita.core.extractValue
 import kz.aita.core.genericLocalService
 import kz.aita.core.stockRepository
+import kz.aita.core.storeRepository
 import kz.aita.core.userRepository
 import kz.aita.model.dataModel.GlobalAppConfigurationDataModel
 import kz.aita.model.dataModel.GoodsItemDataModel
 import kz.aita.model.dataModel.LocalizedStringGroupDataModel
+import kz.aita.model.dataModel.StoreDataModel
 import kz.aita.model.dataModel.StylizedColorGroupDataModel
 import kz.aita.model.dataModel.StylizedDimensionGroupDataModel
 import kz.aita.model.dataModel.StylizedDrawablePathsGroupDataModel
@@ -49,6 +51,8 @@ object AppConfiguration {
     val stockState: DataState<List<GoodsItemDataModel>>
     val stock: List<GoodsItemDataModel>?
 
+    val storesState: DataState<List<StoreDataModel>>
+    val stores: List<StoreDataModel>?
 
     val navigationScreensMain: List<NavigationScreenModel>
     val navigationTransactionSaleClientId: Int
@@ -134,7 +138,6 @@ object AppConfiguration {
     val stringBack: String
     val stringAddGoodsItem: String
     val stringEditGoodsItem: String
-
     val stringUserAccount: String
     val stringGoodsCategories: String
     val stringAddGoodsCategory: String
@@ -180,11 +183,12 @@ object AppConfiguration {
     val stringSupplierState: String
     val stringEnterName: String
     val stringEnterBarcode: String
-    val stringEnterSupplyPriceState: String
-    val stringEnterSalePriceState: String
-    val stringEnterReturnPriceState: String
-    val stringEnterCategoryState: String
-    val stringEnterSupplierState: String
+    val stringEnterSupplyPrice: String
+    val stringEnterSalePrice: String
+    val stringEnterReturnPrice: String
+    val stringSelectCategory: String
+    val stringSelectSupplier: String
+    val stringEdit: String
 
     val screenWidth: Dp
     val screenHeight: Dp
@@ -248,12 +252,11 @@ object AppConfiguration {
     val drawablePathIconAppLanguage: String
     val drawablePathIconAppTheme: String
     val drawablePathIconCheck: String
-    val drawablePathIconCreate: String
+    val drawablePathIconEdit: String
     val drawablePathIconSettings: String
     val drawablePathIconSearch: String
     val drawablePathIconBarcodeCamScanner: String
     val drawablePathIconDelete: String
-
 
     val exceptionMessageUserWithThisPhoneNumberIsAlreadyRegistered: String
     val exceptionMessageUserWithThisEmailAddressIsAlreadyRegistered: String
@@ -348,6 +351,7 @@ object AppConfiguration {
   private val _stringEnterReturnPriceState = MutableStateFlow("Enter return price")
   private val _stringSelectCategoryState = MutableStateFlow("Select category")
   private val _stringSelectSupplierState  = MutableStateFlow("Select supplier")
+  private val _stringEditState  = MutableStateFlow("Select supplier")
 
   private val _screenWidthState = MutableStateFlow(0f.dp)
   private val _screenHeightState = MutableStateFlow(0f.dp)
@@ -409,7 +413,7 @@ object AppConfiguration {
   private val _drawablePathIconAppLanguageState = MutableStateFlow("svg/26_0.svg")
   private val _drawablePathIconAppThemeState = MutableStateFlow("svg/27_0.svg")
   private val _drawablePathIconCheckState = MutableStateFlow("svg/28_0.svg")
-  private val _drawablePathIconCreateState = MutableStateFlow("svg/29_0.svg")
+  private val _drawablePathIconEditState = MutableStateFlow("svg/29_0.svg")
   private val _drawablePathIconSettingsState = MutableStateFlow("svg/30_0.svg")
   private val _drawablePathIconSearchState = MutableStateFlow("svg/31_0.svg")
   private val _drawablePathIconBarcodeCamScannerState = MutableStateFlow("svg/32_0.svg")
@@ -441,8 +445,12 @@ object AppConfiguration {
     stateValues = object: StateValues {
       override val userAccountState: DataState<UserAccountDataModel> by userRepository.userAccountState.value.collectAsState()
       override val userAccount: UserAccountDataModel? by userRepository.userAccountState.payload.collectAsState()
+
       override val stockState: DataState<List<GoodsItemDataModel>> by stockRepository.stockState.value.collectAsState()
       override val stock: List<GoodsItemDataModel>? by stockRepository.stockState.payload.collectAsState()
+
+      override val storesState: DataState<List<StoreDataModel>> by storeRepository.storesState.value.collectAsState()
+      override val stores: List<StoreDataModel>? by storeRepository.storesState.payload.collectAsState()
 
       override val navigationScreensMain: List<NavigationScreenModel> by Navigation.Main.collectAsState()
       override val navigationTransactionSaleClientId: Int by Navigation.TransactionSale.ClientId.collectAsState()
@@ -580,11 +588,12 @@ object AppConfiguration {
       override val stringSupplierState: String by _stringSupplierState.collectAsState()
       override val stringEnterName: String by _stringEnterNameState.collectAsState()
       override val stringEnterBarcode: String by _stringEnterBarcodeState.collectAsState()
-      override val stringEnterSupplyPriceState: String by _stringEnterSupplyPriceState.collectAsState()
-      override val stringEnterSalePriceState: String by _stringEnterSalePriceState.collectAsState()
-      override val stringEnterReturnPriceState: String by _stringEnterReturnPriceState.collectAsState()
-      override val stringEnterCategoryState: String by _stringSelectCategoryState.collectAsState()
-      override val stringEnterSupplierState: String by _stringSelectSupplierState.collectAsState()
+      override val stringEnterSupplyPrice: String by _stringEnterSupplyPriceState.collectAsState()
+      override val stringEnterSalePrice: String by _stringEnterSalePriceState.collectAsState()
+      override val stringEnterReturnPrice: String by _stringEnterReturnPriceState.collectAsState()
+      override val stringSelectCategory: String by _stringSelectCategoryState.collectAsState()
+      override val stringSelectSupplier: String by _stringSelectSupplierState.collectAsState()
+      override val stringEdit: String by _stringEditState.collectAsState()
 
       override val screenWidth: Dp by _screenWidthState.collectAsState()
       override val screenHeight: Dp by _screenHeightState.collectAsState()
@@ -643,7 +652,7 @@ object AppConfiguration {
       override val drawablePathIconAppLanguage: String by _drawablePathIconAppLanguageState.collectAsState()
       override val drawablePathIconAppTheme: String by _drawablePathIconAppThemeState.collectAsState()
       override val drawablePathIconCheck: String by _drawablePathIconCheckState.collectAsState()
-      override val drawablePathIconCreate: String by _drawablePathIconCreateState.collectAsState()
+      override val drawablePathIconEdit: String by _drawablePathIconEditState.collectAsState()
       override val drawablePathIconSettings: String by _drawablePathIconSettingsState.collectAsState()
       override val drawablePathIconSearch: String by _drawablePathIconSearchState.collectAsState()
       override val drawablePathIconBarcodeCamScanner: String by _drawablePathIconBarcodeCamScannerState.collectAsState()
@@ -887,6 +896,7 @@ object AppConfiguration {
     _stringEnterReturnPriceState.emit(strings.extractString(79, stateValues.appLocaleLanguage))
     _stringSelectCategoryState.emit(strings.extractString(80, stateValues.appLocaleLanguage))
     _stringSelectSupplierState.emit(strings.extractString(81, stateValues.appLocaleLanguage))
+    _stringEditState.emit(strings.extractString(82, stateValues.appLocaleLanguage))
   }
 
   private suspend fun updateColors(colors: List<StylizedColorGroupDataModel>) {
@@ -931,7 +941,7 @@ object AppConfiguration {
     _drawablePathIconAppLanguageState.emit(drawables.extractPath(26, stateValues.appThemeId))
     _drawablePathIconAppThemeState.emit(drawables.extractPath(27, stateValues.appThemeId))
     _drawablePathIconCheckState.emit(drawables.extractPath(28, stateValues.appThemeId))
-    _drawablePathIconCreateState.emit(drawables.extractPath(29, stateValues.appThemeId))
+    _drawablePathIconEditState.emit(drawables.extractPath(29, stateValues.appThemeId))
     _drawablePathIconSettingsState.emit(drawables.extractPath(30, stateValues.appThemeId))
     _drawablePathIconSearchState.emit(drawables.extractPath(31, stateValues.appThemeId))
     _drawablePathIconBarcodeCamScannerState.emit(drawables.extractPath(32, stateValues.appThemeId))

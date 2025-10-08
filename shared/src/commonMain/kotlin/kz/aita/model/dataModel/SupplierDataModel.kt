@@ -3,8 +3,9 @@ package kz.aita.model.dataModel
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class StoreSupplierDataModel(
+data class SupplierDataModel(
+  val typeId: String,
   val isActive: Boolean,
-  val storeId: String,
+  val clientId: String,
   val addedAt: Long
 )

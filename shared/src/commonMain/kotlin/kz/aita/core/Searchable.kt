@@ -1,19 +1,18 @@
 package kz.aita.core
 
 @Suppress("UNCHECKED_CAST")
-fun <T : Searchable> List<Searchable>.search(query: String): Pair<List<T>, Boolean> {
-  val unique = filter {
-    it.searchUnique(query)
+fun <T : Searchable> List<Searchable>.search(query: String, vararg extraOperands: String): Pair<List<T>, Boolean> {
+  singleOrNull {
+    it.searchUnique(query, *extraOperands)
+  }?.run {
+    return map { it as T } to true
   }
-
-  if (unique.size == 1)
-    return unique.map { it as T } to true
 
   val exact = filter {
-    it.searchExact(query)
+    it.searchExact(query, *extraOperands)
   }
   val contains = filter {
-    it.searchContains(query) && !exact.contains(it)
+    it.searchContains(query, *extraOperands) && !exact.contains(it)
   }
 
   return mutableListOf<Searchable>()
@@ -27,10 +26,22 @@ fun <T : Searchable> List<Searchable>.search(query: String): Pair<List<T>, Boole
 
 interface Searchable {
 
-  fun searchExact(query: String): Boolean
-  fun searchContains(query: String): Boolean
+  val exactSearchOperands: List<String>
+  val containsSearchOperands: List<String>
+  val uniqueSearchOperands: List<String>
 
-  fun searchUnique(query: String): Boolean {
-    return false
+
+  fun searchExact(query: String, vararg extraOperands: String): Boolean {
+    return exactSearchOperands.any { it.equals(query, true) }
+        || extraOperands.any { it.equals(query, true) }
+  }
+
+  fun searchContains(query: String, vararg extraOperands: String): Boolean {
+    return containsSearchOperands.any { it.equals(query, true) }
+        || extraOperands.any { it.equals(query, true) }
+  }
+
+  fun searchUnique(query: String, vararg extraOperands: String): Boolean {
+    return uniqueSearchOperands.all { it.equals(query, true) } && extraOperands.any { it.equals(query, true) }
   }
 }

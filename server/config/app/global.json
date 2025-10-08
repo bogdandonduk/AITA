@@ -8,6 +8,9 @@
   "refreshPath": "auth/refresh",
   "logOutPath": "auth/logOut",
   "userAccountPath": "userAccount",
+  "storesPath": "stores",
+  "stockPath": "stock",
+  "suppliersPath": "suppliers",
   "stringResourcesPath": "res/string",
   "dimensionResourcesPath": "res/dimension",
   "colorResourcesPath": "res/color",
@@ -16,7 +19,20 @@
   "companyForms": [
     {
       "id": 0,
-      "name": "TOO",
+      "name": [
+        {
+          "language": "en",
+          "value": "TOO"
+        },
+        {
+          "language": "ru",
+          "value": "TOO"
+        },
+        {
+          "language": "kk",
+          "value": "TOO"
+        }
+      ],
       "parameters": []
     }
   ],
@@ -212,6 +228,92 @@
         }
       ],
       "flagDrawablePath": "png/flag_kz.png"
+    }
+  ],
+  "currencies": [
+    {
+      "currency": "KZT",
+      "countries": [
+        "kz"
+      ],
+      "symbol": "₸",
+      "name": [
+        {
+          "language": "en",
+          "value": "tenge"
+        },
+        {
+          "language": "ru",
+          "value": "тенге"
+        },
+        {
+          "language": "kk",
+          "value": "теңге"
+        }
+      ]
+    },
+    {
+      "currency": "TJS",
+      "countries": [
+        "tj"
+      ],
+      "symbol": "SM",
+      "name": [
+        {
+          "language": "en",
+          "value": "somoni"
+        },
+        {
+          "language": "ru",
+          "value": "сом"
+        },
+        {
+          "language": "kk",
+          "value": "сом"
+        }
+      ]
+    },
+    {
+      "currency": "RUB",
+      "countries": [
+        "ru"
+      ],
+      "symbol": "₽",
+      "name": [
+        {
+          "language": "en",
+          "value": "rub."
+        },
+        {
+          "language": "ru",
+          "value": "руб."
+        },
+        {
+          "language": "kk",
+          "value": "руб."
+        }
+      ]
+    },
+    {
+      "currency": "USD",
+      "countries": [
+        "us"
+      ],
+      "symbol": "$",
+      "name": [
+        {
+          "language": "en",
+          "value": "US$"
+        },
+        {
+          "language": "ru",
+          "value": "$ США"
+        },
+        {
+          "language": "kk",
+          "value": "US$"
+        }
+      ]
     }
   ],
   "themes": [

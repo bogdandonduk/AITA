@@ -1,20 +1,18 @@
 package kz.aita.compose.screen.stock
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kz.aita.AppConfiguration
 import kz.aita.compose.navigation.NavigationScreenModel
 import kz.aita.compose.widget.GoodsItemInStockWidget
+import kz.aita.compose.widget.MessageText
 import kz.aita.compose.widget.ScreenAppBarWidget
 import kz.aita.compose.widget.searchTextFieldWithCamBarcodeScanner
 import kz.aita.core.search
@@ -32,21 +30,17 @@ fun AppConfiguration.StockWarehouseScreen() {
       iconPath = stateValues.drawablePathIconStock
     )
 
+    println("stock state ${stateValues.stockState}")
+
     when (val state = stateValues.stockState) {
       is DataState.Success -> {
         if (state.payload.isEmpty()) {
-          Box(
+          MessageText(
             modifier = Modifier
               .fillMaxWidth()
               .weight(1f),
-            contentAlignment = Alignment.Center
-          ) {
-            Text(
-              stateValues.stringListEmpty,
-              color = stateValues.TextColor,
-              fontSize = stateValues.accentTextSize
-            )
-          }
+            stateValues.stringListEmpty
+          )
         } else {
           val searchTextFieldContent =
             searchTextFieldWithCamBarcodeScanner(
@@ -65,18 +59,11 @@ fun AppConfiguration.StockWarehouseScreen() {
             } ?: state.payload
 
           if (items.isEmpty()) {
-            Box(
+            MessageText(
               modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
-              contentAlignment = Alignment.Center
-            ) {
-              Text(
-                stateValues.stringNoMatches,
-                color = stateValues.TextColor,
-                fontSize = stateValues.accentTextSize
-              )
-            }
+              stateValues.stringNoMatches)
           } else {
             LazyColumn(
               modifier = Modifier
@@ -98,6 +85,14 @@ fun AppConfiguration.StockWarehouseScreen() {
             }
           }
         }
+      }
+
+      is DataState.Empty -> {
+        MessageText(
+          modifier = Modifier
+            .fillMaxWidth()
+            .weight(1f),
+          stateValues.stringListEmpty)
       }
 
       else -> {

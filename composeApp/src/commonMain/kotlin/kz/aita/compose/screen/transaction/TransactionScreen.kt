@@ -102,7 +102,7 @@ fun AppConfiguration.TransactionScreen() {
             TransactionReceiptPreviewScreen()
           }
 
-          else -> {}
+          else -> { }
         }
       }
     } else {
@@ -130,7 +130,7 @@ fun AppConfiguration.TransactionScreen() {
               TransactionReceiptPreviewScreen()
             }
 
-            else -> {}
+            else -> { }
           }
         }
 
@@ -153,7 +153,7 @@ fun AppConfiguration.TransactionScreen() {
               TransactionReceiptPreviewScreen()
             }
 
-            else -> {}
+            else -> { }
           }
         }
       }

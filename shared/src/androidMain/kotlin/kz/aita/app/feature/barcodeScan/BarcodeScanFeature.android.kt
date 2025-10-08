@@ -97,7 +97,7 @@
 //                .get()
 //                .run {
 //                  if (viewModel.currentDialogWidget.value.first != "" || viewModel.currentDialogWidget.value.second != "") {
-//                    viewModel.postCurrentDialogWidget("", "", {}) {}
+//                    viewModel.postCurrentDialogWidget("", "", { }) { }
 //                  }
 //                }
 //

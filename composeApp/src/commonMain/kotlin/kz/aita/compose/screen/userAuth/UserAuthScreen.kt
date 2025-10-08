@@ -69,7 +69,7 @@ fun AppConfiguration.UserAuthScreen() {
             is NavigationScreenModel.UserAuth.SignUp -> {
               UserAuthSignUpScreen(userRepository)
             }
-            else -> {}
+            else -> { }
           }
         }
       }

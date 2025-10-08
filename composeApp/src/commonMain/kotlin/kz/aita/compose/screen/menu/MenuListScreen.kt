@@ -74,7 +74,7 @@ fun AppConfiguration.MenuListScreen() {
           CompositionLocalProvider(LocalKamelConfig provides kamelConfig) {
             KamelImage(
               modifier = Modifier
-                .padding(vertical = 8.dp, horizontal = 16.dp)
+                .padding(8.dp)
                 .aspectRatio(1f, matchHeightConstraintsFirst = true),
               resource = {
                 asyncPainterResource(

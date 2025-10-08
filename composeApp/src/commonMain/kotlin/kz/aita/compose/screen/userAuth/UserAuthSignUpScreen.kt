@@ -24,10 +24,11 @@ import kz.aita.compose.util.checkAsPersonName
 import kz.aita.compose.util.filterAsPersonName
 import kz.aita.compose.widget.LargeIconWithTitleWidget
 import kz.aita.compose.widget.actionButton
+import kz.aita.compose.widget.countrySelectionTextField
 import kz.aita.compose.widget.emailTextField
 import kz.aita.compose.widget.errorText
 import kz.aita.compose.widget.genericTextField
-import kz.aita.compose.widget.phoneNumberWithCountrySelectionTextField
+import kz.aita.compose.widget.domainSelectionTextField
 import kz.aita.compose.widget.repeatedPasswordTextFieldGroup
 import kz.aita.model.dataModel.UserAuthSignUpDataModel
 import kz.aita.model.repository.UserRepository
@@ -75,9 +76,7 @@ fun AppConfiguration.UserAuthSignUpScreen(
 
         Spacer(modifier = Modifier.height(outerSpace))
 
-        val phoneNumberTextFieldContent = phoneNumberWithCountrySelectionTextField(
-          countries = stateValues.globalAppConfiguration.countries
-        )
+        val phoneNumberTextFieldContent = countrySelectionTextField()
 
         Spacer(modifier = Modifier.height(innerSpace))
 
@@ -184,12 +183,12 @@ fun AppConfiguration.UserAuthSignUpScreen(
               .signUp(
                 UserAuthSignUpDataModel(
                   phoneNumber = stateValues.globalAppConfiguration.countries.run {
-                    find { it.locale.equals(phoneNumberTextFieldContent.selectedCountryLocale, true) } ?: first()
+                    find { it.locale.equals(phoneNumberTextFieldContent.selectedId, true) } ?: first()
                   }.phoneNumberCode + phoneNumberTextFieldContent.value.text.trim(),
                   email = emailTextFieldContent.value.text.trim(),
                   firstName = firstNameTextFieldContent.value.text.trim(),
                   lastName = lastNameTextFieldContent.value.text.trim(),
-                  countryLocale = phoneNumberTextFieldContent.selectedCountryLocale,
+                  countryLocale = phoneNumberTextFieldContent.selectedId,
                   password = passwordTextFieldContent.value.text
                 )
               )

@@ -13,6 +13,7 @@ import kz.aita.model.wrapper.MutableDataStateFlow
 import kz.aita.model.dataModel.GlobalAppConfigurationDataModel
 import kz.aita.model.dataModel.AppLanguageDataModel
 import kz.aita.model.dataModel.AppThemeDataModel
+import kz.aita.model.dataModel.CurrencyDataModel
 import kz.aita.model.dataModel.LocalizedStringDataModel
 import kz.aita.model.dataModel.LocalizedStringGroupDataModel
 import kz.aita.model.dataModel.QuantityDataModel
@@ -41,6 +42,9 @@ class ConfigurationRepositoryImpl(
       refreshPath = "auth/refresh",
       logOutPath = "auth/logOut",
       userAccountPath = "userAccount",
+      storesPath = "stores",
+      stockPath = "stock",
+      suppliersPath = "suppliers",
       stringResourcesPath = "res/string",
       dimensionResourcesPath = "res/dimension",
       colorResourcesPath = "res/color",
@@ -146,6 +150,84 @@ class ConfigurationRepositoryImpl(
             )
           ),
           "png/flag_kz.png"
+        )
+      ),
+      currencies = listOf(
+        CurrencyDataModel(
+          currency = "KZT",
+          countries = listOf("kz"),
+          symbol = "₸",
+          name = listOf(
+            LocalizedStringDataModel(
+              language = "en",
+              value = "tenge"
+            ),
+            LocalizedStringDataModel(
+              language = "ru",
+              value = "тенге"
+            ),
+            LocalizedStringDataModel(
+              language = "kk",
+              value = "теңге"
+            )
+          )
+        ),
+        CurrencyDataModel(
+          currency = "TJS",
+          countries = listOf("tj"),
+          symbol = "SM",
+          name = listOf(
+            LocalizedStringDataModel(
+              language = "en",
+              value = "somoni"
+            ),
+            LocalizedStringDataModel(
+              language = "ru",
+              value = "сом"
+            ),
+            LocalizedStringDataModel(
+              language = "kk",
+              value = "сом"
+            )
+          )
+        ),
+        CurrencyDataModel(
+          currency = "RUB",
+          countries = listOf("ru"),
+          symbol = "₽",
+          name = listOf(
+            LocalizedStringDataModel(
+              language = "en",
+              value = "rub."
+            ),
+            LocalizedStringDataModel(
+              language = "ru",
+              value = "руб."
+            ),
+            LocalizedStringDataModel(
+              language = "kk",
+              value = "руб."
+            )
+          )
+        ),
+        CurrencyDataModel(
+          currency = "USD",
+          symbol = "$",
+          countries = listOf("us"),
+          name = listOf(
+            LocalizedStringDataModel(
+              language = "en",
+              value = "US$"
+            ),
+            LocalizedStringDataModel(
+              language = "ru",
+              value = "$ США"
+            ),
+            LocalizedStringDataModel(
+              language = "kk",
+              value = "US$"
+            )
+          )
         )
       ),
       themes = listOf(
