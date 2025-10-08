@@ -1,14 +1,9 @@
 package kz.aita.model.repository
 
 import kotlinx.coroutines.flow.Flow
-import kz.aita.model.dataModel.ExceptionDataModel
-import kz.aita.model.wrapper.DataStateFlow
-import kz.aita.model.dataModel.GlobalAppConfigurationDataModel
-import kz.aita.model.dataModel.LocalizedStringGroupDataModel
-import kz.aita.model.dataModel.StylizedColorGroupDataModel
-import kz.aita.model.dataModel.StylizedDimensionGroupDataModel
-import kz.aita.model.dataModel.StylizedDrawablePathsGroupDataModel
+import kz.aita.model.dataModel.*
 import kz.aita.model.wrapper.DataState
+import kz.aita.model.wrapper.DataStateFlow
 import kz.aita.model.wrapper.DataStateFlowNonNull
 
 interface ConfigurationRepository {

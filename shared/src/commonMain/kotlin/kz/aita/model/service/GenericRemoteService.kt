@@ -1,21 +1,11 @@
 package kz.aita.model.service
 
-import io.ktor.client.HttpClient
-import io.ktor.client.call.body
-import io.ktor.client.request.parameter
-import io.ktor.client.request.request
-import io.ktor.client.request.setBody
-import io.ktor.client.statement.bodyAsText
-import io.ktor.http.ContentType
-import io.ktor.http.HttpMethod
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.contentLength
-import io.ktor.http.contentType
-import io.ktor.http.isSuccess
-import kotlinx.coroutines.sync.Mutex
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
 import kz.aita.core.configurationRepository
-import kz.aita.model.repository.ConfigurationRepository
-import kz.aita.model.repository.impl.ConfigurationRepositoryImpl
 
 class GenericRemoteService(
   val httpClient: HttpClient

@@ -1,13 +1,6 @@
 package kz.aita.compose.screen.userAuth
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
@@ -22,14 +15,7 @@ import kz.aita.AppConfiguration
 import kz.aita.compose.navigation.Navigation
 import kz.aita.compose.util.checkAsPersonName
 import kz.aita.compose.util.filterAsPersonName
-import kz.aita.compose.widget.LargeIconWithTitleWidget
-import kz.aita.compose.widget.actionButton
-import kz.aita.compose.widget.countrySelectionTextField
-import kz.aita.compose.widget.emailTextField
-import kz.aita.compose.widget.errorText
-import kz.aita.compose.widget.genericTextField
-import kz.aita.compose.widget.domainSelectionTextField
-import kz.aita.compose.widget.repeatedPasswordTextFieldGroup
+import kz.aita.compose.widget.*
 import kz.aita.model.dataModel.UserAuthSignUpDataModel
 import kz.aita.model.repository.UserRepository
 import kz.aita.model.wrapper.DataState

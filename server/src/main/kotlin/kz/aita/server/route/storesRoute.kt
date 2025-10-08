@@ -1,24 +1,20 @@
 package kz.aita.server.route
 
-import io.ktor.http.HttpStatusCode
-import io.ktor.server.application.Application
-import io.ktor.server.auth.UnauthorizedResponse
-import io.ktor.server.auth.authenticate
-import io.ktor.server.auth.jwt.JWTPrincipal
-import io.ktor.server.auth.principal
-import io.ktor.server.response.respond
-import io.ktor.server.routing.get
-import io.ktor.server.routing.routing
+import io.ktor.http.*
+import io.ktor.server.application.*
+import io.ktor.server.auth.*
+import io.ktor.server.auth.jwt.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
 import kz.aita.core.jsonBase
 import kz.aita.model.dataModel.CompanyFormDataModel
 import kz.aita.model.dataModel.LocalizedStringDataModel
 import kz.aita.model.dataModel.LocationDataModel
 import kz.aita.model.dataModel.StoreDataModel
 import kz.aita.server.db.Stores
-import kz.aita.server.util.getException
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
-import java.util.UUID
+import java.util.*
 
 fun Application.storesRoute() {
   routing {

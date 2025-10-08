@@ -1,12 +1,13 @@
 package kz.aita.server.db
 
-import kotlinx.serialization.KSerializer
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.javatime.*        // Instant/LocalDateTime columns
-import org.jetbrains.exposed.sql.json.jsonb
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
+import org.jetbrains.exposed.sql.ReferenceOption
+import org.jetbrains.exposed.sql.Table
+import org.jetbrains.exposed.sql.javatime.CurrentTimestamp
+import org.jetbrains.exposed.sql.javatime.timestamp
+import org.jetbrains.exposed.sql.json.jsonb
 
 object RefreshSessions: Table("refresh_sessions") {
   val id = uuid("id")

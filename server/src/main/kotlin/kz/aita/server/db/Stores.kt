@@ -1,8 +1,8 @@
 package kz.aita.server.db
 
 import org.jetbrains.exposed.sql.Table
-import org.jetbrains.exposed.sql.javatime.timestamp
 import org.jetbrains.exposed.sql.javatime.CurrentTimestamp
+import org.jetbrains.exposed.sql.javatime.timestamp
 
 object Stores: Table("stores") {
   val id = uuid("id").uniqueIndex()

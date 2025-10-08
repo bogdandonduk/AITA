@@ -2,11 +2,7 @@ package kz.aita
 
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
@@ -19,24 +15,8 @@ import kotlinx.coroutines.launch
 import kz.aita.compose.navigation.Navigation
 import kz.aita.compose.navigation.NavigationScreenModel
 import kz.aita.compose.util.toColor
-import kz.aita.core.configurationRepository
-import kz.aita.core.extractColor
-import kz.aita.core.extractExceptionMessage
-import kz.aita.core.extractPath
-import kz.aita.core.extractString
-import kz.aita.core.extractValue
-import kz.aita.core.genericLocalService
-import kz.aita.core.stockRepository
-import kz.aita.core.storeRepository
-import kz.aita.core.userRepository
-import kz.aita.model.dataModel.GlobalAppConfigurationDataModel
-import kz.aita.model.dataModel.GoodsItemDataModel
-import kz.aita.model.dataModel.LocalizedStringGroupDataModel
-import kz.aita.model.dataModel.StoreDataModel
-import kz.aita.model.dataModel.StylizedColorGroupDataModel
-import kz.aita.model.dataModel.StylizedDimensionGroupDataModel
-import kz.aita.model.dataModel.StylizedDrawablePathsGroupDataModel
-import kz.aita.model.dataModel.UserAccountDataModel
+import kz.aita.core.*
+import kz.aita.model.dataModel.*
 import kz.aita.model.wrapper.DataState
 
 object AppConfiguration {

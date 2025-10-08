@@ -1,10 +1,5 @@
 package kz.aita.server.jwt
 
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.transactions.transaction
-import java.time.Instant
-import java.time.temporal.ChronoUnit
-import java.util.*
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import kotlinx.coroutines.Dispatchers
@@ -17,7 +12,15 @@ import kz.aita.server.encrypt.Refresh
 import kz.aita.server.util.getException
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
+import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.update
+import java.time.Instant
+import java.time.temporal.ChronoUnit
+import java.util.*
 
 class TokenService(private val cfg: JwtConfig) {
 

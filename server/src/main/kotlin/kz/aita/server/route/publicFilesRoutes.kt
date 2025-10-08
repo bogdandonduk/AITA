@@ -1,8 +1,8 @@
 package kz.aita.server.route
 
-import io.ktor.server.application.Application
-import io.ktor.server.http.content.staticFiles
-import io.ktor.server.routing.routing
+import io.ktor.server.application.*
+import io.ktor.server.http.content.*
+import io.ktor.server.routing.*
 import java.io.File
 
 fun Application.filesRoutes() {

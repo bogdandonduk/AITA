@@ -15,12 +15,10 @@ import kz.aita.compose.navigation.Navigation
 import kz.aita.compose.navigation.NavigationScreenModel
 import kz.aita.compose.widget.MessageText
 import kz.aita.compose.widget.ScreenAppBarWidget
-import kz.aita.compose.widget.actionButton
 import kz.aita.compose.widget.searchTextFieldWithCamBarcodeScanner
 import kz.aita.core.search
 import kz.aita.model.dataModel.StoreDataModel
 import kz.aita.model.wrapper.DataState
-import kotlin.to
 
 @Composable
 fun AppConfiguration.MenuStoresScreen() {

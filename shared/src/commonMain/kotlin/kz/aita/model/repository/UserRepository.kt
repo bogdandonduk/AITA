@@ -4,7 +4,6 @@ import kz.aita.model.dataModel.UserAccountDataModel
 import kz.aita.model.dataModel.UserAuthLogInDataModel
 import kz.aita.model.dataModel.UserAuthSignUpDataModel
 import kz.aita.model.wrapper.DataStateFlow
-import kz.aita.model.wrapper.TokenPair
 
 interface UserRepository {
 

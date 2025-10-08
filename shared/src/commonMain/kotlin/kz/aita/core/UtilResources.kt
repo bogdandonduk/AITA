@@ -1,11 +1,6 @@
 package kz.aita.core
 
-import kz.aita.model.dataModel.ExceptionDataModel
-import kz.aita.model.dataModel.LocalizedStringDataModel
-import kz.aita.model.dataModel.LocalizedStringGroupDataModel
-import kz.aita.model.dataModel.StylizedColorGroupDataModel
-import kz.aita.model.dataModel.StylizedDimensionGroupDataModel
-import kz.aita.model.dataModel.StylizedDrawablePathsGroupDataModel
+import kz.aita.model.dataModel.*
 
 fun List<LocalizedStringGroupDataModel>?.extractString(id: Long, language: String): String {
   return this

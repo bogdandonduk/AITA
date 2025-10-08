@@ -2,7 +2,6 @@ package kz.aita.server.encrypt
 
 import at.favre.lib.crypto.bcrypt.BCrypt
 import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.*
 import javax.crypto.Mac

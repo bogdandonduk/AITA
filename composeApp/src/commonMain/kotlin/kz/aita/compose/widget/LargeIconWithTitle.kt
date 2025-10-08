@@ -16,10 +16,10 @@ import androidx.compose.ui.unit.TextUnit
 import io.kamel.image.KamelImage
 import io.kamel.image.asyncPainterResource
 import io.kamel.image.config.LocalKamelConfig
-import io.ktor.http.Url
+import io.ktor.http.*
 import kz.aita.AppConfiguration
-import kz.aita.core.getFullDrawableResourceUrl
 import kz.aita.compose.render.kamelConfig
+import kz.aita.core.getFullDrawableResourceUrl
 
 @Composable
 fun AppConfiguration.LargeIconWithTitleWidget(

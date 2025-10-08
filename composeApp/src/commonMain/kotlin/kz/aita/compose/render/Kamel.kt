@@ -6,10 +6,8 @@ import io.kamel.core.config.httpUrlFetcher
 import io.kamel.core.config.takeFrom
 import io.kamel.image.config.imageBitmapDecoder
 import io.kamel.image.config.svgDecoder
-import io.ktor.client.plugins.HttpRequestRetry
-import io.ktor.client.plugins.defaultRequest
-import io.ktor.http.HttpHeaders
-import io.ktor.http.isSuccess
+import io.ktor.client.plugins.*
+import io.ktor.http.*
 import kz.aita.core.cacheSize
 
 val kamelConfig = KamelConfig {

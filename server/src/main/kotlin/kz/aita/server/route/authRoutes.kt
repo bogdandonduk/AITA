@@ -1,17 +1,11 @@
 package kz.aita.server.route
 
-import io.ktor.http.HttpStatusCode
-import io.ktor.server.application.Application
-import io.ktor.server.auth.UnauthorizedResponse
-import io.ktor.server.auth.authenticate
-import io.ktor.server.auth.jwt.JWTPrincipal
-import io.ktor.server.auth.principal
-import io.ktor.server.request.receive
-import io.ktor.server.response.respond
-import io.ktor.server.routing.get
-import io.ktor.server.routing.post
-import io.ktor.server.routing.route
-import io.ktor.server.routing.routing
+import io.ktor.http.*
+import io.ktor.server.application.*
+import io.ktor.server.auth.*
+import io.ktor.server.request.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
 import kz.aita.model.dataModel.UserAuthLogInDataModel
 import kz.aita.model.dataModel.UserAuthSignUpDataModel
 import kz.aita.model.wrapper.TokenPair
@@ -25,7 +19,7 @@ import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.Instant
-import java.util.UUID
+import java.util.*
 
 fun Application.authRoutes(tokenService: TokenService) {
 

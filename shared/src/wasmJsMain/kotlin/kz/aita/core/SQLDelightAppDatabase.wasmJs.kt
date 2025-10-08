@@ -2,7 +2,6 @@ package kz.aita.core
 
 import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.worker.WebWorkerDriver
-import kz.aita.KeyValueDatabase
 import org.w3c.dom.Worker
 
 @OptIn(ExperimentalWasmJsInterop::class)
