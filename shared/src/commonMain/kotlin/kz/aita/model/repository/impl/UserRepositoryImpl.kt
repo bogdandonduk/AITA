@@ -1,6 +1,6 @@
 package kz.aita.model.repository.impl
 
-import io.ktor.http.HttpMethod
+import io.ktor.http.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
