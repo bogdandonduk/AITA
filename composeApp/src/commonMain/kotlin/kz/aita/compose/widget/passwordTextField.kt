@@ -16,6 +16,9 @@ import kz.aita.compose.wrapper.ImeWithAction
 @Composable
 fun AppConfiguration.passwordTextField(
   modifier: Modifier = Modifier,
+  titleText: String? = null,
+  placeholderText: String? = null,
+  contentInvalidText: String? = null,
   imeWithAction: ImeWithAction? = null
 ): GenericTextFieldContent {
 
@@ -25,8 +28,8 @@ fun AppConfiguration.passwordTextField(
 
   return genericTextField(
     modifier = modifier,
-    titleText = stateValues.stringPassword,
-    placeholderText = stateValues.stringEnterPassword,
+    titleText = titleText ?: stateValues.stringPassword,
+    placeholderText = placeholderText ?: stateValues.stringEnterPassword,
     leadingIconPath = stateValues.drawablePathIconPassword,
     keyboardType = KeyboardType.Password,
     imeWithAction = imeWithAction ?: ImeWithAction.Default,
@@ -34,7 +37,7 @@ fun AppConfiguration.passwordTextField(
     trailingIconExtraOnClick = {
       showPassword = !showPassword
     },
-    contentInvalidText = stateValues.stringPasswordMustBe,
+    contentInvalidText = contentInvalidText ?: stateValues.stringPasswordMustBe,
     onContentValidityCheck = {
       it.checkAsPassword()
     },

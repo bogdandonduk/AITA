@@ -2,14 +2,19 @@ package kz.aita.model.repository.impl
 
 import io.ktor.http.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kz.aita.core.DataStore
 import kz.aita.core.io
+import kz.aita.core.storeRepository
+import kz.aita.model.dataModel.NotificationType
 import kz.aita.model.dataModel.UserAccountDataModel
+import kz.aita.model.dataModel.UserAccountUpdateDataModel
 import kz.aita.model.dataModel.UserAuthLogInDataModel
 import kz.aita.model.dataModel.UserAuthSignUpDataModel
 import kz.aita.model.repository.ConfigurationRepository
+import kz.aita.model.repository.NotificationRepository
 import kz.aita.model.repository.Repository
 import kz.aita.model.repository.UserRepository
 import kz.aita.model.service.GenericRemoteService
@@ -20,8 +25,9 @@ import kz.aita.model.wrapper.TokenPair
 class UserRepositoryImpl(
   private val genericRemoteService: GenericRemoteService,
   private val configurationRepository: ConfigurationRepository,
+  private val notificationRepository: NotificationRepository,
   private val tokenStore: DataStore<TokenPair>?,
-  private val userAccountDataStore: DataStore<UserAccountDataModel>?
+  private val userAccountStore: DataStore<UserAccountDataModel>?
 ): Repository(), UserRepository {
 
   private val _userAccountState = MutableDataStateFlow<UserAccountDataModel>(
@@ -31,12 +37,14 @@ class UserRepositoryImpl(
 
   private val loginMutex = Mutex()
   private val signUpMutex = Mutex()
-  private val getUserAccountMutex = Mutex()
 
   private val logOutMutex = Mutex()
+  private val getUserAccountMutex = Mutex()
+
+  private val updateMutex = Mutex()
 
   init {
-    getUserAccount()
+    get()
   }
 
   override fun logIn(userAuthLogIn: UserAuthLogInDataModel) {
@@ -59,7 +67,8 @@ class UserRepositoryImpl(
         )?.run {
           tokenStore?.set(this)
           loginMutex.unlock()
-          getUserAccount()
+
+          get()
         }
     }
 
@@ -85,42 +94,8 @@ class UserRepositoryImpl(
         )?.run {
           tokenStore?.set(this)
           signUpMutex.unlock()
-          getUserAccount()
-        }
-    }
-  }
 
-  override fun getUserAccount() {
-    launch(Dispatchers.io) {
-      if (!getUserAccountMutex.tryLock())
-        return@launch
-
-      if (_userAccountState.value.value !is DataState.Progress)
-        _userAccountState.emit(DataState.Progress())
-
-      userAccountDataStore?.get()?.run {
-        _userAccountState.emit(DataState.Success(this))
-      }
-
-      genericRemoteService
-        .request<UserAccountDataModel, Unit>(
-          HttpMethod.Get,
-          endpointUrl = configurationRepository.globalAppConfigurationState.payloadValue.userAccountPath,
-          onFailure = {
-            println("get account returned $it")
-            if (userAccountState.value.value !is DataState.Success)
-              _userAccountState.emit(DataState.Failure(it))
-
-            getUserAccountMutex.unlock()
-
-            it.printStackTrace()
-          }
-        )?.run {
-          _userAccountState.emit(DataState.Success(this))
-          userAccountDataStore?.set(this)
-          getUserAccountMutex.unlock()
-
-          configurationRepository.getGlobalConfiguration()
+          get()
         }
     }
   }
@@ -134,7 +109,7 @@ class UserRepositoryImpl(
 
       genericRemoteService
         .request<Unit, String>(
-          HttpMethod.Post,
+          HttpMethod.Delete,
           endpointUrl = configurationRepository.globalAppConfigurationState.payloadValue.logOutPath,
           body = tokenStore?.get()?.refreshToken,
           onFailure = {
@@ -143,13 +118,123 @@ class UserRepositoryImpl(
             it.printStackTrace()
           }
         )?.run {
-          _userAccountState.emit(DataState.Empty())
+          notificationRepository.postNotification(configurationRepository.stringLoggingOutInProgressState.value, NotificationType.Neutral)
+          delay(3000)
 
           tokenStore?.set(null)
-          userAccountDataStore?.set(null)
+          userAccountStore?.set(null)
+          _userAccountState.emit(DataState.Empty())
 
           logOutMutex.unlock()
         }
+    }
+  }
+
+  override fun get(forceLogOut: Boolean) {
+    launch(Dispatchers.io) {
+      if (tokenStore?.get() == null)
+        return@launch
+
+      if (!getUserAccountMutex.tryLock())
+        return@launch
+
+      if (_userAccountState.value.value !is DataState.Progress)
+        _userAccountState.emit(DataState.Progress())
+
+      userAccountStore?.get()?.run {
+        _userAccountState.emit(DataState.Success(this))
+      }
+
+      genericRemoteService
+        .request<UserAccountDataModel, Unit>(
+          HttpMethod.Get,
+          endpointUrl = configurationRepository.globalAppConfigurationState.payloadValue.getUserPath,
+          onFailure = {
+            if (forceLogOut) {
+              _userAccountState.emit(DataState.Failure(it))
+
+              tokenStore?.set(null)
+              userAccountStore?.set(null)
+            } else {
+              (_userAccountState.value.value as? DataState.Success)?.run {
+                _userAccountState.emit(DataState.SoftFailure(it, payload))
+              } ?: (_userAccountState.value.value as? DataState.SoftFailure)?.run {
+                _userAccountState.emit(DataState.SoftFailure(it, existingPayload))
+              }
+            }
+
+            getUserAccountMutex.unlock()
+
+            it.printStackTrace()
+          }
+        )?.run {
+          if (userAccountState.value.value !is DataState.Success) {
+            launch {
+              configurationRepository.getGlobalAppConfiguration()
+            }
+            launch {
+              storeRepository.getStores()
+            }
+          }
+
+          _userAccountState.emit(DataState.Success(this))
+          userAccountStore?.set(this)
+          getUserAccountMutex.unlock()
+        }
+    }
+  }
+
+  override fun update(
+    userAccountUpdate: UserAccountUpdateDataModel
+  ) {
+    launch(Dispatchers.io) {
+      if (!updateMutex.tryLock())
+        return@launch
+
+      _userAccountState.emit(DataState.Progress())
+
+      genericRemoteService
+        .request<UserAccountDataModel, UserAccountUpdateDataModel>(
+          HttpMethod.Put,
+          endpointUrl = configurationRepository.globalAppConfigurationState.payloadValue.updateUserPath,
+          body = userAccountUpdate,
+          onFailure = {
+            (_userAccountState.value.value as? DataState.Success)?.run {
+              DataState.Success(payload).let { dataState ->
+                _userAccountState.emit(dataState)
+                notificationRepository.postNotification(it.toString(), NotificationType.Negative)
+              }
+            } ?: (_userAccountState.value.value as? DataState.SoftFailure)?.run {
+              DataState.SoftFailure(it, existingPayload).let { dataState ->
+                _userAccountState.emit(dataState)
+                notificationRepository.postNotification(it.toString(), NotificationType.Negative)
+              }
+            } ?: _userAccountState.emit(DataState.Failure(it)).run {
+              notificationRepository.postNotification(it.toString(), NotificationType.Negative)
+            }
+
+            updateMutex.unlock()
+            it.printStackTrace()
+          }
+        )?.run {
+          DataState.Success(this).let { dataState ->
+            _userAccountState.emit(dataState)
+          }
+
+          notificationRepository.postNotification(configurationRepository.stringAccountSuccessfullyUpdatedState.value, NotificationType.Positive)
+
+          userAccountStore?.set(this)
+          updateMutex.unlock()
+        }
+    }
+  }
+
+  override fun forceLogOut() {
+    launch(Dispatchers.io) {
+      tokenStore?.set(null)
+      userAccountStore?.set(null)
+
+      _userAccountState.emit(DataState.Empty())
     }
   }
 }

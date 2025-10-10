@@ -69,7 +69,7 @@ fun AppConfiguration.selectableDomainWidget(
             data = Url(getFullDrawableResourceUrl(if (expanded) stateValues.drawablePathIconExpandLess else stateValues.drawablePathIconExpandMore))
           )
         },
-        contentDescription = domain.name.find { it.language == stateValues.appLocaleLanguage }?.value ?: domain.id
+        contentDescription = domain.name.find { it.language == stateValues.appLanguage }?.value ?: domain.id
       )
 
       KamelImage(
@@ -82,7 +82,7 @@ fun AppConfiguration.selectableDomainWidget(
             data = Url(getFullDrawableResourceUrl(domain.iconPath))
           )
         },
-        contentDescription = domain.name.find { it.language == stateValues.appLocaleLanguage }?.value ?: domain.id
+        contentDescription = domain.name.find { it.language == stateValues.appLanguage }?.value ?: domain.id
       )
     }
 
@@ -97,7 +97,7 @@ fun AppConfiguration.selectableDomainWidget(
       Spacer(modifier = Modifier.width(8.dp))
 
       Text(
-        text = domain.name.find { it.language == stateValues.appLocaleLanguage }?.value ?: "",
+        text = domain.name.find { it.language == stateValues.appLanguage }?.value ?: "",
         color = textColor
       )
     }

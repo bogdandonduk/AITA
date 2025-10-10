@@ -159,7 +159,7 @@ fun AppConfiguration.GoodsItemInStockWidget(
       )
 
       Text(
-        text = "${goodsItem.quantity.total.run { if (goodsItem.quantity.roundTotal) toInt() else this }} ${goodsItem.quantity.immutableUnitName.extractLocalizedString(stateValues.appLocaleLanguage)}",
+        text = "${goodsItem.quantity.total.run { if (goodsItem.quantity.roundTotal) toInt() else this }} ${goodsItem.quantity.immutableUnitName.extractLocalizedString(stateValues.appLanguage)}",
         fontSize = stateValues.titleTextSize,
         fontWeight = FontWeight.Bold,
         color = quantityMarkerColor

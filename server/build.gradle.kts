@@ -1,3 +1,5 @@
+import org.gradle.kotlin.dsl.libs
+
 plugins {
     alias(libs.plugins.kotlinJvm)
     alias(libs.plugins.ktor)
@@ -9,8 +11,7 @@ version = "1.0.0"
 application {
     mainClass.set("kz.aita.ApplicationKt")
     
-    val isDevelopment: Boolean = project.ext.has("development")
-    applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
+    applicationDefaultJvmArgs = listOf("-Dio.ktor.development=false")
 }
 
 dependencies {
@@ -24,6 +25,8 @@ dependencies {
     // ContentNegotiation + kotlinx.serialization
     implementation("io.ktor:ktor-server-content-negotiation:${property("ktor.version")}")
     implementation("io.ktor:ktor-serialization-kotlinx-json:${property("ktor.version")}")
+    implementation(libs.kotlinx.serialization.core)
+    implementation(libs.kotlinx.serialization.json)
 
     // Useful server plugins (optional but nice)
     implementation("io.ktor:ktor-server-cors:${property("ktor.version")}")

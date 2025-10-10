@@ -19,6 +19,10 @@ import kz.aita.compose.wrapper.ImeWithAction
 @Composable
 fun AppConfiguration.repeatedPasswordTextFieldGroup(
   modifier: Modifier = Modifier,
+  passwordTitleText: String? = null,
+  passwordPlaceholderText: String? = null,
+  repeatPasswordTitleText: String? = null,
+  repeatPasswordPlaceholderText: String? = null,
   imeWithAction: ImeWithAction? = null
 ): Pair<GenericTextFieldContent, GenericTextFieldContent> {
 
@@ -28,8 +32,8 @@ fun AppConfiguration.repeatedPasswordTextFieldGroup(
 
   val passwordTextFieldContent = genericTextField(
     modifier = modifier,
-    titleText = stateValues.stringPassword,
-    placeholderText = stateValues.stringEnterPassword,
+    titleText = passwordTitleText ?: stateValues.stringPassword,
+    placeholderText = passwordPlaceholderText ?: stateValues.stringEnterPassword,
     leadingIconPath = stateValues.drawablePathIconPassword,
     keyboardType = KeyboardType.Password,
     imeWithAction = imeWithAction ?: ImeWithAction.Default,
@@ -65,8 +69,8 @@ fun AppConfiguration.repeatedPasswordTextFieldGroup(
 
   val repeatedPasswordTextFieldContent = genericTextField(
     modifier = modifier,
-    titleText = stateValues.stringRepeatPassword,
-    placeholderText = stateValues.stringRepeatPassword,
+    titleText = repeatPasswordTitleText ?: stateValues.stringRepeatPassword,
+    placeholderText = repeatPasswordPlaceholderText ?: stateValues.stringRepeatPassword,
     leadingIconPath = stateValues.drawablePathIconPassword,
     keyboardType = KeyboardType.Password,
     imeWithAction = imeWithAction ?: ImeWithAction.Default,

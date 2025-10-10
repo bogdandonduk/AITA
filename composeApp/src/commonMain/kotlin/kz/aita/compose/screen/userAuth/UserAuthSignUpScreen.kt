@@ -24,181 +24,179 @@ import kz.aita.model.wrapper.DataState
 fun AppConfiguration.UserAuthSignUpScreen(
   userRepository: UserRepository
 ) {
-  LazyColumn(
+  Column(
     modifier = Modifier.fillMaxSize(),
     horizontalAlignment = Alignment.CenterHorizontally
   ) {
-    item {
-      if (stateValues.isNarrowScreen)
-        Spacer(
-          modifier = Modifier
-            .height(stateValues.screenHeight / 6)
-        )
-
-      Column(
+    if (stateValues.isNarrowScreen)
+      Spacer(
         modifier = Modifier
-          .width(stateValues.boundWidgetWidth),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-      ) {
-        if (stateValues.isNarrowScreen)
-          LargeIconWithTitleWidget(
-            imageUrl = stateValues.drawablePathAITALogo,
-            title = stateValues.stringSignUp
-          )
+          .height(stateValues.screenHeight / 6)
+      )
 
-        if (!stateValues.isNarrowScreen)
-          Text(
-            text = stateValues.stringSignUp,
-            style = TextStyle(
-              color = stateValues.TextColor,
-              fontSize = stateValues.titleTextSize,
-              fontWeight = FontWeight.Bold
+    Column(
+      modifier = Modifier
+        .width(stateValues.boundWidgetWidth),
+      horizontalAlignment = Alignment.CenterHorizontally,
+      verticalArrangement = Arrangement.Center
+    ) {
+      if (stateValues.isNarrowScreen)
+        LargeIconWithTitleWidget(
+          imageUrl = stateValues.drawablePathAITALogo,
+          title = stateValues.stringSignUp
+        )
+
+      if (!stateValues.isNarrowScreen)
+        Text(
+          text = stateValues.stringSignUp,
+          style = TextStyle(
+            color = stateValues.TextColor,
+            fontSize = stateValues.titleTextSize,
+            fontWeight = FontWeight.Bold
+          )
+        )
+
+      val outerSpace = 16.dp
+      val innerSpace = 8.dp
+
+      Spacer(modifier = Modifier.height(outerSpace))
+
+      val phoneNumberTextFieldContent = countrySelectionPhoneNumberTextField()
+
+      Spacer(modifier = Modifier.height(innerSpace))
+
+      val emailTextFieldContent = emailTextField()
+
+      Spacer(modifier = Modifier.height(innerSpace))
+
+      val firstNameTextFieldContent = genericTextField(
+        titleText = stateValues.stringFirstName,
+        placeholderText = stateValues.stringEnterFirstName,
+        leadingIconPath = stateValues.drawablePathIconPerson,
+        contentInvalidText = stateValues.stringFirstNameCannotBeEmptyOrJustWhitespaces,
+        onContentValidityCheck = {
+          it.checkAsPersonName()
+        },
+        onFilterValue = {
+          it.filterAsPersonName()
+        }
+      )
+
+      Spacer(modifier = Modifier.height(innerSpace))
+
+      val lastNameTextFieldContent = genericTextField(
+        titleText = stateValues.stringLastName,
+        placeholderText = stateValues.stringEnterLastName,
+        leadingIconPath = stateValues.drawablePathIconPerson,
+        contentInvalidText = stateValues.stringLastNameCannotBeEmptyOrJustWhitespaces,
+        onContentValidityCheck = {
+          it.checkAsPersonName()
+        },
+        onFilterValue = {
+          it.filterAsPersonName()
+        }
+      )
+
+      Spacer(modifier = Modifier.height(innerSpace))
+
+      val (passwordTextFieldContent, repeatedPasswordTextFieldContent) = repeatedPasswordTextFieldGroup()
+
+      responseText(
+        stateValues.stringUserWithThisPhoneNumberIsAlreadyRegistered,
+        showIf = {
+          (stateValues.userAccountState as? DataState.Failure)?.exception?.message?.equals(
+            stateValues.exceptionMessageUserWithThisPhoneNumberIsAlreadyRegistered,
+            true
+          ) == true
+        }
+      )
+
+      responseText(
+        stateValues.stringUserWithThisEmailAddressIsAlreadyRegistered,
+        showIf = {
+          (stateValues.userAccountState as? DataState.Failure)?.exception?.message?.equals(
+            stateValues.exceptionMessageUserWithThisEmailAddressIsAlreadyRegistered,
+            true
+          ) == true
+        }
+      )
+
+      responseText(
+        stateValues.stringUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered,
+        showIf = {
+          (stateValues.userAccountState as? DataState.Failure)?.exception?.message?.equals(
+            stateValues.exceptionMessageUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered,
+            true
+          ) == true
+        }
+      )
+
+      Spacer(modifier = Modifier.height(outerSpace))
+
+      actionButton(
+        text = stateValues.stringSignUp,
+        enabled = stateValues.userAccountState !is DataState.Progress,
+        icon = if (stateValues.userAccountState is DataState.Progress) {
+          {
+            CircularProgressIndicator(
+              color = stateValues.AccentTextColor,
+              modifier = Modifier
+                .padding(start = 20.dp)
+                .size(20.dp)
             )
-          )
-
-        val outerSpace = 16.dp
-        val innerSpace = 8.dp
-
-        Spacer(modifier = Modifier.height(outerSpace))
-
-        val phoneNumberTextFieldContent = countrySelectionTextField()
-
-        Spacer(modifier = Modifier.height(innerSpace))
-
-        val emailTextFieldContent = emailTextField()
-
-        Spacer(modifier = Modifier.height(innerSpace))
-
-        val firstNameTextFieldContent = genericTextField(
-          titleText = stateValues.stringFirstName,
-          placeholderText = stateValues.stringEnterFirstName,
-          leadingIconPath = stateValues.drawablePathIconPerson,
-          contentInvalidText = stateValues.stringFirstNameCannotBeEmptyOrJustWhitespaces,
-          onContentValidityCheck = {
-            it.checkAsPersonName()
-          },
-          onFilterValue = {
-            it.filterAsPersonName()
           }
+        } else null
+      ) {
+        phoneNumberTextFieldContent.checkContentValidity()
+        emailTextFieldContent.checkContentValidity()
+
+        firstNameTextFieldContent.checkContentValidity()
+        lastNameTextFieldContent.checkContentValidity()
+
+        passwordTextFieldContent.checkContentValidity()
+        repeatedPasswordTextFieldContent.checkContentValidity()
+
+        if (
+          phoneNumberTextFieldContent.isContentValid
+          && emailTextFieldContent.isContentValid
+          && firstNameTextFieldContent.isContentValid
+          && lastNameTextFieldContent.isContentValid
+          && passwordTextFieldContent.isContentValid
+          && repeatedPasswordTextFieldContent.isContentValid
         )
+          userRepository
+            .signUp(
+              UserAuthSignUpDataModel(
+                phoneNumber = stateValues.globalAppConfiguration.countries.run {
+                  find { it.locale.equals(phoneNumberTextFieldContent.selectedId, true) } ?: first()
+                }.phoneNumberCode + phoneNumberTextFieldContent.value.text.trim(),
+                email = emailTextFieldContent.value.text.trim(),
+                firstName = firstNameTextFieldContent.value.text.trim(),
+                lastName = lastNameTextFieldContent.value.text.trim(),
+                countryLocale = phoneNumberTextFieldContent.selectedId,
+                password = passwordTextFieldContent.value.text
+              )
+            )
 
-        Spacer(modifier = Modifier.height(innerSpace))
+      }
 
-        val lastNameTextFieldContent = genericTextField(
-          titleText = stateValues.stringLastName,
-          placeholderText = stateValues.stringEnterLastName,
-          leadingIconPath = stateValues.drawablePathIconPerson,
-          contentInvalidText = stateValues.stringLastNameCannotBeEmptyOrJustWhitespaces,
-          onContentValidityCheck = {
-            it.checkAsPersonName()
-          },
-          onFilterValue = {
-            it.filterAsPersonName()
-          }
-        )
-
-        Spacer(modifier = Modifier.height(innerSpace))
-
-        val (passwordTextFieldContent, repeatedPasswordTextFieldContent) = repeatedPasswordTextFieldGroup()
-
-        errorText(
-          stateValues.stringUserWithThisPhoneNumberIsAlreadyRegistered,
-          showIf = {
-            (stateValues.userAccountState as? DataState.Failure)?.exception?.message?.equals(
-              stateValues.exceptionMessageUserWithThisPhoneNumberIsAlreadyRegistered,
-              true
-            ) == true
-          }
-        )
-
-        errorText(
-          stateValues.stringUserWithThisEmailAddressIsAlreadyRegistered,
-          showIf = {
-            (stateValues.userAccountState as? DataState.Failure)?.exception?.message?.equals(
-              stateValues.exceptionMessageUserWithThisEmailAddressIsAlreadyRegistered,
-              true
-            ) == true
-          }
-        )
-
-        errorText(
-          stateValues.stringUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered,
-          showIf = {
-            (stateValues.userAccountState as? DataState.Failure)?.exception?.message?.equals(
-              stateValues.exceptionMessageUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered,
-              true
-            ) == true
-          }
-        )
-
-        Spacer(modifier = Modifier.height(outerSpace))
+      if (stateValues.isNarrowScreen) {
+        Spacer(modifier = Modifier.height(2.dp))
 
         actionButton(
-          text = stateValues.stringSignUp,
-          enabled = stateValues.userAccountState !is DataState.Progress,
-          icon = if (stateValues.userAccountState is DataState.Progress) {
-            {
-              CircularProgressIndicator(
-                color = stateValues.AccentTextColor,
-                modifier = Modifier
-                  .padding(start = 20.dp)
-                  .size(20.dp)
-              )
-            }
-          } else null
+          text = stateValues.stringCancel,
+          enabledColor = stateValues.DisabledColor
         ) {
-          phoneNumberTextFieldContent.checkContentValidity()
-          emailTextFieldContent.checkContentValidity()
-
-          firstNameTextFieldContent.checkContentValidity()
-          lastNameTextFieldContent.checkContentValidity()
-
-          passwordTextFieldContent.checkContentValidity()
-          repeatedPasswordTextFieldContent.checkContentValidity()
-
-          if (
-            phoneNumberTextFieldContent.isContentValid
-            && emailTextFieldContent.isContentValid
-            && firstNameTextFieldContent.isContentValid
-            && lastNameTextFieldContent.isContentValid
-            && passwordTextFieldContent.isContentValid
-            && repeatedPasswordTextFieldContent.isContentValid
-          )
-            userRepository
-              .signUp(
-                UserAuthSignUpDataModel(
-                  phoneNumber = stateValues.globalAppConfiguration.countries.run {
-                    find { it.locale.equals(phoneNumberTextFieldContent.selectedId, true) } ?: first()
-                  }.phoneNumberCode + phoneNumberTextFieldContent.value.text.trim(),
-                  email = emailTextFieldContent.value.text.trim(),
-                  firstName = firstNameTextFieldContent.value.text.trim(),
-                  lastName = lastNameTextFieldContent.value.text.trim(),
-                  countryLocale = phoneNumberTextFieldContent.selectedId,
-                  password = passwordTextFieldContent.value.text
-                )
-              )
-
-        }
-
-        if (stateValues.isNarrowScreen) {
-          Spacer(modifier = Modifier.height(2.dp))
-
-          actionButton(
-            text = stateValues.stringCancel,
-            enabledColor = stateValues.DisabledColor
-          ) {
-            coroutineScope.launch {
-              Navigation.UserAuth.popLeft()
-            }
+          coroutineScope.launch {
+            Navigation.UserAuth.popLeft()
           }
         }
-
-        Spacer(
-          modifier = Modifier
-            .height(stateValues.screenHeight / 10)
-        )
       }
+
+      Spacer(
+        modifier = Modifier
+          .height(stateValues.screenHeight / 10)
+      )
     }
   }
 }

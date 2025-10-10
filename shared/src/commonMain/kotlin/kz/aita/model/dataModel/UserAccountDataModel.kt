@@ -10,8 +10,8 @@ data class UserAccountDataModel(
   val firstName: String,
   val lastName: String,
   val countryLocale: String,
-  val storeWorkerAccountId: String?,
-  val storeSupplierAccountId: String?,
+  val workerAccountIds: String?,
+  val supplierAccountIds: String?,
   val createdAt: Long,
   val isActive: Boolean
 )

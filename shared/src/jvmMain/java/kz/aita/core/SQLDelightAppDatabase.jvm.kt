@@ -7,12 +7,10 @@ import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import kz.aita.KeyValueDatabase
 import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.Paths
+import kotlin.io.path.Path
 
 actual var sqlDelightDriver: SqlDriver? = Unit.run {
-  val dir: Path = Paths.get(System.getProperty("user.home"), ".aita")
-  Files.createDirectories(dir)
+  val dir = Path(cacheDirPath)
   val dbPath = dir.resolve("key_value.db").toAbsolutePath()
 
   val url = "jdbc:sqlite:$dbPath"

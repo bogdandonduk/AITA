@@ -38,6 +38,7 @@ import kz.aita.compose.screen.userAuth.UserAuthScreen
 import kz.aita.core.getFullDrawableResourceUrl
 import kz.aita.core.io
 import kz.aita.core.userRepository
+import kz.aita.model.dataModel.NotificationType
 import kz.aita.model.wrapper.DataState
 
 @Composable
@@ -57,9 +58,11 @@ fun AppConfiguration.MainScreen() {
         .userAccountState
         .value
         .collect {
-          if (it is DataState.Empty || it is DataState.Failure) {
+          if (it is DataState.Empty || it is DataState.Failure || (it is DataState.SoftFailure && it.existingPayload == null)) {
             Navigation.goMain(NavigationScreenModel.UserAuth.Main)
-          } else if (it is DataState.Success && Navigation.Main.value.last().run { this is NavigationScreenModel.UserAuth || this is NavigationScreenModel.Splash} )
+          } else if ((it is DataState.Success || it is DataState.SoftFailure && it.existingPayload != null) && Navigation.Main.value.last()
+              .run { this is NavigationScreenModel.UserAuth || this is NavigationScreenModel.Splash }
+          )
             Navigation.goMain(NavigationScreenModel.Transaction.MainSale)
         }
     }
@@ -73,6 +76,7 @@ fun AppConfiguration.MainScreen() {
           is NavigationScreenModel.Splash -> {
             SplashScreen()
           }
+
           is NavigationScreenModel.UserAuth ->
             UserAuthScreen()
 
@@ -85,13 +89,14 @@ fun AppConfiguration.MainScreen() {
           is NavigationScreenModel.Menu ->
             MenuScreen()
 
-          else -> { }
+          else -> {}
         }
       }
     }
 
+
     if (showNavigationBar)
-      Box(
+      Column(
         modifier = Modifier
           .clip(
             RoundedCornerShape(
@@ -108,12 +113,37 @@ fun AppConfiguration.MainScreen() {
             )
           )
           .fillMaxWidth()
-          .height(56.dp)
+          .height(if (stateValues.latestNotification != null) 80.dp else 56.dp)
           .wrapContentHeight(),
-        contentAlignment = Alignment.Center
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
       ) {
+        stateValues.latestNotification?.run {
+          Box(
+            modifier = Modifier
+              .fillMaxWidth()
+              .height(24.dp)
+              .background(
+                when (type) {
+                  NotificationType.Neutral -> stateValues.PlaceholderTextColor
+                  NotificationType.Positive -> stateValues.OkayColor
+                  NotificationType.Negative -> stateValues.ErrorColor
+                }
+              ),
+            contentAlignment = Alignment.Center
+          ) {
+            Text(
+              text = message,
+              color = stateValues.AccentTextColor,
+              fontSize = stateValues.textSize,
+              fontWeight = FontWeight.Bold
+            )
+          }
+        }
+
         Row(
           modifier = Modifier
+            .weight(1f)
             .run {
               if (stateValues.isNarrowScreen)
                 fillMaxWidth()

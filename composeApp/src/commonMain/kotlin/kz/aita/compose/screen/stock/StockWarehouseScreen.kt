@@ -14,7 +14,7 @@ import kz.aita.compose.navigation.NavigationScreenModel
 import kz.aita.compose.widget.GoodsItemInStockWidget
 import kz.aita.compose.widget.MessageText
 import kz.aita.compose.widget.ScreenAppBarWidget
-import kz.aita.compose.widget.searchTextFieldWithCamBarcodeScanner
+import kz.aita.compose.widget.searchTextField
 import kz.aita.core.search
 import kz.aita.model.dataModel.GoodsItemDataModel
 import kz.aita.model.wrapper.DataState
@@ -30,8 +30,6 @@ fun AppConfiguration.StockWarehouseScreen() {
       iconPath = stateValues.drawablePathIconStock
     )
 
-    println("stock state ${stateValues.stockState}")
-
     when (val state = stateValues.stockState) {
       is DataState.Success -> {
         if (state.payload.isEmpty()) {
@@ -43,10 +41,11 @@ fun AppConfiguration.StockWarehouseScreen() {
           )
         } else {
           val searchTextFieldContent =
-            searchTextFieldWithCamBarcodeScanner(
+            searchTextField(
               valueInitial = NavigationScreenModel.Stock.Warehouse.state["search_query"],
               modifier = Modifier
-                .padding(start = 8.dp, top = 8.dp, end = 8.dp)
+                .padding(start = 8.dp, top = 8.dp, end = 8.dp),
+              barcodeCamScanner = true
             )
 
           val items = searchTextFieldContent

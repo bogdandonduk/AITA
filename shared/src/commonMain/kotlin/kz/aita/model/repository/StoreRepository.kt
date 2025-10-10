@@ -7,4 +7,6 @@ interface StoreRepository {
   val storesState: DataStateFlow<List<StoreDataModel>>
 
   fun getStores()
+
+  fun addStore(store: StoreDataModel)
 }

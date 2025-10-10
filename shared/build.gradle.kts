@@ -59,6 +59,7 @@ kotlin {
     }
 
     commonMain.dependencies {
+      implementation("io.ktor:ktor-client-logging:${property("ktor.version")}")
 //            api(libs.kotlinx.serialization.core)
       implementation(libs.kotlinx.serialization.json)
 
@@ -71,6 +72,7 @@ kotlin {
       implementation(libs.sqlDelightAsyncExtensions)
 
       implementation("io.ktor:ktor-client-core:${property("ktor.version")}")
+      implementation("io.ktor:ktor-client-logging:${property("ktor.version")}")
       implementation("io.ktor:ktor-client-content-negotiation:${property("ktor.version")}")
       implementation("io.ktor:ktor-serialization-kotlinx-json:${property("ktor.version")}")
 
@@ -95,7 +97,7 @@ kotlin {
       implementation("io.ktor:ktor-client-android:${property("ktor.version")}")
     }
     jvmMain.dependencies {
-      implementation("com.github.javakeyring:java-keyring:1.0.3")
+      implementation(libs.java.keyring)
       implementation(libs.jserialcomm)
 
       implementation(libs.sqlDelightJvmDriver)

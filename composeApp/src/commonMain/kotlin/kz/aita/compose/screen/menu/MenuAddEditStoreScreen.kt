@@ -10,7 +10,16 @@ import kotlinx.coroutines.launch
 import kz.aita.AppConfiguration
 import kz.aita.compose.navigation.Navigation
 import kz.aita.compose.widget.ScreenAppBarWidget
+import kz.aita.compose.widget.actionButton
+import kz.aita.compose.widget.countrySelectionPhoneNumberTextField
+import kz.aita.compose.widget.emailTextField
 import kz.aita.compose.widget.genericTextField
+import kz.aita.core.extractLocalizedString
+import kz.aita.core.storeRepository
+import kz.aita.model.dataModel.LocalizedStringDataModel
+import kz.aita.model.dataModel.LocationDataModel
+import kz.aita.model.dataModel.StoreDataModel
+import kz.aita.model.wrapper.DataState
 
 @Composable
 fun AppConfiguration.MenuAddEditStoreScreen() {
@@ -38,6 +47,9 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
         .padding(start = 8.dp, top = 24.dp, end = 8.dp)
     ) {
       item {
+        val innerSpace = 8.dp
+        val outerSpace = 16.dp
+
         val nameTextFieldContent =
           genericTextField(
             titleText = stateValues.stringName,
@@ -46,41 +58,111 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
 
         Spacer(
           modifier = Modifier
-            .height(8.dp)
+            .height(innerSpace)
         )
 
-        val alias =
+        val aliasTextFieldContent =
           genericTextField(
-            titleText = stateValues.stringSupplyPriceState,
-            placeholderText = stateValues.stringEnterSupplyPrice,
+            titleText = stateValues.stringAlias,
+            placeholderText = stateValues.stringOptional,
           )
 
         Spacer(
           modifier = Modifier
-            .height(8.dp)
+            .height(innerSpace)
         )
 
-        val salePriceTextFieldContent =
+        val descriptionTextFieldContent =
           genericTextField(
-            titleText = stateValues.stringSalePriceState,
-            placeholderText = stateValues.stringEnterSalePrice,
+            titleText = stateValues.stringDescription,
+            placeholderText = stateValues.stringOptional
           )
 
         Spacer(
           modifier = Modifier
-            .height(8.dp)
+            .height(innerSpace)
         )
 
-        val returnPriceTextFieldContent =
-          genericTextField(
-            titleText = stateValues.stringReturnPriceState,
-            placeholderText = stateValues.stringEnterReturnPrice,
-          )
-
-        Spacer(
-          modifier = Modifier
-            .height(8.dp)
+        val phoneNumberTextFieldContent = countrySelectionPhoneNumberTextField(
+          valueInitial = stateValues.userAccount?.phoneNumber
         )
+
+        Spacer(modifier = Modifier.height(innerSpace))
+
+        var goAction: (() -> Unit)? = null
+        val emailTextFieldContent = emailTextField(valueInitial = stateValues.userAccount?.email)
+
+        Spacer(modifier = Modifier.height(outerSpace))
+
+        goAction = {
+          softKeyboardController?.hide()
+
+          nameTextFieldContent.checkContentValidity()
+
+          phoneNumberTextFieldContent.checkContentValidity()
+          emailTextFieldContent.checkContentValidity()
+
+          if (
+            nameTextFieldContent.isContentValid
+            && phoneNumberTextFieldContent.isContentValid
+            && emailTextFieldContent.isContentValid
+          ) {
+            storeRepository
+              .addStore(
+                  store = StoreDataModel(
+                    id = "",
+                    userId = "",
+                    name = listOf(
+                      LocalizedStringDataModel(
+                        language = stateValues.appLanguage,
+                        value = nameTextFieldContent.value.text.trim()
+                      )
+                    ),
+                    alias = if (aliasTextFieldContent.value.text.isNotEmpty()) {
+                      listOf(
+                        LocalizedStringDataModel(
+                          language = stateValues.appLanguage,
+                          value = aliasTextFieldContent.value.text.trim()
+                        )
+                      )
+                    } else null,
+                    description = if (descriptionTextFieldContent.value.text.isNotEmpty()) {
+                      listOf(
+                        LocalizedStringDataModel(
+                          language = stateValues.appLanguage,
+                          value = descriptionTextFieldContent.value.text.trim()
+                        )
+                      )
+                    } else null,
+                    companyForm = stateValues.globalAppConfiguration.companyForms.first(),
+                    location = stateValues.globalAppConfiguration.countries.first().cities.first().run {
+                      LocationDataModel(
+                        name = name.extractLocalizedString(stateValues.appLanguage) ?: "Some location",
+                        postalIndex = "020000",
+                        latitude = centerLatitude,
+                        longitude = centerLongitude
+                      )
+                    },
+                    phoneNumbers = listOf(
+                      stateValues.globalAppConfiguration.countries.run {
+                        find { it.locale.equals(phoneNumberTextFieldContent.selectedId, true) } ?: first()
+                      }.phoneNumberCode.lowercase() + phoneNumberTextFieldContent.value.text.trim().lowercase()
+                    ),
+                    emails = listOf(emailTextFieldContent.value.text.trim().lowercase()),
+
+                    createdAt = 0L,
+                    isActive = true
+                  )
+              )
+          }
+        }
+
+        actionButton(
+          text = stateValues.stringAddStore,
+          enabled = stateValues.storesState !is DataState.Progress
+        ) {
+          goAction.invoke()
+        }
       }
 
       item {

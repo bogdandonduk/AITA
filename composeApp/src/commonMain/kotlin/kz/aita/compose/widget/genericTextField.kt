@@ -51,7 +51,7 @@ fun AppConfiguration.genericTextField(
   modifier: Modifier = Modifier,
 
   enabled: Boolean = true,
-
+  wide: Boolean = false,
   valueInitial: String? = null,
   titleText: String = "",
 
@@ -82,7 +82,7 @@ fun AppConfiguration.genericTextField(
   cornerRadius: Dp = stateValues.cornerRadius,
 
   keyboardType: KeyboardType = KeyboardType.Text,
-  imeWithAction: ImeWithAction = ImeWithAction(ime = ImeAction.Default),
+  imeWithAction: ImeWithAction? = null,
 
   leadingIconPath: String? = null,
   leadingIcon: @Composable (() -> Unit)? = null,
@@ -93,7 +93,7 @@ fun AppConfiguration.genericTextField(
   visualTransformation: (TextFieldValue) -> TransformedText = {
     getTransformedTextWithSelectionFocusTextColor(it, selectionFocusTextColor)
   },
-  contentInvalidText: String = "",
+  contentInvalidText: String? = null,
   onContentValidityCheck: ((String) -> Boolean)? = null,
   onFilterValue: ((String) -> Boolean)? = null,
   onValueChange: ((String, () -> Unit) -> Unit)? = null
@@ -156,7 +156,7 @@ fun AppConfiguration.genericTextField(
         },
         enabled = enabled,
         modifier = Modifier
-          .height(stateValues.textFieldHeight)
+          .height(if (wide) stateValues.wideTextFieldHeight else stateValues.textFieldHeight)
           .clip(RoundedCornerShape(cornerRadius))
           .background(backgroundColor)
           .border(
@@ -172,9 +172,9 @@ fun AppConfiguration.genericTextField(
           },
         keyboardOptions = KeyboardOptions.Default.copy(
           keyboardType = keyboardType,
-          imeAction = imeWithAction.ime
+          imeAction = (imeWithAction ?: ImeWithAction(ime = ImeAction.Default)).ime
         ),
-        keyboardActions = imeWithAction.getKeyboardActions(),
+        keyboardActions = (imeWithAction ?: ImeWithAction(ime = ImeAction.Default)).getKeyboardActions(),
         textStyle = TextStyle(
           fontSize = textSize,
           color = textColor
@@ -200,8 +200,7 @@ fun AppConfiguration.genericTextField(
                   KamelImage(
                     modifier = Modifier
                       .padding(start = 12.dp, top = stateValues.textFieldIconPadding, bottom = stateValues.textFieldIconPadding)
-                      .fillMaxHeight()
-                      .aspectRatio(1f, matchHeightConstraintsFirst = true),
+                      .size(stateValues.iconSize),
                     resource = {
                       asyncPainterResource(
                         data = Url(getFullDrawableResourceUrl(leadingIconPath))
@@ -215,7 +214,12 @@ fun AppConfiguration.genericTextField(
               Box(
                 Modifier
                   .weight(1f)
-                  .padding(start = 12.dp)
+                  .run {
+//                    if (wide)
+//                      fillMaxHeight().padding(start = 12.dp, top = 12.dp, bottom = 12.dp)
+//                    else
+                      padding(start = 12.dp)
+                  }
               ) {
                 Text(
                   text = if (value.text.isEmpty()) placeholderText else "",
@@ -232,7 +236,7 @@ fun AppConfiguration.genericTextField(
               CompositionLocalProvider(LocalKamelConfig provides kamelConfig) {
                 Row(
                   modifier = Modifier
-                    .fillMaxHeight()
+                    .fillMaxHeight(),
                 ) {
                   trailingIconExtraPath?.run {
                     Box(
@@ -251,15 +255,15 @@ fun AppConfiguration.genericTextField(
                     ) {
                       KamelImage(
                         modifier = Modifier
-                          .padding(horizontal = 12.dp, vertical = stateValues.textFieldIconPadding)
-                          .fillMaxHeight()
-                          .aspectRatio(1f, matchHeightConstraintsFirst = true),
+                          .padding(horizontal = 10.dp, vertical = stateValues.textFieldIconPadding)
+                          .size(stateValues.iconSize),
                         resource = {
                           asyncPainterResource(
                             data = Url(getFullDrawableResourceUrl(trailingIconExtraPath))
                           )
                         },
-                        contentDescription = trailingIconExtraContentDescription
+                        contentDescription = trailingIconExtraContentDescription,
+
                       )
                     }
                   }
@@ -281,8 +285,7 @@ fun AppConfiguration.genericTextField(
                       KamelImage(
                         modifier = Modifier
                           .padding(start = 4.dp, top = stateValues.textFieldIconPadding, bottom = stateValues.textFieldIconPadding, end = 12.dp)
-                          .fillMaxHeight()
-                          .aspectRatio(1f, matchHeightConstraintsFirst = true),
+                          .size(stateValues.iconSize),
                         resource = {
                           asyncPainterResource(
                             data = Url(getFullDrawableResourceUrl(stateValues.drawablePathIconCancel))
@@ -300,7 +303,7 @@ fun AppConfiguration.genericTextField(
       )
     }
 
-    if (!isContentValid && contentInvalidText.isNotEmpty() && contentInvalidText.isNotBlank()) {
+    if (!isContentValid && contentInvalidText != null && contentInvalidText.isNotEmpty() && contentInvalidText.isNotBlank()) {
       Text(
         modifier = Modifier
           .fillMaxWidth()
@@ -336,6 +339,9 @@ fun AppConfiguration.genericTextField(
         isContentValid = value
         value
       }
+    },
+    onReset = {
+      value = TextFieldValue()
     }
   )
 
@@ -355,10 +361,15 @@ class GenericTextFieldContent(
   var isFocused: Boolean,
   var focusRequester: FocusRequester,
   var isContentValid: Boolean,
-  val onContentValidityCheck: ((String) -> Boolean)? = null
+  val onContentValidityCheck: ((String) -> Boolean)? = null,
+  val onReset: (() -> Unit)? = null
 ) {
 
   fun checkContentValidity() {
     isContentValid = onContentValidityCheck?.invoke(value.text) ?: true
+  }
+
+  fun reset() {
+    onReset?.invoke()
   }
 }

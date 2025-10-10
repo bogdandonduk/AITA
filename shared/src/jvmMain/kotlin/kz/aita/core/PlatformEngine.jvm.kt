@@ -11,7 +11,7 @@ actual fun getHttpClientEngine(): HttpClientEngine {
     preconfigured = OkHttpClient.Builder()
       .cache(
         Cache(
-          File(osCacheDirPath),
+          File(cacheDirPath),
           cacheSize
         )
       ).build()

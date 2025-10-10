@@ -6,18 +6,25 @@ import io.ktor.server.auth.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.coroutines.Dispatchers
+import kz.aita.core.jsonBase
 import kz.aita.model.dataModel.UserAuthLogInDataModel
 import kz.aita.model.dataModel.UserAuthSignUpDataModel
 import kz.aita.model.wrapper.TokenPair
+import kz.aita.server.db.Stores
 import kz.aita.server.db.Users
 import kz.aita.server.encrypt.Pw
 import kz.aita.server.jwt.TokenService
 import kz.aita.server.util.getException
+import kz.aita.server.util.metaFrom
+import org.jetbrains.exposed.exceptions.ExposedSQLException
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.postgresql.util.PSQLException
 import java.time.Instant
 import java.util.*
 
@@ -30,102 +37,115 @@ fun Application.authRoutes(tokenService: TokenService) {
         val phoneNumber = body.phoneNumber.trim().lowercase()
         val email = body.email.trim().lowercase()
 
-        val phoneNumberExists = transaction {
-          val cond = Users.phoneNumber eq phoneNumber
-          Users.selectAll().where { cond }.count()
-        } > 0
+        val conflictResult = newSuspendedTransaction(Dispatchers.IO) {
+          val userWithPhoneNumberExists = Users
+            .select(Users.phoneNumber)
+            .where { Users.phoneNumber eq phoneNumber }
+            .empty()
+            .not()
 
-        val emailExists = transaction {
-          val cond = Users.email eq email
-          Users.selectAll().where { cond }.count()
-        } > 0
+           val userWithEmailExists = Users
+            .select(Users.email)
+            .where { Users.email eq email }
+            .empty()
+            .not()
 
-        if (phoneNumberExists && emailExists)
-          return@post call.respond(
-            HttpStatusCode.Conflict,
-            getException(2)?.message ?: "User with this phone number and email address is already registered"
-          )
-        else if (phoneNumberExists)
-          return@post call.respond(
-            HttpStatusCode.Conflict,
-            getException(0)?.message ?: "User with this phone number is already registered"
-          )
-        else if (emailExists)
-          return@post call.respond(
-            HttpStatusCode.Conflict,
-            getException(1)?.message ?: "User with this email address is already registered"
-          )
+          val userWithPhoneNumberAndEmailExists = userWithPhoneNumberExists && userWithEmailExists
+
+          if (userWithPhoneNumberAndEmailExists)
+            return@newSuspendedTransaction 1
+          else if (userWithPhoneNumberExists)
+            return@newSuspendedTransaction 2
+          else if (userWithEmailExists)
+            return@newSuspendedTransaction 3
+
+          return@newSuspendedTransaction 0
+        }
+
+        when (conflictResult) {
+          0 -> {}
+          1 -> return@post call.respond(HttpStatusCode.Conflict, getException(2) ?: "User with this phone number and email address is already registered")
+          2 -> return@post call.respond(HttpStatusCode.Conflict, getException(0) ?: "User with this phone number is already registered")
+          3 -> return@post call.respond(HttpStatusCode.Conflict, getException(1) ?: "User with this email is already registered")
+          else -> return@post call.respond(HttpStatusCode.InternalServerError)
+        }
+
 
         val firstName = body.firstName.trim()
         val lastName = body.lastName.trim()
         val countryLocale = body.countryLocale.trim().lowercase()
 
-        val userId = UUID.randomUUID()
+        var id = UUID.randomUUID()
+
         val hash = Pw.hash(body.password.toCharArray())
         val instant = Instant.now()
 
-        transaction {
-          Users.insert {
-            it[Users. id] = userId
-            it[Users.phoneNumber] = phoneNumber
-            it[Users.email] = email
-            it[Users.firstName] = firstName
-            it[Users.lastName] = lastName
-            it[Users.countryLocale] = countryLocale
-            it[Users.storeWorkerAccountId] = null
-            it[Users.storeSupplierAccountId] = null
-            it[Users.passwordHash] = hash
-            it[Users.createdAt] = instant
-            it[Users.isActive] = true
+        var state23505Reached: Boolean
+
+        do {
+          state23505Reached = try {
+            id = UUID.randomUUID()
+
+            newSuspendedTransaction(Dispatchers.IO) {
+              Users.insert {
+                it[Users.id] = id
+                it[Users.phoneNumber] = phoneNumber
+                it[Users.email] = email
+                it[Users.firstName] = firstName
+                it[Users.lastName] = lastName
+                it[Users.countryLocale] = countryLocale
+                it[Users.workerAccountIds] = null
+                it[Users.supplierAccountIds] = null
+                it[Users.passwordHash] = hash
+                it[Users.createdAt] = instant
+                it[Users.isActive] = true
+              }
+
+              false
+            }
+          } catch (exception: ExposedSQLException) {
+            val constraint = (exception.cause as? PSQLException)?.serverErrorMessage?.constraint
+            val isPkCollision = exception.sqlState == "23505" && constraint?.equals("users_pkey", true) == true
+
+            isPkCollision
           }
-        }
+        } while (state23505Reached)
 
-        val tokenPair: TokenPair = tokenService.newPair(userId, metaFrom(call))
+        id?.run {
+          val tokenPair: TokenPair = tokenService.newPair(this, metaFrom(call))
 
-        call.respond(
-          HttpStatusCode.Created,
-          tokenPair
-        )
+          call.respond(
+            HttpStatusCode.Created,
+            tokenPair
+          )
+        } ?: call.respond(HttpStatusCode.InternalServerError)
+
       }
 
       post("/logIn") {
         val body = call.receive<UserAuthLogInDataModel>()
 
-        println("received1 $body")
         val login = body.login.trim().lowercase()
 
         val cond = (Users.phoneNumber eq login) or (Users.email eq login)
-        println("received3")
 
-        val badCredentialsMessage = getException(4)?.message ?: "Login or password incorrect"
+        val badCredentialsMessage = getException(4)?.message ?: "Login and/or password incorrect"
 
-        println("received4")
-
-        val user = transaction {
+        val user = newSuspendedTransaction(Dispatchers.IO) {
           Users.selectAll().where { cond }.singleOrNull()
         } ?: return@post call.respond(HttpStatusCode.Unauthorized, badCredentialsMessage)
 
-        println("received5")
-
-        // Verify password hash
         val ok = Pw.verify(body.password.toCharArray(), user[Users.passwordHash])
-
-        println("received6")
 
         if (!ok)
           return@post call.respond(HttpStatusCode.Unauthorized, badCredentialsMessage)
 
-
-        println("received7")
-
         val tokenPair: TokenPair = tokenService.newPair(user[Users.id], metaFrom(call))
 
-        println("received8 $tokenPair")
-
-        call.respond(HttpStatusCode.OK,tokenPair)
+        call.respond(HttpStatusCode.OK, tokenPair)
       }
 
-      post("/logOut") {
+      delete("/logOut") {
         val body = call.receive<String>()
         try {
           call.respond(HttpStatusCode.OK, tokenService.revoke(body))

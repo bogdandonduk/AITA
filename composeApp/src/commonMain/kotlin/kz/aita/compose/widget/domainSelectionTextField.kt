@@ -26,6 +26,7 @@ import kz.aita.compose.wrapper.ImeWithAction
 @Composable
 fun AppConfiguration.domainSelectionTextField(
   modifier: Modifier = Modifier,
+  valueInitial: String? = null,
   titleText: String,
   placeholderText: String,
   domains: List<SelectableDomain>,
@@ -33,6 +34,8 @@ fun AppConfiguration.domainSelectionTextField(
   selectionEnabled: Boolean = true,
   imeWithAction: ImeWithAction? = null,
   cornerRadius: Dp = stateValues.cornerRadius,
+  keyboardType: KeyboardType = KeyboardType.Text,
+  contentInvalidText: String? = null,
   onContentValidityCheck: ((String, String) -> Boolean)? = null,
   onFilterValue: ((String, String) -> Boolean)? = null,
   onValueChange: ((String, () -> Unit) -> Unit)? = null
@@ -66,6 +69,7 @@ fun AppConfiguration.domainSelectionTextField(
   Column {
     genericTextFieldContent = genericTextField(
       modifier = modifier,
+      valueInitial = valueInitial,
       titleText = titleText,
       placeholderText = placeholderText,
       leadingIcon = {
@@ -79,9 +83,9 @@ fun AppConfiguration.domainSelectionTextField(
           }
         )
       },
-      keyboardType = KeyboardType.Phone,
-      imeWithAction = imeWithAction ?: ImeWithAction.Default,
-      contentInvalidText = stateValues.stringPhoneNumberMustBe,
+      keyboardType = keyboardType,
+      imeWithAction = imeWithAction,
+      contentInvalidText = contentInvalidText,
       onContentValidityCheck = onContentValidityCheck?.run {
         {
           invoke(it, selectedId)
@@ -90,9 +94,7 @@ fun AppConfiguration.domainSelectionTextField(
       onFilterValue = onFilterValue?.run {
         {
 
-          invoke(it, selectedId).apply {
-            println("running right!!! $this")
-          }
+          invoke(it, selectedId)
         }
       },
       onValueChange = onValueChange

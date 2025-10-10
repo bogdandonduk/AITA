@@ -1,3 +1,3 @@
 package kz.aita.core
 
-actual var osCacheDirPath: String = ""
+actual var cacheDirPath: String = ""

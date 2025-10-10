@@ -4,9 +4,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
@@ -15,7 +17,7 @@ import kz.aita.compose.navigation.Navigation
 import kz.aita.compose.navigation.NavigationScreenModel
 import kz.aita.compose.widget.MessageText
 import kz.aita.compose.widget.ScreenAppBarWidget
-import kz.aita.compose.widget.searchTextFieldWithCamBarcodeScanner
+import kz.aita.compose.widget.searchTextField
 import kz.aita.core.search
 import kz.aita.model.dataModel.StoreDataModel
 import kz.aita.model.wrapper.DataState
@@ -24,7 +26,8 @@ import kz.aita.model.wrapper.DataState
 fun AppConfiguration.MenuStoresScreen() {
   Column(
     modifier = Modifier
-      .fillMaxSize()
+      .fillMaxSize(),
+    horizontalAlignment = Alignment.CenterHorizontally
   ) {
     ScreenAppBarWidget(
       title = stateValues.stringStores,
@@ -54,10 +57,11 @@ fun AppConfiguration.MenuStoresScreen() {
           )
         } else {
           val searchTextFieldContent =
-            searchTextFieldWithCamBarcodeScanner(
+            searchTextField(
               valueInitial = NavigationScreenModel.Menu.Stores.state["search_query"],
               modifier = Modifier
-                .padding(start = 8.dp, top = 8.dp, end = 8.dp)
+                .fillMaxWidth(0.5f)
+                .padding(top = 8.dp)
             )
 
           val items = searchTextFieldContent
@@ -79,9 +83,10 @@ fun AppConfiguration.MenuStoresScreen() {
           } else {
             LazyColumn(
               modifier = Modifier
-                .fillMaxWidth()
                 .weight(1f)
-                .padding(8.dp)
+                .fillMaxWidth(0.5f)
+                .padding(top = 8.dp),
+              horizontalAlignment = Alignment.CenterHorizontally
             ) {
               items(items) {
 //                StoreWidget(

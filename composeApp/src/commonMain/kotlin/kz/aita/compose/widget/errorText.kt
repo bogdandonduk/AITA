@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -16,10 +17,11 @@ import androidx.compose.ui.unit.dp
 import kz.aita.AppConfiguration
 
 @Composable
-fun AppConfiguration.errorText(
+fun AppConfiguration.responseText(
   invalidText: String,
+  color: Color = stateValues.ErrorColor,
   showIf: () -> Boolean
-): ErrorTextContent {
+): ResponseTextContent {
   var show by rememberSaveable {
     mutableStateOf(false)
   }
@@ -33,7 +35,7 @@ fun AppConfiguration.errorText(
         .padding(top = 4.dp),
       text = invalidText,
       style = TextStyle(
-        color = stateValues.ErrorColor,
+        color = color,
         fontSize = stateValues.textSize,
         fontWeight = FontWeight.Bold,
         textAlign = TextAlign.Center
@@ -41,9 +43,9 @@ fun AppConfiguration.errorText(
     )
   }
 
-  return ErrorTextContent(
-    isValid = !show,
-    onValidityCheck = {
+  return ResponseTextContent(
+    isActual = !show,
+    onActualityCheck = {
       val value = showIf()
       show = value
       value
@@ -51,12 +53,12 @@ fun AppConfiguration.errorText(
   )
 }
 
-class ErrorTextContent(
-  var isValid: Boolean,
-  private val onValidityCheck: () -> Boolean
+class ResponseTextContent(
+  var isActual: Boolean,
+  private val onActualityCheck: () -> Boolean
 ) {
 
   fun checkContentValidity() {
-    isValid = onValidityCheck.invoke()
+    isActual = onActualityCheck.invoke()
   }
 }

@@ -1,8 +1,12 @@
 package kz.aita.compose.screen.menu
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -231,6 +235,15 @@ fun AppConfiguration.MenuScreen() {
 
             else -> {}
           }
+        }
+
+        LazyColumn(
+          modifier = Modifier
+            .weight(0.5f)
+            .background(stateValues.DisabledColor)
+            .fillMaxHeight()
+        ) {
+
         }
       }
     }

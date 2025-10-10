@@ -89,7 +89,6 @@ kotlin {
       implementation(libs.kamel.decoder.svg.std)
 //            implementation(libs.kamel.decoder.animated.image) // .gif support
 
-      implementation(compose.components.resources)
       implementation(compose.runtime)
       implementation(compose.foundation)
       implementation(compose.material3)

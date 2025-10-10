@@ -16,7 +16,7 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 
     <application
-        android:name=".app.system.AITA"
+        android:name=".android.app.system.AITA"
         android:fullBackupContent="@xml/backup_rules"
         android:usesCleartextTraffic="true"
         android:allowBackup="true"
@@ -27,7 +27,7 @@
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
             android:exported="true"
-            android:name=".app.system.ui.activity.MainActivity">
+            android:name=".android.app.system.ui.activity.MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

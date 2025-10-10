@@ -5,7 +5,6 @@ import com.auth0.jwt.algorithms.Algorithm
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import kz.aita.core.io
 import kz.aita.model.wrapper.TokenPair
 import kz.aita.server.db.RefreshSessions
 import kz.aita.server.encrypt.Refresh
@@ -48,7 +47,7 @@ class TokenService(private val cfg: JwtConfig) {
       signAccess(userId, now)
     }
 
-    newSuspendedTransaction(Dispatchers.io) {
+    newSuspendedTransaction(Dispatchers.IO) {
       RefreshSessions.insert {
         it[id] = UUID.randomUUID()
         it[RefreshSessions.userId] = userId
@@ -67,7 +66,7 @@ class TokenService(private val cfg: JwtConfig) {
 
     val cond = RefreshSessions.tokenHash eq hash and RefreshSessions.revokedAt.isNull()
 
-    val oldSession = transaction {
+    val oldSession = newSuspendedTransaction(Dispatchers.IO) {
       RefreshSessions.selectAll().where { cond }.forUpdate().singleOrNull() ?: throw IllegalAccessException("No legitimate previous refresh token")
     }
 
@@ -88,13 +87,13 @@ class TokenService(private val cfg: JwtConfig) {
       signAccess(oldSession[RefreshSessions.userId], now)
     }
 
-    newSuspendedTransaction(Dispatchers.io) {
+    newSuspendedTransaction(Dispatchers.IO) {
       RefreshSessions.update({ RefreshSessions.id eq oldSession[RefreshSessions.id] }) {
         it[revokedAt] = now
       }
     }
 
-    newSuspendedTransaction(Dispatchers.io) {
+    newSuspendedTransaction(Dispatchers.IO) {
       RefreshSessions.insert {
         it[id] = UUID.randomUUID()
         it[userId] = oldSession[RefreshSessions.userId]
@@ -114,7 +113,7 @@ class TokenService(private val cfg: JwtConfig) {
     )
   }
 
-  suspend fun revoke(refreshPlain: String) = newSuspendedTransaction(Dispatchers.io) {
+  suspend fun revoke(refreshPlain: String) = newSuspendedTransaction(Dispatchers.IO) {
     val hash = Refresh.hash(refreshPlain)
     RefreshSessions.update({ (RefreshSessions.tokenHash eq hash) and RefreshSessions.revokedAt.isNull() }) {
       it[revokedAt] = Instant.now()

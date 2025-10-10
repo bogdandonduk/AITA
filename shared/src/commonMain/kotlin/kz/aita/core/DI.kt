@@ -5,14 +5,19 @@ import io.ktor.client.plugins.auth.*
 import io.ktor.client.plugins.auth.providers.*
 import io.ktor.client.plugins.cache.*
 import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.client.plugins.logging.Logging
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import io.ktor.util.logging.Logger
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kz.aita.KeyValueDatabase
+import kz.aita.model.dataModel.NotificationType
 import kz.aita.model.repository.*
 import kz.aita.model.repository.impl.*
 import kz.aita.model.service.GenericLocalService
@@ -42,6 +47,9 @@ val httpClient by lazy {
 
     install(HttpCache)
 
+    install(Logging) {
+      level = LogLevel.ALL
+    }
     install(Auth) {
       bearer {
         sendWithoutRequest {
@@ -76,6 +84,9 @@ val httpClient by lazy {
                     endpointUrl = configurationRepository.globalAppConfigurationState.payloadValue.refreshPath,
                     body = current.refreshToken,
                     onFailure = {
+                      notificationRepository.postNotification(configurationRepository.stringSessionTimeExpiredLoggingOutState.value, NotificationType.Negative)
+                      delay(3000)
+                      userRepository.forceLogOut()
                       it.printStackTrace()
                     }
                   )
@@ -107,7 +118,7 @@ val genericLocalService: GenericLocalService by lazy {
 }
 
 val userRepository: UserRepository by lazy {
-  UserRepositoryImpl(genericRemoteService, configurationRepository, tokenStore, userAccountStore)
+  UserRepositoryImpl(genericRemoteService, configurationRepository, notificationRepository, tokenStore, userAccountStore)
 }
 
 val configurationRepository: ConfigurationRepository by lazy {
@@ -115,7 +126,7 @@ val configurationRepository: ConfigurationRepository by lazy {
 }
 
 val stockRepository: StockRepository by lazy {
-  StockRepositoryImpl(genericRemoteService, configurationRepository)
+  StockRepositoryImpl(genericRemoteService, configurationRepository, tokenStore)
 }
 
 val supplierRepository: SupplierRepository by lazy {
@@ -123,11 +134,15 @@ val supplierRepository: SupplierRepository by lazy {
 }
 
 val storeRepository: StoreRepository by lazy {
-  StoreRepositoryImpl(genericRemoteService, configurationRepository)
+  StoreRepositoryImpl(genericRemoteService, configurationRepository, tokenStore)
 }
 
 val goodsCategoryRepository: GoodsCategoryRepository by lazy {
   GoodsCategoryRepositoryImpl(genericRemoteService, genericLocalService)
+}
+
+val notificationRepository: NotificationRepository by lazy {
+  NotificationRepositoryImpl()
 }
 
 

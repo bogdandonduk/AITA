@@ -21,7 +21,7 @@ import kz.aita.server.jwt.jwtConfig
 import kz.aita.server.route.authRoutes
 import kz.aita.server.route.filesRoutes
 import kz.aita.server.route.storesRoute
-import kz.aita.server.route.userAccountRoute
+import kz.aita.server.route.userRoute
 import org.flywaydb.core.Flyway
 import org.jetbrains.exposed.sql.Database
 
@@ -66,7 +66,10 @@ fun Application.module() {
       encodeDefaults = true
     })
   }
-
+  intercept(ApplicationCallPipeline.Plugins) {
+    val ct = call.request.headers[HttpHeaders.ContentType]
+     println("CT=${ct}")
+  }
   val ds = HikariDataSource(HikariConfig().apply {
     jdbcUrl = environment.config.property("db.url").getString()
     username = environment.config.property("db.user").getString()
@@ -91,6 +94,6 @@ fun Application.module() {
 
   filesRoutes()
   authRoutes(TokenService(jwtConfig()))
-  userAccountRoute()
+  userRoute()
   storesRoute()
 }

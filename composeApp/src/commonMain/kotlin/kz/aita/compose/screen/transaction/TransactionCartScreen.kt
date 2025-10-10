@@ -2,11 +2,15 @@ package kz.aita.compose.screen.transaction
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import kz.aita.AppConfiguration
 import kz.aita.compose.navigation.NavigationScreenModel
 import kz.aita.compose.widget.ScreenAppBarWidget
+import kz.aita.compose.widget.searchTextField
 
 @Composable
 fun AppConfiguration.TransactionCartScreen() {
@@ -50,5 +54,15 @@ fun AppConfiguration.TransactionCartScreen() {
         else -> stateValues.drawablePathIconTransactionSale
       }
     )
+
+    val searchTextFieldContent =
+      searchTextField(
+        valueInitial = NavigationScreenModel.Transaction.Cart.state["search_query"],
+        modifier = Modifier
+          .padding(8.dp),
+        barcodeCamScanner = true
+      )
+
+
   }
 }

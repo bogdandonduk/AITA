@@ -10,11 +10,13 @@ import kz.aita.compose.wrapper.ImeWithAction
 @Composable
 fun AppConfiguration.emailTextField(
   modifier: Modifier = Modifier,
-  imeWithAction: ImeWithAction? = null
+  valueInitial: String? = null,
+  imeWithAction: ImeWithAction? = null,
 ): GenericTextFieldContent {
 
   return genericTextField(
     modifier = modifier,
+    valueInitial = valueInitial,
     titleText = stateValues.stringEmail,
     placeholderText = stateValues.stringEnterEmailAddress,
     leadingIconPath = stateValues.drawablePathIconEmail,
