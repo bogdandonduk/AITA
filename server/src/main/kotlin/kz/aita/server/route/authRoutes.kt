@@ -7,11 +7,9 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.coroutines.Dispatchers
-import kz.aita.core.jsonBase
 import kz.aita.model.dataModel.UserAuthLogInDataModel
 import kz.aita.model.dataModel.UserAuthSignUpDataModel
 import kz.aita.model.wrapper.TokenPair
-import kz.aita.server.db.Stores
 import kz.aita.server.db.Users
 import kz.aita.server.encrypt.Pw
 import kz.aita.server.jwt.TokenService
@@ -23,7 +21,6 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
-import org.jetbrains.exposed.sql.transactions.transaction
 import org.postgresql.util.PSQLException
 import java.time.Instant
 import java.util.*
@@ -94,8 +91,8 @@ fun Application.authRoutes(tokenService: TokenService) {
                 it[Users.firstName] = firstName
                 it[Users.lastName] = lastName
                 it[Users.countryLocale] = countryLocale
-                it[Users.workerAccountIds] = null
-                it[Users.supplierAccountIds] = null
+                it[Users.workerIds] = null
+                it[Users.supplierIds] = null
                 it[Users.passwordHash] = hash
                 it[Users.createdAt] = instant
                 it[Users.isActive] = true

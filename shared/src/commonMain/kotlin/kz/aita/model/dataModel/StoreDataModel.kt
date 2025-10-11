@@ -10,10 +10,10 @@ data class StoreDataModel(
   val name: List<LocalizedStringDataModel>,
   val alias: List<LocalizedStringDataModel>?,
   val description: List<LocalizedStringDataModel>?,
-  val companyForm: CompanyFormDataModel,
-  val location: LocationDataModel,
-  val phoneNumbers: List<String>,
-  val emails: List<String>,
+  val companyForms: List<CompanyFormDataModel>?,
+  val location: LocationDataModel?,
+  val phoneNumbers: List<String>?,
+  val emails: List<String>?,
   val createdAt: Long,
   val isActive: Boolean,
 ): Searchable {
@@ -34,13 +34,13 @@ data class StoreDataModel(
             add(it.value)
           }
 
-          add(location.name)
-          add(location.postalIndex)
-          add(location.latitude.toString())
-          add(location.longitude.toString())
+          location?.name?.let { add(it) }
+          location?.postalIndex?.let { add(it) }
+          location?.latitude?.let { add(it.toString()) }
+          location?.longitude?.let { add(it.toString()) }
 
-          addAll(phoneNumbers)
-          addAll(emails)
+          phoneNumbers?.forEach { add(it) }
+          emails?.forEach { add(it) }
         }
     }
   override val containsSearchOperands: List<String>
@@ -59,13 +59,13 @@ data class StoreDataModel(
             add(it.value)
           }
 
-          add(location.name)
-          add(location.postalIndex)
-          add(location.latitude.toString())
-          add(location.longitude.toString())
+          location?.name?.let { add(it) }
+          location?.postalIndex?.let { add(it) }
+          location?.latitude?.let { add(it.toString()) }
+          location?.longitude?.let { add(it.toString()) }
 
-          addAll(phoneNumbers)
-          addAll(emails)
+          phoneNumbers?.forEach { add(it) }
+          emails?.forEach { add(it) }
         }
     }
   override val uniqueSearchOperands: List<String>

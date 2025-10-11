@@ -11,11 +11,11 @@ object Users: Table("users") {
   val firstName = varchar("first_name", 255)
   val lastName = varchar("last_name", 255)
   val countryLocale = varchar("country_locale", 64)
-  val workerAccountIds = text("worker_account_ids").nullable()
-  val supplierAccountIds = text("supplier_account_ids").nullable()
+  val workerIds = text("worker_ids").nullable().default(null)
+  val supplierIds = text("supplier_ids").nullable().default(null)
   val passwordHash = varchar("password_hash", 100) // BCrypt ~60 chars, give some headroom
   val createdAt = timestamp("created_at").defaultExpression(CurrentTimestamp)
-  val isActive = bool("is_active")
+  val isActive = bool("is_active").default(true)
 
   override val primaryKey = PrimaryKey(id)
 }

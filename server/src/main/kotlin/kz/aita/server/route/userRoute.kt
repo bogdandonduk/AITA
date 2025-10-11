@@ -16,7 +16,6 @@ import kz.aita.server.util.getException
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
-import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
 import java.util.*
 
@@ -50,8 +49,8 @@ fun Application.userRoute() {
               firstName = user[Users.firstName],
               lastName = user[Users.lastName],
               countryLocale = user[Users.countryLocale],
-              workerAccountIds = user[Users.workerAccountIds],
-              supplierAccountIds = user[Users.supplierAccountIds],
+              workerAccountIds = user[Users.workerIds],
+              supplierAccountIds = user[Users.supplierIds],
               createdAt = user[Users.createdAt].toEpochMilli(),
               isActive = user[Users.isActive]
             )

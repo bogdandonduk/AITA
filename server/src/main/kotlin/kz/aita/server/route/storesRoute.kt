@@ -62,10 +62,10 @@ fun Application.storesRoute() {
                       description
                     )
                   },
-                  companyForm = jsonBase.decodeFromString<CompanyFormDataModel>(it[Stores.companyForm]),
-                  location = jsonBase.decodeFromString<LocationDataModel>(it[Stores.location]),
-                  phoneNumbers = jsonBase.decodeFromString<List<String>>(it[Stores.phoneNumbers]),
-                  emails = jsonBase.decodeFromString<List<String>>(it[Stores.emails]),
+                  companyForms = it[Stores.companyForms]?.let { value -> jsonBase.decodeFromString<List<CompanyFormDataModel>>(value) },
+                  location = it[Stores.location]?.let { value -> jsonBase.decodeFromString<LocationDataModel>(value) },
+                  phoneNumbers = it[Stores.phoneNumbers]?.let { value -> jsonBase.decodeFromString<List<String>>(value) },
+                  emails = it[Stores.emails]?.let { value -> jsonBase.decodeFromString<List<String>>(value) },
                   createdAt = it[Stores.createdAt].toEpochMilli(),
                   isActive = it[Stores.isActive]
                 )
@@ -113,10 +113,10 @@ fun Application.storesRoute() {
                   it[Stores.name] = jsonBase.encodeToString(body.name)
                   it[Stores.alias] = body.alias?.let { alias -> jsonBase.encodeToString(alias) }
                   it[Stores.description] = body.description?.let { description -> jsonBase.encodeToString(description) }
-                  it[Stores.companyForm] = jsonBase.encodeToString(body.companyForm)
-                  it[Stores.location] = jsonBase.encodeToString(body.location)
-                  it[Stores.phoneNumbers] = jsonBase.encodeToString(body.phoneNumbers)
-                  it[Stores.emails] = jsonBase.encodeToString(body.emails)
+                  it[Stores.companyForms] = body.companyForms?.let { value -> jsonBase.encodeToString(value) }
+                  it[Stores.location] = body.location?.let { value -> jsonBase.encodeToString(value) }
+                  it[Stores.phoneNumbers] = body.phoneNumbers?.let { value -> jsonBase.encodeToString(value) }
+                  it[Stores.emails] = body.emails?.let { value -> jsonBase.encodeToString(value) }
                   it[Stores.createdAt] = instant
                   it[Stores.isActive] = body.isActive
                 }
@@ -156,10 +156,10 @@ fun Application.storesRoute() {
               it[Stores.name] = jsonBase.encodeToString(body.name)
               it[Stores.alias] = body.alias?.let { alias -> jsonBase.encodeToString(alias) }
               it[Stores.description] = body.description?.let { description -> jsonBase.encodeToString(description) }
-              it[Stores.companyForm] = jsonBase.encodeToString(body.companyForm)
-              it[Stores.location] = jsonBase.encodeToString(body.location)
-              it[Stores.phoneNumbers] = jsonBase.encodeToString(body.phoneNumbers)
-              it[Stores.emails] = jsonBase.encodeToString(body.emails)
+              it[Stores.companyForms] = body.companyForms?.let { value -> jsonBase.encodeToString(value) }
+              it[Stores.location] = body.location?.let { value -> jsonBase.encodeToString(value) }
+              it[Stores.phoneNumbers] = body.phoneNumbers?.let { value -> jsonBase.encodeToString(value) }
+              it[Stores.emails] = body.emails?.let { value -> jsonBase.encodeToString(value) }
               it[Stores.isActive] = body.isActive
             }.run {
               if (this > 0)

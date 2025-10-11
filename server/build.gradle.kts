@@ -15,6 +15,8 @@ application {
 }
 
 dependencies {
+    implementation("org.xerial:sqlite-jdbc:3.50.3.0")
+
     implementation(libs.hikaricp)
 
     implementation("io.ktor:ktor-server-auth:${property("ktor.version")}")

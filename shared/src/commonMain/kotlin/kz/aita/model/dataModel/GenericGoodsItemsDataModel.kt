@@ -6,14 +6,15 @@ import kotlinx.serialization.Serializable
 data class GenericGoodsItemsDataModel(
   val id: String,
   val barcode: String,
+  val extraBarcodes: String?,
   val name: String,
+  val extraNames: String?,
   val quantity: QuantityDataModel,
   val categoryId: String,
+  val extraCategoryIds: String?,
   val supplierId: String,
-  val salePrice: Double,
-  val returnPrice: Double = salePrice,
-  val supplyPrice: Double,
-  val saleCurrency: String,
-  val returnCurrency: String = saleCurrency,
-  val supplyCurrency: String
+  val extraSupplierIds: String?,
+  val manufacturerId: String,
+  val extraManufacturerIds: String?,
+  val brandId: String
 )
