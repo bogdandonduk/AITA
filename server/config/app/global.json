@@ -13,7 +13,8 @@
   "addStoresPath": "stores/add",
   "updateStoresPath": "stores/update",
   "deleteStoresPath": "stores/delete",
-  "stockPath": "stock",
+  "getStockPath": "stock/get",
+  "getGenericGoodsItemsPath": "generic/goodsItems/get",
   "suppliersPath": "suppliers",
   "stringResourcesPath": "res/string",
   "dimensionResourcesPath": "res/dimension",
@@ -22,22 +23,26 @@
   "drawableResourcesPath": "res/drawable",
   "companyForms": [
     {
-      "id": 0,
+      "id": "0",
       "name": [
-        {
-          "language": "en",
-          "value": "TOO"
-        },
-        {
-          "language": "ru",
-          "value": "TOO"
-        },
-        {
-          "language": "kk",
-          "value": "TOO"
-        }
+        { "language": "main", "value": "TOO" },
+        { "language": "en", "value": "TOO" },
+        { "language": "ru", "value": "TOO" },
+        { "language": "kk", "value": "TOO" }
       ],
-      "parameters": []
+      "parameters": [
+        {
+          "name": [
+            { "language": "main", "value": "BIN" },
+            { "language": "en", "value": "BIN" },
+            { "language": "ru", "value": "БИН" },
+            { "language": "kk", "value": "БИН" }
+          ],
+          "length": 12,
+          "number": true,
+          "nonLetterSymbolsEnabled": false
+        }
+      ]
     }
   ],
   "countries": [

@@ -35,11 +35,11 @@ class StoreRepositoryImpl(
 
   override fun getStores() {
     launch(Dispatchers.io) {
-      if (tokenStore?.get() == null)
-        return@launch
-
       if (!getStoresMutex.tryLock())
         return@launch
+
+      if (tokenStore?.get() == null)
+        return@launch getStoresMutex.unlock()
 
       _storesState.emit(DataState.Progress())
 
@@ -61,11 +61,11 @@ class StoreRepositoryImpl(
 
   override fun addStore(store: StoreDataModel) {
     launch(Dispatchers.io) {
-      if (tokenStore?.get() == null)
-        return@launch
-
       if (!addStoreMutex.tryLock())
         return@launch
+
+      if (tokenStore?.get() == null)
+        return@launch addStoreMutex.unlock()
 
       _storesState.emit(DataState.Progress())
 
@@ -94,7 +94,7 @@ class StoreRepositoryImpl(
           )
 
           addStoreMutex.unlock()
-        }
+        } ?: addStoreMutex.unlock()
     }
   }
 }

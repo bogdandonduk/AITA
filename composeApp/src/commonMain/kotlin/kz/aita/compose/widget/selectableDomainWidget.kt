@@ -17,6 +17,7 @@ import io.kamel.image.config.LocalKamelConfig
 import io.ktor.http.*
 import kz.aita.AppConfiguration
 import kz.aita.compose.render.kamelConfig
+import kz.aita.core.extractLocalizedString
 import kz.aita.core.getFullDrawableResourceUrl
 import kz.aita.model.dataModel.LocalizedStringDataModel
 
@@ -24,6 +25,7 @@ import kz.aita.model.dataModel.LocalizedStringDataModel
 fun AppConfiguration.selectableDomainWidget(
   modifier: Modifier = Modifier,
   domain: SelectableDomain,
+  showId: Boolean = true,
   showName: Boolean = false,
   textColor: Color = stateValues.TextColor,
   onClick: (() -> Unit)? = null
@@ -69,35 +71,39 @@ fun AppConfiguration.selectableDomainWidget(
             data = Url(getFullDrawableResourceUrl(if (expanded) stateValues.drawablePathIconExpandLess else stateValues.drawablePathIconExpandMore))
           )
         },
-        contentDescription = domain.name.find { it.language == stateValues.appLanguage }?.value ?: domain.id
+        contentDescription = domain.name.extractLocalizedString(stateValues.appLanguage) ?: domain.id
       )
 
-      KamelImage(
-        modifier = Modifier
-          .padding(stateValues.textFieldIconPadding)
-          .fillMaxHeight()
-          .aspectRatio(1f, matchHeightConstraintsFirst = true),
-        resource = {
-          asyncPainterResource(
-            data = Url(getFullDrawableResourceUrl(domain.iconPath))
-          )
-        },
-        contentDescription = domain.name.find { it.language == stateValues.appLanguage }?.value ?: domain.id
-      )
+      domain.iconPath?.let {
+        KamelImage(
+          modifier = Modifier
+            .padding(stateValues.textFieldIconPadding)
+            .fillMaxHeight()
+            .aspectRatio(1f, matchHeightConstraintsFirst = true),
+          resource = {
+            asyncPainterResource(
+              data = Url(getFullDrawableResourceUrl(it))
+            )
+          },
+          contentDescription = domain.name.extractLocalizedString(stateValues.appLanguage) ?: domain.id
+        )
+      }
+
     }
 
-    Text(
-      text = domain.id,
-      color = textColor,
-      modifier = Modifier
-        .padding(8.dp)
-    )
+    if (showId)
+      Text(
+        text = domain.id,
+        color = textColor,
+        modifier = Modifier
+          .padding(8.dp)
+      )
 
     if (showName) {
       Spacer(modifier = Modifier.width(8.dp))
 
       Text(
-        text = domain.name.find { it.language == stateValues.appLanguage }?.value ?: "",
+        text = domain.name.extractLocalizedString(stateValues.appLanguage) ?: "",
         color = textColor
       )
     }
@@ -113,5 +119,5 @@ data class SelectableDomainWidgetContent(
 class SelectableDomain(
   val id: String,
   val name: List<LocalizedStringDataModel>,
-  val iconPath: String
+  val iconPath: String?
 )

@@ -6,6 +6,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kz.aita.core.DataStore
+import kz.aita.core.genericGoodsItemsRepository
 import kz.aita.core.io
 import kz.aita.core.storeRepository
 import kz.aita.model.dataModel.NotificationType
@@ -132,10 +133,10 @@ class UserRepositoryImpl(
 
   override fun get(forceLogOut: Boolean) {
     launch(Dispatchers.io) {
-      if (tokenStore?.get() == null)
+      if (!getUserAccountMutex.tryLock())
         return@launch
 
-      if (!getUserAccountMutex.tryLock())
+      if (tokenStore?.get() == null)
         return@launch
 
       if (_userAccountState.value.value !is DataState.Progress)
@@ -151,10 +152,7 @@ class UserRepositoryImpl(
           endpointUrl = configurationRepository.globalAppConfigurationState.payloadValue.getUserPath,
           onFailure = {
             if (forceLogOut) {
-              _userAccountState.emit(DataState.Failure(it))
-
-              tokenStore?.set(null)
-              userAccountStore?.set(null)
+              forceLogOut()
             } else {
               (_userAccountState.value.value as? DataState.Success)?.run {
                 _userAccountState.emit(DataState.SoftFailure(it, payload))
@@ -168,14 +166,10 @@ class UserRepositoryImpl(
             it.printStackTrace()
           }
         )?.run {
-          if (userAccountState.value.value !is DataState.Success) {
-            launch {
-              configurationRepository.getGlobalAppConfiguration()
-            }
-            launch {
-              storeRepository.getStores()
-            }
-          }
+          configurationRepository.getGlobalAppConfiguration()
+          storeRepository.getStores()
+          genericGoodsItemsRepository.getGenericGoodsItems()
+
 
           _userAccountState.emit(DataState.Success(this))
           userAccountStore?.set(this)
@@ -234,7 +228,8 @@ class UserRepositoryImpl(
       tokenStore?.set(null)
       userAccountStore?.set(null)
 
-      _userAccountState.emit(DataState.Empty())
+      if (_userAccountState.value.value !is DataState.Empty)
+        _userAccountState.emit(DataState.Empty())
     }
   }
 }

@@ -6,7 +6,7 @@ import org.jetbrains.exposed.sql.javatime.timestamp
 
 object Stores: Table("stores") {
   val id = uuid("id").uniqueIndex()
-  val userId = uuid("user_ids")
+  val userIds = text("user_ids")
   val typeIds = text("type_ids").nullable().default(null)
 
   val name = text("name")

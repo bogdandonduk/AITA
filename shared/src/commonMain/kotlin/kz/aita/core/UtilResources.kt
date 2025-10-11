@@ -36,7 +36,7 @@ fun List<ExceptionDataModel>.extractExceptionMessage(id: Long): String? {
 }
 
 fun List<LocalizedStringDataModel>.extractLocalizedString(language: String): String? {
-  return find { language == "system" && it.language == getSystemLocaleLanguage() || it.language == language }?.value
+  return find { language == "system" && it.language == getSystemLocaleLanguage() || it.language == language || it.language == "main" }?.value
 }
 
 

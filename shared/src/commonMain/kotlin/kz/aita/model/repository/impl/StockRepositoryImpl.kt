@@ -31,11 +31,11 @@ class StockRepositoryImpl(
   }
   override fun getStock() {
     launch(Dispatchers.io) {
-      if (tokenStore?.get() == null)
-        return@launch
-
       if (!getStockMutex.tryLock())
         return@launch
+
+      if (tokenStore?.get() == null)
+        return@launch getStockMutex.unlock()
 
       _stockState.emit(DataState.Progress())
 

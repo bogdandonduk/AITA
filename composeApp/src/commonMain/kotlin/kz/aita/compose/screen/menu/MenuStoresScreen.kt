@@ -46,6 +46,7 @@ fun AppConfiguration.MenuStoresScreen() {
       }
     )
 
+    println("stores are ${stateValues.storesState}")
     when (val state = stateValues.storesState) {
       is DataState.Success -> {
         if (state.payload.isEmpty()) {

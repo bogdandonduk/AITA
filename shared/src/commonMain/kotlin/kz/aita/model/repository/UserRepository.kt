@@ -17,7 +17,7 @@ interface UserRepository {
 
   fun logOut()
 
-  fun get(forceLogOut: Boolean = false)
+  fun get(forceLogOut: Boolean = true)
 
   fun update(userAccountUpdate: UserAccountUpdateDataModel)
 

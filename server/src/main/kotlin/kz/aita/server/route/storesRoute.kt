@@ -18,6 +18,7 @@ import kz.aita.server.db.Users
 import org.jetbrains.exposed.exceptions.ExposedSQLException
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.json.contains
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.postgresql.util.PSQLException
 import java.time.Instant
@@ -46,11 +47,11 @@ fun Application.storesRoute() {
             Stores
               .selectAll()
               .where {
-                Stores.userId eq userId
+                Stores.userIds.contains(userId.toString())
               }.map {
                 StoreDataModel(
                   id = it[Stores.id].toString(),
-                  userId = it[Stores.userId].toString(),
+                  userId = it[Stores.userIds].toString(),
                   name = jsonBase.decodeFromString<List<LocalizedStringDataModel>>(it[Stores.name]),
                   alias = it[Stores.alias]?.let { alias ->
                     jsonBase.decodeFromString<List<LocalizedStringDataModel>>(
@@ -109,7 +110,7 @@ fun Application.storesRoute() {
               newSuspendedTransaction(Dispatchers.IO) {
                 Stores.insert {
                   it[Stores.id] = id
-                  it[Stores.userId] = userId
+                  it[Stores.userIds] = jsonBase.encodeToString<List<String>>(listOf(userId.toString()))
                   it[Stores.name] = jsonBase.encodeToString(body.name)
                   it[Stores.alias] = body.alias?.let { alias -> jsonBase.encodeToString(alias) }
                   it[Stores.description] = body.description?.let { description -> jsonBase.encodeToString(description) }
@@ -152,7 +153,7 @@ fun Application.storesRoute() {
 
             val id = runCatching { UUID.fromString(body.id) }.getOrNull() ?: return@newSuspendedTransaction 2
 
-            Stores.update({ (Stores.id eq id) and (Stores.userId eq userId) }) {
+            Stores.update({ (Stores.id eq id) and Stores.userIds.contains(userId.toString()) }) {
               it[Stores.name] = jsonBase.encodeToString(body.name)
               it[Stores.alias] = body.alias?.let { alias -> jsonBase.encodeToString(alias) }
               it[Stores.description] = body.description?.let { description -> jsonBase.encodeToString(description) }
@@ -192,7 +193,7 @@ fun Application.storesRoute() {
 
             val id = runCatching { UUID.fromString(body.id) }.getOrNull() ?: return@newSuspendedTransaction 2
 
-            if (Stores.deleteWhere { (Stores.id eq id) and (Stores.userId eq userId) } > 0)
+            if (Stores.deleteWhere { (Stores.id eq id) and (Stores.userIds.contains(userId.toString())) } > 0)
               0
             else
               1

@@ -47,9 +47,9 @@ val httpClient by lazy {
 
     install(HttpCache)
 
-    install(Logging) {
-      level = LogLevel.ALL
-    }
+//    install(Logging) {
+//      level = LogLevel.
+//    }
     install(Auth) {
       bearer {
         sendWithoutRequest {
@@ -130,7 +130,7 @@ val stockRepository: StockRepository by lazy {
 }
 
 val supplierRepository: SupplierRepository by lazy {
-  SupplierRepositoryImpl(genericRemoteService, configurationRepository)
+  SupplierRepositoryImpl(genericRemoteService, configurationRepository, tokenStore)
 }
 
 val storeRepository: StoreRepository by lazy {
@@ -144,5 +144,11 @@ val goodsCategoryRepository: GoodsCategoryRepository by lazy {
 val notificationRepository: NotificationRepository by lazy {
   NotificationRepositoryImpl()
 }
+
+val genericGoodsItemsRepository: GenericGoodsItemsRepository by lazy {
+  GenericGoodsItemsRepositoryImpl(genericRemoteService, configurationRepository, tokenStore)
+}
+
+
 
 

@@ -42,14 +42,54 @@ class ConfigurationRepositoryImpl(
       addStoresPath = "stores/add",
       updateStoresPath = "stores/update",
       deleteStoresPath = "stores/delete",
-      stockPath = "stock",
+      getStockPath = "stock/get",
+      getGenericGoodsItemsPath = "generic/goodsItems/get",
       suppliersPath = "suppliers",
       stringResourcesPath = "res/string",
       dimensionResourcesPath = "res/dimension",
       colorResourcesPath = "res/color",
       drawableResourcesConfigurationPath = "res/drawableConfig",
       drawableResourcesPath = "res/drawable",
-      companyForms = emptyList(),
+      companyForms = listOf(
+        CompanyFormDataModel(
+          id = "0",
+          name = listOf(
+            LocalizedStringDataModel(
+              language = "en",
+              value = "TOO",
+            ),
+            LocalizedStringDataModel(
+              language = "ru",
+              value = "TOO"
+            ),
+            LocalizedStringDataModel(
+              language = "kk",
+              value = "TOO"
+            )
+          ),
+          parameters = listOf(
+            CompanyFormParameterDataModel(
+              name = listOf(
+                LocalizedStringDataModel(
+                  language = "en",
+                  value = "БИН>",
+                ),
+                LocalizedStringDataModel(
+                  language = "ru",
+                  value = "БИН"
+                ),
+                LocalizedStringDataModel(
+                  language = "kk",
+                  value = "БИН"
+                )
+              ),
+              length = 12,
+              number = true,
+              nonLetterSymbolsEnabled = false
+            )
+          )
+        )
+      ),
       countries = listOf(
         CountryDataModel(
           locale = "kz",
