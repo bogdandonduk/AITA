@@ -9,8 +9,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.withStyle
 import kz.aita.core.jsonBase
-import kz.aita.model.dataModel.ExceptionDataModel
-import kz.aita.model.dataModel.GlobalAppConfigurationDataModel
+import kz.aita.model.dataModel.GenericResponseDataModel
 import kz.aita.model.dataModel.LocalizedStringGroupDataModel
 import kz.aita.model.dataModel.StylizedColorGroupDataModel
 import kz.aita.model.dataModel.StylizedDimensionGroupDataModel
@@ -62,38 +61,26 @@ fun getPasswordTransformedTextWithSelectionFocusTextColor(
     }
 }
 
-suspend fun loadResourceGlobalAppConfiguration(): GlobalAppConfigurationDataModel {
-  return jsonBase.decodeFromString<GlobalAppConfigurationDataModel>(
-    Res.readBytes("files/config/app/global.json").decodeToString()
-  )
-}
-
 suspend fun loadResourceStrings(): List<LocalizedStringGroupDataModel> {
-  return jsonBase.decodeFromString<List<LocalizedStringGroupDataModel>>(
+  return jsonBase.decodeFromString<GenericResponseDataModel<List<LocalizedStringGroupDataModel>>>(
     Res.readBytes("files/assets/values/strings.json").decodeToString()
-  )
+  ).payload!!
 }
 
 suspend fun loadResourceDimensions(): List<StylizedDimensionGroupDataModel> {
-  return jsonBase.decodeFromString<List<StylizedDimensionGroupDataModel>>(
+  return jsonBase.decodeFromString<GenericResponseDataModel<List<StylizedDimensionGroupDataModel>>>(
     Res.readBytes("files/assets/values/dimensions.json").decodeToString()
-  )
+  ).payload!!
 }
 
 suspend fun loadResourceColors(): List<StylizedColorGroupDataModel> {
-  return jsonBase.decodeFromString<List<StylizedColorGroupDataModel>>(
+  return jsonBase.decodeFromString<GenericResponseDataModel<List<StylizedColorGroupDataModel>>>(
     Res.readBytes("files/assets/values/colors.json").decodeToString()
-  )
+  ).payload!!
 }
 
 suspend fun loadResourceDrawablePaths(): List<StylizedDrawablePathsGroupDataModel> {
-  return jsonBase.decodeFromString<List<StylizedDrawablePathsGroupDataModel>>(
+  return jsonBase.decodeFromString<GenericResponseDataModel<List<StylizedDrawablePathsGroupDataModel>>>(
     Res.readBytes("files/assets/drawable/drawables.json").decodeToString()
-  )
-}
-
-suspend fun loadResourceExceptions(): List<ExceptionDataModel> {
-  return jsonBase.decodeFromString<List<ExceptionDataModel>>(
-    Res.readBytes("files/config/app/exceptions.json").decodeToString()
-  )
+  ).payload!!
 }

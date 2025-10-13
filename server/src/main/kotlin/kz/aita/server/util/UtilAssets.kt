@@ -1,17 +1,17 @@
 package kz.aita.server.util
 
 import kotlinx.serialization.json.Json
-import kz.aita.model.dataModel.ExceptionDataModel
+import kz.aita.model.dataModel.ResponseDataModel
 import java.nio.file.Files
 import java.nio.file.Path
 
 const val serverFilesPath = "AITA/server"
 const val configAppPath = "$serverFilesPath/config/app"
 
-fun getExceptions(): List<ExceptionDataModel> {
-  return Json.decodeFromString(Files.readString(Path.of(configAppPath).resolve("exceptions.json")))
+fun getResponses(): List<ResponseDataModel> {
+  return Json.decodeFromString(Files.readString(Path.of(configAppPath).resolve("responses.json")))
 }
 
-fun getException(id: Long): ExceptionDataModel? {
-  return getExceptions().find { it.id == id }
+fun getResponse(id: String): ResponseDataModel {
+  return getResponses().find { it.id == id }!!
 }

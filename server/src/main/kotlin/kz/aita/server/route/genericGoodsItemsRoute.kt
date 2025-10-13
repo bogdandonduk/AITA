@@ -6,8 +6,10 @@ import io.ktor.server.auth.UnauthorizedResponse
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.principal
+import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
+import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.Dispatchers
@@ -16,6 +18,7 @@ import kz.aita.model.dataModel.GenericGoodsItemDataModel
 import kz.aita.model.dataModel.LocalizedStringDataModel
 import kz.aita.server.db.GenericGoodsItems
 import kz.aita.server.db.Users
+import org.jetbrains.exposed.sql.json.contains
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import java.util.UUID
@@ -25,28 +28,27 @@ fun Application.genericGoodsItemsRoute() {
     route("/generic") {
       authenticate("auth-jwt") {
         route("/goodsItems") {
-          get("/get") {
-            val principal = call.principal<JWTPrincipal>() ?: return@get call.respond(UnauthorizedResponse())
-            val userId = runCatching { UUID.fromString(principal.subject) }.getOrNull() ?: return@get call.respond(
+          post("/get") {
+            val principal = call.principal<JWTPrincipal>() ?: return@post call.respond(UnauthorizedResponse())
+            val userId = runCatching { UUID.fromString(principal.subject) }.getOrNull() ?: return@post call.respond(
               UnauthorizedResponse()
             )
+            val body = call.receive<String>()
 
-            val genericGoodsItems = newSuspendedTransaction(Dispatchers.IO) {
+            val genericGoodsItems: Pair<Int, List<GenericGoodsItemDataModel>?> = newSuspendedTransaction(Dispatchers.IO) {
               val noUser = Users.select(Users.id).where { Users.id eq userId }.empty()
 
               if (noUser)
-                return@newSuspendedTransaction call.respond(UnauthorizedResponse())
+                return@newSuspendedTransaction 1 to null
 
-              GenericGoodsItems
+              val matches = GenericGoodsItems
                 .selectAll()
+                .where { GenericGoodsItems.barcode.contains(listOf(body)) }
                 .map {
+
                   GenericGoodsItemDataModel(
                     id = it[GenericGoodsItems.id].toString(),
-                    barcode = it[GenericGoodsItems.barcode]?.let { value ->
-                      jsonBase.decodeFromString<List<String>>(
-                        value
-                      )
-                    },
+                    barcode = it[GenericGoodsItems.barcode],
                     name = it[GenericGoodsItems.name].let { value ->
                       jsonBase.decodeFromString<List<LocalizedStringDataModel>>(
                         value
@@ -74,12 +76,25 @@ fun Application.genericGoodsItemsRoute() {
                     },
                   )
                 }
+
+              0 to matches
             }
 
-            call.respond(
-              HttpStatusCode.OK,
-              genericGoodsItems
-            )
+            when {
+              genericGoodsItems.first == 1 -> call.respond(UnauthorizedResponse())
+              genericGoodsItems.second?.isNotEmpty() == true -> {
+                genericGoodsItems.second.run {
+                  call.respond(
+                    HttpStatusCode.OK,
+                    this!!
+                  )
+                }
+
+              }
+              else -> {
+                call.respond(HttpStatusCode.NotFound)
+              }
+            }
           }
         }
       }

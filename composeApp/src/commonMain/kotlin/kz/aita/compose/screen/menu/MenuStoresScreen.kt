@@ -17,8 +17,10 @@ import kz.aita.compose.navigation.Navigation
 import kz.aita.compose.navigation.NavigationScreenModel
 import kz.aita.compose.widget.MessageText
 import kz.aita.compose.widget.ScreenAppBarWidget
+import kz.aita.compose.widget.StoreWidget
 import kz.aita.compose.widget.searchTextField
 import kz.aita.core.search
+import kz.aita.core.storeRepository
 import kz.aita.model.dataModel.StoreDataModel
 import kz.aita.model.wrapper.DataState
 
@@ -46,7 +48,6 @@ fun AppConfiguration.MenuStoresScreen() {
       }
     )
 
-    println("stores are ${stateValues.storesState}")
     when (val state = stateValues.storesState) {
       is DataState.Success -> {
         if (state.payload.isEmpty()) {
@@ -89,16 +90,19 @@ fun AppConfiguration.MenuStoresScreen() {
                 .padding(top = 8.dp),
               horizontalAlignment = Alignment.CenterHorizontally
             ) {
-              items(items) {
-//                StoreWidget(
-//                  goodsItem = it,
-//                  onDelete = {
-//
-//                  },
-//                  onEdit = {
-//
-//                  }
-//                )
+              items(items) { store ->
+                StoreWidget(
+                  store = store,
+                  isActive = stateValues.activeStoreId == store.id,
+                  onEdit = {
+                    coroutineScope.launch {
+                      NavigationScreenModel.Menu.AddEditStore.setState("state_editedStoreId" to store.id)
+                      Navigation.Menu.go(NavigationScreenModel.Menu.AddEditStore)
+                    }
+                  }
+                ) {
+                  storeRepository.setActiveStoreId(it.id)
+                }
               }
             }
           }

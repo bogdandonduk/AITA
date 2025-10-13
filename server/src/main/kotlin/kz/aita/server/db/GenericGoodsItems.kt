@@ -1,11 +1,15 @@
 package kz.aita.server.db
 
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.Table
+import org.jetbrains.exposed.sql.json.jsonb
 
-object GenericGoodsItems: Table("generic_goods_items") {
+object GenericGoodsItems : Table("generic_goods_items") {
   val id = uuid("id").uniqueIndex()
 
-  val barcode = text("barcode").nullable().default(null)
+  val barcode = jsonb("barcode", Json, ListSerializer(String.serializer()))
 
   val name = text("name")
   val typeIds = text("type_ids").nullable().default(null)

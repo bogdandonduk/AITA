@@ -14,6 +14,29 @@ plugins {
   alias(libs.plugins.ksp)
 }
 
+compose.desktop {
+  application {
+    mainClass = "kz.aita.jvm.app.system.MainKt"
+    nativeDistributions {
+      targetFormats(TargetFormat.Exe, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Dmg)
+
+      windows {
+        iconFile.set(project.file("src/jvmMain/resources/drawable/app_icon.png"))
+        // optional:
+        // shortcut = true
+        // menu = true
+        // menuGroup = "AITA"
+        // console = true  // see section 2 below
+      }
+      macOS {
+        iconFile.set(project.file("src/jvmMain/resources/drawable/app_icon.png"))
+      }
+      linux {
+        iconFile.set(project.file("src/jvmMain/resources/drawable/app_icon.png"))
+      }
+    }
+  }
+}
 kotlin {
   androidTarget {
     @OptIn(ExperimentalKotlinGradlePluginApi::class)

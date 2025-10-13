@@ -1,116 +1,120 @@
-[
-  {
-    "id": 0,
-    "values": [
-      {
-        "themeId": -1,
-        "valueHex": "ffffba24"
-      }
-    ]
-  },
-  {
-    "id": 1,
-    "values": [
-      {
-        "themeId": 0,
-        "valueHex": "ffffffff"
-      },
-      {
-        "themeId": 1,
-        "valueHex": "ff000000"
-      }
-    ]
-  },
-  {
-    "id": 2,
-    "values": [
-      {
-        "themeId": 0,
-        "valueHex": "ff000000"
-      },
-      {
-        "themeId": 1,
-        "valueHex": "ffffffff"
-      }
-    ]
-  },
-  {
-    "id": 3,
-    "values": [
-      {
-        "themeId": -1,
-        "valueHex": "ffffffff"
-      }
-    ]
-  },
-  {
-    "id": 4,
-    "values": [
-      {
-        "themeId": 0,
-        "valueHex": "66000000"
-      },
-      {
-        "themeId": 1,
-        "valueHex": "66ffffff"
-      }
-    ]
-  },
-  {
-    "id": 5,
-    "values": [
-      {
-        "themeId": 0,
-        "valueHex": "ffa7a7a7"
-      },
-      {
-        "themeId": 1,
-        "valueHex": "ffa7a7a7"
-      }
-    ]
-  },
-  {
-    "id": 6,
-    "values": [
-      {
-        "themeId": 0,
-        "valueHex": "ffff0000"
-      },
-      {
-        "themeId": 1,
-        "valueHex": "ffff0000"
-      }
-    ]
-  },
-  {
-    "id": 7,
-    "values": [
-      {
-        "themeId": 0,
-        "valueHex": "aa000000"
-      },
-      {
-        "themeId": 1,
-        "valueHex": "aaffffff"
-      }
-    ]
-  },
-  {
-    "id": 8,
-    "values": [
-      {
-        "themeId": -1,
-        "valueHex": "ff6bb522"
-      }
-    ]
-  },
-  {
-    "id": 9,
-    "values": [
-      {
-        "themeId": -1,
-        "valueHex": "ffffa500"
-      }
-    ]
-  }
-]
+{
+  "message": null,
+  "negative": false,
+  "payload": [
+    {
+      "id": 0,
+      "values": [
+        {
+          "themeId": -1,
+          "valueHex": "ffffba24"
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "values": [
+        {
+          "themeId": 0,
+          "valueHex": "ffffffff"
+        },
+        {
+          "themeId": 1,
+          "valueHex": "ff000000"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "values": [
+        {
+          "themeId": 0,
+          "valueHex": "ff000000"
+        },
+        {
+          "themeId": 1,
+          "valueHex": "ffffffff"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "values": [
+        {
+          "themeId": -1,
+          "valueHex": "ffffffff"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "values": [
+        {
+          "themeId": 0,
+          "valueHex": "66000000"
+        },
+        {
+          "themeId": 1,
+          "valueHex": "66ffffff"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "values": [
+        {
+          "themeId": 0,
+          "valueHex": "ffa7a7a7"
+        },
+        {
+          "themeId": 1,
+          "valueHex": "ffa7a7a7"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "values": [
+        {
+          "themeId": 0,
+          "valueHex": "ffff0000"
+        },
+        {
+          "themeId": 1,
+          "valueHex": "ffff0000"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "values": [
+        {
+          "themeId": 0,
+          "valueHex": "aa000000"
+        },
+        {
+          "themeId": 1,
+          "valueHex": "aaffffff"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "values": [
+        {
+          "themeId": -1,
+          "valueHex": "ff6bb522"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "values": [
+        {
+          "themeId": -1,
+          "valueHex": "ffffa500"
+        }
+      ]
+    }
+  ]
+}

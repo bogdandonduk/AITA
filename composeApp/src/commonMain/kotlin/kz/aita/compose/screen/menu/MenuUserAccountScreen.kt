@@ -134,35 +134,35 @@ fun AppConfiguration.MenuUserAccountScreen() {
           }
         )
 
-        responseText(
-          stateValues.stringUserWithThisPhoneNumberIsAlreadyRegistered,
-          showIf = {
-            (stateValues.userAccountState as? DataState.Failure)?.exception?.message?.equals(
-              stateValues.exceptionMessageUserWithThisPhoneNumberIsAlreadyRegistered,
-              true
-            ) == true
-          }
-        )
-
-        responseText(
-          stateValues.stringUserWithThisEmailAddressIsAlreadyRegistered,
-          showIf = {
-            (stateValues.userAccountState as? DataState.Failure)?.exception?.message?.equals(
-              stateValues.exceptionMessageUserWithThisEmailAddressIsAlreadyRegistered,
-              true
-            ) == true
-          }
-        )
-
-        responseText(
-          stateValues.stringUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered,
-          showIf = {
-            (stateValues.userAccountState as? DataState.Failure)?.exception?.message?.equals(
-              stateValues.exceptionMessageUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered,
-              true
-            ) == true
-          }
-        )
+//        responseText(
+//          stateValues.stringUserWithThisPhoneNumberIsAlreadyRegistered,
+//          showIf = {
+//            (stateValues.userAccountState as? DataState.Failure)?.message?.equals(
+//              stateValues.exceptionMessageUserWithThisPhoneNumberIsAlreadyRegistered,
+//              true
+//            ) == true
+//          }
+//        )
+//
+//        responseText(
+//          stateValues.stringUserWithThisEmailAddressIsAlreadyRegistered,
+//          showIf = {
+//            (stateValues.userAccountState as? DataState.Failure)?.message?.equals(
+//              stateValues.exceptionMessageUserWithThisEmailAddressIsAlreadyRegistered,
+//              true
+//            ) == true
+//          }
+//        )
+//
+//        responseText(
+//          stateValues.stringUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered,
+//          showIf = {
+//            (stateValues.userAccountState as? DataState.Failure)?.message?.equals(
+//              stateValues.exceptionMessageUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered,
+//              true
+//            ) == true
+//          }
+//        )
 
         Spacer(modifier = Modifier.height(outerSpace))
 

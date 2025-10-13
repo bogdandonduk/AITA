@@ -8,14 +8,12 @@ import kotlinx.coroutines.coroutineScope
 import kz.aita.model.wrapper.TokenPair
 import kz.aita.server.db.RefreshSessions
 import kz.aita.server.encrypt.Refresh
-import kz.aita.server.util.getException
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
-import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -73,7 +71,7 @@ class TokenService(private val cfg: JwtConfig) {
     val now = Instant.now()
 
     if (oldSession[RefreshSessions.expiresAt].isBefore(now))
-      throw IllegalAccessException(getException(3)?.message ?: "Refresh token expired")
+      throw IllegalAccessException()
 
     // Revoke old session (so it cannot be used again)
 

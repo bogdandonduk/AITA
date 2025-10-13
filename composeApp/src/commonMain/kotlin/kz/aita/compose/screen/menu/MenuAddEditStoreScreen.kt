@@ -3,12 +3,14 @@ package kz.aita.compose.screen.menu
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import kz.aita.AppConfiguration
 import kz.aita.compose.navigation.Navigation
+import kz.aita.compose.navigation.NavigationScreenModel
 import kz.aita.compose.widget.ScreenAppBarWidget
 import kz.aita.compose.widget.SelectableDomain
 import kz.aita.compose.widget.actionButton
@@ -30,8 +32,17 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
       .fillMaxSize(),
     horizontalAlignment = Alignment.CenterHorizontally
   ) {
+    val editedStore = NavigationScreenModel.Menu.AddEditStore.state["state_editedStoreId"]?.run { stateValues.stores?.find { store -> store.id == this } }
+
+    DisposableEffect(Unit) {
+      onDispose {
+        if (editedStore != null)
+          NavigationScreenModel.Menu.AddEditStore.removeState("state_editedStoreId")
+      }
+    }
+
     ScreenAppBarWidget(
-      title = stateValues.stringAddStore,
+      title = if (editedStore != null) stateValues.stringEditStore else stateValues.stringAddStore,
       iconPath = stateValues.drawablePathIconAdd,
       onBack = {
         coroutineScope.launch {
@@ -56,6 +67,7 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
           genericTextField(
             titleText = stateValues.stringName,
             placeholderText = stateValues.stringEnterName,
+            valueInitial = editedStore?.name?.extractLocalizedString(stateValues.appLanguage)
           )
 
         Spacer(
@@ -67,6 +79,7 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
           genericTextField(
             titleText = stateValues.stringAlias,
             placeholderText = stateValues.stringOptional,
+            valueInitial = editedStore?.alias?.extractLocalizedString(stateValues.appLanguage)
           )
 
         Spacer(
@@ -77,7 +90,8 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
         val descriptionTextFieldContent =
           genericTextField(
             titleText = stateValues.stringDescription,
-            placeholderText = stateValues.stringOptional
+            placeholderText = stateValues.stringOptional,
+            valueInitial = editedStore?.description?.extractLocalizedString(stateValues.appLanguage)
           )
 
         Spacer(
@@ -86,13 +100,15 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
         )
 
         val phoneNumberTextFieldContent = countrySelectionPhoneNumberTextField(
-          valueInitial = stateValues.userAccount?.phoneNumber
+          valueInitial = editedStore?.phoneNumbers?.takeIf { it.isNotEmpty() }?.first()
         )
 
         Spacer(modifier = Modifier.height(innerSpace))
 
         var goAction: (() -> Unit)? = null
-        val emailTextFieldContent = emailTextField(valueInitial = stateValues.userAccount?.email)
+        val emailTextFieldContent = emailTextField(
+          valueInitial = editedStore?.emails?.takeIf { it.isNotEmpty() }?.first()
+        )
 
         Spacer(modifier = Modifier.height(innerSpace))
 
@@ -104,7 +120,8 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
               name = it.name,
               iconPath = null
             )
-          }
+          },
+          selectedInitial = editedStore?.companyForms?.takeIf { it.isNotEmpty() }?.first()?.id
         )
 
         Spacer(modifier = Modifier.height(outerSpace))
@@ -122,59 +139,114 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
             && phoneNumberTextFieldContent.isContentValid
             && emailTextFieldContent.isContentValid
           ) {
-            storeRepository
-              .addStore(
-                store = StoreDataModel(
-                  id = "",
-                  userId = "",
-                  name = listOf(
-                    LocalizedStringDataModel(
-                      language = stateValues.appLanguage,
-                      value = nameTextFieldContent.value.text.trim()
-                    )
-                  ),
-                  alias = if (aliasTextFieldContent.value.text.isNotEmpty()) {
-                    listOf(
+            if (editedStore != null) {
+              storeRepository
+                .updateStore(
+                  store = StoreDataModel(
+                    id = editedStore.id,
+                    userIds = emptyList(),
+                    typeIds = emptyList(),
+                    name = listOf(
                       LocalizedStringDataModel(
-                        language = stateValues.appLanguage,
-                        value = aliasTextFieldContent.value.text.trim()
+                        language = "main",
+                        value = nameTextFieldContent.value.text.trim()
                       )
-                    )
-                  } else null,
-                  description = if (descriptionTextFieldContent.value.text.isNotEmpty()) {
-                    listOf(
-                      LocalizedStringDataModel(
-                        language = stateValues.appLanguage,
-                        value = descriptionTextFieldContent.value.text.trim()
+                    ),
+                    alias = if (aliasTextFieldContent.value.text.isNotEmpty()) {
+                      listOf(
+                        LocalizedStringDataModel(
+                          language = "main",
+                          value = aliasTextFieldContent.value.text.trim()
+                        )
                       )
-                    )
-                  } else null,
-                  companyForms = stateValues.globalAppConfiguration.companyForms.find { it.id == companyFormDropdownListContent.selectedId }
-                    ?.run { listOf(this) },
-                  location = stateValues.globalAppConfiguration.countries.first().cities.first().run {
-                    LocationDataModel(
-                      name = name.extractLocalizedString(stateValues.appLanguage) ?: "Some location",
-                      postalIndex = "020000",
-                      latitude = centerLatitude,
-                      longitude = centerLongitude
-                    )
-                  },
-                  phoneNumbers = listOf(
-                    stateValues.globalAppConfiguration.countries.run {
-                      find { it.locale.equals(phoneNumberTextFieldContent.selectedId, true) } ?: first()
-                    }.phoneNumberCode.lowercase() + phoneNumberTextFieldContent.value.text.trim().lowercase()
-                  ),
-                  emails = listOf(emailTextFieldContent.value.text.trim().lowercase()),
+                    } else null,
+                    description = if (descriptionTextFieldContent.value.text.isNotEmpty()) {
+                      listOf(
+                        LocalizedStringDataModel(
+                          language = "main",
+                          value = descriptionTextFieldContent.value.text.trim()
+                        )
+                      )
+                    } else null,
+                    companyForms = stateValues.globalAppConfiguration.companyForms.find { it.id == companyFormDropdownListContent.selectedId }
+                      ?.run { listOf(this) },
+                    location = stateValues.globalAppConfiguration.countries.first().cities.first().run {
+                      LocationDataModel(
+                        name = name.extractLocalizedString(stateValues.appLanguage) ?: "Some location",
+                        postalIndex = "020000",
+                        latitude = centerLatitude,
+                        longitude = centerLongitude
+                      )
+                    },
+                    phoneNumbers = listOf(
+                      stateValues.globalAppConfiguration.countries.run {
+                        find { it.locale.equals(phoneNumberTextFieldContent.selectedId, true) } ?: first()
+                      }.phoneNumberCode.lowercase() + phoneNumberTextFieldContent.value.text.trim().lowercase()
+                    ),
+                    emails = listOf(emailTextFieldContent.value.text.trim().lowercase()),
 
-                  createdAt = 0L,
-                  isActive = true
+                    createdAt = 0L,
+                    isActive = true
+                  )
+                ) {
+
+                }
+            } else {
+              storeRepository
+                .addStore(
+                  store = StoreDataModel(
+                    id = "",
+                    userIds = emptyList(),
+                    typeIds = emptyList(),
+                    name = listOf(
+                      LocalizedStringDataModel(
+                        language = "main",
+                        value = nameTextFieldContent.value.text.trim()
+                      )
+                    ),
+                    alias = if (aliasTextFieldContent.value.text.isNotEmpty()) {
+                      listOf(
+                        LocalizedStringDataModel(
+                          language = "main",
+                          value = aliasTextFieldContent.value.text.trim()
+                        )
+                      )
+                    } else null,
+                    description = if (descriptionTextFieldContent.value.text.isNotEmpty()) {
+                      listOf(
+                        LocalizedStringDataModel(
+                          language = "main",
+                          value = descriptionTextFieldContent.value.text.trim()
+                        )
+                      )
+                    } else null,
+                    companyForms = stateValues.globalAppConfiguration.companyForms.find { it.id == companyFormDropdownListContent.selectedId }
+                      ?.run { listOf(this) },
+                    location = stateValues.globalAppConfiguration.countries.first().cities.first().run {
+                      LocationDataModel(
+                        name = name.extractLocalizedString(stateValues.appLanguage) ?: "Some location",
+                        postalIndex = "020000",
+                        latitude = centerLatitude,
+                        longitude = centerLongitude
+                      )
+                    },
+                    phoneNumbers = listOf(
+                      stateValues.globalAppConfiguration.countries.run {
+                        find { it.locale.equals(phoneNumberTextFieldContent.selectedId, true) } ?: first()
+                      }.phoneNumberCode.lowercase() + phoneNumberTextFieldContent.value.text.trim().lowercase()
+                    ),
+                    emails = listOf(emailTextFieldContent.value.text.trim().lowercase()),
+
+                    createdAt = 0L,
+                    isActive = true
+                  )
                 )
-              )
+            }
           }
         }
 
         actionButton(
-          text = stateValues.stringAddStore,
+          text = if (editedStore != null) stateValues.stringEditStore else stateValues.stringAddStore,
           enabled = stateValues.storesState !is DataState.Progress
         ) {
           goAction.invoke()

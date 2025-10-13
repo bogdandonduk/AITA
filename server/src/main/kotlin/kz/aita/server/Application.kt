@@ -10,6 +10,8 @@ import io.ktor.server.netty.*
 import io.ktor.server.plugins.autohead.*
 import io.ktor.server.plugins.cachingheaders.*
 import io.ktor.server.plugins.calllogging.*
+import io.ktor.server.plugins.compression.Compression
+import io.ktor.server.plugins.compression.gzip
 import io.ktor.server.plugins.conditionalheaders.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
@@ -50,10 +52,9 @@ fun Application.module() {
 
   install(CallLogging)
   install(AutoHeadResponse)
-//  install(Compression) {
-//    gzip()
-//    deflate()
-//  }
+  install(Compression) {
+    gzip() { priority = 1.0 }
+  }
   install(DefaultHeaders) {
     header(HttpHeaders.Vary, "Accept-Encoding")
   }
@@ -75,6 +76,9 @@ fun Application.module() {
     anyHost() // for LAN/dev; lock down in prod
     allowHeader(HttpHeaders.ContentType)
     allowMethod(HttpMethod.Get)
+    allowMethod(HttpMethod.Post)
+    allowMethod(HttpMethod.Put)
+    allowMethod(HttpMethod.Delete)
   }
   install(ContentNegotiation) {
     json(Json {
@@ -85,10 +89,10 @@ fun Application.module() {
       encodeDefaults = true
     })
   }
-  intercept(ApplicationCallPipeline.Plugins) {
-    val ct = call.request.headers[HttpHeaders.ContentType]
-     println("CT=${ct}")
-  }
+//  intercept(ApplicationCallPipeline.Plugins) {
+//    val ct = call.request.headers[HttpHeaders.ContentType]
+//
+//  }
   val ds = HikariDataSource(HikariConfig().apply {
     jdbcUrl = environment.config.property("db.url").getString()
     username = environment.config.property("db.user").getString()

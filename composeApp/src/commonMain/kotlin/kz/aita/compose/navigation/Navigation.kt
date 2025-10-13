@@ -3,6 +3,7 @@ package kz.aita.compose.navigation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kz.aita.AppConfiguration
 
 object Navigation {
   val bottomNavBarScreens = listOf(
@@ -2260,7 +2261,7 @@ object Navigation {
     val Right =
       _Right.asStateFlow()
 
-    suspend fun go(model: NavigationScreenModel.Menu, isNarrowScreen: Boolean) {
+    suspend fun go(model: NavigationScreenModel.Menu, isNarrowScreen: Boolean = AppConfiguration.stateValues.isNarrowScreen) {
       if (isNarrowScreen)
         goLeft(model)
       else

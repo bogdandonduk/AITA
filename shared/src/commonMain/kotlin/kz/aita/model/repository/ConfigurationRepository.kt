@@ -1,9 +1,7 @@
 package kz.aita.model.repository
 
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kz.aita.model.dataModel.*
-import kz.aita.model.wrapper.DataState
 import kz.aita.model.wrapper.DataStateFlow
 import kz.aita.model.wrapper.DataStateFlowNonNull
 
@@ -14,11 +12,14 @@ interface ConfigurationRepository {
   val dimensionsState: DataStateFlow<List<StylizedDimensionGroupDataModel>>
   val colorsState: DataStateFlow<List<StylizedColorGroupDataModel>>
   val drawablesState: DataStateFlow<List<StylizedDrawablePathsGroupDataModel>>
-  val exceptionsState: DataStateFlow<List<ExceptionDataModel>>
 
   val appLanguageState: StateFlow<String>
   val appThemeIdState: StateFlow<Long>
   val appSizeModeIdState: StateFlow<Long>
+
+  val stringRawAuthenticationFailedState: StateFlow<List<LocalizedStringDataModel>>
+  val stringRawLoggingOutInProgressState: StateFlow<List<LocalizedStringDataModel>>
+  val stringRawSessionTimeExpiredLoggingOutState: StateFlow<List<LocalizedStringDataModel>>
 
   val stringAppNameState: StateFlow<String>
   val stringLogInState: StateFlow<String>
@@ -30,7 +31,7 @@ interface ConfigurationRepository {
   val stringEnterPasswordState: StateFlow<String>
   val stringCancelState: StateFlow<String>
   val stringClearState: StateFlow<String>
-  val stringLoginAndOrPasswordIncorrectState: StateFlow<String>
+  val stringAuthorizationFailedState: StateFlow<String>
   val stringPhoneNumberMustBeState: StateFlow<String>
   val stringEmailMustBeState: StateFlow<String>
   val stringPasswordMustBeState: StateFlow<String>
@@ -153,14 +154,6 @@ interface ConfigurationRepository {
   val drawablePathIconBarcodeCamScannerState: StateFlow<String>
   val drawablePathIconDeleteState: StateFlow<String>
   val drawablePathIconExitState: StateFlow<String>
-
-  val exceptionMessageUserWithThisPhoneNumberIsAlreadyRegisteredState: StateFlow<String>
-  val exceptionMessageUserWithThisEmailAddressIsAlreadyRegisteredState: StateFlow<String>
-  val exceptionMessageUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegisteredState: StateFlow<String>
-  val exceptionMessageRefreshTokenExpiredState: StateFlow<String>
-  val exceptionMessageLoginAndOrPasswordIncorrectState: StateFlow<String>
-  val exceptionMessagePleaseLogInFirstState: StateFlow<String>
-  val exceptionMessageIncorrectPasswordState: StateFlow<String>
   
   fun getGlobalAppConfiguration(loadAll: Boolean = true)
 
@@ -172,12 +165,6 @@ interface ConfigurationRepository {
 
   fun getDrawables()
 
-  fun getDrawable(key: Long, themeId: Long, format: String): Flow<DataState<String>>
-
-  fun getDrawable(name: String, format: String): Flow<DataState<String>>
-
-  fun getExceptions()
-  
   fun setAppLocale(language: String)
 
   fun setAppTheme(themeId: Long)
@@ -188,6 +175,4 @@ interface ConfigurationRepository {
   fun updateStrings(strings: List<LocalizedStringGroupDataModel>, resourceStrings: List<LocalizedStringGroupDataModel>)
 
   fun updateDrawables(drawables: List<StylizedDrawablePathsGroupDataModel>, resourceDrawables: List<StylizedDrawablePathsGroupDataModel>)
-
-  fun updateExceptions(exceptions: List<ExceptionDataModel>, resourceExceptions: List<ExceptionDataModel>)
 }

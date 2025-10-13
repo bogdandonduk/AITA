@@ -1,0 +1,254 @@
+[
+  {
+    "id": "0",
+    "message": [
+      {
+        "language": "main",
+        "value": "User with this phone number is already registered"
+      },
+      {
+        "language": "en",
+        "value": "User with this phone number is already registered"
+      },
+      {
+        "language": "ru",
+        "value": "Пользователь с этим номером телефона уже зарегистрирован"
+      },
+      {
+        "language": "kk",
+        "value": "Бұл телефон нөмірі бар пайдаланушы әлдеқашан тіркелген"
+      }
+    ]
+  },
+  {
+    "id": "1",
+    "message": [
+      {
+        "language": "main",
+        "value": "User with this email address is already registered"
+      },
+      {
+        "language": "en",
+        "value": "User with this email address is already registered"
+      },
+      {
+        "language": "ru",
+        "value": "Пользователь с этим email адресом уже зарегистрирован"
+      },
+      {
+        "language": "kk",
+        "value": "Бұл электрондық пошта мекенжайы бар пайдаланушы әлдеқашан тіркелген"
+      }
+    ]
+  },
+  {
+    "id": "2",
+    "message": [
+      {
+        "language": "main",
+        "value": "User with this phone number and email address is already registered"
+      },
+      {
+        "language": "en",
+        "value": "User with this phone number and email address is already registered"
+      },
+      {
+        "language": "ru",
+        "value": "Пользователь с этим номером телефона и email адресом уже зарегистрирован"
+      },
+      {
+        "language": "kk",
+        "value": "Осы телефон нөмірі мен электрондық пошта мекенжайы бар пайдаланушы әлдеқашан тіркелген"
+      }
+    ]
+  },
+  {
+    "id": "3",
+    "message": [
+      {
+        "language": "main",
+        "value": "Internal server error"
+      },
+      {
+        "language": "en",
+        "value": "Internal server error"
+      },
+      {
+        "language": "ru",
+        "value": "Внутренняя ошибка сервера"
+      },
+      {
+        "language": "kk",
+        "value": "Ішкі қате"
+      }
+    ]
+  },
+  {
+    "id": "4",
+    "message": [
+      {
+        "language": "main",
+        "value": "Authentication failed"
+      },
+      {
+        "language": "en",
+        "value": "Authentication failed"
+      },
+      {
+        "language": "ru",
+        "value": "Аутентификация не удалась"
+      },
+      {
+        "language": "kk",
+        "value": "Аутентификация сәтсіз аяқталды"
+      }
+    ]
+  },
+  {
+    "id": "5",
+    "message": [
+      {
+        "language": "main",
+        "value": "Please log in first"
+      },
+      {
+        "language": "en",
+        "value": "Please log in first"
+      },
+      {
+        "language": "ru",
+        "value": "Пожалуйста, сначала войдите"
+      },
+      {
+        "language": "kk",
+        "value": "Алдымен жүйеге кіріңіз"
+      }
+    ]
+  },
+  {
+    "id": "6",
+    "message": [
+      {
+        "language": "main",
+        "value": "Incorrect password"
+      },
+      {
+        "language": "en",
+        "value": "Incorrect password"
+      },
+      {
+        "language": "ru",
+        "value": "Неверный пароль"
+      },
+      {
+        "language": "kk",
+        "value": "Қате құпия сөз"
+      }
+    ]
+  },
+  {
+    "id": "7",
+    "message": [
+      {
+        "language": "main",
+        "value": "Store is not registered"
+      },
+      {
+        "language": "en",
+        "value": "Store is not registered"
+      },
+      {
+        "language": "ru",
+        "value": "Магазин не зарегистрирован"
+      },
+      {
+        "language": "kk",
+        "value": "Дүкен тіркелмеген"
+      }
+    ]
+  },
+  {
+    "id": "8",
+    "message": [
+      {
+        "language": "main",
+        "value": "Successfully logged out"
+      },
+      {
+        "language": "en",
+        "value": "Successfully logged out"
+      },
+      {
+        "language": "ru",
+        "value": "Выход успешно выполнен"
+      },
+      {
+        "language": "kk",
+        "value": "Жүйеден сәтті шықты"
+      }
+    ]
+  },
+  {
+    "id": "9",
+    "message": [
+      {
+        "language": "main",
+        "value": "User successfully updated"
+      },
+      {
+        "language": "en",
+        "value": "User successfully updated"
+      },
+      {
+        "language": "ru",
+        "value": "Пользователь успешно обновлен"
+      },
+      {
+        "language": "kk",
+        "value": "Пайдаланушы сәтті жаңартылды"
+      }
+    ]
+  },
+  {
+    "id": "11",
+    "message": [
+      {
+        "language": "main",
+        "value": "Store successfully updated"
+      },
+      {
+        "language": "en",
+        "value": "Store successfully updated"
+      },
+      {
+        "language": "ru",
+        "value": "Магазин успешно обновлен"
+      },
+      {
+        "language": "kk",
+        "value": "Дүкен сәтті жаңартылды"
+      }
+    ]
+  },
+  {
+    "id": "12",
+    "message": [
+      {
+        "language": "main",
+        "value": "Store successfully deleted"
+      },
+      {
+        "language": "en",
+        "value": "Store successfully deleted"
+      },
+      {
+        "language": "ru",
+        "value": "Магазин успешно удален"
+      },
+      {
+        "language": "kk",
+        "value": "Дүкен сәтті жойылды"
+      }
+    ]
+  }
+]

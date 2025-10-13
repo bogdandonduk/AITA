@@ -1,110 +1,114 @@
-[
-  {
-    "id": 0,
-    "values": [
-      {
-        "sizeModeId": 0,
-        "value": 14
-      }
-    ]
-  },
-  {
-    "id": 1,
-    "values": [
-      {
-        "sizeModeId": 0,
-        "value": 20
-      }
-    ]
-  },
-  {
-    "id": 2,
-    "values": [
-      {
-        "sizeModeId": 0,
-        "value": 16
-      }
-    ]
-  },
-  {
-    "id": 3,
-    "values": [
-      {
-        "sizeModeId": 0,
-        "value": 12
-      }
-    ]
-  },
-  {
-    "id": 4,
-    "values": [
-      {
-        "sizeModeId": -1,
-        "value": 600
-      }
-    ]
-  },
-  {
-    "id": 5,
-    "values": [
-      {
-        "sizeModeId": -1,
-        "value": 1
-      }
-    ]
-  },
-  {
-    "id": 6,
-    "values": [
-      {
-        "sizeModeId": -1,
-        "value": 0.5
-      }
-    ]
-  },
-  {
-    "id": 7,
-    "values": [
-      {
-        "sizeModeId": 0,
-        "value": 14
-      }
-    ]
-  },
-  {
-    "id": 8,
-    "values": [
-      {
-        "sizeModeId": 0,
-        "value": 24
-      }
-    ]
-  },
-  {
-    "id": 9,
-    "values": [
-      {
-        "sizeModeId": 0,
-        "value": 300
-      }
-    ]
-  },
-  {
-    "id": 10,
-    "values": [
-      {
-        "sizeModeId": 0,
-        "value": 2.6
-      }
-    ]
-  },
-  {
-    "id": 11,
-    "values": [
-      {
-        "sizeModeId": 0,
-        "value": 9
-      }
-    ]
-  }
-]
+{
+  "message": null,
+  "negative": false,
+  "payload": [
+    {
+      "id": 0,
+      "values": [
+        {
+          "sizeModeId": 0,
+          "value": 14
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "values": [
+        {
+          "sizeModeId": 0,
+          "value": 20
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "values": [
+        {
+          "sizeModeId": 0,
+          "value": 16
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "values": [
+        {
+          "sizeModeId": 0,
+          "value": 12
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "values": [
+        {
+          "sizeModeId": -1,
+          "value": 600
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "values": [
+        {
+          "sizeModeId": -1,
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "values": [
+        {
+          "sizeModeId": -1,
+          "value": 0.5
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "values": [
+        {
+          "sizeModeId": 0,
+          "value": 14
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "values": [
+        {
+          "sizeModeId": 0,
+          "value": 24
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "values": [
+        {
+          "sizeModeId": 0,
+          "value": 300
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "values": [
+        {
+          "sizeModeId": 0,
+          "value": 2.6
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "values": [
+        {
+          "sizeModeId": 0,
+          "value": 9
+        }
+      ]
+    }
+  ]
+}

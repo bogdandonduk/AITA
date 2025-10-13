@@ -30,73 +30,73 @@ fun AppConfiguration.StockWarehouseScreen() {
       iconPath = stateValues.drawablePathIconStock
     )
 
-    when (val state = stateValues.stockState) {
-      is DataState.Success -> {
-        if (state.payload.isEmpty()) {
-          MessageText(
-            modifier = Modifier
-              .fillMaxWidth()
-              .weight(1f),
-            stateValues.stringListEmpty
-          )
-        } else {
-          val searchTextFieldContent =
-            searchTextField(
-              valueInitial = NavigationScreenModel.Stock.Warehouse.state["search_query"],
-              modifier = Modifier
-                .padding(start = 8.dp, top = 8.dp, end = 8.dp),
-              barcodeCamScanner = true
-            )
-
-          val items = searchTextFieldContent
-            .value
-            .text
-            .takeIf {
-              it.isNotEmpty()
-            }?.let { query ->
-              state.payload.search<GoodsItemDataModel>(query).first
-            } ?: state.payload
-
-          if (items.isEmpty()) {
-            MessageText(
-              modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-              stateValues.stringNoMatches)
-          } else {
-            LazyColumn(
-              modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .padding(8.dp)
-            ) {
-              items(items) {
-                GoodsItemInStockWidget(
-                  goodsItem = it,
-                  onDelete = {
-
-                  },
-                  onEdit = {
-
-                  }
-                )
-              }
-            }
-          }
-        }
-      }
-
-      is DataState.Empty -> {
-        MessageText(
-          modifier = Modifier
-            .fillMaxWidth()
-            .weight(1f),
-          stateValues.stringListEmpty)
-      }
-
-      else -> {
-
-      }
-    }
+//    when (val state = stateValues.stockState) {
+//      is DataState.Success -> {
+//        if (state.payload.isEmpty()) {
+//          MessageText(
+//            modifier = Modifier
+//              .fillMaxWidth()
+//              .weight(1f),
+//            stateValues.stringListEmpty
+//          )
+//        } else {
+//          val searchTextFieldContent =
+//            searchTextField(
+//              valueInitial = NavigationScreenModel.Stock.Warehouse.state["search_query"],
+//              modifier = Modifier
+//                .padding(start = 8.dp, top = 8.dp, end = 8.dp),
+//              barcodeCamScanner = true
+//            )
+//
+//          val items = searchTextFieldContent
+//            .value
+//            .text
+//            .takeIf {
+//              it.isNotEmpty()
+//            }?.let { query ->
+//              state.payload.search<GoodsItemDataModel>(query).first
+//            } ?: state.payload
+//
+//          if (items.isEmpty()) {
+//            MessageText(
+//              modifier = Modifier
+//                .fillMaxWidth()
+//                .weight(1f),
+//              stateValues.stringNoMatches)
+//          } else {
+//            LazyColumn(
+//              modifier = Modifier
+//                .fillMaxWidth()
+//                .weight(1f)
+//                .padding(8.dp)
+//            ) {
+//              items(items) {
+//                GoodsItemInStockWidget(
+//                  goodsItem = it,
+//                  onDelete = {
+//
+//                  },
+//                  onEdit = {
+//
+//                  }
+//                )
+//              }
+//            }
+//          }
+//        }
+//      }
+//
+//      is DataState.Empty -> {
+//        MessageText(
+//          modifier = Modifier
+//            .fillMaxWidth()
+//            .weight(1f),
+//          stateValues.stringListEmpty)
+//      }
+//
+//      else -> {
+//
+//      }
+//    }
   }
 }

@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kz.aita.compose.navigation.Navigation
@@ -19,8 +20,6 @@ import kz.aita.compose.navigation.NavigationScreenModel
 import kz.aita.compose.util.loadResourceColors
 import kz.aita.compose.util.loadResourceDimensions
 import kz.aita.compose.util.loadResourceDrawablePaths
-import kz.aita.compose.util.loadResourceExceptions
-import kz.aita.compose.util.loadResourceGlobalAppConfiguration
 import kz.aita.compose.util.loadResourceStrings
 import kz.aita.compose.util.toColor
 import kz.aita.core.*
@@ -36,11 +35,12 @@ object AppConfiguration {
     val userAccountState: DataState<UserAccountDataModel>
     val userAccount: UserAccountDataModel?
 
-    val stockState: DataState<List<GoodsItemDataModel>>
-    val stock: List<GoodsItemDataModel>?
+//    val stockState: DataState<List<GoodsItemDataModel>>
+//    val stock: List<GoodsItemDataModel>?
 
     val storesState: DataState<List<StoreDataModel>>
     val stores: List<StoreDataModel>?
+    val activeStoreId: String?
 
     val navigationScreensMain: List<NavigationScreenModel>
     val navigationTransactionSaleClientId: Int
@@ -104,7 +104,7 @@ object AppConfiguration {
     val stringEnterPassword: String
     val stringCancel: String
     val stringClear: String
-    val stringLoginAndOrPasswordIncorrect: String
+    val stringAuthenticationFailed: String
     val stringPhoneNumberMustBe: String
     val stringEmailMustBe: String
     val stringPasswordMustBe: String
@@ -262,14 +262,6 @@ object AppConfiguration {
     val drawablePathIconBarcodeCamScanner: String
     val drawablePathIconDelete: String
     val drawablePathIconExit: String
-
-    val exceptionMessageUserWithThisPhoneNumberIsAlreadyRegistered: String
-    val exceptionMessageUserWithThisEmailAddressIsAlreadyRegistered: String
-    val exceptionMessageUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered: String
-    val exceptionMessageRefreshTokenExpired: String
-    val exceptionMessageLoginAndOrPasswordIncorrect: String
-    val exceptionMessagePleaseLogInFirst: String
-    val exceptionMessageIncorrectPassword: String
   }
 
   private val _screenWidthState = MutableStateFlow(0f.dp)
@@ -318,7 +310,7 @@ object AppConfiguration {
     configurationRepository.setAppLocale(language)
   }
 
-  fun postNotification(message: String, type: NotificationType) {
+  fun postNotification(message: List<LocalizedStringDataModel>?, type: NotificationType) {
     notificationRepository.postNotification(message, type)
   }
 
@@ -333,11 +325,12 @@ object AppConfiguration {
       override val userAccountState: DataState<UserAccountDataModel> by userRepository.userAccountState.value.collectAsState()
       override val userAccount: UserAccountDataModel? by userRepository.userAccountState.payload.collectAsState()
 
-      override val stockState: DataState<List<GoodsItemDataModel>> by stockRepository.stockState.value.collectAsState()
-      override val stock: List<GoodsItemDataModel>? by stockRepository.stockState.payload.collectAsState()
+//      override val stockState: DataState<List<GoodsItemDataModel>> by stockRepository.stockState.value.collectAsState()
+//      override val stock: List<GoodsItemDataModel>? by stockRepository.stockState.payload.collectAsState()
 
       override val storesState: DataState<List<StoreDataModel>> by storeRepository.storesState.value.collectAsState()
       override val stores: List<StoreDataModel>? by storeRepository.storesState.payload.collectAsState()
+      override val activeStoreId: String? by storeRepository.activeStoreId.collectAsState()
 
       override val navigationScreensMain: List<NavigationScreenModel> by Navigation.Main.collectAsState()
       override val navigationTransactionSaleClientId: Int by Navigation.TransactionSale.ClientId.collectAsState()
@@ -408,7 +401,7 @@ object AppConfiguration {
       override val stringEnterPassword: String by configurationRepository.stringEnterPasswordState.collectAsState()
       override val stringCancel: String by configurationRepository.stringCancelState.collectAsState()
       override val stringClear: String by configurationRepository.stringClearState.collectAsState()
-      override val stringLoginAndOrPasswordIncorrect: String by configurationRepository.stringLoginAndOrPasswordIncorrectState.collectAsState()
+      override val stringAuthenticationFailed: String by configurationRepository.stringAuthorizationFailedState.collectAsState()
       override val stringPhoneNumberMustBe: String by configurationRepository.stringPhoneNumberMustBeState.collectAsState()
       override val stringEmailMustBe: String by configurationRepository.stringEmailMustBeState.collectAsState()
       override val stringPasswordMustBe: String by configurationRepository.stringPasswordMustBeState.collectAsState()
@@ -560,14 +553,6 @@ object AppConfiguration {
       override val drawablePathIconBarcodeCamScanner: String by configurationRepository.drawablePathIconBarcodeCamScannerState.collectAsState()
       override val drawablePathIconDelete: String by configurationRepository.drawablePathIconDeleteState.collectAsState()
       override val drawablePathIconExit: String by configurationRepository.drawablePathIconExitState.collectAsState()
-
-      override val exceptionMessageUserWithThisPhoneNumberIsAlreadyRegistered: String by configurationRepository.exceptionMessageUserWithThisPhoneNumberIsAlreadyRegisteredState.collectAsState()
-      override val exceptionMessageUserWithThisEmailAddressIsAlreadyRegistered: String by configurationRepository.exceptionMessageUserWithThisEmailAddressIsAlreadyRegisteredState.collectAsState()
-      override val exceptionMessageUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered: String by configurationRepository.exceptionMessageUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegisteredState.collectAsState()
-      override val exceptionMessageRefreshTokenExpired: String by configurationRepository.exceptionMessageRefreshTokenExpiredState.collectAsState()
-      override val exceptionMessageLoginAndOrPasswordIncorrect: String by configurationRepository.exceptionMessageLoginAndOrPasswordIncorrectState.collectAsState()
-      override val exceptionMessagePleaseLogInFirst: String by configurationRepository.exceptionMessagePleaseLogInFirstState.collectAsState()
-      override val exceptionMessageIncorrectPassword: String by configurationRepository.exceptionMessageIncorrectPasswordState.collectAsState()
     }
 
     softKeyboardController = LocalSoftwareKeyboardController.current
@@ -580,19 +565,17 @@ object AppConfiguration {
       ) {
         content()
 
-        coroutineScope.launch {
+        coroutineScope.launch(Dispatchers.io) {
           _screenWidthState.emit(maxWidth)
           _screenHeightState.emit(maxHeight)
           _isNarrowScreenState.emit(maxWidth.value < stateValues.wideScreenMinWidth)
 
-          val resourceGlobalConfiguration = loadResourceGlobalAppConfiguration()
           val resourceStrings = loadResourceStrings()
           val resourceDimensions = loadResourceDimensions()
           val resourceColors = loadResourceColors()
           val resourceDrawables = loadResourceDrawablePaths()
-          val resourceExceptions = loadResourceExceptions()
 
-          launch {
+          launch(Dispatchers.io) {
             _isNarrowScreenState
               .collect {
                 Navigation.TransactionSale.init(it)
@@ -604,16 +587,7 @@ object AppConfiguration {
               }
           }
 
-          launch {
-            configurationRepository
-              .globalAppConfigurationState
-              .payload
-              .collect {
-                configurationRepository.updateGlobalAppConfiguration(it, resourceGlobalConfiguration)
-              }
-          }
-
-          launch {
+          launch(Dispatchers.io) {
             configurationRepository
               .stringsState
               .payload
@@ -624,7 +598,7 @@ object AppConfiguration {
               }
           }
 
-          launch {
+          launch(Dispatchers.io) {
             configurationRepository
               .appLanguageState
               .collect {
@@ -636,7 +610,7 @@ object AppConfiguration {
               }
           }
 
-          launch {
+          launch(Dispatchers.io) {
             configurationRepository
               .dimensionsState
               .payload
@@ -647,7 +621,7 @@ object AppConfiguration {
               }
           }
 
-          launch {
+          launch(Dispatchers.io) {
             configurationRepository
               .colorsState
               .payload
@@ -658,7 +632,7 @@ object AppConfiguration {
               }
           }
 
-          launch {
+          launch(Dispatchers.io) {
             configurationRepository
               .drawablesState
               .payload
@@ -669,18 +643,7 @@ object AppConfiguration {
               }
           }
 
-          launch {
-            configurationRepository
-              .exceptionsState
-              .payload
-              .collect {
-                it?.let {
-                  configurationRepository.updateExceptions(it, resourceExceptions)
-                }
-              }
-          }
-
-          launch {
+          launch(Dispatchers.io) {
             configurationRepository
               .appThemeIdState
               .collect {
@@ -698,7 +661,7 @@ object AppConfiguration {
               }
           }
 
-          launch {
+          launch(Dispatchers.io) {
             configurationRepository
               .appSizeModeIdState
               .collect {

@@ -33,6 +33,7 @@ import kz.aita.core.getFullDrawableResourceUrl
 @Composable
 fun AppConfiguration.actionButton(
   modifier: Modifier = Modifier,
+  fillMaxWidthIfTextPresent: Boolean = true,
 
   enabled: Boolean = true,
 
@@ -84,7 +85,7 @@ fun AppConfiguration.actionButton(
   Row(
     modifier = modifier
       .run {
-        if (!textPresent)
+        if (!textPresent || !fillMaxWidthIfTextPresent)
           wrapContentWidth()
         else
           fillMaxWidth()
@@ -141,7 +142,12 @@ fun AppConfiguration.actionButton(
     ) {
       if (textPresent) {
         Text(
-          modifier = Modifier.fillMaxWidth(),
+          modifier = Modifier.run {
+            if (!fillMaxWidthIfTextPresent)
+              wrapContentWidth().padding(horizontal = height / 2)
+            else
+              fillMaxWidth()
+          },
           text = text,
           color = textColor,
           fontWeight = FontWeight.Bold,
@@ -151,7 +157,12 @@ fun AppConfiguration.actionButton(
 
         if (subTextPresent) {
           Text(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.run {
+              if (!fillMaxWidthIfTextPresent)
+                wrapContentWidth().padding(horizontal = height / 2)
+              else
+                fillMaxWidth()
+            },
             text = subText,
             color = subTextColor,
             fontSize = subTextSize,

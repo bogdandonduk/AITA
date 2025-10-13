@@ -207,6 +207,29 @@ fun AppConfiguration.MainScreen() {
             }
           }
         }
+      } else {
+      stateValues.latestNotification?.run {
+        Box(
+          modifier = Modifier
+            .fillMaxWidth()
+            .height(32.dp)
+            .background(
+              when (type) {
+                NotificationType.Neutral -> stateValues.PlaceholderTextColor
+                NotificationType.Positive -> stateValues.OkayColor
+                NotificationType.Negative -> stateValues.ErrorColor
+              }
+            ),
+          contentAlignment = Alignment.Center
+        ) {
+          Text(
+            text = message,
+            color = stateValues.AccentTextColor,
+            fontSize = stateValues.accentTextSize,
+            fontWeight = FontWeight.Bold
+          )
+        }
       }
+    }
   }
 }

@@ -37,12 +37,12 @@ fun AppConfiguration.dropdownListWidget(
   showId: Boolean = false,
   showName: Boolean = true,
   domains: List<SelectableDomain>,
-  selectedInitial: String = domains.first().id,
+  selectedInitial: String? = null,
   cornerRadius: Dp = stateValues.cornerRadius
 ): DropdownListWidgetContent {
 
   var selectedId by rememberSaveable {
-    mutableStateOf(selectedInitial)
+    mutableStateOf(selectedInitial ?: domains.first().id)
   }
 
   var selected by remember {
@@ -54,7 +54,9 @@ fun AppConfiguration.dropdownListWidget(
   }
 
   LaunchedEffect(selectedInitial) {
-    selectedId = selectedInitial
+    selectedInitial?.let {
+      selectedId = it
+    }
   }
 
   val isDomainSelectionDropdownExpandedState = remember {

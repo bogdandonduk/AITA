@@ -30,29 +30,29 @@ class StockRepositoryImpl(
     getStock()
   }
   override fun getStock() {
-    launch(Dispatchers.io) {
-      if (!getStockMutex.tryLock())
-        return@launch
-
-      if (tokenStore?.get() == null)
-        return@launch getStockMutex.unlock()
-
-      _stockState.emit(DataState.Progress())
-
-      genericRemoteService
-        .request<List<GoodsItemDataModel>, Unit>(
-          HttpMethod.Get,
-          endpointUrl = configurationRepository.globalAppConfigurationState.payloadValue.getStoresPath,
-          onFailure = {
-            _stockState.emit(DataState.Failure(it))
-            getStockMutex.unlock()
-            it.printStackTrace()
-          }
-        )?.run {
-          _stockState.emit(DataState.Success(this))
-          getStockMutex.unlock()
-        }
-    }
+//    launch(Dispatchers.io) {
+//      if (!getStockMutex.tryLock())
+//        return@launch
+//
+//      if (tokenStore?.get() == null)
+//        return@launch getStockMutex.unlock()
+//
+//      _stockState.emit(DataState.Progress())
+//
+//      genericRemoteService
+//        .request<List<GoodsItemDataModel>, Unit>(
+//          HttpMethod.Get,
+//          endpointUrl = configurationRepository.globalAppConfigurationState.payloadValue.getStoresPath,
+//          onFailure = {
+//            _stockState.emit(DataState.Failure(it))
+//            getStockMutex.unlock()
+//            it.printStackTrace()
+//          }
+//        )?.run {
+//          _stockState.emit(DataState.Success(this))
+//          getStockMutex.unlock()
+//        }
+//    }
   }
 
   override fun addGoodsItem(

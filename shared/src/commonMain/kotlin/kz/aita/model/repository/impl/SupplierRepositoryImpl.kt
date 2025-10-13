@@ -31,28 +31,28 @@ class SupplierRepositoryImpl(
   }
 
   override fun getSuppliers() {
-    launch(Dispatchers.io) {
-      if (!getSuppliersMutex.tryLock())
-        return@launch
-
-      if (tokenStore?.get() == null)
-        return@launch getSuppliersMutex.unlock()
-
-      _suppliersState.emit(DataState.Progress())
-
-      genericRemoteService
-        .request<List<SupplierDataModel>, Unit>(
-          HttpMethod.Get,
-          endpointUrl = configurationRepository.globalAppConfigurationState.payloadValue.suppliersPath,
-          onFailure = {
-            _suppliersState.emit(DataState.Failure(it))
-            getSuppliersMutex.unlock()
-            it.printStackTrace()
-          }
-        )?.run {
-          _suppliersState.emit(DataState.Success(this))
-          getSuppliersMutex.unlock()
-        } ?: getSuppliersMutex.unlock()
-    }
+//    launch(Dispatchers.io) {
+//      if (!getSuppliersMutex.tryLock())
+//        return@launch
+//
+//      if (tokenStore?.get() == null)
+//        return@launch getSuppliersMutex.unlock()
+//
+//      _suppliersState.emit(DataState.Progress())
+//
+//      genericRemoteService
+//        .request<List<SupplierDataModel>, Unit>(
+//          HttpMethod.Get,
+//          endpointUrl = configurationRepository.globalAppConfigurationState.payloadValue.suppliersPath,
+//          onFailure = {
+//            _suppliersState.emit(DataState.Failure(it))
+//            getSuppliersMutex.unlock()
+//            it.printStackTrace()
+//          }
+//        )?.run {
+//          _suppliersState.emit(DataState.Success(this))
+//          getSuppliersMutex.unlock()
+//        } ?: getSuppliersMutex.unlock()
+//    }
   }
 }

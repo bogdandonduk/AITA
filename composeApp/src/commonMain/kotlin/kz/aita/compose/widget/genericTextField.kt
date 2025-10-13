@@ -116,6 +116,10 @@ fun AppConfiguration.genericTextField(
     mutableStateOf(true)
   }
 
+  LaunchedEffect(valueInitial) {
+    val initial = valueInitial ?: ""
+    value = TextFieldValue(initial, selection = TextRange(initial.length))
+  }
   Column(
     modifier = modifier
   ) {

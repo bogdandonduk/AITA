@@ -12,7 +12,9 @@ import kz.aita.model.dataModel.UserAccountDataModel
 import kz.aita.model.dataModel.UserAccountUpdateDataModel
 import kz.aita.server.db.Users
 import kz.aita.server.encrypt.Pw
-import kz.aita.server.util.getException
+import kz.aita.server.util.genericResponse
+import kz.aita.server.util.getResponse
+import kz.aita.server.util.getResponses
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
@@ -40,7 +42,7 @@ fun Application.userRoute() {
               .singleOrNull()
           } ?: return@get call.respond(UnauthorizedResponse())
 
-          call.respond(
+          call.genericResponse(
             HttpStatusCode.OK,
             UserAccountDataModel(
               id = user[Users.id].toString(),
@@ -95,8 +97,6 @@ fun Application.userRoute() {
               .empty()
               .not()
 
-            if (phoneNumberClash)
-              return@newSuspendedTransaction "phone_number_clash"
 
             val emailClash = Users
               .select(Users.id, Users.email)
@@ -106,7 +106,11 @@ fun Application.userRoute() {
               .empty()
               .not()
 
-            if (emailClash)
+            if (phoneNumberClash && emailClash)
+              return@newSuspendedTransaction "phone_number_and_email_clash"
+            else if (phoneNumberClash)
+              return@newSuspendedTransaction "phone_number_clash"
+            else if (emailClash)
               return@newSuspendedTransaction "email_clash"
 
             val newHash = body.newPassword
@@ -146,24 +150,32 @@ fun Application.userRoute() {
           }
 
           when (updated) {
-            "ok" -> call.respond(
+            "ok" -> call.genericResponse(
               HttpStatusCode.OK,
-              body.account
+              body.account,
+              message = getResponse("9").message
             )
 
             "unauthorized", "password_mismatch" -> call.respond(UnauthorizedResponse())
-            "phone_number_clash" -> call.respond(
+
+            "phone_number_and_email_clash" -> call.genericResponse(
               HttpStatusCode.Conflict,
-              getException(0)?.message ?: "User with this phone number is already registered"
+              message = getResponse("2").message
             )
 
-            "email_clash" -> call.respond(
+            "phone_number_clash" -> call.genericResponse(
               HttpStatusCode.Conflict,
-              getException(1)?.message ?: "User with this email is already registered"
+              message = getResponse("0").message
             )
 
-            else -> call.respond(
-              HttpStatusCode.InternalServerError
+            "email_clash" -> call.genericResponse(
+              HttpStatusCode.Conflict,
+              message = getResponse("1").message
+            )
+
+            else -> call.genericResponse(
+              status = HttpStatusCode.InternalServerError,
+              message = getResponse("3").message
             )
           }
         }

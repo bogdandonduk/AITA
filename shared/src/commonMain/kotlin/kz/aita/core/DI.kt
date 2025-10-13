@@ -46,9 +46,9 @@ val httpClient by lazy {
     expectSuccess = false
 
     install(HttpCache)
-
+//
 //    install(Logging) {
-//      level = LogLevel.
+//      level = LogLevel.ALL
 //    }
     install(Auth) {
       bearer {
@@ -77,26 +77,24 @@ val httpClient by lazy {
                 }
               }
 
-              val newPair = runCatching {
-                GenericRemoteService(httpClient)
-                  .request<TokenPair, String>(
-                    HttpMethod.Post,
-                    endpointUrl = configurationRepository.globalAppConfigurationState.payloadValue.refreshPath,
-                    body = current.refreshToken,
-                    onFailure = {
-                      notificationRepository.postNotification(configurationRepository.stringSessionTimeExpiredLoggingOutState.value, NotificationType.Negative)
-                      delay(3000)
-                      userRepository.forceLogOut()
-                      it.printStackTrace()
-                    }
-                  )
-              }.getOrNull()
+              val response = GenericRemoteService(httpClient)
+                .request<TokenPair, String>(
+                  HttpMethod.Post,
+                  endpointUrl = configurationRepository.globalAppConfigurationState.payloadValue.refreshPath,
+                  body = current.refreshToken
+                )
+
+              if (response.negative) {
+                notificationRepository.postNotification(configurationRepository.stringRawSessionTimeExpiredLoggingOutState.value, NotificationType.Negative)
+                delay(3000)
+                userRepository.forceLogOut()
+              }
 
               httpClient.close()
 
-              if (newPair != null) {
-                tokenStore?.set(newPair)
-                BearerTokens(newPair.accessToken, newPair.refreshToken)
+              if (response.payload != null) {
+                tokenStore?.set(response.payload)
+                BearerTokens(response.payload.accessToken, response.payload.refreshToken)
               } else {
                 tokenStore?.set(null)
                 null
@@ -118,7 +116,13 @@ val genericLocalService: GenericLocalService by lazy {
 }
 
 val userRepository: UserRepository by lazy {
-  UserRepositoryImpl(genericRemoteService, configurationRepository, notificationRepository, tokenStore, userAccountStore)
+  UserRepositoryImpl(
+    genericRemoteService,
+    configurationRepository,
+    notificationRepository,
+    tokenStore,
+    userAccountStore
+  )
 }
 
 val configurationRepository: ConfigurationRepository by lazy {
@@ -134,7 +138,7 @@ val supplierRepository: SupplierRepository by lazy {
 }
 
 val storeRepository: StoreRepository by lazy {
-  StoreRepositoryImpl(genericRemoteService, configurationRepository, tokenStore)
+  StoreRepositoryImpl(genericRemoteService, genericLocalService, configurationRepository, tokenStore)
 }
 
 val goodsCategoryRepository: GoodsCategoryRepository by lazy {
@@ -146,7 +150,7 @@ val notificationRepository: NotificationRepository by lazy {
 }
 
 val genericGoodsItemsRepository: GenericGoodsItemsRepository by lazy {
-  GenericGoodsItemsRepositoryImpl(genericRemoteService, configurationRepository, tokenStore)
+  GenericGoodsItemsRepositoryImpl(genericRemoteService, configurationRepository)
 }
 
 

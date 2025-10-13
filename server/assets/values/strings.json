@@ -1,1651 +1,2043 @@
-[
-  {
-    "id": 0,
-    "values": [
-      {
-        "language": "en",
-        "value": "AITA"
-      },
-      {
-        "language": "ru",
-        "value": "AITA"
-      },
-      {
-        "language": "kk",
-        "value": "AITA"
-      }
-    ]
-  },
-  {
-    "id": 1,
-    "values": [
-      {
-        "language": "en",
-        "value": "Log In"
-      },
-      {
-        "language": "ru",
-        "value": "Войти"
-      },
-      {
-        "language": "kk",
-        "value": "Кіру"
-      }
-    ]
-  },
-  {
-    "id": 2,
-    "values": [
-      {
-        "language": "en",
-        "value": "Phone number"
-      },
-      {
-        "language": "ru",
-        "value": "Номер телефона"
-      },
-      {
-        "language": "kk",
-        "value": "Телефон нөмірі"
-      }
-    ]
-  },
-  {
-    "id": 3,
-    "values": [
-      {
-        "language": "en",
-        "value": "Enter phone number"
-      },
-      {
-        "language": "ru",
-        "value": "Введите номер телефона"
-      },
-      {
-        "language": "kk",
-        "value": "Телефон нөміріңізді енгізіңіз"
-      }
-    ]
-  },
-  {
-    "id": 4,
-    "values": [
-      {
-        "language": "en",
-        "value": "Email"
-      },
-      {
-        "language": "ru",
-        "value": "Email"
-      },
-      {
-        "language": "kk",
-        "value": "Email"
-      }
-    ]
-  },
-  {
-    "id": 5,
-    "values": [
-      {
-        "language": "en",
-        "value": "Enter email address"
-      },
-      {
-        "language": "ru",
-        "value": "Введите адрес email"
-      },
-      {
-        "language": "kk",
-        "value": "Электрондық пошта мекенжайыңызды енгізіңіз"
-      }
-    ]
-  },
-  {
-    "id": 6,
-    "values": [
-      {
-        "language": "en",
-        "value": "Password"
-      },
-      {
-        "language": "ru",
-        "value": "Пароль"
-      },
-      {
-        "language": "kk",
-        "value": "Құпия сөз"
-      }
-    ]
-  },
-  {
-    "id": 7,
-    "values": [
-      {
-        "language": "en",
-        "value": "Enter password"
-      },
-      {
-        "language": "ru",
-        "value": "Введите пароль"
-      },
-      {
-        "language": "kk",
-        "value": "Құпия сөзді енгізіңіз"
-      }
-    ]
-  },
-  {
-    "id": 8,
-    "values": [
-      {
-        "language": "en",
-        "value": "Cancel"
-      },
-      {
-        "language": "ru",
-        "value": "Отменить"
-      },
-      {
-        "language": "kk",
-        "value": "Болдырмау"
-      }
-    ]
-  },
-  {
-    "id": 9,
-    "values": [
-      {
-        "language": "en",
-        "value": "Clear"
-      },
-      {
-        "language": "ru",
-        "value": "Очистить"
-      },
-      {
-        "language": "kk",
-        "value": "Таза"
-      }
-    ]
-  },
-  {
-    "id": 10,
-    "values": [
-      {
-        "language": "en",
-        "value": "Login and/or password incorrect"
-      },
-      {
-        "language": "ru",
-        "value": "Неправильный логин и/или пароль"
-      },
-      {
-        "language": "kk",
-        "value": "Қате логин және/немесе құпия сөз"
-      }
-    ]
-  },
-  {
-    "id": 11,
-    "values": [
-      {
-        "language": "en",
-        "value": "Incorrect phone number length"
-      },
-      {
-        "language": "ru",
-        "value": "Неправильная длина номера телефона"
-      },
-      {
-        "language": "kk",
-        "value": "Телефон нөмірі дұрыс емес"
-      }
-    ]
-  },
-  {
-    "id": 12,
-    "values": [
-      {
-        "language": "en",
-        "value": "Incorrect email address format"
-      },
-      {
-        "language": "ru",
-        "value": "Неправильный формат email адреса"
-      },
-      {
-        "language": "kk",
-        "value": "Қате электрондық пошта мекенжайы пішімі"
-      }
-    ]
-  },
-  {
-    "id": 13,
-    "values": [
-      {
-        "language": "en",
-        "value": "Password must be 8 or more symbols long and contain at least one digit"
-      },
-      {
-        "language": "ru",
-        "value": "Пароль должен быть длиной 8 или более символов и содержать хотя бы одну цифру"
-      },
-      {
-        "language": "kk",
-        "value": "Құпия сөз ұзындығы 8 немесе одан да көп таңбадан тұруы және кемінде бір саннан тұруы керек"
-      }
-    ]
-  },
-  {
-    "id": 14,
-    "values": [
-      {
-        "language": "en",
-        "value": "Repeat password"
-      },
-      {
-        "language": "ru",
-        "value": "Повторите пароль"
-      },
-      {
-        "language": "kk",
-        "value": "Құпия сөзді қайталаңыз"
-      }
-    ]
-  },
-  {
-    "id": 15,
-    "values": [
-      {
-        "language": "en",
-        "value": "Passwords must match"
-      },
-      {
-        "language": "ru",
-        "value": "Пароли должны совпадать"
-      },
-      {
-        "language": "kk",
-        "value": "Құпия сөздер бірдей болуы тиіс"
-      }
-    ]
-  },
-  {
-    "id": 16,
-    "values": [
-      {
-        "language": "en",
-        "value": "First name"
-      },
-      {
-        "language": "ru",
-        "value": "Имя"
-      },
-      {
-        "language": "kk",
-        "value": "Аты"
-      }
-    ]
-  },
-  {
-    "id": 17,
-    "values": [
-      {
-        "language": "en",
-        "value": "Last name"
-      },
-      {
-        "language": "ru",
-        "value": "Фамилия"
-      },
-      {
-        "language": "kk",
-        "value": "Фамилиясы"
-      }
-    ]
-  },
-  {
-    "id": 18,
-    "values": [
-      {
-        "language": "en",
-        "value": "Enter first name"
-      },
-      {
-        "language": "ru",
-        "value": "Введите имя"
-      },
-      {
-        "language": "kk",
-        "value": "Атын енгізіңіз"
-      }
-    ]
-  },
-  {
-    "id": 19,
-    "values": [
-      {
-        "language": "en",
-        "value": "Enter last name"
-      },
-      {
-        "language": "ru",
-        "value": "Введите фамилию"
-      },
-      {
-        "language": "kk",
-        "value": "Фамилиясын енгізіңіз"
-      }
-    ]
-  },
-  {
-    "id": 20,
-    "values": [
-      {
-        "language": "en",
-        "value": "User with this phone number is already registered"
-      },
-      {
-        "language": "ru",
-        "value": "Пользователь с этим номером телефона уже зарегистрирован"
-      },
-      {
-        "language": "kk",
-        "value": "Бұл телефон нөмірі бар пайдаланушы әлдеқашан тіркелген"
-      }
-    ]
-  },
-  {
-    "id": 21,
-    "values": [
-      {
-        "language": "en",
-        "value": "User with this email address is already registered"
-      },
-      {
-        "language": "ru",
-        "value": "Пользователь с этим email адресом уже зарегистрирован"
-      },
-      {
-        "language": "kk",
-        "value": "Бұл электрондық пошта мекенжайы бар пайдаланушы әлдеқашан тіркелген"
-      }
-    ]
-  },
-  {
-    "id": 22,
-    "values": [
-      {
-        "language": "en",
-        "value": "Sign Up"
-      },
-      {
-        "language": "ru",
-        "value": "Зарегистрироваться"
-      },
-      {
-        "language": "kk",
-        "value": "Тіркелу"
-      }
-    ]
-  },
-  {
-    "id": 23,
-    "values": [
-      {
-        "language": "en",
-        "value": "Confirm"
-      },
-      {
-        "language": "ru",
-        "value": "Подтвердить"
-      },
-      {
-        "language": "kk",
-        "value": "Растау"
-      }
-    ]
-  },
-  {
-    "id": 24,
-    "values": [
-      {
-        "language": "en",
-        "value": "Sale"
-      },
-      {
-        "language": "ru",
-        "value": "Продажа"
-      },
-      {
-        "language": "kk",
-        "value": "Cату"
-      }
-    ]
-  },
-  {
-    "id": 25,
-    "values": [
-      {
-        "language": "en",
-        "value": "Return"
-      },
-      {
-        "language": "ru",
-        "value": "Возврат"
-      },
-      {
-        "language": "kk",
-        "value": "Қайту"
-      }
-    ]
-  },
-  {
-    "id": 26,
-    "values": [
-      {
-        "language": "en",
-        "value": "Supply"
-      },
-      {
-        "language": "ru",
-        "value": "Поставка"
-      },
-      {
-        "language": "kk",
-        "value": "Жеткізу"
-      }
-    ]
-  },
-  {
-    "id": 27,
-    "values": [
-      {
-        "language": "en",
-        "value": "Stock"
-      },
-      {
-        "language": "ru",
-        "value": "Склад"
-      },
-      {
-        "language": "kk",
-        "value": "Қор"
-      }
-    ]
-  },
-  {
-    "id": 28,
-    "values": [
-      {
-        "language": "en",
-        "value": "Menu"
-      },
-      {
-        "language": "ru",
-        "value": "Меню"
-      },
-      {
-        "language": "kk",
-        "value": "Мәзір"
-      }
-    ]
-  },
-  {
-    "id": 29,
-    "values": [
-      {
-        "language": "en",
-        "value": "Back"
-      },
-      {
-        "language": "ru",
-        "value": "Назад"
-      },
-      {
-        "language": "kk",
-        "value": "Артқа"
-      }
-    ]
-  },
-  {
-    "id": 30,
-    "values": [
-      {
-        "language": "en",
-        "value": "Add goods item"
-      },
-      {
-        "language": "ru",
-        "value": "Добавить товар"
-      },
-      {
-        "language": "kk",
-        "value": "Өнімді қосыңыз"
-      }
-    ]
-  },
-  {
-    "id": 31,
-    "values": [
-      {
-        "language": "en",
-        "value": "Edit goods item"
-      },
-      {
-        "language": "ru",
-        "value": "Редактировать товар"
-      },
-      {
-        "language": "kk",
-        "value": "Өнімді өңдеу"
-      }
-    ]
-  },
-  {
-    "id": 32,
-    "values": [
-      {
-        "language": "en",
-        "value": "User account"
-      },
-      {
-        "language": "ru",
-        "value": "Аккаунт пользователя"
-      },
-      {
-        "language": "kk",
-        "value": "Пайдаланушы тіркелгісі"
-      }
-    ]
-  },
-  {
-    "id": 33,
-    "values": [
-      {
-        "language": "en",
-        "value": "Goods categories"
-      },
-      {
-        "language": "ru",
-        "value": "Категории товаров"
-      },
-      {
-        "language": "kk",
-        "value": "Өнім санаттары"
-      }
-    ]
-  },
-  {
-    "id": 34,
-    "values": [
-      {
-        "language": "en",
-        "value": "Add goods category"
-      },
-      {
-        "language": "ru",
-        "value": "Добавить категорию товаров"
-      },
-      {
-        "language": "kk",
-        "value": "Өнім санатын қосыңыз"
-      }
-    ]
-  },
-  {
-    "id": 35,
-    "values": [
-      {
-        "language": "en",
-        "value": "Edit goods category"
-      },
-      {
-        "language": "ru",
-        "value": "Редактировать категорию товаров"
-      },
-      {
-        "language": "kk",
-        "value": "Өнім санатын өңдеу"
-      }
-    ]
-  },
-  {
-    "id": 36,
-    "values": [
-      {
-        "language": "en",
-        "value": "Stores"
-      },
-      {
-        "language": "ru",
-        "value": "Магазины"
-      },
-      {
-        "language": "kk",
-        "value": "Дүкендер"
-      }
-    ]
-  },
-  {
-    "id": 37,
-    "values": [
-      {
-        "language": "en",
-        "value": "Add store"
-      },
-      {
-        "language": "ru",
-        "value": "Добавить магазин"
-      },
-      {
-        "language": "kk",
-        "value": ""
-      }
-    ]
-  },
-  {
-    "id": 38,
-    "values": [
-      {
-        "language": "en",
-        "value": "Edit store"
-      },
-      {
-        "language": "ru",
-        "value": "Редактировать магазин"
-      },
-      {
-        "language": "kk",
-        "value": "Өнім санатын өңдеу"
-      }
-    ]
-  },
-  {
-    "id": 39,
-    "values": [
-      {
-        "language": "en",
-        "value": "Subscription"
-      },
-      {
-        "language": "ru",
-        "value": "Подписка"
-      },
-      {
-        "language": "kk",
-        "value": "Жазылым"
-      }
-    ]
-  },
-  {
-    "id": 40,
-    "values": [
-      {
-        "language": "en",
-        "value": "Subscription plans"
-      },
-      {
-        "language": "ru",
-        "value": "Планы подписки"
-      },
-      {
-        "language": "kk",
-        "value": "Жазылым жоспарлары"
-      }
-    ]
-  },
-  {
-    "id": 41,
-    "values": [
-      {
-        "language": "en",
-        "value": "Transaction history"
-      },
-      {
-        "language": "ru",
-        "value": "История транзакций"
-      },
-      {
-        "language": "kk",
-        "value": "Транзакция тарихы"
-      }
-    ]
-  },
-  {
-    "id": 42,
-    "values": [
-      {
-        "language": "en",
-        "value": "Receipt"
-      },
-      {
-        "language": "ru",
-        "value": "Чек"
-      },
-      {
-        "language": "kk",
-        "value": "Тексеру"
-      }
-    ]
-  },
-  {
-    "id": 43,
-    "values": [
-      {
-        "language": "en",
-        "value": "Analytics"
-      },
-      {
-        "language": "ru",
-        "value": "Аналитика"
-      },
-      {
-        "language": "kk",
-        "value": "Аналитика"
-      }
-    ]
-  },
-  {
-    "id": 44,
-    "values": [
-      {
-        "language": "en",
-        "value": "Workers"
-      },
-      {
-        "language": "ru",
-        "value": "Сотрудники"
-      },
-      {
-        "language": "kk",
-        "value": "Қызметкерлер"
-      }
-    ]
-  },
-  {
-    "id": 45,
-    "values": [
-      {
-        "language": "en",
-        "value": "Add worker"
-      },
-      {
-        "language": "ru",
-        "value": "Добавить сотрудника"
-      },
-      {
-        "language": "kk",
-        "value": "Қызметкерді қосыңыз"
-      }
-    ]
-  },
-  {
-    "id": 46,
-    "values": [
-      {
-        "language": "en",
-        "value": "Edit worker"
-      },
-      {
-        "language": "ru",
-        "value": "Редактировать сотрудника"
-      },
-      {
-        "language": "kk",
-        "value": "Қызметкерді өңдеу"
-      }
-    ]
-  },
-  {
-    "id": 47,
-    "values": [
-      {
-        "language": "en",
-        "value": "Suppliers"
-      },
-      {
-        "language": "ru",
-        "value": "Поставщики"
-      },
-      {
-        "language": "kk",
-        "value": "Жабдықтаушылар"
-      }
-    ]
-  },
-  {
-    "id": 48,
-    "values": [
-      {
-        "language": "en",
-        "value": "Add supplier"
-      },
-      {
-        "language": "ru",
-        "value": "Добавить поставщика"
-      },
-      {
-        "language": "kk",
-        "value": "Жеткізуші қосыңыз"
-      }
-    ]
-  },
-  {
-    "id": 49,
-    "values": [
-      {
-        "language": "en",
-        "value": "Edit supplier"
-      },
-      {
-        "language": "ru",
-        "value": "Редактировать поставщика"
-      },
-      {
-        "language": "kk",
-        "value": "Жеткізушіні өңдеу"
-      }
-    ]
-  },
-  {
-    "id": 50,
-    "values": [
-      {
-        "language": "en",
-        "value": "Debtors"
-      },
-      {
-        "language": "ru",
-        "value": "Должники"
-      },
-      {
-        "language": "kk",
-        "value": "Борышкерлер"
-      }
-    ]
-  },
-  {
-    "id": 51,
-    "values": [
-      {
-        "language": "en",
-        "value": "Close debt"
-      },
-      {
-        "language": "ru",
-        "value": "Погасить долг"
-      },
-      {
-        "language": "kk",
-        "value": "Қарызды өтеу"
-      }
-    ]
-  },
-  {
-    "id": 52,
-    "values": [
-      {
-        "language": "en",
-        "value": "Devices"
-      },
-      {
-        "language": "ru",
-        "value": "Устройства"
-      },
-      {
-        "language": "kk",
-        "value": "Құрылғылар"
-      }
-    ]
-  },
-  {
-    "id": 53,
-    "values": [
-      {
-        "language": "en",
-        "value": "App language"
-      },
-      {
-        "language": "ru",
-        "value": "Язык приложения"
-      },
-      {
-        "language": "kk",
-        "value": "Қолданба тілі"
-      }
-    ]
-  },
-  {
-    "id": 54,
-    "values": [
-      {
-        "language": "en",
-        "value": "App theme"
-      },
-      {
-        "language": "ru",
-        "value": "Тема приложения"
-      },
-      {
-        "language": "kk",
-        "value": "Қолданба тақырыбы"
-      }
-    ]
-  },
-  {
-    "id": 55,
-    "values": [
-      {
-        "language": "en",
-        "value": "Select"
-      },
-      {
-        "language": "ru",
-        "value": "Выбрать"
-      },
-      {
-        "language": "kk",
-        "value": "Таңдаңыз"
-      }
-    ]
-  },
-  {
-    "id": 56,
-    "values": [
-      {
-        "language": "en",
-        "value": "User with this phone number and email address is already registered"
-      },
-      {
-        "language": "ru",
-        "value": "Пользователь с этим номером телефона и email адресом уже зарегистрирован"
-      },
-      {
-        "language": "kk",
-        "value": "Осы телефон нөмірі мен электрондық пошта мекенжайы бар пайдаланушы әлдеқашан тіркелген"
-      }
-    ]
-  },
-  {
-    "id": 57,
-    "values": [
-      {
-        "language": "en",
-        "value": "First name cannot be empty or just whitespaces"
-      },
-      {
-        "language": "ru",
-        "value": "Имя не может быть пустым или только пробелами"
-      },
-      {
-        "language": "kk",
-        "value": "Атау бос болмауы немесе тек бос орындардан тұруы мүмкін емес"
-      }
-    ]
-  },
-  {
-    "id": 58,
-    "values": [
-      {
-        "language": "en",
-        "value": "Last name cannot be empty or just whitespaces"
-      },
-      {
-        "language": "ru",
-        "value": "Фамилия не может быть пустой или только пробелами"
-      },
-      {
-        "language": "kk",
-        "value": "Тегі бос болмауы немесе тек бос орындар болуы мүмкін емес"
-      }
-    ]
-  },
-  {
-    "id": 59,
-    "values": [
-      {
-        "language": "en",
-        "value": "System language"
-      },
-      {
-        "language": "ru",
-        "value": "Системный язык"
-      },
-      {
-        "language": "kk",
-        "value": "Жүйе тілі"
-      }
-    ]
-  },
-  {
-    "id": 60,
-    "values": [
-      {
-        "language": "en",
-        "value": "Bluetooth permission required"
-      },
-      {
-        "language": "ru",
-        "value": "Необходимо разрешение на Bluetooth"
-      },
-      {
-        "language": "kk",
-        "value": "Bluetooth рұқсаты қажет"
-      }
-    ]
-  },
-  {
-    "id": 61,
-    "values": [
-      {
-        "language": "en",
-        "value": "For search and connection to Bluetooth barcode scanners and receipt printers"
-      },
-      {
-        "language": "ru",
-        "value": "Для поиска и соединения с Bluetooth сканерами штрих-кодов и принтеров чеков"
-      },
-      {
-        "language": "kk",
-        "value": "Bluetooth штрих-код сканерлері мен түбіртек принтерлерін іздеуге және оларға қосылуға арналған"
-      }
-    ]
-  },
-  {
-    "id": 62,
-    "values": [
-      {
-        "language": "en",
-        "value": "For search and connection to Bluetooth barcode scanners and receipt printers. You can grant it in app settings"
-      },
-      {
-        "language": "ru",
-        "value": "Для поиска и соединения с Bluetooth сканерами штрих-кодов и принтеров чеков. Вы можете предоставить его в настройках приложения"
-      },
-      {
-        "language": "kk",
-        "value": "Bluetooth штрих-код сканерлері мен түбіртек принтерлерін іздеу және қосу үшін. Оны қолданба параметрлерінде қамтамасыз етуге болады"
-      }
-    ]
-  },
-  {
-    "id": 63,
-    "values": [
-      {
-        "language": "en",
-        "value": "Bluetooth disabled"
-      },
-      {
-        "language": "ru",
-        "value": "Bluetooth выключен"
-      },
-      {
-        "language": "kk",
-        "value": "Bluetooth өшірілген"
-      }
-    ]
-  },
-  {
-    "id": 64,
-    "values": [
-      {
-        "language": "en",
-        "value": "Enable for search and connection to Bluetooth barcode scanners and receipt printers"
-      },
-      {
-        "language": "ru",
-        "value": "Включите для поиска и соединения с Bluetooth сканерами штрих-кодов и принтеров чеков"
-      },
-      {
-        "language": "kk",
-        "value": "Bluetooth штрих-код сканерлері мен түбіртек принтерлерін іздеуді және оларға қосылуды қосыңыз"
-      }
-    ]
-  },
-  {
-    "id": 65,
-    "values": [
-      {
-        "language": "en",
-        "value": "Search by any data"
-      },
-      {
-        "language": "ru",
-        "value": "Ищите по любым данным"
-      },
-      {
-        "language": "kk",
-        "value": "Кез келген деректер бойынша іздеу"
-      }
-    ]
-  },
-  {
-    "id": 66,
-    "values": [
-      {
-        "language": "en",
-        "value": "List empty"
-      },
-      {
-        "language": "ru",
-        "value": "Список пуст"
-      },
-      {
-        "language": "kk",
-        "value": "Тізім бос"
-      }
-    ]
-  },
-  {
-    "id": 67,
-    "values": [
-      {
-        "language": "en",
-        "value": "No matches"
-      },
-      {
-        "language": "ru",
-        "value": "Нет совпадений"
-      },
-      {
-        "language": "kk",
-        "value": "Сәйкестік жоқ"
-      }
-    ]
-  },
-  {
-    "id": 68,
-    "values": [
-      {
-        "language": "en",
-        "value": "Name"
-      },
-      {
-        "language": "ru",
-        "value": "Название"
-      },
-      {
-        "language": "kk",
-        "value": "Аты"
-      }
-    ]
-  },
-  {
-    "id": 69,
-    "values": [
-      {
-        "language": "en",
-        "value": "Barcode"
-      },
-      {
-        "language": "ru",
-        "value": "Штрих-код"
-      },
-      {
-        "language": "kk",
-        "value": "Штрих-код"
-      }
-    ]
-  },
-  {
-    "id": 70,
-    "values": [
-      {
-        "language": "en",
-        "value": "Supply price"
-      },
-      {
-        "language": "ru",
-        "value": "Цена поставки"
-      },
-      {
-        "language": "kk",
-        "value": "Жеткізу бағасы"
-      }
-    ]
-  },
-  {
-    "id": 71,
-    "values": [
-      {
-        "language": "en",
-        "value": "Sale price"
-      },
-      {
-        "language": "ru",
-        "value": "Цена продажи"
-      },
-      {
-        "language": "kk",
-        "value": "Сату бағасы"
-      }
-    ]
-  },
-  {
-    "id": 72,
-    "values": [
-      {
-        "language": "en",
-        "value": "Return price"
-      },
-      {
-        "language": "ru",
-        "value": "Цена возврата"
-      },
-      {
-        "language": "kk",
-        "value": "Қайтару бағасы"
-      }
-    ]
-  },
-  {
-    "id": 73,
-    "values": [
-      {
-        "language": "en",
-        "value": "Category"
-      },
-      {
-        "language": "ru",
-        "value": "Категория"
-      },
-      {
-        "language": "kk",
-        "value": "Санат"
-      }
-    ]
-  },
-  {
-    "id": 74,
-    "values": [
-      {
-        "language": "en",
-        "value": "Supplier"
-      },
-      {
-        "language": "ru",
-        "value": "Поставщик"
-      },
-      {
-        "language": "kk",
-        "value": "Жеткізуші"
-      }
-    ]
-  },
-  {
-    "id": 75,
-    "values": [
-      {
-        "language": "en",
-        "value": "Enter barcode"
-      },
-      {
-        "language": "ru",
-        "value": "Введите штрих-код"
-      },
-      {
-        "language": "kk",
-        "value": "Штрих-кодты енгізіңіз"
-      }
-    ]
-  },
-  {
-    "id": 76,
-    "values": [
-      {
-        "language": "en",
-        "value": "Enter name"
-      },
-      {
-        "language": "ru",
-        "value": "Введите название"
-      },
-      {
-        "language": "kk",
-        "value": "Атын енгізіңіз"
-      }
-    ]
-  },
-  {
-    "id": 77,
-    "values": [
-      {
-        "language": "en",
-        "value": "Enter supply price"
-      },
-      {
-        "language": "ru",
-        "value": "Введите цену поставки"
-      },
-      {
-        "language": "kk",
-        "value": "Жеткізу бағасын енгізіңіз"
-      }
-    ]
-  },
-  {
-    "id": 78,
-    "values": [
-      {
-        "language": "en",
-        "value": "Enter sale price"
-      },
-      {
-        "language": "ru",
-        "value": "Введите цену продажи"
-      },
-      {
-        "language": "kk",
-        "value": "Сату бағасын енгізіңіз"
-      }
-    ]
-  },
-  {
-    "id": 79,
-    "values": [
-      {
-        "language": "en",
-        "value": "Enter return price"
-      },
-      {
-        "language": "ru",
-        "value": "Введите цену возврата"
-      },
-      {
-        "language": "kk",
-        "value": "Қайтару бағасын енгізіңіз"
-      }
-    ]
-  },
-  {
-    "id": 80,
-    "values": [
-      {
-        "language": "en",
-        "value": "Select category"
-      },
-      {
-        "language": "ru",
-        "value": "Выберите категорию"
-      },
-      {
-        "language": "kk",
-        "value": "Санатты таңдаңыз"
-      }
-    ]
-  },
-  {
-    "id": 81,
-    "values": [
-      {
-        "language": "en",
-        "value": "Select supplier"
-      },
-      {
-        "language": "ru",
-        "value": "Выберите поставщика"
-      },
-      {
-        "language": "kk",
-        "value": "Жеткізушіні таңдаңыз"
-      }
-    ]
-  },
-  {
-    "id": 82,
-    "values": [
-      {
-        "language": "en",
-        "value": "Edit"
-      },
-      {
-        "language": "ru",
-        "value": "Редактировать"
-      },
-      {
-        "language": "kk",
-        "value": "Өңдеу"
-      }
-    ]
-  },
-  {
-    "id": 83,
-    "values": [
-      {
-        "language": "en",
-        "value": "Change password"
-      },
-      {
-        "language": "ru",
-        "value": "Сменить пароль"
-      },
-      {
-        "language": "kk",
-        "value": "Құпия сөзді өзгерту"
-      }
-    ]
-  },
-  {
-    "id": 84,
-    "values": [
-      {
-        "language": "en",
-        "value": "New password"
-      },
-      {
-        "language": "ru",
-        "value": "Новый пароль"
-      },
-      {
-        "language": "kk",
-        "value": "Жаңа құпия сөз"
-      }
-    ]
-  },
-  {
-    "id": 85,
-    "values": [
-      {
-        "language": "en",
-        "value": "Enter new password"
-      },
-      {
-        "language": "ru",
-        "value": "Введите новый пароль"
-      },
-      {
-        "language": "kk",
-        "value": "Жаңа құпия сөзді енгізіңіз"
-      }
-    ]
-  },
-  {
-    "id": 86,
-    "values": [
-      {
-        "language": "en",
-        "value": "Repeat new password"
-      },
-      {
-        "language": "ru",
-        "value": "Повторите новый пароль"
-      },
-      {
-        "language": "kk",
-        "value": "Жаңа құпия сөзді қайталаңыз"
-      }
-    ]
-  },
-  {
-    "id": 87,
-    "values": [
-      {
-        "language": "en",
-        "value": "Confirmation password"
-      },
-      {
-        "language": "ru",
-        "value": "Пароль для подтверждения"
-      },
-      {
-        "language": "kk",
-        "value": "Растау үшін пароль"
-      }
-    ]
-  },
-  {
-    "id": 88,
-    "values": [
-      {
-        "language": "en",
-        "value": "Required to edit account"
-      },
-      {
-        "language": "ru",
-        "value": "Необходим для редактирования аккаунта"
-      },
-      {
-        "language": "kk",
-        "value": "Есептік жазбаны өңдеу үшін қажет"
-      }
-    ]
-  },
-  {
-    "id": 89,
-    "values": [
-      {
-        "language": "en",
-        "value": "Account successfully updated"
-      },
-      {
-        "language": "ru",
-        "value": "Аккаунт успешно обновлен"
-      },
-      {
-        "language": "kk",
-        "value": "Есептік жазба сәтті жаңартылды"
-      }
-    ]
-  },
-  {
-    "id": 90,
-    "values": [
-      {
-        "language": "en",
-        "value": "Logging out in progress"
-      },
-      {
-        "language": "ru",
-        "value": "Выполняется выход из аккаунта"
-      },
-      {
-        "language": "kk",
-        "value": "Шығу орындалуда"
-      }
-    ]
-  },
-  {
-    "id": 91,
-    "values": [
-      {
-        "language": "en",
-        "value": "Session time expired. Logging out in progress"
-      },
-      {
-        "language": "ru",
-        "value": "Session time expired. Logging out"
-      },
-      {
-        "language": "kk",
-        "value": "Сеансыңыздың мерзімі аяқталды. Сіз өзіңіздің есептік жазбаңыздан шығып жатырсыз"
-      }
-    ]
-  },
-  {
-    "id": 92,
-    "values": [
-      {
-        "language": "en",
-        "value": "Alias"
-      },
-      {
-        "language": "ru",
-        "value": "Дополнительное название"
-      },
-      {
-        "language": "kk",
-        "value": "Қосымша атау"
-      }
-    ]
-  },
-  {
-    "id": 93,
-    "values": [
-      {
-        "language": "en",
-        "value": "Description"
-      },
-      {
-        "language": "ru",
-        "value": "Описание"
-      },
-      {
-        "language": "kk",
-        "value": "Сипаттама"
-      }
-    ]
-  },
-  {
-    "id": 94,
-    "values": [
-      {
-        "language": "en",
-        "value": "Enter alias"
-      },
-      {
-        "language": "ru",
-        "value": "Введите дополнительное название"
-      },
-      {
-        "language": "kk",
-        "value": "Қосымша атау енгізіңіз"
-      }
-    ]
-  },
-  {
-    "id": 95,
-    "values": [
-      {
-        "language": "en",
-        "value": "Enter description"
-      },
-      {
-        "language": "ru",
-        "value": "Введите описание"
-      },
-      {
-        "language": "kk",
-        "value": "Сипаттама енгізіңіз"
-      }
-    ]
-  },
-  {
-    "id": 96,
-    "values": [
-      {
-        "language": "en",
-        "value": "Optional"
-      },
-      {
-        "language": "ru",
-        "value": "Необязательно"
-      },
-      {
-        "language": "kk",
-        "value": "Міндетті емес"
-      }
-    ]
-  }
-]
+{
+  "message": null,
+  "negative": false,
+  "payload": [
+    {
+      "id": 0,
+      "values": [
+        {
+          "language": "main",
+          "value": "AITA"
+        },
+        {
+          "language": "en",
+          "value": "AITA"
+        },
+        {
+          "language": "ru",
+          "value": "AITA"
+        },
+        {
+          "language": "kk",
+          "value": "AITA"
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "values": [
+        {
+          "language": "main",
+          "value": "Log In"
+        },
+        {
+          "language": "en",
+          "value": "Log In"
+        },
+        {
+          "language": "ru",
+          "value": "Войти"
+        },
+        {
+          "language": "kk",
+          "value": "Кіру"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "values": [
+        {
+          "language": "main",
+          "value": "Phone number"
+        },
+        {
+          "language": "en",
+          "value": "Phone number"
+        },
+        {
+          "language": "ru",
+          "value": "Номер телефона"
+        },
+        {
+          "language": "kk",
+          "value": "Телефон нөмірі"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "values": [
+        {
+          "language": "main",
+          "value": "Enter phone number"
+        },
+        {
+          "language": "en",
+          "value": "Enter phone number"
+        },
+        {
+          "language": "ru",
+          "value": "Введите номер телефона"
+        },
+        {
+          "language": "kk",
+          "value": "Телефон нөміріңізді енгізіңіз"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "values": [
+        {
+          "language": "main",
+          "value": "Email"
+        },
+        {
+          "language": "en",
+          "value": "Email"
+        },
+        {
+          "language": "ru",
+          "value": "Email"
+        },
+        {
+          "language": "kk",
+          "value": "Email"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "values": [
+        {
+          "language": "main",
+          "value": "Enter email address"
+        },
+        {
+          "language": "en",
+          "value": "Enter email address"
+        },
+        {
+          "language": "ru",
+          "value": "Введите адрес email"
+        },
+        {
+          "language": "kk",
+          "value": "Электрондық пошта мекенжайыңызды енгізіңіз"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "values": [
+        {
+          "language": "main",
+          "value": "Password"
+        },
+        {
+          "language": "en",
+          "value": "Password"
+        },
+        {
+          "language": "ru",
+          "value": "Пароль"
+        },
+        {
+          "language": "kk",
+          "value": "Құпия сөз"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "values": [
+        {
+          "language": "main",
+          "value": "Enter password"
+        },
+        {
+          "language": "en",
+          "value": "Enter password"
+        },
+        {
+          "language": "ru",
+          "value": "Введите пароль"
+        },
+        {
+          "language": "kk",
+          "value": "Құпия сөзді енгізіңіз"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "values": [
+        {
+          "language": "main",
+          "value": "Cancel"
+        },
+        {
+          "language": "en",
+          "value": "Cancel"
+        },
+        {
+          "language": "ru",
+          "value": "Отменить"
+        },
+        {
+          "language": "kk",
+          "value": "Болдырмау"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "values": [
+        {
+          "language": "main",
+          "value": "Clear"
+        },
+        {
+          "language": "en",
+          "value": "Clear"
+        },
+        {
+          "language": "ru",
+          "value": "Очистить"
+        },
+        {
+          "language": "kk",
+          "value": "Таза"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "values": [
+        {
+          "language": "main",
+          "value": "Authentication failed"
+        },
+        {
+          "language": "en",
+          "value": "Authentication failed"
+        },
+        {
+          "language": "ru",
+          "value": "Аутентификация не удалась"
+        },
+        {
+          "language": "kk",
+          "value": "Аутентификация сәтсіз аяқталды"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "values": [
+        {
+          "language": "main",
+          "value": "Incorrect phone number length"
+        },
+        {
+          "language": "en",
+          "value": "Incorrect phone number length"
+        },
+        {
+          "language": "ru",
+          "value": "Неправильная длина номера телефона"
+        },
+        {
+          "language": "kk",
+          "value": "Телефон нөмірі дұрыс емес"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "values": [
+        {
+          "language": "main",
+          "value": "Incorrect email address format"
+        },
+        {
+          "language": "en",
+          "value": "Incorrect email address format"
+        },
+        {
+          "language": "ru",
+          "value": "Неправильный формат email адреса"
+        },
+        {
+          "language": "kk",
+          "value": "Қате электрондық пошта мекенжайы пішімі"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "values": [
+        {
+          "language": "main",
+          "value": "Password must be 8 or more symbols long and contain at least one digit"
+        },
+        {
+          "language": "en",
+          "value": "Password must be 8 or more symbols long and contain at least one digit"
+        },
+        {
+          "language": "ru",
+          "value": "Пароль должен быть длиной 8 или более символов и содержать хотя бы одну цифру"
+        },
+        {
+          "language": "kk",
+          "value": "Құпия сөз ұзындығы 8 немесе одан да көп таңбадан тұруы және кемінде бір саннан тұруы керек"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "values": [
+        {
+          "language": "main",
+          "value": "Repeat password"
+        },
+        {
+          "language": "en",
+          "value": "Repeat password"
+        },
+        {
+          "language": "ru",
+          "value": "Повторите пароль"
+        },
+        {
+          "language": "kk",
+          "value": "Құпия сөзді қайталаңыз"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "values": [
+        {
+          "language": "main",
+          "value": "Passwords must match"
+        },
+        {
+          "language": "en",
+          "value": "Passwords must match"
+        },
+        {
+          "language": "ru",
+          "value": "Пароли должны совпадать"
+        },
+        {
+          "language": "kk",
+          "value": "Құпия сөздер бірдей болуы тиіс"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "values": [
+        {
+          "language": "main",
+          "value": "First name"
+        },
+        {
+          "language": "en",
+          "value": "First name"
+        },
+        {
+          "language": "ru",
+          "value": "Имя"
+        },
+        {
+          "language": "kk",
+          "value": "Аты"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "values": [
+        {
+          "language": "main",
+          "value": "Last name"
+        },
+        {
+          "language": "en",
+          "value": "Last name"
+        },
+        {
+          "language": "ru",
+          "value": "Фамилия"
+        },
+        {
+          "language": "kk",
+          "value": "Фамилиясы"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "values": [
+        {
+          "language": "main",
+          "value": "Enter first name"
+        },
+        {
+          "language": "en",
+          "value": "Enter first name"
+        },
+        {
+          "language": "ru",
+          "value": "Введите имя"
+        },
+        {
+          "language": "kk",
+          "value": "Атын енгізіңіз"
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "values": [
+        {
+          "language": "main",
+          "value": "Enter last name"
+        },
+        {
+          "language": "en",
+          "value": "Enter last name"
+        },
+        {
+          "language": "ru",
+          "value": "Введите фамилию"
+        },
+        {
+          "language": "kk",
+          "value": "Фамилиясын енгізіңіз"
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "values": [
+        {
+          "language": "main",
+          "value": "User with this phone number is already registered"
+        },
+        {
+          "language": "en",
+          "value": "User with this phone number is already registered"
+        },
+        {
+          "language": "ru",
+          "value": "Пользователь с этим номером телефона уже зарегистрирован"
+        },
+        {
+          "language": "kk",
+          "value": "Бұл телефон нөмірі бар пайдаланушы әлдеқашан тіркелген"
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "values": [
+        {
+          "language": "main",
+          "value": "User with this email address is already registered"
+        },
+        {
+          "language": "en",
+          "value": "User with this email address is already registered"
+        },
+        {
+          "language": "ru",
+          "value": "Пользователь с этим email адресом уже зарегистрирован"
+        },
+        {
+          "language": "kk",
+          "value": "Бұл электрондық пошта мекенжайы бар пайдаланушы әлдеқашан тіркелген"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "values": [
+        {
+          "language": "main",
+          "value": "Sign Up"
+        },
+        {
+          "language": "en",
+          "value": "Sign Up"
+        },
+        {
+          "language": "ru",
+          "value": "Зарегистрироваться"
+        },
+        {
+          "language": "kk",
+          "value": "Тіркелу"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "values": [
+        {
+          "language": "main",
+          "value": "Confirm"
+        },
+        {
+          "language": "en",
+          "value": "Confirm"
+        },
+        {
+          "language": "ru",
+          "value": "Подтвердить"
+        },
+        {
+          "language": "kk",
+          "value": "Растау"
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "values": [
+        {
+          "language": "main",
+          "value": "Sale"
+        },
+        {
+          "language": "en",
+          "value": "Sale"
+        },
+        {
+          "language": "ru",
+          "value": "Продажа"
+        },
+        {
+          "language": "kk",
+          "value": "Cату"
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "values": [
+        {
+          "language": "main",
+          "value": "Return"
+        },
+        {
+          "language": "en",
+          "value": "Return"
+        },
+        {
+          "language": "ru",
+          "value": "Возврат"
+        },
+        {
+          "language": "kk",
+          "value": "Қайту"
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supply"
+        },
+        {
+          "language": "en",
+          "value": "Supply"
+        },
+        {
+          "language": "ru",
+          "value": "Поставка"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізу"
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "values": [
+        {
+          "language": "main",
+          "value": "Stock"
+        },
+        {
+          "language": "en",
+          "value": "Stock"
+        },
+        {
+          "language": "ru",
+          "value": "Склад"
+        },
+        {
+          "language": "kk",
+          "value": "Қор"
+        }
+      ]
+    },
+    {
+      "id": 28,
+      "values": [
+        {
+          "language": "main",
+          "value": "Menu"
+        },
+        {
+          "language": "en",
+          "value": "Menu"
+        },
+        {
+          "language": "ru",
+          "value": "Меню"
+        },
+        {
+          "language": "kk",
+          "value": "Мәзір"
+        }
+      ]
+    },
+    {
+      "id": 29,
+      "values": [
+        {
+          "language": "main",
+          "value": "Back"
+        },
+        {
+          "language": "en",
+          "value": "Back"
+        },
+        {
+          "language": "ru",
+          "value": "Назад"
+        },
+        {
+          "language": "kk",
+          "value": "Артқа"
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "values": [
+        {
+          "language": "main",
+          "value": "Add goods item"
+        },
+        {
+          "language": "en",
+          "value": "Add goods item"
+        },
+        {
+          "language": "ru",
+          "value": "Добавить товар"
+        },
+        {
+          "language": "kk",
+          "value": "Өнімді қосыңыз"
+        }
+      ]
+    },
+    {
+      "id": 31,
+      "values": [
+        {
+          "language": "main",
+          "value": "Edit goods item"
+        },
+        {
+          "language": "en",
+          "value": "Edit goods item"
+        },
+        {
+          "language": "ru",
+          "value": "Редактировать товар"
+        },
+        {
+          "language": "kk",
+          "value": "Өнімді өңдеу"
+        }
+      ]
+    },
+    {
+      "id": 32,
+      "values": [
+        {
+          "language": "main",
+          "value": "User account"
+        },
+        {
+          "language": "en",
+          "value": "User account"
+        },
+        {
+          "language": "ru",
+          "value": "Аккаунт пользователя"
+        },
+        {
+          "language": "kk",
+          "value": "Пайдаланушы тіркелгісі"
+        }
+      ]
+    },
+    {
+      "id": 33,
+      "values": [
+        {
+          "language": "en",
+          "value": "Goods categories"
+        },
+        {
+          "language": "main",
+          "value": "Goods categories"
+        },
+        {
+          "language": "ru",
+          "value": "Категории товаров"
+        },
+        {
+          "language": "kk",
+          "value": "Өнім санаттары"
+        }
+      ]
+    },
+    {
+      "id": 34,
+      "values": [
+        {
+          "language": "main",
+          "value": "Add goods category"
+        },
+        {
+          "language": "en",
+          "value": "Add goods category"
+        },
+        {
+          "language": "ru",
+          "value": "Добавить категорию товаров"
+        },
+        {
+          "language": "kk",
+          "value": "Өнім санатын қосыңыз"
+        }
+      ]
+    },
+    {
+      "id": 35,
+      "values": [
+        {
+          "language": "main",
+          "value": "Edit goods category"
+        },
+        {
+          "language": "en",
+          "value": "Edit goods category"
+        },
+        {
+          "language": "ru",
+          "value": "Редактировать категорию товаров"
+        },
+        {
+          "language": "kk",
+          "value": "Өнім санатын өңдеу"
+        }
+      ]
+    },
+    {
+      "id": 36,
+      "values": [
+        {
+          "language": "main",
+          "value": "Stores"
+        },
+        {
+          "language": "en",
+          "value": "Stores"
+        },
+        {
+          "language": "ru",
+          "value": "Магазины"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкендер"
+        }
+      ]
+    },
+    {
+      "id": 37,
+      "values": [
+        {
+          "language": "main",
+          "value": "Add store"
+        },
+        {
+          "language": "en",
+          "value": "Add store"
+        },
+        {
+          "language": "ru",
+          "value": "Добавить магазин"
+        },
+        {
+          "language": "kk",
+          "value": ""
+        }
+      ]
+    },
+    {
+      "id": 38,
+      "values": [
+        {
+          "language": "main",
+          "value": "Edit store"
+        },
+        {
+          "language": "en",
+          "value": "Edit store"
+        },
+        {
+          "language": "ru",
+          "value": "Редактировать магазин"
+        },
+        {
+          "language": "kk",
+          "value": "Өнім санатын өңдеу"
+        }
+      ]
+    },
+    {
+      "id": 39,
+      "values": [
+        {
+          "language": "main",
+          "value": "Subscription"
+        },
+        {
+          "language": "en",
+          "value": "Subscription"
+        },
+        {
+          "language": "ru",
+          "value": "Подписка"
+        },
+        {
+          "language": "kk",
+          "value": "Жазылым"
+        }
+      ]
+    },
+    {
+      "id": 40,
+      "values": [
+        {
+          "language": "main",
+          "value": "Subscription plans"
+        },
+        {
+          "language": "en",
+          "value": "Subscription plans"
+        },
+        {
+          "language": "ru",
+          "value": "Планы подписки"
+        },
+        {
+          "language": "kk",
+          "value": "Жазылым жоспарлары"
+        }
+      ]
+    },
+    {
+      "id": 41,
+      "values": [
+        {
+          "language": "main",
+          "value": "Transaction history"
+        },
+        {
+          "language": "en",
+          "value": "Transaction history"
+        },
+        {
+          "language": "ru",
+          "value": "История транзакций"
+        },
+        {
+          "language": "kk",
+          "value": "Транзакция тарихы"
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "values": [
+        {
+          "language": "main",
+          "value": "Receipt"
+        },
+        {
+          "language": "en",
+          "value": "Receipt"
+        },
+        {
+          "language": "ru",
+          "value": "Чек"
+        },
+        {
+          "language": "kk",
+          "value": "Тексеру"
+        }
+      ]
+    },
+    {
+      "id": 43,
+      "values": [
+        {
+          "language": "main",
+          "value": "Analytics"
+        },
+        {
+          "language": "en",
+          "value": "Analytics"
+        },
+        {
+          "language": "ru",
+          "value": "Аналитика"
+        },
+        {
+          "language": "kk",
+          "value": "Аналитика"
+        }
+      ]
+    },
+    {
+      "id": 44,
+      "values": [
+        {
+          "language": "main",
+          "value": "Workers"
+        },
+        {
+          "language": "en",
+          "value": "Workers"
+        },
+        {
+          "language": "ru",
+          "value": "Сотрудники"
+        },
+        {
+          "language": "kk",
+          "value": "Қызметкерлер"
+        }
+      ]
+    },
+    {
+      "id": 45,
+      "values": [
+        {
+          "language": "main",
+          "value": "Add worker"
+        },
+        {
+          "language": "en",
+          "value": "Add worker"
+        },
+        {
+          "language": "ru",
+          "value": "Добавить сотрудника"
+        },
+        {
+          "language": "kk",
+          "value": "Қызметкерді қосыңыз"
+        }
+      ]
+    },
+    {
+      "id": 46,
+      "values": [
+        {
+          "language": "main",
+          "value": "Edit worker"
+        },
+        {
+          "language": "en",
+          "value": "Edit worker"
+        },
+        {
+          "language": "ru",
+          "value": "Редактировать сотрудника"
+        },
+        {
+          "language": "kk",
+          "value": "Қызметкерді өңдеу"
+        }
+      ]
+    },
+    {
+      "id": 47,
+      "values": [
+        {
+          "language": "main",
+          "value": "Suppliers"
+        },
+        {
+          "language": "en",
+          "value": "Suppliers"
+        },
+        {
+          "language": "ru",
+          "value": "Поставщики"
+        },
+        {
+          "language": "kk",
+          "value": "Жабдықтаушылар"
+        }
+      ]
+    },
+    {
+      "id": 48,
+      "values": [
+        {
+          "language": "main",
+          "value": "Add supplier"
+        },
+        {
+          "language": "en",
+          "value": "Add supplier"
+        },
+        {
+          "language": "ru",
+          "value": "Добавить поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші қосыңыз"
+        }
+      ]
+    },
+    {
+      "id": 49,
+      "values": [
+        {
+          "language": "main",
+          "value": "Edit supplier"
+        },
+        {
+          "language": "en",
+          "value": "Edit supplier"
+        },
+        {
+          "language": "ru",
+          "value": "Редактировать поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізушіні өңдеу"
+        }
+      ]
+    },
+    {
+      "id": 50,
+      "values": [
+        {
+          "language": "main",
+          "value": "Debtors"
+        },
+        {
+          "language": "en",
+          "value": "Debtors"
+        },
+        {
+          "language": "ru",
+          "value": "Должники"
+        },
+        {
+          "language": "kk",
+          "value": "Борышкерлер"
+        }
+      ]
+    },
+    {
+      "id": 51,
+      "values": [
+        {
+          "language": "main",
+          "value": "Close debt"
+        },
+        {
+          "language": "en",
+          "value": "Close debt"
+        },
+        {
+          "language": "ru",
+          "value": "Погасить долг"
+        },
+        {
+          "language": "kk",
+          "value": "Қарызды өтеу"
+        }
+      ]
+    },
+    {
+      "id": 52,
+      "values": [
+        {
+          "language": "main",
+          "value": "Devices"
+        },
+        {
+          "language": "en",
+          "value": "Devices"
+        },
+        {
+          "language": "ru",
+          "value": "Устройства"
+        },
+        {
+          "language": "kk",
+          "value": "Құрылғылар"
+        }
+      ]
+    },
+    {
+      "id": 53,
+      "values": [
+        {
+          "language": "main",
+          "value": "App language"
+        },
+        {
+          "language": "en",
+          "value": "App language"
+        },
+        {
+          "language": "ru",
+          "value": "Язык приложения"
+        },
+        {
+          "language": "kk",
+          "value": "Қолданба тілі"
+        }
+      ]
+    },
+    {
+      "id": 54,
+      "values": [
+        {
+          "language": "main",
+          "value": "App theme"
+        },
+        {
+          "language": "en",
+          "value": "App theme"
+        },
+        {
+          "language": "ru",
+          "value": "Тема приложения"
+        },
+        {
+          "language": "kk",
+          "value": "Қолданба тақырыбы"
+        }
+      ]
+    },
+    {
+      "id": 55,
+      "values": [
+        {
+          "language": "main",
+          "value": "Select"
+        },
+        {
+          "language": "en",
+          "value": "Select"
+        },
+        {
+          "language": "ru",
+          "value": "Выбрать"
+        },
+        {
+          "language": "kk",
+          "value": "Таңдаңыз"
+        }
+      ]
+    },
+    {
+      "id": 56,
+      "values": [
+        {
+          "language": "main",
+          "value": "User with this phone number and email address is already registered"
+        },
+        {
+          "language": "en",
+          "value": "User with this phone number and email address is already registered"
+        },
+        {
+          "language": "ru",
+          "value": "Пользователь с этим номером телефона и email адресом уже зарегистрирован"
+        },
+        {
+          "language": "kk",
+          "value": "Осы телефон нөмірі мен электрондық пошта мекенжайы бар пайдаланушы әлдеқашан тіркелген"
+        }
+      ]
+    },
+    {
+      "id": 57,
+      "values": [
+        {
+          "language": "main",
+          "value": "First name cannot be empty or just whitespaces"
+        },
+        {
+          "language": "en",
+          "value": "First name cannot be empty or just whitespaces"
+        },
+        {
+          "language": "ru",
+          "value": "Имя не может быть пустым или только пробелами"
+        },
+        {
+          "language": "kk",
+          "value": "Атау бос болмауы немесе тек бос орындардан тұруы мүмкін емес"
+        }
+      ]
+    },
+    {
+      "id": 58,
+      "values": [
+        {
+          "language": "main",
+          "value": "Last name cannot be empty or just whitespaces"
+        },
+        {
+          "language": "en",
+          "value": "Last name cannot be empty or just whitespaces"
+        },
+        {
+          "language": "ru",
+          "value": "Фамилия не может быть пустой или только пробелами"
+        },
+        {
+          "language": "kk",
+          "value": "Тегі бос болмауы немесе тек бос орындар болуы мүмкін емес"
+        }
+      ]
+    },
+    {
+      "id": 59,
+      "values": [
+        {
+          "language": "main",
+          "value": "System language"
+        },
+        {
+          "language": "en",
+          "value": "System language"
+        },
+        {
+          "language": "ru",
+          "value": "Системный язык"
+        },
+        {
+          "language": "kk",
+          "value": "Жүйе тілі"
+        }
+      ]
+    },
+    {
+      "id": 60,
+      "values": [
+        {
+          "language": "main",
+          "value": "Bluetooth permission required"
+        },
+        {
+          "language": "en",
+          "value": "Bluetooth permission required"
+        },
+        {
+          "language": "ru",
+          "value": "Необходимо разрешение на Bluetooth"
+        },
+        {
+          "language": "kk",
+          "value": "Bluetooth рұқсаты қажет"
+        }
+      ]
+    },
+    {
+      "id": 61,
+      "values": [
+        {
+          "language": "main",
+          "value": "For search and connection to Bluetooth barcode scanners and receipt printers"
+        },
+        {
+          "language": "en",
+          "value": "For search and connection to Bluetooth barcode scanners and receipt printers"
+        },
+        {
+          "language": "ru",
+          "value": "Для поиска и соединения с Bluetooth сканерами штрих-кодов и принтеров чеков"
+        },
+        {
+          "language": "kk",
+          "value": "Bluetooth штрих-код сканерлері мен түбіртек принтерлерін іздеуге және оларға қосылуға арналған"
+        }
+      ]
+    },
+    {
+      "id": 62,
+      "values": [
+        {
+          "language": "main",
+          "value": "For search and connection to Bluetooth barcode scanners and receipt printers. You can grant it in app settings"
+        },
+        {
+          "language": "en",
+          "value": "For search and connection to Bluetooth barcode scanners and receipt printers. You can grant it in app settings"
+        },
+        {
+          "language": "ru",
+          "value": "Для поиска и соединения с Bluetooth сканерами штрих-кодов и принтеров чеков. Вы можете предоставить его в настройках приложения"
+        },
+        {
+          "language": "kk",
+          "value": "Bluetooth штрих-код сканерлері мен түбіртек принтерлерін іздеу және қосу үшін. Оны қолданба параметрлерінде қамтамасыз етуге болады"
+        }
+      ]
+    },
+    {
+      "id": 63,
+      "values": [
+        {
+          "language": "main",
+          "value": "Bluetooth disabled"
+        },
+        {
+          "language": "en",
+          "value": "Bluetooth disabled"
+        },
+        {
+          "language": "ru",
+          "value": "Bluetooth выключен"
+        },
+        {
+          "language": "kk",
+          "value": "Bluetooth өшірілген"
+        }
+      ]
+    },
+    {
+      "id": 64,
+      "values": [
+        {
+          "language": "main",
+          "value": "Enable for search and connection to Bluetooth barcode scanners and receipt printers"
+        },
+        {
+          "language": "en",
+          "value": "Enable for search and connection to Bluetooth barcode scanners and receipt printers"
+        },
+        {
+          "language": "ru",
+          "value": "Включите для поиска и соединения с Bluetooth сканерами штрих-кодов и принтеров чеков"
+        },
+        {
+          "language": "kk",
+          "value": "Bluetooth штрих-код сканерлері мен түбіртек принтерлерін іздеуді және оларға қосылуды қосыңыз"
+        }
+      ]
+    },
+    {
+      "id": 65,
+      "values": [
+        {
+          "language": "main",
+          "value": "Search by any data"
+        },
+        {
+          "language": "en",
+          "value": "Search by any data"
+        },
+        {
+          "language": "ru",
+          "value": "Ищите по любым данным"
+        },
+        {
+          "language": "kk",
+          "value": "Кез келген деректер бойынша іздеу"
+        }
+      ]
+    },
+    {
+      "id": 66,
+      "values": [
+        {
+          "language": "main",
+          "value": "List empty"
+        },
+        {
+          "language": "en",
+          "value": "List empty"
+        },
+        {
+          "language": "ru",
+          "value": "Список пуст"
+        },
+        {
+          "language": "kk",
+          "value": "Тізім бос"
+        }
+      ]
+    },
+    {
+      "id": 67,
+      "values": [
+        {
+          "language": "main",
+          "value": "No matches"
+        },
+        {
+          "language": "en",
+          "value": "No matches"
+        },
+        {
+          "language": "ru",
+          "value": "Нет совпадений"
+        },
+        {
+          "language": "kk",
+          "value": "Сәйкестік жоқ"
+        }
+      ]
+    },
+    {
+      "id": 68,
+      "values": [
+        {
+          "language": "main",
+          "value": "Name"
+        },
+        {
+          "language": "en",
+          "value": "Name"
+        },
+        {
+          "language": "ru",
+          "value": "Название"
+        },
+        {
+          "language": "kk",
+          "value": "Аты"
+        }
+      ]
+    },
+    {
+      "id": 69,
+      "values": [
+        {
+          "language": "main",
+          "value": "Barcode"
+        },
+        {
+          "language": "en",
+          "value": "Barcode"
+        },
+        {
+          "language": "ru",
+          "value": "Штрих-код"
+        },
+        {
+          "language": "kk",
+          "value": "Штрих-код"
+        }
+      ]
+    },
+    {
+      "id": 70,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supply price"
+        },
+        {
+          "language": "en",
+          "value": "Supply price"
+        },
+        {
+          "language": "ru",
+          "value": "Цена поставки"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізу бағасы"
+        }
+      ]
+    },
+    {
+      "id": 71,
+      "values": [
+        {
+          "language": "main",
+          "value": "Sale price"
+        },
+        {
+          "language": "",
+          "value": "Sale price"
+        },
+        {
+          "language": "ru",
+          "value": "Цена продажи"
+        },
+        {
+          "language": "kk",
+          "value": "Сату бағасы"
+        }
+      ]
+    },
+    {
+      "id": 72,
+      "values": [
+        {
+          "language": "main",
+          "value": "Return price"
+        },
+        {
+          "language": "en",
+          "value": "Return price"
+        },
+        {
+          "language": "ru",
+          "value": "Цена возврата"
+        },
+        {
+          "language": "kk",
+          "value": "Қайтару бағасы"
+        }
+      ]
+    },
+    {
+      "id": 73,
+      "values": [
+        {
+          "language": "main",
+          "value": "Category"
+        },
+        {
+          "language": "en",
+          "value": "Category"
+        },
+        {
+          "language": "ru",
+          "value": "Категория"
+        },
+        {
+          "language": "kk",
+          "value": "Санат"
+        }
+      ]
+    },
+    {
+      "id": 74,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier"
+        },
+        {
+          "language": "en",
+          "value": "Supplier"
+        },
+        {
+          "language": "ru",
+          "value": "Поставщик"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші"
+        }
+      ]
+    },
+    {
+      "id": 75,
+      "values": [
+        {
+          "language": "main",
+          "value": "Enter barcode"
+        },
+        {
+          "language": "en",
+          "value": "Enter barcode"
+        },
+        {
+          "language": "ru",
+          "value": "Введите штрих-код"
+        },
+        {
+          "language": "kk",
+          "value": "Штрих-кодты енгізіңіз"
+        }
+      ]
+    },
+    {
+      "id": 76,
+      "values": [
+        {
+          "language": "main",
+          "value": "Enter name"
+        },
+        {
+          "language": "en",
+          "value": "Enter name"
+        },
+        {
+          "language": "ru",
+          "value": "Введите название"
+        },
+        {
+          "language": "kk",
+          "value": "Атын енгізіңіз"
+        }
+      ]
+    },
+    {
+      "id": 77,
+      "values": [
+        {
+          "language": "main",
+          "value": "Enter supply price"
+        },
+        {
+          "language": "en",
+          "value": "Enter supply price"
+        },
+        {
+          "language": "ru",
+          "value": "Введите цену поставки"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізу бағасын енгізіңіз"
+        }
+      ]
+    },
+    {
+      "id": 78,
+      "values": [
+        {
+          "language": "main",
+          "value": "Enter sale price"
+        },
+        {
+          "language": "en",
+          "value": "Enter sale price"
+        },
+        {
+          "language": "ru",
+          "value": "Введите цену продажи"
+        },
+        {
+          "language": "kk",
+          "value": "Сату бағасын енгізіңіз"
+        }
+      ]
+    },
+    {
+      "id": 79,
+      "values": [
+        {
+          "language": "main",
+          "value": "Enter return price"
+        },
+        {
+          "language": "en",
+          "value": "Enter return price"
+        },
+        {
+          "language": "ru",
+          "value": "Введите цену возврата"
+        },
+        {
+          "language": "kk",
+          "value": "Қайтару бағасын енгізіңіз"
+        }
+      ]
+    },
+    {
+      "id": 80,
+      "values": [
+        {
+          "language": "main",
+          "value": "Select category"
+        },
+        {
+          "language": "en",
+          "value": "Select category"
+        },
+        {
+          "language": "ru",
+          "value": "Выберите категорию"
+        },
+        {
+          "language": "kk",
+          "value": "Санатты таңдаңыз"
+        }
+      ]
+    },
+    {
+      "id": 81,
+      "values": [
+        {
+          "language": "main",
+          "value": "Select supplier"
+        },
+        {
+          "language": "en",
+          "value": "Select supplier"
+        },
+        {
+          "language": "ru",
+          "value": "Выберите поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізушіні таңдаңыз"
+        }
+      ]
+    },
+    {
+      "id": 82,
+      "values": [
+        {
+          "language": "main",
+          "value": "Edit"
+        },
+        {
+          "language": "en",
+          "value": "Edit"
+        },
+        {
+          "language": "ru",
+          "value": "Редактировать"
+        },
+        {
+          "language": "kk",
+          "value": "Өңдеу"
+        }
+      ]
+    },
+    {
+      "id": 83,
+      "values": [
+        {
+          "language": "main",
+          "value": "Change password"
+        },
+        {
+          "language": "en",
+          "value": "Change password"
+        },
+        {
+          "language": "ru",
+          "value": "Сменить пароль"
+        },
+        {
+          "language": "kk",
+          "value": "Құпия сөзді өзгерту"
+        }
+      ]
+    },
+    {
+      "id": 84,
+      "values": [
+        {
+          "language": "main",
+          "value": "New password"
+        },
+        {
+          "language": "en",
+          "value": "New password"
+        },
+        {
+          "language": "ru",
+          "value": "Новый пароль"
+        },
+        {
+          "language": "kk",
+          "value": "Жаңа құпия сөз"
+        }
+      ]
+    },
+    {
+      "id": 85,
+      "values": [
+        {
+          "language": "main",
+          "value": "Enter new password"
+        },
+        {
+          "language": "en",
+          "value": "Enter new password"
+        },
+        {
+          "language": "ru",
+          "value": "Введите новый пароль"
+        },
+        {
+          "language": "kk",
+          "value": "Жаңа құпия сөзді енгізіңіз"
+        }
+      ]
+    },
+    {
+      "id": 86,
+      "values": [
+        {
+          "language": "main",
+          "value": "Repeat new password"
+        },
+        {
+          "language": "en",
+          "value": "Repeat new password"
+        },
+        {
+          "language": "ru",
+          "value": "Повторите новый пароль"
+        },
+        {
+          "language": "kk",
+          "value": "Жаңа құпия сөзді қайталаңыз"
+        }
+      ]
+    },
+    {
+      "id": 87,
+      "values": [
+        {
+          "language": "main",
+          "value": "Confirmation password"
+        },
+        {
+          "language": "en",
+          "value": "Confirmation password"
+        },
+        {
+          "language": "ru",
+          "value": "Пароль для подтверждения"
+        },
+        {
+          "language": "kk",
+          "value": "Растау үшін пароль"
+        }
+      ]
+    },
+    {
+      "id": 88,
+      "values": [
+        {
+          "language": "main",
+          "value": "Required to edit account"
+        },
+        {
+          "language": "en",
+          "value": "Required to edit account"
+        },
+        {
+          "language": "ru",
+          "value": "Необходим для редактирования аккаунта"
+        },
+        {
+          "language": "kk",
+          "value": "Есептік жазбаны өңдеу үшін қажет"
+        }
+      ]
+    },
+    {
+      "id": 89,
+      "values": [
+        {
+          "language": "main",
+          "value": "Account successfully updated"
+        },
+        {
+          "language": "en",
+          "value": "Account successfully updated"
+        },
+        {
+          "language": "ru",
+          "value": "Аккаунт успешно обновлен"
+        },
+        {
+          "language": "kk",
+          "value": "Есептік жазба сәтті жаңартылды"
+        }
+      ]
+    },
+    {
+      "id": 90,
+      "values": [
+        {
+          "language": "main",
+          "value": "Logging out in progress"
+        },
+        {
+          "language": "en",
+          "value": "Logging out in progress"
+        },
+        {
+          "language": "ru",
+          "value": "Выполняется выход из аккаунта"
+        },
+        {
+          "language": "kk",
+          "value": "Шығу орындалуда"
+        }
+      ]
+    },
+    {
+      "id": 91,
+      "values": [
+        {
+          "language": "main",
+          "value": "Session time expired. Logging out in progress"
+        },
+        {
+          "language": "en",
+          "value": "Session time expired. Logging out in progress"
+        },
+        {
+          "language": "ru",
+          "value": "Session time expired. Logging out"
+        },
+        {
+          "language": "kk",
+          "value": "Сеансыңыздың мерзімі аяқталды. Сіз өзіңіздің есептік жазбаңыздан шығып жатырсыз"
+        }
+      ]
+    },
+    {
+      "id": 92,
+      "values": [
+        {
+          "language": "main",
+          "value": "Alias"
+        },
+        {
+          "language": "en",
+          "value": "Alias"
+        },
+        {
+          "language": "ru",
+          "value": "Дополнительное название"
+        },
+        {
+          "language": "kk",
+          "value": "Қосымша атау"
+        }
+      ]
+    },
+    {
+      "id": 93,
+      "values": [
+        {
+          "language": "main",
+          "value": "Description"
+        },
+        {
+          "language": "en",
+          "value": "Description"
+        },
+        {
+          "language": "ru",
+          "value": "Описание"
+        },
+        {
+          "language": "kk",
+          "value": "Сипаттама"
+        }
+      ]
+    },
+    {
+      "id": 94,
+      "values": [
+        {
+          "language": "main",
+          "value": "Enter alias"
+        },
+        {
+          "language": "en",
+          "value": "Enter alias"
+        },
+        {
+          "language": "ru",
+          "value": "Введите дополнительное название"
+        },
+        {
+          "language": "kk",
+          "value": "Қосымша атау енгізіңіз"
+        }
+      ]
+    },
+    {
+      "id": 95,
+      "values": [
+        {
+          "language": "main",
+          "value": "Enter description"
+        },
+        {
+          "language": "en",
+          "value": "Enter description"
+        },
+        {
+          "language": "ru",
+          "value": "Введите описание"
+        },
+        {
+          "language": "kk",
+          "value": "Сипаттама енгізіңіз"
+        }
+      ]
+    },
+    {
+      "id": 96,
+      "values": [
+        {
+          "language": "main",
+          "value": "Optional"
+        },
+        {
+          "language": "en",
+          "value": "Optional"
+        },
+        {
+          "language": "ru",
+          "value": "Необязательно"
+        },
+        {
+          "language": "kk",
+          "value": "Міндетті емес"
+        }
+      ]
+    }
+  ]
+}

@@ -31,7 +31,7 @@ fun getFullDrawableResourceUrl(path: String): String {
   } + "/$path"
 }
 
-fun List<ExceptionDataModel>.extractExceptionMessage(id: Long): String? {
+fun List<ResponseDataModel>.extractExceptionMessage(id: String): List<LocalizedStringDataModel>? {
   return find { it.id == id }?.message
 }
 

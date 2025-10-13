@@ -94,14 +94,14 @@ fun AppConfiguration.UserAuthLogInScreen() {
         }
       )
 
-      responseText(
-        stateValues.stringLoginAndOrPasswordIncorrect
-      ) {
-        (stateValues.userAccountState as? DataState.Failure)?.exception?.message?.equals(
-          stateValues.exceptionMessageLoginAndOrPasswordIncorrect,
-          true
-        ) == true
-      }
+//      responseText(
+//        stateValues.stringLoginAndOrPasswordIncorrect
+//      ) {
+//        (stateValues.userAccountState as? DataState.Failure)?.exception?.message?.equals(
+//          stateValues.exceptionMessageLoginAndOrPasswordIncorrect,
+//          true
+//        ) == true
+//      }
 
       Spacer(modifier = Modifier.height(outerSpace))
 

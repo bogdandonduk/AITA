@@ -6,7 +6,8 @@ import kz.aita.core.Searchable
 @Serializable
 data class StoreDataModel(
   val id: String,
-  val userId: String,
+  val userIds: List<String>,
+  val typeIds: List<String>?,
   val name: List<LocalizedStringDataModel>,
   val alias: List<LocalizedStringDataModel>?,
   val description: List<LocalizedStringDataModel>?,

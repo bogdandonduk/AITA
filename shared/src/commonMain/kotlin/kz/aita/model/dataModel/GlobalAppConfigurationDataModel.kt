@@ -7,7 +7,6 @@ data class GlobalAppConfigurationDataModel(
   val appName: String,
   val serverUrl: String,
   val globalAppConfigurationPath: String,
-  val exceptionConfigurationPath: String,
   val logInPath: String,
   val signUpPath: String,
   val refreshPath: String,

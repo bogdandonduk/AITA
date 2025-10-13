@@ -15,6 +15,10 @@ sealed class NavigationScreenModel(
     _state[pair.first] = pair.second
   }
 
+  fun removeState(key: String) {
+    _state.remove(key)
+  }
+
   fun removeStockWarehouse(key: String) {
     _state.remove(key)
   }

@@ -13,8 +13,11 @@ import kz.aita.model.dataModel.CompanyFormDataModel
 import kz.aita.model.dataModel.LocalizedStringDataModel
 import kz.aita.model.dataModel.LocationDataModel
 import kz.aita.model.dataModel.StoreDataModel
+import kz.aita.server.db.StoreUsers
 import kz.aita.server.db.Stores
 import kz.aita.server.db.Users
+import kz.aita.server.util.genericResponse
+import kz.aita.server.util.getResponse
 import org.jetbrains.exposed.exceptions.ExposedSQLException
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -45,13 +48,18 @@ fun Application.storesRoute() {
               call.respond(UnauthorizedResponse())
 
             Stores
+              .innerJoin(StoreUsers, { Stores.id }, { StoreUsers.storeId })
               .selectAll()
-              .where {
-                Stores.userIds.contains(userId.toString())
-              }.map {
+              .where { StoreUsers.userId eq userId }
+              .map {
                 StoreDataModel(
                   id = it[Stores.id].toString(),
-                  userId = it[Stores.userIds].toString(),
+                  userIds = jsonBase.decodeFromString<List<String>>(it[Stores.userIds]),
+                  typeIds = it[Stores.typeIds]?.let { value ->
+                    jsonBase.decodeFromString<List<String>>(
+                      value
+                    )
+                  },
                   name = jsonBase.decodeFromString<List<LocalizedStringDataModel>>(it[Stores.name]),
                   alias = it[Stores.alias]?.let { alias ->
                     jsonBase.decodeFromString<List<LocalizedStringDataModel>>(
@@ -63,7 +71,11 @@ fun Application.storesRoute() {
                       description
                     )
                   },
-                  companyForms = it[Stores.companyForms]?.let { value -> jsonBase.decodeFromString<List<CompanyFormDataModel>>(value) },
+                  companyForms = it[Stores.companyForms]?.let { value ->
+                    jsonBase.decodeFromString<List<CompanyFormDataModel>>(
+                      value
+                    )
+                  },
                   location = it[Stores.location]?.let { value -> jsonBase.decodeFromString<LocationDataModel>(value) },
                   phoneNumbers = it[Stores.phoneNumbers]?.let { value -> jsonBase.decodeFromString<List<String>>(value) },
                   emails = it[Stores.emails]?.let { value -> jsonBase.decodeFromString<List<String>>(value) },
@@ -111,6 +123,7 @@ fun Application.storesRoute() {
                 Stores.insert {
                   it[Stores.id] = id
                   it[Stores.userIds] = jsonBase.encodeToString<List<String>>(listOf(userId.toString()))
+                  it[Stores.typeIds] = body.typeIds?.let { value -> jsonBase.encodeToString<List<String>>(value) }
                   it[Stores.name] = jsonBase.encodeToString(body.name)
                   it[Stores.alias] = body.alias?.let { alias -> jsonBase.encodeToString(alias) }
                   it[Stores.description] = body.description?.let { description -> jsonBase.encodeToString(description) }
@@ -120,6 +133,11 @@ fun Application.storesRoute() {
                   it[Stores.emails] = body.emails?.let { value -> jsonBase.encodeToString(value) }
                   it[Stores.createdAt] = instant
                   it[Stores.isActive] = body.isActive
+                }
+
+                StoreUsers.insertIgnore {           // composite PK avoids dup (store_id,user_id)
+                  it[StoreUsers.storeId] = id
+                  it[StoreUsers.userId] = userId // from JWT principal
                 }
               }
 
@@ -133,13 +151,16 @@ fun Application.storesRoute() {
           } while (state23505Reached)
 
           id?.run {
-            call.respond(
+            call.genericResponse(
               HttpStatusCode.Created,
-              body.copy(id = id.toString(), createdAt = instant.toEpochMilli())
+              body.copy(id = id.toString(), createdAt = instant.toEpochMilli()),
+              message = getResponse("10").message
             )
-          } ?: call.respond(HttpStatusCode.InternalServerError)
+          } ?: call.genericResponse(
+            status = HttpStatusCode.InternalServerError,
+            message = getResponse("3").message
+          )
         }
-
 
         put("/update") {
           val principal = call.principal<JWTPrincipal>() ?: return@put call.respond(UnauthorizedResponse())
@@ -153,31 +174,39 @@ fun Application.storesRoute() {
 
             val id = runCatching { UUID.fromString(body.id) }.getOrNull() ?: return@newSuspendedTransaction 2
 
-            Stores.update({ (Stores.id eq id) and Stores.userIds.contains(userId.toString()) }) {
-              it[Stores.name] = jsonBase.encodeToString(body.name)
-              it[Stores.alias] = body.alias?.let { alias -> jsonBase.encodeToString(alias) }
-              it[Stores.description] = body.description?.let { description -> jsonBase.encodeToString(description) }
-              it[Stores.companyForms] = body.companyForms?.let { value -> jsonBase.encodeToString(value) }
-              it[Stores.location] = body.location?.let { value -> jsonBase.encodeToString(value) }
-              it[Stores.phoneNumbers] = body.phoneNumbers?.let { value -> jsonBase.encodeToString(value) }
-              it[Stores.emails] = body.emails?.let { value -> jsonBase.encodeToString(value) }
-              it[Stores.isActive] = body.isActive
-            }.run {
-              if (this > 0)
-                0
-              else
-                1
-            }
+            Stores.update({
+                (Stores.id eq id) and exists(
+                  StoreUsers.selectAll().where { (StoreUsers.storeId eq id) and (StoreUsers.userId eq userId) })
+              }) {
+                it[Stores.typeIds] = body.typeIds?.let { value -> jsonBase.encodeToString<List<String>>(value) }
+                it[Stores.name] = jsonBase.encodeToString(body.name)
+                it[Stores.alias] = body.alias?.let { alias -> jsonBase.encodeToString(alias) }
+                it[Stores.description] = body.description?.let { description -> jsonBase.encodeToString(description) }
+                it[Stores.companyForms] = body.companyForms?.let { value -> jsonBase.encodeToString(value) }
+                it[Stores.location] = body.location?.let { value -> jsonBase.encodeToString(value) }
+                it[Stores.phoneNumbers] = body.phoneNumbers?.let { value -> jsonBase.encodeToString(value) }
+                it[Stores.emails] = body.emails?.let { value -> jsonBase.encodeToString(value) }
+                it[Stores.isActive] = body.isActive
+              }.run {
+                if (this > 0)
+                  0
+                else
+                  1
+              }
           }
 
           return@put when (updated) {
-            0 -> call.respond(
+            0 -> call.genericResponse(
               HttpStatusCode.OK,
-              body
+              body,
+              getResponse("11").message
             )
 
             1, 2 -> call.respond(UnauthorizedResponse())
-            else -> call.respond(HttpStatusCode.InternalServerError)
+            else -> call.genericResponse(
+              status = HttpStatusCode.InternalServerError,
+              message = getResponse("3").message
+            )
           }
         }
 
@@ -200,13 +229,16 @@ fun Application.storesRoute() {
           }
 
           return@delete when (deleted) {
-            0 -> call.respond(
+            0 -> call.genericResponse(
               HttpStatusCode.OK,
-              body
+              message = getResponse("12").message
             )
 
             1, 2 -> call.respond(UnauthorizedResponse())
-            else -> call.respond(HttpStatusCode.InternalServerError)
+            else -> call.genericResponse(
+              status = HttpStatusCode.InternalServerError,
+              message = getResponse("3").message
+            )
           }
         }
       }
