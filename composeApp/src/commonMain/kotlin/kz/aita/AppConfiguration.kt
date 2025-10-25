@@ -35,12 +35,18 @@ object AppConfiguration {
     val userAccountState: DataState<UserAccountDataModel>
     val userAccount: UserAccountDataModel?
 
-//    val stockState: DataState<List<GoodsItemDataModel>>
-//    val stock: List<GoodsItemDataModel>?
+    val stockState: DataState<List<GoodsItemDataModel>>
+    val stock: List<GoodsItemDataModel>?
 
     val storesState: DataState<List<StoreDataModel>>
     val stores: List<StoreDataModel>?
     val activeStoreId: String?
+
+    val goodsCategoriesState: DataState<List<GenericGoodsCategoryDataModel>>
+    val goodsCategories: List<GenericGoodsCategoryDataModel>?
+
+    val suppliersState: DataState<List<SupplierDataModel>>
+    val suppliers: List<SupplierDataModel>?
 
     val navigationScreensMain: List<NavigationScreenModel>
     val navigationTransactionSaleClientId: Int
@@ -164,11 +170,11 @@ object AppConfiguration {
     val stringNoMatches: String
     val stringName: String
     val stringBarcode: String
-    val stringSupplyPriceState: String
-    val stringSalePriceState: String
-    val stringReturnPriceState: String
-    val stringCategoryState: String
-    val stringSupplierState: String
+    val stringSupplyPrice: String
+    val stringSalePrice: String
+    val stringReturnPrice: String
+    val stringCategory: String
+    val stringSupplier: String
     val stringEnterName: String
     val stringEnterBarcode: String
     val stringEnterSupplyPrice: String
@@ -184,13 +190,32 @@ object AppConfiguration {
     val stringConfirmationPassword: String
     val stringRequiredToEditAccount: String
     val stringAccountSuccessfullyUpdated: String
-    val stringLoggingOutInProgress: String
+    val stringLoggingOut: String
     val stringSessionTimeExpiredLoggingOut: String
     val stringAlias: String
     val stringDescription: String
     val stringEnterAlias: String
     val stringEnterDescription: String
     val stringOptional: String
+    val stringLoggingIn: String
+    val stringSigningUp: String
+    val stringCompanyForm: String
+    val stringMeasurementUnit: String
+
+    val stringNoActiveStore: String
+    val stringSelectInMenu: String
+    val stringSupplyData: String
+    val stringSaleData: String
+    val stringReturnData: String
+    val stringAddSupplyData: String
+    val stringAddSaleData: String
+    val stringAddReturnData: String
+    val stringAddBarcode: String
+    val stringAddName: String
+    val stringPayment: String
+    val stringAll: String
+    val stringQuick: String
+    val stringCategories: String
 
     val screenWidth: Dp
     val screenHeight: Dp
@@ -213,6 +238,9 @@ object AppConfiguration {
     val wideTextFieldHeight: Dp
 
     val textFieldIconPadding: Dp
+
+    val marginTextField: Dp
+    val marginTextFieldGroup: Dp
 
     val AccentColor: Color
     val BackgroundColor: Color
@@ -284,6 +312,9 @@ object AppConfiguration {
   private val _wideTextFieldHeightState = MutableStateFlow((((_textSizeState.value.value * 4) * _textFieldHeightMultiplierRelativeToTextSizeState.value)).dp)
   private val _textFieldIconPaddingState = MutableStateFlow((9.dp))
 
+  private val _marginTextFieldState = MutableStateFlow((8.dp))
+  private val _marginTextFieldGroupState = MutableStateFlow((24.dp))
+
   private val _AccentColorState = MutableStateFlow(Color(0xffffba24))
   private val _BackgroundColorState = MutableStateFlow(Color(0xffffffff))
   private val _TextColorState = MutableStateFlow(Color(0xffffffff))
@@ -302,7 +333,7 @@ object AppConfiguration {
 
   lateinit var coroutineScope: CoroutineScope
 
-  suspend fun setAppTheme(themeId: Long) {
+  fun setAppTheme(themeId: Long) {
     configurationRepository.setAppTheme(themeId)
   }
 
@@ -311,7 +342,7 @@ object AppConfiguration {
   }
 
   fun postNotification(message: List<LocalizedStringDataModel>?, type: NotificationType) {
-    notificationRepository.postNotification(message, type)
+    notificationRepository.post(message, type)
   }
 
   @Composable
@@ -325,12 +356,18 @@ object AppConfiguration {
       override val userAccountState: DataState<UserAccountDataModel> by userRepository.userAccountState.value.collectAsState()
       override val userAccount: UserAccountDataModel? by userRepository.userAccountState.payload.collectAsState()
 
-//      override val stockState: DataState<List<GoodsItemDataModel>> by stockRepository.stockState.value.collectAsState()
-//      override val stock: List<GoodsItemDataModel>? by stockRepository.stockState.payload.collectAsState()
+      override val stockState: DataState<List<GoodsItemDataModel>> by stockRepository.stockState.value.collectAsState()
+      override val stock: List<GoodsItemDataModel>? by stockRepository.stockState.payload.collectAsState()
 
       override val storesState: DataState<List<StoreDataModel>> by storeRepository.storesState.value.collectAsState()
       override val stores: List<StoreDataModel>? by storeRepository.storesState.payload.collectAsState()
       override val activeStoreId: String? by storeRepository.activeStoreId.collectAsState()
+
+      override val goodsCategoriesState: DataState<List<GenericGoodsCategoryDataModel>> by genericItemsRepository.goodsCategoriesState.value.collectAsState()
+      override val goodsCategories: List<GenericGoodsCategoryDataModel>? by genericItemsRepository.goodsCategoriesState.payload.collectAsState()
+
+      override val suppliersState: DataState<List<SupplierDataModel>> by supplierRepository.suppliersState.value.collectAsState()
+      override val suppliers: List<SupplierDataModel>? by supplierRepository.suppliersState.payload.collectAsState()
 
       override val navigationScreensMain: List<NavigationScreenModel> by Navigation.Main.collectAsState()
       override val navigationTransactionSaleClientId: Int by Navigation.TransactionSale.ClientId.collectAsState()
@@ -461,11 +498,11 @@ object AppConfiguration {
       override val stringNoMatches: String by configurationRepository.stringNoMatchesState.collectAsState()
       override val stringName: String by configurationRepository.stringNameState.collectAsState()
       override val stringBarcode: String by configurationRepository.stringBarcodeState.collectAsState()
-      override val stringSupplyPriceState: String by configurationRepository.stringSupplyPriceState.collectAsState()
-      override val stringSalePriceState: String by configurationRepository.stringSalePriceState.collectAsState()
-      override val stringReturnPriceState: String by configurationRepository.stringReturnPriceState.collectAsState()
-      override val stringCategoryState: String by configurationRepository.stringCategoryState.collectAsState()
-      override val stringSupplierState: String by configurationRepository.stringSupplierState.collectAsState()
+      override val stringSupplyPrice: String by configurationRepository.stringSupplyPriceState.collectAsState()
+      override val stringSalePrice: String by configurationRepository.stringSalePriceState.collectAsState()
+      override val stringReturnPrice: String by configurationRepository.stringReturnPriceState.collectAsState()
+      override val stringCategory: String by configurationRepository.stringCategoryState.collectAsState()
+      override val stringSupplier: String by configurationRepository.stringSupplierState.collectAsState()
       override val stringEnterName: String by configurationRepository.stringEnterNameState.collectAsState()
       override val stringEnterBarcode: String by configurationRepository.stringEnterBarcodeState.collectAsState()
       override val stringEnterSupplyPrice: String by configurationRepository.stringEnterSupplyPriceState.collectAsState()
@@ -481,13 +518,31 @@ object AppConfiguration {
       override val stringConfirmationPassword: String by configurationRepository.stringConfirmationPasswordState.collectAsState()
       override val stringRequiredToEditAccount: String by configurationRepository.stringRequiredToEditAccountState.collectAsState()
       override val stringAccountSuccessfullyUpdated: String by configurationRepository.stringAccountSuccessfullyUpdatedState.collectAsState()
-      override val stringLoggingOutInProgress: String by configurationRepository.stringLoggingOutInProgressState.collectAsState()
+      override val stringLoggingOut: String by configurationRepository.stringLoggingOutState.collectAsState()
       override val stringSessionTimeExpiredLoggingOut: String by configurationRepository.stringSessionTimeExpiredLoggingOutState.collectAsState()
       override val stringAlias: String by configurationRepository.stringAliasState.collectAsState()
       override val stringDescription: String by configurationRepository.stringDescriptionState.collectAsState()
       override val stringEnterAlias: String by configurationRepository.stringEnterAliasState.collectAsState()
       override val stringEnterDescription: String by configurationRepository.stringEnterDescriptionState.collectAsState()
       override val stringOptional: String by configurationRepository.stringOptionalState.collectAsState()
+      override val stringLoggingIn: String by configurationRepository.stringLoggingInState.collectAsState()
+      override val stringSigningUp: String by configurationRepository.stringSigningUpState.collectAsState()
+      override val stringCompanyForm: String by configurationRepository.stringCompanyFormState.collectAsState()
+      override val stringMeasurementUnit: String by configurationRepository.stringMeasurementUnitState.collectAsState()
+      override val stringNoActiveStore: String by configurationRepository.stringNoActiveStoreState.collectAsState()
+      override val stringSelectInMenu: String by configurationRepository.stringSelectInMenuState.collectAsState()
+      override val stringSupplyData: String by configurationRepository.stringSupplyDataState.collectAsState()
+      override val stringSaleData: String by configurationRepository.stringSaleDataState.collectAsState()
+      override val stringReturnData: String by configurationRepository.stringReturnDataState.collectAsState()
+      override val stringAddSupplyData: String by configurationRepository.stringAddSupplyDataState.collectAsState()
+      override val stringAddSaleData: String by configurationRepository.stringAddSaleDataState.collectAsState()
+      override val stringAddReturnData: String by configurationRepository.stringAddReturnDataState.collectAsState()
+      override val stringAddBarcode: String by configurationRepository.stringAddBarcodeState.collectAsState()
+      override val stringAddName: String by configurationRepository.stringAddNameState.collectAsState()
+      override val stringPayment: String by configurationRepository.stringPaymentState.collectAsState()
+      override val stringAll: String by configurationRepository.stringAllState.collectAsState()
+      override val stringQuick: String by configurationRepository.stringQuickGoodsItemsState.collectAsState()
+      override val stringCategories: String by configurationRepository.stringCategoriesState.collectAsState()
 
       override val screenWidth: Dp by _screenWidthState.collectAsState()
       override val screenHeight: Dp by _screenHeightState.collectAsState()
@@ -506,6 +561,8 @@ object AppConfiguration {
       override val textFieldHeight: Dp by _textFieldHeightState.collectAsState()
       override val wideTextFieldHeight: Dp by _wideTextFieldHeightState.collectAsState()
       override val textFieldIconPadding: Dp by _textFieldIconPaddingState.collectAsState()
+      override val marginTextField: Dp by _marginTextFieldState.collectAsState()
+      override val marginTextFieldGroup: Dp by _marginTextFieldGroupState.collectAsState()
 
       override val AccentColor: Color by _AccentColorState.collectAsState()
       override val BackgroundColor: Color by _BackgroundColorState.collectAsState()
@@ -673,8 +730,6 @@ object AppConfiguration {
 
               }
           }
-
-
         }
       }
     }

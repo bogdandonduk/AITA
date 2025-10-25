@@ -23,7 +23,6 @@ import kz.aita.core.storeRepository
 import kz.aita.model.dataModel.LocalizedStringDataModel
 import kz.aita.model.dataModel.LocationDataModel
 import kz.aita.model.dataModel.StoreDataModel
-import kz.aita.model.wrapper.DataState
 
 @Composable
 fun AppConfiguration.MenuAddEditStoreScreen() {
@@ -32,14 +31,7 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
       .fillMaxSize(),
     horizontalAlignment = Alignment.CenterHorizontally
   ) {
-    val editedStore = NavigationScreenModel.Menu.AddEditStore.state["state_editedStoreId"]?.run { stateValues.stores?.find { store -> store.id == this } }
-
-    DisposableEffect(Unit) {
-      onDispose {
-        if (editedStore != null)
-          NavigationScreenModel.Menu.AddEditStore.removeState("state_editedStoreId")
-      }
-    }
+    val editedStore = NavigationScreenModel.Menu.AddEditStore.state.value["state_editedStoreId"]?.run { stateValues.stores?.find { store -> store.id == this } }
 
     ScreenAppBarWidget(
       title = if (editedStore != null) stateValues.stringEditStore else stateValues.stringAddStore,
@@ -47,6 +39,8 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
       onBack = {
         coroutineScope.launch {
           Navigation.Menu.pop(stateValues.isNarrowScreen)
+          if (editedStore != null)
+            NavigationScreenModel.Menu.AddEditStore.removeState("state_editedStoreId")
         }
       }
     )
@@ -67,7 +61,9 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
           genericTextField(
             titleText = stateValues.stringName,
             placeholderText = stateValues.stringEnterName,
-            valueInitial = editedStore?.name?.extractLocalizedString(stateValues.appLanguage)
+            valueInitial = editedStore?.name?.extractLocalizedString(stateValues.appLanguage),
+            stateHost = NavigationScreenModel.Menu.AddEditStore,
+            stateKey = "name",
           )
 
         Spacer(
@@ -79,7 +75,9 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
           genericTextField(
             titleText = stateValues.stringAlias,
             placeholderText = stateValues.stringOptional,
-            valueInitial = editedStore?.alias?.extractLocalizedString(stateValues.appLanguage)
+            valueInitial = editedStore?.alias?.extractLocalizedString(stateValues.appLanguage),
+            stateHost = NavigationScreenModel.Menu.AddEditStore,
+            stateKey = "alias",
           )
 
         Spacer(
@@ -91,7 +89,9 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
           genericTextField(
             titleText = stateValues.stringDescription,
             placeholderText = stateValues.stringOptional,
-            valueInitial = editedStore?.description?.extractLocalizedString(stateValues.appLanguage)
+            valueInitial = editedStore?.description?.extractLocalizedString(stateValues.appLanguage),
+            stateHost = NavigationScreenModel.Menu.AddEditStore,
+            stateKey = "description",
           )
 
         Spacer(
@@ -100,27 +100,33 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
         )
 
         val phoneNumberTextFieldContent = countrySelectionPhoneNumberTextField(
-          valueInitial = editedStore?.phoneNumbers?.takeIf { it.isNotEmpty() }?.first()
+          valueInitial = editedStore?.phoneNumbers?.takeIf { it.isNotEmpty() }?.first(),
+          stateHost = NavigationScreenModel.Menu.AddEditStore,
+          stateKey = "phone_number",
         )
 
         Spacer(modifier = Modifier.height(innerSpace))
 
         var goAction: (() -> Unit)? = null
         val emailTextFieldContent = emailTextField(
-          valueInitial = editedStore?.emails?.takeIf { it.isNotEmpty() }?.first()
+          valueInitial = editedStore?.emails?.takeIf { it.isNotEmpty() }?.first(),
+          stateHost = NavigationScreenModel.Menu.AddEditStore,
+          stateKey = "email",
         )
 
         Spacer(modifier = Modifier.height(innerSpace))
 
         val companyFormDropdownListContent = dropdownListWidget(
-          titleText = "Company form",
+          titleText = stateValues.stringCompanyForm,
           domains = stateValues.globalAppConfiguration.companyForms.map {
             SelectableDomain(
               id = it.id,
+              displayId = it.name,
               name = it.name,
               iconPath = null
             )
           },
+          showName = false,
           selectedInitial = editedStore?.companyForms?.takeIf { it.isNotEmpty() }?.first()?.id
         )
 
@@ -189,7 +195,9 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                     isActive = true
                   )
                 ) {
-
+                  coroutineScope.launch {
+                    Navigation.Menu.pop()
+                  }
                 }
             } else {
               storeRepository
@@ -240,14 +248,19 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                     createdAt = 0L,
                     isActive = true
                   )
-                )
+                ) {
+                  coroutineScope.launch {
+                    Navigation.Menu.pop()
+                    NavigationScreenModel.Stock.AddEditGoodsItem.removeState("state_editedGoodsItemId")
+                  }
+                }
             }
           }
         }
 
         actionButton(
           text = if (editedStore != null) stateValues.stringEditStore else stateValues.stringAddStore,
-          enabled = stateValues.storesState !is DataState.Progress
+          enabled = stateValues.latestNotification == null
         ) {
           goAction.invoke()
         }
@@ -256,7 +269,7 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
       item {
         Spacer(
           modifier = Modifier
-            .height(200.dp)
+            .height(stateValues.screenHeight / 4)
         )
       }
     }

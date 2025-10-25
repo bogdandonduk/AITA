@@ -60,7 +60,8 @@ fun AppConfiguration.MenuStoresScreen() {
         } else {
           val searchTextFieldContent =
             searchTextField(
-              valueInitial = NavigationScreenModel.Menu.Stores.state["search_query"],
+              stateHost = NavigationScreenModel.Menu.Stores,
+              stateKey = "search_query",
               modifier = Modifier
                 .fillMaxWidth(0.5f)
                 .padding(top = 8.dp)
@@ -116,10 +117,6 @@ fun AppConfiguration.MenuStoresScreen() {
             .weight(1f),
           stateValues.stringListEmpty
         )
-      }
-
-      else -> {
-
       }
     }
   }

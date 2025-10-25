@@ -6,7 +6,7 @@ import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.json.jsonb
 
-object GenericGoodsItems : Table("generic_goods_items") {
+object GenericGoodsItems: Table("generic_goods_items") {
   val id = uuid("id").uniqueIndex()
 
   val barcode = jsonb("barcode", Json, ListSerializer(String.serializer()))

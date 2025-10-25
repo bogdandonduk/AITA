@@ -4,6 +4,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kz.aita.AppConfiguration
+import kz.aita.compose.navigation.Navigation.Stock.goLeft
+import kz.aita.compose.navigation.Navigation.Stock.goRight
+import kz.aita.compose.navigation.Navigation.Stock.popLeft
+import kz.aita.compose.navigation.Navigation.Stock.popRight
 
 object Navigation {
   val bottomNavBarScreens = listOf(
@@ -28,6 +32,51 @@ object Navigation {
   }
 
   object TransactionSale {
+
+    suspend fun go(
+      model: NavigationScreenModel.Transaction,
+      isNarrowScreen: Boolean = AppConfiguration.stateValues.isNarrowScreen,
+      remove: Boolean = false
+    ) {
+      if (isNarrowScreen) {
+        when (ClientId.value) {
+          0 -> goLeftClient1(model, remove)
+          1 -> goLeftClient2(model, remove)
+          2 -> goLeftClient3(model, remove)
+          3 -> goLeftClient4(model, remove)
+          else -> goLeftClient5(model, remove)
+        }
+      } else {
+        when (ClientId.value) {
+          0 -> goRightClient1(model, remove)
+          1 -> goRightClient2(model, remove)
+          2 -> goRightClient3(model, remove)
+          3 -> goRightClient4(model, remove)
+          else -> goRightClient5(model, remove)
+        }
+      }
+    }
+
+    suspend fun pop(isNarrowScreen: Boolean = AppConfiguration.stateValues.isNarrowScreen, navigateAfterwards: NavigationScreenModel.Transaction? = null) {
+      if (isNarrowScreen) {
+        when (ClientId.value) {
+          0 -> popLeftClient1(navigateAfterwards)
+          1 -> popLeftClient2(navigateAfterwards)
+          2 -> popLeftClient3(navigateAfterwards)
+          3 -> popLeftClient4(navigateAfterwards)
+          else -> popLeftClient5(navigateAfterwards)
+        }
+      } else {
+        when (ClientId.value) {
+          0 -> popRightClient1(navigateAfterwards)
+          1 -> popRightClient2(navigateAfterwards)
+          2 -> popRightClient3(navigateAfterwards)
+          3 -> popRightClient4(navigateAfterwards)
+          else -> popRightClient5(navigateAfterwards)
+        }
+      }
+    }
+
     fun isVeryFirstScreen(isNarrowScreen: Boolean, clientId: Int): Boolean {
       return (
           if (isNarrowScreen)
@@ -713,6 +762,50 @@ object Navigation {
 
   object TransactionReturn {
 
+    suspend fun go(
+      model: NavigationScreenModel.Transaction,
+      isNarrowScreen: Boolean = AppConfiguration.stateValues.isNarrowScreen,
+      remove: Boolean = false
+    ) {
+      if (isNarrowScreen) {
+        when (TransactionSale.ClientId.value) {
+          0 -> goLeftClient1(model, remove)
+          1 -> goLeftClient2(model, remove)
+          2 -> goLeftClient3(model, remove)
+          3 -> goLeftClient4(model, remove)
+          else -> goLeftClient5(model, remove)
+        }
+      } else {
+        when (ClientId.value) {
+          0 -> goRightClient1(model, remove)
+          1 -> goRightClient2(model, remove)
+          2 -> goRightClient3(model, remove)
+          3 -> goRightClient4(model, remove)
+          else -> goRightClient5(model, remove)
+        }
+      }
+    }
+
+    suspend fun pop(isNarrowScreen: Boolean = AppConfiguration.stateValues.isNarrowScreen, navigateAfterwards: NavigationScreenModel.Transaction? = null) {
+      if (isNarrowScreen) {
+        when (ClientId.value) {
+          0 -> popLeftClient1(navigateAfterwards)
+          1 -> popLeftClient2(navigateAfterwards)
+          2 -> popLeftClient3(navigateAfterwards)
+          3 -> popLeftClient4(navigateAfterwards)
+          else -> popLeftClient5(navigateAfterwards)
+        }
+      } else {
+        when (ClientId.value) {
+          0 -> popRightClient1(navigateAfterwards)
+          1 -> popRightClient2(navigateAfterwards)
+          2 -> popRightClient3(navigateAfterwards)
+          3 -> popRightClient4(navigateAfterwards)
+          else -> popRightClient5(navigateAfterwards)
+        }
+      }
+    }
+
     fun isVeryFirstScreen(isNarrowScreen: Boolean, clientId: Int): Boolean {
       return (
           if (isNarrowScreen)
@@ -1397,6 +1490,50 @@ object Navigation {
   }
 
   object TransactionSupply {
+
+    suspend fun go(
+      model: NavigationScreenModel.Transaction,
+      isNarrowScreen: Boolean = AppConfiguration.stateValues.isNarrowScreen,
+      remove: Boolean = false
+    ) {
+      if (isNarrowScreen) {
+        when (ClientId.value) {
+          0 -> goLeftClient1(model, remove)
+          1 -> goLeftClient2(model, remove)
+          2 -> goLeftClient3(model, remove)
+          3 -> goLeftClient4(model, remove)
+          else -> goLeftClient5(model, remove)
+        }
+      } else {
+        when (ClientId.value) {
+          0 -> goRightClient1(model, remove)
+          1 -> goRightClient2(model, remove)
+          2 -> goRightClient3(model, remove)
+          3 -> goRightClient4(model, remove)
+          else -> goRightClient5(model, remove)
+        }
+      }
+    }
+
+    suspend fun pop(isNarrowScreen: Boolean = AppConfiguration.stateValues.isNarrowScreen, navigateAfterwards: NavigationScreenModel.Transaction? = null) {
+      if (isNarrowScreen) {
+        when (ClientId.value) {
+          0 -> popLeftClient1(navigateAfterwards)
+          1 -> popLeftClient2(navigateAfterwards)
+          2 -> popLeftClient3(navigateAfterwards)
+          3 -> popLeftClient4(navigateAfterwards)
+          else -> popLeftClient5(navigateAfterwards)
+        }
+      } else {
+        when (ClientId.value) {
+          0 -> popRightClient1(navigateAfterwards)
+          1 -> popRightClient2(navigateAfterwards)
+          2 -> popRightClient3(navigateAfterwards)
+          3 -> popRightClient4(navigateAfterwards)
+          else -> popRightClient5(navigateAfterwards)
+        }
+      }
+    }
 
     fun isVeryFirstScreen(isNarrowScreen: Boolean, clientId: Int): Boolean {
       return (
@@ -2105,11 +2242,31 @@ object Navigation {
     val Right =
       _Right.asStateFlow()
 
+    suspend fun go(
+      model: NavigationScreenModel.Stock,
+      isNarrowScreen: Boolean = AppConfiguration.stateValues.isNarrowScreen,
+      remove: Boolean = false,
+      forceSecond: Boolean = false
+    ) {
+      if (isNarrowScreen)
+        goLeft(model, remove, forceSecond)
+      else
+        goRight(model, remove, forceSecond)
+    }
+
+    suspend fun pop(isNarrowScreen: Boolean = AppConfiguration.stateValues.isNarrowScreen, navigateAfterwards: NavigationScreenModel.Stock? = null) {
+      if (isNarrowScreen)
+        popLeft(navigateAfterwards)
+      else
+        popRight(navigateAfterwards)
+    }
+
     suspend fun goLeft(
       model: NavigationScreenModel.Stock,
-      remove: Boolean = false
+      remove: Boolean = false,
+      forceSecond: Boolean = false
     ) {
-      if (model::class != _Left.value.last()::class)
+      if (model::class != _Left.value.last()::class || forceSecond)
         _Left.emit(
           _Left
             .value.toMutableList()
@@ -2154,9 +2311,10 @@ object Navigation {
 
     suspend fun goRight(
       model: NavigationScreenModel.Stock,
-      remove: Boolean = false
+      remove: Boolean = false,
+      forceSecond: Boolean = false
     ) {
-      if (model::class != _Right.value.last()::class)
+      if (model::class != _Right.value.last()::class || forceSecond) {
         _Right.emit(
           _Right
             .value.toMutableList()
@@ -2167,6 +2325,7 @@ object Navigation {
               add(model)
             }
         )
+      }
     }
 
     suspend fun popRight(navigateAfterwards: NavigationScreenModel.Stock? = null) {
@@ -2261,14 +2420,19 @@ object Navigation {
     val Right =
       _Right.asStateFlow()
 
-    suspend fun go(model: NavigationScreenModel.Menu, isNarrowScreen: Boolean = AppConfiguration.stateValues.isNarrowScreen) {
+    suspend fun go(
+      model: NavigationScreenModel.Menu,
+      isNarrowScreen: Boolean = AppConfiguration.stateValues.isNarrowScreen,
+      remove: Boolean = false,
+      forceSecond: Boolean = false
+    ) {
       if (isNarrowScreen)
-        goLeft(model)
+        goLeft(model, remove, forceSecond)
       else
-        goRight(model)
+        goRight(model, remove, forceSecond)
     }
 
-    suspend fun pop(isNarrowScreen: Boolean, navigateAfterwards: NavigationScreenModel.Menu? = null) {
+    suspend fun pop(isNarrowScreen: Boolean = AppConfiguration.stateValues.isNarrowScreen, navigateAfterwards: NavigationScreenModel.Menu? = null) {
       if (isNarrowScreen)
         popLeft(navigateAfterwards)
       else
@@ -2277,9 +2441,10 @@ object Navigation {
 
     suspend fun goLeft(
       model: NavigationScreenModel.Menu,
-      remove: Boolean = false
+      remove: Boolean = false,
+      forceSecond: Boolean = false
     ) {
-      if (model::class != _Left.value.last()::class)
+      if (model::class != _Left.value.last()::class || forceSecond)
         _Left.emit(
           _Left
             .value.toMutableList()
@@ -2324,9 +2489,10 @@ object Navigation {
 
     suspend fun goRight(
       model: NavigationScreenModel.Menu,
-      remove: Boolean = false
+      remove: Boolean = false,
+      forceSecond: Boolean = false
     ) {
-      if (model::class != _Right.value.last()::class)
+      if (model::class != _Right.value.last()::class || forceSecond)
         _Right.emit(
           _Right
             .value.toMutableList()

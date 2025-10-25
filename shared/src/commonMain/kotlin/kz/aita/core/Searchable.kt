@@ -37,8 +37,8 @@ interface Searchable {
   }
 
   fun searchContains(query: String, vararg extraOperands: String): Boolean {
-    return containsSearchOperands.any { it.equals(query, true) }
-        || extraOperands.any { it.equals(query, true) }
+    return containsSearchOperands.any { it.contains(query, true) }
+        || extraOperands.any { it.contains(query, true) }
   }
 
   fun searchUnique(query: String, vararg extraOperands: String): Boolean {

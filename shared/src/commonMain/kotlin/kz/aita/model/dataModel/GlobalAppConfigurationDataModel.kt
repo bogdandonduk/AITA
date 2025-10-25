@@ -18,8 +18,12 @@ data class GlobalAppConfigurationDataModel(
   val updateStoresPath: String,
   val deleteStoresPath: String,
   val getStockPath: String,
+  val addGoodsItemPath: String,
+  val updateGoodsItemPath: String,
+  val deleteGoodsItemPath: String,
   val getGenericGoodsItemsPath: String,
-  val suppliersPath: String,
+  val getGenericGoodsCategoriesPath: String,
+  val getSuppliersPath: String,
   val stringResourcesPath: String,
   val dimensionResourcesPath: String,
   val colorResourcesPath: String,
@@ -28,7 +32,6 @@ data class GlobalAppConfigurationDataModel(
   val companyForms: List<CompanyFormDataModel>,
   val countries: List<CountryDataModel>,
   val languages: List<AppLanguageDataModel>,
-  val currencies: List<CurrencyDataModel>,
   val themes: List<AppThemeDataModel>,
   val goodsItemsQuantityUnits: List<QuantityDataModel>
 )

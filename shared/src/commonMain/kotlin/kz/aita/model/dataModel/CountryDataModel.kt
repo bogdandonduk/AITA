@@ -11,5 +11,5 @@ data class CountryDataModel(
   val cities: List<CityDataModel>,
   val phoneNumberCode: String,
   val phoneNumberSize: Int,
-  val currency: String
+  val currencies: List<CurrencyDataModel>
 )

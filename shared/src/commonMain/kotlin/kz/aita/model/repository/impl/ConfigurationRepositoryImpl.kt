@@ -22,7 +22,7 @@ import kz.aita.model.wrapper.MutableDataStateFlowNonNull
 
 class ConfigurationRepositoryImpl(
   private val genericRemoteService: GenericRemoteService
-) : Repository(), ConfigurationRepository {
+): Repository(), ConfigurationRepository {
 
   private val _globalAppConfigurationState = MutableDataStateFlowNonNull(
     coroutineScope = this,
@@ -41,8 +41,12 @@ class ConfigurationRepositoryImpl(
       updateStoresPath = "stores/update",
       deleteStoresPath = "stores/delete",
       getStockPath = "stock/get",
+      addGoodsItemPath = "stock/add",
+      updateGoodsItemPath = "stock/update",
+      deleteGoodsItemPath = "stock/delete",
       getGenericGoodsItemsPath = "generic/goodsItems/get",
-      suppliersPath = "suppliers",
+      getGenericGoodsCategoriesPath = "generic/goodsCategories/get",
+      getSuppliersPath = "suppliers/get",
       stringResourcesPath = "res/string",
       dimensionResourcesPath = "res/dimension",
       colorResourcesPath = "res/color",
@@ -109,7 +113,26 @@ class ConfigurationRepositoryImpl(
           flagDrawablePath = "png/flag_kz.png",
           phoneNumberCode = "7",
           phoneNumberSize = 10,
-          currency = "₸",
+          currencies = listOf(
+            CurrencyDataModel(
+              code = "KZT",
+              symbol = "₸",
+              name = listOf(
+                LocalizedStringDataModel(
+                  language = "en",
+                  value = "tenge"
+                ),
+                LocalizedStringDataModel(
+                  language = "ru",
+                  value = "тенге"
+                ),
+                LocalizedStringDataModel(
+                  language = "kk",
+                  value = "теңге"
+                )
+              )
+            ),
+          ),
           cities = listOf(
             CityDataModel(
               name = listOf(
@@ -187,84 +210,6 @@ class ConfigurationRepositoryImpl(
             )
           ),
           "png/flag_kz.png"
-        )
-      ),
-      currencies = listOf(
-        CurrencyDataModel(
-          currency = "KZT",
-          countries = listOf("kz"),
-          symbol = "₸",
-          name = listOf(
-            LocalizedStringDataModel(
-              language = "en",
-              value = "tenge"
-            ),
-            LocalizedStringDataModel(
-              language = "ru",
-              value = "тенге"
-            ),
-            LocalizedStringDataModel(
-              language = "kk",
-              value = "теңге"
-            )
-          )
-        ),
-        CurrencyDataModel(
-          currency = "TJS",
-          countries = listOf("tj"),
-          symbol = "SM",
-          name = listOf(
-            LocalizedStringDataModel(
-              language = "en",
-              value = "somoni"
-            ),
-            LocalizedStringDataModel(
-              language = "ru",
-              value = "сом"
-            ),
-            LocalizedStringDataModel(
-              language = "kk",
-              value = "сом"
-            )
-          )
-        ),
-        CurrencyDataModel(
-          currency = "RUB",
-          countries = listOf("ru"),
-          symbol = "₽",
-          name = listOf(
-            LocalizedStringDataModel(
-              language = "en",
-              value = "rub."
-            ),
-            LocalizedStringDataModel(
-              language = "ru",
-              value = "руб."
-            ),
-            LocalizedStringDataModel(
-              language = "kk",
-              value = "руб."
-            )
-          )
-        ),
-        CurrencyDataModel(
-          currency = "USD",
-          symbol = "$",
-          countries = listOf("us"),
-          name = listOf(
-            LocalizedStringDataModel(
-              language = "en",
-              value = "US$"
-            ),
-            LocalizedStringDataModel(
-              language = "ru",
-              value = "$ США"
-            ),
-            LocalizedStringDataModel(
-              language = "kk",
-              value = "US$"
-            )
-          )
         )
       ),
       themes = listOf(
@@ -374,24 +319,6 @@ class ConfigurationRepositoryImpl(
     )
   )
   override val stringRawAuthenticationFailedState = _stringRawAuthenticationFailedState.asStateFlow()
-  private val _stringRawLoggingOutInProgressState = MutableStateFlow(
-    listOf(
-      LocalizedStringDataModel("main", "Logging out in progress"),
-      LocalizedStringDataModel("en", "Logging out in progress"),
-      LocalizedStringDataModel("ru", "Выполняется выход из аккаунта"),
-      LocalizedStringDataModel("kk", "Шығу орындалуда"),
-    )
-  )
-  override val stringRawLoggingOutInProgressState = _stringRawLoggingOutInProgressState.asStateFlow()
-  private val _stringRawSessionTimeExpiredLoggingOutState = MutableStateFlow(
-    listOf(
-      LocalizedStringDataModel("main", "Session time expired. Logging out in progress"),
-      LocalizedStringDataModel("en", "Session time expired. Logging out in progress"),
-      LocalizedStringDataModel("ru", "Время сессии истекло. Выполняется выход из аккаунта"),
-      LocalizedStringDataModel("kk", "Сеансыңыздың мерзімі аяқталды. Сіз өзіңіздің есептік жазбаңыздан шығып жатырсыз"),
-    )
-  )
-  override val stringRawSessionTimeExpiredLoggingOutState = _stringRawSessionTimeExpiredLoggingOutState.asStateFlow()
   private val _stringAppNameState = MutableStateFlow("AITA")
   override val stringAppNameState = _stringAppNameState.asStateFlow()
   private val _stringLogInState = MutableStateFlow("Log In")
@@ -412,7 +339,7 @@ class ConfigurationRepositoryImpl(
   override val stringCancelState = _stringCancelState.asStateFlow()
   private val _stringClearState = MutableStateFlow("Clear")
   override val stringClearState = _stringClearState.asStateFlow()
-  private val _stringAuthenticationFailedState = MutableStateFlow("Login and/or password incorrect")
+  private val _stringAuthenticationFailedState = MutableStateFlow("Authentication failed")
   override val stringAuthorizationFailedState = _stringAuthenticationFailedState.asStateFlow()
   private val _stringPhoneNumberMustBeState = MutableStateFlow("Incorrect phone number length")
   override val stringPhoneNumberMustBeState = _stringPhoneNumberMustBeState.asStateFlow()
@@ -590,8 +517,8 @@ class ConfigurationRepositoryImpl(
   override val stringRequiredToEditAccountState = _stringRequiredToEditAccountState.asStateFlow()
   private val _stringAccountSuccessfullyUpdatedState = MutableStateFlow("Account successfully updated")
   override val stringAccountSuccessfullyUpdatedState = _stringAccountSuccessfullyUpdatedState.asStateFlow()
-  private val _stringLoggingOutInProgressState = MutableStateFlow("Logging out in progress")
-  override val stringLoggingOutInProgressState = _stringLoggingOutInProgressState.asStateFlow()
+  private val _stringLoggingOutState = MutableStateFlow("Logging out")
+  override val stringLoggingOutState = _stringLoggingOutState.asStateFlow()
   private val _stringSessionTimeExpiredLoggingOutState = MutableStateFlow("Session expired")
   override val stringSessionTimeExpiredLoggingOutState = _stringSessionTimeExpiredLoggingOutState.asStateFlow()
   private val _stringAliasState = MutableStateFlow("Alias")
@@ -604,6 +531,44 @@ class ConfigurationRepositoryImpl(
   override val stringEnterDescriptionState: StateFlow<String> = _stringEnterDescriptionState.asStateFlow()
   private val _stringOptionalState = MutableStateFlow("Optional")
   override val stringOptionalState: StateFlow<String> = _stringOptionalState.asStateFlow()
+  private val _stringLoggingInState = MutableStateFlow("Logging in")
+  override val stringLoggingInState: StateFlow<String> = _stringLoggingInState.asStateFlow()
+  private val _stringSigningUpState = MutableStateFlow("Signing up")
+  override val stringSigningUpState: StateFlow<String> = _stringSigningUpState.asStateFlow()
+  private val _stringCompanyFormState = MutableStateFlow("Company form")
+  override val stringCompanyFormState = _stringCompanyFormState.asStateFlow()
+  private val _stringMeasurementUnitState = MutableStateFlow("Measurement unit")
+  override val stringMeasurementUnitState = _stringMeasurementUnitState.asStateFlow()
+  private val _stringNoActiveStoreState = MutableStateFlow("No active store")
+  override val stringNoActiveStoreState = _stringNoActiveStoreState.asStateFlow()
+  private val _stringSelectInMenuState = MutableStateFlow("Select in menu")
+  override val stringSelectInMenuState = _stringSelectInMenuState.asStateFlow()
+  private val _stringSupplyDataState = MutableStateFlow("Supply data")
+  override val stringSupplyDataState = _stringSupplyDataState.asStateFlow()
+  private val _stringSaleDataState = MutableStateFlow("Sale data")
+  override val stringSaleDataState = _stringSaleDataState.asStateFlow()
+  private val _stringReturnDataState = MutableStateFlow("Return data")
+  override val stringReturnDataState = _stringReturnDataState.asStateFlow()
+  private val _stringAddSupplyDataState = MutableStateFlow("Add supply data")
+  override val stringAddSupplyDataState = _stringAddSupplyDataState.asStateFlow()
+  private val _stringAddSaleDataState = MutableStateFlow("Add sale data")
+  override val stringAddSaleDataState = _stringAddSaleDataState.asStateFlow()
+  private val _stringAddReturnDataState = MutableStateFlow("Add return data")
+  override val stringAddReturnDataState = _stringAddReturnDataState.asStateFlow()
+  private val _stringAddBarcodeState = MutableStateFlow("Add barcode")
+  override val stringAddBarcodeState = _stringAddBarcodeState.asStateFlow()
+  private val _stringAddNameState = MutableStateFlow("Add name")
+  override val stringAddNameState = _stringAddNameState.asStateFlow()
+  private val _stringPaymentState = MutableStateFlow("Payment")
+  override val stringPaymentState = _stringPaymentState.asStateFlow()
+  private val _stringAllState = MutableStateFlow("All")
+  override val stringAllState = _stringAllState.asStateFlow()
+  private val _stringQuickState = MutableStateFlow("Quick")
+  override val stringQuickGoodsItemsState = _stringQuickState.asStateFlow()
+  private val _stringCategoriesState = MutableStateFlow("Categories")
+
+  override val stringCategoriesState = _stringCategoriesState.asStateFlow()
+
 
   private val _drawablePathAITALogoState = MutableStateFlow("svg/0_0.svg")
   override val drawablePathAITALogoState = _drawablePathAITALogoState.asStateFlow()
@@ -757,7 +722,7 @@ class ConfigurationRepositoryImpl(
             )
 
           if (response.negative) {
-            _stringsState.emit(DataState.Failure(response.message))
+            _stringsState.emit(DataState.Empty(response.message))
           } else {
             _stringsState.emit(DataState.Success(response.payload!!, response.message))
           }
@@ -777,7 +742,7 @@ class ConfigurationRepositoryImpl(
             )
 
           if (response.negative) {
-            _dimensionsState.emit(DataState.Failure(response.message))
+            _dimensionsState.emit(DataState.Empty(response.message))
           } else {
             _dimensionsState.emit(DataState.Success(response.payload!!, response.message))
           }
@@ -795,10 +760,8 @@ class ConfigurationRepositoryImpl(
               endpointUrl = globalAppConfigurationState.payloadValue.colorResourcesPath
             )
 
-
-
           if (response.negative) {
-            _colorsState.emit(DataState.Failure(response.message))
+            _colorsState.emit(DataState.Empty(response.message))
           } else {
             _colorsState.emit(DataState.Success(response.payload!!, response.message))
           }
@@ -818,7 +781,7 @@ class ConfigurationRepositoryImpl(
             )
 
           if (response.negative) {
-            _drawablesState.emit(DataState.Failure(response.message))
+            _drawablesState.emit(DataState.Empty(response.message))
           } else {
             _drawablesState.emit(DataState.Success(response.payload!!, response.message))
           }
@@ -851,7 +814,7 @@ class ConfigurationRepositoryImpl(
     configuration: GlobalAppConfigurationDataModel,
     resourceConfiguration: GlobalAppConfigurationDataModel
   ) {
-    if (_globalAppConfigurationState.value.value is DataState.Failure)
+    if (_globalAppConfigurationState.value.value is DataState.Empty)
       _globalAppConfigurationState.emit(DataState.Success(resourceConfiguration))
   }
 
@@ -914,7 +877,6 @@ class ConfigurationRepositoryImpl(
       _stringAuthenticationFailedState.emit(
         strings.extractString(10, appLanguageState.value) ?: resourceStrings.extractString(10, appLanguageState.value)!!
       )
-      _stringRawAuthenticationFailedState.emit(strings.find { it.id == 10L }!!.values)
       _stringPhoneNumberMustBeState.emit(
         strings.extractString(11, appLanguageState.value) ?: resourceStrings.extractString(11, appLanguageState.value)!!
       )
@@ -1278,7 +1240,7 @@ class ConfigurationRepositoryImpl(
       _stringAccountSuccessfullyUpdatedState.emit(
         strings.extractString(89, appLanguageState.value) ?: resourceStrings.extractString(89, appLanguageState.value)!!
       )
-      _stringLoggingOutInProgressState.emit(
+      _stringLoggingOutState.emit(
         strings.extractString(90, appLanguageState.value) ?: resourceStrings.extractString(90, appLanguageState.value)!!
       )
       _stringSessionTimeExpiredLoggingOutState.emit(
@@ -1308,6 +1270,115 @@ class ConfigurationRepositoryImpl(
           appLanguageState.value
         )!!
       )
+      _stringLoggingInState.emit(
+        strings.extractString(97, appLanguageState.value) ?: resourceStrings.extractString(
+          97,
+          appLanguageState.value
+        )!!
+      )
+      _stringSigningUpState.emit(
+        strings.extractString(98, appLanguageState.value) ?: resourceStrings.extractString(
+          98,
+          appLanguageState.value
+        )!!
+      )
+      _stringCompanyFormState.emit(
+        strings.extractString(99, appLanguageState.value) ?: resourceStrings.extractString(
+          99,
+          appLanguageState.value
+        )!!
+      )
+      _stringMeasurementUnitState.emit(
+        strings.extractString(100, appLanguageState.value) ?: resourceStrings.extractString(
+          100,
+          appLanguageState.value
+        )!!
+      )
+      _stringNoActiveStoreState.emit(
+        strings.extractString(101, appLanguageState.value) ?: resourceStrings.extractString(
+          101,
+          appLanguageState.value
+        )!!
+      )
+      _stringSelectInMenuState.emit(
+        strings.extractString(102, appLanguageState.value) ?: resourceStrings.extractString(
+          102,
+          appLanguageState.value
+        )!!
+      )
+      _stringSupplyDataState.emit(
+        strings.extractString(103, appLanguageState.value) ?: resourceStrings.extractString(
+          103,
+          appLanguageState.value
+        )!!
+      )
+      _stringSaleDataState.emit(
+        strings.extractString(104, appLanguageState.value) ?: resourceStrings.extractString(
+          104,
+          appLanguageState.value
+        )!!
+      )
+      _stringReturnDataState.emit(
+        strings.extractString(105, appLanguageState.value) ?: resourceStrings.extractString(
+          105,
+          appLanguageState.value
+        )!!
+      )
+      _stringAddSupplyDataState.emit(
+        strings.extractString(106, appLanguageState.value) ?: resourceStrings.extractString(
+          106,
+          appLanguageState.value
+        )!!
+      )
+      _stringAddSaleDataState.emit(
+        strings.extractString(107, appLanguageState.value) ?: resourceStrings.extractString(
+          107,
+          appLanguageState.value
+        )!!
+      )
+      _stringAddReturnDataState.emit(
+        strings.extractString(108, appLanguageState.value) ?: resourceStrings.extractString(
+          108,
+          appLanguageState.value
+        )!!
+      )
+      _stringAddBarcodeState.emit(
+        strings.extractString(109, appLanguageState.value) ?: resourceStrings.extractString(
+          109,
+          appLanguageState.value
+        )!!
+      )
+      _stringAddNameState.emit(
+        strings.extractString(110, appLanguageState.value) ?: resourceStrings.extractString(
+          110,
+          appLanguageState.value
+        )!!
+      )
+      _stringPaymentState.emit(
+        strings.extractString(111, appLanguageState.value) ?: resourceStrings.extractString(
+          111,
+          appLanguageState.value
+        )!!
+      )
+      _stringAllState.emit(
+        strings.extractString(112, appLanguageState.value) ?: resourceStrings.extractString(
+          112,
+          appLanguageState.value
+        )!!
+      )
+      _stringQuickState.emit(
+        strings.extractString(113, appLanguageState.value) ?: resourceStrings.extractString(
+          113,
+          appLanguageState.value
+        )!!
+      )
+      _stringCategoriesState.emit(
+        strings.extractString(114, appLanguageState.value) ?: resourceStrings.extractString(
+          114,
+          appLanguageState.value
+        )!!
+      )
+
     }
   }
 

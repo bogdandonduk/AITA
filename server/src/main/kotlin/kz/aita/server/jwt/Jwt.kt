@@ -6,6 +6,12 @@ import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
 import io.ktor.server.response.*
+import kotlinx.coroutines.Dispatchers
+import kz.aita.server.db.RefreshSessions
+import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
+import java.time.Instant
+import java.util.UUID
 
 @kotlinx.serialization.Serializable
 data class JwtConfig(
@@ -43,15 +49,23 @@ fun Application.configureJwtAuth() {
           .build()
       )
 
-      validate { cred ->                              // If validation passes, build a Principal
-        // Basic checks
-        if (
-          cred.payload.issuer != cfg.issuer
-          || !cred.payload.audience.contains(cfg.audience)
-          || cred.subject == null
-        ) return@validate null
+      validate { cred ->
+        val sessionId = runCatching { UUID.fromString(cred.payload.getClaim("sessionId").asString()) }.getOrNull()
+          ?: return@validate null
 
-        JWTPrincipal(cred.payload)
+        val ok = newSuspendedTransaction(Dispatchers.IO) {
+          val row = RefreshSessions
+            .selectAll()
+            .where { RefreshSessions.id eq sessionId }
+            .limit(1)
+            .singleOrNull()
+
+          row != null && row[RefreshSessions.revokedAt] == null && row[RefreshSessions.expiresAt].isAfter(Instant.now()) && cred.payload.issuer == cfg.issuer && cred.payload.audience.contains(
+            cfg.audience
+          ) && cred.subject != null
+        }
+
+        if (ok) JWTPrincipal(cred.payload) else null
       }
 
       challenge { _, _ ->

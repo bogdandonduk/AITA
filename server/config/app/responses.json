@@ -210,6 +210,27 @@
     ]
   },
   {
+    "id": "10",
+    "message": [
+      {
+        "language": "main",
+        "value": "Store successfully added"
+      },
+      {
+        "language": "en",
+        "value": "Store successfully added"
+      },
+      {
+        "language": "ru",
+        "value": "Магазин успешно добавлен"
+      },
+      {
+        "language": "kk",
+        "value": "Дүкен сәтті қосылды"
+      }
+    ]
+  },
+  {
     "id": "11",
     "message": [
       {
@@ -248,6 +269,90 @@
       {
         "language": "kk",
         "value": "Дүкен сәтті жойылды"
+      }
+    ]
+  },
+  {
+    "id": "13",
+    "message": [
+      {
+        "language": "main",
+        "value": "Not found"
+      },
+      {
+        "language": "en",
+        "value": "Not found"
+      },
+      {
+        "language": "ru",
+        "value": "Не найдено"
+      },
+      {
+        "language": "kk",
+        "value": "Табылмады"
+      }
+    ]
+  },
+  {
+    "id": "14",
+    "message": [
+      {
+        "language": "main",
+        "value": "Goods item successfully added"
+      },
+      {
+        "language": "en",
+        "value": "Goods item successfully added"
+      },
+      {
+        "language": "ru",
+        "value": "Товар успешно добавлен"
+      },
+      {
+        "language": "kk",
+        "value": "Өнім сәтті қосылды"
+      }
+    ]
+  },
+  {
+    "id": "15",
+    "message": [
+      {
+        "language": "main",
+        "value": "Goods item successfully updated"
+      },
+      {
+        "language": "en",
+        "value": "Goods item successfully updated"
+      },
+      {
+        "language": "ru",
+        "value": "Товар успешно обновлен"
+      },
+      {
+        "language": "kk",
+        "value": "Өнім сәтті жаңартылды"
+      }
+    ]
+  },
+  {
+    "id": "16",
+    "message": [
+      {
+        "language": "main",
+        "value": "Goods item successfully deleted"
+      },
+      {
+        "language": "en",
+        "value": "Goods item successfully deleted"
+      },
+      {
+        "language": "ru",
+        "value": "Товар успешно удален"
+      },
+      {
+        "language": "kk",
+        "value": "Элемент сәтті жойылды"
       }
     ]
   }

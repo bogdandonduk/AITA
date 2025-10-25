@@ -3,11 +3,13 @@ package kz.aita.model.service
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.*
 import kz.aita.core.configurationRepository
 import kz.aita.core.extractString
 import kz.aita.model.dataModel.GenericResponseDataModel
 import kz.aita.model.dataModel.LocalizedStringDataModel
+import kz.aita.model.dataModel.ResponseDataModel
 import kz.aita.model.repository.ConfigurationRepository
 
 class GenericRemoteService(
@@ -21,7 +23,7 @@ class GenericRemoteService(
     headers: Map<String, String> = emptyMap(),
     body: Body? = null,
     contentType: ContentType? = ContentType.Application.Json
-  ): GenericResponseDataModel<Response> {
+  ): ResponseDataModel<Response> {
       return try {
         val response = httpClient
           .request("$serverUrl/$endpointUrl") {
@@ -46,19 +48,23 @@ class GenericRemoteService(
             }
           }
 
+
         if (response.status == HttpStatusCode.Unauthorized) {
-          println("we here broooo")
-          GenericResponseDataModel(
+          ResponseDataModel(
             message = configurationRepository.stringRawAuthenticationFailedState.value,
             payload = null,
             negative = true
           )
         } else {
-          response.body<GenericResponseDataModel<Response>>()
+          try {
+            response.body<GenericResponseDataModel>().toResponseDataModel()
+          } catch (_: Throwable) {
+            response.body<ResponseDataModel<Response>>()
+          }
         }
       } catch (throwable: Throwable) {
 
-        GenericResponseDataModel(
+        ResponseDataModel(
           throwable.message?.let { listOf(LocalizedStringDataModel("main", it)) },
           null,
           true

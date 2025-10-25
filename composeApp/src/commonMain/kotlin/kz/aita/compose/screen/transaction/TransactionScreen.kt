@@ -95,8 +95,8 @@ fun AppConfiguration.TransactionScreen() {
           is NavigationScreenModel.Transaction.Selection -> {
             TransactionSelectionScreen()
           }
-          is NavigationScreenModel.Transaction.Checkout -> {
-            TransactionCheckoutScreen()
+          is NavigationScreenModel.Transaction.Payment -> {
+            TransactionPaymentScreen()
           }
           is NavigationScreenModel.Transaction.ReceiptPreview -> {
             TransactionReceiptPreviewScreen()
@@ -123,8 +123,8 @@ fun AppConfiguration.TransactionScreen() {
               TransactionSelectionScreen()
             }
 
-            is NavigationScreenModel.Transaction.Checkout -> {
-              TransactionCheckoutScreen()
+            is NavigationScreenModel.Transaction.Payment -> {
+              TransactionPaymentScreen()
             }
             is NavigationScreenModel.Transaction.ReceiptPreview -> {
               TransactionReceiptPreviewScreen()
@@ -146,8 +146,8 @@ fun AppConfiguration.TransactionScreen() {
             is NavigationScreenModel.Transaction.Selection -> {
               TransactionSelectionScreen()
             }
-            is NavigationScreenModel.Transaction.Checkout -> {
-              TransactionCheckoutScreen()
+            is NavigationScreenModel.Transaction.Payment -> {
+              TransactionPaymentScreen()
             }
             is NavigationScreenModel.Transaction.ReceiptPreview -> {
               TransactionReceiptPreviewScreen()

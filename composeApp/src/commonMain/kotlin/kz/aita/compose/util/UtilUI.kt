@@ -11,6 +11,7 @@ import androidx.compose.ui.text.withStyle
 import kz.aita.core.jsonBase
 import kz.aita.model.dataModel.GenericResponseDataModel
 import kz.aita.model.dataModel.LocalizedStringGroupDataModel
+import kz.aita.model.dataModel.ResponseDataModel
 import kz.aita.model.dataModel.StylizedColorGroupDataModel
 import kz.aita.model.dataModel.StylizedDimensionGroupDataModel
 import kz.aita.model.dataModel.StylizedDrawablePathsGroupDataModel
@@ -62,25 +63,25 @@ fun getPasswordTransformedTextWithSelectionFocusTextColor(
 }
 
 suspend fun loadResourceStrings(): List<LocalizedStringGroupDataModel> {
-  return jsonBase.decodeFromString<GenericResponseDataModel<List<LocalizedStringGroupDataModel>>>(
+  return jsonBase.decodeFromString<ResponseDataModel<List<LocalizedStringGroupDataModel>>>(
     Res.readBytes("files/assets/values/strings.json").decodeToString()
   ).payload!!
 }
 
 suspend fun loadResourceDimensions(): List<StylizedDimensionGroupDataModel> {
-  return jsonBase.decodeFromString<GenericResponseDataModel<List<StylizedDimensionGroupDataModel>>>(
+  return jsonBase.decodeFromString<ResponseDataModel<List<StylizedDimensionGroupDataModel>>>(
     Res.readBytes("files/assets/values/dimensions.json").decodeToString()
   ).payload!!
 }
 
 suspend fun loadResourceColors(): List<StylizedColorGroupDataModel> {
-  return jsonBase.decodeFromString<GenericResponseDataModel<List<StylizedColorGroupDataModel>>>(
+  return jsonBase.decodeFromString<ResponseDataModel<List<StylizedColorGroupDataModel>>>(
     Res.readBytes("files/assets/values/colors.json").decodeToString()
   ).payload!!
 }
 
 suspend fun loadResourceDrawablePaths(): List<StylizedDrawablePathsGroupDataModel> {
-  return jsonBase.decodeFromString<GenericResponseDataModel<List<StylizedDrawablePathsGroupDataModel>>>(
+  return jsonBase.decodeFromString<ResponseDataModel<List<StylizedDrawablePathsGroupDataModel>>>(
     Res.readBytes("files/assets/drawable/drawables.json").decodeToString()
   ).payload!!
 }

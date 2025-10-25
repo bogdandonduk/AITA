@@ -20,9 +20,11 @@ class MutableDataStateFlow<T>(
 
   init {
     coroutineScope.launch(Dispatchers.io) {
-      value.collect {
+      _state.collect {
         if (it is DataState.Success)
           _payload.emit(it.payload)
+        else
+          _payload.emit(null)
       }
     }
   }
@@ -50,7 +52,7 @@ class MutableDataStateFlowNonNull<T>(
 
   init {
     coroutineScope.launch(Dispatchers.io) {
-      value.collect {
+      _state.collect {
         if (it is DataState.Success)
           _payload.emit(it.payload)
       }

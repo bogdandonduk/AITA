@@ -9,5 +9,8 @@ interface NotificationRepository {
 
   val latestNotificationState: StateFlow<NotificationDataModel?>
 
-  fun postNotification(message: List<LocalizedStringDataModel>?, type: NotificationType)
+  fun post(message: List<LocalizedStringDataModel>?, type: NotificationType, transient: Boolean = true)
+  fun post(message: String, type: NotificationType, transient: Boolean = true)
+
+  fun clear()
 }

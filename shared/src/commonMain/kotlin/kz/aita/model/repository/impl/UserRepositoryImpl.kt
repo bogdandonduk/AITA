@@ -1,14 +1,20 @@
 package kz.aita.model.repository.impl
 
+import io.ktor.client.plugins.auth.authProvider
+import io.ktor.client.plugins.auth.authProviders
+import io.ktor.client.plugins.auth.providers.BearerAuthProvider
 import io.ktor.http.*
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kz.aita.core.DataStore
+import kz.aita.core.genericItemsRepository
+import kz.aita.core.httpClient
 import kz.aita.core.io
+import kz.aita.core.stockRepository
 import kz.aita.core.storeRepository
+import kz.aita.core.supplierRepository
 import kz.aita.model.dataModel.NotificationType
 import kz.aita.model.dataModel.UserAccountDataModel
 import kz.aita.model.dataModel.UserAccountUpdateDataModel
@@ -29,7 +35,7 @@ class UserRepositoryImpl(
   private val notificationRepository: NotificationRepository,
   private val tokenStore: DataStore<TokenPair>?,
   private val userAccountStore: DataStore<UserAccountDataModel>?
-) : Repository(), UserRepository {
+): Repository(), UserRepository {
 
   private val _userAccountState = MutableDataStateFlow<UserAccountDataModel>(
     this
@@ -52,7 +58,7 @@ class UserRepositoryImpl(
     if (!logInMutex.isLocked)
       launch(Dispatchers.io) {
         logInMutex.withLock {
-          _userAccountState.emit(DataState.Progress())
+          notificationRepository.post(configurationRepository.stringLoggingInState.value, NotificationType.Neutral)
 
           val response = genericRemoteService
             .request<TokenPair, UserAuthLogInDataModel>(
@@ -61,15 +67,11 @@ class UserRepositoryImpl(
               body = userAuthLogIn
             )
 
-          userAccountStore?.set(null)
-
           if (response.negative) {
-            tokenStore?.set(null)
-
-            notificationRepository.postNotification(response.message, NotificationType.Negative)
+            notificationRepository.post(response.message, NotificationType.Negative, transient = true)
           } else {
             tokenStore?.set(response.payload)
-
+            httpClient.authProvider<BearerAuthProvider>()?.clearToken()
             get()
           }
         }
@@ -80,7 +82,7 @@ class UserRepositoryImpl(
     if (!signUpMutex.isLocked)
       launch(Dispatchers.io) {
         signUpMutex.withLock {
-          _userAccountState.emit(DataState.Progress())
+          notificationRepository.post(configurationRepository.stringSigningUpState.value, NotificationType.Neutral)
 
           val response = genericRemoteService
             .request<TokenPair, UserAuthSignUpDataModel>(
@@ -89,14 +91,11 @@ class UserRepositoryImpl(
               body = userAuthSignUp
             )
 
-          userAccountStore?.set(null)
-
           if (response.negative) {
-            tokenStore?.set(null)
-
-            notificationRepository.postNotification(response.message, NotificationType.Negative)
+            notificationRepository.post(response.message, NotificationType.Negative)
           } else {
             tokenStore?.set(response.payload)
+            httpClient.authProvider<BearerAuthProvider>()?.clearToken()
 
             get()
           }
@@ -116,13 +115,15 @@ class UserRepositoryImpl(
             )
 
           if (response.negative) {
-            notificationRepository.postNotification(response.message, NotificationType.Negative)
+            notificationRepository.post(response.message, NotificationType.Negative)
           } else {
-            notificationRepository.postNotification(response.message, NotificationType.Positive)
+            notificationRepository.post(response.message, NotificationType.Positive)
+            _userAccountState.emit(DataState.Empty())
 
             tokenStore?.set(null)
             userAccountStore?.set(null)
-            _userAccountState.emit(DataState.Empty())
+            storeRepository.setActiveStoreId(null)
+            httpClient.authProvider<BearerAuthProvider>()?.clearToken()
           }
         }
       }
@@ -131,32 +132,35 @@ class UserRepositoryImpl(
   override fun get(forceLogOut: Boolean) {
     if (!getUserAccountMutex.isLocked)
       launch(Dispatchers.io) {
-        getUserAccountMutex.withLock {
-          userAccountStore?.get()?.run {
-            _userAccountState.emit(DataState.Success(this))
+        if (tokenStore?.get() != null)
+          getUserAccountMutex.withLock {
+
+            userAccountStore?.get()?.run {
+              _userAccountState.emit(DataState.Success(this))
+            }
+
+            val response = genericRemoteService
+              .request<UserAccountDataModel, Unit>(
+                HttpMethod.Get,
+                endpointUrl = configurationRepository.globalAppConfigurationState.payloadValue.getUserPath
+              )
+
+            if (response.negative) {
+              if (forceLogOut)
+                forceLogOut()
+
+              notificationRepository.post(response.message, NotificationType.Negative)
+            } else {
+              notificationRepository.clear()
+              userAccountStore?.set(response.payload)
+              _userAccountState.emit(DataState.Success(response.payload!!, response.message))
+
+              configurationRepository.getGlobalAppConfiguration()
+              storeRepository.getStores()
+              supplierRepository.getSuppliers()
+              genericItemsRepository.getGenericGoodsCategories()
+            }
           }
-
-          val response = genericRemoteService
-            .request<UserAccountDataModel, Unit>(
-              HttpMethod.Get,
-              endpointUrl = configurationRepository.globalAppConfigurationState.payloadValue.getUserPath
-            )
-
-          if (response.negative) {
-            if (forceLogOut)
-              forceLogOut()
-
-            notificationRepository.postNotification(response.message, NotificationType.Negative)
-          } else {
-            _userAccountState.emit(DataState.Success(response.payload!!, response.message))
-
-            configurationRepository.getGlobalAppConfiguration()
-            storeRepository.getStores()
-
-            userAccountStore?.set(response.payload)
-            getUserAccountMutex.unlock()
-          }
-        }
       }
   }
 
@@ -174,16 +178,16 @@ class UserRepositoryImpl(
             )
 
           if (response.negative) {
-            notificationRepository.postNotification(response.message, NotificationType.Negative)
+            notificationRepository.post(response.message, NotificationType.Negative)
           } else {
             _userAccountState.emit(DataState.Success(response.payload!!, response.message))
 
-            notificationRepository.postNotification(
+            notificationRepository.post(
               response.message,
               NotificationType.Positive
             )
-
             userAccountStore?.set(response.payload)
+
           }
         }
       }
@@ -193,9 +197,9 @@ class UserRepositoryImpl(
     launch(Dispatchers.io) {
       tokenStore?.set(null)
       userAccountStore?.set(null)
+      storeRepository.setActiveStoreId(null)
 
-      if (_userAccountState.value.value !is DataState.Empty)
-        _userAccountState.emit(DataState.Empty())
+      _userAccountState.emit(DataState.Empty())
     }
   }
 }

@@ -8,23 +8,41 @@ data class GoodsItemDataModel(
   val id: String,
   val userId: String,
   val storeId: String,
-  val barcode: String,
-  val name: String,
+  val barcode: List<String>,
+  val name: List<LocalizedStringDataModel>,
   val quantity: QuantityDataModel,
-  val categoryIds: List<String>?,
-  val supplierIds: List<String>?,
-  val salePricesToSupplierIds: List<Pair<Double, String>>,
-  val returnPricesToSupplierIds: List<Pair<Double, String>> = salePricesToSupplierIds,
-  val supplyPricesToSupplierIds: List<Pair<Double, String>>,
-  val saleCurrencyToSupplierIds: List<Pair<String, String>>,
-  val returnCurrencyToSupplierIds: List<Pair<String, String>> = saleCurrencyToSupplierIds,
-  val supplyCurrencyToSupplierIds: List<Pair<String, String>> = saleCurrencyToSupplierIds
+  val categoryIds: List<String>,
+  val salePrices: List<PriceDataModel>,
+  val returnPrices: List<PriceDataModel> = salePrices,
+  val supplyPrices: List<PriceDataModel>,
+  val createdAt: Long,
+  val isActive: Boolean
 ): Searchable {
 
   override val exactSearchOperands: List<String>
-    get() = listOf(barcode, name)
+    get() = mutableListOf<String>().apply {
+      addAll(barcode)
+      addAll(name.map { it.value })
+      addAll(salePrices.map { it.price })
+      addAll(returnPrices.map { it.price })
+      addAll(supplyPrices.map { it.price })
+      addAll(salePrices.map { it.currency })
+      addAll(returnPrices.map { it.currency })
+      addAll(supplyPrices.map { it.currency })
+    }
   override val containsSearchOperands: List<String>
-    get() = listOf(barcode, name)
+    get() = mutableListOf<String>().apply {
+      addAll(barcode)
+      addAll(name.map { it.value })
+      addAll(salePrices.map { it.price })
+      addAll(returnPrices.map { it.price })
+      addAll(supplyPrices.map { it.price })
+      addAll(salePrices.map { it.currency })
+      addAll(returnPrices.map { it.currency })
+      addAll(supplyPrices.map { it.currency })
+    }
   override val uniqueSearchOperands: List<String>
-    get() = listOf(barcode)
+    get() = mutableListOf<String>().apply {
+      addAll(barcode)
+    }
 }

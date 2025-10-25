@@ -18,6 +18,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kz.aita.AppConfiguration
 import kz.aita.compose.navigation.Navigation
+import kz.aita.compose.navigation.NavigationScreenModel
 import kz.aita.compose.util.checkAsPersonName
 import kz.aita.compose.util.filterAsPersonName
 import kz.aita.compose.widget.*
@@ -65,16 +66,24 @@ fun AppConfiguration.MenuUserAccountScreen() {
 
         val phoneNumberTextFieldContent = countrySelectionPhoneNumberTextField(
           valueInitial = stateValues.userAccount?.phoneNumber,
+          stateHost = NavigationScreenModel.Menu.UserAccount,
+          stateKey = "phone_number",
         )
 
         Spacer(modifier = Modifier.height(innerSpace))
 
-        val emailTextFieldContent = emailTextField(valueInitial = stateValues.userAccount?.email)
+        val emailTextFieldContent = emailTextField(
+          valueInitial = stateValues.userAccount?.email,
+          stateHost = NavigationScreenModel.Menu.UserAccount,
+          stateKey = "email",
+        )
 
         Spacer(modifier = Modifier.height(innerSpace))
 
         val firstNameTextFieldContent = genericTextField(
           valueInitial = stateValues.userAccount?.firstName,
+          stateHost = NavigationScreenModel.Menu.UserAccount,
+          stateKey = "first_name",
           titleText = stateValues.stringFirstName,
           placeholderText = stateValues.stringEnterFirstName,
           leadingIconPath = stateValues.drawablePathIconPerson,
@@ -91,6 +100,8 @@ fun AppConfiguration.MenuUserAccountScreen() {
 
         val lastNameTextFieldContent = genericTextField(
           valueInitial = stateValues.userAccount?.lastName,
+          stateHost = NavigationScreenModel.Menu.UserAccount,
+          stateKey = "last_name",
           titleText = stateValues.stringLastName,
           placeholderText = stateValues.stringEnterLastName,
           leadingIconPath = stateValues.drawablePathIconPerson,
@@ -103,7 +114,7 @@ fun AppConfiguration.MenuUserAccountScreen() {
           }
         )
 
-        Spacer(modifier = Modifier.height(36.dp))
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
         Text(
           text = stateValues.stringChangePassword,
@@ -119,9 +130,12 @@ fun AppConfiguration.MenuUserAccountScreen() {
           passwordPlaceholderText = stateValues.stringEnterNewPassword,
           repeatPasswordTitleText = stateValues.stringRepeatNewPassword,
           repeatPasswordPlaceholderText = stateValues.stringRepeatNewPassword,
+          stateHost = NavigationScreenModel.Menu.UserAccount,
+          stateKey = "new_password",
+          repeatedStateKey = "repeated_password"
         )
 
-        Spacer(modifier = Modifier.height(48.dp))
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
         var goAction: (() -> Unit)? = null
 
@@ -131,7 +145,9 @@ fun AppConfiguration.MenuUserAccountScreen() {
           contentInvalidText = stateValues.stringRequiredToEditAccount + ". \n" + stateValues.stringPasswordMustBe,
           imeWithAction = ImeWithAction(ImeAction.Go) {
             goAction?.invoke()
-          }
+          },
+          stateHost = NavigationScreenModel.Menu.UserAccount,
+          stateKey = "confirmation_password",
         )
 
 //        responseText(
@@ -222,7 +238,7 @@ fun AppConfiguration.MenuUserAccountScreen() {
 
         actionButton(
           text = stateValues.stringEdit,
-          enabled = stateValues.userAccountState !is DataState.Progress
+          enabled = stateValues.latestNotification == null
         ) {
           goAction.invoke()
         }

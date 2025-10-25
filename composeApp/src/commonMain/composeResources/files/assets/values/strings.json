@@ -1501,7 +1501,7 @@
           "value": "Sale price"
         },
         {
-          "language": "",
+          "language": "en",
           "value": "Sale price"
         },
         {
@@ -1897,11 +1897,11 @@
       "values": [
         {
           "language": "main",
-          "value": "Logging out in progress"
+          "value": "Logging out"
         },
         {
           "language": "en",
-          "value": "Logging out in progress"
+          "value": "Logging out"
         },
         {
           "language": "ru",
@@ -1918,11 +1918,11 @@
       "values": [
         {
           "language": "main",
-          "value": "Session time expired. Logging out in progress"
+          "value": "Session time expired. Logging out"
         },
         {
           "language": "en",
-          "value": "Session time expired. Logging out in progress"
+          "value": "Session time expired. Logging out"
         },
         {
           "language": "ru",
@@ -2036,6 +2036,384 @@
         {
           "language": "kk",
           "value": "Міндетті емес"
+        }
+      ]
+    },
+    {
+      "id": 97,
+      "values": [
+        {
+          "language": "main",
+          "value": "Logging in"
+        },
+        {
+          "language": "en",
+          "value": "Logging in"
+        },
+        {
+          "language": "ru",
+          "value": "Выполняется вход в аккаунт"
+        },
+        {
+          "language": "kk",
+          "value": "Сіз өзіңіздің есептік жазбаңызға кіріп жатырсыз"
+        }
+      ]
+    },
+    {
+      "id": 98,
+      "values": [
+        {
+          "language": "main",
+          "value": "Signing up"
+        },
+        {
+          "language": "en",
+          "value": "Signing up"
+        },
+        {
+          "language": "ru",
+          "value": "Выполняется регистрация"
+        },
+        {
+          "language": "kk",
+          "value": "Тіркелу жүріп жатыр"
+        }
+      ]
+    },
+    {
+      "id": 99,
+      "values": [
+        {
+          "language": "main",
+          "value": "Company form"
+        },
+        {
+          "language": "en",
+          "value": "Company form"
+        },
+        {
+          "language": "ru",
+          "value": "Форма компании"
+        },
+        {
+          "language": "kk",
+          "value": "Компания формасы"
+        }
+      ]
+    },
+    {
+      "id": 100,
+      "values": [
+        {
+          "language": "main",
+          "value": "Measurement unit"
+        },
+        {
+          "language": "en",
+          "value": "Measurement unit"
+        },
+        {
+          "language": "ru",
+          "value": "Единица измерения"
+        },
+        {
+          "language": "kk",
+          "value": "Өлшем бірлігі"
+        }
+      ]
+    },
+    {
+      "id": 101,
+      "values": [
+        {
+          "language": "main",
+          "value": "No active store"
+        },
+        {
+          "language": "en",
+          "value": "No active store"
+        },
+        {
+          "language": "ru",
+          "value": "Нет активного магазина"
+        },
+        {
+          "language": "kk",
+          "value": "Белсенді дүкен жоқ"
+        }
+      ]
+    },
+    {
+      "id": 102,
+      "values": [
+        {
+          "language": "main",
+          "value": "Select in menu"
+        },
+        {
+          "language": "en",
+          "value": "Select in menu"
+        },
+        {
+          "language": "ru",
+          "value": "Выбрать в меню"
+        },
+        {
+          "language": "kk",
+          "value": "Мәзірден таңдаңыз"
+        }
+      ]
+    },
+    {
+      "id": 103,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supply data"
+        },
+        {
+          "language": "en",
+          "value": "Supply data"
+        },
+        {
+          "language": "ru",
+          "value": "Данные о поставке"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізу мәліметтері"
+        }
+      ]
+    },
+    {
+      "id": 104,
+      "values": [
+        {
+          "language": "main",
+          "value": "Sale data"
+        },
+        {
+          "language": "en",
+          "value": "Sale data"
+        },
+        {
+          "language": "ru",
+          "value": "Данные о продаже"
+        },
+        {
+          "language": "kk",
+          "value": "Сату деректері"
+        }
+      ]
+    },
+    {
+      "id": 105,
+      "values": [
+        {
+          "language": "main",
+          "value": "Return data"
+        },
+        {
+          "language": "en",
+          "value": "Return data"
+        },
+        {
+          "language": "ru",
+          "value": "Данные о возврате"
+        },
+        {
+          "language": "kk",
+          "value": "Мәліметтерді қайтару"
+        }
+      ]
+    },
+    {
+      "id": 106,
+      "values": [
+        {
+          "language": "main",
+          "value": "Add supply data"
+        },
+        {
+          "language": "en",
+          "value": "Add supply data"
+        },
+        {
+          "language": "ru",
+          "value": "Добавить данные о поставке"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізу мәліметтерін қосыңыз"
+        }
+      ]
+    },
+    {
+      "id": 107,
+      "values": [
+        {
+          "language": "main",
+          "value": "Add sale data"
+        },
+        {
+          "language": "en",
+          "value": "Add sale data"
+        },
+        {
+          "language": "ru",
+          "value": "Добавить данные о продаже"
+        },
+        {
+          "language": "kk",
+          "value": "Сатылым мәліметтерін қосыңыз"
+        }
+      ]
+    },
+    {
+      "id": 108,
+      "values": [
+        {
+          "language": "main",
+          "value": "Add return data"
+        },
+        {
+          "language": "en",
+          "value": "Add return data"
+        },
+        {
+          "language": "ru",
+          "value": "Добавить данные о возврате"
+        },
+        {
+          "language": "kk",
+          "value": "Қайтару мәліметтерін қосыңыз"
+        }
+      ]
+    },
+    {
+      "id": 109,
+      "values": [
+        {
+          "language": "main",
+          "value": "Add barcode"
+        },
+        {
+          "language": "en",
+          "value": "Add barcode"
+        },
+        {
+          "language": "ru",
+          "value": "Добавить штрих-код"
+        },
+        {
+          "language": "kk",
+          "value": "Штрих-код қосу"
+        }
+      ]
+    },
+    {
+      "id": 110,
+      "values": [
+        {
+          "language": "main",
+          "value": "Add name"
+        },
+        {
+          "language": "en",
+          "value": "Add name"
+        },
+        {
+          "language": "ru",
+          "value": "Добавить название"
+        },
+        {
+          "language": "kk",
+          "value": "Атау қосу"
+        }
+      ]
+    },
+    {
+      "id": 111,
+      "values": [
+        {
+          "language": "main",
+          "value": "Payment"
+        },
+        {
+          "language": "en",
+          "value": "Payment"
+        },
+        {
+          "language": "ru",
+          "value": "Оплата"
+        },
+        {
+          "language": "kk",
+          "value": "Төлем"
+        }
+      ]
+    },
+    {
+      "id": 112,
+      "values": [
+        {
+          "language": "main",
+          "value": "All"
+        },
+        {
+          "language": "en",
+          "value": "All"
+        },
+        {
+          "language": "ru",
+          "value": "Все"
+        },
+        {
+          "language": "kk",
+          "value": "Барлығы"
+        }
+      ]
+    },
+    {
+      "id": 113,
+      "values": [
+        {
+          "language": "main",
+          "value": "Quick"
+        },
+        {
+          "language": "en",
+          "value": "Quick"
+        },
+        {
+          "language": "ru",
+          "value": "Быстрые"
+        },
+        {
+          "language": "kk",
+          "value": "Жылдам"
+        }
+      ]
+    },
+    {
+      "id": 114,
+      "values": [
+        {
+          "language": "main",
+          "value": "Categories"
+        },
+        {
+          "language": "en",
+          "value": "Categories"
+        },
+        {
+          "language": "ru",
+          "value": "Категории"
+        },
+        {
+          "language": "kk",
+          "value": "Санаттар"
         }
       ]
     }

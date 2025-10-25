@@ -15,10 +15,14 @@ import kz.aita.compose.util.checkAsPassword
 import kz.aita.compose.util.getPasswordTransformedTextWithSelectionFocusTextColor
 import kz.aita.compose.util.getTransformedTextWithSelectionFocusTextColor
 import kz.aita.compose.wrapper.ImeWithAction
+import kz.aita.core.StateHost
 
 @Composable
 fun AppConfiguration.repeatedPasswordTextFieldGroup(
   modifier: Modifier = Modifier,
+  stateHost: StateHost,
+  stateKey: String,
+  repeatedStateKey: String,
   passwordTitleText: String? = null,
   passwordPlaceholderText: String? = null,
   repeatPasswordTitleText: String? = null,
@@ -32,6 +36,8 @@ fun AppConfiguration.repeatedPasswordTextFieldGroup(
 
   val passwordTextFieldContent = genericTextField(
     modifier = modifier,
+    stateHost = stateHost,
+    stateKey = stateKey,
     titleText = passwordTitleText ?: stateValues.stringPassword,
     placeholderText = passwordPlaceholderText ?: stateValues.stringEnterPassword,
     leadingIconPath = stateValues.drawablePathIconPassword,
@@ -64,11 +70,13 @@ fun AppConfiguration.repeatedPasswordTextFieldGroup(
   )
 
   Spacer(modifier = Modifier
-    .height(8.dp)
+    .height(stateValues.marginTextField)
   )
 
   val repeatedPasswordTextFieldContent = genericTextField(
     modifier = modifier,
+    stateHost = stateHost,
+    stateKey = repeatedStateKey,
     titleText = repeatPasswordTitleText ?: stateValues.stringRepeatPassword,
     placeholderText = repeatPasswordPlaceholderText ?: stateValues.stringRepeatPassword,
     leadingIconPath = stateValues.drawablePathIconPassword,

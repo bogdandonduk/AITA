@@ -4,6 +4,7 @@ import io.ktor.http.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kz.aita.core.DataStore
 import kz.aita.core.io
 import kz.aita.model.dataModel.SupplierDataModel
@@ -17,8 +18,7 @@ import kz.aita.model.wrapper.TokenPair
 
 class SupplierRepositoryImpl(
   private val genericRemoteService: GenericRemoteService,
-  private val configurationRepository: ConfigurationRepository,
-  private val tokenStore: DataStore<TokenPair>?
+  private val configurationRepository: ConfigurationRepository
 ): Repository(), SupplierRepository {
 
   private val _suppliersState = MutableDataStateFlow<List<SupplierDataModel>>(this)
@@ -31,28 +31,19 @@ class SupplierRepositoryImpl(
   }
 
   override fun getSuppliers() {
-//    launch(Dispatchers.io) {
-//      if (!getSuppliersMutex.tryLock())
-//        return@launch
-//
-//      if (tokenStore?.get() == null)
-//        return@launch getSuppliersMutex.unlock()
-//
-//      _suppliersState.emit(DataState.Progress())
-//
-//      genericRemoteService
-//        .request<List<SupplierDataModel>, Unit>(
-//          HttpMethod.Get,
-//          endpointUrl = configurationRepository.globalAppConfigurationState.payloadValue.suppliersPath,
-//          onFailure = {
-//            _suppliersState.emit(DataState.Failure(it))
-//            getSuppliersMutex.unlock()
-//            it.printStackTrace()
-//          }
-//        )?.run {
-//          _suppliersState.emit(DataState.Success(this))
-//          getSuppliersMutex.unlock()
-//        } ?: getSuppliersMutex.unlock()
-//    }
+    if (!getSuppliersMutex.isLocked)
+      launch(Dispatchers.io) {
+        getSuppliersMutex.withLock {
+          val response = genericRemoteService
+            .request<List<SupplierDataModel>, Unit>(
+              HttpMethod.Get,
+              endpointUrl = configurationRepository.globalAppConfigurationState.payloadValue.getSuppliersPath
+            )
+
+            if (!response.negative){
+              _suppliersState.emit(DataState.Success(response.payload!!, response.message))
+            }
+        }
+      }
   }
 }

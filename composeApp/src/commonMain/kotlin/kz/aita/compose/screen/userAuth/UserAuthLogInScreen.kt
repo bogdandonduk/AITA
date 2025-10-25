@@ -1,13 +1,11 @@
 package kz.aita.compose.screen.userAuth
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -20,7 +18,6 @@ import kz.aita.compose.widget.*
 import kz.aita.compose.wrapper.ImeWithAction
 import kz.aita.core.userRepository
 import kz.aita.model.dataModel.UserAuthLogInDataModel
-import kz.aita.model.wrapper.DataState
 
 @Composable
 fun AppConfiguration.UserAuthLogInScreen() {
@@ -74,12 +71,17 @@ fun AppConfiguration.UserAuthLogInScreen() {
       val loginTextFieldContent = when (loginMethodTabRowContent.index) {
         0 -> {
           countrySelectionPhoneNumberTextField(
-            imeWithAction = ImeWithAction(ime = ImeAction.Next)
+            imeWithAction = ImeWithAction(ime = ImeAction.Next),
+            stateHost = NavigationScreenModel.UserAuth.LogIn,
+            stateKey = "phone_number",
           )
         }
 
         else -> {
-          emailTextField()
+          emailTextField(
+            stateHost = NavigationScreenModel.UserAuth.LogIn,
+            stateKey = "email",
+          )
         }
       }
 
@@ -91,17 +93,10 @@ fun AppConfiguration.UserAuthLogInScreen() {
         imeWithAction = ImeWithAction(ImeAction.Go) {
           goAction?.invoke()
 
-        }
+        },
+        stateHost = NavigationScreenModel.UserAuth.LogIn,
+        stateKey = "password",
       )
-
-//      responseText(
-//        stateValues.stringLoginAndOrPasswordIncorrect
-//      ) {
-//        (stateValues.userAccountState as? DataState.Failure)?.exception?.message?.equals(
-//          stateValues.exceptionMessageLoginAndOrPasswordIncorrect,
-//          true
-//        ) == true
-//      }
 
       Spacer(modifier = Modifier.height(outerSpace))
 
@@ -144,8 +139,8 @@ fun AppConfiguration.UserAuthLogInScreen() {
 
       actionButton(
         text = stateValues.stringLogIn,
-        enabled = stateValues.userAccountState !is DataState.Progress,
-        icon = if (stateValues.userAccountState is DataState.Progress) {
+        enabled = stateValues.latestNotification?.message?.equals(stateValues.stringLoggingIn) != true,
+        icon = if (stateValues.latestNotification?.message?.equals(stateValues.stringLoggingIn) == true) {
           {
             CircularProgressIndicator(
               color = stateValues.AccentTextColor,
@@ -163,7 +158,7 @@ fun AppConfiguration.UserAuthLogInScreen() {
 
         actionButton(
           text = stateValues.stringSignUp,
-          enabled = stateValues.userAccountState !is DataState.Progress
+          enabled = stateValues.latestNotification == null
         ) {
           coroutineScope.launch {
             Navigation.UserAuth.goLeft(NavigationScreenModel.UserAuth.SignUp)

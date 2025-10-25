@@ -31,6 +31,19 @@ fun String.isNumericalString(): Boolean {
   return all { it.isDigit() }
 }
 
+fun String.isNumericalDoubleString(): Boolean {
+  var dots = 0
+
+  forEach {
+    if (it == '.')
+      dots ++
+  }
+
+  return if (dots > 1)
+    false
+  else all { it.isDigit() || it == '.' }
+}
+
 fun String.checkAsPersonName(): Boolean {
   return isNotEmpty() && isNotBlank() && matches(Regex("""^[\p{L}\p{M} .-]+$"""))
 }

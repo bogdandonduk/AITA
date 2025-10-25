@@ -17,6 +17,7 @@ import kz.aita.server.db.StoreUsers
 import kz.aita.server.db.Stores
 import kz.aita.server.db.Users
 import kz.aita.server.util.genericResponse
+import kz.aita.server.util.genericResponseNoPayload
 import kz.aita.server.util.getResponse
 import org.jetbrains.exposed.exceptions.ExposedSQLException
 import org.jetbrains.exposed.sql.*
@@ -54,7 +55,7 @@ fun Application.storesRoute() {
               .map {
                 StoreDataModel(
                   id = it[Stores.id].toString(),
-                  userIds = jsonBase.decodeFromString<List<String>>(it[Stores.userIds]),
+                  userIds = it[Stores.userIds],
                   typeIds = it[Stores.typeIds]?.let { value ->
                     jsonBase.decodeFromString<List<String>>(
                       value
@@ -85,7 +86,7 @@ fun Application.storesRoute() {
               }
           }
 
-          call.respond(
+          call.genericResponse(
             HttpStatusCode.OK,
             stores
           )
@@ -105,6 +106,7 @@ fun Application.storesRoute() {
               }
               .empty()
           }
+
           if (noUser) return@post call.respond(UnauthorizedResponse())
 
           val body = call.receive<StoreDataModel>()
@@ -122,7 +124,7 @@ fun Application.storesRoute() {
               newSuspendedTransaction(Dispatchers.IO) {
                 Stores.insert {
                   it[Stores.id] = id
-                  it[Stores.userIds] = jsonBase.encodeToString<List<String>>(listOf(userId.toString()))
+                  it[Stores.userIds] = listOf(userId.toString())
                   it[Stores.typeIds] = body.typeIds?.let { value -> jsonBase.encodeToString<List<String>>(value) }
                   it[Stores.name] = jsonBase.encodeToString(body.name)
                   it[Stores.alias] = body.alias?.let { alias -> jsonBase.encodeToString(alias) }
@@ -153,10 +155,10 @@ fun Application.storesRoute() {
           id?.run {
             call.genericResponse(
               HttpStatusCode.Created,
-              body.copy(id = id.toString(), createdAt = instant.toEpochMilli()),
+              payload = body.copy(id = id.toString(), createdAt = instant.toEpochMilli()),
               message = getResponse("10").message
             )
-          } ?: call.genericResponse(
+          } ?: call.genericResponseNoPayload(
             status = HttpStatusCode.InternalServerError,
             message = getResponse("3").message
           )
@@ -198,12 +200,12 @@ fun Application.storesRoute() {
           return@put when (updated) {
             0 -> call.genericResponse(
               HttpStatusCode.OK,
-              body,
+              payload = body,
               getResponse("11").message
             )
 
             1, 2 -> call.respond(UnauthorizedResponse())
-            else -> call.genericResponse(
+            else -> call.genericResponseNoPayload(
               status = HttpStatusCode.InternalServerError,
               message = getResponse("3").message
             )
@@ -216,11 +218,11 @@ fun Application.storesRoute() {
             UnauthorizedResponse()
           )
 
-          val body = call.receive<StoreDataModel>()
+          val body = call.receive<String>()
 
           val deleted = newSuspendedTransaction(Dispatchers.IO) {
 
-            val id = runCatching { UUID.fromString(body.id) }.getOrNull() ?: return@newSuspendedTransaction 2
+            val id = runCatching { UUID.fromString(body) }.getOrNull() ?: return@newSuspendedTransaction 2
 
             if (Stores.deleteWhere { (Stores.id eq id) and (Stores.userIds.contains(userId.toString())) } > 0)
               0
@@ -229,13 +231,13 @@ fun Application.storesRoute() {
           }
 
           return@delete when (deleted) {
-            0 -> call.genericResponse(
+            0 -> call.genericResponseNoPayload(
               HttpStatusCode.OK,
               message = getResponse("12").message
             )
 
             1, 2 -> call.respond(UnauthorizedResponse())
-            else -> call.genericResponse(
+            else -> call.genericResponseNoPayload(
               status = HttpStatusCode.InternalServerError,
               message = getResponse("3").message
             )

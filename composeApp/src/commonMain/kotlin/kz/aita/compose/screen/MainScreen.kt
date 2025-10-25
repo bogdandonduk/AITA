@@ -58,11 +58,9 @@ fun AppConfiguration.MainScreen() {
         .userAccountState
         .value
         .collect {
-          if (it is DataState.Empty || it is DataState.Failure || (it is DataState.SoftFailure && it.existingPayload == null)) {
+          if (it is DataState.Empty) {
             Navigation.goMain(NavigationScreenModel.UserAuth.Main)
-          } else if ((it is DataState.Success || it is DataState.SoftFailure && it.existingPayload != null) && Navigation.Main.value.last()
-              .run { this is NavigationScreenModel.UserAuth || this is NavigationScreenModel.Splash }
-          )
+          } else if ((it is DataState.Success) && Navigation.Main.value.last().run { this is NavigationScreenModel.UserAuth || this is NavigationScreenModel.Splash })
             Navigation.goMain(NavigationScreenModel.Transaction.MainSale)
         }
     }
@@ -122,7 +120,7 @@ fun AppConfiguration.MainScreen() {
           Box(
             modifier = Modifier
               .fillMaxWidth()
-              .height(24.dp)
+              .height(stateValues.marginTextFieldGroup)
               .background(
                 when (type) {
                   NotificationType.Neutral -> stateValues.PlaceholderTextColor

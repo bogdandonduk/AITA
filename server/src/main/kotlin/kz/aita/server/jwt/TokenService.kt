@@ -24,7 +24,7 @@ class TokenService(private val cfg: JwtConfig) {
   private val algorithm = Algorithm
     .HMAC256(cfg.secret)
 
-  fun signAccess(userId: UUID, instant: Instant): String {
+  fun signAccess(userId: UUID, sessionId: UUID, instant: Instant): String {
     val exp = instant.plusMillis(cfg.accessTTL)
     return JWT.create()
       .withIssuer(cfg.issuer)
@@ -32,6 +32,7 @@ class TokenService(private val cfg: JwtConfig) {
       .withSubject(userId.toString())
       .withIssuedAt(Date.from(instant))
       .withExpiresAt(Date.from(exp))
+      .withClaim("sessionId", sessionId.toString())
       .sign(algorithm)
   }
 
@@ -40,14 +41,15 @@ class TokenService(private val cfg: JwtConfig) {
     val refreshHash = Refresh.hash(refreshPlain)
     val now = Instant.now()
     val expires = now.plus(cfg.refreshTTL, ChronoUnit.MILLIS)
+    val sessionId = UUID.randomUUID()
 
     val signAccessAsync = async(Dispatchers.Default) {
-      signAccess(userId, now)
+      signAccess(userId, sessionId, now)
     }
 
     newSuspendedTransaction(Dispatchers.IO) {
       RefreshSessions.insert {
-        it[id] = UUID.randomUUID()
+        it[id] = sessionId
         it[RefreshSessions.userId] = userId
         it[tokenHash] = refreshHash
         it[createdAt] = now
@@ -62,10 +64,9 @@ class TokenService(private val cfg: JwtConfig) {
   suspend fun rotate(refreshPlain: String, metaParam: Map<String, String>?): TokenPair = coroutineScope {
     val hash = Refresh.hash(refreshPlain)
 
-    val cond = RefreshSessions.tokenHash eq hash and RefreshSessions.revokedAt.isNull()
-
     val oldSession = newSuspendedTransaction(Dispatchers.IO) {
-      RefreshSessions.selectAll().where { cond }.forUpdate().singleOrNull() ?: throw IllegalAccessException("No legitimate previous refresh token")
+      RefreshSessions.selectAll().where { RefreshSessions.tokenHash eq hash and RefreshSessions.revokedAt.isNull() }
+        .forUpdate().singleOrNull() ?: throw IllegalAccessException("No valid previous refresh token")
     }
 
     val now = Instant.now()
@@ -81,8 +82,10 @@ class TokenService(private val cfg: JwtConfig) {
     val nowMillis = now.toEpochMilli()
     val expires = now.plus(cfg.refreshTTL, ChronoUnit.MILLIS)
 
+    val sessionId = UUID.randomUUID()
+
     val signAccessAsync = async(Dispatchers.Default) {
-      signAccess(oldSession[RefreshSessions.userId], now)
+      signAccess(oldSession[RefreshSessions.userId], sessionId, now)
     }
 
     newSuspendedTransaction(Dispatchers.IO) {
@@ -93,7 +96,7 @@ class TokenService(private val cfg: JwtConfig) {
 
     newSuspendedTransaction(Dispatchers.IO) {
       RefreshSessions.insert {
-        it[id] = UUID.randomUUID()
+        it[id] = sessionId
         it[userId] = oldSession[RefreshSessions.userId]
         it[tokenHash] = newHash
         it[createdAt] = now

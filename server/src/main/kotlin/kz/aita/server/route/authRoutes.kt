@@ -14,6 +14,7 @@ import kz.aita.server.db.Users
 import kz.aita.server.encrypt.Pw
 import kz.aita.server.jwt.TokenService
 import kz.aita.server.util.genericResponse
+import kz.aita.server.util.genericResponseNoPayload
 import kz.aita.server.util.getResponse
 import kz.aita.server.util.metaFrom
 import org.jetbrains.exposed.exceptions.ExposedSQLException
@@ -60,22 +61,21 @@ fun Application.authRoutes(tokenService: TokenService) {
 
           when (conflictResult) {
             1 -> {
-              return@post call.genericResponse(
+              return@post call.genericResponseNoPayload(
                 HttpStatusCode.Conflict,
-                null,
                 message = getResponse("2").message
               )
             }
 
             2 -> {
-              return@post call.genericResponse(
+              return@post call.genericResponseNoPayload(
                 HttpStatusCode.Conflict,
                 message = getResponse("0").message
               )
             }
 
             3 -> {
-              return@post call.genericResponse(
+              return@post call.genericResponseNoPayload(
                 HttpStatusCode.Conflict,
                 message = getResponse("1").message
               )
@@ -129,12 +129,12 @@ fun Application.authRoutes(tokenService: TokenService) {
               status = HttpStatusCode.Created,
               tokenPair
             )
-          } ?: call.genericResponse(
+          } ?: call.genericResponseNoPayload(
             status = HttpStatusCode.InternalServerError,
             message = getResponse("3").message
           )
         } catch (throwable: Throwable) {
-          call.genericResponse(
+          call.genericResponseNoPayload(
             status = HttpStatusCode.InternalServerError,
             message = getResponse("3").message
           )
@@ -158,7 +158,8 @@ fun Application.authRoutes(tokenService: TokenService) {
 
         val tokenPair: TokenPair = tokenService.newPair(user[Users.id], metaFrom(call))
 
-        call.genericResponse(HttpStatusCode.OK, tokenPair)
+        print("issued tokens are $tokenPair")
+        call.genericResponse<TokenPair>(HttpStatusCode.OK, tokenPair)
       }
 
       delete("/logOut") {
@@ -170,19 +171,15 @@ fun Application.authRoutes(tokenService: TokenService) {
           throwable.printStackTrace()
         }
 
-        call.genericResponse(HttpStatusCode.OK, message = getResponse("8").message)
+        call.genericResponseNoPayload(HttpStatusCode.OK, message = getResponse("8").message)
       }
 
       post("/refresh") {
-        println("refresh is called")
         val body = call.receive<String>()
-        println("refresh is called2 $body")
         try {
           val newTokens = tokenService.rotate(body, metaFrom(call))
           call.genericResponse(HttpStatusCode.OK, newTokens)
-          println("refresh is called3 $newTokens")
         } catch (throwable: Throwable) {
-          println("refresh is called4 $throwable")
           call.respond(UnauthorizedResponse())
           throwable.printStackTrace()
         }

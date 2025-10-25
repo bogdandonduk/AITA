@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -31,11 +32,10 @@ fun AppConfiguration.dropdownListWidget(
   modifier: Modifier = Modifier,
   titleText: String,
   textColor: Color = stateValues.TextColor,
-
   titleTextSize: TextUnit = stateValues.accentTextSize,
   titleTextColor: Color = textColor,
-  showId: Boolean = false,
-  showName: Boolean = true,
+  showId: Boolean = true,
+  showName: Boolean = false,
   domains: List<SelectableDomain>,
   selectedInitial: String? = null,
   cornerRadius: Dp = stateValues.cornerRadius
@@ -87,20 +87,17 @@ fun AppConfiguration.dropdownListWidget(
       modifier = Modifier
         .fillMaxWidth()
         .clip(RoundedCornerShape(cornerRadius))
-        .height((domains.size * stateValues.textFieldHeight.value).dp)
+        .height(stateValues.textFieldHeight)
         .border(
           width = if (isDomainSelectionDropdownExpandedState.targetState) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
           color = if (isDomainSelectionDropdownExpandedState.targetState) stateValues.AccentColor else textColor,
           shape = RoundedCornerShape(cornerRadius)
         ),
       textColor = textColor,
-      domain = SelectableDomain(
-        id = selected.id,
-        name = selected.name,
-        iconPath = selected.iconPath
-      ),
+      domain = selected,
       showId = showId,
-      showName = showName
+      showName = showName,
+      showExpansion = true
     ) {
       isDomainSelectionDropdownExpandedState.targetState =
         !isDomainSelectionDropdownExpandedState.targetState
@@ -110,7 +107,9 @@ fun AppConfiguration.dropdownListWidget(
       Spacer(modifier = Modifier.height(1.dp))
 
       AnimatedVisibility(
-        modifier = modifier,
+        modifier = Modifier
+          .fillMaxWidth()
+          .heightIn(min = 0.dp, max = stateValues.screenHeight / 3),
         visibleState = isDomainSelectionDropdownExpandedState,
         enter = expandVertically(),
         exit = shrinkVertically()
@@ -126,12 +125,12 @@ fun AppConfiguration.dropdownListWidget(
               shape = RoundedCornerShape(cornerRadius)
             )
         ) {
-          itemsIndexed(domains) { index, country ->
+          itemsIndexed(domains) { index, domain ->
             selectableDomainWidget(
               modifier = Modifier
                 .fillParentMaxWidth(),
               textColor = textColor,
-              domain = country,
+              domain = domain,
               showId = showId,
               showName = showName
             ) {

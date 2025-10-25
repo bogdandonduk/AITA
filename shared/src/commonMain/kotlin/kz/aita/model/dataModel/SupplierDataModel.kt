@@ -5,9 +5,10 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class SupplierDataModel(
   val id: String,
-  val typeId: String,
-  val phoneNumbers: String,
-  val emails: String,
+  val typeIds: List<String>?,
+  val name: List<LocalizedStringDataModel>,
+  val phoneNumbers: List<String>?,
+  val emails: List<String>?,
   val addedAt: Long,
   val isActive: Boolean
 )

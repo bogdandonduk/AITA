@@ -96,7 +96,7 @@ fun AppConfiguration.GoodsItemInStockWidget(
         .padding(top = 8.dp, bottom = 12.dp),
     ) {
       Text(
-        text = index?.run { "${index + 1}.  ${goodsItem.name}" } ?: goodsItem.name,
+        text = index?.run { "${index + 1}.  ${goodsItem.name.extractLocalizedString(stateValues.appLanguage)}" } ?: goodsItem.name.extractLocalizedString(stateValues.appLanguage)!!,
         fontSize = stateValues.titleTextSize,
         fontWeight = FontWeight.Bold,
         color = textColor
@@ -107,51 +107,90 @@ fun AppConfiguration.GoodsItemInStockWidget(
           .height(6.dp)
       )
 
-      Text(
-        text = goodsItem.barcode,
-        fontSize = stateValues.textSize,
-        color = textColor
-      )
+      goodsItem.barcode.run {
+        if (size == 1) {
+          this[0]
+        } else {
+          foldIndexed("") { index, acc, item ->
+            if (index == 0)
+              item
+            else
+              "$acc, $item"
+          }
+        }
+      }.run {
+        Text(
+          text = this,
+          fontSize = stateValues.textSize,
+          color = textColor
+        )
+      }
 
-      Text(
-        text = "Category",
-        fontSize = stateValues.textSize,
-        color = textColor
-      )
+      stateValues.goodsCategories?.run {
+        if (goodsItem.categoryIds.size == 1) {
+          "${stateValues.goodsCategories?.find { it.id == goodsItem.categoryIds[0] }?.name?.extractLocalizedString(stateValues.appLanguage)}"
+        } else {
+          goodsItem.categoryIds.foldIndexed("") { index, acc, item ->
+            if (index == 0)
+              "${stateValues.goodsCategories?.find { it.id == item }?.name?.extractLocalizedString(stateValues.appLanguage)}"
+            else
+              "$acc, ${stateValues.goodsCategories?.find { it.id == item }?.name?.extractLocalizedString(stateValues.appLanguage)}"
+          }
+        }
+      }?.run {
+        Text(
+          text = this,
+          fontSize = stateValues.textSize,
+          color = textColor
+        )
+      }
 
-      Text(
-        text = "Supplier",
-        fontSize = stateValues.textSize,
-        color = textColor
-      )
+      goodsItem.salePrices.run {
+        if (size == 1) {
+          "${stateValues.suppliers?.find { it.id == goodsItem.salePrices[0].supplierId }?.name?.extractLocalizedString(stateValues.appLanguage)}"
+        } else {
+          foldIndexed("") { index, acc, item ->
+            if (index == 0) {
+              "${stateValues.suppliers?.find { it.id == item.supplierId }?.name?.extractLocalizedString(stateValues.appLanguage)}"
+            } else
+              "$acc, ${stateValues.suppliers?.find { it.id == item.supplierId }?.name?.extractLocalizedString(stateValues.appLanguage)}"
+          }
+        }
+      }.run {
+        Text(
+          text = this,
+          fontSize = stateValues.textSize,
+          color = textColor
+        )
+      }
 
       Spacer(
         modifier = Modifier
           .height(6.dp)
       )
 
-      Text(
-        text = "${stateValues.stringSale}: ${goodsItem.salePricesToSupplierIds} ${goodsItem.saleCurrencyToSupplierIds}",
-        fontSize = stateValues.accentTextSize,
-        fontWeight = FontWeight.Bold,
-        color = textColor
-      )
-
-      if (goodsItem.returnPricesToSupplierIds != goodsItem.salePricesToSupplierIds) {
-        Text(
-          text = "${stateValues.stringReturn}: ${goodsItem.returnPricesToSupplierIds} ${goodsItem.returnCurrencyToSupplierIds}",
-          fontSize = stateValues.accentTextSize,
-          fontWeight = FontWeight.Bold,
-          color = textColor
-        )
-      }
-
-      Text(
-        text = "${stateValues.stringSupply}: ${goodsItem.supplyPricesToSupplierIds} ${goodsItem.saleCurrencyToSupplierIds}",
-        fontSize = stateValues.accentTextSize,
-        fontWeight = FontWeight.Bold,
-        color = textColor
-      )
+//      Text(
+//        text = "${stateValues.stringSale}: ${goodsItem.salePrices} ${goodsItem.saleCurrencyToSupplierIds}",
+//        fontSize = stateValues.accentTextSize,
+//        fontWeight = FontWeight.Bold,
+//        color = textColor
+//      )
+//
+//      if (goodsItem.returnPrices != goodsItem.salePrices) {
+//        Text(
+//          text = "${stateValues.stringReturn}: ${goodsItem.returnPrices} ${goodsItem.returnCurrencyToSupplierIds}",
+//          fontSize = stateValues.accentTextSize,
+//          fontWeight = FontWeight.Bold,
+//          color = textColor
+//        )
+//      }
+//
+//      Text(
+//        text = "${stateValues.stringSupply}: ${goodsItem.supplyPrices} ${goodsItem.saleCurrencyToSupplierIds}",
+//        fontSize = stateValues.accentTextSize,
+//        fontWeight = FontWeight.Bold,
+//        color = textColor
+//      )
 
       Spacer(
         modifier = Modifier
@@ -183,7 +222,7 @@ fun AppConfiguration.GoodsItemInStockWidget(
 
       Spacer(
         modifier = Modifier
-          .height(16.dp)
+          .height(stateValues.marginTextField)
       )
 
       actionButton(

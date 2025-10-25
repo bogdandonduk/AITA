@@ -1,6 +1,7 @@
 package kz.aita.jvm.core
 
 import com.github.javakeyring.Keyring
+import io.ktor.client.HttpClient
 import kz.aita.core.DataStore
 import kz.aita.core.cacheDirPath
 import kz.aita.core.jsonBase

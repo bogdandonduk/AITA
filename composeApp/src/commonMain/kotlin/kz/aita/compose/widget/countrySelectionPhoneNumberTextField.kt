@@ -6,21 +6,27 @@ import kz.aita.AppConfiguration
 import kz.aita.compose.util.checkAsPhoneNumber
 import kz.aita.compose.util.filterAsPhoneNumber
 import kz.aita.compose.wrapper.ImeWithAction
+import kz.aita.core.StateHost
 import kz.aita.model.dataModel.CountryDataModel
+import kz.aita.model.dataModel.LocalizedStringDataModel
 
 @Composable
 fun AppConfiguration.countrySelectionPhoneNumberTextField(
   countries: List<CountryDataModel> = stateValues.globalAppConfiguration.countries,
   valueInitial: String? = null,
+  stateHost: StateHost,
+  stateKey: String,
   titleText: String = stateValues.stringPhoneNumber,
   placeholderText: String = stateValues.stringEnterPhoneNumber,
   imeWithAction: ImeWithAction? = null
 ): DomainSelectionTextFieldContent {
 
   return domainSelectionTextField(
-    domains = countries.map {
+    domains = emptyList(),
+    secondaryDomains = countries.map {
       SelectableDomain(
         id = "+${it.phoneNumberCode}",
+        displayId = listOf(LocalizedStringDataModel("main","+${it.phoneNumberCode}")),
         name = it.name,
         iconPath = it.flagDrawablePath
       )
@@ -35,6 +41,8 @@ fun AppConfiguration.countrySelectionPhoneNumberTextField(
         } ?: this
     },
     titleText = titleText,
+    stateHost = stateHost,
+    stateKey = stateKey,
     placeholderText = placeholderText,
     keyboardType = KeyboardType.Phone,
     imeWithAction = imeWithAction,

@@ -3,7 +3,7 @@ package kz.aita.model.repository.impl
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kz.aita.core.io
-import kz.aita.model.dataModel.GoodsItemCategoryDataModel
+import kz.aita.model.dataModel.GenericGoodsCategoryDataModel
 import kz.aita.model.repository.GoodsCategoryRepository
 import kz.aita.model.repository.Repository
 import kz.aita.model.service.GenericLocalService
@@ -16,7 +16,7 @@ class GoodsCategoryRepositoryImpl(
   private val genericLocalService: GenericLocalService
 ): Repository(), GoodsCategoryRepository {
 
-  private val _categoriesState = MutableDataStateFlow<List<GoodsItemCategoryDataModel>>(this)
+  private val _categoriesState = MutableDataStateFlow<List<GenericGoodsCategoryDataModel>>(this)
   override val categoriesState = _categoriesState.asDataStateFlow()
 
   init {

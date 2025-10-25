@@ -8,7 +8,6 @@ import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.principal
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
-import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
@@ -18,6 +17,9 @@ import kz.aita.model.dataModel.GenericGoodsItemDataModel
 import kz.aita.model.dataModel.LocalizedStringDataModel
 import kz.aita.server.db.GenericGoodsItems
 import kz.aita.server.db.Users
+import kz.aita.server.util.genericResponse
+import kz.aita.server.util.genericResponseNoPayload
+import kz.aita.server.util.getResponse
 import org.jetbrains.exposed.sql.json.contains
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
@@ -35,64 +37,63 @@ fun Application.genericGoodsItemsRoute() {
             )
             val body = call.receive<String>()
 
-            val genericGoodsItems: Pair<Int, List<GenericGoodsItemDataModel>?> = newSuspendedTransaction(Dispatchers.IO) {
-              val noUser = Users.select(Users.id).where { Users.id eq userId }.empty()
+            val genericGoodsItems: Pair<Int, List<GenericGoodsItemDataModel>?> =
+              newSuspendedTransaction(Dispatchers.IO) {
+                val noUser = Users.select(Users.id).where { Users.id eq userId }.empty()
 
-              if (noUser)
-                return@newSuspendedTransaction 1 to null
+                if (noUser)
+                  return@newSuspendedTransaction 1 to null
 
-              val matches = GenericGoodsItems
-                .selectAll()
-                .where { GenericGoodsItems.barcode.contains(listOf(body)) }
-                .map {
+                val matches = GenericGoodsItems
+                  .selectAll()
+                  .where { GenericGoodsItems.barcode.contains(listOf(body)) }
+                  .map {
 
-                  GenericGoodsItemDataModel(
-                    id = it[GenericGoodsItems.id].toString(),
-                    barcode = it[GenericGoodsItems.barcode],
-                    name = it[GenericGoodsItems.name].let { value ->
-                      jsonBase.decodeFromString<List<LocalizedStringDataModel>>(
-                        value
-                      )
-                    },
-                    typeIds = it[GenericGoodsItems.typeIds]?.let { value ->
-                      jsonBase.decodeFromString<List<String>>(
-                        value
-                      )
-                    },
-                    categoryIds = it[GenericGoodsItems.categoryIds]?.let { value ->
-                      jsonBase.decodeFromString<List<String>>(
-                        value
-                      )
-                    },
-                    supplierIds = it[GenericGoodsItems.supplierIds]?.let { value ->
-                      jsonBase.decodeFromString<List<String>>(
-                        value
-                      )
-                    },
-                    manufacturerIds = it[GenericGoodsItems.manufacturerIds]?.let { value ->
-                      jsonBase.decodeFromString<List<String>>(
-                        value
-                      )
-                    },
-                  )
-                }
+                    GenericGoodsItemDataModel(
+                      id = it[GenericGoodsItems.id].toString(),
+                      barcode = it[GenericGoodsItems.barcode],
+                      name = it[GenericGoodsItems.name].let { value ->
+                        jsonBase.decodeFromString<List<LocalizedStringDataModel>>(
+                          value
+                        )
+                      },
+                      typeIds = it[GenericGoodsItems.typeIds]?.let { value ->
+                        jsonBase.decodeFromString<List<String>>(
+                          value
+                        )
+                      },
+                      categoryIds = it[GenericGoodsItems.categoryIds]?.let { value ->
+                        jsonBase.decodeFromString<List<String>>(
+                          value
+                        )
+                      },
+                      supplierIds = it[GenericGoodsItems.supplierIds]?.let { value ->
+                        jsonBase.decodeFromString<List<String>>(
+                          value
+                        )
+                      },
+                      manufacturerIds = it[GenericGoodsItems.manufacturerIds]?.let { value ->
+                        jsonBase.decodeFromString<List<String>>(
+                          value
+                        )
+                      },
+                    )
+                  }
 
-              0 to matches
-            }
+                0 to matches
+              }
 
             when {
               genericGoodsItems.first == 1 -> call.respond(UnauthorizedResponse())
               genericGoodsItems.second?.isNotEmpty() == true -> {
-                genericGoodsItems.second.run {
-                  call.respond(
-                    HttpStatusCode.OK,
-                    this!!
-                  )
-                }
-
+                call.genericResponse(
+                  HttpStatusCode.OK,
+                  payload = genericGoodsItems.second
+                )
               }
+
               else -> {
-                call.respond(HttpStatusCode.NotFound)
+                call.genericResponseNoPayload(HttpStatusCode.NotFound, message = getResponse("13").message)
               }
             }
           }

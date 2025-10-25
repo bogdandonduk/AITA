@@ -22,6 +22,7 @@ import androidx.compose.ui.focus.FocusState
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
@@ -40,20 +41,28 @@ import io.kamel.image.asyncPainterResource
 import io.kamel.image.config.LocalKamelConfig
 import io.ktor.http.*
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kz.aita.AppConfiguration
+import kz.aita.compose.navigation.Navigation
+import kz.aita.compose.navigation.NavigationScreenModel
 import kz.aita.compose.render.kamelConfig
 import kz.aita.compose.util.getTransformedTextWithSelectionFocusTextColor
 import kz.aita.compose.wrapper.ImeWithAction
+import kz.aita.core.StateHost
 import kz.aita.core.getFullDrawableResourceUrl
 
 @Composable
 fun AppConfiguration.genericTextField(
   modifier: Modifier = Modifier,
 
+  titleText: String = "",
+
+  stateHost: StateHost,
+  stateKey: String,
+
   enabled: Boolean = true,
   wide: Boolean = false,
   valueInitial: String? = null,
-  titleText: String = "",
 
   textSize: TextUnit = stateValues.textSize,
   textColor: Color = stateValues.TextColor,
@@ -80,13 +89,14 @@ fun AppConfiguration.genericTextField(
   backgroundColor: Color = stateValues.BackgroundColor,
 
   cornerRadius: Dp = stateValues.cornerRadius,
-
+  cornerShape: Shape = RoundedCornerShape(cornerRadius),
   keyboardType: KeyboardType = KeyboardType.Text,
   imeWithAction: ImeWithAction? = null,
 
   leadingIconPath: String? = null,
   leadingIcon: @Composable (() -> Unit)? = null,
   leadingIconContentDescription: String = placeholderText,
+  trailingIcon: @Composable (() -> Unit)? = null,
   trailingIconExtraPath: String? = null,
   trailingIconExtraContentDescription: String = placeholderText,
   trailingIconExtraOnClick: (() -> Unit)? = null,
@@ -99,8 +109,11 @@ fun AppConfiguration.genericTextField(
   onValueChange: ((String, () -> Unit) -> Unit)? = null
 ): GenericTextFieldContent {
 
+  val state by stateHost.state.collectAsState()
+  val stateValue = state[stateKey]
+
   var value by rememberSaveable(stateSaver = TextFieldValue.Saver) {
-    val initial = valueInitial ?: ""
+    val initial = stateValue ?: valueInitial ?: ""
     mutableStateOf(TextFieldValue(initial, selection = TextRange(initial.length)))
   }
 
@@ -150,23 +163,29 @@ fun AppConfiguration.genericTextField(
             onValueChange(it.text) {
               if (onFilterValue == null || onFilterValue(it.text)) {
                 value = it
+                coroutineScope.launch {
+                  stateHost.setState(stateKey to it.text)
+                }
               }
             }
           } else {
             if (onFilterValue == null || onFilterValue(it.text)) {
               value = it
+              coroutineScope.launch {
+                stateHost.setState(stateKey to it.text)
+              }
             }
           }
         },
         enabled = enabled,
         modifier = Modifier
           .height(if (wide) stateValues.wideTextFieldHeight else stateValues.textFieldHeight)
-          .clip(RoundedCornerShape(cornerRadius))
+          .clip(cornerShape)
           .background(backgroundColor)
           .border(
             width = if (isFocused) focusedBorderWidth else unfocusedBorderWidth,
             color = if (isFocused) focusedBorderColor else unfocusedBorderColor,
-            shape = RoundedCornerShape(cornerRadius)
+            shape = cornerShape
           )
           .focusRequester(focusRequester)
           .onFocusChanged {
@@ -242,7 +261,7 @@ fun AppConfiguration.genericTextField(
                   modifier = Modifier
                     .fillMaxHeight(),
                 ) {
-                  trailingIconExtraPath?.run {
+                  trailingIcon?.invoke() ?: trailingIconExtraPath?.run {
                     Box(
                       modifier = Modifier
                         .fillMaxHeight()

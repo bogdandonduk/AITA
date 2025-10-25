@@ -14,28 +14,48 @@ import kz.aita.model.dataModel.NotificationType
 import kz.aita.model.repository.NotificationRepository
 import kz.aita.model.repository.Repository
 
-class NotificationRepositoryImpl : Repository(), NotificationRepository {
+class NotificationRepositoryImpl: Repository(), NotificationRepository {
 
   private val _latestNotificationState = MutableStateFlow<NotificationDataModel?>(null)
   override val latestNotificationState = _latestNotificationState.asStateFlow()
 
-  override fun postNotification(message: List<LocalizedStringDataModel>?, type: NotificationType) {
+  override fun post(message: List<LocalizedStringDataModel>?, type: NotificationType, transient: Boolean) {
     message?.extractLocalizedString(configurationRepository.appLanguageState.value)?.run {
       launch(Dispatchers.io) {
-        while (latestNotificationState.value != null) {
-          delay(100)
-        }
-
         _latestNotificationState.emit(
           NotificationDataModel(
             this@run,
             type
           )
         )
+
+        if (transient) {
+          delay(3000)
+          _latestNotificationState.emit(null)
+        }
+      }
+    }
+  }
+
+  override fun post(message: String, type: NotificationType, transient: Boolean) {
+    launch(Dispatchers.io) {
+      _latestNotificationState.emit(
+        NotificationDataModel(
+          message,
+          type
+        )
+      )
+
+      if (transient) {
         delay(3000)
         _latestNotificationState.emit(null)
       }
     }
+  }
 
+  override fun clear() {
+    launch(Dispatchers.io) {
+      _latestNotificationState.emit(null)
+    }
   }
 }

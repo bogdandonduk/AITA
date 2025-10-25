@@ -10,11 +10,12 @@ import io.ktor.server.routing.*
 import kotlinx.coroutines.Dispatchers
 import kz.aita.model.dataModel.UserAccountDataModel
 import kz.aita.model.dataModel.UserAccountUpdateDataModel
+import kz.aita.model.wrapper.TokenPair
 import kz.aita.server.db.Users
 import kz.aita.server.encrypt.Pw
 import kz.aita.server.util.genericResponse
+import kz.aita.server.util.genericResponseNoPayload
 import kz.aita.server.util.getResponse
-import kz.aita.server.util.getResponses
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
@@ -26,7 +27,6 @@ fun Application.userRoute() {
     route("/user") {
       authenticate("auth-jwt") {
         get("/get") {
-
           val principal = call.principal<JWTPrincipal>() ?: return@get call.respond(UnauthorizedResponse())
           val uuid = runCatching { UUID.fromString(principal.subject) }.getOrNull() ?: return@get call.respond(
             UnauthorizedResponse()
@@ -61,6 +61,7 @@ fun Application.userRoute() {
 
         put("/update") {
           val principal = call.principal<JWTPrincipal>() ?: return@put call.respond(UnauthorizedResponse())
+
           val uuid = runCatching { UUID.fromString(principal.subject) }.getOrNull() ?: return@put call.respond(
             UnauthorizedResponse()
           )
@@ -152,28 +153,28 @@ fun Application.userRoute() {
           when (updated) {
             "ok" -> call.genericResponse(
               HttpStatusCode.OK,
-              body.account,
+              payload = body.account,
               message = getResponse("9").message
             )
 
             "unauthorized", "password_mismatch" -> call.respond(UnauthorizedResponse())
 
-            "phone_number_and_email_clash" -> call.genericResponse(
+            "phone_number_and_email_clash" -> call.genericResponseNoPayload(
               HttpStatusCode.Conflict,
               message = getResponse("2").message
             )
 
-            "phone_number_clash" -> call.genericResponse(
+            "phone_number_clash" -> call.genericResponseNoPayload(
               HttpStatusCode.Conflict,
               message = getResponse("0").message
             )
 
-            "email_clash" -> call.genericResponse(
+            "email_clash" -> call.genericResponseNoPayload(
               HttpStatusCode.Conflict,
               message = getResponse("1").message
             )
 
-            else -> call.genericResponse(
+            else -> call.genericResponseNoPayload(
               status = HttpStatusCode.InternalServerError,
               message = getResponse("3").message
             )

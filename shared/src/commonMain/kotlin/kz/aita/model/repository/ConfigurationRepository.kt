@@ -18,9 +18,6 @@ interface ConfigurationRepository {
   val appSizeModeIdState: StateFlow<Long>
 
   val stringRawAuthenticationFailedState: StateFlow<List<LocalizedStringDataModel>>
-  val stringRawLoggingOutInProgressState: StateFlow<List<LocalizedStringDataModel>>
-  val stringRawSessionTimeExpiredLoggingOutState: StateFlow<List<LocalizedStringDataModel>>
-
   val stringAppNameState: StateFlow<String>
   val stringLogInState: StateFlow<String>
   val stringPhoneNumberState: StateFlow<String>
@@ -95,14 +92,14 @@ interface ConfigurationRepository {
   val stringSalePriceState: StateFlow<String>
   val stringReturnPriceState: StateFlow<String>
   val stringCategoryState: StateFlow<String>
-  val stringSupplierState : StateFlow<String>
+  val stringSupplierState: StateFlow<String>
   val stringEnterNameState: StateFlow<String>
   val stringEnterBarcodeState: StateFlow<String>
   val stringEnterSupplyPriceState: StateFlow<String>
   val stringEnterSalePriceState: StateFlow<String>
   val stringEnterReturnPriceState: StateFlow<String>
   val stringSelectCategoryState: StateFlow<String>
-  val stringSelectSupplierState : StateFlow<String>
+  val stringSelectSupplierState: StateFlow<String>
   val stringEditState: StateFlow<String>
   val stringChangePasswordState: StateFlow<String>
   val stringNewPasswordState: StateFlow<String>
@@ -111,13 +108,31 @@ interface ConfigurationRepository {
   val stringConfirmationPasswordState: StateFlow<String>
   val stringRequiredToEditAccountState: StateFlow<String>
   val stringAccountSuccessfullyUpdatedState: StateFlow<String>
-  val stringLoggingOutInProgressState: StateFlow<String>
+  val stringLoggingOutState: StateFlow<String>
   val stringSessionTimeExpiredLoggingOutState: StateFlow<String>
   val stringAliasState: StateFlow<String>
   val stringDescriptionState: StateFlow<String>
   val stringEnterAliasState: StateFlow<String>
   val stringEnterDescriptionState: StateFlow<String>
   val stringOptionalState: StateFlow<String>
+  val stringLoggingInState: StateFlow<String>
+  val stringSigningUpState: StateFlow<String>
+  val stringCompanyFormState: StateFlow<String>
+  val stringMeasurementUnitState: StateFlow<String>
+  val stringNoActiveStoreState: StateFlow<String>
+  val stringSelectInMenuState: StateFlow<String>
+  val stringSupplyDataState: StateFlow<String>
+  val stringSaleDataState: StateFlow<String>
+  val stringReturnDataState: StateFlow<String>
+  val stringAddSupplyDataState: StateFlow<String>
+  val stringAddSaleDataState: StateFlow<String>
+  val stringAddReturnDataState: StateFlow<String>
+  val stringAddBarcodeState: StateFlow<String>
+  val stringAddNameState: StateFlow<String>
+  val stringPaymentState: StateFlow<String>
+  val stringAllState: StateFlow<String>
+  val stringQuickGoodsItemsState: StateFlow<String>
+  val stringCategoriesState: StateFlow<String>
 
   val drawablePathAITALogoState: StateFlow<String>
   val drawablePathIconPasswordState: StateFlow<String>
@@ -172,6 +187,7 @@ interface ConfigurationRepository {
   fun setAppSizeMode(sizeModeId: Long)
 
   fun updateGlobalAppConfiguration(configuration: GlobalAppConfigurationDataModel, resourceConfiguration: GlobalAppConfigurationDataModel)
+
   fun updateStrings(strings: List<LocalizedStringGroupDataModel>, resourceStrings: List<LocalizedStringGroupDataModel>)
 
   fun updateDrawables(drawables: List<StylizedDrawablePathsGroupDataModel>, resourceDrawables: List<StylizedDrawablePathsGroupDataModel>)

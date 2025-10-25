@@ -13,7 +13,7 @@ import kz.aita.core.tokenStore
 import kz.aita.core.userAccountStore
 
 @HiltAndroidApp
-class AITA : Application() {
+class AITA: Application() {
 
   override fun onCreate() {
     super.onCreate()

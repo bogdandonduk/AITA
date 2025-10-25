@@ -11,7 +11,7 @@ interface StoreRepository {
 
   fun getStores()
 
-  fun addStore(store: StoreDataModel)
+  fun addStore(store: StoreDataModel, onCompleted: ((DataState<StoreDataModel>) -> Unit)? = null)
 
   fun updateStore(store: StoreDataModel, onCompleted: ((DataState<StoreDataModel>) -> Unit)? = null)
 

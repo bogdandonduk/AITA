@@ -1,31 +1,14 @@
 package kz.aita.compose.navigation
 
 import kz.aita.AppConfiguration
+import kz.aita.core.StateHost
+
 
 sealed class NavigationScreenModel(
   val route: String,
   open val name: String = route,
   open val iconPath: String = ""
-) {
-
-  private val _state = mutableMapOf<String, String>()
-  val state = _state as Map<String, String>
-
-  fun setState(pair: Pair<String, String>) {
-    _state[pair.first] = pair.second
-  }
-
-  fun removeState(key: String) {
-    _state.remove(key)
-  }
-
-  fun removeStockWarehouse(key: String) {
-    _state.remove(key)
-  }
-
-  fun clearStockWarehouse() {
-    _state.clear()
-  }
+): StateHost() {
 
   sealed class Transaction(route: String): NavigationScreenModel(route) {
 
@@ -54,7 +37,7 @@ sealed class NavigationScreenModel(
 
     data object Selection: Transaction("TransactionSelectionNavigationScreenModelRoute")
 
-    data object Checkout: Transaction("TransactionCheckoutNavigationScreenModelRoute")
+    data object Payment: Transaction("TransactionPaymentNavigationScreenModelRoute")
 
     data object ReceiptPreview: Transaction("TransactionReceiptPreviewNavigationScreenModelRoute")
   }

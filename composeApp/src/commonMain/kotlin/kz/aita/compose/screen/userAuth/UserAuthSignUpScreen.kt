@@ -1,7 +1,6 @@
 package kz.aita.compose.screen.userAuth
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -13,12 +12,12 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import kz.aita.AppConfiguration
 import kz.aita.compose.navigation.Navigation
+import kz.aita.compose.navigation.NavigationScreenModel
 import kz.aita.compose.util.checkAsPersonName
 import kz.aita.compose.util.filterAsPersonName
 import kz.aita.compose.widget.*
 import kz.aita.model.dataModel.UserAuthSignUpDataModel
 import kz.aita.model.repository.UserRepository
-import kz.aita.model.wrapper.DataState
 
 @Composable
 fun AppConfiguration.UserAuthSignUpScreen(
@@ -61,11 +60,17 @@ fun AppConfiguration.UserAuthSignUpScreen(
 
       Spacer(modifier = Modifier.height(outerSpace))
 
-      val phoneNumberTextFieldContent = countrySelectionPhoneNumberTextField()
+      val phoneNumberTextFieldContent = countrySelectionPhoneNumberTextField(
+        stateHost = NavigationScreenModel.UserAuth.SignUp,
+        stateKey = "phone_number",
+      )
 
       Spacer(modifier = Modifier.height(innerSpace))
 
-      val emailTextFieldContent = emailTextField()
+      val emailTextFieldContent = emailTextField(
+        stateHost = NavigationScreenModel.UserAuth.SignUp,
+        stateKey = "email",
+      )
 
       Spacer(modifier = Modifier.height(innerSpace))
 
@@ -74,6 +79,8 @@ fun AppConfiguration.UserAuthSignUpScreen(
         placeholderText = stateValues.stringEnterFirstName,
         leadingIconPath = stateValues.drawablePathIconPerson,
         contentInvalidText = stateValues.stringFirstNameCannotBeEmptyOrJustWhitespaces,
+        stateHost = NavigationScreenModel.UserAuth.SignUp,
+        stateKey = "first_name",
         onContentValidityCheck = {
           it.checkAsPersonName()
         },
@@ -89,6 +96,8 @@ fun AppConfiguration.UserAuthSignUpScreen(
         placeholderText = stateValues.stringEnterLastName,
         leadingIconPath = stateValues.drawablePathIconPerson,
         contentInvalidText = stateValues.stringLastNameCannotBeEmptyOrJustWhitespaces,
+        stateHost = NavigationScreenModel.UserAuth.SignUp,
+        stateKey = "last_name",
         onContentValidityCheck = {
           it.checkAsPersonName()
         },
@@ -99,44 +108,18 @@ fun AppConfiguration.UserAuthSignUpScreen(
 
       Spacer(modifier = Modifier.height(innerSpace))
 
-      val (passwordTextFieldContent, repeatedPasswordTextFieldContent) = repeatedPasswordTextFieldGroup()
-
-//      responseText(
-//        stateValues.stringUserWithThisPhoneNumberIsAlreadyRegistered,
-//        showIf = {
-//          (stateValues.userAccountState as? DataState.Failure)?.exception?.message?.equals(
-//            stateValues.exceptionMessageUserWithThisPhoneNumberIsAlreadyRegistered,
-//            true
-//          ) == true
-//        }
-//      )
-//
-//      responseText(
-//        stateValues.stringUserWithThisEmailAddressIsAlreadyRegistered,
-//        showIf = {
-//          (stateValues.userAccountState as? DataState.Failure)?.exception?.message?.equals(
-//            stateValues.exceptionMessageUserWithThisEmailAddressIsAlreadyRegistered,
-//            true
-//          ) == true
-//        }
-//      )
-
-//      responseText(
-//        stateValues.stringUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered,
-//        showIf = {
-//          (stateValues.userAccountState as? DataState.Failure)?.message?.equals(
-//            stateValues.exceptionMessageUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered,
-//            true
-//          ) == true
-//        }
-//      )
+      val (passwordTextFieldContent, repeatedPasswordTextFieldContent) = repeatedPasswordTextFieldGroup(
+        stateHost = NavigationScreenModel.UserAuth.SignUp,
+        stateKey = "new_password",
+        repeatedStateKey = "repeated_password",
+      )
 
       Spacer(modifier = Modifier.height(outerSpace))
 
       actionButton(
         text = stateValues.stringSignUp,
-        enabled = stateValues.userAccountState !is DataState.Progress,
-        icon = if (stateValues.userAccountState is DataState.Progress) {
+        enabled = stateValues.latestNotification?.message?.equals(stateValues.stringSignUp) != true,
+        icon = if (stateValues.latestNotification?.message?.equals(stateValues.stringSignUp) == true) {
           {
             CircularProgressIndicator(
               color = stateValues.AccentTextColor,

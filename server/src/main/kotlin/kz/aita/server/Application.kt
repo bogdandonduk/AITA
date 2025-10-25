@@ -16,34 +16,24 @@ import io.ktor.server.plugins.conditionalheaders.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.plugins.defaultheaders.*
-import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.json.Json
-import kz.aita.core.jsonBase
 import kz.aita.model.dataModel.LocalizedStringDataModel
-import kz.aita.server.db.GenericGoodsItems
-import kz.aita.server.db.Manufacturers
-import kz.aita.server.db.Suppliers
+import kz.aita.server.db.GenericGoodsCategories
 import kz.aita.server.jwt.TokenService
 import kz.aita.server.jwt.configureJwtAuth
 import kz.aita.server.jwt.jwtConfig
 import kz.aita.server.route.authRoutes
 import kz.aita.server.route.filesRoutes
+import kz.aita.server.route.genericGoodsCategoriesRoute
 import kz.aita.server.route.genericGoodsItemsRoute
+import kz.aita.server.route.stockRoute
 import kz.aita.server.route.storesRoute
+import kz.aita.server.route.suppliersRoute
 import kz.aita.server.route.userRoute
 import org.flywaydb.core.Flyway
-import org.flywaydb.core.internal.database.sqlite.SQLiteDatabase
 import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.lowerCase
-import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.transactions.transaction
-import org.jetbrains.exposed.sql.trim
-import org.jetbrains.exposed.sql.update
-import org.sqlite.SQLiteConfig
-import java.io.File
-import java.sql.DriverManager
 import java.util.UUID
 
 fun main() = EngineMain.main(emptyArray())
@@ -117,8 +107,11 @@ fun Application.module() {
 
   filesRoutes()
   authRoutes(TokenService(jwtConfig()))
+
   userRoute()
   storesRoute()
+  stockRoute()
+  suppliersRoute()
   genericGoodsItemsRoute()
-
+  genericGoodsCategoriesRoute()
 }

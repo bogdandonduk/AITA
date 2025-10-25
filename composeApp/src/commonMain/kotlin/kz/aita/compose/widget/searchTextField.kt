@@ -13,14 +13,23 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kz.aita.AppConfiguration
+import kz.aita.core.StateHost
 
 @Composable
 fun AppConfiguration.searchTextField(
   modifier: Modifier = Modifier,
   valueInitial: String? = null,
-  barcodeCamScanner: Boolean = false
+  stateHost: StateHost,
+  stateKey: String,
+  barcodeCamScanner: Boolean = false,
+  focusedBorderWidth: Dp = stateValues.focusedBorderWidth,
+  unfocusedBorderWidth: Dp = stateValues.unfocusedBorderWidth,
+  focusedBorderColor: Color = stateValues.AccentColor,
+  unfocusedBorderColor: Color = stateValues.PlaceholderTextColor
 ): GenericTextFieldContent {
   var textFieldContent: GenericTextFieldContent? = null
 
@@ -36,7 +45,13 @@ fun AppConfiguration.searchTextField(
 
     textFieldContent = genericTextField(
       valueInitial = valueInitial,
+      stateHost = stateHost,
+      stateKey = stateKey,
       placeholderText = stateValues.stringSearchByAnyData,
+      focusedBorderWidth = focusedBorderWidth,
+      unfocusedBorderWidth = unfocusedBorderWidth,
+      focusedBorderColor = focusedBorderColor,
+      unfocusedBorderColor = unfocusedBorderColor,
       leadingIconPath = stateValues.drawablePathIconSearch,
       trailingIconExtraPath = if (barcodeCamScanner) stateValues.drawablePathIconBarcodeCamScanner else null,
       trailingIconExtraOnClick = if (barcodeCamScanner) {
@@ -44,7 +59,7 @@ fun AppConfiguration.searchTextField(
           barcodeCamScanningExpansionState.targetState =
             !barcodeCamScanningExpansionState.targetState
         }
-      } else null
+      } else null,
     )
 
     AnimatedVisibility(

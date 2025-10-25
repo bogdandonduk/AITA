@@ -12,12 +12,15 @@ import kz.aita.compose.util.checkAsPassword
 import kz.aita.compose.util.getPasswordTransformedTextWithSelectionFocusTextColor
 import kz.aita.compose.util.getTransformedTextWithSelectionFocusTextColor
 import kz.aita.compose.wrapper.ImeWithAction
+import kz.aita.core.StateHost
 
 @Composable
 fun AppConfiguration.passwordTextField(
   modifier: Modifier = Modifier,
   titleText: String? = null,
   placeholderText: String? = null,
+  stateHost: StateHost,
+  stateKey: String,
   contentInvalidText: String? = null,
   imeWithAction: ImeWithAction? = null
 ): GenericTextFieldContent {
@@ -28,6 +31,8 @@ fun AppConfiguration.passwordTextField(
 
   return genericTextField(
     modifier = modifier,
+    stateHost = stateHost,
+    stateKey = stateKey,
     titleText = titleText ?: stateValues.stringPassword,
     placeholderText = placeholderText ?: stateValues.stringEnterPassword,
     leadingIconPath = stateValues.drawablePathIconPassword,

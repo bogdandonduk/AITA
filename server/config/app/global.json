@@ -16,8 +16,12 @@
     "updateStoresPath": "stores/update",
     "deleteStoresPath": "stores/delete",
     "getStockPath": "stock/get",
+    "addGoodsItemPath": "stock/add",
+    "updateGoodsItemPath": "stock/update",
+    "deleteGoodsItemPath": "stock/delete",
     "getGenericGoodsItemsPath": "generic/goodsItems/get",
-    "suppliersPath": "suppliers",
+    "getGenericGoodsCategoriesPath": "generic/goodsCategories/get",
+    "getSuppliersPath": "suppliers/get",
     "stringResourcesPath": "res/string",
     "dimensionResourcesPath": "res/dimension",
     "colorResourcesPath": "res/color",
@@ -47,7 +51,7 @@
         ]
       }
     ],
-    "countries": [
+    "countries":  [
       {
         "locale": "kz",
         "language": "kk",
@@ -114,7 +118,26 @@
         ],
         "phoneNumberCode": "7",
         "phoneNumberSize": 10,
-        "currency": "KZT"
+        "currencies": [
+          {
+            "code": "KZT",
+            "symbol": "₸",
+            "name": [
+              {
+                "language": "en",
+                "value": "Tenge"
+              },
+              {
+                "language": "ru",
+                "value": "Тенге"
+              },
+              {
+                "language": "kk",
+                "value": "Tеңге"
+              }
+            ]
+          }
+        ]
       },
       {
         "locale": "tj",
@@ -182,7 +205,26 @@
         ],
         "phoneNumberCode": "992",
         "phoneNumberSize": 9,
-        "currency": "SM"
+        "currencies": [
+          {
+            "code": "TJS",
+            "symbol": "SM",
+            "name": [
+              {
+                "language": "en",
+                "value": "Somoni"
+              },
+              {
+                "language": "ru",
+                "value": "Cом"
+              },
+              {
+                "language": "kk",
+                "value": "Cом"
+              }
+            ]
+          }
+        ]
       }
     ],
     "languages": [
@@ -239,92 +281,6 @@
           }
         ],
         "flagDrawablePath": "png/flag_kz.png"
-      }
-    ],
-    "currencies": [
-      {
-        "currency": "KZT",
-        "countries": [
-          "kz"
-        ],
-        "symbol": "₸",
-        "name": [
-          {
-            "language": "en",
-            "value": "tenge"
-          },
-          {
-            "language": "ru",
-            "value": "тенге"
-          },
-          {
-            "language": "kk",
-            "value": "теңге"
-          }
-        ]
-      },
-      {
-        "currency": "TJS",
-        "countries": [
-          "tj"
-        ],
-        "symbol": "SM",
-        "name": [
-          {
-            "language": "en",
-            "value": "somoni"
-          },
-          {
-            "language": "ru",
-            "value": "сом"
-          },
-          {
-            "language": "kk",
-            "value": "сом"
-          }
-        ]
-      },
-      {
-        "currency": "RUB",
-        "countries": [
-          "ru"
-        ],
-        "symbol": "₽",
-        "name": [
-          {
-            "language": "en",
-            "value": "rub."
-          },
-          {
-            "language": "ru",
-            "value": "руб."
-          },
-          {
-            "language": "kk",
-            "value": "руб."
-          }
-        ]
-      },
-      {
-        "currency": "USD",
-        "countries": [
-          "us"
-        ],
-        "symbol": "$",
-        "name": [
-          {
-            "language": "en",
-            "value": "US$"
-          },
-          {
-            "language": "ru",
-            "value": "$ США"
-          },
-          {
-            "language": "kk",
-            "value": "US$"
-          }
-        ]
       }
     ],
     "themes": [
