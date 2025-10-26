@@ -7,7 +7,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kz.aita.core.DataStore
 import kz.aita.core.io
 import kz.aita.core.notificationRepository
 import kz.aita.core.stockRepository
@@ -44,7 +43,7 @@ class StoreRepositoryImpl(
     launch(Dispatchers.io) {
 
       genericLocalService
-        .observe(KEY_ACTIVE_STORE_ID)
+        .observeKv(KEY_ACTIVE_STORE_ID)
         .collect {
           it?.let {
             _activeStoreId.emit(it)
@@ -153,7 +152,7 @@ class StoreRepositoryImpl(
   override fun setActiveStoreId(id: String?) {
     launch(Dispatchers.io) {
       genericLocalService
-        .put(KEY_ACTIVE_STORE_ID, id)
+        .putKv(KEY_ACTIVE_STORE_ID, id)
     }
   }
 }

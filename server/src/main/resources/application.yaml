@@ -8,7 +8,7 @@ ktor:
   security:
     jwt:
       issuer: ${?AITA_JWT_ISSUER}
-      audience: ${?AITA_JWT_AUDIENCE}
+      audience: "aita-client"
       realm: "AITA API"
       secret: ${?AITA_JWT_SECRET}
       accessTTL: 300000

@@ -4,11 +4,10 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import io.ktor.server.auth.UnauthorizedResponse
 import io.ktor.server.auth.authenticate
-import io.ktor.server.auth.jwt.JWTPrincipal
-import io.ktor.server.auth.principal
+import io.ktor.server.request.header
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
-import io.ktor.server.routing.post
+import io.ktor.server.routing.get
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.Dispatchers
@@ -17,25 +16,23 @@ import kz.aita.model.dataModel.GenericGoodsItemDataModel
 import kz.aita.model.dataModel.LocalizedStringDataModel
 import kz.aita.server.db.GenericGoodsItems
 import kz.aita.server.db.Users
+import kz.aita.server.util.checkPrincipal
 import kz.aita.server.util.genericResponse
 import kz.aita.server.util.genericResponseNoPayload
 import kz.aita.server.util.getResponse
 import org.jetbrains.exposed.sql.json.contains
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
-import java.util.UUID
 
 fun Application.genericGoodsItemsRoute() {
   routing {
     route("/generic") {
       authenticate("auth-jwt") {
         route("/goodsItems") {
-          post("/get") {
-            val principal = call.principal<JWTPrincipal>() ?: return@post call.respond(UnauthorizedResponse())
-            val userId = runCatching { UUID.fromString(principal.subject) }.getOrNull() ?: return@post call.respond(
-              UnauthorizedResponse()
-            )
-            val body = call.receive<String>()
+          get("/get") {
+            val userId = call.checkPrincipal() ?: return@get
+
+            val barcode = call.request.header("barcode")
 
             val genericGoodsItems: Pair<Int, List<GenericGoodsItemDataModel>?> =
               newSuspendedTransaction(Dispatchers.IO) {
@@ -46,7 +43,7 @@ fun Application.genericGoodsItemsRoute() {
 
                 val matches = GenericGoodsItems
                   .selectAll()
-                  .where { GenericGoodsItems.barcode.contains(listOf(body)) }
+                  .where { GenericGoodsItems.barcode.contains(listOf(barcode)) }
                   .map {
 
                     GenericGoodsItemDataModel(

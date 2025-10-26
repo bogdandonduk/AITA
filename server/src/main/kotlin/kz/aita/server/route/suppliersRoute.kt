@@ -12,6 +12,7 @@ import kz.aita.model.dataModel.LocalizedStringDataModel
 import kz.aita.model.dataModel.SupplierDataModel
 import kz.aita.server.db.Suppliers
 import kz.aita.server.db.Users
+import kz.aita.server.util.checkPrincipal
 import kz.aita.server.util.genericResponse
 import kz.aita.server.util.genericResponseNoPayload
 import kz.aita.server.util.getResponse
@@ -24,10 +25,7 @@ fun Application.suppliersRoute() {
     route("/suppliers") {
       authenticate("auth-jwt") {
         get("/get") {
-          val principal = call.principal<JWTPrincipal>() ?: return@get call.respond(UnauthorizedResponse())
-          val userId = runCatching { UUID.fromString(principal.subject) }.getOrNull() ?: return@get call.respond(
-            UnauthorizedResponse()
-          )
+          val userId = call.checkPrincipal() ?: return@get
 
           val suppliers: Pair<Int, List<SupplierDataModel>?> =
             newSuspendedTransaction(Dispatchers.IO) {

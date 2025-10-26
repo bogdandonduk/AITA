@@ -656,7 +656,7 @@ class ConfigurationRepositoryImpl(
   init {
     launch {
       genericLocalService
-        .observe(KEY_APP_LOCALE)
+        .observeKv(KEY_APP_LOCALE)
         .collect {
           it?.let {
             _appLanguageState.emit(it)
@@ -666,7 +666,7 @@ class ConfigurationRepositoryImpl(
 
     launch {
       genericLocalService
-        .observe(KEY_APP_THEME)
+        .observeKv(KEY_APP_THEME)
         .collect {
           it?.let {
             _appThemeIdState.emit(it.toLong())
@@ -676,7 +676,7 @@ class ConfigurationRepositoryImpl(
 
     launch {
       genericLocalService
-        .observe(KEY_APP_SIZE_MODE)
+        .observeKv(KEY_APP_SIZE_MODE)
         .collect {
           it?.let {
             _appSizeModeIdState.emit(it.toLong())
@@ -792,21 +792,21 @@ class ConfigurationRepositoryImpl(
   override fun setAppLocale(language: String) {
     launch {
       genericLocalService
-        .put(KEY_APP_LOCALE, language)
+        .putKv(KEY_APP_LOCALE, language)
     }
   }
 
   override fun setAppTheme(themeId: Long) {
     launch(Dispatchers.io) {
       genericLocalService
-        .put(KEY_APP_THEME, themeId.toString())
+        .putKv(KEY_APP_THEME, themeId.toString())
     }
   }
 
   override fun setAppSizeMode(sizeModeId: Long) {
     launch {
       genericLocalService
-        .put(KEY_APP_SIZE_MODE, sizeModeId.toString())
+        .putKv(KEY_APP_SIZE_MODE, sizeModeId.toString())
     }
   }
 

@@ -10,21 +10,22 @@ import kz.aita.KeyValueDatabase
 import kz.aita.core.io
 
 class GenericLocalService(
-  private val keyValueDatabase: KeyValueDatabase
+  private val keyValueDatabase: KeyValueDatabase,
+
 ) {
 
-  suspend fun put(key: String, value: String?) {
+  suspend fun putKv(key: String, value: String?) {
     keyValueDatabase.key_valueQueries.insert(key, value)
   }
 
-  suspend fun get(key: String): String? =
+  suspend fun getKv(key: String): String? =
     keyValueDatabase.key_valueQueries.selectByKey(key).awaitAsOneOrNull()?.value_
 
-  suspend fun delete(key: String) {
+  suspend fun deleteKv(key: String) {
     keyValueDatabase.key_valueQueries.delete(key)
   }
 
-  fun observe(key: String): Flow<String?> =
+  fun observeKv(key: String): Flow<String?> =
     keyValueDatabase.key_valueQueries.selectByKey(key)
       .asFlow()
       .mapToOneOrNull(Dispatchers.io)

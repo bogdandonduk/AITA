@@ -10,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kz.aita.model.dataModel.GenericGoodsCategoryDataModel
 import kz.aita.server.db.GenericGoodsCategories
 import kz.aita.server.db.Users
+import kz.aita.server.util.checkPrincipal
 import kz.aita.server.util.genericResponse
 import kz.aita.server.util.genericResponseNoPayload
 import kz.aita.server.util.getResponse
@@ -23,10 +24,7 @@ fun Application.genericGoodsCategoriesRoute() {
       authenticate("auth-jwt") {
         route("/goodsCategories") {
           get("/get") {
-            val principal = call.principal<JWTPrincipal>() ?: return@get call.respond(UnauthorizedResponse())
-            val userId = runCatching { UUID.fromString(principal.subject) }.getOrNull() ?: return@get call.respond(
-              UnauthorizedResponse()
-            )
+            val userId = call.checkPrincipal() ?: return@get
 
             val genericGoodsCategories: Pair<Int, List<GenericGoodsCategoryDataModel>?> =
               newSuspendedTransaction(Dispatchers.IO) {

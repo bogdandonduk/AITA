@@ -32,9 +32,9 @@ class GenericItemsRepositoryImpl(
       getGenericGoodsItemsMutex.withLock {
         val response = genericRemoteService
           .request<List<GenericGoodsItemDataModel>, String>(
-            method = HttpMethod.Post,
+            method = HttpMethod.Get,
             endpointUrl = configurationRepository.globalAppConfigurationState.payloadValue.getGenericGoodsItemsPath,
-            body = barcode
+            headers = mapOf("barcode" to barcode)
           )
 
           if (!response.negative) {

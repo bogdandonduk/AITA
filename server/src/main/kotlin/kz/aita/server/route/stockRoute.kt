@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kz.aita.model.dataModel.GoodsItemDataModel
 import kz.aita.server.db.Stock
 import kz.aita.server.db.Users
+import kz.aita.server.util.checkPrincipal
 import kz.aita.server.util.genericResponse
 import kz.aita.server.util.genericResponseNoPayload
 import kz.aita.server.util.getResponse
@@ -27,11 +28,7 @@ fun Application.stockRoute() {
     route("/stock") {
       authenticate("auth-jwt") {
         get("/get") {
-          val principal = call.principal<JWTPrincipal>() ?: return@get call.respond(UnauthorizedResponse())
-
-          val userId = runCatching { UUID.fromString(principal.subject) }.getOrNull() ?: return@get call.respond(
-            UnauthorizedResponse()
-          )
+          val userId = call.checkPrincipal() ?: return@get
 
           val goodsItems = newSuspendedTransaction(Dispatchers.IO) {
             val noUser = Users
@@ -72,10 +69,7 @@ fun Application.stockRoute() {
         }
 
         post("/add") {
-          val principal = call.principal<JWTPrincipal>() ?: return@post call.respond(UnauthorizedResponse())
-
-          val userId = runCatching { UUID.fromString(principal.subject) }
-            .getOrNull() ?: return@post call.respond(UnauthorizedResponse())
+          val userId = call.checkPrincipal() ?: return@post
 
           val noUser = newSuspendedTransaction(Dispatchers.IO) {
             Users
@@ -139,10 +133,7 @@ fun Application.stockRoute() {
         }
 
         put("/update") {
-          val principal = call.principal<JWTPrincipal>() ?: return@put call.respond(UnauthorizedResponse())
-          val userId = runCatching { UUID.fromString(principal.subject) }.getOrNull() ?: return@put call.respond(
-            UnauthorizedResponse()
-          )
+          val userId = call.checkPrincipal() ?: return@put
 
           val noUser = newSuspendedTransaction(Dispatchers.IO) {
             Users
@@ -212,10 +203,7 @@ fun Application.stockRoute() {
         }
 
         delete("/delete") {
-          val principal = call.principal<JWTPrincipal>() ?: return@delete call.respond(UnauthorizedResponse())
-          val userId = runCatching { UUID.fromString(principal.subject) }.getOrNull() ?: return@delete call.respond(
-            UnauthorizedResponse()
-          )
+          val userId = call.checkPrincipal() ?: return@delete
 
           val body = call.receive<String>()
           val storeId = UUID.fromString(call.request.header("store_id"))
