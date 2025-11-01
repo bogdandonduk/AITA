@@ -3,11 +3,9 @@ package kz.aita.compose.screen.stock
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -20,7 +18,8 @@ import kotlinx.coroutines.launch
 import kz.aita.AppConfiguration
 import kz.aita.compose.navigation.Navigation
 import kz.aita.compose.navigation.NavigationScreenModel
-import kz.aita.compose.util.isNumericalDoubleString
+import kz.aita.core.isNumericalDoubleString
+import kz.aita.core.toLocalizedSingleMain
 import kz.aita.compose.widget.DomainSelectionTextFieldGroupItemContent
 import kz.aita.compose.widget.DropdownListWidgetContent
 import kz.aita.compose.widget.ScreenAppBarWidget
@@ -77,8 +76,9 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
             placeholderText = stateValues.stringEnterBarcode,
             stateHost = NavigationScreenModel.Stock.AddEditGoodsItem,
             stateKey = "barcode",
-            domains = emptyList(),
-            actionButtonText = stateValues.stringAddBarcode,
+            domains = emptyList<SelectableDomain>(),
+            addDomainActionButtonText = stateValues.stringAddBarcode,
+            addSecondaryDomainActionButtonText = stateValues.stringAddBarcode,
             isFocusedInitial = true,
             valueInitial = editedGoodsItem?.barcode?.map {
               DomainSelectionTextFieldGroupItemContent(
@@ -211,7 +211,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
                 add(
                   SelectableDomain(
                     id = currency.code,
-                    displayId = listOf(LocalizedStringDataModel("main", currency.symbol)),
+                    displayId = currency.symbol.toLocalizedSingleMain(),
                     name = currency.name,
                     iconPath = it.flagDrawablePath
                   )
@@ -222,7 +222,8 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
           keyboardType = KeyboardType.Number,
           onFilterValue = priceOnFilterValue,
           onContentValidityCheck = priceOnContentValidityCheck,
-          actionButtonText = stateValues.stringAddSupplyData
+          addDomainActionButtonText = stateValues.stringAddSupplyData,
+          addSecondaryDomainActionButtonText = stateValues.stringAddSupplyData
         )
 
         Spacer(
@@ -258,7 +259,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
                 add(
                   SelectableDomain(
                     id = currency.code,
-                    displayId = listOf(LocalizedStringDataModel("main", currency.symbol)),
+                    displayId = currency.symbol.toLocalizedSingleMain(),
                     name = currency.name,
                     iconPath = it.flagDrawablePath
                   )
@@ -269,7 +270,8 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
           keyboardType = KeyboardType.Number,
           onFilterValue = priceOnFilterValue,
           onContentValidityCheck = priceOnContentValidityCheck,
-          actionButtonText = stateValues.stringAddSaleData
+          addDomainActionButtonText = stateValues.stringAddSaleData,
+          addSecondaryDomainActionButtonText = stateValues.stringAddSaleData
         )
 
         Spacer(
@@ -305,7 +307,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
                 add(
                   SelectableDomain(
                     id = currency.code,
-                    displayId = listOf(LocalizedStringDataModel("main", currency.symbol)),
+                    displayId = currency.symbol.toLocalizedSingleMain(),
                     name = currency.name,
                     iconPath = it.flagDrawablePath
                   )
@@ -316,7 +318,8 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
           keyboardType = KeyboardType.Number,
           onFilterValue = priceOnFilterValue,
           onContentValidityCheck = priceOnContentValidityCheck,
-          actionButtonText = stateValues.stringAddReturnData
+          addDomainActionButtonText = stateValues.stringAddReturnData,
+          addSecondaryDomainActionButtonText = stateValues.stringAddReturnData,
         )
 
         Spacer(

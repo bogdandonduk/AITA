@@ -70,11 +70,11 @@ class ConfigurationRepositoryImpl(
             )
           ),
           parameters = listOf(
-            CompanyFormParameterDataModel(
+            ParameterDataModel(
               name = listOf(
                 LocalizedStringDataModel(
                   language = "en",
-                  value = "БИН>",
+                  value = "БИН",
                 ),
                 LocalizedStringDataModel(
                   language = "ru",
@@ -85,6 +85,7 @@ class ConfigurationRepositoryImpl(
                   value = "БИН"
                 )
               ),
+              value = "",
               length = 12,
               number = true,
               nonLetterSymbolsEnabled = false
@@ -566,9 +567,9 @@ class ConfigurationRepositoryImpl(
   private val _stringQuickState = MutableStateFlow("Quick")
   override val stringQuickGoodsItemsState = _stringQuickState.asStateFlow()
   private val _stringCategoriesState = MutableStateFlow("Categories")
-
   override val stringCategoriesState = _stringCategoriesState.asStateFlow()
-
+  private val _stringMainState = MutableStateFlow("Main")
+  override val stringMainState = _stringMainState.asStateFlow()
 
   private val _drawablePathAITALogoState = MutableStateFlow("svg/0_0.svg")
   override val drawablePathAITALogoState = _drawablePathAITALogoState.asStateFlow()
@@ -1378,7 +1379,12 @@ class ConfigurationRepositoryImpl(
           appLanguageState.value
         )!!
       )
-
+      _stringMainState.emit(
+        strings.extractString(115, appLanguageState.value) ?: resourceStrings.extractString(
+          115,
+          appLanguageState.value
+        )!!
+      )
     }
   }
 

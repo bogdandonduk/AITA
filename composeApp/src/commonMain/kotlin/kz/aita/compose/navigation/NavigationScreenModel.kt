@@ -91,7 +91,12 @@ sealed class NavigationScreenModel(
       override val name: String
         get() = AppConfiguration.stateValues.stringStores
     }
-    data object AddEditStore: Menu("MenuAddEditStoreNavigationScreenModelRoute")
+    data object AddEditStore: Menu("MenuAddEditStoreNavigationScreenModelRoute") {
+      const val KEY_STATE_EDITED_STORE_ID: String = "keyState_editedStoreId"
+      const val KEY_STATE_NAME: String = "keyState_name"
+      const val KEY_STATE_ALIAS: String = "keyState_alias"
+      const val KEY_STATE_DESCRIPTION: String = "keyState_description"
+    }
 
     data object Analytics: Menu("MenuAnalyticsNavigationScreenModelRoute") {
       override val iconPath: String

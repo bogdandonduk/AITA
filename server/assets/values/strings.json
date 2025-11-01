@@ -2416,6 +2416,27 @@
           "value": "Санаттар"
         }
       ]
+    },
+    {
+      "id": 115,
+      "values": [
+        {
+          "language": "main",
+          "value": "Main"
+        },
+        {
+          "language": "en",
+          "value": "Main"
+        },
+        {
+          "language": "ru",
+          "value": "Основной"
+        },
+        {
+          "language": "kk",
+          "value": "Негізгі"
+        }
+      ]
     }
   ]
 }

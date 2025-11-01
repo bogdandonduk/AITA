@@ -2,32 +2,24 @@ package kz.aita.compose.screen.menu
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kz.aita.AppConfiguration
 import kz.aita.compose.navigation.Navigation
 import kz.aita.compose.navigation.NavigationScreenModel
-import kz.aita.compose.util.checkAsPersonName
-import kz.aita.compose.util.filterAsPersonName
+import kz.aita.core.checkAsPersonName
+import kz.aita.core.filterAsPersonName
 import kz.aita.compose.widget.*
 import kz.aita.compose.wrapper.ImeWithAction
 import kz.aita.core.userRepository
-import kz.aita.model.dataModel.NotificationType
 import kz.aita.model.dataModel.UserAccountDataModel
 import kz.aita.model.dataModel.UserAccountUpdateDataModel
-import kz.aita.model.wrapper.DataState
 
 @Composable
 fun AppConfiguration.MenuUserAccountScreen() {

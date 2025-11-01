@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
@@ -71,7 +70,8 @@ fun AppConfiguration.domainSelectionTextField(
   cornerRadius: Dp = stateValues.cornerRadius,
   keyboardType: KeyboardType = KeyboardType.Text,
   isFocusedInitial: Boolean = false,
-  showName: Boolean = false,
+  secondaryDomainsShowId: Boolean = true,
+  secondaryDomainsShowName: Boolean = true,
   contentInvalidText: String? = null,
   onContentValidityCheck: ((String, String) -> Boolean)? = null,
   onFilterValue: ((String, String) -> Boolean)? = null,
@@ -247,7 +247,8 @@ fun AppConfiguration.domainSelectionTextField(
                     modifier = Modifier
                       .fillParentMaxWidth(),
                     domain = domain,
-                    showName = showName
+                    showId = secondaryDomainsShowId,
+                    showName = secondaryDomainsShowName
                   ) {
                     selectedSecondaryId = domain.id
 
@@ -283,6 +284,8 @@ fun AppConfiguration.domainSelectionTextField(
               domain = this,
               state = isSecondaryDomainSelectionDropdownExpandedState,
               showExpansion = true,
+              showId = secondaryDomainsShowId,
+              showName = false,
               onClick = selectionSecondaryEnabled.takeIf { it }?.run {
                 {
                   isSecondaryDomainSelectionDropdownExpandedState.targetState =
@@ -333,7 +336,7 @@ fun AppConfiguration.domainSelectionTextField(
           modifier = Modifier
             .fillMaxWidth(),
           domain = selected!!,
-          showName = showName,
+          showName = secondaryDomainsShowName,
           state = isDomainSelectionDropdownExpandedState,
           showExpansion = true
         ) {
@@ -401,7 +404,7 @@ fun AppConfiguration.domainSelectionTextField(
                     modifier = Modifier
                       .fillParentMaxWidth(),
                     domain = domain,
-                    showName = showName
+                    showName = secondaryDomainsShowName
                   ) {
                     selectedId = domain.id
 

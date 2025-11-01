@@ -27,14 +27,17 @@ fun AppConfiguration.domainSelectionTextFieldGroupWidget(
   valueInitial: List<DomainSelectionTextFieldGroupItemContent>? = null,
   domains: List<SelectableDomain>,
   secondaryDomains: List<SelectableDomain>? = null,
-  actionButtonText: String,
+  secondaryDomainsShowId: Boolean = true,
+  secondaryDomainsShowName: Boolean = true,
+  addDomainActionButtonText: String,
+  addSecondaryDomainActionButtonText: String,
   keyboardType: KeyboardType = KeyboardType.Text,
   isFocusedInitial: Boolean = false,
   onFilterValue: ((String, String) -> Boolean)? = null,
   onContentValidityCheck: ((String, String) -> Boolean)? = null,
 ): DomainSelectionTextFieldGroupWidgetContent {
   var data: List<DomainSelectionTextFieldGroupItemContent> by rememberSaveable {
-    mutableStateOf(valueInitial ?: listOf(DomainSelectionTextFieldGroupItemContent(TextFieldValue(""), "", "")))
+    mutableStateOf(valueInitial ?: listOf(DomainSelectionTextFieldGroupItemContent(TextFieldValue(""), domains.takeIf { it.isNotEmpty() }?.first()?.id ?: "", secondaryDomains?.takeIf { it.isNotEmpty() }?.first()?.id ?: "")))
   }
 
   LaunchedEffect(valueInitial) {
@@ -43,13 +46,23 @@ fun AppConfiguration.domainSelectionTextFieldGroupWidget(
     }
   }
 
+  var availableDomains by rememberSaveable { mutableStateOf(domains) }
+  var availableSecondaryDomains by rememberSaveable { mutableStateOf(secondaryDomains) }
+
+  LaunchedEffect(data) {
+    println("secondary domains ${secondaryDomains?.map { it.id }}")
+    println("data domains ${data.map { it.selectedSecondaryDomainId }}")
+    availableDomains = domains.filter { domain -> data.find { it.selectedDomainId == domain.id } == null }
+    availableSecondaryDomains = secondaryDomains?.filter { secondaryDomain -> data.find { it.selectedSecondaryDomainId == secondaryDomain.id } == null }
+  }
+
   Column(
     modifier = modifier
       .fillMaxWidth()
   ) {
     data.forEachIndexed { index, item ->
       val instance = domainSelectionTextField(
-        titleText = "$titleText ${index + 1}",
+        titleText = if (data.size == 1 && index == 0) titleText else "$titleText ${index + 1}",
         placeholderText = placeholderText,
         valueInitial = item.value.text,
         stateHost = stateHost,
@@ -74,9 +87,11 @@ fun AppConfiguration.domainSelectionTextFieldGroupWidget(
         },
         domains = domains,
         selectedInitial = item.selectedDomainId,
-        secondaryDomains = secondaryDomains,
+        secondaryDomains = availableSecondaryDomains,
         selectedSecondaryInitial = item.selectedSecondaryDomainId,
         displayFullDomain = true,
+        secondaryDomainsShowId = secondaryDomainsShowId,
+        secondaryDomainsShowName = secondaryDomainsShowName,
         keyboardType = keyboardType,
         isFocusedInitial = isFocusedInitial && index == data.lastIndex,
         onFilterValue = onFilterValue,
@@ -102,16 +117,29 @@ fun AppConfiguration.domainSelectionTextFieldGroupWidget(
       }
     }
 
-    actionButton(
-      modifier = Modifier
-        .fillMaxWidth(),
-      text = actionButtonText,
-      iconPath = stateValues.drawablePathIconAdd
-    ) {
-      data = data.toMutableList().apply {
-        add(DomainSelectionTextFieldGroupItemContent(TextFieldValue(), "", ""))
+    if (availableDomains.isNotEmpty())
+      actionButton(
+        modifier = Modifier
+          .fillMaxWidth(),
+        text = addDomainActionButtonText,
+        iconPath = stateValues.drawablePathIconAdd
+      ) {
+        data = data.toMutableList().apply {
+          add(DomainSelectionTextFieldGroupItemContent(TextFieldValue(), availableDomains.takeIf { it.isNotEmpty() }?.first()?.id ?: "", availableSecondaryDomains?.takeIf { it.isNotEmpty() }?.first()?.id ?: ""))
+        }
       }
-    }
+
+    if (!addSecondaryDomainActionButtonText.equals(addDomainActionButtonText, true) && availableSecondaryDomains?.isNotEmpty() == true)
+      actionButton(
+        modifier = Modifier
+          .fillMaxWidth(),
+        text = addSecondaryDomainActionButtonText,
+        iconPath = stateValues.drawablePathIconAdd
+      ) {
+        data = data.toMutableList().apply {
+          add(DomainSelectionTextFieldGroupItemContent(TextFieldValue(), availableDomains.takeIf { it.isNotEmpty() }?.first()?.id ?: "", availableSecondaryDomains?.takeIf { it.isNotEmpty() }?.first()?.id ?: ""))
+        }
+      }
   }
 
   return DomainSelectionTextFieldGroupWidgetContent(data)

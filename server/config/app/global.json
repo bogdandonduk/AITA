@@ -44,6 +44,7 @@
               { "language": "ru", "value": "БИН" },
               { "language": "kk", "value": "БИН" }
             ],
+            "value": "",
             "length": 12,
             "number": true,
             "nonLetterSymbolsEnabled": false

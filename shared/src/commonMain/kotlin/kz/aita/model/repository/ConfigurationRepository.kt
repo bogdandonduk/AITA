@@ -133,6 +133,7 @@ interface ConfigurationRepository {
   val stringAllState: StateFlow<String>
   val stringQuickGoodsItemsState: StateFlow<String>
   val stringCategoriesState: StateFlow<String>
+  val stringMainState: StateFlow<String>
 
   val drawablePathAITALogoState: StateFlow<String>
   val drawablePathIconPasswordState: StateFlow<String>

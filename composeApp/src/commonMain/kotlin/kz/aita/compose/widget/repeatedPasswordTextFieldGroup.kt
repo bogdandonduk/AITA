@@ -9,9 +9,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.dp
 import kz.aita.AppConfiguration
-import kz.aita.compose.util.checkAsPassword
+import kz.aita.core.checkAsPassword
 import kz.aita.compose.util.getPasswordTransformedTextWithSelectionFocusTextColor
 import kz.aita.compose.util.getTransformedTextWithSelectionFocusTextColor
 import kz.aita.compose.wrapper.ImeWithAction

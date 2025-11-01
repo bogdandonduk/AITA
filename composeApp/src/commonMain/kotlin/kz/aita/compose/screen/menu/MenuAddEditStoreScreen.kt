@@ -3,7 +3,6 @@ package kz.aita.compose.screen.menu
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -15,6 +14,7 @@ import kz.aita.compose.widget.ScreenAppBarWidget
 import kz.aita.compose.widget.SelectableDomain
 import kz.aita.compose.widget.actionButton
 import kz.aita.compose.widget.countrySelectionPhoneNumberTextField
+import kz.aita.compose.widget.domainSelectionTextFieldGroupWidget
 import kz.aita.compose.widget.dropdownListWidget
 import kz.aita.compose.widget.emailTextField
 import kz.aita.compose.widget.genericTextField
@@ -23,6 +23,7 @@ import kz.aita.core.storeRepository
 import kz.aita.model.dataModel.LocalizedStringDataModel
 import kz.aita.model.dataModel.LocationDataModel
 import kz.aita.model.dataModel.StoreDataModel
+import kotlin.collections.emptyList
 
 @Composable
 fun AppConfiguration.MenuAddEditStoreScreen() {
@@ -31,7 +32,7 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
       .fillMaxSize(),
     horizontalAlignment = Alignment.CenterHorizontally
   ) {
-    val editedStore = NavigationScreenModel.Menu.AddEditStore.state.value["state_editedStoreId"]?.run { stateValues.stores?.find { store -> store.id == this } }
+    val editedStore = NavigationScreenModel.Menu.AddEditStore.state.value[NavigationScreenModel.Menu.AddEditStore.KEY_STATE_EDITED_STORE_ID]?.run { stateValues.stores?.find { store -> store.id == this } }
 
     ScreenAppBarWidget(
       title = if (editedStore != null) stateValues.stringEditStore else stateValues.stringAddStore,
@@ -40,7 +41,7 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
         coroutineScope.launch {
           Navigation.Menu.pop(stateValues.isNarrowScreen)
           if (editedStore != null)
-            NavigationScreenModel.Menu.AddEditStore.removeState("state_editedStoreId")
+            NavigationScreenModel.Menu.AddEditStore.removeState(NavigationScreenModel.Menu.AddEditStore.KEY_STATE_EDITED_STORE_ID)
         }
       }
     )
@@ -54,35 +55,80 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
         .padding(start = 8.dp, top = 24.dp, end = 8.dp)
     ) {
       item {
-        val innerSpace = 8.dp
         val outerSpace = 16.dp
 
-        val nameTextFieldContent =
-          genericTextField(
-            titleText = stateValues.stringName,
-            placeholderText = stateValues.stringEnterName,
-            valueInitial = editedStore?.name?.extractLocalizedString(stateValues.appLanguage),
-            stateHost = NavigationScreenModel.Menu.AddEditStore,
-            stateKey = "name",
-          )
+        val nameData = domainSelectionTextFieldGroupWidget(
+          titleText = stateValues.stringName,
+          placeholderText = stateValues.stringEnterName,
+          stateHost = NavigationScreenModel.Menu.AddEditStore,
+          stateKey = NavigationScreenModel.Menu.AddEditStore.KEY_STATE_NAME,
+          domains = emptyList<SelectableDomain>(),
+          secondaryDomains = mutableListOf<SelectableDomain>().apply {
+            add(
+              SelectableDomain(
+                id = "main",
+                displayId = stateValues.stringMain,
+                name = stateValues.stringMain,
+                iconPath = null
+              )
+            )
 
-        Spacer(
-          modifier = Modifier
-            .height(innerSpace)
+            stateValues.globalAppConfiguration.languages.forEach { language ->
+              add(
+                SelectableDomain(
+                  id = language.language,
+                  displayId = language.name,
+                  name = language.name,
+                  iconPath = language.flagDrawablePath
+                )
+              )
+            }
+          },
+          secondaryDomainsShowName = false,
+          addDomainActionButtonText = "",
+          addSecondaryDomainActionButtonText = stateValues.stringAddName,
         )
 
-        val aliasTextFieldContent =
-          genericTextField(
-            titleText = stateValues.stringAlias,
-            placeholderText = stateValues.stringOptional,
-            valueInitial = editedStore?.alias?.extractLocalizedString(stateValues.appLanguage),
-            stateHost = NavigationScreenModel.Menu.AddEditStore,
-            stateKey = "alias",
-          )
+        Spacer(
+          modifier = Modifier
+            .height(stateValues.marginTextFieldGroup)
+        )
+
+        val alias = domainSelectionTextFieldGroupWidget(
+          titleText = stateValues.stringAlias,
+          placeholderText = stateValues.stringEnterAlias,
+          stateHost = NavigationScreenModel.Menu.AddEditStore,
+          stateKey = NavigationScreenModel.Menu.AddEditStore.KEY_STATE_ALIAS,
+          domains = emptyList(),
+          secondaryDomains = mutableListOf<SelectableDomain>().apply {
+            add(
+              SelectableDomain(
+                id = "main",
+                displayId = stateValues.stringMain,
+                name = stateValues.stringMain,
+                iconPath = null
+              )
+            )
+
+            stateValues.globalAppConfiguration.languages.forEach { language ->
+              add(
+                SelectableDomain(
+                  id = language.language,
+                  displayId = language.name,
+                  name = language.name,
+                  iconPath = language.flagDrawablePath
+                )
+              )
+            }
+          },
+          secondaryDomainsShowName = false,
+          addDomainActionButtonText = "",
+          addSecondaryDomainActionButtonText = stateValues.stringAddName,
+        )
 
         Spacer(
           modifier = Modifier
-            .height(innerSpace)
+            .height(stateValues.marginTextFieldGroup)
         )
 
         val descriptionTextFieldContent =
@@ -96,7 +142,7 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
 
         Spacer(
           modifier = Modifier
-            .height(innerSpace)
+            .height(stateValues.marginTextFieldGroup)
         )
 
         val phoneNumberTextFieldContent = countrySelectionPhoneNumberTextField(
@@ -105,7 +151,7 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
           stateKey = "phone_number",
         )
 
-        Spacer(modifier = Modifier.height(innerSpace))
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
         var goAction: (() -> Unit)? = null
         val emailTextFieldContent = emailTextField(
@@ -114,7 +160,7 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
           stateKey = "email",
         )
 
-        Spacer(modifier = Modifier.height(innerSpace))
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
         val companyFormDropdownListContent = dropdownListWidget(
           titleText = stateValues.stringCompanyForm,
@@ -135,14 +181,14 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
         goAction = {
           softKeyboardController?.hide()
 
-          nameTextFieldContent.checkContentValidity()
+//          nameTextFieldContent.checkContentValidity()
 
           phoneNumberTextFieldContent.checkContentValidity()
           emailTextFieldContent.checkContentValidity()
 
           if (
-            nameTextFieldContent.isContentValid
-            && phoneNumberTextFieldContent.isContentValid
+//            nameTextFieldContent.isContentValid &&
+            phoneNumberTextFieldContent.isContentValid
             && emailTextFieldContent.isContentValid
           ) {
             if (editedStore != null) {
@@ -151,13 +197,13 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                   store = StoreDataModel(
                     id = editedStore.id,
                     userIds = emptyList(),
-                    typeIds = emptyList(),
-                    name = listOf(
+                    storeTypeIds = emptyList(),
+                    name = nameData.data.map {
                       LocalizedStringDataModel(
-                        language = "main",
-                        value = nameTextFieldContent.value.text.trim()
+                        it.selectedSecondaryDomainId,
+                        it.value.text
                       )
-                    ),
+                    },
                     alias = if (aliasTextFieldContent.value.text.isNotEmpty()) {
                       listOf(
                         LocalizedStringDataModel(
@@ -165,7 +211,7 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                           value = aliasTextFieldContent.value.text.trim()
                         )
                       )
-                    } else null,
+                    } else emptyList(),
                     description = if (descriptionTextFieldContent.value.text.isNotEmpty()) {
                       listOf(
                         LocalizedStringDataModel(
@@ -173,9 +219,8 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                           value = descriptionTextFieldContent.value.text.trim()
                         )
                       )
-                    } else null,
-                    companyForms = stateValues.globalAppConfiguration.companyForms.find { it.id == companyFormDropdownListContent.selectedId }
-                      ?.run { listOf(this) },
+                    } else emptyList(),
+                    companyForms = stateValues.globalAppConfiguration.companyForms.find { it.id == companyFormDropdownListContent.selectedId }!!.run { listOf(this) },
                     location = stateValues.globalAppConfiguration.countries.first().cities.first().run {
                       LocationDataModel(
                         name = name.extractLocalizedString(stateValues.appLanguage) ?: "Some location",
@@ -190,7 +235,7 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                       }.phoneNumberCode.lowercase() + phoneNumberTextFieldContent.value.text.trim().lowercase()
                     ),
                     emails = listOf(emailTextFieldContent.value.text.trim().lowercase()),
-
+                    countryLocales = listOf(),
                     createdAt = 0L,
                     isActive = true
                   )
@@ -205,11 +250,11 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                   store = StoreDataModel(
                     id = "",
                     userIds = emptyList(),
-                    typeIds = emptyList(),
+                    storeTypeIds = emptyList(),
                     name = listOf(
                       LocalizedStringDataModel(
                         language = "main",
-                        value = nameTextFieldContent.value.text.trim()
+                        value = "" // nameTextFieldContent.value.text.trim()
                       )
                     ),
                     alias = if (aliasTextFieldContent.value.text.isNotEmpty()) {
@@ -219,7 +264,7 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                           value = aliasTextFieldContent.value.text.trim()
                         )
                       )
-                    } else null,
+                    } else emptyList(),
                     description = if (descriptionTextFieldContent.value.text.isNotEmpty()) {
                       listOf(
                         LocalizedStringDataModel(
@@ -227,9 +272,9 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                           value = descriptionTextFieldContent.value.text.trim()
                         )
                       )
-                    } else null,
+                    } else emptyList(),
                     companyForms = stateValues.globalAppConfiguration.companyForms.find { it.id == companyFormDropdownListContent.selectedId }
-                      ?.run { listOf(this) },
+                      !!.run { listOf(this) },
                     location = stateValues.globalAppConfiguration.countries.first().cities.first().run {
                       LocationDataModel(
                         name = name.extractLocalizedString(stateValues.appLanguage) ?: "Some location",
@@ -244,7 +289,7 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                       }.phoneNumberCode.lowercase() + phoneNumberTextFieldContent.value.text.trim().lowercase()
                     ),
                     emails = listOf(emailTextFieldContent.value.text.trim().lowercase()),
-
+                    countryLocales = emptyList(),
                     createdAt = 0L,
                     isActive = true
                   )

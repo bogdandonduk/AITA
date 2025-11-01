@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import kz.aita.AppConfiguration
-import kz.aita.compose.util.checkAsEmail
+import kz.aita.core.checkAsEmail
 import kz.aita.compose.wrapper.ImeWithAction
 import kz.aita.core.StateHost
 

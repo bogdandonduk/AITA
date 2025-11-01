@@ -46,7 +46,7 @@ suspend inline fun <reified T> RoutingCall.genericResponse(
 suspend fun RoutingCall.checkPrincipal(): UUID? {
   val principal = principal<JWTPrincipal>()
 
-  if (principal == null){
+  if (principal == null) {
     respond(UnauthorizedResponse())
     return null
   }

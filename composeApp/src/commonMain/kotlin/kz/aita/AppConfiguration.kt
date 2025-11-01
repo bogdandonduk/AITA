@@ -210,12 +210,15 @@ object AppConfiguration {
     val stringAddSupplyData: String
     val stringAddSaleData: String
     val stringAddReturnData: String
+
     val stringAddBarcode: String
     val stringAddName: String
     val stringPayment: String
     val stringAll: String
     val stringQuick: String
     val stringCategories: String
+    val stringMain: String
+    val stringAddTranslation: String
 
     val screenWidth: Dp
     val screenHeight: Dp
@@ -543,6 +546,7 @@ object AppConfiguration {
       override val stringAll: String by configurationRepository.stringAllState.collectAsState()
       override val stringQuick: String by configurationRepository.stringQuickGoodsItemsState.collectAsState()
       override val stringCategories: String by configurationRepository.stringCategoriesState.collectAsState()
+      override val stringMain: String by configurationRepository.stringMainState.collectAsState()
 
       override val screenWidth: Dp by _screenWidthState.collectAsState()
       override val screenHeight: Dp by _screenHeightState.collectAsState()

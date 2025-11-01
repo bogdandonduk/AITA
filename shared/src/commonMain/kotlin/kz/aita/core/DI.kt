@@ -57,6 +57,7 @@ var httpClient =
         loadTokens {
           withContext(Dispatchers.io) {
             tokenStore?.get()?.let {
+              println("loaded token is $it")
               BearerTokens(it.accessToken, it.refreshToken)
             }
           }

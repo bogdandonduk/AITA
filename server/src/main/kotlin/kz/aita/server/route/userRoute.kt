@@ -23,155 +23,155 @@ import org.jetbrains.exposed.sql.update
 fun Application.userRoute() {
   routing {
     route("/user") {
-      get("/get") {
-        val uuid = call.checkPrincipal() ?: return@get
+      authenticate("auth-jwt") {
+        get("/get") {
+          val uuid = call.checkPrincipal() ?: return@get
 
-        val user = newSuspendedTransaction(Dispatchers.IO) {
-          Users
-            .selectAll()
-            .where {
-              Users.id eq uuid
-            }
-            .limit(1)
-            .singleOrNull()
-        } ?: return@get call.respond(UnauthorizedResponse())
-
-        call.genericResponse(
-          HttpStatusCode.OK,
-          UserAccountDataModel(
-            id = user[Users.id].toString(),
-            phoneNumber = user[Users.phoneNumber],
-            email = user[Users.email],
-            firstName = user[Users.firstName],
-            lastName = user[Users.lastName],
-            countryLocale = user[Users.countryLocale],
-            workerAccountIds = user[Users.workerIds],
-            supplierAccountIds = user[Users.supplierIds],
-            createdAt = user[Users.createdAt].toEpochMilli(),
-            isActive = user[Users.isActive]
-          )
-        )
-      }
-
-      put("/update") {
-        val uuid = call.checkPrincipal() ?: return@put
-
-        val body = call.receive<UserAccountUpdateDataModel>()
-        val newAccount = body.account
-
-        val phoneNumber = newAccount.phoneNumber.trim().lowercase()
-        val email = newAccount.email.trim().lowercase()
-        val firstName = newAccount.firstName.trim()
-        val lastName = newAccount.lastName.trim()
-        val countryLocale = newAccount.countryLocale.trim().lowercase()
-        val isActive = newAccount.isActive
-
-        val updated = newSuspendedTransaction(Dispatchers.IO) {
-          val existingUser =
+          val user = newSuspendedTransaction(Dispatchers.IO) {
             Users
               .selectAll()
               .where {
                 Users.id eq uuid
               }
-              .forUpdate()
               .limit(1)
-              .singleOrNull() ?: return@newSuspendedTransaction "unauthorized"
+              .singleOrNull()
+          } ?: return@get call.respond(UnauthorizedResponse())
 
-          if (!Pw.verify(body.password.toCharArray(), existingUser[Users.passwordHash]))
-            return@newSuspendedTransaction "password_mismatch"
-
-          val phoneNumberClash = Users
-            .select(Users.id, Users.phoneNumber)
-            .where {
-              (Users.phoneNumber eq newAccount.phoneNumber) and (Users.id neq uuid)
-            }
-            .empty()
-            .not()
-
-
-          val emailClash = Users
-            .select(Users.id, Users.email)
-            .where {
-              (Users.email eq newAccount.email) and (Users.id neq uuid)
-            }
-            .empty()
-            .not()
-
-          if (phoneNumberClash && emailClash)
-            return@newSuspendedTransaction "phone_number_and_email_clash"
-          else if (phoneNumberClash)
-            return@newSuspendedTransaction "phone_number_clash"
-          else if (emailClash)
-            return@newSuspendedTransaction "email_clash"
-
-          val newHash = body.newPassword
-            ?.takeIf {
-              it.isNotEmpty()
-                  && it.isNotBlank()
-                  && !Pw.verify(it.toCharArray(), existingUser[Users.passwordHash])
-            }?.let {
-              Pw.hash(it.toCharArray())
-            }
-
-          Users.update({ Users.id eq uuid }) {
-            if (existingUser[Users.phoneNumber] != phoneNumber)
-              it[Users.phoneNumber] = phoneNumber
-
-            if (existingUser[Users.email] != email)
-              it[Users.email] = email
-
-            if (existingUser[Users.firstName] != firstName)
-              it[Users.firstName] = firstName
-
-            if (existingUser[Users.lastName] != lastName)
-              it[Users.lastName] = lastName
-
-            if (existingUser[Users.countryLocale] != countryLocale)
-              it[Users.countryLocale] = countryLocale
-
-            newHash?.run {
-              it[Users.passwordHash] = this
-            }
-
-            if (existingUser[Users.isActive] != isActive)
-              it[Users.isActive] = isActive
-          }
-
-          "ok"
+          call.genericResponse(
+            HttpStatusCode.OK,
+            UserAccountDataModel(
+              id = user[Users.id].toString(),
+              phoneNumber = user[Users.phoneNumber],
+              email = user[Users.email],
+              firstName = user[Users.firstName],
+              lastName = user[Users.lastName],
+              countryLocale = user[Users.countryLocale],
+              workerAccountIds = user[Users.workerIds],
+              supplierAccountIds = user[Users.supplierIds],
+              createdAt = user[Users.createdAt].toEpochMilli(),
+              isActive = user[Users.isActive]
+            )
+          )
         }
 
-        when (updated) {
-          "ok" -> call.genericResponse(
-            HttpStatusCode.OK,
-            payload = body.account,
-            message = getResponse("9").message
-          )
+        put("/update") {
+          val uuid = call.checkPrincipal() ?: return@put
 
-          "unauthorized", "password_mismatch" -> call.respond(UnauthorizedResponse())
+          val body = call.receive<UserAccountUpdateDataModel>()
+          val newAccount = body.account
 
-          "phone_number_and_email_clash" -> call.genericResponseNoPayload(
-            HttpStatusCode.Conflict,
-            message = getResponse("2").message
-          )
+          val phoneNumber = newAccount.phoneNumber.trim().lowercase()
+          val email = newAccount.email.trim().lowercase()
+          val firstName = newAccount.firstName.trim()
+          val lastName = newAccount.lastName.trim()
+          val countryLocale = newAccount.countryLocale.trim().lowercase()
+          val isActive = newAccount.isActive
 
-          "phone_number_clash" -> call.genericResponseNoPayload(
-            HttpStatusCode.Conflict,
-            message = getResponse("0").message
-          )
+          val updated = newSuspendedTransaction(Dispatchers.IO) {
+            val existingUser =
+              Users
+                .selectAll()
+                .where {
+                  Users.id eq uuid
+                }
+                .forUpdate()
+                .limit(1)
+                .singleOrNull() ?: return@newSuspendedTransaction "unauthorized"
 
-          "email_clash" -> call.genericResponseNoPayload(
-            HttpStatusCode.Conflict,
-            message = getResponse("1").message
-          )
+            if (!Pw.verify(body.password.toCharArray(), existingUser[Users.passwordHash]))
+              return@newSuspendedTransaction "password_mismatch"
 
-          else -> call.genericResponseNoPayload(
-            status = HttpStatusCode.InternalServerError,
-            message = getResponse("3").message
-          )
+            val phoneNumberClash = Users
+              .select(Users.id, Users.phoneNumber)
+              .where {
+                (Users.phoneNumber eq newAccount.phoneNumber) and (Users.id neq uuid)
+              }
+              .empty()
+              .not()
+
+
+            val emailClash = Users
+              .select(Users.id, Users.email)
+              .where {
+                (Users.email eq newAccount.email) and (Users.id neq uuid)
+              }
+              .empty()
+              .not()
+
+            if (phoneNumberClash && emailClash)
+              return@newSuspendedTransaction "phone_number_and_email_clash"
+            else if (phoneNumberClash)
+              return@newSuspendedTransaction "phone_number_clash"
+            else if (emailClash)
+              return@newSuspendedTransaction "email_clash"
+
+            val newHash = body.newPassword
+              ?.takeIf {
+                it.isNotEmpty()
+                    && it.isNotBlank()
+                    && !Pw.verify(it.toCharArray(), existingUser[Users.passwordHash])
+              }?.let {
+                Pw.hash(it.toCharArray())
+              }
+
+            Users.update({ Users.id eq uuid }) {
+              if (existingUser[Users.phoneNumber] != phoneNumber)
+                it[Users.phoneNumber] = phoneNumber
+
+              if (existingUser[Users.email] != email)
+                it[Users.email] = email
+
+              if (existingUser[Users.firstName] != firstName)
+                it[Users.firstName] = firstName
+
+              if (existingUser[Users.lastName] != lastName)
+                it[Users.lastName] = lastName
+
+              if (existingUser[Users.countryLocale] != countryLocale)
+                it[Users.countryLocale] = countryLocale
+
+              newHash?.run {
+                it[Users.passwordHash] = this
+              }
+
+              if (existingUser[Users.isActive] != isActive)
+                it[Users.isActive] = isActive
+            }
+
+            "ok"
+          }
+
+          when (updated) {
+            "ok" -> call.genericResponse(
+              HttpStatusCode.OK,
+              payload = body.account,
+              message = getResponse("9").message
+            )
+
+            "unauthorized", "password_mismatch" -> call.respond(UnauthorizedResponse())
+
+            "phone_number_and_email_clash" -> call.genericResponseNoPayload(
+              HttpStatusCode.Conflict,
+              message = getResponse("2").message
+            )
+
+            "phone_number_clash" -> call.genericResponseNoPayload(
+              HttpStatusCode.Conflict,
+              message = getResponse("0").message
+            )
+
+            "email_clash" -> call.genericResponseNoPayload(
+              HttpStatusCode.Conflict,
+              message = getResponse("1").message
+            )
+
+            else -> call.genericResponseNoPayload(
+              status = HttpStatusCode.InternalServerError,
+              message = getResponse("3").message
+            )
+          }
         }
       }
     }
-
-
   }
 }

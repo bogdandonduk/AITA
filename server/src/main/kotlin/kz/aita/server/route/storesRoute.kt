@@ -3,7 +3,6 @@ package kz.aita.server.route
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
-import io.ktor.server.auth.jwt.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -52,31 +51,16 @@ fun Application.storesRoute() {
               .map {
                 StoreDataModel(
                   id = it[Stores.id].toString(),
-                  userIds = it[Stores.userIds],
-                  typeIds = it[Stores.typeIds]?.let { value ->
-                    jsonBase.decodeFromString<List<String>>(
-                      value
-                    )
-                  },
-                  name = jsonBase.decodeFromString<List<LocalizedStringDataModel>>(it[Stores.name]),
-                  alias = it[Stores.alias]?.let { alias ->
-                    jsonBase.decodeFromString<List<LocalizedStringDataModel>>(
-                      alias
-                    )
-                  },
-                  description = it[Stores.description]?.let { description ->
-                    jsonBase.decodeFromString<List<LocalizedStringDataModel>>(
-                      description
-                    )
-                  },
-                  companyForms = it[Stores.companyForms]?.let { value ->
-                    jsonBase.decodeFromString<List<CompanyFormDataModel>>(
-                      value
-                    )
-                  },
-                  location = it[Stores.location]?.let { value -> jsonBase.decodeFromString<LocationDataModel>(value) },
-                  phoneNumbers = it[Stores.phoneNumbers]?.let { value -> jsonBase.decodeFromString<List<String>>(value) },
-                  emails = it[Stores.emails]?.let { value -> jsonBase.decodeFromString<List<String>>(value) },
+                  userIds = it[Stores.ownerUserIds],
+                  storeTypeIds = it[Stores.storeTypeIds],
+                  name = it[Stores.name],
+                  alias = it[Stores.alias],
+                  description = it[Stores.description],
+                  companyForms = it[Stores.companyForms],
+                  location = it[Stores.location],
+                  phoneNumbers = it[Stores.phoneNumbers],
+                  emails = it[Stores.emails],
+                  countryLocales = it[Stores.countryLocales],
                   createdAt = it[Stores.createdAt].toEpochMilli(),
                   isActive = it[Stores.isActive]
                 )
@@ -118,15 +102,16 @@ fun Application.storesRoute() {
               newSuspendedTransaction(Dispatchers.IO) {
                 Stores.insert {
                   it[Stores.id] = id
-                  it[Stores.userIds] = listOf(userId.toString())
-                  it[Stores.typeIds] = body.typeIds?.let { value -> jsonBase.encodeToString<List<String>>(value) }
-                  it[Stores.name] = jsonBase.encodeToString(body.name)
-                  it[Stores.alias] = body.alias?.let { alias -> jsonBase.encodeToString(alias) }
-                  it[Stores.description] = body.description?.let { description -> jsonBase.encodeToString(description) }
-                  it[Stores.companyForms] = body.companyForms?.let { value -> jsonBase.encodeToString(value) }
-                  it[Stores.location] = body.location?.let { value -> jsonBase.encodeToString(value) }
-                  it[Stores.phoneNumbers] = body.phoneNumbers?.let { value -> jsonBase.encodeToString(value) }
-                  it[Stores.emails] = body.emails?.let { value -> jsonBase.encodeToString(value) }
+                  it[Stores.ownerUserIds] = listOf(userId.toString())
+                  it[Stores.storeTypeIds] = body.storeTypeIds
+                  it[Stores.name] = body.name
+                  it[Stores.alias] = body.alias
+                  it[Stores.description] = body.description
+                  it[Stores.companyForms] = body.companyForms
+                  it[Stores.location] = body.location
+                  it[Stores.phoneNumbers] = body.phoneNumbers
+                  it[Stores.emails] = body.emails
+                  it[Stores.countryLocales] = body.countryLocales
                   it[Stores.createdAt] = instant
                   it[Stores.isActive] = body.isActive
                 }
@@ -171,14 +156,15 @@ fun Application.storesRoute() {
                 (Stores.id eq id) and exists(
                   StoreUsers.selectAll().where { (StoreUsers.storeId eq id) and (StoreUsers.userId eq userId) })
               }) {
-                it[Stores.typeIds] = body.typeIds?.let { value -> jsonBase.encodeToString<List<String>>(value) }
-                it[Stores.name] = jsonBase.encodeToString(body.name)
-                it[Stores.alias] = body.alias?.let { alias -> jsonBase.encodeToString(alias) }
-                it[Stores.description] = body.description?.let { description -> jsonBase.encodeToString(description) }
-                it[Stores.companyForms] = body.companyForms?.let { value -> jsonBase.encodeToString(value) }
-                it[Stores.location] = body.location?.let { value -> jsonBase.encodeToString(value) }
-                it[Stores.phoneNumbers] = body.phoneNumbers?.let { value -> jsonBase.encodeToString(value) }
-                it[Stores.emails] = body.emails?.let { value -> jsonBase.encodeToString(value) }
+                it[Stores.storeTypeIds] = body.storeTypeIds
+                it[Stores.name] = body.name
+                it[Stores.alias] = body.alias
+                it[Stores.description] = body.description
+                it[Stores.companyForms] = body.companyForms
+                it[Stores.location] = body.location
+                it[Stores.phoneNumbers] = body.phoneNumbers
+                it[Stores.emails] = body.emails
+                it[Stores.countryLocales] = body.countryLocales
                 it[Stores.isActive] = body.isActive
               }.run {
                 if (this > 0)
@@ -212,7 +198,7 @@ fun Application.storesRoute() {
 
             val id = runCatching { UUID.fromString(body) }.getOrNull() ?: return@newSuspendedTransaction 2
 
-            if (Stores.deleteWhere { (Stores.id eq id) and (Stores.userIds.contains(userId.toString())) } > 0)
+            if (Stores.deleteWhere { (Stores.id eq id) and (Stores.ownerUserIds.contains(userId.toString())) } > 0)
               0
             else
               1

@@ -237,14 +237,14 @@ fun AppConfiguration.MenuScreen() {
           }
         }
 
-        LazyColumn(
-          modifier = Modifier
-            .weight(0.5f)
-            .background(stateValues.DisabledColor)
-            .fillMaxHeight()
-        ) {
-
-        }
+//        LazyColumn(
+//          modifier = Modifier
+//            .weight(0.5f)
+//            .background(stateValues.DisabledColor)
+//            .fillMaxHeight()
+//        ) {
+//
+//        }
       }
     }
   }

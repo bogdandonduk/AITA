@@ -13,8 +13,8 @@ import kotlinx.coroutines.launch
 import kz.aita.AppConfiguration
 import kz.aita.compose.navigation.Navigation
 import kz.aita.compose.navigation.NavigationScreenModel
-import kz.aita.compose.util.checkAsPersonName
-import kz.aita.compose.util.filterAsPersonName
+import kz.aita.core.checkAsPersonName
+import kz.aita.core.filterAsPersonName
 import kz.aita.compose.widget.*
 import kz.aita.model.dataModel.UserAuthSignUpDataModel
 import kz.aita.model.repository.UserRepository

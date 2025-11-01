@@ -3,12 +3,12 @@ package kz.aita.compose.widget
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.input.KeyboardType
 import kz.aita.AppConfiguration
-import kz.aita.compose.util.checkAsPhoneNumber
-import kz.aita.compose.util.filterAsPhoneNumber
+import kz.aita.core.checkAsPhoneNumber
+import kz.aita.core.filterAsPhoneNumber
+import kz.aita.core.toLocalizedSingleMain
 import kz.aita.compose.wrapper.ImeWithAction
 import kz.aita.core.StateHost
 import kz.aita.model.dataModel.CountryDataModel
-import kz.aita.model.dataModel.LocalizedStringDataModel
 
 @Composable
 fun AppConfiguration.countrySelectionPhoneNumberTextField(
@@ -26,7 +26,7 @@ fun AppConfiguration.countrySelectionPhoneNumberTextField(
     secondaryDomains = countries.map {
       SelectableDomain(
         id = "+${it.phoneNumberCode}",
-        displayId = listOf(LocalizedStringDataModel("main","+${it.phoneNumberCode}")),
+        displayId = "+${it.phoneNumberCode}".toLocalizedSingleMain(),
         name = it.name,
         iconPath = it.flagDrawablePath
       )

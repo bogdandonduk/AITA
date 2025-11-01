@@ -19,6 +19,7 @@ import io.kamel.image.config.LocalKamelConfig
 import io.ktor.http.*
 import kz.aita.AppConfiguration
 import kz.aita.compose.render.kamelConfig
+import kz.aita.core.toLocalizedSingleMain
 import kz.aita.core.Searchable
 import kz.aita.core.extractLocalizedString
 import kz.aita.core.getFullDrawableResourceUrl
@@ -122,6 +123,7 @@ fun AppConfiguration.selectableDomainWidget(
         overflow = TextOverflow.Ellipsis
       )
 
+
     if (showName && domain.name != null) {
       Spacer(modifier = Modifier.width(8.dp))
 
@@ -169,6 +171,13 @@ class SelectableDomain(
   val iconPath: String?
 ): Searchable {
 
+  constructor(
+    id: String,
+    displayId: String,
+    name: String,
+    iconPath: String?
+  ) : this(id, displayId.toLocalizedSingleMain(), name.toLocalizedSingleMain(), iconPath)
+
   override val exactSearchOperands: List<String> = mutableListOf<String>().apply {
     addAll(displayId.map { it.value })
     name?.let { addAll(name.map { it.value }) }
@@ -182,5 +191,4 @@ class SelectableDomain(
     addAll(displayId.map { it.value })
     name?.let { addAll(name.map { it.value }) }
   }
-
 }
