@@ -5,20 +5,20 @@ import app.cash.sqldelight.db.QueryResult
 import app.cash.sqldelight.db.SqlCursor
 import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
-import kz.aita.KeyValueDatabase
+import kz.aita.AppDatabase
 import java.nio.file.Files
 import kotlin.io.path.Path
 
 actual var sqlDelightDriver: SqlDriver? = Unit.run {
   val dir = Path(cacheDirPath)
-  val dbPath = dir.resolve("key_value.db").toAbsolutePath()
+  val dbPath = dir.resolve("app_database.db").toAbsolutePath()
 
   val url = "jdbc:sqlite:$dbPath"
   val firstRun = !Files.exists(dbPath)
 
   val driver: SqlDriver = JdbcSqliteDriver(url)
 
-  val schema = KeyValueDatabase.Schema.synchronous()
+  val schema = AppDatabase.Schema.synchronous()
   if (firstRun) {
     schema.create(driver)
   } else {
@@ -37,7 +37,7 @@ actual var sqlDelightDriver: SqlDriver? = Unit.run {
         }
       )
     val currentVersion = cursor.value
-    val targetVersion = KeyValueDatabase.Schema.version.toInt()
+    val targetVersion = AppDatabase.Schema.version.toInt()
     if (currentVersion < targetVersion) {
       schema.migrate(driver, currentVersion.toLong(), schema.version)
     }

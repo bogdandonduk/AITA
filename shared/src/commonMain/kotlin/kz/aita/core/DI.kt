@@ -13,7 +13,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import kz.aita.KeyValueDatabase
+import kz.aita.AppDatabase
 import kz.aita.model.dataModel.NotificationType
 import kz.aita.model.repository.*
 import kz.aita.model.repository.impl.*
@@ -57,7 +57,6 @@ var httpClient =
         loadTokens {
           withContext(Dispatchers.io) {
             tokenStore?.get()?.let {
-              println("loaded token is $it")
               BearerTokens(it.accessToken, it.refreshToken)
             }
           }
@@ -111,7 +110,7 @@ val genericRemoteService: GenericRemoteService by lazy {
 }
 
 val genericLocalService: GenericLocalService by lazy {
-  GenericLocalService(KeyValueDatabase(sqlDelightDriver!!))
+  GenericLocalService(AppDatabase(sqlDelightDriver!!))
 }
 
 val userRepository: UserRepository by lazy {
@@ -152,6 +151,6 @@ val genericItemsRepository: GenericItemsRepository by lazy {
   GenericItemsRepositoryImpl(genericRemoteService, configurationRepository)
 }
 
-
-
-
+val cartRepository: CartRepository by lazy {
+  CartRepositoryImpl(genericLocalService)
+}

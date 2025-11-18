@@ -28,6 +28,7 @@ object Stock: Table("stock") {
   val returnPrices = jsonb("return_prices", Json, ListSerializer(PriceDataModel.serializer()))
   val supplyPrices = jsonb("supply_prices", Json, ListSerializer(PriceDataModel.serializer()))
 
+  val isQuickItem = bool("is_quick_item")
   val createdAt = timestamp("created_at").defaultExpression(CurrentTimestamp)
   val isActive = bool("is_active").default(true)
 

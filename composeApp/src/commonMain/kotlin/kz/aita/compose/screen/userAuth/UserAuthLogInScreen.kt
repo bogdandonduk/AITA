@@ -73,14 +73,14 @@ fun AppConfiguration.UserAuthLogInScreen() {
           countrySelectionPhoneNumberTextField(
             imeWithAction = ImeWithAction(ime = ImeAction.Next),
             stateHost = NavigationScreenModel.UserAuth.LogIn,
-            stateKey = "phone_number",
+            stateKey = NavigationScreenModel.KEY_STATE_PHONE_NUMBER,
           )
         }
 
         else -> {
           emailTextField(
             stateHost = NavigationScreenModel.UserAuth.LogIn,
-            stateKey = "email",
+            stateKey = NavigationScreenModel.KEY_STATE_EMAIL,
           )
         }
       }

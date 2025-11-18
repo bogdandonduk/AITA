@@ -19,19 +19,18 @@ import androidx.compose.ui.unit.dp
 import kz.aita.AppConfiguration
 import kz.aita.core.extractLocalizedString
 import kz.aita.model.dataModel.GoodsItemDataModel
+import kz.aita.model.dataModel.GoodsItemInCartDataModel
 import kz.aita.model.dataModel.QuantityDataModel
 
 @Composable
 fun AppConfiguration.GoodsItemInCartWidget(
   modifier: Modifier = Modifier,
   index: Int? = null,
+  goodsItemInCart: GoodsItemInCartDataModel,
   goodsItem: GoodsItemDataModel,
   textColor: Color = stateValues.TextColor,
-  soldForPeriod: QuantityDataModel? = null,
-  returnedForPeriod: QuantityDataModel? = null,
   onClick: ((GoodsItemDataModel) -> Unit)? = null,
-  onDelete: (GoodsItemDataModel) -> Unit,
-  onEdit: (GoodsItemDataModel) -> Unit,
+  onDelete: ((GoodsItemDataModel) -> Unit)? = null
 ) {
   Row(
     modifier
@@ -59,36 +58,6 @@ fun AppConfiguration.GoodsItemInCartWidget(
         )
       )
   ) {
-    val quantityMarkerColor = when {
-      goodsItem.quantity.total <= 9 -> stateValues.ErrorColor
-      goodsItem.quantity.total <= 19 -> stateValues.BorderlineBadColor
-      else -> stateValues.OkayColor
-    }
-
-    val soldQuantityMarkerColor = when {
-      (soldForPeriod?.total ?: goodsItem.quantity.total) <= 30 -> stateValues.ErrorColor
-      (soldForPeriod?.total ?: goodsItem.quantity.total) <= 50 -> stateValues.BorderlineBadColor
-      else -> stateValues.OkayColor
-    }
-
-    val returnedQuantityMarkerColor = when {
-      (returnedForPeriod?.total ?: goodsItem.quantity.total) >= 30 -> stateValues.ErrorColor
-      (returnedForPeriod?.total ?: goodsItem.quantity.total) >= 15 -> stateValues.BorderlineBadColor
-      else -> stateValues.OkayColor
-    }
-
-    Column(
-      modifier = Modifier
-        .padding(start = 16.dp, top = 16.dp, end = 8.dp, bottom = 16.dp)
-    ) {
-      Spacer(
-        Modifier
-          .size(12.dp)
-          .clip(RoundedCornerShape(stateValues.cornerRadius))
-          .background(quantityMarkerColor)
-      )
-    }
-
     Column(
       modifier = Modifier
         .weight(1f)
@@ -107,38 +76,75 @@ fun AppConfiguration.GoodsItemInCartWidget(
           .height(6.dp)
       )
 
-      Text(
-        text = goodsItem.barcode.fold("") { accumulator, element ->
-          "$accumulator$element, "
-        },
-        fontSize = stateValues.textSize,
-        color = textColor
-      )
+      goodsItem.barcode.run {
+        if (size == 1) {
+          this[0]
+        } else {
+          foldIndexed("") { index, acc, item ->
+            if (index == 0)
+              item
+            else
+              "$acc, $item"
+          }
+        }
+      }.run {
+        Text(
+          text = this,
+          fontSize = stateValues.textSize,
+          color = textColor
+        )
+      }
 
-      Text(
-        text = "Category",
-        fontSize = stateValues.textSize,
-        color = textColor
-      )
+      stateValues.goodsCategories?.run {
+        if (goodsItem.categoryIds.size == 1) {
+          "${stateValues.goodsCategories?.find { it.id == goodsItem.categoryIds[0] }?.name?.extractLocalizedString(stateValues.appLanguage)}"
+        } else {
+          goodsItem.categoryIds.foldIndexed("") { index, acc, item ->
+            if (index == 0)
+              "${stateValues.goodsCategories?.find { it.id == item }?.name?.extractLocalizedString(stateValues.appLanguage)}"
+            else
+              "$acc, ${stateValues.goodsCategories?.find { it.id == item }?.name?.extractLocalizedString(stateValues.appLanguage)}"
+          }
+        }
+      }?.run {
+        Text(
+          text = this,
+          fontSize = stateValues.textSize,
+          color = textColor
+        )
+      }
 
-      Text(
-        text = "Supplier",
-        fontSize = stateValues.textSize,
-        color = textColor
-      )
+      goodsItem.salePrices.run {
+          if (size == 1) {
+          "${stateValues.suppliers?.find { it.id == goodsItem.salePrices[0].supplierId }?.name?.extractLocalizedString(stateValues.appLanguage)}"
+        } else {
+          foldIndexed("") { index, acc, item ->
+            if (index == 0) {
+              "${stateValues.suppliers?.find { it.id == item.supplierId }?.name?.extractLocalizedString(stateValues.appLanguage)}"
+            } else
+              "$acc, ${stateValues.suppliers?.find { it.id == item.supplierId }?.name?.extractLocalizedString(stateValues.appLanguage)}"
+          }
+        }
+      }.run {
+        Text(
+          text = this,
+          fontSize = stateValues.textSize,
+          color = textColor
+        )
+      }
 
       Spacer(
         modifier = Modifier
           .height(6.dp)
       )
 
-      Text(
-        text = "${stateValues.stringSale}: ${goodsItem.salePrices}",
-        fontSize = stateValues.accentTextSize,
-        fontWeight = FontWeight.Bold,
-        color = textColor
-      )
-
+//      Text(
+//        text = "${stateValues.stringSale}: ${goodsItem.salePrices} ${goodsItem.saleCurrencyToSupplierIds}",
+//        fontSize = stateValues.accentTextSize,
+//        fontWeight = FontWeight.Bold,
+//        color = textColor
+//      )
+//
 //      if (goodsItem.returnPrices != goodsItem.salePrices) {
 //        Text(
 //          text = "${stateValues.stringReturn}: ${goodsItem.returnPrices} ${goodsItem.returnCurrencyToSupplierIds}",
@@ -147,7 +153,7 @@ fun AppConfiguration.GoodsItemInCartWidget(
 //          color = textColor
 //        )
 //      }
-
+//
 //      Text(
 //        text = "${stateValues.stringSupply}: ${goodsItem.supplyPrices} ${goodsItem.saleCurrencyToSupplierIds}",
 //        fontSize = stateValues.accentTextSize,
@@ -161,10 +167,10 @@ fun AppConfiguration.GoodsItemInCartWidget(
       )
 
       Text(
-        text = "${goodsItem.quantity.total.run { if (goodsItem.quantity.roundTotal) toInt() else this }} ${goodsItem.quantity.immutableUnitName.extractLocalizedString(stateValues.appLanguage)}",
+        text = "${goodsItemInCart.quantity.total.run { if (goodsItem.quantity.roundTotal) toInt() else this }} ${goodsItemInCart.quantity.immutableUnitName.extractLocalizedString(stateValues.appLanguage)}",
         fontSize = stateValues.titleTextSize,
         fontWeight = FontWeight.Bold,
-        color = quantityMarkerColor
+        color = stateValues.TextColor
       )
     }
 
@@ -174,27 +180,31 @@ fun AppConfiguration.GoodsItemInCartWidget(
       horizontalAlignment = Alignment.End,
       verticalArrangement = Arrangement.SpaceBetween
     ) {
-      actionButton(
-        text = "",
-        enabledColor = stateValues.ErrorColor,
-        iconPath = stateValues.drawablePathIconDelete,
-        iconContentDescription = stateValues.drawablePathIconDelete,
-      ) {
-        onDelete(goodsItem)
+      onDelete?.let {
+        actionButton(
+          text = "",
+          enabledColor = stateValues.ErrorColor,
+          iconPath = stateValues.drawablePathIconDelete,
+          iconContentDescription = stateValues.drawablePathIconDelete,
+        ) {
+          onDelete(goodsItem)
+        }
       }
 
-      Spacer(
-        modifier = Modifier
-          .height(16.dp)
-      )
-
-      actionButton(
-        text = "",
-        iconPath = stateValues.drawablePathIconEdit,
-        iconContentDescription = stateValues.drawablePathIconEdit,
-      ) {
-        onEdit(goodsItem)
-      }
+//      Spacer(
+//        modifier = Modifier
+//          .height(stateValues.marginTextField)
+//      )
+//
+//      onEdit?.let {
+//        actionButton(
+//          text = "",
+//          iconPath = stateValues.drawablePathIconEdit,
+//          iconContentDescription = stateValues.drawablePathIconEdit,
+//        ) {
+//          onEdit(goodsItem)
+//        }
+//      }
     }
   }
 }

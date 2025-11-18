@@ -2,6 +2,7 @@ package kz.aita.compose.util
 
 import aita.composeapp.generated.resources.Res
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.input.OffsetMapping
@@ -9,12 +10,12 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.withStyle
 import kz.aita.core.jsonBase
-import kz.aita.model.dataModel.GenericResponseDataModel
 import kz.aita.model.dataModel.LocalizedStringGroupDataModel
 import kz.aita.model.dataModel.ResponseDataModel
 import kz.aita.model.dataModel.StylizedColorGroupDataModel
 import kz.aita.model.dataModel.StylizedDimensionGroupDataModel
 import kz.aita.model.dataModel.StylizedDrawablePathsGroupDataModel
+import org.jetbrains.compose.resources.DrawableResource
 
 
 fun getTransformedTextWithSelectionFocusTextColor(
@@ -80,8 +81,11 @@ suspend fun loadResourceColors(): List<StylizedColorGroupDataModel> {
   ).payload!!
 }
 
+
 suspend fun loadResourceDrawablePaths(): List<StylizedDrawablePathsGroupDataModel> {
   return jsonBase.decodeFromString<ResponseDataModel<List<StylizedDrawablePathsGroupDataModel>>>(
     Res.readBytes("files/assets/drawable/drawables.json").decodeToString()
   ).payload!!
 }
+
+expect suspend fun getResourceDrawableSvgPainter(name: String): Painter

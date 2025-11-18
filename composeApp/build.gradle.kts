@@ -14,29 +14,10 @@ plugins {
   alias(libs.plugins.ksp)
 }
 
-compose.desktop {
-  application {
-    mainClass = "kz.aita.jvm.app.system.MainKt"
-    nativeDistributions {
-      targetFormats(TargetFormat.Exe, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Dmg)
-
-      windows {
-        iconFile.set(project.file("src/jvmMain/resources/drawable/app_icon.png"))
-        // optional:
-        // shortcut = true
-        // menu = true
-        // menuGroup = "AITA"
-        // console = true  // see section 2 below
-      }
-      macOS {
-        iconFile.set(project.file("src/jvmMain/resources/drawable/app_icon.png"))
-      }
-      linux {
-        iconFile.set(project.file("src/jvmMain/resources/drawable/app_icon.png"))
-      }
-    }
-  }
+java {
+  toolchain { languageVersion.set(JavaLanguageVersion.of(21)) }
 }
+
 kotlin {
   androidTarget {
     @OptIn(ExperimentalKotlinGradlePluginApi::class)
@@ -80,6 +61,8 @@ kotlin {
 
   sourceSets {
     androidMain.dependencies {
+      implementation("com.caverock:androidsvg:1.4")
+
       implementation(libs.androidx.datastore.preferences)
 
       implementation(libs.sqlDelightAndroidDriver)
@@ -93,6 +76,8 @@ kotlin {
       implementation(libs.androidx.activity.compose)
     }
     commonMain.dependencies {
+
+
       implementation(libs.kotlinx.serialization.json)
 //            implementation(libs.kamel.image.default)
 
@@ -128,7 +113,8 @@ kotlin {
       implementation(libs.kotlin.test)
     }
     jvmMain.dependencies {
-      implementation("com.github.javakeyring:java-keyring:1.0.3")
+      implementation(libs.skiko.svg)
+      implementation(libs.java.keyring.v103)
 
       implementation(libs.kamel.decoder.svg.batik)
 
@@ -176,13 +162,49 @@ dependencies {
 
 compose.desktop {
   application {
-    mainClass = "kz.aita.MainKt"
+    mainClass = "kz.aita.jvm.app.system.MainKt"
 
     nativeDistributions {
-      targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-      packageName = "kz.aita"
+      // Only the formats you need:
+      targetFormats(TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Dmg)
+      modules("java.sql", "java.logging", "java.xml", "jdk.crypto.ec")
+      // MSI requires a 3-part numeric version:
       packageVersion = "1.0.0"
+
+      // MSI metadata:
+      packageName = "AITA"
+      description = "AITA"
+      vendor = "AITA"
+
+      // Windows-specific:
+      windows {
+        // Use a proper .ico; path must exist:
+        iconFile.set(project.file("src/jvmMain/resources/drawable/app_icon.ico"))
+        // Optional but nice:
+        console = true
+        // perUserInstall = true
+        // upgradeUuid = "YOUR-STABLE-GUID-HERE" // keep stable across releases
+      }
     }
+
+//    nativeDistributions {
+//      targetFormats(TargetFormat.Exe, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Dmg)
+//
+//      windows {
+//        iconFile.set(project.file("src/jvmMain/resources/drawable/app_icon.png"))
+//        // optional:
+//        // shortcut = true
+//        // menu = true
+//        // menuGroup = "AITA"
+//        // console = true  // see section 2 below
+//      }
+//      macOS {
+//        iconFile.set(project.file("src/jvmMain/resources/drawable/app_icon.png"))
+//      }
+//      linux {
+//        iconFile.set(project.file("src/jvmMain/resources/drawable/app_icon.png"))
+//      }
+//    }
   }
 }
 

@@ -47,13 +47,13 @@ fun AppConfiguration.countrySelectionPhoneNumberTextField(
     keyboardType = KeyboardType.Phone,
     imeWithAction = imeWithAction,
     contentInvalidText = stateValues.stringPhoneNumberMustBe,
-    onContentValidityCheck = { text, selectedId ->
-      countries.find { "+${it.phoneNumberCode}" == selectedId }?.run {
+    onContentValidityCheck = { text, _, selectedSecondaryId ->
+      countries.find { "+${it.phoneNumberCode}" == selectedSecondaryId }?.run {
         text.checkAsPhoneNumber(this)
       } == true
     },
-    onFilterValue = { text, selectedId ->
-      countries.find { "+${it.phoneNumberCode}" == selectedId }?.run {
+    onFilterValue = { text, _, selectedSecondaryId ->
+      countries.find { "+${it.phoneNumberCode}" == selectedSecondaryId }?.run {
         text.filterAsPhoneNumber(this)
       } == true
     }

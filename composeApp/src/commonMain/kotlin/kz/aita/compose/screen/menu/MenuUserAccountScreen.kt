@@ -93,7 +93,7 @@ fun AppConfiguration.MenuUserAccountScreen() {
         val lastNameTextFieldContent = genericTextField(
           valueInitial = stateValues.userAccount?.lastName,
           stateHost = NavigationScreenModel.Menu.UserAccount,
-          stateKey = "last_name",
+          stateKey = NavigationScreenModel.KEY_STATE_LAST_NAME,
           titleText = stateValues.stringLastName,
           placeholderText = stateValues.stringEnterLastName,
           leadingIconPath = stateValues.drawablePathIconPerson,
@@ -123,8 +123,8 @@ fun AppConfiguration.MenuUserAccountScreen() {
           repeatPasswordTitleText = stateValues.stringRepeatNewPassword,
           repeatPasswordPlaceholderText = stateValues.stringRepeatNewPassword,
           stateHost = NavigationScreenModel.Menu.UserAccount,
-          stateKey = "new_password",
-          repeatedStateKey = "repeated_password"
+          stateKey = NavigationScreenModel.KEY_STATE_PASSWORD,
+          repeatedStateKey = NavigationScreenModel.KEY_STATE_REPEATED_PASSWORD,
         )
 
         Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
@@ -139,7 +139,7 @@ fun AppConfiguration.MenuUserAccountScreen() {
             goAction?.invoke()
           },
           stateHost = NavigationScreenModel.Menu.UserAccount,
-          stateKey = "confirmation_password",
+          stateKey = NavigationScreenModel.Menu.UserAccount.KEY_STATE_CONFIRMATION_PASSWORD
         )
 
 //        responseText(

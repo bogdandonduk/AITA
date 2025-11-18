@@ -73,12 +73,12 @@ fun AppConfiguration.domainSelectionTextField(
   secondaryDomainsShowId: Boolean = true,
   secondaryDomainsShowName: Boolean = true,
   contentInvalidText: String? = null,
-  onContentValidityCheck: ((String, String) -> Boolean)? = null,
-  onFilterValue: ((String, String) -> Boolean)? = null,
-  onValueChange: ((String, () -> Unit) -> Unit)? = null
+  onContentValidityCheck: ((String, String, String?) -> Boolean)? = null,
+  onFilterValue: ((String, String, String?) -> Boolean)? = null,
+  onValueChange: ((String, String, String?, () -> Unit) -> Unit)? = null
 ): DomainSelectionTextFieldContent {
   var selectedId by rememberSaveable {
-    mutableStateOf("")
+    mutableStateOf(selectedInitial)
   }
 
   var selected by remember {
@@ -164,7 +164,30 @@ fun AppConfiguration.domainSelectionTextField(
                   data = Url(getFullDrawableResourceUrl(titleIconButtonPath))
                 )
               },
-              contentDescription = titleText
+              contentDescription = titleText,
+              onFailure = {
+                KamelImage(
+                  modifier = Modifier
+                    .padding(2.dp)
+                    .size(stateValues.iconSize)
+                    .clickable(
+                      interactionSource = remember {
+                        MutableInteractionSource()
+                      },
+                      indication = ripple(color = stateValues.TextColor, radius = cornerRadius),
+                      onClick = onTitleIconButtonClick ?: {}
+                    ),
+                  resource = {
+                    asyncPainterResource(
+                      data = Url(getFullDrawableResourceUrl(titleIconButtonPath))
+                    )
+                  },
+                  contentDescription = titleText,
+                  onFailure = {
+
+                  }
+                )
+              }
             )
           }
 
@@ -304,20 +327,21 @@ fun AppConfiguration.domainSelectionTextField(
         unfocusedBorderColor = Color.Transparent,
         contentInvalidText = contentInvalidText,
         onContentValidityCheck = onContentValidityCheck?.run {
-          selectedSecondaryId?.run {
-            {
-              invoke(it, this)
-            }
+          {
+            invoke(it, selectedId, selectedSecondaryId)
           }
         },
         onFilterValue = onFilterValue?.run {
-          selectedSecondaryId?.run {
             {
-              invoke(it, this)
+              println(selectedId)
+              invoke(it, selectedId, selectedSecondaryId)
             }
-          }
         },
-        onValueChange = onValueChange
+        onValueChange = onValueChange?.run {
+          { value, action ->
+            invoke(value, selectedId, selectedSecondaryId, action)
+          }
+        }
       )
 
       LaunchedEffect(textFieldContent.isFocused) {

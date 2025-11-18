@@ -125,8 +125,6 @@ fun Application.authRoutes(tokenService: TokenService) {
           id?.run {
             val tokenPair: TokenPair = tokenService.newPair(this, metaFrom(call))
 
-            println("issued tokens are $tokenPair")
-
             call.genericResponse(
               status = HttpStatusCode.Created,
               tokenPair

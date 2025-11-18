@@ -134,6 +134,8 @@ interface ConfigurationRepository {
   val stringQuickGoodsItemsState: StateFlow<String>
   val stringCategoriesState: StateFlow<String>
   val stringMainState: StateFlow<String>
+  val stringAddTranslationState: StateFlow<String>
+  val stringSetActiveState: StateFlow<String>
 
   val drawablePathAITALogoState: StateFlow<String>
   val drawablePathIconPasswordState: StateFlow<String>
@@ -170,7 +172,10 @@ interface ConfigurationRepository {
   val drawablePathIconBarcodeCamScannerState: StateFlow<String>
   val drawablePathIconDeleteState: StateFlow<String>
   val drawablePathIconExitState: StateFlow<String>
-  
+  val drawablePathIconSwitchState: StateFlow<String>
+  val drawablePathIconCartState: StateFlow<String>
+  val drawablePathIconAddCartState: StateFlow<String>
+
   fun getGlobalAppConfiguration(loadAll: Boolean = true)
 
   fun getStrings()

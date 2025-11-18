@@ -56,6 +56,7 @@ fun Application.stockRoute() {
                   salePrices = it[Stock.salePrices],
                   returnPrices = it[Stock.returnPrices],
                   supplyPrices = it[Stock.supplyPrices],
+                  isQuickItem = it[Stock.isQuickItem],
                   createdAt = it[Stock.createdAt].toEpochMilli(),
                   isActive = it[Stock.isActive]
                 )
@@ -106,6 +107,7 @@ fun Application.stockRoute() {
                   it[Stock.salePrices] = body.salePrices
                   it[Stock.returnPrices] = body.returnPrices
                   it[Stock.supplyPrices] = body.supplyPrices
+                  it[Stock.isQuickItem] = body.isQuickItem
                   it[Stock.createdAt] = instant
                   it[Stock.isActive] = body.isActive
                 }
@@ -179,6 +181,7 @@ fun Application.stockRoute() {
               it[Stock.salePrices] = body.salePrices
               it[Stock.returnPrices] = body.returnPrices
               it[Stock.supplyPrices] = body.supplyPrices
+              it[Stock.isQuickItem] = body.isQuickItem
             }.run {
               if (this > 0)
                 0

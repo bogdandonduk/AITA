@@ -22,7 +22,7 @@ fun main() {
     Window(
       onCloseRequest = ::exitApplication,
       title = "AITA",
-      icon = painterResource("drawable/app_icon.png")
+      icon = painterResource("drawable/app_icon.ico")
     ) {
       AppConfiguration(
         content = {

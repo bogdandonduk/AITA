@@ -62,7 +62,6 @@ class TokenService(private val cfg: JwtConfig) {
   }
 
   suspend fun rotate(refreshPlain: String, metaParam: Map<String, String>?): TokenPair = coroutineScope {
-    println("rotate called $refreshPlain")
     val hash = Refresh.hash(refreshPlain)
 
     val oldSession = newSuspendedTransaction(Dispatchers.IO) {

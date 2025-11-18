@@ -15,7 +15,7 @@ plugins {
 
 sqldelight {
   databases {
-    create("KeyValueDatabase") {
+    create("AppDatabase") {
       packageName.set("kz.aita")
       generateAsync.set(true)
     }
@@ -75,7 +75,6 @@ kotlin {
       implementation("io.ktor:ktor-client-logging:${property("ktor.version")}")
       implementation("io.ktor:ktor-client-content-negotiation:${property("ktor.version")}")
       implementation("io.ktor:ktor-serialization-kotlinx-json:${property("ktor.version")}")
-
     }
     commonTest.dependencies {
 
@@ -138,7 +137,7 @@ afterEvaluate {
   val prereqNames = listOf(
     "generateComposeResClass",
     "generateResourceAccessorsForCommonMain",
-    "generateCommonMainKeyValueDatabaseInterface",
+    "generateCommonMainAppDatabaseInterface",
     "generateExpectResourceCollectorsForCommonMain",
     "generateResourceAccessorsForAndroidMain",
     "generateActualResourceCollectorsForAndroidMain",

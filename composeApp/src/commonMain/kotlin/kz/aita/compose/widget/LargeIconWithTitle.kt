@@ -1,5 +1,6 @@
 package kz.aita.compose.widget
 
+import aita.composeapp.generated.resources.Res
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -13,6 +14,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.TextUnit
+import io.kamel.core.Resource
 import io.kamel.image.KamelImage
 import io.kamel.image.asyncPainterResource
 import io.kamel.image.config.LocalKamelConfig
@@ -43,7 +45,16 @@ fun AppConfiguration.LargeIconWithTitleWidget(
           )
         },
         contentScale = ContentScale.FillWidth,
-        contentDescription = contentDescription
+        contentDescription = contentDescription,
+        onFailure = {
+          KamelImage(
+            resource = {
+              Resource.Success(Res.drawable.0_1)
+            },
+            contentScale = ContentScale.FillWidth,
+            contentDescription = contentDescription
+          )
+        }
       )
     }
 

@@ -570,6 +570,10 @@ class ConfigurationRepositoryImpl(
   override val stringCategoriesState = _stringCategoriesState.asStateFlow()
   private val _stringMainState = MutableStateFlow("Main")
   override val stringMainState = _stringMainState.asStateFlow()
+  private val _stringAddTranslationState = MutableStateFlow("Add translation")
+  override val stringAddTranslationState = _stringAddTranslationState.asStateFlow()
+  private val _stringSetActiveState = MutableStateFlow("Set active")
+  override val stringSetActiveState = _stringSetActiveState.asStateFlow()
 
   private val _drawablePathAITALogoState = MutableStateFlow("svg/0_0.svg")
   override val drawablePathAITALogoState = _drawablePathAITALogoState.asStateFlow()
@@ -641,6 +645,12 @@ class ConfigurationRepositoryImpl(
   override val drawablePathIconDeleteState = _drawablePathIconDeleteState.asStateFlow()
   private val _drawablePathIconExitState = MutableStateFlow("svg/34_0.svg")
   override val drawablePathIconExitState = _drawablePathIconExitState.asStateFlow()
+  private val _drawablePathIconSwitchState = MutableStateFlow("svg/35_0.svg")
+  override val drawablePathIconSwitchState = _drawablePathIconSwitchState.asStateFlow()
+  private val _drawablePathIconCartState = MutableStateFlow("svg/36_0.svg")
+  override val drawablePathIconCartState = _drawablePathIconCartState.asStateFlow()
+  private val _drawablePathIconAddCartState = MutableStateFlow("svg/37_0.svg")
+  override val drawablePathIconAddCartState = _drawablePathIconAddCartState.asStateFlow()
 
   private val getGlobalAppConfigurationMutex = Mutex()
   private val getStringsMutex = Mutex()
@@ -1385,6 +1395,18 @@ class ConfigurationRepositoryImpl(
           appLanguageState.value
         )!!
       )
+      _stringAddTranslationState.emit(
+        strings.extractString(116, appLanguageState.value) ?: resourceStrings.extractString(
+          116,
+          appLanguageState.value
+        )!!
+      )
+      _stringSetActiveState.emit(
+        strings.extractString(117, appLanguageState.value) ?: resourceStrings.extractString(
+          117,
+          appLanguageState.value
+        )!!
+      )
     }
   }
 
@@ -1510,6 +1532,19 @@ class ConfigurationRepositoryImpl(
       _drawablePathIconDeleteState.emit(
         drawables.extractPath(33, appThemeIdState.value) ?: resourceDrawables.extractPath(33, appThemeIdState.value)!!
       )
+      _drawablePathIconExitState.emit(
+        drawables.extractPath(34, appThemeIdState.value) ?: resourceDrawables.extractPath(34, appThemeIdState.value)!!
+      )
+      _drawablePathIconSwitchState.emit(
+        drawables.extractPath(35, appThemeIdState.value) ?: resourceDrawables.extractPath(35, appThemeIdState.value)!!
+      )
+      _drawablePathIconCartState.emit(
+        drawables.extractPath(36, appThemeIdState.value) ?: resourceDrawables.extractPath(36, appThemeIdState.value)!!
+      )
+      _drawablePathIconAddCartState.emit(
+        drawables.extractPath(37, appThemeIdState.value) ?: resourceDrawables.extractPath(37, appThemeIdState.value)!!
+      )
+
     }
   }
 }

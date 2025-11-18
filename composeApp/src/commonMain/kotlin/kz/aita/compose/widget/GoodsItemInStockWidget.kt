@@ -30,8 +30,8 @@ fun AppConfiguration.GoodsItemInStockWidget(
   soldForPeriod: QuantityDataModel? = null,
   returnedForPeriod: QuantityDataModel? = null,
   onClick: ((GoodsItemDataModel) -> Unit)? = null,
-  onDelete: (GoodsItemDataModel) -> Unit,
-  onEdit: (GoodsItemDataModel) -> Unit,
+  onDelete: ((GoodsItemDataModel) -> Unit)? = null,
+  onEdit: ((GoodsItemDataModel) -> Unit)? = null,
 ) {
   Row(
     modifier
@@ -43,7 +43,7 @@ fun AppConfiguration.GoodsItemInStockWidget(
             interactionSource = remember {
               MutableInteractionSource()
             },
-            indication = ripple(color = textColor, radius = stateValues.cornerRadius),
+            indication = ripple(color = textColor),
             onClick = {
               this(goodsItem)
             }
@@ -211,13 +211,15 @@ fun AppConfiguration.GoodsItemInStockWidget(
       horizontalAlignment = Alignment.End,
       verticalArrangement = Arrangement.SpaceBetween
     ) {
-      actionButton(
-        text = "",
-        enabledColor = stateValues.ErrorColor,
-        iconPath = stateValues.drawablePathIconDelete,
-        iconContentDescription = stateValues.drawablePathIconDelete,
-      ) {
-        onDelete(goodsItem)
+      onDelete?.let {
+        actionButton(
+          text = "",
+          enabledColor = stateValues.ErrorColor,
+          iconPath = stateValues.drawablePathIconDelete,
+          iconContentDescription = stateValues.drawablePathIconDelete,
+        ) {
+          onDelete(goodsItem)
+        }
       }
 
       Spacer(
@@ -225,12 +227,14 @@ fun AppConfiguration.GoodsItemInStockWidget(
           .height(stateValues.marginTextField)
       )
 
-      actionButton(
-        text = "",
-        iconPath = stateValues.drawablePathIconEdit,
-        iconContentDescription = stateValues.drawablePathIconEdit,
-      ) {
-        onEdit(goodsItem)
+      onEdit?.let {
+        actionButton(
+          text = "",
+          iconPath = stateValues.drawablePathIconEdit,
+          iconContentDescription = stateValues.drawablePathIconEdit,
+        ) {
+          onEdit(goodsItem)
+        }
       }
     }
   }

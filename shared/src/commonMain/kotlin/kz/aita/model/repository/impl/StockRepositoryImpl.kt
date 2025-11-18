@@ -88,8 +88,6 @@ class StockRepositoryImpl(
   }
 
   override fun addGoodsItem(goodsItem: GoodsItemDataModel, onCompleted: ((DataState<GoodsItemDataModel>) -> Unit)?) {
-    println("being added $goodsItem")
-
     if (!addGoodsItemMutex.isLocked)
       launch(Dispatchers.io) {
         addGoodsItemMutex.withLock {

@@ -10,21 +10,27 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.kamel.core.Resource
 import io.kamel.image.KamelImage
 import io.kamel.image.asyncPainterResource
 import io.kamel.image.config.LocalKamelConfig
 import io.ktor.http.*
+import kotlinx.coroutines.launch
 import kz.aita.AppConfiguration
 import kz.aita.compose.render.kamelConfig
+import kz.aita.compose.util.getResourceDrawableSvgPainter
 import kz.aita.core.getFullDrawableResourceUrl
 
 @Composable
@@ -34,6 +40,7 @@ fun AppConfiguration.ScreenAppBarWidget(
   iconPath: String? = null,
   textColor: Color = stateValues.TextColor,
   cornerRadius: Dp = stateValues.cornerRadius,
+  leadingContent: @Composable (() -> Unit)? = null,
   trailingIcons: List<Pair<String, () -> Unit>> = emptyList(),
   onBack: (() -> Unit)? = null
 ) {
@@ -93,11 +100,34 @@ fun AppConfiguration.ScreenAppBarWidget(
                   data = Url(getFullDrawableResourceUrl(stateValues.drawablePathIconBackArrow))
                 )
               },
-              contentDescription = stateValues.stringBack
+              contentDescription = stateValues.stringBack,
+              onFailure = {
+                val resource by produceState<Resource<Painter>>(
+                  initialValue = Resource.Loading,
+                  key1 = stateValues.drawablePathIconBackArrow
+                ) {
+                  try {
+                    val painter = getResourceDrawableSvgPainter(stateValues.drawablePathIconBackArrow)
+                    value = Resource.Success(painter)
+                  } catch (t: Throwable) {
+                    value = Resource.Failure(t)
+                  }
+                }
+
+                KamelImage(
+                  modifier = Modifier
+                    .padding(16.dp)
+                    .aspectRatio(1f, matchHeightConstraintsFirst = true),
+                  resource = resource,
+                  contentDescription = stateValues.stringBack,
+                )
+              }
             )
           }
         }
       }
+
+      leadingContent?.invoke()
 
       Row(
         modifier = Modifier

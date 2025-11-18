@@ -15,6 +15,7 @@ data class GoodsItemDataModel(
   val salePrices: List<PriceDataModel>,
   val returnPrices: List<PriceDataModel> = salePrices,
   val supplyPrices: List<PriceDataModel>,
+  val isQuickItem: Boolean,
   val createdAt: Long,
   val isActive: Boolean
 ): Searchable {

@@ -2437,6 +2437,48 @@
           "value": "Негізгі"
         }
       ]
+    },
+    {
+      "id": 116,
+      "values": [
+        {
+          "language": "main",
+          "value": "Add translation"
+        },
+        {
+          "language": "en",
+          "value": "Add translation"
+        },
+        {
+          "language": "ru",
+          "value": "Добавить перевод"
+        },
+        {
+          "language": "kk",
+          "value": "Аударма қосу"
+        }
+      ]
+    },
+    {
+      "id": 117,
+      "values": [
+        {
+          "language": "main",
+          "value": "Set active"
+        },
+        {
+          "language": "en",
+          "value": "Set active"
+        },
+        {
+          "language": "ru",
+          "value": "Сделать активным"
+        },
+        {
+          "language": "kk",
+          "value": "Белсенді ету"
+        }
+      ]
     }
   ]
 }

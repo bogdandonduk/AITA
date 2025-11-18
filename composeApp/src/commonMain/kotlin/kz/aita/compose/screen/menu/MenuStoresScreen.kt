@@ -1,10 +1,14 @@
 package kz.aita.compose.screen.menu
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
@@ -34,6 +38,33 @@ fun AppConfiguration.MenuStoresScreen() {
     ScreenAppBarWidget(
       title = stateValues.stringStores,
       iconPath = stateValues.drawablePathIconStores,
+//      leadingContent = stateValues.activeStoreId?.let { activeStoreId ->
+//        stateValues.stores?.find { it.id == activeStoreId }?.let { activeStore ->
+//          activeStore.name.extractLocalizedString(stateValues.appLanguage)?.let { name ->
+//            {
+//              Row(
+//                horizontalArrangement = Arrangement.Center
+//              ) {
+//                Text(
+//                  text = name,
+//                  color = stateValues.TextColor,
+//                  fontSize = stateValues.accentTextSize,
+//                  fontWeight = FontWeight.Bold
+//                )
+//
+//                Spacer(modifier = Modifier.width(8.dp))
+//
+//                actionButton(
+//                  text = "",
+//                  iconPath = stateValues.drawablePathIconSwitch
+//                ) {
+//
+//                }
+//              }
+//            }
+//          }
+//        }
+//      },
       trailingIcons = listOf(
         stateValues.drawablePathIconAdd to {
           coroutineScope.launch {
@@ -61,9 +92,9 @@ fun AppConfiguration.MenuStoresScreen() {
           val searchTextFieldContent =
             searchTextField(
               stateHost = NavigationScreenModel.Menu.Stores,
-              stateKey = "search_query",
+              stateKey = NavigationScreenModel.KEY_STATE_EMAIL,
               modifier = Modifier
-                .fillMaxWidth(0.5f)
+                .fillMaxWidth(0.6f)
                 .padding(top = 8.dp)
             )
 
@@ -87,7 +118,7 @@ fun AppConfiguration.MenuStoresScreen() {
             LazyColumn(
               modifier = Modifier
                 .weight(1f)
-                .fillMaxWidth(0.5f)
+                .fillMaxWidth(0.6f)
                 .padding(top = 8.dp),
               horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -95,15 +126,19 @@ fun AppConfiguration.MenuStoresScreen() {
                 StoreWidget(
                   store = store,
                   isActive = stateValues.activeStoreId == store.id,
+                  onDelete = {
+
+                  },
                   onEdit = {
                     coroutineScope.launch {
-                      NavigationScreenModel.Menu.AddEditStore.setState("state_editedStoreId" to store.id)
+                      NavigationScreenModel.Menu.AddEditStore.setState(NavigationScreenModel.Menu.AddEditStore.KEY_STATE_EDITED_STORE_ID to store.id)
                       Navigation.Menu.go(NavigationScreenModel.Menu.AddEditStore)
                     }
+                  },
+                  onSetActive = {
+                    storeRepository.setActiveStoreId(it.id)
                   }
-                ) {
-                  storeRepository.setActiveStoreId(it.id)
-                }
+                )
               }
             }
           }

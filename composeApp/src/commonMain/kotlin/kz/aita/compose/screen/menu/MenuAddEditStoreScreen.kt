@@ -61,44 +61,7 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
           titleText = stateValues.stringName,
           placeholderText = stateValues.stringEnterName,
           stateHost = NavigationScreenModel.Menu.AddEditStore,
-          stateKey = NavigationScreenModel.Menu.AddEditStore.KEY_STATE_NAME,
-          domains = emptyList<SelectableDomain>(),
-          secondaryDomains = mutableListOf<SelectableDomain>().apply {
-            add(
-              SelectableDomain(
-                id = "main",
-                displayId = stateValues.stringMain,
-                name = stateValues.stringMain,
-                iconPath = null
-              )
-            )
-
-            stateValues.globalAppConfiguration.languages.forEach { language ->
-              add(
-                SelectableDomain(
-                  id = language.language,
-                  displayId = language.name,
-                  name = language.name,
-                  iconPath = language.flagDrawablePath
-                )
-              )
-            }
-          },
-          secondaryDomainsShowName = false,
-          addDomainActionButtonText = "",
-          addSecondaryDomainActionButtonText = stateValues.stringAddName,
-        )
-
-        Spacer(
-          modifier = Modifier
-            .height(stateValues.marginTextFieldGroup)
-        )
-
-        val alias = domainSelectionTextFieldGroupWidget(
-          titleText = stateValues.stringAlias,
-          placeholderText = stateValues.stringEnterAlias,
-          stateHost = NavigationScreenModel.Menu.AddEditStore,
-          stateKey = NavigationScreenModel.Menu.AddEditStore.KEY_STATE_ALIAS,
+          stateKey = NavigationScreenModel.KEY_STATE_NAME,
           domains = emptyList(),
           secondaryDomains = mutableListOf<SelectableDomain>().apply {
             add(
@@ -131,14 +94,74 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
             .height(stateValues.marginTextFieldGroup)
         )
 
-        val descriptionTextFieldContent =
-          genericTextField(
-            titleText = stateValues.stringDescription,
-            placeholderText = stateValues.stringOptional,
-            valueInitial = editedStore?.description?.extractLocalizedString(stateValues.appLanguage),
-            stateHost = NavigationScreenModel.Menu.AddEditStore,
-            stateKey = "description",
-          )
+        val aliasData = domainSelectionTextFieldGroupWidget(
+          titleText = stateValues.stringAlias,
+          placeholderText = stateValues.stringEnterAlias,
+          stateHost = NavigationScreenModel.Menu.AddEditStore,
+          stateKey = NavigationScreenModel.Menu.AddEditStore.KEY_STATE_ALIAS,
+          domains = emptyList(),
+          secondaryDomains = mutableListOf<SelectableDomain>().apply {
+            add(
+              SelectableDomain(
+                id = "main",
+                displayId = stateValues.stringMain,
+                name = stateValues.stringMain,
+                iconPath = null
+              )
+            )
+
+            stateValues.globalAppConfiguration.languages.forEach { language ->
+              add(
+                SelectableDomain(
+                  id = language.language,
+                  displayId = language.name,
+                  name = language.name,
+                  iconPath = language.flagDrawablePath
+                )
+              )
+            }
+          },
+          secondaryDomainsShowName = false,
+          addDomainActionButtonText = "",
+          addSecondaryDomainActionButtonText = stateValues.stringAddTranslation,
+        )
+
+        Spacer(
+          modifier = Modifier
+            .height(stateValues.marginTextFieldGroup)
+        )
+
+        val descriptionData = domainSelectionTextFieldGroupWidget(
+          titleText = stateValues.stringDescription,
+          placeholderText = stateValues.stringEnterDescription,
+          stateHost = NavigationScreenModel.Menu.AddEditStore,
+          stateKey = NavigationScreenModel.Menu.AddEditStore.KEY_STATE_DESCRIPTION,
+          domains = emptyList(),
+          secondaryDomains = mutableListOf<SelectableDomain>().apply {
+            add(
+              SelectableDomain(
+                id = "main",
+                displayId = stateValues.stringMain,
+                name = stateValues.stringMain,
+                iconPath = null
+              )
+            )
+
+            stateValues.globalAppConfiguration.languages.forEach { language ->
+              add(
+                SelectableDomain(
+                  id = language.language,
+                  displayId = language.name,
+                  name = language.name,
+                  iconPath = language.flagDrawablePath
+                )
+              )
+            }
+          },
+          secondaryDomainsShowName = false,
+          addDomainActionButtonText = "",
+          addSecondaryDomainActionButtonText = stateValues.stringAddTranslation
+        )
 
         Spacer(
           modifier = Modifier
@@ -148,7 +171,7 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
         val phoneNumberTextFieldContent = countrySelectionPhoneNumberTextField(
           valueInitial = editedStore?.phoneNumbers?.takeIf { it.isNotEmpty() }?.first(),
           stateHost = NavigationScreenModel.Menu.AddEditStore,
-          stateKey = "phone_number",
+          stateKey = NavigationScreenModel.KEY_STATE_PHONE_NUMBER
         )
 
         Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
@@ -157,7 +180,7 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
         val emailTextFieldContent = emailTextField(
           valueInitial = editedStore?.emails?.takeIf { it.isNotEmpty() }?.first(),
           stateHost = NavigationScreenModel.Menu.AddEditStore,
-          stateKey = "email",
+          stateKey = NavigationScreenModel.KEY_STATE_EMAIL
         )
 
         Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
@@ -204,22 +227,18 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                         it.value.text
                       )
                     },
-                    alias = if (aliasTextFieldContent.value.text.isNotEmpty()) {
-                      listOf(
-                        LocalizedStringDataModel(
-                          language = "main",
-                          value = aliasTextFieldContent.value.text.trim()
-                        )
+                    alias = aliasData.data.map {
+                      LocalizedStringDataModel(
+                        it.selectedSecondaryDomainId,
+                        it.value.text
                       )
-                    } else emptyList(),
-                    description = if (descriptionTextFieldContent.value.text.isNotEmpty()) {
-                      listOf(
-                        LocalizedStringDataModel(
-                          language = "main",
-                          value = descriptionTextFieldContent.value.text.trim()
-                        )
+                    },
+                    description = descriptionData.data.map {
+                      LocalizedStringDataModel(
+                        it.selectedSecondaryDomainId,
+                        it.value.text
                       )
-                    } else emptyList(),
+                    },
                     companyForms = stateValues.globalAppConfiguration.companyForms.find { it.id == companyFormDropdownListContent.selectedId }!!.run { listOf(this) },
                     location = stateValues.globalAppConfiguration.countries.first().cities.first().run {
                       LocationDataModel(
@@ -242,6 +261,7 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                 ) {
                   coroutineScope.launch {
                     Navigation.Menu.pop()
+                    NavigationScreenModel.Menu.AddEditStore.removeState(NavigationScreenModel.Menu.AddEditStore.KEY_STATE_EDITED_STORE_ID)
                   }
                 }
             } else {
@@ -251,28 +271,24 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                     id = "",
                     userIds = emptyList(),
                     storeTypeIds = emptyList(),
-                    name = listOf(
+                    name = nameData.data.map {
                       LocalizedStringDataModel(
-                        language = "main",
-                        value = "" // nameTextFieldContent.value.text.trim()
+                        it.selectedSecondaryDomainId,
+                        it.value.text
                       )
-                    ),
-                    alias = if (aliasTextFieldContent.value.text.isNotEmpty()) {
-                      listOf(
-                        LocalizedStringDataModel(
-                          language = "main",
-                          value = aliasTextFieldContent.value.text.trim()
-                        )
+                    },
+                    alias = aliasData.data.map {
+                      LocalizedStringDataModel(
+                        it.selectedSecondaryDomainId,
+                        it.value.text
                       )
-                    } else emptyList(),
-                    description = if (descriptionTextFieldContent.value.text.isNotEmpty()) {
-                      listOf(
-                        LocalizedStringDataModel(
-                          language = "main",
-                          value = descriptionTextFieldContent.value.text.trim()
-                        )
+                    },
+                    description = descriptionData.data.map {
+                      LocalizedStringDataModel(
+                        it.selectedSecondaryDomainId,
+                        it.value.text
                       )
-                    } else emptyList(),
+                    },
                     companyForms = stateValues.globalAppConfiguration.companyForms.find { it.id == companyFormDropdownListContent.selectedId }
                       !!.run { listOf(this) },
                     location = stateValues.globalAppConfiguration.countries.first().cities.first().run {
@@ -296,7 +312,6 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                 ) {
                   coroutineScope.launch {
                     Navigation.Menu.pop()
-                    NavigationScreenModel.Stock.AddEditGoodsItem.removeState("state_editedGoodsItemId")
                   }
                 }
             }

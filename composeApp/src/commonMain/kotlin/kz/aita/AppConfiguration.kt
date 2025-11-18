@@ -219,6 +219,7 @@ object AppConfiguration {
     val stringCategories: String
     val stringMain: String
     val stringAddTranslation: String
+    val stringSetActive: String
 
     val screenWidth: Dp
     val screenHeight: Dp
@@ -293,6 +294,9 @@ object AppConfiguration {
     val drawablePathIconBarcodeCamScanner: String
     val drawablePathIconDelete: String
     val drawablePathIconExit: String
+    val drawablePathIconSwitch: String
+    val drawablePathIconCart: String
+    val drawablePathIconAddCart: String
   }
 
   private val _screenWidthState = MutableStateFlow(0f.dp)
@@ -547,6 +551,8 @@ object AppConfiguration {
       override val stringQuick: String by configurationRepository.stringQuickGoodsItemsState.collectAsState()
       override val stringCategories: String by configurationRepository.stringCategoriesState.collectAsState()
       override val stringMain: String by configurationRepository.stringMainState.collectAsState()
+      override val stringAddTranslation: String by configurationRepository.stringAddTranslationState.collectAsState()
+      override val stringSetActive: String by configurationRepository.stringSetActiveState.collectAsState()
 
       override val screenWidth: Dp by _screenWidthState.collectAsState()
       override val screenHeight: Dp by _screenHeightState.collectAsState()
@@ -614,6 +620,9 @@ object AppConfiguration {
       override val drawablePathIconBarcodeCamScanner: String by configurationRepository.drawablePathIconBarcodeCamScannerState.collectAsState()
       override val drawablePathIconDelete: String by configurationRepository.drawablePathIconDeleteState.collectAsState()
       override val drawablePathIconExit: String by configurationRepository.drawablePathIconExitState.collectAsState()
+      override val drawablePathIconSwitch: String by configurationRepository.drawablePathIconSwitchState.collectAsState()
+      override val drawablePathIconCart: String by configurationRepository.drawablePathIconCartState.collectAsState()
+      override val drawablePathIconAddCart: String by configurationRepository.drawablePathIconAddCartState.collectAsState()
     }
 
     softKeyboardController = LocalSoftwareKeyboardController.current

@@ -4,7 +4,6 @@ import android.app.Application
 import app.cash.sqldelight.async.coroutines.synchronous
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 import dagger.hilt.android.HiltAndroidApp
-import kz.aita.KeyValueDatabase
 import kz.aita.android.core.TokenStore
 import kz.aita.android.core.UserAccountStore
 import kz.aita.core.cacheDirPath
@@ -22,11 +21,11 @@ class AITA: Application() {
     cacheDirPath = cacheDir.absolutePath
     sqlDelightDriver =
       AndroidSqliteDriver(
-        schema = KeyValueDatabase.Schema.synchronous(),
+        schema = AppDatabase.Schema.synchronous(),
         context = this,
-        name = "key_value.db"
+        name = "app_database.db"
       )
-
+    
     tokenStore = TokenStore()
     userAccountStore = UserAccountStore()
   }

@@ -2,14 +2,11 @@ package kz.aita.compose.widget
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
-import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -25,8 +22,9 @@ fun AppConfiguration.StoreWidget(
   store: StoreDataModel,
   isActive: Boolean = false,
   textColor: Color = stateValues.TextColor,
-  onEdit: (StoreDataModel) -> Unit,
-  onSetActive: (StoreDataModel) -> Unit
+  onDelete: ((StoreDataModel) -> Unit)? = null,
+  onEdit: ((StoreDataModel) -> Unit)? = null,
+  onSetActive: ((StoreDataModel) -> Unit)? = null
 ) {
   Row(
     modifier
@@ -69,29 +67,28 @@ fun AppConfiguration.StoreWidget(
         )
       }
 
-      Spacer(
+      Column(
         modifier = Modifier
-          .height(6.dp)
-      )
+          .padding(top = 6.dp),
+      ) {
+        store.alias.takeIf { it.any  { item -> item.value.isNotEmpty() && item.value.isNotBlank() } }?.extractLocalizedString(stateValues.appLanguage)?.let {
+          Text(
+            text = it,
+            fontSize = stateValues.textSize,
+            color = textColor
+          )
+        }
 
-      Text(
-        text = store.alias?.extractLocalizedString(stateValues.appLanguage) ?: "Alias not specified",
-        fontSize = stateValues.textSize,
-        color = textColor
-      )
+        store.description.takeIf { it.any  { item -> item.value.isNotEmpty() && item.value.isNotBlank() } }?.extractLocalizedString(stateValues.appLanguage)?.let {
+          Text(
+            text = it,
+            fontSize = stateValues.textSize,
+            color = textColor
+          )
+        }
+      }
 
-      Text(
-        text = store.description?.extractLocalizedString(stateValues.appLanguage) ?: "Description not specified",
-        fontSize = stateValues.textSize,
-        color = textColor
-      )
-
-      Spacer(
-        modifier = Modifier
-          .height(6.dp)
-      )
-
-      val companyFormsText = store.companyForms?.takeIf { it.isNotEmpty() }?.let { companyForms ->
+      val companyFormsText = store.companyForms.takeIf { it.isNotEmpty() }?.let { companyForms ->
         StringBuilder()
           .also {
             companyForms.forEachIndexed { index, companyForm ->
@@ -116,7 +113,7 @@ fun AppConfiguration.StoreWidget(
       )
 
       Text(
-        text = store.location?.name ?: "Location not specified",
+        text = store.location.name,
         fontSize = stateValues.textSize,
         fontWeight = FontWeight.Bold,
         color = textColor
@@ -127,26 +124,53 @@ fun AppConfiguration.StoreWidget(
           .height(stateValues.marginTextField)
       )
 
-      Row {
-        if (!isActive) {
-          actionButton(
-            text = "Set active",
-            fillMaxWidthIfTextPresent = false
-          ) {
-            onSetActive(store)
-          }
+    }
 
-          Spacer(
-            modifier = Modifier
-              .width(4.dp)
-          )
-        }
-
+    Column(
+      modifier = Modifier
+        .padding(end = 16.dp, top = 16.dp, start = 8.dp, bottom = 16.dp),
+      horizontalAlignment = Alignment.End,
+      verticalArrangement = Arrangement.SpaceBetween
+    ) {
+      onDelete?.let {
         actionButton(
-          text = stateValues.stringEdit,
-          fillMaxWidthIfTextPresent = false
+          text = "",
+          enabledColor = stateValues.ErrorColor,
+          iconPath = stateValues.drawablePathIconDelete,
+          iconContentDescription = stateValues.drawablePathIconDelete,
+        ) {
+          onDelete(store)
+        }
+      }
+
+      Spacer(
+        modifier = Modifier
+          .height(stateValues.marginTextField)
+      )
+
+      onEdit?.let {
+        actionButton(
+          text = "",
+          iconPath = stateValues.drawablePathIconEdit,
+          iconContentDescription = stateValues.drawablePathIconEdit,
         ) {
           onEdit(store)
+        }
+      }
+
+      Spacer(
+        modifier = Modifier
+          .height(stateValues.marginTextField)
+      )
+
+      onSetActive?.let {
+        actionButton(
+          text = "",
+          enabledColor = stateValues.OkayColor,
+          iconPath = stateValues.drawablePathIconCheck,
+          iconContentDescription = stateValues.stringSelect,
+        ) {
+          onSetActive(store)
         }
       }
     }

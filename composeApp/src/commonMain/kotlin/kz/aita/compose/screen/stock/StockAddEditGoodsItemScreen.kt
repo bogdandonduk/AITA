@@ -2,6 +2,9 @@ package kz.aita.compose.screen.stock
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxColors
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -9,6 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.KeyboardType
@@ -45,7 +49,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
     val state by NavigationScreenModel.Stock.AddEditGoodsItem.state.collectAsState()
 
     val editedGoodsItem =
-      state["state_editedGoodsItemId"]?.run { stateValues.stock?.find { goodsItem -> goodsItem.id == this } }
+      state[NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_EDITED_GOODS_ITEM_ID]?.run { stateValues.stock?.find { goodsItem -> goodsItem.id == this } }
 
     ScreenAppBarWidget(
       title = editedGoodsItem?.let { stateValues.stringEditGoodsItem } ?: stateValues.stringAddGoodsItem,
@@ -55,7 +59,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
           coroutineScope.launch {
             Navigation.Stock.pop(stateValues.isNarrowScreen)
             if (editedGoodsItem != null)
-              NavigationScreenModel.Stock.AddEditGoodsItem.removeState("state_editedGoodsItemId")
+              NavigationScreenModel.Stock.AddEditGoodsItem.removeState(NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_EDITED_GOODS_ITEM_ID)
           }
         }
       } else null
@@ -75,8 +79,8 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
             titleText = stateValues.stringBarcode,
             placeholderText = stateValues.stringEnterBarcode,
             stateHost = NavigationScreenModel.Stock.AddEditGoodsItem,
-            stateKey = "barcode",
-            domains = emptyList<SelectableDomain>(),
+            stateKey = NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_BARCODE,
+            domains = emptyList(),
             addDomainActionButtonText = stateValues.stringAddBarcode,
             addSecondaryDomainActionButtonText = stateValues.stringAddBarcode,
             isFocusedInitial = true,
@@ -84,7 +88,8 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
               DomainSelectionTextFieldGroupItemContent(
                 TextFieldValue(it, selection = TextRange(it.length)),
                 "",
-                ""
+                "",
+                isContentValid = true
               )
             },
           )
@@ -125,13 +130,45 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
             placeholderText = stateValues.stringEnterName,
             valueInitial = name,
             stateHost = NavigationScreenModel.Stock.AddEditGoodsItem,
-            stateKey = "name",
+            stateKey = NavigationScreenModel.KEY_STATE_NAME,
           )
 
-        Spacer(
-          modifier = Modifier
-            .height(stateValues.marginTextFieldGroup)
-        )
+        var isQuickItem by rememberSaveable {
+          mutableStateOf(false)
+        }
+
+        Row(
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          Checkbox(
+            checked = isQuickItem,
+            onCheckedChange = {
+              isQuickItem = it
+            },
+            colors = CheckboxColors(
+              checkedBoxColor = stateValues.AccentColor,
+              checkedCheckmarkColor = stateValues.AccentTextColor,
+              uncheckedBoxColor = stateValues.BackgroundColor,
+              checkedBorderColor = stateValues.PlaceholderTextColor,
+              uncheckedBorderColor = stateValues.PlaceholderTextColor,
+              uncheckedCheckmarkColor = stateValues.PlaceholderTextColor,
+              disabledBorderColor = stateValues.PlaceholderTextColor,
+              disabledCheckedBoxColor = stateValues.PlaceholderTextColor,
+              disabledUncheckedBoxColor = stateValues.PlaceholderTextColor,
+              disabledIndeterminateBorderColor = stateValues.PlaceholderTextColor,
+              disabledUncheckedBorderColor = stateValues.PlaceholderTextColor,
+              disabledIndeterminateBoxColor = stateValues.PlaceholderTextColor,
+            )
+          )
+
+          Spacer(Modifier.width(2.dp))
+
+          Text(
+            text = stateValues.stringQuick,
+            color = stateValues.TextColor
+          )
+        }
+
 
         var categoryDropdownListContent: DropdownListWidgetContent? = null
         categoryDropdownListContent = stateValues.goodsCategories?.run {
@@ -181,10 +218,10 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
             .height(stateValues.marginTextFieldGroup)
         )
 
-        val priceOnFilterValue = { text: String, _: String ->
+        val priceOnFilterValue = { text: String, _: String, _: String? ->
           text.isNumericalDoubleString()
         }
-        val priceOnContentValidityCheck = { text: String, id: String ->
+        val priceOnContentValidityCheck = { text: String, id: String, _: String? ->
           text.isNotEmpty() && id.isNumericalDoubleString()
         }
 
@@ -192,7 +229,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
           titleText = stateValues.stringSupplyData,
           placeholderText = stateValues.stringEnterSupplyPrice,
           stateHost = NavigationScreenModel.Stock.AddEditGoodsItem,
-          stateKey = "supply_data",
+          stateKey = NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_SUPPLY_DATA,
           domains = mutableListOf<SelectableDomain>().apply {
             stateValues.suppliers?.forEach { supplier ->
               add(
@@ -240,7 +277,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
           placeholderText = stateValues.stringEnterSalePrice,
           valueInitial = saleDataInitial,
           stateHost = NavigationScreenModel.Stock.AddEditGoodsItem,
-          stateKey = "sale_data",
+          stateKey = NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_SALE_DATA,
           domains = mutableListOf<SelectableDomain>().apply {
             stateValues.suppliers?.forEach { supplier ->
               add(
@@ -288,7 +325,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
           placeholderText = stateValues.stringEnterReturnPrice,
           valueInitial = returnDataInitial,
           stateHost = NavigationScreenModel.Stock.AddEditGoodsItem,
-          stateKey = "return_data",
+          stateKey = NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_RETURN_DATA,
           domains = mutableListOf<SelectableDomain>().apply {
             stateValues.suppliers?.forEach { supplier ->
               add(
@@ -351,7 +388,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
                 id = "",
                 userId = "",
                 storeId = stateValues.activeStoreId!!,
-                barcode = barcodeTextFieldGroupContent.data.apply { println("barcodes are $this") }.map { it.value.text },
+                barcode = barcodeTextFieldGroupContent.data.map { it.value.text },
                 name = listOf(
                   LocalizedStringDataModel(language = "main", nameTextFieldContent.value.text)
                 ),
@@ -380,13 +417,14 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
                   )
                 },
                 createdAt = 0L,
+                isQuickItem = isQuickItem,
                 isActive = true
               )
             ) {
               coroutineScope.launch {
                 Navigation.Stock.pop(stateValues.isNarrowScreen)
                 if (editedGoodsItem != null)
-                  NavigationScreenModel.Stock.AddEditGoodsItem.removeState("state_editedGoodsItemId")
+                  NavigationScreenModel.Stock.AddEditGoodsItem.removeState(NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_EDITED_GOODS_ITEM_ID)
               }
             }
         }
@@ -410,8 +448,6 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
         text = editedGoodsItem?.let { stateValues.stringEditGoodsItem } ?: stateValues.stringAddGoodsItem,
         enabled = stateValues.latestNotification == null,
         onClick = {
-          println("so go action is $goAction")
-
           goAction?.invoke()
         }
       )

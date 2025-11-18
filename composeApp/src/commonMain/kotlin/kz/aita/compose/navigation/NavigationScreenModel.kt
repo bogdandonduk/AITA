@@ -10,6 +10,17 @@ sealed class NavigationScreenModel(
   open val iconPath: String = ""
 ): StateHost() {
 
+  companion object {
+    const val KEY_STATE_SEARCH_QUERY: String = "keyState_searchQuery"
+    const val KEY_STATE_NAME: String = "keyState_name"
+    const val KEY_STATE_PHONE_NUMBER: String = "keyState_phoneNumber"
+    const val KEY_STATE_EMAIL: String = "keyState_email"
+    const val KEY_STATE_FIRST_NAME: String = "keyState_firstName"
+    const val KEY_STATE_LAST_NAME: String = "keyState_lastName"
+    const val KEY_STATE_PASSWORD: String = "keyState_password"
+    const val KEY_STATE_REPEATED_PASSWORD: String = "keyState_repeatedPassword"
+  }
+
   sealed class Transaction(route: String): NavigationScreenModel(route) {
 
     data object MainSale: Transaction("TransactionMainSaleNavigationScreenModelRoute") {
@@ -53,7 +64,13 @@ sealed class NavigationScreenModel(
 
     data object Warehouse: Stock("StockWarehouseNavigationScreenModelRoute")
 
-    data object AddEditGoodsItem: Stock("StockAddGoodsItemNavigationScreenModelRoute")
+    data object AddEditGoodsItem: Stock("StockAddGoodsItemNavigationScreenModelRoute") {
+      const val KEY_STATE_EDITED_GOODS_ITEM_ID: String = "keyState_editedGoodsItemId"
+      const val KEY_STATE_BARCODE: String = "keyState_barcode"
+      const val KEY_STATE_SALE_DATA: String = "keyState_saleData"
+      const val KEY_STATE_RETURN_DATA: String = "keyState_returnData"
+      const val KEY_STATE_SUPPLY_DATA: String = "keyState_supplyData"
+    }
   }
 
   sealed class Menu(route: String): NavigationScreenModel(route) {
@@ -72,6 +89,8 @@ sealed class NavigationScreenModel(
         get() = AppConfiguration.stateValues.drawablePathIconUserAccount
       override val name: String
         get() = AppConfiguration.stateValues.stringUserAccount
+
+      const val KEY_STATE_CONFIRMATION_PASSWORD: String = "keyState_confirmationPassword"
     }
 
     data object StoreSubscription: Menu("MenuStoreSubscriptionNavigationScreenModelRoute")
@@ -93,7 +112,6 @@ sealed class NavigationScreenModel(
     }
     data object AddEditStore: Menu("MenuAddEditStoreNavigationScreenModelRoute") {
       const val KEY_STATE_EDITED_STORE_ID: String = "keyState_editedStoreId"
-      const val KEY_STATE_NAME: String = "keyState_name"
       const val KEY_STATE_ALIAS: String = "keyState_alias"
       const val KEY_STATE_DESCRIPTION: String = "keyState_description"
     }
@@ -162,6 +180,7 @@ sealed class NavigationScreenModel(
     data object Main: UserAuth("UserAuthNavigationScreenModelRoute")
 
     data object LogIn: UserAuth("UserAuthLogInNavigationScreenModelRoute")
+
     data object SignUp: UserAuth("UserAuthLogInNavigationScreenModelRoute")
   }
 

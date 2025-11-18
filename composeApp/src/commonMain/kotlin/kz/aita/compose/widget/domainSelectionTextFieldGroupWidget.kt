@@ -16,6 +16,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import kotlinx.coroutines.launch
 import kz.aita.AppConfiguration
 import kz.aita.core.StateHost
+import kotlin.run
 
 @Composable
 fun AppConfiguration.domainSelectionTextFieldGroupWidget(
@@ -33,11 +34,39 @@ fun AppConfiguration.domainSelectionTextFieldGroupWidget(
   addSecondaryDomainActionButtonText: String,
   keyboardType: KeyboardType = KeyboardType.Text,
   isFocusedInitial: Boolean = false,
-  onFilterValue: ((String, String) -> Boolean)? = null,
-  onContentValidityCheck: ((String, String) -> Boolean)? = null,
+  onFilterValue: ((String, String, String?) -> Boolean)? = null,
+  onContentValidityCheck: ((String, String, String?) -> Boolean)? = null,
 ): DomainSelectionTextFieldGroupWidgetContent {
+  var isContentValid by rememberSaveable {
+    mutableStateOf(true)
+  }
+
   var data: List<DomainSelectionTextFieldGroupItemContent> by rememberSaveable {
-    mutableStateOf(valueInitial ?: listOf(DomainSelectionTextFieldGroupItemContent(TextFieldValue(""), domains.takeIf { it.isNotEmpty() }?.first()?.id ?: "", secondaryDomains?.takeIf { it.isNotEmpty() }?.first()?.id ?: "")))
+    mutableStateOf(
+      valueInitial ?: listOf(
+        TextFieldValue("").run {
+          DomainSelectionTextFieldGroupItemContent(
+            this,
+            domains.takeIf {
+              it.isNotEmpty()
+            }?.first()?.id ?: "", secondaryDomains?.takeIf { it.isNotEmpty() }?.first()?.id ?: "",
+            isContentValid = isContentValid,
+            onContentValidityCheck = onContentValidityCheck?.let {
+              {
+                val value = it(this@run.text, domains.takeIf { d ->
+                  d.isNotEmpty()
+                }?.first()?.id ?: "", secondaryDomains?.takeIf { sd ->
+                  sd.isNotEmpty()
+                }?.first()?.id ?: "")
+                isContentValid = value
+                value
+              }
+            }
+          )
+        }
+
+      )
+    )
   }
 
   LaunchedEffect(valueInitial) {
@@ -50,10 +79,9 @@ fun AppConfiguration.domainSelectionTextFieldGroupWidget(
   var availableSecondaryDomains by rememberSaveable { mutableStateOf(secondaryDomains) }
 
   LaunchedEffect(data) {
-    println("secondary domains ${secondaryDomains?.map { it.id }}")
-    println("data domains ${data.map { it.selectedSecondaryDomainId }}")
     availableDomains = domains.filter { domain -> data.find { it.selectedDomainId == domain.id } == null }
-    availableSecondaryDomains = secondaryDomains?.filter { secondaryDomain -> data.find { it.selectedSecondaryDomainId == secondaryDomain.id } == null }
+    availableSecondaryDomains =
+      secondaryDomains?.filter { secondaryDomain -> data.find { it.selectedSecondaryDomainId == secondaryDomain.id } == null }
   }
 
   Column(
@@ -125,11 +153,22 @@ fun AppConfiguration.domainSelectionTextFieldGroupWidget(
         iconPath = stateValues.drawablePathIconAdd
       ) {
         data = data.toMutableList().apply {
-          add(DomainSelectionTextFieldGroupItemContent(TextFieldValue(), availableDomains.takeIf { it.isNotEmpty() }?.first()?.id ?: "", availableSecondaryDomains?.takeIf { it.isNotEmpty() }?.first()?.id ?: ""))
+          add(
+            DomainSelectionTextFieldGroupItemContent(
+              TextFieldValue(),
+              availableDomains.takeIf { it.isNotEmpty() }?.first()?.id ?: "",
+              availableSecondaryDomains?.takeIf { it.isNotEmpty() }?.first()?.id ?: "",
+              isContentValid
+            )
+          )
         }
       }
 
-    if (!addSecondaryDomainActionButtonText.equals(addDomainActionButtonText, true) && availableSecondaryDomains?.isNotEmpty() == true)
+    if (!addSecondaryDomainActionButtonText.equals(
+        addDomainActionButtonText,
+        true
+      ) && availableSecondaryDomains?.isNotEmpty() == true
+    )
       actionButton(
         modifier = Modifier
           .fillMaxWidth(),
@@ -137,7 +176,14 @@ fun AppConfiguration.domainSelectionTextFieldGroupWidget(
         iconPath = stateValues.drawablePathIconAdd
       ) {
         data = data.toMutableList().apply {
-          add(DomainSelectionTextFieldGroupItemContent(TextFieldValue(), availableDomains.takeIf { it.isNotEmpty() }?.first()?.id ?: "", availableSecondaryDomains?.takeIf { it.isNotEmpty() }?.first()?.id ?: ""))
+          add(
+            DomainSelectionTextFieldGroupItemContent(
+              TextFieldValue(),
+              availableDomains.takeIf { it.isNotEmpty() }?.first()?.id ?: "",
+              availableSecondaryDomains?.takeIf { it.isNotEmpty() }?.first()?.id ?: "",
+              isContentValid
+            )
+          )
         }
       }
   }
@@ -150,7 +196,14 @@ data class DomainSelectionTextFieldGroupWidgetContent(
 )
 
 data class DomainSelectionTextFieldGroupItemContent(
-  val value: TextFieldValue,
-  val selectedDomainId: String,
-  val selectedSecondaryDomainId: String
-)
+  var value: TextFieldValue,
+  var selectedDomainId: String,
+  var selectedSecondaryDomainId: String,
+  var isContentValid: Boolean,
+  val onContentValidityCheck: ((String) -> Boolean)? = null
+) {
+
+  fun checkContentValidity() {
+    isContentValid = onContentValidityCheck?.invoke(value.text) ?: true
+  }
+}

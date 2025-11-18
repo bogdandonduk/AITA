@@ -8,13 +8,17 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import kotlinx.coroutines.launch
+import kotlinx.io.files.Path
 import kz.aita.AppConfiguration
 import kz.aita.compose.navigation.Navigation
 import kz.aita.compose.navigation.NavigationScreenModel
+import kz.aita.compose.screen.stock.StockWarehouseScreenContent
 import kz.aita.compose.widget.ScreenAppBarWidget
 import kz.aita.compose.widget.TabContent
 import kz.aita.compose.widget.searchTextField
 import kz.aita.compose.widget.tabRowWidget
+import kz.aita.core.cartRepository
+import kz.aita.model.dataModel.QuantityDataModel
 
 @Composable
 fun AppConfiguration.TransactionSelectionScreen() {
@@ -26,21 +30,25 @@ fun AppConfiguration.TransactionSelectionScreen() {
       is NavigationScreenModel.Transaction.MainSale -> {
         0
       }
+
       is NavigationScreenModel.Transaction.MainReturn -> {
         1
       }
+
       else -> {
         2
       }
     }
 
-    val clientId = when(stateValues.navigationScreensMain.last()) {
+    val clientId = when (stateValues.navigationScreensMain.last()) {
       is NavigationScreenModel.Transaction.MainReturn -> {
         stateValues.navigationTransactionReturnClientId
       }
+
       is NavigationScreenModel.Transaction.MainSupply -> {
         stateValues.navigationTransactionSupplyClientId
       }
+
       else -> {
         stateValues.navigationTransactionSaleClientId
       }
@@ -64,7 +72,7 @@ fun AppConfiguration.TransactionSelectionScreen() {
           1 -> NavigationScreenModel.Transaction.MainReturn
           else -> NavigationScreenModel.Transaction.MainSupply
         },
-        stateKey = "search_query",
+        stateKey = NavigationScreenModel.KEY_STATE_SEARCH_QUERY,
         modifier = Modifier
           .padding(stateValues.marginTextField),
         barcodeCamScanner = true
@@ -75,16 +83,40 @@ fun AppConfiguration.TransactionSelectionScreen() {
         .padding(horizontal = stateValues.marginTextField),
       tabs = listOf(
         TabContent(stateValues.stringAll),
-        TabContent(stateValues.stringQuick),
-        TabContent(stateValues.stringCategories),
+        TabContent(stateValues.stringQuick)
       )
     )
 
-    LazyColumn(
-      modifier = Modifier
-        .weight(1f)
-    ) {
+    when (scopeRowContent.index) {
+      0 -> {
+        StockWarehouseScreenContent(
+          modifier = Modifier
+            .weight(1f),
+          searchTextFieldContent.value.text,
+          onClick = {
+            cartRepository.addToCart(
+              id = it.id,
+              transactionTypeIndex,
+              clientId,
+              it.quantity.copy(total = 1.0)
+            )
+          }
+        )
+      }
 
+      1 -> {
+        StockWarehouseScreenContent(
+          modifier = Modifier
+            .weight(1f),
+          searchTextFieldContent.value.text
+        ) {
+          it.isQuickItem
+        }
+      }
+
+      2 -> {
+
+      }
     }
   }
 }
