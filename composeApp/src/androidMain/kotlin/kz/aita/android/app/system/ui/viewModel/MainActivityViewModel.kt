@@ -6,7 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kz.aita.core.genericLocalService
+import kz.aita.genericLocalService
 import javax.inject.Inject
 
 @HiltViewModel
@@ -53,11 +53,11 @@ class MainActivityViewModel @Inject constructor(): ViewModel() {
 
 
   suspend fun getRequestedPermissions(): List<String> {
-    return genericLocalService.get(KEY_REQUESTED_PERMISSIONS)?.run { split("|") } ?: emptyList()
+    return genericLocalService.getKv(KEY_REQUESTED_PERMISSIONS)?.run { split("|") } ?: emptyList()
   }
 
   suspend fun getRequestedPermissionsRepliedWithDontAskAgain(): List<String> {
-    return genericLocalService.get(KEY_REQUESTED_PERMISSIONS_REPLIED_WITH_DONT_ASK_AGAIN)?.run { split("|") } ?: emptyList()
+    return genericLocalService.getKv(KEY_REQUESTED_PERMISSIONS_REPLIED_WITH_DONT_ASK_AGAIN)?.run { split("|") } ?: emptyList()
   }
 
   fun addRequestedPermission(permission: String) {
@@ -65,7 +65,7 @@ class MainActivityViewModel @Inject constructor(): ViewModel() {
       val permissions = getRequestedPermissions()
 
       if (!permissions.contains(permission))
-        genericLocalService.put(KEY_REQUESTED_PERMISSIONS, permission)
+        genericLocalService.putKv(KEY_REQUESTED_PERMISSIONS, permission)
     }
   }
 
@@ -74,7 +74,7 @@ class MainActivityViewModel @Inject constructor(): ViewModel() {
       val permissions = getRequestedPermissionsRepliedWithDontAskAgain()
 
       if (!permissions.contains(permission))
-        genericLocalService.put(KEY_REQUESTED_PERMISSIONS_REPLIED_WITH_DONT_ASK_AGAIN, permission)
+        genericLocalService.putKv(KEY_REQUESTED_PERMISSIONS_REPLIED_WITH_DONT_ASK_AGAIN, permission)
     }
   }
 
@@ -83,7 +83,7 @@ class MainActivityViewModel @Inject constructor(): ViewModel() {
       val permissions = getRequestedPermissions()
 
       if (permissions.contains(permission))
-        genericLocalService.delete(KEY_REQUESTED_PERMISSIONS)
+        genericLocalService.deleteKv(KEY_REQUESTED_PERMISSIONS)
     }
   }
 
@@ -92,7 +92,7 @@ class MainActivityViewModel @Inject constructor(): ViewModel() {
       val permissions = getRequestedPermissionsRepliedWithDontAskAgain()
 
       if (permissions.contains(permission))
-        genericLocalService.delete(KEY_REQUESTED_PERMISSIONS_REPLIED_WITH_DONT_ASK_AGAIN)
+        genericLocalService.deleteKv (KEY_REQUESTED_PERMISSIONS_REPLIED_WITH_DONT_ASK_AGAIN)
     }
   }
 }

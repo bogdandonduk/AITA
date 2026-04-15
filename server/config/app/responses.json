@@ -355,5 +355,68 @@
         "value": "Элемент сәтті жойылды"
       }
     ]
+  },
+  {
+    "id": "17",
+    "message": [
+      {
+        "language": "main",
+        "value": "Goods batch successfully added"
+      },
+      {
+        "language": "en",
+        "value": "Goods batch successfully added"
+      },
+      {
+        "language": "ru",
+        "value": "Партия товара успешно добавлена"
+      },
+      {
+        "language": "kk",
+        "value": "Тауарлар партиясы сәтті қосылды"
+      }
+    ]
+  },
+  {
+    "id": "18",
+    "message": [
+      {
+        "language": "main",
+        "value": "Goods batch successfully updated"
+      },
+      {
+        "language": "en",
+        "value": "Goods batch successfully updated"
+      },
+      {
+        "language": "ru",
+        "value": "Партия товара успешно обновлена"
+      },
+      {
+        "language": "kk",
+        "value": "Өнім партиясы сәтті жаңартылды"
+      }
+    ]
+  },
+  {
+    "id": "19",
+    "message": [
+      {
+        "language": "main",
+        "value": "Goods batch successfully deleted"
+      },
+      {
+        "language": "en",
+        "value": "Goods batch successfully deleted"
+      },
+      {
+        "language": "ru",
+        "value": "Партия товара успешно удалена"
+      },
+      {
+        "language": "kk",
+        "value": "Тауарлар партиясы сәтті жойылды"
+      }
+    ]
   }
 ]

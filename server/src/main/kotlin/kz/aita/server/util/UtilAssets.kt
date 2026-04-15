@@ -1,7 +1,7 @@
 package kz.aita.server.util
 
 import kotlinx.serialization.json.Json
-import kz.aita.model.dataModel.RemoteResponseDataModel
+import kz.aita.RemoteResponseDataModel
 import java.nio.file.Files
 import java.nio.file.Path
 

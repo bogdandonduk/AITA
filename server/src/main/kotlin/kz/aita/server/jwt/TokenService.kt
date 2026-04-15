@@ -5,11 +5,9 @@ import com.auth0.jwt.algorithms.Algorithm
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import kz.aita.model.wrapper.TokenPair
+import kz.aita.TokenPair
 import kz.aita.server.db.RefreshSessions
 import kz.aita.server.encrypt.Refresh
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll

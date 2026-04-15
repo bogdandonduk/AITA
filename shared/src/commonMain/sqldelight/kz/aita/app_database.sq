@@ -12,7 +12,7 @@ SELECT value FROM key_value WHERE key = ?;
 deleteKv:
 DELETE FROM key_value WHERE key = ?;
 
-CREATE TABLE cart (
+CREATE TABLE cart(
   id TEXT NOT NULL,
   transactionTypeIndex INTEGER NOT NULL,
   clientId INTEGER NOT NULL,
@@ -33,4 +33,7 @@ DELETE FROM cart WHERE transactionTypeIndex = ? AND clientId = ?;
 
 deleteCartById:
 DELETE FROM cart WHERE id = ? AND transactionTypeIndex = ? AND clientId = ?;
+
+deleteById:
+DELETE FROM cart WHERE id = ?;
 

@@ -4,12 +4,9 @@ import android.app.Application
 import app.cash.sqldelight.async.coroutines.synchronous
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 import dagger.hilt.android.HiltAndroidApp
+import kz.aita.*
 import kz.aita.android.core.TokenStore
 import kz.aita.android.core.UserAccountStore
-import kz.aita.core.cacheDirPath
-import kz.aita.core.sqlDelightDriver
-import kz.aita.core.tokenStore
-import kz.aita.core.userAccountStore
 
 @HiltAndroidApp
 class AITA: Application() {

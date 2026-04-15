@@ -3,9 +3,9 @@ package kz.aita.server.db
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
-import kz.aita.model.dataModel.CompanyFormDataModel
-import kz.aita.model.dataModel.LocalizedStringDataModel
-import kz.aita.model.dataModel.LocationDataModel
+import kz.aita.CompanyFormDataModel
+import kz.aita.LocalizedStringDataModel
+import kz.aita.LocationDataModel
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.javatime.CurrentTimestamp
 import org.jetbrains.exposed.sql.javatime.timestamp
@@ -27,7 +27,6 @@ object Stores: Table("stores") {
   val countryLocales = jsonb("country_locales", Json, ListSerializer(String.serializer()))
 
   val createdAt = timestamp("created_at").defaultExpression(CurrentTimestamp)
-  val isActive = bool("is_active").default(true)
 
   override val primaryKey = PrimaryKey(id)
 }

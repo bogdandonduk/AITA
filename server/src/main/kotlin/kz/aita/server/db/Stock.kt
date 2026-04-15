@@ -1,12 +1,10 @@
 package kz.aita.server.db
 
 import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.builtins.PairSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
-import kz.aita.model.dataModel.LocalizedStringDataModel
-import kz.aita.model.dataModel.PriceDataModel
-import kz.aita.model.dataModel.QuantityDataModel
+import kz.aita.LocalizedStringDataModel
+import kz.aita.PriceDataModel
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.javatime.CurrentTimestamp
 import org.jetbrains.exposed.sql.javatime.timestamp
@@ -20,7 +18,7 @@ object Stock: Table("stock") {
   val barcode = jsonb("barcode", Json, ListSerializer(String.serializer()))
   val name = jsonb("name", Json, ListSerializer(LocalizedStringDataModel.serializer()))
 
-  val quantity = jsonb("quantity", Json, QuantityDataModel.serializer())
+  val measurementUnitId = text("measurement_unit_id")
 
   val categoryIds = jsonb("category_ids", Json, ListSerializer(String.serializer()))
 
@@ -29,6 +27,7 @@ object Stock: Table("stock") {
   val supplyPrices = jsonb("supply_prices", Json, ListSerializer(PriceDataModel.serializer()))
 
   val isQuickItem = bool("is_quick_item")
+
   val createdAt = timestamp("created_at").defaultExpression(CurrentTimestamp)
   val isActive = bool("is_active").default(true)
 

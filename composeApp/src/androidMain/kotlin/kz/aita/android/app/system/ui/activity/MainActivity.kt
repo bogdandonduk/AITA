@@ -15,9 +15,9 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
-import kz.aita.AppConfiguration
 import kz.aita.android.app.system.ui.viewModel.MainActivityViewModel
-import kz.aita.compose.screen.MainScreen
+import kz.aita.compose.AppConfiguration
+import kz.aita.compose.MainScreen
 
 @AndroidEntryPoint
 class MainActivity: ComponentActivity() {

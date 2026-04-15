@@ -1,0 +1,7 @@
+package kz.aita
+
+class JVMPlatform : Platform {
+  override val name: String = "Java ${System.getProperty("java.version")}"
+}
+
+actual fun getPlatformName(): Platform = JVMPlatform()

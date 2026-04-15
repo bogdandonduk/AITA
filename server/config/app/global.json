@@ -2,31 +2,123 @@
   "message": null,
   "negative": false,
   "payload": {
-    "appName": "AITA",
-    "serverUrl": "http://192.168.100.9:8080",
-    "globalAppConfigurationPath": "config/global",
-    "logInPath": "auth/logIn",
-    "signUpPath": "auth/signUp",
-    "refreshPath": "auth/refresh",
-    "logOutPath": "auth/logOut",
-    "getUserPath": "user/get",
-    "updateUserPath": "user/update",
-    "getStoresPath": "stores/get",
-    "addStoresPath": "stores/add",
-    "updateStoresPath": "stores/update",
-    "deleteStoresPath": "stores/delete",
-    "getStockPath": "stock/get",
-    "addGoodsItemPath": "stock/add",
-    "updateGoodsItemPath": "stock/update",
-    "deleteGoodsItemPath": "stock/delete",
-    "getGenericGoodsItemsPath": "generic/goodsItems/get",
-    "getGenericGoodsCategoriesPath": "generic/goodsCategories/get",
-    "getSuppliersPath": "suppliers/get",
-    "stringResourcesPath": "res/string",
-    "dimensionResourcesPath": "res/dimension",
-    "colorResourcesPath": "res/color",
-    "drawableResourcesConfigurationPath": "res/drawableConfig",
-    "drawableResourcesPath": "res/drawable",
+    "realtimeUpdatesPath": "rt/updates",
+    "appName": {
+      "first": "AITA",
+      "second": "0"
+    },
+    "serverUrl": {
+      "first": "http://192.168.100.9:8080",
+      "second": "1"
+    },
+    "globalAppConfigurationPath": {
+      "first": "config/global",
+      "second": "2"
+    },
+    "logInPath": {
+      "first": "auth/logIn",
+      "second": "3"
+    },
+    "signUpPath": {
+      "first": "auth/signUp",
+      "second": "4"
+    },
+    "refreshPath": {
+      "first": "auth/refresh",
+      "second": "5"
+    },
+    "logOutPath": {
+      "first": "auth/logOut",
+      "second": "6"
+    },
+    "getUserPath": {
+      "first": "user/get",
+      "second": "7"
+    },
+    "updateUserPath": {
+      "first": "user/update",
+      "second": "8"
+    },
+    "getStoresPath": {
+      "first": "stores/get",
+      "second": "9"
+    },
+    "addStoresPath": {
+      "first": "stores/add",
+      "second": "10"
+    },
+    "updateStoresPath": {
+      "first": "stores/update",
+      "second": "11"
+    },
+    "deleteStoresPath": {
+      "first": "stores/delete",
+      "second": "12"
+    },
+    "getStockPath": {
+      "first": "stock/get",
+      "second": "13"
+    },
+    "addGoodsItemPath": {
+      "first": "stock/add",
+      "second": "14"
+    },
+    "updateGoodsItemPath": {
+      "first": "stock/update",
+      "second": "15"
+    },
+    "deleteGoodsItemPath": {
+      "first": "stock/delete",
+      "second": "16"
+    },
+    "getStockBatchesPath": {
+      "first": "stockBatches/get",
+      "second": "17"
+    },
+    "addStockBatchPath": {
+      "first": "stockBatches/add",
+      "second": "18"
+    },
+    "updateStockBatchPath": {
+      "first": "stockBatches/update",
+      "second": "19"
+    },
+    "deleteStockBatchPath": {
+      "first": "stockBatches/delete",
+      "second": "20"
+    },
+    "getGenericGoodsItemsPath": {
+      "first": "generic/goodsItems/get",
+      "second": "21"
+    },
+    "getGenericGoodsCategoriesPath": {
+      "first": "generic/goodsCategories/get",
+      "second": "22"
+    },
+    "getSuppliersPath": {
+      "first": "suppliers/get",
+      "second": "23"
+    },
+    "stringResourcesPath": {
+      "first": "res/string",
+      "second": "24"
+    },
+    "dimensionResourcesPath": {
+      "first": "res/dimension",
+      "second": "25"
+    },
+    "colorResourcesPath": {
+      "first": "res/color",
+      "second": "26"
+    },
+    "drawableResourcesConfigurationPath": {
+      "first": "res/drawableConfig",
+      "second": "27"
+    },
+    "drawableResourcesPath": {
+      "first": "res/drawable",
+      "second": "28"
+    },
     "companyForms": [
       {
         "id": "0",
@@ -125,6 +217,10 @@
             "symbol": "₸",
             "name": [
               {
+                "language": "main",
+                "value": "Tenge"
+              },
+              {
                 "language": "en",
                 "value": "Tenge"
               },
@@ -138,7 +234,94 @@
               }
             ]
           }
-        ]
+        ],
+        "cashlessPaymentOptions": [
+          {
+            "id": "0",
+            "name": [
+              {
+                "language": "main",
+                "value": "Card"
+              },
+              {
+                "language": "en",
+                "value": "Card"
+              },
+              {
+                "language": "ru",
+                "value": "Карта"
+              },
+              {
+                "language": "kk",
+                "value": "Карта"
+              }
+            ]
+          },
+          {
+            "id": "1",
+            "name": [
+              {
+                "language": "main",
+                "value": "QR"
+              },
+              {
+                "language": "en",
+                "value": "QR"
+              },
+              {
+                "language": "ru",
+                "value": "QR"
+              },
+              {
+                "language": "kk",
+                "value": "QR"
+              }
+            ]
+          },
+          {
+            "id": "2",
+            "name": [
+              {
+                "language": "main",
+                "value": "Kaspi RED"
+              },
+              {
+                "language": "en",
+                "value": "Kaspi RED"
+              },
+              {
+                "language": "ru",
+                "value": "Каспи RED"
+              },
+              {
+                "language": "kk",
+                "value": "Каспи RED"
+              }
+            ]
+          },
+          {
+            "id": "3",
+            "name": [
+              {
+                "language": "main",
+                "value": "Rakhmet"
+              },
+              {
+                "language": "en",
+                "value": "Rakhmet"
+              },
+              {
+                "language": "ru",
+                "value": "Рахмет"
+              },
+              {
+                "language": "kk",
+                "value": "Рахмет"
+              }
+            ]
+          }
+        ],
+        "preferredCashlessPaymentOptionId": "1"
       },
       {
         "locale": "tj",
@@ -212,6 +395,10 @@
             "symbol": "SM",
             "name": [
               {
+                "language": "main",
+                "value": "Somoni"
+              },
+              {
                 "language": "en",
                 "value": "Somoni"
               },
@@ -225,7 +412,31 @@
               }
             ]
           }
-        ]
+        ],
+        "cashlessPaymentOptions": [
+          {
+            "id": "0",
+            "name": [
+              {
+                "language": "main",
+                "value": "Card"
+              },
+              {
+                "language": "en",
+                "value": "Card"
+              },
+              {
+                "language": "ru",
+                "value": "Карта"
+              },
+              {
+                "language": "kk",
+                "value": "Карта"
+              }
+            ]
+          }
+        ],
+        "preferredCashlessPaymentOptionId": "0"
       }
     ],
     "languages": [

@@ -2479,6 +2479,510 @@
           "value": "Белсенді ету"
         }
       ]
+    },
+    {
+      "id": 118,
+      "values": [
+        {
+          "language": "main",
+          "value": "Out of stock"
+        },
+        {
+          "language": "en",
+          "value": "Out of stock"
+        },
+        {
+          "language": "ru",
+          "value": "Нет в наличии"
+        },
+        {
+          "language": "kk",
+          "value": "Қоймада жоқ"
+        }
+      ]
+    },
+    {
+      "id": 119,
+      "values": [
+        {
+          "language": "main",
+          "value": "Delete"
+        },
+        {
+          "language": "en",
+          "value": "Delete"
+        },
+        {
+          "language": "ru",
+          "value": "Удалить"
+        },
+        {
+          "language": "kk",
+          "value": "Жою"
+        }
+      ]
+    },
+    {
+      "id": 120,
+      "values": [
+        {
+          "language": "main",
+          "value": "Cash"
+        },
+        {
+          "language": "en",
+          "value": "Cash"
+        },
+        {
+          "language": "ru",
+          "value": "Наличные"
+        },
+        {
+          "language": "kk",
+          "value": "Қолма-қол ақша"
+        }
+      ]
+    },
+    {
+      "id": 121,
+      "values": [
+        {
+          "language": "main",
+          "value": "Cashless"
+        },
+        {
+          "language": "en",
+          "value": "Cashless"
+        },
+        {
+          "language": "ru",
+          "value": "Безналичные"
+        },
+        {
+          "language": "kk",
+          "value": "Ақшасыз"
+        }
+      ]
+    },
+    {
+      "id": 122,
+      "values": [
+        {
+          "language": "main",
+          "value": "Mixed"
+        },
+        {
+          "language": "en",
+          "value": "Mixed"
+        },
+        {
+          "language": "ru",
+          "value": "Смешанная"
+        },
+        {
+          "language": "kk",
+          "value": "Аралас"
+        }
+      ]
+    },
+    {
+      "id": 123,
+      "values": [
+        {
+          "language": "main",
+          "value": "Add"
+        },
+        {
+          "language": "en",
+          "value": "Add"
+        },
+        {
+          "language": "ru",
+          "value": "Добавить"
+        },
+        {
+          "language": "kk",
+          "value": "Қосу"
+        }
+      ]
+    },
+    {
+      "id": 124,
+      "values": [
+        {
+          "language": "main",
+          "value": "Subtract"
+        },
+        {
+          "language": "en",
+          "value": "Subtract"
+        },
+        {
+          "language": "ru",
+          "value": "Вычесть"
+        },
+        {
+          "language": "kk",
+          "value": "Алып тастау"
+        }
+      ]
+    },
+    {
+      "id": 125,
+      "values": [
+        {
+          "language": "main",
+          "value": "Current batch data"
+        },
+        {
+          "language": "en",
+          "value": "Current batch data"
+        },
+        {
+          "language": "ru",
+          "value": "Данные о текущих партиях"
+        },
+        {
+          "language": "kk",
+          "value": "Ағымдағы кеш мәліметтері"
+        }
+      ]
+    },
+    {
+      "id": 126,
+      "values": [
+        {
+          "language": "main",
+          "value": "Enter quantity"
+        },
+        {
+          "language": "en",
+          "value": "Enter quantity"
+        },
+        {
+          "language": "ru",
+          "value": "Введите количество"
+        },
+        {
+          "language": "kk",
+          "value": "Санын енгізіңіз"
+        }
+      ]
+    },
+    {
+      "id": 127,
+      "values": [
+        {
+          "language": "main",
+          "value": "Add quantity data"
+        },
+        {
+          "language": "en",
+          "value": "Add quantity data"
+        },
+        {
+          "language": "ru",
+          "value": "Добавить данные о количестве"
+        },
+        {
+          "language": "kk",
+          "value": "Сандық деректерді қосу"
+        }
+      ]
+    },
+    {
+      "id": 128,
+      "values": [
+        {
+          "language": "main",
+          "value": "Shelf batch"
+        },
+        {
+          "language": "en",
+          "value": "Shelf batch"
+        },
+        {
+          "language": "ru",
+          "value": "Партия на полке"
+        },
+        {
+          "language": "kk",
+          "value": "Сөредегі кеш"
+        }
+      ]
+    },
+    {
+      "id": 129,
+      "values": [
+        {
+          "language": "main",
+          "value": "Active store"
+        },
+        {
+          "language": "en",
+          "value": "Active store"
+        },
+        {
+          "language": "ru",
+          "value": "Активный магазин"
+        },
+        {
+          "language": "kk",
+          "value": "Белсенді дүкен"
+        }
+      ]
+    },
+    {
+      "id": 130,
+      "values": [
+        {
+          "language": "main",
+          "value": "Make inactive"
+        },
+        {
+          "language": "en",
+          "value": "Make inactive"
+        },
+        {
+          "language": "ru",
+          "value": "Сделать неактивным"
+        },
+        {
+          "language": "kk",
+          "value": "Белсенді емес ету"
+        }
+      ]
+    },
+    {
+      "id": 131,
+      "values": [
+        {
+          "language": "main",
+          "value": "Cart empty"
+        },
+        {
+          "language": "en",
+          "value": "Cart empty"
+        },
+        {
+          "language": "ru",
+          "value": "Корзина пуста"
+        },
+        {
+          "language": "kk",
+          "value": "Себет бос"
+        }
+      ]
+    },
+    {
+      "id": 132,
+      "values": [
+        {
+          "language": "main",
+          "value": "Complete"
+        },
+        {
+          "language": "en",
+          "value": "Complete"
+        },
+        {
+          "language": "ru",
+          "value": "Завершить"
+        },
+        {
+          "language": "kk",
+          "value": "Аяқтау"
+        }
+      ]
+    },
+    {
+      "id": 133,
+      "values": [
+        {
+          "language": "main",
+          "value": "No active workshift"
+        },
+        {
+          "language": "en",
+          "value": "No active workshift"
+        },
+        {
+          "language": "ru",
+          "value": "Активной рабочей смены нет"
+        },
+        {
+          "language": "kk",
+          "value": "Белсенді жұмыс ауысымы жоқ"
+        }
+      ]
+    },
+    {
+      "id": 134,
+      "values": [
+        {
+          "language": "main",
+          "value": "Cart"
+        },
+        {
+          "language": "en",
+          "value": "Cart"
+        },
+        {
+          "language": "ru",
+          "value": "Корзина"
+        },
+        {
+          "language": "kk",
+          "value": "Себет"
+        }
+      ]
+    },
+    {
+      "id": 135,
+      "values": [
+        {
+          "language": "main",
+          "value": "App mode"
+        },
+        {
+          "language": "en",
+          "value": "App mode"
+        },
+        {
+          "language": "ru",
+          "value": "Режим приложения"
+        },
+        {
+          "language": "kk",
+          "value": "Қолданба режимі"
+        }
+      ]
+    },
+    {
+      "id": 136,
+      "values": [
+        {
+          "language": "main",
+          "value": "Finances"
+        },
+        {
+          "language": "en",
+          "value": "Finances"
+        },
+        {
+          "language": "ru",
+          "value": "Финансы"
+        },
+        {
+          "language": "kk",
+          "value": "Қолданба режимі"
+        }
+      ]
+    },
+    {
+      "id": 137,
+      "values": [
+        {
+          "language": "main",
+          "value": "Items"
+        },
+        {
+          "language": "en",
+          "value": "Items"
+        },
+        {
+          "language": "ru",
+          "value": "Наименования"
+        },
+        {
+          "language": "kk",
+          "value": "Заттар"
+        }
+      ]
+    },
+    {
+      "id": 138,
+      "values": [
+        {
+          "language": "main",
+          "value": "Batches"
+        },
+        {
+          "language": "en",
+          "value": "Batches"
+        },
+        {
+          "language": "ru",
+          "value": "Партии"
+        },
+        {
+          "language": "kk",
+          "value": "Кештер"
+        }
+      ]
+    },
+    {
+      "id": 139,
+      "values": [
+        {
+          "language": "main",
+          "value": "Standard prices by suppliers"
+        },
+        {
+          "language": "en",
+          "value": "Standard prices by suppliers"
+        },
+        {
+          "language": "ru",
+          "value": "Стандартные цены по поставщикам"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізушілердің стандартты бағалары"
+        }
+      ]
+    },
+    {
+      "id": 140,
+      "values": [
+        {
+          "language": "main",
+          "value": "Editable for individual batches"
+        },
+        {
+          "language": "en",
+          "value": "Editable for individual batches"
+        },
+        {
+          "language": "ru",
+          "value": "Можно изменить для индивидуальных партий"
+        },
+        {
+          "language": "kk",
+          "value": "Жеке тараптар үшін өзгертуге болады"
+        }
+      ]
+    },
+    {
+      "id": 141,
+      "values": [
+        {
+          "language": "main",
+          "value": "Batches data"
+        },
+        {
+          "language": "en",
+          "value": "Batches data"
+        },
+        {
+          "language": "ru",
+          "value": "Данные о партиях"
+        },
+        {
+          "language": "kk",
+          "value": "Партия деректері"
+        }
+      ]
     }
   ]
 }

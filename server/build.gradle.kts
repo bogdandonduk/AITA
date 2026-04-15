@@ -1,5 +1,3 @@
-import org.gradle.kotlin.dsl.libs
-
 plugins {
     alias(libs.plugins.kotlinJvm)
     alias(libs.plugins.ktor)

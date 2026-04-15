@@ -1,10 +1,10 @@
 package kz.aita.android.core
 
+import kz.aita.DataStore
+import kz.aita.TokenPair
+import kz.aita.UserAccountDataModel
 import kz.aita.android.app.system.core.EncryptedDataStore
-import kz.aita.core.DataStore
-import kz.aita.core.jsonBase
-import kz.aita.model.dataModel.UserAccountDataModel
-import kz.aita.model.wrapper.TokenPair
+import kz.aita.jsonBase
 
 class TokenStore: DataStore<TokenPair> {
   private val key = "key_auth_tokens"

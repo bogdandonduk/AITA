@@ -10,31 +10,18 @@ import io.ktor.server.netty.*
 import io.ktor.server.plugins.autohead.*
 import io.ktor.server.plugins.cachingheaders.*
 import io.ktor.server.plugins.calllogging.*
-import io.ktor.server.plugins.compression.Compression
-import io.ktor.server.plugins.compression.gzip
+import io.ktor.server.plugins.compression.*
 import io.ktor.server.plugins.conditionalheaders.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.plugins.defaultheaders.*
 import kotlinx.serialization.json.Json
-import kz.aita.model.dataModel.LocalizedStringDataModel
-import kz.aita.server.db.GenericGoodsCategories
 import kz.aita.server.jwt.TokenService
 import kz.aita.server.jwt.configureJwtAuth
 import kz.aita.server.jwt.jwtConfig
-import kz.aita.server.route.authRoutes
-import kz.aita.server.route.filesRoutes
-import kz.aita.server.route.genericGoodsCategoriesRoute
-import kz.aita.server.route.genericGoodsItemsRoute
-import kz.aita.server.route.stockRoute
-import kz.aita.server.route.storesRoute
-import kz.aita.server.route.suppliersRoute
-import kz.aita.server.route.userRoute
+import kz.aita.server.route.*
 import org.flywaydb.core.Flyway
 import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.transactions.transaction
-import java.util.UUID
 
 fun main() = EngineMain.main(emptyArray())
 
@@ -105,12 +92,13 @@ fun Application.module() {
 
   configureJwtAuth()
 
-  filesRoutes()
-  authRoutes(TokenService(jwtConfig()))
+  publicFilesRoutes()
+  routes(TokenService(jwtConfig()))
 
   userRoute()
   storesRoute()
   stockRoute()
+  stockBatchesRoute()
   suppliersRoute()
   genericGoodsItemsRoute()
   genericGoodsCategoriesRoute()

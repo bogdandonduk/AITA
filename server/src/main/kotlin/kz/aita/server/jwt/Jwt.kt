@@ -11,7 +11,7 @@ import kz.aita.server.db.RefreshSessions
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import java.time.Instant
-import java.util.UUID
+import java.util.*
 
 @kotlinx.serialization.Serializable
 data class JwtConfig(

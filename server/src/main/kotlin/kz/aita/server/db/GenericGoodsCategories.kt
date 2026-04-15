@@ -3,8 +3,8 @@ package kz.aita.server.db
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
-import kz.aita.model.dataModel.LocalizedStringDataModel
-import kz.aita.model.dataModel.StylizedDrawablePathsGroupDataModel
+import kz.aita.LocalizedStringDataModel
+import kz.aita.StylizedDrawablePathsGroupDataModel
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.json.jsonb
 

@@ -61,8 +61,6 @@ kotlin {
 
   sourceSets {
     androidMain.dependencies {
-      implementation("com.caverock:androidsvg:1.4")
-
       implementation(libs.androidx.datastore.preferences)
 
       implementation(libs.sqlDelightAndroidDriver)
@@ -113,7 +111,6 @@ kotlin {
       implementation(libs.kotlin.test)
     }
     jvmMain.dependencies {
-      implementation(libs.skiko.svg)
       implementation(libs.java.keyring.v103)
 
       implementation(libs.kamel.decoder.svg.batik)

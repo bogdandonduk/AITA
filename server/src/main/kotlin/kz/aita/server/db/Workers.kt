@@ -1,9 +1,8 @@
 package kz.aita.server.db
 
 import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
-import kz.aita.model.dataModel.WorkerPrivilegeModeDataModel
+import kz.aita.WorkerPrivilegeModeDataModel
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.javatime.CurrentTimestamp
 import org.jetbrains.exposed.sql.javatime.timestamp

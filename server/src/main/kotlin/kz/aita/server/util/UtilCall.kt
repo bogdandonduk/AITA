@@ -1,16 +1,14 @@
 package kz.aita.server.util
 
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.isSuccess
-import io.ktor.server.auth.UnauthorizedResponse
-import io.ktor.server.auth.jwt.JWTPrincipal
-import io.ktor.server.auth.principal
-import io.ktor.server.response.respond
-import io.ktor.server.routing.RoutingCall
-import kz.aita.core.jsonBase
-import kz.aita.model.dataModel.GenericResponseDataModel
-import kz.aita.model.dataModel.LocalizedStringDataModel
-import java.util.UUID
+import io.ktor.http.*
+import io.ktor.server.auth.*
+import io.ktor.server.auth.jwt.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
+import kz.aita.GenericResponseDataModel
+import kz.aita.LocalizedStringDataModel
+import kz.aita.jsonBase
+import java.util.*
 
 suspend fun RoutingCall.genericResponseNoPayload(
   status: HttpStatusCode,
