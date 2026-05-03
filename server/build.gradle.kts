@@ -7,7 +7,7 @@ plugins {
 group = "kz.aita"
 version = "1.0.0"
 application {
-    mainClass.set("kz.aita.ApplicationKt")
+    mainClass.set("kz.aita.ServerKt")
     
     applicationDefaultJvmArgs = listOf("-Dio.ktor.development=false")
 }

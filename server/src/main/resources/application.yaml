@@ -4,7 +4,7 @@ ktor:
     port: ${?AITA_PORT}
   application:
     modules:
-      - kz.aita.server.ApplicationKt.module
+      - kz.aita.server.ServerKt.module
   security:
     jwt:
       issuer: ${?AITA_JWT_ISSUER}
