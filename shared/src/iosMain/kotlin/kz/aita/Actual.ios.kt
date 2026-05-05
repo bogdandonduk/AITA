@@ -3,14 +3,13 @@ package kz.aita
 import app.cash.sqldelight.async.coroutines.synchronous
 import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.native.NativeSqliteDriver
-import io.ktor.client.engine.HttpClientEngine
-import io.ktor.client.engine.darwin.Darwin
+import io.ktor.client.engine.*
+import io.ktor.client.engine.darwin.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import platform.Foundation.NSLocale
-import platform.Foundation.currentLocale
-import platform.Foundation.languageCode
-import platform.Foundation.preferredLanguages
+import platform.Foundation.*
+
+actual fun getCurrentTimeMillis(): Long = (NSDate().timeIntervalSince1970 * 1000.0).toLong()
 
 actual var getStoredUserAuthTokens: (() -> TokenPair?)? = null
 actual var setStoredUserAuthTokens: ((TokenPair?) -> Unit)? = null

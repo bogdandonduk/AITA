@@ -2,6 +2,7 @@
 
 package kz.aita.server
 
+import at.favre.lib.crypto.bcrypt.BCrypt
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.zaxxer.hikari.HikariConfig
@@ -10,13 +11,11 @@ import io.ktor.http.*
 import io.ktor.http.content.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
-import io.ktor.server.auth.Authentication
-import io.ktor.server.auth.UnauthorizedResponse
-import io.ktor.server.auth.authenticate
-import io.ktor.server.auth.jwt.JWTPrincipal
-import io.ktor.server.auth.jwt.jwt
-import io.ktor.server.http.content.staticFiles
+import io.ktor.server.auth.*
+import io.ktor.server.auth.jwt.*
+import io.ktor.server.http.content.*
 import io.ktor.server.netty.*
+import io.ktor.server.plugins.*
 import io.ktor.server.plugins.autohead.*
 import io.ktor.server.plugins.cachingheaders.*
 import io.ktor.server.plugins.calllogging.*
@@ -25,86 +24,60 @@ import io.ktor.server.plugins.conditionalheaders.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.plugins.defaultheaders.*
-import io.ktor.server.request.header
-import io.ktor.server.request.receive
-import io.ktor.server.response.respond
-import io.ktor.server.routing.delete
-import io.ktor.server.routing.get
-import io.ktor.server.routing.post
-import io.ktor.server.routing.put
-import io.ktor.server.routing.route
-import io.ktor.server.routing.routing
+import io.ktor.server.request.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import kotlinx.serialization.json.Json
-import kz.aita.GenericGoodsCategoryDataModel
-import kz.aita.GenericGoodsItemDataModel
-import kz.aita.GoodsBatchDataModel
-import kz.aita.GoodsItemDataModel
-import kz.aita.LocalizedStringDataModel
-import kz.aita.StoreDataModel
-import kz.aita.SupplierDataModel
-import kz.aita.TokenPair
-import kz.aita.UserAccountDataModel
-import kz.aita.UserAccountUpdateDataModel
-import kz.aita.UserAuthLogInDataModel
-import kz.aita.UserAuthSignUpDataModel
-import kz.aita.UserBalanceDataModel
-import kz.aita.jsonBase
-import org.flywaydb.core.Flyway
-import org.jetbrains.exposed.exceptions.ExposedSQLException
-import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.deleteWhere
-import org.jetbrains.exposed.sql.exists
-import org.jetbrains.exposed.sql.innerJoin
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.insertIgnore
-import org.jetbrains.exposed.sql.json.contains
-import org.jetbrains.exposed.sql.or
-import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
-import org.jetbrains.exposed.sql.update
-import org.postgresql.util.PSQLException
-import java.io.File
-import java.time.Instant
-import java.time.temporal.ChronoUnit
-import java.util.Date
-import java.util.UUID
-import at.favre.lib.crypto.bcrypt.BCrypt
-import io.ktor.server.auth.principal
-import io.ktor.server.plugins.origin
-import io.ktor.server.request.userAgent
-import io.ktor.server.routing.RoutingCall
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
-import kz.aita.ActivationHistoryEntryDataModel
-import kz.aita.BalanceHistoryEntryDataModel
-import kz.aita.CompanyFormDataModel
-import kz.aita.GenericResponseDataModel
-import kz.aita.GoodsBatchShelfQueueDataModel
-import kz.aita.LocationDataModel
-import kz.aita.PriceDataModel
-import kz.aita.QuantityDataModel
-import kz.aita.RemoteResponseDataModel
-import kz.aita.StylizedDrawablePathsGroupDataModel
-import kz.aita.SubscriptionDataModel
-import kz.aita.WorkerPrivilegeModeDataModel
-import org.jetbrains.exposed.sql.ReferenceOption
-import org.jetbrains.exposed.sql.Table
+import kotlinx.serialization.json.Json
+import kz.aita.*
+import org.flywaydb.core.Flyway
+import org.jetbrains.exposed.exceptions.ExposedSQLException
+import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.javatime.CurrentTimestamp
 import org.jetbrains.exposed.sql.javatime.timestamp
+import org.jetbrains.exposed.sql.json.contains
 import org.jetbrains.exposed.sql.json.jsonb
+import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
+import org.postgresql.util.PSQLException
+import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.SecureRandom
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.*
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
+
+object Transactions: Table("transactions") {
+  val id = uuid("id").uniqueIndex()
+  val userId = uuid("user_id")
+  val workshiftId = long("workshift_id")
+  val type = text("type")
+  val storeId = uuid("store_id")
+
+  val goodsInTransaction = jsonb(
+    "goods_in_transaction",
+    Json,
+    ListSerializer(GoodsItemInTransactionDataModel.serializer())
+  )
+
+  val paidCash = double("paid_cash")
+  val paidCard = double("paid_card")
+  val cardPaymentOptionId = integer("card_payment_option_id")
+  val debtor = text("debtor").nullable()
+  val timeMillis = long("time_millis")
+  val createdAt = timestamp("created_at").defaultExpression(CurrentTimestamp)
+
+  override val primaryKey = PrimaryKey(id)
+}
 
 const val serverFilesPath = "AITA/server"
 const val configAppPath = "$serverFilesPath/config/app"
@@ -278,16 +251,16 @@ object StoreActivationHistory: Table("store_activation_history") {
   override val primaryKey = PrimaryKey(id)
 }
 
-object Stock: Table("stock") {
-  val id = uuid("id").uniqueIndex()
+object StockItems: Table("stock_items") {
+  val id = uuid("id")
   val userId = uuid("user_id")
   val storeId = uuid("store_id")
 
-  val barcode = jsonb("barcode", Json, ListSerializer(String.serializer()))
+  val barcodes = jsonb("barcodes", Json, ListSerializer(String.serializer()))
   val name = jsonb("name", Json, ListSerializer(LocalizedStringDataModel.serializer()))
+  val description = jsonb("description", Json, ListSerializer(LocalizedStringDataModel.serializer()))
 
   val measurementUnitId = text("measurement_unit_id")
-
   val categoryIds = jsonb("category_ids", Json, ListSerializer(String.serializer()))
 
   val salePrices = jsonb("sale_prices", Json, ListSerializer(PriceDataModel.serializer()))
@@ -295,39 +268,170 @@ object Stock: Table("stock") {
   val supplyPrices = jsonb("supply_prices", Json, ListSerializer(PriceDataModel.serializer()))
 
   val isQuickItem = bool("is_quick_item")
+  val imagePaths = jsonb("image_paths", Json, ListSerializer(String.serializer()))
 
-  val createdAt = timestamp("created_at").defaultExpression(CurrentTimestamp)
-  val isActive = bool("is_active").default(true)
+  val activeShelfBatchId = uuid("active_shelf_batch_id").nullable()
+
+  val note = text("note").nullable()
+
+  val createdAtMillis = long("created_at_millis")
+  val updatedAtMillis = long("updated_at_millis")
+  val isActive = bool("is_active")
 
   override val primaryKey = PrimaryKey(id)
 }
 
-object StockBatches: Table("stock_batches") {
-  val id = uuid("id").uniqueIndex()
-  val goodsItemId = uuid("goods_item_id")
-
+object StockBatchesV2: Table("stock_batches") {
+  val id = uuid("id")
+  val goodsItemId = uuid("goods_item_id").references(StockItems.id, onDelete = ReferenceOption.CASCADE)
   val userId = uuid("user_id")
   val storeId = uuid("store_id")
-  val supplierId = uuid("supplierId")
 
-  val salePrice = jsonb("sale_price", Json, PriceDataModel.serializer())
-  val returnPrice = jsonb("return_price", Json, PriceDataModel.serializer())
-  val supplyPrice = jsonb("supply_price", Json, PriceDataModel.serializer())
+  val supplierId = uuid("supplier_id").nullable()
+  val supplierOrderId = uuid("supplier_order_id").nullable()
 
   val quantity = jsonb("quantity", Json, QuantityDataModel.serializer())
 
-  val supplyTime = timestamp("supply_time")
-  val expirationTime = timestamp("expiration_time")
-  val shelfQueue = jsonb("shelf_queue", Json, GoodsBatchShelfQueueDataModel.serializer())
+  val supplyPrice = jsonb("supply_price", Json, PriceDataModel.serializer())
+  val salePriceOverride = jsonb("sale_price_override", Json, PriceDataModel.serializer()).nullable()
+  val returnPriceOverride = jsonb("return_price_override", Json, PriceDataModel.serializer()).nullable()
 
-  val createdAt = timestamp("created_at").defaultExpression(CurrentTimestamp)
+  val deliveredAtMillis = long("delivered_at_millis").nullable()
+  val manufacturedAtMillis = long("manufactured_at_millis").nullable()
+  val expirationDateMillis = long("expiration_date_millis").nullable()
 
-  val createdByUserId = uuid("created_by_user_id")
+  val discounts = jsonb("discounts", Json, ListSerializer(BatchDiscountDataModel.serializer()))
 
-  val isActive = bool("is_active").default(true)
+  val shelfPosition = text("shelf_position").nullable()
+  val shelfPriority = integer("shelf_priority")
+
+  val status = text("status")
+  val additionalNotes = text("additional_notes").nullable()
+
+  val createdAtMillis = long("created_at_millis")
+  val updatedAtMillis = long("updated_at_millis")
+  val createdByUserId = uuid("created_by_user_id").nullable()
+
+  val isActive = bool("is_active")
 
   override val primaryKey = PrimaryKey(id)
 }
+
+object SupplierGoodsPrices: Table("supplier_goods_prices") {
+  val id = uuid("id")
+  val userId = uuid("user_id")
+  val storeId = uuid("store_id")
+  val supplierId = uuid("supplier_id")
+  val goodsItemId = uuid("goods_item_id").references(StockItems.id, onDelete = ReferenceOption.CASCADE)
+
+  val supplyPrice = jsonb("supply_price", Json, PriceDataModel.serializer())
+
+  val minOrderQuantity = jsonb("min_order_quantity", Json, QuantityDataModel.serializer()).nullable()
+  val packageQuantity = jsonb("package_quantity", Json, QuantityDataModel.serializer()).nullable()
+
+  val supplierBarcode = text("supplier_barcode").nullable()
+  val supplierGoodsName = text("supplier_goods_name").nullable()
+
+  val lastUsedAtMillis = long("last_used_at_millis").nullable()
+  val createdAtMillis = long("created_at_millis")
+  val updatedAtMillis = long("updated_at_millis")
+  val isActive = bool("is_active")
+
+  override val primaryKey = PrimaryKey(id)
+}
+
+object SupplierOrders: Table("supplier_orders") {
+  val id = uuid("id")
+  val userId = uuid("user_id")
+  val storeId = uuid("store_id")
+  val supplierId = uuid("supplier_id")
+
+  val amount = jsonb("amount", Json, PriceDataModel.serializer()).nullable()
+
+  val orderedAtMillis = long("ordered_at_millis")
+  val desiredDeliveryTimeMillis = long("desired_delivery_time_millis").nullable()
+  val confirmedDeliveryTimeMillis = long("confirmed_delivery_time_millis").nullable()
+  val deliveredAtMillis = long("delivered_at_millis").nullable()
+
+  val storeAddress = jsonb("store_address", Json, LocationDataModel.serializer()).nullable()
+
+  val additionalNotes = text("additional_notes").nullable()
+  val status = text("status")
+
+  val createdAtMillis = long("created_at_millis")
+  val updatedAtMillis = long("updated_at_millis")
+  val isActive = bool("is_active")
+
+  override val primaryKey = PrimaryKey(id)
+}
+
+object SupplierOrderLines: Table("supplier_order_lines") {
+  val id = uuid("id")
+  val orderId = uuid("order_id").references(SupplierOrders.id, onDelete = ReferenceOption.CASCADE)
+  val goodsItemId = uuid("goods_item_id").references(StockItems.id, onDelete = ReferenceOption.CASCADE)
+
+  val requestedQuantity = jsonb("requested_quantity", Json, QuantityDataModel.serializer())
+  val expectedSupplyPrice = jsonb("expected_supply_price", Json, PriceDataModel.serializer()).nullable()
+
+  val desiredExpirationDateMillis = long("desired_expiration_date_millis").nullable()
+  val additionalNotes = text("additional_notes").nullable()
+
+  val deliveredBatchIds = jsonb("delivered_batch_ids", Json, ListSerializer(String.serializer()))
+  val isActive = bool("is_active")
+
+  override val primaryKey = PrimaryKey(id)
+}
+
+//object Stock: Table("stock_items") {
+//  val id = uuid("id").uniqueIndex()
+//  val userId = uuid("user_id")
+//  val storeId = uuid("store_id")
+//
+//  val barcode = jsonb("barcode", Json, ListSerializer(String.serializer()))
+//  val name = jsonb("name", Json, ListSerializer(LocalizedStringDataModel.serializer()))
+//
+//  val measurementUnitId = text("measurement_unit_id")
+//
+//  val categoryIds = jsonb("category_ids", Json, ListSerializer(String.serializer()))
+//
+//  val salePrices = jsonb("sale_prices", Json, ListSerializer(PriceDataModel.serializer()))
+//  val returnPrices = jsonb("return_prices", Json, ListSerializer(PriceDataModel.serializer()))
+//  val supplyPrices = jsonb("supply_prices", Json, ListSerializer(PriceDataModel.serializer()))
+//
+//  val isQuickItem = bool("is_quick_item")
+//
+//  val createdAt = timestamp("created_at").defaultExpression(CurrentTimestamp)
+//  val isActive = bool("is_active").default(true)
+//
+//  override val primaryKey = PrimaryKey(id)
+//}
+//
+//object StockBatches: Table("stock_batches") {
+//  val id = uuid("id").uniqueIndex()
+//  val goodsItemId = uuid("goods_item_id")
+//
+//  val userId = uuid("user_id")
+//  val storeId = uuid("store_id")
+//  val supplierId = uuid("supplierId")
+//
+//  val salePrice = jsonb("sale_price", Json, PriceDataModel.serializer())
+//  val returnPrice = jsonb("return_price", Json, PriceDataModel.serializer())
+//  val supplyPrice = jsonb("supply_price", Json, PriceDataModel.serializer())
+//
+//  val quantity = jsonb("quantity", Json, QuantityDataModel.serializer())
+//
+//  val supplyTime = timestamp("supply_time")
+//  val expirationTime = timestamp("expiration_time")
+//  val shelfQueue = jsonb("shelf_queue", Json, GoodsBatchShelfQueueDataModel.serializer())
+//
+//  val createdAt = timestamp("created_at").defaultExpression(CurrentTimestamp)
+//
+//  val createdByUserId = uuid("created_by_user_id")
+//
+//  val isActive = bool("is_active").default(true)
+//
+//  override val primaryKey = PrimaryKey(id)
+//}
 
 object RefreshSessions: Table("refresh_sessions") {
   val id = uuid("id")
@@ -621,6 +725,210 @@ class TokenService(private val cfg: JwtConfig) {
 }
 
 fun main() = EngineMain.main(emptyArray())
+
+private fun simpleMessage(
+  main: String,
+  en: String = main,
+  ru: String = main,
+  kk: String = main
+): List<LocalizedStringDataModel> {
+  return listOf(
+    LocalizedStringDataModel("main", main),
+    LocalizedStringDataModel("en", en),
+    LocalizedStringDataModel("ru", ru),
+    LocalizedStringDataModel("kk", kk)
+  )
+}
+
+private fun RoutingCall.headerUuid(name: String): UUID? {
+  return request.header(name)
+    ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+}
+
+private suspend inline fun <reified T> RoutingCall.receiveOneOrList(): List<T> {
+  val raw = receiveText().trim()
+
+  return if (raw.startsWith("[")) {
+    jsonBase.decodeFromString<List<T>>(raw)
+  } else {
+    listOf(jsonBase.decodeFromString<T>(raw))
+  }
+}
+
+private fun List<String>.cleanBarcodes(): List<String> {
+  return map { it.trim() }
+    .filter { it.isNotEmpty() }
+    .distinct()
+}
+
+private fun userHasStoreAccessInsideTransaction(
+  userId: UUID,
+  storeId: UUID
+): Boolean {
+  return StoreUsers
+    .selectAll()
+    .where { (StoreUsers.userId eq userId) and (StoreUsers.storeId eq storeId) }
+    .empty()
+    .not()
+}
+
+private fun ResultRow.toGoodsItemDataModel(): GoodsItemDataModel {
+  return GoodsItemDataModel(
+    id = this[StockItems.id].toString(),
+    userId = this[StockItems.userId].toString(),
+    storeId = this[StockItems.storeId].toString(),
+
+    barcodes = this[StockItems.barcodes],
+    name = this[StockItems.name],
+    description = this[StockItems.description],
+
+    measurementUnitId = this[StockItems.measurementUnitId],
+    categoryIds = this[StockItems.categoryIds],
+
+    salePrices = this[StockItems.salePrices],
+    returnPrices = this[StockItems.returnPrices],
+    supplyPrices = this[StockItems.supplyPrices],
+
+    isQuickItem = this[StockItems.isQuickItem],
+    imagePaths = this[StockItems.imagePaths],
+
+    activeShelfBatchId = this[StockItems.activeShelfBatchId]?.toString(),
+
+    note = this[StockItems.note],
+
+    createdAtMillis = this[StockItems.createdAtMillis],
+    updatedAtMillis = this[StockItems.updatedAtMillis],
+    isActive = this[StockItems.isActive]
+  )
+}
+
+private fun ResultRow.toGoodsBatchDataModel(): GoodsBatchDataModel {
+  return GoodsBatchDataModel(
+    id = this[StockBatchesV2.id].toString(),
+    goodsItemId = this[StockBatchesV2.goodsItemId].toString(),
+    userId = this[StockBatchesV2.userId].toString(),
+    storeId = this[StockBatchesV2.storeId].toString(),
+
+    supplierId = this[StockBatchesV2.supplierId]?.toString(),
+    supplierOrderId = this[StockBatchesV2.supplierOrderId]?.toString(),
+
+    quantity = this[StockBatchesV2.quantity],
+
+    supplyPrice = this[StockBatchesV2.supplyPrice],
+    salePriceOverride = this[StockBatchesV2.salePriceOverride],
+    returnPriceOverride = this[StockBatchesV2.returnPriceOverride],
+
+    deliveredAtMillis = this[StockBatchesV2.deliveredAtMillis],
+    manufacturedAtMillis = this[StockBatchesV2.manufacturedAtMillis],
+    expirationDateMillis = this[StockBatchesV2.expirationDateMillis],
+
+    discounts = this[StockBatchesV2.discounts],
+
+    shelfPosition = this[StockBatchesV2.shelfPosition],
+    shelfPriority = this[StockBatchesV2.shelfPriority],
+
+    status = runCatching {
+      StockBatchStatusDataModel.valueOf(this[StockBatchesV2.status])
+    }.getOrDefault(StockBatchStatusDataModel.Delivered),
+
+    additionalNotes = this[StockBatchesV2.additionalNotes],
+
+    createdAtMillis = this[StockBatchesV2.createdAtMillis],
+    updatedAtMillis = this[StockBatchesV2.updatedAtMillis],
+    createdByUserId = this[StockBatchesV2.createdByUserId]?.toString(),
+
+    isActive = this[StockBatchesV2.isActive]
+  )
+}
+
+private fun ResultRow.toSupplierGoodsPriceDataModel(): SupplierGoodsPriceDataModel {
+  return SupplierGoodsPriceDataModel(
+    id = this[SupplierGoodsPrices.id].toString(),
+    userId = this[SupplierGoodsPrices.userId].toString(),
+    storeId = this[SupplierGoodsPrices.storeId].toString(),
+    supplierId = this[SupplierGoodsPrices.supplierId].toString(),
+    goodsItemId = this[SupplierGoodsPrices.goodsItemId].toString(),
+
+    supplyPrice = this[SupplierGoodsPrices.supplyPrice],
+
+    minOrderQuantity = this[SupplierGoodsPrices.minOrderQuantity],
+    packageQuantity = this[SupplierGoodsPrices.packageQuantity],
+
+    supplierBarcode = this[SupplierGoodsPrices.supplierBarcode],
+    supplierGoodsName = this[SupplierGoodsPrices.supplierGoodsName],
+
+    lastUsedAtMillis = this[SupplierGoodsPrices.lastUsedAtMillis],
+    createdAtMillis = this[SupplierGoodsPrices.createdAtMillis],
+    updatedAtMillis = this[SupplierGoodsPrices.updatedAtMillis],
+
+    isActive = this[SupplierGoodsPrices.isActive]
+  )
+}
+
+private fun barcodeClashesInsideTransaction(
+  storeId: UUID,
+  currentItemId: UUID?,
+  barcodes: List<String>
+): Boolean {
+  if (barcodes.isEmpty()) return false
+
+  return StockItems
+    .selectAll()
+    .where {
+      (StockItems.storeId eq storeId) and
+          (StockItems.isActive eq true)
+    }
+    .any { row ->
+      val rowId = row[StockItems.id]
+      val sameItem = currentItemId != null && rowId == currentItemId
+
+      !sameItem && row[StockItems.barcodes].any { it in barcodes }
+    }
+}
+
+private fun upsertSupplierGoodsPriceInsideTransaction(
+  userId: UUID,
+  storeId: UUID,
+  supplierId: UUID,
+  goodsItemId: UUID,
+  supplyPrice: PriceDataModel,
+  now: Long
+) {
+  val existing = SupplierGoodsPrices
+    .selectAll()
+    .where {
+      (SupplierGoodsPrices.storeId eq storeId) and
+          (SupplierGoodsPrices.supplierId eq supplierId) and
+          (SupplierGoodsPrices.goodsItemId eq goodsItemId)
+    }
+    .singleOrNull()
+
+  if (existing == null) {
+    SupplierGoodsPrices.insert {
+      it[id] = UUID.randomUUID()
+      it[SupplierGoodsPrices.userId] = userId
+      it[SupplierGoodsPrices.storeId] = storeId
+      it[SupplierGoodsPrices.supplierId] = supplierId
+      it[SupplierGoodsPrices.goodsItemId] = goodsItemId
+      it[SupplierGoodsPrices.supplyPrice] = supplyPrice
+      it[createdAtMillis] = now
+      it[updatedAtMillis] = now
+      it[lastUsedAtMillis] = now
+      it[isActive] = true
+    }
+  } else {
+    SupplierGoodsPrices.update({
+      (SupplierGoodsPrices.storeId eq storeId) and
+          (SupplierGoodsPrices.supplierId eq supplierId) and
+          (SupplierGoodsPrices.goodsItemId eq goodsItemId)
+    }) {
+      it[SupplierGoodsPrices.supplyPrice] = supplyPrice
+      it[updatedAtMillis] = now
+      it[lastUsedAtMillis] = now
+      it[isActive] = true
+    }
+  }
+}
 
 fun Application.module() {
 
@@ -974,463 +1282,708 @@ fun Application.module() {
     staticFiles("res/drawableConfig", File("AITA/server/assets/drawable/drawables.json"))
     staticFiles("res/drawable", File("AITA/server/assets/drawable"))
 
-    route("/stockBatches") {
-      authenticate("auth-jwt") {
-        get("/get") {
-          val userId = call.checkPrincipal() ?: return@get
-
-          val batches = newSuspendedTransaction(Dispatchers.IO) {
-            val noUser = Users
-              .select(Users.id)
-              .where { Users.id eq userId }
-              .empty()
-
-            if (noUser)
-              call.respond(UnauthorizedResponse())
-
-            val storeId = UUID.fromString(call.request.headers["store_id"])
-
-            StockBatches
-              .selectAll()
-              .where { (StockBatches.userId eq userId) and (StockBatches.storeId eq storeId) }
-              .map {
-                GoodsBatchDataModel(
-                  id = it[StockBatches.id].toString(),
-                  goodsItemId = it[StockBatches.goodsItemId].toString(),
-
-                  userId = it[StockBatches.userId].toString(),
-                  storeId = it[StockBatches.storeId].toString(),
-                  supplierId = it[StockBatches.storeId].toString(),
-
-                  salePrice = it[StockBatches.salePrice],
-                  returnPrice = it[StockBatches.returnPrice],
-                  supplyPrice = it[StockBatches.supplyPrice],
-
-                  quantity = it[StockBatches.quantity],
-
-                  supplyTime = it[StockBatches.supplyTime].toEpochMilli(),
-                  expirationTime = it[StockBatches.expirationTime].toEpochMilli(),
-
-                  shelfQueue = it[StockBatches.shelfQueue],
-                  createdAt = it[StockBatches.createdAt].toEpochMilli(),
-                  createdByUserId = it[StockBatches.createdByUserId].toString(),
-                  isActive = it[StockBatches.isActive]
-                )
-              }
-          }
-
-          call.genericResponse(
-            HttpStatusCode.OK,
-            batches
-          )
-        }
-
-        post("/add") {
-          val userId = call.checkPrincipal() ?: return@post
-
-          val noUser = newSuspendedTransaction(Dispatchers.IO) {
-            Users
-              .select(Users.id)
-              .where {
-                Users.id eq userId
-              }
-              .empty()
-          }
-
-          if (noUser) return@post call.respond(UnauthorizedResponse())
-
-          val body = call.receive<GoodsBatchDataModel>()
-
-          var state23505Reached: Boolean
-
-          var id: UUID? = null
-          var instant = Instant.now()
-
-          do {
-            state23505Reached = try {
-              id = UUID.randomUUID()
-              instant = Instant.now()
-
-              newSuspendedTransaction(Dispatchers.IO) {
-                StockBatches.insert {
-                  it[StockBatches.id] = id
-                  it[StockBatches.goodsItemId] = UUID.fromString(body.goodsItemId)
-
-                  it[StockBatches.userId] = userId
-                  it[StockBatches.storeId] = UUID.fromString(body.storeId)
-                  it[StockBatches.supplierId] = UUID.fromString(body.supplierId)
-
-                  it[StockBatches.salePrice] = body.salePrice
-                  it[StockBatches.returnPrice] = body.returnPrice
-                  it[StockBatches.supplyPrice] = body.supplyPrice
-                  it[StockBatches.quantity] = body.quantity
-
-                  it[StockBatches.supplyTime] = Instant.ofEpochMilli(body.supplyTime)
-                  it[StockBatches.expirationTime] = Instant.ofEpochMilli(body.expirationTime)
-
-                  it[StockBatches.shelfQueue] = body.shelfQueue
-
-                  it[StockBatches.createdAt] = Instant.now()
-                  it[StockBatches.createdByUserId] = userId
-
-                  it[StockBatches.isActive] = body.isActive
-                }
-              }
-
-              false
-            } catch (exception: ExposedSQLException) {
-              val constraint = (exception.cause as? PSQLException)?.serverErrorMessage?.constraint
-              val isPkCollision = exception.sqlState == "23505" && constraint?.equals("stock_pkey", true) == true
-
-              isPkCollision
-            }
-          } while (state23505Reached)
-
-          id?.run {
-            call.genericResponse(
-              HttpStatusCode.Created,
-              payload = body.copy(id = id.toString(), createdAt = instant.toEpochMilli()),
-              message = getResponse("17").message
-            )
-          } ?: call.genericResponseNoPayload(
-            status = HttpStatusCode.InternalServerError,
-            message = getResponse("3").message
-          )
-        }
-
-        put("/update") {
-          val userId = call.checkPrincipal() ?: return@put
-
-          val noUser = newSuspendedTransaction(Dispatchers.IO) {
-            Users
-              .select(Users.id)
-              .where {
-                Users.id eq userId
-              }
-              .empty()
-          }
-
-          if (noUser) return@put call.respond(UnauthorizedResponse())
-
-          val body = call.receive<GoodsBatchDataModel>()
-          val id = UUID.fromString(body.id)
-
-          val doesntExist = newSuspendedTransaction(Dispatchers.IO) {
-            Stock
-              .select(StockBatches.id)
-              .where {
-                StockBatches.id eq id
-              }
-              .empty()
-          }
-
-          if (doesntExist) return@put call.respond(UnauthorizedResponse())
-
-          val storeId = UUID.fromString(body.storeId)
-
-          val updated = newSuspendedTransaction(Dispatchers.IO) {
-
-            val id = runCatching { UUID.fromString(body.id) }.getOrNull() ?: return@newSuspendedTransaction 2
-
-            StockBatches.update({
-              (StockBatches.id eq id) and (StockBatches.userId eq userId) and (StockBatches.storeId eq storeId)
-            }) {
-              it[StockBatches.userId] = userId
-              it[StockBatches.storeId] = UUID.fromString(body.storeId)
-              it[StockBatches.supplierId] = UUID.fromString(body.supplierId)
-
-              it[StockBatches.salePrice] = body.salePrice
-              it[StockBatches.returnPrice] = body.returnPrice
-              it[StockBatches.supplyPrice] = body.supplyPrice
-              it[StockBatches.quantity] = body.quantity
-
-              it[StockBatches.supplyTime] = Instant.ofEpochMilli(body.supplyTime)
-              it[StockBatches.expirationTime] = Instant.ofEpochMilli(body.expirationTime)
-
-              it[StockBatches.shelfQueue] = body.shelfQueue
-
-              it[StockBatches.isActive] = body.isActive
-            }.run {
-              if (this > 0)
-                0
-              else
-                1
-            }
-          }
-
-          return@put when (updated) {
-            0 -> call.genericResponse(
-              HttpStatusCode.OK,
-              payload = body,
-              getResponse("18").message
-            )
-
-            1, 2 -> call.respond(UnauthorizedResponse())
-            else -> call.genericResponseNoPayload(
-              status = HttpStatusCode.InternalServerError,
-              message = getResponse("3").message
-            )
-          }
-        }
-
-        delete("/delete") {
-          val userId = call.checkPrincipal() ?: return@delete
-
-          val body = call.receive<String>()
-          val storeId = UUID.fromString(call.request.header("store_id"))
-          val deleted = newSuspendedTransaction(Dispatchers.IO) {
-
-            val id = runCatching { UUID.fromString(body) }.getOrNull() ?: return@newSuspendedTransaction 2
-
-            if (StockBatches.deleteWhere { (StockBatches.id eq id) and (StockBatches.userId eq userId) and (StockBatches.storeId eq storeId) } > 0)
-              0
-            else
-              1
-          }
-
-          return@delete when (deleted) {
-            0 -> call.genericResponseNoPayload(
-              HttpStatusCode.OK,
-              message = getResponse("19").message
-            )
-
-            1, 2 -> call.respond(UnauthorizedResponse())
-            else -> call.genericResponseNoPayload(
-              status = HttpStatusCode.InternalServerError,
-              message = getResponse("3").message
-            )
-          }
-        }
-      }
-    }
-
     route("/stock") {
       authenticate("auth-jwt") {
         get("/get") {
           val userId = call.checkPrincipal() ?: return@get
+          val storeId = call.headerUuid("store_id")
+            ?: return@get call.respond(UnauthorizedResponse())
 
-          val goodsItems = newSuspendedTransaction(Dispatchers.IO) {
-            val noUser = Users
-              .select(Users.id)
-              .where { Users.id eq userId }
-              .empty()
+          val result = newSuspendedTransaction(Dispatchers.IO) {
+            if (!userHasStoreAccessInsideTransaction(userId, storeId))
+              return@newSuspendedTransaction null
 
-            if (noUser)
-              call.respond(UnauthorizedResponse())
-
-            val storeId = UUID.fromString(call.request.headers["store_id"])
-
-            Stock
+            StockItems
               .selectAll()
-              .where { (Stock.userId eq userId) and (Stock.storeId eq storeId) }
-              .map {
-                GoodsItemDataModel(
-                  id = it[Stock.id].toString(),
-                  userId = it[Stock.userId].toString(),
-                  storeId = it[Stock.storeId].toString(),
-                  barcode = it[Stock.barcode],
-                  name = it[Stock.name],
-                  measurementUnitId = it[Stock.measurementUnitId].toString(),
-                  categoryIds = it[Stock.categoryIds],
-                  salePrices = it[Stock.salePrices],
-                  returnPrices = it[Stock.returnPrices],
-                  supplyPrices = it[Stock.supplyPrices],
-                  isQuickItem = it[Stock.isQuickItem],
-                  createdAt = it[Stock.createdAt].toEpochMilli(),
-                  isActive = it[Stock.isActive]
-                )
+              .where {
+                (StockItems.storeId eq storeId) and
+                    (StockItems.isActive eq true)
               }
+              .map { it.toGoodsItemDataModel() }
           }
 
-          call.genericResponse(
-            HttpStatusCode.OK,
-            goodsItems
-          )
+          result?.let {
+            call.genericResponse(
+              status = HttpStatusCode.OK,
+              payload = it
+            )
+          } ?: call.respond(UnauthorizedResponse())
         }
 
         post("/add") {
           val userId = call.checkPrincipal() ?: return@post
-
-          val noUser = newSuspendedTransaction(Dispatchers.IO) {
-            Users
-              .select(Users.id)
-              .where {
-                Users.id eq userId
-              }
-              .empty()
-          }
-
-          if (noUser) return@post call.respond(UnauthorizedResponse())
-
           val body = call.receive<GoodsItemDataModel>()
 
-          var state23505Reached: Boolean
+          val inserted = newSuspendedTransaction(Dispatchers.IO) {
+            val storeId = runCatching { UUID.fromString(body.storeId) }.getOrNull()
+              ?: return@newSuspendedTransaction null
 
-          var id: UUID? = null
-          var instant = Instant.now()
+            if (!userHasStoreAccessInsideTransaction(userId, storeId))
+              return@newSuspendedTransaction null
 
-          do {
-            state23505Reached = try {
-              id = UUID.randomUUID()
-              instant = Instant.now()
+            val cleanBarcodes = body.barcodes.cleanBarcodes()
 
-              newSuspendedTransaction(Dispatchers.IO) {
-                Stock.insert {
-                  it[Stock.id] = id
-                  it[Stock.userId] = userId
-                  it[Stock.storeId] = UUID.fromString(body.storeId)
-                  it[Stock.name] = body.name
-                  it[Stock.measurementUnitId] = body.measurementUnitId
-                  it[Stock.barcode] = body.barcode
-                  it[Stock.categoryIds] = body.categoryIds
-                  it[Stock.salePrices] = body.salePrices
-                  it[Stock.returnPrices] = body.returnPrices
-                  it[Stock.supplyPrices] = body.supplyPrices
-                  it[Stock.isQuickItem] = body.isQuickItem
-                  it[Stock.createdAt] = instant
-                  it[Stock.isActive] = body.isActive
-                }
-              }
+            if (cleanBarcodes.isEmpty())
+              return@newSuspendedTransaction null
 
-              false
-            } catch (exception: ExposedSQLException) {
-              val constraint = (exception.cause as? PSQLException)?.serverErrorMessage?.constraint
-              val isPkCollision = exception.sqlState == "23505" && constraint?.equals("stock_pkey", true) == true
+            if (barcodeClashesInsideTransaction(storeId, null, cleanBarcodes))
+              return@newSuspendedTransaction null
 
-              isPkCollision
+            val now = System.currentTimeMillis()
+            val id = UUID.randomUUID()
+
+            StockItems.insert {
+              it[StockItems.id] = id
+              it[StockItems.userId] = userId
+              it[StockItems.storeId] = storeId
+
+              it[StockItems.barcodes] = cleanBarcodes
+              it[StockItems.name] = body.name
+              it[StockItems.description] = body.description
+
+              it[StockItems.measurementUnitId] = body.measurementUnitId
+              it[StockItems.categoryIds] = body.categoryIds
+
+              it[StockItems.salePrices] = body.salePrices
+              it[StockItems.returnPrices] = body.returnPrices
+              it[StockItems.supplyPrices] = body.supplyPrices
+
+              it[StockItems.isQuickItem] = body.isQuickItem
+              it[StockItems.imagePaths] = body.imagePaths
+
+              it[StockItems.activeShelfBatchId] = body.activeShelfBatchId
+                ?.takeIf { value -> value.isNotBlank() }
+                ?.let { value -> runCatching { UUID.fromString(value) }.getOrNull() }
+
+              it[StockItems.note] = body.note
+
+              it[StockItems.createdAtMillis] = now
+              it[StockItems.updatedAtMillis] = now
+              it[StockItems.isActive] = true
             }
-          } while (state23505Reached)
 
-          id?.run {
+            body.copy(
+              id = id.toString(),
+              userId = userId.toString(),
+              storeId = storeId.toString(),
+              barcodes = cleanBarcodes,
+              createdAtMillis = now,
+              updatedAtMillis = now,
+              isActive = true
+            )
+          }
+
+          inserted?.let {
             call.genericResponse(
-              HttpStatusCode.Created,
-              payload = body.copy(id = id.toString(), createdAt = instant.toEpochMilli()),
+              status = HttpStatusCode.Created,
+              payload = it,
               message = getResponse("14").message
             )
           } ?: call.genericResponseNoPayload(
-            status = HttpStatusCode.InternalServerError,
-            message = getResponse("3").message
+            status = HttpStatusCode.Conflict,
+            message = simpleMessage(
+              main = "Invalid stock item or duplicated barcode",
+              ru = "Некорректный товар или повторяющийся штрихкод",
+              kk = "Қате тауар немесе қайталанған штрихкод"
+            )
           )
         }
 
         put("/update") {
           val userId = call.checkPrincipal() ?: return@put
-
-          val noUser = newSuspendedTransaction(Dispatchers.IO) {
-            Users
-              .select(Users.id)
-              .where {
-                Users.id eq userId
-              }
-              .empty()
-          }
-
-          if (noUser) return@put call.respond(UnauthorizedResponse())
-
           val body = call.receive<GoodsItemDataModel>()
-          val id = UUID.fromString(body.id)
-
-          val doesntExist = newSuspendedTransaction(Dispatchers.IO) {
-            Stock
-              .select(Stock.id)
-              .where {
-                Stock.id eq id
-              }
-              .empty()
-          }
-
-          if (doesntExist) return@put call.respond(UnauthorizedResponse())
-
-          val storeId = UUID.fromString(body.storeId)
 
           val updated = newSuspendedTransaction(Dispatchers.IO) {
+            val id = runCatching { UUID.fromString(body.id) }.getOrNull()
+              ?: return@newSuspendedTransaction null
 
-            val id = runCatching { UUID.fromString(body.id) }.getOrNull() ?: return@newSuspendedTransaction 2
+            val storeId = runCatching { UUID.fromString(body.storeId) }.getOrNull()
+              ?: return@newSuspendedTransaction null
 
-            Stock.update({
-              (Stock.id eq id) and (Stock.userId eq userId) and (Stock.storeId eq storeId)
+            if (!userHasStoreAccessInsideTransaction(userId, storeId))
+              return@newSuspendedTransaction null
+
+            val cleanBarcodes = body.barcodes.cleanBarcodes()
+
+            if (cleanBarcodes.isEmpty())
+              return@newSuspendedTransaction null
+
+            if (barcodeClashesInsideTransaction(storeId, id, cleanBarcodes))
+              return@newSuspendedTransaction null
+
+            val now = System.currentTimeMillis()
+
+            val affected = StockItems.update({
+              (StockItems.id eq id) and
+                  (StockItems.storeId eq storeId) and
+                  (StockItems.userId eq userId)
             }) {
-              it[Stock.id] = id
-              it[Stock.userId] = userId
-              it[Stock.storeId] = UUID.fromString(body.storeId)
-              it[Stock.name] = body.name
-              it[Stock.measurementUnitId] = body.measurementUnitId
-              it[Stock.barcode] = body.barcode
-              it[Stock.categoryIds] = body.categoryIds
-              it[Stock.salePrices] = body.salePrices
-              it[Stock.returnPrices] = body.returnPrices
-              it[Stock.supplyPrices] = body.supplyPrices
-              it[Stock.isQuickItem] = body.isQuickItem
-            }.run {
-              if (this > 0)
-                0
-              else
-                1
+              it[StockItems.barcodes] = cleanBarcodes
+              it[StockItems.name] = body.name
+              it[StockItems.description] = body.description
+
+              it[StockItems.measurementUnitId] = body.measurementUnitId
+              it[StockItems.categoryIds] = body.categoryIds
+
+              it[StockItems.salePrices] = body.salePrices
+              it[StockItems.returnPrices] = body.returnPrices
+              it[StockItems.supplyPrices] = body.supplyPrices
+
+              it[StockItems.isQuickItem] = body.isQuickItem
+              it[StockItems.imagePaths] = body.imagePaths
+
+              it[StockItems.activeShelfBatchId] = body.activeShelfBatchId
+                ?.takeIf { value -> value.isNotBlank() }
+                ?.let { value -> runCatching { UUID.fromString(value) }.getOrNull() }
+
+              it[StockItems.note] = body.note
+              it[StockItems.updatedAtMillis] = now
+              it[StockItems.isActive] = body.isActive
             }
-          }
 
-          return@put when (updated) {
-            0 -> call.genericResponse(
-              HttpStatusCode.OK,
-              payload = body,
-              getResponse("15").message
-            )
+            if (affected <= 0)
+              return@newSuspendedTransaction null
 
-            1, 2 -> call.respond(UnauthorizedResponse())
-            else -> call.genericResponseNoPayload(
-              status = HttpStatusCode.InternalServerError,
-              message = getResponse("3").message
+            body.copy(
+              userId = userId.toString(),
+              storeId = storeId.toString(),
+              barcodes = cleanBarcodes,
+              updatedAtMillis = now
             )
           }
+
+          updated?.let {
+            call.genericResponse(
+              status = HttpStatusCode.OK,
+              payload = it,
+              message = getResponse("15").message
+            )
+          } ?: call.genericResponseNoPayload(
+            status = HttpStatusCode.Conflict,
+            message = simpleMessage(
+              main = "Invalid stock item or duplicated barcode",
+              ru = "Некорректный товар или повторяющийся штрихкод",
+              kk = "Қате тауар немесе қайталанған штрихкод"
+            )
+          )
         }
 
         delete("/delete") {
           val userId = call.checkPrincipal() ?: return@delete
+          val rawId = call.receive<String>()
+          val storeId = call.headerUuid("store_id")
+            ?: return@delete call.respond(UnauthorizedResponse())
 
-          val noUser = newSuspendedTransaction(Dispatchers.IO) {
-            Users
-              .select(Users.id)
+          val deletedId = newSuspendedTransaction(Dispatchers.IO) {
+            if (!userHasStoreAccessInsideTransaction(userId, storeId))
+              return@newSuspendedTransaction null
+
+            val id = runCatching { UUID.fromString(rawId) }.getOrNull()
+              ?: return@newSuspendedTransaction null
+
+            val now = System.currentTimeMillis()
+
+            val affected = StockItems.update({
+              (StockItems.id eq id) and
+                  (StockItems.storeId eq storeId) and
+                  (StockItems.userId eq userId)
+            }) {
+              it[isActive] = false
+              it[updatedAtMillis] = now
+            }
+
+            if (affected <= 0)
+              return@newSuspendedTransaction null
+
+            StockBatchesV2.update({
+              (StockBatchesV2.goodsItemId eq id) and
+                  (StockBatchesV2.storeId eq storeId) and
+                  (StockBatchesV2.userId eq userId)
+            }) {
+              it[isActive] = false
+              it[updatedAtMillis] = now
+            }
+
+            rawId
+          }
+
+          deletedId?.let {
+            call.genericResponse(
+              status = HttpStatusCode.OK,
+              payload = it,
+              message = getResponse("16").message
+            )
+          } ?: call.respond(UnauthorizedResponse())
+        }
+      }
+    }
+
+    route("/stockBatches") {
+      authenticate("auth-jwt") {
+        get("/get") {
+          val userId = call.checkPrincipal() ?: return@get
+          val storeId = call.headerUuid("store_id")
+            ?: return@get call.respond(UnauthorizedResponse())
+
+          val result = newSuspendedTransaction(Dispatchers.IO) {
+            if (!userHasStoreAccessInsideTransaction(userId, storeId))
+              return@newSuspendedTransaction null
+
+            StockBatchesV2
+              .selectAll()
               .where {
-                Users.id eq userId
+                (StockBatchesV2.storeId eq storeId) and
+                    (StockBatchesV2.isActive eq true)
+              }
+              .map { it.toGoodsBatchDataModel() }
+          }
+
+          result?.let {
+            call.genericResponse(
+              status = HttpStatusCode.OK,
+              payload = it
+            )
+          } ?: call.respond(UnauthorizedResponse())
+        }
+
+        post("/add") {
+          val userId = call.checkPrincipal() ?: return@post
+          val bodies = call.receiveOneOrList<GoodsBatchDataModel>()
+
+          val inserted = newSuspendedTransaction(Dispatchers.IO) {
+            val result = mutableListOf<GoodsBatchDataModel>()
+            val now = System.currentTimeMillis()
+
+            for (body in bodies) {
+              val storeId = runCatching { UUID.fromString(body.storeId) }.getOrNull()
+                ?: return@newSuspendedTransaction null
+
+              val goodsItemId = runCatching { UUID.fromString(body.goodsItemId) }.getOrNull()
+                ?: return@newSuspendedTransaction null
+
+              if (!userHasStoreAccessInsideTransaction(userId, storeId))
+                return@newSuspendedTransaction null
+
+              val itemExists = StockItems
+                .selectAll()
+                .where {
+                  (StockItems.id eq goodsItemId) and
+                      (StockItems.storeId eq storeId) and
+                      (StockItems.isActive eq true)
+                }
+                .empty()
+                .not()
+
+              if (!itemExists)
+                return@newSuspendedTransaction null
+
+              val id = UUID.randomUUID()
+
+              StockBatchesV2.insert {
+                it[StockBatchesV2.id] = id
+                it[StockBatchesV2.goodsItemId] = goodsItemId
+                it[StockBatchesV2.userId] = userId
+                it[StockBatchesV2.storeId] = storeId
+
+                it[StockBatchesV2.supplierId] = body.supplierId?.let(UUID::fromString)
+                it[StockBatchesV2.supplierOrderId] = body.supplierOrderId?.let(UUID::fromString)
+
+                it[StockBatchesV2.quantity] = body.quantity
+
+                it[StockBatchesV2.supplyPrice] = body.supplyPrice
+                it[StockBatchesV2.salePriceOverride] = body.salePriceOverride
+                it[StockBatchesV2.returnPriceOverride] = body.returnPriceOverride
+
+                it[StockBatchesV2.deliveredAtMillis] = body.deliveredAtMillis ?: now
+                it[StockBatchesV2.manufacturedAtMillis] = body.manufacturedAtMillis
+                it[StockBatchesV2.expirationDateMillis] = body.expirationDateMillis
+
+                it[StockBatchesV2.discounts] = body.discounts
+
+                it[StockBatchesV2.shelfPosition] = body.shelfPosition
+                it[StockBatchesV2.shelfPriority] = body.shelfPriority
+
+                it[StockBatchesV2.status] = body.status.name
+                it[StockBatchesV2.additionalNotes] = body.additionalNotes
+
+                it[StockBatchesV2.createdAtMillis] = now
+                it[StockBatchesV2.updatedAtMillis] = now
+                it[StockBatchesV2.createdByUserId] = userId
+
+                it[StockBatchesV2.isActive] = true
+              }
+
+              val item = StockItems
+                .selectAll()
+                .where { StockItems.id eq goodsItemId }
+                .single()
+
+              if (item[StockItems.activeShelfBatchId] == null) {
+                StockItems.update({ StockItems.id eq goodsItemId }) {
+                  it[activeShelfBatchId] = id
+                  it[updatedAtMillis] = now
+                }
+              }
+
+              body.supplierId?.let { rawSupplierId ->
+                val supplierId = runCatching { UUID.fromString(rawSupplierId) }.getOrNull()
+
+                if (supplierId != null) {
+                  upsertSupplierGoodsPriceInsideTransaction(
+                    userId = userId,
+                    storeId = storeId,
+                    supplierId = supplierId,
+                    goodsItemId = goodsItemId,
+                    supplyPrice = body.supplyPrice,
+                    now = now
+                  )
+                }
+              }
+
+              result += body.copy(
+                id = id.toString(),
+                userId = userId.toString(),
+                storeId = storeId.toString(),
+                deliveredAtMillis = body.deliveredAtMillis ?: now,
+                createdAtMillis = now,
+                updatedAtMillis = now,
+                createdByUserId = userId.toString(),
+                isActive = true
+              )
+            }
+
+            result
+          }
+
+          inserted?.let {
+            call.genericResponse(
+              status = HttpStatusCode.Created,
+              payload = it,
+              message = getResponse("17").message
+            )
+          } ?: call.respond(UnauthorizedResponse())
+        }
+
+        put("/update") {
+          val userId = call.checkPrincipal() ?: return@put
+          val bodies = call.receiveOneOrList<GoodsBatchDataModel>()
+
+          val updated = newSuspendedTransaction(Dispatchers.IO) {
+            val result = mutableListOf<GoodsBatchDataModel>()
+            val now = System.currentTimeMillis()
+
+            for (body in bodies) {
+              val id = runCatching { UUID.fromString(body.id) }.getOrNull()
+                ?: return@newSuspendedTransaction null
+
+              val storeId = runCatching { UUID.fromString(body.storeId) }.getOrNull()
+                ?: return@newSuspendedTransaction null
+
+              val goodsItemId = runCatching { UUID.fromString(body.goodsItemId) }.getOrNull()
+                ?: return@newSuspendedTransaction null
+
+              if (!userHasStoreAccessInsideTransaction(userId, storeId))
+                return@newSuspendedTransaction null
+
+              val affected = StockBatchesV2.update({
+                (StockBatchesV2.id eq id) and
+                    (StockBatchesV2.userId eq userId) and
+                    (StockBatchesV2.storeId eq storeId)
+              }) {
+                it[StockBatchesV2.goodsItemId] = goodsItemId
+
+                it[StockBatchesV2.supplierId] = body.supplierId?.let(UUID::fromString)
+                it[StockBatchesV2.supplierOrderId] = body.supplierOrderId?.let(UUID::fromString)
+
+                it[StockBatchesV2.quantity] = body.quantity
+
+                it[StockBatchesV2.supplyPrice] = body.supplyPrice
+                it[StockBatchesV2.salePriceOverride] = body.salePriceOverride
+                it[StockBatchesV2.returnPriceOverride] = body.returnPriceOverride
+
+                it[StockBatchesV2.deliveredAtMillis] = body.deliveredAtMillis
+                it[StockBatchesV2.manufacturedAtMillis] = body.manufacturedAtMillis
+                it[StockBatchesV2.expirationDateMillis] = body.expirationDateMillis
+
+                it[StockBatchesV2.discounts] = body.discounts
+
+                it[StockBatchesV2.shelfPosition] = body.shelfPosition
+                it[StockBatchesV2.shelfPriority] = body.shelfPriority
+
+                it[StockBatchesV2.status] = body.status.name
+                it[StockBatchesV2.additionalNotes] = body.additionalNotes
+
+                it[StockBatchesV2.updatedAtMillis] = now
+                it[StockBatchesV2.isActive] = body.isActive
+              }
+
+              if (affected <= 0)
+                return@newSuspendedTransaction null
+
+              body.supplierId?.let { rawSupplierId ->
+                val supplierId = runCatching { UUID.fromString(rawSupplierId) }.getOrNull()
+
+                if (supplierId != null) {
+                  upsertSupplierGoodsPriceInsideTransaction(
+                    userId = userId,
+                    storeId = storeId,
+                    supplierId = supplierId,
+                    goodsItemId = goodsItemId,
+                    supplyPrice = body.supplyPrice,
+                    now = now
+                  )
+                }
+              }
+
+              result += body.copy(
+                userId = userId.toString(),
+                storeId = storeId.toString(),
+                updatedAtMillis = now
+              )
+            }
+
+            result
+          }
+
+          updated?.let {
+            call.genericResponse(
+              status = HttpStatusCode.OK,
+              payload = it,
+              message = getResponse("18").message
+            )
+          } ?: call.respond(UnauthorizedResponse())
+        }
+
+        delete("/delete") {
+          val userId = call.checkPrincipal() ?: return@delete
+          val ids = call.receiveOneOrList<String>()
+          val storeId = call.headerUuid("store_id")
+            ?: return@delete call.respond(UnauthorizedResponse())
+
+          val deletedIds = newSuspendedTransaction(Dispatchers.IO) {
+            if (!userHasStoreAccessInsideTransaction(userId, storeId))
+              return@newSuspendedTransaction null
+
+            val now = System.currentTimeMillis()
+            val result = mutableListOf<String>()
+
+            for (rawId in ids) {
+              val id = runCatching { UUID.fromString(rawId) }.getOrNull()
+                ?: continue
+
+              val affected = StockBatchesV2.update({
+                (StockBatchesV2.id eq id) and
+                    (StockBatchesV2.userId eq userId) and
+                    (StockBatchesV2.storeId eq storeId)
+              }) {
+                it[isActive] = false
+                it[updatedAtMillis] = now
+              }
+
+              if (affected > 0)
+                result += rawId
+            }
+
+            result
+          }
+
+          deletedIds?.let {
+            call.genericResponse(
+              status = HttpStatusCode.OK,
+              payload = it,
+              message = getResponse("19").message
+            )
+          } ?: call.respond(UnauthorizedResponse())
+        }
+
+        post("/setActiveShelfBatch") {
+          val userId = call.checkPrincipal() ?: return@post
+          val body = call.receive<GoodsBatchDataModel>()
+
+          val updatedItem = newSuspendedTransaction(Dispatchers.IO) {
+            val batchId = runCatching { UUID.fromString(body.id) }.getOrNull()
+              ?: return@newSuspendedTransaction null
+
+            val goodsItemId = runCatching { UUID.fromString(body.goodsItemId) }.getOrNull()
+              ?: return@newSuspendedTransaction null
+
+            val storeId = runCatching { UUID.fromString(body.storeId) }.getOrNull()
+              ?: return@newSuspendedTransaction null
+
+            if (!userHasStoreAccessInsideTransaction(userId, storeId))
+              return@newSuspendedTransaction null
+
+            val batchExists = StockBatchesV2
+              .selectAll()
+              .where {
+                (StockBatchesV2.id eq batchId) and
+                    (StockBatchesV2.goodsItemId eq goodsItemId) and
+                    (StockBatchesV2.storeId eq storeId) and
+                    (StockBatchesV2.isActive eq true)
               }
               .empty()
+              .not()
+
+            if (!batchExists)
+              return@newSuspendedTransaction null
+
+            val now = System.currentTimeMillis()
+
+            StockItems.update({
+              (StockItems.id eq goodsItemId) and
+                  (StockItems.storeId eq storeId) and
+                  (StockItems.userId eq userId)
+            }) {
+              it[activeShelfBatchId] = batchId
+              it[updatedAtMillis] = now
+            }
+
+            StockItems
+              .selectAll()
+              .where { StockItems.id eq goodsItemId }
+              .single()
+              .toGoodsItemDataModel()
           }
 
-          if (noUser) return@delete call.respond(UnauthorizedResponse())
+          updatedItem?.let {
+            call.genericResponse(
+              status = HttpStatusCode.OK,
+              payload = it,
+              message = simpleMessage(
+                main = "Shelf batch selected",
+                ru = "Партия на полке выбрана",
+                kk = "Сөредегі партия таңдалды"
+              )
+            )
+          } ?: call.respond(UnauthorizedResponse())
+        }
+      }
+    }
 
-          val body = call.receive<String>()
-          val storeId = UUID.fromString(call.request.header("store_id"))
-          val id = runCatching { UUID.fromString(body) }.getOrNull()
+    route("/supplierGoodsPrices") {
+      authenticate("auth-jwt") {
+        get("/get") {
+          val userId = call.checkPrincipal() ?: return@get
+          val storeId = call.headerUuid("store_id")
+            ?: return@get call.respond(UnauthorizedResponse())
 
-          if (id == null) {
-            call.genericResponseNoPayload(
-              status = HttpStatusCode.InternalServerError,
-              message = getResponse("3").message
+          val result = newSuspendedTransaction(Dispatchers.IO) {
+            if (!userHasStoreAccessInsideTransaction(userId, storeId))
+              return@newSuspendedTransaction null
+
+            SupplierGoodsPrices
+              .selectAll()
+              .where {
+                (SupplierGoodsPrices.storeId eq storeId) and
+                    (SupplierGoodsPrices.isActive eq true)
+              }
+              .map { it.toSupplierGoodsPriceDataModel() }
+          }
+
+          result?.let {
+            call.genericResponse(
+              status = HttpStatusCode.OK,
+              payload = it
+            )
+          } ?: call.respond(UnauthorizedResponse())
+        }
+
+        post("/upsert") {
+          val userId = call.checkPrincipal() ?: return@post
+          val body = call.receive<SupplierGoodsPriceDataModel>()
+
+          val result = newSuspendedTransaction(Dispatchers.IO) {
+            val storeId = runCatching { UUID.fromString(body.storeId) }.getOrNull()
+              ?: return@newSuspendedTransaction null
+
+            val supplierId = runCatching { UUID.fromString(body.supplierId) }.getOrNull()
+              ?: return@newSuspendedTransaction null
+
+            val goodsItemId = runCatching { UUID.fromString(body.goodsItemId) }.getOrNull()
+              ?: return@newSuspendedTransaction null
+
+            if (!userHasStoreAccessInsideTransaction(userId, storeId))
+              return@newSuspendedTransaction null
+
+            val now = System.currentTimeMillis()
+
+            upsertSupplierGoodsPriceInsideTransaction(
+              userId = userId,
+              storeId = storeId,
+              supplierId = supplierId,
+              goodsItemId = goodsItemId,
+              supplyPrice = body.supplyPrice,
+              now = now
             )
 
-            return@delete
+            SupplierGoodsPrices
+              .selectAll()
+              .where {
+                (SupplierGoodsPrices.storeId eq storeId) and
+                    (SupplierGoodsPrices.supplierId eq supplierId) and
+                    (SupplierGoodsPrices.goodsItemId eq goodsItemId)
+              }
+              .single()
+              .toSupplierGoodsPriceDataModel()
           }
+
+          result?.let {
+            call.genericResponse(
+              status = HttpStatusCode.OK,
+              payload = it,
+              message = simpleMessage(
+                main = "Supplier price saved",
+                ru = "Цена поставщика сохранена",
+                kk = "Жеткізуші бағасы сақталды"
+              )
+            )
+          } ?: call.respond(UnauthorizedResponse())
+        }
+
+        delete("/delete") {
+          val userId = call.checkPrincipal() ?: return@delete
+          val ids = call.receiveOneOrList<String>()
+          val storeId = call.headerUuid("store_id")
+            ?: return@delete call.respond(UnauthorizedResponse())
 
           val deleted = newSuspendedTransaction(Dispatchers.IO) {
-            if (Stock.deleteWhere { (Stock.id eq id) and (Stock.userId eq userId) and (Stock.storeId eq storeId) } > 0)
-              0
-            else
-              1
+            if (!userHasStoreAccessInsideTransaction(userId, storeId))
+              return@newSuspendedTransaction null
+
+            val now = System.currentTimeMillis()
+            val result = mutableListOf<String>()
+
+            for (rawId in ids) {
+              val id = runCatching { UUID.fromString(rawId) }.getOrNull()
+                ?: continue
+
+              val affected = SupplierGoodsPrices.update({
+                (SupplierGoodsPrices.id eq id) and
+                    (SupplierGoodsPrices.storeId eq storeId) and
+                    (SupplierGoodsPrices.userId eq userId)
+              }) {
+                it[isActive] = false
+                it[updatedAtMillis] = now
+              }
+
+              if (affected > 0)
+                result += rawId
+            }
+
+            result
           }
 
-          return@delete when (deleted) {
-            0 -> call.genericResponse(
-              HttpStatusCode.OK,
-              message = getResponse("16").message,
-              payload = id.toString()
+          deleted?.let {
+            call.genericResponse(
+              status = HttpStatusCode.OK,
+              payload = it,
+              message = simpleMessage(
+                main = "Supplier prices deleted",
+                ru = "Цены поставщика удалены",
+                kk = "Жеткізуші бағалары өшірілді"
+              )
             )
-
-            1, 2 -> call.respond(UnauthorizedResponse())
-            else -> call.genericResponseNoPayload(
-              status = HttpStatusCode.InternalServerError,
-              message = getResponse("3").message
-            )
-          }
+          } ?: call.respond(UnauthorizedResponse())
         }
       }
     }
@@ -1901,6 +2454,113 @@ fun Application.module() {
               message = getResponse("3").message
             )
           }
+        }
+      }
+    }
+
+    route("/transactions") {
+      authenticate("auth-jwt") {
+        get("/get") {
+          val userId = call.checkPrincipal() ?: return@get
+          val storeId = runCatching {
+            UUID.fromString(call.request.header("store_id"))
+          }.getOrNull() ?: return@get call.respond(UnauthorizedResponse())
+
+          val transactions = newSuspendedTransaction(Dispatchers.IO) {
+            val hasStoreAccess = StoreUsers
+              .selectAll()
+              .where { (StoreUsers.userId eq userId) and (StoreUsers.storeId eq storeId) }
+              .empty()
+              .not()
+
+            if (!hasStoreAccess)
+              return@newSuspendedTransaction null
+
+            Transactions
+              .selectAll()
+              .where { (Transactions.userId eq userId) and (Transactions.storeId eq storeId) }
+              .map {
+                TransactionDataModel(
+                  id = it[Transactions.id].toString(),
+                  workshiftId = it[Transactions.workshiftId],
+                  type = it[Transactions.type],
+                  storeId = it[Transactions.storeId].toString(),
+                  goodsInTransaction = it[Transactions.goodsInTransaction],
+                  paidCash = it[Transactions.paidCash],
+                  paidCard = it[Transactions.paidCard],
+                  cardPaymentOptionId = it[Transactions.cardPaymentOptionId],
+                  debtor = it[Transactions.debtor]?.let { raw ->
+                    jsonBase.decodeFromString<DebtorDataModel>(raw)
+                  },
+                  timeMillis = it[Transactions.timeMillis]
+                )
+              }
+          }
+
+          transactions?.let {
+            call.genericResponse(
+              status = HttpStatusCode.OK,
+              payload = it
+            )
+          } ?: call.respond(UnauthorizedResponse())
+        }
+
+        post("/complete") {
+          val userId = call.checkPrincipal() ?: return@post
+          val body = call.receive<TransactionDataModel>()
+
+          val storeId = runCatching {
+            UUID.fromString(body.storeId)
+          }.getOrNull() ?: return@post call.respond(UnauthorizedResponse())
+
+          val completed = newSuspendedTransaction(Dispatchers.IO) {
+            val hasStoreAccess = StoreUsers
+              .selectAll()
+              .where { (StoreUsers.userId eq userId) and (StoreUsers.storeId eq storeId) }
+              .empty()
+              .not()
+
+            if (!hasStoreAccess)
+              return@newSuspendedTransaction null
+
+            val id = UUID.randomUUID()
+            val timeMillis = body.timeMillis.takeIf { it > 0 } ?: System.currentTimeMillis()
+
+            Transactions.insert {
+              it[Transactions.id] = id
+              it[Transactions.userId] = userId
+              it[Transactions.workshiftId] = body.workshiftId
+              it[Transactions.type] = body.type
+              it[Transactions.storeId] = storeId
+              it[Transactions.goodsInTransaction] = body.goodsInTransaction
+              it[Transactions.paidCash] = body.paidCash
+              it[Transactions.paidCard] = body.paidCard
+              it[Transactions.cardPaymentOptionId] = body.cardPaymentOptionId
+              it[Transactions.debtor] = body.debtor?.let { debtor ->
+                jsonBase.encodeToString(debtor)
+              }
+              it[Transactions.timeMillis] = timeMillis
+            }
+
+            body.copy(
+              id = id.toString(),
+              storeId = storeId.toString(),
+              timeMillis = timeMillis
+            )
+          }
+
+          completed?.let {
+            call.genericResponse(
+              status = HttpStatusCode.Created,
+              payload = it,
+              message = listOf(
+                LocalizedStringDataModel("main", "Transaction completed"),
+                LocalizedStringDataModel("en", "Transaction completed"),
+                LocalizedStringDataModel("ru", "Транзакция завершена"),
+                LocalizedStringDataModel("kk", "Транзакция аяқталды")
+              )
+            )
+          } ?: call.respond(UnauthorizedResponse())
         }
       }
     }

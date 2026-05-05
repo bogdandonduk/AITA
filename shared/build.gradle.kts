@@ -66,6 +66,7 @@ kotlin {
 //      implementation(libs.kotlinx.datetime)
 
       implementation(libs.ktor.client.auth)
+      implementation(libs.kotlinx.datetime)
 
       implementation(libs.sqlDelightRuntime)
       implementation(libs.sqlDelightCoroutinesExtensions)

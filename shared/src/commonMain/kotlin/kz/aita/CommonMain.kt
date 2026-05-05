@@ -7,82 +7,340 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import app.cash.sqldelight.db.SqlDriver
-import io.ktor.client.call.body
-import io.ktor.client.engine.HttpClientEngine
-import io.ktor.client.plugins.auth.authProvider
-import io.ktor.client.plugins.auth.providers.BearerAuthProvider
-import io.ktor.client.request.parameter
-import io.ktor.client.request.request
-import io.ktor.client.request.setBody
-import io.ktor.http.ContentType
-import io.ktor.http.HttpMethod
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.contentType
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.Dispatchers
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.engine.*
+import io.ktor.client.plugins.auth.*
+import io.ktor.client.plugins.auth.providers.*
+import io.ktor.client.plugins.cache.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.request.*
+import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
+import kotlinx.coroutines.*
 import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import io.ktor.client.HttpClient
-import io.ktor.client.plugins.auth.Auth
-import io.ktor.client.plugins.auth.providers.BearerTokens
-import io.ktor.client.plugins.auth.providers.bearer
-import io.ktor.client.plugins.cache.HttpCache
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.http.Url
-import io.ktor.http.encodedPath
-import io.ktor.serialization.kotlinx.json.json
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 
+@kotlinx.serialization.Serializable
+data class MoneyDataModel(
+  val amount: String = "0",
+  val currencyCode: String = "KZT"
+) {
+  val amountDouble: Double
+    get() = amount.replace(",", ".").toDoubleOrNull() ?: 0.0
+}
 
+@kotlinx.serialization.Serializable
+data class BatchDiscountDataModel(
+  val id: String = "",
+  val title: List<LocalizedStringDataModel> = emptyList(),
+  val mode: String = "percent", // "percent" or "fixed"
+  val value: String = "0",
+  val startsAtMillis: Long? = null,
+  val endsAtMillis: Long? = null,
+  val note: String? = null,
+  val isActive: Boolean = true
+)
 
+@kotlinx.serialization.Serializable
+enum class StockBatchStatusDataModel {
+  Ordered,
+  Delivered,
+  OnShelf,
+  Reserved,
+  SoldOut,
+  WrittenOff,
+  Deleted
+}
 
+@kotlinx.serialization.Serializable
+enum class SupplierOrderStatusDataModel {
+  Draft,
+  Sent,
+  Confirmed,
+  PartiallyDelivered,
+  Delivered,
+  Cancelled
+}
 
+expect fun getCurrentTimeMillis(): Long
 
+val transactionsState = MutableDataStateFlow<List<TransactionDataModel>>(GlobalScope)
 
+private val completeTransactionMutex = Mutex()
+private val getTransactionsMutex = Mutex()
 
+data class TransactionPaymentDraftDataModel(
+  val transactionTypeIndex: Int,
+  val clientId: Int,
+  val paymentModeId: String,
+  val paidCash: Double,
+  val paidCard: Double,
+  val cardPaymentOptionId: Int,
+)
 
+data class TransactionReceiptSnapshotDataModel(
+  val transaction: TransactionDataModel,
+  val store: StoreDataModel?,
+  val lines: List<TransactionReceiptLineDataModel>,
+  val paymentDraft: TransactionPaymentDraftDataModel,
+  val currencyCode: String,
+  val currencySymbol: String,
+)
 
+data class TransactionReceiptLineDataModel(
+  val index: Int,
+  val goodsItemId: String,
+  val name: List<LocalizedStringDataModel>,
+  val barcode: String,
+  val quantity: QuantityDataModel,
+  val pricePerUnit: Double,
+  val currencyCode: String,
+  val currencySymbol: String,
+) {
+  val total: Double
+    get() = quantity.total * pricePerUnit
+}
 
+val latestTransactionReceiptSnapshotState =
+  MutableStateFlow<TransactionReceiptSnapshotDataModel?>(null)
 
+private fun transactionKey(transactionTypeIndex: Int, clientId: Int): String {
+  return "$transactionTypeIndex:$clientId"
+}
 
+private val transactionPaymentDraftsState =
+  MutableStateFlow<Map<String, TransactionPaymentDraftDataModel>>(emptyMap())
 
+fun setTransactionPaymentDraft(draft: TransactionPaymentDraftDataModel) {
+  GlobalScope.launch {
+    transactionPaymentDraftsState.emit(
+      transactionPaymentDraftsState.value.toMutableMap().apply {
+        this[transactionKey(draft.transactionTypeIndex, draft.clientId)] = draft
+      }
+    )
+  }
+}
 
+fun getTransactionPaymentDraft(
+  transactionTypeIndex: Int,
+  clientId: Int
+): TransactionPaymentDraftDataModel? {
+  return transactionPaymentDraftsState.value[transactionKey(transactionTypeIndex, clientId)]
+}
 
+fun clearTransactionPaymentDraft(transactionTypeIndex: Int, clientId: Int) {
+  GlobalScope.launch {
+    transactionPaymentDraftsState.emit(
+      transactionPaymentDraftsState.value.toMutableMap().apply {
+        remove(transactionKey(transactionTypeIndex, clientId))
+      }
+    )
+  }
+}
 
+fun transactionServerType(transactionTypeIndex: Int): String {
+  return when (transactionTypeIndex) {
+    0 -> "purchase"
+    1 -> "return"
+    else -> "accept"
+  }
+}
 
+fun transactionTitle(
+  transactionTypeIndex: Int,
+  sale: String,
+  returnText: String,
+  supply: String
+): String {
+  return when (transactionTypeIndex) {
+    0 -> sale
+    1 -> returnText
+    else -> supply
+  }
+}
 
+fun GoodsItemDataModel.priceForTransaction(transactionTypeIndex: Int): PriceDataModel {
+  return when (transactionTypeIndex) {
+    0 -> salePrices.firstOrNull()
+    1 -> returnPrices.firstOrNull()
+    else -> supplyPrices.firstOrNull()
+  } ?: PriceDataModel(
+    price = "0",
+    currency = salePrices.firstOrNull()?.currency
+      ?: returnPrices.firstOrNull()?.currency
+      ?: supplyPrices.firstOrNull()?.currency
+      ?: "",
+    supplierId = ""
+  )
+}
 
+fun GoodsItemDataModel.defaultCartQuantity(
+  configuration: GlobalAppConfigurationDataModel
+): QuantityDataModel {
+  return configuration.goodsItemsQuantityUnits
+    .find { it.id == measurementUnitId }
+    ?: configuration.goodsItemsQuantityUnits.first()
+}
 
+fun GoodsItemDataModel.firstBarcode(): String {
+  return barcodes.firstOrNull().orEmpty()
+}
 
+fun Double.roundMoney(): Double {
+  return kotlin.math.floor(this * 100.0) / 100.0
+}
 
+fun String.toMoneyDouble(): Double {
+  return trim()
+    .replace(",", ".")
+    .toDoubleOrNull()
+    ?.roundMoney()
+    ?: 0.0
+}
 
+@kotlinx.serialization.Serializable
+data class ReceiveSupplierOrderRequestDataModel(
+  val orderId: String,
+  val receivedLines: List<ReceiveSupplierOrderLineDataModel>
+)
 
+@kotlinx.serialization.Serializable
+data class ReceiveSupplierOrderLineDataModel(
+  val orderLineId: String,
+  val goodsItemId: String,
+  val receivedQuantity: QuantityDataModel,
+  val actualSupplyPrice: PriceDataModel,
+  val expirationDateMillis: Long? = null,
+  val manufacturedAtMillis: Long? = null,
+  val discounts: List<BatchDiscountDataModel> = emptyList(),
+  val notes: String? = null
+)
 
+fun changeCartQuantity(
+  id: String,
+  transactionTypeIndex: Int,
+  clientId: Int,
+  current: QuantityDataModel,
+  deltaSteps: Int
+) {
+  val nextTotal = current.total + current.pricedAmount * deltaSteps
 
+  if (nextTotal <= 0.0) {
+    deleteCartById(id, transactionTypeIndex, clientId)
+    return
+  }
 
+  upsertCart(
+    id = id,
+    transactionTypeIndex = transactionTypeIndex,
+    clientId = clientId,
+    quantity = current.copy(total = nextTotal)
+  )
+}
 
+fun addGoodsItemToTransactionCart(
+  goodsItem: GoodsItemDataModel,
+  transactionTypeIndex: Int,
+  clientId: Int,
+  configuration: GlobalAppConfigurationDataModel,
+  currentCart: List<GoodsItemInCartDataModel>
+) {
+  val existing = currentCart.find { it.id == goodsItem.id }
 
+  if (existing == null) {
+    upsertCart(
+      id = goodsItem.id,
+      transactionTypeIndex = transactionTypeIndex,
+      clientId = clientId,
+      quantity = goodsItem.defaultCartQuantity(configuration)
+    )
+  } else {
+    changeCartQuantity(
+      id = goodsItem.id,
+      transactionTypeIndex = transactionTypeIndex,
+      clientId = clientId,
+      current = existing.quantity,
+      deltaSteps = 1
+    )
+  }
+}
 
+fun getTransactions(storeId: String) {
+  if (!getTransactionsMutex.isLocked)
+    GlobalScope.launch(Dispatchers.ourIo) {
+      getTransactionsMutex.withLock {
+        val response = networkRequest<List<TransactionDataModel>, Unit>(
+          HttpMethod.Get,
+          endpointUrl = globalAppConfigurationState.payloadValue.getTransactionsPath.first,
+          headers = mapOf("store_id" to storeId)
+        )
 
+        if (response.negative) {
+          postInAppNotification(response.message, NotificationType.Negative)
+        } else {
+          transactionsState.emit(DataState.Success(response.payload.orEmpty(), response.message))
+        }
+      }
+    }
+}
 
+fun completeTransaction(
+  transaction: TransactionDataModel,
+  transactionTypeIndex: Int,
+  clientId: Int,
+  receiptSnapshot: TransactionReceiptSnapshotDataModel,
+  onCompleted: (() -> Unit)? = null
+) {
+  if (!completeTransactionMutex.isLocked)
+    GlobalScope.launch(Dispatchers.ourIo) {
+      completeTransactionMutex.withLock {
+        postInAppNotification("Completing transaction", NotificationType.Neutral, transient = false)
 
+        val response = networkRequest<TransactionDataModel, TransactionDataModel>(
+          method = HttpMethod.Post,
+          endpointUrl = globalAppConfigurationState.payloadValue.completeTransactionPath.first,
+          body = transaction
+        )
 
+        if (response.negative || response.payload == null) {
+          postInAppNotification(response.message, NotificationType.Negative)
+          onCompleted?.invoke()
+          return@withLock
+        }
 
+        val completed = response.payload
 
+        latestTransactionReceiptSnapshotState.emit(
+          receiptSnapshot.copy(transaction = completed)
+        )
 
+        transactionsState.emit(
+          DataState.Success(
+            mutableListOf<TransactionDataModel>().apply {
+              transactionsState.payloadValue?.let { addAll(it) }
+              add(completed)
+            },
+            response.message
+          )
+        )
+
+        deleteCart(transactionTypeIndex, clientId)
+        clearTransactionPaymentDraft(transactionTypeIndex, clientId)
+
+        activeStoreIdState.value?.let {
+          getStock(it)
+          getStockBatches(it)
+        }
+
+        postInAppNotification(response.message, NotificationType.Positive)
+        onCompleted?.invoke()
+      }
+    }
+}
 
 expect val Dispatchers.ourIo: CoroutineDispatcher
 
@@ -101,6 +359,177 @@ expect var getPlatformName: () -> String
 
 expect var getSqlDelightDriver: (() -> SqlDriver?)?
 
+val supplierGoodsPricesState =
+  MutableDataStateFlow<List<SupplierGoodsPriceDataModel>>(GlobalScope)
+
+val supplierOrdersState =
+  MutableDataStateFlow<List<SupplierOrderDataModel>>(GlobalScope)
+
+val supplierOrderLinesState =
+  MutableDataStateFlow<List<SupplierOrderLineDataModel>>(GlobalScope)
+
+private val getSupplierGoodsPricesMutex = Mutex()
+private val upsertSupplierGoodsPriceMutex = Mutex()
+
+private val getSupplierOrdersMutex = Mutex()
+private val addSupplierOrderMutex = Mutex()
+private val updateSupplierOrderMutex = Mutex()
+private val deleteSupplierOrderMutex = Mutex()
+private val receiveSupplierOrderMutex = Mutex()
+
+fun getSupplierGoodsPrices(
+  storeId: String,
+  onCompleted: ((DataState<List<SupplierGoodsPriceDataModel>>) -> Unit)? = null
+) {
+  if (!getSupplierGoodsPricesMutex.isLocked)
+    GlobalScope.launch(Dispatchers.ourIo) {
+      getSupplierGoodsPricesMutex.withLock {
+        val response = networkRequest<List<SupplierGoodsPriceDataModel>, Unit>(
+          method = HttpMethod.Get,
+          endpointUrl = globalAppConfigurationState.payloadValue.getSupplierGoodsPricesPath.first,
+          headers = mapOf("store_id" to storeId)
+        )
+
+        if (response.negative || response.payload == null) {
+          postInAppNotification(response.message, NotificationType.Negative)
+          onCompleted?.invoke(DataState.Empty(response.message))
+        } else {
+          supplierGoodsPricesState.emit(DataState.Success(response.payload, response.message))
+          onCompleted?.invoke(DataState.Success(response.payload, response.message))
+        }
+      }
+    }
+}
+
+fun upsertSupplierGoodsPrice(
+  price: SupplierGoodsPriceDataModel,
+  onCompleted: ((DataState<SupplierGoodsPriceDataModel>) -> Unit)? = null
+) {
+  if (!upsertSupplierGoodsPriceMutex.isLocked)
+    GlobalScope.launch(Dispatchers.ourIo) {
+      upsertSupplierGoodsPriceMutex.withLock {
+        val response = networkRequest<SupplierGoodsPriceDataModel, SupplierGoodsPriceDataModel>(
+          method = HttpMethod.Post,
+          endpointUrl = globalAppConfigurationState.payloadValue.upsertSupplierGoodsPricePath.first,
+          body = price
+        )
+
+        if (response.negative || response.payload == null) {
+          postInAppNotification(response.message, NotificationType.Negative)
+          onCompleted?.invoke(DataState.Empty(response.message))
+        } else {
+          supplierGoodsPricesState.emit(
+            DataState.Success(
+              supplierGoodsPricesState.payloadValue
+                .orEmpty()
+                .upsertById(response.payload),
+              response.message
+            )
+          )
+          onCompleted?.invoke(DataState.Success(response.payload, response.message))
+        }
+      }
+    }
+}
+
+@kotlinx.serialization.Serializable
+data class SupplierOrderWithLinesDataModel(
+  val order: SupplierOrderDataModel,
+  val lines: List<SupplierOrderLineDataModel>
+)
+
+fun getSupplierOrders(
+  storeId: String,
+  onCompleted: ((DataState<List<SupplierOrderWithLinesDataModel>>) -> Unit)? = null
+) {
+  if (!getSupplierOrdersMutex.isLocked)
+    GlobalScope.launch(Dispatchers.ourIo) {
+      getSupplierOrdersMutex.withLock {
+        val response = networkRequest<List<SupplierOrderWithLinesDataModel>, Unit>(
+          method = HttpMethod.Get,
+          endpointUrl = globalAppConfigurationState.payloadValue.getSupplierOrdersPath.first,
+          headers = mapOf("store_id" to storeId)
+        )
+
+        if (response.negative || response.payload == null) {
+          postInAppNotification(response.message, NotificationType.Negative)
+          onCompleted?.invoke(DataState.Empty(response.message))
+        } else {
+          supplierOrdersState.emit(
+            DataState.Success(response.payload.map { it.order }, response.message)
+          )
+          supplierOrderLinesState.emit(
+            DataState.Success(response.payload.flatMap { it.lines }, response.message)
+          )
+          onCompleted?.invoke(DataState.Success(response.payload, response.message))
+        }
+      }
+    }
+}
+
+fun addSupplierOrder(
+  orderWithLines: SupplierOrderWithLinesDataModel,
+  onCompleted: ((DataState<SupplierOrderWithLinesDataModel>) -> Unit)? = null
+) {
+  if (!addSupplierOrderMutex.isLocked)
+    GlobalScope.launch(Dispatchers.ourIo) {
+      addSupplierOrderMutex.withLock {
+        val response = networkRequest<SupplierOrderWithLinesDataModel, SupplierOrderWithLinesDataModel>(
+          method = HttpMethod.Post,
+          endpointUrl = globalAppConfigurationState.payloadValue.addSupplierOrderPath.first,
+          body = orderWithLines
+        )
+
+        if (response.negative || response.payload == null) {
+          postInAppNotification(response.message, NotificationType.Negative)
+          onCompleted?.invoke(DataState.Empty(response.message))
+        } else {
+          supplierOrdersState.emit(
+            DataState.Success(
+              supplierOrdersState.payloadValue.orEmpty().upsertById(response.payload.order),
+              response.message
+            )
+          )
+
+          supplierOrderLinesState.emit(
+            DataState.Success(
+              supplierOrderLinesState.payloadValue.orEmpty()
+                .filterNot { line -> response.payload.lines.any { it.id == line.id } } +
+                  response.payload.lines,
+              response.message
+            )
+          )
+
+          postInAppNotification(response.message, NotificationType.Positive)
+          onCompleted?.invoke(DataState.Success(response.payload, response.message))
+        }
+      }
+    }
+}
+
+private fun <T> List<T>.upsertById(
+  item: T,
+  idOf: (T) -> String = {
+    when (it) {
+      is SupplierGoodsPriceDataModel -> it.id
+      is SupplierOrderDataModel -> it.id
+      is SupplierOrderLineDataModel -> it.id
+      is GoodsBatchDataModel -> it.id
+      is GoodsItemDataModel -> it.id
+      else -> ""
+    }
+  }
+): List<T> {
+  val id = idOf(item)
+  val index = indexOfFirst { idOf(it) == id }
+
+  return if (index == -1) {
+    this + item
+  } else {
+    toMutableList().also { it[index] = item }
+  }
+}
+
 val categoriesState = MutableDataStateFlow<List<GenericGoodsCategoryDataModel>>(GlobalScope)
 val storeWorkersState = MutableDataStateFlow<List<UserAccountDataModel>>(GlobalScope)
 
@@ -118,7 +547,7 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
   initial = GlobalAppConfigurationDataModel(
     realtimeUpdatesPath = "rt/updates",
     appName = Pair("AITA", "0"),
-    serverUrl = Pair("http://192.168.100.9:8080", "1"),
+    serverUrl = Pair("http://192.168.0.103:8080", "1"),
     globalAppConfigurationPath = Pair("config/global", "2"),
     logInPath = Pair("auth/logIn", "3"),
     signUpPath = Pair("auth/signUp", "4"),
@@ -146,6 +575,16 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
     colorResourcesPath = Pair("res/color", "26"),
     drawableResourcesConfigurationPath = Pair("res/drawableConfig", "27"),
     drawableResourcesPath = Pair("res/drawable", "28"),
+    getTransactionsPath = Pair("transactions/get", "29"),
+    completeTransactionPath = Pair("transactions/complete", "30"),
+    getSupplierGoodsPricesPath = Pair("supplierGoodsPrices/get", "31"),
+    upsertSupplierGoodsPricePath = Pair("supplierGoodsPrices/upsert", "32"),
+    deleteSupplierGoodsPricesPath = Pair("supplierGoodsPrices/delete", "33"),
+    getSupplierOrdersPath = Pair("supplierOrders/get", "34"),
+    addSupplierOrderPath = Pair("supplierOrders/add", "35"),
+    updateSupplierOrderPath = Pair("supplierOrders/update", "36"),
+    deleteSupplierOrdersPath = Pair("supplierOrders/delete", "37"),
+    receiveSupplierOrderPath = Pair("supplierOrders/receive", "38"),
     companyForms = listOf(
       CompanyFormDataModel(
         id = "0",
@@ -738,7 +1177,7 @@ var httpClient =
 val userAccountState = MutableDataStateFlow<UserAccountDataModel>(GlobalScope)
 
 val storesState = MutableDataStateFlow<List<StoreDataModel>>(GlobalScope)
-val activeStoreId = MutableStateFlow<String?>(null)
+val activeStoreIdState = MutableStateFlow<String?>(null)
 
 val getStoresMutex = Mutex()
 val addStoreMutex = Mutex()
@@ -783,9 +1222,10 @@ val getUserAccountMutex = Mutex()
 val updateUserMutex = Mutex()
 val latestInAppNotificationState = MutableStateFlow<NotificationDataModel?>(null)
 
+val cashRegisterExtractionsState =
+  MutableDataStateFlow<List<CashRegisterExtractionEntryDataModel>>(GlobalScope)
 
-
-
+val cashRegisterAmountState = MutableStateFlow(0.0)
 
 
 
@@ -991,9 +1431,10 @@ fun init() {
   GlobalScope.launch(Dispatchers.ourIo) {
     observeLocalKv(KEY_ACTIVE_STORE_ID)
       .collect {
-        activeStoreId.emit(it)
+        activeStoreIdState.emit(it)
         it?.let {
           getStock(it)
+          getTransactions(it)
         }
       }
   }
@@ -1001,8 +1442,8 @@ fun init() {
   GlobalScope.launch(Dispatchers.ourIo) {
     storesState.payload.collect {
       it?.let {
-        if (it.size == 1 && activeStoreId.value == null) {
-          activeStoreId.emit(it.first().id)
+        if (it.size == 1 && activeStoreIdState.value == null) {
+          activeStoreIdState.emit(it.first().id)
         }
       }
     }
@@ -1245,13 +1686,12 @@ fun getStrings() {
           endpointUrl = globalAppConfigurationState.payloadValue.stringResourcesPath.first
         )
 
-        if (response.negative) {
-          stringsState.emit(DataState.Empty(response.message))
+        if (!response.negative && response.payload != null) {
+          stringsState.emit(DataState.Success(response.payload, response.message))
         } else {
-          stringsState.emit(DataState.Success(response.payload!!, response.message))
+          postInAppNotification(response.message, NotificationType.Negative)
         }
       }
-
     }
 }
 
@@ -1264,10 +1704,8 @@ fun getDimensions() {
           endpointUrl = globalAppConfigurationState.payloadValue.dimensionResourcesPath.first,
         )
 
-        if (response.negative) {
-          dimensionsState.emit(DataState.Empty(response.message))
-        } else {
-          dimensionsState.emit(DataState.Success(response.payload!!, response.message))
+        if (!response.negative && response.payload != null) {
+          dimensionsState.emit(DataState.Success(response.payload, response.message))
         }
       }
     }
@@ -1282,14 +1720,12 @@ fun getColors() {
           endpointUrl = globalAppConfigurationState.payloadValue.colorResourcesPath.first
         )
 
-
-        if (response.negative) {
-          colorsState.emit(DataState.Empty(response.message))
+        if (!response.negative && response.payload != null) {
+          colorsState.emit(DataState.Success(response.payload, response.message))
         } else {
-          colorsState.emit(DataState.Success(response.payload!!, response.message))
+          postInAppNotification(response.message, NotificationType.Negative)
         }
       }
-
     }
 }
 
@@ -2942,16 +3378,30 @@ fun deleteGoodsBatches(ids: List<String>, storeId: String, onCompleted: (() -> U
         } else {
           postInAppNotification(response.message, NotificationType.Positive)
 
+          val deletedIds = response.payload.orEmpty()
+
           stockBatchesState.emit(
             DataState.Success(
               mutableListOf<GoodsBatchDataModel>().also { newList ->
-                (stockBatchesState.value.value as? DataState.Success)?.payload?.let {
+                stockBatchesState.payloadValue?.let {
                   newList.addAll(it)
-                  newList.removeAll { item -> item.id == response.payload }
+                  newList.removeAll { item -> item.id in deletedIds }
                 }
-              }
+              },
+              response.message
             )
           )
+
+//          stockBatchesState.emit(
+//            DataState.Success(
+//              mutableListOf<GoodsBatchDataModel>().also { newList ->
+//                (stockBatchesState.value.value as? DataState.Success)?.payload?.let {
+//                  newList.addAll(it)
+//                  newList.removeAll { item -> item.id == response.payload }
+//                }
+//              }
+//            )
+//          )
 
           onCompleted?.invoke()
         }
@@ -2959,7 +3409,55 @@ fun deleteGoodsBatches(ids: List<String>, storeId: String, onCompleted: (() -> U
     }
 }
 
+fun addGoodsItems(
+  goodsItems: List<GoodsItemDataModel>,
+  onCompleted: ((DataState<List<GoodsItemDataModel>>) -> Unit)? = null
+) {
+  val added = mutableListOf<GoodsItemDataModel>()
 
+  fun addNext(index: Int) {
+    if (index > goodsItems.lastIndex) {
+      onCompleted?.invoke(DataState.Success(added))
+      return
+    }
+
+    addGoodsItem(goodsItems[index]) { state ->
+      if (state is DataState.Success) {
+        added += state.payload
+        addNext(index + 1)
+      } else {
+        onCompleted?.invoke(DataState.Empty())
+      }
+    }
+  }
+
+  addNext(0)
+}
+
+fun updateGoodsItems(
+  goodsItems: List<GoodsItemDataModel>,
+  onCompleted: ((DataState<List<GoodsItemDataModel>>) -> Unit)? = null
+) {
+  val updated = mutableListOf<GoodsItemDataModel>()
+
+  fun updateNext(index: Int) {
+    if (index > goodsItems.lastIndex) {
+      onCompleted?.invoke(DataState.Success(updated))
+      return
+    }
+
+    updateGoodsItem(goodsItems[index]) { state ->
+      if (state is DataState.Success) {
+        updated += state.payload
+        updateNext(index + 1)
+      } else {
+        onCompleted?.invoke(DataState.Empty())
+      }
+    }
+  }
+
+  updateNext(0)
+}
 
 
 
@@ -3033,6 +3531,57 @@ data class AppLanguageDataModel(
   val name: List<LocalizedStringDataModel>,
   val flagDrawablePath: String
 )
+@kotlinx.serialization.Serializable
+data class CashRegisterExtractionEntryDataModel(
+  val id: String,
+  val amount: Double,
+  val timeMillis: Long
+)
+
+private val setActiveShelfBatchMutex = Mutex()
+
+fun setActiveShelfBatch(
+  batch: GoodsBatchDataModel,
+  storeId: String,
+  onCompleted: ((DataState<GoodsItemDataModel>) -> Unit)? = null
+) {
+  if (!setActiveShelfBatchMutex.isLocked)
+    GlobalScope.launch(Dispatchers.ourIo) {
+      setActiveShelfBatchMutex.withLock {
+        val response = networkRequest<GoodsItemDataModel, GoodsBatchDataModel>(
+          method = HttpMethod.Post,
+          endpointUrl = "stockBatches/setActiveShelfBatch",
+          body = batch,
+          headers = mapOf("store_id" to storeId)
+        )
+
+        if (response.negative || response.payload == null) {
+          postInAppNotification(response.message, NotificationType.Negative)
+          onCompleted?.invoke(DataState.Empty())
+        } else {
+          postInAppNotification(response.message, NotificationType.Positive)
+
+          stockState.emit(
+            DataState.Success(
+              mutableListOf<GoodsItemDataModel>().also { newList ->
+                stockState.payloadValue?.let { newList.addAll(it) }
+
+                val index = newList.indexOfFirst { it.id == response.payload.id }
+
+                if (index != -1)
+                  newList[index] = response.payload
+                else
+                  newList.add(response.payload)
+              },
+              response.message
+            )
+          )
+
+          onCompleted?.invoke(DataState.Success(response.payload, response.message))
+        }
+      }
+    }
+}
 
 @kotlinx.serialization.Serializable
 data class AppThemeDataModel(
@@ -3271,6 +3820,7 @@ data class GlobalAppConfigurationDataModel(
   val addStockBatchPath: Pair<String, String>,
   val updateStockBatchPath: Pair<String, String>,
   val deleteStockBatchPath: Pair<String, String>,
+
   val getGenericGoodsItemsPath: Pair<String, String>,
   val getGenericGoodsCategoriesPath: Pair<String, String>,
   val getSuppliersPath: Pair<String, String>,
@@ -3279,6 +3829,17 @@ data class GlobalAppConfigurationDataModel(
   val colorResourcesPath: Pair<String, String>,
   val drawableResourcesConfigurationPath: Pair<String, String>,
   val drawableResourcesPath: Pair<String, String>,
+  val getTransactionsPath: Pair<String, String>,
+  val completeTransactionPath: Pair<String, String>,
+  val getSupplierGoodsPricesPath: Pair<String, String> = Pair("supplierGoodsPrices/get", "31"),
+  val upsertSupplierGoodsPricePath: Pair<String, String> = Pair("supplierGoodsPrices/upsert", "32"),
+  val deleteSupplierGoodsPricesPath: Pair<String, String> = Pair("supplierGoodsPrices/delete", "33"),
+
+  val getSupplierOrdersPath: Pair<String, String> = Pair("supplierOrders/get", "34"),
+  val addSupplierOrderPath: Pair<String, String> = Pair("supplierOrders/add", "35"),
+  val updateSupplierOrderPath: Pair<String, String> = Pair("supplierOrders/update", "36"),
+  val deleteSupplierOrdersPath: Pair<String, String> = Pair("supplierOrders/delete", "37"),
+  val receiveSupplierOrderPath: Pair<String, String> = Pair("supplierOrders/receive", "38"),
   val companyForms: List<CompanyFormDataModel>,
   val countries: List<CountryDataModel>,
   val languages: List<AppLanguageDataModel>,
@@ -3287,23 +3848,125 @@ data class GlobalAppConfigurationDataModel(
 )
 
 @kotlinx.serialization.Serializable
-data class GoodsBatchDataModel(
-  val id: String,
+data class SupplierOrderLineDataModel(
+  val id: String = "",
+  val orderId: String,
   val goodsItemId: String,
-  val userId: String,
+
+  val requestedQuantity: QuantityDataModel,
+
+  val expectedSupplyPrice: PriceDataModel? = null,
+
+  val desiredExpirationDateMillis: Long? = null,
+  val additionalNotes: String? = null,
+
+  val deliveredBatchIds: List<String> = emptyList(),
+
+  val isActive: Boolean = true
+)
+
+@kotlinx.serialization.Serializable
+data class SupplierOrderDataModel(
+  val id: String = "",
+  val userId: String = "",
   val storeId: String,
   val supplierId: String,
-  val salePrice: PriceDataModel,
-  val returnPrice: PriceDataModel,
-  val supplyPrice: PriceDataModel,
-  val quantity: QuantityDataModel,
-  val supplyTime: Long,
-  val expirationTime: Long,
-  val shelfQueue: GoodsBatchShelfQueueDataModel,
-  val createdAt: Long,
-  val createdByUserId: String,
-  val isActive: Boolean
+
+  val amount: PriceDataModel? = null,
+
+  val orderedAtMillis: Long = 0L,
+  val desiredDeliveryTimeMillis: Long? = null,
+  val confirmedDeliveryTimeMillis: Long? = null,
+  val deliveredAtMillis: Long? = null,
+
+  val storeAddress: LocationDataModel? = null,
+
+  val additionalNotes: String? = null,
+
+  val status: SupplierOrderStatusDataModel = SupplierOrderStatusDataModel.Draft,
+
+  val createdAtMillis: Long = 0L,
+  val updatedAtMillis: Long = 0L,
+  val isActive: Boolean = true
 )
+
+@kotlinx.serialization.Serializable
+data class SupplierGoodsPriceDataModel(
+  val id: String = "",
+  val userId: String = "",
+  val storeId: String,
+  val supplierId: String,
+  val goodsItemId: String,
+
+  val supplyPrice: PriceDataModel,
+
+  val minOrderQuantity: QuantityDataModel? = null,
+  val packageQuantity: QuantityDataModel? = null,
+
+  val supplierBarcode: String? = null,
+  val supplierGoodsName: String? = null,
+
+  val lastUsedAtMillis: Long? = null,
+  val createdAtMillis: Long = 0L,
+  val updatedAtMillis: Long = 0L,
+
+  val isActive: Boolean = true
+)
+
+@kotlinx.serialization.Serializable
+data class GoodsBatchDataModel(
+  val id: String = "",
+  val goodsItemId: String,
+  val userId: String = "",
+  val storeId: String,
+
+  val supplierId: String? = null,
+  val supplierOrderId: String? = null,
+
+  val quantity: QuantityDataModel,
+
+  val supplyPrice: PriceDataModel,
+  val salePriceOverride: PriceDataModel? = null,
+  val returnPriceOverride: PriceDataModel? = null,
+
+  val deliveredAtMillis: Long? = null,
+  val manufacturedAtMillis: Long? = null,
+  val expirationDateMillis: Long? = null,
+
+  val discounts: List<BatchDiscountDataModel> = emptyList(),
+
+  val shelfPosition: String? = null,
+  val shelfPriority: Int = 0,
+
+  val status: StockBatchStatusDataModel = StockBatchStatusDataModel.Delivered,
+
+  val additionalNotes: String? = null,
+
+  val createdAtMillis: Long = 0L,
+  val updatedAtMillis: Long = 0L,
+  val createdByUserId: String? = null,
+
+  val isActive: Boolean = true
+)
+
+//@kotlinx.serialization.Serializable
+//data class GoodsBatchDataModel(
+//  val id: String,
+//  val goodsItemId: String,
+//  val userId: String,
+//  val storeId: String,
+//  val supplierId: String,
+//  val salePrice: PriceDataModel,
+//  val returnPrice: PriceDataModel,
+//  val supplyPrice: PriceDataModel,
+//  val quantity: QuantityDataModel,
+//  val supplyTime: Long,
+//  val expirationTime: Long,
+//  val shelfQueue: GoodsBatchShelfQueueDataModel,
+//  val createdAt: Long,
+//  val createdByUserId: String,
+//  val isActive: Boolean
+//)
 
 @kotlinx.serialization.Serializable
 data class GoodsBatchShelfQueueDataModel(
@@ -3324,24 +3987,37 @@ data class GoodsCategoryDataModel(
 
 @kotlinx.serialization.Serializable
 data class GoodsItemDataModel(
-  val id: String,
-  val userId: String,
-  val storeId: String,
-  val barcode: List<String>,
-  val name: List<LocalizedStringDataModel>,
-  val measurementUnitId: String,
-  val categoryIds: List<String>,
-  val salePrices: List<PriceDataModel>,
-  val returnPrices: List<PriceDataModel> = salePrices,
-  val supplyPrices: List<PriceDataModel>,
-  val isQuickItem: Boolean,
-  val createdAt: Long,
-  val isActive: Boolean
+  val id: String = "",
+  val userId: String = "",
+  val storeId: String = "",
+
+  val barcodes: List<String> = emptyList(),
+  val name: List<LocalizedStringDataModel> = emptyList(),
+
+  val description: List<LocalizedStringDataModel> = emptyList(),
+
+  val measurementUnitId: String = "0",
+  val categoryIds: List<String> = emptyList(),
+
+  val salePrices: List<PriceDataModel> = emptyList(),
+  val returnPrices: List<PriceDataModel> = emptyList(),
+  val supplyPrices: List<PriceDataModel> = emptyList(),
+
+  val isQuickItem: Boolean = false,
+  val imagePaths: List<String> = emptyList(),
+
+  val activeShelfBatchId: String? = null,
+
+  val note: String? = null,
+
+  val createdAtMillis: Long = 0L,
+  val updatedAtMillis: Long = 0L,
+  val isActive: Boolean = true
 ): Searchable {
 
   override val exactSearchOperands: List<String>
     get() = mutableListOf<String>().apply {
-      addAll(barcode)
+      addAll(barcodes)
       addAll(name.map { it.value })
       addAll(salePrices.map { it.price })
       addAll(returnPrices.map { it.price })
@@ -3352,7 +4028,7 @@ data class GoodsItemDataModel(
     }
   override val containsSearchOperands: List<String>
     get() = mutableListOf<String>().apply {
-      addAll(barcode)
+      addAll(barcodes)
       addAll(name.map { it.value })
       addAll(salePrices.map { it.price })
       addAll(returnPrices.map { it.price })
@@ -3363,7 +4039,7 @@ data class GoodsItemDataModel(
     }
   override val uniqueSearchOperands: List<String>
     get() = mutableListOf<String>().apply {
-      addAll(barcode)
+      addAll(barcodes)
     }
 }
 

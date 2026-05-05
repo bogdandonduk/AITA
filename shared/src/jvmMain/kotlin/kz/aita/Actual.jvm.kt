@@ -5,17 +5,18 @@ import app.cash.sqldelight.db.QueryResult
 import app.cash.sqldelight.db.SqlCursor
 import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
-import io.ktor.client.engine.HttpClientEngine
-import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.engine.*
+import io.ktor.client.engine.okhttp.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import okhttp3.Cache
 import okhttp3.OkHttpClient
 import java.io.File
 import java.nio.file.Files
-import java.util.Locale
+import java.util.*
 import kotlin.io.path.Path
 
+actual fun getCurrentTimeMillis(): Long = System.currentTimeMillis()
 actual var getStoredUserAuthTokens: (() -> TokenPair?)? = null
 actual var setStoredUserAuthTokens: ((TokenPair?) -> Unit)? = null
 

@@ -1,13 +1,15 @@
 package kz.aita
 
 import app.cash.sqldelight.db.SqlDriver
-import io.ktor.client.engine.HttpClientEngine
-import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.engine.*
+import io.ktor.client.engine.okhttp.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import okhttp3.Cache
 import okhttp3.OkHttpClient
 import java.io.File
+
+actual fun getCurrentTimeMillis(): Long = System.currentTimeMillis()
 
 actual var getStoredUserAuthTokens: (() -> TokenPair?)? = null
 actual var setStoredUserAuthTokens: ((TokenPair?) -> Unit)? = null

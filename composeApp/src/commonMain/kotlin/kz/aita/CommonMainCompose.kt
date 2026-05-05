@@ -1,9 +1,11 @@
 // THIS IS CommonMainCompose.kt - in commonMain shared module of kmp compose app
+@file:OptIn(ExperimentalTime::class)
 package kz.aita
 
 import aita.composeapp.generated.resources.*
 import androidx.compose.animation.*
 import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -12,6 +14,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,12 +23,12 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.TextSelectionColors
-import androidx.compose.material3.Text
-import androidx.compose.material3.ripple
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.FocusState
@@ -36,19 +39,16 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.SoftwareKeyboardController
-import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.*
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.*
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import io.kamel.core.config.*
 import io.kamel.image.KamelImage
 import io.kamel.image.asyncPainterResource
@@ -64,27 +64,17 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.toLocalDateTime
 import kz.aita.*
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.ui.window.Dialog
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxColors
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.input.OffsetMapping
-import androidx.compose.ui.text.withStyle
-import kotlin.collections.get
+import kotlin.math.abs
+import kotlin.math.round
 import kotlin.text.equals
+import kotlin.time.ExperimentalTime
 
 fun getTransformedTextWithSelectionFocusTextColor(
   textFieldValue: TextFieldValue,
@@ -289,17 +279,17 @@ fun AppConfiguration.UserAuthSignUpScreen(
           && repeatedPasswordTextFieldContent.isContentValid
         )
           signUpUser (
-              UserAuthSignUpDataModel(
-                phoneNumber = stateValues.globalAppConfiguration.countries.run {
-                  find { it.locale.equals(phoneNumberTextFieldContent.selectedId, true) } ?: first()
-                }.phoneNumberCode + phoneNumberTextFieldContent.value.text.trim(),
-                email = emailTextFieldContent.value.text.trim(),
-                firstName = firstNameTextFieldContent.value.text.trim(),
-                lastName = lastNameTextFieldContent.value.text.trim(),
-                countryLocale = stateValues.globalAppConfiguration.countries.find { it.phoneNumberCode == phoneNumberTextFieldContent.selectedSecondaryId!!.substringAfter("+") }!!.locale,
-                password = passwordTextFieldContent.value.text
-              )
+            UserAuthSignUpDataModel(
+              phoneNumber = stateValues.globalAppConfiguration.countries.run {
+                find { it.locale.equals(phoneNumberTextFieldContent.selectedId, true) } ?: first()
+              }.phoneNumberCode + phoneNumberTextFieldContent.value.text.trim(),
+              email = emailTextFieldContent.value.text.trim(),
+              firstName = firstNameTextFieldContent.value.text.trim(),
+              lastName = lastNameTextFieldContent.value.text.trim(),
+              countryLocale = stateValues.globalAppConfiguration.countries.find { it.phoneNumberCode == phoneNumberTextFieldContent.selectedSecondaryId!!.substringAfter("+") }!!.locale,
+              password = passwordTextFieldContent.value.text
             )
+          )
 
       }
 
@@ -497,11 +487,11 @@ fun AppConfiguration.UserAuthLogInScreen() {
 
             if (isContentValid && passwordTextFieldContent.isContentValid)
               logInUser(
-                  UserAuthLogInDataModel(
-                    login = this.value.text,
-                    password = passwordTextFieldContent.value.text
-                  )
+                UserAuthLogInDataModel(
+                  login = this.value.text,
+                  password = passwordTextFieldContent.value.text
                 )
+              )
           }
         } else {
           loginTextFieldContent.run {
@@ -509,13 +499,13 @@ fun AppConfiguration.UserAuthLogInScreen() {
 
             if (isContentValid && passwordTextFieldContent.isContentValid)
               logInUser(
-                  UserAuthLogInDataModel(
-                    login = stateValues.globalAppConfiguration.countries.run {
-                      find { it.locale.equals(loginTextFieldContent.selectedId, true) } ?: first()
-                    }.phoneNumberCode + loginTextFieldContent.value.text.trim(),
-                    password = passwordTextFieldContent.value.text
-                  )
+                UserAuthLogInDataModel(
+                  login = stateValues.globalAppConfiguration.countries.run {
+                    find { it.locale.equals(loginTextFieldContent.selectedId, true) } ?: first()
+                  }.phoneNumberCode + loginTextFieldContent.value.text.trim(),
+                  password = passwordTextFieldContent.value.text
                 )
+              )
           }
         }
       }
@@ -558,118 +548,225 @@ fun AppConfiguration.UserAuthLogInScreen() {
   }
 }
 
+private data class TransactionUiContext(
+  val transactionTypeIndex: Int,
+  val clientId: Int,
+  val stateHost: StateHost
+)
+
+@Composable
+private fun AppConfiguration.rememberTransactionContext(): TransactionUiContext {
+  val transactionTypeIndex = when (stateValues.navigationScreensMain.last()) {
+    is NavigationScreenModel.Transaction.MainSale -> 0
+    is NavigationScreenModel.Transaction.MainReturn -> 1
+    else -> 2
+  }
+
+  val clientId = when (transactionTypeIndex) {
+    0 -> stateValues.navigationTransactionSaleClientId
+    1 -> stateValues.navigationTransactionReturnClientId
+    else -> stateValues.navigationTransactionSupplyClientId
+  }
+
+  val stateHost = when (transactionTypeIndex) {
+    0 -> NavigationScreenModel.Transaction.MainSale
+    1 -> NavigationScreenModel.Transaction.MainReturn
+    else -> NavigationScreenModel.Transaction.MainSupply
+  }
+
+  return TransactionUiContext(
+    transactionTypeIndex = transactionTypeIndex,
+    clientId = clientId,
+    stateHost = stateHost
+  )
+}
+
 @Composable
 fun AppConfiguration.TransactionSelectionScreen() {
   Column(
-    modifier = Modifier
-      .fillMaxSize()
+    modifier = Modifier.fillMaxSize()
   ) {
-    val transactionTypeIndex = when (stateValues.navigationScreensMain.last()) {
-      is NavigationScreenModel.Transaction.MainSale -> {
-        0
-      }
-
-      is NavigationScreenModel.Transaction.MainReturn -> {
-        1
-      }
-
-      else -> {
-        2
-      }
-    }
-
-    val clientId = when (stateValues.navigationScreensMain.last()) {
-      is NavigationScreenModel.Transaction.MainReturn -> {
-        stateValues.navigationTransactionReturnClientId
-      }
-
-      is NavigationScreenModel.Transaction.MainSupply -> {
-        stateValues.navigationTransactionSupplyClientId
-      }
-
-      else -> {
-        stateValues.navigationTransactionSaleClientId
-      }
-    }
+    val context = rememberTransactionContext()
 
     ScreenAppBarWidget(
       title = stateValues.stringSelect,
-      onBack = if (!Navigation.TransactionSale.isVeryFirstScreen(stateValues.isNarrowScreen, clientId)) {
-        {
-          coroutineScope.launch {
-            Navigation.Menu.pop(stateValues.isNarrowScreen)
+      onBack = {
+        coroutineScope.launch {
+          when (context.transactionTypeIndex) {
+            0 -> Navigation.TransactionSale.pop()
+            1 -> Navigation.TransactionReturn.pop()
+            else -> Navigation.TransactionSupply.pop()
           }
         }
-      } else null
+      }
     )
+
+    val goodsInCart by getCartState(
+      context.transactionTypeIndex,
+      context.clientId
+    ).collectAsState()
 
     var searchTextFieldFocused by rememberSaveable {
       mutableStateOf(true)
     }
 
-    val searchTextFieldContent =
-      searchTextField(
-        stateHost = when (transactionTypeIndex) {
-          0 -> NavigationScreenModel.Transaction.MainSale
-          1 -> NavigationScreenModel.Transaction.MainReturn
-          else -> NavigationScreenModel.Transaction.MainSupply
-        },
-        stateKey = NavigationScreenModel.KEY_STATE_SEARCH_QUERY,
-        isFocusedInitial = searchTextFieldFocused,
-        forceRefocus = true,
-        modifier = Modifier
-          .padding(stateValues.marginTextField),
-        barcodeCamScanner = true
-      )
+    val searchTextFieldContent = searchTextField(
+      stateHost = context.stateHost,
+      stateKey = NavigationScreenModel.KEY_STATE_SEARCH_QUERY,
+      isFocusedInitial = searchTextFieldFocused,
+      forceRefocus = true,
+      modifier = Modifier.padding(stateValues.marginTextField),
+      barcodeCamScanner = true
+    )
 
     val scopeRowContent = tabRowWidget(
-      modifier = Modifier
-        .padding(horizontal = stateValues.marginTextField),
+      modifier = Modifier.padding(horizontal = stateValues.marginTextField),
       tabs = listOf(
         TabContent("0", stateValues.stringAll),
         TabContent("1", stateValues.stringQuick)
       )
     )
 
-    val addToCartAction: (GoodsItemDataModel) -> Unit = {
-      upsertCart(
-        id = it.id,
-        transactionTypeIndex,
-        clientId,
-        QuantityDataModel("", immutableUnitName = listOf(LocalizedStringDataModel("main", "pc.")), roundTotal = true) // TODO it.quantity.copy(total = it.quantity.total + it.quantity.pricedAmount)
+    val addToCartAction: (GoodsItemDataModel) -> Unit = { goodsItem ->
+      addGoodsItemToTransactionCart(
+        goodsItem = goodsItem,
+        transactionTypeIndex = context.transactionTypeIndex,
+        clientId = context.clientId,
+        configuration = stateValues.globalAppConfiguration,
+        currentCart = goodsInCart
       )
     }
 
-    when (scopeRowContent.id) {
-      "0" -> {
-        StockWarehouseScreenContent(
-          modifier = Modifier
-            .weight(1f),
-          searchTextFieldContent.value.text,
-          onExactSearchHit = addToCartAction,
-          disableIfOutOfStock = true,
-          onClick = addToCartAction,
-          showStockType = false
-        )
-      }
+    StockWarehouseScreenContent(
+      modifier = Modifier.weight(1f),
+      searchQuery = searchTextFieldContent.value.text,
+      onExactSearchHit = addToCartAction,
+      disableIfOutOfStock = context.transactionTypeIndex == 0,
+      showStockType = false,
+      onFilter = when (scopeRowContent.id) {
+        "1" -> {
+          { it.isQuickItem }
+        }
 
-      "1" -> {
-        StockWarehouseScreenContent(
-          modifier = Modifier
-            .weight(1f),
-          searchTextFieldContent.value.text,
-          onExactSearchHit = addToCartAction,
-          disableIfOutOfStock = true,
-          showStockType = false,
-          onFilter = {
-            it.isQuickItem
-          },
-          onClick = addToCartAction
-        )
-      }
-    }
+        else -> null
+      },
+      onClick = addToCartAction
+    )
   }
 }
+
+//@Composable
+//fun AppConfiguration.TransactionSelectionScreen() {
+//  Column(
+//    modifier = Modifier
+//      .fillMaxSize()
+//  ) {
+//    val transactionTypeIndex = when (stateValues.navigationScreensMain.last()) {
+//      is NavigationScreenModel.Transaction.MainSale -> {
+//        0
+//      }
+//
+//      is NavigationScreenModel.Transaction.MainReturn -> {
+//        1
+//      }
+//
+//      else -> {
+//        2
+//      }
+//    }
+//
+//    val clientId = when (stateValues.navigationScreensMain.last()) {
+//      is NavigationScreenModel.Transaction.MainReturn -> {
+//        stateValues.navigationTransactionReturnClientId
+//      }
+//
+//      is NavigationScreenModel.Transaction.MainSupply -> {
+//        stateValues.navigationTransactionSupplyClientId
+//      }
+//
+//      else -> {
+//        stateValues.navigationTransactionSaleClientId
+//      }
+//    }
+//
+//    ScreenAppBarWidget(
+//      title = stateValues.stringSelect,
+//      onBack = if (!Navigation.TransactionSale.isVeryFirstScreen(stateValues.isNarrowScreen, clientId)) {
+//        {
+//          coroutineScope.launch {
+//            Navigation.Menu.pop(stateValues.isNarrowScreen)
+//          }
+//        }
+//      } else null
+//    )
+//
+//    var searchTextFieldFocused by rememberSaveable {
+//      mutableStateOf(true)
+//    }
+//
+//    val searchTextFieldContent =
+//      searchTextField(
+//        stateHost = when (transactionTypeIndex) {
+//          0 -> NavigationScreenModel.Transaction.MainSale
+//          1 -> NavigationScreenModel.Transaction.MainReturn
+//          else -> NavigationScreenModel.Transaction.MainSupply
+//        },
+//        stateKey = NavigationScreenModel.KEY_STATE_SEARCH_QUERY,
+//        isFocusedInitial = searchTextFieldFocused,
+//        forceRefocus = true,
+//        modifier = Modifier
+//          .padding(stateValues.marginTextField),
+//        barcodeCamScanner = true
+//      )
+//
+//    val scopeRowContent = tabRowWidget(
+//      modifier = Modifier
+//        .padding(horizontal = stateValues.marginTextField),
+//      tabs = listOf(
+//        TabContent("0", stateValues.stringAll),
+//        TabContent("1", stateValues.stringQuick)
+//      )
+//    )
+//
+//    val addToCartAction: (GoodsItemDataModel) -> Unit = {
+//      upsertCart(
+//        id = it.id,
+//        transactionTypeIndex,
+//        clientId,
+//        QuantityDataModel("", immutableUnitName = listOf(LocalizedStringDataModel("main", "pc.")), roundTotal = true) // TODO it.quantity.copy(total = it.quantity.total + it.quantity.pricedAmount)
+//      )
+//    }
+//
+//    when (scopeRowContent.id) {
+//      "0" -> {
+//        StockWarehouseScreenContent(
+//          modifier = Modifier
+//            .weight(1f),
+//          searchTextFieldContent.value.text,
+//          onExactSearchHit = addToCartAction,
+//          disableIfOutOfStock = true,
+//          onClick = addToCartAction,
+//          showStockType = false
+//        )
+//      }
+//
+//      "1" -> {
+//        StockWarehouseScreenContent(
+//          modifier = Modifier
+//            .weight(1f),
+//          searchTextFieldContent.value.text,
+//          onExactSearchHit = addToCartAction,
+//          disableIfOutOfStock = true,
+//          showStockType = false,
+//          onFilter = {
+//            it.isQuickItem
+//          },
+//          onClick = addToCartAction
+//        )
+//      }
+//    }
+//  }
+//}
 
 @Composable
 fun AppConfiguration.TransactionScreen() {
@@ -725,9 +822,31 @@ fun AppConfiguration.TransactionScreen() {
 
       val goodsInCart by getCartState(transactionTypeIndex, clientId).collectAsState()
 
+//      LaunchedEffect(goodsInCart) {
+//        if (goodsInCart.isEmpty())
+//          coroutineScope.launch {
+//            when (transactionTypeIndex) {
+//              0 -> Navigation.TransactionSale.clear()
+//              1 -> Navigation.TransactionReturn.clear()
+//              2 -> Navigation.TransactionSupply.clear()
+//            }
+//          }
+//      }
 
-      LaunchedEffect(goodsInCart) {
-        if (goodsInCart.isEmpty())
+      val latestReceiptSnapshot by latestTransactionReceiptSnapshotState.collectAsState()
+
+      LaunchedEffect(goodsInCart, latestReceiptSnapshot) {
+        val currentScreens = Navigation
+          .getCurrentTransactionScreens(transactionTypeIndex, clientId, stateValues.isNarrowScreen)
+          .value
+
+        val showingReceipt = currentScreens.lastOrNull() is NavigationScreenModel.Transaction.ReceiptPreview
+
+        val receiptBelongsHere =
+          latestReceiptSnapshot?.paymentDraft?.transactionTypeIndex == transactionTypeIndex &&
+              latestReceiptSnapshot?.paymentDraft?.clientId == clientId
+
+        if (goodsInCart.isEmpty() && !(showingReceipt && receiptBelongsHere)) {
           coroutineScope.launch {
             when (transactionTypeIndex) {
               0 -> Navigation.TransactionSale.clear()
@@ -735,6 +854,7 @@ fun AppConfiguration.TransactionScreen() {
               2 -> Navigation.TransactionSupply.clear()
             }
           }
+        }
       }
 
       val navigationScreensLeft =
@@ -848,7 +968,7 @@ fun AppConfiguration.TransactionScreen() {
                         Navigation.TransactionReturn.setClientId(index)
                       }
                       is NavigationScreenModel.Transaction.MainSupply -> {
-                        Navigation.TransactionReturn.setClientId(index)
+                        Navigation.TransactionSupply.setClientId(index)
                       }
                       else -> {
 
@@ -972,167 +1092,358 @@ fun AppConfiguration.TransactionScreen() {
 }
 
 @Composable
+private fun AppConfiguration.ReceiptHeader(
+  snapshot: TransactionReceiptSnapshotDataModel
+) {
+  val store = snapshot.store
+
+  store?.let {
+    val companyFormTitle = it.companyForms
+      .firstOrNull()
+      ?.name
+      ?.extractLocalizedString(stateValues.appLanguage)
+      .orEmpty()
+
+    Text(
+      text = "$companyFormTitle ${it.name.extractLocalizedString(stateValues.appLanguage).orEmpty()}".trim(),
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(
+          start = stateValues.marginTextFieldGroup,
+          top = stateValues.marginTextFieldGroup,
+          end = stateValues.marginTextFieldGroup
+        ),
+      color = Color.Black,
+      textAlign = TextAlign.Center,
+      fontWeight = FontWeight.Bold,
+      fontSize = stateValues.accentTextSize
+    )
+
+    Text(
+      text = it.location.name,
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(
+          start = stateValues.marginTextFieldGroup,
+          top = 2.dp,
+          end = stateValues.marginTextFieldGroup,
+          bottom = 12.dp
+        ),
+      color = Color.Black,
+      textAlign = TextAlign.Center,
+      fontSize = stateValues.textSize
+    )
+  }
+
+  Text(
+    text = when (snapshot.transaction.type) {
+      "purchase" -> stateValues.stringSale
+      "return" -> stateValues.stringReturn
+      else -> stateValues.stringSupply
+    },
+    modifier = Modifier
+      .fillMaxWidth()
+      .padding(horizontal = stateValues.marginTextFieldGroup),
+    color = Color.Black,
+    textAlign = TextAlign.Center,
+    fontWeight = FontWeight.Bold,
+    fontSize = stateValues.textSize
+  )
+
+  Spacer(modifier = Modifier.height(8.dp))
+}
+
+@Composable
+private fun AppConfiguration.ReceiptLine(
+  line: TransactionReceiptLineDataModel
+) {
+  val name = line.name.extractLocalizedString(stateValues.appLanguage)
+    ?: line.name.firstOrNull()?.value
+    ?: "No name"
+
+  Text(
+    text = "${line.index + 1}. $name",
+    modifier = Modifier.padding(horizontal = stateValues.marginTextFieldGroup),
+    color = Color.Black,
+    fontWeight = FontWeight.Bold,
+    fontSize = stateValues.textSize
+  )
+
+  Row(
+    modifier = Modifier.fillMaxWidth(),
+    horizontalArrangement = Arrangement.SpaceBetween
+  ) {
+    val suffix = line.quantity.immutableUnitName.extractLocalizedString(stateValues.appLanguage).orEmpty()
+
+    Text(
+      text = "${
+        line.quantity.total.run {
+          if (line.quantity.roundTotal) toInt().toString() else moneyText()
+        }
+      } $suffix x ${line.pricePerUnit.moneyText()} ${line.currencySymbol}",
+      modifier = Modifier.padding(horizontal = stateValues.marginTextFieldGroup),
+      color = Color.Black,
+      fontSize = stateValues.textSize
+    )
+
+    Text(
+      text = "${line.total.moneyText()} ${line.currencySymbol}",
+      modifier = Modifier.padding(horizontal = stateValues.marginTextFieldGroup),
+      color = Color.Black,
+      fontSize = stateValues.textSize,
+      fontWeight = FontWeight.Bold
+    )
+  }
+
+  Spacer(modifier = Modifier.height(6.dp))
+}
+
+@Composable
+private fun AppConfiguration.ReceiptTotals(
+  snapshot: TransactionReceiptSnapshotDataModel
+) {
+  val total = snapshot.lines.sumOf { it.total }.roundMoney()
+
+  Spacer(modifier = Modifier.height(8.dp))
+
+  Spacer(
+    modifier = Modifier
+      .height(1.dp)
+      .padding(horizontal = stateValues.marginTextFieldGroup)
+      .fillMaxWidth()
+      .background(Color.Black)
+  )
+
+  Spacer(modifier = Modifier.height(8.dp))
+
+  Row(
+    modifier = Modifier.fillMaxWidth(),
+    horizontalArrangement = Arrangement.SpaceBetween
+  ) {
+    Text(
+      text = "Total",
+      modifier = Modifier.padding(horizontal = stateValues.marginTextFieldGroup),
+      color = Color.Black,
+      fontSize = stateValues.accentTextSize,
+      fontWeight = FontWeight.Bold
+    )
+
+    Text(
+      text = "${total.moneyText()} ${snapshot.currencySymbol}",
+      modifier = Modifier.padding(horizontal = stateValues.marginTextFieldGroup),
+      color = Color.Black,
+      fontSize = stateValues.accentTextSize,
+      fontWeight = FontWeight.Bold
+    )
+  }
+
+  Spacer(modifier = Modifier.height(8.dp))
+
+  if (snapshot.paymentDraft.paidCash > 0.0) {
+    ReceiptPaymentRow(
+      title = stateValues.stringCash,
+      value = snapshot.paymentDraft.paidCash,
+      currencySymbol = snapshot.currencySymbol
+    )
+  }
+
+  if (snapshot.paymentDraft.paidCard > 0.0) {
+    ReceiptPaymentRow(
+      title = stateValues.stringCashless,
+      value = snapshot.paymentDraft.paidCard,
+      currencySymbol = snapshot.currencySymbol
+    )
+  }
+
+  snapshot.transaction.id.takeIf { it.isNotBlank() }?.let {
+    Spacer(modifier = Modifier.height(8.dp))
+
+    Text(
+      text = "Transaction ID: $it",
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = stateValues.marginTextFieldGroup),
+      color = Color.Black,
+      fontSize = stateValues.smallTextSize,
+      textAlign = TextAlign.Center
+    )
+  }
+}
+
+@Composable
+private fun AppConfiguration.ReceiptPaymentRow(
+  title: String,
+  value: Double,
+  currencySymbol: String
+) {
+  Row(
+    modifier = Modifier.fillMaxWidth(),
+    horizontalArrangement = Arrangement.SpaceBetween
+  ) {
+    Text(
+      text = title,
+      modifier = Modifier.padding(horizontal = stateValues.marginTextFieldGroup),
+      color = Color.Black,
+      fontSize = stateValues.textSize
+    )
+
+    Text(
+      text = "${value.moneyText()} $currencySymbol",
+      modifier = Modifier.padding(horizontal = stateValues.marginTextFieldGroup),
+      color = Color.Black,
+      fontSize = stateValues.textSize
+    )
+  }
+}
+
+private fun AppConfiguration.buildTransactionReceiptLines(
+  cart: List<GoodsItemInCartDataModel>,
+  stock: List<GoodsItemDataModel>,
+  transactionTypeIndex: Int
+): List<TransactionReceiptLineDataModel> {
+  return cart.mapIndexedNotNull { index, cartItem ->
+    val goodsItem = stock.find { it.id == cartItem.id } ?: return@mapIndexedNotNull null
+    val price = goodsItem.priceForTransaction(transactionTypeIndex)
+    val currencySymbol = stateValues.globalAppConfiguration.countries
+      .getCurrency(price.currency)
+      ?.symbol
+      ?: price.currency
+
+    TransactionReceiptLineDataModel(
+      index = index,
+      goodsItemId = goodsItem.id,
+      name = goodsItem.name,
+      barcode = goodsItem.firstBarcode(),
+      quantity = cartItem.quantity,
+      pricePerUnit = price.price.toMoneyDouble(),
+      currencyCode = price.currency,
+      currencySymbol = currencySymbol
+    )
+  }
+}
+
+private fun Double.moneyText(): String {
+  val fixed = roundMoney()
+  val whole = fixed.toLong()
+  val cents = kotlin.math.round((fixed - whole) * 100).toInt()
+  return "$whole.${cents.toString().padStart(2, '0')}"
+}
+
+@Composable
 fun AppConfiguration.TransactionReceiptPreviewScreen() {
   Column(
-    modifier = Modifier
-      .fillMaxSize()
+    modifier = Modifier.fillMaxSize()
   ) {
-    val transactionTypeIndex = when (stateValues.navigationScreensMain.last()) {
-      is NavigationScreenModel.Transaction.MainSale -> {
-        0
-      }
-
-      is NavigationScreenModel.Transaction.MainReturn -> {
-        1
-      }
-
-      else -> {
-        2
-      }
-    }
-
-    val clientId = when (transactionTypeIndex) {
-      0 -> {
-        stateValues.navigationTransactionReturnClientId
-      }
-
-      1 -> {
-        stateValues.navigationTransactionSupplyClientId
-      }
-
-      else -> {
-        stateValues.navigationTransactionSaleClientId
-      }
-    }
+    val context = rememberTransactionContext()
 
     ScreenAppBarWidget(
       title = stateValues.stringReceipt,
       iconPath = stateValues.drawablePathIconReceipt,
-      onBack = if (
-        when (transactionTypeIndex) {
-          0 -> !Navigation.TransactionSale.isVeryFirstScreen(stateValues.isNarrowScreen, clientId)
-          1 -> !Navigation.TransactionReturn.isVeryFirstScreen(stateValues.isNarrowScreen, clientId)
-          else -> !Navigation.TransactionSupply.isVeryFirstScreen(stateValues.isNarrowScreen, clientId)
-        }
-      ) {
-        {
-          coroutineScope.launch {
-            when (transactionTypeIndex) {
-              0 -> Navigation.TransactionSale.pop()
-              1 -> Navigation.TransactionReturn.pop()
-              2 -> Navigation.TransactionSupply.pop()
-            }
-          }
-        }
-      } else null
-    )
-
-    var goodsInCart by rememberSaveable {
-      mutableStateOf(emptyList<GoodsItemInCartDataModel>())
-    }
-
-    LaunchedEffect(Unit) {
-      observeCart(transactionTypeIndex, clientId)
-        .collect {
-          it?.let {
-            goodsInCart = it
-          }
-        }
-    }
-
-    LazyColumn(
-      modifier = Modifier
-        .padding(8.dp)
-        .background(Color.White)
-        .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor)
-        .weight(1f)
-    ) {
-      var totalPrice = 0.0
-
-      stateValues
-        .stores
-        ?.find {
-          it.id == stateValues.activeStoreId
-        }?.run {
-          item {
-            val ownershipFormTitle = this@run.companyForms.first().name.extractLocalizedString(stateValues.appLanguage)
-
-            Text(
-              text = "$ownershipFormTitle ${name.extractLocalizedString(stateValues.appLanguage)}",
-              modifier = Modifier
-                .padding(stateValues.marginTextFieldGroup, stateValues.marginTextFieldGroup, stateValues.marginTextFieldGroup,)
-                .fillMaxWidth(),
-              textAlign = TextAlign.Center,
-              fontWeight = FontWeight.Bold,
-              fontSize = stateValues.accentTextSize
-            )
-
-            Text(
-              text = location.name,
-              modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = stateValues.marginTextFieldGroup, top = 2.dp, end = stateValues.marginTextFieldGroup, 12.dp),
-              textAlign = TextAlign.Center,
-              fontSize = stateValues.textSize
-            )
-          }
-        }
-
-      goodsInCart.forEachIndexed { index, item ->
-        stateValues.stock?.find { it.id == item.id }?.run {
-          val price =
-            when (transactionTypeIndex) {
-              0 -> supplyPrices.first().price.toDouble()
-              1 -> returnPrices.first().price.toDouble()
-              else -> supplyPrices.first().price.toDouble()
-            }  // TODO
-
-          val currencySymbol = stateValues.globalAppConfiguration.countries.getCurrency(
-            when (transactionTypeIndex) {
-              0 -> supplyPrices.first().currency
-              1 -> returnPrices.first().currency
-              else -> supplyPrices.first().currency
-            }
-          )?.symbol
-
-          totalPrice += item.quantity.total * price
-
-          item {
-            Text(
-              text = "${index + 1} ${name.extractLocalizedString(stateValues.appLanguage) ?: "No name"}", // TODO
-              modifier = Modifier
-                .padding(horizontal = stateValues.marginTextFieldGroup),
-              fontWeight = FontWeight.Bold,
-              fontSize = stateValues.textSize
-            )
-
-            Row(
-              modifier = Modifier
-                .fillMaxWidth(),
-              horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-              val suffix = item.quantity.immutableUnitName.extractLocalizedString(stateValues.appLanguage)
-
-              Text(
-                text = "${
-                  item.quantity.run { if (roundTotal) total.toInt() else total }
-                } $suffix x $price $currencySymbol",
-                modifier = Modifier
-                  .padding(horizontal = stateValues.marginTextFieldGroup),
-                fontSize = stateValues.textSize
-              )
-
-              Text(
-                text = "$price $currencySymbol",
-                modifier = Modifier
-                  .padding(horizontal = stateValues.marginTextFieldGroup),
-                fontSize = stateValues.accentTextSize
-              )
-            }
+      onBack = {
+        coroutineScope.launch {
+          when (context.transactionTypeIndex) {
+            0 -> Navigation.TransactionSale.pop()
+            1 -> Navigation.TransactionReturn.pop()
+            else -> Navigation.TransactionSupply.pop()
           }
         }
       }
+    )
+
+    val goodsInCart by getCartState(
+      context.transactionTypeIndex,
+      context.clientId
+    ).collectAsState()
+
+    val latestSnapshot by latestTransactionReceiptSnapshotState.collectAsState()
+
+    val paymentDraft = getTransactionPaymentDraft(
+      context.transactionTypeIndex,
+      context.clientId
+    )
+
+    val liveLines = remember(goodsInCart, stateValues.stock, context.transactionTypeIndex) {
+      buildTransactionReceiptLines(
+        cart = goodsInCart,
+        stock = stateValues.stock.orEmpty(),
+        transactionTypeIndex = context.transactionTypeIndex
+      )
     }
+
+    val store = stateValues.stores?.find { it.id == stateValues.activeStoreId }
+
+    val currencyCode = liveLines.firstOrNull()?.currencyCode.orEmpty()
+    val currencySymbol = liveLines.firstOrNull()?.currencySymbol.orEmpty()
+
+    val total = liveLines.sumOf { it.total }.roundMoney()
+
+    val draft = paymentDraft ?: TransactionPaymentDraftDataModel(
+      transactionTypeIndex = context.transactionTypeIndex,
+      clientId = context.clientId,
+      paymentModeId = "1",
+      paidCash = 0.0,
+      paidCard = total,
+      cardPaymentOptionId = 0
+    )
+
+    val currentTransaction = TransactionDataModel(
+      id = "",
+      workshiftId = 0L,
+      type = transactionServerType(context.transactionTypeIndex),
+      storeId = stateValues.activeStoreId.orEmpty(),
+      goodsInTransaction = liveLines.map {
+        GoodsItemInTransactionDataModel(
+          barcode = it.barcode,
+          quantity = it.quantity.total,
+          pricePerUnit = it.pricePerUnit,
+          supplierId = null
+        )
+      },
+      paidCash = draft.paidCash,
+      paidCard = draft.paidCard,
+      cardPaymentOptionId = draft.cardPaymentOptionId,
+      debtor = null,
+      timeMillis = getCurrentTimeMillis()
+    )
+
+    val snapshotForScreen =
+      latestSnapshot?.takeIf {
+        it.transaction.type == transactionServerType(context.transactionTypeIndex) &&
+            it.paymentDraft.clientId == context.clientId
+      } ?: TransactionReceiptSnapshotDataModel(
+        transaction = currentTransaction,
+        store = store,
+        lines = liveLines,
+        paymentDraft = draft,
+        currencyCode = currencyCode,
+        currencySymbol = currencySymbol
+      )
+
+    LazyColumn(
+      modifier = Modifier
+        .weight(1f)
+        .padding(8.dp)
+        .background(Color.White)
+        .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor)
+    ) {
+      item {
+        ReceiptHeader(snapshotForScreen)
+      }
+
+      items(snapshotForScreen.lines) { line ->
+        ReceiptLine(line)
+      }
+
+      item {
+        ReceiptTotals(snapshotForScreen)
+      }
+
+      item {
+        Spacer(modifier = Modifier.height(stateValues.screenHeight / 5))
+      }
+    }
+
+    val alreadyCompleted = snapshotForScreen.transaction.id.isNotBlank()
 
     Column(
       modifier = Modifier
@@ -1141,28 +1452,37 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
     ) {
       Spacer(modifier = Modifier.height(4.dp))
 
-      Row(
-        modifier = Modifier
-          .fillMaxWidth()
-      ) {
-        actionButton(
-          text = "",
-          enabledColor = stateValues.DisabledColor,
-          iconPath = stateValues.drawablePathIconAdd, // TODO
-          iconContentDescription = stateValues.stringAdd, // TODO
-          onClick = {
-
-          }
-        )
-      }
-
-      Spacer(modifier = Modifier.height(2.dp))
-
       actionButton(
-        text = stateValues.stringComplete, // TODO
-        enabled = stateValues.latestNotification == null,
+        text = if (alreadyCompleted) stateValues.stringComplete else stateValues.stringComplete,
+        enabled = !alreadyCompleted &&
+            snapshotForScreen.lines.isNotEmpty() &&
+            stateValues.latestNotification == null,
         onClick = {
+          completeTransaction(
+            transaction = currentTransaction,
+            transactionTypeIndex = context.transactionTypeIndex,
+            clientId = context.clientId,
+            receiptSnapshot = snapshotForScreen
+          ) {
+            coroutineScope.launch {
+              when (context.transactionTypeIndex) {
+                0 -> Navigation.TransactionSale.go(
+                  NavigationScreenModel.Transaction.ReceiptPreview,
+                  remove = true
+                )
 
+                1 -> Navigation.TransactionReturn.go(
+                  NavigationScreenModel.Transaction.ReceiptPreview,
+                  remove = true
+                )
+
+                else -> Navigation.TransactionSupply.go(
+                  NavigationScreenModel.Transaction.ReceiptPreview,
+                  remove = true
+                )
+              }
+            }
+          }
         }
       )
 
@@ -1171,181 +1491,826 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
   }
 }
 
+//@Composable
+//fun AppConfiguration.TransactionReceiptPreviewScreen() {
+//  Column(
+//    modifier = Modifier
+//      .fillMaxSize()
+//  ) {
+//    val transactionTypeIndex = when (stateValues.navigationScreensMain.last()) {
+//      is NavigationScreenModel.Transaction.MainSale -> {
+//        0
+//      }
+//
+//      is NavigationScreenModel.Transaction.MainReturn -> {
+//        1
+//      }
+//
+//      else -> {
+//        2
+//      }
+//    }
+//
+//    val clientId = when (transactionTypeIndex) {
+//      0 -> {
+//        stateValues.navigationTransactionReturnClientId
+//      }
+//
+//      1 -> {
+//        stateValues.navigationTransactionSupplyClientId
+//      }
+//
+//      else -> {
+//        stateValues.navigationTransactionSaleClientId
+//      }
+//    }
+//
+//    ScreenAppBarWidget(
+//      title = stateValues.stringReceipt,
+//      iconPath = stateValues.drawablePathIconReceipt,
+//      onBack = if (
+//        when (transactionTypeIndex) {
+//          0 -> !Navigation.TransactionSale.isVeryFirstScreen(stateValues.isNarrowScreen, clientId)
+//          1 -> !Navigation.TransactionReturn.isVeryFirstScreen(stateValues.isNarrowScreen, clientId)
+//          else -> !Navigation.TransactionSupply.isVeryFirstScreen(stateValues.isNarrowScreen, clientId)
+//        }
+//      ) {
+//        {
+//          coroutineScope.launch {
+//            when (transactionTypeIndex) {
+//              0 -> Navigation.TransactionSale.pop()
+//              1 -> Navigation.TransactionReturn.pop()
+//              2 -> Navigation.TransactionSupply.pop()
+//            }
+//          }
+//        }
+//      } else null
+//    )
+//
+//    var goodsInCart by rememberSaveable {
+//      mutableStateOf(emptyList<GoodsItemInCartDataModel>())
+//    }
+//
+//    LaunchedEffect(Unit) {
+//      observeCart(transactionTypeIndex, clientId)
+//        .collect {
+//          it?.let {
+//            goodsInCart = it
+//          }
+//        }
+//    }
+//
+//    LazyColumn(
+//      modifier = Modifier
+//        .padding(8.dp)
+//        .background(Color.White)
+//        .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor)
+//        .weight(1f)
+//    ) {
+//      var totalPrice = 0.0
+//
+//      stateValues
+//        .stores
+//        ?.find {
+//          it.id == stateValues.activeStoreId
+//        }?.run {
+//          item {
+//            val ownershipFormTitle = this@run.companyForms.first().name.extractLocalizedString(stateValues.appLanguage)
+//
+//            Text(
+//              text = "$ownershipFormTitle ${name.extractLocalizedString(stateValues.appLanguage)}",
+//              modifier = Modifier
+//                .padding(stateValues.marginTextFieldGroup, stateValues.marginTextFieldGroup, stateValues.marginTextFieldGroup,)
+//                .fillMaxWidth(),
+//              textAlign = TextAlign.Center,
+//              fontWeight = FontWeight.Bold,
+//              fontSize = stateValues.accentTextSize
+//            )
+//
+//            Text(
+//              text = location.name,
+//              modifier = Modifier
+//                .fillMaxWidth()
+//                .padding(start = stateValues.marginTextFieldGroup, top = 2.dp, end = stateValues.marginTextFieldGroup, 12.dp),
+//              textAlign = TextAlign.Center,
+//              fontSize = stateValues.textSize
+//            )
+//          }
+//        }
+//
+//      goodsInCart.forEachIndexed { index, item ->
+//        stateValues.stock?.find { it.id == item.id }?.run {
+//          val price =
+//            when (transactionTypeIndex) {
+//              0 -> supplyPrices.first().price.toDouble()
+//              1 -> returnPrices.first().price.toDouble()
+//              else -> supplyPrices.first().price.toDouble()
+//            }  // TODO
+//
+//          val currencySymbol = stateValues.globalAppConfiguration.countries.getCurrency(
+//            when (transactionTypeIndex) {
+//              0 -> supplyPrices.first().currency
+//              1 -> returnPrices.first().currency
+//              else -> supplyPrices.first().currency
+//            }
+//          )?.symbol
+//
+//          totalPrice += item.quantity.total * price
+//
+//          item {
+//            Text(
+//              text = "${index + 1} ${name.extractLocalizedString(stateValues.appLanguage) ?: "No name"}", // TODO
+//              modifier = Modifier
+//                .padding(horizontal = stateValues.marginTextFieldGroup),
+//              fontWeight = FontWeight.Bold,
+//              fontSize = stateValues.textSize
+//            )
+//
+//            Row(
+//              modifier = Modifier
+//                .fillMaxWidth(),
+//              horizontalArrangement = Arrangement.SpaceBetween
+//            ) {
+//              val suffix = item.quantity.immutableUnitName.extractLocalizedString(stateValues.appLanguage)
+//
+//              Text(
+//                text = "${
+//                  item.quantity.run { if (roundTotal) total.toInt() else total }
+//                } $suffix x $price $currencySymbol",
+//                modifier = Modifier
+//                  .padding(horizontal = stateValues.marginTextFieldGroup),
+//                fontSize = stateValues.textSize
+//              )
+//
+//              Text(
+//                text = "$price $currencySymbol",
+//                modifier = Modifier
+//                  .padding(horizontal = stateValues.marginTextFieldGroup),
+//                fontSize = stateValues.accentTextSize
+//              )
+//            }
+//          }
+//        }
+//      }
+//    }
+//
+//    Column(
+//      modifier = Modifier
+//        .fillMaxWidth()
+//        .padding(horizontal = 8.dp)
+//    ) {
+//      Spacer(modifier = Modifier.height(4.dp))
+//
+//      Row(
+//        modifier = Modifier
+//          .fillMaxWidth()
+//      ) {
+//        actionButton(
+//          text = "",
+//          enabledColor = stateValues.DisabledColor,
+//          iconPath = stateValues.drawablePathIconAdd, // TODO
+//          iconContentDescription = stateValues.stringAdd, // TODO
+//          onClick = {
+//
+//          }
+//        )
+//      }
+//
+//      Spacer(modifier = Modifier.height(2.dp))
+//
+//      actionButton(
+//        text = stateValues.stringComplete, // TODO
+//        enabled = stateValues.latestNotification == null,
+//        onClick = {
+//
+//        }
+//      )
+//
+//      Spacer(modifier = Modifier.height(4.dp))
+//    }
+//  }
+//}
+
+@Composable
+private fun AppConfiguration.TransactionTotalCard(
+  title: String,
+  total: Double,
+  currencySymbol: String,
+  currencyCode: String
+) {
+  Column(
+    modifier = Modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(stateValues.cornerRadius))
+      .border(
+        stateValues.unfocusedBorderWidth,
+        stateValues.AccentColor,
+        RoundedCornerShape(stateValues.cornerRadius)
+      )
+      .background(stateValues.BackgroundColor)
+      .padding(stateValues.marginTextFieldGroup)
+  ) {
+    Text(
+      text = title,
+      color = stateValues.PlaceholderTextColor,
+      fontSize = stateValues.smallTextSize,
+      fontWeight = FontWeight.Bold
+    )
+
+    Spacer(modifier = Modifier.height(4.dp))
+
+    Text(
+      text = "${total.moneyText()} $currencySymbol".trim(),
+      color = stateValues.TextColor,
+      fontSize = stateValues.titleTextSize,
+      fontWeight = FontWeight.Bold
+    )
+
+    if (currencyCode.isNotBlank()) {
+      Text(
+        text = currencyCode,
+        color = stateValues.PlaceholderTextColor,
+        fontSize = stateValues.smallTextSize
+      )
+    }
+  }
+}
+
+@Composable
+private fun AppConfiguration.TransactionPaymentInfoCard(
+  title: String,
+  subtitle: String,
+  amount: Double,
+  currencySymbol: String
+) {
+  Column(
+    modifier = Modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(stateValues.cornerRadius))
+      .border(
+        stateValues.unfocusedBorderWidth,
+        stateValues.PlaceholderTextColor,
+        RoundedCornerShape(stateValues.cornerRadius)
+      )
+      .background(stateValues.BackgroundColor)
+      .padding(stateValues.marginTextFieldGroup)
+  ) {
+    Text(
+      text = title,
+      color = stateValues.TextColor,
+      fontWeight = FontWeight.Bold,
+      fontSize = stateValues.accentTextSize
+    )
+
+    Spacer(modifier = Modifier.height(4.dp))
+
+    Text(
+      text = subtitle,
+      color = stateValues.PlaceholderTextColor,
+      fontSize = stateValues.smallTextSize
+    )
+
+    Spacer(modifier = Modifier.height(8.dp))
+
+    Text(
+      text = "${amount.moneyText()} $currencySymbol".trim(),
+      color = stateValues.TextColor,
+      fontWeight = FontWeight.Bold,
+      fontSize = stateValues.titleTextSize
+    )
+  }
+}
+
+@Composable
+private fun AppConfiguration.TransactionPaymentOptionButton(
+  modifier: Modifier = Modifier,
+  text: String,
+  selected: Boolean,
+  onClick: () -> Unit
+) {
+  Box(
+    modifier = modifier
+      .clip(RoundedCornerShape(stateValues.cornerRadius))
+      .border(
+        stateValues.unfocusedBorderWidth,
+        if (selected) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+        RoundedCornerShape(stateValues.cornerRadius)
+      )
+      .background(if (selected) stateValues.AccentColor else Color.Transparent)
+      .clickable(
+        interactionSource = remember { MutableInteractionSource() },
+        indication = ripple(
+          color = if (selected) stateValues.AccentTextColor else stateValues.TextColor
+        ),
+        onClick = onClick
+      )
+      .padding(18.dp),
+    contentAlignment = Alignment.Center
+  ) {
+    Text(
+      text = text,
+      color = if (selected) stateValues.AccentTextColor else stateValues.TextColor,
+      fontSize = stateValues.textSize,
+      fontWeight = FontWeight.Bold,
+      textAlign = TextAlign.Center
+    )
+  }
+}
+
+@Composable
+private fun AppConfiguration.TransactionAmountField(
+  title: String,
+  value: String,
+  placeholder: String,
+  onValueChange: (String) -> Unit
+) {
+  Column {
+    Text(
+      text = title,
+      color = stateValues.TextColor,
+      fontSize = stateValues.textSize,
+      fontWeight = FontWeight.Bold
+    )
+
+    Spacer(modifier = Modifier.height(4.dp))
+
+    BasicTextField(
+      value = value,
+      onValueChange = onValueChange,
+      singleLine = true,
+      textStyle = TextStyle(
+        color = stateValues.TextColor,
+        fontSize = stateValues.accentTextSize,
+        fontWeight = FontWeight.Bold
+      ),
+      modifier = Modifier
+        .fillMaxWidth()
+        .height(stateValues.textFieldHeight)
+        .clip(RoundedCornerShape(stateValues.cornerRadius))
+        .border(
+          stateValues.unfocusedBorderWidth,
+          stateValues.PlaceholderTextColor,
+          RoundedCornerShape(stateValues.cornerRadius)
+        )
+        .background(stateValues.BackgroundColor)
+        .padding(horizontal = stateValues.marginTextFieldGroup),
+      decorationBox = { innerTextField ->
+        Box(
+          modifier = Modifier.fillMaxSize(),
+          contentAlignment = Alignment.CenterStart
+        ) {
+          if (value.isBlank()) {
+            Text(
+              text = placeholder,
+              color = stateValues.PlaceholderTextColor,
+              fontSize = stateValues.textSize
+            )
+          }
+
+          innerTextField()
+        }
+      }
+    )
+  }
+}
+
 @Composable
 fun AppConfiguration.TransactionPaymentScreen() {
   Column(
-    modifier = Modifier
-      .fillMaxSize()
+    modifier = Modifier.fillMaxSize()
   ) {
-    val transactionTypeIndex = when (stateValues.navigationScreensMain.last()) {
-      is NavigationScreenModel.Transaction.MainSale -> {
-        0
-      }
-
-      is NavigationScreenModel.Transaction.MainReturn -> {
-        1
-      }
-
-      else -> {
-        2
-      }
-    }
-
-    val clientId = when (stateValues.navigationScreensMain.last()) {
-      is NavigationScreenModel.Transaction.MainReturn -> {
-        stateValues.navigationTransactionReturnClientId
-      }
-
-      is NavigationScreenModel.Transaction.MainSupply -> {
-        stateValues.navigationTransactionSupplyClientId
-      }
-
-      else -> {
-        stateValues.navigationTransactionSaleClientId
-      }
-    }
+    val context = rememberTransactionContext()
 
     ScreenAppBarWidget(
       title = stateValues.stringPayment,
-      onBack = if (
-        when (transactionTypeIndex) {
-          0 -> !Navigation.TransactionSale.isVeryFirstScreen(stateValues.isNarrowScreen, clientId)
-          1 -> !Navigation.TransactionReturn.isVeryFirstScreen(stateValues.isNarrowScreen, clientId)
-          else -> !Navigation.TransactionSupply.isVeryFirstScreen(stateValues.isNarrowScreen, clientId)
-        }
-      ) {
-        {
-          coroutineScope.launch {
-            when (transactionTypeIndex) {
-              0 -> Navigation.TransactionSale.pop()
-              1 -> Navigation.TransactionReturn.pop()
-              2 -> Navigation.TransactionSupply.pop()
-            }
+      onBack = {
+        coroutineScope.launch {
+          when (context.transactionTypeIndex) {
+            0 -> Navigation.TransactionSale.pop()
+            1 -> Navigation.TransactionReturn.pop()
+            else -> Navigation.TransactionSupply.pop()
           }
         }
-      } else null
+      }
     )
 
-    val goodsInCart by getCartState(transactionTypeIndex, clientId).collectAsState()
+    val goodsInCart by getCartState(
+      context.transactionTypeIndex,
+      context.clientId
+    ).collectAsState()
 
-    var selectedCashlessPaymentMethodId by rememberSaveable {
-      mutableStateOf(stateValues.globalAppConfiguration.countries.find {
-        it.locale.equals(stateValues.userAccount?.countryLocale, true)
-      }?.preferredCashlessPaymentOptionId ?: "0")
+    val lines = remember(
+      goodsInCart,
+      stateValues.stock,
+      context.transactionTypeIndex,
+      stateValues.appLanguage
+    ) {
+      buildTransactionReceiptLines(
+        cart = goodsInCart,
+        stock = stateValues.stock.orEmpty(),
+        transactionTypeIndex = context.transactionTypeIndex
+      )
     }
 
-    Column(
-      modifier = Modifier
-        .fillMaxWidth()
-        .weight(1f)
-    ) {
-      val scopeRowContent = tabRowWidget(
-        modifier = Modifier
-          .padding(stateValues.marginTextField),
-        selectedIndexInitial = "1",
-        tabs = listOf(
-          TabContent("0", stateValues.stringCash),
-          TabContent("1", stateValues.stringCashless),
-          TabContent("2", stateValues.stringMixed)
-        )
+    val total = remember(lines) {
+      lines.sumOf { it.total }.roundMoney()
+    }
+
+    val country = stateValues.globalAppConfiguration.countries.find {
+      it.locale.equals(stateValues.userAccount?.countryLocale, true)
+    } ?: stateValues.globalAppConfiguration.countries.first()
+
+    var selectedCashlessPaymentMethodId by rememberSaveable {
+      mutableStateOf(country.preferredCashlessPaymentOptionId)
+    }
+
+    var cashText by rememberSaveable {
+      mutableStateOf("")
+    }
+
+    var cardText by rememberSaveable {
+      mutableStateOf("")
+    }
+
+    val paymentMode = tabRowWidget(
+      modifier = Modifier.padding(stateValues.marginTextField),
+      selectedIndexInitial = "1",
+      tabs = listOf(
+        TabContent("0", stateValues.stringCash),
+        TabContent("1", stateValues.stringCashless),
+        TabContent("2", stateValues.stringMixed)
       )
+    )
 
-      when (scopeRowContent.id) {
+    LazyColumn(
+      modifier = Modifier
+        .weight(1f)
+        .padding(horizontal = stateValues.marginTextField)
+    ) {
+      item {
+        TransactionTotalCard(
+          title = stateValues.stringComplete,
+          total = total,
+          currencySymbol = lines.firstOrNull()?.currencySymbol.orEmpty(),
+          currencyCode = lines.firstOrNull()?.currencyCode.orEmpty()
+        )
+      }
+
+      item {
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+      }
+
+      when (paymentMode.id) {
         "0" -> {
-
+          item {
+            TransactionPaymentInfoCard(
+              title = stateValues.stringCash,
+              subtitle = "Full amount will be paid by cash",
+              amount = total,
+              currencySymbol = lines.firstOrNull()?.currencySymbol.orEmpty()
+            )
+          }
         }
 
         "1" -> {
-          Column(
-            modifier = Modifier
-              .weight(1f)
-              .fillMaxSize()
-              .padding(stateValues.marginTextField),
-          ) {
-            LazyVerticalGrid(columns = GridCells.Fixed(2)) {
-              stateValues.globalAppConfiguration.countries.find {
-                it.locale.equals(stateValues.userAccount?.countryLocale, true)
-              }?.cashlessPaymentOptions?.forEach { item ->
-                item {
-                  Box(
-                    modifier = Modifier
-                      .weight(1f)
-                      .clip(RoundedCornerShape(stateValues.cornerRadius))
-                      .border(
-                        stateValues.unfocusedBorderWidth,
-                        stateValues.PlaceholderTextColor,
-                        RoundedCornerShape(
-                          stateValues.cornerRadius
-                        ),
-                      )
-                      .background(if (selectedCashlessPaymentMethodId == item.id) stateValues.AccentColor else Color.Transparent)
-                      .clickable(
-                        interactionSource = remember {
-                          MutableInteractionSource()
-                        },
-                        indication = ripple(color = if (selectedCashlessPaymentMethodId == item.id) stateValues.AccentTextColor else stateValues.TextColor),
-                        onClick = {
-                          selectedCashlessPaymentMethodId = item.id
-                        }
-                      ),
-                    contentAlignment = Alignment.Center
-                  ) {
-                    item.name.extractLocalizedString(stateValues.appLanguage)?.let { text ->
-                      Text(
-                        text = text,
-                        modifier = Modifier
-                          .padding(24.dp),
-                        color = if (selectedCashlessPaymentMethodId == item.id) stateValues.AccentTextColor else stateValues.TextColor
-                      )
-                    }
-                  }
+          item {
+            Text(
+              text = stateValues.stringCashless,
+              color = stateValues.TextColor,
+              fontSize = stateValues.accentTextSize,
+              fontWeight = FontWeight.Bold
+            )
+
+            Spacer(modifier = Modifier.height(stateValues.marginTextField))
+          }
+
+          items(country.cashlessPaymentOptions.chunked(2)) { row ->
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+              row.forEach { option ->
+                TransactionPaymentOptionButton(
+                  modifier = Modifier.weight(1f),
+                  text = option.name.extractLocalizedString(stateValues.appLanguage) ?: option.id,
+                  selected = selectedCashlessPaymentMethodId == option.id
+                ) {
+                  selectedCashlessPaymentMethodId = option.id
                 }
               }
+
+              repeat(2 - row.size) {
+                Spacer(modifier = Modifier.weight(1f))
+              }
             }
+
+            Spacer(modifier = Modifier.height(stateValues.marginTextField))
           }
         }
 
         else -> {
+          item {
+            TransactionAmountField(
+              title = stateValues.stringCash,
+              value = cashText,
+              placeholder = "0.00",
+              onValueChange = {
+                if (it.isEmpty() || it.isNumericalDoubleString()) {
+                  cashText = it
+                }
+              }
+            )
 
+            Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+            TransactionAmountField(
+              title = stateValues.stringCashless,
+              value = cardText,
+              placeholder = "0.00",
+              onValueChange = {
+                if (it.isEmpty() || it.isNumericalDoubleString()) {
+                  cardText = it
+                }
+              }
+            )
+
+            Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+            Text(
+              text = "Remaining: ${
+                (total - cashText.toMoneyDouble() - cardText.toMoneyDouble())
+                  .coerceAtLeast(0.0)
+                  .roundMoney()
+              } ${lines.firstOrNull()?.currencySymbol.orEmpty()}",
+              color = stateValues.TextColor,
+              fontSize = stateValues.textSize,
+              fontWeight = FontWeight.Bold
+            )
+
+            Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+          }
+
+          items(country.cashlessPaymentOptions.chunked(2)) { row ->
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+              row.forEach { option ->
+                TransactionPaymentOptionButton(
+                  modifier = Modifier.weight(1f),
+                  text = option.name.extractLocalizedString(stateValues.appLanguage) ?: option.id,
+                  selected = selectedCashlessPaymentMethodId == option.id
+                ) {
+                  selectedCashlessPaymentMethodId = option.id
+                }
+              }
+
+              repeat(2 - row.size) {
+                Spacer(modifier = Modifier.weight(1f))
+              }
+            }
+
+            Spacer(modifier = Modifier.height(stateValues.marginTextField))
+          }
         }
+      }
+
+      item {
+        Spacer(modifier = Modifier.height(stateValues.screenHeight / 5))
       }
     }
 
-    if (goodsInCart.isNotEmpty())
-      Column(
-        modifier = Modifier
-          .fillMaxWidth()
-          .padding(horizontal = 8.dp)
-      ) {
-        Spacer(modifier = Modifier.height(4.dp))
+    val paidCash = when (paymentMode.id) {
+      "0" -> total
+      "1" -> 0.0
+      else -> cashText.toMoneyDouble()
+    }.roundMoney()
 
-        actionButton(
-          text = stateValues.stringReceipt,
-          enabled = stateValues.latestNotification == null,
-          onClick = {
-            coroutineScope.launch {
-              when (transactionTypeIndex) {
-                0 -> {
-                  Navigation.TransactionSale.go(NavigationScreenModel.Transaction.ReceiptPreview)
-                }
+    val paidCard = when (paymentMode.id) {
+      "0" -> 0.0
+      "1" -> total
+      else -> cardText.toMoneyDouble()
+    }.roundMoney()
 
-                1 -> {
-                  Navigation.TransactionReturn.go(NavigationScreenModel.Transaction.ReceiptPreview)
-                }
+    val paymentValid =
+      goodsInCart.isNotEmpty() &&
+          total > 0.0 &&
+          paidCash >= 0.0 &&
+          paidCard >= 0.0 &&
+          (paidCash + paidCard).roundMoney() >= total
 
-                else -> {
-                  Navigation.TransactionSupply.go(NavigationScreenModel.Transaction.ReceiptPreview)
-                }
+    Column(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = 8.dp)
+    ) {
+      Spacer(modifier = Modifier.height(4.dp))
 
-              }
+      actionButton(
+        text = stateValues.stringReceipt,
+        enabled = paymentValid && stateValues.latestNotification == null,
+        onClick = {
+          val draft = TransactionPaymentDraftDataModel(
+            transactionTypeIndex = context.transactionTypeIndex,
+            clientId = context.clientId,
+            paymentModeId = paymentMode.id,
+            paidCash = paidCash,
+            paidCard = paidCard,
+            cardPaymentOptionId = selectedCashlessPaymentMethodId.toIntOrNull() ?: 0
+          )
+
+          setTransactionPaymentDraft(draft)
+
+          coroutineScope.launch {
+            when (context.transactionTypeIndex) {
+              0 -> Navigation.TransactionSale.go(NavigationScreenModel.Transaction.ReceiptPreview)
+              1 -> Navigation.TransactionReturn.go(NavigationScreenModel.Transaction.ReceiptPreview)
+              else -> Navigation.TransactionSupply.go(NavigationScreenModel.Transaction.ReceiptPreview)
             }
           }
-        )
+        }
+      )
 
-        Spacer(modifier = Modifier.height(4.dp))
-      }
+      Spacer(modifier = Modifier.height(4.dp))
+    }
   }
 }
+
+//@Composable
+//fun AppConfiguration.TransactionPaymentScreen() {
+//  Column(
+//    modifier = Modifier
+//      .fillMaxSize()
+//  ) {
+//    val transactionTypeIndex = when (stateValues.navigationScreensMain.last()) {
+//      is NavigationScreenModel.Transaction.MainSale -> {
+//        0
+//      }
+//
+//      is NavigationScreenModel.Transaction.MainReturn -> {
+//        1
+//      }
+//
+//      else -> {
+//        2
+//      }
+//    }
+//
+//    val clientId = when (stateValues.navigationScreensMain.last()) {
+//      is NavigationScreenModel.Transaction.MainReturn -> {
+//        stateValues.navigationTransactionReturnClientId
+//      }
+//
+//      is NavigationScreenModel.Transaction.MainSupply -> {
+//        stateValues.navigationTransactionSupplyClientId
+//      }
+//
+//      else -> {
+//        stateValues.navigationTransactionSaleClientId
+//      }
+//    }
+//
+//    ScreenAppBarWidget(
+//      title = stateValues.stringPayment,
+//      onBack = if (
+//        when (transactionTypeIndex) {
+//          0 -> !Navigation.TransactionSale.isVeryFirstScreen(stateValues.isNarrowScreen, clientId)
+//          1 -> !Navigation.TransactionReturn.isVeryFirstScreen(stateValues.isNarrowScreen, clientId)
+//          else -> !Navigation.TransactionSupply.isVeryFirstScreen(stateValues.isNarrowScreen, clientId)
+//        }
+//      ) {
+//        {
+//          coroutineScope.launch {
+//            when (transactionTypeIndex) {
+//              0 -> Navigation.TransactionSale.pop()
+//              1 -> Navigation.TransactionReturn.pop()
+//              2 -> Navigation.TransactionSupply.pop()
+//            }
+//          }
+//        }
+//      } else null
+//    )
+//
+//    val goodsInCart by getCartState(transactionTypeIndex, clientId).collectAsState()
+//
+//    var selectedCashlessPaymentMethodId by rememberSaveable {
+//      mutableStateOf(stateValues.globalAppConfiguration.countries.find {
+//        it.locale.equals(stateValues.userAccount?.countryLocale, true)
+//      }?.preferredCashlessPaymentOptionId ?: "0")
+//    }
+//
+//    Column(
+//      modifier = Modifier
+//        .fillMaxWidth()
+//        .weight(1f)
+//    ) {
+//      val scopeRowContent = tabRowWidget(
+//        modifier = Modifier
+//          .padding(stateValues.marginTextField),
+//        selectedIndexInitial = "1",
+//        tabs = listOf(
+//          TabContent("0", stateValues.stringCash),
+//          TabContent("1", stateValues.stringCashless),
+//          TabContent("2", stateValues.stringMixed)
+//        )
+//      )
+//
+//      when (scopeRowContent.id) {
+//        "0" -> {
+//
+//        }
+//
+//        "1" -> {
+//          Column(
+//            modifier = Modifier
+//              .weight(1f)
+//              .fillMaxSize()
+//              .padding(stateValues.marginTextField),
+//          ) {
+//            LazyVerticalGrid(columns = GridCells.Fixed(2)) {
+//              stateValues.globalAppConfiguration.countries.find {
+//                it.locale.equals(stateValues.userAccount?.countryLocale, true)
+//              }?.cashlessPaymentOptions?.forEach { item ->
+//                item {
+//                  Box(
+//                    modifier = Modifier
+//                      .weight(1f)
+//                      .clip(RoundedCornerShape(stateValues.cornerRadius))
+//                      .border(
+//                        stateValues.unfocusedBorderWidth,
+//                        stateValues.PlaceholderTextColor,
+//                        RoundedCornerShape(
+//                          stateValues.cornerRadius
+//                        ),
+//                      )
+//                      .background(if (selectedCashlessPaymentMethodId == item.id) stateValues.AccentColor else Color.Transparent)
+//                      .clickable(
+//                        interactionSource = remember {
+//                          MutableInteractionSource()
+//                        },
+//                        indication = ripple(color = if (selectedCashlessPaymentMethodId == item.id) stateValues.AccentTextColor else stateValues.TextColor),
+//                        onClick = {
+//                          selectedCashlessPaymentMethodId = item.id
+//                        }
+//                      ),
+//                    contentAlignment = Alignment.Center
+//                  ) {
+//                    item.name.extractLocalizedString(stateValues.appLanguage)?.let { text ->
+//                      Text(
+//                        text = text,
+//                        modifier = Modifier
+//                          .padding(24.dp),
+//                        color = if (selectedCashlessPaymentMethodId == item.id) stateValues.AccentTextColor else stateValues.TextColor
+//                      )
+//                    }
+//                  }
+//                }
+//              }
+//            }
+//          }
+//        }
+//
+//        else -> {
+//
+//        }
+//      }
+//    }
+//
+//    if (goodsInCart.isNotEmpty())
+//      Column(
+//        modifier = Modifier
+//          .fillMaxWidth()
+//          .padding(horizontal = 8.dp)
+//      ) {
+//        Spacer(modifier = Modifier.height(4.dp))
+//
+//        actionButton(
+//          text = stateValues.stringReceipt,
+//          enabled = stateValues.latestNotification == null,
+//          onClick = {
+//            coroutineScope.launch {
+//              when (transactionTypeIndex) {
+//                0 -> {
+//                  Navigation.TransactionSale.go(NavigationScreenModel.Transaction.ReceiptPreview)
+//                }
+//
+//                1 -> {
+//                  Navigation.TransactionReturn.go(NavigationScreenModel.Transaction.ReceiptPreview)
+//                }
+//
+//                else -> {
+//                  Navigation.TransactionSupply.go(NavigationScreenModel.Transaction.ReceiptPreview)
+//                }
+//
+//              }
+//            }
+//          }
+//        )
+//
+//        Spacer(modifier = Modifier.height(4.dp))
+//      }
+//  }
+//}
 
 @Composable
 fun AppConfiguration.GoodsItemInCartWidget(
@@ -1403,7 +2368,7 @@ fun AppConfiguration.GoodsItemInCartWidget(
           .height(6.dp)
       )
 
-      goodsItem.barcode.run {
+      goodsItem.barcodes.run {
         if (size == 1) {
           this[0]
         } else {
@@ -1530,85 +2495,72 @@ fun AppConfiguration.GoodsItemInCartWidget(
 @Composable
 fun AppConfiguration.TransactionCartScreen() {
   Column(
-    modifier = Modifier
-      .fillMaxSize()
+    modifier = Modifier.fillMaxSize()
   ) {
-    val transactionTypeIndex = when (stateValues.navigationScreensMain.last()) {
-      is NavigationScreenModel.Transaction.MainSale -> {
-        0
-      }
-      is NavigationScreenModel.Transaction.MainReturn -> {
-        1
-      }
-      else -> {
-        2
-      }
-    }
-
-    val clientId = when(transactionTypeIndex) {
-      0 -> {
-        stateValues.navigationTransactionSaleClientId
-      }
-      1 -> {
-        stateValues.navigationTransactionReturnClientId
-      }
-      else -> {
-        stateValues.navigationTransactionSupplyClientId
-      }
-    }
+    val context = rememberTransactionContext()
 
     ScreenAppBarWidget(
-      title = when (transactionTypeIndex) {
-        1 -> stateValues.stringReturn
-        2 -> stateValues.stringSupply
-        else -> stateValues.stringSale
-      },
-      iconPath = when (transactionTypeIndex) {
+      title = transactionTitle(
+        context.transactionTypeIndex,
+        stateValues.stringSale,
+        stateValues.stringReturn,
+        stateValues.stringSupply
+      ),
+      iconPath = when (context.transactionTypeIndex) {
+        0 -> stateValues.drawablePathIconTransactionSale
         1 -> stateValues.drawablePathIconTransactionReturn
-        2 -> stateValues.drawablePathIconTransactionSupply
-        else -> stateValues.drawablePathIconTransactionSale
+        else -> stateValues.drawablePathIconTransactionSupply
       }
     )
 
-    val goodsInCart by getCartState(transactionTypeIndex, clientId).collectAsState()
+    val goodsInCart by getCartState(
+      context.transactionTypeIndex,
+      context.clientId
+    ).collectAsState()
 
     if (goodsInCart.isEmpty()) {
       MessageText(
-        modifier = Modifier
-          .fillMaxSize(),
-        stateValues.stringCartEmpty
+        modifier = Modifier.fillMaxSize(),
+        text = stateValues.stringCartEmpty
       )
     } else {
       LazyColumn(
         modifier = Modifier
           .weight(1f)
-          .padding(stateValues.marginTextField),
+          .padding(stateValues.marginTextField)
       ) {
-        itemsIndexed(goodsInCart) { index, item ->
-          stateValues.stock?.find {
-            item.id == it.id
-          }?.let {
+        itemsIndexed(goodsInCart) { index, cartItem ->
+          val goodsItem = stateValues.stock?.find { it.id == cartItem.id }
+
+          if (goodsItem != null) {
             GoodsItemInCartWidget(
+              modifier = Modifier.fillParentMaxWidth(),
               index = index,
-              goodsItemInCart = item,
-              goodsItem = it,
+              goodsItemInCart = cartItem,
+              goodsItem = goodsItem,
               onDelete = {
-                deleteCartById(item.id, transactionTypeIndex, clientId)
+                deleteCartById(
+                  id = cartItem.id,
+                  transactionTypeIndex = context.transactionTypeIndex,
+                  clientId = context.clientId
+                )
               },
               increaseQuantityAction = {
-                  upsertCart(
-                    id = it.id,
-                    transactionTypeIndex,
-                    clientId,
-                    QuantityDataModel("", immutableUnitName = listOf(LocalizedStringDataModel("main", "pc.")), roundTotal = true) // TODO it.quantity.copy(total = it.quantity.total + it.quantity.pricedAmount)
-                  )
+                changeCartQuantity(
+                  id = cartItem.id,
+                  transactionTypeIndex = context.transactionTypeIndex,
+                  clientId = context.clientId,
+                  current = cartItem.quantity,
+                  deltaSteps = 1
+                )
               },
               decreaseQuantityAction = {
-                upsertCart(
-                  id = it.id,
-                  transactionTypeIndex,
-                  clientId,
-                  QuantityDataModel("", immutableUnitName = listOf(LocalizedStringDataModel("main", "pc.")), roundTotal = true) // TODO it.quantity.copy(total = it.quantity.total + it.quantity.pricedAmount)
+                changeCartQuantity(
+                  id = cartItem.id,
+                  transactionTypeIndex = context.transactionTypeIndex,
+                  clientId = context.clientId,
+                  current = cartItem.quantity,
+                  deltaSteps = -1
                 )
               }
             )
@@ -1617,9 +2569,23 @@ fun AppConfiguration.TransactionCartScreen() {
       }
     }
 
-    val currentTransactionScreens by Navigation.getCurrentTransactionScreens(transactionTypeIndex, clientId, stateValues.isNarrowScreen).collectAsState()
+    val currentTransactionScreens by Navigation
+      .getCurrentTransactionScreens(
+        context.transactionTypeIndex,
+        context.clientId,
+        stateValues.isNarrowScreen
+      )
+      .collectAsState()
 
-    if (goodsInCart.isNotEmpty() && currentTransactionScreens.run { last() is NavigationScreenModel.Transaction.Cart || last() is NavigationScreenModel.Transaction.Selection })
+    val lastScreen = currentTransactionScreens.lastOrNull()
+
+    if (
+      goodsInCart.isNotEmpty() &&
+      (
+          lastScreen is NavigationScreenModel.Transaction.Cart ||
+              lastScreen is NavigationScreenModel.Transaction.Selection
+          )
+    ) {
       Column(
         modifier = Modifier
           .fillMaxWidth()
@@ -1632,17 +2598,10 @@ fun AppConfiguration.TransactionCartScreen() {
           enabled = stateValues.latestNotification == null,
           onClick = {
             coroutineScope.launch {
-              when (transactionTypeIndex) {
-                0 -> {
-                  Navigation.TransactionSale.go(NavigationScreenModel.Transaction.Payment)
-                }
-                1 -> {
-                  Navigation.TransactionReturn.go(NavigationScreenModel.Transaction.Payment)
-                }
-                else -> {
-                  Navigation.TransactionSupply.go(NavigationScreenModel.Transaction.Payment)
-                }
-
+              when (context.transactionTypeIndex) {
+                0 -> Navigation.TransactionSale.go(NavigationScreenModel.Transaction.Payment)
+                1 -> Navigation.TransactionReturn.go(NavigationScreenModel.Transaction.Payment)
+                else -> Navigation.TransactionSupply.go(NavigationScreenModel.Transaction.Payment)
               }
             }
           }
@@ -1650,8 +2609,135 @@ fun AppConfiguration.TransactionCartScreen() {
 
         Spacer(modifier = Modifier.height(4.dp))
       }
+    }
   }
 }
+
+//@Composable
+//fun AppConfiguration.TransactionCartScreen() {
+//  Column(
+//    modifier = Modifier
+//      .fillMaxSize()
+//  ) {
+//    val transactionTypeIndex = when (stateValues.navigationScreensMain.last()) {
+//      is NavigationScreenModel.Transaction.MainSale -> {
+//        0
+//      }
+//      is NavigationScreenModel.Transaction.MainReturn -> {
+//        1
+//      }
+//      else -> {
+//        2
+//      }
+//    }
+//
+//    val clientId = when(transactionTypeIndex) {
+//      0 -> {
+//        stateValues.navigationTransactionSaleClientId
+//      }
+//      1 -> {
+//        stateValues.navigationTransactionReturnClientId
+//      }
+//      else -> {
+//        stateValues.navigationTransactionSupplyClientId
+//      }
+//    }
+//
+//    ScreenAppBarWidget(
+//      title = when (transactionTypeIndex) {
+//        1 -> stateValues.stringReturn
+//        2 -> stateValues.stringSupply
+//        else -> stateValues.stringSale
+//      },
+//      iconPath = when (transactionTypeIndex) {
+//        1 -> stateValues.drawablePathIconTransactionReturn
+//        2 -> stateValues.drawablePathIconTransactionSupply
+//        else -> stateValues.drawablePathIconTransactionSale
+//      }
+//    )
+//
+//    val goodsInCart by getCartState(transactionTypeIndex, clientId).collectAsState()
+//
+//    if (goodsInCart.isEmpty()) {
+//      MessageText(
+//        modifier = Modifier
+//          .fillMaxSize(),
+//        stateValues.stringCartEmpty
+//      )
+//    } else {
+//      LazyColumn(
+//        modifier = Modifier
+//          .weight(1f)
+//          .padding(stateValues.marginTextField),
+//      ) {
+//        itemsIndexed(goodsInCart) { index, item ->
+//          stateValues.stock?.find {
+//            item.id == it.id
+//          }?.let {
+//            GoodsItemInCartWidget(
+//              index = index,
+//              goodsItemInCart = item,
+//              goodsItem = it,
+//              onDelete = {
+//                deleteCartById(item.id, transactionTypeIndex, clientId)
+//              },
+//              increaseQuantityAction = {
+//                  upsertCart(
+//                    id = it.id,
+//                    transactionTypeIndex,
+//                    clientId,
+//                    QuantityDataModel("", immutableUnitName = listOf(LocalizedStringDataModel("main", "pc.")), roundTotal = true) // TODO it.quantity.copy(total = it.quantity.total + it.quantity.pricedAmount)
+//                  )
+//              },
+//              decreaseQuantityAction = {
+//                upsertCart(
+//                  id = it.id,
+//                  transactionTypeIndex,
+//                  clientId,
+//                  QuantityDataModel("", immutableUnitName = listOf(LocalizedStringDataModel("main", "pc.")), roundTotal = true) // TODO it.quantity.copy(total = it.quantity.total + it.quantity.pricedAmount)
+//                )
+//              }
+//            )
+//          }
+//        }
+//      }
+//    }
+//
+//    val currentTransactionScreens by Navigation.getCurrentTransactionScreens(transactionTypeIndex, clientId, stateValues.isNarrowScreen).collectAsState()
+//
+//    if (goodsInCart.isNotEmpty() && currentTransactionScreens.run { last() is NavigationScreenModel.Transaction.Cart || last() is NavigationScreenModel.Transaction.Selection })
+//      Column(
+//        modifier = Modifier
+//          .fillMaxWidth()
+//          .padding(horizontal = 8.dp)
+//      ) {
+//        Spacer(modifier = Modifier.height(4.dp))
+//
+//        actionButton(
+//          text = stateValues.stringPayment,
+//          enabled = stateValues.latestNotification == null,
+//          onClick = {
+//            coroutineScope.launch {
+//              when (transactionTypeIndex) {
+//                0 -> {
+//                  Navigation.TransactionSale.go(NavigationScreenModel.Transaction.Payment)
+//                }
+//                1 -> {
+//                  Navigation.TransactionReturn.go(NavigationScreenModel.Transaction.Payment)
+//                }
+//                else -> {
+//                  Navigation.TransactionSupply.go(NavigationScreenModel.Transaction.Payment)
+//                }
+//
+//              }
+//            }
+//          }
+//        )
+//
+//        Spacer(modifier = Modifier.height(4.dp))
+//      }
+//  }
+//}
 
 @Composable
 fun AppConfiguration.tabRowWidget(
@@ -1935,6 +3021,18 @@ fun AppConfiguration.StoreWidget(
 
 @Composable
 fun AppConfiguration.StockWarehouseScreen() {
+  fun openStockItemScreen(
+    goodsItem: GoodsItemDataModel,
+    screen: NavigationScreenModel.Stock,
+    stateHost: StateHost,
+    stateKey: String
+  ) {
+    coroutineScope.launch {
+      stateHost.setState(stateKey to goodsItem.id)
+      Navigation.Stock.go(screen, forceSecond = true)
+    }
+  }
+
   Column(
     modifier = Modifier
       .fillMaxSize()
@@ -1954,11 +3052,43 @@ fun AppConfiguration.StockWarehouseScreen() {
       },
       onEdit = {
         coroutineScope.launch {
-          if (!NavigationScreenModel.Stock.AddEditGoodsItem.state.value.contains(NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_EDITED_GOODS_ITEM_ID)) {
-            NavigationScreenModel.Stock.AddEditGoodsItem.setState(NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_EDITED_GOODS_ITEM_ID to it.id)
-            Navigation.Stock.go(NavigationScreenModel.Stock.AddEditGoodsItem, forceSecond = true)
-          }
+          NavigationScreenModel.Stock.AddEditGoodsItem.setState(
+            NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_EDITED_GOODS_ITEM_ID to it.id
+          )
+          Navigation.Stock.go(NavigationScreenModel.Stock.AddEditGoodsItem, forceSecond = true)
         }
+      },
+      onDetails = {
+        openStockItemScreen(
+          goodsItem = it,
+          screen = NavigationScreenModel.Stock.GoodsItemDetails,
+          stateHost = NavigationScreenModel.Stock.GoodsItemDetails,
+          stateKey = NavigationScreenModel.Stock.GoodsItemDetails.KEY_STATE_GOODS_ITEM_ID
+        )
+      },
+      onBatches = {
+        openStockItemScreen(
+          goodsItem = it,
+          screen = NavigationScreenModel.Stock.GoodsItemBatches,
+          stateHost = NavigationScreenModel.Stock.GoodsItemBatches,
+          stateKey = NavigationScreenModel.Stock.GoodsItemBatches.KEY_STATE_GOODS_ITEM_ID
+        )
+      },
+      onSupplierPrices = {
+        openStockItemScreen(
+          goodsItem = it,
+          screen = NavigationScreenModel.Stock.GoodsItemSupplierPrices,
+          stateHost = NavigationScreenModel.Stock.GoodsItemSupplierPrices,
+          stateKey = NavigationScreenModel.Stock.GoodsItemSupplierPrices.KEY_STATE_GOODS_ITEM_ID
+        )
+      },
+      onOrders = {
+        openStockItemScreen(
+          goodsItem = it,
+          screen = NavigationScreenModel.Stock.GoodsItemOrders,
+          stateHost = NavigationScreenModel.Stock.GoodsItemOrders,
+          stateKey = NavigationScreenModel.Stock.GoodsItemOrders.KEY_STATE_GOODS_ITEM_ID
+        )
       }
     )
   }
@@ -1974,6 +3104,10 @@ fun AppConfiguration.StockWarehouseScreenContent(
   onClick: ((GoodsItemDataModel) -> Unit)? = null,
   onDelete: ((GoodsItemDataModel) -> Unit)? = null,
   onEdit: ((GoodsItemDataModel) -> Unit)? = null,
+  onDetails: ((GoodsItemDataModel) -> Unit)? = null,
+  onBatches: ((GoodsItemDataModel) -> Unit)? = null,
+  onSupplierPrices: ((GoodsItemDataModel) -> Unit)? = null,
+  onOrders: ((GoodsItemDataModel) -> Unit)? = null,
   onExactSearchHit: ((GoodsItemDataModel) -> Unit)? = null
 ){
   when (val state = stateValues.stockState) {
@@ -2043,9 +3177,14 @@ fun AppConfiguration.StockWarehouseScreenContent(
                 modifier = Modifier
                   .alpha(if (disableIfOutOfStock /* TODO && item.quantity.total == 0.0 */) 0.5f else 1f),
                 goodsItem = item,
+                batches = stateValues.stockBatches.orEmpty().filter { it.goodsItemId == item.id && it.isActive },
                 onDelete = onDelete,
                 onClick = onClick,
-                onEdit = onEdit
+                onEdit = onEdit,
+                onDetails = onDetails,
+                onBatches = onBatches,
+                onSupplierPrices = onSupplierPrices,
+                onOrders = onOrders
               )
             }
           }
@@ -2103,6 +3242,18 @@ fun AppConfiguration.StockScreen() {
             }
             is NavigationScreenModel.Stock.AddEditGoodsItem -> {
               StockAddEditGoodsItemScreen()
+            }
+            is NavigationScreenModel.Stock.GoodsItemDetails -> {
+              StockGoodsItemDetailsScreen()
+            }
+            is NavigationScreenModel.Stock.GoodsItemBatches -> {
+              StockGoodsItemBatchesScreen()
+            }
+            is NavigationScreenModel.Stock.GoodsItemSupplierPrices -> {
+              StockGoodsItemSupplierPricesScreen()
+            }
+            is NavigationScreenModel.Stock.GoodsItemOrders -> {
+              StockGoodsItemOrdersScreen()
             }
 
             else -> { }
@@ -2228,360 +3379,2410 @@ data class BatchPriceInfo(
   val currency: String
 )
 
+data class StockAddEditDraft(
+  val id: String = "",
+  val barcodes: List<String> = listOf(""),
+  val name: List<LocalizedStringDataModel> = emptyList(),
+  val description: List<LocalizedStringDataModel> = emptyList(),
+  val measurementUnitId: String = "0",
+  val categoryIds: List<String> = emptyList(),
+  val salePrices: List<PriceDataModel> = emptyList(),
+  val returnPrices: List<PriceDataModel> = emptyList(),
+  val supplyPrices: List<PriceDataModel> = emptyList(),
+  val isQuickItem: Boolean = false,
+  val note: String = ""
+)
+
+fun GoodsItemDataModel.toStockAddEditDraft(): StockAddEditDraft {
+  return StockAddEditDraft(
+    id = id,
+    barcodes = barcodes.ifEmpty { listOf("") },
+    name = name,
+    description = description,
+    measurementUnitId = measurementUnitId,
+    categoryIds = categoryIds,
+    salePrices = salePrices,
+    returnPrices = returnPrices,
+    supplyPrices = supplyPrices,
+    isQuickItem = isQuickItem,
+    note = note.orEmpty()
+  )
+}
+
+fun StockAddEditDraft.toGoodsItem(
+  storeId: String,
+  current: GoodsItemDataModel? = null
+): GoodsItemDataModel {
+  val now = getCurrentTimeMillis()
+
+  return GoodsItemDataModel(
+    id = id,
+    userId = current?.userId.orEmpty(),
+    storeId = storeId,
+    barcodes = barcodes.map { it.trim() }.filter { it.isNotEmpty() }.distinct(),
+    name = name.filter { it.value.isNotBlank() },
+    description = description.filter { it.value.isNotBlank() },
+    measurementUnitId = measurementUnitId,
+    categoryIds = categoryIds,
+    salePrices = salePrices,
+    returnPrices = returnPrices,
+    supplyPrices = supplyPrices,
+    isQuickItem = isQuickItem,
+    imagePaths = current?.imagePaths.orEmpty(),
+    activeShelfBatchId = current?.activeShelfBatchId,
+    note = note.takeIf { it.isNotBlank() },
+    createdAtMillis = current?.createdAtMillis ?: now,
+    updatedAtMillis = now,
+    isActive = true
+  )
+}
+
+fun StockAddEditDraft.isValidStockDraft(): Boolean {
+  val cleanBarcodes = barcodes.map { it.trim() }.filter { it.isNotEmpty() }
+
+  val hasName = name.any { it.value.isNotBlank() }
+  val hasBarcode = cleanBarcodes.isNotEmpty()
+  val hasUnit = measurementUnitId.isNotBlank()
+  val hasSalePrice = salePrices.any { it.price.toDoubleOrNull()?.let { price -> price >= 0.0 } == true }
+  val hasSupplyPrice = supplyPrices.any { it.price.toDoubleOrNull()?.let { price -> price >= 0.0 } == true }
+
+  return hasName && hasBarcode && hasUnit && hasSalePrice && hasSupplyPrice
+}
+
+fun List<GoodsBatchDataModel>.bestBatchForSale(
+  goodsItem: GoodsItemDataModel
+): GoodsBatchDataModel? {
+  val active = firstOrNull {
+    it.id == goodsItem.activeShelfBatchId &&
+        it.isActive &&
+        it.quantity.total > 0.0
+  }
+
+  if (active != null) return active
+
+  return filter {
+    it.goodsItemId == goodsItem.id &&
+        it.isActive &&
+        it.quantity.total > 0.0 &&
+        it.status != StockBatchStatusDataModel.SoldOut &&
+        it.status != StockBatchStatusDataModel.Deleted
+  }
+    .sortedWith(
+      compareBy<GoodsBatchDataModel> {
+        it.expirationDateMillis ?: Long.MAX_VALUE
+      }.thenByDescending {
+        it.shelfPriority
+      }
+    )
+    .firstOrNull()
+}
+
+private data class GoodsBatchDraft(
+  val id: String = "",
+  val goodsItemId: String,
+  val storeId: String,
+  val supplierId: String? = null,
+  val quantityText: String = "1",
+  val quantityUnitId: String,
+  val supplyPrice: PriceDataModel,
+  val salePriceOverride: PriceDataModel? = null,
+  val returnPriceOverride: PriceDataModel? = null,
+  val expirationDateMillisText: String = "",
+  val manufacturedAtMillisText: String = "",
+  val shelfPosition: String = "",
+  val shelfPriority: String = "0",
+  val additionalNotes: String = "",
+  val status: StockBatchStatusDataModel = StockBatchStatusDataModel.Delivered
+)
+
+private fun GoodsBatchDataModel.toDraft(
+  fallbackUnitId: String
+): GoodsBatchDraft {
+  return GoodsBatchDraft(
+    id = id,
+    goodsItemId = goodsItemId,
+    storeId = storeId,
+    supplierId = supplierId,
+    quantityText = quantity.total.toString(),
+    quantityUnitId = quantity.id.ifBlank { fallbackUnitId },
+    supplyPrice = supplyPrice,
+    salePriceOverride = salePriceOverride,
+    returnPriceOverride = returnPriceOverride,
+    expirationDateMillisText = expirationDateMillis?.toString().orEmpty(),
+    manufacturedAtMillisText = manufacturedAtMillis?.toString().orEmpty(),
+    shelfPosition = shelfPosition.orEmpty(),
+    shelfPriority = shelfPriority.toString(),
+    additionalNotes = additionalNotes.orEmpty(),
+    status = status
+  )
+}
+
 @Composable
-fun AppConfiguration.StockAddEditGoodsItemScreen() {
+fun AppConfiguration.StockBatchCard(
+  batch: GoodsBatchDataModel,
+  activeShelfBatchId: String?,
+  onEdit: () -> Unit,
+  onDelete: () -> Unit,
+  onSetActiveShelf: () -> Unit
+) {
+  val supplierName = stateValues.suppliers
+    .orEmpty()
+    .find { it.id == batch.supplierId }
+    ?.name
+    ?.extractLocalizedString(stateValues.appLanguage)
+    ?: "No supplier"
+
+  val isActiveShelf = batch.id == activeShelfBatchId
+
   Column(
     modifier = Modifier
-      .fillMaxSize()
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(stateValues.cornerRadius))
+      .border(
+        stateValues.unfocusedBorderWidth,
+        if (isActiveShelf) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+        RoundedCornerShape(stateValues.cornerRadius)
+      )
+      .background(stateValues.BackgroundColor)
+      .padding(stateValues.marginTextFieldGroup)
   ) {
-    val state by NavigationScreenModel.Stock.AddEditGoodsItem.state.collectAsState()
-
-    val editedGoodsItem =
-      state[NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_EDITED_GOODS_ITEM_ID]?.run { stateValues.stock?.find { goodsItem -> goodsItem.id == this } }
-
-    ScreenAppBarWidget(
-      title = editedGoodsItem?.let { stateValues.stringEditGoodsItem } ?: stateValues.stringAddGoodsItem,
-      iconPath = editedGoodsItem?.let { stateValues.drawablePathIconEdit } ?: stateValues.drawablePathIconAdd,
-      onBack = if (!Navigation.Stock.isVeryFirstScreen(stateValues.isNarrowScreen)) {
-        {
-          coroutineScope.launch {
-            Navigation.Stock.pop(stateValues.isNarrowScreen)
-            if (editedGoodsItem != null)
-              NavigationScreenModel.Stock.AddEditGoodsItem.removeState(NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_EDITED_GOODS_ITEM_ID)
-          }
-        }
-      } else null
-    )
-
-    var goAction: (() -> Unit)? = null
-
-    LazyColumn(
-      modifier = Modifier
-        .fillMaxWidth()
-        .weight(1f)
-        .padding(start = 8.dp, top = 24.dp, end = 8.dp)
+    Row(
+      modifier = Modifier.fillMaxWidth(),
+      horizontalArrangement = Arrangement.SpaceBetween,
+      verticalAlignment = Alignment.CenterVertically
     ) {
-      item {
-        val barcodeTextFieldGroupContent =
-          domainSelectionTextFieldGroupWidget(
-            titleText = stateValues.stringBarcode,
-            placeholderText = stateValues.stringEnterBarcode,
-            stateHost = NavigationScreenModel.Stock.AddEditGoodsItem,
-            stateKey = NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_BARCODE,
-            domains = emptyList(),
-            addDomainActionButtonText = stateValues.stringAddBarcode,
-            addSecondaryDomainActionButtonText = stateValues.stringAddBarcode,
-            isFocusedInitial = true,
-//            valueInitial = editedGoodsItem?.barcode?.map {
-//              println("executing again $it")
-//              DomainSelectionTextFieldGroupItemContent(
-//                TextFieldValue(it, selection = TextRange(it.length)),
-//                "",
-//                "",
-//                isContentValid = true
-//              )
-//            },
-          )
-
-        var name: String? by rememberSaveable {
-          mutableStateOf(null)
-        }
-
-        var measurementUnitDropdownListSelectedInitial: String? by rememberSaveable {
-          mutableStateOf(stateValues.globalAppConfiguration.goodsItemsQuantityUnits.takeIf { it.isNotEmpty() }
-            ?.first()?.id)
-        }
-
-//        LaunchedEffect(barcodeTextFieldGroupContent.data) {
-//          try {
-//            barcodeTextFieldGroupContent.data.last().value.text.takeIf { it.length == 13 }?.run {
-//              genericItemsRepository
-//                .getGenericGoodsItems(this)
-//                .collect {
-//                  if (it is DataState.Success && it.payload.isNotEmpty()) {
-//                    name = it.payload.first().name.extractLocalizedString(stateValues.appLanguage)
-//                  }
-//                }
-//            }
-//          } catch (thr: Throwable) {
-//            thr.printStackTrace()
-//          }
-//        }
-
-        Spacer(
-          modifier = Modifier
-            .height(stateValues.marginTextField)
-        )
-
-        val nameTextFieldContent =
-          genericTextField(
-            titleText = stateValues.stringName,
-            placeholderText = stateValues.stringEnterName,
-            valueInitial = name,
-            stateHost = NavigationScreenModel.Stock.AddEditGoodsItem,
-            stateKey = NavigationScreenModel.KEY_STATE_NAME,
-          )
-
-        var isQuickItem by rememberSaveable {
-          mutableStateOf(false)
-        }
-
-        Row(
-          verticalAlignment = Alignment.CenterVertically
-        ) {
-          Checkbox(
-            checked = isQuickItem,
-            onCheckedChange = {
-              isQuickItem = it
-            },
-            colors = CheckboxColors(
-              checkedBoxColor = stateValues.AccentColor,
-              checkedCheckmarkColor = stateValues.AccentTextColor,
-              uncheckedBoxColor = stateValues.BackgroundColor,
-              checkedBorderColor = stateValues.PlaceholderTextColor,
-              uncheckedBorderColor = stateValues.PlaceholderTextColor,
-              uncheckedCheckmarkColor = stateValues.PlaceholderTextColor,
-              disabledBorderColor = stateValues.PlaceholderTextColor,
-              disabledCheckedBoxColor = stateValues.PlaceholderTextColor,
-              disabledUncheckedBoxColor = stateValues.PlaceholderTextColor,
-              disabledIndeterminateBorderColor = stateValues.PlaceholderTextColor,
-              disabledUncheckedBorderColor = stateValues.PlaceholderTextColor,
-              disabledIndeterminateBoxColor = stateValues.PlaceholderTextColor,
-            )
-          )
-
-          Spacer(Modifier.width(2.dp))
-
-          Text(
-            text = stateValues.stringQuick,
-            color = stateValues.TextColor
-          )
-        }
-
-
-        var categoryDropdownListContent: DropdownListWidgetContent? = null
-        categoryDropdownListContent = stateValues.goodsCategories?.run {
-          val content = dropdownListWidget(
-            titleText = stateValues.stringCategory,
-            domains = map {
-              SelectableDomain(
-                id = it.id,
-                displayId = it.name,
-                name = it.name,
-                iconPath = null,
-                iconRes = null,
-              )
-            },
-            showName = false
-          )
-
-          Spacer(
-            modifier = Modifier
-              .height(stateValues.marginTextField)
-          )
-
-          content
-        }
-
-        LaunchedEffect(categoryDropdownListContent?.selectedId) {
-          stateValues.goodsCategories?.find { it.id == categoryDropdownListContent?.selectedId }?.let {
-            measurementUnitDropdownListSelectedInitial = it.quantityUnitId
-          }
-        }
-
-        val measurementUnitDropdownListContent = dropdownListWidget(
-          titleText = stateValues.stringMeasurementUnit,
-          domains = stateValues.globalAppConfiguration.goodsItemsQuantityUnits.map {
-            SelectableDomain(
-              id = it.id,
-              displayId = it.immutableUnitName,
-              name = it.immutableUnitName,
-              iconPath = null,
-              iconRes = null
-            )
-          },
-          selectedInitial = measurementUnitDropdownListSelectedInitial,
-          showName = false
-        )
-
-        Spacer(
-          modifier = Modifier
-            .height(stateValues.marginTextField)
+      Column(
+        modifier = Modifier.weight(1f)
+      ) {
+        Text(
+          text = if (isActiveShelf) "Active shelf batch" else "Batch",
+          color = if (isActiveShelf) stateValues.AccentColor else stateValues.TextColor,
+          fontSize = stateValues.textSize,
+          fontWeight = FontWeight.Bold
         )
 
         Text(
-          text = "Batch data", // TODO
-          fontSize = stateValues.accentTextSize,
-          fontWeight = FontWeight.Bold,
-          color = stateValues.TextColor,
-          modifier = Modifier
-            .fillMaxWidth()
+          text = supplierName,
+          color = stateValues.PlaceholderTextColor,
+          fontSize = stateValues.smallTextSize
+        )
+      }
+
+      Text(
+        text = "${batch.quantity.total} ${
+          batch.quantity.immutableUnitName.extractLocalizedString(stateValues.appLanguage).orEmpty()
+        }",
+        color = stateValues.TextColor,
+        fontSize = stateValues.accentTextSize,
+        fontWeight = FontWeight.Bold
+      )
+    }
+
+    Spacer(modifier = Modifier.height(8.dp))
+
+    Text(
+      text = "Supply price: ${batch.supplyPrice.price} ${batch.supplyPrice.currency}",
+      color = stateValues.TextColor,
+      fontSize = stateValues.textSize
+    )
+
+    batch.expirationDateMillis?.let {
+      Text(
+        text = "Expires: $it",
+        color = stateValues.PlaceholderTextColor,
+        fontSize = stateValues.smallTextSize
+      )
+    }
+
+    batch.additionalNotes?.takeIf { it.isNotBlank() }?.let {
+      Text(
+        text = it,
+        color = stateValues.PlaceholderTextColor,
+        fontSize = stateValues.smallTextSize
+      )
+    }
+
+    Spacer(modifier = Modifier.height(8.dp))
+
+    Row(
+      modifier = Modifier.fillMaxWidth(),
+      horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+      actionButton(
+        modifier = Modifier.weight(1f),
+        text = "Edit",
+        onClick = onEdit
+      )
+
+      actionButton(
+        modifier = Modifier.weight(1f),
+        text = "Shelf",
+        enabled = !isActiveShelf,
+        onClick = onSetActiveShelf
+      )
+
+      actionButton(
+        modifier = Modifier.weight(1f),
+        text = "Delete",
+        enabledColor = stateValues.ErrorColor,
+        onClick = onDelete
+      )
+    }
+  }
+}
+
+@Composable
+fun AppConfiguration.StockBatchEditor(
+  modifier: Modifier = Modifier,
+  goodsItem: GoodsItemDataModel,
+  existingBatch: GoodsBatchDataModel?,
+  onCancel: () -> Unit,
+  onSaved: () -> Unit
+) {
+  val defaultUnit = stateValues.globalAppConfiguration.goodsItemsQuantityUnits
+    .find { it.id == goodsItem.measurementUnitId }
+    ?: stateValues.globalAppConfiguration.goodsItemsQuantityUnits.first()
+
+  val defaultCurrency =
+    goodsItem.supplyPrices.firstOrNull()?.currency
+      ?: goodsItem.salePrices.firstOrNull()?.currency
+      ?: "KZT"
+
+  var draft by remember(existingBatch?.id, goodsItem.id) {
+    mutableStateOf(
+      existingBatch?.toDraft(defaultUnit.id)
+        ?: GoodsBatchDraft(
+          goodsItemId = goodsItem.id,
+          storeId = goodsItem.storeId,
+          supplierId = null,
+          quantityUnitId = defaultUnit.id,
+          supplyPrice = PriceDataModel(
+            price = "0",
+            currency = defaultCurrency,
+            supplierId = ""
+          )
+        )
+    )
+  }
+
+  val supplierGoodsPricesPayload by supplierGoodsPricesState.payload.collectAsState()
+  val supplierGoodsPrices = supplierGoodsPricesPayload.orEmpty()
+
+  var lastAutoFillKey by remember {
+    mutableStateOf("")
+  }
+
+  LaunchedEffect(
+    draft.goodsItemId,
+    draft.supplierId,
+    supplierGoodsPrices
+  ) {
+    val supplierId = draft.supplierId ?: return@LaunchedEffect
+    val autoFillKey = "${draft.goodsItemId}:$supplierId"
+
+    if (autoFillKey == lastAutoFillKey)
+      return@LaunchedEffect
+
+    val rememberedPrice = supplierGoodsPrices.find {
+      it.supplierId == supplierId &&
+          it.goodsItemId == draft.goodsItemId &&
+          it.isActive
+    }
+
+    rememberedPrice?.let {
+      draft = draft.copy(
+        supplyPrice = it.supplyPrice
+      )
+    }
+
+    lastAutoFillKey = autoFillKey
+  }
+
+  val suppliers = stateValues.suppliers.orEmpty()
+
+  Column(
+    modifier = modifier.fillMaxSize()
+  ) {
+    ScreenAppBarWidget(
+      title = if (existingBatch == null) "Add batch" else "Edit batch",
+      onBack = onCancel
+    )
+
+    LazyColumn(
+      modifier = Modifier
+        .weight(1f)
+        .padding(stateValues.marginTextField)
+    ) {
+      item {
+        SimpleDropdownField(
+          title = stateValues.stringSupplier,
+          selectedId = draft.supplierId,
+          options = suppliers.map {
+            DropdownOption(
+              id = it.id,
+              title = it.name.extractLocalizedString(stateValues.appLanguage)
+                ?: it.name.firstOrNull()?.value
+                ?: it.id
+            )
+          },
+          placeholder = "Select supplier",
+          onSelected = { selectedSupplierId ->
+            draft = draft.copy(
+              supplierId = selectedSupplierId,
+              supplyPrice = draft.supplyPrice.copy(
+                supplierId = selectedSupplierId
+              )
+            )
+          }
         )
 
-        Spacer(
-          modifier = Modifier
-            .height(4.dp)
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+        SimpleTextInput(
+          modifier = Modifier.fillMaxWidth(),
+          value = draft.quantityText,
+          placeholder = "Quantity",
+          onValueChange = {
+            if (it.isEmpty() || it.isNumericalDoubleString()) {
+              draft = draft.copy(quantityText = it)
+            }
+          }
         )
 
-        val prices by rememberSaveable {
-          mutableStateOf(
-            editedGoodsItem?.let {
-              mutableListOf<BatchPriceInfo>().apply {
-                it.salePrices.forEach { item ->
-                  if (find { item2 -> item2.supplierId == item.supplierId } != null)
-                    indexOfFirst { item3 -> item3.supplierId == item.supplierId }.takeIf { v -> v != -1 }?.let { index ->
-                      set(index, get(index).copy(salePrice = item.price))
-                    }
-                  else
-                    add(
-                      BatchPriceInfo(
-                        supplierId = item.supplierId,
-                        supplyPrice = "",
-                        salePrice = item.price,
-                        returnPrice = "",
-                        currency = item.currency
-                      )
-                    )
-                }
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
-                it.supplyPrices.forEach { item ->
-                  if (find { item2 -> item2.supplierId == item.supplierId } != null)
-                    indexOfFirst { item3 -> item3.supplierId == item.supplierId }.takeIf { v -> v != -1 }?.let { index ->
-                      set(index, get(index).copy(supplyPrice = item.price))
-                    }
-                  else
-                    add(
-                      BatchPriceInfo(
-                        supplierId = item.supplierId,
-                        supplyPrice = item.price,
-                        salePrice = "",
-                        returnPrice = "",
-                        currency = item.currency
-                      )
-                    )
-                }
+        SimpleDropdownField(
+          title = "Unit",
+          selectedId = draft.quantityUnitId,
+          options = stateValues.globalAppConfiguration.goodsItemsQuantityUnits.map {
+            DropdownOption(
+              id = it.id,
+              title = it.immutableUnitName.extractLocalizedString(stateValues.appLanguage)
+                ?: it.id
+            )
+          },
+          placeholder = "Select unit",
+          onSelected = {
+            draft = draft.copy(quantityUnitId = it)
+          }
+        )
 
-                it.returnPrices.forEach { item ->
-                  if (find { item2 -> item2.supplierId == item.supplierId } != null)
-                    indexOfFirst { item3 -> item3.supplierId == item.supplierId }.takeIf { v -> v != -1 }?.let { index ->
-                      set(index, get(index).copy(supplyPrice = item.price))
-                    }
-                  else
-                    add(
-                      BatchPriceInfo(
-                        supplierId = item.supplierId,
-                        supplyPrice = "",
-                        salePrice = "",
-                        returnPrice = item.price,
-                        currency = item.currency
-                      )
-                    )
-                }
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+        SimpleTextInput(
+          modifier = Modifier.fillMaxWidth(),
+          value = draft.supplyPrice.price,
+          placeholder = stateValues.stringSupplyPrice,
+          onValueChange = {
+            if (it.isEmpty() || it.isNumericalDoubleString()) {
+              draft = draft.copy(
+                supplyPrice = draft.supplyPrice.copy(price = it)
+              )
+            }
+          }
+        )
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+        SimpleTextInput(
+          modifier = Modifier.fillMaxWidth(),
+          value = draft.expirationDateMillisText,
+          placeholder = "Expiration date millis optional",
+          onValueChange = {
+            if (it.all { char -> char.isDigit() }) {
+              draft = draft.copy(expirationDateMillisText = it)
+            }
+          }
+        )
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+        SimpleTextInput(
+          modifier = Modifier.fillMaxWidth(),
+          value = draft.shelfPosition,
+          placeholder = "Shelf position optional",
+          onValueChange = {
+            draft = draft.copy(shelfPosition = it)
+          }
+        )
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+        SimpleTextInput(
+          modifier = Modifier.fillMaxWidth(),
+          value = draft.shelfPriority,
+          placeholder = "Shelf priority",
+          onValueChange = {
+            if (it.all { char -> char.isDigit() }) {
+              draft = draft.copy(shelfPriority = it)
+            }
+          }
+        )
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+        SimpleTextInput(
+          modifier = Modifier.fillMaxWidth(),
+          value = draft.additionalNotes,
+          placeholder = "Additional notes optional",
+          singleLine = false,
+          onValueChange = {
+            draft = draft.copy(additionalNotes = it)
+          }
+        )
+
+        Spacer(modifier = Modifier.height(stateValues.screenHeight / 5))
+      }
+    }
+
+    Row(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(8.dp),
+      horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+      actionButton(
+        modifier = Modifier.weight(1f),
+        text = stateValues.stringCancel,
+        enabledColor = stateValues.DisabledColor,
+        onClick = onCancel
+      )
+
+      actionButton(
+        modifier = Modifier.weight(1f),
+        text = stateValues.stringConfirm,
+        enabled = draft.quantityText.toDoubleOrNull()?.let { it > 0.0 } == true,
+        onClick = {
+          val unit = stateValues.globalAppConfiguration.goodsItemsQuantityUnits
+            .find { it.id == draft.quantityUnitId }
+            ?: defaultUnit
+
+          val batch = GoodsBatchDataModel(
+            id = draft.id,
+            goodsItemId = draft.goodsItemId,
+            storeId = draft.storeId,
+            supplierId = draft.supplierId,
+
+            quantity = unit.copy(
+              total = draft.quantityText.toDoubleOrNull() ?: 0.0
+            ),
+
+            supplyPrice = draft.supplyPrice,
+            salePriceOverride = draft.salePriceOverride,
+            returnPriceOverride = draft.returnPriceOverride,
+
+            expirationDateMillis = draft.expirationDateMillisText.toLongOrNull(),
+            manufacturedAtMillis = draft.manufacturedAtMillisText.toLongOrNull(),
+
+            discounts = emptyList(),
+
+            shelfPosition = draft.shelfPosition.takeIf { it.isNotBlank() },
+            shelfPriority = draft.shelfPriority.toIntOrNull() ?: 0,
+
+            status = draft.status,
+            additionalNotes = draft.additionalNotes.takeIf { it.isNotBlank() },
+
+            isActive = true
+          )
+
+          if (existingBatch == null) {
+            addGoodsBatches(listOf(batch)) {
+              if (it is DataState.Success) {
+                onSaved()
               }
-            } ?: emptyList()
+            }
+          } else {
+            updateGoodsBatches(listOf(batch)) {
+              if (it is DataState.Success) {
+                onSaved()
+              }
+            }
+          }
+        }
+      )
+    }
+  }
+}
+
+@Composable
+fun AppConfiguration.StockAddEditIdentityPage(
+  modifier: Modifier = Modifier,
+  draft: StockAddEditDraft,
+  onDraftChanged: (StockAddEditDraft) -> Unit
+) {
+  LazyColumn(
+    modifier = modifier.padding(stateValues.marginTextField)
+  ) {
+    item {
+      BarcodeListEditor(
+        title = stateValues.stringBarcode,
+        barcodes = draft.barcodes,
+        onChanged = { onDraftChanged(draft.copy(barcodes = it)) }
+      )
+
+      Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+      LocalizedStringListEditor(
+        title = stateValues.stringName,
+        values = draft.name,
+        onChanged = { onDraftChanged(draft.copy(name = it)) }
+      )
+
+      Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+      LocalizedStringListEditor(
+        title = "Description",
+        values = draft.description,
+        onChanged = { onDraftChanged(draft.copy(description = it)) }
+      )
+
+      Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+      SimpleDropdownField(
+        title = "Measurement unit",
+        selectedId = draft.measurementUnitId,
+        options = stateValues.globalAppConfiguration.goodsItemsQuantityUnits.map {
+          DropdownOption(
+            id = it.id,
+            title = it.immutableUnitName.extractLocalizedString(stateValues.appLanguage)
+              ?: it.id
+          )
+        },
+        placeholder = "Select unit",
+        onSelected = {
+          onDraftChanged(draft.copy(measurementUnitId = it))
+        }
+      )
+
+      Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+      SimpleDropdownField(
+        title = stateValues.stringCategory,
+        selectedId = draft.categoryIds.firstOrNull(),
+        options = stateValues.goodsCategories.orEmpty().map {
+          DropdownOption(
+            id = it.id,
+            title = it.name.extractLocalizedString(stateValues.appLanguage)
+              ?: it.id
+          )
+        },
+        placeholder = "Select category",
+        onSelected = {
+          onDraftChanged(draft.copy(categoryIds = listOf(it)))
+        }
+      )
+    }
+  }
+}
+
+@Composable
+fun AppConfiguration.StockAddEditBatchesPage(
+  modifier: Modifier = Modifier,
+  goodsItem: GoodsItemDataModel?
+) {
+  if (goodsItem == null || goodsItem.id.isBlank()) {
+    Box(
+      modifier = modifier.fillMaxSize(),
+      contentAlignment = Alignment.Center
+    ) {
+      MessageText(
+        text = "Save the goods item first, then you can add batches."
+      )
+    }
+
+    return
+  }
+
+  var editingBatch by remember {
+    mutableStateOf<GoodsBatchDataModel?>(null)
+  }
+
+  var addingBatch by remember {
+    mutableStateOf(false)
+  }
+
+  val batches = stateValues.stockBatches
+    .orEmpty()
+    .filter {
+      it.goodsItemId == goodsItem.id && it.isActive
+    }
+    .sortedWith(
+      compareBy<GoodsBatchDataModel> {
+        it.expirationDateMillis ?: Long.MAX_VALUE
+      }.thenByDescending {
+        it.shelfPriority
+      }
+    )
+
+  if (addingBatch || editingBatch != null) {
+    StockBatchEditor(
+      modifier = modifier,
+      goodsItem = goodsItem,
+      existingBatch = editingBatch,
+      onCancel = {
+        addingBatch = false
+        editingBatch = null
+      },
+      onSaved = {
+        addingBatch = false
+        editingBatch = null
+      }
+    )
+
+    return
+  }
+
+  Column(
+    modifier = modifier.fillMaxSize()
+  ) {
+    LazyColumn(
+      modifier = Modifier
+        .weight(1f)
+        .padding(stateValues.marginTextField)
+    ) {
+      item {
+        Text(
+          text = "Batches",
+          color = stateValues.TextColor,
+          fontSize = stateValues.titleTextSize,
+          fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+      }
+
+      if (batches.isEmpty()) {
+        item {
+          MessageText(
+            modifier = Modifier
+              .fillMaxWidth()
+              .padding(vertical = stateValues.marginTextFieldGroup),
+            text = "No batches yet"
           )
         }
+      } else {
+        items(batches) { batch ->
+          StockBatchCard(
+            batch = batch,
+            activeShelfBatchId = goodsItem.activeShelfBatchId,
+            onEdit = {
+              editingBatch = batch
+            },
+            onDelete = {
+              stateValues.activeStoreId?.let { storeId ->
+                deleteGoodsBatches(
+                  ids = listOf(batch.id),
+                  storeId = storeId,
+                  onCompleted = null
+                )
+              }
+            },
+            onSetActiveShelf = {
+              stateValues.activeStoreId?.let { storeId ->
+                setActiveShelfBatch(batch, storeId)
+              }
+            }
+          )
 
-        Row(
-          verticalAlignment = Alignment.CenterVertically
+          Spacer(modifier = Modifier.height(stateValues.marginTextField))
+        }
+      }
+
+      item {
+        Spacer(modifier = Modifier.height(stateValues.screenHeight / 5))
+      }
+    }
+
+    actionButton(
+      modifier = Modifier.padding(8.dp),
+      text = "Add batch",
+      onClick = {
+        addingBatch = true
+      }
+    )
+  }
+}
+
+@Composable
+fun AppConfiguration.StockSupplierPricesPage(
+  modifier: Modifier = Modifier,
+  goodsItem: GoodsItemDataModel?
+) {
+  if (goodsItem == null || goodsItem.id.isBlank()) {
+    Box(
+      modifier = modifier.fillMaxSize(),
+      contentAlignment = Alignment.Center
+    ) {
+      MessageText(
+        text = "Save the goods item first, then supplier prices will appear."
+      )
+    }
+
+    return
+  }
+
+  val supplierPricesPayload by supplierGoodsPricesState.payload.collectAsState()
+  val supplierPrices = supplierPricesPayload
+    .orEmpty()
+    .filter {
+      it.goodsItemId == goodsItem.id && it.isActive
+    }
+
+  LazyColumn(
+    modifier = modifier
+      .fillMaxSize()
+      .padding(stateValues.marginTextField)
+  ) {
+    item {
+      Text(
+        text = "Supplier prices",
+        color = stateValues.TextColor,
+        fontSize = stateValues.titleTextSize,
+        fontWeight = FontWeight.Bold
+      )
+
+      Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+    }
+
+    if (supplierPrices.isEmpty()) {
+      item {
+        MessageText(
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = stateValues.marginTextFieldGroup),
+          text = "No supplier prices yet. They will be remembered automatically when you add batches."
+        )
+      }
+    } else {
+      items(supplierPrices) { supplierPrice ->
+        val supplierName = stateValues.suppliers
+          .orEmpty()
+          .find { it.id == supplierPrice.supplierId }
+          ?.name
+          ?.extractLocalizedString(stateValues.appLanguage)
+          ?: supplierPrice.supplierId
+
+        Column(
+          modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .border(
+              stateValues.unfocusedBorderWidth,
+              stateValues.PlaceholderTextColor,
+              RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .background(stateValues.BackgroundColor)
+            .padding(stateValues.marginTextFieldGroup)
         ) {
-          actionButton(
-            text = "",
-            iconPath = stateValues.drawablePathIconAdd,
-            iconRes = stateValues.drawableResIconAdd.value
-          ) {
+          Text(
+            text = supplierName,
+            color = stateValues.TextColor,
+            fontSize = stateValues.textSize,
+            fontWeight = FontWeight.Bold
+          )
 
+          Spacer(modifier = Modifier.height(4.dp))
+
+          Text(
+            text = "${supplierPrice.supplyPrice.price} ${supplierPrice.supplyPrice.currency}",
+            color = stateValues.AccentColor,
+            fontSize = stateValues.accentTextSize,
+            fontWeight = FontWeight.Bold
+          )
+
+          supplierPrice.lastUsedAtMillis?.let {
+            Text(
+              text = "Last used: $it",
+              color = stateValues.PlaceholderTextColor,
+              fontSize = stateValues.smallTextSize
+            )
           }
+        }
 
-          Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.height(stateValues.marginTextField))
+      }
+    }
 
-          LazyRow {
-            items(prices) {
-              StockBatchWidget(
-                modifier = Modifier
-                  .width(stateValues.screenWidth / 3),
-                containedSupplierIds = prices.map { it.supplierId }
+    item {
+      Spacer(modifier = Modifier.height(stateValues.screenHeight / 5))
+    }
+  }
+}
+
+@Composable
+fun AppConfiguration.StockAddEditNotesPage(
+  modifier: Modifier = Modifier,
+  draft: StockAddEditDraft,
+  onDraftChanged: (StockAddEditDraft) -> Unit
+) {
+  LazyColumn(
+    modifier = modifier
+      .fillMaxSize()
+      .padding(stateValues.marginTextField)
+  ) {
+    item {
+      Text(
+        text = "Notes",
+        color = stateValues.TextColor,
+        fontSize = stateValues.titleTextSize,
+        fontWeight = FontWeight.Bold
+      )
+
+      Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+      SimpleTextInput(
+        modifier = Modifier.fillMaxWidth(),
+        value = draft.note,
+        placeholder = "Additional notes about this goods item",
+        singleLine = false,
+        onValueChange = {
+          onDraftChanged(
+            draft.copy(note = it)
+          )
+        }
+      )
+
+      Spacer(modifier = Modifier.height(stateValues.screenHeight / 5))
+    }
+  }
+}
+
+@Composable
+fun AppConfiguration.StockAddEditPricesPage(
+  modifier: Modifier = Modifier,
+  draft: StockAddEditDraft,
+  onDraftChanged: (StockAddEditDraft) -> Unit
+) {
+  val defaultCurrency = stateValues.globalAppConfiguration
+    .countries
+    .firstOrNull()
+    ?.currencies
+    ?.firstOrNull()
+    ?.code
+    ?: "KZT"
+
+  LazyColumn(
+    modifier = modifier
+      .fillMaxSize()
+      .padding(stateValues.marginTextField)
+  ) {
+    item {
+      Text(
+        text = "Prices",
+        color = stateValues.TextColor,
+        fontSize = stateValues.titleTextSize,
+        fontWeight = FontWeight.Bold
+      )
+
+      Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+      StockSinglePriceEditor(
+        title = stateValues.stringSalePrice,
+        price = draft.salePrices.firstOrNull()
+          ?: PriceDataModel(
+            price = "",
+            currency = defaultCurrency,
+            supplierId = ""
+          ),
+        onChanged = {
+          onDraftChanged(
+            draft.copy(
+              salePrices = listOf(it)
+            )
+          )
+        }
+      )
+
+      Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+      StockSinglePriceEditor(
+        title = stateValues.stringReturnPrice,
+        price = draft.returnPrices.firstOrNull()
+          ?: PriceDataModel(
+            price = "",
+            currency = defaultCurrency,
+            supplierId = ""
+          ),
+        onChanged = {
+          onDraftChanged(
+            draft.copy(
+              returnPrices = listOf(it)
+            )
+          )
+        }
+      )
+
+      Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+      StockSinglePriceEditor(
+        title = stateValues.stringSupplyPrice,
+        price = draft.supplyPrices.firstOrNull()
+          ?: PriceDataModel(
+            price = "",
+            currency = defaultCurrency,
+            supplierId = ""
+          ),
+        onChanged = {
+          onDraftChanged(
+            draft.copy(
+              supplyPrices = listOf(it)
+            )
+          )
+        }
+      )
+
+      Spacer(modifier = Modifier.height(stateValues.screenHeight / 5))
+    }
+  }
+}
+
+@Composable
+fun AppConfiguration.StockSinglePriceEditor(
+  title: String,
+  price: PriceDataModel,
+  onChanged: (PriceDataModel) -> Unit
+) {
+  Column {
+    Text(
+      text = title,
+      color = stateValues.TextColor,
+      fontSize = stateValues.textSize,
+      fontWeight = FontWeight.Bold
+    )
+
+    Spacer(modifier = Modifier.height(8.dp))
+
+    SimpleTextInput(
+      modifier = Modifier.fillMaxWidth(),
+      value = price.price,
+      placeholder = "0",
+      onValueChange = {
+        if (it.isEmpty() || it.isNumericalDoubleString()) {
+          onChanged(
+            price.copy(price = it)
+          )
+        }
+      }
+    )
+
+    Spacer(modifier = Modifier.height(8.dp))
+
+    SimpleDropdownField(
+      title = "Currency",
+      selectedId = price.currency,
+      options = stateValues.globalAppConfiguration
+        .countries
+        .flatMap { it.currencies }
+        .distinctBy { it.code }
+        .map {
+          DropdownOption(
+            id = it.code,
+            title = "${it.code} ${it.symbol}"
+          )
+        },
+      placeholder = "Select currency",
+      onSelected = {
+        onChanged(
+          price.copy(currency = it)
+        )
+      }
+    )
+  }
+}
+
+private fun AppConfiguration.stockLanguageDomains(): List<SelectableDomain> {
+  return stateValues.globalAppConfiguration.languages.map { language ->
+    SelectableDomain(
+      id = language.language,
+      displayId = language.language.uppercase().toLocalizedSingleMain(),
+      name = language.name,
+      iconPath = null,
+      iconRes = language.mapIconRes()
+    )
+  }
+}
+
+private fun AppConfiguration.stockCurrencyDomains(): List<SelectableDomain> {
+  return stateValues.globalAppConfiguration.countries
+    .flatMap { it.currencies }
+    .distinctBy { it.code }
+    .map { currency ->
+      SelectableDomain(
+        id = currency.code,
+        displayId = currency.code.toLocalizedSingleMain(),
+        name = currency.symbol.toLocalizedSingleMain(),
+        iconPath = null,
+        iconRes = null
+      )
+    }
+}
+
+private fun AppConfiguration.stockQuantityUnitDomains(): List<SelectableDomain> {
+  return stateValues.globalAppConfiguration.goodsItemsQuantityUnits.map { unit ->
+    SelectableDomain(
+      id = unit.id,
+      displayId = unit.immutableUnitName,
+      name = unit.immutableUnitName,
+      iconPath = null,
+      iconRes = null
+    )
+  }
+}
+
+private fun AppConfiguration.stockCategoryDomains(): List<SelectableDomain> {
+  return stateValues.goodsCategories.orEmpty().map { category ->
+    SelectableDomain(
+      id = category.id,
+      displayId = category.name,
+      name = category.name,
+      iconPath = null,
+      iconRes = null
+    )
+  }
+}
+
+private fun List<LocalizedStringDataModel>.toDomainSelectionItems(
+  fallbackLanguageId: String
+): List<DomainSelectionTextFieldGroupItemContent> {
+  val cleaned = map { it.copy(value = it.value.trim()) }
+    .filter { it.language.isNotBlank() || it.value.isNotBlank() }
+    .distinctBy { it.language }
+
+  return cleaned.ifEmpty {
+    listOf(LocalizedStringDataModel(fallbackLanguageId, ""))
+  }.map {
+    DomainSelectionTextFieldGroupItemContent(
+      value = TextFieldValue(it.value, selection = TextRange(it.value.length)),
+      selectedDomainId = "text",
+      selectedSecondaryDomainId = it.language.ifBlank { fallbackLanguageId },
+      isContentValid = true
+    )
+  }
+}
+
+private fun List<DomainSelectionTextFieldGroupItemContent>.toLocalizedStringsFromLanguageSelection(): List<LocalizedStringDataModel> {
+  return map {
+    LocalizedStringDataModel(
+      language = it.selectedSecondaryDomainId,
+      value = it.value.text.trim()
+    )
+  }
+    .filter { it.language.isNotBlank() && it.value.isNotBlank() }
+    .distinctBy { it.language }
+}
+
+private fun AppConfiguration.emptyLocalizedItemForCurrentLanguage(): List<LocalizedStringDataModel> {
+  val language = stateValues.appLanguage.takeIf { it.isNotBlank() }
+    ?: stateValues.globalAppConfiguration.languages.firstOrNull()?.language
+    ?: "main"
+
+  return listOf(LocalizedStringDataModel(language, ""))
+}
+
+private fun AppConfiguration.stockTextOnlyDomain(): List<SelectableDomain> {
+  return listOf(
+    SelectableDomain(
+      id = "text",
+      displayId = "".toLocalizedSingleMain(),
+      name = null,
+      iconPath = null,
+      iconRes = null
+    )
+  )
+}
+
+@Composable
+private fun AppConfiguration.StockLocalizedStringGroupEditor(
+  title: String,
+  placeholder: String,
+  values: List<LocalizedStringDataModel>,
+  addText: String,
+  required: Boolean,
+  onChanged: (List<LocalizedStringDataModel>) -> Unit
+) {
+  val fallbackLanguageId = stateValues.appLanguage.takeIf { it.isNotBlank() }
+    ?: stateValues.globalAppConfiguration.languages.firstOrNull()?.language
+    ?: "main"
+
+  val languageDomains = stockLanguageDomains()
+  val textOnlyDomain = stockTextOnlyDomain()
+
+  var focusTargetIndex by rememberSaveable {
+    mutableStateOf(0)
+  }
+
+  var data by rememberSaveable {
+    mutableStateOf(values.toDomainSelectionItems(fallbackLanguageId))
+  }
+
+  LaunchedEffect(values, fallbackLanguageId) {
+    val next = values.toDomainSelectionItems(fallbackLanguageId)
+    if (next.map { it.selectedSecondaryDomainId to it.value.text } != data.map { it.selectedSecondaryDomainId to it.value.text }) {
+      data = next
+    }
+  }
+
+  val usedLanguageIds = data.map { it.selectedSecondaryDomainId }.filter { it.isNotBlank() }.toSet()
+  val availableLanguageDomains = languageDomains.filter { it.id !in usedLanguageIds }
+
+  Column(modifier = Modifier.fillMaxWidth()) {
+    data.forEachIndexed { index, item ->
+      val rowLanguageDomains = (
+          listOfNotNull(languageDomains.find { it.id == item.selectedSecondaryDomainId }) +
+              languageDomains.filter { it.id !in usedLanguageIds || it.id == item.selectedSecondaryDomainId }
+          )
+        .distinctBy { it.id }
+
+      val instance = domainSelectionTextField(
+        titleText = if (index == 0) title else "$title ${index + 1}",
+        placeholderText = placeholder,
+        valueInitial = item.value.text,
+        titleIconButtonPath = if (data.size == 1) null else stateValues.drawablePathIconDelete,
+        onTitleIconButtonClick = if (data.size == 1) null else {
+          {
+            data = data.toMutableList().also { list ->
+              if (index in list.indices) list.removeAt(index)
+            }.ifEmpty {
+              listOf(
+                DomainSelectionTextFieldGroupItemContent(
+                  value = TextFieldValue(""),
+                  selectedDomainId = "text",
+                  selectedSecondaryDomainId = fallbackLanguageId,
+                  isContentValid = true
+                )
               )
+            }
+            focusTargetIndex = (index - 1).coerceAtLeast(0)
+          }
+        },
+        domains = textOnlyDomain,
+        selectedInitial = "text",
+        selectionEnabled = false,
+        displayFullDomain = false,
+        secondaryDomains = rowLanguageDomains,
+        selectedSecondaryInitial = item.selectedSecondaryDomainId.takeIf { it.isNotBlank() }
+          ?: rowLanguageDomains.firstOrNull()?.id
+          ?: fallbackLanguageId,
+        secondaryDomainsShowId = true,
+        secondaryDomainsShowName = false,
+        keyboardType = KeyboardType.Text,
+        isFocusedInitial = index == focusTargetIndex && item.value.text.isBlank(),
+        contentInvalidText = if (required) placeholder else null,
+        onContentValidityCheck = if (required) {
+          { value, _, _ -> value.isNotBlank() }
+        } else null
+      )
+
+      Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+      LaunchedEffect(instance.value.text, instance.selectedSecondaryId) {
+        val selectedLanguageId = instance.selectedSecondaryId ?: item.selectedSecondaryDomainId
+        val nextItem = item.copy(
+          value = instance.value,
+          selectedDomainId = "text",
+          selectedSecondaryDomainId = selectedLanguageId,
+          isContentValid = instance.isContentValid
+        )
+
+        if (data.getOrNull(index) != nextItem) {
+          data = data.toMutableList().also { list ->
+            if (index in list.indices) list[index] = nextItem
+          }
+        }
+      }
+    }
+
+    LaunchedEffect(data) {
+      val next = data.toLocalizedStringsFromLanguageSelection()
+      val current = values
+        .map { it.copy(value = it.value.trim()) }
+        .filter { it.language.isNotBlank() && it.value.isNotBlank() }
+        .distinctBy { it.language }
+
+      if (next != current) {
+        onChanged(next)
+      }
+    }
+
+    if (availableLanguageDomains.isNotEmpty()) {
+      actionButton(
+        modifier = Modifier.fillMaxWidth(),
+        text = addText,
+        iconPath = stateValues.drawablePathIconAdd
+      ) {
+        val nextLanguageId = availableLanguageDomains.first().id
+        focusTargetIndex = data.size
+        data = data + DomainSelectionTextFieldGroupItemContent(
+          value = TextFieldValue(""),
+          selectedDomainId = "text",
+          selectedSecondaryDomainId = nextLanguageId,
+          isContentValid = true
+        )
+      }
+    }
+  }
+}
+
+
+private fun List<PriceDataModel>.toStockPriceEditorItems(
+  fallbackCurrency: String
+): List<DomainSelectionTextFieldGroupItemContent> {
+  val cleaned = filter { it.currency.isNotBlank() || it.price.isNotBlank() }
+    .distinctBy { it.currency }
+
+  return cleaned.ifEmpty {
+    listOf(PriceDataModel("", fallbackCurrency, ""))
+  }.map {
+    DomainSelectionTextFieldGroupItemContent(
+      value = TextFieldValue(it.price, selection = TextRange(it.price.length)),
+      selectedDomainId = "text",
+      selectedSecondaryDomainId = it.currency.ifBlank { fallbackCurrency },
+      isContentValid = true
+    )
+  }
+}
+
+private fun List<DomainSelectionTextFieldGroupItemContent>.toPriceDataModelsFromCurrencySelection(): List<PriceDataModel> {
+  return map {
+    PriceDataModel(
+      price = it.value.text.trim(),
+      currency = it.selectedSecondaryDomainId,
+      supplierId = ""
+    )
+  }
+    .filter { it.currency.isNotBlank() && it.price.isNotBlank() }
+    .distinctBy { it.currency }
+}
+@Composable
+private fun AppConfiguration.StockPriceGroupEditor(
+  title: String,
+  placeholder: String,
+  prices: List<PriceDataModel>,
+  addText: String,
+  onChanged: (List<PriceDataModel>) -> Unit
+) {
+  val currencies = stockCurrencyDomains()
+  val fallbackCurrency = currencies.firstOrNull()?.id ?: "KZT"
+
+  var focusTargetIndex by rememberSaveable {
+    mutableStateOf(-1)
+  }
+
+  var data by remember {
+    mutableStateOf(
+      prices.toStockPriceEditorItems(fallbackCurrency)
+    )
+  }
+
+  LaunchedEffect(prices, fallbackCurrency) {
+    val next = prices.toStockPriceEditorItems(fallbackCurrency)
+    if (next.map { it.selectedSecondaryDomainId to it.value.text } != data.map { it.selectedSecondaryDomainId to it.value.text }) {
+      data = next
+    }
+  }
+
+  val usedCurrencyIds = data.map { it.selectedSecondaryDomainId }.filter { it.isNotBlank() }.toSet()
+  val availableCurrencyDomains = currencies.filter { it.id !in usedCurrencyIds }
+
+  Column(modifier = Modifier.fillMaxWidth()) {
+    data.forEachIndexed { index, item ->
+      val rowCurrencyDomains = (
+          listOfNotNull(currencies.find { it.id == item.selectedSecondaryDomainId }) +
+              currencies.filter { it.id !in usedCurrencyIds || it.id == item.selectedSecondaryDomainId }
+          )
+        .distinctBy { it.id }
+
+      val content = domainSelectionTextField(
+        titleText = if (index == 0) title else "$title ${index + 1}",
+        placeholderText = placeholder,
+        valueInitial = item.value.text,
+        titleIconButtonPath = if (data.size == 1) null else stateValues.drawablePathIconDelete,
+        onTitleIconButtonClick = if (data.size == 1) null else {
+          {
+            data = data.toMutableList().also { list ->
+              if (index in list.indices) list.removeAt(index)
+            }.ifEmpty {
+              listOf(
+                DomainSelectionTextFieldGroupItemContent(
+                  value = TextFieldValue(""),
+                  selectedDomainId = "text",
+                  selectedSecondaryDomainId = fallbackCurrency,
+                  isContentValid = true
+                )
+              )
+            }
+            focusTargetIndex = (index - 1).coerceAtLeast(0)
+          }
+        },
+        domains = stockTextOnlyDomain(),
+        selectedInitial = "text",
+        selectionEnabled = false,
+        displayFullDomain = false,
+        secondaryDomains = rowCurrencyDomains,
+        selectedSecondaryInitial = item.selectedSecondaryDomainId.takeIf { it.isNotBlank() }
+          ?: rowCurrencyDomains.firstOrNull()?.id
+          ?: fallbackCurrency,
+        secondaryDomainsShowId = true,
+        secondaryDomainsShowName = false,
+        keyboardType = KeyboardType.Decimal,
+        isFocusedInitial = index == focusTargetIndex,
+        contentInvalidText = placeholder,
+        onContentValidityCheck = { value, _, _ ->
+          value.toDoubleOrNull()?.let { it >= 0.0 } == true
+        },
+        onFilterValue = { value, _, _ ->
+          value.isEmpty() || value.isNumericalDoubleString()
+        }
+      )
+
+      Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+      LaunchedEffect(content.value.text, content.selectedSecondaryId) {
+        val selectedCurrencyId = content.selectedSecondaryId ?: item.selectedSecondaryDomainId
+        val nextItem = item.copy(
+          value = content.value,
+          selectedDomainId = "text",
+          selectedSecondaryDomainId = selectedCurrencyId,
+          isContentValid = content.isContentValid
+        )
+
+        if (data.getOrNull(index) != nextItem) {
+          data = data.toMutableList().also { list ->
+            if (index in list.indices) list[index] = nextItem
+          }
+        }
+      }
+    }
+
+    LaunchedEffect(data) {
+      val next = data.toPriceDataModelsFromCurrencySelection()
+      val current = prices
+        .filter { it.price.isNotBlank() && it.currency.isNotBlank() }
+        .distinctBy { it.currency }
+
+      if (next != current) {
+        onChanged(next)
+      }
+    }
+
+    if (availableCurrencyDomains.isNotEmpty()) {
+      actionButton(
+        modifier = Modifier.fillMaxWidth(),
+        text = addText,
+        iconPath = stateValues.drawablePathIconAdd
+      ) {
+        val nextCurrencyId = availableCurrencyDomains.first().id
+        focusTargetIndex = data.size
+        data = data + DomainSelectionTextFieldGroupItemContent(
+          value = TextFieldValue(""),
+          selectedDomainId = "text",
+          selectedSecondaryDomainId = nextCurrencyId,
+          isContentValid = true
+        )
+      }
+    }
+  }
+}
+
+@Composable
+fun AppConfiguration.StockAddEditGoodsItemScreen() {
+  val addEditState by NavigationScreenModel.Stock.AddEditGoodsItem.state.collectAsState()
+
+  val editedId = addEditState[
+    NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_EDITED_GOODS_ITEM_ID
+  ]
+
+  val existing = stateValues.stock.orEmpty().find { it.id == editedId }
+
+  val defaultCurrency = stateValues.globalAppConfiguration
+    .countries
+    .firstOrNull()
+    ?.currencies
+    ?.firstOrNull()
+    ?.code
+    ?: "KZT"
+
+  val defaultMeasurementUnitId = stateValues.globalAppConfiguration
+    .goodsItemsQuantityUnits
+    .firstOrNull()
+    ?.id
+    ?: "0"
+
+  fun newDraft(): StockAddEditDraft {
+    return StockAddEditDraft(
+      barcodes = listOf(""),
+      name = emptyLocalizedItemForCurrentLanguage(),
+      description = emptyLocalizedItemForCurrentLanguage(),
+      measurementUnitId = defaultMeasurementUnitId,
+      categoryIds = emptyList(),
+      salePrices = listOf(
+        PriceDataModel(
+          price = "",
+          currency = defaultCurrency,
+          supplierId = ""
+        )
+      ),
+      returnPrices = listOf(
+        PriceDataModel(
+          price = "",
+          currency = defaultCurrency,
+          supplierId = ""
+        )
+      ),
+      supplyPrices = listOf(
+        PriceDataModel(
+          price = "",
+          currency = defaultCurrency,
+          supplierId = ""
+        )
+      ),
+      isQuickItem = false,
+      note = ""
+    )
+  }
+
+  var draft by remember(existing?.id, defaultCurrency, defaultMeasurementUnitId, stateValues.appLanguage) {
+    mutableStateOf(
+      existing?.toStockAddEditDraft() ?: newDraft()
+    )
+  }
+
+  Column(
+    modifier = Modifier.fillMaxSize(),
+    horizontalAlignment = Alignment.CenterHorizontally
+  ) {
+    ScreenAppBarWidget(
+      title = if (existing == null) stateValues.stringAddGoodsItem else stateValues.stringEditGoodsItem,
+      iconPath = if (existing == null) stateValues.drawablePathIconAdd else stateValues.drawablePathIconEdit,
+      onBack = {
+        coroutineScope.launch {
+          Navigation.Stock.pop(stateValues.isNarrowScreen)
+          NavigationScreenModel.Stock.AddEditGoodsItem.removeState(
+            NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_EDITED_GOODS_ITEM_ID
+          )
+        }
+      }
+    )
+
+    LazyColumn(
+      modifier = Modifier
+        .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.92f)
+        .weight(1f)
+        .padding(start = 8.dp, top = 8.dp, end = 8.dp)
+    ) {
+      item {
+        BarcodeListEditor(
+          title = stateValues.stringBarcode,
+          barcodes = draft.barcodes.ifEmpty { listOf("") },
+          onChanged = {
+            draft = draft.copy(barcodes = it.ifEmpty { listOf("") })
+          }
+        )
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+        StockLocalizedStringGroupEditor(
+          title = stateValues.stringName,
+          placeholder = stateValues.stringEnterName,
+          values = draft.name,
+          addText = stateValues.stringAddTranslation,
+          required = true,
+          onChanged = {
+            draft = draft.copy(name = it)
+          }
+        )
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+        StockLocalizedStringGroupEditor(
+          title = stateValues.stringDescription,
+          placeholder = stateValues.stringEnterDescription,
+          values = draft.description,
+          addText = "${stateValues.stringAdd} ${stateValues.stringDescription}",
+          required = false,
+          onChanged = {
+            draft = draft.copy(description = it)
+          }
+        )
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+        val measurementUnitDropdown = dropdownListWidget(
+          titleText = stateValues.stringMeasurementUnit,
+          domains = stockQuantityUnitDomains(),
+          selectedInitial = draft.measurementUnitId,
+          showId = false,
+          showName = true
+        )
+
+        LaunchedEffect(measurementUnitDropdown.selectedId) {
+          if (measurementUnitDropdown.selectedId != draft.measurementUnitId) {
+            draft = draft.copy(measurementUnitId = measurementUnitDropdown.selectedId)
+          }
+        }
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+        val categoryDomains = stockCategoryDomains()
+
+        if (categoryDomains.isEmpty()) {
+          Text(
+            text = stateValues.stringCategory,
+            color = stateValues.TextColor,
+            fontSize = stateValues.accentTextSize,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 4.dp)
+          )
+
+          MessageText(
+            modifier = Modifier
+              .fillMaxWidth()
+              .height(stateValues.textFieldHeight),
+            text = stateValues.stringListEmpty,
+            textSize = stateValues.textSize
+          )
+        } else {
+          val categoryDropdown = dropdownListWidget(
+            titleText = stateValues.stringCategory,
+            domains = categoryDomains,
+            selectedInitial = draft.categoryIds.firstOrNull() ?: categoryDomains.first().id,
+            showId = false,
+            showName = true,
+            search = Triple(stateValues.stringSearchByAnyData, NavigationScreenModel.Stock.AddEditGoodsItem, "stock_category_search")
+          )
+
+          LaunchedEffect(categoryDropdown.selectedId) {
+            if (draft.categoryIds.firstOrNull() != categoryDropdown.selectedId) {
+              draft = draft.copy(categoryIds = listOf(categoryDropdown.selectedId))
             }
           }
         }
 
-        goAction = {
-//          editedGoodsItem?.let {
-//
-//          } ?: stockRepository
-//            .addGoodsItem(
-//              GoodsItemDataModel(
-//                id = "",
-//                userId = "",
-//                storeId = stateValues.activeStoreId!!,
-//                barcode = barcodeTextFieldGroupContent.data.map { it.value.text },
-//                name = listOf(
-//                  LocalizedStringDataModel(language = "main", nameTextFieldContent.value.text)
-//                ),
-//                measurementUnitId = stateValues.globalAppConfiguration.goodsItemsQuantityUnits.find {
-//                  it.id == measurementUnitDropdownListContent.selectedId
-//                }!!.id,
-//                categoryIds = categoryDropdownListContent?.selectedId?.let { listOf(it) } ?: emptyList(),
-//                salePrices = saleData.data.map {
-//                  PriceDataModel(
-//                    price = it.value.text,
-//                    currency = it.selectedSecondaryDomainId,
-//                    supplierId = it.selectedDomainId
-//                  )
-//                },
-//                supplyPrices = supplyData.data.map {
-//                  PriceDataModel(
-//                    price = it.value.text,
-//                    currency = it.selectedSecondaryDomainId,
-//                    supplierId = it.selectedDomainId
-//                  )
-//                },
-//                returnPrices = returnData.data.map {
-//                  PriceDataModel(
-//                    price = it.value.text,
-//                    currency = it.selectedSecondaryDomainId,
-//                    supplierId = it.selectedDomainId
-//                  )
-//                },
-//                createdAt = 0L,
-//                isQuickItem = isQuickItem,
-//                isActive = true
-//              )
-//            ) {
-//              coroutineScope.launch {
-//                Navigation.Stock.pop(stateValues.isNarrowScreen)
-//                if (editedGoodsItem != null)
-//                  NavigationScreenModel.Stock.AddEditGoodsItem.removeState(NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_EDITED_GOODS_ITEM_ID)
-//              }
-//            }
-        }
-      }
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
-      item {
-        Spacer(
-          modifier = Modifier
-            .height(stateValues.screenHeight / 4)
+        StockPriceGroupEditor(
+          title = stateValues.stringSalePrice,
+          placeholder = stateValues.stringEnterSalePrice,
+          prices = draft.salePrices.ifEmpty { listOf(PriceDataModel("", defaultCurrency, "")) },
+          addText = "${stateValues.stringAdd} ${stateValues.stringSalePrice}",
+          onChanged = {
+            draft = draft.copy(salePrices = it.ifEmpty { listOf(PriceDataModel("", defaultCurrency, "")) })
+          }
         )
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+        StockPriceGroupEditor(
+          title = stateValues.stringReturnPrice,
+          placeholder = stateValues.stringEnterReturnPrice,
+          prices = draft.returnPrices.ifEmpty { listOf(PriceDataModel("", draft.salePrices.firstOrNull()?.currency ?: defaultCurrency, "")) },
+          addText = "${stateValues.stringAdd} ${stateValues.stringReturnPrice}",
+          onChanged = {
+            draft = draft.copy(returnPrices = it.ifEmpty { listOf(PriceDataModel("", draft.salePrices.firstOrNull()?.currency ?: defaultCurrency, "")) })
+          }
+        )
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+        StockPriceGroupEditor(
+          title = stateValues.stringSupplyPrice,
+          placeholder = stateValues.stringEnterSupplyPrice,
+          prices = draft.supplyPrices.ifEmpty { listOf(PriceDataModel("", draft.salePrices.firstOrNull()?.currency ?: defaultCurrency, "")) },
+          addText = "${stateValues.stringAdd} ${stateValues.stringSupplyPrice}",
+          onChanged = {
+            draft = draft.copy(supplyPrices = it.ifEmpty { listOf(PriceDataModel("", draft.salePrices.firstOrNull()?.currency ?: defaultCurrency, "")) })
+          }
+        )
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+        Row(
+          modifier = Modifier
+            .fillMaxWidth()
+            .height(stateValues.textFieldHeight)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .border(
+              stateValues.unfocusedBorderWidth,
+              if (draft.isQuickItem) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+              RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .background(stateValues.BackgroundColor)
+            .clickable(
+              interactionSource = remember { MutableInteractionSource() },
+              indication = ripple(color = stateValues.AccentColor),
+              onClick = {
+                draft = draft.copy(isQuickItem = !draft.isQuickItem)
+              }
+            )
+            .padding(horizontal = stateValues.marginTextFieldGroup),
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          Checkbox(
+            checked = draft.isQuickItem,
+            onCheckedChange = {
+              draft = draft.copy(isQuickItem = it)
+            },
+            colors = CheckboxDefaults.colors(
+              checkedColor = stateValues.AccentColor,
+              uncheckedColor = stateValues.PlaceholderTextColor,
+              checkmarkColor = stateValues.AccentTextColor
+            )
+          )
+
+          Spacer(modifier = Modifier.width(8.dp))
+
+          Text(
+            text = stateValues.stringQuick,
+            color = stateValues.TextColor,
+            fontSize = stateValues.textSize,
+            fontWeight = FontWeight.Bold
+          )
+        }
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+        genericTextField(
+          titleText = "Notes / ${stateValues.stringOptional}",
+          valueInitial = draft.note,
+          placeholderText = stateValues.stringOptional,
+          wide = true,
+          onValueChange = { value, applyChange ->
+            applyChange()
+            draft = draft.copy(note = value)
+          }
+        )
+
+        Spacer(modifier = Modifier.height(stateValues.screenHeight / 5))
       }
     }
 
-    Column(
+    actionButton(
       modifier = Modifier
-        .fillMaxWidth()
-        .padding(4.dp)
-    ) {
-      Spacer(modifier = Modifier.height(4.dp))
+        .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.92f)
+        .padding(8.dp),
+      text = stateValues.stringConfirm,
+      enabled = draft.isValidStockDraft() &&
+          stateValues.activeStoreId != null &&
+          stateValues.latestNotification == null,
+      onClick = {
+        val storeId = stateValues.activeStoreId ?: return@actionButton
+        val goodsItem = draft.toGoodsItem(storeId, existing)
 
-      actionButton(
-        text = editedGoodsItem?.let { stateValues.stringEditGoodsItem } ?: stateValues.stringAddGoodsItem,
-        enabled = stateValues.latestNotification == null,
-        onClick = {
-          goAction?.invoke()
+        if (existing == null) {
+          addGoodsItem(goodsItem) {
+            if (it is DataState.Success) {
+              coroutineScope.launch {
+                Navigation.Stock.pop(stateValues.isNarrowScreen)
+              }
+            }
+          }
+        } else {
+          updateGoodsItem(goodsItem) {
+            if (it is DataState.Success) {
+              coroutineScope.launch {
+                Navigation.Stock.pop(stateValues.isNarrowScreen)
+                NavigationScreenModel.Stock.AddEditGoodsItem.removeState(
+                  NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_EDITED_GOODS_ITEM_ID
+                )
+              }
+            }
+          }
+        }
+      }
+    )
+  }
+}
+
+//@Composable
+//fun AppConfiguration.StockAddEditGoodsItemScreen() {
+//  Column(
+//    modifier = Modifier
+//      .fillMaxSize()
+//  ) {
+//    val state by NavigationScreenModel.Stock.AddEditGoodsItem.state.collectAsState()
+//
+//    val editedGoodsItem =
+//      state[NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_EDITED_GOODS_ITEM_ID]?.run { stateValues.stock?.find { goodsItem -> goodsItem.id == this } }
+//
+//    ScreenAppBarWidget(
+//      title = editedGoodsItem?.let { stateValues.stringEditGoodsItem } ?: stateValues.stringAddGoodsItem,
+//      iconPath = editedGoodsItem?.let { stateValues.drawablePathIconEdit } ?: stateValues.drawablePathIconAdd,
+//      onBack = if (!Navigation.Stock.isVeryFirstScreen(stateValues.isNarrowScreen)) {
+//        {
+//          coroutineScope.launch {
+//            Navigation.Stock.pop(stateValues.isNarrowScreen)
+//            if (editedGoodsItem != null)
+//              NavigationScreenModel.Stock.AddEditGoodsItem.removeState(NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_EDITED_GOODS_ITEM_ID)
+//          }
+//        }
+//      } else null
+//    )
+//
+//    var goAction: (() -> Unit)? = null
+//
+//    var barcodeTextFieldValues by rememberSaveable {
+//      mutableStateOf(
+//        mutableListOf<String>()
+//          .apply {
+//            add("")
+//          }
+//      )
+//    }
+//
+//    LazyColumn(
+//      modifier = Modifier
+//        .fillMaxWidth()
+//        .weight(1f)
+//        .padding(start = 8.dp, top = 24.dp, end = 8.dp)
+//    ) {
+//      item {
+//        Text(
+//          modifier = Modifier
+//            .padding(bottom = 4.dp),
+//          text = stateValues.stringBarcode,
+//          style = TextStyle(
+//            color = stateValues.TextColor,
+//            fontSize = stateValues.accentTextSize,
+//            fontWeight = FontWeight.Bold
+//          )
+//        )
+//
+//        barcodeTextFieldValues.forEachIndexed { index, _ ->
+//          Row {
+//            genericTextField(
+//              placeholderText = if (index == 0) stateValues.stringEnterBarcode else stateValues.stringEnterBarcode + " ${index + 1}",
+//              onValueChange = { value, action ->
+//                barcodeTextFieldValues[index] = value
+//                action()
+//              }
+//            )
+//
+//            Spacer(modifier = Modifier.width(1.dp))
+//
+//            actionButton(
+//              text = "",
+//              iconPath = stateValues.drawablePathIconSubtract,
+//              iconRes = stateValues.drawableResIconSubtract.value
+//            ) {
+//
+//            }
+//          }
+//
+//          Spacer(modifier = Modifier.height(2.dp))
+//        }
+//
+//        Spacer(modifier = Modifier.height(4.dp))
+//
+//        actionButton(
+//          text = stateValues.stringAddBarcode
+//        ) {
+//          barcodeTextFieldValues = mutableListOf<String>().apply {
+//            addAll(barcodeTextFieldValues)
+//            add("")
+//          }
+//
+//          println("barcodes $barcodeTextFieldValues")
+//
+//        }
+//
+//        var name: String? by rememberSaveable {
+//          mutableStateOf(null)
+//        }
+//
+//        var measurementUnitDropdownListSelectedInitial: String? by rememberSaveable {
+//          mutableStateOf(stateValues.globalAppConfiguration.goodsItemsQuantityUnits.takeIf { it.isNotEmpty() }
+//            ?.first()?.id)
+//        }
+//
+////        LaunchedEffect(barcodeTextFieldGroupContent.data) {
+////          try {
+////            barcodeTextFieldGroupContent.data.last().value.text.takeIf { it.length == 13 }?.run {
+////              genericItemsRepository
+////                .getGenericGoodsItems(this)
+////                .collect {
+////                  if (it is DataState.Success && it.payload.isNotEmpty()) {
+////                    name = it.payload.first().name.extractLocalizedString(stateValues.appLanguage)
+////                  }
+////                }
+////            }
+////          } catch (thr: Throwable) {
+////            thr.printStackTrace()
+////          }
+////        }
+//
+//        Spacer(
+//          modifier = Modifier
+//            .height(stateValues.marginTextField)
+//        )
+//
+//        val nameTextFieldContent =
+//          genericTextField(
+//            titleText = stateValues.stringName,
+//            placeholderText = stateValues.stringEnterName,
+//            valueInitial = name,
+//            stateHost = NavigationScreenModel.Stock.AddEditGoodsItem,
+//            stateKey = NavigationScreenModel.KEY_STATE_NAME,
+//          )
+//
+//        var isQuickItem by rememberSaveable {
+//          mutableStateOf(false)
+//        }
+//
+//        Row(
+//          verticalAlignment = Alignment.CenterVertically
+//        ) {
+//          Checkbox(
+//            checked = isQuickItem,
+//            onCheckedChange = {
+//              isQuickItem = it
+//            },
+//            colors = CheckboxColors(
+//              checkedBoxColor = stateValues.AccentColor,
+//              checkedCheckmarkColor = stateValues.AccentTextColor,
+//              uncheckedBoxColor = stateValues.BackgroundColor,
+//              checkedBorderColor = stateValues.PlaceholderTextColor,
+//              uncheckedBorderColor = stateValues.PlaceholderTextColor,
+//              uncheckedCheckmarkColor = stateValues.PlaceholderTextColor,
+//              disabledBorderColor = stateValues.PlaceholderTextColor,
+//              disabledCheckedBoxColor = stateValues.PlaceholderTextColor,
+//              disabledUncheckedBoxColor = stateValues.PlaceholderTextColor,
+//              disabledIndeterminateBorderColor = stateValues.PlaceholderTextColor,
+//              disabledUncheckedBorderColor = stateValues.PlaceholderTextColor,
+//              disabledIndeterminateBoxColor = stateValues.PlaceholderTextColor,
+//            )
+//          )
+//
+//          Spacer(Modifier.width(2.dp))
+//
+//          Text(
+//            text = stateValues.stringQuick,
+//            color = stateValues.TextColor
+//          )
+//        }
+//
+//        var categoryDropdownListContent: DropdownListWidgetContent? = null
+//        categoryDropdownListContent = stateValues.goodsCategories?.run {
+//          val content = dropdownListWidget(
+//            titleText = stateValues.stringCategory,
+//            domains = map {
+//              SelectableDomain(
+//                id = it.id,
+//                displayId = it.name,
+//                name = it.name,
+//                iconPath = null,
+//                iconRes = null,
+//              )
+//            },
+//            showName = false
+//          )
+//
+//          Spacer(
+//            modifier = Modifier
+//              .height(stateValues.marginTextField)
+//          )
+//
+//          content
+//        }
+//
+//        LaunchedEffect(categoryDropdownListContent?.selectedId) {
+//          stateValues.goodsCategories?.find { it.id == categoryDropdownListContent?.selectedId }?.let {
+//            measurementUnitDropdownListSelectedInitial = it.quantityUnitId
+//          }
+//        }
+//
+//        val measurementUnitDropdownListContent = dropdownListWidget(
+//          titleText = stateValues.stringMeasurementUnit,
+//          domains = stateValues.globalAppConfiguration.goodsItemsQuantityUnits.map {
+//            SelectableDomain(
+//              id = it.id,
+//              displayId = it.immutableUnitName,
+//              name = it.immutableUnitName,
+//              iconPath = null,
+//              iconRes = null
+//            )
+//          },
+//          selectedInitial = measurementUnitDropdownListSelectedInitial,
+//          showName = false
+//        )
+//
+//        Spacer(
+//          modifier = Modifier
+//            .height(stateValues.marginTextField)
+//        )
+//
+//        Text(
+//          text = "Batch data", // TODO
+//          fontSize = stateValues.accentTextSize,
+//          fontWeight = FontWeight.Bold,
+//          color = stateValues.TextColor,
+//          modifier = Modifier
+//            .fillMaxWidth()
+//        )
+//
+//        Spacer(
+//          modifier = Modifier
+//            .height(4.dp)
+//        )
+//
+//        val prices by rememberSaveable {
+//          mutableStateOf(
+//            editedGoodsItem?.let {
+//              mutableListOf<BatchPriceInfo>().apply {
+//                it.salePrices.forEach { item ->
+//                  if (find { item2 -> item2.supplierId == item.supplierId } != null)
+//                    indexOfFirst { item3 -> item3.supplierId == item.supplierId }.takeIf { v -> v != -1 }?.let { index ->
+//                      set(index, get(index).copy(salePrice = item.price))
+//                    }
+//                  else
+//                    add(
+//                      BatchPriceInfo(
+//                        supplierId = item.supplierId,
+//                        supplyPrice = "",
+//                        salePrice = item.price,
+//                        returnPrice = "",
+//                        currency = item.currency
+//                      )
+//                    )
+//                }
+//
+//                it.supplyPrices.forEach { item ->
+//                  if (find { item2 -> item2.supplierId == item.supplierId } != null)
+//                    indexOfFirst { item3 -> item3.supplierId == item.supplierId }.takeIf { v -> v != -1 }?.let { index ->
+//                      set(index, get(index).copy(supplyPrice = item.price))
+//                    }
+//                  else
+//                    add(
+//                      BatchPriceInfo(
+//                        supplierId = item.supplierId,
+//                        supplyPrice = item.price,
+//                        salePrice = "",
+//                        returnPrice = "",
+//                        currency = item.currency
+//                      )
+//                    )
+//                }
+//
+//                it.returnPrices.forEach { item ->
+//                  if (find { item2 -> item2.supplierId == item.supplierId } != null)
+//                    indexOfFirst { item3 -> item3.supplierId == item.supplierId }.takeIf { v -> v != -1 }?.let { index ->
+//                      set(index, get(index).copy(supplyPrice = item.price))
+//                    }
+//                  else
+//                    add(
+//                      BatchPriceInfo(
+//                        supplierId = item.supplierId,
+//                        supplyPrice = "",
+//                        salePrice = "",
+//                        returnPrice = item.price,
+//                        currency = item.currency
+//                      )
+//                    )
+//                }
+//              }
+//            } ?: emptyList()
+//          )
+//        }
+//
+//        Row(
+//          verticalAlignment = Alignment.CenterVertically
+//        ) {
+//          actionButton(
+//            text = "",
+//            iconPath = stateValues.drawablePathIconAdd,
+//            iconRes = stateValues.drawableResIconAdd.value
+//          ) {
+//
+//          }
+//
+//          Spacer(modifier = Modifier.width(8.dp))
+//
+//          LazyRow {
+//            items(prices) {
+//              StockBatchWidget(
+//                modifier = Modifier
+//                  .width(stateValues.screenWidth / 3),
+//                containedSupplierIds = prices.map { it.supplierId }
+//              )
+//            }
+//          }
+//        }
+//
+//        goAction = {
+////          editedGoodsItem?.let {
+////
+////          } ?: stockRepository
+////            .addGoodsItem(
+////              GoodsItemDataModel(
+////                id = "",
+////                userId = "",
+////                storeId = stateValues.activeStoreId!!,
+////                barcode = barcodeTextFieldGroupContent.data.map { it.value.text },
+////                name = listOf(
+////                  LocalizedStringDataModel(language = "main", nameTextFieldContent.value.text)
+////                ),
+////                measurementUnitId = stateValues.globalAppConfiguration.goodsItemsQuantityUnits.find {
+////                  it.id == measurementUnitDropdownListContent.selectedId
+////                }!!.id,
+////                categoryIds = categoryDropdownListContent?.selectedId?.let { listOf(it) } ?: emptyList(),
+////                salePrices = saleData.data.map {
+////                  PriceDataModel(
+////                    price = it.value.text,
+////                    currency = it.selectedSecondaryDomainId,
+////                    supplierId = it.selectedDomainId
+////                  )
+////                },
+////                supplyPrices = supplyData.data.map {
+////                  PriceDataModel(
+////                    price = it.value.text,
+////                    currency = it.selectedSecondaryDomainId,
+////                    supplierId = it.selectedDomainId
+////                  )
+////                },
+////                returnPrices = returnData.data.map {
+////                  PriceDataModel(
+////                    price = it.value.text,
+////                    currency = it.selectedSecondaryDomainId,
+////                    supplierId = it.selectedDomainId
+////                  )
+////                },
+////                createdAt = 0L,
+////                isQuickItem = isQuickItem,
+////                isActive = true
+////              )
+////            ) {
+////              coroutineScope.launch {
+////                Navigation.Stock.pop(stateValues.isNarrowScreen)
+////                if (editedGoodsItem != null)
+////                  NavigationScreenModel.Stock.AddEditGoodsItem.removeState(NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_EDITED_GOODS_ITEM_ID)
+////              }
+////            }
+//        }
+//      }
+//
+//      item {
+//        Spacer(
+//          modifier = Modifier
+//            .height(stateValues.screenHeight / 4)
+//        )
+//      }
+//    }
+//
+//    Column(
+//      modifier = Modifier
+//        .fillMaxWidth()
+//        .padding(4.dp)
+//    ) {
+//      Spacer(modifier = Modifier.height(4.dp))
+//
+//      actionButton(
+//        text = editedGoodsItem?.let { stateValues.stringEditGoodsItem } ?: stateValues.stringAddGoodsItem,
+//        enabled = stateValues.latestNotification == null,
+//        onClick = {
+//          goAction?.invoke()
+//        }
+//      )
+//
+//      Spacer(modifier = Modifier.height(4.dp))
+//    }
+//  }
+//}
+
+data class DropdownOption(
+  val id: String,
+  val title: String,
+  val subtitle: String? = null
+)
+
+@Composable
+fun AppConfiguration.LocalizedStringListEditor(
+  title: String,
+  values: List<LocalizedStringDataModel>,
+  onChanged: (List<LocalizedStringDataModel>) -> Unit
+) {
+  Column {
+    Text(
+      text = title,
+      color = stateValues.TextColor,
+      fontSize = stateValues.textSize,
+      fontWeight = FontWeight.Bold
+    )
+
+    Spacer(modifier = Modifier.height(8.dp))
+
+    stateValues.globalAppConfiguration.languages.forEach { language ->
+      val current = values.find { it.language == language.language }?.value.orEmpty()
+
+      SimpleTextInput(
+        modifier = Modifier.fillMaxWidth(),
+        value = current,
+        placeholder = language.name.extractLocalizedString(stateValues.appLanguage)
+          ?: language.language,
+        onValueChange = { newValue ->
+          val mutable = values.toMutableList()
+          val index = mutable.indexOfFirst { it.language == language.language }
+
+          if (index == -1) {
+            mutable.add(
+              LocalizedStringDataModel(
+                language = language.language,
+                value = newValue
+              )
+            )
+          } else {
+            mutable[index] = mutable[index].copy(value = newValue)
+          }
+
+          onChanged(mutable)
         }
       )
 
-      Spacer(modifier = Modifier.height(4.dp))
+      Spacer(modifier = Modifier.height(stateValues.marginTextField))
+    }
+  }
+}
+
+@Composable
+fun AppConfiguration.SimpleTextInput(
+  modifier: Modifier = Modifier,
+  value: String,
+  placeholder: String,
+  singleLine: Boolean = true,
+  onValueChange: (String) -> Unit
+) {
+  BasicTextField(
+    value = value,
+    onValueChange = onValueChange,
+    singleLine = singleLine,
+    textStyle = TextStyle(
+      color = stateValues.TextColor,
+      fontSize = stateValues.textSize
+    ),
+    modifier = modifier
+      .height(if (singleLine) stateValues.textFieldHeight else stateValues.wideTextFieldHeight)
+      .clip(RoundedCornerShape(stateValues.cornerRadius))
+      .border(
+        stateValues.unfocusedBorderWidth,
+        stateValues.PlaceholderTextColor,
+        RoundedCornerShape(stateValues.cornerRadius)
+      )
+      .background(stateValues.BackgroundColor)
+      .padding(horizontal = stateValues.marginTextFieldGroup),
+    decorationBox = { inner ->
+      Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.CenterStart
+      ) {
+        if (value.isBlank()) {
+          Text(
+            text = placeholder,
+            color = stateValues.PlaceholderTextColor,
+            fontSize = stateValues.textSize
+          )
+        }
+
+        inner()
+      }
+    }
+  )
+}
+
+@Composable
+fun AppConfiguration.BarcodeListEditor(
+  title: String,
+  barcodes: List<String>,
+  onChanged: (List<String>) -> Unit
+) {
+  var focusTargetIndex by rememberSaveable {
+    mutableStateOf(0)
+  }
+
+  LaunchedEffect(focusTargetIndex, barcodes.size) {
+    if (focusTargetIndex >= 0) {
+      delay(650)
+      focusTargetIndex = -1
+    }
+  }
+
+  Column {
+    val currentBarcodes = barcodes.ifEmpty { listOf("") }
+
+    currentBarcodes.forEachIndexed { index, barcode ->
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        genericTextField(
+          modifier = Modifier.weight(1f),
+          titleText = if (index == 0) title else "$title ${index + 1}",
+          valueInitial = barcode,
+          placeholderText = stateValues.stringEnterBarcode,
+          leadingIconPath = stateValues.drawablePathIconBarcodeCamScanner,
+          keyboardType = KeyboardType.Text,
+          imeWithAction = ImeWithAction(ImeAction.Next),
+          isFocusedInitial = index == focusTargetIndex,
+          forceRefocus = index == focusTargetIndex,
+          showClearButton = false,
+          contentInvalidText = stateValues.stringBarcode,
+          onContentValidityCheck = { it.isNotBlank() },
+          onFilterValue = { value ->
+            value.all { char -> char.isDigit() || char.isLetter() }
+          },
+          onValueChange = { value, applyChange ->
+            if (value.all { char -> char.isDigit() || char.isLetter() }) {
+              applyChange()
+              onChanged(
+                currentBarcodes.toMutableList().also {
+                  while (it.size <= index) it.add("")
+                  it[index] = value
+                }
+              )
+            }
+          }
+        )
+
+        if (currentBarcodes.size > 1) {
+          Box(
+            modifier = Modifier
+              .height(stateValues.textFieldHeight)
+              .wrapContentWidth(),
+            contentAlignment = Alignment.Center
+          ) {
+            actionButton(
+              text = "",
+              iconPath = stateValues.drawablePathIconCancel,
+              iconContentDescription = stateValues.stringDelete,
+              fillMaxWidthIfTextPresent = false,
+              enabledColor = stateValues.ErrorColor
+            ) {
+              val newList = currentBarcodes.toMutableList().also {
+                if (index in it.indices) it.removeAt(index)
+              }
+              focusTargetIndex = (index - 1).coerceAtLeast(0)
+              onChanged(newList.ifEmpty { listOf("") })
+            }
+          }
+        }
+      }
+
+      Spacer(modifier = Modifier.height(stateValues.marginTextField))
+    }
+
+    actionButton(
+      text = stateValues.stringAddBarcode,
+      iconPath = stateValues.drawablePathIconAdd,
+      fillMaxWidthIfTextPresent = false
+    ) {
+      val nextIndex = currentBarcodes.size
+      focusTargetIndex = nextIndex
+      onChanged(currentBarcodes + "")
+    }
+  }
+}
+
+@Composable
+fun AppConfiguration.SimpleDropdownField(
+  modifier: Modifier = Modifier,
+  title: String,
+  selectedId: String?,
+  options: List<DropdownOption>,
+  placeholder: String,
+  onSelected: (String) -> Unit
+) {
+  var expanded by rememberSaveable {
+    mutableStateOf(false)
+  }
+
+  val selected = options.find { it.id == selectedId }
+
+  Column(modifier = modifier) {
+    Text(
+      text = title,
+      color = stateValues.TextColor,
+      fontSize = stateValues.textSize,
+      fontWeight = FontWeight.Bold
+    )
+
+    Spacer(modifier = Modifier.height(4.dp))
+
+    Box(
+      modifier = Modifier
+        .fillMaxWidth()
+        .clip(RoundedCornerShape(stateValues.cornerRadius))
+        .border(
+          stateValues.unfocusedBorderWidth,
+          stateValues.PlaceholderTextColor,
+          RoundedCornerShape(stateValues.cornerRadius)
+        )
+        .background(stateValues.BackgroundColor)
+        .clickable(
+          interactionSource = remember { MutableInteractionSource() },
+          indication = ripple(color = stateValues.TextColor)
+        ) {
+          expanded = !expanded
+        }
+        .padding(stateValues.marginTextFieldGroup)
+    ) {
+      Column {
+        Text(
+          text = selected?.title ?: placeholder,
+          color = if (selected == null) stateValues.PlaceholderTextColor else stateValues.TextColor,
+          fontSize = stateValues.textSize,
+          fontWeight = FontWeight.Bold
+        )
+
+        selected?.subtitle?.let {
+          Text(
+            text = it,
+            color = stateValues.PlaceholderTextColor,
+            fontSize = stateValues.smallTextSize
+          )
+        }
+      }
+    }
+
+    AnimatedVisibility(expanded) {
+      LazyColumn(
+        modifier = Modifier
+          .fillMaxWidth()
+          .heightIn(max = stateValues.screenHeight / 3)
+          .clip(RoundedCornerShape(stateValues.cornerRadius))
+          .border(
+            stateValues.unfocusedBorderWidth,
+            stateValues.PlaceholderTextColor,
+            RoundedCornerShape(stateValues.cornerRadius)
+          )
+          .background(stateValues.BackgroundColor)
+      ) {
+        items(options) { option ->
+          Column(
+            modifier = Modifier
+              .fillMaxWidth()
+              .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple(color = stateValues.TextColor)
+              ) {
+                onSelected(option.id)
+                expanded = false
+              }
+              .padding(stateValues.marginTextFieldGroup)
+          ) {
+            Text(
+              text = option.title,
+              color = stateValues.TextColor,
+              fontWeight = FontWeight.Bold
+            )
+
+            option.subtitle?.let {
+              Text(
+                text = it,
+                color = stateValues.PlaceholderTextColor,
+                fontSize = stateValues.smallTextSize
+              )
+            }
+          }
+        }
+      }
     }
   }
 }
@@ -3291,6 +6492,30 @@ sealed class NavigationScreenModel(
       override val iconRes: DrawableResource
         get() = TODO("Not yet implemented")
     }
+
+    data object GoodsItemDetails: Stock("StockGoodsItemDetailsNavigationScreenModelRoute") {
+      const val KEY_STATE_GOODS_ITEM_ID: String = "keyState_goodsItemId"
+      override val iconRes: DrawableResource
+        get() = TODO("Not yet implemented")
+    }
+
+    data object GoodsItemBatches: Stock("StockGoodsItemBatchesNavigationScreenModelRoute") {
+      const val KEY_STATE_GOODS_ITEM_ID: String = "keyState_goodsItemId"
+      override val iconRes: DrawableResource
+        get() = TODO("Not yet implemented")
+    }
+
+    data object GoodsItemSupplierPrices: Stock("StockGoodsItemSupplierPricesNavigationScreenModelRoute") {
+      const val KEY_STATE_GOODS_ITEM_ID: String = "keyState_goodsItemId"
+      override val iconRes: DrawableResource
+        get() = TODO("Not yet implemented")
+    }
+
+    data object GoodsItemOrders: Stock("StockGoodsItemOrdersNavigationScreenModelRoute") {
+      const val KEY_STATE_GOODS_ITEM_ID: String = "keyState_goodsItemId"
+      override val iconRes: DrawableResource
+        get() = TODO("Not yet implemented")
+    }
   }
 
   sealed class Menu(route: String): NavigationScreenModel(route) {
@@ -3546,20 +6771,20 @@ object Navigation {
       }
       1 -> {
         when (clientId) {
-          0 -> if (isNarrowScreen) TransactionReturn.LeftClient1 else TransactionSale.RightClient1
-          1 -> if (isNarrowScreen) TransactionReturn.LeftClient2 else TransactionSale.RightClient2
-          2 -> if (isNarrowScreen) TransactionReturn.LeftClient3 else TransactionSale.RightClient3
-          3 -> if (isNarrowScreen) TransactionReturn.LeftClient4 else TransactionSale.RightClient4
-          else -> if (isNarrowScreen) TransactionReturn.LeftClient5 else TransactionSale.RightClient5
+          0 -> if (isNarrowScreen) TransactionReturn.LeftClient1 else TransactionReturn.RightClient1
+          1 -> if (isNarrowScreen) TransactionReturn.LeftClient2 else TransactionReturn.RightClient2
+          2 -> if (isNarrowScreen) TransactionReturn.LeftClient3 else TransactionReturn.RightClient3
+          3 -> if (isNarrowScreen) TransactionReturn.LeftClient4 else TransactionReturn.RightClient4
+          else -> if (isNarrowScreen) TransactionReturn.LeftClient5 else TransactionReturn.RightClient5
         }
       }
       else -> {
         when (clientId) {
-          0 -> if (isNarrowScreen) TransactionSupply.LeftClient1 else TransactionSale.RightClient1
-          1 -> if (isNarrowScreen) TransactionSupply.LeftClient2 else TransactionSale.RightClient2
-          2 -> if (isNarrowScreen) TransactionSupply.LeftClient3 else TransactionSale.RightClient3
-          3 -> if (isNarrowScreen) TransactionSupply.LeftClient4 else TransactionSale.RightClient4
-          else -> if (isNarrowScreen) TransactionSupply.LeftClient5 else TransactionSale.RightClient5
+          0 -> if (isNarrowScreen) TransactionSupply.LeftClient1 else TransactionSupply.RightClient1
+          1 -> if (isNarrowScreen) TransactionSupply.LeftClient2 else TransactionSupply.RightClient2
+          2 -> if (isNarrowScreen) TransactionSupply.LeftClient3 else TransactionSupply.RightClient3
+          3 -> if (isNarrowScreen) TransactionSupply.LeftClient4 else TransactionSupply.RightClient4
+          else -> if (isNarrowScreen) TransactionSupply.LeftClient5 else TransactionSupply.RightClient5
         }
       }
     }
@@ -6623,25 +9848,25 @@ fun AppConfiguration.MenuUserAccountScreen() {
             && confirmationPasswordTextFieldContent.isContentValid
           ) {
             updateUser(
-                userAccountUpdate = UserAccountUpdateDataModel(
-                  account = UserAccountDataModel(
-                    id = "",
-                    phoneNumber = stateValues.globalAppConfiguration.countries.run {
-                      find { it.locale.equals(phoneNumberTextFieldContent.selectedId, true) } ?: first()
-                    }.phoneNumberCode.lowercase() + phoneNumberTextFieldContent.value.text.trim().lowercase(),
-                    email = emailTextFieldContent.value.text.trim().lowercase(),
-                    firstName = firstNameTextFieldContent.value.text.trim(),
-                    lastName = lastNameTextFieldContent.value.text.trim(),
-                    countryLocale = phoneNumberTextFieldContent.selectedId,
-                    workerAccountIds = stateValues.userAccount?.workerAccountIds,
-                    supplierAccountIds = stateValues.userAccount?.supplierAccountIds,
-                    createdAt = 0L,
-                    isActive = true
-                  ),
-                  password = confirmationPasswordTextFieldContent!!.value.text,
-                  newPassword = passwordTextFieldContent!!.takeIf { it.value.text.isNotEmpty() }?.value?.text
-                )
+              userAccountUpdate = UserAccountUpdateDataModel(
+                account = UserAccountDataModel(
+                  id = "",
+                  phoneNumber = stateValues.globalAppConfiguration.countries.run {
+                    find { it.locale.equals(phoneNumberTextFieldContent.selectedId, true) } ?: first()
+                  }.phoneNumberCode.lowercase() + phoneNumberTextFieldContent.value.text.trim().lowercase(),
+                  email = emailTextFieldContent.value.text.trim().lowercase(),
+                  firstName = firstNameTextFieldContent.value.text.trim(),
+                  lastName = lastNameTextFieldContent.value.text.trim(),
+                  countryLocale = phoneNumberTextFieldContent.selectedId,
+                  workerAccountIds = stateValues.userAccount?.workerAccountIds,
+                  supplierAccountIds = stateValues.userAccount?.supplierAccountIds,
+                  createdAt = 0L,
+                  isActive = true
+                ),
+                password = confirmationPasswordTextFieldContent!!.value.text,
+                newPassword = passwordTextFieldContent!!.takeIf { it.value.text.isNotEmpty() }?.value?.text
               )
+            )
 
             confirmationPasswordTextFieldContent.reset()
             passwordTextFieldContent.reset()
@@ -6998,7 +10223,7 @@ fun AppConfiguration.MenuScreen() {
               MenuAddEditStoreScreen()
             }
             is NavigationScreenModel.Menu.StoreSubscription -> {
-            MenuStoreSubscriptionPlansScreen()
+              MenuStoreSubscriptionPlansScreen()
             }
             is NavigationScreenModel.Menu.StoreSubscriptionPlans -> {
               MenuStoreSubscriptionPlansScreen()
@@ -7493,11 +10718,57 @@ fun AppConfiguration.MenuAppLanguageScreen() {
   }
 }
 
+private enum class MenuAnalyticsTab(val id: String) {
+  Sales("sales"),
+  Returns("returns"),
+  Acceptance("acceptance"),
+  Stock("stock"),
+  Suppliers("suppliers"),
+  Workers("workers"),
+  CashRegister("cash_register");
+
+  companion object {
+    fun fromId(id: String): MenuAnalyticsTab {
+      return entries.find { it.id == id } ?: Sales
+    }
+  }
+}
+
+private enum class AnalyticsPeriodPreset(val id: String) {
+  Today("today"),
+  Week("week"),
+  Month("month"),
+  All("all");
+
+  companion object {
+    fun fromId(id: String): AnalyticsPeriodPreset {
+      return entries.find { it.id == id } ?: Month
+    }
+  }
+}
+
+private data class AnalyticsPeriod(
+  val startMillis: Long,
+  val endMillisExclusive: Long
+)
+
+private data class AnalyticsHistoryRow(
+  val title: String,
+  val count: Int,
+  val total: Double
+)
+
+private data class AnalyticsSummaryCardData(
+  val title: String,
+  val value: String,
+  val subtitle: String? = null
+)
+
 @Composable
 fun AppConfiguration.MenuAnalyticsScreen() {
   Column(
-    modifier = Modifier
-      .fillMaxSize()
+    modifier = Modifier.fillMaxSize(),
+    horizontalAlignment = Alignment.CenterHorizontally
   ) {
     ScreenAppBarWidget(
       title = stateValues.stringAnalytics,
@@ -7508,8 +10779,803 @@ fun AppConfiguration.MenuAnalyticsScreen() {
         }
       }
     )
+
+    val transactionsPayload by transactionsState.payload.collectAsState()
+    val transactions = transactionsPayload.orEmpty()
+
+    val cashRegisterExtractionsPayload by cashRegisterExtractionsState.payload.collectAsState()
+    val cashRegisterExtractions = cashRegisterExtractionsPayload.orEmpty()
+
+    val currentCashRegisterAmount by cashRegisterAmountState.collectAsState()
+
+    var selectedPeriodId by rememberSaveable {
+      mutableStateOf(AnalyticsPeriodPreset.Month.id)
+    }
+
+    val selectedPeriodPreset = AnalyticsPeriodPreset.fromId(selectedPeriodId)
+
+    val period = remember(selectedPeriodPreset) {
+      selectedPeriodPreset.toAnalyticsPeriod()
+    }
+
+    val scopedTransactions = remember(
+      transactions,
+      stateValues.activeStoreId,
+      period
+    ) {
+      transactions
+        .filter {
+          stateValues.activeStoreId == null || it.storeId == stateValues.activeStoreId
+        }
+        .filter {
+          it.timeMillis >= period.startMillis &&
+              it.timeMillis < period.endMillisExclusive
+        }
+    }
+
+    val scopedCashRegisterExtractions = remember(
+      cashRegisterExtractions,
+      period
+    ) {
+      cashRegisterExtractions.filter {
+        it.timeMillis >= period.startMillis &&
+            it.timeMillis < period.endMillisExclusive
+      }
+    }
+
+    val selectedTabContent = tabRowWidget(
+      modifier = Modifier
+        .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+        .padding(stateValues.marginTextField),
+      tabs = listOf(
+        TabContent(MenuAnalyticsTab.Sales.id, stateValues.stringSale),
+        TabContent(MenuAnalyticsTab.Returns.id, stateValues.stringReturn),
+        TabContent(MenuAnalyticsTab.Acceptance.id, stateValues.stringSupply),
+        TabContent(MenuAnalyticsTab.Stock.id, stateValues.stringStock),
+        TabContent(MenuAnalyticsTab.Suppliers.id, stateValues.stringSuppliers),
+        TabContent(MenuAnalyticsTab.Workers.id, stateValues.stringWorkers),
+        TabContent(MenuAnalyticsTab.CashRegister.id, "Cash register")
+      )
+    )
+
+    AnalyticsPeriodSelector(
+      selectedPeriodId = selectedPeriodId,
+      onSelected = {
+        selectedPeriodId = it
+      }
+    )
+
+    val selectedTab = MenuAnalyticsTab.fromId(selectedTabContent.id)
+    val currencyCode = currentAnalyticsCurrencyCode()
+
+    when (selectedTab) {
+      MenuAnalyticsTab.Sales -> {
+        MenuAnalyticsTransactionScreen(
+          title = stateValues.stringSale,
+          transactionType = "purchase",
+          transactions = scopedTransactions,
+          currencyCode = currencyCode,
+          emptyText = "No sales in this period"
+        )
+      }
+
+      MenuAnalyticsTab.Returns -> {
+        MenuAnalyticsTransactionScreen(
+          title = stateValues.stringReturn,
+          transactionType = "return",
+          transactions = scopedTransactions,
+          currencyCode = currencyCode,
+          emptyText = "No returns in this period"
+        )
+      }
+
+      MenuAnalyticsTab.Acceptance -> {
+        MenuAnalyticsTransactionScreen(
+          title = stateValues.stringSupply,
+          transactionType = "accept",
+          transactions = scopedTransactions,
+          currencyCode = currencyCode,
+          emptyText = "No supply transactions in this period"
+        )
+      }
+
+      MenuAnalyticsTab.Stock -> {
+        MenuAnalyticsStockScreen()
+      }
+
+      MenuAnalyticsTab.Suppliers -> {
+        MenuAnalyticsSimpleScreen(
+          title = stateValues.stringSuppliers,
+          cards = listOf(
+            AnalyticsSummaryCardData(
+              title = "Connected module",
+              value = "Supplier analytics",
+              subtitle = "Use accepted goods grouped by supplier here"
+            ),
+            AnalyticsSummaryCardData(
+              title = "Useful metric",
+              value = "Acceptance total",
+              subtitle = "Old Android version reused supplier screen from analytics"
+            )
+          )
+        )
+      }
+
+      MenuAnalyticsTab.Workers -> {
+        MenuAnalyticsSimpleScreen(
+          title = stateValues.stringWorkers,
+          cards = listOf(
+            AnalyticsSummaryCardData(
+              title = "Connected module",
+              value = "Worker analytics",
+              subtitle = "Use workshifts, sales per worker, and salary here"
+            ),
+            AnalyticsSummaryCardData(
+              title = "Useful metric",
+              value = "Revenue / worker",
+              subtitle = "Good for cashier performance later"
+            )
+          )
+        )
+      }
+
+      MenuAnalyticsTab.CashRegister -> {
+        MenuAnalyticsCashRegisterScreen(
+          currentAmount = currentCashRegisterAmount,
+          extractions = scopedCashRegisterExtractions,
+          currencyCode = currencyCode
+        )
+      }
+    }
   }
 }
+
+@Composable
+private fun AppConfiguration.MenuAnalyticsTransactionScreen(
+  title: String,
+  transactionType: String,
+  transactions: List<TransactionDataModel>,
+  currencyCode: String,
+  emptyText: String
+) {
+  val typedTransactions = remember(transactions, transactionType) {
+    transactions.filter { it.type == transactionType }
+  }
+
+  val totalCash = remember(typedTransactions) {
+    typedTransactions.sumOf { it.paidCash }
+  }
+
+  val totalCard = remember(typedTransactions) {
+    typedTransactions.sumOf { it.paidCard }
+  }
+
+  val total = totalCash + totalCard
+
+  val average = if (typedTransactions.isNotEmpty()) {
+    total / typedTransactions.size
+  } else {
+    0.0
+  }
+
+  val totalGoodsQuantity = remember(typedTransactions) {
+    typedTransactions
+      .flatMap { it.goodsInTransaction }
+      .sumOf { it.quantity }
+  }
+
+  val historyRows = remember(typedTransactions) {
+    typedTransactions.toMonthlyAnalyticsHistoryRows()
+  }
+
+  LazyColumn(
+    modifier = Modifier
+//      .weight(1f) // h1
+      .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+      .padding(stateValues.marginTextField)
+  ) {
+    item {
+      Text(
+        text = title,
+        color = stateValues.TextColor,
+        fontSize = stateValues.titleTextSize,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(bottom = stateValues.marginTextField)
+      )
+    }
+
+    item {
+      AnalyticsCardsGrid(
+        cards = listOf(
+          AnalyticsSummaryCardData(
+            title = "Total",
+            value = total.money(currencyCode),
+            subtitle = "Cash + cashless"
+          ),
+          AnalyticsSummaryCardData(
+            title = stateValues.stringCash,
+            value = totalCash.money(currencyCode)
+          ),
+          AnalyticsSummaryCardData(
+            title = stateValues.stringCashless,
+            value = totalCard.money(currencyCode)
+          ),
+          AnalyticsSummaryCardData(
+            title = "Transactions",
+            value = typedTransactions.size.toString()
+          ),
+          AnalyticsSummaryCardData(
+            title = "Average transaction",
+            value = average.money(currencyCode)
+          ),
+          AnalyticsSummaryCardData(
+            title = stateValues.stringItems,
+            value = totalGoodsQuantity.cleanNumber()
+          )
+        )
+      )
+    }
+
+    item {
+      Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+      Text(
+        text = "History",
+        color = stateValues.TextColor,
+        fontSize = stateValues.accentTextSize,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(bottom = stateValues.marginTextField)
+      )
+    }
+
+    if (typedTransactions.isEmpty()) {
+      item {
+        MessageText(
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = stateValues.marginTextFieldGroup),
+          emptyText
+        )
+      }
+    } else {
+      items(historyRows) { row ->
+        AnalyticsHistoryRowWidget(
+          row = row,
+          currencyCode = currencyCode
+        )
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextField))
+      }
+    }
+
+    item {
+      Spacer(modifier = Modifier.height(stateValues.screenHeight / 5))
+    }
+  }
+}
+
+@Composable
+private fun AppConfiguration.MenuAnalyticsStockScreen() {
+  val stock = stateValues.stock.orEmpty()
+  val batches = stateValues.stockBatches.orEmpty()
+
+  val activeItems = stock.count { it.isActive }
+  val inactiveItems = stock.size - activeItems
+  val quickItems = stock.count { it.isQuickItem }
+
+  val activeBatches = batches.count { it.isActive }
+  val inactiveBatches = batches.size - activeBatches
+
+  LazyColumn(
+    modifier = Modifier
+//      .weight(1f) h1
+      .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+      .padding(stateValues.marginTextField)
+  ) {
+    item {
+      Text(
+        text = stateValues.stringStock,
+        color = stateValues.TextColor,
+        fontSize = stateValues.titleTextSize,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(bottom = stateValues.marginTextField)
+      )
+    }
+
+    item {
+      AnalyticsCardsGrid(
+        cards = listOf(
+          AnalyticsSummaryCardData(
+            title = stateValues.stringItems,
+            value = stock.size.toString(),
+            subtitle = "All stock items"
+          ),
+          AnalyticsSummaryCardData(
+            title = "Active items",
+            value = activeItems.toString()
+          ),
+          AnalyticsSummaryCardData(
+            title = "Inactive items",
+            value = inactiveItems.toString()
+          ),
+          AnalyticsSummaryCardData(
+            title = stateValues.stringQuick,
+            value = quickItems.toString(),
+            subtitle = "Quick-sale items"
+          ),
+          AnalyticsSummaryCardData(
+            title = stateValues.stringBatches,
+            value = batches.size.toString()
+          ),
+          AnalyticsSummaryCardData(
+            title = "Active batches",
+            value = activeBatches.toString()
+          ),
+          AnalyticsSummaryCardData(
+            title = "Inactive batches",
+            value = inactiveBatches.toString()
+          )
+        )
+      )
+    }
+
+    item {
+      Spacer(modifier = Modifier.height(stateValues.screenHeight / 5))
+    }
+  }
+}
+
+@Composable
+private fun AppConfiguration.MenuAnalyticsCashRegisterScreen(
+  currentAmount: Double,
+  extractions: List<CashRegisterExtractionEntryDataModel>,
+  currencyCode: String
+) {
+  val extractedTotal = remember(extractions) {
+    extractions.sumOf { it.amount }
+  }
+
+  val historyRows = remember(extractions) {
+    extractions
+      .groupBy { it.timeMillis.monthLabel() }
+      .map { (month, entries) ->
+        AnalyticsHistoryRow(
+          title = month,
+          count = entries.size,
+          total = entries.sumOf { it.amount }
+        )
+      }
+  }
+
+  LazyColumn(
+    modifier = Modifier
+//      .weight(1f) n1
+      .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+      .padding(stateValues.marginTextField)
+  ) {
+    item {
+      Text(
+        text = "Cash register",
+        color = stateValues.TextColor,
+        fontSize = stateValues.titleTextSize,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(bottom = stateValues.marginTextField)
+      )
+    }
+
+    item {
+      AnalyticsCardsGrid(
+        cards = listOf(
+          AnalyticsSummaryCardData(
+            title = "Current amount",
+            value = currentAmount.money(currencyCode)
+          ),
+          AnalyticsSummaryCardData(
+            title = "Extracted",
+            value = extractedTotal.money(currencyCode)
+          ),
+          AnalyticsSummaryCardData(
+            title = "Extractions",
+            value = extractions.size.toString()
+          )
+        )
+      )
+    }
+
+    item {
+      Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+      Text(
+        text = "History",
+        color = stateValues.TextColor,
+        fontSize = stateValues.accentTextSize,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(bottom = stateValues.marginTextField)
+      )
+    }
+
+    if (extractions.isEmpty()) {
+      item {
+        MessageText(
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = stateValues.marginTextFieldGroup),
+          "No cash register extractions in this period"
+        )
+      }
+    } else {
+      items(historyRows) { row ->
+        AnalyticsHistoryRowWidget(
+          row = row,
+          currencyCode = currencyCode
+        )
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextField))
+      }
+    }
+
+    item {
+      Spacer(modifier = Modifier.height(stateValues.screenHeight / 5))
+    }
+  }
+}
+
+@Composable
+private fun AppConfiguration.MenuAnalyticsSimpleScreen(
+  title: String,
+  cards: List<AnalyticsSummaryCardData>
+) {
+  LazyColumn(
+    modifier = Modifier
+//      .weight(1f) h1
+      .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+      .padding(stateValues.marginTextField)
+  ) {
+    item {
+      Text(
+        text = title,
+        color = stateValues.TextColor,
+        fontSize = stateValues.titleTextSize,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(bottom = stateValues.marginTextField)
+      )
+    }
+
+    item {
+      AnalyticsCardsGrid(cards)
+    }
+
+    item {
+      Spacer(modifier = Modifier.height(stateValues.screenHeight / 5))
+    }
+  }
+}
+
+@Composable
+private fun AppConfiguration.AnalyticsPeriodSelector(
+  selectedPeriodId: String,
+  onSelected: (String) -> Unit
+) {
+  val presets = listOf(
+    AnalyticsPeriodPreset.Today to "Today",
+    AnalyticsPeriodPreset.Week to "7 days",
+    AnalyticsPeriodPreset.Month to "30 days",
+    AnalyticsPeriodPreset.All to "All"
+  )
+
+  Row(
+    modifier = Modifier
+      .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+      .padding(horizontal = stateValues.marginTextField),
+    horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+  ) {
+    presets.forEach { (preset, title) ->
+      AnalyticsPill(
+        modifier = Modifier.weight(1f),
+        text = title,
+        selected = selectedPeriodId == preset.id
+      ) {
+        onSelected(preset.id)
+      }
+    }
+  }
+
+  Spacer(modifier = Modifier.height(stateValues.marginTextField))
+}
+
+@Composable
+private fun AppConfiguration.AnalyticsPill(
+  modifier: Modifier = Modifier,
+  text: String,
+  selected: Boolean,
+  onClick: () -> Unit
+) {
+  Box(
+    modifier = modifier
+      .clip(RoundedCornerShape(stateValues.cornerRadius))
+      .border(
+        width = stateValues.unfocusedBorderWidth,
+        color = if (selected) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+        shape = RoundedCornerShape(stateValues.cornerRadius)
+      )
+      .background(
+        if (selected) stateValues.AccentColor else stateValues.BackgroundColor
+      )
+      .clickable(
+        interactionSource = remember { MutableInteractionSource() },
+        indication = ripple(
+          color = if (selected) stateValues.AccentTextColor else stateValues.TextColor
+        ),
+        onClick = onClick
+      )
+      .padding(vertical = 10.dp),
+    contentAlignment = Alignment.Center
+  ) {
+    Text(
+      text = text,
+      color = if (selected) stateValues.AccentTextColor else stateValues.TextColor,
+      fontSize = stateValues.smallTextSize,
+      fontWeight = FontWeight.Bold,
+      textAlign = TextAlign.Center,
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis
+    )
+  }
+}
+
+@Composable
+private fun AppConfiguration.AnalyticsCardsGrid(
+  cards: List<AnalyticsSummaryCardData>
+) {
+  if (stateValues.isNarrowScreen) {
+    Column(
+      verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+    ) {
+      cards.forEach { card ->
+        AnalyticsSummaryCard(
+          modifier = Modifier.fillMaxWidth(),
+          card = card
+        )
+      }
+    }
+  } else {
+    Column(
+      verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+    ) {
+      cards.chunked(3).forEach { rowCards ->
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+          rowCards.forEach { card ->
+            AnalyticsSummaryCard(
+              modifier = Modifier.weight(1f),
+              card = card
+            )
+          }
+
+          repeat(3 - rowCards.size) {
+            Spacer(modifier = Modifier.weight(1f))
+          }
+        }
+      }
+    }
+  }
+}
+
+@Composable
+private fun AppConfiguration.AnalyticsSummaryCard(
+  modifier: Modifier = Modifier,
+  card: AnalyticsSummaryCardData
+) {
+  Column(
+    modifier = modifier
+      .clip(RoundedCornerShape(stateValues.cornerRadius))
+      .border(
+        width = stateValues.unfocusedBorderWidth,
+        color = stateValues.PlaceholderTextColor,
+        shape = RoundedCornerShape(stateValues.cornerRadius)
+      )
+      .background(stateValues.BackgroundColor)
+      .padding(stateValues.marginTextFieldGroup)
+  ) {
+    Text(
+      text = card.title,
+      color = stateValues.PlaceholderTextColor,
+      fontSize = stateValues.smallTextSize,
+      fontWeight = FontWeight.Bold
+    )
+
+    Spacer(modifier = Modifier.height(4.dp))
+
+    Text(
+      text = card.value,
+      color = stateValues.TextColor,
+      fontSize = stateValues.accentTextSize,
+      fontWeight = FontWeight.Bold
+    )
+
+    card.subtitle?.takeIf { it.isNotBlank() }?.let {
+      Spacer(modifier = Modifier.height(4.dp))
+
+      Text(
+        text = it,
+        color = stateValues.PlaceholderTextColor,
+        fontSize = stateValues.smallTextSize
+      )
+    }
+  }
+}
+
+@Composable
+private fun AppConfiguration.AnalyticsHistoryRowWidget(
+  row: AnalyticsHistoryRow,
+  currencyCode: String
+) {
+  Row(
+    modifier = Modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(stateValues.cornerRadius))
+      .border(
+        width = stateValues.unfocusedBorderWidth,
+        color = stateValues.AccentColor,
+        shape = RoundedCornerShape(stateValues.cornerRadius)
+      )
+      .background(stateValues.BackgroundColor)
+      .padding(stateValues.marginTextFieldGroup),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.SpaceBetween
+  ) {
+    Column(
+      modifier = Modifier.weight(1f)
+    ) {
+      Text(
+        text = row.title,
+        color = stateValues.TextColor,
+        fontSize = stateValues.textSize,
+        fontWeight = FontWeight.Bold
+      )
+
+      Text(
+        text = "${row.count} transactions",
+        color = stateValues.PlaceholderTextColor,
+        fontSize = stateValues.smallTextSize
+      )
+    }
+
+    Text(
+      text = row.total.money(currencyCode),
+      color = stateValues.TextColor,
+      fontSize = stateValues.accentTextSize,
+      fontWeight = FontWeight.Bold,
+      textAlign = TextAlign.End
+    )
+  }
+}
+
+private fun AnalyticsPeriodPreset.toAnalyticsPeriod(): AnalyticsPeriod {
+  val now = kotlin.time.Clock.System.now()
+  val nowMillis = now.toEpochMilliseconds()
+
+  return when (this) {
+    AnalyticsPeriodPreset.Today -> {
+      val start = todayStartMillis()
+      AnalyticsPeriod(
+        startMillis = start,
+        endMillisExclusive = nowMillis + 1
+      )
+    }
+
+    AnalyticsPeriodPreset.Week -> {
+      AnalyticsPeriod(
+        startMillis = nowMillis - 7L * 24L * 60L * 60L * 1000L,
+        endMillisExclusive = nowMillis + 1
+      )
+    }
+
+    AnalyticsPeriodPreset.Month -> {
+      AnalyticsPeriod(
+        startMillis = nowMillis - 30L * 24L * 60L * 60L * 1000L,
+        endMillisExclusive = nowMillis + 1
+      )
+    }
+
+    AnalyticsPeriodPreset.All -> {
+      AnalyticsPeriod(
+        startMillis = 0L,
+        endMillisExclusive = Long.MAX_VALUE
+      )
+    }
+  }
+}
+private fun todayStartMillis(): Long {
+  val timeZone = TimeZone.currentSystemDefault()
+  val today = kotlin.time.Clock.System.now()
+    .toLocalDateTime(timeZone)
+    .date
+
+  return today
+    .atStartOfDayIn(timeZone)
+    .toEpochMilliseconds()
+}
+
+private fun List<TransactionDataModel>.toMonthlyAnalyticsHistoryRows(): List<AnalyticsHistoryRow> {
+  return groupBy { it.timeMillis.monthLabel() }
+    .map { (month, transactions) ->
+      AnalyticsHistoryRow(
+        title = month,
+        count = transactions.size,
+        total = transactions.sumOf { it.paidCash + it.paidCard }
+      )
+    }
+}
+
+private fun Long.monthLabel(): String {
+  val date = Instant
+    .fromEpochMilliseconds(this)
+    .toLocalDateTime(TimeZone.currentSystemDefault())
+
+  val month = date.monthNumber.toString().padStart(2, '0')
+  val year = date.year.toString()
+
+  return "$month.$year"
+}
+
+private fun Double.money(currencyCode: String): String {
+  return if (currencyCode.isBlank()) {
+    fixed2()
+  } else {
+    "${fixed2()} $currencyCode"
+  }
+}
+
+private fun Double.fixed2(): String {
+  val negative = this < 0
+  val scaled = round(abs(this) * 100.0).toLong()
+
+  val whole = scaled / 100
+  val cents = (scaled % 100).toString().padStart(2, '0')
+
+  return "${if (negative) "-" else ""}$whole.$cents"
+}
+
+private fun Double.cleanNumber(): String {
+  return if (this % 1.0 == 0.0) {
+    toLong().toString()
+  } else {
+    fixed2()
+  }
+}
+
+private fun AppConfiguration.currentAnalyticsCurrencyCode(): String {
+  val countryLocale = stateValues.userAccount?.countryLocale
+
+  return stateValues.globalAppConfiguration
+    .countries
+    .find { it.locale.equals(countryLocale, ignoreCase = true) }
+    ?.currencies
+    ?.firstOrNull()
+    ?.code
+    ?: ""
+}
+
+//@Composable
+//fun AppConfiguration.MenuAnalyticsScreen() {
+//  Column(
+//    modifier = Modifier
+//      .fillMaxSize()
+//  ) {
+//    ScreenAppBarWidget(
+//      title = stateValues.stringAnalytics,
+//      iconPath = stateValues.drawablePathIconAnalytics,
+//      onBack = {
+//        coroutineScope.launch {
+//          Navigation.Menu.pop(stateValues.isNarrowScreen)
+//        }
+//      }
+//    )
+//  }
+//}
 
 @Composable
 fun AppConfiguration.MenuAddEditWorkerScreen() {
@@ -7631,14 +11697,14 @@ fun AppConfiguration.MenuAddEditWorkerScreen() {
             && confirmationPasswordTextFieldContent!!.isContentValid
           ) {
             addStoreWorker(
-                phoneNumber = stateValues.globalAppConfiguration.countries.run {
-                  find { it.locale.equals(phoneNumberTextFieldContent.selectedId, true) } ?: first()
-                }.phoneNumberCode.lowercase() + phoneNumberTextFieldContent.value.text.trim().lowercase(),
-                email = emailTextFieldContent.value.text.trim().lowercase(),
-                firstName = firstNameTextFieldContent.value.text.trim(),
-                lastName = lastNameTextFieldContent.value.text.trim(),
-                password = confirmationPasswordTextFieldContent?.value?.text!!
-              )
+              phoneNumber = stateValues.globalAppConfiguration.countries.run {
+                find { it.locale.equals(phoneNumberTextFieldContent.selectedId, true) } ?: first()
+              }.phoneNumberCode.lowercase() + phoneNumberTextFieldContent.value.text.trim().lowercase(),
+              email = emailTextFieldContent.value.text.trim().lowercase(),
+              firstName = firstNameTextFieldContent.value.text.trim(),
+              lastName = lastNameTextFieldContent.value.text.trim(),
+              password = confirmationPasswordTextFieldContent?.value?.text!!
+            )
 
             confirmationPasswordTextFieldContent.reset()
           }
@@ -8317,7 +12383,44 @@ fun AppConfiguration.GoodsItemInStockWidget(
   onClick: ((GoodsItemDataModel) -> Unit)? = null,
   onDelete: ((GoodsItemDataModel) -> Unit)? = null,
   onEdit: ((GoodsItemDataModel) -> Unit)? = null,
+  onDetails: ((GoodsItemDataModel) -> Unit)? = null,
+  onBatches: ((GoodsItemDataModel) -> Unit)? = null,
+  onSupplierPrices: ((GoodsItemDataModel) -> Unit)? = null,
+  onOrders: ((GoodsItemDataModel) -> Unit)? = null,
 ) {
+  val itemName = goodsItem.name.extractLocalizedString(stateValues.appLanguage)
+    ?: goodsItem.name.firstOrNull()?.value
+    ?: "Unnamed item"
+
+  val barcodesText = goodsItem.barcodes
+    .filter { it.isNotBlank() }
+    .joinToString(", ")
+
+  val categoriesText = goodsItem.categoryIds
+    .mapNotNull { categoryId ->
+      stateValues.goodsCategories
+        .orEmpty()
+        .find { it.id == categoryId }
+        ?.name
+        ?.extractLocalizedString(stateValues.appLanguage)
+    }
+    .joinToString(", ")
+
+  val totalQuantity = batches.sumOf { it.quantity.total }
+  val quantityUnitText = batches
+    .firstOrNull()
+    ?.quantity
+    ?.immutableUnitName
+    ?.extractLocalizedString(stateValues.appLanguage)
+    .orEmpty()
+
+  val activeBatch = batches.find { it.id == goodsItem.activeShelfBatchId }
+    ?: batches.bestBatchForSale(goodsItem)
+
+  val expirationStatusText = activeBatch?.expirationDateMillis?.let {
+    "Exp: $it"
+  }
+
   Row(
     modifier
       .padding(bottom = 4.dp)
@@ -8348,127 +12451,141 @@ fun AppConfiguration.GoodsItemInStockWidget(
       modifier = Modifier
         .weight(1f)
         .fillMaxHeight()
-        .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
+        .padding(start = 16.dp, end = 12.dp, top = 8.dp, bottom = 12.dp),
     ) {
-      Text(
-        text = index?.run { "${index + 1}.  ${goodsItem.name.extractLocalizedString(stateValues.appLanguage)}" } ?: goodsItem.name.extractLocalizedString(stateValues.appLanguage)!!,
-        fontSize = stateValues.titleTextSize,
-        fontWeight = FontWeight.Bold,
-        color = textColor
-      )
-
-      Spacer(
-        modifier = Modifier
-          .height(6.dp)
-      )
-
-      goodsItem.barcode.run {
-        if (size == 1) {
-          this[0]
-        } else {
-          foldIndexed("") { index, acc, item ->
-            if (index == 0)
-              item
-            else
-              "$acc, $item"
-          }
-        }
-      }.run {
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+      ) {
         Text(
-          text = this,
-          fontSize = stateValues.textSize,
-          color = textColor
+          modifier = Modifier.weight(1f),
+          text = index?.run { "${index + 1}.  $itemName" } ?: itemName,
+          fontSize = stateValues.titleTextSize,
+          fontWeight = FontWeight.Bold,
+          color = textColor,
+          maxLines = 2,
+          overflow = TextOverflow.Ellipsis
+        )
+
+        if (goodsItem.isQuickItem) {
+          Spacer(modifier = Modifier.width(8.dp))
+
+          Text(
+            text = stateValues.stringQuick,
+            color = stateValues.AccentColor,
+            fontSize = stateValues.smallTextSize,
+            fontWeight = FontWeight.Bold
+          )
+        }
+      }
+
+      Spacer(modifier = Modifier.height(6.dp))
+
+      if (barcodesText.isNotBlank()) {
+        StockCardInfoLine(
+          title = stateValues.stringBarcode,
+          value = barcodesText,
+          textColor = textColor
         )
       }
 
-      stateValues.goodsCategories?.run {
-        if (goodsItem.categoryIds.size == 1) {
-          "${stateValues.goodsCategories?.find { it.id == goodsItem.categoryIds[0] }?.name?.extractLocalizedString(stateValues.appLanguage)}"
-        } else {
-          goodsItem.categoryIds.foldIndexed("") { index, acc, item ->
-            if (index == 0)
-              "${stateValues.goodsCategories?.find { it.id == item }?.name?.extractLocalizedString(stateValues.appLanguage)}"
-            else
-              "$acc, ${stateValues.goodsCategories?.find { it.id == item }?.name?.extractLocalizedString(stateValues.appLanguage)}"
-          }
-        }
-      }?.run {
-        Text(
-          text = this,
-          fontSize = stateValues.textSize,
-          color = textColor
+      if (categoriesText.isNotBlank()) {
+        StockCardInfoLine(
+          title = stateValues.stringCategory,
+          value = categoriesText,
+          textColor = textColor
         )
       }
 
-      goodsItem.salePrices.run {
-        if (size == 1) {
-          "${stateValues.suppliers?.find { it.id == goodsItem.salePrices[0].supplierId }?.name?.extractLocalizedString(stateValues.appLanguage)}"
+      StockCardInfoLine(
+        title = "Stock",
+        value = if (batches.isEmpty()) {
+          "No batches"
         } else {
-          foldIndexed("") { index, acc, item ->
-            if (index == 0) {
-              "${stateValues.suppliers?.find { it.id == item.supplierId }?.name?.extractLocalizedString(stateValues.appLanguage)}"
-            } else
-              "$acc, ${stateValues.suppliers?.find { it.id == item.supplierId }?.name?.extractLocalizedString(stateValues.appLanguage)}"
-          }
-        }
-      }.run {
-        Text(
-          text = this,
-          fontSize = stateValues.textSize,
-          color = textColor
-        )
-      }
-
-      Spacer(
-        modifier = Modifier
-          .height(6.dp)
+          "$totalQuantity $quantityUnitText • ${batches.size} batch${if (batches.size == 1) "" else "es"}"
+        },
+        textColor = if (batches.isEmpty()) stateValues.ErrorColor else textColor
       )
 
-//      Text(
-//        text = "${stateValues.stringSale}: ${goodsItem.salePrices} ${goodsItem.saleCurrencyToSupplierIds}",
-//        fontSize = stateValues.accentTextSize,
-//        fontWeight = FontWeight.Bold,
-//        color = textColor
-//      )
-//
-//      if (goodsItem.returnPrices != goodsItem.salePrices) {
-//        Text(
-//          text = "${stateValues.stringReturn}: ${goodsItem.returnPrices} ${goodsItem.returnCurrencyToSupplierIds}",
-//          fontSize = stateValues.accentTextSize,
-//          fontWeight = FontWeight.Bold,
-//          color = textColor
-//        )
-//      }
-//
-//      Text(
-//        text = "${stateValues.stringSupply}: ${goodsItem.supplyPrices} ${goodsItem.saleCurrencyToSupplierIds}",
-//        fontSize = stateValues.accentTextSize,
-//        fontWeight = FontWeight.Bold,
-//        color = textColor
-//      )
+      activeBatch?.let {
+        StockCardInfoLine(
+          title = "Shelf",
+          value = listOfNotNull(
+            if (it.id == goodsItem.activeShelfBatchId) "active" else "auto",
+            it.shelfPosition,
+            expirationStatusText
+          ).joinToString(" • "),
+          textColor = stateValues.AccentColor
+        )
+      }
+
+      if (goodsItem.salePrices.isNotEmpty()) {
+        StockCardInfoLine(
+          title = stateValues.stringSale,
+          value = goodsItem.salePrices.joinToString(" / ") { "${it.price} ${it.currency}" },
+          textColor = textColor
+        )
+      }
+
+      if (goodsItem.supplyPrices.isNotEmpty()) {
+        StockCardInfoLine(
+          title = stateValues.stringSupply,
+          value = goodsItem.supplyPrices.joinToString(" / ") { "${it.price} ${it.currency}" },
+          textColor = textColor
+        )
+      }
+
+      goodsItem.note?.takeIf { it.isNotBlank() }?.let {
+        StockCardInfoLine(
+          title = "Note",
+          value = it,
+          textColor = stateValues.PlaceholderTextColor
+        )
+      }
     }
 
     Column(
       modifier = Modifier
-        .padding(end = 16.dp, top = 16.dp, start = 8.dp, bottom = 16.dp),
+        .widthIn(min = 112.dp)
+        .padding(end = 12.dp, top = 12.dp, start = 4.dp, bottom = 12.dp),
       horizontalAlignment = Alignment.End,
-      verticalArrangement = Arrangement.SpaceBetween
+      verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-      onDelete?.let {
+      onDetails?.let {
         actionButton(
-          text = "",
-          enabledColor = stateValues.ErrorColor,
-          iconPath = stateValues.drawablePathIconDelete,
-          iconContentDescription = stateValues.drawablePathIconDelete,
+          text = "Info",
+          fillMaxWidthIfTextPresent = false,
         ) {
-          onDelete(goodsItem)
+          onDetails(goodsItem)
         }
       }
 
-      Spacer(
-        modifier = Modifier
-          .height(stateValues.marginTextField)
-      )
+      onBatches?.let {
+        actionButton(
+          text = "Batches",
+          fillMaxWidthIfTextPresent = false,
+        ) {
+          onBatches(goodsItem)
+        }
+      }
+
+      onSupplierPrices?.let {
+        actionButton(
+          text = "Prices",
+          fillMaxWidthIfTextPresent = false,
+        ) {
+          onSupplierPrices(goodsItem)
+        }
+      }
+
+      onOrders?.let {
+        actionButton(
+          text = "Orders",
+          fillMaxWidthIfTextPresent = false,
+        ) {
+          onOrders(goodsItem)
+        }
+      }
 
       onEdit?.let {
         actionButton(
@@ -8479,9 +12596,239 @@ fun AppConfiguration.GoodsItemInStockWidget(
           onEdit(goodsItem)
         }
       }
+
+      onDelete?.let {
+        actionButton(
+          text = "",
+          enabledColor = stateValues.ErrorColor,
+          iconPath = stateValues.drawablePathIconDelete,
+          iconContentDescription = stateValues.drawablePathIconDelete,
+        ) {
+          onDelete(goodsItem)
+        }
+      }
     }
   }
 }
+
+@Composable
+private fun AppConfiguration.StockCardInfoLine(
+  title: String,
+  value: String,
+  textColor: Color
+) {
+  if (value.isBlank()) return
+
+  Text(
+    text = "$title: $value",
+    fontSize = stateValues.textSize,
+    color = textColor,
+    maxLines = 2,
+    overflow = TextOverflow.Ellipsis
+  )
+}
+
+@Composable
+private fun AppConfiguration.StockScreenScaffold(
+  title: String,
+  iconPath: String? = stateValues.drawablePathIconStock,
+  content: @Composable ColumnScope.() -> Unit
+) {
+  Column(
+    modifier = Modifier.fillMaxSize()
+  ) {
+    ScreenAppBarWidget(
+      title = title,
+      iconPath = iconPath,
+      onBack = if (!Navigation.Stock.isVeryFirstScreen(stateValues.isNarrowScreen)) {
+        {
+          coroutineScope.launch {
+            Navigation.Stock.pop(stateValues.isNarrowScreen)
+          }
+        }
+      } else null
+    )
+
+    content()
+  }
+}
+
+@Composable
+private fun AppConfiguration.rememberSelectedStockItem(
+  stateHost: StateHost,
+  stateKey: String
+): GoodsItemDataModel? {
+  val screenState by stateHost.state.collectAsState()
+  val goodsItemId = screenState[stateKey]
+
+  return stateValues.stock
+    .orEmpty()
+    .find { it.id == goodsItemId }
+}
+
+@Composable
+fun AppConfiguration.StockGoodsItemDetailsScreen() {
+  val goodsItem = rememberSelectedStockItem(
+    stateHost = NavigationScreenModel.Stock.GoodsItemDetails,
+    stateKey = NavigationScreenModel.Stock.GoodsItemDetails.KEY_STATE_GOODS_ITEM_ID
+  )
+
+  StockScreenScaffold(
+    title = "Goods item"
+  ) {
+    if (goodsItem == null) {
+      MessageText(
+        modifier = Modifier.weight(1f),
+        text = "Goods item was not found"
+      )
+      return@StockScreenScaffold
+    }
+
+    val batches = stateValues.stockBatches.orEmpty().filter { it.goodsItemId == goodsItem.id && it.isActive }
+    val itemName = goodsItem.name.extractLocalizedString(stateValues.appLanguage)
+      ?: goodsItem.name.firstOrNull()?.value
+      ?: "Unnamed item"
+
+    LazyColumn(
+      modifier = Modifier
+        .weight(1f)
+        .fillMaxWidth()
+        .padding(stateValues.marginTextField)
+    ) {
+      item {
+        Text(
+          text = itemName,
+          color = stateValues.TextColor,
+          fontSize = stateValues.titleTextSize,
+          fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+        StockCardInfoLine(stateValues.stringBarcode, goodsItem.barcodes.joinToString(", "), stateValues.TextColor)
+        StockCardInfoLine(stateValues.stringCategory, goodsItem.categoryIds.joinToString(", "), stateValues.TextColor)
+        StockCardInfoLine("Measurement unit", goodsItem.measurementUnitId, stateValues.TextColor)
+        StockCardInfoLine("Batches", batches.size.toString(), stateValues.TextColor)
+        StockCardInfoLine(stateValues.stringSale, goodsItem.salePrices.joinToString(" / ") { "${it.price} ${it.currency}" }, stateValues.TextColor)
+        StockCardInfoLine(stateValues.stringReturn, goodsItem.returnPrices.joinToString(" / ") { "${it.price} ${it.currency}" }, stateValues.TextColor)
+        StockCardInfoLine(stateValues.stringSupply, goodsItem.supplyPrices.joinToString(" / ") { "${it.price} ${it.currency}" }, stateValues.TextColor)
+
+        goodsItem.description.takeIf { it.isNotEmpty() }?.let {
+          Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+          Text("Description", color = stateValues.TextColor, fontWeight = FontWeight.Bold)
+          it.forEach { line ->
+            Text(
+              text = "${line.language}: ${line.value}",
+              color = stateValues.TextColor,
+              fontSize = stateValues.textSize
+            )
+          }
+        }
+
+        goodsItem.note?.takeIf { it.isNotBlank() }?.let {
+          Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+          Text("Note", color = stateValues.TextColor, fontWeight = FontWeight.Bold)
+          Text(it, color = stateValues.TextColor, fontSize = stateValues.textSize)
+        }
+      }
+    }
+
+    Row(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(8.dp),
+      horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+      actionButton(
+        modifier = Modifier.weight(1f),
+        text = "Batches"
+      ) {
+        coroutineScope.launch {
+          NavigationScreenModel.Stock.GoodsItemBatches.setState(
+            NavigationScreenModel.Stock.GoodsItemBatches.KEY_STATE_GOODS_ITEM_ID to goodsItem.id
+          )
+          Navigation.Stock.go(NavigationScreenModel.Stock.GoodsItemBatches, remove = true, forceSecond = true)
+        }
+      }
+
+      actionButton(
+        modifier = Modifier.weight(1f),
+        text = "Supplier prices"
+      ) {
+        coroutineScope.launch {
+          NavigationScreenModel.Stock.GoodsItemSupplierPrices.setState(
+            NavigationScreenModel.Stock.GoodsItemSupplierPrices.KEY_STATE_GOODS_ITEM_ID to goodsItem.id
+          )
+          Navigation.Stock.go(NavigationScreenModel.Stock.GoodsItemSupplierPrices, remove = true, forceSecond = true)
+        }
+      }
+    }
+  }
+}
+
+@Composable
+fun AppConfiguration.StockGoodsItemBatchesScreen() {
+  val goodsItem = rememberSelectedStockItem(
+    stateHost = NavigationScreenModel.Stock.GoodsItemBatches,
+    stateKey = NavigationScreenModel.Stock.GoodsItemBatches.KEY_STATE_GOODS_ITEM_ID
+  )
+
+  StockScreenScaffold(
+    title = "Batches"
+  ) {
+    StockAddEditBatchesPage(
+      modifier = Modifier.weight(1f),
+      goodsItem = goodsItem
+    )
+  }
+}
+
+@Composable
+fun AppConfiguration.StockGoodsItemSupplierPricesScreen() {
+  val goodsItem = rememberSelectedStockItem(
+    stateHost = NavigationScreenModel.Stock.GoodsItemSupplierPrices,
+    stateKey = NavigationScreenModel.Stock.GoodsItemSupplierPrices.KEY_STATE_GOODS_ITEM_ID
+  )
+
+  StockScreenScaffold(
+    title = "Supplier prices"
+  ) {
+    StockSupplierPricesPage(
+      modifier = Modifier.weight(1f),
+      goodsItem = goodsItem
+    )
+  }
+}
+
+@Composable
+fun AppConfiguration.StockGoodsItemOrdersScreen() {
+  val goodsItem = rememberSelectedStockItem(
+    stateHost = NavigationScreenModel.Stock.GoodsItemOrders,
+    stateKey = NavigationScreenModel.Stock.GoodsItemOrders.KEY_STATE_GOODS_ITEM_ID
+  )
+
+  StockScreenScaffold(
+    title = "Supplier orders"
+  ) {
+    Column(
+      modifier = Modifier
+        .weight(1f)
+        .fillMaxSize()
+        .padding(stateValues.marginTextField),
+      horizontalAlignment = Alignment.CenterHorizontally,
+      verticalArrangement = Arrangement.Center
+    ) {
+      MessageText(
+        text = if (goodsItem == null) {
+          "Goods item was not found"
+        } else {
+          "Supplier orders screen is ready as a navigation destination. The order creation/receiving form is the next safe layer to connect."
+        }
+      )
+    }
+  }
+}
+
 
 @Composable
 fun AppConfiguration.genericTextField(
@@ -8489,8 +12836,8 @@ fun AppConfiguration.genericTextField(
 
   titleText: String = "",
 
-  stateHost: StateHost?,
-  stateKey: String?,
+  stateHost: StateHost? = null,
+  stateKey: String? = null,
 
   enabled: Boolean = true,
   wide: Boolean = false,
@@ -8535,6 +12882,7 @@ fun AppConfiguration.genericTextField(
   visualTransformation: (TextFieldValue) -> TransformedText = {
     getTransformedTextWithSelectionFocusTextColor(it, selectionFocusTextColor)
   },
+  showClearButton: Boolean = true,
   contentInvalidText: String? = null,
   onContentValidityCheck: ((String) -> Boolean)? = null,
   onFilterValue: ((String) -> Boolean)? = null,
@@ -8568,6 +12916,7 @@ fun AppConfiguration.genericTextField(
     val initial = valueInitial ?: ""
     textFieldValue = TextFieldValue(initial, selection = TextRange(initial.length))
   }
+
   Column(
     modifier = modifier
   ) {
@@ -8729,7 +13078,7 @@ fun AppConfiguration.genericTextField(
                     }
                   }
 
-                  if (textFieldValue.text.isNotEmpty()) {
+                  if (showClearButton && textFieldValue.text.isNotEmpty()) {
                     Box(
                       modifier = Modifier
                         .fillMaxHeight()
@@ -9186,9 +13535,13 @@ fun AppConfiguration.domainSelectionTextFieldGroupWidget(
             }
           }
         },
-        domains = domains,
+        domains = (listOfNotNull(domains.find { it.id == item.selectedDomainId }) + availableDomains)
+          .distinctBy { it.id },
         selectedInitial = item.selectedDomainId,
-        secondaryDomains = availableSecondaryDomains,
+        secondaryDomains = secondaryDomains?.let { allSecondaryDomains ->
+          (listOfNotNull(allSecondaryDomains.find { it.id == item.selectedSecondaryDomainId }) + availableSecondaryDomains.orEmpty())
+            .distinctBy { it.id }
+        },
         selectedSecondaryInitial = item.selectedSecondaryDomainId,
         displayFullDomain = true,
         secondaryDomainsShowId = secondaryDomainsShowId,
@@ -9203,8 +13556,6 @@ fun AppConfiguration.domainSelectionTextFieldGroupWidget(
 
       LaunchedEffect(instance.value.text) {
         if (data[index].value.text != instance.value.text) {
-          println("fucking in ${data[index].value.text} != ${instance.value.text}")
-
           data = data.toMutableList().apply {
             set(index, get(index).copy(value = instance.value))
           }
@@ -9299,10 +13650,10 @@ data class DomainSelectionTextFieldGroupItemContent(
 fun AppConfiguration.domainSelectionTextField(
   modifier: Modifier = Modifier,
   valueInitial: String? = null,
-  titleText: String,
+  titleText: String = "",
   stateHost: StateHost? = null,
   stateKey: String? = null,
-  placeholderText: String,
+  placeholderText: String = "",
   titleIconButtonPath: String? = null,
   titleIconButtonRes: DrawableResource? = null,
   onTitleIconButtonClick: (() -> Unit)? = null,
@@ -9331,7 +13682,7 @@ fun AppConfiguration.domainSelectionTextField(
   onValueChange: ((String, String, String?, () -> Unit) -> Unit)? = null
 ): DomainSelectionTextFieldContent {
   var selectedId by rememberSaveable {
-    mutableStateOf(lockedSecondaryDomainId ?: selectedInitial)
+    mutableStateOf(lockedDomainId ?: selectedInitial)
   }
 
   var selected by remember {
@@ -9350,8 +13701,8 @@ fun AppConfiguration.domainSelectionTextField(
     }
   }
 
-  LaunchedEffect(selectedInitial) {
-    selectedId = selectedInitial.takeIf { it.isNotEmpty() } ?: try {
+  LaunchedEffect(selectedInitial, lockedDomainId) {
+    selectedId = lockedDomainId ?: selectedInitial.takeIf { it.isNotEmpty() } ?: try {
       domains.first().id
     } catch (thr: Throwable) {
       ""
@@ -9359,7 +13710,7 @@ fun AppConfiguration.domainSelectionTextField(
   }
 
   var selectedSecondaryId by rememberSaveable {
-    mutableStateOf(selectedSecondaryInitial)
+    mutableStateOf(lockedSecondaryDomainId ?: selectedSecondaryInitial)
   }
 
   var selectedSecondary by remember {
@@ -9372,8 +13723,8 @@ fun AppConfiguration.domainSelectionTextField(
     }
   }
 
-  LaunchedEffect(selectedSecondaryInitial) {
-    selectedSecondaryId = selectedSecondaryInitial
+  LaunchedEffect(selectedSecondaryInitial, lockedSecondaryDomainId) {
+    selectedSecondaryId = lockedSecondaryDomainId ?: selectedSecondaryInitial
   }
 
   val isDomainSelectionDropdownExpandedState = remember {
@@ -10105,12 +14456,12 @@ object AppConfiguration {
 
   private val _AccentColorState = MutableStateFlow(Color(0xffffba24))
   private val _BackgroundColorState = MutableStateFlow(Color(0xffffffff))
-  private val _TextColorState = MutableStateFlow(Color(0xffffffff))
+  private val _TextColorState = MutableStateFlow(Color(0x00000000))
   private val _AccentTextColorState = MutableStateFlow(Color(0xffffffff))
   private val _PlaceholderTextColorState = MutableStateFlow(Color(0xaa000000))
   private val _DisabledColorState = MutableStateFlow(Color(0xffa7a7a7))
   private val _ErrorColorState = MutableStateFlow(Color(0xffff0000))
-  private val _IconTintColorState = MutableStateFlow(Color(0xff000000))
+  private val _IconTintColorState = MutableStateFlow(Color(0xffffffff))
 
   private val _OkayColorState = MutableStateFlow(Color(0xff6bb522))
   private val _BorderlineBadColorState = MutableStateFlow(Color(0xffffa500))
@@ -10139,7 +14490,7 @@ object AppConfiguration {
 
       override val storesState: DataState<List<StoreDataModel>> by kz.aita.storesState.value.collectAsState()
       override val stores: List<StoreDataModel>? by kz.aita.storesState.payload.collectAsState()
-      override val activeStoreId: String? by kz.aita.activeStoreId.collectAsState()
+      override val activeStoreId: String? by kz.aita.activeStoreIdState.collectAsState()
 
       override val goodsCategoriesState: DataState<List<GenericGoodsCategoryDataModel>> by genericGoodsCategoriesState.value.collectAsState()
       override val goodsCategories: List<GenericGoodsCategoryDataModel>? by genericGoodsCategoriesState.payload.collectAsState()
@@ -10655,6 +15006,28 @@ object AppConfiguration {
           val resourceDimensions = loadResourceDimensions()
           val resourceColors = loadResourceColors()
           val resourceDrawables = loadResourceDrawablePaths()
+
+          updateStrings(
+            strings = stringsState.payloadValue ?: resourceStrings,
+            resourceStrings = resourceStrings
+          )
+
+          updateDimensions(
+            dimensions = dimensionsState.payloadValue ?: resourceDimensions,
+            resourceDimensions = resourceDimensions
+          )
+
+          updateColors(
+            colors = colorsState.payloadValue ?: resourceColors,
+            resourceColors = resourceColors
+          )
+
+          updateDrawables(
+            drawables = drawablesState.payloadValue ?: resourceDrawables,
+            resourceDrawables = resourceDrawables
+          )
+
+          stateValues.updateDrawableResources()
 
           launch(Dispatchers.ourIo) {
             _isNarrowScreenState

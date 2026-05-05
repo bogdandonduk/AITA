@@ -74,7 +74,7 @@ kotlin {
       implementation(libs.androidx.activity.compose)
     }
     commonMain.dependencies {
-
+      implementation(libs.kotlinx.datetime)
 
       implementation(libs.kotlinx.serialization.json)
 //            implementation(libs.kamel.image.default)
