@@ -588,17 +588,25 @@ fun AppConfiguration.TransactionSelectionScreen() {
   ) {
     val context = rememberTransactionContext()
 
+    val canGoBack = when (context.transactionTypeIndex) {
+      0 -> !Navigation.TransactionSale.isVeryFirstScreen(stateValues.isNarrowScreen, context.clientId)
+      1 -> !Navigation.TransactionReturn.isVeryFirstScreen(stateValues.isNarrowScreen, context.clientId)
+      else -> !Navigation.TransactionSupply.isVeryFirstScreen(stateValues.isNarrowScreen, context.clientId)
+    }
+
     ScreenAppBarWidget(
       title = stateValues.stringSelect,
-      onBack = {
-        coroutineScope.launch {
-          when (context.transactionTypeIndex) {
-            0 -> Navigation.TransactionSale.pop()
-            1 -> Navigation.TransactionReturn.pop()
-            else -> Navigation.TransactionSupply.pop()
+      onBack = if (canGoBack) {
+        {
+          coroutineScope.launch {
+            when (context.transactionTypeIndex) {
+              0 -> Navigation.TransactionSale.pop()
+              1 -> Navigation.TransactionReturn.pop()
+              else -> Navigation.TransactionSupply.pop()
+            }
           }
         }
-      }
+      } else null
     )
 
     val goodsInCart by getCartState(
@@ -1091,209 +1099,244 @@ fun AppConfiguration.TransactionScreen() {
   }
 }
 
-@Composable
-private fun AppConfiguration.ReceiptHeader(
-  snapshot: TransactionReceiptSnapshotDataModel
-) {
-  val store = snapshot.store
-
-  store?.let {
-    val companyFormTitle = it.companyForms
-      .firstOrNull()
-      ?.name
-      ?.extractLocalizedString(stateValues.appLanguage)
-      .orEmpty()
-
-    Text(
-      text = "$companyFormTitle ${it.name.extractLocalizedString(stateValues.appLanguage).orEmpty()}".trim(),
-      modifier = Modifier
-        .fillMaxWidth()
-        .padding(
-          start = stateValues.marginTextFieldGroup,
-          top = stateValues.marginTextFieldGroup,
-          end = stateValues.marginTextFieldGroup
-        ),
-      color = Color.Black,
-      textAlign = TextAlign.Center,
-      fontWeight = FontWeight.Bold,
-      fontSize = stateValues.accentTextSize
-    )
-
-    Text(
-      text = it.location.name,
-      modifier = Modifier
-        .fillMaxWidth()
-        .padding(
-          start = stateValues.marginTextFieldGroup,
-          top = 2.dp,
-          end = stateValues.marginTextFieldGroup,
-          bottom = 12.dp
-        ),
-      color = Color.Black,
-      textAlign = TextAlign.Center,
-      fontSize = stateValues.textSize
-    )
-  }
-
-  Text(
-    text = when (snapshot.transaction.type) {
-      "purchase" -> stateValues.stringSale
-      "return" -> stateValues.stringReturn
-      else -> stateValues.stringSupply
-    },
-    modifier = Modifier
-      .fillMaxWidth()
-      .padding(horizontal = stateValues.marginTextFieldGroup),
-    color = Color.Black,
-    textAlign = TextAlign.Center,
-    fontWeight = FontWeight.Bold,
-    fontSize = stateValues.textSize
-  )
-
-  Spacer(modifier = Modifier.height(8.dp))
-}
 
 @Composable
-private fun AppConfiguration.ReceiptLine(
-  line: TransactionReceiptLineDataModel
-) {
-  val name = line.name.extractLocalizedString(stateValues.appLanguage)
-    ?: line.name.firstOrNull()?.value
-    ?: "No name"
-
-  Text(
-    text = "${line.index + 1}. $name",
-    modifier = Modifier.padding(horizontal = stateValues.marginTextFieldGroup),
-    color = Color.Black,
-    fontWeight = FontWeight.Bold,
-    fontSize = stateValues.textSize
-  )
-
-  Row(
-    modifier = Modifier.fillMaxWidth(),
-    horizontalArrangement = Arrangement.SpaceBetween
-  ) {
-    val suffix = line.quantity.immutableUnitName.extractLocalizedString(stateValues.appLanguage).orEmpty()
-
-    Text(
-      text = "${
-        line.quantity.total.run {
-          if (line.quantity.roundTotal) toInt().toString() else moneyText()
-        }
-      } $suffix x ${line.pricePerUnit.moneyText()} ${line.currencySymbol}",
-      modifier = Modifier.padding(horizontal = stateValues.marginTextFieldGroup),
-      color = Color.Black,
-      fontSize = stateValues.textSize
-    )
-
-    Text(
-      text = "${line.total.moneyText()} ${line.currencySymbol}",
-      modifier = Modifier.padding(horizontal = stateValues.marginTextFieldGroup),
-      color = Color.Black,
-      fontSize = stateValues.textSize,
-      fontWeight = FontWeight.Bold
-    )
-  }
-
-  Spacer(modifier = Modifier.height(6.dp))
-}
-
-@Composable
-private fun AppConfiguration.ReceiptTotals(
-  snapshot: TransactionReceiptSnapshotDataModel
-) {
-  val total = snapshot.lines.sumOf { it.total }.roundMoney()
-
-  Spacer(modifier = Modifier.height(8.dp))
-
+private fun ReceiptPreviewDivider() {
   Spacer(
     modifier = Modifier
       .height(1.dp)
-      .padding(horizontal = stateValues.marginTextFieldGroup)
       .fillMaxWidth()
       .background(Color.Black)
+  )
+}
+
+@Composable
+private fun AppConfiguration.ReceiptPreviewText(
+  text: String,
+  modifier: Modifier = Modifier,
+  bold: Boolean = false,
+  center: Boolean = false,
+  large: Boolean = false,
+  color: Color = Color.Black
+) {
+  Text(
+    text = text,
+    modifier = modifier
+      .fillMaxWidth(),
+    color = color,
+    fontSize = if (large) stateValues.accentTextSize else stateValues.textSize,
+    fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
+    textAlign = if (center) TextAlign.Center else TextAlign.Start
+  )
+}
+
+@Composable
+private fun AppConfiguration.ReceiptPreviewRow(
+  title: String,
+  value: String,
+  bold: Boolean = false,
+  large: Boolean = false
+) {
+  Row(
+    modifier = Modifier.fillMaxWidth(),
+    horizontalArrangement = Arrangement.SpaceBetween,
+    verticalAlignment = Alignment.Top
+  ) {
+    Text(
+      text = title,
+      color = Color.Black,
+      fontSize = if (large) stateValues.accentTextSize else stateValues.textSize,
+      fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
+      modifier = Modifier.weight(1f)
+    )
+
+    Text(
+      text = value,
+      color = Color.Black,
+      fontSize = if (large) stateValues.accentTextSize else stateValues.textSize,
+      fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
+      textAlign = TextAlign.End,
+      modifier = Modifier.weight(1f)
+    )
+  }
+}
+
+@Composable
+private fun AppConfiguration.ReceiptPreviewHeader(
+  snapshot: TransactionReceiptSnapshotDataModel
+) {
+  val store = snapshot.store
+  val companyFormTitle = store
+    ?.companyForms
+    ?.firstOrNull()
+    ?.name
+    ?.visibleLocalizedString(stateValues.appLanguage, "")
+    .orEmpty()
+  val storeName = store?.name?.visibleLocalizedString(stateValues.appLanguage, "Store") ?: "Store"
+
+  ReceiptPreviewText(
+    text = "$companyFormTitle $storeName".trim(),
+    bold = true,
+    center = true,
+    large = true
+  )
+
+  store?.location?.name?.takeIf { it.isNotBlank() }?.let {
+    Spacer(modifier = Modifier.height(3.dp))
+    ReceiptPreviewText(text = it, center = true)
+  }
+
+  store?.phoneNumbers?.takeIf { it.isNotEmpty() }?.let {
+    Spacer(modifier = Modifier.height(3.dp))
+    ReceiptPreviewText(text = "Tel: ${it.joinToString()}", center = true)
+  }
+
+  store?.emails?.takeIf { it.isNotEmpty() }?.let {
+    Spacer(modifier = Modifier.height(3.dp))
+    ReceiptPreviewText(text = "Email: ${it.joinToString()}", center = true)
+  }
+
+  Spacer(modifier = Modifier.height(8.dp))
+  ReceiptPreviewDivider()
+  Spacer(modifier = Modifier.height(8.dp))
+
+  ReceiptPreviewText(
+    text = "ТОВАРНЫЙ ЧЕК / SALES RECEIPT",
+    bold = true,
+    center = true
+  )
+
+  ReceiptPreviewText(
+    text = snapshot.receiptTitle(stateValues.appLanguage),
+    bold = true,
+    center = true
   )
 
   Spacer(modifier = Modifier.height(8.dp))
 
-  Row(
-    modifier = Modifier.fillMaxWidth(),
-    horizontalArrangement = Arrangement.SpaceBetween
-  ) {
-    Text(
-      text = "Total",
-      modifier = Modifier.padding(horizontal = stateValues.marginTextFieldGroup),
-      color = Color.Black,
-      fontSize = stateValues.accentTextSize,
-      fontWeight = FontWeight.Bold
-    )
+  ReceiptPreviewRow("Receipt", snapshot.receiptNumberText(), bold = true)
+  ReceiptPreviewRow("Transaction ID", snapshot.transaction.id.ifBlank { "draft" })
+  ReceiptPreviewRow("Date", receiptUiDateTime(snapshot.transaction.timeMillis))
 
-    Text(
-      text = "${total.moneyText()} ${snapshot.currencySymbol}",
-      modifier = Modifier.padding(horizontal = stateValues.marginTextFieldGroup),
-      color = Color.Black,
-      fontSize = stateValues.accentTextSize,
-      fontWeight = FontWeight.Bold
+  snapshot.cashierName.takeIf { it.isNotBlank() }?.let {
+    ReceiptPreviewRow("Cashier", it)
+  }
+
+  Spacer(modifier = Modifier.height(8.dp))
+  ReceiptPreviewDivider()
+  Spacer(modifier = Modifier.height(8.dp))
+}
+
+private fun receiptUiDateTime(timeMillis: Long): String {
+  return runCatching {
+    val dt = Instant.fromEpochMilliseconds(timeMillis).toLocalDateTime(TimeZone.currentSystemDefault())
+    "${dt.dayOfMonth.toString().padStart(2, '0')}.${dt.monthNumber.toString().padStart(2, '0')}.${dt.year} ${dt.hour.toString().padStart(2, '0')}:${dt.minute.toString().padStart(2, '0')}:${dt.second.toString().padStart(2, '0')}"
+  }.getOrElse { timeMillis.toString() }
+}
+
+@Composable
+private fun AppConfiguration.ReceiptPreviewLine(
+  line: TransactionReceiptLineDataModel
+) {
+  val name = line.name.visibleLocalizedString(stateValues.appLanguage, "No name")
+  val suffix = line.quantity.immutableUnitName.visibleLocalizedString(stateValues.appLanguage, "")
+  val quantityText = line.quantity.total.run {
+    if (line.quantity.roundTotal) toInt().toString() else moneyText()
+  }
+
+  ReceiptPreviewText(
+    text = "${line.index + 1}. $name",
+    bold = true
+  )
+
+  line.barcode.takeIf { it.isNotBlank() }?.let {
+    ReceiptPreviewText(
+      text = "Barcode: $it",
+      color = Color.DarkGray
     )
   }
+
+  ReceiptPreviewRow(
+    title = "$quantityText $suffix x ${line.pricePerUnit.moneyText()} ${line.currencySymbol}".trim(),
+    value = "${line.total.moneyText()} ${line.currencySymbol}",
+    bold = true
+  )
+
+  Spacer(modifier = Modifier.height(7.dp))
+}
+
+@Composable
+private fun AppConfiguration.ReceiptPreviewTotals(
+  snapshot: TransactionReceiptSnapshotDataModel
+) {
+  val total = snapshot.totalAmount()
+  val debt = snapshot.debtAmount()
+  val change = snapshot.changeAmount()
+
+  Spacer(modifier = Modifier.height(6.dp))
+  ReceiptPreviewDivider()
+  Spacer(modifier = Modifier.height(8.dp))
+
+  ReceiptPreviewRow(
+    title = "TOTAL",
+    value = "${total.moneyText()} ${snapshot.currencySymbol}",
+    bold = true,
+    large = true
+  )
 
   Spacer(modifier = Modifier.height(8.dp))
 
   if (snapshot.paymentDraft.paidCash > 0.0) {
-    ReceiptPaymentRow(
+    ReceiptPreviewRow(
       title = stateValues.stringCash,
-      value = snapshot.paymentDraft.paidCash,
-      currencySymbol = snapshot.currencySymbol
+      value = "${snapshot.paymentDraft.paidCash.moneyText()} ${snapshot.currencySymbol}"
     )
   }
 
   if (snapshot.paymentDraft.paidCard > 0.0) {
-    ReceiptPaymentRow(
+    ReceiptPreviewRow(
       title = stateValues.stringCashless,
-      value = snapshot.paymentDraft.paidCard,
-      currencySymbol = snapshot.currencySymbol
+      value = "${snapshot.paymentDraft.paidCard.moneyText()} ${snapshot.currencySymbol}"
     )
   }
 
-  snapshot.transaction.id.takeIf { it.isNotBlank() }?.let {
-    Spacer(modifier = Modifier.height(8.dp))
+  if (debt > 0.0) {
+    ReceiptPreviewRow(
+      title = stateValues.stringDebtors,
+      value = "${debt.moneyText()} ${snapshot.currencySymbol}"
+    )
 
-    Text(
-      text = "Transaction ID: $it",
-      modifier = Modifier
-        .fillMaxWidth()
-        .padding(horizontal = stateValues.marginTextFieldGroup),
-      color = Color.Black,
-      fontSize = stateValues.smallTextSize,
-      textAlign = TextAlign.Center
+    snapshot.paymentDraft.debtor?.let { debtor ->
+      val debtorName = "${debtor.firstName} ${debtor.lastName}".trim()
+        .ifBlank { debtor.phoneNumber.ifBlank { debtor.id } }
+      ReceiptPreviewRow("Debtor", debtorName)
+      debtor.phoneNumber.takeIf { it.isNotBlank() }?.let {
+        ReceiptPreviewRow("Debtor phone", it)
+      }
+    }
+  }
+
+  if (change > 0.0) {
+    ReceiptPreviewRow(
+      title = "Change",
+      value = "${change.moneyText()} ${snapshot.currencySymbol}"
     )
   }
-}
 
-@Composable
-private fun AppConfiguration.ReceiptPaymentRow(
-  title: String,
-  value: Double,
-  currencySymbol: String
-) {
-  Row(
-    modifier = Modifier.fillMaxWidth(),
-    horizontalArrangement = Arrangement.SpaceBetween
-  ) {
-    Text(
-      text = title,
-      modifier = Modifier.padding(horizontal = stateValues.marginTextFieldGroup),
-      color = Color.Black,
-      fontSize = stateValues.textSize
-    )
+  Spacer(modifier = Modifier.height(8.dp))
+  ReceiptPreviewDivider()
+  Spacer(modifier = Modifier.height(8.dp))
 
-    Text(
-      text = "${value.moneyText()} $currencySymbol",
-      modifier = Modifier.padding(horizontal = stateValues.marginTextFieldGroup),
-      color = Color.Black,
-      fontSize = stateValues.textSize
-    )
-  }
+  ReceiptPreviewRow("VAT / НДС / ҚҚС", "not specified")
+  ReceiptPreviewRow("Fiscal status", "non-fiscal software receipt")
+
+  Spacer(modifier = Modifier.height(10.dp))
+
+  ReceiptPreviewText(
+    text = "Thank you / Спасибо / Рақмет",
+    center = true,
+    bold = true
+  )
 }
 
 private fun AppConfiguration.buildTransactionReceiptLines(
@@ -1327,6 +1370,13 @@ private fun Double.moneyText(): String {
   val whole = fixed.toLong()
   val cents = kotlin.math.round((fixed - whole) * 100).toInt()
   return "$whole.${cents.toString().padStart(2, '0')}"
+}
+
+private fun AppConfiguration.receiptActionNotification(result: ReceiptPlatformActionResult, positiveMessage: String) {
+  postInAppNotification(
+    if (result.success) positiveMessage else result.message.ifBlank { "Receipt action failed" },
+    if (result.success) NotificationType.Positive else NotificationType.Negative
+  )
 }
 
 @Composable
@@ -1372,8 +1422,18 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
 
     val store = stateValues.stores?.find { it.id == stateValues.activeStoreId }
 
-    val currencyCode = liveLines.firstOrNull()?.currencyCode.orEmpty()
-    val currencySymbol = liveLines.firstOrNull()?.currencySymbol.orEmpty()
+    val currencyCode = liveLines.firstOrNull()?.currencyCode
+      ?: paymentDraft?.debtor?.currency
+      ?: stateValues.globalAppConfiguration.countries
+        .find { it.locale.equals(stateValues.userAccount?.countryLocale, true) }
+        ?.currencies
+        ?.firstOrNull()
+        ?.code
+      ?: "KZT"
+
+    val currencySymbol = liveLines.firstOrNull()?.currencySymbol
+      ?: stateValues.globalAppConfiguration.countries.getCurrency(currencyCode)?.symbol
+      ?: currencyCode
 
     val total = liveLines.sumOf { it.total }.roundMoney()
 
@@ -1402,9 +1462,11 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
       paidCash = draft.paidCash,
       paidCard = draft.paidCard,
       cardPaymentOptionId = draft.cardPaymentOptionId,
-      debtor = null,
+      debtor = draft.debtor,
       timeMillis = getCurrentTimeMillis()
     )
+
+    val cashierName = "${stateValues.userAccount?.firstName.orEmpty()} ${stateValues.userAccount?.lastName.orEmpty()}".trim()
 
     val snapshotForScreen =
       latestSnapshot?.takeIf {
@@ -1416,34 +1478,57 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
         lines = liveLines,
         paymentDraft = draft,
         currencyCode = currencyCode,
-        currencySymbol = currencySymbol
+        currencySymbol = currencySymbol,
+        cashierName = cashierName,
+        cashierPhoneNumber = stateValues.userAccount?.phoneNumber.orEmpty(),
+        cashierEmail = stateValues.userAccount?.email.orEmpty()
       )
 
     LazyColumn(
       modifier = Modifier
         .weight(1f)
         .padding(8.dp)
+        .clip(RoundedCornerShape(stateValues.cornerRadius))
         .background(Color.White)
-        .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor)
+        .border(
+          stateValues.unfocusedBorderWidth,
+          stateValues.PlaceholderTextColor,
+          RoundedCornerShape(stateValues.cornerRadius)
+        )
+        .padding(stateValues.marginTextFieldGroup)
     ) {
       item {
-        ReceiptHeader(snapshotForScreen)
+        ReceiptPreviewHeader(snapshotForScreen)
       }
 
-      items(snapshotForScreen.lines) { line ->
-        ReceiptLine(line)
+      if (snapshotForScreen.lines.isEmpty()) {
+        item {
+          ReceiptPreviewText(
+            text = "No items",
+            center = true,
+            bold = true,
+            color = Color.DarkGray
+          )
+        }
+      } else {
+        items(snapshotForScreen.lines) { line ->
+          ReceiptPreviewLine(line)
+        }
       }
 
       item {
-        ReceiptTotals(snapshotForScreen)
-      }
-
-      item {
-        Spacer(modifier = Modifier.height(stateValues.screenHeight / 5))
+        ReceiptPreviewTotals(snapshotForScreen)
+        Spacer(modifier = Modifier.height(stateValues.screenHeight / 7))
       }
     }
 
     val alreadyCompleted = snapshotForScreen.transaction.id.isNotBlank()
+    val pdfBytes = remember(snapshotForScreen, stateValues.appLanguage) {
+      snapshotForScreen.buildReceiptPdfBytes(stateValues.appLanguage)
+    }
+    val fileName = remember(snapshotForScreen) {
+      snapshotForScreen.receiptPdfFileName()
+    }
 
     Column(
       modifier = Modifier
@@ -1452,44 +1537,131 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
     ) {
       Spacer(modifier = Modifier.height(4.dp))
 
-      actionButton(
-        text = if (alreadyCompleted) stateValues.stringComplete else stateValues.stringComplete,
-        enabled = !alreadyCompleted &&
-            snapshotForScreen.lines.isNotEmpty() &&
-            stateValues.latestNotification == null,
-        onClick = {
-          completeTransaction(
-            transaction = currentTransaction,
-            transactionTypeIndex = context.transactionTypeIndex,
-            clientId = context.clientId,
-            receiptSnapshot = snapshotForScreen
-          ) {
-            coroutineScope.launch {
-              when (context.transactionTypeIndex) {
-                0 -> Navigation.TransactionSale.go(
-                  NavigationScreenModel.Transaction.ReceiptPreview,
-                  remove = true
-                )
+      if (!alreadyCompleted) {
+        actionButton(
+          text = stateValues.stringComplete,
+          enabled = snapshotForScreen.lines.isNotEmpty() && stateValues.latestNotification == null,
+          iconPath = stateValues.drawablePathIconCheck,
+          onClick = {
+            completeTransaction(
+              transaction = currentTransaction,
+              transactionTypeIndex = context.transactionTypeIndex,
+              clientId = context.clientId,
+              receiptSnapshot = snapshotForScreen
+            ) {
+              coroutineScope.launch {
+                when (context.transactionTypeIndex) {
+                  0 -> Navigation.TransactionSale.go(
+                    NavigationScreenModel.Transaction.ReceiptPreview,
+                    remove = true
+                  )
 
-                1 -> Navigation.TransactionReturn.go(
-                  NavigationScreenModel.Transaction.ReceiptPreview,
-                  remove = true
-                )
+                  1 -> Navigation.TransactionReturn.go(
+                    NavigationScreenModel.Transaction.ReceiptPreview,
+                    remove = true
+                  )
 
-                else -> Navigation.TransactionSupply.go(
-                  NavigationScreenModel.Transaction.ReceiptPreview,
-                  remove = true
-                )
+                  else -> Navigation.TransactionSupply.go(
+                    NavigationScreenModel.Transaction.ReceiptPreview,
+                    remove = true
+                  )
+                }
               }
             }
           }
+        )
+      } else {
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+          actionButton(
+            modifier = Modifier.weight(1f),
+            text = "PDF",
+            iconPath = stateValues.drawablePathIconReceipt,
+            onClick = {
+              coroutineScope.launch {
+                receiptActionNotification(
+                  saveReceiptPdf(fileName, pdfBytes),
+                  "Receipt PDF saved"
+                )
+              }
+            }
+          )
+
+          actionButton(
+            modifier = Modifier.weight(1f),
+            text = "Share",
+            iconPath = stateValues.drawablePathIconSwitch,
+            onClick = {
+              coroutineScope.launch {
+                receiptActionNotification(
+                  shareReceiptPdf(fileName, pdfBytes, whatsappOnly = false),
+                  "Receipt shared"
+                )
+              }
+            }
+          )
+
+          actionButton(
+            modifier = Modifier.weight(1f),
+            text = "WhatsApp",
+            iconPath = stateValues.drawablePathIconSwitch,
+            onClick = {
+              coroutineScope.launch {
+                receiptActionNotification(
+                  shareReceiptPdf(fileName, pdfBytes, whatsappOnly = true),
+                  "Receipt sent to WhatsApp"
+                )
+              }
+            }
+          )
         }
-      )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+          actionButton(
+            modifier = Modifier.weight(1f),
+            text = "Print",
+            iconPath = stateValues.drawablePathIconDevices,
+            onClick = {
+              coroutineScope.launch {
+                receiptActionNotification(
+                  printReceiptEscPos(snapshotForScreen.buildReceiptEscPosBytes(stateValues.appLanguage)),
+                  "Receipt sent to printer"
+                )
+              }
+            }
+          )
+
+          actionButton(
+            modifier = Modifier.weight(1f),
+            text = "Quit",
+            enabledColor = stateValues.DisabledColor,
+            iconPath = stateValues.drawablePathIconExit,
+            onClick = {
+              coroutineScope.launch {
+                latestTransactionReceiptSnapshotState.emit(null)
+                when (context.transactionTypeIndex) {
+                  0 -> Navigation.TransactionSale.clear()
+                  1 -> Navigation.TransactionReturn.clear()
+                  else -> Navigation.TransactionSupply.clear()
+                }
+              }
+            }
+          )
+        }
+      }
 
       Spacer(modifier = Modifier.height(4.dp))
     }
   }
 }
+
 
 //@Composable
 //fun AppConfiguration.TransactionReceiptPreviewScreen() {
@@ -1710,14 +1882,16 @@ private fun AppConfiguration.TransactionTotalCard(
       .background(stateValues.BackgroundColor)
       .padding(stateValues.marginTextFieldGroup)
   ) {
-    Text(
-      text = title,
-      color = stateValues.PlaceholderTextColor,
-      fontSize = stateValues.smallTextSize,
-      fontWeight = FontWeight.Bold
-    )
+    if (title.isNotBlank()) {
+      Text(
+        text = title,
+        color = stateValues.PlaceholderTextColor,
+        fontSize = stateValues.smallTextSize,
+        fontWeight = FontWeight.Bold
+      )
 
-    Spacer(modifier = Modifier.height(4.dp))
+      Spacer(modifier = Modifier.height(4.dp))
+    }
 
     Text(
       text = "${total.moneyText()} $currencySymbol".trim(),
@@ -1874,6 +2048,519 @@ private fun AppConfiguration.TransactionAmountField(
   }
 }
 
+
+private fun paymentInputAppend(current: String, token: String): String {
+  val clean = current.trim().replace(',', '.')
+
+  if (token == "⌫")
+    return clean.dropLast(1)
+
+  if (token == ".") {
+    return if (clean.contains('.')) clean else clean.ifBlank { "0" } + "."
+  }
+
+  if (!token.all { it.isDigit() })
+    return clean
+
+  val next = if (clean == "0") token else clean + token
+  val decimals = next.substringAfter('.', "")
+
+  return if (next.contains('.') && decimals.length > 2)
+    clean
+  else
+    next
+}
+
+private fun paymentInputNormalize(value: String): String {
+  val clean = value.trim().replace(',', '.')
+
+  if (clean.isBlank() || clean == ".")
+    return ""
+
+  val number = clean.toDoubleOrNull() ?: return clean.dropLast(1)
+  val limited = kotlin.math.floor(number * 100.0) / 100.0
+
+  return when {
+    clean.endsWith(".") -> clean
+    clean.contains('.') -> {
+      val before = limited.toString().substringBefore('.')
+      val after = clean.substringAfter('.', "").take(2)
+      "$before.$after"
+    }
+    else -> limited.toLong().toString()
+  }
+}
+
+private fun moneyInputFromDouble(value: Double): String {
+  val rounded = kotlin.math.floor(value.coerceAtLeast(0.0) * 100.0) / 100.0
+  val whole = rounded.toLong()
+  val cents = kotlin.math.round((rounded - whole) * 100.0).toInt()
+  return "$whole.${cents.toString().padStart(2, '0')}"
+}
+
+private fun List<LocalizedStringDataModel>.visibleLocalizedString(
+  language: String,
+  fallback: String
+): String {
+  return extractLocalizedString(language)
+    ?.trim()
+    ?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+    ?: firstOrNull { it.language.equals("main", ignoreCase = true) && it.value.trim().isNotBlank() && !it.value.trim().equals("null", ignoreCase = true) }
+      ?.value
+      ?.trim()
+    ?: firstOrNull { it.value.trim().isNotBlank() && !it.value.trim().equals("null", ignoreCase = true) }
+      ?.value
+      ?.trim()
+    ?: fallback
+}
+
+private fun AppConfiguration.goodsCategoryName(
+  categoryId: String
+): String? {
+  return stateValues.goodsCategories
+    .orEmpty()
+    .find { it.id == categoryId }
+    ?.name
+    ?.visibleLocalizedString(stateValues.appLanguage, categoryId)
+}
+
+private fun cashTenderShortcutBase(currencyCode: String): List<Double> {
+  return when (currencyCode.uppercase()) {
+    "KZT" -> listOf(100.0, 200.0, 500.0, 1000.0, 2000.0, 3000.0, 5000.0, 10000.0, 20000.0, 50000.0, 100000.0)
+    "RUB" -> listOf(50.0, 100.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0, 20000.0)
+    "USD" -> listOf(1.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0)
+    "EUR" -> listOf(5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0)
+    else -> listOf(100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0, 20000.0)
+  }
+}
+
+private fun quickTenderAmounts(
+  amount: Double,
+  currencyCode: String,
+  includeExactRemaining: Boolean
+): List<Double> {
+  val target = amount.roundMoney().coerceAtLeast(0.0)
+  if (target <= 0.0)
+    return emptyList()
+
+  val result = mutableListOf<Double>()
+
+  if (includeExactRemaining)
+    result += target
+
+  cashTenderShortcutBase(currencyCode)
+    .filter { it >= target && it !in result }
+    .forEach { result += it }
+
+  if (result.size < 4) {
+    var next = cashTenderShortcutBase(currencyCode).lastOrNull()?.takeIf { it > 0.0 } ?: 10000.0
+    while (result.size < 4) {
+      next *= 2.0
+      if (next !in result)
+        result += next
+    }
+  }
+
+  return result.distinct().take(4)
+}
+
+@Composable
+private fun AppConfiguration.TransactionQuickAmountButtons(
+  targetAmount: Double,
+  currencyCode: String,
+  currencySymbol: String,
+  includeExactRemaining: Boolean,
+  onAmountSelected: (Double) -> Unit
+) {
+  val amounts = quickTenderAmounts(targetAmount, currencyCode, includeExactRemaining)
+
+  if (amounts.isEmpty())
+    return
+
+  LazyRow(
+    horizontalArrangement = Arrangement.spacedBy(6.dp),
+    modifier = Modifier.fillMaxWidth()
+  ) {
+    items(amounts) { amount ->
+      Box(
+        modifier = Modifier
+          .clip(RoundedCornerShape(stateValues.cornerRadius))
+          .border(
+            stateValues.unfocusedBorderWidth,
+            stateValues.AccentColor,
+            RoundedCornerShape(stateValues.cornerRadius)
+          )
+          .background(stateValues.BackgroundColor)
+          .clickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = ripple(color = stateValues.AccentColor)
+          ) {
+            onAmountSelected(amount)
+          }
+          .padding(horizontal = 14.dp, vertical = 10.dp),
+        contentAlignment = Alignment.Center
+      ) {
+        Text(
+          text = "${moneyInputFromDouble(amount)} $currencySymbol",
+          color = stateValues.AccentColor,
+          fontSize = stateValues.smallTextSize,
+          fontWeight = FontWeight.Bold,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis
+        )
+      }
+    }
+  }
+}
+
+@Composable
+private fun AppConfiguration.TransactionPaymentAmountField(
+  modifier: Modifier = Modifier,
+  title: String,
+  value: String,
+  placeholder: String = "0.00",
+  selected: Boolean,
+  leadingIconPath: String,
+  onSelected: () -> Unit,
+  onValueChange: (String) -> Unit
+) {
+  val keyboardController = LocalSoftwareKeyboardController.current
+  val suppressSystemKeyboard = getPlatformName().contains("android", ignoreCase = true)
+
+  genericTextField(
+    modifier = modifier,
+    titleText = title,
+    valueInitial = value,
+    placeholderText = placeholder,
+    leadingIconPath = leadingIconPath,
+    keyboardType = KeyboardType.Decimal,
+    imeWithAction = ImeWithAction(ImeAction.Done),
+    readOnly = suppressSystemKeyboard,
+    showClearButton = true,
+    titleTextColor = if (selected) stateValues.AccentColor else stateValues.TextColor,
+    focusedBorderColor = stateValues.AccentColor,
+    unfocusedBorderColor = if (selected) stateValues.AccentColor else stateValues.TextColor,
+    selectionBackgroundColor = stateValues.AccentColor,
+    selectionFocusTextColor = stateValues.AccentTextColor,
+    updateIsFocusedAction = { focusState ->
+      if (focusState.isFocused) {
+        onSelected()
+
+        if (suppressSystemKeyboard)
+          keyboardController?.hide()
+      }
+    },
+    onValueChange = { rawValue, applyChange ->
+      val normalized = rawValue.trim().replace(',', '.')
+      val isAcceptable = normalized.isEmpty() ||
+          normalized == "." ||
+          normalized.matches(Regex("^\\d*(\\.\\d{0,2})?$"))
+
+      if (isAcceptable) {
+        onValueChange(normalized)
+        applyChange()
+      }
+    }
+  )
+}
+
+
+@Composable
+private fun AppConfiguration.TransactionNumpad(
+  modifier: Modifier = Modifier,
+  onInput: (String) -> Unit
+) {
+  val rows = listOf(
+    listOf("1", "2", "3"),
+    listOf("4", "5", "6"),
+    listOf("7", "8", "9"),
+    listOf(".", "0", "⌫")
+  )
+
+  Column(
+    modifier = modifier,
+    verticalArrangement = Arrangement.spacedBy(6.dp)
+  ) {
+    rows.forEach { row ->
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+      ) {
+        row.forEach { token ->
+          Box(
+            modifier = Modifier
+              .weight(1f)
+              .height((stateValues.textFieldHeight.value * 0.9f).dp)
+              .clip(RoundedCornerShape(stateValues.cornerRadius))
+              .border(
+                stateValues.unfocusedBorderWidth,
+                stateValues.PlaceholderTextColor,
+                RoundedCornerShape(stateValues.cornerRadius)
+              )
+              .background(if (token == "⌫") stateValues.DisabledColor else stateValues.BackgroundColor)
+              .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple(color = stateValues.TextColor)
+              ) {
+                onInput(token)
+              },
+            contentAlignment = Alignment.Center
+          ) {
+            Text(
+              text = token,
+              color = stateValues.TextColor,
+              fontSize = stateValues.accentTextSize,
+              fontWeight = FontWeight.Bold
+            )
+          }
+        }
+      }
+    }
+  }
+}
+
+@Composable
+private fun AppConfiguration.DebtorPaymentCard(
+  debtor: DebtorDataModel,
+  selected: Boolean = false,
+  onClick: () -> Unit,
+  onDelete: (() -> Unit)? = null
+) {
+  Row(
+    modifier = Modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(stateValues.cornerRadius))
+      .border(
+        stateValues.unfocusedBorderWidth,
+        if (selected) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+        RoundedCornerShape(stateValues.cornerRadius)
+      )
+      .background(if (selected) stateValues.AccentColor else stateValues.BackgroundColor)
+      .clickable(
+        interactionSource = remember { MutableInteractionSource() },
+        indication = ripple(color = if (selected) stateValues.AccentTextColor else stateValues.TextColor),
+        onClick = onClick
+      )
+      .padding(stateValues.marginTextFieldGroup),
+    verticalAlignment = Alignment.CenterVertically
+  ) {
+    Column(modifier = Modifier.weight(1f)) {
+      Text(
+        text = "${debtor.firstName} ${debtor.lastName}".trim().ifBlank { debtor.phoneNumber.ifBlank { "Unnamed debtor" } },
+        color = if (selected) stateValues.AccentTextColor else stateValues.TextColor,
+        fontSize = stateValues.textSize,
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+      )
+
+      debtor.phoneNumber.takeIf { it.isNotBlank() }?.let {
+        Text(
+          text = it,
+          color = if (selected) stateValues.AccentTextColor else stateValues.PlaceholderTextColor,
+          fontSize = stateValues.smallTextSize,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis
+        )
+      }
+    }
+
+    Text(
+      text = "${moneyInputFromDouble(debtor.debtAmount)} ${debtor.currency}",
+      color = if (selected) stateValues.AccentTextColor else stateValues.AccentColor,
+      fontSize = stateValues.textSize,
+      fontWeight = FontWeight.Bold
+    )
+
+    onDelete?.let {
+      Spacer(modifier = Modifier.width(8.dp))
+
+      actionButton(
+        text = "",
+        fillMaxWidthIfTextPresent = false,
+        enabledColor = stateValues.ErrorColor,
+        iconPath = stateValues.drawablePathIconCancel,
+        iconContentDescription = stateValues.stringDelete,
+        onClick = it
+      )
+    }
+  }
+}
+
+
+@Composable
+private fun AppConfiguration.TransactionPlainTextField(
+  title: String,
+  value: String,
+  placeholder: String,
+  leadingIconPath: String? = null,
+  keyboardType: KeyboardType = KeyboardType.Text,
+  onValueChange: (String) -> Unit
+) {
+  genericTextField(
+    titleText = title,
+    valueInitial = value,
+    placeholderText = placeholder,
+    leadingIconPath = leadingIconPath,
+    keyboardType = keyboardType,
+    imeWithAction = ImeWithAction(ImeAction.Next),
+    showClearButton = true,
+    onValueChange = { rawValue, applyChange ->
+      onValueChange(rawValue)
+      applyChange()
+    }
+  )
+}
+
+
+
+@Composable
+private fun AppConfiguration.TransactionPaymentHeadsUpCard(
+  total: Double,
+  paid: Double,
+  debt: Double,
+  remaining: Double,
+  change: Double,
+  currencySymbol: String,
+  currencyCode: String,
+  paymentValid: Boolean
+) {
+  Column(
+    modifier = Modifier
+      .fillMaxWidth()
+      .padding(horizontal = stateValues.marginTextField)
+      .clip(RoundedCornerShape(stateValues.cornerRadius))
+      .border(
+        stateValues.unfocusedBorderWidth,
+        if (paymentValid) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+        RoundedCornerShape(stateValues.cornerRadius)
+      )
+      .background(stateValues.BackgroundColor)
+      .padding(stateValues.marginTextFieldGroup)
+  ) {
+    Text(
+      text = "${total.moneyText()} $currencySymbol".trim(),
+      color = stateValues.TextColor,
+      fontSize = stateValues.titleTextSize,
+      fontWeight = FontWeight.Bold,
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis
+    )
+
+    if (currencyCode.isNotBlank()) {
+      Text(
+        text = currencyCode,
+        color = stateValues.PlaceholderTextColor,
+        fontSize = stateValues.smallTextSize,
+        fontWeight = FontWeight.Bold
+      )
+    }
+
+    Spacer(modifier = Modifier.height(8.dp))
+
+    TransactionPaymentSummaryRows(
+      paid = paid,
+      debt = debt,
+      remaining = remaining,
+      change = change,
+      currencySymbol = currencySymbol,
+      large = true,
+      paymentValid = paymentValid
+    )
+  }
+}
+
+@Composable
+private fun AppConfiguration.TransactionPaymentSummaryRows(
+  paid: Double,
+  debt: Double,
+  remaining: Double,
+  change: Double,
+  currencySymbol: String,
+  large: Boolean = false,
+  paymentValid: Boolean = true
+) {
+  val textSize = if (large) stateValues.textSize else stateValues.smallTextSize
+  val valueSize = if (large) stateValues.accentTextSize else stateValues.textSize
+
+  @Composable
+  fun SummaryRow(
+    title: String,
+    value: Double,
+    valueColor: Color = stateValues.TextColor
+  ) {
+    Row(
+      modifier = Modifier.fillMaxWidth(),
+      horizontalArrangement = Arrangement.SpaceBetween,
+      verticalAlignment = Alignment.CenterVertically
+    ) {
+      Text(
+        text = title,
+        color = stateValues.PlaceholderTextColor,
+        fontSize = textSize,
+        fontWeight = FontWeight.Bold
+      )
+
+      Text(
+        text = "${moneyInputFromDouble(value)} $currencySymbol",
+        color = valueColor,
+        fontSize = valueSize,
+        fontWeight = FontWeight.Bold
+      )
+    }
+  }
+
+  Column(
+    modifier = Modifier.fillMaxWidth()
+  ) {
+    SummaryRow(
+      title = "Paid",
+      value = paid,
+      valueColor = stateValues.TextColor
+    )
+
+    if (debt > 0.0) {
+      Spacer(modifier = Modifier.height(4.dp))
+      SummaryRow(
+        title = "Debt",
+        value = debt,
+        valueColor = stateValues.AccentColor
+      )
+    }
+
+    if (remaining > 0.0) {
+      Spacer(modifier = Modifier.height(4.dp))
+      SummaryRow(
+        title = "Remaining",
+        value = remaining,
+        valueColor = stateValues.ErrorColor
+      )
+    }
+
+    if (change > 0.0) {
+      Spacer(modifier = Modifier.height(4.dp))
+      SummaryRow(
+        title = "Change",
+        value = change,
+        valueColor = stateValues.AccentColor
+      )
+    }
+  }
+}
+
+@Composable
+private fun AppConfiguration.TransactionDebtText(
+  debtAmount: Double,
+  currencySymbol: String
+) {
+  Text(
+    text = "Debt: ${moneyInputFromDouble(debtAmount)} $currencySymbol",
+    color = if (debtAmount > 0.0) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+    fontSize = stateValues.textSize,
+    fontWeight = FontWeight.Bold
+  )
+}
+
 @Composable
 fun AppConfiguration.TransactionPaymentScreen() {
   Column(
@@ -1920,54 +2607,257 @@ fun AppConfiguration.TransactionPaymentScreen() {
       it.locale.equals(stateValues.userAccount?.countryLocale, true)
     } ?: stateValues.globalAppConfiguration.countries.first()
 
+    val currencyCode = lines.firstOrNull()?.currencyCode
+      ?: country.currencies.firstOrNull()?.code
+      ?: "KZT"
+
+    val currencySymbol = lines.firstOrNull()?.currencySymbol
+      ?: country.currencies.firstOrNull()?.symbol
+      ?: currencyCode
+
+    LaunchedEffect(stateValues.activeStoreId) {
+      stateValues.activeStoreId?.let { getDebtors(it) }
+    }
+
+    val debtors by debtorsState.payload.collectAsState()
+
     var selectedCashlessPaymentMethodId by rememberSaveable {
       mutableStateOf(country.preferredCashlessPaymentOptionId)
     }
 
-    var cashText by rememberSaveable {
+    var cashText by rememberSaveable(context.transactionTypeIndex, context.clientId) {
       mutableStateOf("")
     }
 
-    var cardText by rememberSaveable {
+    var cardText by rememberSaveable(context.transactionTypeIndex, context.clientId) {
       mutableStateOf("")
     }
+
+    var debtText by rememberSaveable(context.transactionTypeIndex, context.clientId) {
+      mutableStateOf("")
+    }
+
+    var activeAmountField by rememberSaveable {
+      mutableStateOf("cash")
+    }
+
+    var selectedDebtorId by rememberSaveable {
+      mutableStateOf<String?>(null)
+    }
+
+    var newDebtorFirstName by rememberSaveable { mutableStateOf("") }
+    var newDebtorLastName by rememberSaveable { mutableStateOf("") }
+    var newDebtorPhone by rememberSaveable { mutableStateOf("") }
+    var newDebtorEmail by rememberSaveable { mutableStateOf("") }
+
+    val paymentScreenState by context.stateHost.state.collectAsState()
+    val paymentModeStateKey = "payment_mode_${context.transactionTypeIndex}_${context.clientId}"
 
     val paymentMode = tabRowWidget(
-      modifier = Modifier.padding(stateValues.marginTextField),
-      selectedIndexInitial = "1",
+      modifier = Modifier.padding(
+        start = stateValues.marginTextField,
+        top = stateValues.marginTextField,
+        end = stateValues.marginTextField
+      ),
+      selectedIndexInitial = paymentScreenState[paymentModeStateKey] ?: "0",
       tabs = listOf(
-        TabContent("0", stateValues.stringCash),
-        TabContent("1", stateValues.stringCashless),
-        TabContent("2", stateValues.stringMixed)
+        TabContent("0", stateValues.stringCash) {
+          coroutineScope.launch { context.stateHost.setState(paymentModeStateKey to it) }
+        },
+        TabContent("1", stateValues.stringCashless) {
+          coroutineScope.launch { context.stateHost.setState(paymentModeStateKey to it) }
+        },
+        TabContent("2", stateValues.stringMixed) {
+          coroutineScope.launch { context.stateHost.setState(paymentModeStateKey to it) }
+        }
       )
     )
+
+    LaunchedEffect(paymentMode.id, total) {
+      when (paymentMode.id) {
+        "0" -> {
+          cashText = moneyInputFromDouble(total)
+          cardText = ""
+          debtText = ""
+          activeAmountField = "cash"
+        }
+
+        "1" -> {
+          cashText = ""
+          cardText = moneyInputFromDouble(total)
+          debtText = ""
+          activeAmountField = "card"
+        }
+
+        else -> {
+          cashText = ""
+          cardText = ""
+          debtText = ""
+          activeAmountField = "cash"
+        }
+      }
+    }
+
+    fun rawPaymentValue(field: String): String {
+      return when (field) {
+        "card" -> cardText
+        "debt" -> debtText
+        else -> cashText
+      }
+    }
+
+    fun fieldMax(field: String): Double {
+      if (paymentMode.id != "2")
+        return Double.POSITIVE_INFINITY
+
+      val cash = if (field == "cash") 0.0 else cashText.toMoneyDouble()
+      val card = if (field == "card") 0.0 else cardText.toMoneyDouble()
+      val debt = if (field == "debt") 0.0 else debtText.toMoneyDouble()
+
+      return (total - cash - card - debt).coerceAtLeast(0.0).roundMoney()
+    }
+
+    fun setPaymentField(field: String, rawValue: String) {
+      val normalized = paymentInputNormalize(rawValue)
+      val numericValue = normalized.toMoneyDouble()
+      val maxValue = fieldMax(field)
+
+      val finalText = if (paymentMode.id == "2" && numericValue > maxValue) {
+        moneyInputFromDouble(maxValue)
+      } else {
+        normalized
+      }
+
+      when (field) {
+        "card" -> cardText = finalText
+        "debt" -> debtText = finalText
+        else -> cashText = finalText
+      }
+    }
+
+    fun setActiveAmount(value: Double) {
+      setPaymentField(activeAmountField, moneyInputFromDouble(value))
+    }
+
+    fun applyNumpadToken(token: String) {
+      val current = rawPaymentValue(activeAmountField)
+      setPaymentField(activeAmountField, paymentInputAppend(current, token))
+    }
+
+    val paidCash = when (paymentMode.id) {
+      "1" -> 0.0
+      else -> cashText.toMoneyDouble()
+    }.roundMoney()
+
+    val paidCard = when (paymentMode.id) {
+      "0" -> 0.0
+      "1" -> total
+      else -> cardText.toMoneyDouble()
+    }.roundMoney()
+
+    val debtAmount = when (paymentMode.id) {
+      "2" -> debtText.toMoneyDouble()
+      else -> 0.0
+    }.roundMoney()
+
+    val selectedDebtor = debtors.orEmpty().find { it.id == selectedDebtorId }
+
+    val draftDebtor = if (debtAmount > 0.0) {
+      selectedDebtor?.copy(
+        debtAmount = debtAmount,
+        currency = currencyCode
+      ) ?: DebtorDataModel(
+        firstName = newDebtorFirstName.trim(),
+        lastName = newDebtorLastName.trim(),
+        phoneNumber = newDebtorPhone.trim(),
+        email = newDebtorEmail.trim(),
+        debtAmount = debtAmount,
+        currency = currencyCode
+      )
+    } else null
+
+    val debtorValid = debtAmount <= 0.0 || (
+        selectedDebtor != null ||
+            newDebtorFirstName.trim().isNotBlank() ||
+            newDebtorLastName.trim().isNotBlank() ||
+            newDebtorPhone.trim().isNotBlank() ||
+            newDebtorEmail.trim().isNotBlank()
+        )
+
+    val paymentSum = (paidCash + paidCard + debtAmount).roundMoney()
+    val remainingAmount = (total - paymentSum).coerceAtLeast(0.0).roundMoney()
+    val paidMoneyAmount = (paidCash + paidCard).roundMoney()
+    val cashRequiredAmount = (total - paidCard - debtAmount).coerceAtLeast(0.0).roundMoney()
+    val changeAmount = (paidCash - cashRequiredAmount).coerceAtLeast(0.0).roundMoney()
+
+    val paymentValid = goodsInCart.isNotEmpty() &&
+        total > 0.0 &&
+        paidCash >= 0.0 &&
+        paidCard >= 0.0 &&
+        debtAmount >= 0.0 &&
+        paymentSum >= total &&
+        debtorValid
+
+    fun targetForField(field: String): Double {
+      return when (field) {
+        "card" -> (total - paidCash - debtAmount).coerceAtLeast(0.0)
+        "debt" -> (total - paidCash - paidCard).coerceAtLeast(0.0)
+        else -> (total - paidCard - debtAmount).coerceAtLeast(0.0)
+      }.roundMoney()
+    }
+
+    Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+    TransactionPaymentHeadsUpCard(
+      total = total,
+      paid = paidMoneyAmount,
+      debt = debtAmount,
+      remaining = remainingAmount,
+      change = changeAmount,
+      currencySymbol = currencySymbol,
+      currencyCode = currencyCode,
+      paymentValid = paymentValid
+    )
+
+    Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
     LazyColumn(
       modifier = Modifier
         .weight(1f)
         .padding(horizontal = stateValues.marginTextField)
     ) {
-      item {
-        TransactionTotalCard(
-          title = stateValues.stringComplete,
-          total = total,
-          currencySymbol = lines.firstOrNull()?.currencySymbol.orEmpty(),
-          currencyCode = lines.firstOrNull()?.currencyCode.orEmpty()
-        )
-      }
-
-      item {
-        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-      }
-
       when (paymentMode.id) {
         "0" -> {
           item {
-            TransactionPaymentInfoCard(
+            TransactionPaymentAmountField(
               title = stateValues.stringCash,
-              subtitle = "Full amount will be paid by cash",
-              amount = total,
-              currencySymbol = lines.firstOrNull()?.currencySymbol.orEmpty()
+              value = cashText,
+              selected = activeAmountField == "cash",
+              leadingIconPath = stateValues.drawablePathIconFinances,
+              onSelected = { activeAmountField = "cash" },
+              onValueChange = { setPaymentField("cash", it) }
+            )
+
+            Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+            TransactionQuickAmountButtons(
+              targetAmount = total,
+              currencyCode = currencyCode,
+              currencySymbol = currencySymbol,
+              includeExactRemaining = true,
+              onAmountSelected = {
+                activeAmountField = "cash"
+                setPaymentField("cash", moneyInputFromDouble(it))
+              }
+            )
+
+            Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+            TransactionNumpad(
+              onInput = {
+                activeAmountField = "cash"
+                applyNumpadToken(it)
+              }
             )
           }
         }
@@ -2010,94 +2900,190 @@ fun AppConfiguration.TransactionPaymentScreen() {
 
         else -> {
           item {
-            TransactionAmountField(
+            TransactionPaymentAmountField(
               title = stateValues.stringCash,
               value = cashText,
-              placeholder = "0.00",
-              onValueChange = {
-                if (it.isEmpty() || it.isNumericalDoubleString()) {
-                  cashText = it
-                }
-              }
+              selected = activeAmountField == "cash",
+              leadingIconPath = stateValues.drawablePathIconFinances,
+              onSelected = { activeAmountField = "cash" },
+              onValueChange = { setPaymentField("cash", it) }
             )
-
-            Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-
-            TransactionAmountField(
-              title = stateValues.stringCashless,
-              value = cardText,
-              placeholder = "0.00",
-              onValueChange = {
-                if (it.isEmpty() || it.isNumericalDoubleString()) {
-                  cardText = it
-                }
-              }
-            )
-
-            Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-
-            Text(
-              text = "Remaining: ${
-                (total - cashText.toMoneyDouble() - cardText.toMoneyDouble())
-                  .coerceAtLeast(0.0)
-                  .roundMoney()
-              } ${lines.firstOrNull()?.currencySymbol.orEmpty()}",
-              color = stateValues.TextColor,
-              fontSize = stateValues.textSize,
-              fontWeight = FontWeight.Bold
-            )
-
-            Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-          }
-
-          items(country.cashlessPaymentOptions.chunked(2)) { row ->
-            Row(
-              modifier = Modifier.fillMaxWidth(),
-              horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
-            ) {
-              row.forEach { option ->
-                TransactionPaymentOptionButton(
-                  modifier = Modifier.weight(1f),
-                  text = option.name.extractLocalizedString(stateValues.appLanguage) ?: option.id,
-                  selected = selectedCashlessPaymentMethodId == option.id
-                ) {
-                  selectedCashlessPaymentMethodId = option.id
-                }
-              }
-
-              repeat(2 - row.size) {
-                Spacer(modifier = Modifier.weight(1f))
-              }
-            }
 
             Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+            TransactionQuickAmountButtons(
+              targetAmount = targetForField("cash"),
+              currencyCode = currencyCode,
+              currencySymbol = currencySymbol,
+              includeExactRemaining = true,
+              onAmountSelected = {
+                activeAmountField = "cash"
+                setPaymentField("cash", moneyInputFromDouble(it))
+              }
+            )
+
+            Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+            TransactionPaymentAmountField(
+              title = stateValues.stringCashless,
+              value = cardText,
+              selected = activeAmountField == "card",
+              leadingIconPath = stateValues.drawablePathIconFinances,
+              onSelected = { activeAmountField = "card" },
+              onValueChange = { setPaymentField("card", it) }
+            )
+
+            Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+            TransactionQuickAmountButtons(
+              targetAmount = targetForField("card"),
+              currencyCode = currencyCode,
+              currencySymbol = currencySymbol,
+              includeExactRemaining = true,
+              onAmountSelected = {
+                activeAmountField = "card"
+                setPaymentField("card", moneyInputFromDouble(it))
+              }
+            )
+
+            Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+            TransactionPaymentAmountField(
+              title = stateValues.stringDebtors,
+              value = debtText,
+              selected = activeAmountField == "debt",
+              leadingIconPath = stateValues.drawablePathIconDebtors,
+              onSelected = { activeAmountField = "debt" },
+              onValueChange = { setPaymentField("debt", it) }
+            )
+
+            Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+            TransactionQuickAmountButtons(
+              targetAmount = targetForField("debt"),
+              currencyCode = currencyCode,
+              currencySymbol = currencySymbol,
+              includeExactRemaining = true,
+              onAmountSelected = {
+                activeAmountField = "debt"
+                setPaymentField("debt", moneyInputFromDouble(it))
+              }
+            )
+
+            Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+            TransactionDebtText(
+              debtAmount = debtAmount,
+              currencySymbol = currencySymbol
+            )
+
+            Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+            TransactionNumpad(
+              onInput = ::applyNumpadToken
+            )
+
+            if (debtAmount > 0.0) {
+              Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+              Text(
+                text = "Select debtor",
+                color = stateValues.TextColor,
+                fontSize = stateValues.accentTextSize,
+                fontWeight = FontWeight.Bold
+              )
+
+              Spacer(modifier = Modifier.height(stateValues.marginTextField))
+            }
+          }
+
+          if (debtAmount > 0.0) {
+            items(debtors.orEmpty().filter { it.debtAmount >= 0.0 }) { debtor ->
+              DebtorPaymentCard(
+                debtor = debtor,
+                selected = debtor.id == selectedDebtorId,
+                onClick = {
+                  selectedDebtorId = if (selectedDebtorId == debtor.id) null else debtor.id
+                }
+              )
+
+              Spacer(modifier = Modifier.height(stateValues.marginTextField))
+            }
+
+            item {
+              Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+              Text(
+                text = "Or add debtor for this transaction",
+                color = stateValues.TextColor,
+                fontSize = stateValues.textSize,
+                fontWeight = FontWeight.Bold
+              )
+
+              Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+              if (selectedDebtorId == null) {
+                TransactionPlainTextField(
+                  title = stateValues.stringFirstName,
+                  value = newDebtorFirstName,
+                  placeholder = stateValues.stringFirstName,
+                  leadingIconPath = stateValues.drawablePathIconPerson,
+                  onValueChange = { newDebtorFirstName = it }
+                )
+
+                Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+                TransactionPlainTextField(
+                  title = stateValues.stringLastName,
+                  value = newDebtorLastName,
+                  placeholder = stateValues.stringLastName,
+                  leadingIconPath = stateValues.drawablePathIconPerson,
+                  onValueChange = { newDebtorLastName = it }
+                )
+
+                Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+                TransactionPlainTextField(
+                  title = stateValues.stringPhoneNumber,
+                  value = newDebtorPhone,
+                  placeholder = stateValues.stringPhoneNumber,
+                  leadingIconPath = stateValues.drawablePathIconPerson,
+                  keyboardType = KeyboardType.Phone,
+                  onValueChange = { newDebtorPhone = it.filter { ch -> ch.isDigit() || ch == '+' } }
+                )
+
+                Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+                TransactionPlainTextField(
+                  title = stateValues.stringEmail,
+                  value = newDebtorEmail,
+                  placeholder = stateValues.stringEmail,
+                  leadingIconPath = stateValues.drawablePathIconEmail,
+                  keyboardType = KeyboardType.Email,
+                  onValueChange = { newDebtorEmail = it }
+                )
+              }
+            }
           }
         }
       }
 
       item {
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+        TransactionPaymentSummaryRows(
+          paid = paidMoneyAmount,
+          debt = debtAmount,
+          remaining = remainingAmount,
+          change = changeAmount,
+          currencySymbol = currencySymbol,
+          large = false,
+          paymentValid = paymentValid
+        )
+
         Spacer(modifier = Modifier.height(stateValues.screenHeight / 5))
       }
     }
-
-    val paidCash = when (paymentMode.id) {
-      "0" -> total
-      "1" -> 0.0
-      else -> cashText.toMoneyDouble()
-    }.roundMoney()
-
-    val paidCard = when (paymentMode.id) {
-      "0" -> 0.0
-      "1" -> total
-      else -> cardText.toMoneyDouble()
-    }.roundMoney()
-
-    val paymentValid =
-      goodsInCart.isNotEmpty() &&
-          total > 0.0 &&
-          paidCash >= 0.0 &&
-          paidCard >= 0.0 &&
-          (paidCash + paidCard).roundMoney() >= total
 
     Column(
       modifier = Modifier
@@ -2116,7 +3102,8 @@ fun AppConfiguration.TransactionPaymentScreen() {
             paymentModeId = paymentMode.id,
             paidCash = paidCash,
             paidCard = paidCard,
-            cardPaymentOptionId = selectedCashlessPaymentMethodId.toIntOrNull() ?: 0
+            cardPaymentOptionId = selectedCashlessPaymentMethodId.toIntOrNull() ?: 0,
+            debtor = draftDebtor
           )
 
           setTransactionPaymentDraft(draft)
@@ -2135,6 +3122,7 @@ fun AppConfiguration.TransactionPaymentScreen() {
     }
   }
 }
+
 
 //@Composable
 //fun AppConfiguration.TransactionPaymentScreen() {
@@ -2356,8 +3344,10 @@ fun AppConfiguration.GoodsItemInCartWidget(
         .fillMaxHeight()
         .padding(16.dp),
     ) {
+      val itemName = goodsItem.name.visibleLocalizedString(stateValues.appLanguage, "Unnamed item")
+
       Text(
-        text = index?.run { "${index + 1}.  ${goodsItem.name.extractLocalizedString(stateValues.appLanguage)}" } ?: goodsItem.name.extractLocalizedString(stateValues.appLanguage)!!,
+        text = index?.run { "${index + 1}.  $itemName" } ?: itemName,
         fontSize = stateValues.titleTextSize,
         fontWeight = FontWeight.Bold,
         color = textColor
@@ -2387,24 +3377,17 @@ fun AppConfiguration.GoodsItemInCartWidget(
         )
       }
 
-      stateValues.goodsCategories?.run {
-        if (goodsItem.categoryIds.size == 1) {
-          "${stateValues.goodsCategories?.find { it.id == goodsItem.categoryIds[0] }?.name?.extractLocalizedString(stateValues.appLanguage)}"
-        } else {
-          goodsItem.categoryIds.foldIndexed("") { index, acc, item ->
-            if (index == 0)
-              "${stateValues.goodsCategories?.find { it.id == item }?.name?.extractLocalizedString(stateValues.appLanguage)}"
-            else
-              "$acc, ${stateValues.goodsCategories?.find { it.id == item }?.name?.extractLocalizedString(stateValues.appLanguage)}"
-          }
+      goodsItem.categoryIds
+        .mapNotNull { goodsCategoryName(it) }
+        .joinToString(", ")
+        .takeIf { it.isNotBlank() }
+        ?.run {
+          Text(
+            text = this,
+            fontSize = stateValues.textSize,
+            color = textColor
+          )
         }
-      }?.run {
-        Text(
-          text = this,
-          fontSize = stateValues.textSize,
-          color = textColor
-        )
-      }
 
       Spacer(
         modifier = Modifier
@@ -3021,18 +4004,6 @@ fun AppConfiguration.StoreWidget(
 
 @Composable
 fun AppConfiguration.StockWarehouseScreen() {
-  fun openStockItemScreen(
-    goodsItem: GoodsItemDataModel,
-    screen: NavigationScreenModel.Stock,
-    stateHost: StateHost,
-    stateKey: String
-  ) {
-    coroutineScope.launch {
-      stateHost.setState(stateKey to goodsItem.id)
-      Navigation.Stock.go(screen, forceSecond = true)
-    }
-  }
-
   Column(
     modifier = Modifier
       .fillMaxSize()
@@ -3057,42 +4028,11 @@ fun AppConfiguration.StockWarehouseScreen() {
           )
           Navigation.Stock.go(NavigationScreenModel.Stock.AddEditGoodsItem, forceSecond = true)
         }
-      },
-      onDetails = {
-        openStockItemScreen(
-          goodsItem = it,
-          screen = NavigationScreenModel.Stock.GoodsItemDetails,
-          stateHost = NavigationScreenModel.Stock.GoodsItemDetails,
-          stateKey = NavigationScreenModel.Stock.GoodsItemDetails.KEY_STATE_GOODS_ITEM_ID
-        )
-      },
-      onBatches = {
-        openStockItemScreen(
-          goodsItem = it,
-          screen = NavigationScreenModel.Stock.GoodsItemBatches,
-          stateHost = NavigationScreenModel.Stock.GoodsItemBatches,
-          stateKey = NavigationScreenModel.Stock.GoodsItemBatches.KEY_STATE_GOODS_ITEM_ID
-        )
-      },
-      onSupplierPrices = {
-        openStockItemScreen(
-          goodsItem = it,
-          screen = NavigationScreenModel.Stock.GoodsItemSupplierPrices,
-          stateHost = NavigationScreenModel.Stock.GoodsItemSupplierPrices,
-          stateKey = NavigationScreenModel.Stock.GoodsItemSupplierPrices.KEY_STATE_GOODS_ITEM_ID
-        )
-      },
-      onOrders = {
-        openStockItemScreen(
-          goodsItem = it,
-          screen = NavigationScreenModel.Stock.GoodsItemOrders,
-          stateHost = NavigationScreenModel.Stock.GoodsItemOrders,
-          stateKey = NavigationScreenModel.Stock.GoodsItemOrders.KEY_STATE_GOODS_ITEM_ID
-        )
       }
     )
   }
 }
+
 
 @Composable
 fun AppConfiguration.StockWarehouseScreenContent(
@@ -3104,10 +4044,6 @@ fun AppConfiguration.StockWarehouseScreenContent(
   onClick: ((GoodsItemDataModel) -> Unit)? = null,
   onDelete: ((GoodsItemDataModel) -> Unit)? = null,
   onEdit: ((GoodsItemDataModel) -> Unit)? = null,
-  onDetails: ((GoodsItemDataModel) -> Unit)? = null,
-  onBatches: ((GoodsItemDataModel) -> Unit)? = null,
-  onSupplierPrices: ((GoodsItemDataModel) -> Unit)? = null,
-  onOrders: ((GoodsItemDataModel) -> Unit)? = null,
   onExactSearchHit: ((GoodsItemDataModel) -> Unit)? = null
 ){
   when (val state = stateValues.stockState) {
@@ -3142,22 +4078,17 @@ fun AppConfiguration.StockWarehouseScreenContent(
           }
         }
 
-        if (showStockType) {
-          val stockTypeTabRowContent = tabRowWidget(
-            modifier = Modifier
-              .padding(8.dp),
-            tabs = listOf(
-              TabContent("0", stateValues.stringItems),
-              TabContent("1", stateValues.stringBatches)
-            )
-          )
-        }
-
         val items = lSearchQuery
           .takeIf {
             it.isNotEmpty()
           }?.let { query ->
-            state.payload.run { onFilter?.let { filter { onFilter(it) } } ?: this }.search<GoodsItemDataModel>(query).apply { if (second && onExactSearchHit != null && first.isNotEmpty()) onExactSearchHit(first.first()) }.first
+            state.payload
+              .run { onFilter?.let { filter { onFilter(it) } } ?: this }
+              .search<GoodsItemDataModel>(query)
+              .apply {
+                if (second && onExactSearchHit != null && first.isNotEmpty())
+                  onExactSearchHit(first.first())
+              }.first
           } ?: state.payload.run { onFilter?.let { filter { onFilter(it) } } ?: this }
 
         if (items.isEmpty()) {
@@ -3180,11 +4111,7 @@ fun AppConfiguration.StockWarehouseScreenContent(
                 batches = stateValues.stockBatches.orEmpty().filter { it.goodsItemId == item.id && it.isActive },
                 onDelete = onDelete,
                 onClick = onClick,
-                onEdit = onEdit,
-                onDetails = onDetails,
-                onBatches = onBatches,
-                onSupplierPrices = onSupplierPrices,
-                onOrders = onOrders
+                onEdit = onEdit
               )
             }
           }
@@ -3201,6 +4128,7 @@ fun AppConfiguration.StockWarehouseScreenContent(
     }
   }
 }
+
 
 @Composable
 fun AppConfiguration.StockScreen() {
@@ -3243,19 +4171,6 @@ fun AppConfiguration.StockScreen() {
             is NavigationScreenModel.Stock.AddEditGoodsItem -> {
               StockAddEditGoodsItemScreen()
             }
-            is NavigationScreenModel.Stock.GoodsItemDetails -> {
-              StockGoodsItemDetailsScreen()
-            }
-            is NavigationScreenModel.Stock.GoodsItemBatches -> {
-              StockGoodsItemBatchesScreen()
-            }
-            is NavigationScreenModel.Stock.GoodsItemSupplierPrices -> {
-              StockGoodsItemSupplierPricesScreen()
-            }
-            is NavigationScreenModel.Stock.GoodsItemOrders -> {
-              StockGoodsItemOrdersScreen()
-            }
-
             else -> { }
           }
         }
@@ -3276,7 +4191,6 @@ fun AppConfiguration.StockScreen() {
               is NavigationScreenModel.Stock.AddEditGoodsItem -> {
                 StockAddEditGoodsItemScreen()
               }
-
               else -> { }
             }
           }
@@ -3293,7 +4207,6 @@ fun AppConfiguration.StockScreen() {
               is NavigationScreenModel.Stock.AddEditGoodsItem -> {
                 StockAddEditGoodsItemScreen()
               }
-
               else -> { }
             }
           }
@@ -3302,6 +4215,7 @@ fun AppConfiguration.StockScreen() {
     }
   }
 }
+
 
 @Composable
 fun AppConfiguration.StockBatchWidget(
@@ -3962,8 +4876,7 @@ fun AppConfiguration.StockAddEditIdentityPage(
         options = stateValues.goodsCategories.orEmpty().map {
           DropdownOption(
             id = it.id,
-            title = it.name.extractLocalizedString(stateValues.appLanguage)
-              ?: it.id
+            title = it.name.visibleLocalizedString(stateValues.appLanguage, it.id)
           )
         },
         placeholder = "Select category",
@@ -4431,10 +5344,14 @@ private fun AppConfiguration.stockQuantityUnitDomains(): List<SelectableDomain> 
 
 private fun AppConfiguration.stockCategoryDomains(): List<SelectableDomain> {
   return stateValues.goodsCategories.orEmpty().map { category ->
+    val localizedName = category.name
+      .visibleLocalizedString(stateValues.appLanguage, category.id)
+      .toLocalizedSingleMain()
+
     SelectableDomain(
       id = category.id,
-      displayId = category.name,
-      name = category.name,
+      displayId = localizedName,
+      name = localizedName,
       iconPath = null,
       iconRes = null
     )
@@ -4784,6 +5701,334 @@ private fun AppConfiguration.StockPriceGroupEditor(
   }
 }
 
+private data class StockAddEditTabContent(
+  val id: String,
+  val title: String,
+  val iconPath: String? = null,
+  val enabled: Boolean = true
+)
+
+@Composable
+private fun AppConfiguration.StockAddEditTabs(
+  modifier: Modifier = Modifier,
+  selectedId: String,
+  tabs: List<StockAddEditTabContent>,
+  onSelected: (String) -> Unit
+) {
+  LazyRow(
+    modifier = modifier
+      .fillMaxWidth(),
+    horizontalArrangement = Arrangement.spacedBy(6.dp),
+    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+  ) {
+    items(tabs) { tab ->
+      val selected = selectedId == tab.id
+
+      Row(
+        modifier = Modifier
+          .height(stateValues.textFieldHeight)
+          .clip(RoundedCornerShape(stateValues.cornerRadius))
+          .border(
+            width = if (selected) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
+            color = when {
+              selected -> stateValues.AccentColor
+              tab.enabled -> stateValues.PlaceholderTextColor
+              else -> stateValues.DisabledColor
+            },
+            shape = RoundedCornerShape(stateValues.cornerRadius)
+          )
+          .background(if (selected) stateValues.AccentColor else stateValues.BackgroundColor)
+          .alpha(if (tab.enabled) 1f else 0.55f)
+          .clickable(
+            enabled = tab.enabled,
+            interactionSource = remember { MutableInteractionSource() },
+            indication = ripple(color = if (selected) stateValues.AccentTextColor else stateValues.TextColor),
+            onClick = { onSelected(tab.id) }
+          )
+          .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
+      ) {
+        tab.iconPath?.let {
+          CpImage(
+            modifier = Modifier
+              .size(18.dp),
+            url = it,
+            fallbackRes = Res.drawable._0_0,
+            contentDescription = tab.title,
+            tintColor = if (selected) stateValues.AccentTextColor else stateValues.TextColor
+          )
+
+          Spacer(modifier = Modifier.width(6.dp))
+        }
+
+        Text(
+          text = tab.title,
+          color = if (selected) stateValues.AccentTextColor else stateValues.TextColor,
+          fontSize = stateValues.textSize,
+          fontWeight = FontWeight.Bold,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis
+        )
+      }
+    }
+  }
+}
+
+@Composable
+private fun AppConfiguration.StockAddEditInfoTab(
+  modifier: Modifier = Modifier,
+  draft: StockAddEditDraft,
+  onDraftChanged: (StockAddEditDraft) -> Unit
+) {
+  LazyColumn(
+    modifier = modifier
+      .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.92f)
+      .padding(start = 8.dp, top = 8.dp, end = 8.dp)
+  ) {
+    item {
+      BarcodeListEditor(
+        title = stateValues.stringBarcode,
+        barcodes = draft.barcodes.ifEmpty { listOf("") },
+        onChanged = {
+          onDraftChanged(draft.copy(barcodes = it.ifEmpty { listOf("") }))
+        }
+      )
+
+      Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+      StockLocalizedStringGroupEditor(
+        title = stateValues.stringName,
+        placeholder = stateValues.stringEnterName,
+        values = draft.name,
+        addText = stateValues.stringAddTranslation,
+        required = true,
+        onChanged = {
+          onDraftChanged(draft.copy(name = it))
+        }
+      )
+
+      Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+      StockLocalizedStringGroupEditor(
+        title = stateValues.stringDescription,
+        placeholder = stateValues.stringEnterDescription,
+        values = draft.description,
+        addText = "${stateValues.stringAdd} ${stateValues.stringDescription}",
+        required = false,
+        onChanged = {
+          onDraftChanged(draft.copy(description = it))
+        }
+      )
+
+      Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+      val measurementUnitDropdown = dropdownListWidget(
+        titleText = stateValues.stringMeasurementUnit,
+        domains = stockQuantityUnitDomains(),
+        selectedInitial = draft.measurementUnitId,
+        showId = false,
+        showName = true
+      )
+
+      LaunchedEffect(measurementUnitDropdown.selectedId) {
+        if (measurementUnitDropdown.selectedId != draft.measurementUnitId) {
+          onDraftChanged(draft.copy(measurementUnitId = measurementUnitDropdown.selectedId))
+        }
+      }
+
+      Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+      val categoryDomains = stockCategoryDomains()
+
+      if (categoryDomains.isEmpty()) {
+        Text(
+          text = stateValues.stringCategory,
+          color = stateValues.TextColor,
+          fontSize = stateValues.accentTextSize,
+          fontWeight = FontWeight.Bold,
+          modifier = Modifier.padding(bottom = 4.dp)
+        )
+
+        MessageText(
+          modifier = Modifier
+            .fillMaxWidth()
+            .height(stateValues.textFieldHeight),
+          text = stateValues.stringListEmpty,
+          textSize = stateValues.textSize
+        )
+      } else {
+        val categoryDropdown = dropdownListWidget(
+          titleText = stateValues.stringCategory,
+          domains = categoryDomains,
+          selectedInitial = draft.categoryIds.firstOrNull() ?: categoryDomains.first().id,
+          showId = false,
+          showName = true,
+          search = Triple(stateValues.stringSearchByAnyData, NavigationScreenModel.Stock.AddEditGoodsItem, "stock_category_search")
+        )
+
+        LaunchedEffect(categoryDropdown.selectedId) {
+          if (draft.categoryIds.firstOrNull() != categoryDropdown.selectedId) {
+            onDraftChanged(draft.copy(categoryIds = listOf(categoryDropdown.selectedId)))
+          }
+        }
+      }
+
+      Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+      Row(
+        modifier = Modifier
+          .fillMaxWidth()
+          .height(stateValues.textFieldHeight)
+          .clip(RoundedCornerShape(stateValues.cornerRadius))
+          .border(
+            stateValues.unfocusedBorderWidth,
+            if (draft.isQuickItem) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+            RoundedCornerShape(stateValues.cornerRadius)
+          )
+          .background(stateValues.BackgroundColor)
+          .clickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = ripple(color = stateValues.AccentColor),
+            onClick = {
+              onDraftChanged(draft.copy(isQuickItem = !draft.isQuickItem))
+            }
+          )
+          .padding(horizontal = stateValues.marginTextFieldGroup),
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        Checkbox(
+          checked = draft.isQuickItem,
+          onCheckedChange = {
+            onDraftChanged(draft.copy(isQuickItem = it))
+          },
+          colors = CheckboxDefaults.colors(
+            checkedColor = stateValues.AccentColor,
+            uncheckedColor = stateValues.PlaceholderTextColor,
+            checkmarkColor = stateValues.AccentTextColor
+          )
+        )
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        Text(
+          text = stateValues.stringQuick,
+          color = stateValues.TextColor,
+          fontSize = stateValues.textSize,
+          fontWeight = FontWeight.Bold
+        )
+      }
+
+      Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+      genericTextField(
+        titleText = "Notes / ${stateValues.stringOptional}",
+        valueInitial = draft.note,
+        placeholderText = stateValues.stringOptional,
+        wide = true,
+        onValueChange = { value, applyChange ->
+          applyChange()
+          onDraftChanged(draft.copy(note = value))
+        }
+      )
+
+      Spacer(modifier = Modifier.height(stateValues.screenHeight / 5))
+    }
+  }
+}
+
+@Composable
+private fun AppConfiguration.StockAddEditPricesTab(
+  modifier: Modifier = Modifier,
+  draft: StockAddEditDraft,
+  defaultCurrency: String,
+  returnPriceManuallyEdited: Boolean,
+  onReturnPriceManuallyEditedChanged: (Boolean) -> Unit,
+  onDraftChanged: (StockAddEditDraft) -> Unit
+) {
+  LazyColumn(
+    modifier = modifier
+      .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.92f)
+      .padding(start = 8.dp, top = 8.dp, end = 8.dp)
+  ) {
+    item {
+      StockPriceGroupEditor(
+        title = stateValues.stringSalePrice,
+        placeholder = stateValues.stringEnterSalePrice,
+        prices = draft.salePrices.ifEmpty { listOf(PriceDataModel("", defaultCurrency, "")) },
+        addText = "${stateValues.stringAdd} ${stateValues.stringSalePrice}",
+        onChanged = { salePrices ->
+          val safeSalePrices = salePrices.ifEmpty { listOf(PriceDataModel("", defaultCurrency, "")) }
+          val updated = draft.copy(salePrices = safeSalePrices)
+
+          onDraftChanged(
+            if (returnPriceManuallyEdited) {
+              updated
+            } else {
+              updated.copy(
+                returnPrices = safeSalePrices.map { it.copy(supplierId = "") }
+              )
+            }
+          )
+        }
+      )
+
+      Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+      StockPriceGroupEditor(
+        title = stateValues.stringReturnPrice,
+        placeholder = stateValues.stringEnterReturnPrice,
+        prices = draft.returnPrices.ifEmpty { listOf(PriceDataModel("", draft.salePrices.firstOrNull()?.currency ?: defaultCurrency, "")) },
+        addText = "${stateValues.stringAdd} ${stateValues.stringReturnPrice}",
+        onChanged = {
+          onReturnPriceManuallyEditedChanged(true)
+          onDraftChanged(
+            draft.copy(returnPrices = it.ifEmpty { listOf(PriceDataModel("", draft.salePrices.firstOrNull()?.currency ?: defaultCurrency, "")) })
+          )
+        }
+      )
+
+      Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+      StockPriceGroupEditor(
+        title = stateValues.stringSupplyPrice,
+        placeholder = stateValues.stringEnterSupplyPrice,
+        prices = draft.supplyPrices.ifEmpty { listOf(PriceDataModel("", draft.salePrices.firstOrNull()?.currency ?: defaultCurrency, "")) },
+        addText = "${stateValues.stringAdd} ${stateValues.stringSupplyPrice}",
+        onChanged = {
+          onDraftChanged(
+            draft.copy(supplyPrices = it.ifEmpty { listOf(PriceDataModel("", draft.salePrices.firstOrNull()?.currency ?: defaultCurrency, "")) })
+          )
+        }
+      )
+
+      Spacer(modifier = Modifier.height(stateValues.screenHeight / 5))
+    }
+  }
+}
+
+@Composable
+private fun AppConfiguration.StockAddEditOrdersTab(
+  modifier: Modifier = Modifier,
+  goodsItem: GoodsItemDataModel?
+) {
+  Column(
+    modifier = modifier
+      .fillMaxSize()
+      .padding(stateValues.marginTextField),
+    horizontalAlignment = Alignment.CenterHorizontally,
+    verticalArrangement = Arrangement.Center
+  ) {
+    MessageText(
+      text = if (goodsItem == null || goodsItem.id.isBlank()) {
+        "Save the goods item first, then supplier orders can be attached to it."
+      } else {
+        "Supplier orders are ready as a tab destination. The order creation and receiving form is the next safe layer to connect."
+      }
+    )
+  }
+}
+
 @Composable
 fun AppConfiguration.StockAddEditGoodsItemScreen() {
   val addEditState by NavigationScreenModel.Stock.AddEditGoodsItem.state.collectAsState()
@@ -4847,6 +6092,52 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
     )
   }
 
+  var selectedTabId by rememberSaveable(existing?.id ?: "new_stock_item") {
+    mutableStateOf("info")
+  }
+
+  var returnPriceManuallyEdited by rememberSaveable(existing?.id ?: "new_stock_item") {
+    mutableStateOf(
+      existing?.let {
+        it.returnPrices
+          .map { price -> price.price to price.currency }
+          .toSet() != it.salePrices
+          .map { price -> price.price to price.currency }
+          .toSet()
+      } ?: false
+    )
+  }
+
+  val canPopStockScreen = !Navigation.Stock.isVeryFirstScreen(stateValues.isNarrowScreen)
+
+  val tabs = listOf(
+    StockAddEditTabContent(
+      id = "info",
+      title = "Info",
+      iconPath = stateValues.drawablePathIconEdit
+    ),
+    StockAddEditTabContent(
+      id = "prices",
+      title = "Prices",
+      iconPath = stateValues.drawablePathIconFinances
+    ),
+    StockAddEditTabContent(
+      id = "batches",
+      title = "Batches",
+      iconPath = stateValues.drawablePathIconStock
+    ),
+    StockAddEditTabContent(
+      id = "supplier_prices",
+      title = "Supplier prices",
+      iconPath = stateValues.drawablePathIconSuppliers
+    ),
+    StockAddEditTabContent(
+      id = "orders",
+      title = "Orders",
+      iconPath = stateValues.drawablePathIconTransactionSupply
+    )
+  )
+
   Column(
     modifier = Modifier.fillMaxSize(),
     horizontalAlignment = Alignment.CenterHorizontally
@@ -4854,244 +6145,115 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
     ScreenAppBarWidget(
       title = if (existing == null) stateValues.stringAddGoodsItem else stateValues.stringEditGoodsItem,
       iconPath = if (existing == null) stateValues.drawablePathIconAdd else stateValues.drawablePathIconEdit,
-      onBack = {
-        coroutineScope.launch {
-          Navigation.Stock.pop(stateValues.isNarrowScreen)
-          NavigationScreenModel.Stock.AddEditGoodsItem.removeState(
-            NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_EDITED_GOODS_ITEM_ID
-          )
+      onBack = if (canPopStockScreen) {
+        {
+          coroutineScope.launch {
+            Navigation.Stock.pop(stateValues.isNarrowScreen)
+            NavigationScreenModel.Stock.AddEditGoodsItem.removeState(
+              NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_EDITED_GOODS_ITEM_ID
+            )
+          }
         }
+      } else null
+    )
+
+    StockAddEditTabs(
+      modifier = Modifier
+        .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.92f),
+      selectedId = selectedTabId,
+      tabs = tabs,
+      onSelected = {
+        selectedTabId = it
       }
     )
 
-    LazyColumn(
-      modifier = Modifier
-        .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.92f)
-        .weight(1f)
-        .padding(start = 8.dp, top = 8.dp, end = 8.dp)
-    ) {
-      item {
-        BarcodeListEditor(
-          title = stateValues.stringBarcode,
-          barcodes = draft.barcodes.ifEmpty { listOf("") },
-          onChanged = {
-            draft = draft.copy(barcodes = it.ifEmpty { listOf("") })
+    when (selectedTabId) {
+      "prices" -> {
+        StockAddEditPricesTab(
+          modifier = Modifier.weight(1f),
+          draft = draft,
+          defaultCurrency = defaultCurrency,
+          returnPriceManuallyEdited = returnPriceManuallyEdited,
+          onReturnPriceManuallyEditedChanged = {
+            returnPriceManuallyEdited = it
+          },
+          onDraftChanged = {
+            draft = it
           }
         )
+      }
 
-        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+      "batches" -> {
+        StockAddEditBatchesPage(
+          modifier = Modifier.weight(1f),
+          goodsItem = existing
+        )
+      }
 
-        StockLocalizedStringGroupEditor(
-          title = stateValues.stringName,
-          placeholder = stateValues.stringEnterName,
-          values = draft.name,
-          addText = stateValues.stringAddTranslation,
-          required = true,
-          onChanged = {
-            draft = draft.copy(name = it)
+      "supplier_prices" -> {
+        StockSupplierPricesPage(
+          modifier = Modifier.weight(1f),
+          goodsItem = existing
+        )
+      }
+
+      "orders" -> {
+        StockAddEditOrdersTab(
+          modifier = Modifier.weight(1f),
+          goodsItem = existing
+        )
+      }
+
+      else -> {
+        StockAddEditInfoTab(
+          modifier = Modifier.weight(1f),
+          draft = draft,
+          onDraftChanged = {
+            draft = it
           }
         )
-
-        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-
-        StockLocalizedStringGroupEditor(
-          title = stateValues.stringDescription,
-          placeholder = stateValues.stringEnterDescription,
-          values = draft.description,
-          addText = "${stateValues.stringAdd} ${stateValues.stringDescription}",
-          required = false,
-          onChanged = {
-            draft = draft.copy(description = it)
-          }
-        )
-
-        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-
-        val measurementUnitDropdown = dropdownListWidget(
-          titleText = stateValues.stringMeasurementUnit,
-          domains = stockQuantityUnitDomains(),
-          selectedInitial = draft.measurementUnitId,
-          showId = false,
-          showName = true
-        )
-
-        LaunchedEffect(measurementUnitDropdown.selectedId) {
-          if (measurementUnitDropdown.selectedId != draft.measurementUnitId) {
-            draft = draft.copy(measurementUnitId = measurementUnitDropdown.selectedId)
-          }
-        }
-
-        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-
-        val categoryDomains = stockCategoryDomains()
-
-        if (categoryDomains.isEmpty()) {
-          Text(
-            text = stateValues.stringCategory,
-            color = stateValues.TextColor,
-            fontSize = stateValues.accentTextSize,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 4.dp)
-          )
-
-          MessageText(
-            modifier = Modifier
-              .fillMaxWidth()
-              .height(stateValues.textFieldHeight),
-            text = stateValues.stringListEmpty,
-            textSize = stateValues.textSize
-          )
-        } else {
-          val categoryDropdown = dropdownListWidget(
-            titleText = stateValues.stringCategory,
-            domains = categoryDomains,
-            selectedInitial = draft.categoryIds.firstOrNull() ?: categoryDomains.first().id,
-            showId = false,
-            showName = true,
-            search = Triple(stateValues.stringSearchByAnyData, NavigationScreenModel.Stock.AddEditGoodsItem, "stock_category_search")
-          )
-
-          LaunchedEffect(categoryDropdown.selectedId) {
-            if (draft.categoryIds.firstOrNull() != categoryDropdown.selectedId) {
-              draft = draft.copy(categoryIds = listOf(categoryDropdown.selectedId))
-            }
-          }
-        }
-
-        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-
-        StockPriceGroupEditor(
-          title = stateValues.stringSalePrice,
-          placeholder = stateValues.stringEnterSalePrice,
-          prices = draft.salePrices.ifEmpty { listOf(PriceDataModel("", defaultCurrency, "")) },
-          addText = "${stateValues.stringAdd} ${stateValues.stringSalePrice}",
-          onChanged = {
-            draft = draft.copy(salePrices = it.ifEmpty { listOf(PriceDataModel("", defaultCurrency, "")) })
-          }
-        )
-
-        Spacer(modifier = Modifier.height(stateValues.marginTextField))
-
-        StockPriceGroupEditor(
-          title = stateValues.stringReturnPrice,
-          placeholder = stateValues.stringEnterReturnPrice,
-          prices = draft.returnPrices.ifEmpty { listOf(PriceDataModel("", draft.salePrices.firstOrNull()?.currency ?: defaultCurrency, "")) },
-          addText = "${stateValues.stringAdd} ${stateValues.stringReturnPrice}",
-          onChanged = {
-            draft = draft.copy(returnPrices = it.ifEmpty { listOf(PriceDataModel("", draft.salePrices.firstOrNull()?.currency ?: defaultCurrency, "")) })
-          }
-        )
-
-        Spacer(modifier = Modifier.height(stateValues.marginTextField))
-
-        StockPriceGroupEditor(
-          title = stateValues.stringSupplyPrice,
-          placeholder = stateValues.stringEnterSupplyPrice,
-          prices = draft.supplyPrices.ifEmpty { listOf(PriceDataModel("", draft.salePrices.firstOrNull()?.currency ?: defaultCurrency, "")) },
-          addText = "${stateValues.stringAdd} ${stateValues.stringSupplyPrice}",
-          onChanged = {
-            draft = draft.copy(supplyPrices = it.ifEmpty { listOf(PriceDataModel("", draft.salePrices.firstOrNull()?.currency ?: defaultCurrency, "")) })
-          }
-        )
-
-        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-
-        Row(
-          modifier = Modifier
-            .fillMaxWidth()
-            .height(stateValues.textFieldHeight)
-            .clip(RoundedCornerShape(stateValues.cornerRadius))
-            .border(
-              stateValues.unfocusedBorderWidth,
-              if (draft.isQuickItem) stateValues.AccentColor else stateValues.PlaceholderTextColor,
-              RoundedCornerShape(stateValues.cornerRadius)
-            )
-            .background(stateValues.BackgroundColor)
-            .clickable(
-              interactionSource = remember { MutableInteractionSource() },
-              indication = ripple(color = stateValues.AccentColor),
-              onClick = {
-                draft = draft.copy(isQuickItem = !draft.isQuickItem)
-              }
-            )
-            .padding(horizontal = stateValues.marginTextFieldGroup),
-          verticalAlignment = Alignment.CenterVertically
-        ) {
-          Checkbox(
-            checked = draft.isQuickItem,
-            onCheckedChange = {
-              draft = draft.copy(isQuickItem = it)
-            },
-            colors = CheckboxDefaults.colors(
-              checkedColor = stateValues.AccentColor,
-              uncheckedColor = stateValues.PlaceholderTextColor,
-              checkmarkColor = stateValues.AccentTextColor
-            )
-          )
-
-          Spacer(modifier = Modifier.width(8.dp))
-
-          Text(
-            text = stateValues.stringQuick,
-            color = stateValues.TextColor,
-            fontSize = stateValues.textSize,
-            fontWeight = FontWeight.Bold
-          )
-        }
-
-        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-
-        genericTextField(
-          titleText = "Notes / ${stateValues.stringOptional}",
-          valueInitial = draft.note,
-          placeholderText = stateValues.stringOptional,
-          wide = true,
-          onValueChange = { value, applyChange ->
-            applyChange()
-            draft = draft.copy(note = value)
-          }
-        )
-
-        Spacer(modifier = Modifier.height(stateValues.screenHeight / 5))
       }
     }
 
-    actionButton(
-      modifier = Modifier
-        .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.92f)
-        .padding(8.dp),
-      text = stateValues.stringConfirm,
-      enabled = draft.isValidStockDraft() &&
-          stateValues.activeStoreId != null &&
-          stateValues.latestNotification == null,
-      onClick = {
-        val storeId = stateValues.activeStoreId ?: return@actionButton
-        val goodsItem = draft.toGoodsItem(storeId, existing)
+    if (selectedTabId == "info" || selectedTabId == "prices") {
+      actionButton(
+        modifier = Modifier
+          .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.92f)
+          .padding(8.dp),
+        text = stateValues.stringConfirm,
+        enabled = draft.isValidStockDraft() &&
+            stateValues.activeStoreId != null &&
+            stateValues.latestNotification == null,
+        onClick = {
+          val storeId = stateValues.activeStoreId ?: return@actionButton
+          val goodsItem = draft.toGoodsItem(storeId, existing)
 
-        if (existing == null) {
-          addGoodsItem(goodsItem) {
-            if (it is DataState.Success) {
-              coroutineScope.launch {
-                Navigation.Stock.pop(stateValues.isNarrowScreen)
+          if (existing == null) {
+            addGoodsItem(goodsItem) {
+              if (it is DataState.Success) {
+                coroutineScope.launch {
+                  Navigation.Stock.pop(stateValues.isNarrowScreen)
+                }
               }
             }
-          }
-        } else {
-          updateGoodsItem(goodsItem) {
-            if (it is DataState.Success) {
-              coroutineScope.launch {
-                Navigation.Stock.pop(stateValues.isNarrowScreen)
-                NavigationScreenModel.Stock.AddEditGoodsItem.removeState(
-                  NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_EDITED_GOODS_ITEM_ID
-                )
+          } else {
+            updateGoodsItem(goodsItem) {
+              if (it is DataState.Success) {
+                coroutineScope.launch {
+                  Navigation.Stock.pop(stateValues.isNarrowScreen)
+                  NavigationScreenModel.Stock.AddEditGoodsItem.removeState(
+                    NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_EDITED_GOODS_ITEM_ID
+                  )
+                }
               }
             }
           }
         }
-      }
-    )
+      )
+    }
   }
 }
+
 
 //@Composable
 //fun AppConfiguration.StockAddEditGoodsItemScreen() {
@@ -7024,7 +8186,7 @@ object Navigation {
       if (_RightClient2.value.last()::class == _LeftClient2.value.last()::class)
         popRightClient2()
 
-      val oldSize = _RightClient2.value.size
+      val oldSize = _LeftClient2.value.size
 
       _LeftClient2.emit(
         _LeftClient2.value.toMutableList()
@@ -7040,12 +8202,12 @@ object Navigation {
 
         delay(300)
 
-        goLeftClient1(this@run)
+        goLeftClient2(this@run)
       }
     }
 
     suspend fun clearLeftClient2(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.Cart) {
-      _LeftClient1.emit(
+      _LeftClient2.emit(
         listOf(model)
       )
     }
@@ -7087,7 +8249,7 @@ object Navigation {
 
         delay(300)
 
-        goLeftClient1(this@run)
+        goLeftClient3(this@run)
       }
     }
 
@@ -7139,7 +8301,7 @@ object Navigation {
     }
 
     suspend fun clearLeftClient4(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.Cart) {
-      _LeftClient1.emit(
+      _LeftClient4.emit(
         listOf(model)
       )
     }
@@ -7269,12 +8431,12 @@ object Navigation {
 
         delay(300)
 
-        goLeftClient1(this@run)
+        goRightClient2(this@run)
       }
     }
 
     suspend fun clearRightClient2(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.Selection) {
-      _RightClient1.emit(
+      _RightClient2.emit(
         listOf(model)
       )
     }
@@ -7313,7 +8475,7 @@ object Navigation {
 
         delay(300)
 
-        goLeftClient1(this@run)
+        goRightClient3(this@run)
       }
     }
 
@@ -7357,7 +8519,7 @@ object Navigation {
 
         delay(300)
 
-        goLeftClient4(this@run)
+        goRightClient4(this@run)
       }
     }
 
@@ -7401,7 +8563,7 @@ object Navigation {
 
         delay(300)
 
-        goLeftClient5(this@run)
+        goRightClient5(this@run)
       }
     }
 
@@ -7547,7 +8709,7 @@ object Navigation {
       remove: Boolean = false
     ) {
       if (isNarrowScreen) {
-        when (TransactionSale.ClientId.value) {
+        when (ClientId.value) {
           0 -> goLeftClient1(model, remove)
           1 -> goLeftClient2(model, remove)
           2 -> goLeftClient3(model, remove)
@@ -7595,7 +8757,7 @@ object Navigation {
           else -> clearLeftClient5()
         }
       } else {
-        when (TransactionSale.ClientId.value) {
+        when (ClientId.value) {
           0 -> clearRightClient1()
           1 -> clearRightClient2()
           2 -> clearRightClient3()
@@ -7773,7 +8935,7 @@ object Navigation {
       if (_RightClient2.value.last()::class == _LeftClient2.value.last()::class)
         popRightClient2()
 
-      val oldSize = _RightClient2.value.size
+      val oldSize = _LeftClient2.value.size
 
       _LeftClient2.emit(
         _LeftClient2.value.toMutableList()
@@ -7789,12 +8951,12 @@ object Navigation {
 
         delay(300)
 
-        goLeftClient1(this@run)
+        goLeftClient2(this@run)
       }
     }
 
     suspend fun clearLeftClient2(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.Cart) {
-      _LeftClient1.emit(
+      _LeftClient2.emit(
         listOf(model)
       )
     }
@@ -7836,7 +8998,7 @@ object Navigation {
 
         delay(300)
 
-        goLeftClient1(this@run)
+        goLeftClient3(this@run)
       }
     }
 
@@ -7888,7 +9050,7 @@ object Navigation {
     }
 
     suspend fun clearLeftClient4(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.Cart) {
-      _LeftClient1.emit(
+      _LeftClient4.emit(
         listOf(model)
       )
     }
@@ -8018,12 +9180,12 @@ object Navigation {
 
         delay(300)
 
-        goLeftClient1(this@run)
+        goRightClient2(this@run)
       }
     }
 
     suspend fun clearRightClient2(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.Selection) {
-      _RightClient1.emit(
+      _RightClient2.emit(
         listOf(model)
       )
     }
@@ -8062,7 +9224,7 @@ object Navigation {
 
         delay(300)
 
-        goLeftClient1(this@run)
+        goRightClient3(this@run)
       }
     }
 
@@ -8106,7 +9268,7 @@ object Navigation {
 
         delay(300)
 
-        goLeftClient4(this@run)
+        goRightClient4(this@run)
       }
     }
 
@@ -8150,7 +9312,7 @@ object Navigation {
 
         delay(300)
 
-        goLeftClient5(this@run)
+        goRightClient5(this@run)
       }
     }
 
@@ -8522,7 +9684,7 @@ object Navigation {
       if (_RightClient2.value.last()::class == _LeftClient2.value.last()::class)
         popRightClient2()
 
-      val oldSize = _RightClient2.value.size
+      val oldSize = _LeftClient2.value.size
 
       _LeftClient2.emit(
         _LeftClient2.value.toMutableList()
@@ -8538,12 +9700,12 @@ object Navigation {
 
         delay(300)
 
-        goLeftClient1(this@run)
+        goLeftClient2(this@run)
       }
     }
 
     suspend fun clearLeftClient2(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.Cart) {
-      _LeftClient1.emit(
+      _LeftClient2.emit(
         listOf(model)
       )
     }
@@ -8585,7 +9747,7 @@ object Navigation {
 
         delay(300)
 
-        goLeftClient1(this@run)
+        goLeftClient3(this@run)
       }
     }
 
@@ -8637,7 +9799,7 @@ object Navigation {
     }
 
     suspend fun clearLeftClient4(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.Cart) {
-      _LeftClient1.emit(
+      _LeftClient4.emit(
         listOf(model)
       )
     }
@@ -8767,12 +9929,12 @@ object Navigation {
 
         delay(300)
 
-        goLeftClient1(this@run)
+        goRightClient2(this@run)
       }
     }
 
     suspend fun clearRightClient2(model: NavigationScreenModel.Transaction = NavigationScreenModel.Transaction.Selection) {
-      _RightClient1.emit(
+      _RightClient2.emit(
         listOf(model)
       )
     }
@@ -8811,7 +9973,7 @@ object Navigation {
 
         delay(300)
 
-        goLeftClient1(this@run)
+        goRightClient3(this@run)
       }
     }
 
@@ -8855,7 +10017,7 @@ object Navigation {
 
         delay(300)
 
-        goLeftClient4(this@run)
+        goRightClient4(this@run)
       }
     }
 
@@ -8899,7 +10061,7 @@ object Navigation {
 
         delay(300)
 
-        goLeftClient5(this@run)
+        goRightClient5(this@run)
       }
     }
 
@@ -10484,8 +11646,8 @@ fun AppConfiguration.MenuDevicesScreen() {
 @Composable
 fun AppConfiguration.MenuDebtorsScreen() {
   Column(
-    modifier = Modifier
-      .fillMaxSize()
+    modifier = Modifier.fillMaxSize(),
+    horizontalAlignment = Alignment.CenterHorizontally
   ) {
     ScreenAppBarWidget(
       title = stateValues.stringDebtors,
@@ -10496,12 +11658,238 @@ fun AppConfiguration.MenuDebtorsScreen() {
         }
       }
     )
+
+    val storeId = stateValues.activeStoreId
+    val debtors by debtorsState.payload.collectAsState()
+
+    LaunchedEffect(storeId) {
+      storeId?.let { getDebtors(it) }
+    }
+
+    var search by rememberSaveable { mutableStateOf("") }
+    var pendingDeleteId by rememberSaveable { mutableStateOf<String?>(null) }
+
+    val shownDebtors = debtors.orEmpty()
+      .filter { it.debtAmount > 0.0 }
+      .filter { debtor ->
+        val q = search.trim()
+        q.isBlank() ||
+            debtor.firstName.contains(q, true) ||
+            debtor.lastName.contains(q, true) ||
+            debtor.phoneNumber.contains(q, true) ||
+            debtor.email.contains(q, true)
+      }
+      .sortedByDescending { it.debtAmount }
+
+    Column(
+      modifier = Modifier
+        .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
+        .padding(horizontal = stateValues.marginTextField)
+    ) {
+      TransactionPlainTextField(
+        title = stateValues.stringSearchByAnyData,
+        value = search,
+        placeholder = stateValues.stringSearchByAnyData,
+        onValueChange = { search = it }
+      )
+    }
+
+    LazyColumn(
+      modifier = Modifier
+        .weight(1f)
+        .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
+        .padding(stateValues.marginTextField)
+    ) {
+      if (storeId == null) {
+        item {
+          MessageText(text = stateValues.stringNoActiveStore)
+        }
+      } else if (shownDebtors.isEmpty()) {
+        item {
+          MessageText(text = stateValues.stringListEmpty)
+        }
+      } else {
+        items(shownDebtors) { debtor ->
+          DebtorPaymentCard(
+            debtor = debtor,
+            onClick = {
+              coroutineScope.launch {
+                NavigationScreenModel.Menu.CloseDebt.setState("selected_debtor_id" to debtor.id)
+                Navigation.Menu.go(NavigationScreenModel.Menu.CloseDebt, forceSecond = true)
+              }
+            },
+            onDelete = {
+              pendingDeleteId = debtor.id
+            }
+          )
+
+          Spacer(modifier = Modifier.height(stateValues.marginTextField))
+        }
+      }
+
+      item {
+        Spacer(modifier = Modifier.height(stateValues.screenHeight / 5))
+      }
+    }
+
+    pendingDeleteId?.let { debtorId ->
+      Dialog(
+        onDismissRequest = { pendingDeleteId = null }
+      ) {
+        Column(
+          modifier = Modifier
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .border(
+              stateValues.unfocusedBorderWidth,
+              stateValues.PlaceholderTextColor,
+              RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .padding(stateValues.marginTextFieldGroup)
+        ) {
+          Text(
+            text = "Delete debtor?",
+            color = stateValues.TextColor,
+            fontSize = stateValues.accentTextSize,
+            fontWeight = FontWeight.Bold
+          )
+
+          Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+          Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            actionButton(
+              modifier = Modifier.weight(1f),
+              text = stateValues.stringCancel,
+              enabledColor = stateValues.DisabledColor
+            ) {
+              pendingDeleteId = null
+            }
+
+            actionButton(
+              modifier = Modifier.weight(1f),
+              text = stateValues.stringDelete,
+              enabledColor = stateValues.ErrorColor
+            ) {
+              storeId?.let {
+                deleteDebtor(it, debtorId)
+              }
+              pendingDeleteId = null
+            }
+          }
+        }
+      }
+    }
   }
 }
 
 @Composable
-fun MenuCloseDebtScreen() {
+fun AppConfiguration.MenuCloseDebtScreen() {
+  Column(
+    modifier = Modifier.fillMaxSize(),
+    horizontalAlignment = Alignment.CenterHorizontally
+  ) {
+    val state by NavigationScreenModel.Menu.CloseDebt.state.collectAsState()
+    val selectedId = state["selected_debtor_id"]
+    val debtors by debtorsState.payload.collectAsState()
+    val debtor = debtors.orEmpty().find { it.id == selectedId }
+    val storeId = stateValues.activeStoreId
+
+    ScreenAppBarWidget(
+      title = stateValues.stringCloseDebt,
+      iconPath = stateValues.drawablePathIconDebtors,
+      onBack = {
+        coroutineScope.launch {
+          Navigation.Menu.pop(stateValues.isNarrowScreen)
+        }
+      }
+    )
+
+    if (storeId == null || debtor == null) {
+      MessageText(
+        modifier = Modifier.fillMaxSize(),
+        text = stateValues.stringListEmpty
+      )
+      return@Column
+    }
+
+    var amountText by rememberSaveable(debtor.id) {
+      mutableStateOf(moneyInputFromDouble(debtor.debtAmount))
+    }
+
+    LazyColumn(
+      modifier = Modifier
+        .weight(1f)
+        .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
+        .padding(stateValues.marginTextField)
+    ) {
+      item {
+        DebtorPaymentCard(
+          debtor = debtor,
+          selected = true,
+          onClick = {}
+        )
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+        TransactionPaymentAmountField(
+          title = stateValues.stringCloseDebt,
+          value = amountText,
+          selected = true,
+          onSelected = {
+
+          },
+          onValueChange = { amountText = it },
+          leadingIconPath = stateValues.drawablePathIconDebtors
+        )
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+        TransactionNumpad(
+          onInput = { token ->
+            amountText = paymentInputAppend(amountText, token)
+          }
+        )
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+        actionButton(
+          text = "Pay full debt",
+          onClick = {
+            amountText = moneyInputFromDouble(debtor.debtAmount)
+          }
+        )
+
+        Spacer(modifier = Modifier.height(stateValues.screenHeight / 5))
+      }
+    }
+
+    actionButton(
+      modifier = Modifier
+        .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
+        .padding(8.dp),
+      text = stateValues.stringConfirm,
+      enabled = amountText.toMoneyDouble() > 0.0 && stateValues.latestNotification == null,
+      onClick = {
+        payDebtorDebt(
+          DebtPaymentRequestDataModel(
+            debtorId = debtor.id,
+            storeId = storeId,
+            amount = amountText.toMoneyDouble().coerceAtMost(debtor.debtAmount),
+            currency = debtor.currency,
+            timeMillis = getCurrentTimeMillis()
+          )
+        ) { state ->
+          if (state is DataState.Success) {
+            coroutineScope.launch {
+              Navigation.Menu.pop(stateValues.isNarrowScreen)
+            }
+          }
+        }
+      }
+    )
+  }
 }
+
 
 @Composable
 fun AppConfiguration.MenuAppThemeScreen() {
@@ -12382,15 +13770,9 @@ fun AppConfiguration.GoodsItemInStockWidget(
   returnedForPeriod: QuantityDataModel? = null,
   onClick: ((GoodsItemDataModel) -> Unit)? = null,
   onDelete: ((GoodsItemDataModel) -> Unit)? = null,
-  onEdit: ((GoodsItemDataModel) -> Unit)? = null,
-  onDetails: ((GoodsItemDataModel) -> Unit)? = null,
-  onBatches: ((GoodsItemDataModel) -> Unit)? = null,
-  onSupplierPrices: ((GoodsItemDataModel) -> Unit)? = null,
-  onOrders: ((GoodsItemDataModel) -> Unit)? = null,
+  onEdit: ((GoodsItemDataModel) -> Unit)? = null
 ) {
-  val itemName = goodsItem.name.extractLocalizedString(stateValues.appLanguage)
-    ?: goodsItem.name.firstOrNull()?.value
-    ?: "Unnamed item"
+  val itemName = goodsItem.name.visibleLocalizedString(stateValues.appLanguage, "Unnamed item")
 
   val barcodesText = goodsItem.barcodes
     .filter { it.isNotBlank() }
@@ -12402,7 +13784,7 @@ fun AppConfiguration.GoodsItemInStockWidget(
         .orEmpty()
         .find { it.id == categoryId }
         ?.name
-        ?.extractLocalizedString(stateValues.appLanguage)
+        ?.visibleLocalizedString(stateValues.appLanguage, categoryId)
     }
     .joinToString(", ")
 
@@ -12546,47 +13928,10 @@ fun AppConfiguration.GoodsItemInStockWidget(
 
     Column(
       modifier = Modifier
-        .widthIn(min = 112.dp)
         .padding(end = 12.dp, top = 12.dp, start = 4.dp, bottom = 12.dp),
       horizontalAlignment = Alignment.End,
       verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-      onDetails?.let {
-        actionButton(
-          text = "Info",
-          fillMaxWidthIfTextPresent = false,
-        ) {
-          onDetails(goodsItem)
-        }
-      }
-
-      onBatches?.let {
-        actionButton(
-          text = "Batches",
-          fillMaxWidthIfTextPresent = false,
-        ) {
-          onBatches(goodsItem)
-        }
-      }
-
-      onSupplierPrices?.let {
-        actionButton(
-          text = "Prices",
-          fillMaxWidthIfTextPresent = false,
-        ) {
-          onSupplierPrices(goodsItem)
-        }
-      }
-
-      onOrders?.let {
-        actionButton(
-          text = "Orders",
-          fillMaxWidthIfTextPresent = false,
-        ) {
-          onOrders(goodsItem)
-        }
-      }
-
       onEdit?.let {
         actionButton(
           text = "",
@@ -12610,6 +13955,7 @@ fun AppConfiguration.GoodsItemInStockWidget(
     }
   }
 }
+
 
 @Composable
 private fun AppConfiguration.StockCardInfoLine(
@@ -12706,7 +14052,11 @@ fun AppConfiguration.StockGoodsItemDetailsScreen() {
         Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
         StockCardInfoLine(stateValues.stringBarcode, goodsItem.barcodes.joinToString(", "), stateValues.TextColor)
-        StockCardInfoLine(stateValues.stringCategory, goodsItem.categoryIds.joinToString(", "), stateValues.TextColor)
+        StockCardInfoLine(
+          stateValues.stringCategory,
+          goodsItem.categoryIds.mapNotNull { goodsCategoryName(it) }.joinToString(", "),
+          stateValues.TextColor
+        )
         StockCardInfoLine("Measurement unit", goodsItem.measurementUnitId, stateValues.TextColor)
         StockCardInfoLine("Batches", batches.size.toString(), stateValues.TextColor)
         StockCardInfoLine(stateValues.stringSale, goodsItem.salePrices.joinToString(" / ") { "${it.price} ${it.currency}" }, stateValues.TextColor)
@@ -12840,6 +14190,7 @@ fun AppConfiguration.genericTextField(
   stateKey: String? = null,
 
   enabled: Boolean = true,
+  readOnly: Boolean = false,
   wide: Boolean = false,
   valueInitial: String? = null,
 
@@ -12913,8 +14264,9 @@ fun AppConfiguration.genericTextField(
   }
 
   LaunchedEffect(valueInitial) {
-    val initial = valueInitial ?: ""
-    textFieldValue = TextFieldValue(initial, selection = TextRange(initial.length))
+    if (valueInitial != null) {
+      textFieldValue = TextFieldValue(valueInitial, selection = TextRange(valueInitial.length))
+    }
   }
 
   Column(
@@ -12968,6 +14320,7 @@ fun AppConfiguration.genericTextField(
           }
         },
         enabled = enabled,
+        readOnly = readOnly,
         modifier = Modifier
           .height(if (wide) stateValues.wideTextFieldHeight else stateValues.textFieldHeight)
           .clip(cornerShape)
@@ -13088,8 +14441,26 @@ fun AppConfiguration.genericTextField(
                           },
                           indication = ripple(color = textColor, radius = cornerRadius)
                         ) {
-                          textFieldValue = TextFieldValue("")
+                          val applyClear = {
+                            textFieldValue = TextFieldValue("")
+
+                            stateKey?.run {
+                              coroutineScope.launch {
+                                stateHost?.setState(stateKey to "")
+                              }
+                            }
+                          }
+
+                          if (onValueChange != null) {
+                            onValueChange("") {
+                              applyClear()
+                            }
+                          } else {
+                            applyClear()
+                          }
+
                           isFocused = true
+                          focusRequester.requestFocus()
                         }
                     ) {
                       CpImage(
@@ -15294,14 +16665,14 @@ fun AppConfiguration.countrySelectionPhoneNumberTextField(
         iconRes = it.mapIconRes()
       )
     },
-    lockedSecondaryDomainId = lockedId,
+    lockedSecondaryDomainId = lockedId?.let { if (it.startsWith("+")) it else "+$it" },
     valueInitial = valueInitial?.run {
       countries
-        .find { startsWith(it.phoneNumberCode) }
+        .find { startsWith(it.phoneNumberCode) || startsWith("+${it.phoneNumberCode}") }
         ?.takeIf { countryMatch ->
           length > countryMatch.phoneNumberSize
         }?.let { countryMatch ->
-          substringAfter(countryMatch.phoneNumberCode)
+          removePrefix("+").substringAfter(countryMatch.phoneNumberCode)
         } ?: this
     },
     titleText = titleText,

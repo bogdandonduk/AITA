@@ -79,6 +79,25 @@ object Transactions: Table("transactions") {
   override val primaryKey = PrimaryKey(id)
 }
 
+object Debtors: Table("debtors") {
+  val id = uuid("id").uniqueIndex()
+  val userId = uuid("user_id")
+  val storeId = uuid("store_id")
+  val email = text("email").default("")
+  val debtAmount = double("debt_amount")
+  val currency = text("currency")
+  val phoneNumber = text("phone_number").default("")
+  val firstName = text("first_name")
+  val lastName = text("last_name")
+  val transactionIds = jsonb("transaction_ids", Json, ListSerializer(String.serializer()))
+  val createdAt = timestamp("created_at").defaultExpression(CurrentTimestamp)
+  val updatedAt = timestamp("updated_at").defaultExpression(CurrentTimestamp)
+  val isActive = bool("is_active").default(true)
+
+  override val primaryKey = PrimaryKey(id)
+}
+
+
 const val serverFilesPath = "AITA/server"
 const val configAppPath = "$serverFilesPath/config/app"
 
@@ -865,6 +884,91 @@ private fun ResultRow.toSupplierGoodsPriceDataModel(): SupplierGoodsPriceDataMod
   )
 }
 
+
+private fun ResultRow.toDebtorDataModel(): DebtorDataModel {
+  return DebtorDataModel(
+    id = this[Debtors.id].toString(),
+    email = this[Debtors.email],
+    debtAmount = this[Debtors.debtAmount],
+    currency = this[Debtors.currency],
+    phoneNumber = this[Debtors.phoneNumber],
+    firstName = this[Debtors.firstName],
+    lastName = this[Debtors.lastName],
+    transactionIds = this[Debtors.transactionIds]
+  )
+}
+
+private fun upsertDebtorInsideTransaction(
+  userId: UUID,
+  storeId: UUID,
+  debtor: DebtorDataModel,
+  transactionId: String? = null
+): DebtorDataModel {
+  val now = Instant.now()
+  val parsedId = debtor.id.takeIf { it.isNotBlank() }?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+  val existing = parsedId?.let { id ->
+    Debtors
+      .selectAll()
+      .where {
+        (Debtors.id eq id) and
+            (Debtors.userId eq userId) and
+            (Debtors.storeId eq storeId) and
+            (Debtors.isActive eq true)
+      }
+      .singleOrNull()
+  }
+
+  val transactionIds = debtor.transactionIds
+    .toMutableList()
+    .also { ids ->
+      transactionId?.takeIf { it.isNotBlank() && it !in ids }?.let { ids.add(it) }
+    }
+    .distinct()
+
+  return if (existing == null) {
+    val id = parsedId ?: UUID.randomUUID()
+
+    Debtors.insert {
+      it[Debtors.id] = id
+      it[Debtors.userId] = userId
+      it[Debtors.storeId] = storeId
+      it[Debtors.email] = debtor.email.trim()
+      it[Debtors.debtAmount] = debtor.debtAmount.coerceAtLeast(0.0)
+      it[Debtors.currency] = debtor.currency
+      it[Debtors.phoneNumber] = debtor.phoneNumber.trim()
+      it[Debtors.firstName] = debtor.firstName.trim()
+      it[Debtors.lastName] = debtor.lastName.trim()
+      it[Debtors.transactionIds] = transactionIds
+      it[Debtors.updatedAt] = now
+      it[Debtors.isActive] = true
+    }
+
+    debtor.copy(
+      id = id.toString(),
+      debtAmount = debtor.debtAmount.coerceAtLeast(0.0),
+      transactionIds = transactionIds
+    )
+  } else {
+    val id = existing[Debtors.id]
+    val newDebt = (existing[Debtors.debtAmount] + debtor.debtAmount).coerceAtLeast(0.0)
+    val mergedIds = (existing[Debtors.transactionIds] + transactionIds).distinct()
+
+    Debtors.update({ Debtors.id eq id }) {
+      it[Debtors.email] = debtor.email.trim().ifBlank { existing[Debtors.email] }
+      it[Debtors.debtAmount] = newDebt
+      it[Debtors.currency] = debtor.currency.ifBlank { existing[Debtors.currency] }
+      it[Debtors.phoneNumber] = debtor.phoneNumber.trim().ifBlank { existing[Debtors.phoneNumber] }
+      it[Debtors.firstName] = debtor.firstName.trim().ifBlank { existing[Debtors.firstName] }
+      it[Debtors.lastName] = debtor.lastName.trim().ifBlank { existing[Debtors.lastName] }
+      it[Debtors.transactionIds] = mergedIds
+      it[Debtors.updatedAt] = now
+      it[Debtors.isActive] = true
+    }
+
+    Debtors.selectAll().where { Debtors.id eq id }.single().toDebtorDataModel()
+  }
+}
+
 private fun barcodeClashesInsideTransaction(
   storeId: UUID,
   currentItemId: UUID?,
@@ -994,6 +1098,10 @@ fun Application.module() {
     .migrate()
 
   Database.connect(ds)
+
+  org.jetbrains.exposed.sql.transactions.transaction {
+    SchemaUtils.createMissingTablesAndColumns(Debtors)
+  }
 
   configureJwtAuth()
 
@@ -2458,6 +2566,178 @@ fun Application.module() {
       }
     }
 
+
+    route("/debtors") {
+      authenticate("auth-jwt") {
+        get("/get") {
+          val userId = call.checkPrincipal() ?: return@get
+          val storeId = call.headerUuid("store_id") ?: return@get call.respond(UnauthorizedResponse())
+
+          val debtors = newSuspendedTransaction(Dispatchers.IO) {
+            if (!userHasStoreAccessInsideTransaction(userId, storeId))
+              return@newSuspendedTransaction null
+
+            Debtors
+              .selectAll()
+              .where {
+                (Debtors.userId eq userId) and
+                    (Debtors.storeId eq storeId) and
+                    (Debtors.isActive eq true)
+              }
+              .map { it.toDebtorDataModel() }
+          }
+
+          debtors?.let {
+            call.genericResponse(HttpStatusCode.OK, it)
+          } ?: call.respond(UnauthorizedResponse())
+        }
+
+        post("/add") {
+          val userId = call.checkPrincipal() ?: return@post
+          val storeId = call.headerUuid("store_id") ?: return@post call.respond(UnauthorizedResponse())
+          val body = call.receive<DebtorDataModel>()
+
+          val debtor = newSuspendedTransaction(Dispatchers.IO) {
+            if (!userHasStoreAccessInsideTransaction(userId, storeId))
+              return@newSuspendedTransaction null
+
+            upsertDebtorInsideTransaction(
+              userId = userId,
+              storeId = storeId,
+              debtor = body.copy(debtAmount = body.debtAmount.coerceAtLeast(0.0))
+            )
+          }
+
+          debtor?.let {
+            call.genericResponse(
+              HttpStatusCode.Created,
+              it,
+              simpleMessage("Debtor saved", ru = "Должник сохранён", kk = "Борышкер сақталды")
+            )
+          } ?: call.respond(UnauthorizedResponse())
+        }
+
+        put("/update") {
+          val userId = call.checkPrincipal() ?: return@put
+          val storeId = call.headerUuid("store_id") ?: return@put call.respond(UnauthorizedResponse())
+          val body = call.receive<DebtorDataModel>()
+          val debtorId = runCatching { UUID.fromString(body.id) }.getOrNull()
+            ?: return@put call.respond(UnauthorizedResponse())
+
+          val debtor = newSuspendedTransaction(Dispatchers.IO) {
+            if (!userHasStoreAccessInsideTransaction(userId, storeId))
+              return@newSuspendedTransaction null
+
+            val existing = Debtors
+              .selectAll()
+              .where {
+                (Debtors.id eq debtorId) and
+                    (Debtors.userId eq userId) and
+                    (Debtors.storeId eq storeId) and
+                    (Debtors.isActive eq true)
+              }
+              .singleOrNull() ?: return@newSuspendedTransaction null
+
+            Debtors.update({ Debtors.id eq debtorId }) {
+              it[Debtors.email] = body.email.trim()
+              it[Debtors.debtAmount] = body.debtAmount.coerceAtLeast(0.0)
+              it[Debtors.currency] = body.currency
+              it[Debtors.phoneNumber] = body.phoneNumber.trim()
+              it[Debtors.firstName] = body.firstName.trim()
+              it[Debtors.lastName] = body.lastName.trim()
+              it[Debtors.transactionIds] = body.transactionIds.ifEmpty { existing[Debtors.transactionIds] }
+              it[Debtors.updatedAt] = Instant.now()
+            }
+
+            Debtors.selectAll().where { Debtors.id eq debtorId }.single().toDebtorDataModel()
+          }
+
+          debtor?.let {
+            call.genericResponse(
+              HttpStatusCode.OK,
+              it,
+              simpleMessage("Debtor updated", ru = "Должник обновлён", kk = "Борышкер жаңартылды")
+            )
+          } ?: call.respond(UnauthorizedResponse())
+        }
+
+        delete("/delete") {
+          val userId = call.checkPrincipal() ?: return@delete
+          val storeId = call.headerUuid("store_id") ?: return@delete call.respond(UnauthorizedResponse())
+          val body = call.receive<String>()
+          val debtorId = runCatching { UUID.fromString(body) }.getOrNull()
+            ?: return@delete call.respond(UnauthorizedResponse())
+
+          val deleted = newSuspendedTransaction(Dispatchers.IO) {
+            if (!userHasStoreAccessInsideTransaction(userId, storeId))
+              return@newSuspendedTransaction null
+
+            val affected = Debtors.update({
+              (Debtors.id eq debtorId) and
+                  (Debtors.userId eq userId) and
+                  (Debtors.storeId eq storeId)
+            }) {
+              it[Debtors.isActive] = false
+              it[Debtors.updatedAt] = Instant.now()
+            }
+
+            if (affected > 0) body else null
+          }
+
+          deleted?.let {
+            call.genericResponse(
+              HttpStatusCode.OK,
+              it,
+              simpleMessage("Debtor deleted", ru = "Должник удалён", kk = "Борышкер өшірілді")
+            )
+          } ?: call.respond(UnauthorizedResponse())
+        }
+
+        post("/pay") {
+          val userId = call.checkPrincipal() ?: return@post
+          val body = call.receive<DebtPaymentRequestDataModel>()
+          val storeId = runCatching { UUID.fromString(body.storeId) }.getOrNull()
+            ?: return@post call.respond(UnauthorizedResponse())
+          val debtorId = runCatching { UUID.fromString(body.debtorId) }.getOrNull()
+            ?: return@post call.respond(UnauthorizedResponse())
+
+          val debtor = newSuspendedTransaction(Dispatchers.IO) {
+            if (!userHasStoreAccessInsideTransaction(userId, storeId))
+              return@newSuspendedTransaction null
+
+            val existing = Debtors
+              .selectAll()
+              .where {
+                (Debtors.id eq debtorId) and
+                    (Debtors.userId eq userId) and
+                    (Debtors.storeId eq storeId) and
+                    (Debtors.isActive eq true)
+              }
+              .singleOrNull() ?: return@newSuspendedTransaction null
+
+            val newDebt = (existing[Debtors.debtAmount] - body.amount.coerceAtLeast(0.0))
+              .coerceAtLeast(0.0)
+              .let { kotlin.math.floor(it * 100.0) / 100.0 }
+
+            Debtors.update({ Debtors.id eq debtorId }) {
+              it[Debtors.debtAmount] = newDebt
+              it[Debtors.updatedAt] = Instant.now()
+            }
+
+            Debtors.selectAll().where { Debtors.id eq debtorId }.single().toDebtorDataModel()
+          }
+
+          debtor?.let {
+            call.genericResponse(
+              HttpStatusCode.OK,
+              it,
+              simpleMessage("Debt payment saved", ru = "Оплата долга сохранена", kk = "Қарыз төлемі сақталды")
+            )
+          } ?: call.respond(UnauthorizedResponse())
+        }
+      }
+    }
+
     route("/transactions") {
       authenticate("auth-jwt") {
         get("/get") {
@@ -2479,6 +2759,7 @@ fun Application.module() {
             Transactions
               .selectAll()
               .where { (Transactions.userId eq userId) and (Transactions.storeId eq storeId) }
+              .orderBy(Transactions.timeMillis to SortOrder.DESC)
               .map {
                 TransactionDataModel(
                   id = it[Transactions.id].toString(),
@@ -2523,8 +2804,32 @@ fun Application.module() {
             if (!hasStoreAccess)
               return@newSuspendedTransaction null
 
+            val transactionTotal = body.goodsInTransaction
+              .sumOf { it.quantity * it.pricePerUnit }
+              .let { kotlin.math.floor(it * 100.0) / 100.0 }
+
+            val uploadedPaymentTotal = (body.paidCash + body.paidCard + (body.debtor?.debtAmount ?: 0.0))
+              .let { kotlin.math.floor(it * 100.0) / 100.0 }
+
+            if (body.goodsInTransaction.isEmpty())
+              return@newSuspendedTransaction null
+
+            if (transactionTotal > 0.0 && uploadedPaymentTotal + 0.01 < transactionTotal)
+              return@newSuspendedTransaction null
+
             val id = UUID.randomUUID()
             val timeMillis = body.timeMillis.takeIf { it > 0 } ?: System.currentTimeMillis()
+
+            val savedDebtor = body.debtor
+              ?.takeIf { it.debtAmount > 0.0 }
+              ?.let { debtor ->
+                upsertDebtorInsideTransaction(
+                  userId = userId,
+                  storeId = storeId,
+                  debtor = debtor,
+                  transactionId = id.toString()
+                )
+              }
 
             Transactions.insert {
               it[Transactions.id] = id
@@ -2536,7 +2841,7 @@ fun Application.module() {
               it[Transactions.paidCash] = body.paidCash
               it[Transactions.paidCard] = body.paidCard
               it[Transactions.cardPaymentOptionId] = body.cardPaymentOptionId
-              it[Transactions.debtor] = body.debtor?.let { debtor ->
+              it[Transactions.debtor] = savedDebtor?.let { debtor ->
                 jsonBase.encodeToString(debtor)
               }
               it[Transactions.timeMillis] = timeMillis
@@ -2545,6 +2850,7 @@ fun Application.module() {
             body.copy(
               id = id.toString(),
               storeId = storeId.toString(),
+              debtor = savedDebtor,
               timeMillis = timeMillis
             )
           }

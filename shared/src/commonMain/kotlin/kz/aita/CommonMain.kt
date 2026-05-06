@@ -17,11 +17,15 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import io.ktor.utils.io.core.toByteArray
 import kotlinx.coroutines.*
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.Json
 
 @kotlinx.serialization.Serializable
@@ -70,6 +74,176 @@ expect fun getCurrentTimeMillis(): Long
 
 val transactionsState = MutableDataStateFlow<List<TransactionDataModel>>(GlobalScope)
 
+
+val debtorsState = MutableDataStateFlow<List<DebtorDataModel>>(GlobalScope)
+
+private val getDebtorsMutex = Mutex()
+private val addDebtorMutex = Mutex()
+private val updateDebtorMutex = Mutex()
+private val deleteDebtorMutex = Mutex()
+private val payDebtorDebtMutex = Mutex()
+
+private fun List<DebtorDataModel>.upsertDebtor(debtor: DebtorDataModel): List<DebtorDataModel> {
+  val index = indexOfFirst { it.id == debtor.id }
+
+  return if (index == -1) {
+    this + debtor
+  } else {
+    toMutableList().also { it[index] = debtor }
+  }
+}
+
+fun getDebtors(
+  storeId: String,
+  onCompleted: ((DataState<List<DebtorDataModel>>) -> Unit)? = null
+) {
+  if (!getDebtorsMutex.isLocked)
+    GlobalScope.launch(Dispatchers.ourIo) {
+      getDebtorsMutex.withLock {
+        val response = networkRequest<List<DebtorDataModel>, Unit>(
+          method = HttpMethod.Get,
+          endpointUrl = globalAppConfigurationState.payloadValue.getDebtorsPath.first,
+          headers = mapOf("store_id" to storeId)
+        )
+
+        if (response.negative || response.payload == null) {
+          postInAppNotification(response.message, NotificationType.Negative)
+          onCompleted?.invoke(DataState.Empty(response.message))
+        } else {
+          debtorsState.emit(DataState.Success(response.payload, response.message))
+          onCompleted?.invoke(DataState.Success(response.payload, response.message))
+        }
+      }
+    }
+}
+
+fun addDebtor(
+  storeId: String,
+  debtor: DebtorDataModel,
+  onCompleted: ((DataState<DebtorDataModel>) -> Unit)? = null
+) {
+  if (!addDebtorMutex.isLocked)
+    GlobalScope.launch(Dispatchers.ourIo) {
+      addDebtorMutex.withLock {
+        val response = networkRequest<DebtorDataModel, DebtorDataModel>(
+          method = HttpMethod.Post,
+          endpointUrl = globalAppConfigurationState.payloadValue.addDebtorPath.first,
+          headers = mapOf("store_id" to storeId),
+          body = debtor
+        )
+
+        if (response.negative || response.payload == null) {
+          postInAppNotification(response.message, NotificationType.Negative)
+          onCompleted?.invoke(DataState.Empty(response.message))
+        } else {
+          debtorsState.emit(
+            DataState.Success(
+              debtorsState.payloadValue.orEmpty().upsertDebtor(response.payload),
+              response.message
+            )
+          )
+          postInAppNotification(response.message, NotificationType.Positive)
+          onCompleted?.invoke(DataState.Success(response.payload, response.message))
+        }
+      }
+    }
+}
+
+fun updateDebtor(
+  storeId: String,
+  debtor: DebtorDataModel,
+  onCompleted: ((DataState<DebtorDataModel>) -> Unit)? = null
+) {
+  if (!updateDebtorMutex.isLocked)
+    GlobalScope.launch(Dispatchers.ourIo) {
+      updateDebtorMutex.withLock {
+        val response = networkRequest<DebtorDataModel, DebtorDataModel>(
+          method = HttpMethod.Put,
+          endpointUrl = globalAppConfigurationState.payloadValue.updateDebtorPath.first,
+          headers = mapOf("store_id" to storeId),
+          body = debtor
+        )
+
+        if (response.negative || response.payload == null) {
+          postInAppNotification(response.message, NotificationType.Negative)
+          onCompleted?.invoke(DataState.Empty(response.message))
+        } else {
+          debtorsState.emit(
+            DataState.Success(
+              debtorsState.payloadValue.orEmpty().upsertDebtor(response.payload),
+              response.message
+            )
+          )
+          postInAppNotification(response.message, NotificationType.Positive)
+          onCompleted?.invoke(DataState.Success(response.payload, response.message))
+        }
+      }
+    }
+}
+
+fun deleteDebtor(
+  storeId: String,
+  debtorId: String,
+  onCompleted: ((DataState<String>) -> Unit)? = null
+) {
+  if (!deleteDebtorMutex.isLocked)
+    GlobalScope.launch(Dispatchers.ourIo) {
+      deleteDebtorMutex.withLock {
+        val response = networkRequest<String, String>(
+          method = HttpMethod.Delete,
+          endpointUrl = globalAppConfigurationState.payloadValue.deleteDebtorPath.first,
+          headers = mapOf("store_id" to storeId),
+          body = debtorId
+        )
+
+        if (response.negative || response.payload == null) {
+          postInAppNotification(response.message, NotificationType.Negative)
+          onCompleted?.invoke(DataState.Empty(response.message))
+        } else {
+          debtorsState.emit(
+            DataState.Success(
+              debtorsState.payloadValue.orEmpty().filterNot { it.id == response.payload },
+              response.message
+            )
+          )
+          postInAppNotification(response.message, NotificationType.Positive)
+          onCompleted?.invoke(DataState.Success(response.payload, response.message))
+        }
+      }
+    }
+}
+
+fun payDebtorDebt(
+  request: DebtPaymentRequestDataModel,
+  onCompleted: ((DataState<DebtorDataModel>) -> Unit)? = null
+) {
+  if (!payDebtorDebtMutex.isLocked)
+    GlobalScope.launch(Dispatchers.ourIo) {
+      payDebtorDebtMutex.withLock {
+        val response = networkRequest<DebtorDataModel, DebtPaymentRequestDataModel>(
+          method = HttpMethod.Post,
+          endpointUrl = globalAppConfigurationState.payloadValue.payDebtorDebtPath.first,
+          headers = mapOf("store_id" to request.storeId),
+          body = request
+        )
+
+        if (response.negative || response.payload == null) {
+          postInAppNotification(response.message, NotificationType.Negative)
+          onCompleted?.invoke(DataState.Empty(response.message))
+        } else {
+          debtorsState.emit(
+            DataState.Success(
+              debtorsState.payloadValue.orEmpty().upsertDebtor(response.payload),
+              response.message
+            )
+          )
+          postInAppNotification(response.message, NotificationType.Positive)
+          onCompleted?.invoke(DataState.Success(response.payload, response.message))
+        }
+      }
+    }
+}
+
 private val completeTransactionMutex = Mutex()
 private val getTransactionsMutex = Mutex()
 
@@ -80,6 +254,7 @@ data class TransactionPaymentDraftDataModel(
   val paidCash: Double,
   val paidCard: Double,
   val cardPaymentOptionId: Int,
+  val debtor: DebtorDataModel? = null
 )
 
 data class TransactionReceiptSnapshotDataModel(
@@ -89,6 +264,9 @@ data class TransactionReceiptSnapshotDataModel(
   val paymentDraft: TransactionPaymentDraftDataModel,
   val currencyCode: String,
   val currencySymbol: String,
+  val cashierName: String = "",
+  val cashierPhoneNumber: String = "",
+  val cashierEmail: String = ""
 )
 
 data class TransactionReceiptLineDataModel(
@@ -103,6 +281,225 @@ data class TransactionReceiptLineDataModel(
 ) {
   val total: Double
     get() = quantity.total * pricePerUnit
+}
+
+
+data class ReceiptPlatformActionResult(
+  val success: Boolean,
+  val message: String = ""
+)
+
+var saveReceiptPdfFile: (suspend (fileName: String, pdfBytes: ByteArray) -> ReceiptPlatformActionResult)? = null
+var shareReceiptPdfFile: (suspend (fileName: String, pdfBytes: ByteArray, whatsappOnly: Boolean) -> ReceiptPlatformActionResult)? = null
+var printReceiptEscPosBytes: (suspend (printerBytes: ByteArray) -> ReceiptPlatformActionResult)? = null
+
+suspend fun saveReceiptPdf(fileName: String, pdfBytes: ByteArray): ReceiptPlatformActionResult {
+  return saveReceiptPdfFile?.invoke(fileName, pdfBytes)
+    ?: ReceiptPlatformActionResult(false, "PDF export is not configured for this platform")
+}
+
+suspend fun shareReceiptPdf(fileName: String, pdfBytes: ByteArray, whatsappOnly: Boolean = false): ReceiptPlatformActionResult {
+  return shareReceiptPdfFile?.invoke(fileName, pdfBytes, whatsappOnly)
+    ?: ReceiptPlatformActionResult(false, "PDF sharing is not configured for this platform")
+}
+
+suspend fun printReceiptEscPos(printerBytes: ByteArray): ReceiptPlatformActionResult {
+  return printReceiptEscPosBytes?.invoke(printerBytes)
+    ?: ReceiptPlatformActionResult(false, "Receipt printer is not configured for this platform")
+}
+
+private fun receiptVisibleString(values: List<LocalizedStringDataModel>, language: String, fallback: String): String {
+  return values.extractLocalizedString(language)
+    ?.trim()
+    ?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+    ?: values.extractLocalizedString("main")
+      ?.trim()
+      ?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+    ?: values.firstOrNull { it.value.trim().isNotBlank() && !it.value.trim().equals("null", ignoreCase = true) }
+      ?.value
+      ?.trim()
+    ?: fallback
+}
+
+private fun receiptMoney(value: Double): String {
+  val rounded = kotlin.math.floor(value.coerceAtLeast(0.0) * 100.0) / 100.0
+  val whole = rounded.toLong()
+  val cents = kotlin.math.round((rounded - whole) * 100.0).toInt()
+  return "$whole.${cents.toString().padStart(2, '0')}"
+}
+
+private fun receiptQuantityText(quantity: QuantityDataModel, language: String): String {
+  val value = if (quantity.roundTotal) quantity.total.toInt().toString() else receiptMoney(quantity.total)
+  val unit = receiptVisibleString(quantity.immutableUnitName, language, quantity.id.ifBlank { "unit" })
+  return "$value $unit".trim()
+}
+
+private fun receiptDateTimeText(timeMillis: Long): String {
+  return runCatching {
+    val dt = Instant.fromEpochMilliseconds(timeMillis).toLocalDateTime(TimeZone.currentSystemDefault())
+    "${dt.dayOfMonth.toString().padStart(2, '0')}.${dt.monthNumber.toString().padStart(2, '0')}.${dt.year} ${dt.hour.toString().padStart(2, '0')}:${dt.minute.toString().padStart(2, '0')}:${dt.second.toString().padStart(2, '0')}"
+  }.getOrElse { timeMillis.toString() }
+}
+
+fun TransactionReceiptSnapshotDataModel.receiptTitle(language: String): String {
+  return when (transaction.type) {
+    "purchase" -> "SALE / ПРОДАЖА"
+    "return" -> "RETURN / ВОЗВРАТ"
+    else -> "SUPPLY / ПРИЁМКА"
+  }
+}
+
+fun TransactionReceiptSnapshotDataModel.receiptNumberText(): String {
+  val id = transaction.id.takeIf { it.isNotBlank() } ?: "draft"
+  return id.take(8).uppercase()
+}
+
+fun TransactionReceiptSnapshotDataModel.totalAmount(): Double {
+  return lines.sumOf { it.total }.roundMoney()
+}
+
+fun TransactionReceiptSnapshotDataModel.debtAmount(): Double {
+  return paymentDraft.debtor?.debtAmount?.roundMoney() ?: 0.0
+}
+
+fun TransactionReceiptSnapshotDataModel.paidAmount(): Double {
+  return (paymentDraft.paidCash + paymentDraft.paidCard).roundMoney()
+}
+
+fun TransactionReceiptSnapshotDataModel.changeAmount(): Double {
+  val change = paymentDraft.paidCash - (totalAmount() - paymentDraft.paidCard - debtAmount()).coerceAtLeast(0.0)
+  return change.coerceAtLeast(0.0).roundMoney()
+}
+
+fun TransactionReceiptSnapshotDataModel.buildReceiptPlainText(language: String): String {
+  val builder = StringBuilder()
+  val storeName = store?.let {
+    val form = it.companyForms.firstOrNull()?.name?.let { name -> receiptVisibleString(name, language, "") }.orEmpty()
+    val name = receiptVisibleString(it.name, language, "Store")
+    "$form $name".trim()
+  } ?: "Store"
+
+  builder.appendLine(storeName)
+  store?.location?.name?.takeIf { it.isNotBlank() }?.let { builder.appendLine(it) }
+  store?.phoneNumbers?.takeIf { it.isNotEmpty() }?.let { builder.appendLine("Tel: ${it.joinToString()}") }
+  store?.emails?.takeIf { it.isNotEmpty() }?.let { builder.appendLine("Email: ${it.joinToString()}") }
+  builder.appendLine("--------------------------------")
+  builder.appendLine("ТОВАРНЫЙ ЧЕК / SALES RECEIPT")
+  builder.appendLine(receiptTitle(language))
+  builder.appendLine("Receipt: ${receiptNumberText()}")
+  builder.appendLine("Date: ${receiptDateTimeText(transaction.timeMillis)}")
+  cashierName.takeIf { it.isNotBlank() }?.let { builder.appendLine("Cashier: $it") }
+  builder.appendLine("--------------------------------")
+
+  lines.forEach { line ->
+    val name = receiptVisibleString(line.name, language, "No name")
+    builder.appendLine("${line.index + 1}. $name")
+    if (line.barcode.isNotBlank()) builder.appendLine("   Barcode: ${line.barcode}")
+    builder.appendLine("   ${receiptQuantityText(line.quantity, language)} x ${receiptMoney(line.pricePerUnit)} ${line.currencySymbol} = ${receiptMoney(line.total)} ${line.currencySymbol}")
+  }
+
+  builder.appendLine("--------------------------------")
+  builder.appendLine("TOTAL: ${receiptMoney(totalAmount())} $currencySymbol")
+  if (paymentDraft.paidCash > 0.0) builder.appendLine("Cash: ${receiptMoney(paymentDraft.paidCash)} $currencySymbol")
+  if (paymentDraft.paidCard > 0.0) builder.appendLine("Cashless: ${receiptMoney(paymentDraft.paidCard)} $currencySymbol")
+  if (debtAmount() > 0.0) {
+    builder.appendLine("Debt: ${receiptMoney(debtAmount())} $currencySymbol")
+    paymentDraft.debtor?.let { debtor ->
+      val debtorName = "${debtor.firstName} ${debtor.lastName}".trim().ifBlank { debtor.phoneNumber.ifBlank { debtor.id } }
+      builder.appendLine("Debtor: $debtorName")
+      debtor.phoneNumber.takeIf { it.isNotBlank() }?.let { builder.appendLine("Debtor phone: $it") }
+    }
+  }
+  if (changeAmount() > 0.0) builder.appendLine("Change: ${receiptMoney(changeAmount())} $currencySymbol")
+  builder.appendLine("--------------------------------")
+  builder.appendLine("VAT/НДС/ҚҚС: not specified")
+  builder.appendLine("Fiscal status: non-fiscal software receipt")
+  builder.appendLine("Thank you / Спасибо / Рақмет")
+
+  return builder.toString()
+}
+
+private fun pdfEscape(value: String): String {
+  return value
+    .replace("\\", "\\\\")
+    .replace("(", "\\(")
+    .replace(")", "\\)")
+    .map { ch -> if (ch.code in 32..126) ch else '?' }
+    .joinToString("")
+}
+
+fun TransactionReceiptSnapshotDataModel.buildReceiptPdfBytes(language: String): ByteArray {
+  val lines = buildReceiptPlainText(language)
+    .lines()
+    .flatMap { line ->
+      if (line.length <= 58) listOf(line) else line.chunked(58)
+    }
+
+  val pageWidth = 226.0
+  val pageHeight = kotlin.math.max(420.0, 84.0 + lines.size * 12.0)
+  val content = buildString {
+    append("BT\n")
+    append("/F1 9 Tf\n")
+    append("12 ${pageHeight - 24} Td\n")
+    lines.forEachIndexed { index, line ->
+      if (index > 0) append("0 -12 Td\n")
+      append("(${pdfEscape(line)}) Tj\n")
+    }
+    append("ET\n")
+  }
+
+  val objects = mutableListOf<String>()
+  objects += "<< /Type /Catalog /Pages 2 0 R >>"
+  objects += "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"
+  objects += "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth.toInt()} ${pageHeight.toInt()}] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>"
+  objects += "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"
+  objects += "<< /Length ${content.toByteArray().size} >>\nstream\n$content\nendstream"
+
+  val out = StringBuilder()
+  val offsets = mutableListOf<Int>()
+  out.append("%PDF-1.4\n")
+  objects.forEachIndexed { index, obj ->
+    offsets += out.toString().toByteArray().size
+    out.append("${index + 1} 0 obj\n$obj\nendobj\n")
+  }
+  val xrefOffset = out.toString().toByteArray().size
+  out.append("xref\n0 ${objects.size + 1}\n")
+  out.append("0000000000 65535 f \n")
+  offsets.forEach { offset ->
+    out.append(offset.toString().padStart(10, '0')).append(" 00000 n \n")
+  }
+  out.append("trailer\n<< /Size ${objects.size + 1} /Root 1 0 R >>\n")
+  out.append("startxref\n$xrefOffset\n%%EOF")
+  return out.toString().toByteArray()
+}
+
+private fun String.escPosSafe(): String {
+  return map { ch -> if (ch.code in 32..126 || ch == '\n') ch else '?' }.joinToString("")
+}
+
+fun TransactionReceiptSnapshotDataModel.buildReceiptEscPosBytes(language: String): ByteArray {
+  val text = buildReceiptPlainText(language).escPosSafe()
+  val bytes = mutableListOf<Byte>()
+  fun add(vararg values: Int) { values.forEach { bytes += it.toByte() } }
+  fun addText(value: String) { bytes += value.encodeToByteArray().toList() }
+
+  add(0x1B, 0x40) // init
+  add(0x1B, 0x61, 0x01) // center
+  add(0x1B, 0x45, 0x01) // bold on
+  addText((store?.name?.let { receiptVisibleString(it, language, "Store") } ?: "Store") + "\n")
+  add(0x1B, 0x45, 0x00)
+  addText("Receipt ${receiptNumberText()}\n")
+  add(0x1B, 0x61, 0x00) // left
+  addText("--------------------------------\n")
+  addText(text.substringAfter("--------------------------------\n", text))
+  addText("\n\n")
+  add(0x1D, 0x56, 0x42, 0x00) // cut, if supported
+  return bytes.toByteArray()
+}
+
+fun TransactionReceiptSnapshotDataModel.receiptPdfFileName(): String {
+  val safeId = receiptNumberText().replace(Regex("[^A-Za-z0-9_-]"), "_")
+  return "receipt_${safeId}.pdf"
 }
 
 val latestTransactionReceiptSnapshotState =
@@ -327,6 +724,15 @@ fun completeTransaction(
             response.message
           )
         )
+
+        completed.debtor?.let { debtor ->
+          debtorsState.emit(
+            DataState.Success(
+              debtorsState.payloadValue.orEmpty().upsertDebtor(debtor),
+              response.message
+            )
+          )
+        }
 
         deleteCart(transactionTypeIndex, clientId)
         clearTransactionPaymentDraft(transactionTypeIndex, clientId)
@@ -577,6 +983,11 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
     drawableResourcesPath = Pair("res/drawable", "28"),
     getTransactionsPath = Pair("transactions/get", "29"),
     completeTransactionPath = Pair("transactions/complete", "30"),
+    getDebtorsPath = Pair("debtors/get", "39"),
+    addDebtorPath = Pair("debtors/add", "40"),
+    updateDebtorPath = Pair("debtors/update", "41"),
+    deleteDebtorPath = Pair("debtors/delete", "42"),
+    payDebtorDebtPath = Pair("debtors/pay", "43"),
     getSupplierGoodsPricesPath = Pair("supplierGoodsPrices/get", "31"),
     upsertSupplierGoodsPricePath = Pair("supplierGoodsPrices/upsert", "32"),
     deleteSupplierGoodsPricesPath = Pair("supplierGoodsPrices/delete", "33"),
@@ -3741,14 +4152,24 @@ class MutableDataStateFlow<T>(
 
 @kotlinx.serialization.Serializable
 data class DebtorDataModel(
-  val id: String,
-  val email: String,
-  val debtAmount: Double,
+  val id: String = "",
+  val email: String = "",
+  val debtAmount: Double = 0.0,
+  val currency: String = "KZT",
+  val phoneNumber: String = "",
+  val firstName: String = "",
+  val lastName: String = "",
+  val transactionIds: List<String> = emptyList()
+)
+
+@kotlinx.serialization.Serializable
+data class DebtPaymentRequestDataModel(
+  val debtorId: String,
+  val storeId: String,
+  val amount: Double,
   val currency: String,
-  val phoneNumber: String,
-  val firstName: String,
-  val lastName: String,
-  val transactionIds: List<Long>
+  val note: String? = null,
+  val timeMillis: Long = 0L
 )
 
 @kotlinx.serialization.Serializable
@@ -3831,6 +4252,11 @@ data class GlobalAppConfigurationDataModel(
   val drawableResourcesPath: Pair<String, String>,
   val getTransactionsPath: Pair<String, String>,
   val completeTransactionPath: Pair<String, String>,
+  val getDebtorsPath: Pair<String, String> = Pair("debtors/get", "39"),
+  val addDebtorPath: Pair<String, String> = Pair("debtors/add", "40"),
+  val updateDebtorPath: Pair<String, String> = Pair("debtors/update", "41"),
+  val deleteDebtorPath: Pair<String, String> = Pair("debtors/delete", "42"),
+  val payDebtorDebtPath: Pair<String, String> = Pair("debtors/pay", "43"),
   val getSupplierGoodsPricesPath: Pair<String, String> = Pair("supplierGoodsPrices/get", "31"),
   val upsertSupplierGoodsPricePath: Pair<String, String> = Pair("supplierGoodsPrices/upsert", "32"),
   val deleteSupplierGoodsPricesPath: Pair<String, String> = Pair("supplierGoodsPrices/delete", "33"),
@@ -3977,12 +4403,12 @@ data class GoodsBatchShelfQueueDataModel(
 
 @kotlinx.serialization.Serializable
 data class GoodsCategoryDataModel(
-  val id: String,
-  val name: String,
-  val imageUrl: String,
-  val quantityWithUnitSerialized: String,
-  val storeId: String,
-  val universal: Boolean
+  val id: String = "",
+  val name: List<LocalizedStringDataModel> = emptyList(),
+  val imageUrl: String = "",
+  val quantityWithUnitSerialized: String = "",
+  val storeId: String = "",
+  val universal: Boolean = false
 )
 
 @kotlinx.serialization.Serializable
