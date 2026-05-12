@@ -6,6 +6,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import com.github.javakeyring.Keyring
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.awt.Desktop
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Paths
@@ -21,7 +24,60 @@ private val keyring: Keyring = Keyring.create()
 
 private val rng = SecureRandom()
 
+object ReceiptPlatformJvmBridge {
+  /**
+   * Optional desktop ESC/POS writer. Configure it for a USB serial, COM port, or network printer.
+   */
+  var writeEscPosBytes: (suspend (ByteArray) -> Boolean)? = null
+}
 
+fun installReceiptPlatformJvm() {
+  saveReceiptPdfFile = { fileName, pdfBytes ->
+    withContext(Dispatchers.IO) {
+      runCatching {
+        val downloads = File(System.getProperty("user.home"), "Downloads").takeIf { it.exists() }
+          ?: File(System.getProperty("user.home"))
+        val file = File(downloads, fileName)
+        file.writeBytes(pdfBytes)
+        ReceiptPlatformActionResult(true, "Saved to ${file.absolutePath}")
+      }.getOrElse {
+        ReceiptPlatformActionResult(false, it.message ?: "Could not save PDF")
+      }
+    }
+  }
+
+  shareReceiptPdfFile = { fileName, pdfBytes, whatsappOnly ->
+    withContext(Dispatchers.IO) {
+      runCatching {
+        val file = File(System.getProperty("java.io.tmpdir"), fileName)
+        file.writeBytes(pdfBytes)
+        if (Desktop.isDesktopSupported()) {
+          Desktop.getDesktop().open(file)
+          ReceiptPlatformActionResult(true, if (whatsappOnly) "Opened PDF; send it through WhatsApp Desktop manually" else "Opened PDF")
+        } else {
+          ReceiptPlatformActionResult(true, "PDF created at ${file.absolutePath}")
+        }
+      }.getOrElse {
+        ReceiptPlatformActionResult(false, it.message ?: "Could not share PDF")
+      }
+    }
+  }
+
+  printReceiptEscPosBytes = { printerBytes ->
+    runCatching {
+      val writer = ReceiptPlatformJvmBridge.writeEscPosBytes
+        ?: return@runCatching ReceiptPlatformActionResult(false, "No desktop ESC/POS printer writer is configured")
+
+      if (writer(printerBytes)) {
+        ReceiptPlatformActionResult(true, "Sent to printer")
+      } else {
+        ReceiptPlatformActionResult(false, "Printer rejected the receipt")
+      }
+    }.getOrElse {
+      ReceiptPlatformActionResult(false, it.message ?: "Could not print receipt")
+    }
+  }
+}
 
 fun loadOrCreateKey(account: String): ByteArray {
   val existingKey = try {

@@ -8,7 +8,7 @@
       "second": "0"
     },
     "serverUrl": {
-      "first": "http://192.168.0.103:8080",
+      "first": "http://192.168.100.9:8080",
       "second": "1"
     },
     "globalAppConfigurationPath": {

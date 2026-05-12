@@ -11,6 +11,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -65,6 +67,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toLocalDateTime
@@ -1110,6 +1113,41 @@ private fun ReceiptPreviewDivider() {
   )
 }
 
+private fun AppConfiguration.receiptLabels(): ReceiptTextLabelsDataModel {
+  return ReceiptTextLabelsDataModel(
+    store = stateValues.stringStore,
+    goodsReceiptTitle = stateValues.stringGoodsReceiptTitle,
+    receipt = stateValues.stringReceiptNumber,
+    transactionId = stateValues.stringTransactionId,
+    draft = stateValues.stringDraft,
+    date = stateValues.stringDate,
+    cashier = stateValues.stringCashier,
+    phone = stateValues.stringPhone,
+    email = stateValues.stringEmail,
+    barcode = stateValues.stringBarcode,
+    noName = stateValues.stringNoName,
+    noItems = stateValues.stringNoItems,
+    total = stateValues.stringTotal,
+    cash = stateValues.stringCash,
+    cashless = stateValues.stringCashless,
+    debt = stateValues.stringDebt,
+    debtor = stateValues.stringDebtor,
+    debtorPhone = stateValues.stringDebtorPhone,
+    change = stateValues.stringChange,
+    vat = stateValues.stringVat,
+    vatNotSpecified = stateValues.stringVatNotSpecified,
+    fiscalStatus = stateValues.stringFiscalStatus,
+    nonFiscalSoftwareReceipt = stateValues.stringNonFiscalSoftwareReceipt,
+    thankYou = stateValues.stringThankYou,
+    saleReceiptTitle = stateValues.stringSaleReceiptTitle,
+    returnReceiptTitle = stateValues.stringReturnReceiptTitle,
+    supplyReceiptTitle = stateValues.stringSupplyReceiptTitle,
+    pdfExportNotConfigured = stateValues.stringReceiptActionFailed,
+    pdfSharingNotConfigured = stateValues.stringReceiptActionFailed,
+    printerNotConfigured = stateValues.stringReceiptActionFailed
+  )
+}
+
 @Composable
 private fun AppConfiguration.ReceiptPreviewText(
   text: String,
@@ -1121,8 +1159,7 @@ private fun AppConfiguration.ReceiptPreviewText(
 ) {
   Text(
     text = text,
-    modifier = modifier
-      .fillMaxWidth(),
+    modifier = modifier.fillMaxWidth(),
     color = color,
     fontSize = if (large) stateValues.accentTextSize else stateValues.textSize,
     fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
@@ -1163,7 +1200,8 @@ private fun AppConfiguration.ReceiptPreviewRow(
 
 @Composable
 private fun AppConfiguration.ReceiptPreviewHeader(
-  snapshot: TransactionReceiptSnapshotDataModel
+  snapshot: TransactionReceiptSnapshotDataModel,
+  labels: ReceiptTextLabelsDataModel
 ) {
   val store = snapshot.store
   val companyFormTitle = store
@@ -1172,7 +1210,7 @@ private fun AppConfiguration.ReceiptPreviewHeader(
     ?.name
     ?.visibleLocalizedString(stateValues.appLanguage, "")
     .orEmpty()
-  val storeName = store?.name?.visibleLocalizedString(stateValues.appLanguage, "Store") ?: "Store"
+  val storeName = store?.name?.visibleLocalizedString(stateValues.appLanguage, labels.store) ?: labels.store
 
   ReceiptPreviewText(
     text = "$companyFormTitle $storeName".trim(),
@@ -1188,12 +1226,12 @@ private fun AppConfiguration.ReceiptPreviewHeader(
 
   store?.phoneNumbers?.takeIf { it.isNotEmpty() }?.let {
     Spacer(modifier = Modifier.height(3.dp))
-    ReceiptPreviewText(text = "Tel: ${it.joinToString()}", center = true)
+    ReceiptPreviewText(text = "${labels.phone}: ${it.joinToString()}", center = true)
   }
 
   store?.emails?.takeIf { it.isNotEmpty() }?.let {
     Spacer(modifier = Modifier.height(3.dp))
-    ReceiptPreviewText(text = "Email: ${it.joinToString()}", center = true)
+    ReceiptPreviewText(text = "${labels.email}: ${it.joinToString()}", center = true)
   }
 
   Spacer(modifier = Modifier.height(8.dp))
@@ -1201,25 +1239,26 @@ private fun AppConfiguration.ReceiptPreviewHeader(
   Spacer(modifier = Modifier.height(8.dp))
 
   ReceiptPreviewText(
-    text = "ТОВАРНЫЙ ЧЕК / SALES RECEIPT",
+    text = labels.goodsReceiptTitle,
     bold = true,
     center = true
   )
 
   ReceiptPreviewText(
-    text = snapshot.receiptTitle(stateValues.appLanguage),
+    text = snapshot.receiptTitle(labels),
     bold = true,
     center = true
   )
 
   Spacer(modifier = Modifier.height(8.dp))
 
-  ReceiptPreviewRow("Receipt", snapshot.receiptNumberText(), bold = true)
-  ReceiptPreviewRow("Transaction ID", snapshot.transaction.id.ifBlank { "draft" })
-  ReceiptPreviewRow("Date", receiptUiDateTime(snapshot.transaction.timeMillis))
+  ReceiptPreviewRow(labels.receipt, snapshot.receiptNumberText(labels), bold = true)
+  if (snapshot.transaction.id.isNotBlank())
+    ReceiptPreviewRow(labels.transactionId, snapshot.transaction.id)
+  ReceiptPreviewRow(labels.date, receiptUiDateTime(snapshot.transaction.timeMillis))
 
   snapshot.cashierName.takeIf { it.isNotBlank() }?.let {
-    ReceiptPreviewRow("Cashier", it)
+    ReceiptPreviewRow(labels.cashier, it)
   }
 
   Spacer(modifier = Modifier.height(8.dp))
@@ -1236,9 +1275,10 @@ private fun receiptUiDateTime(timeMillis: Long): String {
 
 @Composable
 private fun AppConfiguration.ReceiptPreviewLine(
-  line: TransactionReceiptLineDataModel
+  line: TransactionReceiptLineDataModel,
+  labels: ReceiptTextLabelsDataModel
 ) {
-  val name = line.name.visibleLocalizedString(stateValues.appLanguage, "No name")
+  val name = line.name.visibleLocalizedString(stateValues.appLanguage, labels.noName)
   val suffix = line.quantity.immutableUnitName.visibleLocalizedString(stateValues.appLanguage, "")
   val quantityText = line.quantity.total.run {
     if (line.quantity.roundTotal) toInt().toString() else moneyText()
@@ -1251,7 +1291,7 @@ private fun AppConfiguration.ReceiptPreviewLine(
 
   line.barcode.takeIf { it.isNotBlank() }?.let {
     ReceiptPreviewText(
-      text = "Barcode: $it",
+      text = "${labels.barcode}: $it",
       color = Color.DarkGray
     )
   }
@@ -1267,7 +1307,8 @@ private fun AppConfiguration.ReceiptPreviewLine(
 
 @Composable
 private fun AppConfiguration.ReceiptPreviewTotals(
-  snapshot: TransactionReceiptSnapshotDataModel
+  snapshot: TransactionReceiptSnapshotDataModel,
+  labels: ReceiptTextLabelsDataModel
 ) {
   val total = snapshot.totalAmount()
   val debt = snapshot.debtAmount()
@@ -1278,7 +1319,7 @@ private fun AppConfiguration.ReceiptPreviewTotals(
   Spacer(modifier = Modifier.height(8.dp))
 
   ReceiptPreviewRow(
-    title = "TOTAL",
+    title = labels.total.uppercase(),
     value = "${total.moneyText()} ${snapshot.currencySymbol}",
     bold = true,
     large = true
@@ -1288,37 +1329,37 @@ private fun AppConfiguration.ReceiptPreviewTotals(
 
   if (snapshot.paymentDraft.paidCash > 0.0) {
     ReceiptPreviewRow(
-      title = stateValues.stringCash,
+      title = labels.cash,
       value = "${snapshot.paymentDraft.paidCash.moneyText()} ${snapshot.currencySymbol}"
     )
   }
 
   if (snapshot.paymentDraft.paidCard > 0.0) {
     ReceiptPreviewRow(
-      title = stateValues.stringCashless,
+      title = labels.cashless,
       value = "${snapshot.paymentDraft.paidCard.moneyText()} ${snapshot.currencySymbol}"
     )
   }
 
   if (debt > 0.0) {
     ReceiptPreviewRow(
-      title = stateValues.stringDebtors,
+      title = labels.debt,
       value = "${debt.moneyText()} ${snapshot.currencySymbol}"
     )
 
     snapshot.paymentDraft.debtor?.let { debtor ->
       val debtorName = "${debtor.firstName} ${debtor.lastName}".trim()
         .ifBlank { debtor.phoneNumber.ifBlank { debtor.id } }
-      ReceiptPreviewRow("Debtor", debtorName)
+      ReceiptPreviewRow(labels.debtor, debtorName)
       debtor.phoneNumber.takeIf { it.isNotBlank() }?.let {
-        ReceiptPreviewRow("Debtor phone", it)
+        ReceiptPreviewRow(labels.debtorPhone, it)
       }
     }
   }
 
   if (change > 0.0) {
     ReceiptPreviewRow(
-      title = "Change",
+      title = labels.change,
       value = "${change.moneyText()} ${snapshot.currencySymbol}"
     )
   }
@@ -1327,15 +1368,22 @@ private fun AppConfiguration.ReceiptPreviewTotals(
   ReceiptPreviewDivider()
   Spacer(modifier = Modifier.height(8.dp))
 
-  ReceiptPreviewRow("VAT / НДС / ҚҚС", "not specified")
-  ReceiptPreviewRow("Fiscal status", "non-fiscal software receipt")
+  ReceiptPreviewRow(labels.vat, labels.vatNotSpecified)
+  ReceiptPreviewRow(labels.fiscalStatus, labels.nonFiscalSoftwareReceipt)
 
   Spacer(modifier = Modifier.height(10.dp))
 
   ReceiptPreviewText(
-    text = "Thank you / Спасибо / Рақмет",
+    text = labels.thankYou,
     center = true,
     bold = true
+  )
+}
+
+private fun AppConfiguration.receiptActionNotification(result: ReceiptPlatformActionResult, positiveMessage: String) {
+  postInAppNotification(
+    if (result.success) positiveMessage else result.message.ifBlank { stateValues.stringReceiptActionFailed },
+    if (result.success) NotificationType.Positive else NotificationType.Negative
   )
 }
 
@@ -1372,12 +1420,6 @@ private fun Double.moneyText(): String {
   return "$whole.${cents.toString().padStart(2, '0')}"
 }
 
-private fun AppConfiguration.receiptActionNotification(result: ReceiptPlatformActionResult, positiveMessage: String) {
-  postInAppNotification(
-    if (result.success) positiveMessage else result.message.ifBlank { "Receipt action failed" },
-    if (result.success) NotificationType.Positive else NotificationType.Negative
-  )
-}
 
 @Composable
 fun AppConfiguration.TransactionReceiptPreviewScreen() {
@@ -1484,6 +1526,8 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
         cashierEmail = stateValues.userAccount?.email.orEmpty()
       )
 
+    val labels = receiptLabels()
+
     LazyColumn(
       modifier = Modifier
         .weight(1f)
@@ -1498,13 +1542,13 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
         .padding(stateValues.marginTextFieldGroup)
     ) {
       item {
-        ReceiptPreviewHeader(snapshotForScreen)
+        ReceiptPreviewHeader(snapshotForScreen, labels)
       }
 
       if (snapshotForScreen.lines.isEmpty()) {
         item {
           ReceiptPreviewText(
-            text = "No items",
+            text = labels.noItems,
             center = true,
             bold = true,
             color = Color.DarkGray
@@ -1512,22 +1556,22 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
         }
       } else {
         items(snapshotForScreen.lines) { line ->
-          ReceiptPreviewLine(line)
+          ReceiptPreviewLine(line, labels)
         }
       }
 
       item {
-        ReceiptPreviewTotals(snapshotForScreen)
+        ReceiptPreviewTotals(snapshotForScreen, labels)
         Spacer(modifier = Modifier.height(stateValues.screenHeight / 7))
       }
     }
 
     val alreadyCompleted = snapshotForScreen.transaction.id.isNotBlank()
-    val pdfBytes = remember(snapshotForScreen, stateValues.appLanguage) {
-      snapshotForScreen.buildReceiptPdfBytes(stateValues.appLanguage)
+    val pdfBytes = remember(snapshotForScreen, stateValues.appLanguage, labels) {
+      snapshotForScreen.buildReceiptPdfBytes(stateValues.appLanguage, labels)
     }
-    val fileName = remember(snapshotForScreen) {
-      snapshotForScreen.receiptPdfFileName()
+    val fileName = remember(snapshotForScreen, labels) {
+      snapshotForScreen.receiptPdfFileName(labels)
     }
 
     Column(
@@ -1577,13 +1621,13 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
         ) {
           actionButton(
             modifier = Modifier.weight(1f),
-            text = "PDF",
+            text = stateValues.stringPdf,
             iconPath = stateValues.drawablePathIconReceipt,
             onClick = {
               coroutineScope.launch {
                 receiptActionNotification(
-                  saveReceiptPdf(fileName, pdfBytes),
-                  "Receipt PDF saved"
+                  saveReceiptPdf(fileName, pdfBytes, labels),
+                  stateValues.stringReceiptPdfSaved
                 )
               }
             }
@@ -1591,13 +1635,13 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
 
           actionButton(
             modifier = Modifier.weight(1f),
-            text = "Share",
+            text = stateValues.stringShare,
             iconPath = stateValues.drawablePathIconSwitch,
             onClick = {
               coroutineScope.launch {
                 receiptActionNotification(
-                  shareReceiptPdf(fileName, pdfBytes, whatsappOnly = false),
-                  "Receipt shared"
+                  shareReceiptPdf(fileName, pdfBytes, whatsappOnly = false, labels = labels),
+                  stateValues.stringReceiptShared
                 )
               }
             }
@@ -1605,13 +1649,13 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
 
           actionButton(
             modifier = Modifier.weight(1f),
-            text = "WhatsApp",
+            text = stateValues.stringWhatsApp,
             iconPath = stateValues.drawablePathIconSwitch,
             onClick = {
               coroutineScope.launch {
                 receiptActionNotification(
-                  shareReceiptPdf(fileName, pdfBytes, whatsappOnly = true),
-                  "Receipt sent to WhatsApp"
+                  shareReceiptPdf(fileName, pdfBytes, whatsappOnly = true, labels = labels),
+                  stateValues.stringReceiptSentToWhatsApp
                 )
               }
             }
@@ -1626,13 +1670,13 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
         ) {
           actionButton(
             modifier = Modifier.weight(1f),
-            text = "Print",
+            text = stateValues.stringPrint,
             iconPath = stateValues.drawablePathIconDevices,
             onClick = {
               coroutineScope.launch {
                 receiptActionNotification(
-                  printReceiptEscPos(snapshotForScreen.buildReceiptEscPosBytes(stateValues.appLanguage)),
-                  "Receipt sent to printer"
+                  printReceiptEscPos(snapshotForScreen.buildReceiptEscPosBytes(stateValues.appLanguage, labels), labels),
+                  stateValues.stringReceiptSentToPrinter
                 )
               }
             }
@@ -1640,7 +1684,7 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
 
           actionButton(
             modifier = Modifier.weight(1f),
-            text = "Quit",
+            text = stateValues.stringQuit,
             enabledColor = stateValues.DisabledColor,
             iconPath = stateValues.drawablePathIconExit,
             onClick = {
@@ -4013,6 +4057,33 @@ fun AppConfiguration.StockWarehouseScreen() {
       iconPath = stateValues.drawablePathIconStock
     )
 
+    val openEdit: (GoodsItemDataModel) -> Unit = { item ->
+      coroutineScope.launch {
+        NavigationScreenModel.Stock.AddEditGoodsItem.setState(
+          NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_EDITED_GOODS_ITEM_ID to item.id
+        )
+        NavigationScreenModel.Stock.AddEditGoodsItem.setState(
+          "stock_add_edit_selected_tab" to "info"
+        )
+        Navigation.Stock.go(NavigationScreenModel.Stock.AddEditGoodsItem, forceSecond = true)
+      }
+    }
+
+    val openAddBatch: (GoodsItemDataModel) -> Unit = { item ->
+      coroutineScope.launch {
+        NavigationScreenModel.Stock.AddEditGoodsItem.setState(
+          NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_EDITED_GOODS_ITEM_ID to item.id
+        )
+        NavigationScreenModel.Stock.AddEditGoodsItem.setState(
+          "stock_add_edit_selected_tab" to "batches"
+        )
+        NavigationScreenModel.Stock.AddEditGoodsItem.setState(
+          "stock_add_edit_start_add_batch" to "true"
+        )
+        Navigation.Stock.go(NavigationScreenModel.Stock.AddEditGoodsItem, forceSecond = true)
+      }
+    }
+
     StockWarehouseScreenContent(
       modifier = Modifier
         .weight(1f),
@@ -4021,14 +4092,9 @@ fun AppConfiguration.StockWarehouseScreen() {
 
         }
       },
-      onEdit = {
-        coroutineScope.launch {
-          NavigationScreenModel.Stock.AddEditGoodsItem.setState(
-            NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_EDITED_GOODS_ITEM_ID to it.id
-          )
-          Navigation.Stock.go(NavigationScreenModel.Stock.AddEditGoodsItem, forceSecond = true)
-        }
-      }
+      onClick = openEdit,
+      onEdit = openEdit,
+      onAddBatch = openAddBatch
     )
   }
 }
@@ -4044,6 +4110,7 @@ fun AppConfiguration.StockWarehouseScreenContent(
   onClick: ((GoodsItemDataModel) -> Unit)? = null,
   onDelete: ((GoodsItemDataModel) -> Unit)? = null,
   onEdit: ((GoodsItemDataModel) -> Unit)? = null,
+  onAddBatch: ((GoodsItemDataModel) -> Unit)? = null,
   onExactSearchHit: ((GoodsItemDataModel) -> Unit)? = null
 ){
   when (val state = stateValues.stockState) {
@@ -4111,7 +4178,8 @@ fun AppConfiguration.StockWarehouseScreenContent(
                 batches = stateValues.stockBatches.orEmpty().filter { it.goodsItemId == item.id && it.isActive },
                 onDelete = onDelete,
                 onClick = onClick,
-                onEdit = onEdit
+                onEdit = onEdit,
+                onAddBatch = onAddBatch
               )
             }
           }
@@ -4303,6 +4371,7 @@ data class StockAddEditDraft(
   val salePrices: List<PriceDataModel> = emptyList(),
   val returnPrices: List<PriceDataModel> = emptyList(),
   val supplyPrices: List<PriceDataModel> = emptyList(),
+  val genericExpirationPeriod: ExpirationPeriodDataModel? = null,
   val isQuickItem: Boolean = false,
   val note: String = ""
 )
@@ -4318,6 +4387,7 @@ fun GoodsItemDataModel.toStockAddEditDraft(): StockAddEditDraft {
     salePrices = salePrices,
     returnPrices = returnPrices,
     supplyPrices = supplyPrices,
+    genericExpirationPeriod = genericExpirationPeriod,
     isQuickItem = isQuickItem,
     note = note.orEmpty()
   )
@@ -4341,6 +4411,7 @@ fun StockAddEditDraft.toGoodsItem(
     salePrices = salePrices,
     returnPrices = returnPrices,
     supplyPrices = supplyPrices,
+    genericExpirationPeriod = genericExpirationPeriod,
     isQuickItem = isQuickItem,
     imagePaths = current?.imagePaths.orEmpty(),
     activeShelfBatchId = current?.activeShelfBatchId,
@@ -4391,6 +4462,7 @@ fun List<GoodsBatchDataModel>.bestBatchForSale(
     .firstOrNull()
 }
 
+@kotlinx.serialization.Serializable
 private data class GoodsBatchDraft(
   val id: String = "",
   val goodsItemId: String,
@@ -4401,13 +4473,353 @@ private data class GoodsBatchDraft(
   val supplyPrice: PriceDataModel,
   val salePriceOverride: PriceDataModel? = null,
   val returnPriceOverride: PriceDataModel? = null,
-  val expirationDateMillisText: String = "",
-  val manufacturedAtMillisText: String = "",
-  val shelfPosition: String = "",
-  val shelfPriority: String = "0",
+  val expirationDateText: String = "",
+  val manufacturedDateText: String = "",
   val additionalNotes: String = "",
   val status: StockBatchStatusDataModel = StockBatchStatusDataModel.Delivered
 )
+
+private const val GOODS_BATCH_DRAFT_SEPARATOR = "\u001F"
+
+private fun String.cleanForGoodsBatchDraftState(): String {
+  return replace(GOODS_BATCH_DRAFT_SEPARATOR, " ")
+}
+
+private fun GoodsBatchDraft.toNavigationStateString(): String {
+  return listOf(
+    id,
+    goodsItemId,
+    storeId,
+    supplierId.orEmpty(),
+    quantityText,
+    quantityUnitId,
+    supplyPrice.price,
+    supplyPrice.currency,
+    supplyPrice.supplierId,
+    salePriceOverride?.price.orEmpty(),
+    salePriceOverride?.currency.orEmpty(),
+    salePriceOverride?.supplierId.orEmpty(),
+    returnPriceOverride?.price.orEmpty(),
+    returnPriceOverride?.currency.orEmpty(),
+    returnPriceOverride?.supplierId.orEmpty(),
+    expirationDateText,
+    manufacturedDateText,
+    additionalNotes,
+    status.name
+  ).joinToString(GOODS_BATCH_DRAFT_SEPARATOR) { it.cleanForGoodsBatchDraftState() }
+}
+
+private fun goodsBatchDraftFromNavigationStateString(raw: String): GoodsBatchDraft? {
+  val values = raw.split(GOODS_BATCH_DRAFT_SEPARATOR)
+  if (values.size < 19) return null
+
+  val salePrice = values[9].takeIf { it.isNotBlank() }?.let {
+    PriceDataModel(
+      price = it,
+      currency = values.getOrNull(10).orEmpty(),
+      supplierId = values.getOrNull(11).orEmpty()
+    )
+  }
+
+  val returnPrice = values[12].takeIf { it.isNotBlank() }?.let {
+    PriceDataModel(
+      price = it,
+      currency = values.getOrNull(13).orEmpty(),
+      supplierId = values.getOrNull(14).orEmpty()
+    )
+  }
+
+  return runCatching {
+    GoodsBatchDraft(
+      id = values[0],
+      goodsItemId = values[1],
+      storeId = values[2],
+      supplierId = values[3].takeIf { it.isNotBlank() },
+      quantityText = values[4].ifBlank { "1" },
+      quantityUnitId = values[5],
+      supplyPrice = PriceDataModel(
+        price = values[6].ifBlank { "0" },
+        currency = values[7].ifBlank { "KZT" },
+        supplierId = values[8]
+      ),
+      salePriceOverride = salePrice,
+      returnPriceOverride = returnPrice,
+      expirationDateText = values[15],
+      manufacturedDateText = values[16],
+      additionalNotes = values[17],
+      status = StockBatchStatusDataModel.valueOf(values[18].ifBlank { StockBatchStatusDataModel.Delivered.name })
+    )
+  }.getOrNull()
+}
+
+private fun Long?.toStockDateInputText(): String {
+  return this?.let { millis ->
+    runCatching {
+      val localDate = Instant
+        .fromEpochMilliseconds(millis)
+        .toLocalDateTime(TimeZone.currentSystemDefault())
+        .date
+
+      "${localDate.year.toString().padStart(4, '0')}-${localDate.monthNumber.toString().padStart(2, '0')}-${localDate.dayOfMonth.toString().padStart(2, '0')}"
+    }.getOrDefault("")
+  }.orEmpty()
+}
+
+private fun stockDateInputTextToMillis(value: String): Long? {
+  val clean = value.trim()
+  if (clean.isBlank()) return null
+
+  val match = Regex("""^(\d{4})-(\d{2})-(\d{2})$""").matchEntire(clean) ?: return null
+  val year = match.groupValues[1].toIntOrNull() ?: return null
+  val month = match.groupValues[2].toIntOrNull() ?: return null
+  val day = match.groupValues[3].toIntOrNull() ?: return null
+
+  return runCatching {
+    LocalDate(year, month, day)
+      .atStartOfDayIn(TimeZone.currentSystemDefault())
+      .toEpochMilliseconds()
+  }.getOrNull()
+}
+
+private fun String.filterStockDateInput(): String {
+  return filter { it.isDigit() || it == '-' }
+    .take(10)
+}
+
+private fun isStockLeapYear(year: Int): Boolean {
+  return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
+}
+
+private fun stockDaysInMonth(year: Int, month: Int): Int {
+  return when (month) {
+    1, 3, 5, 7, 8, 10, 12 -> 31
+    4, 6, 9, 11 -> 30
+    2 -> if (isStockLeapYear(year)) 29 else 28
+    else -> 31
+  }
+}
+
+private fun LocalDate.toStockDateInputText(): String {
+  return "${year.toString().padStart(4, '0')}-${monthNumber.toString().padStart(2, '0')}-${dayOfMonth.toString().padStart(2, '0')}"
+}
+
+private fun currentStockLocalDate(): LocalDate {
+  return Instant
+    .fromEpochMilliseconds(getCurrentTimeMillis())
+    .toLocalDateTime(TimeZone.currentSystemDefault())
+    .date
+}
+
+private fun stockDateInputTextToLocalDate(value: String): LocalDate? {
+  val clean = value.trim()
+  if (clean.isBlank()) return null
+
+  val match = Regex("""^(\d{4})-(\d{2})-(\d{2})$""").matchEntire(clean) ?: return null
+  val year = match.groupValues[1].toIntOrNull() ?: return null
+  val month = match.groupValues[2].toIntOrNull() ?: return null
+  val day = match.groupValues[3].toIntOrNull() ?: return null
+
+  if (year !in 1970..2500 || month !in 1..12 || day !in 1..stockDaysInMonth(year, month))
+    return null
+
+  return LocalDate(year, month, day)
+}
+
+private fun stockDateFromParts(yearText: String, monthText: String, dayText: String): String {
+  val year = yearText.toIntOrNull() ?: return ""
+  val month = monthText.toIntOrNull() ?: return ""
+  val day = dayText.toIntOrNull() ?: return ""
+
+  if (year !in 1970..2500 || month !in 1..12 || day !in 1..stockDaysInMonth(year, month))
+    return ""
+
+  return LocalDate(year, month, day).toStockDateInputText()
+}
+
+private fun sanitizeStockYear(value: String): String {
+  return value.filter { it.isDigit() }.take(4)
+}
+
+private fun sanitizeStockMonth(value: String): String {
+  val digits = value.filter { it.isDigit() }.take(2)
+  if (digits.isBlank()) return ""
+  val number = digits.toIntOrNull() ?: return ""
+  return number.coerceIn(1, 12).toString().padStart(if (digits.length >= 2) 2 else digits.length, '0')
+}
+
+private fun sanitizeStockDay(value: String, yearText: String, monthText: String): String {
+  val digits = value.filter { it.isDigit() }.take(2)
+  if (digits.isBlank()) return ""
+  val number = digits.toIntOrNull() ?: return ""
+  val year = yearText.toIntOrNull() ?: 2024
+  val month = monthText.toIntOrNull()?.coerceIn(1, 12) ?: 1
+  return number.coerceIn(1, stockDaysInMonth(year, month)).toString().padStart(if (digits.length >= 2) 2 else digits.length, '0')
+}
+
+private fun addStockExpirationPeriod(date: LocalDate, period: ExpirationPeriodDataModel): LocalDate {
+  val amount = period.amount.coerceAtLeast(0)
+
+  return when (period.unit) {
+    "days" -> Instant
+      .fromEpochMilliseconds(date.atStartOfDayIn(TimeZone.currentSystemDefault()).toEpochMilliseconds() + amount * 24L * 60L * 60L * 1000L)
+      .toLocalDateTime(TimeZone.currentSystemDefault())
+      .date
+
+    "weeks" -> Instant
+      .fromEpochMilliseconds(date.atStartOfDayIn(TimeZone.currentSystemDefault()).toEpochMilliseconds() + amount * 7L * 24L * 60L * 60L * 1000L)
+      .toLocalDateTime(TimeZone.currentSystemDefault())
+      .date
+
+    "months" -> {
+      val monthIndex = (date.year * 12 + (date.monthNumber - 1)) + amount
+      val year = monthIndex / 12
+      val month = monthIndex % 12 + 1
+      LocalDate(year, month, date.dayOfMonth.coerceAtMost(stockDaysInMonth(year, month)))
+    }
+
+    "years" -> {
+      val year = date.year + amount
+      LocalDate(year, date.monthNumber, date.dayOfMonth.coerceAtMost(stockDaysInMonth(year, date.monthNumber)))
+    }
+
+    else -> date
+  }
+}
+
+private fun AppConfiguration.stockExpirationPeriodUnitDomains(): List<SelectableDomain> {
+  return listOf(
+    SelectableDomain("days", "Days".toLocalizedSingleMain(), "Days".toLocalizedSingleMain(), null, null),
+    SelectableDomain("weeks", "Weeks".toLocalizedSingleMain(), "Weeks".toLocalizedSingleMain(), null, null),
+    SelectableDomain("months", "Months".toLocalizedSingleMain(), "Months".toLocalizedSingleMain(), null, null),
+    SelectableDomain("years", "Years".toLocalizedSingleMain(), "Years".toLocalizedSingleMain(), null, null)
+  )
+}
+
+@Composable
+private fun AppConfiguration.StockDatePartsEditor(
+  title: String,
+  dateText: String,
+  onDateChanged: (String) -> Unit
+) {
+  val parsed = stockDateInputTextToLocalDate(dateText)
+
+  var yearText by rememberSaveable(dateText) { mutableStateOf(parsed?.year?.toString().orEmpty()) }
+  var monthText by rememberSaveable(dateText) { mutableStateOf(parsed?.monthNumber?.toString()?.padStart(2, '0').orEmpty()) }
+  var dayText by rememberSaveable(dateText) { mutableStateOf(parsed?.dayOfMonth?.toString()?.padStart(2, '0').orEmpty()) }
+
+  LaunchedEffect(yearText, monthText, dayText) {
+    onDateChanged(stockDateFromParts(yearText, monthText, dayText))
+  }
+
+  Column(modifier = Modifier.fillMaxWidth()) {
+    Text(
+      text = title,
+      color = stateValues.TextColor,
+      fontSize = stateValues.textSize,
+      fontWeight = FontWeight.Bold
+    )
+
+    Spacer(modifier = Modifier.height(4.dp))
+
+    Row(
+      modifier = Modifier.fillMaxWidth(),
+      horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
+      verticalAlignment = Alignment.CenterVertically
+    ) {
+      SimpleTextInput(
+        modifier = Modifier.weight(1f),
+        value = dayText,
+        placeholder = "DD",
+        keyboardType = KeyboardType.Number,
+        leadingIconPath = null,
+        onTransformValue = { sanitizeStockDay(it, yearText, monthText) },
+        onValueChange = { dayText = it }
+      )
+
+      SimpleTextInput(
+        modifier = Modifier.weight(1f),
+        value = monthText,
+        placeholder = "MM",
+        keyboardType = KeyboardType.Number,
+        leadingIconPath = null,
+        onTransformValue = { sanitizeStockMonth(it) },
+        onValueChange = {
+          monthText = it
+          dayText = sanitizeStockDay(dayText, yearText, it)
+        }
+      )
+
+      SimpleTextInput(
+        modifier = Modifier.weight(1.3f),
+        value = yearText,
+        placeholder = "YYYY",
+        keyboardType = KeyboardType.Number,
+        leadingIconPath = null,
+        onTransformValue = { sanitizeStockYear(it) },
+        onValueChange = {
+          yearText = it
+          dayText = sanitizeStockDay(dayText, it, monthText)
+        }
+      )
+    }
+  }
+}
+
+@Composable
+private fun AppConfiguration.StockExpirationPeriodEditor(
+  period: ExpirationPeriodDataModel?,
+  onChanged: (ExpirationPeriodDataModel?) -> Unit
+) {
+  val amount = period?.amount?.takeIf { it > 0 }?.toString().orEmpty()
+  val unit = period?.unit ?: "days"
+
+  Column(modifier = Modifier.fillMaxWidth()) {
+    Text(
+      text = "Generic expiration period",
+      color = stateValues.TextColor,
+      fontSize = stateValues.textSize,
+      fontWeight = FontWeight.Bold
+    )
+
+    Spacer(modifier = Modifier.height(4.dp))
+
+    Row(
+      modifier = Modifier.fillMaxWidth(),
+      horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
+      verticalAlignment = Alignment.Top
+    ) {
+      SimpleTextInput(
+        modifier = Modifier.weight(1f),
+        value = amount,
+        placeholder = "0",
+        keyboardType = KeyboardType.Number,
+        leadingIconPath = stateValues.drawablePathIconStock,
+        onTransformValue = { it.filter { char -> char.isDigit() }.take(4) },
+        onValueChange = { raw ->
+          val number = raw.toIntOrNull() ?: 0
+          onChanged(number.takeIf { it > 0 }?.let { ExpirationPeriodDataModel(it, unit) })
+        }
+      )
+
+      SimpleDropdownField(
+        modifier = Modifier.weight(1.2f),
+        title = "",
+        selectedId = unit,
+        options = stockExpirationPeriodUnitDomains().map {
+          DropdownOption(
+            id = it.id,
+            title = it.displayId.visibleLocalizedString(stateValues.appLanguage, it.id)
+          )
+        },
+        placeholder = "Unit",
+        onSelected = { selectedUnit ->
+          val number = amount.toIntOrNull() ?: 0
+          onChanged(number.takeIf { it > 0 }?.let { ExpirationPeriodDataModel(it, selectedUnit) })
+        }
+      )
+    }
+  }
+}
 
 private fun GoodsBatchDataModel.toDraft(
   fallbackUnitId: String
@@ -4422,12 +4834,77 @@ private fun GoodsBatchDataModel.toDraft(
     supplyPrice = supplyPrice,
     salePriceOverride = salePriceOverride,
     returnPriceOverride = returnPriceOverride,
-    expirationDateMillisText = expirationDateMillis?.toString().orEmpty(),
-    manufacturedAtMillisText = manufacturedAtMillis?.toString().orEmpty(),
-    shelfPosition = shelfPosition.orEmpty(),
-    shelfPriority = shelfPriority.toString(),
+    expirationDateText = expirationDateMillis.toStockDateInputText(),
+    manufacturedDateText = manufacturedAtMillis.toStockDateInputText(),
     additionalNotes = additionalNotes.orEmpty(),
     status = status
+  )
+}
+
+private fun List<GoodsBatchDataModel>.sortedForShelf(goodsItem: GoodsItemDataModel): List<GoodsBatchDataModel> {
+  return filter {
+    it.goodsItemId == goodsItem.id &&
+        it.isActive &&
+        it.status != StockBatchStatusDataModel.Deleted
+  }.sortedWith(
+    compareBy<GoodsBatchDataModel> {
+      if (it.id == goodsItem.activeShelfBatchId) 0 else 1
+    }.thenBy {
+      it.shelfPriority
+    }.thenBy {
+      it.expirationDateMillis ?: Long.MAX_VALUE
+    }
+  )
+}
+
+private fun AppConfiguration.reorderShelfBatches(
+  goodsItem: GoodsItemDataModel,
+  batches: List<GoodsBatchDataModel>,
+  fromIndex: Int,
+  toIndex: Int
+) {
+  val storeId = stateValues.activeStoreId ?: return
+  val current = batches.sortedForShelf(goodsItem).toMutableList()
+
+  if (fromIndex !in current.indices || toIndex !in current.indices || fromIndex == toIndex)
+    return
+
+  val moved = current.removeAt(fromIndex)
+  current.add(toIndex, moved)
+
+  val updated = current.mapIndexed { index, batch ->
+    batch.copy(
+      shelfPriority = index,
+      shelfPosition = (index + 1).toString()
+    )
+  }
+
+  updateGoodsBatches(updated) {
+    if (it is DataState.Success) {
+      updated.firstOrNull()?.let { firstBatch ->
+        if (firstBatch.id != goodsItem.activeShelfBatchId) {
+          setActiveShelfBatch(firstBatch, storeId)
+        }
+      }
+    }
+  }
+}
+
+private fun AppConfiguration.moveShelfBatch(
+  goodsItem: GoodsItemDataModel,
+  batches: List<GoodsBatchDataModel>,
+  batch: GoodsBatchDataModel,
+  direction: Int
+) {
+  val sorted = batches.sortedForShelf(goodsItem)
+  val from = sorted.indexOfFirst { it.id == batch.id }
+  val to = (from + direction).coerceIn(0, sorted.lastIndex)
+
+  reorderShelfBatches(
+    goodsItem = goodsItem,
+    batches = sorted,
+    fromIndex = from,
+    toIndex = to
   )
 }
 
@@ -4435,9 +4912,12 @@ private fun GoodsBatchDataModel.toDraft(
 fun AppConfiguration.StockBatchCard(
   batch: GoodsBatchDataModel,
   activeShelfBatchId: String?,
+  shelfIndex: Int? = null,
+  compact: Boolean = false,
   onEdit: () -> Unit,
   onDelete: () -> Unit,
-  onSetActiveShelf: () -> Unit
+  onSetActiveShelf: () -> Unit,
+  onMove: ((Int) -> Unit)? = null
 ) {
   val supplierName = stateValues.suppliers
     .orEmpty()
@@ -4447,17 +4927,46 @@ fun AppConfiguration.StockBatchCard(
     ?: "No supplier"
 
   val isActiveShelf = batch.id == activeShelfBatchId
+  var dragDelta by remember { mutableStateOf(0f) }
 
   Column(
     modifier = Modifier
-      .fillMaxWidth()
+      .run {
+        if (compact) widthIn(min = 176.dp, max = 240.dp) else fillMaxWidth()
+      }
       .clip(RoundedCornerShape(stateValues.cornerRadius))
       .border(
-        stateValues.unfocusedBorderWidth,
+        if (isActiveShelf) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
         if (isActiveShelf) stateValues.AccentColor else stateValues.PlaceholderTextColor,
         RoundedCornerShape(stateValues.cornerRadius)
       )
       .background(stateValues.BackgroundColor)
+      .pointerInput(batch.id, onMove, compact) {
+        val moveAction = onMove ?: return@pointerInput
+
+        detectDragGesturesAfterLongPress(
+          onDragStart = { dragDelta = 0f },
+          onDrag = { change, dragAmount ->
+            change.consume()
+            dragDelta += if (compact) dragAmount.x else dragAmount.y
+
+            val threshold = 44f
+            when {
+              dragDelta > threshold -> {
+                moveAction(1)
+                dragDelta = 0f
+              }
+
+              dragDelta < -threshold -> {
+                moveAction(-1)
+                dragDelta = 0f
+              }
+            }
+          },
+          onDragEnd = { dragDelta = 0f },
+          onDragCancel = { dragDelta = 0f }
+        )
+      }
       .padding(stateValues.marginTextFieldGroup)
   ) {
     Row(
@@ -4465,54 +4974,59 @@ fun AppConfiguration.StockBatchCard(
       horizontalArrangement = Arrangement.SpaceBetween,
       verticalAlignment = Alignment.CenterVertically
     ) {
-      Column(
-        modifier = Modifier.weight(1f)
-      ) {
+      Column(modifier = Modifier.weight(1f)) {
         Text(
-          text = if (isActiveShelf) "Active shelf batch" else "Batch",
+          text = listOfNotNull(
+            shelfIndex?.let { "#${it + 1}" },
+            if (isActiveShelf) "Active shelf" else "Batch"
+          ).joinToString(" • "),
           color = if (isActiveShelf) stateValues.AccentColor else stateValues.TextColor,
           fontSize = stateValues.textSize,
-          fontWeight = FontWeight.Bold
+          fontWeight = FontWeight.Bold,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis
         )
 
         Text(
           text = supplierName,
           color = stateValues.PlaceholderTextColor,
-          fontSize = stateValues.smallTextSize
+          fontSize = stateValues.smallTextSize,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis
         )
       }
 
       Text(
-        text = "${batch.quantity.total} ${
-          batch.quantity.immutableUnitName.extractLocalizedString(stateValues.appLanguage).orEmpty()
-        }",
+        text = "${batch.quantity.total} ${batch.quantity.immutableUnitName.extractLocalizedString(stateValues.appLanguage).orEmpty()}",
         color = stateValues.TextColor,
         fontSize = stateValues.accentTextSize,
-        fontWeight = FontWeight.Bold
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
       )
     }
 
     Spacer(modifier = Modifier.height(8.dp))
 
-    Text(
-      text = "Supply price: ${batch.supplyPrice.price} ${batch.supplyPrice.currency}",
-      color = stateValues.TextColor,
-      fontSize = stateValues.textSize
+    StockCardInfoLine(
+      title = stateValues.stringSupplyPrice,
+      value = "${batch.supplyPrice.price} ${batch.supplyPrice.currency}",
+      textColor = stateValues.TextColor
     )
 
-    batch.expirationDateMillis?.let {
-      Text(
-        text = "Expires: $it",
-        color = stateValues.PlaceholderTextColor,
-        fontSize = stateValues.smallTextSize
+    batch.expirationDateMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let {
+      StockCardInfoLine(
+        title = "Expiration",
+        value = it,
+        textColor = stateValues.PlaceholderTextColor
       )
     }
 
     batch.additionalNotes?.takeIf { it.isNotBlank() }?.let {
-      Text(
-        text = it,
-        color = stateValues.PlaceholderTextColor,
-        fontSize = stateValues.smallTextSize
+      StockCardInfoLine(
+        title = "Notes",
+        value = it,
+        textColor = stateValues.PlaceholderTextColor
       )
     }
 
@@ -4520,36 +5034,46 @@ fun AppConfiguration.StockBatchCard(
 
     Row(
       modifier = Modifier.fillMaxWidth(),
-      horizontalArrangement = Arrangement.spacedBy(8.dp)
+      horizontalArrangement = Arrangement.spacedBy(6.dp),
+      verticalAlignment = Alignment.CenterVertically
     ) {
       actionButton(
         modifier = Modifier.weight(1f),
-        text = "Edit",
+        text = "",
+        iconPath = stateValues.drawablePathIconEdit,
+        iconContentDescription = stateValues.drawablePathIconEdit,
         onClick = onEdit
       )
 
       actionButton(
         modifier = Modifier.weight(1f),
-        text = "Shelf",
+        text = "",
+        iconPath = stateValues.drawablePathIconStock,
+        iconContentDescription = "Shelf",
         enabled = !isActiveShelf,
         onClick = onSetActiveShelf
       )
 
       actionButton(
         modifier = Modifier.weight(1f),
-        text = "Delete",
+        text = "",
         enabledColor = stateValues.ErrorColor,
+        iconPath = stateValues.drawablePathIconDelete,
+        iconContentDescription = stateValues.drawablePathIconDelete,
         onClick = onDelete
       )
     }
   }
 }
 
+
+
 @Composable
 fun AppConfiguration.StockBatchEditor(
   modifier: Modifier = Modifier,
   goodsItem: GoodsItemDataModel,
   existingBatch: GoodsBatchDataModel?,
+  draftStateKey: String? = null,
   onCancel: () -> Unit,
   onSaved: () -> Unit
 ) {
@@ -4562,21 +5086,44 @@ fun AppConfiguration.StockBatchEditor(
       ?: goodsItem.salePrices.firstOrNull()?.currency
       ?: "KZT"
 
-  var draft by remember(existingBatch?.id, goodsItem.id) {
+  val addEditState by NavigationScreenModel.Stock.AddEditGoodsItem.state.collectAsState()
+  val restoredDraft = draftStateKey
+    ?.let { addEditState[it] }
+    ?.let { raw ->
+      goodsBatchDraftFromNavigationStateString(raw)
+    }
+    ?.takeIf {
+      it.goodsItemId == goodsItem.id &&
+          (existingBatch == null || it.id == existingBatch.id)
+    }
+
+  var draft by remember(draftStateKey, existingBatch?.id, goodsItem.id) {
     mutableStateOf(
-      existingBatch?.toDraft(defaultUnit.id)
+      restoredDraft
+        ?: existingBatch?.toDraft(defaultUnit.id)
         ?: GoodsBatchDraft(
           goodsItemId = goodsItem.id,
           storeId = goodsItem.storeId,
           supplierId = null,
           quantityUnitId = defaultUnit.id,
-          supplyPrice = PriceDataModel(
-            price = "0",
-            currency = defaultCurrency,
-            supplierId = ""
-          )
+          supplyPrice = goodsItem.supplyPrices.firstOrNull()
+            ?: PriceDataModel(
+              price = "0",
+              currency = defaultCurrency,
+              supplierId = ""
+            ),
+          salePriceOverride = goodsItem.salePrices.firstOrNull(),
+          returnPriceOverride = goodsItem.returnPrices.firstOrNull()
         )
     )
+  }
+
+  LaunchedEffect(draft, draftStateKey) {
+    draftStateKey?.let {
+      NavigationScreenModel.Stock.AddEditGoodsItem.setState(
+        it to draft.toNavigationStateString()
+      )
+    }
   }
 
   val supplierGoodsPricesPayload by supplierGoodsPricesState.payload.collectAsState()
@@ -4613,6 +5160,17 @@ fun AppConfiguration.StockBatchEditor(
   }
 
   val suppliers = stateValues.suppliers.orEmpty()
+  val selectedSupplierRememberedSupplyPrice = draft.supplierId?.let { selectedSupplierId ->
+    supplierGoodsPrices.find {
+      it.supplierId == selectedSupplierId &&
+          it.goodsItemId == draft.goodsItemId &&
+          it.isActive
+    }?.supplyPrice
+  }
+
+  val predictedExpirationDate = goodsItem.genericExpirationPeriod
+    ?.takeIf { it.isUsable }
+    ?.let { addStockExpirationPeriod(currentStockLocalDate(), it).toStockDateInputText() }
 
   Column(
     modifier = modifier.fillMaxSize()
@@ -4656,6 +5214,8 @@ fun AppConfiguration.StockBatchEditor(
           modifier = Modifier.fillMaxWidth(),
           value = draft.quantityText,
           placeholder = "Quantity",
+          keyboardType = KeyboardType.Decimal,
+          leadingIconPath = stateValues.drawablePathIconStock,
           onValueChange = {
             if (it.isEmpty() || it.isNumericalDoubleString()) {
               draft = draft.copy(quantityText = it)
@@ -4683,54 +5243,66 @@ fun AppConfiguration.StockBatchEditor(
 
         Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
-        SimpleTextInput(
-          modifier = Modifier.fillMaxWidth(),
-          value = draft.supplyPrice.price,
-          placeholder = stateValues.stringSupplyPrice,
-          onValueChange = {
-            if (it.isEmpty() || it.isNumericalDoubleString()) {
-              draft = draft.copy(
-                supplyPrice = draft.supplyPrice.copy(price = it)
-              )
-            }
-          }
+        Text(
+          text = "Batch prices",
+          color = stateValues.TextColor,
+          fontSize = stateValues.titleTextSize,
+          fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+        StockSinglePriceEditor(
+          title = stateValues.stringSalePrice,
+          price = draft.salePriceOverride ?: goodsItem.salePrices.firstOrNull() ?: PriceDataModel("", defaultCurrency, ""),
+          quickFillPrices = goodsItem.salePrices,
+          onChanged = { draft = draft.copy(salePriceOverride = it) }
+        )
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+        StockSinglePriceEditor(
+          title = stateValues.stringReturnPrice,
+          price = draft.returnPriceOverride ?: goodsItem.returnPrices.firstOrNull() ?: PriceDataModel("", defaultCurrency, ""),
+          quickFillPrices = goodsItem.returnPrices,
+          onChanged = { draft = draft.copy(returnPriceOverride = it) }
+        )
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+        StockSinglePriceEditor(
+          title = stateValues.stringSupplyPrice,
+          price = draft.supplyPrice,
+          quickFillPrices = listOfNotNull(selectedSupplierRememberedSupplyPrice, goodsItem.supplyPrices.firstOrNull()) + goodsItem.supplyPrices,
+          onChanged = { draft = draft.copy(supplyPrice = it.copy(supplierId = draft.supplierId.orEmpty())) }
         )
 
         Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
-        SimpleTextInput(
-          modifier = Modifier.fillMaxWidth(),
-          value = draft.expirationDateMillisText,
-          placeholder = "Expiration date millis optional",
-          onValueChange = {
-            if (it.all { char -> char.isDigit() }) {
-              draft = draft.copy(expirationDateMillisText = it)
-            }
-          }
+        StockDatePartsEditor(
+          title = "Expiration date",
+          dateText = draft.expirationDateText,
+          onDateChanged = { draft = draft.copy(expirationDateText = it) }
         )
+
+        predictedExpirationDate?.let { predicted ->
+          Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+          actionButton(
+            text = "Use predicted expiration: $predicted",
+            iconPath = stateValues.drawablePathIconStock,
+            fillMaxWidthIfTextPresent = false
+          ) {
+            draft = draft.copy(expirationDateText = predicted)
+          }
+        }
 
         Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
-        SimpleTextInput(
-          modifier = Modifier.fillMaxWidth(),
-          value = draft.shelfPosition,
-          placeholder = "Shelf position optional",
-          onValueChange = {
-            draft = draft.copy(shelfPosition = it)
-          }
-        )
-
-        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-
-        SimpleTextInput(
-          modifier = Modifier.fillMaxWidth(),
-          value = draft.shelfPriority,
-          placeholder = "Shelf priority",
-          onValueChange = {
-            if (it.all { char -> char.isDigit() }) {
-              draft = draft.copy(shelfPriority = it)
-            }
-          }
+        StockDatePartsEditor(
+          title = "Manufactured date",
+          dateText = draft.manufacturedDateText,
+          onDateChanged = { draft = draft.copy(manufacturedDateText = it) }
         )
 
         Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
@@ -4765,51 +5337,48 @@ fun AppConfiguration.StockBatchEditor(
       actionButton(
         modifier = Modifier.weight(1f),
         text = stateValues.stringConfirm,
-        enabled = draft.quantityText.toDoubleOrNull()?.let { it > 0.0 } == true,
+        enabled = draft.quantityText.toDoubleOrNull()?.let { it > 0.0 } == true &&
+            draft.supplyPrice.price.toDoubleOrNull()?.let { it >= 0.0 } == true,
         onClick = {
-          val unit = stateValues.globalAppConfiguration.goodsItemsQuantityUnits
+          val now = getCurrentTimeMillis()
+          val quantityUnit = stateValues.globalAppConfiguration.goodsItemsQuantityUnits
             .find { it.id == draft.quantityUnitId }
             ?: defaultUnit
 
           val batch = GoodsBatchDataModel(
             id = draft.id,
-            goodsItemId = draft.goodsItemId,
-            storeId = draft.storeId,
-            supplierId = draft.supplierId,
-
-            quantity = unit.copy(
+            goodsItemId = goodsItem.id,
+            userId = existingBatch?.userId.orEmpty(),
+            storeId = goodsItem.storeId,
+            supplierId = draft.supplierId?.takeIf { it.isNotBlank() },
+            supplierOrderId = existingBatch?.supplierOrderId,
+            quantity = quantityUnit.copy(
               total = draft.quantityText.toDoubleOrNull() ?: 0.0
             ),
-
-            supplyPrice = draft.supplyPrice,
-            salePriceOverride = draft.salePriceOverride,
-            returnPriceOverride = draft.returnPriceOverride,
-
-            expirationDateMillis = draft.expirationDateMillisText.toLongOrNull(),
-            manufacturedAtMillis = draft.manufacturedAtMillisText.toLongOrNull(),
-
-            discounts = emptyList(),
-
-            shelfPosition = draft.shelfPosition.takeIf { it.isNotBlank() },
-            shelfPriority = draft.shelfPriority.toIntOrNull() ?: 0,
-
+            supplyPrice = draft.supplyPrice.copy(supplierId = draft.supplierId.orEmpty()),
+            salePriceOverride = draft.salePriceOverride?.takeIf { it.price.isNotBlank() },
+            returnPriceOverride = draft.returnPriceOverride?.takeIf { it.price.isNotBlank() },
+            deliveredAtMillis = existingBatch?.deliveredAtMillis ?: now,
+            manufacturedAtMillis = stockDateInputTextToMillis(draft.manufacturedDateText),
+            expirationDateMillis = stockDateInputTextToMillis(draft.expirationDateText),
+            discounts = existingBatch?.discounts.orEmpty(),
+            shelfPosition = existingBatch?.shelfPosition,
+            shelfPriority = existingBatch?.shelfPriority ?: stateValues.stockBatches.orEmpty().count { it.goodsItemId == goodsItem.id },
             status = draft.status,
             additionalNotes = draft.additionalNotes.takeIf { it.isNotBlank() },
-
+            createdAtMillis = existingBatch?.createdAtMillis ?: now,
+            updatedAtMillis = now,
+            createdByUserId = existingBatch?.createdByUserId.orEmpty(),
             isActive = true
           )
 
           if (existingBatch == null) {
             addGoodsBatches(listOf(batch)) {
-              if (it is DataState.Success) {
-                onSaved()
-              }
+              if (it is DataState.Success) onSaved()
             }
           } else {
             updateGoodsBatches(listOf(batch)) {
-              if (it is DataState.Success) {
-                onSaved()
-              }
+              if (it is DataState.Success) onSaved()
             }
           }
         }
@@ -4817,6 +5386,8 @@ fun AppConfiguration.StockBatchEditor(
     }
   }
 }
+
+
 
 @Composable
 fun AppConfiguration.StockAddEditIdentityPage(
@@ -4884,6 +5455,13 @@ fun AppConfiguration.StockAddEditIdentityPage(
           onDraftChanged(draft.copy(categoryIds = listOf(it)))
         }
       )
+
+      Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+      StockExpirationPeriodEditor(
+        period = draft.genericExpirationPeriod,
+        onChanged = { onDraftChanged(draft.copy(genericExpirationPeriod = it)) }
+      )
     }
   }
 }
@@ -4891,7 +5469,9 @@ fun AppConfiguration.StockAddEditIdentityPage(
 @Composable
 fun AppConfiguration.StockAddEditBatchesPage(
   modifier: Modifier = Modifier,
-  goodsItem: GoodsItemDataModel?
+  goodsItem: GoodsItemDataModel?,
+  startAddingBatch: Boolean = false,
+  onStartAddingBatchConsumed: () -> Unit = {}
 ) {
   if (goodsItem == null || goodsItem.id.isBlank()) {
     Box(
@@ -4906,39 +5486,53 @@ fun AppConfiguration.StockAddEditBatchesPage(
     return
   }
 
-  var editingBatch by remember {
-    mutableStateOf<GoodsBatchDataModel?>(null)
-  }
-
-  var addingBatch by remember {
-    mutableStateOf(false)
-  }
+  val addEditState by NavigationScreenModel.Stock.AddEditGoodsItem.state.collectAsState()
+  val modeKey = "stock_batches_mode_${goodsItem.id}"
+  val editIdKey = "stock_batches_edit_id_${goodsItem.id}"
+  val currentMode = addEditState[modeKey] ?: "list"
+  val currentEditId = addEditState[editIdKey]
 
   val batches = stateValues.stockBatches
     .orEmpty()
     .filter {
       it.goodsItemId == goodsItem.id && it.isActive
     }
-    .sortedWith(
-      compareBy<GoodsBatchDataModel> {
-        it.expirationDateMillis ?: Long.MAX_VALUE
-      }.thenByDescending {
-        it.shelfPriority
-      }
-    )
+    .sortedForShelf(goodsItem)
 
-  if (addingBatch || editingBatch != null) {
+  val editingBatch = batches.find { it.id == currentEditId }
+  val addingBatch = currentMode == "add"
+  val editing = currentMode == "edit" && editingBatch != null
+  val draftStateKey = "stock_batches_draft_${goodsItem.id}_${editingBatch?.id ?: "add"}"
+
+  fun closeBatchEditor(clearDraft: Boolean) {
+    coroutineScope.launch {
+      NavigationScreenModel.Stock.AddEditGoodsItem.setState(modeKey to "list")
+      NavigationScreenModel.Stock.AddEditGoodsItem.removeState(editIdKey)
+      if (clearDraft) {
+        NavigationScreenModel.Stock.AddEditGoodsItem.removeState(draftStateKey)
+      }
+    }
+  }
+
+  LaunchedEffect(startAddingBatch) {
+    if (startAddingBatch) {
+      NavigationScreenModel.Stock.AddEditGoodsItem.setState(modeKey to "add")
+      NavigationScreenModel.Stock.AddEditGoodsItem.removeState(editIdKey)
+      onStartAddingBatchConsumed()
+    }
+  }
+
+  if (addingBatch || editing) {
     StockBatchEditor(
       modifier = modifier,
       goodsItem = goodsItem,
       existingBatch = editingBatch,
+      draftStateKey = draftStateKey,
       onCancel = {
-        addingBatch = false
-        editingBatch = null
+        closeBatchEditor(clearDraft = false)
       },
       onSaved = {
-        addingBatch = false
-        editingBatch = null
+        closeBatchEditor(clearDraft = true)
       }
     )
 
@@ -4955,10 +5549,18 @@ fun AppConfiguration.StockAddEditBatchesPage(
     ) {
       item {
         Text(
-          text = "Batches",
+          text = "Shelf order",
           color = stateValues.TextColor,
           fontSize = stateValues.titleTextSize,
           fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+        Text(
+          text = "The first batch is the active shelf batch. Long-press and drag a batch up or down to change shelf order.",
+          color = stateValues.PlaceholderTextColor,
+          fontSize = stateValues.smallTextSize
         )
 
         Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
@@ -4974,12 +5576,17 @@ fun AppConfiguration.StockAddEditBatchesPage(
           )
         }
       } else {
-        items(batches) { batch ->
+        itemsIndexed(batches, key = { _, batch -> batch.id }) { index, batch ->
           StockBatchCard(
             batch = batch,
             activeShelfBatchId = goodsItem.activeShelfBatchId,
+            shelfIndex = index,
+            compact = false,
             onEdit = {
-              editingBatch = batch
+              coroutineScope.launch {
+                NavigationScreenModel.Stock.AddEditGoodsItem.setState(modeKey to "edit")
+                NavigationScreenModel.Stock.AddEditGoodsItem.setState(editIdKey to batch.id)
+              }
             },
             onDelete = {
               stateValues.activeStoreId?.let { storeId ->
@@ -4994,6 +5601,14 @@ fun AppConfiguration.StockAddEditBatchesPage(
               stateValues.activeStoreId?.let { storeId ->
                 setActiveShelfBatch(batch, storeId)
               }
+            },
+            onMove = { direction ->
+              moveShelfBatch(
+                goodsItem = goodsItem,
+                batches = batches,
+                batch = batch,
+                direction = direction
+              )
             }
           )
 
@@ -5009,8 +5624,12 @@ fun AppConfiguration.StockAddEditBatchesPage(
     actionButton(
       modifier = Modifier.padding(8.dp),
       text = "Add batch",
+      iconPath = stateValues.drawablePathIconAdd,
       onClick = {
-        addingBatch = true
+        coroutineScope.launch {
+          NavigationScreenModel.Stock.AddEditGoodsItem.setState(modeKey to "add")
+          NavigationScreenModel.Stock.AddEditGoodsItem.removeState(editIdKey)
+        }
       }
     )
   }
@@ -5253,8 +5872,13 @@ fun AppConfiguration.StockAddEditPricesPage(
 fun AppConfiguration.StockSinglePriceEditor(
   title: String,
   price: PriceDataModel,
+  quickFillPrices: List<PriceDataModel> = emptyList(),
   onChanged: (PriceDataModel) -> Unit
 ) {
+  val quickFills = quickFillPrices
+    .filter { it.price.isNotBlank() && it.currency.isNotBlank() }
+    .distinctBy { it.price to it.currency }
+
   Column {
     Text(
       text = title,
@@ -5269,6 +5893,7 @@ fun AppConfiguration.StockSinglePriceEditor(
       modifier = Modifier.fillMaxWidth(),
       value = price.price,
       placeholder = "0",
+      keyboardType = KeyboardType.Decimal,
       onValueChange = {
         if (it.isEmpty() || it.isNumericalDoubleString()) {
           onChanged(
@@ -5300,8 +5925,52 @@ fun AppConfiguration.StockSinglePriceEditor(
         )
       }
     )
+
+    if (quickFills.isNotEmpty()) {
+      Spacer(modifier = Modifier.height(8.dp))
+
+      LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier.fillMaxWidth()
+      ) {
+        items(quickFills) { quickPrice ->
+          Box(
+            modifier = Modifier
+              .clip(RoundedCornerShape(stateValues.cornerRadius))
+              .border(
+                stateValues.unfocusedBorderWidth,
+                stateValues.AccentColor,
+                RoundedCornerShape(stateValues.cornerRadius)
+              )
+              .background(stateValues.BackgroundColor)
+              .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple(color = stateValues.AccentColor)
+              ) {
+                onChanged(
+                  quickPrice.copy(
+                    supplierId = price.supplierId
+                  )
+                )
+              }
+              .padding(horizontal = 12.dp, vertical = 8.dp),
+            contentAlignment = Alignment.Center
+          ) {
+            Text(
+              text = "${quickPrice.price} ${quickPrice.currency}",
+              color = stateValues.AccentColor,
+              fontSize = stateValues.smallTextSize,
+              fontWeight = FontWeight.Normal,
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis
+            )
+          }
+        }
+      }
+    }
   }
 }
+
 
 private fun AppConfiguration.stockLanguageDomains(): List<SelectableDomain> {
   return stateValues.globalAppConfiguration.languages.map { language ->
@@ -6093,7 +6762,13 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
   }
 
   var selectedTabId by rememberSaveable(existing?.id ?: "new_stock_item") {
-    mutableStateOf("info")
+    mutableStateOf(addEditState["stock_add_edit_selected_tab"] ?: "info")
+  }
+
+  LaunchedEffect(addEditState["stock_add_edit_selected_tab"]) {
+    addEditState["stock_add_edit_selected_tab"]?.let {
+      selectedTabId = it
+    }
   }
 
   var returnPriceManuallyEdited by rememberSaveable(existing?.id ?: "new_stock_item") {
@@ -6164,6 +6839,9 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
       tabs = tabs,
       onSelected = {
         selectedTabId = it
+        coroutineScope.launch {
+          NavigationScreenModel.Stock.AddEditGoodsItem.setState("stock_add_edit_selected_tab" to it)
+        }
       }
     )
 
@@ -6186,7 +6864,13 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
       "batches" -> {
         StockAddEditBatchesPage(
           modifier = Modifier.weight(1f),
-          goodsItem = existing
+          goodsItem = existing,
+          startAddingBatch = addEditState["stock_add_edit_start_add_batch"] == "true",
+          onStartAddingBatchConsumed = {
+            coroutineScope.launch {
+              NavigationScreenModel.Stock.AddEditGoodsItem.removeState("stock_add_edit_start_add_batch")
+            }
+          }
         )
       }
 
@@ -6709,44 +7393,43 @@ fun AppConfiguration.SimpleTextInput(
   value: String,
   placeholder: String,
   singleLine: Boolean = true,
+  keyboardType: KeyboardType = KeyboardType.Text,
+  leadingIconPath: String? = null,
+  onTransformValue: ((String) -> String)? = null,
   onValueChange: (String) -> Unit
 ) {
-  BasicTextField(
-    value = value,
-    onValueChange = onValueChange,
-    singleLine = singleLine,
-    textStyle = TextStyle(
-      color = stateValues.TextColor,
-      fontSize = stateValues.textSize
-    ),
-    modifier = modifier
-      .height(if (singleLine) stateValues.textFieldHeight else stateValues.wideTextFieldHeight)
-      .clip(RoundedCornerShape(stateValues.cornerRadius))
-      .border(
-        stateValues.unfocusedBorderWidth,
-        stateValues.PlaceholderTextColor,
-        RoundedCornerShape(stateValues.cornerRadius)
-      )
-      .background(stateValues.BackgroundColor)
-      .padding(horizontal = stateValues.marginTextFieldGroup),
-    decorationBox = { inner ->
-      Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.CenterStart
-      ) {
-        if (value.isBlank()) {
-          Text(
-            text = placeholder,
-            color = stateValues.PlaceholderTextColor,
-            fontSize = stateValues.textSize
-          )
-        }
-
-        inner()
+  genericTextField(
+    modifier = modifier,
+    valueInitial = value,
+    placeholderText = placeholder,
+    leadingIcon = leadingIconPath?.let { path ->
+      {
+        CpImage(
+          modifier = Modifier
+            .padding(start = 12.dp, top = 7.dp, bottom = 7.dp)
+            .size(18.dp),
+          url = path,
+          fallbackRes = Res.drawable._9_0,
+          contentDescription = placeholder,
+          tintColor = stateValues.AccentColor
+        )
       }
+    },
+    keyboardType = keyboardType,
+    imeWithAction = ImeWithAction(if (singleLine) ImeAction.Next else ImeAction.Default),
+    wide = !singleLine,
+    singleLine = singleLine,
+    showClearButton = true,
+    onTransformValue = onTransformValue,
+    onValueChange = { newValue, applyChange ->
+      onValueChange(newValue)
+      applyChange()
     }
   )
 }
+
+
+
 
 @Composable
 fun AppConfiguration.BarcodeListEditor(
@@ -6858,89 +7541,123 @@ fun AppConfiguration.SimpleDropdownField(
   val selected = options.find { it.id == selectedId }
 
   Column(modifier = modifier) {
-    Text(
-      text = title,
-      color = stateValues.TextColor,
-      fontSize = stateValues.textSize,
-      fontWeight = FontWeight.Bold
-    )
+    if (title.isNotBlank()) {
+      Text(
+        text = title,
+        color = stateValues.TextColor,
+        fontSize = stateValues.textSize,
+        fontWeight = FontWeight.Bold
+      )
 
-    Spacer(modifier = Modifier.height(4.dp))
+      Spacer(modifier = Modifier.height(4.dp))
+    }
 
     Box(
       modifier = Modifier
         .fillMaxWidth()
+        .height(stateValues.textFieldHeight)
         .clip(RoundedCornerShape(stateValues.cornerRadius))
         .border(
-          stateValues.unfocusedBorderWidth,
-          stateValues.PlaceholderTextColor,
+          if (expanded) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
+          if (expanded) stateValues.AccentColor else stateValues.PlaceholderTextColor,
           RoundedCornerShape(stateValues.cornerRadius)
         )
         .background(stateValues.BackgroundColor)
         .clickable(
           interactionSource = remember { MutableInteractionSource() },
-          indication = ripple(color = stateValues.TextColor)
+          indication = ripple(color = stateValues.AccentColor)
         ) {
           expanded = !expanded
         }
-        .padding(stateValues.marginTextFieldGroup)
+        .padding(horizontal = 14.dp),
+      contentAlignment = Alignment.CenterStart
     ) {
-      Column {
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+      ) {
+        Column(modifier = Modifier.weight(1f)) {
+          Text(
+            text = selected?.title?.takeIf { it.isNotBlank() } ?: placeholder,
+            color = if (selected == null) stateValues.PlaceholderTextColor else stateValues.TextColor,
+            fontSize = stateValues.textSize,
+            fontWeight = FontWeight.Normal,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+          )
+
+          selected?.subtitle?.takeIf { it.isNotBlank() }?.let {
+            Text(
+              text = it,
+              color = stateValues.PlaceholderTextColor,
+              fontSize = stateValues.smallTextSize,
+              fontWeight = FontWeight.Normal,
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis
+            )
+          }
+        }
+
         Text(
-          text = selected?.title ?: placeholder,
-          color = if (selected == null) stateValues.PlaceholderTextColor else stateValues.TextColor,
-          fontSize = stateValues.textSize,
+          text = if (expanded) "▲" else "▼",
+          color = stateValues.AccentColor,
+          fontSize = stateValues.smallTextSize,
           fontWeight = FontWeight.Bold
         )
-
-        selected?.subtitle?.let {
-          Text(
-            text = it,
-            color = stateValues.PlaceholderTextColor,
-            fontSize = stateValues.smallTextSize
-          )
-        }
       }
     }
 
     AnimatedVisibility(expanded) {
-      LazyColumn(
-        modifier = Modifier
-          .fillMaxWidth()
-          .heightIn(max = stateValues.screenHeight / 3)
-          .clip(RoundedCornerShape(stateValues.cornerRadius))
-          .border(
-            stateValues.unfocusedBorderWidth,
-            stateValues.PlaceholderTextColor,
-            RoundedCornerShape(stateValues.cornerRadius)
-          )
-          .background(stateValues.BackgroundColor)
-      ) {
-        items(options) { option ->
-          Column(
-            modifier = Modifier
-              .fillMaxWidth()
-              .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = ripple(color = stateValues.TextColor)
-              ) {
-                onSelected(option.id)
-                expanded = false
-              }
-              .padding(stateValues.marginTextFieldGroup)
-          ) {
-            Text(
-              text = option.title,
-              color = stateValues.TextColor,
-              fontWeight = FontWeight.Bold
-            )
+      Column(modifier = Modifier.fillMaxWidth()) {
+        Spacer(modifier = Modifier.height(2.dp))
 
-            option.subtitle?.let {
+        LazyColumn(
+          modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(max = stateValues.screenHeight / 4)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .border(
+              stateValues.unfocusedBorderWidth,
+              stateValues.AccentColor,
+              RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .background(stateValues.BackgroundColor)
+        ) {
+          items(options) { option ->
+            Column(
+              modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 38.dp)
+                .clickable(
+                  interactionSource = remember { MutableInteractionSource() },
+                  indication = ripple(color = stateValues.AccentColor)
+                ) {
+                  onSelected(option.id)
+                  expanded = false
+                }
+                .padding(horizontal = 14.dp, vertical = 6.dp),
+              verticalArrangement = Arrangement.Center
+            ) {
               Text(
-                text = it,
-                color = stateValues.PlaceholderTextColor,
-                fontSize = stateValues.smallTextSize
+                text = option.title,
+                color = stateValues.TextColor,
+                fontSize = stateValues.textSize,
+                fontWeight = FontWeight.Normal,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
               )
+
+              option.subtitle?.takeIf { it.isNotBlank() }?.let {
+                Text(
+                  text = it,
+                  color = stateValues.PlaceholderTextColor,
+                  fontSize = stateValues.smallTextSize,
+                  fontWeight = FontWeight.Normal,
+                  maxLines = 1,
+                  overflow = TextOverflow.Ellipsis
+                )
+              }
             }
           }
         }
@@ -6948,6 +7665,8 @@ fun AppConfiguration.SimpleDropdownField(
     }
   }
 }
+
+
 
 @Composable
 fun AppConfiguration.SimpleDialogWidget(
@@ -13759,6 +14478,94 @@ class ImeWithAction(
   }
 }
 
+
+@Composable
+private fun AppConfiguration.StockBatchShelfPreviewCard(
+  batch: GoodsBatchDataModel,
+  goodsItem: GoodsItemDataModel,
+  batches: List<GoodsBatchDataModel>,
+  index: Int
+) {
+  val isActiveShelf = batch.id == goodsItem.activeShelfBatchId
+  var dragDelta by remember { mutableStateOf(0f) }
+
+  Column(
+    modifier = Modifier
+      .widthIn(min = 150.dp, max = 210.dp)
+      .clip(RoundedCornerShape(stateValues.cornerRadius))
+      .border(
+        if (isActiveShelf) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
+        if (isActiveShelf) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+        RoundedCornerShape(stateValues.cornerRadius)
+      )
+      .background(stateValues.BackgroundColor)
+      .pointerInput(batch.id, batches.size) {
+        detectDragGesturesAfterLongPress(
+          onDragStart = { dragDelta = 0f },
+          onDrag = { change, dragAmount ->
+            change.consume()
+            dragDelta += dragAmount.x
+
+            val threshold = 42f
+            when {
+              dragDelta > threshold -> {
+                moveShelfBatch(goodsItem, batches, batch, 1)
+                dragDelta = 0f
+              }
+
+              dragDelta < -threshold -> {
+                moveShelfBatch(goodsItem, batches, batch, -1)
+                dragDelta = 0f
+              }
+            }
+          },
+          onDragEnd = { dragDelta = 0f },
+          onDragCancel = { dragDelta = 0f }
+        )
+      }
+      .clickable(
+        interactionSource = remember { MutableInteractionSource() },
+        indication = ripple(color = stateValues.AccentColor)
+      ) {
+        stateValues.activeStoreId?.let { storeId ->
+          setActiveShelfBatch(batch, storeId)
+        }
+      }
+      .padding(10.dp)
+  ) {
+    Text(
+      text = "#${index + 1}${if (isActiveShelf) " • active" else ""}",
+      color = if (isActiveShelf) stateValues.AccentColor else stateValues.TextColor,
+      fontSize = stateValues.smallTextSize,
+      fontWeight = FontWeight.Bold,
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis
+    )
+
+    Spacer(modifier = Modifier.height(4.dp))
+
+    Text(
+      text = "${batch.quantity.total} ${batch.quantity.immutableUnitName.extractLocalizedString(stateValues.appLanguage).orEmpty()}",
+      color = stateValues.TextColor,
+      fontSize = stateValues.textSize,
+      fontWeight = FontWeight.Bold,
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis
+    )
+
+    batch.expirationDateMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let {
+      Text(
+        text = it,
+        color = stateValues.PlaceholderTextColor,
+        fontSize = stateValues.smallTextSize,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+      )
+    }
+  }
+}
+
+
 @Composable
 fun AppConfiguration.GoodsItemInStockWidget(
   modifier: Modifier = Modifier,
@@ -13770,7 +14577,8 @@ fun AppConfiguration.GoodsItemInStockWidget(
   returnedForPeriod: QuantityDataModel? = null,
   onClick: ((GoodsItemDataModel) -> Unit)? = null,
   onDelete: ((GoodsItemDataModel) -> Unit)? = null,
-  onEdit: ((GoodsItemDataModel) -> Unit)? = null
+  onEdit: ((GoodsItemDataModel) -> Unit)? = null,
+  onAddBatch: ((GoodsItemDataModel) -> Unit)? = null
 ) {
   val itemName = goodsItem.name.visibleLocalizedString(stateValues.appLanguage, "Unnamed item")
 
@@ -13788,18 +14596,19 @@ fun AppConfiguration.GoodsItemInStockWidget(
     }
     .joinToString(", ")
 
-  val totalQuantity = batches.sumOf { it.quantity.total }
-  val quantityUnitText = batches
+  val shelfBatches = batches.sortedForShelf(goodsItem)
+  val totalQuantity = shelfBatches.sumOf { it.quantity.total }
+  val quantityUnitText = shelfBatches
     .firstOrNull()
     ?.quantity
     ?.immutableUnitName
     ?.extractLocalizedString(stateValues.appLanguage)
     .orEmpty()
 
-  val activeBatch = batches.find { it.id == goodsItem.activeShelfBatchId }
-    ?: batches.bestBatchForSale(goodsItem)
+  val activeBatch = shelfBatches.find { it.id == goodsItem.activeShelfBatchId }
+    ?: shelfBatches.bestBatchForSale(goodsItem)
 
-  val expirationStatusText = activeBatch?.expirationDateMillis?.let {
+  val expirationStatusText = activeBatch?.expirationDateMillis?.toStockDateInputText()?.let {
     "Exp: $it"
   }
 
@@ -13807,26 +14616,17 @@ fun AppConfiguration.GoodsItemInStockWidget(
     modifier
       .padding(bottom = 4.dp)
       .fillMaxHeight()
-      .run {
-        onClick?.run {
-          clickable(
-            interactionSource = remember {
-              MutableInteractionSource()
-            },
-            indication = ripple(color = textColor),
-            onClick = {
-              this(goodsItem)
-            }
-          )
-        } ?: this
-      }
       .clip(RoundedCornerShape(stateValues.cornerRadius))
       .border(
         stateValues.unfocusedBorderWidth,
         stateValues.PlaceholderTextColor,
-        RoundedCornerShape(
-          stateValues.cornerRadius
-        )
+        RoundedCornerShape(stateValues.cornerRadius)
+      )
+      .clickable(
+        enabled = onClick != null,
+        interactionSource = remember { MutableInteractionSource() },
+        indication = ripple(color = textColor),
+        onClick = { onClick?.invoke(goodsItem) }
       )
   ) {
     Column(
@@ -13881,12 +14681,12 @@ fun AppConfiguration.GoodsItemInStockWidget(
 
       StockCardInfoLine(
         title = "Stock",
-        value = if (batches.isEmpty()) {
+        value = if (shelfBatches.isEmpty()) {
           "No batches"
         } else {
-          "$totalQuantity $quantityUnitText • ${batches.size} batch${if (batches.size == 1) "" else "es"}"
+          "$totalQuantity $quantityUnitText • ${shelfBatches.size} batch${if (shelfBatches.size == 1) "" else "es"}"
         },
-        textColor = if (batches.isEmpty()) stateValues.ErrorColor else textColor
+        textColor = if (shelfBatches.isEmpty()) stateValues.ErrorColor else textColor
       )
 
       activeBatch?.let {
@@ -13894,7 +14694,7 @@ fun AppConfiguration.GoodsItemInStockWidget(
           title = "Shelf",
           value = listOfNotNull(
             if (it.id == goodsItem.activeShelfBatchId) "active" else "auto",
-            it.shelfPosition,
+            "#${shelfBatches.indexOfFirst { batch -> batch.id == it.id } + 1}",
             expirationStatusText
           ).joinToString(" • "),
           textColor = stateValues.AccentColor
@@ -13924,6 +14724,24 @@ fun AppConfiguration.GoodsItemInStockWidget(
           textColor = stateValues.PlaceholderTextColor
         )
       }
+
+      if (shelfBatches.isNotEmpty()) {
+        Spacer(modifier = Modifier.height(10.dp))
+
+        LazyRow(
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+          modifier = Modifier.fillMaxWidth()
+        ) {
+          itemsIndexed(shelfBatches) { batchIndex, batch ->
+            StockBatchShelfPreviewCard(
+              batch = batch,
+              goodsItem = goodsItem,
+              batches = shelfBatches,
+              index = batchIndex
+            )
+          }
+        }
+      }
     }
 
     Column(
@@ -13932,6 +14750,16 @@ fun AppConfiguration.GoodsItemInStockWidget(
       horizontalAlignment = Alignment.End,
       verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
+      onAddBatch?.let {
+        actionButton(
+          text = "",
+          iconPath = stateValues.drawablePathIconAdd,
+          iconContentDescription = "Add batch",
+        ) {
+          onAddBatch(goodsItem)
+        }
+      }
+
       onEdit?.let {
         actionButton(
           text = "",
@@ -13955,6 +14783,7 @@ fun AppConfiguration.GoodsItemInStockWidget(
     }
   }
 }
+
 
 
 @Composable
@@ -14192,6 +15021,7 @@ fun AppConfiguration.genericTextField(
   enabled: Boolean = true,
   readOnly: Boolean = false,
   wide: Boolean = false,
+  singleLine: Boolean = true,
   valueInitial: String? = null,
 
   textSize: TextUnit = stateValues.textSize,
@@ -14237,6 +15067,7 @@ fun AppConfiguration.genericTextField(
   contentInvalidText: String? = null,
   onContentValidityCheck: ((String) -> Boolean)? = null,
   onFilterValue: ((String) -> Boolean)? = null,
+  onTransformValue: ((String) -> String)? = null,
   onValueChange: ((String, () -> Unit) -> Unit)? = null
 ): GenericTextFieldContent {
 
@@ -14294,26 +15125,31 @@ fun AppConfiguration.genericTextField(
     CompositionLocalProvider(LocalTextSelectionColors provides textSelectionColors) {
       BasicTextField(
         value = textFieldValue,
-        onValueChange = {
+        onValueChange = { rawValue ->
+          val nextText = onTransformValue?.invoke(rawValue.text) ?: rawValue.text
+          val nextValue = rawValue.copy(
+            text = nextText,
+            selection = TextRange(nextText.length)
+          )
+
           if (onValueChange != null) {
-            onValueChange(it.text) {
-              if (onFilterValue == null || onFilterValue(it.text)) {
-                textFieldValue = it
+            onValueChange(nextText) {
+              if (onFilterValue == null || onFilterValue(nextText)) {
+                textFieldValue = nextValue
 
                 stateKey?.run {
                   coroutineScope.launch {
-                    stateHost?.setState(stateKey to it.text)
+                    stateHost?.setState(stateKey to nextText)
                   }
                 }
-
               }
             }
           } else {
-            if (onFilterValue == null || onFilterValue(it.text)) {
-              textFieldValue = it
+            if (onFilterValue == null || onFilterValue(nextText)) {
+              textFieldValue = nextValue
               stateKey?.run {
                 coroutineScope.launch {
-                  stateHost?.setState(stateKey to it.text)
+                  stateHost?.setState(stateKey to nextText)
                 }
               }
             }
@@ -14348,7 +15184,7 @@ fun AppConfiguration.genericTextField(
         visualTransformation = {
           visualTransformation(textFieldValue)
         },
-        singleLine = true,
+        singleLine = singleLine,
         cursorBrush = SolidColor(selectionBackgroundColor),
         decorationBox = { innerTextField ->
           Box(
@@ -15637,6 +16473,41 @@ object AppConfiguration {
     val stringStandardPricesForSuppliers: String
     val stringEditableForIndividualBatches: String
     val stringBatchesData: String
+    val stringReceiptNumber: String
+    val stringTransactionId: String
+    val stringDate: String
+    val stringCashier: String
+    val stringStore: String
+    val stringAddress: String
+    val stringPhone: String
+    val stringTotal: String
+    val stringPaid: String
+    val stringDebt: String
+    val stringDebtor: String
+    val stringDebtorPhone: String
+    val stringChange: String
+    val stringVat: String
+    val stringVatNotSpecified: String
+    val stringFiscalStatus: String
+    val stringNonFiscalSoftwareReceipt: String
+    val stringThankYou: String
+    val stringNoItems: String
+    val stringNoName: String
+    val stringPdf: String
+    val stringShare: String
+    val stringWhatsApp: String
+    val stringPrint: String
+    val stringQuit: String
+    val stringReceiptPdfSaved: String
+    val stringReceiptShared: String
+    val stringReceiptSentToWhatsApp: String
+    val stringReceiptSentToPrinter: String
+    val stringReceiptActionFailed: String
+    val stringGoodsReceiptTitle: String
+    val stringSaleReceiptTitle: String
+    val stringReturnReceiptTitle: String
+    val stringSupplyReceiptTitle: String
+    val stringDraft: String
 
     val screenWidth: Dp
     val screenHeight: Dp
@@ -16071,6 +16942,41 @@ object AppConfiguration {
       override val stringStandardPricesForSuppliers: String by stringStandardPricesForSuppliersState.collectAsState()
       override val stringEditableForIndividualBatches: String by stringEditableForIndividualBatchesState.collectAsState()
       override val stringBatchesData: String by stringBatchesDataState.collectAsState()
+      override val stringReceiptNumber: String by stringReceiptNumberState.collectAsState()
+      override val stringTransactionId: String by stringTransactionIdState.collectAsState()
+      override val stringDate: String by stringDateState.collectAsState()
+      override val stringCashier: String by stringCashierState.collectAsState()
+      override val stringStore: String by stringStoreState.collectAsState()
+      override val stringAddress: String by stringAddressState.collectAsState()
+      override val stringPhone: String by stringPhoneState.collectAsState()
+      override val stringTotal: String by stringTotalState.collectAsState()
+      override val stringPaid: String by stringPaidState.collectAsState()
+      override val stringDebt: String by stringDebtState.collectAsState()
+      override val stringDebtor: String by stringDebtorState.collectAsState()
+      override val stringDebtorPhone: String by stringDebtorPhoneState.collectAsState()
+      override val stringChange: String by stringChangeState.collectAsState()
+      override val stringVat: String by stringVatState.collectAsState()
+      override val stringVatNotSpecified: String by stringVatNotSpecifiedState.collectAsState()
+      override val stringFiscalStatus: String by stringFiscalStatusState.collectAsState()
+      override val stringNonFiscalSoftwareReceipt: String by stringNonFiscalSoftwareReceiptState.collectAsState()
+      override val stringThankYou: String by stringThankYouState.collectAsState()
+      override val stringNoItems: String by stringNoItemsState.collectAsState()
+      override val stringNoName: String by stringNoNameState.collectAsState()
+      override val stringPdf: String by stringPdfState.collectAsState()
+      override val stringShare: String by stringShareState.collectAsState()
+      override val stringWhatsApp: String by stringWhatsAppState.collectAsState()
+      override val stringPrint: String by stringPrintState.collectAsState()
+      override val stringQuit: String by stringQuitState.collectAsState()
+      override val stringReceiptPdfSaved: String by stringReceiptPdfSavedState.collectAsState()
+      override val stringReceiptShared: String by stringReceiptSharedState.collectAsState()
+      override val stringReceiptSentToWhatsApp: String by stringReceiptSentToWhatsAppState.collectAsState()
+      override val stringReceiptSentToPrinter: String by stringReceiptSentToPrinterState.collectAsState()
+      override val stringReceiptActionFailed: String by stringReceiptActionFailedState.collectAsState()
+      override val stringGoodsReceiptTitle: String by stringGoodsReceiptTitleState.collectAsState()
+      override val stringSaleReceiptTitle: String by stringSaleReceiptTitleState.collectAsState()
+      override val stringReturnReceiptTitle: String by stringReturnReceiptTitleState.collectAsState()
+      override val stringSupplyReceiptTitle: String by stringSupplyReceiptTitleState.collectAsState()
+      override val stringDraft: String by stringDraftState.collectAsState()
 
       override val screenWidth: Dp by _screenWidthState.collectAsState()
       override val screenHeight: Dp by _screenHeightState.collectAsState()

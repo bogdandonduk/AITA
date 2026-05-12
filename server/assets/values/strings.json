@@ -2983,6 +2983,741 @@
           "value": "Партия деректері"
         }
       ]
+    },
+    {
+      "id": 142,
+      "values": [
+        {
+          "language": "main",
+          "value": "Receipt number"
+        },
+        {
+          "language": "en",
+          "value": "Receipt number"
+        },
+        {
+          "language": "ru",
+          "value": "Номер чека"
+        },
+        {
+          "language": "kk",
+          "value": "Чек нөмірі"
+        }
+      ]
+    },
+    {
+      "id": 143,
+      "values": [
+        {
+          "language": "main",
+          "value": "Transaction ID"
+        },
+        {
+          "language": "en",
+          "value": "Transaction ID"
+        },
+        {
+          "language": "ru",
+          "value": "ID транзакции"
+        },
+        {
+          "language": "kk",
+          "value": "Транзакция ID-і"
+        }
+      ]
+    },
+    {
+      "id": 144,
+      "values": [
+        {
+          "language": "main",
+          "value": "Date"
+        },
+        {
+          "language": "en",
+          "value": "Date"
+        },
+        {
+          "language": "ru",
+          "value": "Дата"
+        },
+        {
+          "language": "kk",
+          "value": "Күні"
+        }
+      ]
+    },
+    {
+      "id": 145,
+      "values": [
+        {
+          "language": "main",
+          "value": "Cashier"
+        },
+        {
+          "language": "en",
+          "value": "Cashier"
+        },
+        {
+          "language": "ru",
+          "value": "Кассир"
+        },
+        {
+          "language": "kk",
+          "value": "Кассир"
+        }
+      ]
+    },
+    {
+      "id": 146,
+      "values": [
+        {
+          "language": "main",
+          "value": "Store"
+        },
+        {
+          "language": "en",
+          "value": "Store"
+        },
+        {
+          "language": "ru",
+          "value": "Магазин"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен"
+        }
+      ]
+    },
+    {
+      "id": 147,
+      "values": [
+        {
+          "language": "main",
+          "value": "Address"
+        },
+        {
+          "language": "en",
+          "value": "Address"
+        },
+        {
+          "language": "ru",
+          "value": "Адрес"
+        },
+        {
+          "language": "kk",
+          "value": "Мекенжай"
+        }
+      ]
+    },
+    {
+      "id": 148,
+      "values": [
+        {
+          "language": "main",
+          "value": "Phone"
+        },
+        {
+          "language": "en",
+          "value": "Phone"
+        },
+        {
+          "language": "ru",
+          "value": "Телефон"
+        },
+        {
+          "language": "kk",
+          "value": "Телефон"
+        }
+      ]
+    },
+    {
+      "id": 149,
+      "values": [
+        {
+          "language": "main",
+          "value": "Total"
+        },
+        {
+          "language": "en",
+          "value": "Total"
+        },
+        {
+          "language": "ru",
+          "value": "Итого"
+        },
+        {
+          "language": "kk",
+          "value": "Барлығы"
+        }
+      ]
+    },
+    {
+      "id": 150,
+      "values": [
+        {
+          "language": "main",
+          "value": "Paid"
+        },
+        {
+          "language": "en",
+          "value": "Paid"
+        },
+        {
+          "language": "ru",
+          "value": "Оплачено"
+        },
+        {
+          "language": "kk",
+          "value": "Төленді"
+        }
+      ]
+    },
+    {
+      "id": 151,
+      "values": [
+        {
+          "language": "main",
+          "value": "Debt"
+        },
+        {
+          "language": "en",
+          "value": "Debt"
+        },
+        {
+          "language": "ru",
+          "value": "Долг"
+        },
+        {
+          "language": "kk",
+          "value": "Қарыз"
+        }
+      ]
+    },
+    {
+      "id": 152,
+      "values": [
+        {
+          "language": "main",
+          "value": "Debtor"
+        },
+        {
+          "language": "en",
+          "value": "Debtor"
+        },
+        {
+          "language": "ru",
+          "value": "Должник"
+        },
+        {
+          "language": "kk",
+          "value": "Қарыз алушы"
+        }
+      ]
+    },
+    {
+      "id": 153,
+      "values": [
+        {
+          "language": "main",
+          "value": "Debtor phone"
+        },
+        {
+          "language": "en",
+          "value": "Debtor phone"
+        },
+        {
+          "language": "ru",
+          "value": "Телефон должника"
+        },
+        {
+          "language": "kk",
+          "value": "Қарыз алушының телефоны"
+        }
+      ]
+    },
+    {
+      "id": 154,
+      "values": [
+        {
+          "language": "main",
+          "value": "Change"
+        },
+        {
+          "language": "en",
+          "value": "Change"
+        },
+        {
+          "language": "ru",
+          "value": "Сдача"
+        },
+        {
+          "language": "kk",
+          "value": "Қайтарым"
+        }
+      ]
+    },
+    {
+      "id": 155,
+      "values": [
+        {
+          "language": "main",
+          "value": "VAT / НДС / ҚҚС"
+        },
+        {
+          "language": "en",
+          "value": "VAT / НДС / ҚҚС"
+        },
+        {
+          "language": "ru",
+          "value": "НДС / VAT / ҚҚС"
+        },
+        {
+          "language": "kk",
+          "value": "ҚҚС / НДС / VAT"
+        }
+      ]
+    },
+    {
+      "id": 156,
+      "values": [
+        {
+          "language": "main",
+          "value": "Not specified"
+        },
+        {
+          "language": "en",
+          "value": "Not specified"
+        },
+        {
+          "language": "ru",
+          "value": "Не указано"
+        },
+        {
+          "language": "kk",
+          "value": "Көрсетілмеген"
+        }
+      ]
+    },
+    {
+      "id": 157,
+      "values": [
+        {
+          "language": "main",
+          "value": "Fiscal status"
+        },
+        {
+          "language": "en",
+          "value": "Fiscal status"
+        },
+        {
+          "language": "ru",
+          "value": "Фискальный статус"
+        },
+        {
+          "language": "kk",
+          "value": "Фискалдық мәртебе"
+        }
+      ]
+    },
+    {
+      "id": 158,
+      "values": [
+        {
+          "language": "main",
+          "value": "Non-fiscal software receipt"
+        },
+        {
+          "language": "en",
+          "value": "Non-fiscal software receipt"
+        },
+        {
+          "language": "ru",
+          "value": "Нефискальный программный чек"
+        },
+        {
+          "language": "kk",
+          "value": "Фискалдық емес бағдарламалық чек"
+        }
+      ]
+    },
+    {
+      "id": 159,
+      "values": [
+        {
+          "language": "main",
+          "value": "Thank you for your purchase!"
+        },
+        {
+          "language": "en",
+          "value": "Thank you for your purchase!"
+        },
+        {
+          "language": "ru",
+          "value": "Спасибо за покупку!"
+        },
+        {
+          "language": "kk",
+          "value": "Сатып алғаныңызға рақмет!"
+        }
+      ]
+    },
+    {
+      "id": 160,
+      "values": [
+        {
+          "language": "main",
+          "value": "No items"
+        },
+        {
+          "language": "en",
+          "value": "No items"
+        },
+        {
+          "language": "ru",
+          "value": "Нет товаров"
+        },
+        {
+          "language": "kk",
+          "value": "Тауарлар жоқ"
+        }
+      ]
+    },
+    {
+      "id": 161,
+      "values": [
+        {
+          "language": "main",
+          "value": "PDF"
+        },
+        {
+          "language": "en",
+          "value": "PDF"
+        },
+        {
+          "language": "ru",
+          "value": "PDF"
+        },
+        {
+          "language": "kk",
+          "value": "PDF"
+        }
+      ]
+    },
+    {
+      "id": 162,
+      "values": [
+        {
+          "language": "main",
+          "value": "Share"
+        },
+        {
+          "language": "en",
+          "value": "Share"
+        },
+        {
+          "language": "ru",
+          "value": "Поделиться"
+        },
+        {
+          "language": "kk",
+          "value": "Бөлісу"
+        }
+      ]
+    },
+    {
+      "id": 163,
+      "values": [
+        {
+          "language": "main",
+          "value": "WhatsApp"
+        },
+        {
+          "language": "en",
+          "value": "WhatsApp"
+        },
+        {
+          "language": "ru",
+          "value": "WhatsApp"
+        },
+        {
+          "language": "kk",
+          "value": "WhatsApp"
+        }
+      ]
+    },
+    {
+      "id": 164,
+      "values": [
+        {
+          "language": "main",
+          "value": "Print"
+        },
+        {
+          "language": "en",
+          "value": "Print"
+        },
+        {
+          "language": "ru",
+          "value": "Печать"
+        },
+        {
+          "language": "kk",
+          "value": "Басып шығару"
+        }
+      ]
+    },
+    {
+      "id": 165,
+      "values": [
+        {
+          "language": "main",
+          "value": "Quit"
+        },
+        {
+          "language": "en",
+          "value": "Quit"
+        },
+        {
+          "language": "ru",
+          "value": "Выйти"
+        },
+        {
+          "language": "kk",
+          "value": "Шығу"
+        }
+      ]
+    },
+    {
+      "id": 166,
+      "values": [
+        {
+          "language": "main",
+          "value": "Receipt PDF saved"
+        },
+        {
+          "language": "en",
+          "value": "Receipt PDF saved"
+        },
+        {
+          "language": "ru",
+          "value": "PDF-чек сохранён"
+        },
+        {
+          "language": "kk",
+          "value": "PDF чек сақталды"
+        }
+      ]
+    },
+    {
+      "id": 167,
+      "values": [
+        {
+          "language": "main",
+          "value": "Receipt shared"
+        },
+        {
+          "language": "en",
+          "value": "Receipt shared"
+        },
+        {
+          "language": "ru",
+          "value": "Чек отправлен"
+        },
+        {
+          "language": "kk",
+          "value": "Чек жіберілді"
+        }
+      ]
+    },
+    {
+      "id": 168,
+      "values": [
+        {
+          "language": "main",
+          "value": "Receipt sent to WhatsApp"
+        },
+        {
+          "language": "en",
+          "value": "Receipt sent to WhatsApp"
+        },
+        {
+          "language": "ru",
+          "value": "Чек отправлен в WhatsApp"
+        },
+        {
+          "language": "kk",
+          "value": "Чек WhatsApp арқылы жіберілді"
+        }
+      ]
+    },
+    {
+      "id": 169,
+      "values": [
+        {
+          "language": "main",
+          "value": "Receipt sent to printer"
+        },
+        {
+          "language": "en",
+          "value": "Receipt sent to printer"
+        },
+        {
+          "language": "ru",
+          "value": "Чек отправлен на принтер"
+        },
+        {
+          "language": "kk",
+          "value": "Чек принтерге жіберілді"
+        }
+      ]
+    },
+    {
+      "id": 170,
+      "values": [
+        {
+          "language": "main",
+          "value": "Receipt action failed"
+        },
+        {
+          "language": "en",
+          "value": "Receipt action failed"
+        },
+        {
+          "language": "ru",
+          "value": "Не удалось выполнить действие с чеком"
+        },
+        {
+          "language": "kk",
+          "value": "Чек әрекетін орындау мүмкін болмады"
+        }
+      ]
+    },
+    {
+      "id": 171,
+      "values": [
+        {
+          "language": "main",
+          "value": "Goods receipt"
+        },
+        {
+          "language": "en",
+          "value": "Goods receipt"
+        },
+        {
+          "language": "ru",
+          "value": "Товарный чек"
+        },
+        {
+          "language": "kk",
+          "value": "Тауар чегі"
+        }
+      ]
+    },
+    {
+      "id": 172,
+      "values": [
+        {
+          "language": "main",
+          "value": "Sale"
+        },
+        {
+          "language": "en",
+          "value": "Sale"
+        },
+        {
+          "language": "ru",
+          "value": "Продажа"
+        },
+        {
+          "language": "kk",
+          "value": "Сату"
+        }
+      ]
+    },
+    {
+      "id": 173,
+      "values": [
+        {
+          "language": "main",
+          "value": "Return"
+        },
+        {
+          "language": "en",
+          "value": "Return"
+        },
+        {
+          "language": "ru",
+          "value": "Возврат"
+        },
+        {
+          "language": "kk",
+          "value": "Қайтару"
+        }
+      ]
+    },
+    {
+      "id": 174,
+      "values": [
+        {
+          "language": "main",
+          "value": "Acceptance"
+        },
+        {
+          "language": "en",
+          "value": "Acceptance"
+        },
+        {
+          "language": "ru",
+          "value": "Приёмка"
+        },
+        {
+          "language": "kk",
+          "value": "Қабылдау"
+        }
+      ]
+    },
+    {
+      "id": 175,
+      "values": [
+        {
+          "language": "main",
+          "value": "Draft"
+        },
+        {
+          "language": "en",
+          "value": "Draft"
+        },
+        {
+          "language": "ru",
+          "value": "Черновик"
+        },
+        {
+          "language": "kk",
+          "value": "Жоба"
+        }
+      ]
+    },
+    {
+      "id": 176,
+      "values": [
+        {
+          "language": "main",
+          "value": "No name"
+        },
+        {
+          "language": "en",
+          "value": "No name"
+        },
+        {
+          "language": "ru",
+          "value": "Без названия"
+        },
+        {
+          "language": "kk",
+          "value": "Атаусыз"
+        }
+      ]
     }
   ]
 }

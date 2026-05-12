@@ -2,10 +2,14 @@
 package kz.aita.android
 
 import android.app.Application
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.provider.MediaStore
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
@@ -15,6 +19,7 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.core.app.ActivityCompat
+import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -36,13 +41,103 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kz.aita.*
+import java.io.File
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 import javax.inject.Inject
+
+object ReceiptPlatformAndroidBridge {
+  /**
+   * Set this from your Bluetooth receipt-printer manager.
+   * It should write raw ESC/POS bytes to the already-selected printer socket/output stream.
+   */
+  var writeEscPosBytes: (suspend (ByteArray) -> Boolean)? = null
+}
+
+fun installReceiptPlatformAndroid(context: Context) {
+  val appContext = context.applicationContext
+
+  saveReceiptPdfFile = { fileName, pdfBytes ->
+    withContext(Dispatchers.IO) {
+      runCatching {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+          val values = ContentValues().apply {
+            put(MediaStore.Downloads.DISPLAY_NAME, fileName)
+            put(MediaStore.Downloads.MIME_TYPE, "application/pdf")
+            put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+          }
+
+          val uri = appContext.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+            ?: return@runCatching ReceiptPlatformActionResult(false, "Could not create PDF file")
+
+          appContext.contentResolver.openOutputStream(uri)?.use { it.write(pdfBytes) }
+            ?: return@runCatching ReceiptPlatformActionResult(false, "Could not open PDF output stream")
+
+          ReceiptPlatformActionResult(true, "Saved to Downloads")
+        } else {
+          val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+          if (!dir.exists()) dir.mkdirs()
+          val file = File(dir, fileName)
+          file.writeBytes(pdfBytes)
+          ReceiptPlatformActionResult(true, "Saved to ${file.absolutePath}")
+        }
+      }.getOrElse {
+        ReceiptPlatformActionResult(false, it.message ?: "Could not save PDF")
+      }
+    }
+  }
+
+  shareReceiptPdfFile = { fileName, pdfBytes, whatsappOnly ->
+    withContext(Dispatchers.IO) {
+      runCatching {
+        val dir = File(appContext.cacheDir, "receipts").apply { mkdirs() }
+        val file = File(dir, fileName).apply { writeBytes(pdfBytes) }
+        val uri: Uri = FileProvider.getUriForFile(
+          appContext,
+          appContext.packageName + ".fileprovider",
+          file
+        )
+
+        val intent = Intent(Intent.ACTION_SEND).apply {
+          type = "application/pdf"
+          putExtra(Intent.EXTRA_STREAM, uri)
+          addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+          addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+          if (whatsappOnly) setPackage("com.whatsapp")
+        }
+
+        val chooser = if (whatsappOnly) intent else Intent.createChooser(intent, "Share receipt").apply {
+          addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+
+        appContext.startActivity(chooser)
+        ReceiptPlatformActionResult(true, if (whatsappOnly) "Opening WhatsApp" else "Opening share sheet")
+      }.getOrElse {
+        ReceiptPlatformActionResult(false, it.message ?: "Could not share PDF")
+      }
+    }
+  }
+
+  printReceiptEscPosBytes = { printerBytes ->
+    runCatching {
+      val writer = ReceiptPlatformAndroidBridge.writeEscPosBytes
+        ?: return@runCatching ReceiptPlatformActionResult(false, "No Android ESC/POS printer writer is configured")
+
+      if (writer(printerBytes)) {
+        ReceiptPlatformActionResult(true, "Sent to printer")
+      } else {
+        ReceiptPlatformActionResult(false, "Printer rejected the receipt")
+      }
+    }.getOrElse {
+      ReceiptPlatformActionResult(false, it.message ?: "Could not print receipt")
+    }
+  }
+}
 
 val Context.tokensDataStore by preferencesDataStore(name = "store_tokens")
 

@@ -286,6 +286,8 @@ object StockItems: Table("stock_items") {
   val returnPrices = jsonb("return_prices", Json, ListSerializer(PriceDataModel.serializer()))
   val supplyPrices = jsonb("supply_prices", Json, ListSerializer(PriceDataModel.serializer()))
 
+  val genericExpirationPeriod = jsonb("generic_expiration_period", Json, ExpirationPeriodDataModel.serializer()).nullable()
+
   val isQuickItem = bool("is_quick_item")
   val imagePaths = jsonb("image_paths", Json, ListSerializer(String.serializer()))
 
@@ -808,6 +810,8 @@ private fun ResultRow.toGoodsItemDataModel(): GoodsItemDataModel {
     returnPrices = this[StockItems.returnPrices],
     supplyPrices = this[StockItems.supplyPrices],
 
+    genericExpirationPeriod = this[StockItems.genericExpirationPeriod],
+
     isQuickItem = this[StockItems.isQuickItem],
     imagePaths = this[StockItems.imagePaths],
 
@@ -1032,6 +1036,301 @@ private fun upsertSupplierGoodsPriceInsideTransaction(
       it[isActive] = true
     }
   }
+}
+
+private fun defaultServerQuantityForGoodsItem(
+  measurementUnitId: String,
+  total: Double
+): QuantityDataModel {
+  return when (measurementUnitId) {
+    "1" -> QuantityDataModel(
+      id = "1",
+      immutableUnitName = listOf(
+        LocalizedStringDataModel("main", "kg."),
+        LocalizedStringDataModel("en", "kg."),
+        LocalizedStringDataModel("ru", "кг."),
+        LocalizedStringDataModel("kk", "кг.")
+      ),
+      total = total,
+      pricedAmount = 1.0,
+      roundTotal = false
+    )
+
+    else -> QuantityDataModel(
+      id = measurementUnitId.ifBlank { "0" },
+      immutableUnitName = listOf(
+        LocalizedStringDataModel("main", "pc."),
+        LocalizedStringDataModel("en", "pc."),
+        LocalizedStringDataModel("ru", "шт."),
+        LocalizedStringDataModel("kk", "дана")
+      ),
+      total = total,
+      pricedAmount = 1.0,
+      roundTotal = true
+    )
+  }
+}
+
+private fun findStockItemRowByTransactionBarcodeInsideTransaction(
+  storeId: UUID,
+  barcode: String
+): ResultRow? {
+  val cleanBarcode = barcode.trim()
+  if (cleanBarcode.isBlank()) return null
+
+  return StockItems
+    .selectAll()
+    .where {
+      (StockItems.storeId eq storeId) and
+          (StockItems.isActive eq true)
+    }
+    .firstOrNull { row ->
+      row[StockItems.barcodes].any { it.equals(cleanBarcode, ignoreCase = true) }
+    }
+}
+
+private fun activeStockBatchesForGoodsItemInsideTransaction(
+  storeId: UUID,
+  goodsItemId: UUID,
+  activeShelfBatchId: UUID?
+): List<ResultRow> {
+  return StockBatchesV2
+    .selectAll()
+    .where {
+      (StockBatchesV2.storeId eq storeId) and
+          (StockBatchesV2.goodsItemId eq goodsItemId) and
+          (StockBatchesV2.isActive eq true)
+    }
+    .filter { row ->
+      val status = row[StockBatchesV2.status]
+      status != StockBatchStatusDataModel.Deleted.name &&
+          status != StockBatchStatusDataModel.WrittenOff.name
+    }
+    .sortedWith(
+      compareBy<ResultRow> { row ->
+        if (activeShelfBatchId != null && row[StockBatchesV2.id] == activeShelfBatchId) 0 else 1
+      }.thenBy { row ->
+        row[StockBatchesV2.expirationDateMillis] ?: Long.MAX_VALUE
+      }.thenByDescending { row ->
+        row[StockBatchesV2.shelfPriority]
+      }
+    )
+}
+
+private fun updateGoodsItemActiveShelfBatchInsideTransaction(
+  goodsItemId: UUID,
+  storeId: UUID,
+  now: Long
+) {
+  val nextBatchId = StockBatchesV2
+    .selectAll()
+    .where {
+      (StockBatchesV2.goodsItemId eq goodsItemId) and
+          (StockBatchesV2.storeId eq storeId) and
+          (StockBatchesV2.isActive eq true)
+    }
+    .filter { row ->
+      val status = row[StockBatchesV2.status]
+      status != StockBatchStatusDataModel.Deleted.name &&
+          status != StockBatchStatusDataModel.WrittenOff.name &&
+          row[StockBatchesV2.quantity].total > 0.0
+    }
+    .sortedWith(
+      compareBy<ResultRow> { row ->
+        row[StockBatchesV2.expirationDateMillis] ?: Long.MAX_VALUE
+      }.thenByDescending { row -> row[StockBatchesV2.shelfPriority] }
+    )
+    .firstOrNull()
+    ?.get(StockBatchesV2.id)
+
+  StockItems.update({
+    (StockItems.id eq goodsItemId) and
+        (StockItems.storeId eq storeId)
+  }) {
+    it[StockItems.activeShelfBatchId] = nextBatchId
+    it[StockItems.updatedAtMillis] = now
+  }
+}
+
+private fun subtractStockForTransactionLineInsideTransaction(
+  storeId: UUID,
+  itemRow: ResultRow,
+  requestedQuantity: Double,
+  now: Long
+): Boolean {
+  val goodsItemId = itemRow[StockItems.id]
+  val activeShelfBatchId = itemRow[StockItems.activeShelfBatchId]
+  val quantityToSubtract = requestedQuantity.coerceAtLeast(0.0)
+
+  if (quantityToSubtract <= 0.0) return true
+
+  val batches = activeStockBatchesForGoodsItemInsideTransaction(
+    storeId = storeId,
+    goodsItemId = goodsItemId,
+    activeShelfBatchId = activeShelfBatchId
+  ).filter { it[StockBatchesV2.quantity].total > 0.0 }
+
+  val available = batches.sumOf { it[StockBatchesV2.quantity].total }
+  if (available + 0.000001 < quantityToSubtract)
+    return false
+
+  var remaining = quantityToSubtract
+
+  for (batch in batches) {
+    if (remaining <= 0.0) break
+
+    val batchId = batch[StockBatchesV2.id]
+    val currentQuantity = batch[StockBatchesV2.quantity]
+    val currentTotal = currentQuantity.total.coerceAtLeast(0.0)
+    val taken = kotlin.math.min(currentTotal, remaining)
+    val nextTotal = (currentTotal - taken).coerceAtLeast(0.0)
+    val nextQuantity = currentQuantity.copy(total = nextTotal)
+    val nextStatus = if (nextTotal <= 0.000001) {
+      StockBatchStatusDataModel.SoldOut.name
+    } else {
+      batch[StockBatchesV2.status]
+    }
+
+    StockBatchesV2.update({ StockBatchesV2.id eq batchId }) {
+      it[StockBatchesV2.quantity] = nextQuantity
+      it[StockBatchesV2.status] = nextStatus
+      it[StockBatchesV2.updatedAtMillis] = now
+    }
+
+    remaining -= taken
+  }
+
+  updateGoodsItemActiveShelfBatchInsideTransaction(goodsItemId, storeId, now)
+  return true
+}
+
+private fun addStockForTransactionLineInsideTransaction(
+  userId: UUID,
+  storeId: UUID,
+  itemRow: ResultRow,
+  addedQuantity: Double,
+  now: Long,
+  preferredPricePerUnit: Double
+): Boolean {
+  val goodsItemId = itemRow[StockItems.id]
+  val activeShelfBatchId = itemRow[StockItems.activeShelfBatchId]
+  val quantityToAdd = addedQuantity.coerceAtLeast(0.0)
+
+  if (quantityToAdd <= 0.0) return true
+
+  val targetBatch = activeStockBatchesForGoodsItemInsideTransaction(
+    storeId = storeId,
+    goodsItemId = goodsItemId,
+    activeShelfBatchId = activeShelfBatchId
+  ).firstOrNull { row ->
+    row[StockBatchesV2.status] != StockBatchStatusDataModel.Deleted.name &&
+        row[StockBatchesV2.status] != StockBatchStatusDataModel.WrittenOff.name
+  }
+
+  if (targetBatch != null) {
+    val batchId = targetBatch[StockBatchesV2.id]
+    val currentQuantity = targetBatch[StockBatchesV2.quantity]
+    val nextQuantity = currentQuantity.copy(total = currentQuantity.total + quantityToAdd)
+    val currentStatus = targetBatch[StockBatchesV2.status]
+    val nextStatus = if (currentStatus == StockBatchStatusDataModel.SoldOut.name) {
+      StockBatchStatusDataModel.Delivered.name
+    } else {
+      currentStatus
+    }
+
+    StockBatchesV2.update({ StockBatchesV2.id eq batchId }) {
+      it[StockBatchesV2.quantity] = nextQuantity
+      it[StockBatchesV2.status] = nextStatus
+      it[StockBatchesV2.updatedAtMillis] = now
+    }
+
+    if (activeShelfBatchId == null) {
+      StockItems.update({ StockItems.id eq goodsItemId }) {
+        it[StockItems.activeShelfBatchId] = batchId
+        it[StockItems.updatedAtMillis] = now
+      }
+    }
+
+    return true
+  }
+
+  val supplyPrice = itemRow[StockItems.supplyPrices].firstOrNull()
+    ?: itemRow[StockItems.salePrices].firstOrNull()
+    ?: itemRow[StockItems.returnPrices].firstOrNull()
+    ?: PriceDataModel(
+      price = preferredPricePerUnit.toString(),
+      currency = "",
+      supplierId = ""
+    )
+
+  val batchId = UUID.randomUUID()
+  StockBatchesV2.insert {
+    it[id] = batchId
+    it[StockBatchesV2.goodsItemId] = goodsItemId
+    it[StockBatchesV2.userId] = userId
+    it[StockBatchesV2.storeId] = storeId
+    it[StockBatchesV2.supplierId] = null
+    it[StockBatchesV2.supplierOrderId] = null
+    it[StockBatchesV2.quantity] = defaultServerQuantityForGoodsItem(itemRow[StockItems.measurementUnitId], quantityToAdd)
+    it[StockBatchesV2.supplyPrice] = supplyPrice
+    it[StockBatchesV2.salePriceOverride] = null
+    it[StockBatchesV2.returnPriceOverride] = null
+    it[StockBatchesV2.deliveredAtMillis] = now
+    it[StockBatchesV2.manufacturedAtMillis] = null
+    it[StockBatchesV2.expirationDateMillis] = null
+    it[StockBatchesV2.discounts] = emptyList()
+    it[StockBatchesV2.shelfPosition] = null
+    it[StockBatchesV2.shelfPriority] = 0
+    it[StockBatchesV2.status] = StockBatchStatusDataModel.Delivered.name
+    it[StockBatchesV2.additionalNotes] = null
+    it[StockBatchesV2.createdAtMillis] = now
+    it[StockBatchesV2.updatedAtMillis] = now
+    it[StockBatchesV2.createdByUserId] = userId
+    it[StockBatchesV2.isActive] = true
+  }
+
+  StockItems.update({ StockItems.id eq goodsItemId }) {
+    it[StockItems.activeShelfBatchId] = batchId
+    it[StockItems.updatedAtMillis] = now
+  }
+
+  return true
+}
+
+private fun applyTransactionStockMutationInsideTransaction(
+  userId: UUID,
+  storeId: UUID,
+  transaction: TransactionDataModel,
+  now: Long
+): Boolean {
+  for (line in transaction.goodsInTransaction) {
+    val itemRow = findStockItemRowByTransactionBarcodeInsideTransaction(storeId, line.barcode)
+      ?: return false
+
+    val ok = when (transaction.type) {
+      "purchase" -> subtractStockForTransactionLineInsideTransaction(
+        storeId = storeId,
+        itemRow = itemRow,
+        requestedQuantity = line.quantity,
+        now = now
+      )
+
+      "return", "accept" -> addStockForTransactionLineInsideTransaction(
+        userId = userId,
+        storeId = storeId,
+        itemRow = itemRow,
+        addedQuantity = line.quantity,
+        now = now,
+        preferredPricePerUnit = line.pricePerUnit
+      )
+
+      else -> false
+    }
+
+    if (!ok) return false
+  }
+
+  return true
 }
 
 fun Application.module() {
@@ -1456,6 +1755,8 @@ fun Application.module() {
               it[StockItems.returnPrices] = body.returnPrices
               it[StockItems.supplyPrices] = body.supplyPrices
 
+              it[StockItems.genericExpirationPeriod] = body.genericExpirationPeriod?.takeIf { period -> period.isUsable }
+
               it[StockItems.isQuickItem] = body.isQuickItem
               it[StockItems.imagePaths] = body.imagePaths
 
@@ -1536,6 +1837,8 @@ fun Application.module() {
               it[StockItems.salePrices] = body.salePrices
               it[StockItems.returnPrices] = body.returnPrices
               it[StockItems.supplyPrices] = body.supplyPrices
+
+              it[StockItems.genericExpirationPeriod] = body.genericExpirationPeriod?.takeIf { period -> period.isUsable }
 
               it[StockItems.isQuickItem] = body.isQuickItem
               it[StockItems.imagePaths] = body.imagePaths
@@ -2759,7 +3062,6 @@ fun Application.module() {
             Transactions
               .selectAll()
               .where { (Transactions.userId eq userId) and (Transactions.storeId eq storeId) }
-              .orderBy(Transactions.timeMillis to SortOrder.DESC)
               .map {
                 TransactionDataModel(
                   id = it[Transactions.id].toString(),
@@ -2794,6 +3096,8 @@ fun Application.module() {
             UUID.fromString(body.storeId)
           }.getOrNull() ?: return@post call.respond(UnauthorizedResponse())
 
+          var transactionFailureMessage: List<LocalizedStringDataModel>? = null
+
           val completed = newSuspendedTransaction(Dispatchers.IO) {
             val hasStoreAccess = StoreUsers
               .selectAll()
@@ -2811,14 +3115,42 @@ fun Application.module() {
             val uploadedPaymentTotal = (body.paidCash + body.paidCard + (body.debtor?.debtAmount ?: 0.0))
               .let { kotlin.math.floor(it * 100.0) / 100.0 }
 
-            if (body.goodsInTransaction.isEmpty())
+            if (body.goodsInTransaction.isEmpty()) {
+              transactionFailureMessage = simpleMessage(
+                main = "Transaction has no items",
+                ru = "В транзакции нет товаров",
+                kk = "Транзакцияда тауарлар жоқ"
+              )
               return@newSuspendedTransaction null
+            }
 
-            if (transactionTotal > 0.0 && uploadedPaymentTotal + 0.01 < transactionTotal)
+            if (transactionTotal > 0.0 && uploadedPaymentTotal + 0.01 < transactionTotal) {
+              transactionFailureMessage = simpleMessage(
+                main = "Payment amount is not enough",
+                ru = "Суммы оплаты недостаточно",
+                kk = "Төлем сомасы жеткіліксіз"
+              )
               return@newSuspendedTransaction null
+            }
 
             val id = UUID.randomUUID()
             val timeMillis = body.timeMillis.takeIf { it > 0 } ?: System.currentTimeMillis()
+
+            val stockMutationOk = applyTransactionStockMutationInsideTransaction(
+              userId = userId,
+              storeId = storeId,
+              transaction = body,
+              now = timeMillis
+            )
+
+            if (!stockMutationOk) {
+              transactionFailureMessage = simpleMessage(
+                main = "Not enough stock or item barcode was not found",
+                ru = "Недостаточно товара на складе или штрихкод не найден",
+                kk = "Қоймада тауар жеткіліксіз немесе штрихкод табылмады"
+              )
+              return@newSuspendedTransaction null
+            }
 
             val savedDebtor = body.debtor
               ?.takeIf { it.debtAmount > 0.0 }
@@ -2859,14 +3191,20 @@ fun Application.module() {
             call.genericResponse(
               status = HttpStatusCode.Created,
               payload = it,
-              message = listOf(
-                LocalizedStringDataModel("main", "Transaction completed"),
-                LocalizedStringDataModel("en", "Transaction completed"),
-                LocalizedStringDataModel("ru", "Транзакция завершена"),
-                LocalizedStringDataModel("kk", "Транзакция аяқталды")
+              message = simpleMessage(
+                main = "Transaction completed",
+                ru = "Транзакция завершена",
+                kk = "Транзакция аяқталды"
               )
             )
-          } ?: call.respond(UnauthorizedResponse())
+          } ?: run {
+            transactionFailureMessage?.let { message ->
+              call.genericResponseNoPayload(
+                status = HttpStatusCode.Conflict,
+                message = message
+              )
+            } ?: call.respond(UnauthorizedResponse())
+          }
         }
       }
     }

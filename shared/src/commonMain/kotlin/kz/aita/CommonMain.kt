@@ -23,10 +23,10 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.json.Json
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import kotlinx.serialization.json.Json
 
 @kotlinx.serialization.Serializable
 data class MoneyDataModel(
@@ -35,6 +35,15 @@ data class MoneyDataModel(
 ) {
   val amountDouble: Double
     get() = amount.replace(",", ".").toDoubleOrNull() ?: 0.0
+}
+
+@kotlinx.serialization.Serializable
+data class ExpirationPeriodDataModel(
+  val amount: Int = 0,
+  val unit: String = "days" // days, weeks, months, years
+) {
+  val isUsable: Boolean
+    get() = amount > 0 && unit in setOf("days", "weeks", "months", "years")
 }
 
 @kotlinx.serialization.Serializable
@@ -289,23 +298,56 @@ data class ReceiptPlatformActionResult(
   val message: String = ""
 )
 
+data class ReceiptTextLabelsDataModel(
+  val store: String = "Store",
+  val goodsReceiptTitle: String = "Goods receipt",
+  val receipt: String = "Receipt",
+  val transactionId: String = "Transaction ID",
+  val draft: String = "Draft",
+  val date: String = "Date",
+  val cashier: String = "Cashier",
+  val phone: String = "Phone",
+  val email: String = "Email",
+  val barcode: String = "Barcode",
+  val noName: String = "No name",
+  val noItems: String = "No items",
+  val total: String = "Total",
+  val cash: String = "Cash",
+  val cashless: String = "Cashless",
+  val debt: String = "Debt",
+  val debtor: String = "Debtor",
+  val debtorPhone: String = "Debtor phone",
+  val change: String = "Change",
+  val vat: String = "VAT / НДС / ҚҚС",
+  val vatNotSpecified: String = "Not specified",
+  val fiscalStatus: String = "Fiscal status",
+  val nonFiscalSoftwareReceipt: String = "Non-fiscal software receipt",
+  val thankYou: String = "Thank you",
+  val saleReceiptTitle: String = "Sale",
+  val returnReceiptTitle: String = "Return",
+  val supplyReceiptTitle: String = "Acceptance",
+  val pdfExportNotConfigured: String = "PDF export is not configured for this platform",
+  val pdfSharingNotConfigured: String = "PDF sharing is not configured for this platform",
+  val printerNotConfigured: String = "Receipt printer is not configured for this platform"
+)
+
 var saveReceiptPdfFile: (suspend (fileName: String, pdfBytes: ByteArray) -> ReceiptPlatformActionResult)? = null
 var shareReceiptPdfFile: (suspend (fileName: String, pdfBytes: ByteArray, whatsappOnly: Boolean) -> ReceiptPlatformActionResult)? = null
 var printReceiptEscPosBytes: (suspend (printerBytes: ByteArray) -> ReceiptPlatformActionResult)? = null
 
-suspend fun saveReceiptPdf(fileName: String, pdfBytes: ByteArray): ReceiptPlatformActionResult {
+suspend fun saveReceiptPdf(fileName: String, pdfBytes: ByteArray, labels: ReceiptTextLabelsDataModel = ReceiptTextLabelsDataModel()): ReceiptPlatformActionResult {
   return saveReceiptPdfFile?.invoke(fileName, pdfBytes)
-    ?: ReceiptPlatformActionResult(false, "PDF export is not configured for this platform")
+    ?: ReceiptPlatformActionResult(false, labels.pdfExportNotConfigured)
 }
 
-suspend fun shareReceiptPdf(fileName: String, pdfBytes: ByteArray, whatsappOnly: Boolean = false): ReceiptPlatformActionResult {
+suspend fun shareReceiptPdf(fileName: String, pdfBytes: ByteArray, whatsappOnly: Boolean = false, labels: ReceiptTextLabelsDataModel = ReceiptTextLabelsDataModel()): ReceiptPlatformActionResult {
   return shareReceiptPdfFile?.invoke(fileName, pdfBytes, whatsappOnly)
-    ?: ReceiptPlatformActionResult(false, "PDF sharing is not configured for this platform")
+    ?: ReceiptPlatformActionResult(false, labels.pdfSharingNotConfigured)
 }
 
-suspend fun printReceiptEscPos(printerBytes: ByteArray): ReceiptPlatformActionResult {
+suspend fun printReceiptEscPos(printerBytes: ByteArray, labels: ReceiptTextLabelsDataModel = ReceiptTextLabelsDataModel()): ReceiptPlatformActionResult {
   return printReceiptEscPosBytes?.invoke(printerBytes)
-    ?: ReceiptPlatformActionResult(false, "Receipt printer is not configured for this platform")
+    ?: ReceiptPlatformActionResult(false, labels.printerNotConfigured)
 }
 
 private fun receiptVisibleString(values: List<LocalizedStringDataModel>, language: String, fallback: String): String {
@@ -341,16 +383,16 @@ private fun receiptDateTimeText(timeMillis: Long): String {
   }.getOrElse { timeMillis.toString() }
 }
 
-fun TransactionReceiptSnapshotDataModel.receiptTitle(language: String): String {
+fun TransactionReceiptSnapshotDataModel.receiptTitle(labels: ReceiptTextLabelsDataModel): String {
   return when (transaction.type) {
-    "purchase" -> "SALE / ПРОДАЖА"
-    "return" -> "RETURN / ВОЗВРАТ"
-    else -> "SUPPLY / ПРИЁМКА"
+    "purchase" -> labels.saleReceiptTitle
+    "return" -> labels.returnReceiptTitle
+    else -> labels.supplyReceiptTitle
   }
 }
 
-fun TransactionReceiptSnapshotDataModel.receiptNumberText(): String {
-  val id = transaction.id.takeIf { it.isNotBlank() } ?: "draft"
+fun TransactionReceiptSnapshotDataModel.receiptNumberText(labels: ReceiptTextLabelsDataModel = ReceiptTextLabelsDataModel()): String {
+  val id = transaction.id.takeIf { it.isNotBlank() } ?: labels.draft
   return id.take(8).uppercase()
 }
 
@@ -371,53 +413,59 @@ fun TransactionReceiptSnapshotDataModel.changeAmount(): Double {
   return change.coerceAtLeast(0.0).roundMoney()
 }
 
-fun TransactionReceiptSnapshotDataModel.buildReceiptPlainText(language: String): String {
+fun TransactionReceiptSnapshotDataModel.buildReceiptPlainText(language: String, labels: ReceiptTextLabelsDataModel): String {
   val builder = StringBuilder()
   val storeName = store?.let {
     val form = it.companyForms.firstOrNull()?.name?.let { name -> receiptVisibleString(name, language, "") }.orEmpty()
-    val name = receiptVisibleString(it.name, language, "Store")
+    val name = receiptVisibleString(it.name, language, labels.store)
     "$form $name".trim()
-  } ?: "Store"
+  } ?: labels.store
 
   builder.appendLine(storeName)
   store?.location?.name?.takeIf { it.isNotBlank() }?.let { builder.appendLine(it) }
-  store?.phoneNumbers?.takeIf { it.isNotEmpty() }?.let { builder.appendLine("Tel: ${it.joinToString()}") }
-  store?.emails?.takeIf { it.isNotEmpty() }?.let { builder.appendLine("Email: ${it.joinToString()}") }
+  store?.phoneNumbers?.takeIf { it.isNotEmpty() }?.let { builder.appendLine("${labels.phone}: ${it.joinToString()}") }
+  store?.emails?.takeIf { it.isNotEmpty() }?.let { builder.appendLine("${labels.email}: ${it.joinToString()}") }
   builder.appendLine("--------------------------------")
-  builder.appendLine("ТОВАРНЫЙ ЧЕК / SALES RECEIPT")
-  builder.appendLine(receiptTitle(language))
-  builder.appendLine("Receipt: ${receiptNumberText()}")
-  builder.appendLine("Date: ${receiptDateTimeText(transaction.timeMillis)}")
-  cashierName.takeIf { it.isNotBlank() }?.let { builder.appendLine("Cashier: $it") }
+  builder.appendLine(labels.goodsReceiptTitle)
+  builder.appendLine(receiptTitle(labels))
+  builder.appendLine("${labels.receipt}: ${receiptNumberText(labels)}")
+  if (transaction.id.isNotBlank()) builder.appendLine("${labels.transactionId}: ${transaction.id}")
+  builder.appendLine("${labels.date}: ${receiptDateTimeText(transaction.timeMillis)}")
+  cashierName.takeIf { it.isNotBlank() }?.let { builder.appendLine("${labels.cashier}: $it") }
   builder.appendLine("--------------------------------")
 
-  lines.forEach { line ->
-    val name = receiptVisibleString(line.name, language, "No name")
-    builder.appendLine("${line.index + 1}. $name")
-    if (line.barcode.isNotBlank()) builder.appendLine("   Barcode: ${line.barcode}")
-    builder.appendLine("   ${receiptQuantityText(line.quantity, language)} x ${receiptMoney(line.pricePerUnit)} ${line.currencySymbol} = ${receiptMoney(line.total)} ${line.currencySymbol}")
-  }
-
-  builder.appendLine("--------------------------------")
-  builder.appendLine("TOTAL: ${receiptMoney(totalAmount())} $currencySymbol")
-  if (paymentDraft.paidCash > 0.0) builder.appendLine("Cash: ${receiptMoney(paymentDraft.paidCash)} $currencySymbol")
-  if (paymentDraft.paidCard > 0.0) builder.appendLine("Cashless: ${receiptMoney(paymentDraft.paidCard)} $currencySymbol")
-  if (debtAmount() > 0.0) {
-    builder.appendLine("Debt: ${receiptMoney(debtAmount())} $currencySymbol")
-    paymentDraft.debtor?.let { debtor ->
-      val debtorName = "${debtor.firstName} ${debtor.lastName}".trim().ifBlank { debtor.phoneNumber.ifBlank { debtor.id } }
-      builder.appendLine("Debtor: $debtorName")
-      debtor.phoneNumber.takeIf { it.isNotBlank() }?.let { builder.appendLine("Debtor phone: $it") }
+  if (lines.isEmpty()) {
+    builder.appendLine(labels.noItems)
+  } else {
+    lines.forEach { line ->
+      val name = receiptVisibleString(line.name, language, labels.noName)
+      builder.appendLine("${line.index + 1}. $name")
+      if (line.barcode.isNotBlank()) builder.appendLine("   ${labels.barcode}: ${line.barcode}")
+      builder.appendLine("   ${receiptQuantityText(line.quantity, language)} x ${receiptMoney(line.pricePerUnit)} ${line.currencySymbol} = ${receiptMoney(line.total)} ${line.currencySymbol}")
     }
   }
-  if (changeAmount() > 0.0) builder.appendLine("Change: ${receiptMoney(changeAmount())} $currencySymbol")
+
   builder.appendLine("--------------------------------")
-  builder.appendLine("VAT/НДС/ҚҚС: not specified")
-  builder.appendLine("Fiscal status: non-fiscal software receipt")
-  builder.appendLine("Thank you / Спасибо / Рақмет")
+  builder.appendLine("${labels.total}: ${receiptMoney(totalAmount())} $currencySymbol")
+  if (paymentDraft.paidCash > 0.0) builder.appendLine("${labels.cash}: ${receiptMoney(paymentDraft.paidCash)} $currencySymbol")
+  if (paymentDraft.paidCard > 0.0) builder.appendLine("${labels.cashless}: ${receiptMoney(paymentDraft.paidCard)} $currencySymbol")
+  if (debtAmount() > 0.0) {
+    builder.appendLine("${labels.debt}: ${receiptMoney(debtAmount())} $currencySymbol")
+    paymentDraft.debtor?.let { debtor ->
+      val debtorName = "${debtor.firstName} ${debtor.lastName}".trim().ifBlank { debtor.phoneNumber.ifBlank { debtor.id } }
+      builder.appendLine("${labels.debtor}: $debtorName")
+      debtor.phoneNumber.takeIf { it.isNotBlank() }?.let { builder.appendLine("${labels.debtorPhone}: $it") }
+    }
+  }
+  if (changeAmount() > 0.0) builder.appendLine("${labels.change}: ${receiptMoney(changeAmount())} $currencySymbol")
+  builder.appendLine("--------------------------------")
+  builder.appendLine("${labels.vat}: ${labels.vatNotSpecified}")
+  builder.appendLine("${labels.fiscalStatus}: ${labels.nonFiscalSoftwareReceipt}")
+  builder.appendLine(labels.thankYou)
 
   return builder.toString()
 }
+
 
 private fun pdfEscape(value: String): String {
   return value
@@ -428,8 +476,8 @@ private fun pdfEscape(value: String): String {
     .joinToString("")
 }
 
-fun TransactionReceiptSnapshotDataModel.buildReceiptPdfBytes(language: String): ByteArray {
-  val lines = buildReceiptPlainText(language)
+fun TransactionReceiptSnapshotDataModel.buildReceiptPdfBytes(language: String, labels: ReceiptTextLabelsDataModel): ByteArray {
+  val lines = buildReceiptPlainText(language, labels)
     .lines()
     .flatMap { line ->
       if (line.length <= 58) listOf(line) else line.chunked(58)
@@ -477,28 +525,28 @@ private fun String.escPosSafe(): String {
   return map { ch -> if (ch.code in 32..126 || ch == '\n') ch else '?' }.joinToString("")
 }
 
-fun TransactionReceiptSnapshotDataModel.buildReceiptEscPosBytes(language: String): ByteArray {
-  val text = buildReceiptPlainText(language).escPosSafe()
+fun TransactionReceiptSnapshotDataModel.buildReceiptEscPosBytes(language: String, labels: ReceiptTextLabelsDataModel): ByteArray {
+  val text = buildReceiptPlainText(language, labels).escPosSafe()
   val bytes = mutableListOf<Byte>()
   fun add(vararg values: Int) { values.forEach { bytes += it.toByte() } }
   fun addText(value: String) { bytes += value.encodeToByteArray().toList() }
 
-  add(0x1B, 0x40) // init
-  add(0x1B, 0x61, 0x01) // center
-  add(0x1B, 0x45, 0x01) // bold on
-  addText((store?.name?.let { receiptVisibleString(it, language, "Store") } ?: "Store") + "\n")
+  add(0x1B, 0x40)
+  add(0x1B, 0x61, 0x01)
+  add(0x1B, 0x45, 0x01)
+  addText((store?.name?.let { receiptVisibleString(it, language, labels.store) } ?: labels.store) + "\n")
   add(0x1B, 0x45, 0x00)
-  addText("Receipt ${receiptNumberText()}\n")
-  add(0x1B, 0x61, 0x00) // left
+  addText("${labels.receipt} ${receiptNumberText(labels)}\n")
+  add(0x1B, 0x61, 0x00)
   addText("--------------------------------\n")
   addText(text.substringAfter("--------------------------------\n", text))
   addText("\n\n")
-  add(0x1D, 0x56, 0x42, 0x00) // cut, if supported
+  add(0x1D, 0x56, 0x42, 0x00)
   return bytes.toByteArray()
 }
 
-fun TransactionReceiptSnapshotDataModel.receiptPdfFileName(): String {
-  val safeId = receiptNumberText().replace(Regex("[^A-Za-z0-9_-]"), "_")
+fun TransactionReceiptSnapshotDataModel.receiptPdfFileName(labels: ReceiptTextLabelsDataModel = ReceiptTextLabelsDataModel()): String {
+  val safeId = receiptNumberText(labels).replace(Regex("[^A-Za-z0-9_-]"), "_")
   return "receipt_${safeId}.pdf"
 }
 
@@ -953,7 +1001,7 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
   initial = GlobalAppConfigurationDataModel(
     realtimeUpdatesPath = "rt/updates",
     appName = Pair("AITA", "0"),
-    serverUrl = Pair("http://192.168.0.103:8080", "1"),
+    serverUrl = Pair("http://192.168.100.9:8080", "1"),
     globalAppConfigurationPath = Pair("config/global", "2"),
     logInPath = Pair("auth/logIn", "3"),
     signUpPath = Pair("auth/signUp", "4"),
@@ -1440,6 +1488,42 @@ val stringStandardPricesForSuppliersState = MutableStateFlow("Standard prices fo
 val stringEditableForIndividualBatchesState = MutableStateFlow("Editable for individual batches")
 val stringBatchesDataState = MutableStateFlow("Batches data")
 
+val stringReceiptNumberState = MutableStateFlow("Receipt number")
+val stringTransactionIdState = MutableStateFlow("Transaction ID")
+val stringDateState = MutableStateFlow("Date")
+val stringCashierState = MutableStateFlow("Cashier")
+val stringStoreState = MutableStateFlow("Store")
+val stringAddressState = MutableStateFlow("Address")
+val stringPhoneState = MutableStateFlow("Phone")
+val stringTotalState = MutableStateFlow("Total")
+val stringPaidState = MutableStateFlow("Paid")
+val stringDebtState = MutableStateFlow("Debt")
+val stringDebtorState = MutableStateFlow("Debtor")
+val stringDebtorPhoneState = MutableStateFlow("Debtor phone")
+val stringChangeState = MutableStateFlow("Change")
+val stringVatState = MutableStateFlow("VAT / НДС / ҚҚС")
+val stringVatNotSpecifiedState = MutableStateFlow("Not specified")
+val stringFiscalStatusState = MutableStateFlow("Fiscal status")
+val stringNonFiscalSoftwareReceiptState = MutableStateFlow("Non-fiscal software receipt")
+val stringThankYouState = MutableStateFlow("Thank you")
+val stringNoItemsState = MutableStateFlow("No items")
+val stringNoNameState = MutableStateFlow("No name")
+val stringPdfState = MutableStateFlow("PDF")
+val stringShareState = MutableStateFlow("Share")
+val stringWhatsAppState = MutableStateFlow("WhatsApp")
+val stringPrintState = MutableStateFlow("Print")
+val stringQuitState = MutableStateFlow("Quit")
+val stringReceiptPdfSavedState = MutableStateFlow("Receipt PDF saved")
+val stringReceiptSharedState = MutableStateFlow("Receipt shared")
+val stringReceiptSentToWhatsAppState = MutableStateFlow("Receipt sent to WhatsApp")
+val stringReceiptSentToPrinterState = MutableStateFlow("Receipt sent to printer")
+val stringReceiptActionFailedState = MutableStateFlow("Receipt action failed")
+val stringGoodsReceiptTitleState = MutableStateFlow("Goods receipt")
+val stringSaleReceiptTitleState = MutableStateFlow("Sale")
+val stringReturnReceiptTitleState = MutableStateFlow("Return")
+val stringSupplyReceiptTitleState = MutableStateFlow("Acceptance")
+val stringDraftState = MutableStateFlow("Draft")
+
 val drawablePathAITALogoState = MutableStateFlow("svg/0_0.svg")
 val drawablePathIconPasswordState = MutableStateFlow("svg/1_0.svg")
 val drawablePathIconCancelState = MutableStateFlow("svg/2_0.svg")
@@ -1621,6 +1705,7 @@ val stockState = MutableDataStateFlow<List<GoodsItemDataModel>>(GlobalScope)
 val stockBatchesState = MutableDataStateFlow<List<GoodsBatchDataModel>>(GlobalScope)
 
 val getStockMutex = Mutex()
+val getStockBatchesMutex = Mutex()
 val addGoodsItemMutex = Mutex()
 val updateGoodsItemMutex = Mutex()
 val deleteGoodsItemMutex = Mutex()
@@ -1845,6 +1930,7 @@ fun init() {
         activeStoreIdState.emit(it)
         it?.let {
           getStock(it)
+          getStockBatches(it)
           getTransactions(it)
         }
       }
@@ -2906,11 +2992,221 @@ fun updateStrings(
         appLanguageState.value
       )!!
     )
-    stringBatchesState.emit(
+    stringBatchesDataState.emit(
       strings.extractString(141, appLanguageState.value) ?: resourceStrings.extractString(
         141,
         appLanguageState.value
       )!!
+    )
+    stringReceiptNumberState.emit(
+      strings.extractString(142, appLanguageState.value) ?: resourceStrings.extractString(
+        142,
+        appLanguageState.value
+      ) ?: stringReceiptNumberState.value
+    )
+    stringTransactionIdState.emit(
+      strings.extractString(143, appLanguageState.value) ?: resourceStrings.extractString(
+        143,
+        appLanguageState.value
+      ) ?: stringTransactionIdState.value
+    )
+    stringDateState.emit(
+      strings.extractString(144, appLanguageState.value) ?: resourceStrings.extractString(
+        144,
+        appLanguageState.value
+      ) ?: stringDateState.value
+    )
+    stringCashierState.emit(
+      strings.extractString(145, appLanguageState.value) ?: resourceStrings.extractString(
+        145,
+        appLanguageState.value
+      ) ?: stringCashierState.value
+    )
+    stringStoreState.emit(
+      strings.extractString(146, appLanguageState.value) ?: resourceStrings.extractString(
+        146,
+        appLanguageState.value
+      ) ?: stringStoreState.value
+    )
+    stringAddressState.emit(
+      strings.extractString(147, appLanguageState.value) ?: resourceStrings.extractString(
+        147,
+        appLanguageState.value
+      ) ?: stringAddressState.value
+    )
+    stringPhoneState.emit(
+      strings.extractString(148, appLanguageState.value) ?: resourceStrings.extractString(
+        148,
+        appLanguageState.value
+      ) ?: stringPhoneState.value
+    )
+    stringTotalState.emit(
+      strings.extractString(149, appLanguageState.value) ?: resourceStrings.extractString(
+        149,
+        appLanguageState.value
+      ) ?: stringTotalState.value
+    )
+    stringPaidState.emit(
+      strings.extractString(150, appLanguageState.value) ?: resourceStrings.extractString(
+        150,
+        appLanguageState.value
+      ) ?: stringPaidState.value
+    )
+    stringDebtState.emit(
+      strings.extractString(151, appLanguageState.value) ?: resourceStrings.extractString(
+        151,
+        appLanguageState.value
+      ) ?: stringDebtState.value
+    )
+    stringDebtorState.emit(
+      strings.extractString(152, appLanguageState.value) ?: resourceStrings.extractString(
+        152,
+        appLanguageState.value
+      ) ?: stringDebtorState.value
+    )
+    stringDebtorPhoneState.emit(
+      strings.extractString(153, appLanguageState.value) ?: resourceStrings.extractString(
+        153,
+        appLanguageState.value
+      ) ?: stringDebtorPhoneState.value
+    )
+    stringChangeState.emit(
+      strings.extractString(154, appLanguageState.value) ?: resourceStrings.extractString(
+        154,
+        appLanguageState.value
+      ) ?: stringChangeState.value
+    )
+    stringVatState.emit(
+      strings.extractString(155, appLanguageState.value) ?: resourceStrings.extractString(
+        155,
+        appLanguageState.value
+      ) ?: stringVatState.value
+    )
+    stringVatNotSpecifiedState.emit(
+      strings.extractString(156, appLanguageState.value) ?: resourceStrings.extractString(
+        156,
+        appLanguageState.value
+      ) ?: stringVatNotSpecifiedState.value
+    )
+    stringFiscalStatusState.emit(
+      strings.extractString(157, appLanguageState.value) ?: resourceStrings.extractString(
+        157,
+        appLanguageState.value
+      ) ?: stringFiscalStatusState.value
+    )
+    stringNonFiscalSoftwareReceiptState.emit(
+      strings.extractString(158, appLanguageState.value) ?: resourceStrings.extractString(
+        158,
+        appLanguageState.value
+      ) ?: stringNonFiscalSoftwareReceiptState.value
+    )
+    stringThankYouState.emit(
+      strings.extractString(159, appLanguageState.value) ?: resourceStrings.extractString(
+        159,
+        appLanguageState.value
+      ) ?: stringThankYouState.value
+    )
+    stringNoItemsState.emit(
+      strings.extractString(160, appLanguageState.value) ?: resourceStrings.extractString(
+        160,
+        appLanguageState.value
+      ) ?: stringNoItemsState.value
+    )
+    stringPdfState.emit(
+      strings.extractString(161, appLanguageState.value) ?: resourceStrings.extractString(
+        161,
+        appLanguageState.value
+      ) ?: stringPdfState.value
+    )
+    stringShareState.emit(
+      strings.extractString(162, appLanguageState.value) ?: resourceStrings.extractString(
+        162,
+        appLanguageState.value
+      ) ?: stringShareState.value
+    )
+    stringWhatsAppState.emit(
+      strings.extractString(163, appLanguageState.value) ?: resourceStrings.extractString(
+        163,
+        appLanguageState.value
+      ) ?: stringWhatsAppState.value
+    )
+    stringPrintState.emit(
+      strings.extractString(164, appLanguageState.value) ?: resourceStrings.extractString(
+        164,
+        appLanguageState.value
+      ) ?: stringPrintState.value
+    )
+    stringQuitState.emit(
+      strings.extractString(165, appLanguageState.value) ?: resourceStrings.extractString(
+        165,
+        appLanguageState.value
+      ) ?: stringQuitState.value
+    )
+    stringReceiptPdfSavedState.emit(
+      strings.extractString(166, appLanguageState.value) ?: resourceStrings.extractString(
+        166,
+        appLanguageState.value
+      ) ?: stringReceiptPdfSavedState.value
+    )
+    stringReceiptSharedState.emit(
+      strings.extractString(167, appLanguageState.value) ?: resourceStrings.extractString(
+        167,
+        appLanguageState.value
+      ) ?: stringReceiptSharedState.value
+    )
+    stringReceiptSentToWhatsAppState.emit(
+      strings.extractString(168, appLanguageState.value) ?: resourceStrings.extractString(
+        168,
+        appLanguageState.value
+      ) ?: stringReceiptSentToWhatsAppState.value
+    )
+    stringReceiptSentToPrinterState.emit(
+      strings.extractString(169, appLanguageState.value) ?: resourceStrings.extractString(
+        169,
+        appLanguageState.value
+      ) ?: stringReceiptSentToPrinterState.value
+    )
+    stringReceiptActionFailedState.emit(
+      strings.extractString(170, appLanguageState.value) ?: resourceStrings.extractString(
+        170,
+        appLanguageState.value
+      ) ?: stringReceiptActionFailedState.value
+    )
+    stringGoodsReceiptTitleState.emit(
+      strings.extractString(171, appLanguageState.value) ?: resourceStrings.extractString(
+        171,
+        appLanguageState.value
+      ) ?: stringGoodsReceiptTitleState.value
+    )
+    stringSaleReceiptTitleState.emit(
+      strings.extractString(172, appLanguageState.value) ?: resourceStrings.extractString(
+        172,
+        appLanguageState.value
+      ) ?: stringSaleReceiptTitleState.value
+    )
+    stringReturnReceiptTitleState.emit(
+      strings.extractString(173, appLanguageState.value) ?: resourceStrings.extractString(
+        173,
+        appLanguageState.value
+      ) ?: stringReturnReceiptTitleState.value
+    )
+    stringSupplyReceiptTitleState.emit(
+      strings.extractString(174, appLanguageState.value) ?: resourceStrings.extractString(
+        174,
+        appLanguageState.value
+      ) ?: stringSupplyReceiptTitleState.value
+    )
+    stringDraftState.emit(
+      strings.extractString(175, appLanguageState.value) ?: resourceStrings.extractString(
+        175,
+        appLanguageState.value
+      ) ?: stringDraftState.value
+    )
+    stringNoNameState.emit(
+      strings.extractString(176, appLanguageState.value) ?: resourceStrings.extractString(
+        176,
+        appLanguageState.value
+      ) ?: stringNoNameState.value
     )
 
   }
@@ -3676,9 +3972,9 @@ fun deleteGoodsItem(id: String, storeId: String, onCompleted: (() -> Unit)?) {
 }
 
 fun getStockBatches(storeId: String) {
-  if (!getStockMutex.isLocked)
+  if (!getStockBatchesMutex.isLocked)
     GlobalScope.launch(Dispatchers.ourIo) {
-      getStockMutex.withLock {
+      getStockBatchesMutex.withLock {
         val response = networkRequest<List<GoodsBatchDataModel>, Unit>(
           HttpMethod.Get,
           endpointUrl = globalAppConfigurationState.payloadValue.getStockBatchesPath.first,
@@ -3719,9 +4015,13 @@ fun updateGoodsBatches(
                 }
 
                 response.payload!!.forEach { item ->
-                  stockBatchesState.payloadValue?.indexOfFirst { it.id == item.id }?.let { index ->
+                  val index = newList.indexOfFirst { it.id == item.id }
+
+                  if (index >= 0) {
                     newList[index] = item
-                  } ?: newList.addAll(response.payload)
+                  } else {
+                    newList.add(item)
+                  }
                 }
               }
             )
@@ -3775,7 +4075,7 @@ fun deleteGoodsBatches(ids: List<String>, storeId: String, onCompleted: (() -> U
   if (!deleteGoodsItemMutex.isLocked)
     GlobalScope.launch(Dispatchers.ourIo) {
       deleteGoodsItemMutex.withLock {
-        val response = networkRequest<String, List<String>>(
+        val response = networkRequest<List<String>, List<String>>(
           HttpMethod.Delete,
           endpointUrl = globalAppConfigurationState.payloadValue.deleteStockBatchPath.first,
           body = ids,
@@ -4428,6 +4728,8 @@ data class GoodsItemDataModel(
   val salePrices: List<PriceDataModel> = emptyList(),
   val returnPrices: List<PriceDataModel> = emptyList(),
   val supplyPrices: List<PriceDataModel> = emptyList(),
+
+  val genericExpirationPeriod: ExpirationPeriodDataModel? = null,
 
   val isQuickItem: Boolean = false,
   val imagePaths: List<String> = emptyList(),

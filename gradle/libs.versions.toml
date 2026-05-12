@@ -39,6 +39,7 @@ securityCrypto = "1.1.0"
 hiltAndroid = "2.57.2"
 ksp = "2.2.20-2.0.3"
 skiko-svg = "0.8.22"
+lifecycleViewmodelKtx = "2.10.0"
 
 [libraries]
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastorePreferences" }
@@ -106,6 +107,7 @@ sqlDelightAsyncExtensions = { module = "app.cash.sqldelight:async-extensions", v
 androidx-security-crypto = { module = "androidx.security:security-crypto", version.ref = "securityCrypto" }
 hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hiltAndroid" }
 hilt-android-compiler = { module = "com.google.dagger:hilt-android-compiler", version.ref = "hiltAndroid" }
+androidx-lifecycle-viewmodel-ktx = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-ktx", version.ref = "lifecycleViewmodelKtx" }
 
 [plugins]
 kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
