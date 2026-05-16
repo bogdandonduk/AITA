@@ -5,6 +5,7 @@ package kz.aita
 import aita.composeapp.generated.resources.*
 import androidx.compose.animation.*
 import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -32,13 +33,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.FocusState
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.compose.ui.text.*
@@ -50,6 +55,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.window.Dialog
 import io.kamel.core.config.*
 import io.kamel.image.KamelImage
@@ -147,6 +153,56 @@ suspend fun loadResourceDrawablePaths(): List<StylizedDrawablePathsGroupDataMode
   return jsonBase.decodeFromString<ResponseDataModel<List<StylizedDrawablePathsGroupDataModel>>>(
     Res.readBytes("files/assets/drawable/drawables.json").decodeToString()
   ).payload!!
+}
+
+private fun Color.softAppBackgroundColor(): Color {
+  return when {
+    red > 0.97f && green > 0.97f && blue > 0.97f -> Color(0xFFF4F5F7)
+    red < 0.04f && green < 0.04f && blue < 0.04f -> Color(0xFF121316)
+    else -> this
+  }
+}
+
+private fun Modifier.foregroundTactileShadow(
+  cornerRadius: Dp,
+  elevated: Boolean = false
+): Modifier {
+  return shadow(
+    elevation = if (elevated) 12.dp else 4.dp,
+    shape = RoundedCornerShape(cornerRadius),
+    clip = false
+  )
+}
+
+private fun Modifier.foregroundSubtleShadow(
+  cornerRadius: Dp
+): Modifier {
+  return shadow(
+    elevation = 1.dp,
+    shape = RoundedCornerShape(cornerRadius),
+    clip = false
+  )
+}
+
+private fun accentTextShadow(
+  color: Color,
+  accentColor: Color
+): Shadow? {
+  return if (color == accentColor) {
+    Shadow(
+      color = accentColor.copy(alpha = 0.95f),
+      offset = Offset.Zero,
+      blurRadius = 8f
+    )
+  } else null
+}
+
+private fun accentTextWeight(
+  color: Color,
+  accentColor: Color,
+  fallback: FontWeight = FontWeight.Normal
+): FontWeight {
+  return if (color == accentColor) FontWeight.Bold else fallback
 }
 
 @Composable
@@ -654,6 +710,8 @@ fun AppConfiguration.TransactionSelectionScreen() {
       onExactSearchHit = addToCartAction,
       disableIfOutOfStock = context.transactionTypeIndex == 0,
       showStockType = false,
+      showBatches = false,
+      transactionTypeIndex = context.transactionTypeIndex,
       onFilter = when (scopeRowContent.id) {
         "1" -> {
           { it.isQuickItem }
@@ -954,7 +1012,8 @@ fun AppConfiguration.TransactionScreen() {
             modifier = Modifier
               .weight(1f)
               .height(38.dp)
-              .padding(stateValues.focusedBorderWidth)
+              .padding(2.dp)
+              .foregroundTactileShadow(stateValues.cornerRadius, elevated = clientId == index)
               .clip(RoundedCornerShape(stateValues.cornerRadius))
               .border(
                 stateValues.unfocusedBorderWidth,
@@ -963,7 +1022,7 @@ fun AppConfiguration.TransactionScreen() {
                   stateValues.cornerRadius
                 )
               )
-              .background(if (clientId == index) stateValues.AccentColor else Color.Transparent)
+              .background(if (clientId == index) stateValues.AccentColor else stateValues.BackgroundColor)
               .clickable(
                 interactionSource = remember {
                   MutableInteractionSource()
@@ -1292,7 +1351,7 @@ private fun AppConfiguration.ReceiptPreviewLine(
   line.barcode.takeIf { it.isNotBlank() }?.let {
     ReceiptPreviewText(
       text = "${labels.barcode}: $it",
-      color = Color.DarkGray
+      color = stateValues.TextColor
     )
   }
 
@@ -1551,7 +1610,7 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
             text = labels.noItems,
             center = true,
             bold = true,
-            color = Color.DarkGray
+            color = stateValues.TextColor
           )
         }
       } else {
@@ -1929,7 +1988,7 @@ private fun AppConfiguration.TransactionTotalCard(
     if (title.isNotBlank()) {
       Text(
         text = title,
-        color = stateValues.PlaceholderTextColor,
+        color = stateValues.TextColor,
         fontSize = stateValues.smallTextSize,
         fontWeight = FontWeight.Bold
       )
@@ -1947,7 +2006,7 @@ private fun AppConfiguration.TransactionTotalCard(
     if (currencyCode.isNotBlank()) {
       Text(
         text = currencyCode,
-        color = stateValues.PlaceholderTextColor,
+        color = stateValues.TextColor,
         fontSize = stateValues.smallTextSize
       )
     }
@@ -1984,7 +2043,7 @@ private fun AppConfiguration.TransactionPaymentInfoCard(
 
     Text(
       text = subtitle,
-      color = stateValues.PlaceholderTextColor,
+      color = stateValues.TextColor,
       fontSize = stateValues.smallTextSize
     )
 
@@ -2008,13 +2067,14 @@ private fun AppConfiguration.TransactionPaymentOptionButton(
 ) {
   Box(
     modifier = modifier
+      .foregroundTactileShadow(stateValues.cornerRadius, elevated = selected)
       .clip(RoundedCornerShape(stateValues.cornerRadius))
       .border(
         stateValues.unfocusedBorderWidth,
         if (selected) stateValues.AccentColor else stateValues.PlaceholderTextColor,
         RoundedCornerShape(stateValues.cornerRadius)
       )
-      .background(if (selected) stateValues.AccentColor else Color.Transparent)
+      .background(if (selected) stateValues.AccentColor else stateValues.BackgroundColor)
       .clickable(
         interactionSource = remember { MutableInteractionSource() },
         indication = ripple(
@@ -2080,7 +2140,7 @@ private fun AppConfiguration.TransactionAmountField(
           if (value.isBlank()) {
             Text(
               text = placeholder,
-              color = stateValues.PlaceholderTextColor,
+              color = stateValues.TextColor,
               fontSize = stateValues.textSize
             )
           }
@@ -2214,9 +2274,18 @@ private fun AppConfiguration.TransactionQuickAmountButtons(
   currencyCode: String,
   currencySymbol: String,
   includeExactRemaining: Boolean,
+  currentAmount: Double? = null,
   onAmountSelected: (Double) -> Unit
 ) {
-  val amounts = quickTenderAmounts(targetAmount, currencyCode, includeExactRemaining)
+  val target = targetAmount.roundMoney().coerceAtLeast(0.0)
+  val current = currentAmount?.roundMoney()
+  val exactAlreadyEntered = includeExactRemaining && current != null && kotlin.math.abs(current - target) < 0.01
+
+  val amounts = quickTenderAmounts(
+    amount = target,
+    currencyCode = currencyCode,
+    includeExactRemaining = includeExactRemaining && !exactAlreadyEntered
+  ).filterNot { exactAlreadyEntered && kotlin.math.abs(it.roundMoney() - target) < 0.01 }
 
   if (amounts.isEmpty())
     return
@@ -2228,6 +2297,7 @@ private fun AppConfiguration.TransactionQuickAmountButtons(
     items(amounts) { amount ->
       Box(
         modifier = Modifier
+          .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
           .clip(RoundedCornerShape(stateValues.cornerRadius))
           .border(
             stateValues.unfocusedBorderWidth,
@@ -2249,6 +2319,7 @@ private fun AppConfiguration.TransactionQuickAmountButtons(
           color = stateValues.AccentColor,
           fontSize = stateValues.smallTextSize,
           fontWeight = FontWeight.Bold,
+          style = TextStyle(shadow = accentTextShadow(stateValues.AccentColor, stateValues.AccentColor)),
           maxLines = 1,
           overflow = TextOverflow.Ellipsis
         )
@@ -2473,13 +2544,14 @@ private fun AppConfiguration.TransactionPaymentHeadsUpCard(
     modifier = Modifier
       .fillMaxWidth()
       .padding(horizontal = stateValues.marginTextField)
+      .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
       .clip(RoundedCornerShape(stateValues.cornerRadius))
+      .background(stateValues.BackgroundColor)
       .border(
         stateValues.unfocusedBorderWidth,
         if (paymentValid) stateValues.AccentColor else stateValues.PlaceholderTextColor,
         RoundedCornerShape(stateValues.cornerRadius)
       )
-      .background(stateValues.BackgroundColor)
       .padding(stateValues.marginTextFieldGroup)
   ) {
     Text(
@@ -2494,7 +2566,7 @@ private fun AppConfiguration.TransactionPaymentHeadsUpCard(
     if (currencyCode.isNotBlank()) {
       Text(
         text = currencyCode,
-        color = stateValues.PlaceholderTextColor,
+        color = stateValues.TextColor,
         fontSize = stateValues.smallTextSize,
         fontWeight = FontWeight.Bold
       )
@@ -2540,7 +2612,7 @@ private fun AppConfiguration.TransactionPaymentSummaryRows(
     ) {
       Text(
         text = title,
-        color = stateValues.PlaceholderTextColor,
+        color = stateValues.TextColor,
         fontSize = textSize,
         fontWeight = FontWeight.Bold
       )
@@ -2889,6 +2961,7 @@ fun AppConfiguration.TransactionPaymentScreen() {
               currencyCode = currencyCode,
               currencySymbol = currencySymbol,
               includeExactRemaining = true,
+              currentAmount = cashText.toMoneyDouble(),
               onAmountSelected = {
                 activeAmountField = "cash"
                 setPaymentField("cash", moneyInputFromDouble(it))
@@ -2960,6 +3033,7 @@ fun AppConfiguration.TransactionPaymentScreen() {
               currencyCode = currencyCode,
               currencySymbol = currencySymbol,
               includeExactRemaining = true,
+              currentAmount = cashText.toMoneyDouble(),
               onAmountSelected = {
                 activeAmountField = "cash"
                 setPaymentField("cash", moneyInputFromDouble(it))
@@ -2984,6 +3058,7 @@ fun AppConfiguration.TransactionPaymentScreen() {
               currencyCode = currencyCode,
               currencySymbol = currencySymbol,
               includeExactRemaining = true,
+              currentAmount = cardText.toMoneyDouble(),
               onAmountSelected = {
                 activeAmountField = "card"
                 setPaymentField("card", moneyInputFromDouble(it))
@@ -3008,6 +3083,7 @@ fun AppConfiguration.TransactionPaymentScreen() {
               currencyCode = currencyCode,
               currencySymbol = currencySymbol,
               includeExactRemaining = true,
+              currentAmount = debtText.toMoneyDouble(),
               onAmountSelected = {
                 activeAmountField = "debt"
                 setPaymentField("debt", moneyInputFromDouble(it))
@@ -3350,6 +3426,7 @@ fun AppConfiguration.GoodsItemInCartWidget(
   index: Int? = null,
   goodsItemInCart: GoodsItemInCartDataModel,
   goodsItem: GoodsItemDataModel,
+  transactionTypeIndex: Int,
   textColor: Color = stateValues.TextColor,
   onClick: ((GoodsItemDataModel) -> Unit)? = null,
   onDelete: ((GoodsItemDataModel) -> Unit)? = null,
@@ -3360,6 +3437,16 @@ fun AppConfiguration.GoodsItemInCartWidget(
     modifier
       .padding(bottom = 4.dp)
       .fillMaxHeight()
+      .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+      .clip(RoundedCornerShape(stateValues.cornerRadius))
+      .background(stateValues.BackgroundColor)
+      .border(
+        stateValues.unfocusedBorderWidth,
+        stateValues.PlaceholderTextColor,
+        RoundedCornerShape(
+          stateValues.cornerRadius
+        )
+      )
       .run {
         onClick?.run {
           clickable(
@@ -3373,14 +3460,6 @@ fun AppConfiguration.GoodsItemInCartWidget(
           )
         } ?: this
       }
-      .clip(RoundedCornerShape(stateValues.cornerRadius))
-      .border(
-        stateValues.unfocusedBorderWidth,
-        stateValues.PlaceholderTextColor,
-        RoundedCornerShape(
-          stateValues.cornerRadius
-        )
-      )
   ) {
     Column(
       modifier = Modifier
@@ -3414,10 +3493,10 @@ fun AppConfiguration.GoodsItemInCartWidget(
           }
         }
       }.run {
-        Text(
-          text = this,
-          fontSize = stateValues.textSize,
-          color = textColor
+        StockCardInfoLine(
+          title = stateValues.stringBarcode,
+          value = this,
+          textColor = textColor
         )
       }
 
@@ -3426,12 +3505,80 @@ fun AppConfiguration.GoodsItemInCartWidget(
         .joinToString(", ")
         .takeIf { it.isNotBlank() }
         ?.run {
-          Text(
-            text = this,
-            fontSize = stateValues.textSize,
-            color = textColor
+          StockCardInfoLine(
+            title = stateValues.stringCategory,
+            value = this,
+            textColor = textColor
           )
         }
+
+      val cartUnitText = goodsItemInCart.quantity.immutableUnitName.extractLocalizedString(stateValues.appLanguage).orEmpty()
+      val quantityText = "${goodsItemInCart.quantity.total.run { if (goodsItemInCart.quantity.roundTotal) toInt().toString() else moneyText() }} $cartUnitText".trim()
+      val itemPrice = when (transactionTypeIndex) {
+        0 -> goodsItem.salePrices.firstOrNull()
+        1 -> goodsItem.returnPrices.firstOrNull()
+        else -> goodsItem.supplyPrices.firstOrNull()
+      }
+      val itemPriceTitle = when (transactionTypeIndex) {
+        0 -> stateValues.stringSalePrice
+        1 -> stateValues.stringReturnPrice
+        else -> stateValues.stringSupplyPrice
+      }
+      val lineTotal = itemPrice?.price?.replace(',', '.')?.toDoubleOrNull()?.let { it * goodsItemInCart.quantity.total }
+      val itemBatches = stateValues.stockBatches.orEmpty().filter { it.goodsItemId == goodsItem.id && it.isActive }
+      val availableQuantity = itemBatches
+        .filter { it.status != StockBatchStatusDataModel.Deleted && it.status != StockBatchStatusDataModel.WrittenOff }
+        .sumOf { it.quantity.total }
+      val activeBatch = itemBatches.sortedForShelf(goodsItem).firstOrNull { it.id == goodsItem.activeShelfBatchId }
+        ?: itemBatches.sortedForShelf(goodsItem).firstOrNull()
+
+      StockCardInfoLine(
+        title = "In cart",
+        value = quantityText,
+        textColor = textColor
+      )
+
+      itemPrice?.let { price ->
+        StockCardInfoLine(
+          title = itemPriceTitle,
+          value = "${price.price} ${price.currency}",
+          textColor = textColor
+        )
+      }
+
+      lineTotal?.let { totalValue ->
+        StockCardInfoLine(
+          title = stateValues.stringTotal,
+          value = "${totalValue.moneyText()} ${itemPrice?.currency.orEmpty()}".trim(),
+          textColor = textColor
+        )
+      }
+
+      StockCardInfoLine(
+        title = "Available",
+        value = "${availableQuantity.run { if (goodsItemInCart.quantity.roundTotal) toInt().toString() else moneyText() }} $cartUnitText".trim(),
+        textColor = textColor
+      )
+
+      activeBatch?.let { batch ->
+        StockCardInfoLine(
+          title = "Active batch",
+          value = listOfNotNull(
+            "#${itemBatches.sortedForShelf(goodsItem).indexOfFirst { it.id == batch.id } + 1}",
+            batch.expirationDateMillis?.toStockDateInputText()?.let { "exp $it" },
+            batch.status.name
+          ).joinToString(" • "),
+          textColor = textColor
+        )
+      }
+
+      goodsItem.note?.takeIf { it.isNotBlank() }?.let { note ->
+        StockCardInfoLine(
+          title = "Note",
+          value = note,
+          textColor = textColor
+        )
+      }
 
       Spacer(
         modifier = Modifier
@@ -3445,7 +3592,7 @@ fun AppConfiguration.GoodsItemInCartWidget(
         actionButton(
           fillMaxHeight = true,
           text = "",
-          enabledColor = stateValues.DisabledColor,
+          enabledColor = stateValues.ErrorColor,
           iconPath = stateValues.drawablePathIconSubtract,
           iconContentDescription = stateValues.stringSubtract,
           onClick = decreaseQuantityAction
@@ -3456,7 +3603,9 @@ fun AppConfiguration.GoodsItemInCartWidget(
         Box(
           modifier = Modifier
             .height(stateValues.textFieldHeight)
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
             .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
             .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor, RoundedCornerShape(stateValues.cornerRadius)),
           contentAlignment = Alignment.Center
         ) {
@@ -3471,12 +3620,10 @@ fun AppConfiguration.GoodsItemInCartWidget(
 
         Spacer(modifier = Modifier.width(2.dp))
 
-        // TODO: Add red and green quantity dependent coloring of buttons
-
         actionButton(
           fillMaxHeight = true,
           text = "",
-          enabledColor = stateValues.DisabledColor,
+          enabledColor = stateValues.OkayColor,
           iconPath = stateValues.drawablePathIconAdd,
           iconContentDescription = stateValues.stringAdd,
           onClick = increaseQuantityAction
@@ -3565,6 +3712,7 @@ fun AppConfiguration.TransactionCartScreen() {
               index = index,
               goodsItemInCart = cartItem,
               goodsItem = goodsItem,
+              transactionTypeIndex = context.transactionTypeIndex,
               onDelete = {
                 deleteCartById(
                   id = cartItem.id,
@@ -3810,7 +3958,10 @@ fun AppConfiguration.tabRowWidget(
 
       Row(
         modifier = Modifier
+          .padding(2.dp)
+          .foregroundTactileShadow(cornerRadius, elevated = false)
           .clip(RoundedCornerShape(cornerRadius))
+          .background(stateValues.BackgroundColor)
       ) {
         tabs.forEachIndexed { _, tab ->
           val isSelected = tab.id == selectedId
@@ -3844,6 +3995,8 @@ fun AppConfiguration.tabRowWidget(
                 .padding(6.dp),
               fontSize = textSize,
               color = textColor,
+              fontWeight = accentTextWeight(textColor, stateValues.AccentColor),
+              style = TextStyle(shadow = accentTextShadow(textColor, stateValues.AccentColor)),
               textAlign = TextAlign.Center,
               maxLines = 1,
               overflow = TextOverflow.Ellipsis
@@ -3880,7 +4033,9 @@ fun AppConfiguration.StoreWidget(
   Row(
     modifier
       .padding(bottom = 4.dp)
+      .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
       .clip(RoundedCornerShape(stateValues.cornerRadius))
+      .background(stateValues.BackgroundColor)
       .border(
         if (onSetActive == null) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
         if (onSetActive == null) stateValues.OkayColor else stateValues.PlaceholderTextColor,
@@ -4106,6 +4261,8 @@ fun AppConfiguration.StockWarehouseScreenContent(
   searchQuery: String? = null,
   disableIfOutOfStock: Boolean = false,
   showStockType: Boolean = true,
+  showBatches: Boolean = true,
+  transactionTypeIndex: Int? = null,
   onFilter: ((GoodsItemDataModel) -> Boolean)? = null,
   onClick: ((GoodsItemDataModel) -> Unit)? = null,
   onDelete: ((GoodsItemDataModel) -> Unit)? = null,
@@ -4171,13 +4328,21 @@ fun AppConfiguration.StockWarehouseScreenContent(
               .padding(8.dp)
           ) {
             items(items) { item ->
+              val itemBatches = stateValues.stockBatches.orEmpty().filter { it.goodsItemId == item.id && it.isActive }
+              val availableQuantity = itemBatches
+                .filter { it.status != StockBatchStatusDataModel.Deleted && it.status != StockBatchStatusDataModel.WrittenOff }
+                .sumOf { it.quantity.total }
+              val trulyOutOfStock = disableIfOutOfStock && availableQuantity <= 0.0
+
               GoodsItemInStockWidget(
                 modifier = Modifier
-                  .alpha(if (disableIfOutOfStock /* TODO && item.quantity.total == 0.0 */) 0.5f else 1f),
+                  .alpha(if (trulyOutOfStock) 0.5f else 1f),
                 goodsItem = item,
-                batches = stateValues.stockBatches.orEmpty().filter { it.goodsItemId == item.id && it.isActive },
+                batches = itemBatches,
+                showBatches = showBatches,
+                transactionTypeIndex = transactionTypeIndex,
                 onDelete = onDelete,
-                onClick = onClick,
+                onClick = if (trulyOutOfStock) null else onClick,
                 onEdit = onEdit,
                 onAddBatch = onAddBatch
               )
@@ -4914,10 +5079,17 @@ fun AppConfiguration.StockBatchCard(
   activeShelfBatchId: String?,
   shelfIndex: Int? = null,
   compact: Boolean = false,
+  draggedBatchId: String? = null,
+  draggedBatchIndex: Int? = null,
+  dragTargetIndex: Int? = null,
+  allBatchesCount: Int = 0,
   onEdit: () -> Unit,
   onDelete: () -> Unit,
   onSetActiveShelf: () -> Unit,
-  onMove: ((Int) -> Unit)? = null
+  onDragStart: ((String) -> Unit)? = null,
+  onDragTargetChanged: ((Int) -> Unit)? = null,
+  onDragFinished: ((Int) -> Unit)? = null,
+  onDragCancelled: (() -> Unit)? = null
 ) {
   val supplierName = stateValues.suppliers
     .orEmpty()
@@ -4927,44 +5099,86 @@ fun AppConfiguration.StockBatchCard(
     ?: "No supplier"
 
   val isActiveShelf = batch.id == activeShelfBatchId
-  var dragDelta by remember { mutableStateOf(0f) }
+  val isDragging = draggedBatchId == batch.id
+  val currentIndex = shelfIndex ?: 0
+  val density = LocalDensity.current
+  val itemStepPx = with(density) { 116.dp.toPx() }
+
+  var dragOffsetPx by remember(batch.id) { mutableStateOf(0f) }
+
+  val pushedOffsetPx = when {
+    draggedBatchIndex == null || dragTargetIndex == null || isDragging -> 0f
+    draggedBatchIndex < dragTargetIndex && currentIndex in (draggedBatchIndex + 1)..dragTargetIndex -> -itemStepPx
+    draggedBatchIndex > dragTargetIndex && currentIndex in dragTargetIndex until draggedBatchIndex -> itemStepPx
+    else -> 0f
+  }
+
+  val animatedPushedOffsetPx by animateFloatAsState(
+    targetValue = pushedOffsetPx,
+    animationSpec = tween(160),
+    label = "batchVerticalPushedOffset"
+  )
+
+  fun dragBounds(): ClosedFloatingPointRange<Float> {
+    if (allBatchesCount <= 0) return 0f..0f
+    val min = -currentIndex * itemStepPx
+    val max = ((allBatchesCount - 1) - currentIndex) * itemStepPx
+    return min..max
+  }
+
+  fun currentTargetIndex(): Int {
+    if (allBatchesCount <= 0) return currentIndex
+    val deltaSlots = round(dragOffsetPx / itemStepPx).toInt()
+    return (currentIndex + deltaSlots).coerceIn(0, allBatchesCount - 1)
+  }
 
   Column(
     modifier = Modifier
       .run {
         if (compact) widthIn(min = 176.dp, max = 240.dp) else fillMaxWidth()
       }
+      .zIndex(if (isDragging) 2f else 0f)
+      .graphicsLayer {
+        translationY = if (isDragging) dragOffsetPx else animatedPushedOffsetPx
+        scaleX = if (isDragging) 1.025f else 1f
+        scaleY = if (isDragging) 1.025f else 1f
+        alpha = if (isDragging) 0.97f else 1f
+      }
+      .foregroundTactileShadow(stateValues.cornerRadius, elevated = isDragging)
       .clip(RoundedCornerShape(stateValues.cornerRadius))
+      .background(stateValues.BackgroundColor)
       .border(
-        if (isActiveShelf) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
-        if (isActiveShelf) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+        if (isActiveShelf || isDragging) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
+        when {
+          isDragging -> stateValues.AccentColor
+          isActiveShelf -> stateValues.AccentColor
+          else -> stateValues.PlaceholderTextColor
+        },
         RoundedCornerShape(stateValues.cornerRadius)
       )
-      .background(stateValues.BackgroundColor)
-      .pointerInput(batch.id, onMove, compact) {
-        val moveAction = onMove ?: return@pointerInput
+      .pointerInput(batch.id, allBatchesCount, currentIndex) {
+        if (onDragFinished == null) return@pointerInput
 
         detectDragGesturesAfterLongPress(
-          onDragStart = { dragDelta = 0f },
+          onDragStart = {
+            dragOffsetPx = 0f
+            onDragStart?.invoke(batch.id)
+            onDragTargetChanged?.invoke(currentIndex)
+          },
           onDrag = { change, dragAmount ->
             change.consume()
-            dragDelta += if (compact) dragAmount.x else dragAmount.y
-
-            val threshold = 44f
-            when {
-              dragDelta > threshold -> {
-                moveAction(1)
-                dragDelta = 0f
-              }
-
-              dragDelta < -threshold -> {
-                moveAction(-1)
-                dragDelta = 0f
-              }
-            }
+            dragOffsetPx += dragAmount.y
+            onDragTargetChanged?.invoke(currentTargetIndex())
           },
-          onDragEnd = { dragDelta = 0f },
-          onDragCancel = { dragDelta = 0f }
+          onDragEnd = {
+            val target = currentTargetIndex()
+            dragOffsetPx = 0f
+            onDragFinished?.invoke(target)
+          },
+          onDragCancel = {
+            dragOffsetPx = 0f
+            onDragCancelled?.invoke()
+          }
         )
       }
       .padding(stateValues.marginTextFieldGroup)
@@ -4980,7 +5194,7 @@ fun AppConfiguration.StockBatchCard(
             shelfIndex?.let { "#${it + 1}" },
             if (isActiveShelf) "Active shelf" else "Batch"
           ).joinToString(" • "),
-          color = if (isActiveShelf) stateValues.AccentColor else stateValues.TextColor,
+          color = if (isActiveShelf || isDragging) stateValues.AccentColor else stateValues.TextColor,
           fontSize = stateValues.textSize,
           fontWeight = FontWeight.Bold,
           maxLines = 1,
@@ -4989,7 +5203,7 @@ fun AppConfiguration.StockBatchCard(
 
         Text(
           text = supplierName,
-          color = stateValues.PlaceholderTextColor,
+          color = stateValues.TextColor,
           fontSize = stateValues.smallTextSize,
           maxLines = 1,
           overflow = TextOverflow.Ellipsis
@@ -5018,7 +5232,67 @@ fun AppConfiguration.StockBatchCard(
       StockCardInfoLine(
         title = "Expiration",
         value = it,
-        textColor = stateValues.PlaceholderTextColor
+        textColor = stateValues.TextColor
+      )
+    }
+
+    batch.salePriceOverride?.let {
+      StockCardInfoLine(
+        title = stateValues.stringSalePrice,
+        value = "${it.price} ${it.currency}",
+        textColor = stateValues.TextColor
+      )
+    }
+
+    batch.returnPriceOverride?.let {
+      StockCardInfoLine(
+        title = stateValues.stringReturnPrice,
+        value = "${it.price} ${it.currency}",
+        textColor = stateValues.TextColor
+      )
+    }
+
+    batch.deliveredAtMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let {
+      StockCardInfoLine(
+        title = "Delivered",
+        value = it,
+        textColor = stateValues.TextColor
+      )
+    }
+
+    batch.manufacturedAtMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let {
+      StockCardInfoLine(
+        title = "Made",
+        value = it,
+        textColor = stateValues.TextColor
+      )
+    }
+
+    StockCardInfoLine(
+      title = "Status",
+      value = batch.status.name,
+      textColor = stateValues.TextColor
+    )
+
+    batch.shelfPosition?.takeIf { it.isNotBlank() }?.let {
+      StockCardInfoLine(
+        title = "Shelf position",
+        value = it,
+        textColor = stateValues.TextColor
+      )
+    }
+
+    StockCardInfoLine(
+      title = "Priority",
+      value = batch.shelfPriority.toString(),
+      textColor = stateValues.TextColor
+    )
+
+    if (batch.discounts.isNotEmpty()) {
+      StockCardInfoLine(
+        title = "Discounts",
+        value = batch.discounts.size.toString(),
+        textColor = stateValues.TextColor
       )
     }
 
@@ -5026,7 +5300,7 @@ fun AppConfiguration.StockBatchCard(
       StockCardInfoLine(
         title = "Notes",
         value = it,
-        textColor = stateValues.PlaceholderTextColor
+        textColor = stateValues.TextColor
       )
     }
 
@@ -5065,6 +5339,7 @@ fun AppConfiguration.StockBatchCard(
     }
   }
 }
+
 
 
 
@@ -5539,6 +5814,9 @@ fun AppConfiguration.StockAddEditBatchesPage(
     return
   }
 
+  var draggedBatchId by remember(goodsItem.id) { mutableStateOf<String?>(null) }
+  var dragTargetIndex by remember(goodsItem.id) { mutableStateOf<Int?>(null) }
+
   Column(
     modifier = modifier.fillMaxSize()
   ) {
@@ -5559,7 +5837,7 @@ fun AppConfiguration.StockAddEditBatchesPage(
 
         Text(
           text = "The first batch is the active shelf batch. Long-press and drag a batch up or down to change shelf order.",
-          color = stateValues.PlaceholderTextColor,
+          color = stateValues.TextColor,
           fontSize = stateValues.smallTextSize
         )
 
@@ -5582,6 +5860,10 @@ fun AppConfiguration.StockAddEditBatchesPage(
             activeShelfBatchId = goodsItem.activeShelfBatchId,
             shelfIndex = index,
             compact = false,
+            draggedBatchId = draggedBatchId,
+            draggedBatchIndex = draggedBatchId?.let { id -> batches.indexOfFirst { it.id == id }.takeIf { it >= 0 } },
+            dragTargetIndex = dragTargetIndex,
+            allBatchesCount = batches.size,
             onEdit = {
               coroutineScope.launch {
                 NavigationScreenModel.Stock.AddEditGoodsItem.setState(modeKey to "edit")
@@ -5602,13 +5884,29 @@ fun AppConfiguration.StockAddEditBatchesPage(
                 setActiveShelfBatch(batch, storeId)
               }
             },
-            onMove = { direction ->
-              moveShelfBatch(
-                goodsItem = goodsItem,
-                batches = batches,
-                batch = batch,
-                direction = direction
-              )
+            onDragStart = { id ->
+              draggedBatchId = id
+              dragTargetIndex = index
+            },
+            onDragTargetChanged = { target ->
+              dragTargetIndex = target
+            },
+            onDragFinished = { target ->
+              val from = index
+              draggedBatchId = null
+              dragTargetIndex = null
+              if (from != target) {
+                reorderShelfBatches(
+                  goodsItem = goodsItem,
+                  batches = batches,
+                  fromIndex = from,
+                  toIndex = target
+                )
+              }
+            },
+            onDragCancelled = {
+              draggedBatchId = null
+              dragTargetIndex = null
             }
           )
 
@@ -5653,90 +5951,427 @@ fun AppConfiguration.StockSupplierPricesPage(
     return
   }
 
+  val storeId = stateValues.activeStoreId ?: goodsItem.storeId
+  val suppliers = stateValues.suppliers.orEmpty()
   val supplierPricesPayload by supplierGoodsPricesState.payload.collectAsState()
-  val supplierPrices = supplierPricesPayload
-    .orEmpty()
-    .filter {
-      it.goodsItemId == goodsItem.id && it.isActive
-    }
+  val allSupplierPrices = supplierPricesPayload.orEmpty()
+  val supplierPrices = allSupplierPrices
+    .filter { it.goodsItemId == goodsItem.id && it.isActive }
 
-  LazyColumn(
-    modifier = modifier
-      .fillMaxSize()
-      .padding(stateValues.marginTextField)
-  ) {
-    item {
-      Text(
-        text = "Supplier prices",
-        color = stateValues.TextColor,
-        fontSize = stateValues.titleTextSize,
-        fontWeight = FontWeight.Bold
+  val defaultCurrency = goodsItem.supplyPrices.firstOrNull()?.currency
+    ?: stateValues.globalAppConfiguration.countries
+      .find { it.locale.equals(stateValues.userAccount?.countryLocale, true) }
+      ?.currencies
+      ?.firstOrNull()
+      ?.code
+    ?: stateValues.globalAppConfiguration.countries
+      .firstOrNull()
+      ?.currencies
+      ?.firstOrNull()
+      ?.code
+    ?: "KZT"
+  val defaultUnit = stateValues.globalAppConfiguration.goodsItemsQuantityUnits.firstOrNull()
+
+  var searchText by rememberSaveable(goodsItem.id) { mutableStateOf("") }
+  var selectedSupplierId by rememberSaveable(goodsItem.id) { mutableStateOf(suppliers.firstOrNull()?.id.orEmpty()) }
+  var supplierGoodsName by rememberSaveable(goodsItem.id) { mutableStateOf("") }
+  var supplierBarcode by rememberSaveable(goodsItem.id) { mutableStateOf("") }
+  var supplyPriceText by rememberSaveable(goodsItem.id, defaultCurrency) { mutableStateOf(goodsItem.supplyPrices.firstOrNull()?.price ?: "0") }
+  var minOrderText by rememberSaveable(goodsItem.id) { mutableStateOf("") }
+  var packageText by rememberSaveable(goodsItem.id) { mutableStateOf("") }
+
+  LaunchedEffect(suppliers.map { it.id }, selectedSupplierId) {
+    if (selectedSupplierId.isBlank() && suppliers.isNotEmpty()) {
+      selectedSupplierId = suppliers.first().id
+    }
+  }
+
+  LaunchedEffect(selectedSupplierId, supplierPrices.map { it.id to it.supplyPrice.price }) {
+    val remembered = supplierPrices.find { it.supplierId == selectedSupplierId }
+    remembered?.let {
+      supplierGoodsName = it.supplierGoodsName.orEmpty()
+      supplierBarcode = it.supplierBarcode.orEmpty()
+      supplyPriceText = it.supplyPrice.price
+      minOrderText = it.minOrderQuantity?.total?.toString().orEmpty()
+      packageText = it.packageQuantity?.total?.toString().orEmpty()
+    }
+  }
+
+  fun supplierName(id: String): String {
+    return suppliers
+      .find { it.id == id }
+      ?.name
+      ?.visibleLocalizedString(stateValues.appLanguage, id)
+      ?: id
+  }
+
+  fun priceSearchText(price: SupplierGoodsPriceDataModel): String {
+    return listOf(
+      supplierName(price.supplierId),
+      price.supplierId,
+      price.supplierGoodsName.orEmpty(),
+      price.supplierBarcode.orEmpty(),
+      price.supplyPrice.price,
+      price.supplyPrice.currency,
+      price.minOrderQuantity?.total?.toString().orEmpty(),
+      price.packageQuantity?.total?.toString().orEmpty(),
+      price.lastUsedAtMillis?.toStockDateInputText().orEmpty(),
+      price.createdAtMillis.takeIf { it > 0L }?.toStockDateInputText().orEmpty(),
+      price.updatedAtMillis.takeIf { it > 0L }?.toStockDateInputText().orEmpty()
+    ).joinToString(" ")
+  }
+
+  val query = searchText.trim()
+  val visibleSupplierPrices = supplierPrices
+    .filter { query.isBlank() || priceSearchText(it).contains(query, ignoreCase = true) }
+    .sortedWith(
+      compareByDescending<SupplierGoodsPriceDataModel> { it.lastUsedAtMillis ?: it.updatedAtMillis }
+        .thenBy { supplierName(it.supplierId) }
+    )
+
+  val rememberedSupplierIds = supplierPrices.map { it.supplierId }.toSet()
+  val supplierOptions = suppliers
+    .sortedBy { it.name.visibleLocalizedString(stateValues.appLanguage, it.id) }
+    .map {
+      DropdownOption(
+        id = it.id,
+        title = it.name.visibleLocalizedString(stateValues.appLanguage, it.id),
+        subtitle = if (it.id in rememberedSupplierIds) "remembered price exists" else "new supplier price"
       )
-
-      Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
     }
 
-    if (supplierPrices.isEmpty()) {
+  Column(modifier = modifier.fillMaxSize()) {
+    LazyColumn(
+      modifier = Modifier
+        .weight(1f)
+        .padding(stateValues.marginTextField)
+    ) {
       item {
-        MessageText(
-          modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = stateValues.marginTextFieldGroup),
-          text = "No supplier prices yet. They will be remembered automatically when you add batches."
+        Text(
+          text = "Supplier prices",
+          color = stateValues.TextColor,
+          fontSize = stateValues.titleTextSize,
+          fontWeight = FontWeight.Bold
         )
-      }
-    } else {
-      items(supplierPrices) { supplierPrice ->
-        val supplierName = stateValues.suppliers
-          .orEmpty()
-          .find { it.id == supplierPrice.supplierId }
-          ?.name
-          ?.extractLocalizedString(stateValues.appLanguage)
-          ?: supplierPrice.supplierId
 
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Text(
+          text = "Remember default supply prices for this goods item per supplier. These prices can prefill new batches later.",
+          color = stateValues.TextColor,
+          fontSize = stateValues.smallTextSize
+        )
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+        val supplierSearchTextFieldContent = searchTextField(
+          valueInitial = searchText,
+          stateHost = NavigationScreenModel.Stock.AddEditGoodsItem,
+          stateKey = "supplier_prices_search_${goodsItem.id}",
+          modifier = Modifier.fillMaxWidth(),
+          updateIsFocusedAction = null
+        )
+
+        LaunchedEffect(supplierSearchTextFieldContent.value) {
+          searchText = supplierSearchTextFieldContent.value.text
+        }
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+      }
+
+      item {
         Column(
           modifier = Modifier
             .fillMaxWidth()
+            .padding(2.dp)
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
             .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
             .border(
               stateValues.unfocusedBorderWidth,
               stateValues.PlaceholderTextColor,
               RoundedCornerShape(stateValues.cornerRadius)
             )
-            .background(stateValues.BackgroundColor)
             .padding(stateValues.marginTextFieldGroup)
         ) {
           Text(
-            text = supplierName,
+            text = "Add / update supplier price",
             color = stateValues.TextColor,
-            fontSize = stateValues.textSize,
-            fontWeight = FontWeight.Bold
-          )
-
-          Spacer(modifier = Modifier.height(4.dp))
-
-          Text(
-            text = "${supplierPrice.supplyPrice.price} ${supplierPrice.supplyPrice.currency}",
-            color = stateValues.AccentColor,
             fontSize = stateValues.accentTextSize,
             fontWeight = FontWeight.Bold
           )
 
-          supplierPrice.lastUsedAtMillis?.let {
-            Text(
-              text = "Last used: $it",
-              color = stateValues.PlaceholderTextColor,
-              fontSize = stateValues.smallTextSize
+          Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+          if (supplierOptions.isEmpty()) {
+            MessageText(
+              text = "No suppliers yet. Add suppliers first, then connect them to this goods item."
+            )
+          } else {
+            SimpleDropdownField(
+              title = stateValues.stringSupplier,
+              selectedId = selectedSupplierId,
+              options = supplierOptions,
+              placeholder = stateValues.stringSupplier,
+              onSelected = { selectedSupplierId = it }
+            )
+
+            Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+            SimpleTextInput(
+              modifier = Modifier.fillMaxWidth(),
+              value = supplierGoodsName,
+              placeholder = "Supplier goods name / article",
+              leadingIconPath = stateValues.drawablePathIconStock,
+              onValueChange = { supplierGoodsName = it }
+            )
+
+            Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+            SimpleTextInput(
+              modifier = Modifier.fillMaxWidth(),
+              value = supplierBarcode,
+              placeholder = stateValues.stringBarcode,
+              leadingIconPath = stateValues.drawablePathIconBarcodeCamScanner,
+              onValueChange = { supplierBarcode = it }
+            )
+
+            Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+            SimpleTextInput(
+              modifier = Modifier.fillMaxWidth(),
+              value = supplyPriceText,
+              placeholder = stateValues.stringSupplyPrice,
+              keyboardType = KeyboardType.Decimal,
+              leadingIconPath = stateValues.drawablePathIconFinances,
+              onTransformValue = { raw -> raw.filter { it.isDigit() || it == '.' || it == ',' }.replace(',', '.') },
+              onValueChange = { supplyPriceText = it }
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+              goodsItem.supplyPrices
+                .filter { it.price.isNotBlank() }
+                .distinctBy { it.price to it.currency }
+                .take(4)
+                .forEach { price ->
+                  actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = "${price.price} ${price.currency}",
+                    textSize = stateValues.smallTextSize,
+                    iconPath = stateValues.drawablePathIconFinances,
+                    onClick = { supplyPriceText = price.price }
+                  )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+              SimpleTextInput(
+                modifier = Modifier.weight(1f),
+                value = minOrderText,
+                placeholder = "Min order",
+                keyboardType = KeyboardType.Decimal,
+                leadingIconPath = stateValues.drawablePathIconStock,
+                onTransformValue = { raw -> raw.filter { it.isDigit() || it == '.' || it == ',' }.replace(',', '.') },
+                onValueChange = { minOrderText = it }
+              )
+
+              SimpleTextInput(
+                modifier = Modifier.weight(1f),
+                value = packageText,
+                placeholder = "Package qty",
+                keyboardType = KeyboardType.Decimal,
+                leadingIconPath = stateValues.drawablePathIconStock,
+                onTransformValue = { raw -> raw.filter { it.isDigit() || it == '.' || it == ',' }.replace(',', '.') },
+                onValueChange = { packageText = it }
+              )
+            }
+
+            Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+            actionButton(
+              text = "Save supplier price",
+              iconPath = stateValues.drawablePathIconCheck,
+              enabled = selectedSupplierId.isNotBlank() && supplyPriceText.toDoubleOrNull() != null,
+              onClick = {
+                val unit = defaultUnit
+                upsertSupplierGoodsPrice(
+                  SupplierGoodsPriceDataModel(
+                    storeId = storeId,
+                    supplierId = selectedSupplierId,
+                    goodsItemId = goodsItem.id,
+                    supplyPrice = PriceDataModel(
+                      price = supplyPriceText.ifBlank { "0" },
+                      currency = defaultCurrency,
+                      supplierId = selectedSupplierId
+                    ),
+                    minOrderQuantity = unit?.let { u ->
+                      minOrderText.toDoubleOrNull()?.let { total ->
+                        QuantityDataModel(
+                          id = u.id,
+                          immutableUnitName = u.immutableUnitName,
+                          total = total,
+                          pricedAmount = 1.0,
+                          roundTotal = u.roundTotal
+                        )
+                      }
+                    },
+                    packageQuantity = unit?.let { u ->
+                      packageText.toDoubleOrNull()?.let { total ->
+                        QuantityDataModel(
+                          id = u.id,
+                          immutableUnitName = u.immutableUnitName,
+                          total = total,
+                          pricedAmount = 1.0,
+                          roundTotal = u.roundTotal
+                        )
+                      }
+                    },
+                    supplierBarcode = supplierBarcode.takeIf { it.isNotBlank() },
+                    supplierGoodsName = supplierGoodsName.takeIf { it.isNotBlank() }
+                  )
+                )
+              }
             )
           }
         }
 
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+      }
+
+      item {
+        Text(
+          text = "Remembered supplier prices (${visibleSupplierPrices.size})",
+          color = stateValues.TextColor,
+          fontSize = stateValues.accentTextSize,
+          fontWeight = FontWeight.Bold
+        )
+
         Spacer(modifier = Modifier.height(stateValues.marginTextField))
       }
-    }
 
-    item {
-      Spacer(modifier = Modifier.height(stateValues.screenHeight / 5))
+      if (visibleSupplierPrices.isEmpty()) {
+        item {
+          MessageText(
+            modifier = Modifier
+              .fillMaxWidth()
+              .padding(vertical = stateValues.marginTextFieldGroup),
+            text = if (supplierPrices.isEmpty()) {
+              "No supplier prices yet. Add one above or add a batch with supplier price."
+            } else {
+              "No supplier prices match this search."
+            }
+          )
+        }
+      } else {
+        items(visibleSupplierPrices) { supplierPrice ->
+          Column(
+            modifier = Modifier
+              .fillMaxWidth()
+              .padding(2.dp)
+              .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+              .clip(RoundedCornerShape(stateValues.cornerRadius))
+              .background(stateValues.BackgroundColor)
+              .border(
+                stateValues.unfocusedBorderWidth,
+                stateValues.PlaceholderTextColor,
+                RoundedCornerShape(stateValues.cornerRadius)
+              )
+              .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple(color = stateValues.AccentColor)
+              ) {
+                selectedSupplierId = supplierPrice.supplierId
+                supplierGoodsName = supplierPrice.supplierGoodsName.orEmpty()
+                supplierBarcode = supplierPrice.supplierBarcode.orEmpty()
+                supplyPriceText = supplierPrice.supplyPrice.price
+                minOrderText = supplierPrice.minOrderQuantity?.total?.toString().orEmpty()
+                packageText = supplierPrice.packageQuantity?.total?.toString().orEmpty()
+              }
+              .padding(stateValues.marginTextFieldGroup)
+          ) {
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              CpImage(
+                modifier = Modifier.size(22.dp),
+                url = stateValues.drawablePathIconSuppliers,
+                fallbackRes = Res.drawable._0_0,
+                contentDescription = supplierName(supplierPrice.supplierId),
+                tintColor = stateValues.AccentColor
+              )
+
+              Spacer(modifier = Modifier.width(8.dp))
+
+              Text(
+                modifier = Modifier.weight(1f),
+                text = supplierName(supplierPrice.supplierId),
+                color = stateValues.TextColor,
+                fontSize = stateValues.textSize,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+              )
+
+              Text(
+                text = "${supplierPrice.supplyPrice.price} ${supplierPrice.supplyPrice.currency}",
+                color = stateValues.AccentColor,
+                fontSize = stateValues.accentTextSize,
+                fontWeight = FontWeight.Bold,
+                style = TextStyle(shadow = accentTextShadow(stateValues.AccentColor, stateValues.AccentColor))
+              )
+            }
+
+            supplierPrice.supplierGoodsName?.takeIf { it.isNotBlank() }?.let {
+              StockCardInfoLine("Goods name", it, stateValues.TextColor)
+            }
+
+            supplierPrice.supplierBarcode?.takeIf { it.isNotBlank() }?.let {
+              StockCardInfoLine(stateValues.stringBarcode, it, stateValues.TextColor)
+            }
+
+            supplierPrice.minOrderQuantity?.let {
+              StockCardInfoLine(
+                "Min order",
+                "${it.total} ${it.immutableUnitName.visibleLocalizedString(stateValues.appLanguage, it.id)}",
+                stateValues.TextColor
+              )
+            }
+
+            supplierPrice.packageQuantity?.let {
+              StockCardInfoLine(
+                "Package",
+                "${it.total} ${it.immutableUnitName.visibleLocalizedString(stateValues.appLanguage, it.id)}",
+                stateValues.TextColor
+              )
+            }
+
+            supplierPrice.lastUsedAtMillis?.takeIf { it > 0L }?.let {
+              StockCardInfoLine("Last used", it.toStockDateInputText(), stateValues.TextColor)
+            }
+
+            supplierPrice.updatedAtMillis.takeIf { it > 0L }?.let {
+              StockCardInfoLine("Updated", it.toStockDateInputText(), stateValues.TextColor)
+            }
+          }
+
+          Spacer(modifier = Modifier.height(stateValues.marginTextField))
+        }
+      }
+
+      item {
+        Spacer(modifier = Modifier.height(stateValues.screenHeight / 5))
+      }
     }
   }
 }
@@ -5960,7 +6595,8 @@ fun AppConfiguration.StockSinglePriceEditor(
               text = "${quickPrice.price} ${quickPrice.currency}",
               color = stateValues.AccentColor,
               fontSize = stateValues.smallTextSize,
-              fontWeight = FontWeight.Normal,
+              fontWeight = FontWeight.Bold,
+              style = TextStyle(shadow = accentTextShadow(stateValues.AccentColor, stateValues.AccentColor)),
               maxLines = 1,
               overflow = TextOverflow.Ellipsis
             )
@@ -6393,10 +7029,15 @@ private fun AppConfiguration.StockAddEditTabs(
     items(tabs) { tab ->
       val selected = selectedId == tab.id
 
+      val shape = RoundedCornerShape(stateValues.cornerRadius)
+
       Row(
         modifier = Modifier
           .height(stateValues.textFieldHeight)
-          .clip(RoundedCornerShape(stateValues.cornerRadius))
+          .padding(2.dp)
+          .foregroundTactileShadow(stateValues.cornerRadius, elevated = selected)
+          .clip(shape)
+          .background(if (selected) stateValues.AccentColor else stateValues.BackgroundColor)
           .border(
             width = if (selected) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
             color = when {
@@ -6404,9 +7045,8 @@ private fun AppConfiguration.StockAddEditTabs(
               tab.enabled -> stateValues.PlaceholderTextColor
               else -> stateValues.DisabledColor
             },
-            shape = RoundedCornerShape(stateValues.cornerRadius)
+            shape = shape
           )
-          .background(if (selected) stateValues.AccentColor else stateValues.BackgroundColor)
           .alpha(if (tab.enabled) 1f else 0.55f)
           .clickable(
             enabled = tab.enabled,
@@ -6793,7 +7433,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
     ),
     StockAddEditTabContent(
       id = "prices",
-      title = "Prices",
+      title = "Generic prices",
       iconPath = stateValues.drawablePathIconFinances
     ),
     StockAddEditTabContent(
@@ -7555,14 +8195,16 @@ fun AppConfiguration.SimpleDropdownField(
     Box(
       modifier = Modifier
         .fillMaxWidth()
+        .padding(2.dp)
         .height(stateValues.textFieldHeight)
+        .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
         .clip(RoundedCornerShape(stateValues.cornerRadius))
+        .background(stateValues.BackgroundColor)
         .border(
           if (expanded) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
           if (expanded) stateValues.AccentColor else stateValues.PlaceholderTextColor,
           RoundedCornerShape(stateValues.cornerRadius)
         )
-        .background(stateValues.BackgroundColor)
         .clickable(
           interactionSource = remember { MutableInteractionSource() },
           indication = ripple(color = stateValues.AccentColor)
@@ -7590,7 +8232,7 @@ fun AppConfiguration.SimpleDropdownField(
           selected?.subtitle?.takeIf { it.isNotBlank() }?.let {
             Text(
               text = it,
-              color = stateValues.PlaceholderTextColor,
+              color = stateValues.TextColor,
               fontSize = stateValues.smallTextSize,
               fontWeight = FontWeight.Normal,
               maxLines = 1,
@@ -7603,7 +8245,8 @@ fun AppConfiguration.SimpleDropdownField(
           text = if (expanded) "▲" else "▼",
           color = stateValues.AccentColor,
           fontSize = stateValues.smallTextSize,
-          fontWeight = FontWeight.Bold
+          fontWeight = FontWeight.Bold,
+          style = TextStyle(shadow = accentTextShadow(stateValues.AccentColor, stateValues.AccentColor))
         )
       }
     }
@@ -7615,14 +8258,16 @@ fun AppConfiguration.SimpleDropdownField(
         LazyColumn(
           modifier = Modifier
             .fillMaxWidth()
+            .padding(2.dp)
             .heightIn(max = stateValues.screenHeight / 4)
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
             .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
             .border(
               stateValues.unfocusedBorderWidth,
               stateValues.AccentColor,
               RoundedCornerShape(stateValues.cornerRadius)
             )
-            .background(stateValues.BackgroundColor)
         ) {
           items(options) { option ->
             Column(
@@ -7651,7 +8296,7 @@ fun AppConfiguration.SimpleDropdownField(
               option.subtitle?.takeIf { it.isNotBlank() }?.let {
                 Text(
                   text = it,
-                  color = stateValues.PlaceholderTextColor,
+                  color = stateValues.TextColor,
                   fontSize = stateValues.smallTextSize,
                   fontWeight = FontWeight.Normal,
                   maxLines = 1,
@@ -7893,6 +8538,7 @@ fun AppConfiguration.ScreenAppBarWidget(
   ) {
     Row(
       modifier = modifier
+        .foregroundTactileShadow(cornerRadius = cornerRadius, elevated = false)
         .run {
           if (stateValues.isNarrowScreen)
             clip(
@@ -7904,6 +8550,7 @@ fun AppConfiguration.ScreenAppBarWidget(
           else
             this
         }
+        .background(stateValues.BackgroundColor)
         .run {
           if (stateValues.isNarrowScreen)
             border(
@@ -7924,7 +8571,7 @@ fun AppConfiguration.ScreenAppBarWidget(
       onBack?.run {
         Box(
           modifier = Modifier
-            .fillMaxHeight()
+            .size(48.dp)
             .clickable(
               interactionSource = remember {
                 MutableInteractionSource()
@@ -7937,8 +8584,8 @@ fun AppConfiguration.ScreenAppBarWidget(
 
           CpImage(
             modifier = Modifier
-              .padding(16.dp)
-              .aspectRatio(1f, matchHeightConstraintsFirst = true),
+              .align(Alignment.Center)
+              .size(22.dp),
             url = stateValues.drawablePathIconBackArrow,
             fallbackRes = iconRes,
             contentDescription = stateValues.stringBack
@@ -7958,8 +8605,9 @@ fun AppConfiguration.ScreenAppBarWidget(
         if (iconPath != null) {
           CpImage(
             modifier = Modifier
-              .padding(start = 0.dp, top = 14.dp, end = 8.dp, bottom = 14.dp)
-              .aspectRatio(1f, matchHeightConstraintsFirst = true),
+              .padding(end = 8.dp)
+              .size(22.dp)
+              .align(Alignment.CenterVertically),
             url = iconPath,
             fallbackRes = iconRes,
             contentDescription = title
@@ -7968,11 +8616,12 @@ fun AppConfiguration.ScreenAppBarWidget(
 
         Text(
           text = title,
-          modifier = modifier,
+          modifier = Modifier.align(Alignment.CenterVertically),
           textAlign = TextAlign.Center,
           fontWeight = FontWeight.Bold,
           fontSize = stateValues.accentTextSize,
-          color = textColor
+          color = textColor,
+          style = TextStyle(shadow = null)
         )
       }
 
@@ -11741,6 +12390,7 @@ fun AppConfiguration.MenuUserAccountScreen() {
                   countryLocale = phoneNumberTextFieldContent.selectedId,
                   workerAccountIds = stateValues.userAccount?.workerAccountIds,
                   supplierAccountIds = stateValues.userAccount?.supplierAccountIds,
+                  activeStoreId = stateValues.userAccount?.activeStoreId,
                   createdAt = 0L,
                   isActive = true
                 ),
@@ -13480,7 +14130,7 @@ private fun AppConfiguration.AnalyticsSummaryCard(
       .clip(RoundedCornerShape(stateValues.cornerRadius))
       .border(
         width = stateValues.unfocusedBorderWidth,
-        color = stateValues.PlaceholderTextColor,
+        color = stateValues.TextColor,
         shape = RoundedCornerShape(stateValues.cornerRadius)
       )
       .background(stateValues.BackgroundColor)
@@ -13488,7 +14138,7 @@ private fun AppConfiguration.AnalyticsSummaryCard(
   ) {
     Text(
       text = card.title,
-      color = stateValues.PlaceholderTextColor,
+      color = stateValues.TextColor,
       fontSize = stateValues.smallTextSize,
       fontWeight = FontWeight.Bold
     )
@@ -13507,7 +14157,7 @@ private fun AppConfiguration.AnalyticsSummaryCard(
 
       Text(
         text = it,
-        color = stateValues.PlaceholderTextColor,
+        color = stateValues.TextColor,
         fontSize = stateValues.smallTextSize
       )
     }
@@ -13545,7 +14195,7 @@ private fun AppConfiguration.AnalyticsHistoryRowWidget(
 
       Text(
         text = "${row.count} transactions",
-        color = stateValues.PlaceholderTextColor,
+        color = stateValues.TextColor,
         fontSize = stateValues.smallTextSize
       )
     }
@@ -14161,7 +14811,7 @@ fun MenuAddEditGoodsCategoryScreen() {
 @Composable
 fun AppConfiguration.MainScreen() {
   Column(
-    modifier = Modifier.background(stateValues.BackgroundColor).windowInsetsPadding(WindowInsets.systemBars)
+    modifier = Modifier.background(stateValues.BackgroundColor.softAppBackgroundColor()).windowInsetsPadding(WindowInsets.systemBars)
       .fillMaxSize()
   ) {
     val showNavigationBar = stateValues.navigationScreensMain.last().run {
@@ -14202,15 +14852,27 @@ fun AppConfiguration.MainScreen() {
 
 
     if (showNavigationBar) Column(
-      modifier = Modifier.clip(
-        RoundedCornerShape(
-          topStart = stateValues.cornerRadius, topEnd = stateValues.cornerRadius
+      modifier = Modifier
+        .padding(top = 4.dp)
+        .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+        .clip(
+          RoundedCornerShape(
+            topStart = stateValues.cornerRadius,
+            topEnd = stateValues.cornerRadius
+          )
         )
-      ).border(
-        stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor, RoundedCornerShape(
-          topStart = stateValues.cornerRadius, topEnd = stateValues.cornerRadius
+        .background(stateValues.BackgroundColor)
+        .border(
+          stateValues.unfocusedBorderWidth,
+          stateValues.PlaceholderTextColor,
+          RoundedCornerShape(
+            topStart = stateValues.cornerRadius,
+            topEnd = stateValues.cornerRadius
+          )
         )
-      ).fillMaxWidth().height(if (stateValues.latestNotification != null) 80.dp else 56.dp).wrapContentHeight(),
+        .fillMaxWidth()
+        .height(if (stateValues.latestNotification != null) 80.dp else 56.dp)
+        .wrapContentHeight(),
       verticalArrangement = Arrangement.Center,
       horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -14399,26 +15061,27 @@ fun CpImage(
   }
 
   val cf = tintColor?.let { ColorFilter.tint(it) }
+  val safeModifier = if (url.substringAfterLast('/').startsWith("13_")) modifier.padding(2.dp) else modifier
 
   CompositionLocalProvider(LocalKamelConfig provides kamelConfig) {
     if (failed) {
       if (fallbackRes != null)
         Image(
-          modifier = modifier,
+          modifier = safeModifier,
           painter = painterResource(fallbackRes),
           contentDescription = contentDescription,
-          contentScale = ContentScale.FillWidth,
+          contentScale = ContentScale.Fit,
           colorFilter = cf,
         )
     } else {
       KamelImage(
-        modifier = modifier,
+        modifier = safeModifier,
         resource = {
           asyncPainterResource(
             data = Url(getFullDrawableRemoteResourceUrl(url))
           )
         },
-        contentScale = ContentScale.FillWidth,
+        contentScale = ContentScale.Fit,
         contentDescription = contentDescription,
         colorFilter = cf,
         onFailure = {
@@ -14484,43 +15147,104 @@ private fun AppConfiguration.StockBatchShelfPreviewCard(
   batch: GoodsBatchDataModel,
   goodsItem: GoodsItemDataModel,
   batches: List<GoodsBatchDataModel>,
-  index: Int
+  index: Int,
+  draggedBatchId: String?,
+  dragTargetIndex: Int?,
+  onDragStart: (String) -> Unit,
+  onDragTargetChanged: (Int) -> Unit,
+  onDragFinished: (Int, Int) -> Unit,
+  onDragCancelled: () -> Unit
 ) {
   val isActiveShelf = batch.id == goodsItem.activeShelfBatchId
-  var dragDelta by remember { mutableStateOf(0f) }
+  val supplierName = stateValues.suppliers
+    .orEmpty()
+    .find { it.id == batch.supplierId }
+    ?.name
+    ?.extractLocalizedString(stateValues.appLanguage)
+    ?: "No supplier"
+
+  val salePrice = batch.salePriceOverride ?: goodsItem.salePrices.firstOrNull()
+  val returnPrice = batch.returnPriceOverride ?: goodsItem.returnPrices.firstOrNull()
+  val isDragging = draggedBatchId == batch.id
+  val draggedIndex = draggedBatchId?.let { id -> batches.indexOfFirst { it.id == id }.takeIf { it >= 0 } }
+  val density = LocalDensity.current
+  val cardStepPx = with(density) { 208.dp.toPx() }
+
+  var dragOffsetPx by remember(batch.id) { mutableStateOf(0f) }
+
+  val targetPushedOffset = when {
+    draggedIndex == null || dragTargetIndex == null || isDragging -> 0f
+    draggedIndex < dragTargetIndex && index in (draggedIndex + 1)..dragTargetIndex -> -cardStepPx
+    draggedIndex > dragTargetIndex && index in dragTargetIndex until draggedIndex -> cardStepPx
+    else -> 0f
+  }
+
+  val animatedPushedOffset by animateFloatAsState(
+    targetValue = targetPushedOffset,
+    animationSpec = tween(160),
+    label = "batchShelfPreviewPushedOffset"
+  )
+
+  fun dragBounds(): ClosedFloatingPointRange<Float> {
+    if (batches.isEmpty()) return 0f..0f
+    val min = -index * cardStepPx
+    val max = (batches.lastIndex - index) * cardStepPx
+    return min..max
+  }
+
+  fun currentTargetIndex(): Int {
+    if (batches.isEmpty()) return index
+    val deltaSlots = round(dragOffsetPx / cardStepPx).toInt()
+    return (index + deltaSlots).coerceIn(0, batches.lastIndex)
+  }
+
+  val cardShape = RoundedCornerShape(stateValues.cornerRadius)
 
   Column(
     modifier = Modifier
-      .widthIn(min = 150.dp, max = 210.dp)
-      .clip(RoundedCornerShape(stateValues.cornerRadius))
-      .border(
-        if (isActiveShelf) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
-        if (isActiveShelf) stateValues.AccentColor else stateValues.PlaceholderTextColor,
-        RoundedCornerShape(stateValues.cornerRadius)
-      )
+      .widthIn(min = 190.dp, max = 260.dp)
+      .zIndex(if (isDragging) 2f else 0f)
+      .graphicsLayer {
+        translationX = if (isDragging) dragOffsetPx else animatedPushedOffset
+        scaleX = if (isDragging) 1.035f else 1f
+        scaleY = if (isDragging) 1.035f else 1f
+        alpha = if (isDragging) 0.97f else 1f
+        shadowElevation = with(density) { (if (isDragging) 12.dp else 4.dp).toPx() }
+        shape = cardShape
+        clip = true
+      }
       .background(stateValues.BackgroundColor)
-      .pointerInput(batch.id, batches.size) {
+      .border(
+        if (isActiveShelf || isDragging) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
+        when {
+          isDragging -> stateValues.AccentColor
+          isActiveShelf -> stateValues.AccentColor
+          else -> stateValues.PlaceholderTextColor
+        },
+        cardShape
+      )
+      .pointerInput(batch.id, batches.size, index) {
         detectDragGesturesAfterLongPress(
-          onDragStart = { dragDelta = 0f },
+          onDragStart = {
+            dragOffsetPx = 0f
+            onDragStart(batch.id)
+            onDragTargetChanged(index)
+          },
           onDrag = { change, dragAmount ->
             change.consume()
-            dragDelta += dragAmount.x
-
-            val threshold = 42f
-            when {
-              dragDelta > threshold -> {
-                moveShelfBatch(goodsItem, batches, batch, 1)
-                dragDelta = 0f
-              }
-
-              dragDelta < -threshold -> {
-                moveShelfBatch(goodsItem, batches, batch, -1)
-                dragDelta = 0f
-              }
-            }
+            val bounds = dragBounds()
+            dragOffsetPx = (dragOffsetPx + dragAmount.x).coerceIn(bounds.start, bounds.endInclusive)
+            onDragTargetChanged(currentTargetIndex())
           },
-          onDragEnd = { dragDelta = 0f },
-          onDragCancel = { dragDelta = 0f }
+          onDragEnd = {
+            val target = currentTargetIndex()
+            dragOffsetPx = 0f
+            onDragFinished(index, target)
+          },
+          onDragCancel = {
+            dragOffsetPx = 0f
+            onDragCancelled()
+          }
         )
       }
       .clickable(
@@ -14535,7 +15259,7 @@ private fun AppConfiguration.StockBatchShelfPreviewCard(
   ) {
     Text(
       text = "#${index + 1}${if (isActiveShelf) " • active" else ""}",
-      color = if (isActiveShelf) stateValues.AccentColor else stateValues.TextColor,
+      color = if (isActiveShelf || isDragging) stateValues.AccentColor else stateValues.TextColor,
       fontSize = stateValues.smallTextSize,
       fontWeight = FontWeight.Bold,
       maxLines = 1,
@@ -14553,17 +15277,98 @@ private fun AppConfiguration.StockBatchShelfPreviewCard(
       overflow = TextOverflow.Ellipsis
     )
 
+    Text(
+      text = supplierName,
+      color = stateValues.TextColor,
+      fontSize = stateValues.smallTextSize,
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis
+    )
+
+    StockCardInfoLine(
+      title = stateValues.stringSupplyPrice,
+      value = "${batch.supplyPrice.price} ${batch.supplyPrice.currency}",
+      textColor = stateValues.TextColor
+    )
+
+    salePrice?.let {
+      StockCardInfoLine(
+        title = stateValues.stringSalePrice,
+        value = "${it.price} ${it.currency}",
+        textColor = stateValues.TextColor
+      )
+    }
+
+    returnPrice?.let {
+      StockCardInfoLine(
+        title = stateValues.stringReturnPrice,
+        value = "${it.price} ${it.currency}",
+        textColor = stateValues.TextColor
+      )
+    }
+
     batch.expirationDateMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let {
-      Text(
-        text = it,
-        color = stateValues.PlaceholderTextColor,
-        fontSize = stateValues.smallTextSize,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis
+      StockCardInfoLine(
+        title = stateValues.stringDate,
+        value = it,
+        textColor = stateValues.TextColor
+      )
+    }
+
+    StockCardInfoLine(
+      title = "Status",
+      value = batch.status.name,
+      textColor = stateValues.TextColor
+    )
+
+    batch.deliveredAtMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let {
+      StockCardInfoLine(
+        title = "Delivered",
+        value = it,
+        textColor = stateValues.TextColor
+      )
+    }
+
+    batch.manufacturedAtMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let {
+      StockCardInfoLine(
+        title = "Made",
+        value = it,
+        textColor = stateValues.TextColor
+      )
+    }
+
+    batch.shelfPosition?.takeIf { it.isNotBlank() }?.let {
+      StockCardInfoLine(
+        title = "Shelf position",
+        value = it,
+        textColor = stateValues.TextColor
+      )
+    }
+
+    StockCardInfoLine(
+      title = "Priority",
+      value = batch.shelfPriority.toString(),
+      textColor = stateValues.TextColor
+    )
+
+    if (batch.discounts.isNotEmpty()) {
+      StockCardInfoLine(
+        title = "Discounts",
+        value = batch.discounts.size.toString(),
+        textColor = stateValues.TextColor
+      )
+    }
+
+    batch.additionalNotes?.takeIf { it.isNotBlank() }?.let {
+      StockCardInfoLine(
+        title = "Notes",
+        value = it,
+        textColor = stateValues.TextColor
       )
     }
   }
 }
+
 
 
 @Composable
@@ -14575,6 +15380,8 @@ fun AppConfiguration.GoodsItemInStockWidget(
   textColor: Color = stateValues.TextColor,
   soldForPeriod: QuantityDataModel? = null,
   returnedForPeriod: QuantityDataModel? = null,
+  showBatches: Boolean = true,
+  transactionTypeIndex: Int? = null,
   onClick: ((GoodsItemDataModel) -> Unit)? = null,
   onDelete: ((GoodsItemDataModel) -> Unit)? = null,
   onEdit: ((GoodsItemDataModel) -> Unit)? = null,
@@ -14616,7 +15423,9 @@ fun AppConfiguration.GoodsItemInStockWidget(
     modifier
       .padding(bottom = 4.dp)
       .fillMaxHeight()
+      .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
       .clip(RoundedCornerShape(stateValues.cornerRadius))
+      .background(stateValues.BackgroundColor)
       .border(
         stateValues.unfocusedBorderWidth,
         stateValues.PlaceholderTextColor,
@@ -14701,43 +15510,110 @@ fun AppConfiguration.GoodsItemInStockWidget(
         )
       }
 
-      if (goodsItem.salePrices.isNotEmpty()) {
-        StockCardInfoLine(
-          title = stateValues.stringSale,
-          value = goodsItem.salePrices.joinToString(" / ") { "${it.price} ${it.currency}" },
-          textColor = textColor
-        )
-      }
+      when (transactionTypeIndex) {
+        0 -> if (goodsItem.salePrices.isNotEmpty()) {
+          StockCardInfoLine(
+            title = stateValues.stringSale,
+            value = goodsItem.salePrices.joinToString(" / ") { "${it.price} ${it.currency}" },
+            textColor = textColor
+          )
+        }
 
-      if (goodsItem.supplyPrices.isNotEmpty()) {
-        StockCardInfoLine(
-          title = stateValues.stringSupply,
-          value = goodsItem.supplyPrices.joinToString(" / ") { "${it.price} ${it.currency}" },
-          textColor = textColor
-        )
+        1 -> if (goodsItem.returnPrices.isNotEmpty()) {
+          StockCardInfoLine(
+            title = stateValues.stringReturn,
+            value = goodsItem.returnPrices.joinToString(" / ") { "${it.price} ${it.currency}" },
+            textColor = textColor
+          )
+        }
+
+        2 -> if (goodsItem.supplyPrices.isNotEmpty()) {
+          StockCardInfoLine(
+            title = stateValues.stringSupply,
+            value = goodsItem.supplyPrices.joinToString(" / ") { "${it.price} ${it.currency}" },
+            textColor = textColor
+          )
+        }
+
+        else -> {
+          if (goodsItem.salePrices.isNotEmpty()) {
+            StockCardInfoLine(
+              title = stateValues.stringSale,
+              value = goodsItem.salePrices.joinToString(" / ") { "${it.price} ${it.currency}" },
+              textColor = textColor
+            )
+          }
+
+          if (goodsItem.returnPrices.isNotEmpty()) {
+            StockCardInfoLine(
+              title = stateValues.stringReturn,
+              value = goodsItem.returnPrices.joinToString(" / ") { "${it.price} ${it.currency}" },
+              textColor = textColor
+            )
+          }
+
+          if (goodsItem.supplyPrices.isNotEmpty()) {
+            StockCardInfoLine(
+              title = stateValues.stringSupply,
+              value = goodsItem.supplyPrices.joinToString(" / ") { "${it.price} ${it.currency}" },
+              textColor = textColor
+            )
+          }
+        }
       }
 
       goodsItem.note?.takeIf { it.isNotBlank() }?.let {
         StockCardInfoLine(
           title = "Note",
           value = it,
-          textColor = stateValues.PlaceholderTextColor
+          textColor = stateValues.TextColor
         )
       }
 
-      if (shelfBatches.isNotEmpty()) {
+      if (showBatches && shelfBatches.isNotEmpty()) {
         Spacer(modifier = Modifier.height(10.dp))
+
+        var draggedBatchId by remember(goodsItem.id) { mutableStateOf<String?>(null) }
+        var dragTargetIndex by remember(goodsItem.id) { mutableStateOf<Int?>(null) }
 
         LazyRow(
           horizontalArrangement = Arrangement.spacedBy(8.dp),
-          modifier = Modifier.fillMaxWidth()
+          contentPadding = PaddingValues(horizontal = 4.dp, vertical = 12.dp),
+          modifier = Modifier
+            .fillMaxWidth()
+            .clipToBounds()
         ) {
-          itemsIndexed(shelfBatches) { batchIndex, batch ->
+          itemsIndexed(shelfBatches, key = { _, batch -> batch.id }) { batchIndex, batch ->
             StockBatchShelfPreviewCard(
               batch = batch,
               goodsItem = goodsItem,
               batches = shelfBatches,
-              index = batchIndex
+              index = batchIndex,
+              draggedBatchId = draggedBatchId,
+              dragTargetIndex = dragTargetIndex,
+              onDragStart = { id ->
+                draggedBatchId = id
+                dragTargetIndex = batchIndex
+              },
+              onDragTargetChanged = { target ->
+                dragTargetIndex = target
+              },
+              onDragFinished = { from, to ->
+                draggedBatchId = null
+                dragTargetIndex = null
+                if (from != to) {
+                  reorderShelfBatches(
+                    goodsItem = goodsItem,
+                    batches = shelfBatches,
+                    fromIndex = from,
+                    toIndex = to
+                  )
+                }
+              },
+              onDragCancelled = {
+                draggedBatchId = null
+                dragTargetIndex = null
+              }
             )
           }
         }
@@ -14795,9 +15671,16 @@ private fun AppConfiguration.StockCardInfoLine(
   if (value.isBlank()) return
 
   Text(
-    text = "$title: $value",
+    text = buildAnnotatedString {
+      append("$title: ")
+      withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+        append(value)
+      }
+    },
     fontSize = stateValues.textSize,
     color = textColor,
+    fontWeight = accentTextWeight(textColor, stateValues.AccentColor),
+    style = TextStyle(shadow = accentTextShadow(textColor, stateValues.AccentColor)),
     maxLines = 2,
     overflow = TextOverflow.Ellipsis
   )
@@ -15159,6 +16042,12 @@ fun AppConfiguration.genericTextField(
         readOnly = readOnly,
         modifier = Modifier
           .height(if (wide) stateValues.wideTextFieldHeight else stateValues.textFieldHeight)
+          .run {
+            if (focusedBorderWidth.value > 0f || unfocusedBorderWidth.value > 0f)
+              foregroundTactileShadow(cornerRadius, elevated = false)
+            else
+              this
+          }
           .clip(cornerShape)
           .background(backgroundColor)
           .border(
@@ -15555,8 +16444,11 @@ fun AppConfiguration.dropdownListWidget(
     selectableDomainWidget(
       modifier = Modifier
         .fillMaxWidth()
+        .padding(2.dp)
+        .foregroundTactileShadow(cornerRadius, elevated = false)
         .clip(RoundedCornerShape(cornerRadius))
         .height(stateValues.textFieldHeight)
+        .background(stateValues.BackgroundColor)
         .border(
           width = if (isDomainSelectionDropdownExpandedState.targetState) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
           color = if (isDomainSelectionDropdownExpandedState.targetState) stateValues.AccentColor else textColor,
@@ -15585,7 +16477,10 @@ fun AppConfiguration.dropdownListWidget(
       ) {
         Column(
           modifier = Modifier
+            .padding(2.dp)
+            .foregroundTactileShadow(cornerRadius, elevated = false)
             .clip(RoundedCornerShape(cornerRadius))
+            .background(stateValues.BackgroundColor)
             .fillMaxWidth()
             .height((domains.size * stateValues.textFieldHeight.value).dp)
             .border(
@@ -15993,7 +16888,9 @@ fun AppConfiguration.domainSelectionTextField(
 
     Column(
       modifier = Modifier
+        .foregroundTactileShadow(cornerRadius, elevated = false)
         .clip(RoundedCornerShape(cornerRadius))
+        .background(stateValues.BackgroundColor)
         .border(
           width = if (isFocused) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
           color = if (isFocused) stateValues.AccentColor else stateValues.PlaceholderTextColor,
@@ -17773,16 +18670,35 @@ fun AppConfiguration.actionButton(
     targetValue = if (isEnabled) enabledColor else disabledColor
   )
 
-  val textPresent =
-    text.isNotEmpty() && text.isNotBlank()
-
-  val subTextPresent =
-    subText.isNotEmpty() && subText.isNotBlank()
+  val textPresent = text.isNotEmpty() && text.isNotBlank()
+  val subTextPresent = subText.isNotEmpty() && subText.isNotBlank()
 
   val textHeight = if (!textPresent) 0f else textSize.value
   val subTextHeight = if (subTextPresent) subTextSize.value else 0f
+  val height = if (!textPresent) stateValues.textFieldHeight else (textHeight + subTextHeight + 24).dp
 
-  val height = (textHeight + subTextHeight + 24).dp
+  val inferredIconPath = iconPath ?: when (text) {
+    stateValues.stringAdd -> stateValues.drawablePathIconAdd
+    stateValues.stringCancel -> stateValues.drawablePathIconCancel
+    stateValues.stringDelete -> stateValues.drawablePathIconDelete
+    stateValues.stringEdit -> stateValues.drawablePathIconEdit
+    stateValues.stringBack -> stateValues.drawablePathIconBackArrow
+    stateValues.stringLogIn -> stateValues.drawablePathIconUserAccount
+    stateValues.stringSignUp -> stateValues.drawablePathIconPerson
+    stateValues.stringSelect -> stateValues.drawablePathIconCheck
+    stateValues.stringSelectInMenu -> stateValues.drawablePathIconMenu
+    stateValues.stringComplete -> stateValues.drawablePathIconCheck
+    stateValues.stringPdf -> stateValues.drawablePathIconReceipt
+    stateValues.stringShare -> stateValues.drawablePathIconSwitch
+    stateValues.stringWhatsApp -> stateValues.drawablePathIconSwitch
+    stateValues.stringPrint -> stateValues.drawablePathIconDevices
+    stateValues.stringQuit -> stateValues.drawablePathIconExit
+    else -> null
+  }
+
+  val resolvedIconRes = iconRes
+  val iconPresent = icon != null || inferredIconPath != null
+  val iconSize = if (textPresent) 20.dp else 22.dp
 
   Row(
     modifier = modifier
@@ -17798,6 +18714,7 @@ fun AppConfiguration.actionButton(
         else
           height(height)
       }
+      .foregroundTactileShadow(cornerRadius = cornerRadius, elevated = false)
       .clip(RoundedCornerShape(cornerRadius))
       .background(backgroundColor)
       .run {
@@ -17822,57 +18739,61 @@ fun AppConfiguration.actionButton(
             )
           }
         } ?: this
-      },
+      }
+      .padding(horizontal = if (textPresent) 10.dp else 6.dp),
     horizontalArrangement = Arrangement.Center,
     verticalAlignment = Alignment.CenterVertically
   ) {
-    icon?.invoke() ?: iconPath?.run {
+    icon?.invoke() ?: inferredIconPath?.run {
       CpImage(
         modifier = Modifier
-          .fillMaxHeight()
-          .padding(2.dp)
-          .aspectRatio(1f, matchHeightConstraintsFirst = true),
-        url = iconPath,
-        fallbackRes = iconRes,
+          .size(iconSize)
+          .align(Alignment.CenterVertically),
+        url = this,
+        fallbackRes = resolvedIconRes,
         contentDescription = iconContentDescription,
         tintColor = iconTintColor
       )
     }
 
-    Column(
-      verticalArrangement = Arrangement.Center
-    ) {
-      if (textPresent) {
+    if (iconPresent && textPresent)
+      Spacer(modifier = Modifier.width(8.dp))
+
+    if (textPresent) {
+      Column(
+        modifier = Modifier.run {
+          if (!fillMaxWidthIfTextPresent)
+            wrapContentWidth()
+          else
+            weight(1f)
+        },
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+      ) {
         Text(
-          modifier = Modifier.run {
-            if (!fillMaxWidthIfTextPresent)
-              wrapContentWidth().padding(horizontal = height / 2)
-            else
-              fillMaxWidth()
-          },
           text = text,
           color = textColor,
-          fontWeight = FontWeight.Bold,
+          fontWeight = accentTextWeight(textColor, stateValues.AccentColor, FontWeight.Bold),
           fontSize = textSize,
-          textAlign = TextAlign.Center
+          style = TextStyle(shadow = accentTextShadow(textColor, stateValues.AccentColor)),
+          textAlign = TextAlign.Center,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis
         )
 
         if (subTextPresent) {
           Text(
-            modifier = Modifier.run {
-              if (!fillMaxWidthIfTextPresent)
-                wrapContentWidth().padding(horizontal = height / 2)
-              else
-                fillMaxWidth()
-            },
             text = subText,
             color = subTextColor,
             fontSize = subTextSize,
-            textAlign = TextAlign.Center
+            fontWeight = accentTextWeight(subTextColor, stateValues.AccentColor),
+            style = TextStyle(shadow = accentTextShadow(subTextColor, stateValues.AccentColor)),
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
           )
         }
       }
-
     }
   }
 

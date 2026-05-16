@@ -191,6 +191,7 @@ object Users: Table("users") {
   val countryLocale = varchar("country_locale", 64)
   val workerIds = text("worker_ids").nullable().default(null)
   val supplierIds = text("supplier_ids").nullable().default(null)
+  val activeStoreId = uuid("active_store_id").nullable()
   val passwordHash = varchar("password_hash", 100) // BCrypt ~60 chars, give some headroom
   val createdAt = timestamp("created_at").defaultExpression(CurrentTimestamp)
   val isActive = bool("is_active").default(true)
@@ -1000,6 +1001,10 @@ private fun upsertSupplierGoodsPriceInsideTransaction(
   supplierId: UUID,
   goodsItemId: UUID,
   supplyPrice: PriceDataModel,
+  minOrderQuantity: QuantityDataModel? = null,
+  packageQuantity: QuantityDataModel? = null,
+  supplierBarcode: String? = null,
+  supplierGoodsName: String? = null,
   now: Long
 ) {
   val existing = SupplierGoodsPrices
@@ -1019,6 +1024,10 @@ private fun upsertSupplierGoodsPriceInsideTransaction(
       it[SupplierGoodsPrices.supplierId] = supplierId
       it[SupplierGoodsPrices.goodsItemId] = goodsItemId
       it[SupplierGoodsPrices.supplyPrice] = supplyPrice
+      it[SupplierGoodsPrices.minOrderQuantity] = minOrderQuantity
+      it[SupplierGoodsPrices.packageQuantity] = packageQuantity
+      it[SupplierGoodsPrices.supplierBarcode] = supplierBarcode?.takeIf { value -> value.isNotBlank() }
+      it[SupplierGoodsPrices.supplierGoodsName] = supplierGoodsName?.takeIf { value -> value.isNotBlank() }
       it[createdAtMillis] = now
       it[updatedAtMillis] = now
       it[lastUsedAtMillis] = now
@@ -1031,6 +1040,14 @@ private fun upsertSupplierGoodsPriceInsideTransaction(
           (SupplierGoodsPrices.goodsItemId eq goodsItemId)
     }) {
       it[SupplierGoodsPrices.supplyPrice] = supplyPrice
+      minOrderQuantity?.let { value -> it[SupplierGoodsPrices.minOrderQuantity] = value }
+      packageQuantity?.let { value -> it[SupplierGoodsPrices.packageQuantity] = value }
+      supplierBarcode?.takeIf { value -> value.isNotBlank() }?.let { value ->
+        it[SupplierGoodsPrices.supplierBarcode] = value
+      }
+      supplierGoodsName?.takeIf { value -> value.isNotBlank() }?.let { value ->
+        it[SupplierGoodsPrices.supplierGoodsName] = value
+      }
       it[updatedAtMillis] = now
       it[lastUsedAtMillis] = now
       it[isActive] = true
@@ -1122,33 +1139,70 @@ private fun updateGoodsItemActiveShelfBatchInsideTransaction(
   storeId: UUID,
   now: Long
 ) {
-  val nextBatchId = StockBatchesV2
+  val currentActiveBatchId = StockItems
     .selectAll()
     .where {
-      (StockBatchesV2.goodsItemId eq goodsItemId) and
-          (StockBatchesV2.storeId eq storeId) and
-          (StockBatchesV2.isActive eq true)
+      (StockItems.id eq goodsItemId) and
+          (StockItems.storeId eq storeId)
     }
-    .filter { row ->
-      val status = row[StockBatchesV2.status]
-      status != StockBatchStatusDataModel.Deleted.name &&
-          status != StockBatchStatusDataModel.WrittenOff.name &&
-          row[StockBatchesV2.quantity].total > 0.0
-    }
-    .sortedWith(
-      compareBy<ResultRow> { row ->
-        row[StockBatchesV2.expirationDateMillis] ?: Long.MAX_VALUE
-      }.thenByDescending { row -> row[StockBatchesV2.shelfPriority] }
-    )
     .firstOrNull()
-    ?.get(StockBatchesV2.id)
+    ?.get(StockItems.activeShelfBatchId)
 
-  StockItems.update({
-    (StockItems.id eq goodsItemId) and
-        (StockItems.storeId eq storeId)
-  }) {
-    it[StockItems.activeShelfBatchId] = nextBatchId
-    it[StockItems.updatedAtMillis] = now
+  val currentActiveBatchStillUsable = currentActiveBatchId?.let { activeId ->
+    StockBatchesV2
+      .selectAll()
+      .where {
+        (StockBatchesV2.id eq activeId) and
+            (StockBatchesV2.goodsItemId eq goodsItemId) and
+            (StockBatchesV2.storeId eq storeId) and
+            (StockBatchesV2.isActive eq true)
+      }
+      .firstOrNull()
+      ?.let { row ->
+        val status = row[StockBatchesV2.status]
+        status != StockBatchStatusDataModel.Deleted.name &&
+            status != StockBatchStatusDataModel.WrittenOff.name &&
+            status != StockBatchStatusDataModel.SoldOut.name &&
+            row[StockBatchesV2.quantity].total > 0.0
+      }
+  } == true
+
+  val nextBatchId = if (currentActiveBatchStillUsable) {
+    currentActiveBatchId
+  } else {
+    StockBatchesV2
+      .selectAll()
+      .where {
+        (StockBatchesV2.goodsItemId eq goodsItemId) and
+            (StockBatchesV2.storeId eq storeId) and
+            (StockBatchesV2.isActive eq true)
+      }
+      .filter { row ->
+        val status = row[StockBatchesV2.status]
+        status != StockBatchStatusDataModel.Deleted.name &&
+            status != StockBatchStatusDataModel.WrittenOff.name &&
+            status != StockBatchStatusDataModel.SoldOut.name &&
+            row[StockBatchesV2.quantity].total > 0.0
+      }
+      .sortedWith(
+        compareBy<ResultRow> { row ->
+          row[StockBatchesV2.shelfPriority]
+        }.thenBy { row ->
+          row[StockBatchesV2.expirationDateMillis] ?: Long.MAX_VALUE
+        }
+      )
+      .firstOrNull()
+      ?.get(StockBatchesV2.id)
+  }
+
+  if (nextBatchId != currentActiveBatchId) {
+    StockItems.update({
+      (StockItems.id eq goodsItemId) and
+          (StockItems.storeId eq storeId)
+    }) {
+      it[StockItems.activeShelfBatchId] = nextBatchId
+      it[StockItems.updatedAtMillis] = now
+    }
   }
 }
 
@@ -2324,6 +2378,10 @@ fun Application.module() {
               supplierId = supplierId,
               goodsItemId = goodsItemId,
               supplyPrice = body.supplyPrice,
+              minOrderQuantity = body.minOrderQuantity,
+              packageQuantity = body.packageQuantity,
+              supplierBarcode = body.supplierBarcode,
+              supplierGoodsName = body.supplierGoodsName,
               now = now
             )
 
@@ -2439,6 +2497,41 @@ fun Application.module() {
             HttpStatusCode.OK,
             stores
           )
+        }
+
+        put("/active") {
+          val userId = call.checkPrincipal() ?: return@put
+          val body = call.receive<String>().trim()
+          val storeId = runCatching { UUID.fromString(body) }.getOrNull()
+            ?: return@put call.respond(UnauthorizedResponse())
+
+          val updated = newSuspendedTransaction(Dispatchers.IO) {
+            val hasAccess = StoreUsers
+              .selectAll()
+              .where { (StoreUsers.userId eq userId) and (StoreUsers.storeId eq storeId) }
+              .empty()
+              .not()
+
+            if (!hasAccess)
+              return@newSuspendedTransaction false
+
+            Users.update({ Users.id eq userId }) {
+              it[Users.activeStoreId] = storeId
+            } > 0
+          }
+
+          if (updated) {
+            call.genericResponseNoPayload(
+              HttpStatusCode.OK,
+              message = simpleMessage(
+                main = "Active store saved",
+                ru = "Активный магазин сохранён",
+                kk = "Белсенді дүкен сақталды"
+              )
+            )
+          } else {
+            call.respond(UnauthorizedResponse())
+          }
         }
 
         post("/add") {
@@ -2743,6 +2836,7 @@ fun Application.module() {
               countryLocale = user[Users.countryLocale],
               workerAccountIds = user[Users.workerIds],
               supplierAccountIds = user[Users.supplierIds],
+              activeStoreId = user[Users.activeStoreId]?.toString(),
               createdAt = user[Users.createdAt].toEpochMilli(),
               isActive = user[Users.isActive]
             )

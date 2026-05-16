@@ -1939,8 +1939,8 @@ fun init() {
   GlobalScope.launch(Dispatchers.ourIo) {
     storesState.payload.collect {
       it?.let {
-        if (it.size == 1 && activeStoreIdState.value == null) {
-          activeStoreIdState.emit(it.first().id)
+        if (it.size == 1 && activeStoreIdState.value != it.first().id) {
+          setActiveStoreId(it.first().id)
         }
       }
     }
@@ -3532,7 +3532,7 @@ fun logOutUser() {
 
           setStoredUserAuthTokens?.invoke(null)
           setStoredUserAccountDataModel?.invoke(null)
-          setActiveStoreId(null)
+          setActiveStoreId(null, syncServer = false)
           httpClient.authProvider<BearerAuthProvider>()?.clearToken()
         }
       }
@@ -3562,6 +3562,11 @@ fun getUser(forceLogOut: Boolean = true) {
             clearInAppNotification()
             setStoredUserAccountDataModel?.invoke(response.payload)
             userAccountState.emit(DataState.Success(response.payload!!, response.message))
+
+            response.payload.activeStoreId?.takeIf { it.isNotBlank() }?.let { savedStoreId ->
+              putLocalKv(KEY_ACTIVE_STORE_ID, savedStoreId)
+              activeStoreIdState.emit(savedStoreId)
+            }
 
             getGlobalAppConfiguration()
             getStores()
@@ -3603,7 +3608,7 @@ fun forceLogOutUser() {
   GlobalScope.launch(Dispatchers.ourIo) {
     setStoredUserAuthTokens?.invoke(null)
     setStoredUserAccountDataModel?.invoke(null)
-    setActiveStoreId(null)
+    setActiveStoreId(null, syncServer = false)
 
     userAccountState.emit(DataState.Empty())
   }
@@ -3676,7 +3681,7 @@ fun getStores() {
 
         if (!response.negative) {
           storesState.emit(DataState.Success(response.payload!!, response.message))
-          if (response.payload.size == 1)
+          if (response.payload.size == 1 && activeStoreIdState.value != response.payload.first().id)
             setActiveStoreId(response.payload.first().id)
         }
       }
@@ -3759,9 +3764,31 @@ fun updateStore(store: StoreDataModel, onCompleted: ((DataState<StoreDataModel>)
     }
 }
 
-fun setActiveStoreId(id: String?) {
+fun setActiveStoreId(
+  id: String?,
+  syncServer: Boolean = true
+) {
   GlobalScope.launch(Dispatchers.ourIo) {
     putLocalKv(KEY_ACTIVE_STORE_ID, id)
+    activeStoreIdState.emit(id)
+
+    if (syncServer && !id.isNullOrBlank() && getStoredUserAuthTokens?.invoke() != null) {
+      val response = networkRequest<Unit, String>(
+        method = HttpMethod.Put,
+        endpointUrl = "stores/active",
+        body = id
+      )
+
+      if (response.negative)
+        postInAppNotification(response.message, NotificationType.Negative, transient = true)
+      else {
+        (userAccountState.payloadValue)?.let { account ->
+          val updated = account.copy(activeStoreId = id)
+          userAccountState.emit(DataState.Success(updated))
+          setStoredUserAccountDataModel?.invoke(updated)
+        }
+      }
+    }
   }
 }
 
@@ -5148,6 +5175,7 @@ data class UserAccountDataModel(
   val countryLocale: String,
   val workerAccountIds: String?,
   val supplierAccountIds: String?,
+  val activeStoreId: String? = null,
   val createdAt: Long,
   val isActive: Boolean
 )
