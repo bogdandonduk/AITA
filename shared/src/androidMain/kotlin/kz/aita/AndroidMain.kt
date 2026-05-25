@@ -10,7 +10,7 @@ import android.provider.MediaStore
 import androidx.core.content.FileProvider
 import app.cash.sqldelight.db.SqlDriver
 import io.ktor.client.engine.HttpClientEngine
-import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.engine.okhttp.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

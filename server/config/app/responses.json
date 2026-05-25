@@ -33,11 +33,11 @@
       },
       {
         "language": "ru",
-        "value": "Пользователь с этим email адресом уже зарегистрирован"
+        "value": "Пользователь с этим email уже зарегистрирован"
       },
       {
         "language": "kk",
-        "value": "Бұл электрондық пошта мекенжайы бар пайдаланушы әлдеқашан тіркелген"
+        "value": "Бұл email мекенжайы бар пайдаланушы әлдеқашан тіркелген"
       }
     ]
   },
@@ -54,11 +54,11 @@
       },
       {
         "language": "ru",
-        "value": "Пользователь с этим номером телефона и email адресом уже зарегистрирован"
+        "value": "Пользователь с этим номером телефона и email уже зарегистрирован"
       },
       {
         "language": "kk",
-        "value": "Осы телефон нөмірі мен электрондық пошта мекенжайы бар пайдаланушы әлдеқашан тіркелген"
+        "value": "Бұл телефон нөмірі мен email мекенжайы бар пайдаланушы әлдеқашан тіркелген"
       }
     ]
   },
@@ -79,7 +79,7 @@
       },
       {
         "language": "kk",
-        "value": "Ішкі қате"
+        "value": "Сервердің ішкі қатесі"
       }
     ]
   },
@@ -180,11 +180,11 @@
       },
       {
         "language": "ru",
-        "value": "Выход успешно выполнен"
+        "value": "Вы успешно вышли"
       },
       {
         "language": "kk",
-        "value": "Жүйеден сәтті шықты"
+        "value": "Жүйеден сәтті шықтыңыз"
       }
     ]
   },
@@ -201,11 +201,11 @@
       },
       {
         "language": "ru",
-        "value": "Пользователь успешно обновлен"
+        "value": "Данные пользователя обновлены"
       },
       {
         "language": "kk",
-        "value": "Пайдаланушы сәтті жаңартылды"
+        "value": "Пайдаланушы деректері жаңартылды"
       }
     ]
   },
@@ -222,11 +222,11 @@
       },
       {
         "language": "ru",
-        "value": "Магазин успешно добавлен"
+        "value": "Магазин добавлен"
       },
       {
         "language": "kk",
-        "value": "Дүкен сәтті қосылды"
+        "value": "Дүкен қосылды"
       }
     ]
   },
@@ -243,11 +243,11 @@
       },
       {
         "language": "ru",
-        "value": "Магазин успешно обновлен"
+        "value": "Магазин обновлён"
       },
       {
         "language": "kk",
-        "value": "Дүкен сәтті жаңартылды"
+        "value": "Дүкен жаңартылды"
       }
     ]
   },
@@ -264,11 +264,11 @@
       },
       {
         "language": "ru",
-        "value": "Магазин успешно удален"
+        "value": "Магазин удалён"
       },
       {
         "language": "kk",
-        "value": "Дүкен сәтті жойылды"
+        "value": "Дүкен жойылды"
       }
     ]
   },
@@ -298,19 +298,19 @@
     "message": [
       {
         "language": "main",
-        "value": "Goods item successfully added"
+        "value": "Stock item added"
       },
       {
         "language": "en",
-        "value": "Goods item successfully added"
+        "value": "Stock item added"
       },
       {
         "language": "ru",
-        "value": "Товар успешно добавлен"
+        "value": "Товар добавлен"
       },
       {
         "language": "kk",
-        "value": "Өнім сәтті қосылды"
+        "value": "Тауар қосылды"
       }
     ]
   },
@@ -319,19 +319,19 @@
     "message": [
       {
         "language": "main",
-        "value": "Goods item successfully updated"
+        "value": "Stock item updated"
       },
       {
         "language": "en",
-        "value": "Goods item successfully updated"
+        "value": "Stock item updated"
       },
       {
         "language": "ru",
-        "value": "Товар успешно обновлен"
+        "value": "Товар обновлён"
       },
       {
         "language": "kk",
-        "value": "Өнім сәтті жаңартылды"
+        "value": "Тауар жаңартылды"
       }
     ]
   },
@@ -340,19 +340,19 @@
     "message": [
       {
         "language": "main",
-        "value": "Goods item successfully deleted"
+        "value": "Stock item deleted"
       },
       {
         "language": "en",
-        "value": "Goods item successfully deleted"
+        "value": "Stock item deleted"
       },
       {
         "language": "ru",
-        "value": "Товар успешно удален"
+        "value": "Товар удалён"
       },
       {
         "language": "kk",
-        "value": "Элемент сәтті жойылды"
+        "value": "Тауар жойылды"
       }
     ]
   },
@@ -361,19 +361,19 @@
     "message": [
       {
         "language": "main",
-        "value": "Goods batch successfully added"
+        "value": "Batch added"
       },
       {
         "language": "en",
-        "value": "Goods batch successfully added"
+        "value": "Batch added"
       },
       {
         "language": "ru",
-        "value": "Партия товара успешно добавлена"
+        "value": "Партия добавлена"
       },
       {
         "language": "kk",
-        "value": "Тауарлар партиясы сәтті қосылды"
+        "value": "Партия қосылды"
       }
     ]
   },
@@ -382,19 +382,19 @@
     "message": [
       {
         "language": "main",
-        "value": "Goods batch successfully updated"
+        "value": "Batch updated"
       },
       {
         "language": "en",
-        "value": "Goods batch successfully updated"
+        "value": "Batch updated"
       },
       {
         "language": "ru",
-        "value": "Партия товара успешно обновлена"
+        "value": "Партия обновлена"
       },
       {
         "language": "kk",
-        "value": "Өнім партиясы сәтті жаңартылды"
+        "value": "Партия жаңартылды"
       }
     ]
   },
@@ -403,19 +403,124 @@
     "message": [
       {
         "language": "main",
-        "value": "Goods batch successfully deleted"
+        "value": "Batch deleted"
       },
       {
         "language": "en",
-        "value": "Goods batch successfully deleted"
+        "value": "Batch deleted"
       },
       {
         "language": "ru",
-        "value": "Партия товара успешно удалена"
+        "value": "Партия удалена"
       },
       {
         "language": "kk",
-        "value": "Тауарлар партиясы сәтті жойылды"
+        "value": "Партия жойылды"
+      }
+    ]
+  },
+  {
+    "id": "44",
+    "message": [
+      {
+        "language": "main",
+        "value": "Active sessions loaded"
+      },
+      {
+        "language": "en",
+        "value": "Active sessions loaded"
+      },
+      {
+        "language": "ru",
+        "value": "Активные сеансы загружены"
+      },
+      {
+        "language": "kk",
+        "value": "Белсенді сеанстар жүктелді"
+      }
+    ]
+  },
+  {
+    "id": "45",
+    "message": [
+      {
+        "language": "main",
+        "value": "Session revoked"
+      },
+      {
+        "language": "en",
+        "value": "Session revoked"
+      },
+      {
+        "language": "ru",
+        "value": "Сеанс завершён"
+      },
+      {
+        "language": "kk",
+        "value": "Сеанс тоқтатылды"
+      }
+    ]
+  },
+  {
+    "id": "46",
+    "message": [
+      {
+        "language": "main",
+        "value": "Other sessions revoked"
+      },
+      {
+        "language": "en",
+        "value": "Other sessions revoked"
+      },
+      {
+        "language": "ru",
+        "value": "Другие сеансы завершены"
+      },
+      {
+        "language": "kk",
+        "value": "Басқа сеанстар тоқтатылды"
+      }
+    ]
+  },
+  {
+    "id": "47",
+    "message": [
+      {
+        "language": "main",
+        "value": "Session id is required"
+      },
+      {
+        "language": "en",
+        "value": "Session id is required"
+      },
+      {
+        "language": "ru",
+        "value": "Нужен id сеанса"
+      },
+      {
+        "language": "kk",
+        "value": "Сеанс id қажет"
+      }
+    ]
+  },
+  {
+    "id": "48",
+    "message": [
+      {
+        "language": "main",
+        "value": "Use logout to revoke the current session"
+      },
+      {
+        "language": "en",
+        "value": "Use logout to revoke the current session"
+      },
+      {
+        "language": "ru",
+        "value": "Чтобы завершить текущий сеанс, выйдите из аккаунта"
+      },
+      {
+        "language": "kk",
+        "value": "Ағымдағы сеансты тоқтату үшін аккаунттан шығыңыз"
       }
     ]
   }

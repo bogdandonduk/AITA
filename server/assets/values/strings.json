@@ -208,7 +208,7 @@
         },
         {
           "language": "kk",
-          "value": "Таза"
+          "value": "Тазалау"
         }
       ]
     },
@@ -796,7 +796,7 @@
         },
         {
           "language": "kk",
-          "value": ""
+          "value": "Дүкен қосу"
         }
       ]
     },
@@ -817,7 +817,7 @@
         },
         {
           "language": "kk",
-          "value": "Өнім санатын өңдеу"
+          "value": "Дүкенді өңдеу"
         }
       ]
     },
@@ -901,7 +901,7 @@
         },
         {
           "language": "kk",
-          "value": "Тексеру"
+          "value": "Түбіртек"
         }
       ]
     },
@@ -1174,7 +1174,7 @@
         },
         {
           "language": "kk",
-          "value": "Таңдаңыз"
+          "value": "Таңдау"
         }
       ]
     },
@@ -1926,11 +1926,11 @@
         },
         {
           "language": "ru",
-          "value": "Session time expired. Logging out"
+          "value": "Время сеанса истекло. Выполняется выход"
         },
         {
           "language": "kk",
-          "value": "Сеансыңыздың мерзімі аяқталды. Сіз өзіңіздің есептік жазбаңыздан шығып жатырсыз"
+          "value": "Сеанс мерзімі аяқталды. Аккаунттан шығу орындалуда"
         }
       ]
     },
@@ -3716,6 +3716,5298 @@
         {
           "language": "kk",
           "value": "Атаусыз"
+        }
+      ]
+    },
+    {
+      "id": 177,
+      "values": [
+        {
+          "language": "main",
+          "value": "Notifications"
+        },
+        {
+          "language": "en",
+          "value": "Notifications"
+        },
+        {
+          "language": "ru",
+          "value": "Уведомления"
+        },
+        {
+          "language": "kk",
+          "value": "Хабарламалар"
+        }
+      ]
+    },
+    {
+      "id": 178,
+      "values": [
+        {
+          "language": "main",
+          "value": "Unread"
+        },
+        {
+          "language": "en",
+          "value": "Unread"
+        },
+        {
+          "language": "ru",
+          "value": "Непрочитанные"
+        },
+        {
+          "language": "kk",
+          "value": "Оқылмаған"
+        }
+      ]
+    },
+    {
+      "id": 179,
+      "values": [
+        {
+          "language": "main",
+          "value": "Positive"
+        },
+        {
+          "language": "en",
+          "value": "Positive"
+        },
+        {
+          "language": "ru",
+          "value": "Положительные"
+        },
+        {
+          "language": "kk",
+          "value": "Жағымды"
+        }
+      ]
+    },
+    {
+      "id": 180,
+      "values": [
+        {
+          "language": "main",
+          "value": "Negative"
+        },
+        {
+          "language": "en",
+          "value": "Negative"
+        },
+        {
+          "language": "ru",
+          "value": "Отрицательные"
+        },
+        {
+          "language": "kk",
+          "value": "Жағымсыз"
+        }
+      ]
+    },
+    {
+      "id": 181,
+      "values": [
+        {
+          "language": "main",
+          "value": "Neutral"
+        },
+        {
+          "language": "en",
+          "value": "Neutral"
+        },
+        {
+          "language": "ru",
+          "value": "Нейтральные"
+        },
+        {
+          "language": "kk",
+          "value": "Бейтарап"
+        }
+      ]
+    },
+    {
+      "id": 182,
+      "values": [
+        {
+          "language": "main",
+          "value": "NEW"
+        },
+        {
+          "language": "en",
+          "value": "NEW"
+        },
+        {
+          "language": "ru",
+          "value": "НОВОЕ"
+        },
+        {
+          "language": "kk",
+          "value": "ЖАҢА"
+        }
+      ]
+    },
+    {
+      "id": 183,
+      "values": [
+        {
+          "language": "main",
+          "value": "more notifications queued"
+        },
+        {
+          "language": "en",
+          "value": "more notifications queued"
+        },
+        {
+          "language": "ru",
+          "value": "уведомлений в очереди"
+        },
+        {
+          "language": "kk",
+          "value": "хабарлама кезекте"
+        }
+      ]
+    },
+    {
+      "id": 184,
+      "values": [
+        {
+          "language": "main",
+          "value": "Subcategory"
+        },
+        {
+          "language": "en",
+          "value": "Subcategory"
+        },
+        {
+          "language": "ru",
+          "value": "Подкатегория"
+        },
+        {
+          "language": "kk",
+          "value": "Ішкі санат"
+        }
+      ]
+    },
+    {
+      "id": 185,
+      "values": [
+        {
+          "language": "main",
+          "value": "Select subcategory"
+        },
+        {
+          "language": "en",
+          "value": "Select subcategory"
+        },
+        {
+          "language": "ru",
+          "value": "Выберите подкатегорию"
+        },
+        {
+          "language": "kk",
+          "value": "Ішкі санатты таңдаңыз"
+        }
+      ]
+    },
+    {
+      "id": 186,
+      "values": [
+        {
+          "language": "main",
+          "value": "No categories loaded yet. Restart server after category migrations or refresh categories."
+        },
+        {
+          "language": "en",
+          "value": "No categories loaded yet. Restart server after category migrations or refresh categories."
+        },
+        {
+          "language": "ru",
+          "value": "Категории ещё не загружены. Перезапустите сервер после миграций категорий или обновите категории."
+        },
+        {
+          "language": "kk",
+          "value": "Санаттар әлі жүктелмеді. Санат миграцияларынан кейін серверді қайта іске қосыңыз немесе санаттарды жаңартыңыз."
+        }
+      ]
+    },
+    {
+      "id": 187,
+      "values": [
+        {
+          "language": "main",
+          "value": "Refresh categories"
+        },
+        {
+          "language": "en",
+          "value": "Refresh categories"
+        },
+        {
+          "language": "ru",
+          "value": "Обновить категории"
+        },
+        {
+          "language": "kk",
+          "value": "Санаттарды жаңарту"
+        }
+      ]
+    },
+    {
+      "id": 188,
+      "values": [
+        {
+          "language": "main",
+          "value": "Select unit"
+        },
+        {
+          "language": "en",
+          "value": "Select unit"
+        },
+        {
+          "language": "ru",
+          "value": "Выберите единицу"
+        },
+        {
+          "language": "kk",
+          "value": "Өлшем бірлігін таңдаңыз"
+        }
+      ]
+    },
+    {
+      "id": 189,
+      "values": [
+        {
+          "language": "main",
+          "value": "Select category"
+        },
+        {
+          "language": "en",
+          "value": "Select category"
+        },
+        {
+          "language": "ru",
+          "value": "Выберите категорию"
+        },
+        {
+          "language": "kk",
+          "value": "Санатты таңдаңыз"
+        }
+      ]
+    },
+    {
+      "id": 190,
+      "values": [
+        {
+          "language": "main",
+          "value": "read"
+        },
+        {
+          "language": "en",
+          "value": "read"
+        },
+        {
+          "language": "ru",
+          "value": "прочитано"
+        },
+        {
+          "language": "kk",
+          "value": "оқылды"
+        }
+      ]
+    },
+    {
+      "id": 191,
+      "values": [
+        {
+          "language": "main",
+          "value": "Source"
+        },
+        {
+          "language": "en",
+          "value": "Source"
+        },
+        {
+          "language": "ru",
+          "value": "Источник"
+        },
+        {
+          "language": "kk",
+          "value": "Дереккөз"
+        }
+      ]
+    },
+    {
+      "id": 192,
+      "values": [
+        {
+          "language": "main",
+          "value": "Created"
+        },
+        {
+          "language": "en",
+          "value": "Created"
+        },
+        {
+          "language": "ru",
+          "value": "Создано"
+        },
+        {
+          "language": "kk",
+          "value": "Жасалды"
+        }
+      ]
+    },
+    {
+      "id": 193,
+      "values": [
+        {
+          "language": "main",
+          "value": "No notifications match this search"
+        },
+        {
+          "language": "en",
+          "value": "No notifications match this search"
+        },
+        {
+          "language": "ru",
+          "value": "По этому поиску уведомлений нет"
+        },
+        {
+          "language": "kk",
+          "value": "Бұл іздеу бойынша хабарламалар жоқ"
+        }
+      ]
+    },
+    {
+      "id": 194,
+      "values": [
+        {
+          "language": "main",
+          "value": "Add batch"
+        },
+        {
+          "language": "en",
+          "value": "Add batch"
+        },
+        {
+          "language": "ru",
+          "value": "Добавить партию"
+        },
+        {
+          "language": "kk",
+          "value": "Партия қосу"
+        }
+      ]
+    },
+    {
+      "id": 195,
+      "values": [
+        {
+          "language": "main",
+          "value": "Edit batch"
+        },
+        {
+          "language": "en",
+          "value": "Edit batch"
+        },
+        {
+          "language": "ru",
+          "value": "Редактировать партию"
+        },
+        {
+          "language": "kk",
+          "value": "Партияны өңдеу"
+        }
+      ]
+    },
+    {
+      "id": 196,
+      "values": [
+        {
+          "language": "main",
+          "value": "Save the goods item first, then you can add batches."
+        },
+        {
+          "language": "en",
+          "value": "Save the goods item first, then you can add batches."
+        },
+        {
+          "language": "ru",
+          "value": "Сначала сохраните товар, затем можно будет добавить партии."
+        },
+        {
+          "language": "kk",
+          "value": "Алдымен тауарды сақтаңыз, содан кейін партияларды қосуға болады."
+        }
+      ]
+    },
+    {
+      "id": 197,
+      "values": [
+        {
+          "language": "main",
+          "value": "Shelf order"
+        },
+        {
+          "language": "en",
+          "value": "Shelf order"
+        },
+        {
+          "language": "ru",
+          "value": "Порядок на полке"
+        },
+        {
+          "language": "kk",
+          "value": "Сөредегі рет"
+        }
+      ]
+    },
+    {
+      "id": 198,
+      "values": [
+        {
+          "language": "main",
+          "value": "The first batch is the active shelf batch. Long-press and drag a batch up or down to change shelf order."
+        },
+        {
+          "language": "en",
+          "value": "The first batch is the active shelf batch. Long-press and drag a batch up or down to change shelf order."
+        },
+        {
+          "language": "ru",
+          "value": "Первая партия считается активной на полке. Зажмите и перетащите партию вверх или вниз, чтобы изменить порядок."
+        },
+        {
+          "language": "kk",
+          "value": "Бірінші партия сөредегі белсенді партия болып саналады. Ретін өзгерту үшін партияны басып тұрып жоғары немесе төмен сүйреңіз."
+        }
+      ]
+    },
+    {
+      "id": 199,
+      "values": [
+        {
+          "language": "main",
+          "value": "No batches yet"
+        },
+        {
+          "language": "en",
+          "value": "No batches yet"
+        },
+        {
+          "language": "ru",
+          "value": "Партий пока нет"
+        },
+        {
+          "language": "kk",
+          "value": "Әзірге партия жоқ"
+        }
+      ]
+    },
+    {
+      "id": 200,
+      "values": [
+        {
+          "language": "main",
+          "value": "Status"
+        },
+        {
+          "language": "en",
+          "value": "Status"
+        },
+        {
+          "language": "ru",
+          "value": "Статус"
+        },
+        {
+          "language": "kk",
+          "value": "Күйі"
+        }
+      ]
+    },
+    {
+      "id": 201,
+      "values": [
+        {
+          "language": "main",
+          "value": "Notes"
+        },
+        {
+          "language": "en",
+          "value": "Notes"
+        },
+        {
+          "language": "ru",
+          "value": "Заметки"
+        },
+        {
+          "language": "kk",
+          "value": "Ескертпелер"
+        }
+      ]
+    },
+    {
+      "id": 202,
+      "values": [
+        {
+          "language": "main",
+          "value": "Expiration"
+        },
+        {
+          "language": "en",
+          "value": "Expiration"
+        },
+        {
+          "language": "ru",
+          "value": "Срок годности"
+        },
+        {
+          "language": "kk",
+          "value": "Жарамдылық мерзімі"
+        }
+      ]
+    },
+    {
+      "id": 203,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier prices"
+        },
+        {
+          "language": "en",
+          "value": "Supplier prices"
+        },
+        {
+          "language": "ru",
+          "value": "Цены поставщиков"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші бағалары"
+        }
+      ]
+    },
+    {
+      "id": 204,
+      "values": [
+        {
+          "language": "main",
+          "value": "Confirm action"
+        },
+        {
+          "language": "en",
+          "value": "Confirm action"
+        },
+        {
+          "language": "ru",
+          "value": "Подтвердите действие"
+        },
+        {
+          "language": "kk",
+          "value": "Әрекетті растаңыз"
+        }
+      ]
+    },
+    {
+      "id": 205,
+      "values": [
+        {
+          "language": "main",
+          "value": "This action may change or delete important data."
+        },
+        {
+          "language": "en",
+          "value": "This action may change or delete important data."
+        },
+        {
+          "language": "ru",
+          "value": "Это действие может изменить или удалить важные данные."
+        },
+        {
+          "language": "kk",
+          "value": "Бұл әрекет маңызды деректерді өзгертуі немесе өшіруі мүмкін."
+        }
+      ]
+    },
+    {
+      "id": 206,
+      "values": [
+        {
+          "language": "main",
+          "value": "Weight"
+        },
+        {
+          "language": "en",
+          "value": "Weight"
+        },
+        {
+          "language": "ru",
+          "value": "Вес"
+        },
+        {
+          "language": "kk",
+          "value": "Салмақ"
+        }
+      ]
+    },
+    {
+      "id": 207,
+      "values": [
+        {
+          "language": "main",
+          "value": "Enter weight"
+        },
+        {
+          "language": "en",
+          "value": "Enter weight"
+        },
+        {
+          "language": "ru",
+          "value": "Введите вес"
+        },
+        {
+          "language": "kk",
+          "value": "Салмақты енгізіңіз"
+        }
+      ]
+    },
+    {
+      "id": 208,
+      "values": [
+        {
+          "language": "main",
+          "value": "Set weight"
+        },
+        {
+          "language": "en",
+          "value": "Set weight"
+        },
+        {
+          "language": "ru",
+          "value": "Установить вес"
+        },
+        {
+          "language": "kk",
+          "value": "Салмақты орнату"
+        }
+      ]
+    },
+    {
+      "id": 209,
+      "values": [
+        {
+          "language": "main",
+          "value": "Security"
+        },
+        {
+          "language": "en",
+          "value": "Security"
+        },
+        {
+          "language": "ru",
+          "value": "Безопасность"
+        },
+        {
+          "language": "kk",
+          "value": "Қауіпсіздік"
+        }
+      ]
+    },
+    {
+      "id": 210,
+      "values": [
+        {
+          "language": "main",
+          "value": "Active sessions"
+        },
+        {
+          "language": "en",
+          "value": "Active sessions"
+        },
+        {
+          "language": "ru",
+          "value": "Активные сеансы"
+        },
+        {
+          "language": "kk",
+          "value": "Белсенді сеанстар"
+        }
+      ]
+    },
+    {
+      "id": 211,
+      "values": [
+        {
+          "language": "main",
+          "value": "Current device"
+        },
+        {
+          "language": "en",
+          "value": "Current device"
+        },
+        {
+          "language": "ru",
+          "value": "Текущее устройство"
+        },
+        {
+          "language": "kk",
+          "value": "Ағымдағы құрылғы"
+        }
+      ]
+    },
+    {
+      "id": 212,
+      "values": [
+        {
+          "language": "main",
+          "value": "Revoke session"
+        },
+        {
+          "language": "en",
+          "value": "Revoke session"
+        },
+        {
+          "language": "ru",
+          "value": "Завершить сеанс"
+        },
+        {
+          "language": "kk",
+          "value": "Сеансты тоқтату"
+        }
+      ]
+    },
+    {
+      "id": 213,
+      "values": [
+        {
+          "language": "main",
+          "value": "Revoke other sessions"
+        },
+        {
+          "language": "en",
+          "value": "Revoke other sessions"
+        },
+        {
+          "language": "ru",
+          "value": "Завершить другие сеансы"
+        },
+        {
+          "language": "kk",
+          "value": "Басқа сеанстарды тоқтату"
+        }
+      ]
+    },
+    {
+      "id": 214,
+      "values": [
+        {
+          "language": "main",
+          "value": "Cannot reach server. Keeping you signed in offline."
+        },
+        {
+          "language": "en",
+          "value": "Cannot reach server. Keeping you signed in offline."
+        },
+        {
+          "language": "ru",
+          "value": "Сервер недоступен. Вы остаётесь в аккаунте офлайн."
+        },
+        {
+          "language": "kk",
+          "value": "Сервер қолжетімсіз. Сіз офлайн режимде аккаунтта қаласыз."
+        }
+      ]
+    },
+    {
+      "id": 215,
+      "values": [
+        {
+          "language": "main",
+          "value": "Cannot reach server. Security sessions will refresh when connection returns."
+        },
+        {
+          "language": "en",
+          "value": "Cannot reach server. Security sessions will refresh when connection returns."
+        },
+        {
+          "language": "ru",
+          "value": "Сервер недоступен. Сеансы безопасности обновятся после восстановления соединения."
+        },
+        {
+          "language": "kk",
+          "value": "Сервер қолжетімсіз. Қауіпсіздік сеанстары байланыс қалпына келгенде жаңартылады."
+        }
+      ]
+    },
+    {
+      "id": 216,
+      "values": [
+        {
+          "language": "main",
+          "value": "Session revoked"
+        },
+        {
+          "language": "en",
+          "value": "Session revoked"
+        },
+        {
+          "language": "ru",
+          "value": "Сеанс завершён"
+        },
+        {
+          "language": "kk",
+          "value": "Сеанс тоқтатылды"
+        }
+      ]
+    },
+    {
+      "id": 217,
+      "values": [
+        {
+          "language": "main",
+          "value": "Other sessions revoked"
+        },
+        {
+          "language": "en",
+          "value": "Other sessions revoked"
+        },
+        {
+          "language": "ru",
+          "value": "Другие сеансы завершены"
+        },
+        {
+          "language": "kk",
+          "value": "Басқа сеанстар тоқтатылды"
+        }
+      ]
+    },
+    {
+      "id": 218,
+      "values": [
+        {
+          "language": "main",
+          "value": "Active sessions loaded"
+        },
+        {
+          "language": "en",
+          "value": "Active sessions loaded"
+        },
+        {
+          "language": "ru",
+          "value": "Активные сеансы загружены"
+        },
+        {
+          "language": "kk",
+          "value": "Белсенді сеанстар жүктелді"
+        }
+      ]
+    },
+    {
+      "id": 219,
+      "values": [
+        {
+          "language": "main",
+          "value": "Login is already in progress"
+        },
+        {
+          "language": "en",
+          "value": "Login is already in progress"
+        },
+        {
+          "language": "ru",
+          "value": "Вход уже выполняется"
+        },
+        {
+          "language": "kk",
+          "value": "Кіру қазірдің өзінде орындалып жатыр"
+        }
+      ]
+    },
+    {
+      "id": 220,
+      "values": [
+        {
+          "language": "main",
+          "value": "Logged out locally"
+        },
+        {
+          "language": "en",
+          "value": "Logged out locally"
+        },
+        {
+          "language": "ru",
+          "value": "Вы вышли локально"
+        },
+        {
+          "language": "kk",
+          "value": "Сіз жергілікті түрде шықтыңыз"
+        }
+      ]
+    },
+    {
+      "id": 221,
+      "values": [
+        {
+          "language": "main",
+          "value": "Logged out locally; server session cleanup failed"
+        },
+        {
+          "language": "en",
+          "value": "Logged out locally; server session cleanup failed"
+        },
+        {
+          "language": "ru",
+          "value": "Вы вышли локально; не удалось завершить сеанс на сервере"
+        },
+        {
+          "language": "kk",
+          "value": "Сіз жергілікті түрде шықтыңыз; сервердегі сеансты аяқтау мүмкін болмады"
+        }
+      ]
+    },
+    {
+      "id": 222,
+      "values": [
+        {
+          "language": "main",
+          "value": "Login failed: empty token response"
+        },
+        {
+          "language": "en",
+          "value": "Login failed: empty token response"
+        },
+        {
+          "language": "ru",
+          "value": "Не удалось войти: сервер не вернул токены"
+        },
+        {
+          "language": "kk",
+          "value": "Кіру орындалмады: сервер токендерді қайтармады"
+        }
+      ]
+    },
+    {
+      "id": 223,
+      "values": [
+        {
+          "language": "main",
+          "value": "Cannot reach server"
+        },
+        {
+          "language": "en",
+          "value": "Cannot reach server"
+        },
+        {
+          "language": "ru",
+          "value": "Сервер недоступен"
+        },
+        {
+          "language": "kk",
+          "value": "Сервер қолжетімсіз"
+        }
+      ]
+    },
+    {
+      "id": 224,
+      "values": [
+        {
+          "language": "main",
+          "value": "Completing transaction"
+        },
+        {
+          "language": "en",
+          "value": "Completing transaction"
+        },
+        {
+          "language": "ru",
+          "value": "Завершение операции"
+        },
+        {
+          "language": "kk",
+          "value": "Операция аяқталуда"
+        }
+      ]
+    },
+    {
+      "id": 225,
+      "values": [
+        {
+          "language": "main",
+          "value": "Server response could not be read"
+        },
+        {
+          "language": "en",
+          "value": "Server response could not be read"
+        },
+        {
+          "language": "ru",
+          "value": "Не удалось прочитать ответ сервера"
+        },
+        {
+          "language": "kk",
+          "value": "Сервер жауабын оқу мүмкін болмады"
+        }
+      ]
+    },
+    {
+      "id": 226,
+      "values": [
+        {
+          "language": "main",
+          "value": "Account security"
+        },
+        {
+          "language": "en",
+          "value": "Account security"
+        },
+        {
+          "language": "ru",
+          "value": "Безопасность аккаунта"
+        },
+        {
+          "language": "kk",
+          "value": "Аккаунт қауіпсіздігі"
+        }
+      ]
+    },
+    {
+      "id": 227,
+      "values": [
+        {
+          "language": "main",
+          "value": "Review where your account is signed in. Revoke sessions you do not recognize."
+        },
+        {
+          "language": "en",
+          "value": "Review where your account is signed in. Revoke sessions you do not recognize."
+        },
+        {
+          "language": "ru",
+          "value": "Проверьте, где выполнен вход в аккаунт. Завершите незнакомые сеансы."
+        },
+        {
+          "language": "kk",
+          "value": "Аккаунтқа қай жерде кірілгенін тексеріңіз. Танымайтын сеанстарды тоқтатыңыз."
+        }
+      ]
+    },
+    {
+      "id": 228,
+      "values": [
+        {
+          "language": "main",
+          "value": "This device"
+        },
+        {
+          "language": "en",
+          "value": "This device"
+        },
+        {
+          "language": "ru",
+          "value": "Это устройство"
+        },
+        {
+          "language": "kk",
+          "value": "Осы құрылғы"
+        }
+      ]
+    },
+    {
+      "id": 229,
+      "values": [
+        {
+          "language": "main",
+          "value": "Current session"
+        },
+        {
+          "language": "en",
+          "value": "Current session"
+        },
+        {
+          "language": "ru",
+          "value": "Текущий сеанс"
+        },
+        {
+          "language": "kk",
+          "value": "Ағымдағы сеанс"
+        }
+      ]
+    },
+    {
+      "id": 230,
+      "values": [
+        {
+          "language": "main",
+          "value": "Unknown device"
+        },
+        {
+          "language": "en",
+          "value": "Unknown device"
+        },
+        {
+          "language": "ru",
+          "value": "Неизвестное устройство"
+        },
+        {
+          "language": "kk",
+          "value": "Белгісіз құрылғы"
+        }
+      ]
+    },
+    {
+      "id": 231,
+      "values": [
+        {
+          "language": "main",
+          "value": "Active session"
+        },
+        {
+          "language": "en",
+          "value": "Active session"
+        },
+        {
+          "language": "ru",
+          "value": "Активный сеанс"
+        },
+        {
+          "language": "kk",
+          "value": "Белсенді сеанс"
+        }
+      ]
+    },
+    {
+      "id": 232,
+      "values": [
+        {
+          "language": "main",
+          "value": "Current"
+        },
+        {
+          "language": "en",
+          "value": "Current"
+        },
+        {
+          "language": "ru",
+          "value": "Текущий"
+        },
+        {
+          "language": "kk",
+          "value": "Ағымдағы"
+        }
+      ]
+    },
+    {
+      "id": 233,
+      "values": [
+        {
+          "language": "main",
+          "value": "Signed in"
+        },
+        {
+          "language": "en",
+          "value": "Signed in"
+        },
+        {
+          "language": "ru",
+          "value": "Вход выполнен"
+        },
+        {
+          "language": "kk",
+          "value": "Кірілген"
+        }
+      ]
+    },
+    {
+      "id": 234,
+      "values": [
+        {
+          "language": "main",
+          "value": "Expires"
+        },
+        {
+          "language": "en",
+          "value": "Expires"
+        },
+        {
+          "language": "ru",
+          "value": "Истекает"
+        },
+        {
+          "language": "kk",
+          "value": "Аяқталады"
+        }
+      ]
+    },
+    {
+      "id": 235,
+      "values": [
+        {
+          "language": "main",
+          "value": "Language"
+        },
+        {
+          "language": "en",
+          "value": "Language"
+        },
+        {
+          "language": "ru",
+          "value": "Язык"
+        },
+        {
+          "language": "kk",
+          "value": "Тіл"
+        }
+      ]
+    },
+    {
+      "id": 236,
+      "values": [
+        {
+          "language": "main",
+          "value": "User agent"
+        },
+        {
+          "language": "en",
+          "value": "User agent"
+        },
+        {
+          "language": "ru",
+          "value": "User agent"
+        },
+        {
+          "language": "kk",
+          "value": "User agent"
+        }
+      ]
+    },
+    {
+      "id": 237,
+      "values": [
+        {
+          "language": "main",
+          "value": "Refresh"
+        },
+        {
+          "language": "en",
+          "value": "Refresh"
+        },
+        {
+          "language": "ru",
+          "value": "Обновить"
+        },
+        {
+          "language": "kk",
+          "value": "Жаңарту"
+        }
+      ]
+    },
+    {
+      "id": 238,
+      "values": [
+        {
+          "language": "main",
+          "value": "Revoke others"
+        },
+        {
+          "language": "en",
+          "value": "Revoke others"
+        },
+        {
+          "language": "ru",
+          "value": "Завершить другие"
+        },
+        {
+          "language": "kk",
+          "value": "Басқаларын тоқтату"
+        }
+      ]
+    },
+    {
+      "id": 239,
+      "values": [
+        {
+          "language": "main",
+          "value": "No active sessions loaded yet"
+        },
+        {
+          "language": "en",
+          "value": "No active sessions loaded yet"
+        },
+        {
+          "language": "ru",
+          "value": "Активные сеансы ещё не загружены"
+        },
+        {
+          "language": "kk",
+          "value": "Белсенді сеанстар әлі жүктелмеді"
+        }
+      ]
+    },
+    {
+      "id": 240,
+      "values": [
+        {
+          "language": "main",
+          "value": "Session id is required"
+        },
+        {
+          "language": "en",
+          "value": "Session id is required"
+        },
+        {
+          "language": "ru",
+          "value": "Нужен id сеанса"
+        },
+        {
+          "language": "kk",
+          "value": "Сеанс id қажет"
+        }
+      ]
+    },
+    {
+      "id": 241,
+      "values": [
+        {
+          "language": "main",
+          "value": "Use logout to revoke the current session"
+        },
+        {
+          "language": "en",
+          "value": "Use logout to revoke the current session"
+        },
+        {
+          "language": "ru",
+          "value": "Чтобы завершить текущий сеанс, выйдите из аккаунта"
+        },
+        {
+          "language": "kk",
+          "value": "Ағымдағы сеансты тоқтату үшін аккаунттан шығыңыз"
+        }
+      ]
+    },
+    {
+      "id": 242,
+      "values": [
+        {
+          "language": "main",
+          "value": "Server"
+        },
+        {
+          "language": "en",
+          "value": "Server"
+        },
+        {
+          "language": "ru",
+          "value": "Сервер"
+        },
+        {
+          "language": "kk",
+          "value": "Сервер"
+        }
+      ]
+    },
+    {
+      "id": 243,
+      "values": [
+        {
+          "language": "main",
+          "value": "Sale method"
+        },
+        {
+          "language": "en",
+          "value": "Sale method"
+        },
+        {
+          "language": "ru",
+          "value": "Способ продажи"
+        },
+        {
+          "language": "kk",
+          "value": "Сату тәсілі"
+        }
+      ]
+    },
+    {
+      "id": 244,
+      "values": [
+        {
+          "language": "main",
+          "value": "Retail"
+        },
+        {
+          "language": "en",
+          "value": "Retail"
+        },
+        {
+          "language": "ru",
+          "value": "Розница"
+        },
+        {
+          "language": "kk",
+          "value": "Бөлшек"
+        }
+      ]
+    },
+    {
+      "id": 245,
+      "values": [
+        {
+          "language": "main",
+          "value": "Wholesale"
+        },
+        {
+          "language": "en",
+          "value": "Wholesale"
+        },
+        {
+          "language": "ru",
+          "value": "Оптом"
+        },
+        {
+          "language": "kk",
+          "value": "Көтерме"
+        }
+      ]
+    },
+    {
+      "id": 246,
+      "values": [
+        {
+          "language": "main",
+          "value": "Wholesale price"
+        },
+        {
+          "language": "en",
+          "value": "Wholesale price"
+        },
+        {
+          "language": "ru",
+          "value": "Оптовая цена"
+        },
+        {
+          "language": "kk",
+          "value": "Көтерме баға"
+        }
+      ]
+    },
+    {
+      "id": 247,
+      "values": [
+        {
+          "language": "main",
+          "value": "Wholesale price override"
+        },
+        {
+          "language": "en",
+          "value": "Wholesale price override"
+        },
+        {
+          "language": "ru",
+          "value": "Оптовая цена партии"
+        },
+        {
+          "language": "kk",
+          "value": "Партияның көтерме бағасы"
+        }
+      ]
+    },
+    {
+      "id": 248,
+      "values": [
+        {
+          "language": "main",
+          "value": "Wholesale minimum quantity"
+        },
+        {
+          "language": "en",
+          "value": "Wholesale minimum quantity"
+        },
+        {
+          "language": "ru",
+          "value": "Минимум для опта"
+        },
+        {
+          "language": "kk",
+          "value": "Көтерме үшін минимум"
+        }
+      ]
+    },
+    {
+      "id": 249,
+      "values": [
+        {
+          "language": "main",
+          "value": "Enter wholesale minimum quantity"
+        },
+        {
+          "language": "en",
+          "value": "Enter wholesale minimum quantity"
+        },
+        {
+          "language": "ru",
+          "value": "Введите минимум для опта"
+        },
+        {
+          "language": "kk",
+          "value": "Көтерме минимумын енгізіңіз"
+        }
+      ]
+    },
+    {
+      "id": 250,
+      "values": [
+        {
+          "language": "main",
+          "value": "Wholesale from"
+        },
+        {
+          "language": "en",
+          "value": "Wholesale from"
+        },
+        {
+          "language": "ru",
+          "value": "Оптом от"
+        },
+        {
+          "language": "kk",
+          "value": "Көтерме"
+        }
+      ]
+    },
+    {
+      "id": 251,
+      "values": [
+        {
+          "language": "main",
+          "value": "Not enough for wholesale"
+        },
+        {
+          "language": "en",
+          "value": "Not enough for wholesale"
+        },
+        {
+          "language": "ru",
+          "value": "Недостаточно для опта"
+        },
+        {
+          "language": "kk",
+          "value": "Көтерме үшін жеткіліксіз"
+        }
+      ]
+    },
+    {
+      "id": 252,
+      "values": [
+        {
+          "language": "main",
+          "value": "Info"
+        },
+        {
+          "language": "en",
+          "value": "Info"
+        },
+        {
+          "language": "ru",
+          "value": "Информация"
+        },
+        {
+          "language": "kk",
+          "value": "Ақпарат"
+        }
+      ]
+    },
+    {
+      "id": 253,
+      "values": [
+        {
+          "language": "main",
+          "value": "Generic prices"
+        },
+        {
+          "language": "en",
+          "value": "Generic prices"
+        },
+        {
+          "language": "ru",
+          "value": "Базовые цены"
+        },
+        {
+          "language": "kk",
+          "value": "Негізгі бағалар"
+        }
+      ]
+    },
+    {
+      "id": 254,
+      "values": [
+        {
+          "language": "main",
+          "value": "Orders"
+        },
+        {
+          "language": "en",
+          "value": "Orders"
+        },
+        {
+          "language": "ru",
+          "value": "Заказы"
+        },
+        {
+          "language": "kk",
+          "value": "Тапсырыстар"
+        }
+      ]
+    },
+    {
+      "id": 255,
+      "values": [
+        {
+          "language": "main",
+          "value": "Cash register"
+        },
+        {
+          "language": "en",
+          "value": "Cash register"
+        },
+        {
+          "language": "ru",
+          "value": "Касса"
+        },
+        {
+          "language": "kk",
+          "value": "Касса"
+        }
+      ]
+    },
+    {
+      "id": 256,
+      "values": [
+        {
+          "language": "main",
+          "value": "Cash registers"
+        },
+        {
+          "language": "en",
+          "value": "Cash registers"
+        },
+        {
+          "language": "ru",
+          "value": "Кассы"
+        },
+        {
+          "language": "kk",
+          "value": "Кассалар"
+        }
+      ]
+    },
+    {
+      "id": 257,
+      "values": [
+        {
+          "language": "main",
+          "value": "History"
+        },
+        {
+          "language": "en",
+          "value": "History"
+        },
+        {
+          "language": "ru",
+          "value": "История"
+        },
+        {
+          "language": "kk",
+          "value": "Тарих"
+        }
+      ]
+    },
+    {
+      "id": 258,
+      "values": [
+        {
+          "language": "main",
+          "value": "No sales in this period"
+        },
+        {
+          "language": "en",
+          "value": "No sales in this period"
+        },
+        {
+          "language": "ru",
+          "value": "За этот период продаж нет"
+        },
+        {
+          "language": "kk",
+          "value": "Бұл кезеңде сатылым жоқ"
+        }
+      ]
+    },
+    {
+      "id": 259,
+      "values": [
+        {
+          "language": "main",
+          "value": "No cash register extractions in this period"
+        },
+        {
+          "language": "en",
+          "value": "No cash register extractions in this period"
+        },
+        {
+          "language": "ru",
+          "value": "За этот период изъятий из кассы нет"
+        },
+        {
+          "language": "kk",
+          "value": "Бұл кезеңде кассадан алу жоқ"
+        }
+      ]
+    },
+    {
+      "id": 260,
+      "values": [
+        {
+          "language": "main",
+          "value": "Today"
+        },
+        {
+          "language": "en",
+          "value": "Today"
+        },
+        {
+          "language": "ru",
+          "value": "Сегодня"
+        },
+        {
+          "language": "kk",
+          "value": "Бүгін"
+        }
+      ]
+    },
+    {
+      "id": 261,
+      "values": [
+        {
+          "language": "main",
+          "value": "7 days"
+        },
+        {
+          "language": "en",
+          "value": "7 days"
+        },
+        {
+          "language": "ru",
+          "value": "7 дней"
+        },
+        {
+          "language": "kk",
+          "value": "7 күн"
+        }
+      ]
+    },
+    {
+      "id": 262,
+      "values": [
+        {
+          "language": "main",
+          "value": "30 days"
+        },
+        {
+          "language": "en",
+          "value": "30 days"
+        },
+        {
+          "language": "ru",
+          "value": "30 дней"
+        },
+        {
+          "language": "kk",
+          "value": "30 күн"
+        }
+      ]
+    },
+    {
+      "id": 263,
+      "values": [
+        {
+          "language": "main",
+          "value": "In cart"
+        },
+        {
+          "language": "en",
+          "value": "In cart"
+        },
+        {
+          "language": "ru",
+          "value": "В корзине"
+        },
+        {
+          "language": "kk",
+          "value": "Себетте"
+        }
+      ]
+    },
+    {
+      "id": 264,
+      "values": [
+        {
+          "language": "main",
+          "value": "Available"
+        },
+        {
+          "language": "en",
+          "value": "Available"
+        },
+        {
+          "language": "ru",
+          "value": "Доступно"
+        },
+        {
+          "language": "kk",
+          "value": "Қолжетімді"
+        }
+      ]
+    },
+    {
+      "id": 265,
+      "values": [
+        {
+          "language": "main",
+          "value": "Active batch"
+        },
+        {
+          "language": "en",
+          "value": "Active batch"
+        },
+        {
+          "language": "ru",
+          "value": "Активная партия"
+        },
+        {
+          "language": "kk",
+          "value": "Белсенді партия"
+        }
+      ]
+    },
+    {
+      "id": 266,
+      "values": [
+        {
+          "language": "main",
+          "value": "Note"
+        },
+        {
+          "language": "en",
+          "value": "Note"
+        },
+        {
+          "language": "ru",
+          "value": "Заметка"
+        },
+        {
+          "language": "kk",
+          "value": "Ескертпе"
+        }
+      ]
+    },
+    {
+      "id": 267,
+      "values": [
+        {
+          "language": "main",
+          "value": "Batch prices"
+        },
+        {
+          "language": "en",
+          "value": "Batch prices"
+        },
+        {
+          "language": "ru",
+          "value": "Цены партии"
+        },
+        {
+          "language": "kk",
+          "value": "Партия бағалары"
+        }
+      ]
+    },
+    {
+      "id": 268,
+      "values": [
+        {
+          "language": "main",
+          "value": "Currency"
+        },
+        {
+          "language": "en",
+          "value": "Currency"
+        },
+        {
+          "language": "ru",
+          "value": "Валюта"
+        },
+        {
+          "language": "kk",
+          "value": "Валюта"
+        }
+      ]
+    },
+    {
+      "id": 269,
+      "values": [
+        {
+          "language": "main",
+          "value": "Select currency"
+        },
+        {
+          "language": "en",
+          "value": "Select currency"
+        },
+        {
+          "language": "ru",
+          "value": "Выберите валюту"
+        },
+        {
+          "language": "kk",
+          "value": "Валютаны таңдаңыз"
+        }
+      ]
+    },
+    {
+      "id": 270,
+      "values": [
+        {
+          "language": "main",
+          "value": "Unit"
+        },
+        {
+          "language": "en",
+          "value": "Unit"
+        },
+        {
+          "language": "ru",
+          "value": "Единица"
+        },
+        {
+          "language": "kk",
+          "value": "Бірлік"
+        }
+      ]
+    },
+    {
+      "id": 271,
+      "values": [
+        {
+          "language": "main",
+          "value": "Quantity"
+        },
+        {
+          "language": "en",
+          "value": "Quantity"
+        },
+        {
+          "language": "ru",
+          "value": "Количество"
+        },
+        {
+          "language": "kk",
+          "value": "Саны"
+        }
+      ]
+    },
+    {
+      "id": 272,
+      "values": [
+        {
+          "language": "main",
+          "value": "Save the goods item first, then supplier orders can be attached to it."
+        },
+        {
+          "language": "en",
+          "value": "Save the goods item first, then supplier orders can be attached to it."
+        },
+        {
+          "language": "ru",
+          "value": "Сначала сохраните товар, затем к нему можно будет прикреплять заказы поставщикам."
+        },
+        {
+          "language": "kk",
+          "value": "Алдымен тауарды сақтаңыз, содан кейін оған жеткізуші тапсырыстарын байланыстыруға болады."
+        }
+      ]
+    },
+    {
+      "id": 273,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier orders are ready as a tab destination. The order creation and receiving form is the next safe layer to connect."
+        },
+        {
+          "language": "en",
+          "value": "Supplier orders are ready as a tab destination. The order creation and receiving form is the next safe layer to connect."
+        },
+        {
+          "language": "ru",
+          "value": "Вкладка заказов поставщикам уже готова. Следующий безопасный слой — форма создания и приёмки заказа."
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші тапсырыстары қойындысы дайын. Келесі қауіпсіз қабат — тапсырыс жасау және қабылдау формасы."
+        }
+      ]
+    },
+    {
+      "id": 274,
+      "values": [
+        {
+          "language": "main",
+          "value": "Set the minimum amount required for the wholesale sale method. Leave wholesale price empty to disable it."
+        },
+        {
+          "language": "en",
+          "value": "Set the minimum amount required for the wholesale sale method. Leave wholesale price empty to disable it."
+        },
+        {
+          "language": "ru",
+          "value": "Укажите минимальное количество для продажи оптом. Оставьте оптовую цену пустой, чтобы отключить опт."
+        },
+        {
+          "language": "kk",
+          "value": "Көтерме сату үшін ең аз санды көрсетіңіз. Көтерме бағаны өшіру үшін оны бос қалдырыңыз."
+        }
+      ]
+    },
+    {
+      "id": 275,
+      "values": [
+        {
+          "language": "main",
+          "value": "No returns in this period"
+        },
+        {
+          "language": "en",
+          "value": "No returns in this period"
+        },
+        {
+          "language": "ru",
+          "value": "За этот период возвратов нет"
+        },
+        {
+          "language": "kk",
+          "value": "Бұл кезеңде қайтарым жоқ"
+        }
+      ]
+    },
+    {
+      "id": 276,
+      "values": [
+        {
+          "language": "main",
+          "value": "No supply transactions in this period"
+        },
+        {
+          "language": "en",
+          "value": "No supply transactions in this period"
+        },
+        {
+          "language": "ru",
+          "value": "За этот период поставок нет"
+        },
+        {
+          "language": "kk",
+          "value": "Бұл кезеңде жеткізу операциялары жоқ"
+        }
+      ]
+    },
+    {
+      "id": 277,
+      "values": [
+        {
+          "language": "main",
+          "value": "Current amount"
+        },
+        {
+          "language": "en",
+          "value": "Current amount"
+        },
+        {
+          "language": "ru",
+          "value": "Текущая сумма"
+        },
+        {
+          "language": "kk",
+          "value": "Ағымдағы сома"
+        }
+      ]
+    },
+    {
+      "id": 278,
+      "values": [
+        {
+          "language": "main",
+          "value": "Extracted"
+        },
+        {
+          "language": "en",
+          "value": "Extracted"
+        },
+        {
+          "language": "ru",
+          "value": "Изъято"
+        },
+        {
+          "language": "kk",
+          "value": "Алынды"
+        }
+      ]
+    },
+    {
+      "id": 279,
+      "values": [
+        {
+          "language": "main",
+          "value": "Extractions"
+        },
+        {
+          "language": "en",
+          "value": "Extractions"
+        },
+        {
+          "language": "ru",
+          "value": "Изъятия"
+        },
+        {
+          "language": "kk",
+          "value": "Алу операциялары"
+        }
+      ]
+    },
+    {
+      "id": 280,
+      "values": [
+        {
+          "language": "main",
+          "value": "Active items"
+        },
+        {
+          "language": "en",
+          "value": "Active items"
+        },
+        {
+          "language": "ru",
+          "value": "Активные товары"
+        },
+        {
+          "language": "kk",
+          "value": "Белсенді тауарлар"
+        }
+      ]
+    },
+    {
+      "id": 281,
+      "values": [
+        {
+          "language": "main",
+          "value": "Inactive items"
+        },
+        {
+          "language": "en",
+          "value": "Inactive items"
+        },
+        {
+          "language": "ru",
+          "value": "Неактивные товары"
+        },
+        {
+          "language": "kk",
+          "value": "Белсенді емес тауарлар"
+        }
+      ]
+    },
+    {
+      "id": 282,
+      "values": [
+        {
+          "language": "main",
+          "value": "All stock items"
+        },
+        {
+          "language": "en",
+          "value": "All stock items"
+        },
+        {
+          "language": "ru",
+          "value": "Все товары склада"
+        },
+        {
+          "language": "kk",
+          "value": "Қоймадағы барлық тауарлар"
+        }
+      ]
+    },
+    {
+      "id": 283,
+      "values": [
+        {
+          "language": "main",
+          "value": "Quick-sale items"
+        },
+        {
+          "language": "en",
+          "value": "Quick-sale items"
+        },
+        {
+          "language": "ru",
+          "value": "Быстрые товары"
+        },
+        {
+          "language": "kk",
+          "value": "Жылдам сатылатын тауарлар"
+        }
+      ]
+    },
+    {
+      "id": 284,
+      "values": [
+        {
+          "language": "main",
+          "value": "Active batches"
+        },
+        {
+          "language": "en",
+          "value": "Active batches"
+        },
+        {
+          "language": "ru",
+          "value": "Активные партии"
+        },
+        {
+          "language": "kk",
+          "value": "Белсенді партиялар"
+        }
+      ]
+    },
+    {
+      "id": 285,
+      "values": [
+        {
+          "language": "main",
+          "value": "Inactive batches"
+        },
+        {
+          "language": "en",
+          "value": "Inactive batches"
+        },
+        {
+          "language": "ru",
+          "value": "Неактивные партии"
+        },
+        {
+          "language": "kk",
+          "value": "Белсенді емес партиялар"
+        }
+      ]
+    },
+    {
+      "id": 286,
+      "values": [
+        {
+          "language": "main",
+          "value": "Select debtor"
+        },
+        {
+          "language": "en",
+          "value": "Select debtor"
+        },
+        {
+          "language": "ru",
+          "value": "Выберите должника"
+        },
+        {
+          "language": "kk",
+          "value": "Борышкерді таңдаңыз"
+        }
+      ]
+    },
+    {
+      "id": 287,
+      "values": [
+        {
+          "language": "main",
+          "value": "Or add debtor"
+        },
+        {
+          "language": "en",
+          "value": "Or add debtor"
+        },
+        {
+          "language": "ru",
+          "value": "Или добавьте должника"
+        },
+        {
+          "language": "kk",
+          "value": "Немесе борышкер қосыңыз"
+        }
+      ]
+    },
+    {
+      "id": 288,
+      "values": [
+        {
+          "language": "main",
+          "value": "Debtor form"
+        },
+        {
+          "language": "en",
+          "value": "Debtor form"
+        },
+        {
+          "language": "ru",
+          "value": "Форма должника"
+        },
+        {
+          "language": "kk",
+          "value": "Борышкер түрі"
+        }
+      ]
+    },
+    {
+      "id": 289,
+      "values": [
+        {
+          "language": "main",
+          "value": "Individual"
+        },
+        {
+          "language": "en",
+          "value": "Individual"
+        },
+        {
+          "language": "ru",
+          "value": "Физическое лицо"
+        },
+        {
+          "language": "kk",
+          "value": "Жеке тұлға"
+        }
+      ]
+    },
+    {
+      "id": 290,
+      "values": [
+        {
+          "language": "main",
+          "value": "Company"
+        },
+        {
+          "language": "en",
+          "value": "Company"
+        },
+        {
+          "language": "ru",
+          "value": "Компания"
+        },
+        {
+          "language": "kk",
+          "value": "Компания"
+        }
+      ]
+    },
+    {
+      "id": 291,
+      "values": [
+        {
+          "language": "main",
+          "value": "Company name"
+        },
+        {
+          "language": "en",
+          "value": "Company name"
+        },
+        {
+          "language": "ru",
+          "value": "Название компании"
+        },
+        {
+          "language": "kk",
+          "value": "Компания атауы"
+        }
+      ]
+    },
+    {
+      "id": 292,
+      "values": [
+        {
+          "language": "main",
+          "value": "Company ID / BIN"
+        },
+        {
+          "language": "en",
+          "value": "Company ID / BIN"
+        },
+        {
+          "language": "ru",
+          "value": "БИН компании"
+        },
+        {
+          "language": "kk",
+          "value": "Компания БСН"
+        }
+      ]
+    },
+    {
+      "id": 293,
+      "values": [
+        {
+          "language": "main",
+          "value": "ID number"
+        },
+        {
+          "language": "en",
+          "value": "ID number"
+        },
+        {
+          "language": "ru",
+          "value": "Номер удостоверения"
+        },
+        {
+          "language": "kk",
+          "value": "ЖСН/құжат нөмірі"
+        }
+      ]
+    },
+    {
+      "id": 294,
+      "values": [
+        {
+          "language": "main",
+          "value": "ID number optional"
+        },
+        {
+          "language": "en",
+          "value": "ID number optional"
+        },
+        {
+          "language": "ru",
+          "value": "Номер удостоверения необязательно"
+        },
+        {
+          "language": "kk",
+          "value": "Құжат нөмірі міндетті емес"
+        }
+      ]
+    },
+    {
+      "id": 295,
+      "values": [
+        {
+          "language": "main",
+          "value": "Debt final repay date optional"
+        },
+        {
+          "language": "en",
+          "value": "Debt final repay date optional"
+        },
+        {
+          "language": "ru",
+          "value": "Крайняя дата возврата долга необязательно"
+        },
+        {
+          "language": "kk",
+          "value": "Қарызды өтеудің соңғы күні міндетті емес"
+        }
+      ]
+    },
+    {
+      "id": 296,
+      "values": [
+        {
+          "language": "main",
+          "value": "Connected module"
+        },
+        {
+          "language": "en",
+          "value": "Connected module"
+        },
+        {
+          "language": "ru",
+          "value": "Подключённый модуль"
+        },
+        {
+          "language": "kk",
+          "value": "Қосылған модуль"
+        }
+      ]
+    },
+    {
+      "id": 297,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier analytics"
+        },
+        {
+          "language": "en",
+          "value": "Supplier analytics"
+        },
+        {
+          "language": "ru",
+          "value": "Аналитика поставщиков"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші аналитикасы"
+        }
+      ]
+    },
+    {
+      "id": 298,
+      "values": [
+        {
+          "language": "main",
+          "value": "Use accepted goods grouped by supplier here"
+        },
+        {
+          "language": "en",
+          "value": "Use accepted goods grouped by supplier here"
+        },
+        {
+          "language": "ru",
+          "value": "Здесь можно использовать принятые товары, сгруппированные по поставщику"
+        },
+        {
+          "language": "kk",
+          "value": "Мұнда жеткізуші бойынша топталған қабылданған тауарларды қолдануға болады"
+        }
+      ]
+    },
+    {
+      "id": 299,
+      "values": [
+        {
+          "language": "main",
+          "value": "Useful metric"
+        },
+        {
+          "language": "en",
+          "value": "Useful metric"
+        },
+        {
+          "language": "ru",
+          "value": "Полезная метрика"
+        },
+        {
+          "language": "kk",
+          "value": "Пайдалы көрсеткіш"
+        }
+      ]
+    },
+    {
+      "id": 300,
+      "values": [
+        {
+          "language": "main",
+          "value": "Acceptance total"
+        },
+        {
+          "language": "en",
+          "value": "Acceptance total"
+        },
+        {
+          "language": "ru",
+          "value": "Итого приёмки"
+        },
+        {
+          "language": "kk",
+          "value": "Қабылдау жиыны"
+        }
+      ]
+    },
+    {
+      "id": 301,
+      "values": [
+        {
+          "language": "main",
+          "value": "Worker analytics"
+        },
+        {
+          "language": "en",
+          "value": "Worker analytics"
+        },
+        {
+          "language": "ru",
+          "value": "Аналитика сотрудников"
+        },
+        {
+          "language": "kk",
+          "value": "Қызметкер аналитикасы"
+        }
+      ]
+    },
+    {
+      "id": 302,
+      "values": [
+        {
+          "language": "main",
+          "value": "Use workshifts, sales per worker, and salary here"
+        },
+        {
+          "language": "en",
+          "value": "Use workshifts, sales per worker, and salary here"
+        },
+        {
+          "language": "ru",
+          "value": "Здесь можно использовать смены, продажи по сотрудникам и зарплату"
+        },
+        {
+          "language": "kk",
+          "value": "Мұнда ауысымдарды, қызметкер бойынша сатылымды және жалақыны қолдануға болады"
+        }
+      ]
+    },
+    {
+      "id": 303,
+      "values": [
+        {
+          "language": "main",
+          "value": "Revenue / worker"
+        },
+        {
+          "language": "en",
+          "value": "Revenue / worker"
+        },
+        {
+          "language": "ru",
+          "value": "Выручка / сотрудник"
+        },
+        {
+          "language": "kk",
+          "value": "Түсім / қызметкер"
+        }
+      ]
+    },
+    {
+      "id": 304,
+      "values": [
+        {
+          "language": "main",
+          "value": "Good for cashier performance later"
+        },
+        {
+          "language": "en",
+          "value": "Good for cashier performance later"
+        },
+        {
+          "language": "ru",
+          "value": "Позже удобно для оценки кассиров"
+        },
+        {
+          "language": "kk",
+          "value": "Кейін кассир жұмысына баға беруге ыңғайлы"
+        }
+      ]
+    },
+    {
+      "id": 305,
+      "values": [
+        {
+          "language": "main",
+          "value": "Use predicted expiration"
+        },
+        {
+          "language": "en",
+          "value": "Use predicted expiration"
+        },
+        {
+          "language": "ru",
+          "value": "Использовать рассчитанный срок годности"
+        },
+        {
+          "language": "kk",
+          "value": "Есептелген жарамдылық мерзімін қолдану"
+        }
+      ]
+    },
+    {
+      "id": 306,
+      "values": [
+        {
+          "language": "main",
+          "value": "Manufactured date"
+        },
+        {
+          "language": "en",
+          "value": "Manufactured date"
+        },
+        {
+          "language": "ru",
+          "value": "Дата производства"
+        },
+        {
+          "language": "kk",
+          "value": "Өндірілген күні"
+        }
+      ]
+    },
+    {
+      "id": 307,
+      "values": [
+        {
+          "language": "main",
+          "value": "Add note translation"
+        },
+        {
+          "language": "en",
+          "value": "Add note translation"
+        },
+        {
+          "language": "ru",
+          "value": "Добавить перевод заметки"
+        },
+        {
+          "language": "kk",
+          "value": "Ескертпе аудармасын қосу"
+        }
+      ]
+    },
+    {
+      "id": 308,
+      "values": [
+        {
+          "language": "main",
+          "value": "Debt payment receipt"
+        },
+        {
+          "language": "en",
+          "value": "Debt payment receipt"
+        },
+        {
+          "language": "ru",
+          "value": "Чек оплаты долга"
+        },
+        {
+          "language": "kk",
+          "value": "Қарыз төлемінің чегі"
+        }
+      ]
+    },
+    {
+      "id": 309,
+      "values": [
+        {
+          "language": "main",
+          "value": "Type"
+        },
+        {
+          "language": "en",
+          "value": "Type"
+        },
+        {
+          "language": "ru",
+          "value": "Тип"
+        },
+        {
+          "language": "kk",
+          "value": "Түрі"
+        }
+      ]
+    },
+    {
+      "id": 310,
+      "values": [
+        {
+          "language": "main",
+          "value": "Full"
+        },
+        {
+          "language": "en",
+          "value": "Full"
+        },
+        {
+          "language": "ru",
+          "value": "Полностью"
+        },
+        {
+          "language": "kk",
+          "value": "Толық"
+        }
+      ]
+    },
+    {
+      "id": 311,
+      "values": [
+        {
+          "language": "main",
+          "value": "Partial"
+        },
+        {
+          "language": "en",
+          "value": "Partial"
+        },
+        {
+          "language": "ru",
+          "value": "Частично"
+        },
+        {
+          "language": "kk",
+          "value": "Ішінара"
+        }
+      ]
+    },
+    {
+      "id": 312,
+      "values": [
+        {
+          "language": "main",
+          "value": "Debt before"
+        },
+        {
+          "language": "en",
+          "value": "Debt before"
+        },
+        {
+          "language": "ru",
+          "value": "Долг до оплаты"
+        },
+        {
+          "language": "kk",
+          "value": "Төлемге дейінгі қарыз"
+        }
+      ]
+    },
+    {
+      "id": 313,
+      "values": [
+        {
+          "language": "main",
+          "value": "Debt remaining"
+        },
+        {
+          "language": "en",
+          "value": "Debt remaining"
+        },
+        {
+          "language": "ru",
+          "value": "Остаток долга"
+        },
+        {
+          "language": "kk",
+          "value": "Қалған қарыз"
+        }
+      ]
+    },
+    {
+      "id": 314,
+      "values": [
+        {
+          "language": "main",
+          "value": "Final due date"
+        },
+        {
+          "language": "en",
+          "value": "Final due date"
+        },
+        {
+          "language": "ru",
+          "value": "Конечная дата оплаты"
+        },
+        {
+          "language": "kk",
+          "value": "Соңғы төлем күні"
+        }
+      ]
+    },
+    {
+      "id": 315,
+      "values": [
+        {
+          "language": "main",
+          "value": "Original cart content"
+        },
+        {
+          "language": "en",
+          "value": "Original cart content"
+        },
+        {
+          "language": "ru",
+          "value": "Исходный состав корзины"
+        },
+        {
+          "language": "kk",
+          "value": "Бастапқы себет құрамы"
+        }
+      ]
+    },
+    {
+      "id": 316,
+      "values": [
+        {
+          "language": "main",
+          "value": "Transaction"
+        },
+        {
+          "language": "en",
+          "value": "Transaction"
+        },
+        {
+          "language": "ru",
+          "value": "Транзакция"
+        },
+        {
+          "language": "kk",
+          "value": "Транзакция"
+        }
+      ]
+    },
+    {
+      "id": 317,
+      "values": [
+        {
+          "language": "main",
+          "value": "Planned next payments"
+        },
+        {
+          "language": "en",
+          "value": "Planned next payments"
+        },
+        {
+          "language": "ru",
+          "value": "Следующие плановые платежи"
+        },
+        {
+          "language": "kk",
+          "value": "Келесі жоспарлы төлемдер"
+        }
+      ]
+    },
+    {
+      "id": 318,
+      "values": [
+        {
+          "language": "main",
+          "value": "No date"
+        },
+        {
+          "language": "en",
+          "value": "No date"
+        },
+        {
+          "language": "ru",
+          "value": "Без даты"
+        },
+        {
+          "language": "kk",
+          "value": "Күні жоқ"
+        }
+      ]
+    },
+    {
+      "id": 319,
+      "values": [
+        {
+          "language": "main",
+          "value": "Close"
+        },
+        {
+          "language": "en",
+          "value": "Close"
+        },
+        {
+          "language": "ru",
+          "value": "Закрыть"
+        },
+        {
+          "language": "kk",
+          "value": "Жабу"
+        }
+      ]
+    },
+    {
+      "id": 320,
+      "values": [
+        {
+          "language": "main",
+          "value": "Due"
+        },
+        {
+          "language": "en",
+          "value": "Due"
+        },
+        {
+          "language": "ru",
+          "value": "Срок"
+        },
+        {
+          "language": "kk",
+          "value": "Мерзімі"
+        }
+      ]
+    },
+    {
+      "id": 321,
+      "values": [
+        {
+          "language": "main",
+          "value": "Final date"
+        },
+        {
+          "language": "en",
+          "value": "Final date"
+        },
+        {
+          "language": "ru",
+          "value": "Конечная дата"
+        },
+        {
+          "language": "kk",
+          "value": "Соңғы күн"
+        }
+      ]
+    },
+    {
+      "id": 322,
+      "values": [
+        {
+          "language": "main",
+          "value": "Interest"
+        },
+        {
+          "language": "en",
+          "value": "Interest"
+        },
+        {
+          "language": "ru",
+          "value": "Процент"
+        },
+        {
+          "language": "kk",
+          "value": "Пайыз"
+        }
+      ]
+    },
+    {
+      "id": 323,
+      "values": [
+        {
+          "language": "main",
+          "value": "Debt with interest"
+        },
+        {
+          "language": "en",
+          "value": "Debt with interest"
+        },
+        {
+          "language": "ru",
+          "value": "Долг с процентом"
+        },
+        {
+          "language": "kk",
+          "value": "Пайызбен қарыз"
+        }
+      ]
+    },
+    {
+      "id": 324,
+      "values": [
+        {
+          "language": "main",
+          "value": "Plan"
+        },
+        {
+          "language": "en",
+          "value": "Plan"
+        },
+        {
+          "language": "ru",
+          "value": "План"
+        },
+        {
+          "language": "kk",
+          "value": "Жоспар"
+        }
+      ]
+    },
+    {
+      "id": 325,
+      "values": [
+        {
+          "language": "main",
+          "value": "Paid records"
+        },
+        {
+          "language": "en",
+          "value": "Paid records"
+        },
+        {
+          "language": "ru",
+          "value": "Записи оплат"
+        },
+        {
+          "language": "kk",
+          "value": "Төлем жазбалары"
+        }
+      ]
+    },
+    {
+      "id": 326,
+      "values": [
+        {
+          "language": "main",
+          "value": "Edit / pay debt"
+        },
+        {
+          "language": "en",
+          "value": "Edit / pay debt"
+        },
+        {
+          "language": "ru",
+          "value": "Изменить / оплатить долг"
+        },
+        {
+          "language": "kk",
+          "value": "Қарызды өзгерту / төлеу"
+        }
+      ]
+    },
+    {
+      "id": 327,
+      "values": [
+        {
+          "language": "main",
+          "value": "per"
+        },
+        {
+          "language": "en",
+          "value": "per"
+        },
+        {
+          "language": "ru",
+          "value": "за"
+        },
+        {
+          "language": "kk",
+          "value": "әр"
+        }
+      ]
+    },
+    {
+      "id": 328,
+      "values": [
+        {
+          "language": "main",
+          "value": "est."
+        },
+        {
+          "language": "en",
+          "value": "est."
+        },
+        {
+          "language": "ru",
+          "value": "примерно"
+        },
+        {
+          "language": "kk",
+          "value": "шамамен"
+        }
+      ]
+    },
+    {
+      "id": 329,
+      "values": [
+        {
+          "language": "main",
+          "value": "open payments"
+        },
+        {
+          "language": "en",
+          "value": "open payments"
+        },
+        {
+          "language": "ru",
+          "value": "открытых платежей"
+        },
+        {
+          "language": "kk",
+          "value": "ашық төлем"
+        }
+      ]
+    },
+    {
+      "id": 330,
+      "values": [
+        {
+          "language": "main",
+          "value": "Remaining"
+        },
+        {
+          "language": "en",
+          "value": "Remaining"
+        },
+        {
+          "language": "ru",
+          "value": "Осталось"
+        },
+        {
+          "language": "kk",
+          "value": "Қалды"
+        }
+      ]
+    },
+    {
+      "id": 331,
+      "values": [
+        {
+          "language": "main",
+          "value": "Or add debtor for this transaction"
+        },
+        {
+          "language": "en",
+          "value": "Or add debtor for this transaction"
+        },
+        {
+          "language": "ru",
+          "value": "Или добавьте должника для этой транзакции"
+        },
+        {
+          "language": "kk",
+          "value": "Немесе осы транзакцияға борышкер қосыңыз"
+        }
+      ]
+    },
+    {
+      "id": 332,
+      "values": [
+        {
+          "language": "main",
+          "value": "Generic expiration period"
+        },
+        {
+          "language": "en",
+          "value": "Generic expiration period"
+        },
+        {
+          "language": "ru",
+          "value": "Базовый срок годности"
+        },
+        {
+          "language": "kk",
+          "value": "Негізгі жарамдылық мерзімі"
+        }
+      ]
+    },
+    {
+      "id": 333,
+      "values": [
+        {
+          "language": "main",
+          "value": "Save the goods item first, then supplier prices will appear."
+        },
+        {
+          "language": "en",
+          "value": "Save the goods item first, then supplier prices will appear."
+        },
+        {
+          "language": "ru",
+          "value": "Сначала сохраните товар, затем появятся цены поставщиков."
+        },
+        {
+          "language": "kk",
+          "value": "Алдымен тауарды сақтаңыз, содан кейін жеткізуші бағалары пайда болады."
+        }
+      ]
+    },
+    {
+      "id": 334,
+      "values": [
+        {
+          "language": "main",
+          "value": "Add / update supplier price"
+        },
+        {
+          "language": "en",
+          "value": "Add / update supplier price"
+        },
+        {
+          "language": "ru",
+          "value": "Добавить / обновить цену поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші бағасын қосу / жаңарту"
+        }
+      ]
+    },
+    {
+      "id": 335,
+      "values": [
+        {
+          "language": "main",
+          "value": "No suppliers yet. Add suppliers first, then connect them to this goods item."
+        },
+        {
+          "language": "en",
+          "value": "No suppliers yet. Add suppliers first, then connect them to this goods item."
+        },
+        {
+          "language": "ru",
+          "value": "Поставщиков пока нет. Сначала добавьте поставщиков, затем свяжите их с этим товаром."
+        },
+        {
+          "language": "kk",
+          "value": "Әзірге жеткізушілер жоқ. Алдымен жеткізушілерді қосып, кейін оларды осы тауармен байланыстырыңыз."
+        }
+      ]
+    },
+    {
+      "id": 336,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier goods name / article"
+        },
+        {
+          "language": "en",
+          "value": "Supplier goods name / article"
+        },
+        {
+          "language": "ru",
+          "value": "Название / артикул у поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізушідегі атау / артикул"
+        }
+      ]
+    },
+    {
+      "id": 337,
+      "values": [
+        {
+          "language": "main",
+          "value": "Min order"
+        },
+        {
+          "language": "en",
+          "value": "Min order"
+        },
+        {
+          "language": "ru",
+          "value": "Минимальный заказ"
+        },
+        {
+          "language": "kk",
+          "value": "Ең аз тапсырыс"
+        }
+      ]
+    },
+    {
+      "id": 338,
+      "values": [
+        {
+          "language": "main",
+          "value": "Package qty"
+        },
+        {
+          "language": "en",
+          "value": "Package qty"
+        },
+        {
+          "language": "ru",
+          "value": "Количество в упаковке"
+        },
+        {
+          "language": "kk",
+          "value": "Қаптамадағы саны"
+        }
+      ]
+    },
+    {
+      "id": 339,
+      "values": [
+        {
+          "language": "main",
+          "value": "Save supplier price"
+        },
+        {
+          "language": "en",
+          "value": "Save supplier price"
+        },
+        {
+          "language": "ru",
+          "value": "Сохранить цену поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші бағасын сақтау"
+        }
+      ]
+    },
+    {
+      "id": 340,
+      "values": [
+        {
+          "language": "main",
+          "value": "Prices"
+        },
+        {
+          "language": "en",
+          "value": "Prices"
+        },
+        {
+          "language": "ru",
+          "value": "Цены"
+        },
+        {
+          "language": "kk",
+          "value": "Бағалар"
+        }
+      ]
+    },
+    {
+      "id": 341,
+      "values": [
+        {
+          "language": "main",
+          "value": "Batch data"
+        },
+        {
+          "language": "en",
+          "value": "Batch data"
+        },
+        {
+          "language": "ru",
+          "value": "Данные партии"
+        },
+        {
+          "language": "kk",
+          "value": "Партия деректері"
+        }
+      ]
+    },
+    {
+      "id": 342,
+      "values": [
+        {
+          "language": "main",
+          "value": "Delivered"
+        },
+        {
+          "language": "en",
+          "value": "Delivered"
+        },
+        {
+          "language": "ru",
+          "value": "Поставлено"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізілді"
+        }
+      ]
+    },
+    {
+      "id": 343,
+      "values": [
+        {
+          "language": "main",
+          "value": "Made"
+        },
+        {
+          "language": "en",
+          "value": "Made"
+        },
+        {
+          "language": "ru",
+          "value": "Изготовлено"
+        },
+        {
+          "language": "kk",
+          "value": "Жасалған"
+        }
+      ]
+    },
+    {
+      "id": 344,
+      "values": [
+        {
+          "language": "main",
+          "value": "Shelf position"
+        },
+        {
+          "language": "en",
+          "value": "Shelf position"
+        },
+        {
+          "language": "ru",
+          "value": "Место на полке"
+        },
+        {
+          "language": "kk",
+          "value": "Сөредегі орны"
+        }
+      ]
+    },
+    {
+      "id": 345,
+      "values": [
+        {
+          "language": "main",
+          "value": "Priority"
+        },
+        {
+          "language": "en",
+          "value": "Priority"
+        },
+        {
+          "language": "ru",
+          "value": "Приоритет"
+        },
+        {
+          "language": "kk",
+          "value": "Басымдық"
+        }
+      ]
+    },
+    {
+      "id": 346,
+      "values": [
+        {
+          "language": "main",
+          "value": "Discounts"
+        },
+        {
+          "language": "en",
+          "value": "Discounts"
+        },
+        {
+          "language": "ru",
+          "value": "Скидки"
+        },
+        {
+          "language": "kk",
+          "value": "Жеңілдіктер"
+        }
+      ]
+    },
+    {
+      "id": 347,
+      "values": [
+        {
+          "language": "main",
+          "value": "Save debtor"
+        },
+        {
+          "language": "en",
+          "value": "Save debtor"
+        },
+        {
+          "language": "ru",
+          "value": "Сохранить должника"
+        },
+        {
+          "language": "kk",
+          "value": "Борышкерді сақтау"
+        }
+      ]
+    },
+    {
+      "id": 348,
+      "values": [
+        {
+          "language": "main",
+          "value": "Add planned payment"
+        },
+        {
+          "language": "en",
+          "value": "Add planned payment"
+        },
+        {
+          "language": "ru",
+          "value": "Добавить плановый платёж"
+        },
+        {
+          "language": "kk",
+          "value": "Жоспарлы төлем қосу"
+        }
+      ]
+    },
+    {
+      "id": 349,
+      "values": [
+        {
+          "language": "main",
+          "value": "No payment records yet"
+        },
+        {
+          "language": "en",
+          "value": "No payment records yet"
+        },
+        {
+          "language": "ru",
+          "value": "Записей оплат пока нет"
+        },
+        {
+          "language": "kk",
+          "value": "Әзірге төлем жазбалары жоқ"
+        }
+      ]
+    },
+    {
+      "id": 350,
+      "values": [
+        {
+          "language": "main",
+          "value": "Pay partial"
+        },
+        {
+          "language": "en",
+          "value": "Pay partial"
+        },
+        {
+          "language": "ru",
+          "value": "Оплатить частично"
+        },
+        {
+          "language": "kk",
+          "value": "Ішінара төлеу"
+        }
+      ]
+    },
+    {
+      "id": 351,
+      "values": [
+        {
+          "language": "main",
+          "value": "Pay full"
+        },
+        {
+          "language": "en",
+          "value": "Pay full"
+        },
+        {
+          "language": "ru",
+          "value": "Оплатить полностью"
+        },
+        {
+          "language": "kk",
+          "value": "Толық төлеу"
+        }
+      ]
+    },
+    {
+      "id": 352,
+      "values": [
+        {
+          "language": "main",
+          "value": "If everything is correct the user will be invited"
+        },
+        {
+          "language": "en",
+          "value": "If everything is correct the user will be invited"
+        },
+        {
+          "language": "ru",
+          "value": "Если всё верно, пользователь получит приглашение"
+        },
+        {
+          "language": "kk",
+          "value": "Бәрі дұрыс болса, пайдаланушы шақырылады"
+        }
+      ]
+    },
+    {
+      "id": 353,
+      "values": [
+        {
+          "language": "main",
+          "value": "Goods item was not found"
+        },
+        {
+          "language": "en",
+          "value": "Goods item was not found"
+        },
+        {
+          "language": "ru",
+          "value": "Товар не найден"
+        },
+        {
+          "language": "kk",
+          "value": "Тауар табылмады"
+        }
+      ]
+    },
+    {
+      "id": 354,
+      "values": [
+        {
+          "language": "main",
+          "value": "Pay"
+        },
+        {
+          "language": "en",
+          "value": "Pay"
+        },
+        {
+          "language": "ru",
+          "value": "Оплата"
+        },
+        {
+          "language": "kk",
+          "value": "Төлеу"
+        }
+      ]
+    },
+    {
+      "id": 355,
+      "values": [
+        {
+          "language": "main",
+          "value": "Edit debt"
+        },
+        {
+          "language": "en",
+          "value": "Edit debt"
+        },
+        {
+          "language": "ru",
+          "value": "Изменить долг"
+        },
+        {
+          "language": "kk",
+          "value": "Қарызды өзгерту"
+        }
+      ]
+    },
+    {
+      "id": 356,
+      "values": [
+        {
+          "language": "main",
+          "value": "Payment plan"
+        },
+        {
+          "language": "en",
+          "value": "Payment plan"
+        },
+        {
+          "language": "ru",
+          "value": "План платежей"
+        },
+        {
+          "language": "kk",
+          "value": "Төлем жоспары"
+        }
+      ]
+    },
+    {
+      "id": 357,
+      "values": [
+        {
+          "language": "main",
+          "value": "Cash + cashless"
+        },
+        {
+          "language": "en",
+          "value": "Cash + cashless"
+        },
+        {
+          "language": "ru",
+          "value": "Наличные + безнал"
+        },
+        {
+          "language": "kk",
+          "value": "Қолма-қол + қолма-қолсыз"
+        }
+      ]
+    },
+    {
+      "id": 358,
+      "values": [
+        {
+          "language": "main",
+          "value": "Transactions"
+        },
+        {
+          "language": "en",
+          "value": "Transactions"
+        },
+        {
+          "language": "ru",
+          "value": "Транзакции"
+        },
+        {
+          "language": "kk",
+          "value": "Транзакциялар"
+        }
+      ]
+    },
+    {
+      "id": 359,
+      "values": [
+        {
+          "language": "main",
+          "value": "Average transaction"
+        },
+        {
+          "language": "en",
+          "value": "Average transaction"
+        },
+        {
+          "language": "ru",
+          "value": "Средняя транзакция"
+        },
+        {
+          "language": "kk",
+          "value": "Орташа транзакция"
+        }
+      ]
+    },
+    {
+      "id": 360,
+      "values": [
+        {
+          "language": "main",
+          "value": "Old Android version reused supplier screen from analytics"
+        },
+        {
+          "language": "en",
+          "value": "Old Android version reused supplier screen from analytics"
+        },
+        {
+          "language": "ru",
+          "value": "Старая Android-версия использовала экран поставщиков из аналитики"
+        },
+        {
+          "language": "kk",
+          "value": "Ескі Android нұсқасы аналитикадағы жеткізушілер экранын қолданған"
+        }
+      ]
+    },
+    {
+      "id": 361,
+      "values": [
+        {
+          "language": "main",
+          "value": "Shelf"
+        },
+        {
+          "language": "en",
+          "value": "Shelf"
+        },
+        {
+          "language": "ru",
+          "value": "Полка"
+        },
+        {
+          "language": "kk",
+          "value": "Сөре"
+        }
+      ]
+    },
+    {
+      "id": 362,
+      "values": [
+        {
+          "language": "main",
+          "value": "Debt amount"
+        },
+        {
+          "language": "en",
+          "value": "Debt amount"
+        },
+        {
+          "language": "ru",
+          "value": "Сумма долга"
+        },
+        {
+          "language": "kk",
+          "value": "Қарыз сомасы"
+        }
+      ]
+    },
+    {
+      "id": 363,
+      "values": [
+        {
+          "language": "main",
+          "value": "Period"
+        },
+        {
+          "language": "en",
+          "value": "Period"
+        },
+        {
+          "language": "ru",
+          "value": "Период"
+        },
+        {
+          "language": "kk",
+          "value": "Кезең"
+        }
+      ]
+    },
+    {
+      "id": 364,
+      "values": [
+        {
+          "language": "main",
+          "value": "Planned amount"
+        },
+        {
+          "language": "en",
+          "value": "Planned amount"
+        },
+        {
+          "language": "ru",
+          "value": "Плановая сумма"
+        },
+        {
+          "language": "kk",
+          "value": "Жоспарланған сома"
+        }
+      ]
+    },
+    {
+      "id": 365,
+      "values": [
+        {
+          "language": "main",
+          "value": "Goods item"
+        },
+        {
+          "language": "en",
+          "value": "Goods item"
+        },
+        {
+          "language": "ru",
+          "value": "Товар"
+        },
+        {
+          "language": "kk",
+          "value": "Тауар"
+        }
+      ]
+    },
+    {
+      "id": 366,
+      "values": [
+        {
+          "language": "main",
+          "value": "Debt due"
+        },
+        {
+          "language": "en",
+          "value": "Debt due"
+        },
+        {
+          "language": "ru",
+          "value": "Срок долга"
+        },
+        {
+          "language": "kk",
+          "value": "Қарыз мерзімі"
+        }
+      ]
+    },
+    {
+      "id": 367,
+      "values": [
+        {
+          "language": "main",
+          "value": "Day"
+        },
+        {
+          "language": "en",
+          "value": "Day"
+        },
+        {
+          "language": "ru",
+          "value": "День"
+        },
+        {
+          "language": "kk",
+          "value": "Күн"
+        }
+      ]
+    },
+    {
+      "id": 368,
+      "values": [
+        {
+          "language": "main",
+          "value": "Week"
+        },
+        {
+          "language": "en",
+          "value": "Week"
+        },
+        {
+          "language": "ru",
+          "value": "Неделя"
+        },
+        {
+          "language": "kk",
+          "value": "Апта"
+        }
+      ]
+    },
+    {
+      "id": 369,
+      "values": [
+        {
+          "language": "main",
+          "value": "Month"
+        },
+        {
+          "language": "en",
+          "value": "Month"
+        },
+        {
+          "language": "ru",
+          "value": "Месяц"
+        },
+        {
+          "language": "kk",
+          "value": "Ай"
+        }
+      ]
+    },
+    {
+      "id": 370,
+      "values": [
+        {
+          "language": "main",
+          "value": "Year"
+        },
+        {
+          "language": "en",
+          "value": "Year"
+        },
+        {
+          "language": "ru",
+          "value": "Год"
+        },
+        {
+          "language": "kk",
+          "value": "Жыл"
+        }
+      ]
+    },
+    {
+      "id": 371,
+      "values": [
+        {
+          "language": "main",
+          "value": "Remaining after open planned payments"
+        },
+        {
+          "language": "en",
+          "value": "Remaining after open planned payments"
+        },
+        {
+          "language": "ru",
+          "value": "Остаток после открытых плановых платежей"
+        },
+        {
+          "language": "kk",
+          "value": "Ашық жоспарлы төлемдерден кейінгі қалдық"
+        }
+      ]
+    },
+    {
+      "id": 372,
+      "values": [
+        {
+          "language": "main",
+          "value": "Planned payment date"
+        },
+        {
+          "language": "en",
+          "value": "Planned payment date"
+        },
+        {
+          "language": "ru",
+          "value": "Дата планового платежа"
+        },
+        {
+          "language": "kk",
+          "value": "Жоспарлы төлем күні"
+        }
+      ]
+    },
+    {
+      "id": 373,
+      "values": [
+        {
+          "language": "main",
+          "value": "Plan note"
+        },
+        {
+          "language": "en",
+          "value": "Plan note"
+        },
+        {
+          "language": "ru",
+          "value": "Заметка к плану"
+        },
+        {
+          "language": "kk",
+          "value": "Жоспар ескертпесі"
+        }
+      ]
+    },
+    {
+      "id": 374,
+      "values": [
+        {
+          "language": "main",
+          "value": "Planned"
+        },
+        {
+          "language": "en",
+          "value": "Planned"
+        },
+        {
+          "language": "ru",
+          "value": "Плановый"
+        },
+        {
+          "language": "kk",
+          "value": "Жоспарланған"
+        }
+      ]
+    },
+    {
+      "id": 375,
+      "values": [
+        {
+          "language": "main",
+          "value": "Percent"
+        },
+        {
+          "language": "en",
+          "value": "Percent"
+        },
+        {
+          "language": "ru",
+          "value": "Процент"
+        },
+        {
+          "language": "kk",
+          "value": "Пайыз"
+        }
+      ]
+    },
+    {
+      "id": 376,
+      "values": [
+        {
+          "language": "main",
+          "value": "Original debt transactions"
+        },
+        {
+          "language": "en",
+          "value": "Original debt transactions"
+        },
+        {
+          "language": "ru",
+          "value": "Исходные долговые транзакции"
+        },
+        {
+          "language": "kk",
+          "value": "Бастапқы қарыз транзакциялары"
+        }
+      ]
+    },
+    {
+      "id": 377,
+      "values": [
+        {
+          "language": "main",
+          "value": "Payment history"
+        },
+        {
+          "language": "en",
+          "value": "Payment history"
+        },
+        {
+          "language": "ru",
+          "value": "История оплат"
+        },
+        {
+          "language": "kk",
+          "value": "Төлем тарихы"
+        }
+      ]
+    },
+    {
+      "id": 378,
+      "values": [
+        {
+          "language": "main",
+          "value": "Before / after"
+        },
+        {
+          "language": "en",
+          "value": "Before / after"
+        },
+        {
+          "language": "ru",
+          "value": "До / после"
+        },
+        {
+          "language": "kk",
+          "value": "Дейін / кейін"
+        }
+      ]
+    },
+    {
+      "id": 379,
+      "values": [
+        {
+          "language": "main",
+          "value": "Interest estimate"
+        },
+        {
+          "language": "en",
+          "value": "Interest estimate"
+        },
+        {
+          "language": "ru",
+          "value": "Оценка процентов"
+        },
+        {
+          "language": "kk",
+          "value": "Пайыз болжамы"
+        }
+      ]
+    },
+    {
+      "id": 380,
+      "values": [
+        {
+          "language": "main",
+          "value": "Payable now"
+        },
+        {
+          "language": "en",
+          "value": "Payable now"
+        },
+        {
+          "language": "ru",
+          "value": "К оплате сейчас"
+        },
+        {
+          "language": "kk",
+          "value": "Қазір төленеді"
+        }
+      ]
+    },
+    {
+      "id": 381,
+      "values": [
+        {
+          "language": "main",
+          "value": "Delete debtor?"
+        },
+        {
+          "language": "en",
+          "value": "Delete debtor?"
+        },
+        {
+          "language": "ru",
+          "value": "Удалить должника?"
+        },
+        {
+          "language": "kk",
+          "value": "Борышкерді жою керек пе?"
+        }
+      ]
+    },
+    {
+      "id": 382,
+      "values": [
+        {
+          "language": "main",
+          "value": "Search transactions"
+        },
+        {
+          "language": "en",
+          "value": "Search transactions"
+        },
+        {
+          "language": "ru",
+          "value": "Поиск транзакций"
+        },
+        {
+          "language": "kk",
+          "value": "Транзакцияларды іздеу"
+        }
+      ]
+    },
+    {
+      "id": 383,
+      "values": [
+        {
+          "language": "main",
+          "value": "All transaction types"
+        },
+        {
+          "language": "en",
+          "value": "All transaction types"
+        },
+        {
+          "language": "ru",
+          "value": "Все типы транзакций"
+        },
+        {
+          "language": "kk",
+          "value": "Барлық транзакция түрлері"
+        }
+      ]
+    },
+    {
+      "id": 384,
+      "values": [
+        {
+          "language": "main",
+          "value": "Start date"
+        },
+        {
+          "language": "en",
+          "value": "Start date"
+        },
+        {
+          "language": "ru",
+          "value": "Дата начала"
+        },
+        {
+          "language": "kk",
+          "value": "Басталу күні"
+        }
+      ]
+    },
+    {
+      "id": 385,
+      "values": [
+        {
+          "language": "main",
+          "value": "End date"
+        },
+        {
+          "language": "en",
+          "value": "End date"
+        },
+        {
+          "language": "ru",
+          "value": "Дата окончания"
+        },
+        {
+          "language": "kk",
+          "value": "Аяқталу күні"
+        }
+      ]
+    },
+    {
+      "id": 386,
+      "values": [
+        {
+          "language": "main",
+          "value": "Custom period"
+        },
+        {
+          "language": "en",
+          "value": "Custom period"
+        },
+        {
+          "language": "ru",
+          "value": "Произвольный период"
+        },
+        {
+          "language": "kk",
+          "value": "Таңдалған кезең"
+        }
+      ]
+    },
+    {
+      "id": 387,
+      "values": [
+        {
+          "language": "main",
+          "value": "This month"
+        },
+        {
+          "language": "en",
+          "value": "This month"
+        },
+        {
+          "language": "ru",
+          "value": "Этот месяц"
+        },
+        {
+          "language": "kk",
+          "value": "Осы ай"
+        }
+      ]
+    },
+    {
+      "id": 388,
+      "values": [
+        {
+          "language": "main",
+          "value": "This year"
+        },
+        {
+          "language": "en",
+          "value": "This year"
+        },
+        {
+          "language": "ru",
+          "value": "Этот год"
+        },
+        {
+          "language": "kk",
+          "value": "Осы жыл"
+        }
+      ]
+    },
+    {
+      "id": 389,
+      "values": [
+        {
+          "language": "main",
+          "value": "Apply period"
+        },
+        {
+          "language": "en",
+          "value": "Apply period"
+        },
+        {
+          "language": "ru",
+          "value": "Применить период"
+        },
+        {
+          "language": "kk",
+          "value": "Кезеңді қолдану"
+        }
+      ]
+    },
+    {
+      "id": 390,
+      "values": [
+        {
+          "language": "main",
+          "value": "Clear period"
+        },
+        {
+          "language": "en",
+          "value": "Clear period"
+        },
+        {
+          "language": "ru",
+          "value": "Очистить период"
+        },
+        {
+          "language": "kk",
+          "value": "Кезеңді тазалау"
+        }
+      ]
+    },
+    {
+      "id": 391,
+      "values": [
+        {
+          "language": "main",
+          "value": "No transactions in this period"
+        },
+        {
+          "language": "en",
+          "value": "No transactions in this period"
+        },
+        {
+          "language": "ru",
+          "value": "За этот период транзакций нет"
+        },
+        {
+          "language": "kk",
+          "value": "Бұл кезеңде транзакциялар жоқ"
+        }
+      ]
+    },
+    {
+      "id": 392,
+      "values": [
+        {
+          "language": "main",
+          "value": "Items"
+        },
+        {
+          "language": "en",
+          "value": "Items"
+        },
+        {
+          "language": "ru",
+          "value": "Товары"
+        },
+        {
+          "language": "kk",
+          "value": "Тауарлар"
+        }
+      ]
+    },
+    {
+      "id": 393,
+      "values": [
+        {
+          "language": "main",
+          "value": "Payment details"
+        },
+        {
+          "language": "en",
+          "value": "Payment details"
+        },
+        {
+          "language": "ru",
+          "value": "Детали оплаты"
+        },
+        {
+          "language": "kk",
+          "value": "Төлем мәліметтері"
+        }
+      ]
+    },
+    {
+      "id": 394,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open receipt"
+        },
+        {
+          "language": "en",
+          "value": "Open receipt"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть чек"
+        },
+        {
+          "language": "kk",
+          "value": "Чекті ашу"
+        }
+      ]
+    },
+    {
+      "id": 395,
+      "values": [
+        {
+          "language": "main",
+          "value": "Period"
+        },
+        {
+          "language": "en",
+          "value": "Period"
+        },
+        {
+          "language": "ru",
+          "value": "Период"
+        },
+        {
+          "language": "kk",
+          "value": "Кезең"
+        }
+      ]
+    },
+    {
+      "id": 396,
+      "values": [
+        {
+          "language": "main",
+          "value": "From"
+        },
+        {
+          "language": "en",
+          "value": "From"
+        },
+        {
+          "language": "ru",
+          "value": "С"
+        },
+        {
+          "language": "kk",
+          "value": "Бастап"
+        }
+      ]
+    },
+    {
+      "id": 397,
+      "values": [
+        {
+          "language": "main",
+          "value": "To"
+        },
+        {
+          "language": "en",
+          "value": "To"
+        },
+        {
+          "language": "ru",
+          "value": "По"
+        },
+        {
+          "language": "kk",
+          "value": "Дейін"
+        }
+      ]
+    },
+    {
+      "id": 398,
+      "values": [
+        {
+          "language": "main",
+          "value": "Newest first"
+        },
+        {
+          "language": "en",
+          "value": "Newest first"
+        },
+        {
+          "language": "ru",
+          "value": "Сначала новые"
+        },
+        {
+          "language": "kk",
+          "value": "Алдымен жаңалары"
+        }
+      ]
+    },
+    {
+      "id": 399,
+      "values": [
+        {
+          "language": "main",
+          "value": "Oldest first"
+        },
+        {
+          "language": "en",
+          "value": "Oldest first"
+        },
+        {
+          "language": "ru",
+          "value": "Сначала старые"
+        },
+        {
+          "language": "kk",
+          "value": "Алдымен ескілері"
+        }
+      ]
+    },
+    {
+      "id": 400,
+      "values": [
+        {
+          "language": "main",
+          "value": "Highest total"
+        },
+        {
+          "language": "en",
+          "value": "Highest total"
+        },
+        {
+          "language": "ru",
+          "value": "Сначала крупные суммы"
+        },
+        {
+          "language": "kk",
+          "value": "Алдымен жоғары сома"
+        }
+      ]
+    },
+    {
+      "id": 401,
+      "values": [
+        {
+          "language": "main",
+          "value": "Lowest total"
+        },
+        {
+          "language": "en",
+          "value": "Lowest total"
+        },
+        {
+          "language": "ru",
+          "value": "Сначала малые суммы"
+        },
+        {
+          "language": "kk",
+          "value": "Алдымен төмен сома"
+        }
+      ]
+    },
+    {
+      "id": 402,
+      "values": [
+        {
+          "language": "main",
+          "value": "Calendar"
+        },
+        {
+          "language": "en",
+          "value": "Calendar"
+        },
+        {
+          "language": "ru",
+          "value": "Календарь"
+        },
+        {
+          "language": "kk",
+          "value": "Күнтізбе"
+        }
+      ]
+    },
+    {
+      "id": 403,
+      "values": [
+        {
+          "language": "main",
+          "value": "Pick start date"
+        },
+        {
+          "language": "en",
+          "value": "Pick start date"
+        },
+        {
+          "language": "ru",
+          "value": "Выберите дату начала"
+        },
+        {
+          "language": "kk",
+          "value": "Басталу күнін таңдаңыз"
+        }
+      ]
+    },
+    {
+      "id": 404,
+      "values": [
+        {
+          "language": "main",
+          "value": "Pick end date"
+        },
+        {
+          "language": "en",
+          "value": "Pick end date"
+        },
+        {
+          "language": "ru",
+          "value": "Выберите дату окончания"
+        },
+        {
+          "language": "kk",
+          "value": "Аяқталу күнін таңдаңыз"
+        }
+      ]
+    },
+    {
+      "id": 405,
+      "values": [
+        {
+          "language": "main",
+          "value": "Tap a day to set the date"
+        },
+        {
+          "language": "en",
+          "value": "Tap a day to set the date"
+        },
+        {
+          "language": "ru",
+          "value": "Нажмите на день, чтобы выбрать дату"
+        },
+        {
+          "language": "kk",
+          "value": "Күнді таңдау үшін басыңыз"
+        }
+      ]
+    },
+    {
+      "id": 406,
+      "values": [
+        {
+          "language": "main",
+          "value": "Transaction details"
+        },
+        {
+          "language": "en",
+          "value": "Transaction details"
+        },
+        {
+          "language": "ru",
+          "value": "Детали транзакции"
+        },
+        {
+          "language": "kk",
+          "value": "Транзакция мәліметтері"
+        }
+      ]
+    },
+    {
+      "id": 407,
+      "values": [
+        {
+          "language": "main",
+          "value": "Line items"
+        },
+        {
+          "language": "en",
+          "value": "Line items"
+        },
+        {
+          "language": "ru",
+          "value": "Позиции чека"
+        },
+        {
+          "language": "kk",
+          "value": "Чек позициялары"
+        }
+      ]
+    },
+    {
+      "id": 408,
+      "values": [
+        {
+          "language": "main",
+          "value": "Receipt operations"
+        },
+        {
+          "language": "en",
+          "value": "Receipt operations"
+        },
+        {
+          "language": "ru",
+          "value": "Операции с чеком"
+        },
+        {
+          "language": "kk",
+          "value": "Чек әрекеттері"
+        }
+      ]
+    },
+    {
+      "id": 409,
+      "values": [
+        {
+          "language": "main",
+          "value": "Refresh history"
+        },
+        {
+          "language": "en",
+          "value": "Refresh history"
+        },
+        {
+          "language": "ru",
+          "value": "Обновить историю"
+        },
+        {
+          "language": "kk",
+          "value": "Тарихты жаңарту"
+        }
+      ]
+    },
+    {
+      "id": 410,
+      "values": [
+        {
+          "language": "main",
+          "value": "Sort"
+        },
+        {
+          "language": "en",
+          "value": "Sort"
+        },
+        {
+          "language": "ru",
+          "value": "Сортировка"
+        },
+        {
+          "language": "kk",
+          "value": "Сұрыптау"
+        }
+      ]
+    },
+    {
+      "id": 411,
+      "values": [
+        {
+          "language": "main",
+          "value": "Mon"
+        },
+        {
+          "language": "en",
+          "value": "Mon"
+        },
+        {
+          "language": "ru",
+          "value": "Пн"
+        },
+        {
+          "language": "kk",
+          "value": "Дс"
+        }
+      ]
+    },
+    {
+      "id": 412,
+      "values": [
+        {
+          "language": "main",
+          "value": "Tue"
+        },
+        {
+          "language": "en",
+          "value": "Tue"
+        },
+        {
+          "language": "ru",
+          "value": "Вт"
+        },
+        {
+          "language": "kk",
+          "value": "Сс"
+        }
+      ]
+    },
+    {
+      "id": 413,
+      "values": [
+        {
+          "language": "main",
+          "value": "Wed"
+        },
+        {
+          "language": "en",
+          "value": "Wed"
+        },
+        {
+          "language": "ru",
+          "value": "Ср"
+        },
+        {
+          "language": "kk",
+          "value": "Ср"
+        }
+      ]
+    },
+    {
+      "id": 414,
+      "values": [
+        {
+          "language": "main",
+          "value": "Thu"
+        },
+        {
+          "language": "en",
+          "value": "Thu"
+        },
+        {
+          "language": "ru",
+          "value": "Чт"
+        },
+        {
+          "language": "kk",
+          "value": "Бс"
+        }
+      ]
+    },
+    {
+      "id": 415,
+      "values": [
+        {
+          "language": "main",
+          "value": "Fri"
+        },
+        {
+          "language": "en",
+          "value": "Fri"
+        },
+        {
+          "language": "ru",
+          "value": "Пт"
+        },
+        {
+          "language": "kk",
+          "value": "Жм"
+        }
+      ]
+    },
+    {
+      "id": 416,
+      "values": [
+        {
+          "language": "main",
+          "value": "Sat"
+        },
+        {
+          "language": "en",
+          "value": "Sat"
+        },
+        {
+          "language": "ru",
+          "value": "Сб"
+        },
+        {
+          "language": "kk",
+          "value": "Сн"
+        }
+      ]
+    },
+    {
+      "id": 417,
+      "values": [
+        {
+          "language": "main",
+          "value": "Sun"
+        },
+        {
+          "language": "en",
+          "value": "Sun"
+        },
+        {
+          "language": "ru",
+          "value": "Вс"
+        },
+        {
+          "language": "kk",
+          "value": "Жс"
+        }
+      ]
+    },
+    {
+      "id": 418,
+      "values": [
+        {
+          "language": "main",
+          "value": "Receipt preview"
+        },
+        {
+          "language": "en",
+          "value": "Receipt preview"
+        },
+        {
+          "language": "ru",
+          "value": "Предпросмотр чека"
+        },
+        {
+          "language": "kk",
+          "value": "Чекті алдын ала қарау"
+        }
+      ]
+    },
+    {
+      "id": 419,
+      "values": [
+        {
+          "language": "main",
+          "value": "Transaction type"
+        },
+        {
+          "language": "en",
+          "value": "Transaction type"
+        },
+        {
+          "language": "ru",
+          "value": "Тип транзакции"
+        },
+        {
+          "language": "kk",
+          "value": "Транзакция түрі"
+        }
+      ]
+    },
+    {
+      "id": 420,
+      "values": [
+        {
+          "language": "main",
+          "value": "Paid by cash"
+        },
+        {
+          "language": "en",
+          "value": "Paid by cash"
+        },
+        {
+          "language": "ru",
+          "value": "Оплачено наличными"
+        },
+        {
+          "language": "kk",
+          "value": "Қолма-қол төленді"
+        }
+      ]
+    },
+    {
+      "id": 421,
+      "values": [
+        {
+          "language": "main",
+          "value": "Paid cashless"
+        },
+        {
+          "language": "en",
+          "value": "Paid cashless"
+        },
+        {
+          "language": "ru",
+          "value": "Оплачено безналично"
+        },
+        {
+          "language": "kk",
+          "value": "Қолма-қолсыз төленді"
+        }
+      ]
+    },
+    {
+      "id": 422,
+      "values": [
+        {
+          "language": "main",
+          "value": "Debt part"
+        },
+        {
+          "language": "en",
+          "value": "Debt part"
+        },
+        {
+          "language": "ru",
+          "value": "Часть в долг"
+        },
+        {
+          "language": "kk",
+          "value": "Қарыз бөлігі"
+        }
+      ]
+    },
+    {
+      "id": 423,
+      "values": [
+        {
+          "language": "main",
+          "value": "Cash / card / debt"
+        },
+        {
+          "language": "en",
+          "value": "Cash / card / debt"
+        },
+        {
+          "language": "ru",
+          "value": "Наличные / безнал / долг"
+        },
+        {
+          "language": "kk",
+          "value": "Қолма-қол / карта / қарыз"
+        }
+      ]
+    },
+    {
+      "id": 424,
+      "values": [
+        {
+          "language": "main",
+          "value": "No matching transactions"
+        },
+        {
+          "language": "en",
+          "value": "No matching transactions"
+        },
+        {
+          "language": "ru",
+          "value": "Подходящих транзакций нет"
+        },
+        {
+          "language": "kk",
+          "value": "Сәйкес транзакциялар жоқ"
+        }
+      ]
+    },
+    {
+      "id": 425,
+      "values": [
+        {
+          "language": "main",
+          "value": "All period"
+        },
+        {
+          "language": "en",
+          "value": "All period"
+        },
+        {
+          "language": "ru",
+          "value": "Весь период"
+        },
+        {
+          "language": "kk",
+          "value": "Барлық кезең"
+        }
+      ]
+    },
+    {
+      "id": 426,
+      "values": [
+        {
+          "language": "main",
+          "value": "Transaction total"
+        },
+        {
+          "language": "en",
+          "value": "Transaction total"
+        },
+        {
+          "language": "ru",
+          "value": "Сумма транзакции"
+        },
+        {
+          "language": "kk",
+          "value": "Транзакция сомасы"
+        }
+      ]
+    },
+    {
+      "id": 427,
+      "values": [
+        {
+          "language": "main",
+          "value": "First page"
+        },
+        {
+          "language": "en",
+          "value": "First page"
+        },
+        {
+          "language": "ru",
+          "value": "В начало"
+        },
+        {
+          "language": "kk",
+          "value": "Басына"
+        }
+      ]
+    },
+    {
+      "id": 428,
+      "values": [
+        {
+          "language": "main",
+          "value": "Last page"
+        },
+        {
+          "language": "en",
+          "value": "Last page"
+        },
+        {
+          "language": "ru",
+          "value": "В конец"
+        },
+        {
+          "language": "kk",
+          "value": "Соңына"
         }
       ]
     }

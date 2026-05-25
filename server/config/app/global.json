@@ -8,7 +8,7 @@
       "second": "0"
     },
     "serverUrl": {
-      "first": "http://192.168.100.9:8080",
+      "first": "http://10.202.10.165:8080",
       "second": "1"
     },
     "globalAppConfigurationPath": {
@@ -30,6 +30,18 @@
     "logOutPath": {
       "first": "auth/logOut",
       "second": "6"
+    },
+    "getSecuritySessionsPath": {
+      "first": "security/sessions/get",
+      "second": "44"
+    },
+    "revokeSecuritySessionPath": {
+      "first": "security/sessions/revoke",
+      "second": "45"
+    },
+    "revokeOtherSecuritySessionsPath": {
+      "first": "security/sessions/revokeOthers",
+      "second": "46"
     },
     "getUserPath": {
       "first": "user/get",
@@ -135,10 +147,6 @@
       "first": "supplierGoodsPrices/upsert",
       "second": "32"
     },
-    "deleteSupplierGoodsPricesPath ": {
-      "first": "supplierGoodsPrices/delete",
-      "second": "33"
-    },
     "getSupplierOrdersPath": {
       "first": "supplierOrders/get",
       "second": "34"
@@ -163,18 +171,42 @@
       {
         "id": "0",
         "name": [
-          { "language": "main", "value": "TOO" },
-          { "language": "en", "value": "TOO" },
-          { "language": "ru", "value": "TOO" },
-          { "language": "kk", "value": "TOO" }
+          {
+            "language": "main",
+            "value": "TOO"
+          },
+          {
+            "language": "en",
+            "value": "TOO"
+          },
+          {
+            "language": "ru",
+            "value": "TOO"
+          },
+          {
+            "language": "kk",
+            "value": "TOO"
+          }
         ],
         "parameters": [
           {
             "name": [
-              { "language": "main", "value": "BIN" },
-              { "language": "en", "value": "BIN" },
-              { "language": "ru", "value": "БИН" },
-              { "language": "kk", "value": "БИН" }
+              {
+                "language": "main",
+                "value": "BIN"
+              },
+              {
+                "language": "en",
+                "value": "BIN"
+              },
+              {
+                "language": "ru",
+                "value": "БИН"
+              },
+              {
+                "language": "kk",
+                "value": "БИН"
+              }
             ],
             "value": "",
             "length": 12,
@@ -184,7 +216,7 @@
         ]
       }
     ],
-    "countries":  [
+    "countries": [
       {
         "locale": "kz",
         "language": "kk",
@@ -221,10 +253,10 @@
             ],
             "centerLatitude": 51.1667,
             "centerLongitude": 71.4333,
-            "swLatitude": 51.0230,
-            "swLongitude": 71.2660,
+            "swLatitude": 51.023,
+            "swLongitude": 71.266,
             "neLatitude": 51.250071,
-            "neLongitude": 71.5500
+            "neLongitude": 71.55
           },
           {
             "name": [
@@ -244,9 +276,9 @@
             "centerLatitude": 43.2775,
             "centerLongitude": 76.8936,
             "swLatitude": 43.0975,
-            "swLongitude": 76.7950,
-            "neLatitude": 43.3600,
-            "neLongitude": 77.0800
+            "swLongitude": 76.795,
+            "neLatitude": 43.36,
+            "neLongitude": 77.08
           }
         ],
         "phoneNumberCode": "7",
@@ -399,10 +431,10 @@
             ],
             "centerLatitude": 38.5606,
             "centerLongitude": 68.7778,
-            "swLatitude": 38.4950,
-            "swLongitude": 68.6800,
-            "neLatitude": 38.6100,
-            "neLongitude": 68.8800
+            "swLatitude": 38.495,
+            "swLongitude": 68.68,
+            "neLatitude": 38.61,
+            "neLongitude": 68.88
           },
           {
             "name": [
@@ -420,11 +452,11 @@
               }
             ],
             "centerLatitude": 40.2894,
-            "centerLongitude": 69.6270,
-            "swLatitude": 40.2560,
-            "swLongitude": 69.5900,
-            "neLatitude": 40.3050,
-            "neLongitude": 69.7300
+            "centerLongitude": 69.627,
+            "swLatitude": 40.256,
+            "swLongitude": 69.59,
+            "neLatitude": 40.305,
+            "neLongitude": 69.73
           }
         ],
         "phoneNumberCode": "992",
@@ -612,6 +644,10 @@
         "pricedAmount": 1.0,
         "roundTotal": false
       }
-    ]
+    ],
+    "deleteSupplierGoodsPricesPath": {
+      "first": "supplierGoodsPrices/delete",
+      "second": "33"
+    }
   }
 }

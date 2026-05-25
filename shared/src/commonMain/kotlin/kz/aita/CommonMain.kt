@@ -15,68 +15,69 @@ import io.ktor.client.plugins.auth.providers.*
 import io.ktor.client.plugins.cache.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
-import io.ktor.utils.io.core.toByteArray
+import io.ktor.utils.io.core.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.serialization.json.Json
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.serialization.json.Json
 
 @kotlinx.serialization.Serializable
 data class MoneyDataModel(
-  val amount: String = "0",
-  val currencyCode: String = "KZT"
+    val amount: String = "0",
+    val currencyCode: String = "KZT"
 ) {
-  val amountDouble: Double
-    get() = amount.replace(",", ".").toDoubleOrNull() ?: 0.0
+    val amountDouble: Double
+        get() = amount.replace(",", ".").toDoubleOrNull() ?: 0.0
 }
 
 @kotlinx.serialization.Serializable
 data class ExpirationPeriodDataModel(
-  val amount: Int = 0,
-  val unit: String = "days" // days, weeks, months, years
+    val amount: Int = 0,
+    val unit: String = "days" // days, weeks, months, years
 ) {
-  val isUsable: Boolean
-    get() = amount > 0 && unit in setOf("days", "weeks", "months", "years")
+    val isUsable: Boolean
+        get() = amount > 0 && unit in setOf("days", "weeks", "months", "years")
 }
 
 @kotlinx.serialization.Serializable
 data class BatchDiscountDataModel(
-  val id: String = "",
-  val title: List<LocalizedStringDataModel> = emptyList(),
-  val mode: String = "percent", // "percent" or "fixed"
-  val value: String = "0",
-  val startsAtMillis: Long? = null,
-  val endsAtMillis: Long? = null,
-  val note: String? = null,
-  val isActive: Boolean = true
+    val id: String = "",
+    val title: List<LocalizedStringDataModel> = emptyList(),
+    val mode: String = "percent", // "percent" or "fixed"
+    val value: String = "0",
+    val startsAtMillis: Long? = null,
+    val endsAtMillis: Long? = null,
+    val note: String? = null,
+    val isActive: Boolean = true
 )
 
 @kotlinx.serialization.Serializable
 enum class StockBatchStatusDataModel {
-  Ordered,
-  Delivered,
-  OnShelf,
-  Reserved,
-  SoldOut,
-  WrittenOff,
-  Deleted
+    Ordered,
+    Delivered,
+    OnShelf,
+    Reserved,
+    SoldOut,
+    WrittenOff,
+    Deleted
 }
 
 @kotlinx.serialization.Serializable
 enum class SupplierOrderStatusDataModel {
-  Draft,
-  Sent,
-  Confirmed,
-  PartiallyDelivered,
-  Delivered,
-  Cancelled
+    Draft,
+    Sent,
+    Confirmed,
+    PartiallyDelivered,
+    Delivered,
+    Cancelled
 }
 
 expect fun getCurrentTimeMillis(): Long
@@ -93,242 +94,244 @@ private val deleteDebtorMutex = Mutex()
 private val payDebtorDebtMutex = Mutex()
 
 private fun List<DebtorDataModel>.upsertDebtor(debtor: DebtorDataModel): List<DebtorDataModel> {
-  val index = indexOfFirst { it.id == debtor.id }
+    val index = indexOfFirst { it.id == debtor.id }
 
-  return if (index == -1) {
-    this + debtor
-  } else {
-    toMutableList().also { it[index] = debtor }
-  }
+    return if (index == -1) {
+        this + debtor
+    } else {
+        toMutableList().also { it[index] = debtor }
+    }
 }
 
 fun getDebtors(
-  storeId: String,
-  onCompleted: ((DataState<List<DebtorDataModel>>) -> Unit)? = null
+    storeId: String,
+    onCompleted: ((DataState<List<DebtorDataModel>>) -> Unit)? = null
 ) {
-  if (!getDebtorsMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      getDebtorsMutex.withLock {
-        val response = networkRequest<List<DebtorDataModel>, Unit>(
-          method = HttpMethod.Get,
-          endpointUrl = globalAppConfigurationState.payloadValue.getDebtorsPath.first,
-          headers = mapOf("store_id" to storeId)
-        )
+    if (!getDebtorsMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getDebtorsMutex.withLock {
+                val response = networkRequest<List<DebtorDataModel>, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getDebtorsPath.first,
+                    headers = mapOf("store_id" to storeId)
+                )
 
-        if (response.negative || response.payload == null) {
-          postInAppNotification(response.message, NotificationType.Negative)
-          onCompleted?.invoke(DataState.Empty(response.message))
-        } else {
-          debtorsState.emit(DataState.Success(response.payload, response.message))
-          onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    debtorsState.emit(DataState.Success(response.payload, response.message))
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
         }
-      }
-    }
 }
 
 fun addDebtor(
-  storeId: String,
-  debtor: DebtorDataModel,
-  onCompleted: ((DataState<DebtorDataModel>) -> Unit)? = null
+    storeId: String,
+    debtor: DebtorDataModel,
+    onCompleted: ((DataState<DebtorDataModel>) -> Unit)? = null
 ) {
-  if (!addDebtorMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      addDebtorMutex.withLock {
-        val response = networkRequest<DebtorDataModel, DebtorDataModel>(
-          method = HttpMethod.Post,
-          endpointUrl = globalAppConfigurationState.payloadValue.addDebtorPath.first,
-          headers = mapOf("store_id" to storeId),
-          body = debtor
-        )
+    if (!addDebtorMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            addDebtorMutex.withLock {
+                val response = networkRequest<DebtorDataModel, DebtorDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.addDebtorPath.first,
+                    headers = mapOf("store_id" to storeId),
+                    body = debtor
+                )
 
-        if (response.negative || response.payload == null) {
-          postInAppNotification(response.message, NotificationType.Negative)
-          onCompleted?.invoke(DataState.Empty(response.message))
-        } else {
-          debtorsState.emit(
-            DataState.Success(
-              debtorsState.payloadValue.orEmpty().upsertDebtor(response.payload),
-              response.message
-            )
-          )
-          postInAppNotification(response.message, NotificationType.Positive)
-          onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    debtorsState.emit(
+                        DataState.Success(
+                            debtorsState.payloadValue.orEmpty().upsertDebtor(response.payload),
+                            response.message
+                        )
+                    )
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
         }
-      }
-    }
 }
 
 fun updateDebtor(
-  storeId: String,
-  debtor: DebtorDataModel,
-  onCompleted: ((DataState<DebtorDataModel>) -> Unit)? = null
+    storeId: String,
+    debtor: DebtorDataModel,
+    onCompleted: ((DataState<DebtorDataModel>) -> Unit)? = null
 ) {
-  if (!updateDebtorMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      updateDebtorMutex.withLock {
-        val response = networkRequest<DebtorDataModel, DebtorDataModel>(
-          method = HttpMethod.Put,
-          endpointUrl = globalAppConfigurationState.payloadValue.updateDebtorPath.first,
-          headers = mapOf("store_id" to storeId),
-          body = debtor
-        )
+    if (!updateDebtorMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            updateDebtorMutex.withLock {
+                val response = networkRequest<DebtorDataModel, DebtorDataModel>(
+                    method = HttpMethod.Put,
+                    endpointUrl = globalAppConfigurationState.payloadValue.updateDebtorPath.first,
+                    headers = mapOf("store_id" to storeId),
+                    body = debtor
+                )
 
-        if (response.negative || response.payload == null) {
-          postInAppNotification(response.message, NotificationType.Negative)
-          onCompleted?.invoke(DataState.Empty(response.message))
-        } else {
-          debtorsState.emit(
-            DataState.Success(
-              debtorsState.payloadValue.orEmpty().upsertDebtor(response.payload),
-              response.message
-            )
-          )
-          postInAppNotification(response.message, NotificationType.Positive)
-          onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    debtorsState.emit(
+                        DataState.Success(
+                            debtorsState.payloadValue.orEmpty().upsertDebtor(response.payload),
+                            response.message
+                        )
+                    )
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
         }
-      }
-    }
 }
 
 fun deleteDebtor(
-  storeId: String,
-  debtorId: String,
-  onCompleted: ((DataState<String>) -> Unit)? = null
+    storeId: String,
+    debtorId: String,
+    onCompleted: ((DataState<String>) -> Unit)? = null
 ) {
-  if (!deleteDebtorMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      deleteDebtorMutex.withLock {
-        val response = networkRequest<String, String>(
-          method = HttpMethod.Delete,
-          endpointUrl = globalAppConfigurationState.payloadValue.deleteDebtorPath.first,
-          headers = mapOf("store_id" to storeId),
-          body = debtorId
-        )
+    if (!deleteDebtorMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            deleteDebtorMutex.withLock {
+                val response = networkRequest<String, String>(
+                    method = HttpMethod.Delete,
+                    endpointUrl = globalAppConfigurationState.payloadValue.deleteDebtorPath.first,
+                    headers = mapOf("store_id" to storeId),
+                    body = debtorId
+                )
 
-        if (response.negative || response.payload == null) {
-          postInAppNotification(response.message, NotificationType.Negative)
-          onCompleted?.invoke(DataState.Empty(response.message))
-        } else {
-          debtorsState.emit(
-            DataState.Success(
-              debtorsState.payloadValue.orEmpty().filterNot { it.id == response.payload },
-              response.message
-            )
-          )
-          postInAppNotification(response.message, NotificationType.Positive)
-          onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    debtorsState.emit(
+                        DataState.Success(
+                            debtorsState.payloadValue.orEmpty().filterNot { it.id == response.payload },
+                            response.message
+                        )
+                    )
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
         }
-      }
-    }
 }
 
 fun payDebtorDebt(
-  request: DebtPaymentRequestDataModel,
-  onCompleted: ((DataState<DebtorDataModel>) -> Unit)? = null
+    request: DebtPaymentRequestDataModel,
+    onCompleted: ((DataState<DebtorDataModel>) -> Unit)? = null
 ) {
-  if (!payDebtorDebtMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      payDebtorDebtMutex.withLock {
-        val response = networkRequest<DebtorDataModel, DebtPaymentRequestDataModel>(
-          method = HttpMethod.Post,
-          endpointUrl = globalAppConfigurationState.payloadValue.payDebtorDebtPath.first,
-          headers = mapOf("store_id" to request.storeId),
-          body = request
-        )
+    if (!payDebtorDebtMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            payDebtorDebtMutex.withLock {
+                val response = networkRequest<DebtorDataModel, DebtPaymentRequestDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.payDebtorDebtPath.first,
+                    headers = mapOf("store_id" to request.storeId),
+                    body = request
+                )
 
-        if (response.negative || response.payload == null) {
-          postInAppNotification(response.message, NotificationType.Negative)
-          onCompleted?.invoke(DataState.Empty(response.message))
-        } else {
-          debtorsState.emit(
-            DataState.Success(
-              debtorsState.payloadValue.orEmpty().upsertDebtor(response.payload),
-              response.message
-            )
-          )
-          postInAppNotification(response.message, NotificationType.Positive)
-          onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    debtorsState.emit(
+                        DataState.Success(
+                            debtorsState.payloadValue.orEmpty().upsertDebtor(response.payload),
+                            response.message
+                        )
+                    )
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
         }
-      }
-    }
 }
 
 private val completeTransactionMutex = Mutex()
 private val getTransactionsMutex = Mutex()
 
 data class TransactionPaymentDraftDataModel(
-  val transactionTypeIndex: Int,
-  val clientId: Int,
-  val paymentModeId: String,
-  val paidCash: Double,
-  val paidCard: Double,
-  val cardPaymentOptionId: Int,
-  val debtor: DebtorDataModel? = null
+    val transactionTypeIndex: Int,
+    val clientId: Int,
+    val paymentModeId: String,
+    val paidCash: Double,
+    val paidCard: Double,
+    val cardPaymentOptionId: Int,
+    val debtor: DebtorDataModel? = null
 )
 
 data class TransactionReceiptSnapshotDataModel(
-  val transaction: TransactionDataModel,
-  val store: StoreDataModel?,
-  val lines: List<TransactionReceiptLineDataModel>,
-  val paymentDraft: TransactionPaymentDraftDataModel,
-  val currencyCode: String,
-  val currencySymbol: String,
-  val cashierName: String = "",
-  val cashierPhoneNumber: String = "",
-  val cashierEmail: String = ""
+    val transaction: TransactionDataModel,
+    val store: StoreDataModel?,
+    val lines: List<TransactionReceiptLineDataModel>,
+    val paymentDraft: TransactionPaymentDraftDataModel,
+    val currencyCode: String,
+    val currencySymbol: String,
+    val cashierName: String = "",
+    val cashierPhoneNumber: String = "",
+    val cashierEmail: String = ""
 )
 
 data class TransactionReceiptLineDataModel(
-  val index: Int,
-  val goodsItemId: String,
-  val name: List<LocalizedStringDataModel>,
-  val barcode: String,
-  val quantity: QuantityDataModel,
-  val pricePerUnit: Double,
-  val currencyCode: String,
-  val currencySymbol: String,
+    val index: Int,
+    val goodsItemId: String,
+    val name: List<LocalizedStringDataModel>,
+    val barcode: String,
+    val quantity: QuantityDataModel,
+    val pricePerUnit: Double,
+    val currencyCode: String,
+    val currencySymbol: String,
+    val saleMethodId: String = SALE_METHOD_RETAIL,
+    val saleMethodName: List<LocalizedStringDataModel> = saleMethodLocalizedName(saleMethodId),
 ) {
-  val total: Double
-    get() = quantity.total * pricePerUnit
+    val total: Double
+        get() = quantity.total * pricePerUnit
 }
 
 
 data class ReceiptPlatformActionResult(
-  val success: Boolean,
-  val message: String = ""
+    val success: Boolean,
+    val message: String = ""
 )
 
 data class ReceiptTextLabelsDataModel(
-  val store: String = "Store",
-  val goodsReceiptTitle: String = "Goods receipt",
-  val receipt: String = "Receipt",
-  val transactionId: String = "Transaction ID",
-  val draft: String = "Draft",
-  val date: String = "Date",
-  val cashier: String = "Cashier",
-  val phone: String = "Phone",
-  val email: String = "Email",
-  val barcode: String = "Barcode",
-  val noName: String = "No name",
-  val noItems: String = "No items",
-  val total: String = "Total",
-  val cash: String = "Cash",
-  val cashless: String = "Cashless",
-  val debt: String = "Debt",
-  val debtor: String = "Debtor",
-  val debtorPhone: String = "Debtor phone",
-  val change: String = "Change",
-  val vat: String = "VAT / НДС / ҚҚС",
-  val vatNotSpecified: String = "Not specified",
-  val fiscalStatus: String = "Fiscal status",
-  val nonFiscalSoftwareReceipt: String = "Non-fiscal software receipt",
-  val thankYou: String = "Thank you",
-  val saleReceiptTitle: String = "Sale",
-  val returnReceiptTitle: String = "Return",
-  val supplyReceiptTitle: String = "Acceptance",
-  val pdfExportNotConfigured: String = "PDF export is not configured for this platform",
-  val pdfSharingNotConfigured: String = "PDF sharing is not configured for this platform",
-  val printerNotConfigured: String = "Receipt printer is not configured for this platform"
+    val store: String = "Store",
+    val goodsReceiptTitle: String = "Goods receipt",
+    val receipt: String = "Receipt",
+    val transactionId: String = "Transaction ID",
+    val draft: String = "Draft",
+    val date: String = "Date",
+    val cashier: String = "Cashier",
+    val phone: String = "Phone",
+    val email: String = "Email",
+    val barcode: String = "Barcode",
+    val noName: String = "No name",
+    val noItems: String = "No items",
+    val total: String = "Total",
+    val cash: String = "Cash",
+    val cashless: String = "Cashless",
+    val debt: String = "Debt",
+    val debtor: String = "Debtor",
+    val debtorPhone: String = "Debtor phone",
+    val change: String = "Change",
+    val vat: String = "VAT / НДС / ҚҚС",
+    val vatNotSpecified: String = "Not specified",
+    val fiscalStatus: String = "Fiscal status",
+    val nonFiscalSoftwareReceipt: String = "Non-fiscal software receipt",
+    val thankYou: String = "Thank you",
+    val saleReceiptTitle: String = "Sale",
+    val returnReceiptTitle: String = "Return",
+    val supplyReceiptTitle: String = "Acceptance",
+    val pdfExportNotConfigured: String = "PDF export is not configured for this platform",
+    val pdfSharingNotConfigured: String = "PDF sharing is not configured for this platform",
+    val printerNotConfigured: String = "Receipt printer is not configured for this platform"
 )
 
 var saveReceiptPdfFile: (suspend (fileName: String, pdfBytes: ByteArray) -> ReceiptPlatformActionResult)? = null
@@ -336,464 +339,833 @@ var shareReceiptPdfFile: (suspend (fileName: String, pdfBytes: ByteArray, whatsa
 var printReceiptEscPosBytes: (suspend (printerBytes: ByteArray) -> ReceiptPlatformActionResult)? = null
 
 suspend fun saveReceiptPdf(fileName: String, pdfBytes: ByteArray, labels: ReceiptTextLabelsDataModel = ReceiptTextLabelsDataModel()): ReceiptPlatformActionResult {
-  return saveReceiptPdfFile?.invoke(fileName, pdfBytes)
-    ?: ReceiptPlatformActionResult(false, labels.pdfExportNotConfigured)
+    return saveReceiptPdfFile?.invoke(fileName, pdfBytes)
+        ?: ReceiptPlatformActionResult(false, labels.pdfExportNotConfigured)
 }
 
 suspend fun shareReceiptPdf(fileName: String, pdfBytes: ByteArray, whatsappOnly: Boolean = false, labels: ReceiptTextLabelsDataModel = ReceiptTextLabelsDataModel()): ReceiptPlatformActionResult {
-  return shareReceiptPdfFile?.invoke(fileName, pdfBytes, whatsappOnly)
-    ?: ReceiptPlatformActionResult(false, labels.pdfSharingNotConfigured)
+    return shareReceiptPdfFile?.invoke(fileName, pdfBytes, whatsappOnly)
+        ?: ReceiptPlatformActionResult(false, labels.pdfSharingNotConfigured)
 }
 
 suspend fun printReceiptEscPos(printerBytes: ByteArray, labels: ReceiptTextLabelsDataModel = ReceiptTextLabelsDataModel()): ReceiptPlatformActionResult {
-  return printReceiptEscPosBytes?.invoke(printerBytes)
-    ?: ReceiptPlatformActionResult(false, labels.printerNotConfigured)
+    return printReceiptEscPosBytes?.invoke(printerBytes)
+        ?: ReceiptPlatformActionResult(false, labels.printerNotConfigured)
 }
 
 private fun receiptVisibleString(values: List<LocalizedStringDataModel>, language: String, fallback: String): String {
-  return values.extractLocalizedString(language)
-    ?.trim()
-    ?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
-    ?: values.extractLocalizedString("main")
-      ?.trim()
-      ?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
-    ?: values.firstOrNull { it.value.trim().isNotBlank() && !it.value.trim().equals("null", ignoreCase = true) }
-      ?.value
-      ?.trim()
-    ?: fallback
+    return values.extractLocalizedString(language)
+        ?.trim()
+        ?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+        ?: values.extractLocalizedString("main")
+            ?.trim()
+            ?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+        ?: values.firstOrNull { it.value.trim().isNotBlank() && !it.value.trim().equals("null", ignoreCase = true) }
+            ?.value
+            ?.trim()
+        ?: fallback
 }
 
 private fun receiptMoney(value: Double): String {
-  val rounded = kotlin.math.floor(value.coerceAtLeast(0.0) * 100.0) / 100.0
-  val whole = rounded.toLong()
-  val cents = kotlin.math.round((rounded - whole) * 100.0).toInt()
-  return "$whole.${cents.toString().padStart(2, '0')}"
+    val rounded = kotlin.math.floor(value.coerceAtLeast(0.0) * 100.0) / 100.0
+    val whole = rounded.toLong()
+    val cents = kotlin.math.round((rounded - whole) * 100.0).toInt()
+    return "$whole.${cents.toString().padStart(2, '0')}"
+}
+
+private fun receiptQuantityAmount(value: Double, roundTotal: Boolean): String {
+    if (roundTotal)
+        return value.toInt().toString()
+
+    val scaled = kotlin.math.round(value.coerceAtLeast(0.0) * 1000.0).toLong()
+    val whole = scaled / 1000
+    val fraction = (scaled % 1000).toString().padStart(3, '0')
+
+    return "$whole.$fraction"
 }
 
 private fun receiptQuantityText(quantity: QuantityDataModel, language: String): String {
-  val value = if (quantity.roundTotal) quantity.total.toInt().toString() else receiptMoney(quantity.total)
-  val unit = receiptVisibleString(quantity.immutableUnitName, language, quantity.id.ifBlank { "unit" })
-  return "$value $unit".trim()
+    val value = receiptQuantityAmount(quantity.total, quantity.roundTotal)
+    val unit = receiptVisibleString(quantity.immutableUnitName, language, quantity.id.ifBlank { "unit" })
+    return "$value $unit".trim()
 }
 
 private fun receiptDateTimeText(timeMillis: Long): String {
-  return runCatching {
-    val dt = Instant.fromEpochMilliseconds(timeMillis).toLocalDateTime(TimeZone.currentSystemDefault())
-    "${dt.dayOfMonth.toString().padStart(2, '0')}.${dt.monthNumber.toString().padStart(2, '0')}.${dt.year} ${dt.hour.toString().padStart(2, '0')}:${dt.minute.toString().padStart(2, '0')}:${dt.second.toString().padStart(2, '0')}"
-  }.getOrElse { timeMillis.toString() }
+    return runCatching {
+        val dt = Instant.fromEpochMilliseconds(timeMillis).toLocalDateTime(TimeZone.currentSystemDefault())
+        "${dt.dayOfMonth.toString().padStart(2, '0')}.${dt.monthNumber.toString().padStart(2, '0')}.${dt.year} ${dt.hour.toString().padStart(2, '0')}:${dt.minute.toString().padStart(2, '0')}:${dt.second.toString().padStart(2, '0')}"
+    }.getOrElse { timeMillis.toString() }
 }
 
 fun TransactionReceiptSnapshotDataModel.receiptTitle(labels: ReceiptTextLabelsDataModel): String {
-  return when (transaction.type) {
-    "purchase" -> labels.saleReceiptTitle
-    "return" -> labels.returnReceiptTitle
-    else -> labels.supplyReceiptTitle
-  }
+    return when (transaction.type) {
+        "purchase" -> labels.saleReceiptTitle
+        "return" -> labels.returnReceiptTitle
+        else -> labels.supplyReceiptTitle
+    }
 }
 
 fun TransactionReceiptSnapshotDataModel.receiptNumberText(labels: ReceiptTextLabelsDataModel = ReceiptTextLabelsDataModel()): String {
-  val id = transaction.id.takeIf { it.isNotBlank() } ?: labels.draft
-  return id.take(8).uppercase()
+    val id = transaction.id.takeIf { it.isNotBlank() } ?: labels.draft
+    return id.take(8).uppercase()
 }
 
 fun TransactionReceiptSnapshotDataModel.totalAmount(): Double {
-  return lines.sumOf { it.total }.roundMoney()
+    return lines.sumOf { it.total }.roundMoney()
 }
 
 fun TransactionReceiptSnapshotDataModel.debtAmount(): Double {
-  return paymentDraft.debtor?.debtAmount?.roundMoney() ?: 0.0
+    return paymentDraft.debtor?.debtAmount?.roundMoney() ?: 0.0
 }
 
 fun TransactionReceiptSnapshotDataModel.paidAmount(): Double {
-  return (paymentDraft.paidCash + paymentDraft.paidCard).roundMoney()
+    return (paymentDraft.paidCash + paymentDraft.paidCard).roundMoney()
 }
 
 fun TransactionReceiptSnapshotDataModel.changeAmount(): Double {
-  val change = paymentDraft.paidCash - (totalAmount() - paymentDraft.paidCard - debtAmount()).coerceAtLeast(0.0)
-  return change.coerceAtLeast(0.0).roundMoney()
+    val change = paymentDraft.paidCash - (totalAmount() - paymentDraft.paidCard - debtAmount()).coerceAtLeast(0.0)
+    return change.coerceAtLeast(0.0).roundMoney()
 }
 
 fun TransactionReceiptSnapshotDataModel.buildReceiptPlainText(language: String, labels: ReceiptTextLabelsDataModel): String {
-  val builder = StringBuilder()
-  val storeName = store?.let {
-    val form = it.companyForms.firstOrNull()?.name?.let { name -> receiptVisibleString(name, language, "") }.orEmpty()
-    val name = receiptVisibleString(it.name, language, labels.store)
-    "$form $name".trim()
-  } ?: labels.store
+    val builder = StringBuilder()
+    val storeName = store?.let {
+        val form = it.companyForms.firstOrNull()?.name?.let { name -> receiptVisibleString(name, language, "") }.orEmpty()
+        val name = receiptVisibleString(it.name, language, labels.store)
+        "$form $name".trim()
+    } ?: labels.store
 
-  builder.appendLine(storeName)
-  store?.location?.name?.takeIf { it.isNotBlank() }?.let { builder.appendLine(it) }
-  store?.phoneNumbers?.takeIf { it.isNotEmpty() }?.let { builder.appendLine("${labels.phone}: ${it.joinToString()}") }
-  store?.emails?.takeIf { it.isNotEmpty() }?.let { builder.appendLine("${labels.email}: ${it.joinToString()}") }
-  builder.appendLine("--------------------------------")
-  builder.appendLine(labels.goodsReceiptTitle)
-  builder.appendLine(receiptTitle(labels))
-  builder.appendLine("${labels.receipt}: ${receiptNumberText(labels)}")
-  if (transaction.id.isNotBlank()) builder.appendLine("${labels.transactionId}: ${transaction.id}")
-  builder.appendLine("${labels.date}: ${receiptDateTimeText(transaction.timeMillis)}")
-  cashierName.takeIf { it.isNotBlank() }?.let { builder.appendLine("${labels.cashier}: $it") }
-  builder.appendLine("--------------------------------")
+    builder.appendLine(storeName)
+    store?.location?.name?.takeIf { it.isNotBlank() }?.let { builder.appendLine(it) }
+    store?.phoneNumbers?.takeIf { it.isNotEmpty() }?.let { builder.appendLine("${labels.phone}: ${it.joinToString()}") }
+    store?.emails?.takeIf { it.isNotEmpty() }?.let { builder.appendLine("${labels.email}: ${it.joinToString()}") }
+    builder.appendLine("--------------------------------")
+    builder.appendLine(labels.goodsReceiptTitle)
+    builder.appendLine(receiptTitle(labels))
+    builder.appendLine("${labels.receipt}: ${receiptNumberText(labels)}")
+    if (transaction.id.isNotBlank()) builder.appendLine("${labels.transactionId}: ${transaction.id}")
+    builder.appendLine("${labels.date}: ${receiptDateTimeText(transaction.timeMillis)}")
+    cashierName.takeIf { it.isNotBlank() }?.let { builder.appendLine("${labels.cashier}: $it") }
+    builder.appendLine("--------------------------------")
 
-  if (lines.isEmpty()) {
-    builder.appendLine(labels.noItems)
-  } else {
-    lines.forEach { line ->
-      val name = receiptVisibleString(line.name, language, labels.noName)
-      builder.appendLine("${line.index + 1}. $name")
-      if (line.barcode.isNotBlank()) builder.appendLine("   ${labels.barcode}: ${line.barcode}")
-      builder.appendLine("   ${receiptQuantityText(line.quantity, language)} x ${receiptMoney(line.pricePerUnit)} ${line.currencySymbol} = ${receiptMoney(line.total)} ${line.currencySymbol}")
+    if (lines.isEmpty()) {
+        builder.appendLine(labels.noItems)
+    } else {
+        lines.forEach { line ->
+            val name = receiptVisibleString(line.name, language, labels.noName)
+            builder.appendLine("${line.index + 1}. $name")
+            if (line.barcode.isNotBlank()) builder.appendLine("   ${labels.barcode}: ${line.barcode}")
+            if (line.saleMethodId == SALE_METHOD_WHOLESALE) {
+                val saleMethodText = receiptVisibleString(line.saleMethodName, language, "")
+                if (saleMethodText.isNotBlank()) builder.appendLine("   $saleMethodText")
+            }
+            builder.appendLine("   ${receiptQuantityText(line.quantity, language)} x ${receiptMoney(line.pricePerUnit)} ${line.currencySymbol} = ${receiptMoney(line.total)} ${line.currencySymbol}")
+        }
     }
-  }
 
-  builder.appendLine("--------------------------------")
-  builder.appendLine("${labels.total}: ${receiptMoney(totalAmount())} $currencySymbol")
-  if (paymentDraft.paidCash > 0.0) builder.appendLine("${labels.cash}: ${receiptMoney(paymentDraft.paidCash)} $currencySymbol")
-  if (paymentDraft.paidCard > 0.0) builder.appendLine("${labels.cashless}: ${receiptMoney(paymentDraft.paidCard)} $currencySymbol")
-  if (debtAmount() > 0.0) {
-    builder.appendLine("${labels.debt}: ${receiptMoney(debtAmount())} $currencySymbol")
-    paymentDraft.debtor?.let { debtor ->
-      val debtorName = "${debtor.firstName} ${debtor.lastName}".trim().ifBlank { debtor.phoneNumber.ifBlank { debtor.id } }
-      builder.appendLine("${labels.debtor}: $debtorName")
-      debtor.phoneNumber.takeIf { it.isNotBlank() }?.let { builder.appendLine("${labels.debtorPhone}: $it") }
+    builder.appendLine("--------------------------------")
+    builder.appendLine("${labels.total}: ${receiptMoney(totalAmount())} $currencySymbol")
+    if (paymentDraft.paidCash > 0.0) builder.appendLine("${labels.cash}: ${receiptMoney(paymentDraft.paidCash)} $currencySymbol")
+    if (paymentDraft.paidCard > 0.0) builder.appendLine("${labels.cashless}: ${receiptMoney(paymentDraft.paidCard)} $currencySymbol")
+    if (debtAmount() > 0.0) {
+        builder.appendLine("${labels.debt}: ${receiptMoney(debtAmount())} $currencySymbol")
+        paymentDraft.debtor?.let { debtor ->
+            builder.appendLine("${labels.debtor}: ${debtor.displayName}")
+            builder.appendLine("Type: ${debtor.debtorType}")
+            debtor.idNumber.takeIf { it.isNotBlank() }?.let { builder.appendLine("ID number: $it") }
+            debtor.companyIdNumber.takeIf { it.isNotBlank() }?.let { builder.appendLine("Company ID: $it") }
+            debtor.phoneNumber.takeIf { it.isNotBlank() }?.let { builder.appendLine("${labels.debtorPhone}: $it") }
+            debtor.debtDueAtMillis?.let { builder.appendLine("Debt due at: ${receiptDateTimeText(it)}") }
+            debtor.interest?.takeIf { it.enabled && it.ratePercent > 0.0 }?.let {
+                builder.appendLine("Interest: ${it.ratePercent}% per ${it.periodUnit}")
+            }
+            debtor.plannedPayments.takeIf { it.isNotEmpty() }?.let { plans ->
+                builder.appendLine("Payment plan:")
+                plans.forEach { plan ->
+                    builder.appendLine("- ${receiptMoney(plan.amount)} ${debtor.currency} by ${plan.dueAtMillis?.let { due -> receiptDateTimeText(due) } ?: "no date"}${plan.percent?.let { pct -> " ($pct%)" } ?: ""}")
+                }
+            }
+        }
     }
-  }
-  if (changeAmount() > 0.0) builder.appendLine("${labels.change}: ${receiptMoney(changeAmount())} $currencySymbol")
-  builder.appendLine("--------------------------------")
-  builder.appendLine("${labels.vat}: ${labels.vatNotSpecified}")
-  builder.appendLine("${labels.fiscalStatus}: ${labels.nonFiscalSoftwareReceipt}")
-  builder.appendLine(labels.thankYou)
+    if (changeAmount() > 0.0) builder.appendLine("${labels.change}: ${receiptMoney(changeAmount())} $currencySymbol")
+    builder.appendLine("--------------------------------")
+    builder.appendLine("${labels.vat}: ${labels.vatNotSpecified}")
+    builder.appendLine("${labels.fiscalStatus}: ${labels.nonFiscalSoftwareReceipt}")
+    builder.appendLine(labels.thankYou)
 
-  return builder.toString()
+    return builder.toString()
 }
 
 
 private fun pdfEscape(value: String): String {
-  return value
-    .replace("\\", "\\\\")
-    .replace("(", "\\(")
-    .replace(")", "\\)")
-    .map { ch -> if (ch.code in 32..126) ch else '?' }
-    .joinToString("")
+    return value
+        .replace("\\", "\\\\")
+        .replace("(", "\\(")
+        .replace(")", "\\)")
+        .map { ch -> if (ch.code in 32..126) ch else '?' }
+        .joinToString("")
 }
 
 fun TransactionReceiptSnapshotDataModel.buildReceiptPdfBytes(language: String, labels: ReceiptTextLabelsDataModel): ByteArray {
-  val lines = buildReceiptPlainText(language, labels)
-    .lines()
-    .flatMap { line ->
-      if (line.length <= 58) listOf(line) else line.chunked(58)
+    val lines = buildReceiptPlainText(language, labels)
+        .lines()
+        .flatMap { line ->
+            if (line.length <= 58) listOf(line) else line.chunked(58)
+        }
+
+    val pageWidth = 226.0
+    val pageHeight = kotlin.math.max(420.0, 84.0 + lines.size * 12.0)
+    val content = buildString {
+        append("BT\n")
+        append("/F1 9 Tf\n")
+        append("12 ${pageHeight - 24} Td\n")
+        lines.forEachIndexed { index, line ->
+            if (index > 0) append("0 -12 Td\n")
+            append("(${pdfEscape(line)}) Tj\n")
+        }
+        append("ET\n")
     }
 
-  val pageWidth = 226.0
-  val pageHeight = kotlin.math.max(420.0, 84.0 + lines.size * 12.0)
-  val content = buildString {
-    append("BT\n")
-    append("/F1 9 Tf\n")
-    append("12 ${pageHeight - 24} Td\n")
-    lines.forEachIndexed { index, line ->
-      if (index > 0) append("0 -12 Td\n")
-      append("(${pdfEscape(line)}) Tj\n")
+    val objects = mutableListOf<String>()
+    objects += "<< /Type /Catalog /Pages 2 0 R >>"
+    objects += "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"
+    objects += "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth.toInt()} ${pageHeight.toInt()}] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>"
+    objects += "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"
+    objects += "<< /Length ${content.toByteArray().size} >>\nstream\n$content\nendstream"
+
+    val out = StringBuilder()
+    val offsets = mutableListOf<Int>()
+    out.append("%PDF-1.4\n")
+    objects.forEachIndexed { index, obj ->
+        offsets += out.toString().toByteArray().size
+        out.append("${index + 1} 0 obj\n$obj\nendobj\n")
     }
-    append("ET\n")
-  }
-
-  val objects = mutableListOf<String>()
-  objects += "<< /Type /Catalog /Pages 2 0 R >>"
-  objects += "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"
-  objects += "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth.toInt()} ${pageHeight.toInt()}] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>"
-  objects += "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"
-  objects += "<< /Length ${content.toByteArray().size} >>\nstream\n$content\nendstream"
-
-  val out = StringBuilder()
-  val offsets = mutableListOf<Int>()
-  out.append("%PDF-1.4\n")
-  objects.forEachIndexed { index, obj ->
-    offsets += out.toString().toByteArray().size
-    out.append("${index + 1} 0 obj\n$obj\nendobj\n")
-  }
-  val xrefOffset = out.toString().toByteArray().size
-  out.append("xref\n0 ${objects.size + 1}\n")
-  out.append("0000000000 65535 f \n")
-  offsets.forEach { offset ->
-    out.append(offset.toString().padStart(10, '0')).append(" 00000 n \n")
-  }
-  out.append("trailer\n<< /Size ${objects.size + 1} /Root 1 0 R >>\n")
-  out.append("startxref\n$xrefOffset\n%%EOF")
-  return out.toString().toByteArray()
+    val xrefOffset = out.toString().toByteArray().size
+    out.append("xref\n0 ${objects.size + 1}\n")
+    out.append("0000000000 65535 f \n")
+    offsets.forEach { offset ->
+        out.append(offset.toString().padStart(10, '0')).append(" 00000 n \n")
+    }
+    out.append("trailer\n<< /Size ${objects.size + 1} /Root 1 0 R >>\n")
+    out.append("startxref\n$xrefOffset\n%%EOF")
+    return out.toString().toByteArray()
 }
 
 private fun String.escPosSafe(): String {
-  return map { ch -> if (ch.code in 32..126 || ch == '\n') ch else '?' }.joinToString("")
+    return map { ch -> if (ch.code in 32..126 || ch == '\n') ch else '?' }.joinToString("")
 }
 
 fun TransactionReceiptSnapshotDataModel.buildReceiptEscPosBytes(language: String, labels: ReceiptTextLabelsDataModel): ByteArray {
-  val text = buildReceiptPlainText(language, labels).escPosSafe()
-  val bytes = mutableListOf<Byte>()
-  fun add(vararg values: Int) { values.forEach { bytes += it.toByte() } }
-  fun addText(value: String) { bytes += value.encodeToByteArray().toList() }
+    val text = buildReceiptPlainText(language, labels).escPosSafe()
+    val bytes = mutableListOf<Byte>()
+    fun add(vararg values: Int) { values.forEach { bytes += it.toByte() } }
+    fun addText(value: String) { bytes += value.encodeToByteArray().toList() }
 
-  add(0x1B, 0x40)
-  add(0x1B, 0x61, 0x01)
-  add(0x1B, 0x45, 0x01)
-  addText((store?.name?.let { receiptVisibleString(it, language, labels.store) } ?: labels.store) + "\n")
-  add(0x1B, 0x45, 0x00)
-  addText("${labels.receipt} ${receiptNumberText(labels)}\n")
-  add(0x1B, 0x61, 0x00)
-  addText("--------------------------------\n")
-  addText(text.substringAfter("--------------------------------\n", text))
-  addText("\n\n")
-  add(0x1D, 0x56, 0x42, 0x00)
-  return bytes.toByteArray()
+    add(0x1B, 0x40)
+    add(0x1B, 0x61, 0x01)
+    add(0x1B, 0x45, 0x01)
+    addText((store?.name?.let { receiptVisibleString(it, language, labels.store) } ?: labels.store) + "\n")
+    add(0x1B, 0x45, 0x00)
+    addText("${labels.receipt} ${receiptNumberText(labels)}\n")
+    add(0x1B, 0x61, 0x00)
+    addText("--------------------------------\n")
+    addText(text.substringAfter("--------------------------------\n", text))
+    addText("\n\n")
+    add(0x1D, 0x56, 0x42, 0x00)
+    return bytes.toByteArray()
 }
 
 fun TransactionReceiptSnapshotDataModel.receiptPdfFileName(labels: ReceiptTextLabelsDataModel = ReceiptTextLabelsDataModel()): String {
-  val safeId = receiptNumberText(labels).replace(Regex("[^A-Za-z0-9_-]"), "_")
-  return "receipt_${safeId}.pdf"
+    val safeId = receiptNumberText(labels).replace(Regex("[^A-Za-z0-9_-]"), "_")
+    return "receipt_${safeId}.pdf"
 }
 
 val latestTransactionReceiptSnapshotState =
-  MutableStateFlow<TransactionReceiptSnapshotDataModel?>(null)
+    MutableStateFlow<TransactionReceiptSnapshotDataModel?>(null)
 
 private fun transactionKey(transactionTypeIndex: Int, clientId: Int): String {
-  return "$transactionTypeIndex:$clientId"
+    return "$transactionTypeIndex:$clientId"
 }
 
+const val SALE_METHOD_RETAIL = "retail"
+const val SALE_METHOD_WHOLESALE = "wholesale"
+
+val cartSaleMethodIdsState = MutableStateFlow<Map<String, String>>(emptyMap())
+
+fun getCartSaleMethodId(transactionTypeIndex: Int, clientId: Int, goodsItemId: String): String {
+    return cartSaleMethodIdsState.value["${transactionKey(transactionTypeIndex, clientId)}:$goodsItemId"]
+        ?: SALE_METHOD_RETAIL
+}
+
+fun setCartSaleMethodId(
+    transactionTypeIndex: Int,
+    clientId: Int,
+    goodsItemId: String,
+    saleMethodId: String
+) {
+    GlobalScope.launch {
+        val normalizedSaleMethodId = if (saleMethodId == SALE_METHOD_WHOLESALE) {
+            SALE_METHOD_WHOLESALE
+        } else {
+            SALE_METHOD_RETAIL
+        }
+
+        cartSaleMethodIdsState.emit(
+            cartSaleMethodIdsState.value.toMutableMap().apply {
+                val key = "${transactionKey(transactionTypeIndex, clientId)}:$goodsItemId"
+                if (normalizedSaleMethodId == SALE_METHOD_RETAIL) {
+                    remove(key)
+                } else {
+                    this[key] = normalizedSaleMethodId
+                }
+            }
+        )
+    }
+}
+
+private fun removeCartSaleMethodId(transactionTypeIndex: Int, clientId: Int, goodsItemId: String) {
+    GlobalScope.launch {
+        cartSaleMethodIdsState.emit(
+            cartSaleMethodIdsState.value.toMutableMap().apply {
+                remove("${transactionKey(transactionTypeIndex, clientId)}:$goodsItemId")
+            }
+        )
+    }
+}
+
+private fun removeCartSaleMethodIds(transactionTypeIndex: Int, clientId: Int) {
+    val prefix = "${transactionKey(transactionTypeIndex, clientId)}:"
+
+    GlobalScope.launch {
+        cartSaleMethodIdsState.emit(
+            cartSaleMethodIdsState.value.filterKeys { !it.startsWith(prefix) }
+        )
+    }
+}
+
+fun saleMethodLocalizedName(saleMethodId: String): List<LocalizedStringDataModel> =
+    if (saleMethodId == SALE_METHOD_WHOLESALE) {
+        listOf(
+            LocalizedStringDataModel("main", "Wholesale"),
+            LocalizedStringDataModel("en", "Wholesale"),
+            LocalizedStringDataModel("ru", "Оптом"),
+            LocalizedStringDataModel("kk", "Көтерме")
+        )
+    } else {
+        listOf(
+            LocalizedStringDataModel("main", "Retail"),
+            LocalizedStringDataModel("en", "Retail"),
+            LocalizedStringDataModel("ru", "Розница"),
+            LocalizedStringDataModel("kk", "Бөлшек")
+        )
+    }
+
 private val transactionPaymentDraftsState =
-  MutableStateFlow<Map<String, TransactionPaymentDraftDataModel>>(emptyMap())
+    MutableStateFlow<Map<String, TransactionPaymentDraftDataModel>>(emptyMap())
 
 fun setTransactionPaymentDraft(draft: TransactionPaymentDraftDataModel) {
-  GlobalScope.launch {
-    transactionPaymentDraftsState.emit(
-      transactionPaymentDraftsState.value.toMutableMap().apply {
-        this[transactionKey(draft.transactionTypeIndex, draft.clientId)] = draft
-      }
-    )
-  }
+    GlobalScope.launch {
+        transactionPaymentDraftsState.emit(
+            transactionPaymentDraftsState.value.toMutableMap().apply {
+                this[transactionKey(draft.transactionTypeIndex, draft.clientId)] = draft
+            }
+        )
+    }
 }
 
 fun getTransactionPaymentDraft(
-  transactionTypeIndex: Int,
-  clientId: Int
+    transactionTypeIndex: Int,
+    clientId: Int
 ): TransactionPaymentDraftDataModel? {
-  return transactionPaymentDraftsState.value[transactionKey(transactionTypeIndex, clientId)]
+    return transactionPaymentDraftsState.value[transactionKey(transactionTypeIndex, clientId)]
 }
 
 fun clearTransactionPaymentDraft(transactionTypeIndex: Int, clientId: Int) {
-  GlobalScope.launch {
-    transactionPaymentDraftsState.emit(
-      transactionPaymentDraftsState.value.toMutableMap().apply {
-        remove(transactionKey(transactionTypeIndex, clientId))
-      }
-    )
-  }
+    GlobalScope.launch {
+        transactionPaymentDraftsState.emit(
+            transactionPaymentDraftsState.value.toMutableMap().apply {
+                remove(transactionKey(transactionTypeIndex, clientId))
+            }
+        )
+    }
 }
 
 fun transactionServerType(transactionTypeIndex: Int): String {
-  return when (transactionTypeIndex) {
-    0 -> "purchase"
-    1 -> "return"
-    else -> "accept"
-  }
+    return when (transactionTypeIndex) {
+        0 -> "purchase"
+        1 -> "return"
+        else -> "accept"
+    }
 }
 
 fun transactionTitle(
-  transactionTypeIndex: Int,
-  sale: String,
-  returnText: String,
-  supply: String
+    transactionTypeIndex: Int,
+    sale: String,
+    returnText: String,
+    supply: String
 ): String {
-  return when (transactionTypeIndex) {
-    0 -> sale
-    1 -> returnText
-    else -> supply
-  }
+    return when (transactionTypeIndex) {
+        0 -> sale
+        1 -> returnText
+        else -> supply
+    }
 }
 
-fun GoodsItemDataModel.priceForTransaction(transactionTypeIndex: Int): PriceDataModel {
-  return when (transactionTypeIndex) {
-    0 -> salePrices.firstOrNull()
-    1 -> returnPrices.firstOrNull()
-    else -> supplyPrices.firstOrNull()
-  } ?: PriceDataModel(
-    price = "0",
-    currency = salePrices.firstOrNull()?.currency
-      ?: returnPrices.firstOrNull()?.currency
-      ?: supplyPrices.firstOrNull()?.currency
-      ?: "",
-    supplierId = ""
-  )
+fun GoodsItemDataModel.hasWholesalePrice(): Boolean =
+    wholesalePrices.any { it.price.toMoneyDouble() > 0.0 }
+
+fun GoodsItemDataModel.isWholesaleEligible(quantityTotal: Double): Boolean {
+    val minimum = wholesaleMinQuantity?.total ?: 0.0
+    return hasWholesalePrice() && minimum > 0.0 && quantityTotal >= minimum
+}
+
+fun GoodsItemDataModel.priceForTransaction(
+    transactionTypeIndex: Int,
+    saleMethodId: String = SALE_METHOD_RETAIL,
+    quantityTotal: Double = 1.0,
+    batch: GoodsBatchDataModel? = null
+): PriceDataModel {
+    val retailSalePrice = batch?.salePriceOverride ?: salePrices.firstOrNull()
+    val wholesalePrice = batch?.wholesalePriceOverride ?: wholesalePrices.firstOrNull()
+    val returnPrice = batch?.returnPriceOverride ?: returnPrices.firstOrNull()
+    val supplyPrice = batch?.supplyPrice ?: supplyPrices.firstOrNull()
+
+    val selectedPrice = when (transactionTypeIndex) {
+        0 -> if (saleMethodId == SALE_METHOD_WHOLESALE && isWholesaleEligible(quantityTotal)) {
+            wholesalePrice ?: retailSalePrice
+        } else {
+            retailSalePrice
+        }
+        1 -> returnPrice
+        else -> supplyPrice
+    }
+
+    return selectedPrice ?: PriceDataModel(
+        price = "0",
+        currency = retailSalePrice?.currency
+            ?: wholesalePrice?.currency
+            ?: returnPrice?.currency
+            ?: supplyPrice?.currency
+            ?: "",
+        supplierId = ""
+    )
 }
 
 fun GoodsItemDataModel.defaultCartQuantity(
-  configuration: GlobalAppConfigurationDataModel
+    configuration: GlobalAppConfigurationDataModel
 ): QuantityDataModel {
-  return configuration.goodsItemsQuantityUnits
-    .find { it.id == measurementUnitId }
-    ?: configuration.goodsItemsQuantityUnits.first()
+    return configuration.goodsItemsQuantityUnits
+        .find { it.id == measurementUnitId }
+        ?: configuration.goodsItemsQuantityUnits.first()
+}
+
+fun GoodsItemDataModel.isWeightMeasurementUnit(
+    configuration: GlobalAppConfigurationDataModel
+): Boolean {
+    val unit = configuration.goodsItemsQuantityUnits
+        .find { it.id == measurementUnitId }
+        ?: return measurementUnitId == "1"
+
+    return unit.isWeightQuantityUnit()
+}
+
+fun QuantityDataModel.isWeightQuantityUnit(): Boolean {
+    if (id == "1") return true
+
+    return immutableUnitName.any { localized ->
+        val value = localized.value.trim().lowercase()
+        value == "kg" ||
+                value == "kg." ||
+                value == "кг" ||
+                value == "кг." ||
+                value.contains("kilogram") ||
+                value.contains("килограмм")
+    }
+}
+
+fun QuantityDataModel.withTotalValue(total: Double): QuantityDataModel {
+    val normalized = if (roundTotal) {
+        total.coerceAtLeast(0.0).toInt().toDouble()
+    } else {
+        kotlin.math.round(total.coerceAtLeast(0.0) * 1000.0) / 1000.0
+    }
+
+    return copy(total = normalized)
+}
+
+@kotlinx.serialization.Serializable
+data class EmbeddedWeightBarcodeDataModel(
+    val rawBarcode: String,
+    val productBarcode: String,
+    val productLookupCodes: List<String>,
+    val weightKilograms: Double,
+    val weightGrams: Int,
+    val productCodeLength: Int = 5,
+    val weightDigitsLength: Int = 5,
+    val formatId: String = "2+5+5+1"
+)
+
+fun String.normalizedBarcodeToken(): String {
+    return filter { it.isLetterOrDigit() }.uppercase()
+}
+
+fun String.barcodeDigitsOnly(): String = filter { it.isDigit() }
+
+fun String.hasValidRetailBarcodeChecksum(): Boolean {
+    val digits = barcodeDigitsOnly()
+    if (digits.length !in setOf(8, 12, 13, 14))
+        return false
+
+    val check = digits.last().digitToInt()
+    val body = digits.dropLast(1)
+    var sum = 0
+    var weight = 3
+
+    for (index in body.length - 1 downTo 0) {
+        val digit = body[index]
+        sum += digit.digitToInt() * weight
+        weight = if (weight == 3) 1 else 3
+    }
+
+    return ((10 - (sum % 10)) % 10) == check
+}
+
+fun String.isVariableMeasureRetailBarcode(): Boolean {
+    val digits = barcodeDigitsOnly()
+    if (digits.length != 13) return false
+
+    val prefix2Text = digits.take(2)
+    val prefix2 = prefix2Text.toIntOrNull() ?: return false
+
+    return prefix2Text == "02" || prefix2 in 20..29
+}
+
+fun String.parseEmbeddedWeightBarcodeFormats(
+    requireValidChecksum: Boolean = false,
+    allowZeroWeight: Boolean = false
+): List<EmbeddedWeightBarcodeDataModel> {
+    val digits = barcodeDigitsOnly()
+
+    fun ean13Format(productCodeLength: Int, weightDigitsLength: Int): EmbeddedWeightBarcodeDataModel? {
+        if (digits.length != 13 || !digits.isVariableMeasureRetailBarcode()) return null
+        if (requireValidChecksum && !digits.hasValidRetailBarcodeChecksum()) return null
+
+        val productEnd = 2 + productCodeLength
+        val weightEnd = productEnd + weightDigitsLength
+        if (weightEnd > 12) return null
+
+        val productBarcode = digits.take(productEnd)
+        val itemCodeWithoutPrefix = digits.substring(2, productEnd)
+        val grams = digits.substring(productEnd, weightEnd).toIntOrNull() ?: return null
+
+        if (grams <= 0 && !allowZeroWeight) return null
+
+        return EmbeddedWeightBarcodeDataModel(
+            rawBarcode = digits,
+            productBarcode = productBarcode,
+            productLookupCodes = listOf(productBarcode, itemCodeWithoutPrefix).distinct(),
+            weightKilograms = grams.toDouble() / 1000.0,
+            weightGrams = grams,
+            productCodeLength = productCodeLength,
+            weightDigitsLength = weightDigitsLength,
+            formatId = "2+$productCodeLength+$weightDigitsLength+1"
+        )
+    }
+
+    fun upcLike12Format(): EmbeddedWeightBarcodeDataModel? {
+        if (digits.length != 12 || digits.firstOrNull() != '2') return null
+        if (requireValidChecksum && !digits.hasValidRetailBarcodeChecksum()) return null
+
+        val productBarcode = digits.substring(0, 6)
+        val itemCodeWithoutPrefix = digits.substring(1, 6)
+        val grams = digits.substring(6, 11).toIntOrNull() ?: return null
+
+        if (grams <= 0 && !allowZeroWeight) return null
+
+        return EmbeddedWeightBarcodeDataModel(
+            rawBarcode = digits,
+            productBarcode = productBarcode,
+            productLookupCodes = listOf(productBarcode, itemCodeWithoutPrefix).distinct(),
+            weightKilograms = grams.toDouble() / 1000.0,
+            weightGrams = grams,
+            productCodeLength = 5,
+            weightDigitsLength = 5,
+            formatId = "1+5+5+1"
+        )
+    }
+
+    return listOfNotNull(
+        ean13Format(productCodeLength = 5, weightDigitsLength = 5),
+        ean13Format(productCodeLength = 6, weightDigitsLength = 4),
+        upcLike12Format()
+    )
+}
+
+fun String.parseEmbeddedWeightBarcode(): EmbeddedWeightBarcodeDataModel? {
+    return parseEmbeddedWeightBarcodeFormats(requireValidChecksum = false, allowZeroWeight = false)
+        .firstOrNull()
+}
+
+fun String.toStoredGoodsItemBarcodeCandidates(): List<String> {
+    val weightedCandidates = parseEmbeddedWeightBarcodeFormats(requireValidChecksum = false, allowZeroWeight = true)
+        .flatMap { barcode ->
+            listOf(barcode.productBarcode) + barcode.productLookupCodes.filter { it.length >= 5 }
+        }
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .distinct()
+
+    return weightedCandidates.ifEmpty { listOf(trim()).filter { it.isNotEmpty() } }
+}
+
+fun String.toStoredGoodsItemBarcode(): String {
+    return toStoredGoodsItemBarcodeCandidates().firstOrNull() ?: trim()
+}
+
+fun storedBarcodeMatchesScannedTransactionBarcode(storedBarcode: String, scannedBarcode: String): Boolean {
+    val storedToken = storedBarcode.normalizedBarcodeToken()
+    val scannedToken = scannedBarcode.normalizedBarcodeToken()
+
+    if (storedToken.isNotBlank() && storedToken == scannedToken) return true
+
+    val storedWeightedLookupTokens = storedBarcode
+        .parseEmbeddedWeightBarcodeFormats(requireValidChecksum = false, allowZeroWeight = true)
+        .flatMap { barcode -> listOf(barcode.productBarcode) + barcode.productLookupCodes }
+        .map { it.normalizedBarcodeToken() }
+        .filter { it.isNotBlank() }
+        .toSet()
+
+    val scannedWeightedLookupTokens = scannedBarcode
+        .parseEmbeddedWeightBarcodeFormats(requireValidChecksum = false, allowZeroWeight = true)
+        .flatMap { barcode -> listOf(barcode.productBarcode) + barcode.productLookupCodes }
+        .map { it.normalizedBarcodeToken() }
+        .filter { it.isNotBlank() }
+        .toSet()
+
+    if (storedWeightedLookupTokens.isNotEmpty() && scannedToken in storedWeightedLookupTokens) return true
+    if (storedToken in scannedWeightedLookupTokens) return true
+    if (storedWeightedLookupTokens.any { it in scannedWeightedLookupTokens }) return true
+
+    return false
+}
+
+fun GoodsItemDataModel.matchesEmbeddedWeightBarcode(
+    embeddedWeightBarcode: EmbeddedWeightBarcodeDataModel
+): Boolean {
+    val lookupCodes = embeddedWeightBarcode.productLookupCodes.map { it.normalizedBarcodeToken() }.toSet()
+    val productBarcode = embeddedWeightBarcode.productBarcode.normalizedBarcodeToken()
+
+    return barcodes.any { barcode ->
+        val normalized = barcode.normalizedBarcodeToken()
+        val storedBarcode = barcode.toStoredGoodsItemBarcode().normalizedBarcodeToken()
+
+        normalized in lookupCodes ||
+                storedBarcode == productBarcode ||
+                barcode.parseEmbeddedWeightBarcodeFormats(requireValidChecksum = false, allowZeroWeight = true)
+                    .any { it.productBarcode.normalizedBarcodeToken() == productBarcode } ||
+                (normalized.length in setOf(12, 13, 14) && normalized.startsWith(productBarcode))
+    }
 }
 
 fun GoodsItemDataModel.firstBarcode(): String {
-  return barcodes.firstOrNull().orEmpty()
+    return barcodes.firstOrNull()?.toStoredGoodsItemBarcode().orEmpty()
 }
 
 fun Double.roundMoney(): Double {
-  return kotlin.math.floor(this * 100.0) / 100.0
+    return kotlin.math.floor(this * 100.0) / 100.0
 }
 
 fun String.toMoneyDouble(): Double {
-  return trim()
-    .replace(",", ".")
-    .toDoubleOrNull()
-    ?.roundMoney()
-    ?: 0.0
+    return trim()
+        .replace(",", ".")
+        .toDoubleOrNull()
+        ?.roundMoney()
+        ?: 0.0
 }
 
 @kotlinx.serialization.Serializable
 data class ReceiveSupplierOrderRequestDataModel(
-  val orderId: String,
-  val receivedLines: List<ReceiveSupplierOrderLineDataModel>
+    val orderId: String,
+    val receivedLines: List<ReceiveSupplierOrderLineDataModel>
 )
 
 @kotlinx.serialization.Serializable
 data class ReceiveSupplierOrderLineDataModel(
-  val orderLineId: String,
-  val goodsItemId: String,
-  val receivedQuantity: QuantityDataModel,
-  val actualSupplyPrice: PriceDataModel,
-  val expirationDateMillis: Long? = null,
-  val manufacturedAtMillis: Long? = null,
-  val discounts: List<BatchDiscountDataModel> = emptyList(),
-  val notes: String? = null
+    val orderLineId: String,
+    val goodsItemId: String,
+    val receivedQuantity: QuantityDataModel,
+    val actualSupplyPrice: PriceDataModel,
+    val expirationDateMillis: Long? = null,
+    val manufacturedAtMillis: Long? = null,
+    val discounts: List<BatchDiscountDataModel> = emptyList(),
+    val notes: String? = null
 )
 
 fun changeCartQuantity(
-  id: String,
-  transactionTypeIndex: Int,
-  clientId: Int,
-  current: QuantityDataModel,
-  deltaSteps: Int
+    id: String,
+    transactionTypeIndex: Int,
+    clientId: Int,
+    current: QuantityDataModel,
+    deltaSteps: Int
 ) {
-  val nextTotal = current.total + current.pricedAmount * deltaSteps
+    setCartQuantity(
+        id = id,
+        transactionTypeIndex = transactionTypeIndex,
+        clientId = clientId,
+        current = current,
+        total = current.total + current.pricedAmount * deltaSteps
+    )
+}
 
-  if (nextTotal <= 0.0) {
-    deleteCartById(id, transactionTypeIndex, clientId)
-    return
-  }
+fun setCartQuantity(
+    id: String,
+    transactionTypeIndex: Int,
+    clientId: Int,
+    current: QuantityDataModel,
+    total: Double
+) {
+    val nextTotal = current.withTotalValue(total).total
 
-  upsertCart(
-    id = id,
-    transactionTypeIndex = transactionTypeIndex,
-    clientId = clientId,
-    quantity = current.copy(total = nextTotal)
-  )
+    if (nextTotal <= 0.0) {
+        deleteCartById(id, transactionTypeIndex, clientId)
+        removeCartSaleMethodId(transactionTypeIndex, clientId, id)
+        return
+    }
+
+    upsertCart(
+        id = id,
+        transactionTypeIndex = transactionTypeIndex,
+        clientId = clientId,
+        quantity = current.copy(total = nextTotal)
+    )
 }
 
 fun addGoodsItemToTransactionCart(
-  goodsItem: GoodsItemDataModel,
-  transactionTypeIndex: Int,
-  clientId: Int,
-  configuration: GlobalAppConfigurationDataModel,
-  currentCart: List<GoodsItemInCartDataModel>
+    goodsItem: GoodsItemDataModel,
+    transactionTypeIndex: Int,
+    clientId: Int,
+    configuration: GlobalAppConfigurationDataModel,
+    currentCart: List<GoodsItemInCartDataModel>,
+    quantityToAdd: QuantityDataModel? = null
 ) {
-  val existing = currentCart.find { it.id == goodsItem.id }
+    val existing = currentCart.find { it.id == goodsItem.id }
+    val defaultQuantity = goodsItem.defaultCartQuantity(configuration)
+    val deltaQuantity = quantityToAdd ?: defaultQuantity
+    val normalizedDeltaQuantity = defaultQuantity.copy(
+        total = defaultQuantity.withTotalValue(deltaQuantity.total).total,
+        pricedAmount = deltaQuantity.pricedAmount.takeIf { it > 0.0 } ?: defaultQuantity.pricedAmount,
+        roundTotal = deltaQuantity.roundTotal
+    )
 
-  if (existing == null) {
-    upsertCart(
-      id = goodsItem.id,
-      transactionTypeIndex = transactionTypeIndex,
-      clientId = clientId,
-      quantity = goodsItem.defaultCartQuantity(configuration)
-    )
-  } else {
-    changeCartQuantity(
-      id = goodsItem.id,
-      transactionTypeIndex = transactionTypeIndex,
-      clientId = clientId,
-      current = existing.quantity,
-      deltaSteps = 1
-    )
-  }
+    if (normalizedDeltaQuantity.total <= 0.0)
+        return
+
+    if (existing == null) {
+        upsertCart(
+            id = goodsItem.id,
+            transactionTypeIndex = transactionTypeIndex,
+            clientId = clientId,
+            quantity = normalizedDeltaQuantity
+        )
+    } else {
+        upsertCart(
+            id = goodsItem.id,
+            transactionTypeIndex = transactionTypeIndex,
+            clientId = clientId,
+            quantity = existing.quantity.copy(total = existing.quantity.total + normalizedDeltaQuantity.total)
+        )
+    }
 }
 
 fun getTransactions(storeId: String) {
-  if (!getTransactionsMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      getTransactionsMutex.withLock {
-        val response = networkRequest<List<TransactionDataModel>, Unit>(
-          HttpMethod.Get,
-          endpointUrl = globalAppConfigurationState.payloadValue.getTransactionsPath.first,
-          headers = mapOf("store_id" to storeId)
-        )
+    if (!getTransactionsMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getTransactionsMutex.withLock {
+                val response = networkRequest<List<TransactionDataModel>, Unit>(
+                    HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getTransactionsPath.first,
+                    headers = mapOf("store_id" to storeId)
+                )
 
-        if (response.negative) {
-          postInAppNotification(response.message, NotificationType.Negative)
-        } else {
-          transactionsState.emit(DataState.Success(response.payload.orEmpty(), response.message))
+                if (response.negative) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                } else {
+                    transactionsState.emit(DataState.Success(response.payload.orEmpty(), response.message))
+                }
+            }
         }
-      }
-    }
 }
 
 fun completeTransaction(
-  transaction: TransactionDataModel,
-  transactionTypeIndex: Int,
-  clientId: Int,
-  receiptSnapshot: TransactionReceiptSnapshotDataModel,
-  onCompleted: (() -> Unit)? = null
+    transaction: TransactionDataModel,
+    transactionTypeIndex: Int,
+    clientId: Int,
+    receiptSnapshot: TransactionReceiptSnapshotDataModel,
+    onCompleted: (() -> Unit)? = null
 ) {
-  if (!completeTransactionMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      completeTransactionMutex.withLock {
-        postInAppNotification("Completing transaction", NotificationType.Neutral, transient = false)
+    if (!completeTransactionMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            completeTransactionMutex.withLock {
+                postInAppNotification(
+                    localizedStringResourceMessage(
+                        id = 224,
+                        main = "Completing transaction",
+                        ru = "Завершение операции",
+                        kk = "Операция аяқталуда"
+                    ),
+                    NotificationType.Neutral,
+                    transient = true
+                )
 
-        val response = networkRequest<TransactionDataModel, TransactionDataModel>(
-          method = HttpMethod.Post,
-          endpointUrl = globalAppConfigurationState.payloadValue.completeTransactionPath.first,
-          body = transaction
-        )
+                val response = networkRequest<TransactionDataModel, TransactionDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.completeTransactionPath.first,
+                    body = transaction
+                )
 
-        if (response.negative || response.payload == null) {
-          postInAppNotification(response.message, NotificationType.Negative)
-          onCompleted?.invoke()
-          return@withLock
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke()
+                    return@withLock
+                }
+
+                val completed = response.payload
+
+                latestTransactionReceiptSnapshotState.emit(
+                    receiptSnapshot.copy(transaction = completed)
+                )
+
+                transactionsState.emit(
+                    DataState.Success(
+                        mutableListOf<TransactionDataModel>().apply {
+                            transactionsState.payloadValue?.let { addAll(it) }
+                            add(completed)
+                        },
+                        response.message
+                    )
+                )
+
+                completed.debtor?.let { debtor ->
+                    debtorsState.emit(
+                        DataState.Success(
+                            debtorsState.payloadValue.orEmpty().upsertDebtor(debtor),
+                            response.message
+                        )
+                    )
+                }
+
+                deleteCart(transactionTypeIndex, clientId)
+                clearTransactionPaymentDraft(transactionTypeIndex, clientId)
+
+                activeStoreIdState.value?.let {
+                    getStock(it)
+                    getStockBatches(it)
+                }
+
+                postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke()
+            }
         }
-
-        val completed = response.payload
-
-        latestTransactionReceiptSnapshotState.emit(
-          receiptSnapshot.copy(transaction = completed)
-        )
-
-        transactionsState.emit(
-          DataState.Success(
-            mutableListOf<TransactionDataModel>().apply {
-              transactionsState.payloadValue?.let { addAll(it) }
-              add(completed)
-            },
-            response.message
-          )
-        )
-
-        completed.debtor?.let { debtor ->
-          debtorsState.emit(
-            DataState.Success(
-              debtorsState.payloadValue.orEmpty().upsertDebtor(debtor),
-              response.message
-            )
-          )
-        }
-
-        deleteCart(transactionTypeIndex, clientId)
-        clearTransactionPaymentDraft(transactionTypeIndex, clientId)
-
-        activeStoreIdState.value?.let {
-          getStock(it)
-          getStockBatches(it)
-        }
-
-        postInAppNotification(response.message, NotificationType.Positive)
-        onCompleted?.invoke()
-      }
-    }
 }
 
 expect val Dispatchers.ourIo: CoroutineDispatcher
@@ -811,16 +1183,18 @@ expect var getSystemLocaleLanguage: () -> String
 
 expect var getPlatformName: () -> String
 
+var getClientDeviceInfo: (() -> ClientDeviceInfoDataModel?)? = null
+
 expect var getSqlDelightDriver: (() -> SqlDriver?)?
 
 val supplierGoodsPricesState =
-  MutableDataStateFlow<List<SupplierGoodsPriceDataModel>>(GlobalScope)
+    MutableDataStateFlow<List<SupplierGoodsPriceDataModel>>(GlobalScope)
 
 val supplierOrdersState =
-  MutableDataStateFlow<List<SupplierOrderDataModel>>(GlobalScope)
+    MutableDataStateFlow<List<SupplierOrderDataModel>>(GlobalScope)
 
 val supplierOrderLinesState =
-  MutableDataStateFlow<List<SupplierOrderLineDataModel>>(GlobalScope)
+    MutableDataStateFlow<List<SupplierOrderLineDataModel>>(GlobalScope)
 
 private val getSupplierGoodsPricesMutex = Mutex()
 private val upsertSupplierGoodsPriceMutex = Mutex()
@@ -831,494 +1205,502 @@ private val updateSupplierOrderMutex = Mutex()
 private val deleteSupplierOrderMutex = Mutex()
 private val receiveSupplierOrderMutex = Mutex()
 
-fun getSupplierGoodsPrices(
-  storeId: String,
-  onCompleted: ((DataState<List<SupplierGoodsPriceDataModel>>) -> Unit)? = null
-) {
-  if (!getSupplierGoodsPricesMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      getSupplierGoodsPricesMutex.withLock {
-        val response = networkRequest<List<SupplierGoodsPriceDataModel>, Unit>(
-          method = HttpMethod.Get,
-          endpointUrl = globalAppConfigurationState.payloadValue.getSupplierGoodsPricesPath.first,
-          headers = mapOf("store_id" to storeId)
-        )
+val securitySessionsState = MutableDataStateFlow<List<SecuritySessionDataModel>>(GlobalScope)
+private val getSecuritySessionsMutex = Mutex()
+private val revokeSecuritySessionMutex = Mutex()
+private val revokeOtherSecuritySessionsMutex = Mutex()
 
-        if (response.negative || response.payload == null) {
-          postInAppNotification(response.message, NotificationType.Negative)
-          onCompleted?.invoke(DataState.Empty(response.message))
-        } else {
-          supplierGoodsPricesState.emit(DataState.Success(response.payload, response.message))
-          onCompleted?.invoke(DataState.Success(response.payload, response.message))
+fun getSupplierGoodsPrices(
+    storeId: String,
+    onCompleted: ((DataState<List<SupplierGoodsPriceDataModel>>) -> Unit)? = null
+) {
+    if (!getSupplierGoodsPricesMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getSupplierGoodsPricesMutex.withLock {
+                val response = networkRequest<List<SupplierGoodsPriceDataModel>, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getSupplierGoodsPricesPath.first,
+                    headers = mapOf("store_id" to storeId)
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    supplierGoodsPricesState.emit(DataState.Success(response.payload, response.message))
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
         }
-      }
-    }
 }
 
 fun upsertSupplierGoodsPrice(
-  price: SupplierGoodsPriceDataModel,
-  onCompleted: ((DataState<SupplierGoodsPriceDataModel>) -> Unit)? = null
+    price: SupplierGoodsPriceDataModel,
+    onCompleted: ((DataState<SupplierGoodsPriceDataModel>) -> Unit)? = null
 ) {
-  if (!upsertSupplierGoodsPriceMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      upsertSupplierGoodsPriceMutex.withLock {
-        val response = networkRequest<SupplierGoodsPriceDataModel, SupplierGoodsPriceDataModel>(
-          method = HttpMethod.Post,
-          endpointUrl = globalAppConfigurationState.payloadValue.upsertSupplierGoodsPricePath.first,
-          body = price
-        )
+    if (!upsertSupplierGoodsPriceMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            upsertSupplierGoodsPriceMutex.withLock {
+                val response = networkRequest<SupplierGoodsPriceDataModel, SupplierGoodsPriceDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.upsertSupplierGoodsPricePath.first,
+                    body = price
+                )
 
-        if (response.negative || response.payload == null) {
-          postInAppNotification(response.message, NotificationType.Negative)
-          onCompleted?.invoke(DataState.Empty(response.message))
-        } else {
-          supplierGoodsPricesState.emit(
-            DataState.Success(
-              supplierGoodsPricesState.payloadValue
-                .orEmpty()
-                .upsertById(response.payload),
-              response.message
-            )
-          )
-          onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    supplierGoodsPricesState.emit(
+                        DataState.Success(
+                            supplierGoodsPricesState.payloadValue
+                                .orEmpty()
+                                .upsertById(response.payload),
+                            response.message
+                        )
+                    )
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
         }
-      }
-    }
 }
 
 @kotlinx.serialization.Serializable
 data class SupplierOrderWithLinesDataModel(
-  val order: SupplierOrderDataModel,
-  val lines: List<SupplierOrderLineDataModel>
+    val order: SupplierOrderDataModel,
+    val lines: List<SupplierOrderLineDataModel>
 )
 
 fun getSupplierOrders(
-  storeId: String,
-  onCompleted: ((DataState<List<SupplierOrderWithLinesDataModel>>) -> Unit)? = null
+    storeId: String,
+    onCompleted: ((DataState<List<SupplierOrderWithLinesDataModel>>) -> Unit)? = null
 ) {
-  if (!getSupplierOrdersMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      getSupplierOrdersMutex.withLock {
-        val response = networkRequest<List<SupplierOrderWithLinesDataModel>, Unit>(
-          method = HttpMethod.Get,
-          endpointUrl = globalAppConfigurationState.payloadValue.getSupplierOrdersPath.first,
-          headers = mapOf("store_id" to storeId)
-        )
+    if (!getSupplierOrdersMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getSupplierOrdersMutex.withLock {
+                val response = networkRequest<List<SupplierOrderWithLinesDataModel>, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getSupplierOrdersPath.first,
+                    headers = mapOf("store_id" to storeId)
+                )
 
-        if (response.negative || response.payload == null) {
-          postInAppNotification(response.message, NotificationType.Negative)
-          onCompleted?.invoke(DataState.Empty(response.message))
-        } else {
-          supplierOrdersState.emit(
-            DataState.Success(response.payload.map { it.order }, response.message)
-          )
-          supplierOrderLinesState.emit(
-            DataState.Success(response.payload.flatMap { it.lines }, response.message)
-          )
-          onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    supplierOrdersState.emit(
+                        DataState.Success(response.payload.map { it.order }, response.message)
+                    )
+                    supplierOrderLinesState.emit(
+                        DataState.Success(response.payload.flatMap { it.lines }, response.message)
+                    )
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
         }
-      }
-    }
 }
 
 fun addSupplierOrder(
-  orderWithLines: SupplierOrderWithLinesDataModel,
-  onCompleted: ((DataState<SupplierOrderWithLinesDataModel>) -> Unit)? = null
+    orderWithLines: SupplierOrderWithLinesDataModel,
+    onCompleted: ((DataState<SupplierOrderWithLinesDataModel>) -> Unit)? = null
 ) {
-  if (!addSupplierOrderMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      addSupplierOrderMutex.withLock {
-        val response = networkRequest<SupplierOrderWithLinesDataModel, SupplierOrderWithLinesDataModel>(
-          method = HttpMethod.Post,
-          endpointUrl = globalAppConfigurationState.payloadValue.addSupplierOrderPath.first,
-          body = orderWithLines
-        )
+    if (!addSupplierOrderMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            addSupplierOrderMutex.withLock {
+                val response = networkRequest<SupplierOrderWithLinesDataModel, SupplierOrderWithLinesDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.addSupplierOrderPath.first,
+                    body = orderWithLines
+                )
 
-        if (response.negative || response.payload == null) {
-          postInAppNotification(response.message, NotificationType.Negative)
-          onCompleted?.invoke(DataState.Empty(response.message))
-        } else {
-          supplierOrdersState.emit(
-            DataState.Success(
-              supplierOrdersState.payloadValue.orEmpty().upsertById(response.payload.order),
-              response.message
-            )
-          )
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    supplierOrdersState.emit(
+                        DataState.Success(
+                            supplierOrdersState.payloadValue.orEmpty().upsertById(response.payload.order),
+                            response.message
+                        )
+                    )
 
-          supplierOrderLinesState.emit(
-            DataState.Success(
-              supplierOrderLinesState.payloadValue.orEmpty()
-                .filterNot { line -> response.payload.lines.any { it.id == line.id } } +
-                  response.payload.lines,
-              response.message
-            )
-          )
+                    supplierOrderLinesState.emit(
+                        DataState.Success(
+                            supplierOrderLinesState.payloadValue.orEmpty()
+                                .filterNot { line -> response.payload.lines.any { it.id == line.id } } +
+                                    response.payload.lines,
+                            response.message
+                        )
+                    )
 
-          postInAppNotification(response.message, NotificationType.Positive)
-          onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
         }
-      }
-    }
 }
 
 private fun <T> List<T>.upsertById(
-  item: T,
-  idOf: (T) -> String = {
-    when (it) {
-      is SupplierGoodsPriceDataModel -> it.id
-      is SupplierOrderDataModel -> it.id
-      is SupplierOrderLineDataModel -> it.id
-      is GoodsBatchDataModel -> it.id
-      is GoodsItemDataModel -> it.id
-      else -> ""
+    item: T,
+    idOf: (T) -> String = {
+        when (it) {
+            is SupplierGoodsPriceDataModel -> it.id
+            is SupplierOrderDataModel -> it.id
+            is SupplierOrderLineDataModel -> it.id
+            is GoodsBatchDataModel -> it.id
+            is GoodsItemDataModel -> it.id
+            else -> ""
+        }
     }
-  }
 ): List<T> {
-  val id = idOf(item)
-  val index = indexOfFirst { idOf(it) == id }
+    val id = idOf(item)
+    val index = indexOfFirst { idOf(it) == id }
 
-  return if (index == -1) {
-    this + item
-  } else {
-    toMutableList().also { it[index] = item }
-  }
+    return if (index == -1) {
+        this + item
+    } else {
+        toMutableList().also { it[index] = item }
+    }
 }
 
 val categoriesState = MutableDataStateFlow<List<GenericGoodsCategoryDataModel>>(GlobalScope)
 val storeWorkersState = MutableDataStateFlow<List<UserAccountDataModel>>(GlobalScope)
 
 val jsonBase: Json by lazy {
-  Json {
-    encodeDefaults = true
-    ignoreUnknownKeys = true
-  }
+    Json {
+        encodeDefaults = true
+        ignoreUnknownKeys = true
+    }
 }
 
 val GlobalScope = CoroutineScope(SupervisorJob())
 val appModeState = MutableStateFlow(0)
 val globalAppConfigurationState = MutableDataStateFlowNonNull(
-  coroutineScope = GlobalScope,
-  initial = GlobalAppConfigurationDataModel(
-    realtimeUpdatesPath = "rt/updates",
-    appName = Pair("AITA", "0"),
-    serverUrl = Pair("http://192.168.100.9:8080", "1"),
-    globalAppConfigurationPath = Pair("config/global", "2"),
-    logInPath = Pair("auth/logIn", "3"),
-    signUpPath = Pair("auth/signUp", "4"),
-    refreshPath = Pair("auth/refresh", "5"),
-    logOutPath = Pair("auth/logOut", "6"),
-    getUserPath = Pair("user/get", "7"),
-    updateUserPath = Pair("user/update", "8"),
-    getStoresPath = Pair("stores/get", "9"),
-    addStoresPath = Pair("stores/add", "10"),
-    updateStoresPath = Pair("stores/update", "11"),
-    deleteStoresPath = Pair("stores/delete", "12"),
-    getStockPath = Pair("stock/get", "13"),
-    addGoodsItemPath = Pair("stock/add", "14"),
-    updateGoodsItemPath = Pair("stock/update", "15"),
-    deleteGoodsItemPath = Pair("stock/delete", "16"),
-    getStockBatchesPath = Pair("stockBatches/get", "17"),
-    addStockBatchPath = Pair("stockBatches/add", "18"),
-    updateStockBatchPath = Pair("stockBatches/update", "19"),
-    deleteStockBatchPath = Pair("stockBatches/delete", "20"),
-    getGenericGoodsItemsPath = Pair("generic/goodsItems/get", "21"),
-    getGenericGoodsCategoriesPath = Pair("generic/goodsCategories/get", "22"),
-    getSuppliersPath = Pair("suppliers/get", "23"),
-    stringResourcesPath = Pair("res/string", "24"),
-    dimensionResourcesPath = Pair("res/dimension", "25"),
-    colorResourcesPath = Pair("res/color", "26"),
-    drawableResourcesConfigurationPath = Pair("res/drawableConfig", "27"),
-    drawableResourcesPath = Pair("res/drawable", "28"),
-    getTransactionsPath = Pair("transactions/get", "29"),
-    completeTransactionPath = Pair("transactions/complete", "30"),
-    getDebtorsPath = Pair("debtors/get", "39"),
-    addDebtorPath = Pair("debtors/add", "40"),
-    updateDebtorPath = Pair("debtors/update", "41"),
-    deleteDebtorPath = Pair("debtors/delete", "42"),
-    payDebtorDebtPath = Pair("debtors/pay", "43"),
-    getSupplierGoodsPricesPath = Pair("supplierGoodsPrices/get", "31"),
-    upsertSupplierGoodsPricePath = Pair("supplierGoodsPrices/upsert", "32"),
-    deleteSupplierGoodsPricesPath = Pair("supplierGoodsPrices/delete", "33"),
-    getSupplierOrdersPath = Pair("supplierOrders/get", "34"),
-    addSupplierOrderPath = Pair("supplierOrders/add", "35"),
-    updateSupplierOrderPath = Pair("supplierOrders/update", "36"),
-    deleteSupplierOrdersPath = Pair("supplierOrders/delete", "37"),
-    receiveSupplierOrderPath = Pair("supplierOrders/receive", "38"),
-    companyForms = listOf(
-      CompanyFormDataModel(
-        id = "0",
-        name = listOf(
-          LocalizedStringDataModel(
-            language = "en",
-            value = "TOO",
-          ),
-          LocalizedStringDataModel(
-            language = "ru",
-            value = "TOO"
-          ),
-          LocalizedStringDataModel(
-            language = "kk",
-            value = "TOO"
-          )
-        ),
-        parameters = listOf(
-          ParameterDataModel(
-            name = listOf(
-              LocalizedStringDataModel(
-                language = "en",
-                value = "БИН",
-              ),
-              LocalizedStringDataModel(
-                language = "ru",
-                value = "БИН"
-              ),
-              LocalizedStringDataModel(
-                language = "kk",
-                value = "БИН"
-              )
-            ),
-            value = "",
-            length = 12,
-            number = true,
-            nonLetterSymbolsEnabled = false
-          )
-        )
-      )
-    ),
-    countries = listOf(
-      CountryDataModel(
-        locale = "kz",
-        language = "kk",
-        name = listOf(
-          LocalizedStringDataModel(
-            "en",
-            "Kazakhstan"
-          ),
-          LocalizedStringDataModel(
-            "ru",
-            "Казахстан"
-          ),
-          LocalizedStringDataModel(
-            "kk",
-            "Казакстан"
-          )
-        ),
-        flagDrawablePath = "png/flag_kz.png",
-        phoneNumberCode = "7",
-        phoneNumberSize = 10,
-        currencies = listOf(
-          CurrencyDataModel(
-            code = "KZT",
-            symbol = "₸",
-            name = listOf(
-              LocalizedStringDataModel(
-                language = "en",
-                value = "tenge"
-              ),
-              LocalizedStringDataModel(
-                language = "ru",
-                value = "тенге"
-              ),
-              LocalizedStringDataModel(
-                language = "kk",
-                value = "теңге"
-              )
+    coroutineScope = GlobalScope,
+    initial = GlobalAppConfigurationDataModel(
+        realtimeUpdatesPath = "rt/updates",
+        appName = Pair("AITA", "0"),
+        serverUrl = Pair("http://10.202.10.165:8080", "1"),
+        globalAppConfigurationPath = Pair("config/global", "2"),
+        logInPath = Pair("auth/logIn", "3"),
+        signUpPath = Pair("auth/signUp", "4"),
+        refreshPath = Pair("auth/refresh", "5"),
+        logOutPath = Pair("auth/logOut", "6"),
+        getSecuritySessionsPath = Pair("security/sessions/get", "44"),
+        revokeSecuritySessionPath = Pair("security/sessions/revoke", "45"),
+        revokeOtherSecuritySessionsPath = Pair("security/sessions/revokeOthers", "46"),
+        getUserPath = Pair("user/get", "7"),
+        updateUserPath = Pair("user/update", "8"),
+        getStoresPath = Pair("stores/get", "9"),
+        addStoresPath = Pair("stores/add", "10"),
+        updateStoresPath = Pair("stores/update", "11"),
+        deleteStoresPath = Pair("stores/delete", "12"),
+        getStockPath = Pair("stock/get", "13"),
+        addGoodsItemPath = Pair("stock/add", "14"),
+        updateGoodsItemPath = Pair("stock/update", "15"),
+        deleteGoodsItemPath = Pair("stock/delete", "16"),
+        getStockBatchesPath = Pair("stockBatches/get", "17"),
+        addStockBatchPath = Pair("stockBatches/add", "18"),
+        updateStockBatchPath = Pair("stockBatches/update", "19"),
+        deleteStockBatchPath = Pair("stockBatches/delete", "20"),
+        getGenericGoodsItemsPath = Pair("generic/goodsItems/get", "21"),
+        getGenericGoodsCategoriesPath = Pair("generic/goodsCategories/get", "22"),
+        getSuppliersPath = Pair("suppliers/get", "23"),
+        stringResourcesPath = Pair("res/string", "24"),
+        dimensionResourcesPath = Pair("res/dimension", "25"),
+        colorResourcesPath = Pair("res/color", "26"),
+        drawableResourcesConfigurationPath = Pair("res/drawableConfig", "27"),
+        drawableResourcesPath = Pair("res/drawable", "28"),
+        getTransactionsPath = Pair("transactions/get", "29"),
+        completeTransactionPath = Pair("transactions/complete", "30"),
+        getDebtorsPath = Pair("debtors/get", "39"),
+        addDebtorPath = Pair("debtors/add", "40"),
+        updateDebtorPath = Pair("debtors/update", "41"),
+        deleteDebtorPath = Pair("debtors/delete", "42"),
+        payDebtorDebtPath = Pair("debtors/pay", "43"),
+        getSupplierGoodsPricesPath = Pair("supplierGoodsPrices/get", "31"),
+        upsertSupplierGoodsPricePath = Pair("supplierGoodsPrices/upsert", "32"),
+        deleteSupplierGoodsPricesPath = Pair("supplierGoodsPrices/delete", "33"),
+        getSupplierOrdersPath = Pair("supplierOrders/get", "34"),
+        addSupplierOrderPath = Pair("supplierOrders/add", "35"),
+        updateSupplierOrderPath = Pair("supplierOrders/update", "36"),
+        deleteSupplierOrdersPath = Pair("supplierOrders/delete", "37"),
+        receiveSupplierOrderPath = Pair("supplierOrders/receive", "38"),
+        companyForms = listOf(
+            CompanyFormDataModel(
+                id = "0",
+                name = listOf(
+                    LocalizedStringDataModel(
+                        language = "en",
+                        value = "TOO",
+                    ),
+                    LocalizedStringDataModel(
+                        language = "ru",
+                        value = "TOO"
+                    ),
+                    LocalizedStringDataModel(
+                        language = "kk",
+                        value = "TOO"
+                    )
+                ),
+                parameters = listOf(
+                    ParameterDataModel(
+                        name = listOf(
+                            LocalizedStringDataModel(
+                                language = "en",
+                                value = "БИН",
+                            ),
+                            LocalizedStringDataModel(
+                                language = "ru",
+                                value = "БИН"
+                            ),
+                            LocalizedStringDataModel(
+                                language = "kk",
+                                value = "БИН"
+                            )
+                        ),
+                        value = "",
+                        length = 12,
+                        number = true,
+                        nonLetterSymbolsEnabled = false
+                    )
+                )
             )
-          ),
         ),
-        cities = listOf(
-          CityDataModel(
-            name = listOf(
-              LocalizedStringDataModel(
+        countries = listOf(
+            CountryDataModel(
+                locale = "kz",
+                language = "kk",
+                name = listOf(
+                    LocalizedStringDataModel(
+                        "en",
+                        "Kazakhstan"
+                    ),
+                    LocalizedStringDataModel(
+                        "ru",
+                        "Казахстан"
+                    ),
+                    LocalizedStringDataModel(
+                        "kk",
+                        "Казакстан"
+                    )
+                ),
+                flagDrawablePath = "png/flag_kz.png",
+                phoneNumberCode = "7",
+                phoneNumberSize = 10,
+                currencies = listOf(
+                    CurrencyDataModel(
+                        code = "KZT",
+                        symbol = "₸",
+                        name = listOf(
+                            LocalizedStringDataModel(
+                                language = "en",
+                                value = "tenge"
+                            ),
+                            LocalizedStringDataModel(
+                                language = "ru",
+                                value = "тенге"
+                            ),
+                            LocalizedStringDataModel(
+                                language = "kk",
+                                value = "теңге"
+                            )
+                        )
+                    ),
+                ),
+                cities = listOf(
+                    CityDataModel(
+                        name = listOf(
+                            LocalizedStringDataModel(
+                                "en",
+                                "Astana"
+                            ),
+                            LocalizedStringDataModel(
+                                "ru",
+                                "Астана"
+                            ),
+                            LocalizedStringDataModel(
+                                "kk",
+                                "Астана"
+                            )
+                        ),
+                        51.1667, 71.4333,
+                        51.0230, 71.2660,
+                        51.250071, 71.5500
+                    ),
+                ),
+                cashlessPaymentOptions = listOf(
+                    PaymentOptionDataModel(
+                        "0",
+                        listOf(
+                            "Card" localized "main",
+                            "Card" localized "en",
+                            "Карта" localized "ru",
+                            "Карта" localized "kk",
+                        )
+                    ),
+                    PaymentOptionDataModel(
+                        "1",
+                        listOf(
+                            "QR" localized "main",
+                            "QR" localized "en",
+                            "QR" localized "ru",
+                            "QR" localized "kk",
+                        )
+                    ),
+                    PaymentOptionDataModel(
+                        "2",
+                        listOf(
+                            "Kaspi RED" localized "main",
+                            "Kaspi RED" localized "en",
+                            "Каспи RED" localized "ru",
+                            "Каспи RED" localized "kk",
+                        )
+                    ),
+                    PaymentOptionDataModel(
+                        "3",
+                        listOf(
+                            "Rakhmet" localized "main",
+                            "Rakhmet" localized "en",
+                            "Рахмет" localized "ru",
+                            "Рахмет" localized "kk",
+                        )
+                    )
+                ),
+                preferredCashlessPaymentOptionId = "1"
+            )
+        ),
+        languages = listOf(
+            AppLanguageDataModel(
                 "en",
-                "Astana"
-              ),
-              LocalizedStringDataModel(
-                "ru",
-                "Астана"
-              ),
-              LocalizedStringDataModel(
-                "kk",
-                "Астана"
-              )
+                listOf(
+                    LocalizedStringDataModel(
+                        "en",
+                        "English"
+                    ),
+                    LocalizedStringDataModel(
+                        "ru",
+                        "Английский"
+                    ),
+                    LocalizedStringDataModel(
+                        "kk",
+                        "Ағылшынша"
+                    )
+                ),
+                "png/flag_en.png"
             ),
-            51.1667, 71.4333,
-            51.0230, 71.2660,
-            51.250071, 71.5500
-          ),
-        ),
-        cashlessPaymentOptions = listOf(
-          PaymentOptionDataModel(
-            "0",
-            listOf(
-              "Card" localized "main",
-              "Card" localized "en",
-              "Карта" localized "ru",
-              "Карта" localized "kk",
+            AppLanguageDataModel(
+                "ru",
+                listOf(
+                    LocalizedStringDataModel(
+                        "en",
+                        "Russian"
+                    ),
+                    LocalizedStringDataModel(
+                        "ru",
+                        "Русский"
+                    ),
+                    LocalizedStringDataModel(
+                        "kk",
+                        "Орысша"
+                    )
+                ),
+                "png/flag_ru.png"
+            ),
+            AppLanguageDataModel(
+                "kk",
+                listOf(
+                    LocalizedStringDataModel(
+                        "en",
+                        "Kazakh"
+                    ),
+                    LocalizedStringDataModel(
+                        "ru",
+                        "Казахский"
+                    ),
+                    LocalizedStringDataModel(
+                        "kk",
+                        "Қазақша"
+                    )
+                ),
+                "png/flag_kz.png"
             )
-          ),
-          PaymentOptionDataModel(
-            "1",
-            listOf(
-              "QR" localized "main",
-              "QR" localized "en",
-              "QR" localized "ru",
-              "QR" localized "kk",
+        ),
+        themes = listOf(
+            AppThemeDataModel(
+                0,
+                listOf(
+                    LocalizedStringDataModel(
+                        "en",
+                        "Light"
+                    ),
+                    LocalizedStringDataModel(
+                        "ru",
+                        "Светлая"
+                    ),
+                    LocalizedStringDataModel(
+                        "kk",
+                        "Жарық"
+                    )
+                )
+            ),
+            AppThemeDataModel(
+                1,
+                listOf(
+                    LocalizedStringDataModel(
+                        "en",
+                        "Dark"
+                    ),
+                    LocalizedStringDataModel(
+                        "ru",
+                        "Темная"
+                    ),
+                    LocalizedStringDataModel(
+                        "kk",
+                        "Қараңғы"
+                    )
+                )
             )
-          ),
-          PaymentOptionDataModel(
-            "2",
-            listOf(
-              "Kaspi RED" localized "main",
-              "Kaspi RED" localized "en",
-              "Каспи RED" localized "ru",
-              "Каспи RED" localized "kk",
+        ),
+        goodsItemsQuantityUnits = listOf(
+            QuantityDataModel(
+                id = "0",
+                listOf(
+                    LocalizedStringDataModel(
+                        "en",
+                        "pc."
+                    ),
+                    LocalizedStringDataModel(
+                        "ru",
+                        "шт."
+                    ),
+                    LocalizedStringDataModel(
+                        "kk",
+                        "шт."
+                    )
+                ),
+                roundTotal = true
+            ),
+            QuantityDataModel(
+                id = "1",
+                listOf(
+                    LocalizedStringDataModel(
+                        "en",
+                        "kg."
+                    ),
+                    LocalizedStringDataModel(
+                        "ru",
+                        "кг."
+                    ),
+                    LocalizedStringDataModel(
+                        "kk",
+                        "кг."
+                    )
+                ),
+                roundTotal = false
             )
-          ),
-          PaymentOptionDataModel(
-            "3",
-            listOf(
-              "Rakhmet" localized "main",
-              "Rakhmet" localized "en",
-              "Рахмет" localized "ru",
-              "Рахмет" localized "kk",
-            )
-          )
-        ),
-        preferredCashlessPaymentOptionId = "1"
-      )
-    ),
-    languages = listOf(
-      AppLanguageDataModel(
-        "en",
-        listOf(
-          LocalizedStringDataModel(
-            "en",
-            "English"
-          ),
-          LocalizedStringDataModel(
-            "ru",
-            "Английский"
-          ),
-          LocalizedStringDataModel(
-            "kk",
-            "Ағылшынша"
-          )
-        ),
-        "png/flag_en.png"
-      ),
-      AppLanguageDataModel(
-        "ru",
-        listOf(
-          LocalizedStringDataModel(
-            "en",
-            "Russian"
-          ),
-          LocalizedStringDataModel(
-            "ru",
-            "Русский"
-          ),
-          LocalizedStringDataModel(
-            "kk",
-            "Орысша"
-          )
-        ),
-        "png/flag_ru.png"
-      ),
-      AppLanguageDataModel(
-        "kk",
-        listOf(
-          LocalizedStringDataModel(
-            "en",
-            "Kazakh"
-          ),
-          LocalizedStringDataModel(
-            "ru",
-            "Казахский"
-          ),
-          LocalizedStringDataModel(
-            "kk",
-            "Қазақша"
-          )
-        ),
-        "png/flag_kz.png"
-      )
-    ),
-    themes = listOf(
-      AppThemeDataModel(
-        0,
-        listOf(
-          LocalizedStringDataModel(
-            "en",
-            "Light"
-          ),
-          LocalizedStringDataModel(
-            "ru",
-            "Светлая"
-          ),
-          LocalizedStringDataModel(
-            "kk",
-            "Жарық"
-          )
         )
-      ),
-      AppThemeDataModel(
-        1,
-        listOf(
-          LocalizedStringDataModel(
-            "en",
-            "Dark"
-          ),
-          LocalizedStringDataModel(
-            "ru",
-            "Темная"
-          ),
-          LocalizedStringDataModel(
-            "kk",
-            "Қараңғы"
-          )
-        )
-      )
-    ),
-    goodsItemsQuantityUnits = listOf(
-      QuantityDataModel(
-        id = "0",
-        listOf(
-          LocalizedStringDataModel(
-            "en",
-            "pc."
-          ),
-          LocalizedStringDataModel(
-            "ru",
-            "шт."
-          ),
-          LocalizedStringDataModel(
-            "kk",
-            "шт."
-          )
-        ),
-        roundTotal = true
-      ),
-      QuantityDataModel(
-        id = "1",
-        listOf(
-          LocalizedStringDataModel(
-            "en",
-            "kg."
-          ),
-          LocalizedStringDataModel(
-            "ru",
-            "кг."
-          ),
-          LocalizedStringDataModel(
-            "kk",
-            "кг."
-          )
-        ),
-        roundTotal = false
-      )
     )
-  )
 )
 val stringsState = MutableDataStateFlow<List<LocalizedStringGroupDataModel>>(GlobalScope)
 val dimensionsState = MutableDataStateFlow<List<StylizedDimensionGroupDataModel>>(GlobalScope)
@@ -1328,12 +1710,12 @@ val appLanguageState = MutableStateFlow("system")
 val appThemeIdState = MutableStateFlow(0L)
 val appSizeModeIdState = MutableStateFlow(0L)
 val stringRawAuthenticationFailedState = MutableStateFlow(
-  listOf(
-    LocalizedStringDataModel("main", "Authentication failed"),
-    LocalizedStringDataModel("en", "Authentication failed"),
-    LocalizedStringDataModel("ru", "Аутентификация не удалась"),
-    LocalizedStringDataModel("kk", "Аутентификация сәтсіз аяқталды"),
-  )
+    listOf(
+        LocalizedStringDataModel("main", "Authentication failed"),
+        LocalizedStringDataModel("en", "Authentication failed"),
+        LocalizedStringDataModel("ru", "Аутентификация не удалась"),
+        LocalizedStringDataModel("kk", "Аутентификация сәтсіз аяқталды"),
+    )
 )
 val stringAppNameState = MutableStateFlow("AITA")
 val stringLogInState = MutableStateFlow("Log In")
@@ -1349,7 +1731,7 @@ val stringAuthenticationFailedState = MutableStateFlow("Authentication failed")
 val stringPhoneNumberMustBeState = MutableStateFlow("Incorrect phone number length")
 val stringEmailMustBeState = MutableStateFlow("Incorrect email address format")
 val stringPasswordMustBeState =
-  MutableStateFlow("Password must be 8 or more symbols long and contain at least one digit")
+    MutableStateFlow("Password must be 8 or more symbols long and contain at least one digit")
 val stringRepeatPasswordState = MutableStateFlow("Repeat password")
 val stringPasswordsMustMatchState = MutableStateFlow("Passwords must match")
 val stringFirstNameState = MutableStateFlow("First name")
@@ -1358,9 +1740,9 @@ val stringEnterFirstNameState = MutableStateFlow("Enter first name")
 val stringEnterLastNameState = MutableStateFlow("Enter last name")
 
 val stringUserWithThisPhoneNumberIsAlreadyRegisteredState =
-  MutableStateFlow("User with this phone number is already registered")
+    MutableStateFlow("User with this phone number is already registered")
 val stringUserWithThisEmailAddressIsAlreadyRegisteredState =
-  MutableStateFlow("User with this email address is already registered")
+    MutableStateFlow("User with this email address is already registered")
 val stringSignUpState = MutableStateFlow("Sign Up")
 val stringConfirmState = MutableStateFlow("Confirm")
 val stringSaleState = MutableStateFlow("Sale")
@@ -1396,20 +1778,20 @@ val stringAppLanguageState = MutableStateFlow("App language")
 val stringAppThemeState = MutableStateFlow("App theme")
 val stringSelectState = MutableStateFlow("Select")
 val stringUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegisteredState =
-  MutableStateFlow("User with this phone number and email address is already registered")
+    MutableStateFlow("User with this phone number and email address is already registered")
 val stringFirstNameCannotBeEmptyOrJustWhitespacesState =
-  MutableStateFlow("First name cannot be empty or just whitespaces")
+    MutableStateFlow("First name cannot be empty or just whitespaces")
 val stringLastNameCannotBeEmptyOrJustWhitespacesState =
-  MutableStateFlow("Last cannot be empty or just whitespaces")
+    MutableStateFlow("Last cannot be empty or just whitespaces")
 val stringSystemLanguageState = MutableStateFlow("System language")
 val stringBluetoothPermissionRequiredState = MutableStateFlow("Bluetooth permission required")
 val stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersState =
-  MutableStateFlow("For search and connection to Bluetooth barcode scanners and receipt printers")
+    MutableStateFlow("For search and connection to Bluetooth barcode scanners and receipt printers")
 val stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersYouCanGrantItInAppSettingsState =
-  MutableStateFlow("For search and connection to Bluetooth barcode scanners and receipt printers. You can grant it in app settings")
+    MutableStateFlow("For search and connection to Bluetooth barcode scanners and receipt printers. You can grant it in app settings")
 val stringBluetoothDisabledState = MutableStateFlow("Bluetooth disabled")
 val stringEnableForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersState =
-  MutableStateFlow("Enable for search and connection to Bluetooth barcode scanners and receipt printers")
+    MutableStateFlow("Enable for search and connection to Bluetooth barcode scanners and receipt printers")
 val stringSearchByAnyDataState = MutableStateFlow("Search by any data")
 val stringListEmptyState = MutableStateFlow("List empty")
 val stringNoMatchesState = MutableStateFlow("No matches")
@@ -1586,88 +1968,102 @@ val tokenRefreshMutex = Mutex()
 val appDatabase = AppDatabase(getSqlDelightDriver?.invoke()!!)
 
 var httpClient =
-  HttpClient(getHttpClientEngine()) {
-    install(ContentNegotiation) {
-      json(
-        Json {
-          prettyPrint = true
-          isLenient = true
-          ignoreUnknownKeys = true
-          explicitNulls = true
-          encodeDefaults = true
+    HttpClient(getHttpClientEngine()) {
+        install(ContentNegotiation) {
+            json(
+                Json {
+                    prettyPrint = true
+                    isLenient = true
+                    ignoreUnknownKeys = true
+                    explicitNulls = true
+                    encodeDefaults = true
+                }
+            )
         }
-      )
-    }
 
-    expectSuccess = false
+        expectSuccess = false
 
-    install(HttpCache)
+        install(HttpCache)
 //
 //    install(Logging) {
 //      level = LogLevel.ALL
 //    }
-    install(Auth) {
-      bearer {
-        sendWithoutRequest {
-          it.url.host.equals(
-            Url(globalAppConfigurationState.payloadValue.serverUrl.first).host,
-            true
-          )
-              && !it.url.encodedPath.startsWith("/auth")
-        }
-
-        loadTokens {
-          withContext(Dispatchers.ourIo) {
-            getStoredUserAuthTokens?.invoke()?.let {
-              BearerTokens(it.accessToken, it.refreshToken)
-            }
-          }
-        }
-
-        refreshTokens {
-          withContext(Dispatchers.ourIo) {
-
-            tokenRefreshMutex.withLock {
-              val current = getStoredUserAuthTokens?.invoke()
-
-              current ?: return@withLock null
-
-              val httpClient = HttpClient(getHttpClientEngine()) {
-                install(ContentNegotiation) {
-                  json(jsonBase)
+        install(Auth) {
+            bearer {
+                sendWithoutRequest {
+                    it.url.host.equals(
+                        Url(globalAppConfigurationState.payloadValue.serverUrl.first).host,
+                        true
+                    )
+                            && !it.url.encodedPath.startsWith("/auth")
                 }
-              }
 
-              val response = networkRequest<TokenPair, String>(
-                HttpMethod.Post,
-                endpointUrl = globalAppConfigurationState.payloadValue.refreshPath.first,
-                body = current.refreshToken
-              )
+                loadTokens {
+                    withContext(Dispatchers.ourIo) {
+                        getStoredUserAuthTokens?.invoke()?.let {
+                            BearerTokens(it.accessToken, it.refreshToken)
+                        }
+                    }
+                }
 
-              if (response.negative) {
-                postInAppNotification(
-                  stringSessionTimeExpiredLoggingOutState.value,
-                  NotificationType.Negative
-                )
-                delay(3000)
-                forceLogOutUser()
-              }
+                refreshTokens {
+                    withContext(Dispatchers.ourIo) {
 
-              httpClient.close()
+                        tokenRefreshMutex.withLock {
+                            val current = getStoredUserAuthTokens?.invoke()
 
-              if (response.payload != null) {
-                setStoredUserAuthTokens?.invoke(response.payload)
-                BearerTokens(response.payload.accessToken, response.payload.refreshToken)
-              } else {
-                setStoredUserAuthTokens?.invoke(null)
-                null
-              }
+                            current ?: return@withLock null
+
+                            val httpClient = HttpClient(getHttpClientEngine()) {
+                                install(ContentNegotiation) {
+                                    json(jsonBase)
+                                }
+                            }
+
+                            val response = networkRequest<TokenPair, String>(
+                                HttpMethod.Post,
+                                endpointUrl = globalAppConfigurationState.payloadValue.refreshPath.first,
+                                body = current.refreshToken
+                            )
+
+                            if (response.negative && response.payload == null) {
+                                if (response.transportFailure) {
+                                    postInAppNotification(
+                                        localizedStringResourceMessage(
+                                            id = 214,
+                                            main = "Cannot reach server. Keeping you signed in offline.",
+                                            ru = "Сервер недоступен. Вы остаётесь в аккаунте офлайн.",
+                                            kk = "Сервер қолжетімсіз. Сіз офлайн режимде аккаунтта қаласыз."
+                                        ),
+                                        NotificationType.Neutral
+                                    )
+                                } else {
+                                    postInAppNotification(
+                                        stringSessionTimeExpiredLoggingOutState.value,
+                                        NotificationType.Negative
+                                    )
+                                    delay(3000)
+                                    forceLogOutUser()
+                                }
+                            }
+
+                            httpClient.close()
+
+                            if (response.payload != null) {
+                                setStoredUserAuthTokens?.invoke(response.payload)
+                                BearerTokens(response.payload.accessToken, response.payload.refreshToken)
+                            } else if (response.transportFailure) {
+                                current?.let { BearerTokens(it.accessToken, it.refreshToken) }
+                            } else {
+                                setStoredUserAuthTokens?.invoke(null)
+                                null
+                            }
+                        }
+                    }
+                }
             }
-          }
         }
-      }
     }
-  }
 
 val userAccountState = MutableDataStateFlow<UserAccountDataModel>(GlobalScope)
 
@@ -1712,14 +2108,21 @@ val deleteGoodsItemMutex = Mutex()
 
 val logInMutex = Mutex()
 val signUpUserMutex = Mutex()
+val logInInProgressState = MutableStateFlow(false)
+val signUpInProgressState = MutableStateFlow(false)
 
 val logOutUserMutex = Mutex()
 val getUserAccountMutex = Mutex()
 val updateUserMutex = Mutex()
 val latestInAppNotificationState = MutableStateFlow<NotificationDataModel?>(null)
+val activeInAppNotificationsState = MutableStateFlow<List<NotificationDataModel>>(emptyList())
+val notificationsState = MutableDataStateFlow<List<NotificationDataModel>>(GlobalScope)
+val getNotificationsMutex = Mutex()
+val saveNotificationMutex = Mutex()
+val markNotificationReadMutex = Mutex()
 
 val cashRegisterExtractionsState =
-  MutableDataStateFlow<List<CashRegisterExtractionEntryDataModel>>(GlobalScope)
+    MutableDataStateFlow<List<CashRegisterExtractionEntryDataModel>>(GlobalScope)
 
 val cashRegisterAmountState = MutableStateFlow(0.0)
 
@@ -1749,2047 +2152,2432 @@ val cashRegisterAmountState = MutableStateFlow(0.0)
 
 
 fun String.checkAsEmail(): Boolean {
-  return isNotEmpty() && isNotBlank() && !contains(" ") &&
-      contains("@") && contains(".") &&
-      Regex("^[a-zA-Z0-9]").matches(first().toString()) &&
-      filter { it == '@' }.length == 1 && lastIndexOf(".") > lastIndexOf("@") &&
-      lastIndexOf(".") != lastIndex
+    return isNotEmpty() && isNotBlank() && !contains(" ") &&
+            contains("@") && contains(".") &&
+            Regex("^[a-zA-Z0-9]").matches(first().toString()) &&
+            filter { it == '@' }.length == 1 && lastIndexOf(".") > lastIndexOf("@") &&
+            lastIndexOf(".") != lastIndex
 }
 
 fun String.checkAsPhoneNumber(country: CountryDataModel): Boolean {
-  return length == country.phoneNumberSize
+    return length == country.phoneNumberSize
 }
 
 fun String.filterAsPhoneNumber(country: CountryDataModel): Boolean {
-  return isNumericalString() && length <= country.phoneNumberSize
+    return isNumericalString() && length <= country.phoneNumberSize
 }
 
 fun String.checkAsPassword(): Boolean {
-  return length >= 8 && isNotBlank() && any { it.isDigit() }
+    return length >= 8 && isNotBlank() && any { it.isDigit() }
 }
 
 fun String.isNumericalString(): Boolean {
-  return all { it.isDigit() }
+    return all { it.isDigit() }
 }
 
 fun String.isNumericalDoubleString(): Boolean {
-  var dots = 0
+    var dots = 0
 
-  forEach {
-    if (it == '.')
-      dots++
-  }
+    forEach {
+        if (it == '.')
+            dots++
+    }
 
-  return if (dots > 1)
-    false
-  else all { it.isDigit() || it == '.' }
+    return if (dots > 1)
+        false
+    else all { it.isDigit() || it == '.' }
 }
 
 fun String.checkAsPersonName(): Boolean {
-  return isNotEmpty() && isNotBlank() && matches(Regex("""^[\p{L}\p{M} .-]+$"""))
+    return isNotEmpty() && isNotBlank() && matches(Regex("""^[\p{L}\p{M} .-]+$"""))
 }
 
 fun String.filterAsPersonName(): Boolean {
-  return isEmpty() || matches(Regex("""^[\p{L}\p{M} .-]+$"""))
+    return isEmpty() || matches(Regex("""^[\p{L}\p{M} .-]+$"""))
 }
 
 infix fun String.localized(locale: String): LocalizedStringDataModel {
-  return LocalizedStringDataModel(locale, this)
+    return LocalizedStringDataModel(locale, this)
 }
 
 fun getStoreWorkers() {
-  TODO("Not yet implemented")
+    TODO("Not yet implemented")
 }
 
 fun addStoreWorker(
-  phoneNumber: String,
-  email: String,
-  firstName: String,
-  lastName: String,
-  password: String
+    phoneNumber: String,
+    email: String,
+    firstName: String,
+    lastName: String,
+    password: String
 ) {
-  TODO("Not yet implemented")
+    TODO("Not yet implemented")
 }
 
 fun getGoodsCategories() {
-  GlobalScope.launch(Dispatchers.ourIo) {
-    categoriesState
-      .emit(
-        DataState.Success(
-          listOf(
+    GlobalScope.launch(Dispatchers.ourIo) {
+        categoriesState
+            .emit(
+                DataState.Success(
+                    listOf(
 
-          )
-        )
-      )
-  }
+                    )
+                )
+            )
+    }
 }
 
 fun List<LocalizedStringGroupDataModel>?.extractString(id: Long, language: String): String? {
-  return this
-    ?.run {
-      find { it.id == id }
+    return this
+        ?.find { it.id == id }
         ?.values
-        ?.find {
-          (language == "system" && it.language == getSystemLocaleLanguage()) || it.language == language
-        }?.value
-    }
+        ?.extractLocalizedString(language)
 }
 
 fun List<StylizedDimensionGroupDataModel>.extractValue(id: Long, sizeModeId: Long): Float? {
-  return find { it.id == id }?.values?.find { it.sizeModeId == -1L || it.sizeModeId == sizeModeId }?.value
+    return find { it.id == id }?.values?.find { it.sizeModeId == -1L || it.sizeModeId == sizeModeId }?.value
 }
 
 fun List<StylizedColorGroupDataModel>.extractColor(id: Long, themeId: Long): String? {
-  return find { it.id == id }?.values?.find { it.themeId == -1L || it.themeId == themeId }?.valueHex
+    return find { it.id == id }?.values?.find { it.themeId == -1L || it.themeId == themeId }?.valueHex
 }
 
 fun List<StylizedDrawablePathsGroupDataModel>.extractPath(id: Long, themeId: Long): String? {
-  return find { it.id == id }?.values?.find { it.themeId == -1L || it.themeId == themeId }?.path
+    return find { it.id == id }?.values?.find { it.themeId == -1L || it.themeId == themeId }?.path
 }
 
 fun getFullDrawableRemoteResourceUrl(path: String): String {
-  return globalAppConfigurationState.payloadValue.run {
-    "${serverUrl.first}/${drawableResourcesPath.first}"
-  } + "/$path"
+    return globalAppConfigurationState.payloadValue.run {
+        "${serverUrl.first}/${drawableResourcesPath.first}"
+    } + "/$path"
 }
 
 fun getFullDrawableLocalResourceUrl(path: String): String {
-  return "files/$path"
+    return "files/$path"
 }
 
 fun List<RemoteResponseDataModel>.extractExceptionMessage(id: String): List<LocalizedStringDataModel>? {
-  return find { it.id == id }?.message
+    return find { it.id == id }?.message
 }
 
 fun List<LocalizedStringDataModel>.extractLocalizedString(language: String): String? {
-  return find { language == "system" && it.language == getSystemLocaleLanguage() || it.language == language || it.language == "main" }?.value
+    val targetLanguage = if (language == "system") getSystemLocaleLanguage() else language
+
+    return find { it.language.equals(targetLanguage, ignoreCase = true) }?.value
+        ?: find { it.language.equals("main", ignoreCase = true) }?.value
+        ?: find { it.language.equals("en", ignoreCase = true) }?.value
+        ?: firstOrNull()?.value
+}
+
+fun localizedStringResourceMessage(
+    id: Long,
+    main: String,
+    en: String = main,
+    ru: String = main,
+    kk: String = main
+): List<LocalizedStringDataModel> {
+    return stringsState.payloadValue
+        ?.find { it.id == id }
+        ?.values
+        ?.takeIf { it.isNotEmpty() }
+        ?: listOf(
+            LocalizedStringDataModel("main", main),
+            LocalizedStringDataModel("en", en),
+            LocalizedStringDataModel("ru", ru),
+            LocalizedStringDataModel("kk", kk)
+        )
+}
+
+fun localizedStringResourceText(
+    id: Long,
+    main: String,
+    en: String = main,
+    ru: String = main,
+    kk: String = main
+): String {
+    return localizedStringResourceMessage(id, main, en, ru, kk)
+        .extractLocalizedString(appLanguageState.value)
+        ?: main
 }
 
 fun String.toLocalizedSingleMain(): List<LocalizedStringDataModel> {
-  return listOf(LocalizedStringDataModel("main", this))
+    return listOf(LocalizedStringDataModel("main", this))
 }
 
 fun List<CountryDataModel>.getCurrency(code: String): CurrencyDataModel? {
-  val currencies = mutableListOf<CurrencyDataModel>().apply {
-    this@getCurrency.forEach {
-      addAll(it.currencies)
+    val currencies = mutableListOf<CurrencyDataModel>().apply {
+        this@getCurrency.forEach {
+            addAll(it.currencies)
+        }
     }
-  }
 
-  return currencies.find { it.code.equals(code, true) }
+    return currencies.find { it.code.equals(code, true) }
 }
 
 fun List<CountryDataModel>.getCurrenciesByCountry(locale: String): List<CurrencyDataModel>? {
-  return this.find { it.locale == locale }?.currencies
+    return this.find { it.locale == locale }?.currencies
 }
 
 fun List<CountryDataModel>.getFirstCurrencyByCountry(locale: String): CurrencyDataModel? {
-  return getCurrenciesByCountry(locale)?.takeIf { it.isNotEmpty() }?.first()
+    return getCurrenciesByCountry(locale)?.takeIf { it.isNotEmpty() }?.first()
 }
 
 fun init() {
-  GlobalScope.launch {
-    observeLocalKv(KEY_APP_LOCALE)
-      .collect {
-        it?.let {
-          appLanguageState.emit(it)
-        }
-      }
-  }
-
-  GlobalScope.launch {
-    observeLocalKv(KEY_APP_THEME)
-      .collect {
-        it?.let {
-          appThemeIdState.emit(it.toLong())
-        }
-      }
-  }
-
-  GlobalScope.launch {
-    observeLocalKv(KEY_APP_SIZE_MODE)
-      .collect {
-        it?.let {
-          appSizeModeIdState.emit(it.toLong())
-        }
-      }
-  }
-
-  GlobalScope.launch {
-    observeLocalKv(KEY_APP_MODE)
-      .collect {
-        it?.let {
-          appModeState.emit(it.toInt())
-        }
-      }
-  }
-
-  GlobalScope.launch(Dispatchers.ourIo) {
-    observeLocalKv(KEY_ACTIVE_STORE_ID)
-      .collect {
-        activeStoreIdState.emit(it)
-        it?.let {
-          getStock(it)
-          getStockBatches(it)
-          getTransactions(it)
-        }
-      }
-  }
-
-  GlobalScope.launch(Dispatchers.ourIo) {
-    storesState.payload.collect {
-      it?.let {
-        if (it.size == 1 && activeStoreIdState.value != it.first().id) {
-          setActiveStoreId(it.first().id)
-        }
-      }
+    GlobalScope.launch {
+        observeLocalKv(KEY_APP_LOCALE)
+            .collect {
+                it?.let {
+                    appLanguageState.emit(it)
+                }
+            }
     }
-  }
 
-  GlobalScope.launch(Dispatchers.ourIo) {
-    observeCart(0, 0)
-      .collect {
-        cartTransactionType0_clientId0_state.emit(it?.filter { item ->
-          (stockState.payloadValue?.find { goodsItem -> goodsItem.id == item.id } != null).apply {
-            if (!this) deleteCartItemById(
-              item.id
-            )
-          }
-        } ?: emptyList())
-      }
-  }
+    GlobalScope.launch {
+        observeLocalKv(KEY_APP_THEME)
+            .collect {
+                it?.let {
+                    appThemeIdState.emit(it.toLong())
+                }
+            }
+    }
 
-  GlobalScope.launch(Dispatchers.ourIo) {
-    observeCart(0, 1)
-      .collect {
-        cartTransactionType0_clientId1_state.emit(it?.filter { item ->
-          (stockState.payloadValue?.find { goodsItem -> goodsItem.id == item.id } != null).apply {
-            if (!this) deleteCartItemById(
-              item.id
-            )
-          }
-        } ?: emptyList())
-      }
-  }
+    GlobalScope.launch {
+        observeLocalKv(KEY_APP_SIZE_MODE)
+            .collect {
+                it?.let {
+                    appSizeModeIdState.emit(it.toLong())
+                }
+            }
+    }
 
-  GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch {
+        observeLocalKv(KEY_APP_MODE)
+            .collect {
+                it?.let {
+                    appModeState.emit(it.toInt())
+                }
+            }
+    }
 
-    observeCart(0, 2)
-      .collect {
-        cartTransactionType0_clientId2_state.emit(it?.filter { item ->
-          (stockState.payloadValue?.find { goodsItem -> goodsItem.id == item.id } != null).apply {
-            if (!this) deleteCartItemById(
-              item.id
-            )
-          }
-        } ?: emptyList())
-      }
-  }
+    GlobalScope.launch(Dispatchers.ourIo) {
+        observeLocalKv(KEY_ACTIVE_STORE_ID)
+            .collect {
+                activeStoreIdState.emit(it)
+                it?.let {
+                    getStock(it)
+                    getStockBatches(it)
+                    getTransactions(it)
+                }
+            }
+    }
 
-  GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
+        storesState.payload.collect {
+            it?.let {
+                if (it.size == 1 && activeStoreIdState.value != it.first().id) {
+                    setActiveStoreId(it.first().id)
+                }
+            }
+        }
+    }
 
-    observeCart(0, 3)
-      .collect {
-        cartTransactionType0_clientId3_state.emit(it?.filter { item ->
-          (stockState.payloadValue?.find { goodsItem -> goodsItem.id == item.id } != null).apply {
-            if (!this) deleteCartItemById(
-              item.id
-            )
-          }
-        } ?: emptyList())
-      }
-  }
+    GlobalScope.launch(Dispatchers.ourIo) {
+        observeCart(0, 0)
+            .collect {
+                cartTransactionType0_clientId0_state.emit(it?.filter { item ->
+                    (stockState.payloadValue?.find { goodsItem -> goodsItem.id == item.id } != null).apply {
+                        if (!this) deleteCartItemById(
+                            item.id
+                        )
+                    }
+                } ?: emptyList())
+            }
+    }
 
-  GlobalScope.launch(Dispatchers.ourIo) {
-    observeCart(0, 4)
-      .collect {
-        cartTransactionType0_clientId4_state.emit(it?.filter { item ->
-          (stockState.payloadValue?.find { goodsItem -> goodsItem.id == item.id } != null).apply {
-            if (!this) deleteCartItemById(
-              item.id
-            )
-          }
-        } ?: emptyList())
-      }
-  }
+    GlobalScope.launch(Dispatchers.ourIo) {
+        observeCart(0, 1)
+            .collect {
+                cartTransactionType0_clientId1_state.emit(it?.filter { item ->
+                    (stockState.payloadValue?.find { goodsItem -> goodsItem.id == item.id } != null).apply {
+                        if (!this) deleteCartItemById(
+                            item.id
+                        )
+                    }
+                } ?: emptyList())
+            }
+    }
 
-  GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
 
-    observeCart(1, 0)
-      .collect {
-        cartTransactionType1_clientId0_state.emit(it?.filter { item ->
-          (stockState.payloadValue?.find { goodsItem -> goodsItem.id == item.id } != null).apply {
-            if (!this) deleteCartItemById(
-              item.id
-            )
-          }
-        } ?: emptyList())
-      }
-  }
+        observeCart(0, 2)
+            .collect {
+                cartTransactionType0_clientId2_state.emit(it?.filter { item ->
+                    (stockState.payloadValue?.find { goodsItem -> goodsItem.id == item.id } != null).apply {
+                        if (!this) deleteCartItemById(
+                            item.id
+                        )
+                    }
+                } ?: emptyList())
+            }
+    }
 
-  GlobalScope.launch(Dispatchers.ourIo) {
-    observeCart(1, 1)
-      .collect {
-        cartTransactionType1_clientId1_state.emit(it?.filter { item ->
-          (stockState.payloadValue?.find { goodsItem -> goodsItem.id == item.id } != null).apply {
-            if (!this) deleteCartItemById(
-              item.id
-            )
-          }
-        } ?: emptyList())
-      }
-  }
+    GlobalScope.launch(Dispatchers.ourIo) {
 
-  GlobalScope.launch(Dispatchers.ourIo) {
-    observeCart(1, 2)
-      .collect {
-        cartTransactionType1_clientId2_state.emit(it?.filter { item ->
-          (stockState.payloadValue?.find { goodsItem -> goodsItem.id == item.id } != null).apply {
-            if (!this) deleteCartItemById(
-              item.id
-            )
-          }
-        } ?: emptyList())
-      }
-  }
+        observeCart(0, 3)
+            .collect {
+                cartTransactionType0_clientId3_state.emit(it?.filter { item ->
+                    (stockState.payloadValue?.find { goodsItem -> goodsItem.id == item.id } != null).apply {
+                        if (!this) deleteCartItemById(
+                            item.id
+                        )
+                    }
+                } ?: emptyList())
+            }
+    }
 
-  GlobalScope.launch(Dispatchers.ourIo) {
-    observeCart(1, 3)
-      .collect {
-        cartTransactionType1_clientId3_state.emit(it?.filter { item ->
-          (stockState.payloadValue?.find { goodsItem -> goodsItem.id == item.id } != null).apply {
-            if (!this) deleteCartItemById(
-              item.id
-            )
-          }
-        } ?: emptyList())
-      }
-  }
+    GlobalScope.launch(Dispatchers.ourIo) {
+        observeCart(0, 4)
+            .collect {
+                cartTransactionType0_clientId4_state.emit(it?.filter { item ->
+                    (stockState.payloadValue?.find { goodsItem -> goodsItem.id == item.id } != null).apply {
+                        if (!this) deleteCartItemById(
+                            item.id
+                        )
+                    }
+                } ?: emptyList())
+            }
+    }
 
-  GlobalScope.launch(Dispatchers.ourIo) {
-    observeCart(1, 4)
-      .collect {
-        cartTransactionType1_clientId4_state.emit(it?.filter { item ->
-          (stockState.payloadValue?.find { goodsItem -> goodsItem.id == item.id } != null).apply {
-            if (!this) deleteCartItemById(
-              item.id
-            )
-          }
-        } ?: emptyList())
-      }
-  }
+    GlobalScope.launch(Dispatchers.ourIo) {
 
-  GlobalScope.launch(Dispatchers.ourIo) {
-    observeCart(2, 0)
-      .collect {
-        cartTransactionType2_clientId0_state.emit(it?.filter { item ->
-          (stockState.payloadValue?.find { goodsItem -> goodsItem.id == item.id } != null).apply {
-            if (!this) deleteCartItemById(
-              item.id
-            )
-          }
-        } ?: emptyList())
-      }
-  }
+        observeCart(1, 0)
+            .collect {
+                cartTransactionType1_clientId0_state.emit(it?.filter { item ->
+                    (stockState.payloadValue?.find { goodsItem -> goodsItem.id == item.id } != null).apply {
+                        if (!this) deleteCartItemById(
+                            item.id
+                        )
+                    }
+                } ?: emptyList())
+            }
+    }
 
-  GlobalScope.launch(Dispatchers.ourIo) {
-    observeCart(2, 1)
-      .collect {
-        cartTransactionType2_clientId1_state.emit(it?.filter { item ->
-          (stockState.payloadValue?.find { goodsItem -> goodsItem.id == item.id } != null).apply {
-            if (!this) deleteCartItemById(
-              item.id
-            )
-          }
-        } ?: emptyList())
-      }
-  }
+    GlobalScope.launch(Dispatchers.ourIo) {
+        observeCart(1, 1)
+            .collect {
+                cartTransactionType1_clientId1_state.emit(it?.filter { item ->
+                    (stockState.payloadValue?.find { goodsItem -> goodsItem.id == item.id } != null).apply {
+                        if (!this) deleteCartItemById(
+                            item.id
+                        )
+                    }
+                } ?: emptyList())
+            }
+    }
 
-  GlobalScope.launch(Dispatchers.ourIo) {
-    observeCart(2, 2)
-      .collect {
-        cartTransactionType2_clientId2_state.emit(it?.filter { item ->
-          (stockState.payloadValue?.find { goodsItem -> goodsItem.id == item.id } != null).apply {
-            if (!this) deleteCartItemById(
-              item.id
-            )
-          }
-        } ?: emptyList())
-      }
-  }
+    GlobalScope.launch(Dispatchers.ourIo) {
+        observeCart(1, 2)
+            .collect {
+                cartTransactionType1_clientId2_state.emit(it?.filter { item ->
+                    (stockState.payloadValue?.find { goodsItem -> goodsItem.id == item.id } != null).apply {
+                        if (!this) deleteCartItemById(
+                            item.id
+                        )
+                    }
+                } ?: emptyList())
+            }
+    }
 
-  GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
+        observeCart(1, 3)
+            .collect {
+                cartTransactionType1_clientId3_state.emit(it?.filter { item ->
+                    (stockState.payloadValue?.find { goodsItem -> goodsItem.id == item.id } != null).apply {
+                        if (!this) deleteCartItemById(
+                            item.id
+                        )
+                    }
+                } ?: emptyList())
+            }
+    }
 
-    observeCart(2, 3)
-      .collect {
-        cartTransactionType2_clientId3_state.emit(it?.filter { item ->
-          (stockState.payloadValue?.find { goodsItem -> goodsItem.id == item.id } != null).apply {
-            if (!this) deleteCartItemById(
-              item.id
-            )
-          }
-        } ?: emptyList())
-      }
-  }
+    GlobalScope.launch(Dispatchers.ourIo) {
+        observeCart(1, 4)
+            .collect {
+                cartTransactionType1_clientId4_state.emit(it?.filter { item ->
+                    (stockState.payloadValue?.find { goodsItem -> goodsItem.id == item.id } != null).apply {
+                        if (!this) deleteCartItemById(
+                            item.id
+                        )
+                    }
+                } ?: emptyList())
+            }
+    }
 
-  GlobalScope.launch(Dispatchers.ourIo) {
-    observeCart(2, 4)
-      .collect {
-        cartTransactionType2_clientId4_state.emit(it?.filter { item ->
-          (stockState.payloadValue?.find { goodsItem -> goodsItem.id == item.id } != null).apply {
-            if (!this) deleteCartItemById(
-              item.id
-            )
-          }
-        } ?: emptyList())
-      }
-  }
-  getGlobalAppConfiguration(true)
-  getUser()
-  getSuppliers()
-  getGoodsCategories()
-  getStores()
+    GlobalScope.launch(Dispatchers.ourIo) {
+        observeCart(2, 0)
+            .collect {
+                cartTransactionType2_clientId0_state.emit(it?.filter { item ->
+                    (stockState.payloadValue?.find { goodsItem -> goodsItem.id == item.id } != null).apply {
+                        if (!this) deleteCartItemById(
+                            item.id
+                        )
+                    }
+                } ?: emptyList())
+            }
+    }
+
+    GlobalScope.launch(Dispatchers.ourIo) {
+        observeCart(2, 1)
+            .collect {
+                cartTransactionType2_clientId1_state.emit(it?.filter { item ->
+                    (stockState.payloadValue?.find { goodsItem -> goodsItem.id == item.id } != null).apply {
+                        if (!this) deleteCartItemById(
+                            item.id
+                        )
+                    }
+                } ?: emptyList())
+            }
+    }
+
+    GlobalScope.launch(Dispatchers.ourIo) {
+        observeCart(2, 2)
+            .collect {
+                cartTransactionType2_clientId2_state.emit(it?.filter { item ->
+                    (stockState.payloadValue?.find { goodsItem -> goodsItem.id == item.id } != null).apply {
+                        if (!this) deleteCartItemById(
+                            item.id
+                        )
+                    }
+                } ?: emptyList())
+            }
+    }
+
+    GlobalScope.launch(Dispatchers.ourIo) {
+
+        observeCart(2, 3)
+            .collect {
+                cartTransactionType2_clientId3_state.emit(it?.filter { item ->
+                    (stockState.payloadValue?.find { goodsItem -> goodsItem.id == item.id } != null).apply {
+                        if (!this) deleteCartItemById(
+                            item.id
+                        )
+                    }
+                } ?: emptyList())
+            }
+    }
+
+    GlobalScope.launch(Dispatchers.ourIo) {
+        observeCart(2, 4)
+            .collect {
+                cartTransactionType2_clientId4_state.emit(it?.filter { item ->
+                    (stockState.payloadValue?.find { goodsItem -> goodsItem.id == item.id } != null).apply {
+                        if (!this) deleteCartItemById(
+                            item.id
+                        )
+                    }
+                } ?: emptyList())
+            }
+    }
+    getGlobalAppConfiguration(true)
+    getUser()
+    getSuppliers()
+    getGoodsCategories()
+    getStores()
 }
 
 fun getGlobalAppConfiguration(loadAll: Boolean = true) {
-  if (!getGlobalAppConfigurationMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      getGlobalAppConfigurationMutex.withLock {
-        val response = networkRequest<GlobalAppConfigurationDataModel, Unit>(
-          method = HttpMethod.Get,
-          endpointUrl = globalAppConfigurationState.payloadValue.globalAppConfigurationPath.first
-        )
+    if (!getGlobalAppConfigurationMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getGlobalAppConfigurationMutex.withLock {
+                val response = networkRequest<GlobalAppConfigurationDataModel, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.globalAppConfigurationPath.first
+                )
 
-        if (!response.negative) {
-          globalAppConfigurationState.emit(DataState.Success(response.payload!!, response.message))
+                if (!response.negative) {
+                    globalAppConfigurationState.emit(DataState.Success(response.payload!!, response.message))
 
-          if (loadAll) {
-            getStrings()
-            getDimensions()
-            getColors()
-            getDrawables()
-          }
+                    if (loadAll) {
+                        getStrings()
+                        getDimensions()
+                        getColors()
+                        getDrawables()
+                    }
+                }
+            }
         }
-      }
-    }
 }
 
 fun getStrings() {
-  if (!getStringsMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      getStringsMutex.withLock {
-        val response = networkRequest<List<LocalizedStringGroupDataModel>, Unit>(
-          method = HttpMethod.Get,
-          endpointUrl = globalAppConfigurationState.payloadValue.stringResourcesPath.first
-        )
+    if (!getStringsMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getStringsMutex.withLock {
+                val response = networkRequest<List<LocalizedStringGroupDataModel>, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.stringResourcesPath.first
+                )
 
-        if (!response.negative && response.payload != null) {
-          stringsState.emit(DataState.Success(response.payload, response.message))
-        } else {
-          postInAppNotification(response.message, NotificationType.Negative)
+                if (!response.negative && response.payload != null) {
+                    stringsState.emit(DataState.Success(response.payload, response.message))
+                } else {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                }
+            }
         }
-      }
-    }
 }
 
 fun getDimensions() {
-  if (!getDimensionsMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      getDimensionsMutex.withLock {
-        val response = networkRequest<List<StylizedDimensionGroupDataModel>, Unit>(
-          method = HttpMethod.Get,
-          endpointUrl = globalAppConfigurationState.payloadValue.dimensionResourcesPath.first,
-        )
+    if (!getDimensionsMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getDimensionsMutex.withLock {
+                val response = networkRequest<List<StylizedDimensionGroupDataModel>, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.dimensionResourcesPath.first,
+                )
 
-        if (!response.negative && response.payload != null) {
-          dimensionsState.emit(DataState.Success(response.payload, response.message))
+                if (!response.negative && response.payload != null) {
+                    dimensionsState.emit(DataState.Success(response.payload, response.message))
+                }
+            }
         }
-      }
-    }
 }
 
 fun getColors() {
-  if (!getColorsMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      getColorsMutex.withLock {
-        val response = networkRequest<List<StylizedColorGroupDataModel>, Unit>(
-          method = HttpMethod.Get,
-          endpointUrl = globalAppConfigurationState.payloadValue.colorResourcesPath.first
-        )
+    if (!getColorsMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getColorsMutex.withLock {
+                val response = networkRequest<List<StylizedColorGroupDataModel>, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.colorResourcesPath.first
+                )
 
-        if (!response.negative && response.payload != null) {
-          colorsState.emit(DataState.Success(response.payload, response.message))
-        } else {
-          postInAppNotification(response.message, NotificationType.Negative)
+                if (!response.negative && response.payload != null) {
+                    colorsState.emit(DataState.Success(response.payload, response.message))
+                } else {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                }
+            }
         }
-      }
-    }
 }
 
 fun getDrawables() {
-  if (!getDrawablesMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      getDrawablesMutex.withLock {
-        val response = networkRequest<List<StylizedDrawablePathsGroupDataModel>, Unit>(
-          method = HttpMethod.Get,
-          endpointUrl = globalAppConfigurationState.payloadValue.drawableResourcesConfigurationPath.first
-        )
+    if (!getDrawablesMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getDrawablesMutex.withLock {
+                val response = networkRequest<List<StylizedDrawablePathsGroupDataModel>, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.drawableResourcesConfigurationPath.first
+                )
 
-        if (response.negative) {
-          drawablesState.emit(DataState.Empty(response.message))
-        } else {
-          drawablesState.emit(DataState.Success(response.payload!!, response.message))
+                if (response.negative) {
+                    drawablesState.emit(DataState.Empty(response.message))
+                } else {
+                    drawablesState.emit(DataState.Success(response.payload!!, response.message))
+                }
+            }
         }
-      }
-    }
 }
 
 fun setAppLocale(language: String) {
-  GlobalScope.launch {
-    putLocalKv(KEY_APP_LOCALE, language)
-  }
+    GlobalScope.launch(Dispatchers.ourIo) {
+        appLanguageState.emit(language)
+        putLocalKv(KEY_APP_LOCALE, language)
+    }
 }
 
 fun setAppTheme(themeId: Long) {
-  GlobalScope.launch(Dispatchers.ourIo) {
-    putLocalKv(KEY_APP_THEME, themeId.toString())
-  }
+    GlobalScope.launch(Dispatchers.ourIo) {
+        // Emit immediately so UI changes now; local storage observer will keep it persistent.
+        appThemeIdState.emit(themeId)
+        putLocalKv(KEY_APP_THEME, themeId.toString())
+    }
 }
 
 fun setAppSizeMode(sizeModeId: Long) {
-  GlobalScope.launch {
-    putLocalKv(KEY_APP_SIZE_MODE, sizeModeId.toString())
-  }
+    GlobalScope.launch {
+        putLocalKv(KEY_APP_SIZE_MODE, sizeModeId.toString())
+    }
 }
 
 fun setAppMode(modeId: Int) {
-  GlobalScope.launch {
-    putLocalKv(KEY_APP_MODE, modeId.toString())
-  }
+    GlobalScope.launch {
+        putLocalKv(KEY_APP_MODE, modeId.toString())
+    }
 }
 
 fun updateGlobalAppConfiguration(
-  configuration: GlobalAppConfigurationDataModel,
-  resourceConfiguration: GlobalAppConfigurationDataModel
+    configuration: GlobalAppConfigurationDataModel,
+    resourceConfiguration: GlobalAppConfigurationDataModel
 ) {
-  if (globalAppConfigurationState.value.value is DataState.Empty)
-    globalAppConfigurationState.emit(DataState.Success(resourceConfiguration))
+    if (globalAppConfigurationState.value.value is DataState.Empty)
+        globalAppConfigurationState.emit(DataState.Success(resourceConfiguration))
 }
 
 fun updateStrings(
-  strings: List<LocalizedStringGroupDataModel>,
-  resourceStrings: List<LocalizedStringGroupDataModel>
+    strings: List<LocalizedStringGroupDataModel>,
+    resourceStrings: List<LocalizedStringGroupDataModel>
 ) {
-  GlobalScope.launch(Dispatchers.ourIo) {
-    stringAppNameState.emit(
-      strings.extractString(0, appLanguageState.value) ?: resourceStrings.extractString(
-        0,
-        appLanguageState.value
-      )!!
-    )
-    stringLogInState.emit(
-      strings.extractString(1, appLanguageState.value) ?: resourceStrings.extractString(
-        1,
-        appLanguageState.value
-      )!!
-    )
-    stringPhoneNumberState.emit(
-      strings.extractString(2, appLanguageState.value) ?: resourceStrings.extractString(
-        2,
-        appLanguageState.value
-      )!!
-    )
-    stringEnterPhoneNumberState.emit(
-      strings.extractString(3, appLanguageState.value) ?: resourceStrings.extractString(3, appLanguageState.value)!!
-    )
-    stringEmailState.emit(
-      strings.extractString(4, appLanguageState.value) ?: resourceStrings.extractString(
-        4,
-        appLanguageState.value
-      )!!
-    )
-    stringEnterEmailAddressState.emit(
-      strings.extractString(5, appLanguageState.value) ?: resourceStrings.extractString(5, appLanguageState.value)!!
-    )
-    stringPasswordState.emit(
-      strings.extractString(6, appLanguageState.value) ?: resourceStrings.extractString(
-        6,
-        appLanguageState.value
-      )!!
-    )
-    stringEnterPasswordState.emit(
-      strings.extractString(7, appLanguageState.value) ?: resourceStrings.extractString(7, appLanguageState.value)!!
-    )
-    stringCancelState.emit(
-      strings.extractString(8, appLanguageState.value) ?: resourceStrings.extractString(
-        8,
-        appLanguageState.value
-      )!!
-    )
-    stringClearState.emit(
-      strings.extractString(9, appLanguageState.value) ?: resourceStrings.extractString(
-        9,
-        appLanguageState.value
-      )!!
-    )
-    stringAuthenticationFailedState.emit(
-      strings.extractString(10, appLanguageState.value) ?: resourceStrings.extractString(10, appLanguageState.value)!!
-    )
-    stringPhoneNumberMustBeState.emit(
-      strings.extractString(11, appLanguageState.value) ?: resourceStrings.extractString(11, appLanguageState.value)!!
-    )
-    stringEmailMustBeState.emit(
-      strings.extractString(12, appLanguageState.value) ?: resourceStrings.extractString(12, appLanguageState.value)!!
-    )
-    stringPasswordMustBeState.emit(
-      strings.extractString(13, appLanguageState.value) ?: resourceStrings.extractString(13, appLanguageState.value)!!
-    )
-    stringRepeatPasswordState.emit(
-      strings.extractString(14, appLanguageState.value) ?: resourceStrings.extractString(14, appLanguageState.value)!!
-    )
-    stringPasswordsMustMatchState.emit(
-      strings.extractString(15, appLanguageState.value) ?: resourceStrings.extractString(15, appLanguageState.value)!!
-    )
-    stringFirstNameState.emit(
-      strings.extractString(16, appLanguageState.value) ?: resourceStrings.extractString(
-        16,
-        appLanguageState.value
-      )!!
-    )
-    stringLastNameState.emit(
-      strings.extractString(17, appLanguageState.value) ?: resourceStrings.extractString(
-        17,
-        appLanguageState.value
-      )!!
-    )
-    stringEnterFirstNameState.emit(
-      strings.extractString(18, appLanguageState.value) ?: resourceStrings.extractString(18, appLanguageState.value)!!
-    )
-    stringEnterLastNameState.emit(
-      strings.extractString(19, appLanguageState.value) ?: resourceStrings.extractString(
-        19,
-        appLanguageState.value
-      )!!
-    )
-    stringUserWithThisPhoneNumberIsAlreadyRegisteredState.emit(
-      strings.extractString(20, appLanguageState.value) ?: resourceStrings.extractString(20, appLanguageState.value)!!
-    )
-    stringUserWithThisEmailAddressIsAlreadyRegisteredState.emit(
-      strings.extractString(21, appLanguageState.value) ?: resourceStrings.extractString(21, appLanguageState.value)!!
-    )
-    stringSignUpState.emit(
-      strings.extractString(22, appLanguageState.value) ?: resourceStrings.extractString(
-        22,
-        appLanguageState.value
-      )!!
-    )
-    stringConfirmState.emit(
-      strings.extractString(23, appLanguageState.value) ?: resourceStrings.extractString(
-        23,
-        appLanguageState.value
-      )!!
-    )
-    stringSaleState.emit(
-      strings.extractString(24, appLanguageState.value) ?: resourceStrings.extractString(
-        24,
-        appLanguageState.value
-      )!!
-    )
-    stringReturnState.emit(
-      strings.extractString(25, appLanguageState.value) ?: resourceStrings.extractString(
-        25,
-        appLanguageState.value
-      )!!
-    )
-    stringSupplyState.emit(
-      strings.extractString(26, appLanguageState.value) ?: resourceStrings.extractString(
-        26,
-        appLanguageState.value
-      )!!
-    )
-    stringStockState.emit(
-      strings.extractString(27, appLanguageState.value) ?: resourceStrings.extractString(
-        27,
-        appLanguageState.value
-      )!!
-    )
-    stringMenuState.emit(
-      strings.extractString(28, appLanguageState.value) ?: resourceStrings.extractString(
-        28,
-        appLanguageState.value
-      )!!
-    )
-    stringBackState.emit(
-      strings.extractString(29, appLanguageState.value) ?: resourceStrings.extractString(
-        29,
-        appLanguageState.value
-      )!!
-    )
-    stringAddGoodsItemState.emit(
-      strings.extractString(30, appLanguageState.value) ?: resourceStrings.extractString(
-        30,
-        appLanguageState.value
-      )!!
-    )
-    stringEditGoodsItemState.emit(
-      strings.extractString(31, appLanguageState.value) ?: resourceStrings.extractString(
-        31,
-        appLanguageState.value
-      )!!
-    )
-    stringUserAccountState.emit(
-      strings.extractString(32, appLanguageState.value) ?: resourceStrings.extractString(32, appLanguageState.value)!!
-    )
-    stringGoodsCategoriesState.emit(
-      strings.extractString(33, appLanguageState.value) ?: resourceStrings.extractString(33, appLanguageState.value)!!
-    )
-    stringAddGoodsCategoryState.emit(
-      strings.extractString(34, appLanguageState.value) ?: resourceStrings.extractString(34, appLanguageState.value)!!
-    )
-    stringEditGoodsCategoryState.emit(
-      strings.extractString(35, appLanguageState.value) ?: resourceStrings.extractString(35, appLanguageState.value)!!
-    )
-    stringStoresState.emit(
-      strings.extractString(36, appLanguageState.value) ?: resourceStrings.extractString(
-        36,
-        appLanguageState.value
-      )!!
-    )
-    stringAddStoreState.emit(
-      strings.extractString(37, appLanguageState.value) ?: resourceStrings.extractString(
-        37,
-        appLanguageState.value
-      )!!
-    )
-    stringEditStoreState.emit(
-      strings.extractString(38, appLanguageState.value) ?: resourceStrings.extractString(
-        38,
-        appLanguageState.value
-      )!!
-    )
-    stringSubscriptionState.emit(
-      strings.extractString(39, appLanguageState.value) ?: resourceStrings.extractString(
-        39,
-        appLanguageState.value
-      )!!
-    )
-    stringSubscriptionPlansState.emit(
-      strings.extractString(40, appLanguageState.value) ?: resourceStrings.extractString(40, appLanguageState.value)!!
-    )
-    stringTransactionHistoryState.emit(
-      strings.extractString(41, appLanguageState.value) ?: resourceStrings.extractString(41, appLanguageState.value)!!
-    )
-    stringReceiptState.emit(
-      strings.extractString(42, appLanguageState.value) ?: resourceStrings.extractString(
-        42,
-        appLanguageState.value
-      )!!
-    )
-    stringAnalyticsState.emit(
-      strings.extractString(43, appLanguageState.value) ?: resourceStrings.extractString(
-        43,
-        appLanguageState.value
-      )!!
-    )
-    stringWorkersState.emit(
-      strings.extractString(44, appLanguageState.value) ?: resourceStrings.extractString(
-        44,
-        appLanguageState.value
-      )!!
-    )
-    stringAddWorkerState.emit(
-      strings.extractString(45, appLanguageState.value) ?: resourceStrings.extractString(
-        45,
-        appLanguageState.value
-      )!!
-    )
-    stringEditWorkerState.emit(
-      strings.extractString(46, appLanguageState.value) ?: resourceStrings.extractString(
-        46,
-        appLanguageState.value
-      )!!
-    )
-    stringSuppliersState.emit(
-      strings.extractString(47, appLanguageState.value) ?: resourceStrings.extractString(
-        47,
-        appLanguageState.value
-      )!!
-    )
-    stringAddSupplierState.emit(
-      strings.extractString(48, appLanguageState.value) ?: resourceStrings.extractString(48, appLanguageState.value)!!
-    )
-    stringEditSupplierState.emit(
-      strings.extractString(49, appLanguageState.value) ?: resourceStrings.extractString(
-        49,
-        appLanguageState.value
-      )!!
-    )
-    stringDebtorsState.emit(
-      strings.extractString(50, appLanguageState.value) ?: resourceStrings.extractString(
-        50,
-        appLanguageState.value
-      )!!
-    )
-    stringCloseDebtState.emit(
-      strings.extractString(51, appLanguageState.value) ?: resourceStrings.extractString(
-        51,
-        appLanguageState.value
-      )!!
-    )
-    stringDevicesState.emit(
-      strings.extractString(52, appLanguageState.value) ?: resourceStrings.extractString(
-        52,
-        appLanguageState.value
-      )!!
-    )
-    stringAppLanguageState.emit(
-      strings.extractString(53, appLanguageState.value) ?: resourceStrings.extractString(53, appLanguageState.value)!!
-    )
-    stringAppThemeState.emit(
-      strings.extractString(54, appLanguageState.value) ?: resourceStrings.extractString(
-        54,
-        appLanguageState.value
-      )!!
-    )
-    stringSelectState.emit(
-      strings.extractString(55, appLanguageState.value) ?: resourceStrings.extractString(
-        55,
-        appLanguageState.value
-      )!!
-    )
-    stringUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegisteredState.emit(
-      strings.extractString(
-        56,
-        appLanguageState.value
-      ) ?: resourceStrings.extractString(56, appLanguageState.value)!!
-    )
-    stringFirstNameCannotBeEmptyOrJustWhitespacesState.emit(
-      strings.extractString(57, appLanguageState.value) ?: resourceStrings.extractString(57, appLanguageState.value)!!
-    )
-    stringLastNameCannotBeEmptyOrJustWhitespacesState.emit(
-      strings.extractString(58, appLanguageState.value) ?: resourceStrings.extractString(58, appLanguageState.value)!!
-    )
-    stringSystemLanguageState.emit(
-      strings.extractString(59, appLanguageState.value) ?: resourceStrings.extractString(59, appLanguageState.value)!!
-    )
-    stringBluetoothPermissionRequiredState.emit(
-      strings.extractString(60, appLanguageState.value) ?: resourceStrings.extractString(60, appLanguageState.value)!!
-    )
-    stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersState.emit(
-      strings.extractString(
-        61,
-        appLanguageState.value
-      ) ?: resourceStrings.extractString(61, appLanguageState.value)!!
-    )
-    stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersYouCanGrantItInAppSettingsState.emit(
-      strings.extractString(62, appLanguageState.value) ?: resourceStrings.extractString(62, appLanguageState.value)!!
-    )
-    stringBluetoothDisabledState.emit(
-      strings.extractString(63, appLanguageState.value) ?: resourceStrings.extractString(63, appLanguageState.value)!!
-    )
-    stringEnableForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersState.emit(
-      strings.extractString(
-        64,
-        appLanguageState.value
-      ) ?: resourceStrings.extractString(64, appLanguageState.value)!!
-    )
-    stringSearchByAnyDataState.emit(
-      strings.extractString(65, appLanguageState.value) ?: resourceStrings.extractString(65, appLanguageState.value)!!
-    )
-    stringListEmptyState.emit(
-      strings.extractString(66, appLanguageState.value) ?: resourceStrings.extractString(
-        66,
-        appLanguageState.value
-      )!!
-    )
-    stringNoMatchesState.emit(
-      strings.extractString(67, appLanguageState.value) ?: resourceStrings.extractString(
-        67,
-        appLanguageState.value
-      )!!
-    )
-    stringNameState.emit(
-      strings.extractString(68, appLanguageState.value) ?: resourceStrings.extractString(
-        68,
-        appLanguageState.value
-      )!!
-    )
-    stringBarcodeState.emit(
-      strings.extractString(69, appLanguageState.value) ?: resourceStrings.extractString(
-        69,
-        appLanguageState.value
-      )!!
-    )
-    stringSupplyPriceState.emit(
-      strings.extractString(70, appLanguageState.value) ?: resourceStrings.extractString(70, appLanguageState.value)!!
-    )
-    stringSalePriceState.emit(
-      strings.extractString(71, appLanguageState.value) ?: resourceStrings.extractString(
-        71,
-        appLanguageState.value
-      )!!
-    )
-    stringReturnPriceState.emit(
-      strings.extractString(72, appLanguageState.value) ?: resourceStrings.extractString(72, appLanguageState.value)!!
-    )
-    stringCategoryState.emit(
-      strings.extractString(73, appLanguageState.value) ?: resourceStrings.extractString(
-        73,
-        appLanguageState.value
-      )!!
-    )
-    stringSupplierState.emit(
-      strings.extractString(74, appLanguageState.value) ?: resourceStrings.extractString(
-        74,
-        appLanguageState.value
-      )!!
-    )
-    stringEnterBarcodeState.emit(
-      strings.extractString(75, appLanguageState.value) ?: resourceStrings.extractString(
-        75,
-        appLanguageState.value
-      )!!
-    )
-    stringEnterNameState.emit(
-      strings.extractString(76, appLanguageState.value) ?: resourceStrings.extractString(
-        76,
-        appLanguageState.value
-      )!!
-    )
-    stringEnterSupplyPriceState.emit(
-      strings.extractString(77, appLanguageState.value) ?: resourceStrings.extractString(77, appLanguageState.value)!!
-    )
-    stringEnterSalePriceState.emit(
-      strings.extractString(78, appLanguageState.value) ?: resourceStrings.extractString(78, appLanguageState.value)!!
-    )
-    stringEnterReturnPriceState.emit(
-      strings.extractString(79, appLanguageState.value) ?: resourceStrings.extractString(79, appLanguageState.value)!!
-    )
-    stringSelectCategoryState.emit(
-      strings.extractString(80, appLanguageState.value) ?: resourceStrings.extractString(80, appLanguageState.value)!!
-    )
-    stringSelectSupplierState.emit(
-      strings.extractString(81, appLanguageState.value) ?: resourceStrings.extractString(81, appLanguageState.value)!!
-    )
-    stringEditState.emit(
-      strings.extractString(82, appLanguageState.value) ?: resourceStrings.extractString(
-        82,
-        appLanguageState.value
-      )!!
-    )
-    stringChangePasswordState.emit(
-      strings.extractString(83, appLanguageState.value) ?: resourceStrings.extractString(83, appLanguageState.value)!!
-    )
-    stringNewPasswordState.emit(
-      strings.extractString(84, appLanguageState.value) ?: resourceStrings.extractString(84, appLanguageState.value)!!
-    )
-    stringEnterNewPasswordState.emit(
-      strings.extractString(85, appLanguageState.value) ?: resourceStrings.extractString(85, appLanguageState.value)!!
-    )
-    stringRepeatNewPasswordState.emit(
-      strings.extractString(86, appLanguageState.value) ?: resourceStrings.extractString(86, appLanguageState.value)!!
-    )
-    stringConfirmationPasswordState.emit(
-      strings.extractString(87, appLanguageState.value) ?: resourceStrings.extractString(87, appLanguageState.value)!!
-    )
-    stringRequiredToEditAccountState.emit(
-      strings.extractString(88, appLanguageState.value) ?: resourceStrings.extractString(88, appLanguageState.value)!!
-    )
-    stringAccountSuccessfullyUpdatedState.emit(
-      strings.extractString(89, appLanguageState.value) ?: resourceStrings.extractString(89, appLanguageState.value)!!
-    )
-    stringLoggingOutState.emit(
-      strings.extractString(90, appLanguageState.value) ?: resourceStrings.extractString(90, appLanguageState.value)!!
-    )
-    stringSessionTimeExpiredLoggingOutState.emit(
-      strings.extractString(91, appLanguageState.value) ?: resourceStrings.extractString(91, appLanguageState.value)!!
-    )
-    stringAliasState.emit(
-      strings.extractString(92, appLanguageState.value) ?: resourceStrings.extractString(
-        92,
-        appLanguageState.value
-      )!!
-    )
-    stringDescriptionState.emit(
-      strings.extractString(93, appLanguageState.value) ?: resourceStrings.extractString(93, appLanguageState.value)!!
-    )
-    stringEnterAliasState.emit(
-      strings.extractString(94, appLanguageState.value) ?: resourceStrings.extractString(
-        94,
-        appLanguageState.value
-      )!!
-    )
-    stringEnterDescriptionState.emit(
-      strings.extractString(95, appLanguageState.value) ?: resourceStrings.extractString(95, appLanguageState.value)!!
-    )
-    stringOptionalState.emit(
-      strings.extractString(96, appLanguageState.value) ?: resourceStrings.extractString(
-        96,
-        appLanguageState.value
-      )!!
-    )
-    stringLoggingInState.emit(
-      strings.extractString(97, appLanguageState.value) ?: resourceStrings.extractString(
-        97,
-        appLanguageState.value
-      )!!
-    )
-    stringSigningUpState.emit(
-      strings.extractString(98, appLanguageState.value) ?: resourceStrings.extractString(
-        98,
-        appLanguageState.value
-      )!!
-    )
-    stringCompanyFormState.emit(
-      strings.extractString(99, appLanguageState.value) ?: resourceStrings.extractString(
-        99,
-        appLanguageState.value
-      )!!
-    )
-    stringMeasurementUnitState.emit(
-      strings.extractString(100, appLanguageState.value) ?: resourceStrings.extractString(
-        100,
-        appLanguageState.value
-      )!!
-    )
-    stringNoActiveStoreState.emit(
-      strings.extractString(101, appLanguageState.value) ?: resourceStrings.extractString(
-        101,
-        appLanguageState.value
-      )!!
-    )
-    stringSelectInMenuState.emit(
-      strings.extractString(102, appLanguageState.value) ?: resourceStrings.extractString(
-        102,
-        appLanguageState.value
-      )!!
-    )
-    stringSupplyDataState.emit(
-      strings.extractString(103, appLanguageState.value) ?: resourceStrings.extractString(
-        103,
-        appLanguageState.value
-      )!!
-    )
-    stringSaleDataState.emit(
-      strings.extractString(104, appLanguageState.value) ?: resourceStrings.extractString(
-        104,
-        appLanguageState.value
-      )!!
-    )
-    stringReturnDataState.emit(
-      strings.extractString(105, appLanguageState.value) ?: resourceStrings.extractString(
-        105,
-        appLanguageState.value
-      )!!
-    )
-    stringAddSupplyDataState.emit(
-      strings.extractString(106, appLanguageState.value) ?: resourceStrings.extractString(
-        106,
-        appLanguageState.value
-      )!!
-    )
-    stringAddSaleDataState.emit(
-      strings.extractString(107, appLanguageState.value) ?: resourceStrings.extractString(
-        107,
-        appLanguageState.value
-      )!!
-    )
-    stringAddReturnDataState.emit(
-      strings.extractString(108, appLanguageState.value) ?: resourceStrings.extractString(
-        108,
-        appLanguageState.value
-      )!!
-    )
-    stringAddBarcodeState.emit(
-      strings.extractString(109, appLanguageState.value) ?: resourceStrings.extractString(
-        109,
-        appLanguageState.value
-      )!!
-    )
-    stringAddNameState.emit(
-      strings.extractString(110, appLanguageState.value) ?: resourceStrings.extractString(
-        110,
-        appLanguageState.value
-      )!!
-    )
-    stringPaymentState.emit(
-      strings.extractString(111, appLanguageState.value) ?: resourceStrings.extractString(
-        111,
-        appLanguageState.value
-      )!!
-    )
-    stringAllState.emit(
-      strings.extractString(112, appLanguageState.value) ?: resourceStrings.extractString(
-        112,
-        appLanguageState.value
-      )!!
-    )
-    stringQuickState.emit(
-      strings.extractString(113, appLanguageState.value) ?: resourceStrings.extractString(
-        113,
-        appLanguageState.value
-      )!!
-    )
-    stringCategoriesState.emit(
-      strings.extractString(114, appLanguageState.value) ?: resourceStrings.extractString(
-        114,
-        appLanguageState.value
-      )!!
-    )
-    stringMainState.emit(
-      strings.extractString(115, appLanguageState.value) ?: resourceStrings.extractString(
-        115,
-        appLanguageState.value
-      )!!
-    )
-    stringAddTranslationState.emit(
-      strings.extractString(116, appLanguageState.value) ?: resourceStrings.extractString(
-        116,
-        appLanguageState.value
-      )!!
-    )
-    stringSetActiveState.emit(
-      strings.extractString(117, appLanguageState.value) ?: resourceStrings.extractString(
-        117,
-        appLanguageState.value
-      )!!
-    )
-    stringOutOfStockState.emit(
-      strings.extractString(118, appLanguageState.value) ?: resourceStrings.extractString(
-        118,
-        appLanguageState.value
-      )!!
-    )
-    stringDeleteState.emit(
-      strings.extractString(119, appLanguageState.value) ?: resourceStrings.extractString(
-        119,
-        appLanguageState.value
-      )!!
-    )
-    stringCashState.emit(
-      strings.extractString(120, appLanguageState.value) ?: resourceStrings.extractString(
-        120,
-        appLanguageState.value
-      )!!
-    )
-    stringCashlessState.emit(
-      strings.extractString(121, appLanguageState.value) ?: resourceStrings.extractString(
-        121,
-        appLanguageState.value
-      )!!
-    )
-    stringMixedState.emit(
-      strings.extractString(122, appLanguageState.value) ?: resourceStrings.extractString(
-        122,
-        appLanguageState.value
-      )!!
-    )
-    stringAddState.emit(
-      strings.extractString(123, appLanguageState.value) ?: resourceStrings.extractString(
-        123,
-        appLanguageState.value
-      )!!
-    )
-    stringSubtractState.emit(
-      strings.extractString(124, appLanguageState.value) ?: resourceStrings.extractString(
-        124,
-        appLanguageState.value
-      )!!
-    )
-    stringCurrentQuantityDataState.emit(
-      strings.extractString(125, appLanguageState.value) ?: resourceStrings.extractString(
-        125,
-        appLanguageState.value
-      )!!
-    )
-    stringEnterQuantityState.emit(
-      strings.extractString(126, appLanguageState.value) ?: resourceStrings.extractString(
-        126,
-        appLanguageState.value
-      )!!
-    )
-    stringAddQuantityDataState.emit(
-      strings.extractString(127, appLanguageState.value) ?: resourceStrings.extractString(
-        127,
-        appLanguageState.value
-      )!!
-    )
-    stringShelfBatchState.emit(
-      strings.extractString(128, appLanguageState.value) ?: resourceStrings.extractString(
-        128,
-        appLanguageState.value
-      )!!
-    )
-    stringActiveStoreState.emit(
-      strings.extractString(129, appLanguageState.value) ?: resourceStrings.extractString(
-        129,
-        appLanguageState.value
-      )!!
-    )
-    stringMakeInactiveState.emit(
-      strings.extractString(130, appLanguageState.value) ?: resourceStrings.extractString(
-        130,
-        appLanguageState.value
-      )!!
-    )
-    stringCartEmptyState.emit(
-      strings.extractString(131, appLanguageState.value) ?: resourceStrings.extractString(
-        131,
-        appLanguageState.value
-      )!!
-    )
-    stringCompleteState.emit(
-      strings.extractString(132, appLanguageState.value) ?: resourceStrings.extractString(
-        132,
-        appLanguageState.value
-      )!!
-    )
-    stringNoActiveWorkshiftState.emit(
-      strings.extractString(133, appLanguageState.value) ?: resourceStrings.extractString(
-        133,
-        appLanguageState.value
-      )!!
-    )
-    stringCartState.emit(
-      strings.extractString(134, appLanguageState.value) ?: resourceStrings.extractString(
-        134,
-        appLanguageState.value
-      )!!
-    )
-    stringAppModeState.emit(
-      strings.extractString(135, appLanguageState.value) ?: resourceStrings.extractString(
-        135,
-        appLanguageState.value
-      )!!
-    )
-    stringFinancesState.emit(
-      strings.extractString(136, appLanguageState.value) ?: resourceStrings.extractString(
-        136,
-        appLanguageState.value
-      )!!
-    )
-    stringItemsState.emit(
-      strings.extractString(137, appLanguageState.value) ?: resourceStrings.extractString(
-        137,
-        appLanguageState.value
-      )!!
-    )
-    stringBatchesState.emit(
-      strings.extractString(138, appLanguageState.value) ?: resourceStrings.extractString(
-        138,
-        appLanguageState.value
-      )!!
-    )
-    stringStandardPricesForSuppliersState.emit(
-      strings.extractString(139, appLanguageState.value) ?: resourceStrings.extractString(
-        139,
-        appLanguageState.value
-      )!!
-    )
-    stringEditableForIndividualBatchesState.emit(
-      strings.extractString(140, appLanguageState.value) ?: resourceStrings.extractString(
-        140,
-        appLanguageState.value
-      )!!
-    )
-    stringBatchesDataState.emit(
-      strings.extractString(141, appLanguageState.value) ?: resourceStrings.extractString(
-        141,
-        appLanguageState.value
-      )!!
-    )
-    stringReceiptNumberState.emit(
-      strings.extractString(142, appLanguageState.value) ?: resourceStrings.extractString(
-        142,
-        appLanguageState.value
-      ) ?: stringReceiptNumberState.value
-    )
-    stringTransactionIdState.emit(
-      strings.extractString(143, appLanguageState.value) ?: resourceStrings.extractString(
-        143,
-        appLanguageState.value
-      ) ?: stringTransactionIdState.value
-    )
-    stringDateState.emit(
-      strings.extractString(144, appLanguageState.value) ?: resourceStrings.extractString(
-        144,
-        appLanguageState.value
-      ) ?: stringDateState.value
-    )
-    stringCashierState.emit(
-      strings.extractString(145, appLanguageState.value) ?: resourceStrings.extractString(
-        145,
-        appLanguageState.value
-      ) ?: stringCashierState.value
-    )
-    stringStoreState.emit(
-      strings.extractString(146, appLanguageState.value) ?: resourceStrings.extractString(
-        146,
-        appLanguageState.value
-      ) ?: stringStoreState.value
-    )
-    stringAddressState.emit(
-      strings.extractString(147, appLanguageState.value) ?: resourceStrings.extractString(
-        147,
-        appLanguageState.value
-      ) ?: stringAddressState.value
-    )
-    stringPhoneState.emit(
-      strings.extractString(148, appLanguageState.value) ?: resourceStrings.extractString(
-        148,
-        appLanguageState.value
-      ) ?: stringPhoneState.value
-    )
-    stringTotalState.emit(
-      strings.extractString(149, appLanguageState.value) ?: resourceStrings.extractString(
-        149,
-        appLanguageState.value
-      ) ?: stringTotalState.value
-    )
-    stringPaidState.emit(
-      strings.extractString(150, appLanguageState.value) ?: resourceStrings.extractString(
-        150,
-        appLanguageState.value
-      ) ?: stringPaidState.value
-    )
-    stringDebtState.emit(
-      strings.extractString(151, appLanguageState.value) ?: resourceStrings.extractString(
-        151,
-        appLanguageState.value
-      ) ?: stringDebtState.value
-    )
-    stringDebtorState.emit(
-      strings.extractString(152, appLanguageState.value) ?: resourceStrings.extractString(
-        152,
-        appLanguageState.value
-      ) ?: stringDebtorState.value
-    )
-    stringDebtorPhoneState.emit(
-      strings.extractString(153, appLanguageState.value) ?: resourceStrings.extractString(
-        153,
-        appLanguageState.value
-      ) ?: stringDebtorPhoneState.value
-    )
-    stringChangeState.emit(
-      strings.extractString(154, appLanguageState.value) ?: resourceStrings.extractString(
-        154,
-        appLanguageState.value
-      ) ?: stringChangeState.value
-    )
-    stringVatState.emit(
-      strings.extractString(155, appLanguageState.value) ?: resourceStrings.extractString(
-        155,
-        appLanguageState.value
-      ) ?: stringVatState.value
-    )
-    stringVatNotSpecifiedState.emit(
-      strings.extractString(156, appLanguageState.value) ?: resourceStrings.extractString(
-        156,
-        appLanguageState.value
-      ) ?: stringVatNotSpecifiedState.value
-    )
-    stringFiscalStatusState.emit(
-      strings.extractString(157, appLanguageState.value) ?: resourceStrings.extractString(
-        157,
-        appLanguageState.value
-      ) ?: stringFiscalStatusState.value
-    )
-    stringNonFiscalSoftwareReceiptState.emit(
-      strings.extractString(158, appLanguageState.value) ?: resourceStrings.extractString(
-        158,
-        appLanguageState.value
-      ) ?: stringNonFiscalSoftwareReceiptState.value
-    )
-    stringThankYouState.emit(
-      strings.extractString(159, appLanguageState.value) ?: resourceStrings.extractString(
-        159,
-        appLanguageState.value
-      ) ?: stringThankYouState.value
-    )
-    stringNoItemsState.emit(
-      strings.extractString(160, appLanguageState.value) ?: resourceStrings.extractString(
-        160,
-        appLanguageState.value
-      ) ?: stringNoItemsState.value
-    )
-    stringPdfState.emit(
-      strings.extractString(161, appLanguageState.value) ?: resourceStrings.extractString(
-        161,
-        appLanguageState.value
-      ) ?: stringPdfState.value
-    )
-    stringShareState.emit(
-      strings.extractString(162, appLanguageState.value) ?: resourceStrings.extractString(
-        162,
-        appLanguageState.value
-      ) ?: stringShareState.value
-    )
-    stringWhatsAppState.emit(
-      strings.extractString(163, appLanguageState.value) ?: resourceStrings.extractString(
-        163,
-        appLanguageState.value
-      ) ?: stringWhatsAppState.value
-    )
-    stringPrintState.emit(
-      strings.extractString(164, appLanguageState.value) ?: resourceStrings.extractString(
-        164,
-        appLanguageState.value
-      ) ?: stringPrintState.value
-    )
-    stringQuitState.emit(
-      strings.extractString(165, appLanguageState.value) ?: resourceStrings.extractString(
-        165,
-        appLanguageState.value
-      ) ?: stringQuitState.value
-    )
-    stringReceiptPdfSavedState.emit(
-      strings.extractString(166, appLanguageState.value) ?: resourceStrings.extractString(
-        166,
-        appLanguageState.value
-      ) ?: stringReceiptPdfSavedState.value
-    )
-    stringReceiptSharedState.emit(
-      strings.extractString(167, appLanguageState.value) ?: resourceStrings.extractString(
-        167,
-        appLanguageState.value
-      ) ?: stringReceiptSharedState.value
-    )
-    stringReceiptSentToWhatsAppState.emit(
-      strings.extractString(168, appLanguageState.value) ?: resourceStrings.extractString(
-        168,
-        appLanguageState.value
-      ) ?: stringReceiptSentToWhatsAppState.value
-    )
-    stringReceiptSentToPrinterState.emit(
-      strings.extractString(169, appLanguageState.value) ?: resourceStrings.extractString(
-        169,
-        appLanguageState.value
-      ) ?: stringReceiptSentToPrinterState.value
-    )
-    stringReceiptActionFailedState.emit(
-      strings.extractString(170, appLanguageState.value) ?: resourceStrings.extractString(
-        170,
-        appLanguageState.value
-      ) ?: stringReceiptActionFailedState.value
-    )
-    stringGoodsReceiptTitleState.emit(
-      strings.extractString(171, appLanguageState.value) ?: resourceStrings.extractString(
-        171,
-        appLanguageState.value
-      ) ?: stringGoodsReceiptTitleState.value
-    )
-    stringSaleReceiptTitleState.emit(
-      strings.extractString(172, appLanguageState.value) ?: resourceStrings.extractString(
-        172,
-        appLanguageState.value
-      ) ?: stringSaleReceiptTitleState.value
-    )
-    stringReturnReceiptTitleState.emit(
-      strings.extractString(173, appLanguageState.value) ?: resourceStrings.extractString(
-        173,
-        appLanguageState.value
-      ) ?: stringReturnReceiptTitleState.value
-    )
-    stringSupplyReceiptTitleState.emit(
-      strings.extractString(174, appLanguageState.value) ?: resourceStrings.extractString(
-        174,
-        appLanguageState.value
-      ) ?: stringSupplyReceiptTitleState.value
-    )
-    stringDraftState.emit(
-      strings.extractString(175, appLanguageState.value) ?: resourceStrings.extractString(
-        175,
-        appLanguageState.value
-      ) ?: stringDraftState.value
-    )
-    stringNoNameState.emit(
-      strings.extractString(176, appLanguageState.value) ?: resourceStrings.extractString(
-        176,
-        appLanguageState.value
-      ) ?: stringNoNameState.value
-    )
+    GlobalScope.launch(Dispatchers.ourIo) {
+        stringAppNameState.emit(
+            strings.extractString(0, appLanguageState.value) ?: resourceStrings.extractString(
+                0,
+                appLanguageState.value
+            )!!
+        )
+        stringLogInState.emit(
+            strings.extractString(1, appLanguageState.value) ?: resourceStrings.extractString(
+                1,
+                appLanguageState.value
+            )!!
+        )
+        stringPhoneNumberState.emit(
+            strings.extractString(2, appLanguageState.value) ?: resourceStrings.extractString(
+                2,
+                appLanguageState.value
+            )!!
+        )
+        stringEnterPhoneNumberState.emit(
+            strings.extractString(3, appLanguageState.value) ?: resourceStrings.extractString(3, appLanguageState.value)!!
+        )
+        stringEmailState.emit(
+            strings.extractString(4, appLanguageState.value) ?: resourceStrings.extractString(
+                4,
+                appLanguageState.value
+            )!!
+        )
+        stringEnterEmailAddressState.emit(
+            strings.extractString(5, appLanguageState.value) ?: resourceStrings.extractString(5, appLanguageState.value)!!
+        )
+        stringPasswordState.emit(
+            strings.extractString(6, appLanguageState.value) ?: resourceStrings.extractString(
+                6,
+                appLanguageState.value
+            )!!
+        )
+        stringEnterPasswordState.emit(
+            strings.extractString(7, appLanguageState.value) ?: resourceStrings.extractString(7, appLanguageState.value)!!
+        )
+        stringCancelState.emit(
+            strings.extractString(8, appLanguageState.value) ?: resourceStrings.extractString(
+                8,
+                appLanguageState.value
+            )!!
+        )
+        stringClearState.emit(
+            strings.extractString(9, appLanguageState.value) ?: resourceStrings.extractString(
+                9,
+                appLanguageState.value
+            )!!
+        )
+        stringAuthenticationFailedState.emit(
+            strings.extractString(10, appLanguageState.value) ?: resourceStrings.extractString(10, appLanguageState.value)!!
+        )
+        stringPhoneNumberMustBeState.emit(
+            strings.extractString(11, appLanguageState.value) ?: resourceStrings.extractString(11, appLanguageState.value)!!
+        )
+        stringEmailMustBeState.emit(
+            strings.extractString(12, appLanguageState.value) ?: resourceStrings.extractString(12, appLanguageState.value)!!
+        )
+        stringPasswordMustBeState.emit(
+            strings.extractString(13, appLanguageState.value) ?: resourceStrings.extractString(13, appLanguageState.value)!!
+        )
+        stringRepeatPasswordState.emit(
+            strings.extractString(14, appLanguageState.value) ?: resourceStrings.extractString(14, appLanguageState.value)!!
+        )
+        stringPasswordsMustMatchState.emit(
+            strings.extractString(15, appLanguageState.value) ?: resourceStrings.extractString(15, appLanguageState.value)!!
+        )
+        stringFirstNameState.emit(
+            strings.extractString(16, appLanguageState.value) ?: resourceStrings.extractString(
+                16,
+                appLanguageState.value
+            )!!
+        )
+        stringLastNameState.emit(
+            strings.extractString(17, appLanguageState.value) ?: resourceStrings.extractString(
+                17,
+                appLanguageState.value
+            )!!
+        )
+        stringEnterFirstNameState.emit(
+            strings.extractString(18, appLanguageState.value) ?: resourceStrings.extractString(18, appLanguageState.value)!!
+        )
+        stringEnterLastNameState.emit(
+            strings.extractString(19, appLanguageState.value) ?: resourceStrings.extractString(
+                19,
+                appLanguageState.value
+            )!!
+        )
+        stringUserWithThisPhoneNumberIsAlreadyRegisteredState.emit(
+            strings.extractString(20, appLanguageState.value) ?: resourceStrings.extractString(20, appLanguageState.value)!!
+        )
+        stringUserWithThisEmailAddressIsAlreadyRegisteredState.emit(
+            strings.extractString(21, appLanguageState.value) ?: resourceStrings.extractString(21, appLanguageState.value)!!
+        )
+        stringSignUpState.emit(
+            strings.extractString(22, appLanguageState.value) ?: resourceStrings.extractString(
+                22,
+                appLanguageState.value
+            )!!
+        )
+        stringConfirmState.emit(
+            strings.extractString(23, appLanguageState.value) ?: resourceStrings.extractString(
+                23,
+                appLanguageState.value
+            )!!
+        )
+        stringSaleState.emit(
+            strings.extractString(24, appLanguageState.value) ?: resourceStrings.extractString(
+                24,
+                appLanguageState.value
+            )!!
+        )
+        stringReturnState.emit(
+            strings.extractString(25, appLanguageState.value) ?: resourceStrings.extractString(
+                25,
+                appLanguageState.value
+            )!!
+        )
+        stringSupplyState.emit(
+            strings.extractString(26, appLanguageState.value) ?: resourceStrings.extractString(
+                26,
+                appLanguageState.value
+            )!!
+        )
+        stringStockState.emit(
+            strings.extractString(27, appLanguageState.value) ?: resourceStrings.extractString(
+                27,
+                appLanguageState.value
+            )!!
+        )
+        stringMenuState.emit(
+            strings.extractString(28, appLanguageState.value) ?: resourceStrings.extractString(
+                28,
+                appLanguageState.value
+            )!!
+        )
+        stringBackState.emit(
+            strings.extractString(29, appLanguageState.value) ?: resourceStrings.extractString(
+                29,
+                appLanguageState.value
+            )!!
+        )
+        stringAddGoodsItemState.emit(
+            strings.extractString(30, appLanguageState.value) ?: resourceStrings.extractString(
+                30,
+                appLanguageState.value
+            )!!
+        )
+        stringEditGoodsItemState.emit(
+            strings.extractString(31, appLanguageState.value) ?: resourceStrings.extractString(
+                31,
+                appLanguageState.value
+            )!!
+        )
+        stringUserAccountState.emit(
+            strings.extractString(32, appLanguageState.value) ?: resourceStrings.extractString(32, appLanguageState.value)!!
+        )
+        stringGoodsCategoriesState.emit(
+            strings.extractString(33, appLanguageState.value) ?: resourceStrings.extractString(33, appLanguageState.value)!!
+        )
+        stringAddGoodsCategoryState.emit(
+            strings.extractString(34, appLanguageState.value) ?: resourceStrings.extractString(34, appLanguageState.value)!!
+        )
+        stringEditGoodsCategoryState.emit(
+            strings.extractString(35, appLanguageState.value) ?: resourceStrings.extractString(35, appLanguageState.value)!!
+        )
+        stringStoresState.emit(
+            strings.extractString(36, appLanguageState.value) ?: resourceStrings.extractString(
+                36,
+                appLanguageState.value
+            )!!
+        )
+        stringAddStoreState.emit(
+            strings.extractString(37, appLanguageState.value) ?: resourceStrings.extractString(
+                37,
+                appLanguageState.value
+            )!!
+        )
+        stringEditStoreState.emit(
+            strings.extractString(38, appLanguageState.value) ?: resourceStrings.extractString(
+                38,
+                appLanguageState.value
+            )!!
+        )
+        stringSubscriptionState.emit(
+            strings.extractString(39, appLanguageState.value) ?: resourceStrings.extractString(
+                39,
+                appLanguageState.value
+            )!!
+        )
+        stringSubscriptionPlansState.emit(
+            strings.extractString(40, appLanguageState.value) ?: resourceStrings.extractString(40, appLanguageState.value)!!
+        )
+        stringTransactionHistoryState.emit(
+            strings.extractString(41, appLanguageState.value) ?: resourceStrings.extractString(41, appLanguageState.value)!!
+        )
+        stringReceiptState.emit(
+            strings.extractString(42, appLanguageState.value) ?: resourceStrings.extractString(
+                42,
+                appLanguageState.value
+            )!!
+        )
+        stringAnalyticsState.emit(
+            strings.extractString(43, appLanguageState.value) ?: resourceStrings.extractString(
+                43,
+                appLanguageState.value
+            )!!
+        )
+        stringWorkersState.emit(
+            strings.extractString(44, appLanguageState.value) ?: resourceStrings.extractString(
+                44,
+                appLanguageState.value
+            )!!
+        )
+        stringAddWorkerState.emit(
+            strings.extractString(45, appLanguageState.value) ?: resourceStrings.extractString(
+                45,
+                appLanguageState.value
+            )!!
+        )
+        stringEditWorkerState.emit(
+            strings.extractString(46, appLanguageState.value) ?: resourceStrings.extractString(
+                46,
+                appLanguageState.value
+            )!!
+        )
+        stringSuppliersState.emit(
+            strings.extractString(47, appLanguageState.value) ?: resourceStrings.extractString(
+                47,
+                appLanguageState.value
+            )!!
+        )
+        stringAddSupplierState.emit(
+            strings.extractString(48, appLanguageState.value) ?: resourceStrings.extractString(48, appLanguageState.value)!!
+        )
+        stringEditSupplierState.emit(
+            strings.extractString(49, appLanguageState.value) ?: resourceStrings.extractString(
+                49,
+                appLanguageState.value
+            )!!
+        )
+        stringDebtorsState.emit(
+            strings.extractString(50, appLanguageState.value) ?: resourceStrings.extractString(
+                50,
+                appLanguageState.value
+            )!!
+        )
+        stringCloseDebtState.emit(
+            strings.extractString(51, appLanguageState.value) ?: resourceStrings.extractString(
+                51,
+                appLanguageState.value
+            )!!
+        )
+        stringDevicesState.emit(
+            strings.extractString(52, appLanguageState.value) ?: resourceStrings.extractString(
+                52,
+                appLanguageState.value
+            )!!
+        )
+        stringAppLanguageState.emit(
+            strings.extractString(53, appLanguageState.value) ?: resourceStrings.extractString(53, appLanguageState.value)!!
+        )
+        stringAppThemeState.emit(
+            strings.extractString(54, appLanguageState.value) ?: resourceStrings.extractString(
+                54,
+                appLanguageState.value
+            )!!
+        )
+        stringSelectState.emit(
+            strings.extractString(55, appLanguageState.value) ?: resourceStrings.extractString(
+                55,
+                appLanguageState.value
+            )!!
+        )
+        stringUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegisteredState.emit(
+            strings.extractString(
+                56,
+                appLanguageState.value
+            ) ?: resourceStrings.extractString(56, appLanguageState.value)!!
+        )
+        stringFirstNameCannotBeEmptyOrJustWhitespacesState.emit(
+            strings.extractString(57, appLanguageState.value) ?: resourceStrings.extractString(57, appLanguageState.value)!!
+        )
+        stringLastNameCannotBeEmptyOrJustWhitespacesState.emit(
+            strings.extractString(58, appLanguageState.value) ?: resourceStrings.extractString(58, appLanguageState.value)!!
+        )
+        stringSystemLanguageState.emit(
+            strings.extractString(59, appLanguageState.value) ?: resourceStrings.extractString(59, appLanguageState.value)!!
+        )
+        stringBluetoothPermissionRequiredState.emit(
+            strings.extractString(60, appLanguageState.value) ?: resourceStrings.extractString(60, appLanguageState.value)!!
+        )
+        stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersState.emit(
+            strings.extractString(
+                61,
+                appLanguageState.value
+            ) ?: resourceStrings.extractString(61, appLanguageState.value)!!
+        )
+        stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersYouCanGrantItInAppSettingsState.emit(
+            strings.extractString(62, appLanguageState.value) ?: resourceStrings.extractString(62, appLanguageState.value)!!
+        )
+        stringBluetoothDisabledState.emit(
+            strings.extractString(63, appLanguageState.value) ?: resourceStrings.extractString(63, appLanguageState.value)!!
+        )
+        stringEnableForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersState.emit(
+            strings.extractString(
+                64,
+                appLanguageState.value
+            ) ?: resourceStrings.extractString(64, appLanguageState.value)!!
+        )
+        stringSearchByAnyDataState.emit(
+            strings.extractString(65, appLanguageState.value) ?: resourceStrings.extractString(65, appLanguageState.value)!!
+        )
+        stringListEmptyState.emit(
+            strings.extractString(66, appLanguageState.value) ?: resourceStrings.extractString(
+                66,
+                appLanguageState.value
+            )!!
+        )
+        stringNoMatchesState.emit(
+            strings.extractString(67, appLanguageState.value) ?: resourceStrings.extractString(
+                67,
+                appLanguageState.value
+            )!!
+        )
+        stringNameState.emit(
+            strings.extractString(68, appLanguageState.value) ?: resourceStrings.extractString(
+                68,
+                appLanguageState.value
+            )!!
+        )
+        stringBarcodeState.emit(
+            strings.extractString(69, appLanguageState.value) ?: resourceStrings.extractString(
+                69,
+                appLanguageState.value
+            )!!
+        )
+        stringSupplyPriceState.emit(
+            strings.extractString(70, appLanguageState.value) ?: resourceStrings.extractString(70, appLanguageState.value)!!
+        )
+        stringSalePriceState.emit(
+            strings.extractString(71, appLanguageState.value) ?: resourceStrings.extractString(
+                71,
+                appLanguageState.value
+            )!!
+        )
+        stringReturnPriceState.emit(
+            strings.extractString(72, appLanguageState.value) ?: resourceStrings.extractString(72, appLanguageState.value)!!
+        )
+        stringCategoryState.emit(
+            strings.extractString(73, appLanguageState.value) ?: resourceStrings.extractString(
+                73,
+                appLanguageState.value
+            )!!
+        )
+        stringSupplierState.emit(
+            strings.extractString(74, appLanguageState.value) ?: resourceStrings.extractString(
+                74,
+                appLanguageState.value
+            )!!
+        )
+        stringEnterBarcodeState.emit(
+            strings.extractString(75, appLanguageState.value) ?: resourceStrings.extractString(
+                75,
+                appLanguageState.value
+            )!!
+        )
+        stringEnterNameState.emit(
+            strings.extractString(76, appLanguageState.value) ?: resourceStrings.extractString(
+                76,
+                appLanguageState.value
+            )!!
+        )
+        stringEnterSupplyPriceState.emit(
+            strings.extractString(77, appLanguageState.value) ?: resourceStrings.extractString(77, appLanguageState.value)!!
+        )
+        stringEnterSalePriceState.emit(
+            strings.extractString(78, appLanguageState.value) ?: resourceStrings.extractString(78, appLanguageState.value)!!
+        )
+        stringEnterReturnPriceState.emit(
+            strings.extractString(79, appLanguageState.value) ?: resourceStrings.extractString(79, appLanguageState.value)!!
+        )
+        stringSelectCategoryState.emit(
+            strings.extractString(80, appLanguageState.value) ?: resourceStrings.extractString(80, appLanguageState.value)!!
+        )
+        stringSelectSupplierState.emit(
+            strings.extractString(81, appLanguageState.value) ?: resourceStrings.extractString(81, appLanguageState.value)!!
+        )
+        stringEditState.emit(
+            strings.extractString(82, appLanguageState.value) ?: resourceStrings.extractString(
+                82,
+                appLanguageState.value
+            )!!
+        )
+        stringChangePasswordState.emit(
+            strings.extractString(83, appLanguageState.value) ?: resourceStrings.extractString(83, appLanguageState.value)!!
+        )
+        stringNewPasswordState.emit(
+            strings.extractString(84, appLanguageState.value) ?: resourceStrings.extractString(84, appLanguageState.value)!!
+        )
+        stringEnterNewPasswordState.emit(
+            strings.extractString(85, appLanguageState.value) ?: resourceStrings.extractString(85, appLanguageState.value)!!
+        )
+        stringRepeatNewPasswordState.emit(
+            strings.extractString(86, appLanguageState.value) ?: resourceStrings.extractString(86, appLanguageState.value)!!
+        )
+        stringConfirmationPasswordState.emit(
+            strings.extractString(87, appLanguageState.value) ?: resourceStrings.extractString(87, appLanguageState.value)!!
+        )
+        stringRequiredToEditAccountState.emit(
+            strings.extractString(88, appLanguageState.value) ?: resourceStrings.extractString(88, appLanguageState.value)!!
+        )
+        stringAccountSuccessfullyUpdatedState.emit(
+            strings.extractString(89, appLanguageState.value) ?: resourceStrings.extractString(89, appLanguageState.value)!!
+        )
+        stringLoggingOutState.emit(
+            strings.extractString(90, appLanguageState.value) ?: resourceStrings.extractString(90, appLanguageState.value)!!
+        )
+        stringSessionTimeExpiredLoggingOutState.emit(
+            strings.extractString(91, appLanguageState.value) ?: resourceStrings.extractString(91, appLanguageState.value)!!
+        )
+        stringAliasState.emit(
+            strings.extractString(92, appLanguageState.value) ?: resourceStrings.extractString(
+                92,
+                appLanguageState.value
+            )!!
+        )
+        stringDescriptionState.emit(
+            strings.extractString(93, appLanguageState.value) ?: resourceStrings.extractString(93, appLanguageState.value)!!
+        )
+        stringEnterAliasState.emit(
+            strings.extractString(94, appLanguageState.value) ?: resourceStrings.extractString(
+                94,
+                appLanguageState.value
+            )!!
+        )
+        stringEnterDescriptionState.emit(
+            strings.extractString(95, appLanguageState.value) ?: resourceStrings.extractString(95, appLanguageState.value)!!
+        )
+        stringOptionalState.emit(
+            strings.extractString(96, appLanguageState.value) ?: resourceStrings.extractString(
+                96,
+                appLanguageState.value
+            )!!
+        )
+        stringLoggingInState.emit(
+            strings.extractString(97, appLanguageState.value) ?: resourceStrings.extractString(
+                97,
+                appLanguageState.value
+            )!!
+        )
+        stringSigningUpState.emit(
+            strings.extractString(98, appLanguageState.value) ?: resourceStrings.extractString(
+                98,
+                appLanguageState.value
+            )!!
+        )
+        stringCompanyFormState.emit(
+            strings.extractString(99, appLanguageState.value) ?: resourceStrings.extractString(
+                99,
+                appLanguageState.value
+            )!!
+        )
+        stringMeasurementUnitState.emit(
+            strings.extractString(100, appLanguageState.value) ?: resourceStrings.extractString(
+                100,
+                appLanguageState.value
+            )!!
+        )
+        stringNoActiveStoreState.emit(
+            strings.extractString(101, appLanguageState.value) ?: resourceStrings.extractString(
+                101,
+                appLanguageState.value
+            )!!
+        )
+        stringSelectInMenuState.emit(
+            strings.extractString(102, appLanguageState.value) ?: resourceStrings.extractString(
+                102,
+                appLanguageState.value
+            )!!
+        )
+        stringSupplyDataState.emit(
+            strings.extractString(103, appLanguageState.value) ?: resourceStrings.extractString(
+                103,
+                appLanguageState.value
+            )!!
+        )
+        stringSaleDataState.emit(
+            strings.extractString(104, appLanguageState.value) ?: resourceStrings.extractString(
+                104,
+                appLanguageState.value
+            )!!
+        )
+        stringReturnDataState.emit(
+            strings.extractString(105, appLanguageState.value) ?: resourceStrings.extractString(
+                105,
+                appLanguageState.value
+            )!!
+        )
+        stringAddSupplyDataState.emit(
+            strings.extractString(106, appLanguageState.value) ?: resourceStrings.extractString(
+                106,
+                appLanguageState.value
+            )!!
+        )
+        stringAddSaleDataState.emit(
+            strings.extractString(107, appLanguageState.value) ?: resourceStrings.extractString(
+                107,
+                appLanguageState.value
+            )!!
+        )
+        stringAddReturnDataState.emit(
+            strings.extractString(108, appLanguageState.value) ?: resourceStrings.extractString(
+                108,
+                appLanguageState.value
+            )!!
+        )
+        stringAddBarcodeState.emit(
+            strings.extractString(109, appLanguageState.value) ?: resourceStrings.extractString(
+                109,
+                appLanguageState.value
+            )!!
+        )
+        stringAddNameState.emit(
+            strings.extractString(110, appLanguageState.value) ?: resourceStrings.extractString(
+                110,
+                appLanguageState.value
+            )!!
+        )
+        stringPaymentState.emit(
+            strings.extractString(111, appLanguageState.value) ?: resourceStrings.extractString(
+                111,
+                appLanguageState.value
+            )!!
+        )
+        stringAllState.emit(
+            strings.extractString(112, appLanguageState.value) ?: resourceStrings.extractString(
+                112,
+                appLanguageState.value
+            )!!
+        )
+        stringQuickState.emit(
+            strings.extractString(113, appLanguageState.value) ?: resourceStrings.extractString(
+                113,
+                appLanguageState.value
+            )!!
+        )
+        stringCategoriesState.emit(
+            strings.extractString(114, appLanguageState.value) ?: resourceStrings.extractString(
+                114,
+                appLanguageState.value
+            )!!
+        )
+        stringMainState.emit(
+            strings.extractString(115, appLanguageState.value) ?: resourceStrings.extractString(
+                115,
+                appLanguageState.value
+            )!!
+        )
+        stringAddTranslationState.emit(
+            strings.extractString(116, appLanguageState.value) ?: resourceStrings.extractString(
+                116,
+                appLanguageState.value
+            )!!
+        )
+        stringSetActiveState.emit(
+            strings.extractString(117, appLanguageState.value) ?: resourceStrings.extractString(
+                117,
+                appLanguageState.value
+            )!!
+        )
+        stringOutOfStockState.emit(
+            strings.extractString(118, appLanguageState.value) ?: resourceStrings.extractString(
+                118,
+                appLanguageState.value
+            )!!
+        )
+        stringDeleteState.emit(
+            strings.extractString(119, appLanguageState.value) ?: resourceStrings.extractString(
+                119,
+                appLanguageState.value
+            )!!
+        )
+        stringCashState.emit(
+            strings.extractString(120, appLanguageState.value) ?: resourceStrings.extractString(
+                120,
+                appLanguageState.value
+            )!!
+        )
+        stringCashlessState.emit(
+            strings.extractString(121, appLanguageState.value) ?: resourceStrings.extractString(
+                121,
+                appLanguageState.value
+            )!!
+        )
+        stringMixedState.emit(
+            strings.extractString(122, appLanguageState.value) ?: resourceStrings.extractString(
+                122,
+                appLanguageState.value
+            )!!
+        )
+        stringAddState.emit(
+            strings.extractString(123, appLanguageState.value) ?: resourceStrings.extractString(
+                123,
+                appLanguageState.value
+            )!!
+        )
+        stringSubtractState.emit(
+            strings.extractString(124, appLanguageState.value) ?: resourceStrings.extractString(
+                124,
+                appLanguageState.value
+            )!!
+        )
+        stringCurrentQuantityDataState.emit(
+            strings.extractString(125, appLanguageState.value) ?: resourceStrings.extractString(
+                125,
+                appLanguageState.value
+            )!!
+        )
+        stringEnterQuantityState.emit(
+            strings.extractString(126, appLanguageState.value) ?: resourceStrings.extractString(
+                126,
+                appLanguageState.value
+            )!!
+        )
+        stringAddQuantityDataState.emit(
+            strings.extractString(127, appLanguageState.value) ?: resourceStrings.extractString(
+                127,
+                appLanguageState.value
+            )!!
+        )
+        stringShelfBatchState.emit(
+            strings.extractString(128, appLanguageState.value) ?: resourceStrings.extractString(
+                128,
+                appLanguageState.value
+            )!!
+        )
+        stringActiveStoreState.emit(
+            strings.extractString(129, appLanguageState.value) ?: resourceStrings.extractString(
+                129,
+                appLanguageState.value
+            )!!
+        )
+        stringMakeInactiveState.emit(
+            strings.extractString(130, appLanguageState.value) ?: resourceStrings.extractString(
+                130,
+                appLanguageState.value
+            )!!
+        )
+        stringCartEmptyState.emit(
+            strings.extractString(131, appLanguageState.value) ?: resourceStrings.extractString(
+                131,
+                appLanguageState.value
+            )!!
+        )
+        stringCompleteState.emit(
+            strings.extractString(132, appLanguageState.value) ?: resourceStrings.extractString(
+                132,
+                appLanguageState.value
+            )!!
+        )
+        stringNoActiveWorkshiftState.emit(
+            strings.extractString(133, appLanguageState.value) ?: resourceStrings.extractString(
+                133,
+                appLanguageState.value
+            )!!
+        )
+        stringCartState.emit(
+            strings.extractString(134, appLanguageState.value) ?: resourceStrings.extractString(
+                134,
+                appLanguageState.value
+            )!!
+        )
+        stringAppModeState.emit(
+            strings.extractString(135, appLanguageState.value) ?: resourceStrings.extractString(
+                135,
+                appLanguageState.value
+            )!!
+        )
+        stringFinancesState.emit(
+            strings.extractString(136, appLanguageState.value) ?: resourceStrings.extractString(
+                136,
+                appLanguageState.value
+            )!!
+        )
+        stringItemsState.emit(
+            strings.extractString(137, appLanguageState.value) ?: resourceStrings.extractString(
+                137,
+                appLanguageState.value
+            )!!
+        )
+        stringBatchesState.emit(
+            strings.extractString(138, appLanguageState.value) ?: resourceStrings.extractString(
+                138,
+                appLanguageState.value
+            )!!
+        )
+        stringStandardPricesForSuppliersState.emit(
+            strings.extractString(139, appLanguageState.value) ?: resourceStrings.extractString(
+                139,
+                appLanguageState.value
+            )!!
+        )
+        stringEditableForIndividualBatchesState.emit(
+            strings.extractString(140, appLanguageState.value) ?: resourceStrings.extractString(
+                140,
+                appLanguageState.value
+            )!!
+        )
+        stringBatchesDataState.emit(
+            strings.extractString(141, appLanguageState.value) ?: resourceStrings.extractString(
+                141,
+                appLanguageState.value
+            )!!
+        )
+        stringReceiptNumberState.emit(
+            strings.extractString(142, appLanguageState.value) ?: resourceStrings.extractString(
+                142,
+                appLanguageState.value
+            ) ?: stringReceiptNumberState.value
+        )
+        stringTransactionIdState.emit(
+            strings.extractString(143, appLanguageState.value) ?: resourceStrings.extractString(
+                143,
+                appLanguageState.value
+            ) ?: stringTransactionIdState.value
+        )
+        stringDateState.emit(
+            strings.extractString(144, appLanguageState.value) ?: resourceStrings.extractString(
+                144,
+                appLanguageState.value
+            ) ?: stringDateState.value
+        )
+        stringCashierState.emit(
+            strings.extractString(145, appLanguageState.value) ?: resourceStrings.extractString(
+                145,
+                appLanguageState.value
+            ) ?: stringCashierState.value
+        )
+        stringStoreState.emit(
+            strings.extractString(146, appLanguageState.value) ?: resourceStrings.extractString(
+                146,
+                appLanguageState.value
+            ) ?: stringStoreState.value
+        )
+        stringAddressState.emit(
+            strings.extractString(147, appLanguageState.value) ?: resourceStrings.extractString(
+                147,
+                appLanguageState.value
+            ) ?: stringAddressState.value
+        )
+        stringPhoneState.emit(
+            strings.extractString(148, appLanguageState.value) ?: resourceStrings.extractString(
+                148,
+                appLanguageState.value
+            ) ?: stringPhoneState.value
+        )
+        stringTotalState.emit(
+            strings.extractString(149, appLanguageState.value) ?: resourceStrings.extractString(
+                149,
+                appLanguageState.value
+            ) ?: stringTotalState.value
+        )
+        stringPaidState.emit(
+            strings.extractString(150, appLanguageState.value) ?: resourceStrings.extractString(
+                150,
+                appLanguageState.value
+            ) ?: stringPaidState.value
+        )
+        stringDebtState.emit(
+            strings.extractString(151, appLanguageState.value) ?: resourceStrings.extractString(
+                151,
+                appLanguageState.value
+            ) ?: stringDebtState.value
+        )
+        stringDebtorState.emit(
+            strings.extractString(152, appLanguageState.value) ?: resourceStrings.extractString(
+                152,
+                appLanguageState.value
+            ) ?: stringDebtorState.value
+        )
+        stringDebtorPhoneState.emit(
+            strings.extractString(153, appLanguageState.value) ?: resourceStrings.extractString(
+                153,
+                appLanguageState.value
+            ) ?: stringDebtorPhoneState.value
+        )
+        stringChangeState.emit(
+            strings.extractString(154, appLanguageState.value) ?: resourceStrings.extractString(
+                154,
+                appLanguageState.value
+            ) ?: stringChangeState.value
+        )
+        stringVatState.emit(
+            strings.extractString(155, appLanguageState.value) ?: resourceStrings.extractString(
+                155,
+                appLanguageState.value
+            ) ?: stringVatState.value
+        )
+        stringVatNotSpecifiedState.emit(
+            strings.extractString(156, appLanguageState.value) ?: resourceStrings.extractString(
+                156,
+                appLanguageState.value
+            ) ?: stringVatNotSpecifiedState.value
+        )
+        stringFiscalStatusState.emit(
+            strings.extractString(157, appLanguageState.value) ?: resourceStrings.extractString(
+                157,
+                appLanguageState.value
+            ) ?: stringFiscalStatusState.value
+        )
+        stringNonFiscalSoftwareReceiptState.emit(
+            strings.extractString(158, appLanguageState.value) ?: resourceStrings.extractString(
+                158,
+                appLanguageState.value
+            ) ?: stringNonFiscalSoftwareReceiptState.value
+        )
+        stringThankYouState.emit(
+            strings.extractString(159, appLanguageState.value) ?: resourceStrings.extractString(
+                159,
+                appLanguageState.value
+            ) ?: stringThankYouState.value
+        )
+        stringNoItemsState.emit(
+            strings.extractString(160, appLanguageState.value) ?: resourceStrings.extractString(
+                160,
+                appLanguageState.value
+            ) ?: stringNoItemsState.value
+        )
+        stringPdfState.emit(
+            strings.extractString(161, appLanguageState.value) ?: resourceStrings.extractString(
+                161,
+                appLanguageState.value
+            ) ?: stringPdfState.value
+        )
+        stringShareState.emit(
+            strings.extractString(162, appLanguageState.value) ?: resourceStrings.extractString(
+                162,
+                appLanguageState.value
+            ) ?: stringShareState.value
+        )
+        stringWhatsAppState.emit(
+            strings.extractString(163, appLanguageState.value) ?: resourceStrings.extractString(
+                163,
+                appLanguageState.value
+            ) ?: stringWhatsAppState.value
+        )
+        stringPrintState.emit(
+            strings.extractString(164, appLanguageState.value) ?: resourceStrings.extractString(
+                164,
+                appLanguageState.value
+            ) ?: stringPrintState.value
+        )
+        stringQuitState.emit(
+            strings.extractString(165, appLanguageState.value) ?: resourceStrings.extractString(
+                165,
+                appLanguageState.value
+            ) ?: stringQuitState.value
+        )
+        stringReceiptPdfSavedState.emit(
+            strings.extractString(166, appLanguageState.value) ?: resourceStrings.extractString(
+                166,
+                appLanguageState.value
+            ) ?: stringReceiptPdfSavedState.value
+        )
+        stringReceiptSharedState.emit(
+            strings.extractString(167, appLanguageState.value) ?: resourceStrings.extractString(
+                167,
+                appLanguageState.value
+            ) ?: stringReceiptSharedState.value
+        )
+        stringReceiptSentToWhatsAppState.emit(
+            strings.extractString(168, appLanguageState.value) ?: resourceStrings.extractString(
+                168,
+                appLanguageState.value
+            ) ?: stringReceiptSentToWhatsAppState.value
+        )
+        stringReceiptSentToPrinterState.emit(
+            strings.extractString(169, appLanguageState.value) ?: resourceStrings.extractString(
+                169,
+                appLanguageState.value
+            ) ?: stringReceiptSentToPrinterState.value
+        )
+        stringReceiptActionFailedState.emit(
+            strings.extractString(170, appLanguageState.value) ?: resourceStrings.extractString(
+                170,
+                appLanguageState.value
+            ) ?: stringReceiptActionFailedState.value
+        )
+        stringGoodsReceiptTitleState.emit(
+            strings.extractString(171, appLanguageState.value) ?: resourceStrings.extractString(
+                171,
+                appLanguageState.value
+            ) ?: stringGoodsReceiptTitleState.value
+        )
+        stringSaleReceiptTitleState.emit(
+            strings.extractString(172, appLanguageState.value) ?: resourceStrings.extractString(
+                172,
+                appLanguageState.value
+            ) ?: stringSaleReceiptTitleState.value
+        )
+        stringReturnReceiptTitleState.emit(
+            strings.extractString(173, appLanguageState.value) ?: resourceStrings.extractString(
+                173,
+                appLanguageState.value
+            ) ?: stringReturnReceiptTitleState.value
+        )
+        stringSupplyReceiptTitleState.emit(
+            strings.extractString(174, appLanguageState.value) ?: resourceStrings.extractString(
+                174,
+                appLanguageState.value
+            ) ?: stringSupplyReceiptTitleState.value
+        )
+        stringDraftState.emit(
+            strings.extractString(175, appLanguageState.value) ?: resourceStrings.extractString(
+                175,
+                appLanguageState.value
+            ) ?: stringDraftState.value
+        )
+        stringNoNameState.emit(
+            strings.extractString(176, appLanguageState.value) ?: resourceStrings.extractString(
+                176,
+                appLanguageState.value
+            ) ?: stringNoNameState.value
+        )
 
-  }
+    }
 }
 
 fun updateDrawables(
-  drawables: List<StylizedDrawablePathsGroupDataModel>,
-  resourceDrawables: List<StylizedDrawablePathsGroupDataModel>
+    drawables: List<StylizedDrawablePathsGroupDataModel>,
+    resourceDrawables: List<StylizedDrawablePathsGroupDataModel>
 ) {
-  GlobalScope.launch(Dispatchers.ourIo) {
-    drawablePathAITALogoState.emit(
-      drawables.extractPath(0, appThemeIdState.value) ?: resourceDrawables.extractPath(0, appThemeIdState.value)!!
-    )
-    drawablePathIconPasswordState.emit(
-      drawables.extractPath(1, appThemeIdState.value) ?: resourceDrawables.extractPath(1, appThemeIdState.value)!!
-    )
-    drawablePathIconCancelState.emit(
-      drawables.extractPath(2, appThemeIdState.value) ?: resourceDrawables.extractPath(2, appThemeIdState.value)!!
-    )
-    drawablePathIconEyeHideState.emit(
-      drawables.extractPath(3, appThemeIdState.value) ?: resourceDrawables.extractPath(3, appThemeIdState.value)!!
-    )
-    drawablePathIconEyeShowState.emit(
-      drawables.extractPath(4, appThemeIdState.value) ?: resourceDrawables.extractPath(4, appThemeIdState.value)!!
-    )
-    drawablePathIconEmailState.emit(
-      drawables.extractPath(5, appThemeIdState.value) ?: resourceDrawables.extractPath(
-        5,
-        appThemeIdState.value
-      )!!
-    )
-    drawablePathIconPhoneState.emit(
-      drawables.extractPath(6, appThemeIdState.value) ?: resourceDrawables.extractPath(
-        6,
-        appThemeIdState.value
-      )!!
-    )
-    drawablePathIconExpandMoreState.emit(
-      drawables.extractPath(7, appThemeIdState.value) ?: resourceDrawables.extractPath(7, appThemeIdState.value)!!
-    )
-    drawablePathIconExpandLessState.emit(
-      drawables.extractPath(8, appThemeIdState.value) ?: resourceDrawables.extractPath(8, appThemeIdState.value)!!
-    )
-    drawablePathIconPersonState.emit(
-      drawables.extractPath(9, appThemeIdState.value) ?: resourceDrawables.extractPath(9, appThemeIdState.value)!!
-    )
-    drawablePathIconTransactionSaleState.emit(
-      drawables.extractPath(10, appThemeIdState.value) ?: resourceDrawables.extractPath(10, appThemeIdState.value)!!
-    )
-    drawablePathIconTransactionReturnState.emit(
-      drawables.extractPath(11, appThemeIdState.value) ?: resourceDrawables.extractPath(11, appThemeIdState.value)!!
-    )
-    drawablePathIconTransactionSupplyState.emit(
-      drawables.extractPath(12, appThemeIdState.value) ?: resourceDrawables.extractPath(12, appThemeIdState.value)!!
-    )
-    drawablePathIconStockState.emit(
-      drawables.extractPath(13, appThemeIdState.value) ?: resourceDrawables.extractPath(13, appThemeIdState.value)!!
-    )
-    drawablePathIconMenuState.emit(
-      drawables.extractPath(14, appThemeIdState.value) ?: resourceDrawables.extractPath(
-        14,
-        appThemeIdState.value
-      )!!
-    )
-    drawablePathIconBackArrowState.emit(
-      drawables.extractPath(15, appThemeIdState.value) ?: resourceDrawables.extractPath(15, appThemeIdState.value)!!
-    )
-    drawablePathIconAddState.emit(
-      drawables.extractPath(16, appThemeIdState.value) ?: resourceDrawables.extractPath(
-        16,
-        appThemeIdState.value
-      )!!
-    )
-    drawablePathIconUserAccountState.emit(
-      drawables.extractPath(17, appThemeIdState.value) ?: resourceDrawables.extractPath(17, appThemeIdState.value)!!
-    )
-    drawablePathIconGoodsCategoriesState.emit(
-      drawables.extractPath(18, appThemeIdState.value) ?: resourceDrawables.extractPath(18, appThemeIdState.value)!!
-    )
-    drawablePathIconStoresState.emit(
-      drawables.extractPath(19, appThemeIdState.value) ?: resourceDrawables.extractPath(19, appThemeIdState.value)!!
-    )
-    drawablePathIconTransactionHistoryState.emit(
-      drawables.extractPath(20, appThemeIdState.value) ?: resourceDrawables.extractPath(20, appThemeIdState.value)!!
-    )
-    drawablePathIconAnalyticsState.emit(
-      drawables.extractPath(21, appThemeIdState.value) ?: resourceDrawables.extractPath(21, appThemeIdState.value)!!
-    )
-    drawablePathIconWorkersState.emit(
-      drawables.extractPath(22, appThemeIdState.value) ?: resourceDrawables.extractPath(22, appThemeIdState.value)!!
-    )
-    drawablePathIconSuppliersState.emit(
-      drawables.extractPath(23, appThemeIdState.value) ?: resourceDrawables.extractPath(23, appThemeIdState.value)!!
-    )
-    drawablePathIconDebtorsState.emit(
-      drawables.extractPath(24, appThemeIdState.value) ?: resourceDrawables.extractPath(24, appThemeIdState.value)!!
-    )
-    drawablePathIconDevicesState.emit(
-      drawables.extractPath(25, appThemeIdState.value) ?: resourceDrawables.extractPath(25, appThemeIdState.value)!!
-    )
-    drawablePathIconAppLanguageState.emit(
-      drawables.extractPath(26, appThemeIdState.value) ?: resourceDrawables.extractPath(26, appThemeIdState.value)!!
-    )
-    drawablePathIconAppThemeState.emit(
-      drawables.extractPath(27, appThemeIdState.value) ?: resourceDrawables.extractPath(27, appThemeIdState.value)!!
-    )
-    drawablePathIconCheckState.emit(
-      drawables.extractPath(28, appThemeIdState.value) ?: resourceDrawables.extractPath(28, appThemeIdState.value)!!
-    )
-    drawablePathIconEditState.emit(
-      drawables.extractPath(29, appThemeIdState.value) ?: resourceDrawables.extractPath(
-        29,
-        appThemeIdState.value
-      )!!
-    )
-    drawablePathIconSettingsState.emit(
-      drawables.extractPath(30, appThemeIdState.value) ?: resourceDrawables.extractPath(30, appThemeIdState.value)!!
-    )
-    drawablePathIconSearchState.emit(
-      drawables.extractPath(31, appThemeIdState.value) ?: resourceDrawables.extractPath(31, appThemeIdState.value)!!
-    )
-    drawablePathIconBarcodeCamScannerState.emit(
-      drawables.extractPath(32, appThemeIdState.value) ?: resourceDrawables.extractPath(32, appThemeIdState.value)!!
-    )
-    drawablePathIconDeleteState.emit(
-      drawables.extractPath(33, appThemeIdState.value) ?: resourceDrawables.extractPath(33, appThemeIdState.value)!!
-    )
-    drawablePathIconExitState.emit(
-      drawables.extractPath(34, appThemeIdState.value) ?: resourceDrawables.extractPath(34, appThemeIdState.value)!!
-    )
-    drawablePathIconSwitchState.emit(
-      drawables.extractPath(35, appThemeIdState.value) ?: resourceDrawables.extractPath(35, appThemeIdState.value)!!
-    )
-    drawablePathIconCartState.emit(
-      drawables.extractPath(36, appThemeIdState.value) ?: resourceDrawables.extractPath(36, appThemeIdState.value)!!
-    )
-    drawablePathIconAddCartState.emit(
-      drawables.extractPath(37, appThemeIdState.value) ?: resourceDrawables.extractPath(37, appThemeIdState.value)!!
-    )
-    drawablePathIconSubtractState.emit(
-      drawables.extractPath(38, appThemeIdState.value) ?: resourceDrawables.extractPath(38, appThemeIdState.value)!!
-    )
-    drawablePathIconReceiptState.emit(
-      drawables.extractPath(39, appThemeIdState.value) ?: resourceDrawables.extractPath(39, appThemeIdState.value)!!
-    )
-    drawablePathIconFinancesState.emit(
-      drawables.extractPath(40, appThemeIdState.value) ?: resourceDrawables.extractPath(40, appThemeIdState.value)!!
-    )
-  }
+    GlobalScope.launch(Dispatchers.ourIo) {
+        drawablePathAITALogoState.emit(
+            drawables.extractPath(0, appThemeIdState.value) ?: resourceDrawables.extractPath(0, appThemeIdState.value)!!
+        )
+        drawablePathIconPasswordState.emit(
+            drawables.extractPath(1, appThemeIdState.value) ?: resourceDrawables.extractPath(1, appThemeIdState.value)!!
+        )
+        drawablePathIconCancelState.emit(
+            drawables.extractPath(2, appThemeIdState.value) ?: resourceDrawables.extractPath(2, appThemeIdState.value)!!
+        )
+        drawablePathIconEyeHideState.emit(
+            drawables.extractPath(3, appThemeIdState.value) ?: resourceDrawables.extractPath(3, appThemeIdState.value)!!
+        )
+        drawablePathIconEyeShowState.emit(
+            drawables.extractPath(4, appThemeIdState.value) ?: resourceDrawables.extractPath(4, appThemeIdState.value)!!
+        )
+        drawablePathIconEmailState.emit(
+            drawables.extractPath(5, appThemeIdState.value) ?: resourceDrawables.extractPath(
+                5,
+                appThemeIdState.value
+            )!!
+        )
+        drawablePathIconPhoneState.emit(
+            drawables.extractPath(6, appThemeIdState.value) ?: resourceDrawables.extractPath(
+                6,
+                appThemeIdState.value
+            )!!
+        )
+        drawablePathIconExpandMoreState.emit(
+            drawables.extractPath(7, appThemeIdState.value) ?: resourceDrawables.extractPath(7, appThemeIdState.value)!!
+        )
+        drawablePathIconExpandLessState.emit(
+            drawables.extractPath(8, appThemeIdState.value) ?: resourceDrawables.extractPath(8, appThemeIdState.value)!!
+        )
+        drawablePathIconPersonState.emit(
+            drawables.extractPath(9, appThemeIdState.value) ?: resourceDrawables.extractPath(9, appThemeIdState.value)!!
+        )
+        drawablePathIconTransactionSaleState.emit(
+            drawables.extractPath(10, appThemeIdState.value) ?: resourceDrawables.extractPath(10, appThemeIdState.value)!!
+        )
+        drawablePathIconTransactionReturnState.emit(
+            drawables.extractPath(11, appThemeIdState.value) ?: resourceDrawables.extractPath(11, appThemeIdState.value)!!
+        )
+        drawablePathIconTransactionSupplyState.emit(
+            drawables.extractPath(12, appThemeIdState.value) ?: resourceDrawables.extractPath(12, appThemeIdState.value)!!
+        )
+        drawablePathIconStockState.emit(
+            drawables.extractPath(13, appThemeIdState.value) ?: resourceDrawables.extractPath(13, appThemeIdState.value)!!
+        )
+        drawablePathIconMenuState.emit(
+            drawables.extractPath(14, appThemeIdState.value) ?: resourceDrawables.extractPath(
+                14,
+                appThemeIdState.value
+            )!!
+        )
+        drawablePathIconBackArrowState.emit(
+            drawables.extractPath(15, appThemeIdState.value) ?: resourceDrawables.extractPath(15, appThemeIdState.value)!!
+        )
+        drawablePathIconAddState.emit(
+            drawables.extractPath(16, appThemeIdState.value) ?: resourceDrawables.extractPath(
+                16,
+                appThemeIdState.value
+            )!!
+        )
+        drawablePathIconUserAccountState.emit(
+            drawables.extractPath(17, appThemeIdState.value) ?: resourceDrawables.extractPath(17, appThemeIdState.value)!!
+        )
+        drawablePathIconGoodsCategoriesState.emit(
+            drawables.extractPath(18, appThemeIdState.value) ?: resourceDrawables.extractPath(18, appThemeIdState.value)!!
+        )
+        drawablePathIconStoresState.emit(
+            drawables.extractPath(19, appThemeIdState.value) ?: resourceDrawables.extractPath(19, appThemeIdState.value)!!
+        )
+        drawablePathIconTransactionHistoryState.emit(
+            drawables.extractPath(20, appThemeIdState.value) ?: resourceDrawables.extractPath(20, appThemeIdState.value)!!
+        )
+        drawablePathIconAnalyticsState.emit(
+            drawables.extractPath(21, appThemeIdState.value) ?: resourceDrawables.extractPath(21, appThemeIdState.value)!!
+        )
+        drawablePathIconWorkersState.emit(
+            drawables.extractPath(22, appThemeIdState.value) ?: resourceDrawables.extractPath(22, appThemeIdState.value)!!
+        )
+        drawablePathIconSuppliersState.emit(
+            drawables.extractPath(23, appThemeIdState.value) ?: resourceDrawables.extractPath(23, appThemeIdState.value)!!
+        )
+        drawablePathIconDebtorsState.emit(
+            drawables.extractPath(24, appThemeIdState.value) ?: resourceDrawables.extractPath(24, appThemeIdState.value)!!
+        )
+        drawablePathIconDevicesState.emit(
+            drawables.extractPath(25, appThemeIdState.value) ?: resourceDrawables.extractPath(25, appThemeIdState.value)!!
+        )
+        drawablePathIconAppLanguageState.emit(
+            drawables.extractPath(26, appThemeIdState.value) ?: resourceDrawables.extractPath(26, appThemeIdState.value)!!
+        )
+        drawablePathIconAppThemeState.emit(
+            drawables.extractPath(27, appThemeIdState.value) ?: resourceDrawables.extractPath(27, appThemeIdState.value)!!
+        )
+        drawablePathIconCheckState.emit(
+            drawables.extractPath(28, appThemeIdState.value) ?: resourceDrawables.extractPath(28, appThemeIdState.value)!!
+        )
+        drawablePathIconEditState.emit(
+            drawables.extractPath(29, appThemeIdState.value) ?: resourceDrawables.extractPath(
+                29,
+                appThemeIdState.value
+            )!!
+        )
+        drawablePathIconSettingsState.emit(
+            drawables.extractPath(30, appThemeIdState.value) ?: resourceDrawables.extractPath(30, appThemeIdState.value)!!
+        )
+        drawablePathIconSearchState.emit(
+            drawables.extractPath(31, appThemeIdState.value) ?: resourceDrawables.extractPath(31, appThemeIdState.value)!!
+        )
+        drawablePathIconBarcodeCamScannerState.emit(
+            drawables.extractPath(32, appThemeIdState.value) ?: resourceDrawables.extractPath(32, appThemeIdState.value)!!
+        )
+        drawablePathIconDeleteState.emit(
+            drawables.extractPath(33, appThemeIdState.value) ?: resourceDrawables.extractPath(33, appThemeIdState.value)!!
+        )
+        drawablePathIconExitState.emit(
+            drawables.extractPath(34, appThemeIdState.value) ?: resourceDrawables.extractPath(34, appThemeIdState.value)!!
+        )
+        drawablePathIconSwitchState.emit(
+            drawables.extractPath(35, appThemeIdState.value) ?: resourceDrawables.extractPath(35, appThemeIdState.value)!!
+        )
+        drawablePathIconCartState.emit(
+            drawables.extractPath(36, appThemeIdState.value) ?: resourceDrawables.extractPath(36, appThemeIdState.value)!!
+        )
+        drawablePathIconAddCartState.emit(
+            drawables.extractPath(37, appThemeIdState.value) ?: resourceDrawables.extractPath(37, appThemeIdState.value)!!
+        )
+        drawablePathIconSubtractState.emit(
+            drawables.extractPath(38, appThemeIdState.value) ?: resourceDrawables.extractPath(38, appThemeIdState.value)!!
+        )
+        drawablePathIconReceiptState.emit(
+            drawables.extractPath(39, appThemeIdState.value) ?: resourceDrawables.extractPath(39, appThemeIdState.value)!!
+        )
+        drawablePathIconFinancesState.emit(
+            drawables.extractPath(40, appThemeIdState.value) ?: resourceDrawables.extractPath(40, appThemeIdState.value)!!
+        )
+    }
 }
 
 suspend fun putLocalKv(key: String, value: String?) {
-  appDatabase.app_databaseQueries.insertKv(key, value)
+    appDatabase.app_databaseQueries.insertKv(key, value)
 }
 
 suspend fun getLocalKv(key: String): String? =
-  appDatabase.app_databaseQueries.selectKvByKey(key).awaitAsOneOrNull()?.value_
+    appDatabase.app_databaseQueries.selectKvByKey(key).awaitAsOneOrNull()?.value_
 
 suspend fun deleteLocalKv(key: String) {
-  appDatabase.app_databaseQueries.deleteKv(key)
+    appDatabase.app_databaseQueries.deleteKv(key)
 }
 
 fun observeLocalKv(key: String): Flow<String?> =
-  appDatabase.app_databaseQueries.selectKvByKey(key)
-    .asFlow()
-    .mapToOneOrNull(Dispatchers.ourIo)
-    .map {
-      it?.value_
-    }
+    appDatabase.app_databaseQueries.selectKvByKey(key)
+        .asFlow()
+        .mapToOneOrNull(Dispatchers.ourIo)
+        .map {
+            it?.value_
+        }
 
 fun upsertCart(
-  id: String,
-  transactionTypeIndex: Int,
-  clientId: Int,
-  quantity: QuantityDataModel
+    id: String,
+    transactionTypeIndex: Int,
+    clientId: Int,
+    quantity: QuantityDataModel
 ) {
-  GlobalScope.launch {
-    appDatabase.app_databaseQueries.upsertCart(
-      id,
-      transactionTypeIndex.toLong(),
-      clientId.toLong(),
-      jsonBase.encodeToString(quantity)
-    )
-  }
+    GlobalScope.launch {
+        appDatabase.app_databaseQueries.upsertCart(
+            id,
+            transactionTypeIndex.toLong(),
+            clientId.toLong(),
+            jsonBase.encodeToString(quantity)
+        )
+    }
 }
 
 suspend fun deleteCart(transactionTypeIndex: Int, clientId: Int) {
-  appDatabase.app_databaseQueries.deleteCart(transactionTypeIndex.toLong(), clientId.toLong())
+    appDatabase.app_databaseQueries.deleteCart(transactionTypeIndex.toLong(), clientId.toLong())
+    removeCartSaleMethodIds(transactionTypeIndex, clientId)
 }
 
 fun deleteCartById(id: String, transactionTypeIndex: Int, clientId: Int) {
-  GlobalScope.launch {
-    appDatabase.app_databaseQueries.deleteCartById(id, transactionTypeIndex.toLong(), clientId.toLong())
-  }
+    GlobalScope.launch {
+        appDatabase.app_databaseQueries.deleteCartById(id, transactionTypeIndex.toLong(), clientId.toLong())
+        removeCartSaleMethodId(transactionTypeIndex, clientId, id)
+    }
 }
 
 suspend fun deleteCartItemById(id: String) {
-  appDatabase.app_databaseQueries.deleteById(id)
+    appDatabase.app_databaseQueries.deleteById(id)
 }
 
 fun observeCart(transactionTypeIndex: Int, clientId: Int): Flow<List<GoodsItemInCartDataModel>?> =
-  appDatabase.app_databaseQueries.getCart(transactionTypeIndex.toLong(), clientId.toLong())
-    .asFlow()
-    .mapToList(Dispatchers.ourIo)
-    .map { rows ->
-      rows.map { row ->
-        GoodsItemInCartDataModel(
-          id = row.id,
-          transactionTypeIndex = row.transactionTypeIndex.toInt(),
-          clientId = row.clientId.toInt(),
-          quantity = jsonBase.decodeFromString(row.quantity),
-          timeAdded = row.timeAdded
-        )
-      }
+    appDatabase.app_databaseQueries.getCart(transactionTypeIndex.toLong(), clientId.toLong())
+        .asFlow()
+        .mapToList(Dispatchers.ourIo)
+        .map { rows ->
+            rows.map { row ->
+                GoodsItemInCartDataModel(
+                    id = row.id,
+                    transactionTypeIndex = row.transactionTypeIndex.toInt(),
+                    clientId = row.clientId.toInt(),
+                    quantity = jsonBase.decodeFromString(row.quantity),
+                    timeAdded = row.timeAdded
+                )
+            }
+        }
+
+private fun createNotificationDataModel(
+    message: String,
+    type: NotificationType,
+    title: String = "",
+    category: String = when (type) {
+        NotificationType.Positive -> "positive"
+        NotificationType.Negative -> "negative"
+        NotificationType.Neutral -> "neutral"
     }
+): NotificationDataModel {
+    val now = getCurrentTimeMillis()
+    return NotificationDataModel(
+        id = "${now}_${message.hashCode()}_${type.name}",
+        userId = userAccountState.payloadValue?.id,
+        storeId = activeStoreIdState.value,
+        title = title,
+        message = message,
+        type = type,
+        category = category,
+        source = "app",
+        metadata = emptyMap(),
+        createdAtMillis = now,
+        shownAtMillis = now,
+        readAtMillis = null,
+        isSavedOnServer = false
+    )
+}
+
+private suspend fun appendNotificationLocally(notification: NotificationDataModel) {
+    val old = notificationsState.payloadValue.orEmpty()
+    notificationsState.emit(
+        DataState.Success(
+            (listOf(notification) + old)
+                .distinctBy { it.id }
+                .sortedByDescending { it.createdAtMillis }
+                .take(500)
+        )
+    )
+}
+
+private fun pushInAppNotification(notification: NotificationDataModel, transient: Boolean) {
+    GlobalScope.launch(Dispatchers.ourIo) {
+        latestInAppNotificationState.emit(notification)
+        activeInAppNotificationsState.emit(
+            (listOf(notification) + activeInAppNotificationsState.value)
+                .distinctBy { it.id }
+                .take(25)
+        )
+        appendNotificationLocally(notification)
+        saveNotificationToServer(notification)
+
+        // Popup cards are temporary visual toasts; the notification itself stays in history.
+        // The transient flag is kept for call-site compatibility, but popups always disappear.
+        delay(5000)
+        activeInAppNotificationsState.emit(activeInAppNotificationsState.value.filter { it.id != notification.id })
+        if (latestInAppNotificationState.value?.id == notification.id) {
+            latestInAppNotificationState.emit(activeInAppNotificationsState.value.firstOrNull())
+        }
+    }
+}
 
 fun postInAppNotification(
-  message: List<LocalizedStringDataModel>?,
-  type: NotificationType,
-  transient: Boolean = true
+    message: List<LocalizedStringDataModel>?,
+    type: NotificationType,
+    transient: Boolean = true
 ) {
-  message?.extractLocalizedString(appLanguageState.value)?.run {
-    GlobalScope.launch(Dispatchers.ourIo) {
-      latestInAppNotificationState.emit(
-        NotificationDataModel(
-          this@run,
-          type
-        )
-      )
-
-      if (transient) {
-        delay(3000)
-        latestInAppNotificationState.emit(null)
-      }
+    message?.extractLocalizedString(appLanguageState.value)?.run {
+        postInAppNotification(this, type, transient)
     }
-  }
 }
 
 fun postInAppNotification(message: String, type: NotificationType, transient: Boolean = true) {
-  GlobalScope.launch(Dispatchers.ourIo) {
-    latestInAppNotificationState.emit(
-      NotificationDataModel(
-        message,
-        type
-      )
-    )
-
-    if (transient) {
-      delay(3000)
-      latestInAppNotificationState.emit(null)
-    }
-  }
+    pushInAppNotification(createNotificationDataModel(message, type), transient)
 }
 
 fun clearInAppNotification() {
-  GlobalScope.launch(Dispatchers.ourIo) {
-    latestInAppNotificationState.emit(null)
-  }
+    GlobalScope.launch(Dispatchers.ourIo) {
+        latestInAppNotificationState.emit(null)
+        activeInAppNotificationsState.emit(emptyList())
+    }
+}
+
+fun getNotifications() {
+    if (!getNotificationsMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getNotificationsMutex.withLock {
+                if (getStoredUserAuthTokens?.invoke() == null) return@withLock
+
+                val response = networkRequest<List<NotificationDataModel>, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = "notifications/get"
+                )
+
+                if (!response.negative) {
+                    notificationsState.emit(DataState.Success(response.payload.orEmpty(), response.message))
+                }
+            }
+        }
+}
+
+fun saveNotificationToServer(notification: NotificationDataModel) {
+    if (notification.message.isBlank()) return
+    if (getStoredUserAuthTokens?.invoke() == null) return
+    if (userAccountState.payloadValue == null) return
+
+    GlobalScope.launch(Dispatchers.ourIo) {
+        if (!saveNotificationMutex.isLocked) {
+            saveNotificationMutex.withLock {
+                val response = networkRequest<NotificationDataModel, NotificationDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = "notifications/add",
+                    body = notification
+                )
+
+                if (!response.negative && response.payload != null) {
+                    val saved = response.payload
+                    val old = notificationsState.payloadValue.orEmpty()
+                    notificationsState.emit(
+                        DataState.Success(
+                            (listOf(saved) + old)
+                                .distinctBy { it.id }
+                                .sortedByDescending { it.createdAtMillis }
+                                .take(500)
+                        )
+                    )
+                }
+            }
+        }
+    }
+}
+
+fun markNotificationRead(notificationId: String) {
+    if (!markNotificationReadMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            markNotificationReadMutex.withLock {
+                val local = notificationsState.payloadValue.orEmpty()
+                val now = getCurrentTimeMillis()
+                notificationsState.emit(
+                    DataState.Success(local.map { if (it.id == notificationId) it.copy(readAtMillis = now) else it })
+                )
+
+                val response = networkRequest<List<NotificationDataModel>, List<String>>(
+                    method = HttpMethod.Put,
+                    endpointUrl = "notifications/read",
+                    body = listOf(notificationId)
+                )
+
+                if (!response.negative && response.payload != null) {
+                    notificationsState.emit(DataState.Success(response.payload))
+                }
+            }
+        }
+}
+
+fun markAllNotificationsRead() {
+    GlobalScope.launch(Dispatchers.ourIo) {
+        val ids = notificationsState.payloadValue.orEmpty()
+            .filter { it.readAtMillis == null }
+            .map { it.id }
+
+        if (ids.isEmpty()) return@launch
+
+        val now = getCurrentTimeMillis()
+        notificationsState.emit(
+            DataState.Success(
+                notificationsState.payloadValue.orEmpty().map { if (it.id in ids) it.copy(readAtMillis = now) else it }
+            )
+        )
+
+        val response = networkRequest<List<NotificationDataModel>, List<String>>(
+            method = HttpMethod.Put,
+            endpointUrl = "notifications/read",
+            body = ids
+        )
+
+        if (!response.negative && response.payload != null) {
+            notificationsState.emit(DataState.Success(response.payload))
+        }
+    }
+}
+
+fun getSecuritySessions(onCompleted: ((DataState<List<SecuritySessionDataModel>>) -> Unit)? = null) {
+    if (!getSecuritySessionsMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getSecuritySessionsMutex.withLock {
+                val response = networkRequest<List<SecuritySessionDataModel>, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getSecuritySessionsPath.first
+                )
+
+                if (response.negative || response.payload == null) {
+                    if (response.transportFailure) {
+                        postInAppNotification(
+                            localizedStringResourceMessage(
+                                id = 215,
+                                main = "Cannot reach server. Security sessions will refresh when connection returns.",
+                                ru = "Сервер недоступен. Сеансы безопасности обновятся после восстановления соединения.",
+                                kk = "Сервер қолжетімсіз. Қауіпсіздік сеанстары байланыс қалпына келгенде жаңартылады."
+                            ),
+                            NotificationType.Neutral
+                        )
+                    } else {
+                        postInAppNotification(response.message, NotificationType.Negative)
+                    }
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    securitySessionsState.emit(DataState.Success(response.payload, response.message))
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun revokeSecuritySession(
+    sessionId: String,
+    onCompleted: ((DataState<List<SecuritySessionDataModel>>) -> Unit)? = null
+) {
+    if (sessionId.isBlank()) return
+
+    if (!revokeSecuritySessionMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            revokeSecuritySessionMutex.withLock {
+                val response = networkRequest<List<SecuritySessionDataModel>, SecuritySessionRevokeRequestDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.revokeSecuritySessionPath.first,
+                    body = SecuritySessionRevokeRequestDataModel(sessionId)
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, if (response.transportFailure) NotificationType.Neutral else NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    securitySessionsState.emit(DataState.Success(response.payload, response.message))
+                    postInAppNotification(response.message ?: localizedStringResourceMessage(
+                        id = 216,
+                        main = "Session revoked",
+                        ru = "Сеанс завершён",
+                        kk = "Сеанс тоқтатылды"
+                    ), NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun revokeOtherSecuritySessions(onCompleted: ((DataState<List<SecuritySessionDataModel>>) -> Unit)? = null) {
+    if (!revokeOtherSecuritySessionsMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            revokeOtherSecuritySessionsMutex.withLock {
+                val response = networkRequest<List<SecuritySessionDataModel>, Unit>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.revokeOtherSecuritySessionsPath.first
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, if (response.transportFailure) NotificationType.Neutral else NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    securitySessionsState.emit(DataState.Success(response.payload, response.message))
+                    postInAppNotification(response.message ?: localizedStringResourceMessage(
+                        id = 217,
+                        main = "Other sessions revoked",
+                        ru = "Другие сеансы завершены",
+                        kk = "Басқа сеанстар тоқтатылды"
+                    ), NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
 }
 
 fun logInUser(userAuthLogIn: UserAuthLogInDataModel) {
-  if (!logInMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      logInMutex.withLock {
-        postInAppNotification(stringLoggingInState.value, NotificationType.Neutral)
+    if (!logInMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            logInMutex.withLock {
+                logInInProgressState.emit(true)
+                try {
+                    postInAppNotification(stringLoggingInState.value, NotificationType.Neutral, transient = true)
 
-        val response = networkRequest<TokenPair, UserAuthLogInDataModel>(
-          HttpMethod.Post,
-          endpointUrl = globalAppConfigurationState.payloadValue.logInPath.first,
-          body = userAuthLogIn
-        )
+                    // Avoid stale sessions and make repeated login attempts deterministic.
+                    setStoredUserAuthTokens?.invoke(null)
+                    httpClient.authProvider<BearerAuthProvider>()?.clearToken()
 
-        if (response.negative) {
-          postInAppNotification(response.message, NotificationType.Negative, transient = true)
-        } else {
-          setStoredUserAuthTokens?.invoke(response.payload)
-          httpClient.authProvider<BearerAuthProvider>()?.clearToken()
-          getUser()
+                    val logInRequest = userAuthLogIn.copy(deviceInfo = buildCurrentClientDeviceInfo())
+
+                    val response = networkRequest<TokenPair, UserAuthLogInDataModel>(
+                        HttpMethod.Post,
+                        endpointUrl = globalAppConfigurationState.payloadValue.logInPath.first,
+                        body = logInRequest
+                    )
+
+                    if (response.negative || response.payload == null) {
+                        postInAppNotification(
+                            response.message ?: localizedStringResourceMessage(
+                                id = 222,
+                                main = "Login failed: empty token response",
+                                ru = "Не удалось войти: сервер не вернул токены",
+                                kk = "Кіру орындалмады: сервер токендерді қайтармады"
+                            ),
+                            NotificationType.Negative,
+                            transient = true
+                        )
+                    } else {
+                        setStoredUserAuthTokens?.invoke(response.payload)
+                        httpClient.authProvider<BearerAuthProvider>()?.clearToken()
+                        getUser(forceLogOut = false)
+                    }
+                } finally {
+                    logInInProgressState.emit(false)
+                }
+            }
         }
-      }
-    }
+    else
+        postInAppNotification(
+            localizedStringResourceMessage(
+                id = 219,
+                main = "Login is already in progress",
+                ru = "Вход уже выполняется",
+                kk = "Кіру қазірдің өзінде орындалып жатыр"
+            ),
+            NotificationType.Neutral,
+            transient = true
+        )
 }
 
 fun signUpUser(userAuthSignUp: UserAuthSignUpDataModel) {
-  if (!signUpUserMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      signUpUserMutex.withLock {
-        postInAppNotification(stringSigningUpState.value, NotificationType.Neutral)
+    if (!signUpUserMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            signUpInProgressState.emit(true)
 
-        val response = networkRequest<TokenPair, UserAuthSignUpDataModel>(
-          HttpMethod.Post,
-          endpointUrl = globalAppConfigurationState.payloadValue.signUpPath.first,
-          body = userAuthSignUp
-        )
+            try {
+                signUpUserMutex.withLock {
+                    postInAppNotification(stringSigningUpState.value, NotificationType.Neutral, transient = true)
 
-        if (response.negative) {
-          postInAppNotification(response.message, NotificationType.Negative)
-        } else {
-          setStoredUserAuthTokens?.invoke(response.payload)
-          httpClient.authProvider<BearerAuthProvider>()?.clearToken()
+                    val signUpRequest = userAuthSignUp.copy(deviceInfo = buildCurrentClientDeviceInfo())
 
-          getUser()
+                    val response = networkRequest<TokenPair, UserAuthSignUpDataModel>(
+                        HttpMethod.Post,
+                        endpointUrl = globalAppConfigurationState.payloadValue.signUpPath.first,
+                        body = signUpRequest
+                    )
+
+                    if (response.negative) {
+                        postInAppNotification(response.message, NotificationType.Negative)
+                    } else {
+                        setStoredUserAuthTokens?.invoke(response.payload)
+                        httpClient.authProvider<BearerAuthProvider>()?.clearToken()
+
+                        getUser(forceLogOut = false)
+                    }
+                }
+            } finally {
+                signUpInProgressState.emit(false)
+            }
         }
-      }
-    }
 }
 
 fun logOutUser() {
-  if (!logOutUserMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      logOutUserMutex.withLock {
-        val response = networkRequest<Unit, String>(
-          HttpMethod.Delete,
-          endpointUrl = globalAppConfigurationState.payloadValue.logOutPath.first,
-          body = getStoredUserAuthTokens?.invoke()?.refreshToken
-        )
+    if (!logOutUserMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            logOutUserMutex.withLock {
+                val refreshToken = getStoredUserAuthTokens?.invoke()?.refreshToken
 
-        if (response.negative) {
-          postInAppNotification(response.message, NotificationType.Negative)
-        } else {
-          postInAppNotification(response.message, NotificationType.Positive)
-          userAccountState.emit(DataState.Empty())
+                val response = if (!refreshToken.isNullOrBlank()) {
+                    networkRequest<Unit, String>(
+                        HttpMethod.Delete,
+                        endpointUrl = globalAppConfigurationState.payloadValue.logOutPath.first,
+                        body = refreshToken
+                    )
+                } else {
+                    ResponseDataModel<Unit>(
+                        message = localizedStringResourceMessage(
+                            id = 220,
+                            main = "Logged out locally",
+                            ru = "Выход выполнен локально",
+                            kk = "Жергілікті түрде шығу орындалды"
+                        ),
+                        payload = null,
+                        negative = false
+                    )
+                }
 
-          setStoredUserAuthTokens?.invoke(null)
-          setStoredUserAccountDataModel?.invoke(null)
-          setActiveStoreId(null, syncServer = false)
-          httpClient.authProvider<BearerAuthProvider>()?.clearToken()
+                // Logout must never trap the cashier inside account screen. Server revoke is best-effort.
+                setStoredUserAuthTokens?.invoke(null)
+                setStoredUserAccountDataModel?.invoke(null)
+                setActiveStoreId(null, syncServer = false)
+                httpClient.authProvider<BearerAuthProvider>()?.clearToken()
+
+                userAccountState.emit(DataState.Empty())
+                storesState.emit(DataState.Empty())
+                securitySessionsState.emit(DataState.Empty())
+                activeStoreIdState.emit(null)
+
+                postInAppNotification(
+                    if (response.negative)
+                        localizedStringResourceMessage(
+                            id = 221,
+                            main = "Logged out locally; server session cleanup failed",
+                            ru = "Выход выполнен локально; серверный сеанс не удалось завершить",
+                            kk = "Жергілікті түрде шығу орындалды; сервердегі сеансты тоқтату мүмкін болмады"
+                        )
+                    else response.message,
+                    if (response.negative) NotificationType.Neutral else NotificationType.Positive,
+                    transient = true
+                )
+            }
         }
-      }
-    }
 }
 
 fun getUser(forceLogOut: Boolean = true) {
-  if (!getUserAccountMutex.isLocked)
     GlobalScope.launch(Dispatchers.ourIo) {
-      if (getStoredUserAuthTokens?.invoke() != null)
-        getUserAccountMutex.withLock {
-          getStoredUserAccountDataModel?.invoke()?.run {
-            userAccountState.emit(DataState.Success(this))
-          }
+        if (getStoredUserAuthTokens?.invoke() != null)
+            getUserAccountMutex.withLock {
+                getStoredUserAccountDataModel?.invoke()?.run {
+                    userAccountState.emit(DataState.Success(this))
+                }
 
-          val response = networkRequest<UserAccountDataModel, Unit>(
-            HttpMethod.Get,
-            endpointUrl = globalAppConfigurationState.payloadValue.getUserPath.first
-          )
+                val response = networkRequest<UserAccountDataModel, Unit>(
+                    HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getUserPath.first
+                )
 
-          if (response.negative) {
-            if (forceLogOut)
-              forceLogOutUser()
+                if (response.negative) {
+                    when {
+                        response.transportFailure -> {
+                            postInAppNotification(
+                                localizedStringResourceMessage(
+                                    id = 214,
+                                    main = "Cannot reach server. Keeping you signed in offline.",
+                                    ru = "Сервер недоступен. Вы остаётесь в аккаунте офлайн.",
+                                    kk = "Сервер қолжетімсіз. Сіз офлайн режимде аккаунтта қаласыз."
+                                ),
+                                NotificationType.Neutral
+                            )
+                        }
+                        response.httpStatusCode == HttpStatusCode.Unauthorized.value && forceLogOut -> {
+                            forceLogOutUser()
+                            postInAppNotification(response.message, NotificationType.Negative)
+                        }
+                        else -> postInAppNotification(response.message, NotificationType.Negative)
+                    }
+                } else {
+                    clearInAppNotification()
+                    setStoredUserAccountDataModel?.invoke(response.payload)
+                    userAccountState.emit(DataState.Success(response.payload!!, response.message))
 
-            postInAppNotification(response.message, NotificationType.Negative)
-          } else {
-            clearInAppNotification()
-            setStoredUserAccountDataModel?.invoke(response.payload)
-            userAccountState.emit(DataState.Success(response.payload!!, response.message))
+                    response.payload.activeStoreId?.takeIf { it.isNotBlank() }?.let { savedStoreId ->
+                        putLocalKv(KEY_ACTIVE_STORE_ID, savedStoreId)
+                        activeStoreIdState.emit(savedStoreId)
+                    }
 
-            response.payload.activeStoreId?.takeIf { it.isNotBlank() }?.let { savedStoreId ->
-              putLocalKv(KEY_ACTIVE_STORE_ID, savedStoreId)
-              activeStoreIdState.emit(savedStoreId)
+                    getGlobalAppConfiguration()
+                    getNotifications()
+                    getStores()
+                    getSuppliers()
+                    getGenericGoodsCategories()
+                }
             }
-
-            getGlobalAppConfiguration()
-            getStores()
-            getSuppliers()
-            getGenericGoodsCategories()
-          }
-        }
     }
 }
 
 fun updateUser(
-  userAccountUpdate: UserAccountUpdateDataModel
+    userAccountUpdate: UserAccountUpdateDataModel
 ) {
-  if (!updateUserMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      updateUserMutex.withLock {
-        val response = networkRequest<UserAccountDataModel, UserAccountUpdateDataModel>(
-          HttpMethod.Put,
-          endpointUrl = globalAppConfigurationState.payloadValue.updateUserPath.first,
-          body = userAccountUpdate
-        )
+    if (!updateUserMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            updateUserMutex.withLock {
+                val response = networkRequest<UserAccountDataModel, UserAccountUpdateDataModel>(
+                    HttpMethod.Put,
+                    endpointUrl = globalAppConfigurationState.payloadValue.updateUserPath.first,
+                    body = userAccountUpdate
+                )
 
-        if (response.negative) {
-          postInAppNotification(response.message, NotificationType.Negative)
-        } else {
-          userAccountState.emit(DataState.Success(response.payload!!, response.message))
+                if (response.negative) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                } else {
+                    userAccountState.emit(DataState.Success(response.payload!!, response.message))
 
-          postInAppNotification(
-            response.message,
-            NotificationType.Positive
-          )
-          setStoredUserAccountDataModel?.invoke(response.payload)
+                    postInAppNotification(
+                        response.message,
+                        NotificationType.Positive
+                    )
+                    setStoredUserAccountDataModel?.invoke(response.payload)
+                }
+            }
         }
-      }
-    }
 }
 
 fun forceLogOutUser() {
-  GlobalScope.launch(Dispatchers.ourIo) {
-    setStoredUserAuthTokens?.invoke(null)
-    setStoredUserAccountDataModel?.invoke(null)
-    setActiveStoreId(null, syncServer = false)
+    GlobalScope.launch(Dispatchers.ourIo) {
+        setStoredUserAuthTokens?.invoke(null)
+        setStoredUserAccountDataModel?.invoke(null)
+        setActiveStoreId(null, syncServer = false)
 
-    userAccountState.emit(DataState.Empty())
-  }
+        userAccountState.emit(DataState.Empty())
+        securitySessionsState.emit(DataState.Empty())
+    }
 }
 
 suspend inline fun <reified Response, reified Body> networkRequest(
-  method: HttpMethod,
-  serverUrl: String = globalAppConfigurationState.payloadValue.serverUrl.first,
-  endpointUrl: String,
-  query: Map<String, Any?> = emptyMap(),
-  headers: Map<String, String> = emptyMap(),
-  body: Body? = null,
-  contentType: ContentType? = ContentType.Application.Json
+    method: HttpMethod,
+    serverUrl: String = globalAppConfigurationState.payloadValue.serverUrl.first,
+    endpointUrl: String,
+    query: Map<String, Any?> = emptyMap(),
+    headers: Map<String, String> = emptyMap(),
+    body: Body? = null,
+    contentType: ContentType? = ContentType.Application.Json
 ): ResponseDataModel<Response> {
-  return try {
-    val response = httpClient
-      .request("$serverUrl/$endpointUrl") {
-        this.method = method
+    return try {
+        val response = httpClient
+            .request("$serverUrl/$endpointUrl") {
+                this.method = method
 
-        headers.forEach { (key, value) ->
-          this.headers.append(key, value)
+                headers.forEach { (key, value) ->
+                    this.headers.append(key, value)
+                }
+
+                query.forEach { (key, value) ->
+                    value?.let {
+                        parameter(key, it)
+                    }
+                }
+
+                body?.let { body ->
+                    contentType?.let {
+                        this.contentType(it)
+                    }
+
+                    setBody(body)
+                }
+            }
+
+        if (response.status == HttpStatusCode.Unauthorized) {
+            ResponseDataModel(
+                message = stringRawAuthenticationFailedState.value,
+                payload = null,
+                negative = true,
+                httpStatusCode = response.status.value
+            )
+        } else {
+            val rawBody = response.bodyAsText()
+
+            try {
+                jsonBase.decodeFromString<GenericResponseDataModel>(rawBody).toResponseDataModel<Response>()
+            } catch (_: Throwable) {
+                try {
+                    jsonBase.decodeFromString<ResponseDataModel<Response>>(rawBody)
+                } catch (decodeThrowable: Throwable) {
+                    val rawPreview = rawBody
+                        .replace("\n", " ")
+                        .replace("\r", " ")
+                        .take(1200)
+                        .ifBlank { "<empty response body>" }
+
+                    ResponseDataModel(
+                        message = listOf(
+                            LocalizedStringDataModel(
+                                language = "main",
+                                value = "Server returned an unreadable response: HTTP ${response.status.value} ${response.status.description}: $rawPreview"
+                            ),
+                            LocalizedStringDataModel(
+                                language = "en",
+                                value = "Server returned an unreadable response: HTTP ${response.status.value} ${response.status.description}: $rawPreview"
+                            ),
+                            LocalizedStringDataModel(
+                                language = "ru",
+                                value = "Сервер вернул нечитаемый ответ: HTTP ${response.status.value} ${response.status.description}: $rawPreview"
+                            ),
+                            LocalizedStringDataModel(
+                                language = "kk",
+                                value = "Сервер оқылмайтын жауап қайтарды: HTTP ${response.status.value} ${response.status.description}: $rawPreview"
+                            )
+                        ),
+                        payload = null,
+                        negative = true,
+                        httpStatusCode = response.status.value
+                    )
+                }
+            }
         }
-
-        query.forEach { (key, value) ->
-          value?.let {
-            parameter(key, it)
-          }
-        }
-
-        body?.let { body ->
-          contentType?.let {
-            this.contentType(it)
-          }
-
-          setBody(body)
-        }
-      }
-
-
-    if (response.status == HttpStatusCode.Unauthorized) {
-      ResponseDataModel(
-        message = stringRawAuthenticationFailedState.value,
-        payload = null,
-        negative = true
-      )
-    } else {
-      try {
-        response.body<GenericResponseDataModel>().toResponseDataModel()
-      } catch (_: Throwable) {
-        response.body<ResponseDataModel<Response>>()
-      }
+    } catch (throwable: Throwable) {
+        ResponseDataModel(
+            message = localizedStringResourceMessage(
+                id = 223,
+                main = "Cannot reach server",
+                ru = "Сервер недоступен",
+                kk = "Сервер қолжетімсіз"
+            ),
+            payload = null,
+            negative = true,
+            transportFailure = true
+        )
     }
-  } catch (throwable: Throwable) {
-    ResponseDataModel(
-      throwable.message?.let { listOf(LocalizedStringDataModel("main", it)) },
-      null,
-      true
-    )
-  }
 }
 
 fun getStores() {
-  if (!getStoresMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      getStoresMutex.withLock {
-        val response = networkRequest<List<StoreDataModel>, Unit>(
-          HttpMethod.Get,
-          endpointUrl = globalAppConfigurationState.payloadValue.getStoresPath.first
-        )
+    if (!getStoresMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getStoresMutex.withLock {
+                val response = networkRequest<List<StoreDataModel>, Unit>(
+                    HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getStoresPath.first
+                )
 
-        if (!response.negative) {
-          storesState.emit(DataState.Success(response.payload!!, response.message))
-          if (response.payload.size == 1 && activeStoreIdState.value != response.payload.first().id)
-            setActiveStoreId(response.payload.first().id)
+                if (!response.negative) {
+                    storesState.emit(DataState.Success(response.payload!!, response.message))
+                    if (response.payload.size == 1 && activeStoreIdState.value != response.payload.first().id)
+                        setActiveStoreId(response.payload.first().id)
+                }
+            }
         }
-      }
-    }
 }
 
 fun addStore(store: StoreDataModel, onCompleted: ((DataState<StoreDataModel>) -> Unit)?) {
-  if (!addStoreMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      addStoreMutex.withLock {
-        val response = networkRequest<StoreDataModel, StoreDataModel>(
-          HttpMethod.Post,
-          endpointUrl = globalAppConfigurationState.payloadValue.addStoresPath.first,
-          body = store
-        )
+    if (!addStoreMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            addStoreMutex.withLock {
+                val response = networkRequest<StoreDataModel, StoreDataModel>(
+                    HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.addStoresPath.first,
+                    body = store
+                )
 
-        if (response.negative) {
-          postInAppNotification(response.message, NotificationType.Negative)
+                if (response.negative) {
+                    postInAppNotification(response.message, NotificationType.Negative)
 
-          onCompleted?.invoke(DataState.Empty())
-        } else {
-          postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Empty())
+                } else {
+                    postInAppNotification(response.message, NotificationType.Positive)
 
-          storesState.emit(
-            DataState.Success(
-              mutableListOf<StoreDataModel>().also { newList ->
-                (storesState.value.value as? DataState.Success)?.payload?.run {
-                  newList.addAll(this)
+                    storesState.emit(
+                        DataState.Success(
+                            mutableListOf<StoreDataModel>().also { newList ->
+                                (storesState.value.value as? DataState.Success)?.payload?.run {
+                                    newList.addAll(this)
+                                }
+
+                                storesState.payloadValue?.indexOfFirst { it.id == response.payload!!.id }?.takeIf { it != -1 }
+                                    ?.let { index ->
+                                        newList[index] = response.payload!!
+                                    } ?: newList.add(response.payload!!)
+                            }
+                        )
+                    )
+
+                    onCompleted?.invoke(DataState.Success(response.payload!!))
                 }
-
-                storesState.payloadValue?.indexOfFirst { it.id == response.payload!!.id }?.takeIf { it != -1 }
-                  ?.let { index ->
-                    newList[index] = response.payload!!
-                  } ?: newList.add(response.payload!!)
-              }
-            )
-          )
-
-          onCompleted?.invoke(DataState.Success(response.payload!!))
+            }
         }
-      }
-    }
 }
 
 fun updateStore(store: StoreDataModel, onCompleted: ((DataState<StoreDataModel>) -> Unit)?) {
-  if (!updateStoreMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      updateStoreMutex.withLock {
-        val response = networkRequest<StoreDataModel, StoreDataModel>(
-          HttpMethod.Put,
-          endpointUrl = globalAppConfigurationState.payloadValue.updateStoresPath.first,
-          body = store
-        )
+    if (!updateStoreMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            updateStoreMutex.withLock {
+                val response = networkRequest<StoreDataModel, StoreDataModel>(
+                    HttpMethod.Put,
+                    endpointUrl = globalAppConfigurationState.payloadValue.updateStoresPath.first,
+                    body = store
+                )
 
-        if (response.negative) {
-          postInAppNotification(response.message, NotificationType.Negative)
+                if (response.negative) {
+                    postInAppNotification(response.message, NotificationType.Negative)
 
-          onCompleted?.invoke(DataState.Empty())
-        } else {
-          postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Empty())
+                } else {
+                    postInAppNotification(response.message, NotificationType.Positive)
 
-          storesState.emit(
-            DataState.Success(
-              mutableListOf<StoreDataModel>().also { newList ->
-                (storesState.value.value as? DataState.Success)?.payload?.run {
-                  newList.addAll(this)
+                    storesState.emit(
+                        DataState.Success(
+                            mutableListOf<StoreDataModel>().also { newList ->
+                                (storesState.value.value as? DataState.Success)?.payload?.run {
+                                    newList.addAll(this)
+                                }
+
+                                newList.indexOfFirst { item -> item.id == store.id }
+                                    .takeIf { index -> index != -1 }?.let { index ->
+                                        newList[index] = response.payload!!
+                                    }
+                            }
+                        )
+                    )
+
+                    onCompleted?.invoke(DataState.Success(response.payload!!))
                 }
-
-                newList.indexOfFirst { item -> item.id == store.id }
-                  .takeIf { index -> index != -1 }?.let { index ->
-                    newList[index] = response.payload!!
-                  }
-              }
-            )
-          )
-
-          onCompleted?.invoke(DataState.Success(response.payload!!))
+            }
         }
-      }
-    }
 }
 
 fun setActiveStoreId(
-  id: String?,
-  syncServer: Boolean = true
+    id: String?,
+    syncServer: Boolean = true
 ) {
-  GlobalScope.launch(Dispatchers.ourIo) {
-    putLocalKv(KEY_ACTIVE_STORE_ID, id)
-    activeStoreIdState.emit(id)
+    GlobalScope.launch(Dispatchers.ourIo) {
+        putLocalKv(KEY_ACTIVE_STORE_ID, id)
+        activeStoreIdState.emit(id)
 
-    if (syncServer && !id.isNullOrBlank() && getStoredUserAuthTokens?.invoke() != null) {
-      val response = networkRequest<Unit, String>(
-        method = HttpMethod.Put,
-        endpointUrl = "stores/active",
-        body = id
-      )
+        if (syncServer && !id.isNullOrBlank() && getStoredUserAuthTokens?.invoke() != null) {
+            val response = networkRequest<Unit, String>(
+                method = HttpMethod.Put,
+                endpointUrl = "stores/active",
+                body = id
+            )
 
-      if (response.negative)
-        postInAppNotification(response.message, NotificationType.Negative, transient = true)
-      else {
-        (userAccountState.payloadValue)?.let { account ->
-          val updated = account.copy(activeStoreId = id)
-          userAccountState.emit(DataState.Success(updated))
-          setStoredUserAccountDataModel?.invoke(updated)
+            if (response.negative)
+                postInAppNotification(response.message, NotificationType.Negative, transient = true)
+            else {
+                (userAccountState.payloadValue)?.let { account ->
+                    val updated = account.copy(activeStoreId = id)
+                    userAccountState.emit(DataState.Success(updated))
+                    setStoredUserAccountDataModel?.invoke(updated)
+                }
+            }
         }
-      }
     }
-  }
 }
 
 val suppliersState = MutableDataStateFlow<List<SupplierDataModel>>(GlobalScope)
@@ -3797,338 +4585,338 @@ val suppliersState = MutableDataStateFlow<List<SupplierDataModel>>(GlobalScope)
 private val getSuppliersMutex = Mutex()
 
 fun getSuppliers() {
-  if (!getSuppliersMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      getSuppliersMutex.withLock {
-        val response = networkRequest<List<SupplierDataModel>, Unit>(
-          HttpMethod.Get,
-          endpointUrl = globalAppConfigurationState.payloadValue.getSuppliersPath.first
-        )
+    if (!getSuppliersMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getSuppliersMutex.withLock {
+                val response = networkRequest<List<SupplierDataModel>, Unit>(
+                    HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getSuppliersPath.first
+                )
 
-        if (!response.negative) {
-          suppliersState.emit(DataState.Success(response.payload!!, response.message))
+                if (!response.negative) {
+                    suppliersState.emit(DataState.Success(response.payload!!, response.message))
+                }
+            }
         }
-      }
-    }
 }
 
 fun getGenericGoodsItems(barcode: String): Flow<DataState<List<GenericGoodsItemDataModel>>> {
-  return flow {
-    getGenericGoodsItemsMutex.withLock {
-      val response = networkRequest<List<GenericGoodsItemDataModel>, String>(
-        method = HttpMethod.Get,
-        endpointUrl = globalAppConfigurationState.payloadValue.getGenericGoodsItemsPath.first,
-        headers = mapOf("barcode" to barcode)
-      )
+    return flow {
+        getGenericGoodsItemsMutex.withLock {
+            val response = networkRequest<List<GenericGoodsItemDataModel>, String>(
+                method = HttpMethod.Get,
+                endpointUrl = globalAppConfigurationState.payloadValue.getGenericGoodsItemsPath.first,
+                headers = mapOf("barcode" to barcode)
+            )
 
-      if (!response.negative) {
-        emit(DataState.Success(response.payload!!, response.message))
-      }
+            if (!response.negative) {
+                emit(DataState.Success(response.payload!!, response.message))
+            }
+        }
     }
-  }
 }
 
 fun getGenericGoodsCategories() {
-  if (!getGenericGoodsCategoriesMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      getGenericGoodsCategoriesMutex.withLock {
-        val response = networkRequest<List<GenericGoodsCategoryDataModel>, Unit>(
-          method = HttpMethod.Get,
-          endpointUrl = globalAppConfigurationState.payloadValue.getGenericGoodsCategoriesPath.first
-        )
+    if (!getGenericGoodsCategoriesMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getGenericGoodsCategoriesMutex.withLock {
+                val response = networkRequest<List<GenericGoodsCategoryDataModel>, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getGenericGoodsCategoriesPath.first
+                )
 
-        if (!response.negative)
-          genericGoodsCategoriesState.emit(DataState.Success(response.payload!!, response.message))
-      }
-    }
+                if (!response.negative)
+                    genericGoodsCategoriesState.emit(DataState.Success(response.payload!!, response.message))
+            }
+        }
 }
 
 fun getCartState(transactionTypeIndex: Int, clientId: Int): StateFlow<List<GoodsItemInCartDataModel>> {
-  return when (transactionTypeIndex) {
-    0 -> {
-      when (clientId) {
-        0 -> cartTransactionType0_clientId0_state
-        1 -> cartTransactionType0_clientId1_state
-        2 -> cartTransactionType0_clientId2_state
-        3 -> cartTransactionType0_clientId3_state
-        else -> cartTransactionType0_clientId4_state
-      }
-    }
+    return when (transactionTypeIndex) {
+        0 -> {
+            when (clientId) {
+                0 -> cartTransactionType0_clientId0_state
+                1 -> cartTransactionType0_clientId1_state
+                2 -> cartTransactionType0_clientId2_state
+                3 -> cartTransactionType0_clientId3_state
+                else -> cartTransactionType0_clientId4_state
+            }
+        }
 
-    1 -> {
-      when (clientId) {
-        0 -> cartTransactionType1_clientId0_state
-        1 -> cartTransactionType1_clientId1_state
-        2 -> cartTransactionType1_clientId2_state
-        3 -> cartTransactionType1_clientId3_state
-        else -> cartTransactionType1_clientId4_state
-      }
-    }
+        1 -> {
+            when (clientId) {
+                0 -> cartTransactionType1_clientId0_state
+                1 -> cartTransactionType1_clientId1_state
+                2 -> cartTransactionType1_clientId2_state
+                3 -> cartTransactionType1_clientId3_state
+                else -> cartTransactionType1_clientId4_state
+            }
+        }
 
-    else -> {
-      when (clientId) {
-        0 -> cartTransactionType2_clientId0_state
-        1 -> cartTransactionType2_clientId1_state
-        2 -> cartTransactionType2_clientId2_state
-        3 -> cartTransactionType2_clientId3_state
-        else -> cartTransactionType2_clientId4_state
-      }
+        else -> {
+            when (clientId) {
+                0 -> cartTransactionType2_clientId0_state
+                1 -> cartTransactionType2_clientId1_state
+                2 -> cartTransactionType2_clientId2_state
+                3 -> cartTransactionType2_clientId3_state
+                else -> cartTransactionType2_clientId4_state
+            }
+        }
     }
-  }
 }
 
 fun getStock(storeId: String) {
-  if (!getStockMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      getStockMutex.withLock {
-        val response = networkRequest<List<GoodsItemDataModel>, Unit>(
-          HttpMethod.Get,
-          endpointUrl = globalAppConfigurationState.payloadValue.getStockPath.first,
-          headers = mapOf("store_id" to storeId)
-        )
+    if (!getStockMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getStockMutex.withLock {
+                val response = networkRequest<List<GoodsItemDataModel>, Unit>(
+                    HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getStockPath.first,
+                    headers = mapOf("store_id" to storeId)
+                )
 
-        if (!response.negative)
-          stockState.emit(DataState.Success(response.payload!!, response.message))
-      }
-    }
+                if (!response.negative)
+                    stockState.emit(DataState.Success(response.payload!!, response.message))
+            }
+        }
 }
 
 fun updateGoodsItem(
-  goodsItem: GoodsItemDataModel,
-  onCompleted: ((DataState<GoodsItemDataModel>) -> Unit)?
+    goodsItem: GoodsItemDataModel,
+    onCompleted: ((DataState<GoodsItemDataModel>) -> Unit)?
 ) {
-  if (!updateGoodsItemMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      updateGoodsItemMutex.withLock {
-        val response = networkRequest<GoodsItemDataModel, GoodsItemDataModel>(
-          HttpMethod.Put,
-          endpointUrl = globalAppConfigurationState.payloadValue.updateGoodsItemPath.first,
-          body = goodsItem
-        )
+    if (!updateGoodsItemMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            updateGoodsItemMutex.withLock {
+                val response = networkRequest<GoodsItemDataModel, GoodsItemDataModel>(
+                    HttpMethod.Put,
+                    endpointUrl = globalAppConfigurationState.payloadValue.updateGoodsItemPath.first,
+                    body = goodsItem
+                )
 
-        if (response.negative) {
-          postInAppNotification(response.message, NotificationType.Negative)
+                if (response.negative) {
+                    postInAppNotification(response.message, NotificationType.Negative)
 
-          onCompleted?.invoke(DataState.Empty())
-        } else {
-          postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Empty())
+                } else {
+                    postInAppNotification(response.message, NotificationType.Positive)
 
-          stockState.emit(
-            DataState.Success(
-              mutableListOf<GoodsItemDataModel>().also { newList ->
-                (stockState.value.value as? DataState.Success)?.payload?.run {
-                  newList.addAll(this)
+                    stockState.emit(
+                        DataState.Success(
+                            mutableListOf<GoodsItemDataModel>().also { newList ->
+                                (stockState.value.value as? DataState.Success)?.payload?.run {
+                                    newList.addAll(this)
+                                }
+
+                                stockState.payloadValue?.indexOfFirst { it.id == response.payload!!.id }?.let { index ->
+                                    newList[index] = response.payload!!
+                                } ?: newList.add(response.payload!!)
+                            }
+                        )
+                    )
+
+                    onCompleted?.invoke(DataState.Success(response.payload!!))
                 }
-
-                stockState.payloadValue?.indexOfFirst { it.id == response.payload!!.id }?.let { index ->
-                  newList[index] = response.payload!!
-                } ?: newList.add(response.payload!!)
-              }
-            )
-          )
-
-          onCompleted?.invoke(DataState.Success(response.payload!!))
+            }
         }
-      }
-    }
 }
 
 fun addGoodsItem(goodsItem: GoodsItemDataModel, onCompleted: ((DataState<GoodsItemDataModel>) -> Unit)?) {
-  if (!addGoodsItemMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      addGoodsItemMutex.withLock {
-        val response = networkRequest<GoodsItemDataModel, GoodsItemDataModel>(
-          HttpMethod.Post,
-          endpointUrl = globalAppConfigurationState.payloadValue.addGoodsItemPath.first,
-          body = goodsItem
-        )
+    if (!addGoodsItemMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            addGoodsItemMutex.withLock {
+                val response = networkRequest<GoodsItemDataModel, GoodsItemDataModel>(
+                    HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.addGoodsItemPath.first,
+                    body = goodsItem
+                )
 
-        if (response.negative) {
-          postInAppNotification(response.message, NotificationType.Negative)
+                if (response.negative) {
+                    postInAppNotification(response.message, NotificationType.Negative)
 
-          onCompleted?.invoke(DataState.Empty())
-        } else {
-          postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Empty())
+                } else {
+                    postInAppNotification(response.message, NotificationType.Positive)
 
-          stockState.emit(
-            DataState.Success(
-              mutableListOf<GoodsItemDataModel>().also { newList ->
-                (stockState.value.value as? DataState.Success)?.payload?.run {
-                  newList.addAll(this)
+                    stockState.emit(
+                        DataState.Success(
+                            mutableListOf<GoodsItemDataModel>().also { newList ->
+                                (stockState.value.value as? DataState.Success)?.payload?.run {
+                                    newList.addAll(this)
+                                }
+
+                                newList.add(response.payload!!)
+                            }
+                        )
+                    )
+
+                    onCompleted?.invoke(DataState.Success(response.payload!!))
                 }
-
-                newList.add(response.payload!!)
-              }
-            )
-          )
-
-          onCompleted?.invoke(DataState.Success(response.payload!!))
+            }
         }
-      }
-    }
 }
 
 fun deleteGoodsItem(id: String, storeId: String, onCompleted: (() -> Unit)?) {
-  if (!deleteGoodsItemMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      deleteGoodsItemMutex.withLock {
-        val response = networkRequest<String, String>(
-          HttpMethod.Delete,
-          endpointUrl = globalAppConfigurationState.payloadValue.deleteGoodsItemPath.first,
-          body = id,
-          headers = mapOf("store_id" to storeId)
-        )
+    if (!deleteGoodsItemMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            deleteGoodsItemMutex.withLock {
+                val response = networkRequest<String, String>(
+                    HttpMethod.Delete,
+                    endpointUrl = globalAppConfigurationState.payloadValue.deleteGoodsItemPath.first,
+                    body = id,
+                    headers = mapOf("store_id" to storeId)
+                )
 
-        if (response.negative) {
-          postInAppNotification(response.message, NotificationType.Negative)
+                if (response.negative) {
+                    postInAppNotification(response.message, NotificationType.Negative)
 
-          onCompleted?.invoke()
-        } else {
-          postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke()
+                } else {
+                    postInAppNotification(response.message, NotificationType.Positive)
 
-          stockState.payloadValue?.run {
-            stockState.emit(DataState.Success(filter { it.id != response.payload }))
-          }
+                    stockState.payloadValue?.run {
+                        stockState.emit(DataState.Success(filter { it.id != response.payload }))
+                    }
 
-          deleteCartItemById(id)
+                    deleteCartItemById(id)
 
-          onCompleted?.invoke()
+                    onCompleted?.invoke()
+                }
+            }
         }
-      }
-    }
 }
 
 fun getStockBatches(storeId: String) {
-  if (!getStockBatchesMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      getStockBatchesMutex.withLock {
-        val response = networkRequest<List<GoodsBatchDataModel>, Unit>(
-          HttpMethod.Get,
-          endpointUrl = globalAppConfigurationState.payloadValue.getStockBatchesPath.first,
-          headers = mapOf("store_id" to storeId)
-        )
+    if (!getStockBatchesMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getStockBatchesMutex.withLock {
+                val response = networkRequest<List<GoodsBatchDataModel>, Unit>(
+                    HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getStockBatchesPath.first,
+                    headers = mapOf("store_id" to storeId)
+                )
 
-        if (!response.negative)
-          stockBatchesState.emit(DataState.Success(response.payload!!, response.message))
-      }
-    }
+                if (!response.negative)
+                    stockBatchesState.emit(DataState.Success(response.payload!!, response.message))
+            }
+        }
 }
 
 fun updateGoodsBatches(
-  goodsBatches: List<GoodsBatchDataModel>,
-  onCompleted: ((DataState<List<GoodsBatchDataModel>>) -> Unit)?
+    goodsBatches: List<GoodsBatchDataModel>,
+    onCompleted: ((DataState<List<GoodsBatchDataModel>>) -> Unit)?
 ) {
-  if (!updateGoodsItemMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      updateGoodsItemMutex.withLock {
-        val response = networkRequest<List<GoodsBatchDataModel>, List<GoodsBatchDataModel>>(
-          HttpMethod.Put,
-          endpointUrl = globalAppConfigurationState.payloadValue.updateStockBatchPath.first,
-          body = goodsBatches
-        )
+    if (!updateGoodsItemMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            updateGoodsItemMutex.withLock {
+                val response = networkRequest<List<GoodsBatchDataModel>, List<GoodsBatchDataModel>>(
+                    HttpMethod.Put,
+                    endpointUrl = globalAppConfigurationState.payloadValue.updateStockBatchPath.first,
+                    body = goodsBatches
+                )
 
-        if (response.negative) {
-          postInAppNotification(response.message, NotificationType.Negative)
+                if (response.negative) {
+                    postInAppNotification(response.message, NotificationType.Negative)
 
-          onCompleted?.invoke(DataState.Empty())
-        } else {
-          postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Empty())
+                } else {
+                    postInAppNotification(response.message, NotificationType.Positive)
 
-          stockBatchesState.emit(
-            DataState.Success(
-              mutableListOf<GoodsBatchDataModel>().also { newList ->
-                (stockBatchesState.value.value as? DataState.Success)?.payload?.run {
-                  newList.addAll(this)
+                    stockBatchesState.emit(
+                        DataState.Success(
+                            mutableListOf<GoodsBatchDataModel>().also { newList ->
+                                (stockBatchesState.value.value as? DataState.Success)?.payload?.run {
+                                    newList.addAll(this)
+                                }
+
+                                response.payload!!.forEach { item ->
+                                    val index = newList.indexOfFirst { it.id == item.id }
+
+                                    if (index >= 0) {
+                                        newList[index] = item
+                                    } else {
+                                        newList.add(item)
+                                    }
+                                }
+                            }
+                        )
+                    )
+
+                    onCompleted?.invoke(DataState.Success(response.payload!!))
                 }
-
-                response.payload!!.forEach { item ->
-                  val index = newList.indexOfFirst { it.id == item.id }
-
-                  if (index >= 0) {
-                    newList[index] = item
-                  } else {
-                    newList.add(item)
-                  }
-                }
-              }
-            )
-          )
-
-          onCompleted?.invoke(DataState.Success(response.payload!!))
+            }
         }
-      }
-    }
 }
 
 fun addGoodsBatches(
-  goodsBatches: List<GoodsBatchDataModel>,
-  onCompleted: ((DataState<List<GoodsBatchDataModel>>) -> Unit)?
+    goodsBatches: List<GoodsBatchDataModel>,
+    onCompleted: ((DataState<List<GoodsBatchDataModel>>) -> Unit)?
 ) {
-  if (!addGoodsItemMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      addGoodsItemMutex.withLock {
-        val response = networkRequest<List<GoodsBatchDataModel>, List<GoodsBatchDataModel>>(
-          HttpMethod.Post,
-          endpointUrl = globalAppConfigurationState.payloadValue.addStockBatchPath.first,
-          body = goodsBatches
-        )
+    if (!addGoodsItemMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            addGoodsItemMutex.withLock {
+                val response = networkRequest<List<GoodsBatchDataModel>, List<GoodsBatchDataModel>>(
+                    HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.addStockBatchPath.first,
+                    body = goodsBatches
+                )
 
-        if (response.negative) {
-          postInAppNotification(response.message, NotificationType.Negative)
+                if (response.negative) {
+                    postInAppNotification(response.message, NotificationType.Negative)
 
-          onCompleted?.invoke(DataState.Empty())
-        } else {
-          postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Empty())
+                } else {
+                    postInAppNotification(response.message, NotificationType.Positive)
 
-          stockBatchesState.emit(
-            DataState.Success(
-              mutableListOf<GoodsBatchDataModel>().also { newList ->
-                (stockBatchesState.value.value as? DataState.Success)?.payload?.run {
-                  newList.addAll(this)
+                    stockBatchesState.emit(
+                        DataState.Success(
+                            mutableListOf<GoodsBatchDataModel>().also { newList ->
+                                (stockBatchesState.value.value as? DataState.Success)?.payload?.run {
+                                    newList.addAll(this)
+                                }
+
+                                newList.addAll(response.payload!!)
+                            }
+                        )
+                    )
+
+                    onCompleted?.invoke(DataState.Success(response.payload!!))
                 }
-
-                newList.addAll(response.payload!!)
-              }
-            )
-          )
-
-          onCompleted?.invoke(DataState.Success(response.payload!!))
+            }
         }
-      }
-    }
 }
 
 fun deleteGoodsBatches(ids: List<String>, storeId: String, onCompleted: (() -> Unit)?) {
-  if (!deleteGoodsItemMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      deleteGoodsItemMutex.withLock {
-        val response = networkRequest<List<String>, List<String>>(
-          HttpMethod.Delete,
-          endpointUrl = globalAppConfigurationState.payloadValue.deleteStockBatchPath.first,
-          body = ids,
-          headers = mapOf("store_id" to storeId)
-        )
+    if (!deleteGoodsItemMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            deleteGoodsItemMutex.withLock {
+                val response = networkRequest<List<String>, List<String>>(
+                    HttpMethod.Delete,
+                    endpointUrl = globalAppConfigurationState.payloadValue.deleteStockBatchPath.first,
+                    body = ids,
+                    headers = mapOf("store_id" to storeId)
+                )
 
-        if (response.negative) {
-          postInAppNotification(response.message, NotificationType.Negative)
+                if (response.negative) {
+                    postInAppNotification(response.message, NotificationType.Negative)
 
-          onCompleted?.invoke()
-        } else {
-          postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke()
+                } else {
+                    postInAppNotification(response.message, NotificationType.Positive)
 
-          val deletedIds = response.payload.orEmpty()
+                    val deletedIds = response.payload.orEmpty()
 
-          stockBatchesState.emit(
-            DataState.Success(
-              mutableListOf<GoodsBatchDataModel>().also { newList ->
-                stockBatchesState.payloadValue?.let {
-                  newList.addAll(it)
-                  newList.removeAll { item -> item.id in deletedIds }
-                }
-              },
-              response.message
-            )
-          )
+                    stockBatchesState.emit(
+                        DataState.Success(
+                            mutableListOf<GoodsBatchDataModel>().also { newList ->
+                                stockBatchesState.payloadValue?.let {
+                                    newList.addAll(it)
+                                    newList.removeAll { item -> item.id in deletedIds }
+                                }
+                            },
+                            response.message
+                        )
+                    )
 
 //          stockBatchesState.emit(
 //            DataState.Success(
@@ -4141,60 +4929,60 @@ fun deleteGoodsBatches(ids: List<String>, storeId: String, onCompleted: (() -> U
 //            )
 //          )
 
-          onCompleted?.invoke()
+                    onCompleted?.invoke()
+                }
+            }
         }
-      }
-    }
 }
 
 fun addGoodsItems(
-  goodsItems: List<GoodsItemDataModel>,
-  onCompleted: ((DataState<List<GoodsItemDataModel>>) -> Unit)? = null
+    goodsItems: List<GoodsItemDataModel>,
+    onCompleted: ((DataState<List<GoodsItemDataModel>>) -> Unit)? = null
 ) {
-  val added = mutableListOf<GoodsItemDataModel>()
+    val added = mutableListOf<GoodsItemDataModel>()
 
-  fun addNext(index: Int) {
-    if (index > goodsItems.lastIndex) {
-      onCompleted?.invoke(DataState.Success(added))
-      return
+    fun addNext(index: Int) {
+        if (index > goodsItems.lastIndex) {
+            onCompleted?.invoke(DataState.Success(added))
+            return
+        }
+
+        addGoodsItem(goodsItems[index]) { state ->
+            if (state is DataState.Success) {
+                added += state.payload
+                addNext(index + 1)
+            } else {
+                onCompleted?.invoke(DataState.Empty())
+            }
+        }
     }
 
-    addGoodsItem(goodsItems[index]) { state ->
-      if (state is DataState.Success) {
-        added += state.payload
-        addNext(index + 1)
-      } else {
-        onCompleted?.invoke(DataState.Empty())
-      }
-    }
-  }
-
-  addNext(0)
+    addNext(0)
 }
 
 fun updateGoodsItems(
-  goodsItems: List<GoodsItemDataModel>,
-  onCompleted: ((DataState<List<GoodsItemDataModel>>) -> Unit)? = null
+    goodsItems: List<GoodsItemDataModel>,
+    onCompleted: ((DataState<List<GoodsItemDataModel>>) -> Unit)? = null
 ) {
-  val updated = mutableListOf<GoodsItemDataModel>()
+    val updated = mutableListOf<GoodsItemDataModel>()
 
-  fun updateNext(index: Int) {
-    if (index > goodsItems.lastIndex) {
-      onCompleted?.invoke(DataState.Success(updated))
-      return
+    fun updateNext(index: Int) {
+        if (index > goodsItems.lastIndex) {
+            onCompleted?.invoke(DataState.Success(updated))
+            return
+        }
+
+        updateGoodsItem(goodsItems[index]) { state ->
+            if (state is DataState.Success) {
+                updated += state.payload
+                updateNext(index + 1)
+            } else {
+                onCompleted?.invoke(DataState.Empty())
+            }
+        }
     }
 
-    updateGoodsItem(goodsItems[index]) { state ->
-      if (state is DataState.Success) {
-        updated += state.payload
-        updateNext(index + 1)
-      } else {
-        onCompleted?.invoke(DataState.Empty())
-      }
-    }
-  }
-
-  updateNext(0)
+    updateNext(0)
 }
 
 
@@ -4248,458 +5036,516 @@ fun updateGoodsItems(
 
 @kotlinx.serialization.Serializable
 data class AccountSubscriptionStatusDataModel(
-  val id: Long,
-  val userId: Long,
-  val balance: Double,
-  val subscriptionPlanId: Long,
-  val lastChargeTime: Long,
-  val nextChargeTime: Long
+    val id: Long,
+    val userId: Long,
+    val balance: Double,
+    val subscriptionPlanId: Long,
+    val lastChargeTime: Long,
+    val nextChargeTime: Long
 )
 
 @kotlinx.serialization.Serializable
 data class ActivationHistoryEntryDataModel(
-  val id: String,
-  val type: Int,
-  val time: Long
+    val id: String,
+    val type: Int,
+    val time: Long
 )
 
 @kotlinx.serialization.Serializable
 data class AppLanguageDataModel(
-  val language: String,
-  val name: List<LocalizedStringDataModel>,
-  val flagDrawablePath: String
+    val language: String,
+    val name: List<LocalizedStringDataModel>,
+    val flagDrawablePath: String
 )
 @kotlinx.serialization.Serializable
 data class CashRegisterExtractionEntryDataModel(
-  val id: String,
-  val amount: Double,
-  val timeMillis: Long
+    val id: String,
+    val amount: Double,
+    val timeMillis: Long
 )
 
 private val setActiveShelfBatchMutex = Mutex()
 
 fun setActiveShelfBatch(
-  batch: GoodsBatchDataModel,
-  storeId: String,
-  onCompleted: ((DataState<GoodsItemDataModel>) -> Unit)? = null
+    batch: GoodsBatchDataModel,
+    storeId: String,
+    onCompleted: ((DataState<GoodsItemDataModel>) -> Unit)? = null
 ) {
-  if (!setActiveShelfBatchMutex.isLocked)
-    GlobalScope.launch(Dispatchers.ourIo) {
-      setActiveShelfBatchMutex.withLock {
-        val response = networkRequest<GoodsItemDataModel, GoodsBatchDataModel>(
-          method = HttpMethod.Post,
-          endpointUrl = "stockBatches/setActiveShelfBatch",
-          body = batch,
-          headers = mapOf("store_id" to storeId)
-        )
+    if (!setActiveShelfBatchMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            setActiveShelfBatchMutex.withLock {
+                val response = networkRequest<GoodsItemDataModel, GoodsBatchDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = "stockBatches/setActiveShelfBatch",
+                    body = batch,
+                    headers = mapOf("store_id" to storeId)
+                )
 
-        if (response.negative || response.payload == null) {
-          postInAppNotification(response.message, NotificationType.Negative)
-          onCompleted?.invoke(DataState.Empty())
-        } else {
-          postInAppNotification(response.message, NotificationType.Positive)
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty())
+                } else {
+                    postInAppNotification(response.message, NotificationType.Positive)
 
-          stockState.emit(
-            DataState.Success(
-              mutableListOf<GoodsItemDataModel>().also { newList ->
-                stockState.payloadValue?.let { newList.addAll(it) }
+                    stockState.emit(
+                        DataState.Success(
+                            mutableListOf<GoodsItemDataModel>().also { newList ->
+                                stockState.payloadValue?.let { newList.addAll(it) }
 
-                val index = newList.indexOfFirst { it.id == response.payload.id }
+                                val index = newList.indexOfFirst { it.id == response.payload.id }
 
-                if (index != -1)
-                  newList[index] = response.payload
-                else
-                  newList.add(response.payload)
-              },
-              response.message
-            )
-          )
+                                if (index != -1)
+                                    newList[index] = response.payload
+                                else
+                                    newList.add(response.payload)
+                            },
+                            response.message
+                        )
+                    )
 
-          onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
         }
-      }
-    }
 }
 
 @kotlinx.serialization.Serializable
 data class AppThemeDataModel(
-  val id: Long,
-  val name: List<LocalizedStringDataModel>
+    val id: Long,
+    val name: List<LocalizedStringDataModel>
 )
 
 @kotlinx.serialization.Serializable
 data class BalanceHistoryEntryDataModel(
-  val id: String,
-  val type: Int,
-  val amount: Double,
-  val currency: String
+    val id: String,
+    val type: Int,
+    val amount: Double,
+    val currency: String
 )
 
 @kotlinx.serialization.Serializable
 data class CityDataModel(
-  val name: List<LocalizedStringDataModel>,
-  var centerLatitude: Double,
-  var centerLongitude: Double,
-  val swLatitude: Double,
-  val swLongitude: Double,
-  val neLatitude: Double,
-  val neLongitude: Double
+    val name: List<LocalizedStringDataModel>,
+    var centerLatitude: Double,
+    var centerLongitude: Double,
+    val swLatitude: Double,
+    val swLongitude: Double,
+    val neLatitude: Double,
+    val neLongitude: Double
 )
 
 @kotlinx.serialization.Serializable
 data class CompanyFormDataModel(
-  val id: String,
-  val name: List<LocalizedStringDataModel>,
-  val parameters: List<ParameterDataModel>
+    val id: String,
+    val name: List<LocalizedStringDataModel>,
+    val parameters: List<ParameterDataModel>
 )
 
 @kotlinx.serialization.Serializable
 data class CountryDataModel(
-  val locale: String,
-  val language: String,
-  val name: List<LocalizedStringDataModel>,
-  val flagDrawablePath: String,
-  val cities: List<CityDataModel>,
-  val phoneNumberCode: String,
-  val phoneNumberSize: Int,
-  val currencies: List<CurrencyDataModel>,
-  val cashlessPaymentOptions: List<PaymentOptionDataModel>,
-  val preferredCashlessPaymentOptionId: String
+    val locale: String,
+    val language: String,
+    val name: List<LocalizedStringDataModel>,
+    val flagDrawablePath: String,
+    val cities: List<CityDataModel>,
+    val phoneNumberCode: String,
+    val phoneNumberSize: Int,
+    val currencies: List<CurrencyDataModel>,
+    val cashlessPaymentOptions: List<PaymentOptionDataModel>,
+    val preferredCashlessPaymentOptionId: String
 )
 
 @kotlinx.serialization.Serializable
 data class CurrencyDataModel(
-  val code: String,
-  val symbol: String,
-  val name: List<LocalizedStringDataModel>
+    val code: String,
+    val symbol: String,
+    val name: List<LocalizedStringDataModel>
 )
 
 sealed interface DataState<T> {
 
-  val message: List<LocalizedStringDataModel>?
+    val message: List<LocalizedStringDataModel>?
 
-  data class Success<T>(
-    val payload: T,
-    override val message: List<LocalizedStringDataModel>? = null,
-  ): DataState<T>
+    data class Success<T>(
+        val payload: T,
+        override val message: List<LocalizedStringDataModel>? = null,
+    ): DataState<T>
 
-  class Empty<T>(override val message: List<LocalizedStringDataModel>? = null): DataState<T>
+    class Empty<T>(override val message: List<LocalizedStringDataModel>? = null): DataState<T>
 }
 
 fun <From, To> DataState<From>.map(
-  action: (From?) -> To
+    action: (From?) -> To
 ): DataState<To> {
 
-  return when (this) {
-    is DataState.Success -> DataState.Success(action(payload))
-    is DataState.Empty -> DataState.Empty(message)
-  }
+    return when (this) {
+        is DataState.Success -> DataState.Success(action(payload))
+        is DataState.Empty -> DataState.Empty(message)
+    }
 }
 
 class MutableDataStateFlowNonNull<T>(
-  private val coroutineScope: CoroutineScope,
-  initial: T
+    private val coroutineScope: CoroutineScope,
+    initial: T
 ): DataStateFlowNonNull<T> {
 
-  private val _state = MutableStateFlow<DataState<T>>(DataState.Success(initial))
-  override val value = _state.asStateFlow()
-  private val _payload = MutableStateFlow(initial)
-  override val payload = _payload.asStateFlow()
+    private val _state = MutableStateFlow<DataState<T>>(DataState.Success(initial))
+    override val value = _state.asStateFlow()
+    private val _payload = MutableStateFlow(initial)
+    override val payload = _payload.asStateFlow()
 
-  init {
-    coroutineScope.launch(Dispatchers.ourIo) {
-      _state.collect {
-        if (it is DataState.Success)
-          _payload.emit(it.payload)
-      }
+    init {
+        coroutineScope.launch(Dispatchers.ourIo) {
+            _state.collect {
+                if (it is DataState.Success)
+                    _payload.emit(it.payload)
+            }
+        }
     }
-  }
 
-  fun emit(newValue: DataState<T>) {
-    coroutineScope.launch(Dispatchers.ourIo) {
-      _state.emit(newValue)
+    fun emit(newValue: DataState<T>) {
+        coroutineScope.launch(Dispatchers.ourIo) {
+            _state.emit(newValue)
+        }
     }
-  }
 
-  fun asDataStateFlow(): DataStateFlowNonNull<T> {
-    return this as DataStateFlowNonNull<T>
-  }
+    fun asDataStateFlow(): DataStateFlowNonNull<T> {
+        return this as DataStateFlowNonNull<T>
+    }
 }
 
 interface DataStateFlow<T> {
 
-  val value: StateFlow<DataState<T>>
-  val payload: StateFlow<T?>
-  val payloadValue: T?
-    get() = payload.value
-  val payloadValueNonNull: T
-    get() = payloadValue!!
+    val value: StateFlow<DataState<T>>
+    val payload: StateFlow<T?>
+    val payloadValue: T?
+        get() = payload.value
+    val payloadValueNonNull: T
+        get() = payloadValue!!
 }
 
 interface DataStateFlowNonNull<T> {
 
-  val value: StateFlow<DataState<T>>
-  val payload: StateFlow<T>
+    val value: StateFlow<DataState<T>>
+    val payload: StateFlow<T>
 
-  val payloadValue: T
-    get() = payload.value
+    val payloadValue: T
+        get() = payload.value
 }
 
 class MutableDataStateFlow<T>(
-  private val coroutineScope: CoroutineScope,
-  initial: T? = null
+    private val coroutineScope: CoroutineScope,
+    initial: T? = null
 ): DataStateFlow<T> {
 
-  private val _state = MutableStateFlow<DataState<T>>(initial?.run { DataState.Success(initial) } ?: DataState.Empty())
-  override val value = _state.asStateFlow()
-  private val _payload = MutableStateFlow(initial)
-  override val payload = _payload.asStateFlow()
+    private val _state = MutableStateFlow<DataState<T>>(initial?.run { DataState.Success(initial) } ?: DataState.Empty())
+    override val value = _state.asStateFlow()
+    private val _payload = MutableStateFlow(initial)
+    override val payload = _payload.asStateFlow()
 
-  init {
-    coroutineScope.launch(Dispatchers.ourIo) {
-      _state.collect {
-        if (it is DataState.Success)
-          _payload.emit(it.payload)
-        else
-          _payload.emit(null)
-      }
+    init {
+        coroutineScope.launch(Dispatchers.ourIo) {
+            _state.collect {
+                if (it is DataState.Success)
+                    _payload.emit(it.payload)
+                else
+                    _payload.emit(null)
+            }
+        }
     }
-  }
 
-  fun emit(newValue: DataState<T>) {
-    coroutineScope.launch(Dispatchers.ourIo) {
-      _state.emit(newValue)
+    fun emit(newValue: DataState<T>) {
+        coroutineScope.launch(Dispatchers.ourIo) {
+            _state.emit(newValue)
+        }
     }
-  }
 
-  fun asDataStateFlow(): DataStateFlow<T> {
-    return this as DataStateFlow<T>
-  }
+    fun asDataStateFlow(): DataStateFlow<T> {
+        return this as DataStateFlow<T>
+    }
 }
 
 @kotlinx.serialization.Serializable
-data class DebtorDataModel(
-  val id: String = "",
-  val email: String = "",
-  val debtAmount: Double = 0.0,
-  val currency: String = "KZT",
-  val phoneNumber: String = "",
-  val firstName: String = "",
-  val lastName: String = "",
-  val transactionIds: List<String> = emptyList()
+data class DebtInterestDataModel(
+    val enabled: Boolean = false,
+    val ratePercent: Double = 0.0,
+    val periodUnit: String = "month", // day, week, month, year
+    val startsAtMillis: Long? = null,
+    val note: String? = null
 )
 
 @kotlinx.serialization.Serializable
+data class DebtPartialPaymentPlanDataModel(
+    val id: String = "",
+    val amount: Double = 0.0,
+    val percent: Double? = null,
+    val dueAtMillis: Long? = null,
+    val note: String? = null,
+    val completed: Boolean = false,
+    val paidAtMillis: Long? = null
+)
+
+@kotlinx.serialization.Serializable
+data class DebtPaymentRecordDataModel(
+    val id: String = "",
+    val amount: Double = 0.0,
+    val currency: String = "KZT",
+    val timeMillis: Long = 0L,
+    val paymentKind: String = "partial", // full, partial, edit
+    val plannedPaymentId: String? = null,
+    val note: String? = null,
+    val debtBefore: Double = 0.0,
+    val debtAfter: Double = 0.0
+)
+
+@kotlinx.serialization.Serializable
+data class DebtorDataModel(
+    val id: String = "",
+    val email: String = "",
+    val debtAmount: Double = 0.0,
+    val currency: String = "KZT",
+    val phoneNumber: String = "",
+    val firstName: String = "",
+    val lastName: String = "",
+    val debtorType: String = "individual", // individual, company
+    val idNumber: String = "",
+    val companyName: String = "",
+    val companyIdNumber: String = "",
+    val debtCreatedAtMillis: Long = 0L,
+    val debtDueAtMillis: Long? = null,
+    val originalDebtAmount: Double? = null,
+    val interest: DebtInterestDataModel? = null,
+    val plannedPayments: List<DebtPartialPaymentPlanDataModel> = emptyList(),
+    val paymentHistory: List<DebtPaymentRecordDataModel> = emptyList(),
+    val transactionIds: List<String> = emptyList()
+) {
+    val displayName: String
+        get() = if (debtorType == "company") {
+            companyName.ifBlank { companyIdNumber.ifBlank { id } }
+        } else {
+            "${firstName.trim()} ${lastName.trim()}".trim().ifBlank { phoneNumber.ifBlank { id } }
+        }
+}
+
+@kotlinx.serialization.Serializable
 data class DebtPaymentRequestDataModel(
-  val debtorId: String,
-  val storeId: String,
-  val amount: Double,
-  val currency: String,
-  val note: String? = null,
-  val timeMillis: Long = 0L
+    val debtorId: String,
+    val storeId: String,
+    val amount: Double,
+    val currency: String,
+    val paymentKind: String = "partial", // full, partial
+    val plannedPaymentId: String? = null,
+    val note: String? = null,
+    val timeMillis: Long = 0L
 )
 
 @kotlinx.serialization.Serializable
 data class GenericGoodsCategoryDataModel(
-  val id: String,
-  val typeIds: List<String>?,
-  val name: List<LocalizedStringDataModel>,
-  val quantityUnitId: String,
-  val imagePaths: List<StylizedDrawablePathsGroupDataModel>?
+    val id: String,
+    val typeIds: List<String>?,
+    val name: List<LocalizedStringDataModel>,
+    val alias: List<LocalizedStringDataModel>? = null,
+    val description: List<LocalizedStringDataModel>? = null,
+    val quantityUnitId: String,
+    val imagePaths: List<StylizedDrawablePathsGroupDataModel>?
 )
 
 @kotlinx.serialization.Serializable
 data class GenericGoodsItemDataModel(
-  val id: String,
-  val barcode: List<String>?,
-  val name: List<LocalizedStringDataModel>,
-  val typeIds: List<String>?,
-  val categoryIds: List<String>?,
-  val supplierIds: List<String>?,
-  val manufacturerIds: List<String>?
+    val id: String,
+    val barcode: List<String>?,
+    val name: List<LocalizedStringDataModel>,
+    val typeIds: List<String>?,
+    val categoryIds: List<String>?,
+    val supplierIds: List<String>?,
+    val manufacturerIds: List<String>?
 )
 
 @kotlinx.serialization.Serializable
 data class GenericResponseDataModel(
-  val message: String?,
-  val payload: String?,
-  val negative: Boolean
+    val message: String?,
+    val payload: String?,
+    val negative: Boolean
 ) {
 
-  fun getMessage(): List<LocalizedStringDataModel>? {
-    return message?.let { jsonBase.decodeFromString(it) }
-  }
+    fun getMessage(): List<LocalizedStringDataModel>? {
+        return message?.let { jsonBase.decodeFromString(it) }
+    }
 
-  inline fun <reified T> getPayload(): T? {
-    return payload?.let { jsonBase.decodeFromString(it) }
-  }
+    inline fun <reified T> getPayload(): T? {
+        return payload?.let { jsonBase.decodeFromString(it) }
+    }
 
-  inline fun <reified T> toResponseDataModel(): ResponseDataModel<T> {
-    return ResponseDataModel(
-      message?.let { jsonBase.decodeFromString(it) },
-      payload?.let { jsonBase.decodeFromString(it) },
-      negative
-    )
-  }
+    inline fun <reified T> toResponseDataModel(): ResponseDataModel<T> {
+        return ResponseDataModel(
+            message?.let { jsonBase.decodeFromString(it) },
+            payload?.let { jsonBase.decodeFromString(it) },
+            negative
+        )
+    }
 }
 
 
 @kotlinx.serialization.Serializable
 data class GlobalAppConfigurationDataModel(
-  val realtimeUpdatesPath: String,
-  val appName: Pair<String, String>,
-  val serverUrl: Pair<String, String>,
-  val globalAppConfigurationPath: Pair<String, String>,
-  val logInPath: Pair<String, String>,
-  val signUpPath: Pair<String, String>,
-  val refreshPath: Pair<String, String>,
-  val logOutPath: Pair<String, String>,
-  val getUserPath: Pair<String, String>,
-  val updateUserPath: Pair<String, String>,
-  val getStoresPath: Pair<String, String>,
-  val addStoresPath: Pair<String, String>,
-  val updateStoresPath: Pair<String, String>,
-  val deleteStoresPath: Pair<String, String>,
-  val getStockPath: Pair<String, String>,
-  val addGoodsItemPath: Pair<String, String>,
-  val updateGoodsItemPath: Pair<String, String>,
-  val deleteGoodsItemPath: Pair<String, String>,
-  val getStockBatchesPath: Pair<String, String>,
-  val addStockBatchPath: Pair<String, String>,
-  val updateStockBatchPath: Pair<String, String>,
-  val deleteStockBatchPath: Pair<String, String>,
+    val realtimeUpdatesPath: String,
+    val appName: Pair<String, String>,
+    val serverUrl: Pair<String, String>,
+    val globalAppConfigurationPath: Pair<String, String>,
+    val logInPath: Pair<String, String>,
+    val signUpPath: Pair<String, String>,
+    val refreshPath: Pair<String, String>,
+    val logOutPath: Pair<String, String>,
+    val getSecuritySessionsPath: Pair<String, String> = Pair("security/sessions/get", "44"),
+    val revokeSecuritySessionPath: Pair<String, String> = Pair("security/sessions/revoke", "45"),
+    val revokeOtherSecuritySessionsPath: Pair<String, String> = Pair("security/sessions/revokeOthers", "46"),
+    val getUserPath: Pair<String, String>,
+    val updateUserPath: Pair<String, String>,
+    val getStoresPath: Pair<String, String>,
+    val addStoresPath: Pair<String, String>,
+    val updateStoresPath: Pair<String, String>,
+    val deleteStoresPath: Pair<String, String>,
+    val getStockPath: Pair<String, String>,
+    val addGoodsItemPath: Pair<String, String>,
+    val updateGoodsItemPath: Pair<String, String>,
+    val deleteGoodsItemPath: Pair<String, String>,
+    val getStockBatchesPath: Pair<String, String>,
+    val addStockBatchPath: Pair<String, String>,
+    val updateStockBatchPath: Pair<String, String>,
+    val deleteStockBatchPath: Pair<String, String>,
 
-  val getGenericGoodsItemsPath: Pair<String, String>,
-  val getGenericGoodsCategoriesPath: Pair<String, String>,
-  val getSuppliersPath: Pair<String, String>,
-  val stringResourcesPath: Pair<String, String>,
-  val dimensionResourcesPath: Pair<String, String>,
-  val colorResourcesPath: Pair<String, String>,
-  val drawableResourcesConfigurationPath: Pair<String, String>,
-  val drawableResourcesPath: Pair<String, String>,
-  val getTransactionsPath: Pair<String, String>,
-  val completeTransactionPath: Pair<String, String>,
-  val getDebtorsPath: Pair<String, String> = Pair("debtors/get", "39"),
-  val addDebtorPath: Pair<String, String> = Pair("debtors/add", "40"),
-  val updateDebtorPath: Pair<String, String> = Pair("debtors/update", "41"),
-  val deleteDebtorPath: Pair<String, String> = Pair("debtors/delete", "42"),
-  val payDebtorDebtPath: Pair<String, String> = Pair("debtors/pay", "43"),
-  val getSupplierGoodsPricesPath: Pair<String, String> = Pair("supplierGoodsPrices/get", "31"),
-  val upsertSupplierGoodsPricePath: Pair<String, String> = Pair("supplierGoodsPrices/upsert", "32"),
-  val deleteSupplierGoodsPricesPath: Pair<String, String> = Pair("supplierGoodsPrices/delete", "33"),
+    val getGenericGoodsItemsPath: Pair<String, String>,
+    val getGenericGoodsCategoriesPath: Pair<String, String>,
+    val getSuppliersPath: Pair<String, String>,
+    val stringResourcesPath: Pair<String, String>,
+    val dimensionResourcesPath: Pair<String, String>,
+    val colorResourcesPath: Pair<String, String>,
+    val drawableResourcesConfigurationPath: Pair<String, String>,
+    val drawableResourcesPath: Pair<String, String>,
+    val getTransactionsPath: Pair<String, String>,
+    val completeTransactionPath: Pair<String, String>,
+    val getDebtorsPath: Pair<String, String> = Pair("debtors/get", "39"),
+    val addDebtorPath: Pair<String, String> = Pair("debtors/add", "40"),
+    val updateDebtorPath: Pair<String, String> = Pair("debtors/update", "41"),
+    val deleteDebtorPath: Pair<String, String> = Pair("debtors/delete", "42"),
+    val payDebtorDebtPath: Pair<String, String> = Pair("debtors/pay", "43"),
+    val getSupplierGoodsPricesPath: Pair<String, String> = Pair("supplierGoodsPrices/get", "31"),
+    val upsertSupplierGoodsPricePath: Pair<String, String> = Pair("supplierGoodsPrices/upsert", "32"),
+    val deleteSupplierGoodsPricesPath: Pair<String, String> = Pair("supplierGoodsPrices/delete", "33"),
 
-  val getSupplierOrdersPath: Pair<String, String> = Pair("supplierOrders/get", "34"),
-  val addSupplierOrderPath: Pair<String, String> = Pair("supplierOrders/add", "35"),
-  val updateSupplierOrderPath: Pair<String, String> = Pair("supplierOrders/update", "36"),
-  val deleteSupplierOrdersPath: Pair<String, String> = Pair("supplierOrders/delete", "37"),
-  val receiveSupplierOrderPath: Pair<String, String> = Pair("supplierOrders/receive", "38"),
-  val companyForms: List<CompanyFormDataModel>,
-  val countries: List<CountryDataModel>,
-  val languages: List<AppLanguageDataModel>,
-  val themes: List<AppThemeDataModel>,
-  val goodsItemsQuantityUnits: List<QuantityDataModel>
+    val getSupplierOrdersPath: Pair<String, String> = Pair("supplierOrders/get", "34"),
+    val addSupplierOrderPath: Pair<String, String> = Pair("supplierOrders/add", "35"),
+    val updateSupplierOrderPath: Pair<String, String> = Pair("supplierOrders/update", "36"),
+    val deleteSupplierOrdersPath: Pair<String, String> = Pair("supplierOrders/delete", "37"),
+    val receiveSupplierOrderPath: Pair<String, String> = Pair("supplierOrders/receive", "38"),
+    val companyForms: List<CompanyFormDataModel>,
+    val countries: List<CountryDataModel>,
+    val languages: List<AppLanguageDataModel>,
+    val themes: List<AppThemeDataModel>,
+    val goodsItemsQuantityUnits: List<QuantityDataModel>
 )
 
 @kotlinx.serialization.Serializable
 data class SupplierOrderLineDataModel(
-  val id: String = "",
-  val orderId: String,
-  val goodsItemId: String,
+    val id: String = "",
+    val orderId: String,
+    val goodsItemId: String,
 
-  val requestedQuantity: QuantityDataModel,
+    val requestedQuantity: QuantityDataModel,
 
-  val expectedSupplyPrice: PriceDataModel? = null,
+    val expectedSupplyPrice: PriceDataModel? = null,
 
-  val desiredExpirationDateMillis: Long? = null,
-  val additionalNotes: String? = null,
+    val desiredExpirationDateMillis: Long? = null,
+    val additionalNotes: String? = null,
 
-  val deliveredBatchIds: List<String> = emptyList(),
+    val deliveredBatchIds: List<String> = emptyList(),
 
-  val isActive: Boolean = true
+    val isActive: Boolean = true
 )
 
 @kotlinx.serialization.Serializable
 data class SupplierOrderDataModel(
-  val id: String = "",
-  val userId: String = "",
-  val storeId: String,
-  val supplierId: String,
+    val id: String = "",
+    val userId: String = "",
+    val storeId: String,
+    val supplierId: String,
 
-  val amount: PriceDataModel? = null,
+    val amount: PriceDataModel? = null,
 
-  val orderedAtMillis: Long = 0L,
-  val desiredDeliveryTimeMillis: Long? = null,
-  val confirmedDeliveryTimeMillis: Long? = null,
-  val deliveredAtMillis: Long? = null,
+    val orderedAtMillis: Long = 0L,
+    val desiredDeliveryTimeMillis: Long? = null,
+    val confirmedDeliveryTimeMillis: Long? = null,
+    val deliveredAtMillis: Long? = null,
 
-  val storeAddress: LocationDataModel? = null,
+    val storeAddress: LocationDataModel? = null,
 
-  val additionalNotes: String? = null,
+    val additionalNotes: String? = null,
 
-  val status: SupplierOrderStatusDataModel = SupplierOrderStatusDataModel.Draft,
+    val status: SupplierOrderStatusDataModel = SupplierOrderStatusDataModel.Draft,
 
-  val createdAtMillis: Long = 0L,
-  val updatedAtMillis: Long = 0L,
-  val isActive: Boolean = true
+    val createdAtMillis: Long = 0L,
+    val updatedAtMillis: Long = 0L,
+    val isActive: Boolean = true
 )
 
 @kotlinx.serialization.Serializable
 data class SupplierGoodsPriceDataModel(
-  val id: String = "",
-  val userId: String = "",
-  val storeId: String,
-  val supplierId: String,
-  val goodsItemId: String,
+    val id: String = "",
+    val userId: String = "",
+    val storeId: String,
+    val supplierId: String,
+    val goodsItemId: String,
 
-  val supplyPrice: PriceDataModel,
+    val supplyPrice: PriceDataModel,
 
-  val minOrderQuantity: QuantityDataModel? = null,
-  val packageQuantity: QuantityDataModel? = null,
+    val minOrderQuantity: QuantityDataModel? = null,
+    val packageQuantity: QuantityDataModel? = null,
 
-  val supplierBarcode: String? = null,
-  val supplierGoodsName: String? = null,
+    val supplierBarcode: String? = null,
+    val supplierGoodsName: String? = null,
 
-  val lastUsedAtMillis: Long? = null,
-  val createdAtMillis: Long = 0L,
-  val updatedAtMillis: Long = 0L,
+    val lastUsedAtMillis: Long? = null,
+    val createdAtMillis: Long = 0L,
+    val updatedAtMillis: Long = 0L,
 
-  val isActive: Boolean = true
+    val isActive: Boolean = true
 )
 
 @kotlinx.serialization.Serializable
 data class GoodsBatchDataModel(
-  val id: String = "",
-  val goodsItemId: String,
-  val userId: String = "",
-  val storeId: String,
+    val id: String = "",
+    val goodsItemId: String,
+    val userId: String = "",
+    val storeId: String,
 
-  val supplierId: String? = null,
-  val supplierOrderId: String? = null,
+    val supplierId: String? = null,
+    val supplierOrderId: String? = null,
 
-  val quantity: QuantityDataModel,
+    val quantity: QuantityDataModel,
 
-  val supplyPrice: PriceDataModel,
-  val salePriceOverride: PriceDataModel? = null,
-  val returnPriceOverride: PriceDataModel? = null,
+    val supplyPrice: PriceDataModel,
+    val salePriceOverride: PriceDataModel? = null,
+    val returnPriceOverride: PriceDataModel? = null,
+    val wholesalePriceOverride: PriceDataModel? = null,
 
-  val deliveredAtMillis: Long? = null,
-  val manufacturedAtMillis: Long? = null,
-  val expirationDateMillis: Long? = null,
+    val deliveredAtMillis: Long? = null,
+    val manufacturedAtMillis: Long? = null,
+    val expirationDateMillis: Long? = null,
 
-  val discounts: List<BatchDiscountDataModel> = emptyList(),
+    val discounts: List<BatchDiscountDataModel> = emptyList(),
 
-  val shelfPosition: String? = null,
-  val shelfPriority: Int = 0,
+    val shelfPosition: String? = null,
+    val shelfPriority: Int = 0,
 
-  val status: StockBatchStatusDataModel = StockBatchStatusDataModel.Delivered,
+    val status: StockBatchStatusDataModel = StockBatchStatusDataModel.Delivered,
 
-  val additionalNotes: String? = null,
+    val additionalNotes: String? = null,
 
-  val createdAtMillis: Long = 0L,
-  val updatedAtMillis: Long = 0L,
-  val createdByUserId: String? = null,
+    val createdAtMillis: Long = 0L,
+    val updatedAtMillis: Long = 0L,
+    val createdByUserId: String? = null,
 
-  val isActive: Boolean = true
+    val isActive: Boolean = true
 )
 
 //@kotlinx.serialization.Serializable
@@ -4723,528 +5569,616 @@ data class GoodsBatchDataModel(
 
 @kotlinx.serialization.Serializable
 data class GoodsBatchShelfQueueDataModel(
-  val statusId: Int,
-  val startTime: Long,
-  val endTime: Long
+    val statusId: Int,
+    val startTime: Long,
+    val endTime: Long
 )
 
 @kotlinx.serialization.Serializable
 data class GoodsCategoryDataModel(
-  val id: String = "",
-  val name: List<LocalizedStringDataModel> = emptyList(),
-  val imageUrl: String = "",
-  val quantityWithUnitSerialized: String = "",
-  val storeId: String = "",
-  val universal: Boolean = false
+    val id: String = "",
+    val name: List<LocalizedStringDataModel> = emptyList(),
+    val imageUrl: String = "",
+    val quantityWithUnitSerialized: String = "",
+    val storeId: String = "",
+    val universal: Boolean = false
 )
 
 @kotlinx.serialization.Serializable
 data class GoodsItemDataModel(
-  val id: String = "",
-  val userId: String = "",
-  val storeId: String = "",
+    val id: String = "",
+    val userId: String = "",
+    val storeId: String = "",
 
-  val barcodes: List<String> = emptyList(),
-  val name: List<LocalizedStringDataModel> = emptyList(),
+    val barcodes: List<String> = emptyList(),
+    val name: List<LocalizedStringDataModel> = emptyList(),
 
-  val description: List<LocalizedStringDataModel> = emptyList(),
+    val description: List<LocalizedStringDataModel> = emptyList(),
 
-  val measurementUnitId: String = "0",
-  val categoryIds: List<String> = emptyList(),
+    val measurementUnitId: String = "0",
+    val categoryIds: List<String> = emptyList(),
 
-  val salePrices: List<PriceDataModel> = emptyList(),
-  val returnPrices: List<PriceDataModel> = emptyList(),
-  val supplyPrices: List<PriceDataModel> = emptyList(),
+    val salePrices: List<PriceDataModel> = emptyList(),
+    val returnPrices: List<PriceDataModel> = emptyList(),
+    val supplyPrices: List<PriceDataModel> = emptyList(),
+    val wholesalePrices: List<PriceDataModel> = emptyList(),
+    val wholesaleMinQuantity: QuantityDataModel? = null,
 
-  val genericExpirationPeriod: ExpirationPeriodDataModel? = null,
+    val genericExpirationPeriod: ExpirationPeriodDataModel? = null,
 
-  val isQuickItem: Boolean = false,
-  val imagePaths: List<String> = emptyList(),
+    val isQuickItem: Boolean = false,
+    val imagePaths: List<String> = emptyList(),
 
-  val activeShelfBatchId: String? = null,
+    val activeShelfBatchId: String? = null,
 
-  val note: String? = null,
+    val note: String? = null,
+    val noteLocalized: List<LocalizedStringDataModel> = emptyList(),
 
-  val createdAtMillis: Long = 0L,
-  val updatedAtMillis: Long = 0L,
-  val isActive: Boolean = true
+    val createdAtMillis: Long = 0L,
+    val updatedAtMillis: Long = 0L,
+    val isActive: Boolean = true
 ): Searchable {
 
-  override val exactSearchOperands: List<String>
-    get() = mutableListOf<String>().apply {
-      addAll(barcodes)
-      addAll(name.map { it.value })
-      addAll(salePrices.map { it.price })
-      addAll(returnPrices.map { it.price })
-      addAll(supplyPrices.map { it.price })
-      addAll(salePrices.map { it.currency })
-      addAll(returnPrices.map { it.currency })
-      addAll(supplyPrices.map { it.currency })
-    }
-  override val containsSearchOperands: List<String>
-    get() = mutableListOf<String>().apply {
-      addAll(barcodes)
-      addAll(name.map { it.value })
-      addAll(salePrices.map { it.price })
-      addAll(returnPrices.map { it.price })
-      addAll(supplyPrices.map { it.price })
-      addAll(salePrices.map { it.currency })
-      addAll(returnPrices.map { it.currency })
-      addAll(supplyPrices.map { it.currency })
-    }
-  override val uniqueSearchOperands: List<String>
-    get() = mutableListOf<String>().apply {
-      addAll(barcodes)
-    }
+    override val exactSearchOperands: List<String>
+        get() = mutableListOf<String>().apply {
+            addAll(barcodes)
+            addAll(barcodes.map { it.toStoredGoodsItemBarcode() })
+            addAll(name.map { it.value })
+            addAll(salePrices.map { it.price })
+            addAll(returnPrices.map { it.price })
+            addAll(supplyPrices.map { it.price })
+            addAll(wholesalePrices.map { it.price })
+            addAll(noteLocalized.map { it.value })
+            note?.let { add(it) }
+            addAll(salePrices.map { it.currency })
+            addAll(returnPrices.map { it.currency })
+            addAll(supplyPrices.map { it.currency })
+            addAll(wholesalePrices.map { it.currency })
+        }
+    override val containsSearchOperands: List<String>
+        get() = mutableListOf<String>().apply {
+            addAll(barcodes)
+            addAll(barcodes.map { it.toStoredGoodsItemBarcode() })
+            addAll(name.map { it.value })
+            addAll(salePrices.map { it.price })
+            addAll(returnPrices.map { it.price })
+            addAll(supplyPrices.map { it.price })
+            addAll(wholesalePrices.map { it.price })
+            addAll(noteLocalized.map { it.value })
+            note?.let { add(it) }
+            addAll(salePrices.map { it.currency })
+            addAll(returnPrices.map { it.currency })
+            addAll(supplyPrices.map { it.currency })
+            addAll(wholesalePrices.map { it.currency })
+        }
+    override val uniqueSearchOperands: List<String>
+        get() = mutableListOf<String>().apply {
+            addAll(barcodes)
+            addAll(barcodes.map { it.toStoredGoodsItemBarcode() })
+        }
 }
 
 @kotlinx.serialization.Serializable
 class GoodsItemInCartDataModel(
-  val id: String,
-  val transactionTypeIndex: Int,
-  val clientId: Int,
-  val quantity: QuantityDataModel,
-  val timeAdded: Long
+    val id: String,
+    val transactionTypeIndex: Int,
+    val clientId: Int,
+    val quantity: QuantityDataModel,
+    val timeAdded: Long
 )
 
 @kotlinx.serialization.Serializable
 data class GoodsItemInRemovalDataModel(
-  val barcode: String,
-  val quantity: Double,
-  val storeId: String
+    val barcode: String,
+    val quantity: Double,
+    val storeId: String
 )
 
 @kotlinx.serialization.Serializable
 data class GoodsItemInTransactionDataModel(
-  val barcode: String,
-  val quantity: Double,
-  val pricePerUnit: Double,
-  val supplierId: Long? = null
+    val barcode: String,
+    val quantity: Double,
+    val pricePerUnit: Double,
+    val supplierId: Long? = null,
+    val saleMethodId: String = SALE_METHOD_RETAIL
 )
 
 @kotlinx.serialization.Serializable
 data class LocalizedStringDataModel(
-  val language: String,
-  val value: String
+    val language: String,
+    val value: String
 )
 
 @kotlinx.serialization.Serializable
 data class LocalizedStringGroupDataModel(
-  val id: Long,
-  val values: List<LocalizedStringDataModel>
+    val id: Long,
+    val values: List<LocalizedStringDataModel>
 )
 
 @kotlinx.serialization.Serializable
 data class LocationDataModel(
-  val name: String,
-  val postalIndex: String,
-  val latitude: Double,
-  val longitude: Double
+    val name: String,
+    val postalIndex: String,
+    val latitude: Double,
+    val longitude: Double
 )
 
 @kotlinx.serialization.Serializable
 data class ManufacturerDataModel(
-  val id: String,
-  val name: List<LocalizedStringDataModel>,
-  val alias: List<LocalizedStringDataModel>?,
-  val description: List<LocalizedStringDataModel>?
+    val id: String,
+    val name: List<LocalizedStringDataModel>,
+    val alias: List<LocalizedStringDataModel>?,
+    val description: List<LocalizedStringDataModel>?
 )
 
 @kotlinx.serialization.Serializable
 data class NotificationDataModel(
-  val message: String,
-  val type: NotificationType
-)
+    val message: String,
+    val type: NotificationType,
+    val id: String = "",
+    val userId: String? = null,
+    val storeId: String? = null,
+    val title: String = "",
+    val category: String = "general",
+    val source: String = "app",
+    val metadata: Map<String, String> = emptyMap(),
+    val createdAtMillis: Long = 0L,
+    val shownAtMillis: Long = 0L,
+    val readAtMillis: Long? = null,
+    val isSavedOnServer: Boolean = false
+): Searchable {
+    override val exactSearchOperands: List<String>
+        get() = listOf(id, title, message, category, source, type.name) + metadata.values
+
+    override val containsSearchOperands: List<String>
+        get() = listOf(id, title, message, category, source, type.name) + metadata.values
+
+    override val uniqueSearchOperands: List<String>
+        get() = listOf(id)
+}
 
 enum class NotificationType {
-  Positive, Negative, Neutral
+    Positive, Negative, Neutral
 }
 
 @kotlinx.serialization.Serializable
 data class ParameterDataModel(
-  val name: List<LocalizedStringDataModel>,
-  val value: String,
-  val length: Int,
-  val number: Boolean,
-  val nonLetterSymbolsEnabled: Boolean
+    val name: List<LocalizedStringDataModel>,
+    val value: String,
+    val length: Int,
+    val number: Boolean,
+    val nonLetterSymbolsEnabled: Boolean
 )
 
 @kotlinx.serialization.Serializable
 data class PaymentOptionDataModel(
-  val id: String,
-  val name: List<LocalizedStringDataModel>
+    val id: String,
+    val name: List<LocalizedStringDataModel>
 )
 
 @kotlinx.serialization.Serializable
 data class PriceDataModel(
-  val price: String,
-  val currency: String,
-  val supplierId: String
+    val price: String,
+    val currency: String,
+    val supplierId: String
 )
 
 @kotlinx.serialization.Serializable
 data class QuantityDataModel(
-  val id: String,
-  val immutableUnitName: List<LocalizedStringDataModel>,
-  val total: Double = 1.0,
-  val pricedAmount: Double = 1.0,
-  val roundTotal: Boolean
+    val id: String,
+    val immutableUnitName: List<LocalizedStringDataModel>,
+    val total: Double = 1.0,
+    val pricedAmount: Double = 1.0,
+    val roundTotal: Boolean
 ) {
 
-  fun matchesName(name: String): Boolean {
-    return immutableUnitName.any {
-      it.value.equals(name, true)
+    fun matchesName(name: String): Boolean {
+        return immutableUnitName.any {
+            it.value.equals(name, true)
+        }
     }
-  }
 }
 
 @kotlinx.serialization.Serializable
 data class RemoteResponseDataModel(
-  val id: String,
-  val message: List<LocalizedStringDataModel>
+    val id: String,
+    val message: List<LocalizedStringDataModel>
 )
 
 @kotlinx.serialization.Serializable
 data class ResponseDataModel<T>(
-  val message: List<LocalizedStringDataModel>?,
-  val payload: T?,
-  val negative: Boolean
+    val message: List<LocalizedStringDataModel>?,
+    val payload: T?,
+    val negative: Boolean,
+    val httpStatusCode: Int? = null,
+    val transportFailure: Boolean = false
 )
 
 @Suppress("UNCHECKED_CAST")
 fun <T : Searchable> List<Searchable>.search(query: String, vararg extraOperands: String): Pair<List<T>, Boolean> {
-  singleOrNull {
-    it.searchUnique(query, *extraOperands)
-  }?.run {
-    return map { it as T } to true
-  }
-
-  val exact = filter {
-    it.searchExact(query, *extraOperands)
-  }
-  val contains = filter {
-    it.searchContains(query, *extraOperands) && !exact.contains(it)
-  }
-
-  return mutableListOf<Searchable>()
-    .apply {
-      addAll(exact)
-      addAll(contains)
+    singleOrNull {
+        it.searchUnique(query, *extraOperands)
+    }?.run {
+        return map { it as T } to true
     }
-    .toList()
-    .map { it as T } to false
+
+    val exact = filter {
+        it.searchExact(query, *extraOperands)
+    }
+    val contains = filter {
+        it.searchContains(query, *extraOperands) && !exact.contains(it)
+    }
+
+    return mutableListOf<Searchable>()
+        .apply {
+            addAll(exact)
+            addAll(contains)
+        }
+        .toList()
+        .map { it as T } to false
 }
 
 interface Searchable {
 
-  val exactSearchOperands: List<String>
-  val containsSearchOperands: List<String>
-  val uniqueSearchOperands: List<String>
+    val exactSearchOperands: List<String>
+    val containsSearchOperands: List<String>
+    val uniqueSearchOperands: List<String>
 
 
-  fun searchExact(query: String, vararg extraOperands: String): Boolean {
-    return exactSearchOperands.any { it.equals(query, true) }
-        || extraOperands.any { it.equals(query, true) }
-  }
+    fun searchExact(query: String, vararg extraOperands: String): Boolean {
+        return exactSearchOperands.any { it.equals(query, true) }
+                || extraOperands.any { it.equals(query, true) }
+    }
 
-  fun searchContains(query: String, vararg extraOperands: String): Boolean {
-    return containsSearchOperands.any { it.contains(query, true) }
-        || extraOperands.any { it.contains(query, true) }
-  }
+    fun searchContains(query: String, vararg extraOperands: String): Boolean {
+        return containsSearchOperands.any { it.contains(query, true) }
+                || extraOperands.any { it.contains(query, true) }
+    }
 
-  fun searchUnique(query: String, vararg extraOperands: String): Boolean {
-    return uniqueSearchOperands.all { it.equals(query, true) } && extraOperands.any { it.equals(query, true) }
-  }
+    fun searchUnique(query: String, vararg extraOperands: String): Boolean {
+        return uniqueSearchOperands.all { it.equals(query, true) } && extraOperands.any { it.equals(query, true) }
+    }
 }
 
 abstract class StateHost {
-  private val _state = MutableStateFlow(mapOf<String, String>())
-  val state = _state.asStateFlow()
+    private val _state = MutableStateFlow(mapOf<String, String>())
+    val state = _state.asStateFlow()
 
-  suspend fun setState(pair: Pair<String, String>) {
-    _state.emit(
-      _state.value.toMutableMap().apply {
-        this[pair.first] = pair.second
-      }
-    )
-  }
+    suspend fun setState(pair: Pair<String, String>) {
+        _state.emit(
+            _state.value.toMutableMap().apply {
+                this[pair.first] = pair.second
+            }
+        )
+    }
 
-  suspend fun removeState(key: String) {
-    _state.emit(
-      _state.value.toMutableMap().apply {
-        remove(key)
-      }
-    )
-  }
+    suspend fun removeState(key: String) {
+        _state.emit(
+            _state.value.toMutableMap().apply {
+                remove(key)
+            }
+        )
+    }
 }
 
 @kotlinx.serialization.Serializable
 data class StoreDataModel(
-  val id: String,
-  val userIds: List<String>,
-  val storeTypeIds: List<String>,
-  val name: List<LocalizedStringDataModel>,
-  val alias: List<LocalizedStringDataModel>,
-  val description: List<LocalizedStringDataModel>,
-  val companyForms: List<CompanyFormDataModel>,
-  val location: LocationDataModel,
-  val phoneNumbers: List<String>,
-  val emails: List<String>,
-  val countryLocales: List<String>,
-  val createdAt: Long
+    val id: String,
+    val userIds: List<String>,
+    val storeTypeIds: List<String>,
+    val name: List<LocalizedStringDataModel>,
+    val alias: List<LocalizedStringDataModel>,
+    val description: List<LocalizedStringDataModel>,
+    val companyForms: List<CompanyFormDataModel>,
+    val location: LocationDataModel,
+    val phoneNumbers: List<String>,
+    val emails: List<String>,
+    val countryLocales: List<String>,
+    val createdAt: Long
 ): Searchable {
 
-  override val exactSearchOperands: List<String>
-    get() {
-      return mutableListOf<String>()
-        .apply {
-          name.forEach {
-            add(it.value)
-          }
+    override val exactSearchOperands: List<String>
+        get() {
+            return mutableListOf<String>()
+                .apply {
+                    name.forEach {
+                        add(it.value)
+                    }
 
-          alias.forEach {
-            add(it.value)
-          }
+                    alias.forEach {
+                        add(it.value)
+                    }
 
-          description.forEach {
-            add(it.value)
-          }
+                    description.forEach {
+                        add(it.value)
+                    }
 
-          add(location.name)
-          add(location.postalIndex)
-          add(location.latitude.toString())
-          add(location.longitude.toString())
+                    add(location.name)
+                    add(location.postalIndex)
+                    add(location.latitude.toString())
+                    add(location.longitude.toString())
 
-          phoneNumbers.forEach { add(it) }
-          emails.forEach { add(it) }
+                    phoneNumbers.forEach { add(it) }
+                    emails.forEach { add(it) }
+                }
         }
-    }
-  override val containsSearchOperands: List<String>
-    get() {
-      return mutableListOf<String>()
-        .apply {
-          name.forEach {
-            add(it.value)
-          }
+    override val containsSearchOperands: List<String>
+        get() {
+            return mutableListOf<String>()
+                .apply {
+                    name.forEach {
+                        add(it.value)
+                    }
 
-          alias.forEach {
-            add(it.value)
-          }
+                    alias.forEach {
+                        add(it.value)
+                    }
 
-          description.forEach {
-            add(it.value)
-          }
+                    description.forEach {
+                        add(it.value)
+                    }
 
-          add(location.name)
-          add(location.postalIndex)
-          add(location.latitude.toString())
-          add(location.longitude.toString())
+                    add(location.name)
+                    add(location.postalIndex)
+                    add(location.latitude.toString())
+                    add(location.longitude.toString())
 
-          phoneNumbers.forEach { add(it) }
-          emails.forEach { add(it) }
+                    phoneNumbers.forEach { add(it) }
+                    emails.forEach { add(it) }
+                }
         }
-    }
-  override val uniqueSearchOperands: List<String>
-    get() {
-      return emptyList()
-    }
+    override val uniqueSearchOperands: List<String>
+        get() {
+            return emptyList()
+        }
 }
 
 @kotlinx.serialization.Serializable
 sealed interface StoreJobDataModel {
 
-  data object Cashier: StoreJobDataModel
+    data object Cashier: StoreJobDataModel
 
-  data object WarehouseManager: StoreJobDataModel
+    data object WarehouseManager: StoreJobDataModel
 
-  data object Administrator: StoreJobDataModel
+    data object Administrator: StoreJobDataModel
 
-  fun serialize(): String {
-    return when (this) {
-      is Cashier -> "Cashier"
-      is WarehouseManager -> "WarehouseManager"
-      is Administrator -> "Administrator"
+    fun serialize(): String {
+        return when (this) {
+            is Cashier -> "Cashier"
+            is WarehouseManager -> "WarehouseManager"
+            is Administrator -> "Administrator"
+        }
     }
-  }
 
-  companion object {
-    fun deserialize(serialized: String): StoreJobDataModel {
-      return when (serialized) {
-        "Cashier" -> Cashier
-        "WarehouseManager" -> WarehouseManager
-        "Administrator" -> Administrator
-        else -> throw IllegalStateException("Must be Cashier or WarehouseManager or Administrator")
-      }
+    companion object {
+        fun deserialize(serialized: String): StoreJobDataModel {
+            return when (serialized) {
+                "Cashier" -> Cashier
+                "WarehouseManager" -> WarehouseManager
+                "Administrator" -> Administrator
+                else -> throw IllegalStateException("Must be Cashier or WarehouseManager or Administrator")
+            }
+        }
     }
-  }
 }
 
 @kotlinx.serialization.Serializable
 data class StylizedColorDataModel(
-  val themeId: Long,
-  val valueHex: String
+    val themeId: Long,
+    val valueHex: String
 )
 
 @kotlinx.serialization.Serializable
 data class StylizedColorGroupDataModel(
-  val id: Long,
-  val values: List<StylizedColorDataModel>
+    val id: Long,
+    val values: List<StylizedColorDataModel>
 )
 
 @kotlinx.serialization.Serializable
 data class StylizedDimensionDataModel(
-  val sizeModeId: Long,
-  val value: Float
+    val sizeModeId: Long,
+    val value: Float
 )
 
 @kotlinx.serialization.Serializable
 data class StylizedDimensionGroupDataModel(
-  val id: Long,
-  val values: List<StylizedDimensionDataModel>
+    val id: Long,
+    val values: List<StylizedDimensionDataModel>
 )
 
 @kotlinx.serialization.Serializable
 data class StylizedDrawablePathsDataModel(
-  val themeId: Long,
-  val path: String
+    val themeId: Long,
+    val path: String
 )
 
 @kotlinx.serialization.Serializable
 data class StylizedDrawablePathsGroupDataModel(
-  val id: Long,
-  val values: List<StylizedDrawablePathsDataModel>
+    val id: Long,
+    val values: List<StylizedDrawablePathsDataModel>
 )
 
 @kotlinx.serialization.Serializable
 data class SubscriptionDataModel(
-  val id: String,
-  val startTime: Long,
-  val endTime: Long
+    val id: String,
+    val startTime: Long,
+    val endTime: Long
 )
 
 @kotlinx.serialization.Serializable
 data class SubscriptionPlanDataModel(
-  val id: Int,
-  val name: String,
-  val storesCount: Int,
-  val cashRegistersCount: Int,
-  val monthlyPrice: Double
+    val id: Int,
+    val name: String,
+    val storesCount: Int,
+    val cashRegistersCount: Int,
+    val monthlyPrice: Double
 )
 
 
 @kotlinx.serialization.Serializable
 data class SupplierDataModel(
-  val id: String,
-  val typeIds: List<String>?,
-  val name: List<LocalizedStringDataModel>,
-  val phoneNumbers: List<String>?,
-  val emails: List<String>?,
-  val addedAt: Long,
-  val isActive: Boolean
+    val id: String,
+    val typeIds: List<String>?,
+    val name: List<LocalizedStringDataModel>,
+    val phoneNumbers: List<String>?,
+    val emails: List<String>?,
+    val addedAt: Long,
+    val isActive: Boolean
 )
 
 @kotlinx.serialization.Serializable
 data class TokenPair(
-  val accessToken: String,
-  val accessExpiryTime: Long,
-  val refreshToken: String,
-  val refreshExpiryTime: Long
+    val accessToken: String,
+    val accessExpiryTime: Long,
+    val refreshToken: String,
+    val refreshExpiryTime: Long
 )
 
 @kotlinx.serialization.Serializable
+data class ClientDeviceInfoDataModel(
+    val installationId: String = "",
+    val deviceName: String = "",
+    val platformName: String = "",
+    val osName: String = "",
+    val appName: String = "AITA",
+    val appVersion: String = "",
+    val localeLanguage: String = ""
+)
+
+@kotlinx.serialization.Serializable
+data class SecuritySessionDataModel(
+    val id: String,
+    val userId: String,
+    val deviceName: String = "",
+    val platformName: String = "",
+    val osName: String = "",
+    val appName: String = "",
+    val appVersion: String = "",
+    val localeLanguage: String = "",
+    val ipAddress: String = "",
+    val userAgent: String = "",
+    val createdAtMillis: Long = 0L,
+    val expiresAtMillis: Long = 0L,
+    val revokedAtMillis: Long? = null,
+    val current: Boolean = false,
+    val active: Boolean = true
+)
+
+@kotlinx.serialization.Serializable
+data class SecuritySessionRevokeRequestDataModel(
+    val sessionId: String
+)
+
+fun buildCurrentClientDeviceInfo(): ClientDeviceInfoDataModel {
+    val platformInfo = runCatching { getClientDeviceInfo?.invoke() }.getOrNull()
+
+    return ClientDeviceInfoDataModel(
+        installationId = platformInfo?.installationId.orEmpty(),
+        deviceName = platformInfo?.deviceName?.takeIf { it.isNotBlank() } ?: getPlatformName(),
+        platformName = platformInfo?.platformName?.takeIf { it.isNotBlank() } ?: getPlatformName(),
+        osName = platformInfo?.osName.orEmpty(),
+        appName = platformInfo?.appName?.takeIf { it.isNotBlank() } ?: globalAppConfigurationState.payloadValue.appName.first,
+        appVersion = platformInfo?.appVersion.orEmpty(),
+        localeLanguage = platformInfo?.localeLanguage?.takeIf { it.isNotBlank() } ?: getSystemLocaleLanguage()
+    )
+}
+
+@kotlinx.serialization.Serializable
 data class TransactionDataModel(
-  val id: String,
-  val workshiftId: Long,
-  val type: String,
-  val storeId: String,
-  val goodsInTransaction: List<GoodsItemInTransactionDataModel>,
-  val paidCash: Double,
-  val paidCard: Double,
-  val cardPaymentOptionId: Int,
-  val debtor: DebtorDataModel? = null,
-  val timeMillis: Long
+    val id: String,
+    val workshiftId: Long,
+    val type: String,
+    val storeId: String,
+    val goodsInTransaction: List<GoodsItemInTransactionDataModel>,
+    val paidCash: Double,
+    val paidCard: Double,
+    val cardPaymentOptionId: Int,
+    val debtor: DebtorDataModel? = null,
+    val timeMillis: Long
 )
 
 @kotlinx.serialization.Serializable
 data class UserAccountDataModel(
-  val id: String,
-  val phoneNumber: String,
-  val email: String,
-  val firstName: String,
-  val lastName: String,
-  val countryLocale: String,
-  val workerAccountIds: String?,
-  val supplierAccountIds: String?,
-  val activeStoreId: String? = null,
-  val createdAt: Long,
-  val isActive: Boolean
+    val id: String,
+    val phoneNumber: String,
+    val email: String,
+    val firstName: String,
+    val lastName: String,
+    val countryLocale: String,
+    val workerAccountIds: String?,
+    val supplierAccountIds: String?,
+    val activeStoreId: String? = null,
+    val createdAt: Long,
+    val isActive: Boolean
 )
 
 @kotlinx.serialization.Serializable
 class UserAccountUpdateDataModel(
-  val account: UserAccountDataModel,
-  val password: String,
-  val newPassword: String?
+    val account: UserAccountDataModel,
+    val password: String,
+    val newPassword: String?
 )
 
 @kotlinx.serialization.Serializable
 data class UserAuthLogInDataModel(
-  val login: String,
-  val password: String
+    val login: String,
+    val password: String,
+    val deviceInfo: ClientDeviceInfoDataModel? = null
 )
 
 @kotlinx.serialization.Serializable
 data class UserAuthSignUpDataModel(
-  val phoneNumber: String,
-  val email: String,
-  val firstName: String,
-  val lastName: String,
-  val countryLocale: String,
-  val password: String
+    val phoneNumber: String,
+    val email: String,
+    val firstName: String,
+    val lastName: String,
+    val countryLocale: String,
+    val password: String,
+    val deviceInfo: ClientDeviceInfoDataModel? = null
 )
 
 @kotlinx.serialization.Serializable
 class UserBalanceDataModel(
-  val value: String,
-  val currencyCode: String,
-  val history: List<BalanceHistoryEntryDataModel>
+    val value: String,
+    val currencyCode: String,
+    val history: List<BalanceHistoryEntryDataModel>
 )
 
 @kotlinx.serialization.Serializable
 data class UserSettingsDataModel(
-  val registrationTime: Long,
-  val appLanguage: String,
-  val appThemeId: Long,
-  val appSizeModeId: Long
+    val registrationTime: Long,
+    val appLanguage: String,
+    val appThemeId: Long,
+    val appSizeModeId: Long
 )
 
 @kotlinx.serialization.Serializable
 data class WorkerDataModel(
-  val id: String,
-  val userId: String,
-  val workerTypeId: String,
-  val placeId: String,
-  val privilegeModes: List<WorkerPrivilegeModeDataModel>,
-  val phoneNumber: String,
-  val emails: String,
-  val firstName: String,
-  val lastName: String,
-  val salary: String,
-  val salaryCurrencyCode: String,
-  val addedAt: Long,
-  val isActive: Boolean
+    val id: String,
+    val userId: String,
+    val workerTypeId: String,
+    val placeId: String,
+    val privilegeModes: List<WorkerPrivilegeModeDataModel>,
+    val phoneNumber: String,
+    val emails: String,
+    val firstName: String,
+    val lastName: String,
+    val salary: String,
+    val salaryCurrencyCode: String,
+    val addedAt: Long,
+    val isActive: Boolean
 )
 
 @kotlinx.serialization.Serializable
 data class WorkerPrivilegeModeDataModel(
-  val id: String,
-  val parameters: List<ParameterDataModel>
+    val id: String,
+    val parameters: List<ParameterDataModel>
 )
 
 @kotlinx.serialization.Serializable
 data class WorkshiftDataModel(
-  val id: Long,
-  val startTime: Long,
-  val endTime: Long,
-  val employeeId: Long
+    val id: Long,
+    val startTime: Long,
+    val endTime: Long,
+    val employeeId: Long
 )

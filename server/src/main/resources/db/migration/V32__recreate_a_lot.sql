@@ -1,4 +1,16 @@
-CREATE TABLE IF NOT EXISTS stock_items (
+-- Defensive launch-safe version of V32.
+-- The old V24/V29 migrations could leave stock_batches with an older shape.
+-- CREATE TABLE IF NOT EXISTS does not add missing columns, so indexes on new columns can fail.
+-- This migration intentionally recreates the stock/batch/supplier-order group before V36 final alignment.
+-- Safe for the fresh Mac launch database before real client data.
+
+DROP TABLE IF EXISTS supplier_order_lines CASCADE;
+DROP TABLE IF EXISTS supplier_orders CASCADE;
+DROP TABLE IF EXISTS supplier_goods_prices CASCADE;
+DROP TABLE IF EXISTS stock_batches CASCADE;
+DROP TABLE IF EXISTS stock_items CASCADE;
+
+CREATE TABLE stock_items (
   id UUID PRIMARY KEY,
   user_id UUID NOT NULL,
   store_id UUID NOT NULL,
@@ -33,7 +45,7 @@ CREATE INDEX IF NOT EXISTS idx_stock_items_barcodes
 ON stock_items USING GIN (barcodes);
 
 
-CREATE TABLE IF NOT EXISTS stock_batches (
+CREATE TABLE stock_batches (
   id UUID PRIMARY KEY,
   goods_item_id UUID NOT NULL REFERENCES stock_items(id) ON DELETE CASCADE,
   user_id UUID NOT NULL,
@@ -78,7 +90,7 @@ CREATE INDEX IF NOT EXISTS idx_stock_batches_expiration
 ON stock_batches(expiration_date_millis);
 
 
-CREATE TABLE IF NOT EXISTS supplier_goods_prices (
+CREATE TABLE supplier_goods_prices (
   id UUID PRIMARY KEY,
   user_id UUID NOT NULL,
   store_id UUID NOT NULL,
@@ -103,7 +115,7 @@ CREATE TABLE IF NOT EXISTS supplier_goods_prices (
 );
 
 
-CREATE TABLE IF NOT EXISTS supplier_orders (
+CREATE TABLE supplier_orders (
   id UUID PRIMARY KEY,
   user_id UUID NOT NULL,
   store_id UUID NOT NULL,
@@ -131,7 +143,7 @@ CREATE INDEX IF NOT EXISTS idx_supplier_orders_store_supplier
 ON supplier_orders(store_id, supplier_id);
 
 
-CREATE TABLE IF NOT EXISTS supplier_order_lines (
+CREATE TABLE supplier_order_lines (
   id UUID PRIMARY KEY,
   order_id UUID NOT NULL REFERENCES supplier_orders(id) ON DELETE CASCADE,
   goods_item_id UUID NOT NULL REFERENCES stock_items(id) ON DELETE CASCADE,
