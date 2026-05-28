@@ -6691,7 +6691,19 @@ private fun AppConfiguration.AitaBottomSheet(
                         .background(stateValues.PlaceholderTextColor)
                 )
 
-                content()
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(
+                            start = stateValues.marginTextFieldGroup,
+                            end = stateValues.marginTextFieldGroup,
+                            top = stateValues.marginTextFieldGroup,
+                            bottom = stateValues.marginTextFieldGroup
+                        )
+                ) {
+                    content()
+                }
             }
         }
     }
@@ -12498,6 +12510,15 @@ sealed class NavigationScreenModel(
                 get() = AppConfiguration.stateValues.drawableResIconReceipt.value
         }
 
+        data object OperationLogs: Menu("MenuOperationLogsNavigationScreenModelRoute") {
+            override val iconPath: String
+                get() = AppConfiguration.stateValues.drawablePathIconTransactionHistory
+            override val name: String
+                get() = with(AppConfiguration) { localizedStringResource(662, "Operation logs") }
+            override val iconRes: DrawableResource
+                get() = AppConfiguration.stateValues.drawableResIconTransactionHistory.value
+        }
+
         data object Debtors: Menu("MenuDebtorsNavigationScreenModelRoute") {
             override val iconPath: String
                 get() = AppConfiguration.stateValues.drawablePathIconDebtors
@@ -15081,6 +15102,7 @@ object Navigation {
             NavigationScreenModel.Menu.Finances,
             NavigationScreenModel.Menu.Stores,
             NavigationScreenModel.Menu.TransactionHistory,
+            NavigationScreenModel.Menu.OperationLogs,
             NavigationScreenModel.Menu.Analytics,
             NavigationScreenModel.Menu.Workers,
             NavigationScreenModel.Menu.Suppliers,
@@ -17812,6 +17834,178 @@ private fun AppConfiguration.SupplierCard(
 }
 
 @Composable
+private fun AppConfiguration.OperationLogCard(log: OperationLogDataModel) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor, RoundedCornerShape(stateValues.cornerRadius))
+            .padding(stateValues.marginTextField),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField / 2)
+        ) {
+            CpImage(
+                modifier = Modifier.size(22.dp),
+                url = stateValues.drawablePathIconTransactionHistory,
+                fallbackRes = stateValues.drawableResIconTransactionHistory.value,
+                contentDescription = localizedStringResource(662, "Operation logs"),
+                tintColor = stateValues.AccentColor
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = log.title.visibleLocalizedString(stateValues.appLanguage, log.action.ifBlank { localizedStringResource(662, "Operation log") }),
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.textSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = receiptUiDateTime(log.createdAtMillis),
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize
+                )
+            }
+        }
+
+        Text(
+            text = log.details.visibleLocalizedString(stateValues.appLanguage, "").ifBlank { "${log.entityType} • ${log.action}" },
+            color = stateValues.TextColor,
+            fontSize = stateValues.smallTextSize
+        )
+        Text(
+            text = "${localizedStringResource(668, "By")}: ${log.actorDisplayName.ifBlank { log.actorPublicId.ifBlank { log.actorUserId } }}",
+            color = stateValues.PlaceholderTextColor,
+            fontSize = stateValues.smallTextSize
+        )
+        Text(
+            text = "${localizedStringResource(669, "Place")}: ${log.storeName.visibleLocalizedString(stateValues.appLanguage, log.storePublicId.ifBlank { log.storeId })}",
+            color = stateValues.PlaceholderTextColor,
+            fontSize = stateValues.smallTextSize
+        )
+        if (log.metadata.isNotEmpty()) {
+            Text(
+                text = log.metadata.entries.take(4).joinToString(" • ") { "${it.key}: ${it.value}" },
+                color = stateValues.PlaceholderTextColor,
+                fontSize = stateValues.smallTextSize,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+fun AppConfiguration.MenuOperationLogsScreen() {
+    val logsState by operationLogsState.value.collectAsState()
+    val logs = operationLogsState.payload.collectAsState().value.orEmpty()
+    var query by rememberSaveable { mutableStateOf("") }
+    var showRootScope by rememberSaveable { mutableStateOf(false) }
+    val activeStoreId = stateValues.activeStoreId
+
+    LaunchedEffect(activeStoreId, showRootScope) {
+        activeStoreId?.let { getOperationLogs(it, if (showRootScope) OPERATION_LOG_SCOPE_ROOT else OPERATION_LOG_SCOPE_CURRENT) }
+    }
+
+    val filtered = remember(logs, query) {
+        val q = query.trim().lowercase()
+        if (q.isBlank()) logs else logs.filter { log ->
+            listOf(
+                log.action, log.entityType, log.entityId.orEmpty(), log.actorDisplayName, log.actorPublicId, log.storePublicId,
+                log.title.visibleLocalizedString(stateValues.appLanguage, ""),
+                log.details.visibleLocalizedString(stateValues.appLanguage, "")
+            ).any { it.lowercase().contains(q) }
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        ScreenAppBarWidget(
+            title = localizedStringResource(662, "Operation logs"),
+            iconPath = stateValues.drawablePathIconTransactionHistory,
+            onBack = { coroutineScope.launch { Navigation.Menu.pop(stateValues.isNarrowScreen) } },
+            trailingIcons = listOf(
+                Triple(stateValues.drawablePathIconSearch, stateValues.drawableResIconSearch.value) {
+                    activeStoreId?.let { getOperationLogs(it, if (showRootScope) OPERATION_LOG_SCOPE_ROOT else OPERATION_LOG_SCOPE_CURRENT) }
+                }
+            )
+        )
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5),
+            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(stateValues.marginTextField),
+                    verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                ) {
+                    SimpleTextInput(
+                        modifier = Modifier.fillMaxWidth(),
+                        value = query,
+                        placeholder = localizedStringResource(663, "Search logs"),
+                        leadingIconPath = stateValues.drawablePathIconSearch,
+                        onValueChange = { query = it }
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+                        actionButton(
+                            text = localizedStringResource(664, "Current place"),
+                            fillMaxWidthIfTextPresent = false,
+                            enabledColor = if (!showRootScope) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+                            onClick = { showRootScope = false }
+                        )
+                        actionButton(
+                            text = localizedStringResource(666, "Parent and branches"),
+                            fillMaxWidthIfTextPresent = false,
+                            enabledColor = if (showRootScope) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+                            onClick = { showRootScope = true }
+                        )
+                    }
+                }
+            }
+
+            if (activeStoreId == null) {
+                item {
+                    Text(
+                        text = localizedStringResource(130, "No active store"),
+                        color = stateValues.PlaceholderTextColor,
+                        modifier = Modifier.padding(stateValues.marginTextField)
+                    )
+                }
+            } else if (!currentUserCanViewLogs(activeStoreId)) {
+                item {
+                    Text(
+                        text = localizedStringResource(665, "You do not have permission for this action"),
+                        color = stateValues.ErrorColor,
+                        modifier = Modifier.padding(stateValues.marginTextField)
+                    )
+                }
+            } else if (filtered.isEmpty()) {
+                item {
+                    Text(
+                        text = localizedStringResource(667, "No operation logs yet"),
+                        color = stateValues.PlaceholderTextColor,
+                        modifier = Modifier.padding(stateValues.marginTextField)
+                    )
+                }
+            } else {
+                items(filtered, key = { it.id }) { log ->
+                    Box(modifier = Modifier.padding(horizontal = stateValues.marginTextField)) { OperationLogCard(log) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun AppConfiguration.MenuSuppliersScreen() {
     LaunchedEffect(Unit) { getSuppliers() }
 
@@ -18277,6 +18471,9 @@ fun AppConfiguration.MenuScreen() {
                     is NavigationScreenModel.Menu.TransactionHistoryReceiptPreview -> {
                         MenuTransactionHistoryReceiptPreviewScreen()
                     }
+                    is NavigationScreenModel.Menu.OperationLogs -> {
+                        MenuOperationLogsScreen()
+                    }
                     is NavigationScreenModel.Menu.Analytics -> {
                         MenuAnalyticsScreen()
                     }
@@ -18361,6 +18558,9 @@ fun AppConfiguration.MenuScreen() {
                         is NavigationScreenModel.Menu.TransactionHistoryReceiptPreview -> {
                             MenuTransactionHistoryReceiptPreviewScreen()
                         }
+                        is NavigationScreenModel.Menu.OperationLogs -> {
+                            MenuOperationLogsScreen()
+                        }
                         is NavigationScreenModel.Menu.Analytics -> {
                             MenuAnalyticsScreen()
                         }
@@ -18441,6 +18641,9 @@ fun AppConfiguration.MenuScreen() {
                         is NavigationScreenModel.Menu.TransactionHistoryReceiptPreview -> {
                             MenuTransactionHistoryReceiptPreviewScreen()
                         }
+                        is NavigationScreenModel.Menu.OperationLogs -> {
+                            MenuOperationLogsScreen()
+                        }
                         is NavigationScreenModel.Menu.Analytics -> {
                             MenuAnalyticsScreen()
                         }
@@ -18490,6 +18693,40 @@ fun AppConfiguration.MenuScreen() {
             }
         }
     }
+}
+
+private fun AppConfiguration.canOpenMenuDestination(model: NavigationScreenModel.Menu): Boolean {
+    val activeStoreId = stateValues.activeStoreId
+    return when (model) {
+        NavigationScreenModel.Menu.TransactionHistory -> currentUserCanViewTransactionHistory(activeStoreId)
+        NavigationScreenModel.Menu.OperationLogs -> currentUserCanViewLogs(activeStoreId)
+        NavigationScreenModel.Menu.Analytics -> currentUserCanViewAnalytics(activeStoreId)
+        NavigationScreenModel.Menu.Workers -> currentUserCanViewWorkers(activeStoreId)
+        NavigationScreenModel.Menu.Stores -> true
+        NavigationScreenModel.Menu.Suppliers -> currentUserCanViewStock(activeStoreId) || currentUserOwnsStore(activeStoreId)
+        NavigationScreenModel.Menu.Debtors -> currentUserCanViewTransactionHistory(activeStoreId) || currentUserOwnsStore(activeStoreId)
+        NavigationScreenModel.Menu.GoodsCategories -> currentUserCanViewStock(activeStoreId) || currentUserOwnsStore(activeStoreId)
+        NavigationScreenModel.Menu.StoreSubscription,
+        NavigationScreenModel.Menu.StoreSubscriptionPlans -> currentUserOwnsStore(activeStoreId)
+        else -> true
+    }
+}
+
+private fun AppConfiguration.filteredMenuDestinations(): List<NavigationScreenModel.Menu> {
+    return Navigation.Menu.listScreens.filter { canOpenMenuDestination(it) }
+}
+
+private fun AppConfiguration.filteredMainBottomDestinations(): List<NavigationScreenModel> {
+    val activeStoreId = stateValues.activeStoreId
+    return Navigation.bottomNavBarScreensStore.filter { model ->
+        when (model) {
+            NavigationScreenModel.Transaction.MainSale -> currentUserCanUseTransactionType(activeStoreId, 0)
+            NavigationScreenModel.Transaction.MainReturn -> currentUserCanUseTransactionType(activeStoreId, 1)
+            NavigationScreenModel.Transaction.MainSupply -> currentUserCanUseTransactionType(activeStoreId, 2)
+            NavigationScreenModel.Stock.Main -> currentUserCanViewStock(activeStoreId)
+            else -> true
+        }
+    }.ifEmpty { listOf(NavigationScreenModel.Menu.Main) }
 }
 
 @Composable
@@ -18546,7 +18783,7 @@ fun AppConfiguration.MenuListScreen() {
             modifier = Modifier
                 .weight(1f)
         ) {
-            items(Navigation.Menu.listScreens) { model ->
+            items(filteredMenuDestinations()) { model ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -18557,8 +18794,10 @@ fun AppConfiguration.MenuListScreen() {
                             },
                             indication = ripple(color = stateValues.TextColor)
                         ) {
-                            coroutineScope.launch {
-                                Navigation.Menu.go(model, stateValues.isNarrowScreen)
+                            if (canOpenMenuDestination(model)) {
+                                coroutineScope.launch { Navigation.Menu.go(model, stateValues.isNarrowScreen) }
+                            } else {
+                                postInAppNotification(currentUserPermissionDeniedMessage(), NotificationType.Negative)
                             }
                         },
                     verticalAlignment = Alignment.CenterVertically
@@ -18570,20 +18809,28 @@ fun AppConfiguration.MenuListScreen() {
                             navigationScreensMenuRight
                     }.last().route == model.route
 
-                    CpImage(
+                    Box(
                         modifier = Modifier
-                            .padding(8.dp)
-                            .aspectRatio(1f, matchHeightConstraintsFirst = true),
-                        url = model.iconPath,
-                        fallbackRes = model.iconRes,
-                        contentDescription = stateValues.stringBack,
-                        tintColor = if (isActive)
-                            stateValues.AccentColor
-                        else
-                            stateValues.TextColor
-                    )
+                            .width(42.dp)
+                            .padding(horizontal = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CpImage(
+                            modifier = Modifier.size(24.dp),
+                            url = model.iconPath,
+                            fallbackRes = model.iconRes,
+                            contentDescription = stateValues.stringBack,
+                            tintColor = if (isActive)
+                                stateValues.AccentColor
+                            else
+                                stateValues.TextColor
+                        )
+                    }
 
                     Text(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 12.dp, top = 10.dp, bottom = 10.dp),
                         text = model.name,
                         color = if (isActive)
                             stateValues.AccentColor
@@ -18592,7 +18839,9 @@ fun AppConfiguration.MenuListScreen() {
                         fontWeight = if (isActive)
                             FontWeight.Bold
                         else
-                            FontWeight.Normal
+                            FontWeight.Normal,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -21735,7 +21984,7 @@ fun AppConfiguration.MainScreen() {
                     else width((stateValues.boundWidgetWidth * 2.2f))
                 }) {
                 val items = when (stateValues.appModeId) {
-                    0 -> Navigation.bottomNavBarScreensStore
+                    0 -> filteredMainBottomDestinations()
                     else -> Navigation.bottomNavBarScreensBuyer
                 }
 
@@ -21750,8 +21999,10 @@ fun AppConfiguration.MainScreen() {
                     Column(
                         modifier = Modifier.weight(1f).clickable(
                             onClick = {
-                                coroutineScope.launch {
-                                    Navigation.goMain(model)
+                                if (model in filteredMainBottomDestinations() || stateValues.appModeId != 0) {
+                                    coroutineScope.launch { Navigation.goMain(model) }
+                                } else {
+                                    postInAppNotification(currentUserPermissionDeniedMessage(), NotificationType.Negative)
                                 }
                             }, interactionSource = remember {
                                 MutableInteractionSource()
@@ -21972,12 +22223,25 @@ private fun AppConfiguration.NotificationPopupCard(
             )
         }
 
-        actionButton(
-            text = "",
-            iconPath = stateValues.drawablePathIconCancel,
-            enabledColor = color,
-            onClick = onDismiss
-        )
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(stateValues.cornerRadius))
+                .background(color)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = ripple(color = stateValues.AccentTextColor)
+                ) { onDismiss() },
+            contentAlignment = Alignment.Center
+        ) {
+            CpImage(
+                modifier = Modifier.size(20.dp),
+                url = stateValues.drawablePathIconCancel,
+                fallbackRes = stateValues.drawableResIconCancel.value,
+                contentDescription = stateValues.stringCancel,
+                tintColor = stateValues.AccentTextColor
+            )
+        }
     }
 }
 

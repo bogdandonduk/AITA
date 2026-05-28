@@ -13903,6 +13903,195 @@
           "value": "Белсенді ауысым"
         }
       ]
+    },
+    {
+      "id": 662,
+      "values": [
+        {
+          "language": "main",
+          "value": "Operation logs"
+        },
+        {
+          "language": "en",
+          "value": "Operation logs"
+        },
+        {
+          "language": "ru",
+          "value": "Журнал операций"
+        },
+        {
+          "language": "kk",
+          "value": "Операциялар журналы"
+        }
+      ]
+    },
+    {
+      "id": 663,
+      "values": [
+        {
+          "language": "main",
+          "value": "Search logs"
+        },
+        {
+          "language": "en",
+          "value": "Search logs"
+        },
+        {
+          "language": "ru",
+          "value": "Поиск в журнале"
+        },
+        {
+          "language": "kk",
+          "value": "Журналдан іздеу"
+        }
+      ]
+    },
+    {
+      "id": 664,
+      "values": [
+        {
+          "language": "main",
+          "value": "Current place"
+        },
+        {
+          "language": "en",
+          "value": "Current place"
+        },
+        {
+          "language": "ru",
+          "value": "Текущая точка"
+        },
+        {
+          "language": "kk",
+          "value": "Ағымдағы орын"
+        }
+      ]
+    },
+    {
+      "id": 665,
+      "values": [
+        {
+          "language": "main",
+          "value": "You do not have permission for this action"
+        },
+        {
+          "language": "en",
+          "value": "You do not have permission for this action"
+        },
+        {
+          "language": "ru",
+          "value": "У вас нет прав для этого действия"
+        },
+        {
+          "language": "kk",
+          "value": "Бұл әрекетке рұқсатыңыз жоқ"
+        }
+      ]
+    },
+    {
+      "id": 666,
+      "values": [
+        {
+          "language": "main",
+          "value": "Parent and branches"
+        },
+        {
+          "language": "en",
+          "value": "Parent and branches"
+        },
+        {
+          "language": "ru",
+          "value": "Головной и филиалы"
+        },
+        {
+          "language": "kk",
+          "value": "Негізгі және филиалдар"
+        }
+      ]
+    },
+    {
+      "id": 667,
+      "values": [
+        {
+          "language": "main",
+          "value": "No operation logs yet"
+        },
+        {
+          "language": "en",
+          "value": "No operation logs yet"
+        },
+        {
+          "language": "ru",
+          "value": "Журнал операций пока пуст"
+        },
+        {
+          "language": "kk",
+          "value": "Операциялар журналы әзірге бос"
+        }
+      ]
+    },
+    {
+      "id": 668,
+      "values": [
+        {
+          "language": "main",
+          "value": "By"
+        },
+        {
+          "language": "en",
+          "value": "By"
+        },
+        {
+          "language": "ru",
+          "value": "Кто"
+        },
+        {
+          "language": "kk",
+          "value": "Кім"
+        }
+      ]
+    },
+    {
+      "id": 669,
+      "values": [
+        {
+          "language": "main",
+          "value": "Place"
+        },
+        {
+          "language": "en",
+          "value": "Place"
+        },
+        {
+          "language": "ru",
+          "value": "Место"
+        },
+        {
+          "language": "kk",
+          "value": "Орын"
+        }
+      ]
+    },
+    {
+      "id": 670,
+      "values": [
+        {
+          "language": "main",
+          "value": "Worker permissions are applied"
+        },
+        {
+          "language": "en",
+          "value": "Worker permissions are applied"
+        },
+        {
+          "language": "ru",
+          "value": "Права сотрудника применены"
+        },
+        {
+          "language": "kk",
+          "value": "Қызметкер рұқсаттары қолданылды"
+        }
+      ]
     }
   ]
 }

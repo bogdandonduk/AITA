@@ -1426,5 +1426,47 @@
         "value": "Бұл ауысымды тек осы қызметкер аккаунты бастай алады"
       }
     ]
+  },
+  {
+    "id": "92",
+    "message": [
+      {
+        "language": "main",
+        "value": "Operation logs loaded"
+      },
+      {
+        "language": "en",
+        "value": "Operation logs loaded"
+      },
+      {
+        "language": "ru",
+        "value": "Журнал операций загружен"
+      },
+      {
+        "language": "kk",
+        "value": "Операциялар журналы жүктелді"
+      }
+    ]
+  },
+  {
+    "id": "93",
+    "message": [
+      {
+        "language": "main",
+        "value": "Operation logged"
+      },
+      {
+        "language": "en",
+        "value": "Operation logged"
+      },
+      {
+        "language": "ru",
+        "value": "Операция записана в журнал"
+      },
+      {
+        "language": "kk",
+        "value": "Операция журналға жазылды"
+      }
+    ]
   }
 ]

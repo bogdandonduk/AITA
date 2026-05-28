@@ -453,6 +453,8 @@ private fun fallbackResponseMessage(id: String): List<LocalizedStringDataModel> 
         "60" -> simpleMessage("Cash register amount is not enough", ru = "В кассе недостаточно наличных", kk = "Кассада қолма-қол ақша жеткіліксіз")
         "61" -> simpleMessage("Request is already pending", ru = "Заявка уже ожидает решения", kk = "Өтінім қазірдің өзінде күтуде")
         "62" -> simpleMessage("User is already a worker in this store", ru = "Пользователь уже сотрудник этого магазина", kk = "Пайдаланушы бұл дүкеннің қызметкері")
+        "92" -> simpleMessage("Operation logs loaded", ru = "Журнал операций загружен", kk = "Операциялар журналы жүктелді")
+        "93" -> simpleMessage("Operation logged", ru = "Операция записана в журнал", kk = "Операция журналға жазылды")
         else -> simpleMessage(
             main = "Done",
             ru = "Готово",
@@ -685,6 +687,28 @@ object Workshifts: Table("workshifts") {
     val createdAt = timestamp("created_at").defaultExpression(CurrentTimestamp)
     val updatedAt = timestamp("updated_at").defaultExpression(CurrentTimestamp)
     val isActive = bool("is_active").default(true)
+
+    override val primaryKey = PrimaryKey(id)
+}
+
+object OperationLogs: Table("operation_logs") {
+    val id = uuid("id").uniqueIndex()
+    val rootStoreId = uuid("root_store_id").references(Stores.id, onDelete = ReferenceOption.CASCADE)
+    val storeId = uuid("store_id").references(Stores.id, onDelete = ReferenceOption.CASCADE)
+    val storePublicId = text("store_public_id").default("")
+    val storeName = jsonb("store_name", Json, ListSerializer(LocalizedStringDataModel.serializer())).default(emptyList())
+    val actorUserId = uuid("actor_user_id").references(Users.id, onDelete = ReferenceOption.CASCADE)
+    val actorPublicId = text("actor_public_id").default("")
+    val actorDisplayName = text("actor_display_name").default("")
+    val workshiftId = uuid("workshift_id").nullable()
+    val action = text("action")
+    val entityType = text("entity_type")
+    val entityId = text("entity_id").nullable()
+    val title = jsonb("title", Json, ListSerializer(LocalizedStringDataModel.serializer())).default(emptyList())
+    val details = jsonb("details", Json, ListSerializer(LocalizedStringDataModel.serializer())).default(emptyList())
+    val metadata = jsonb("metadata", Json, MapSerializer(String.serializer(), String.serializer())).default(emptyMap())
+    val createdAtMillis = long("created_at_millis")
+    val createdAt = timestamp("created_at").defaultExpression(CurrentTimestamp)
 
     override val primaryKey = PrimaryKey(id)
 }
@@ -1795,6 +1819,161 @@ private fun requiredPermissionForTransactionType(type: String): String? {
 private fun cleanPermissionIds(input: List<String>): List<String> {
     val known = ALL_STORE_PERMISSION_IDS.toSet()
     return input.filter { it in known }.distinct()
+}
+
+private fun userRequiresWorkshiftInsideTransaction(userId: UUID, storeId: UUID): Boolean {
+    if (isStoreOwnerInsideTransaction(userId, storeId)) return false
+    val rootStoreId = rootStoreIdForAccessInsideTransaction(storeId)
+    return StoreWorkerMemberships
+        .select(StoreWorkerMemberships.id)
+        .where {
+            (StoreWorkerMemberships.userId eq userId) and
+                    ((StoreWorkerMemberships.storeId eq storeId) or (StoreWorkerMemberships.storeId eq rootStoreId)) and
+                    (StoreWorkerMemberships.isActive eq true)
+        }
+        .empty()
+        .not()
+}
+
+private fun activeWorkshiftIdInsideTransaction(userId: UUID, storeId: UUID): UUID? {
+    return Workshifts
+        .select(Workshifts.id)
+        .where {
+            (Workshifts.workerUserId eq userId) and
+                    (Workshifts.storeId eq storeId) and
+                    (Workshifts.isActive eq true) and
+                    Workshifts.endedAtMillis.isNull()
+        }
+        .orderBy(Workshifts.startedAtMillis, SortOrder.DESC)
+        .limit(1)
+        .singleOrNull()
+        ?.get(Workshifts.id)
+}
+
+private fun userHasRequiredActiveWorkshiftInsideTransaction(userId: UUID, storeId: UUID): Boolean {
+    return !userRequiresWorkshiftInsideTransaction(userId, storeId) || activeWorkshiftIdInsideTransaction(userId, storeId) != null
+}
+
+private fun userCanUseStoreActionInsideTransaction(userId: UUID, storeId: UUID, permission: String, requireWorkshift: Boolean = true): Boolean {
+    if (!userHasStorePermissionInsideTransaction(userId, storeId, permission)) return false
+    if (requireWorkshift && !userHasRequiredActiveWorkshiftInsideTransaction(userId, storeId)) return false
+    return true
+}
+
+private fun ResultRow.toOperationLogDataModel(): OperationLogDataModel {
+    return OperationLogDataModel(
+        id = this[OperationLogs.id].toString(),
+        rootStoreId = this[OperationLogs.rootStoreId].toString(),
+        storeId = this[OperationLogs.storeId].toString(),
+        storePublicId = this[OperationLogs.storePublicId],
+        storeName = this[OperationLogs.storeName],
+        actorUserId = this[OperationLogs.actorUserId].toString(),
+        actorPublicId = this[OperationLogs.actorPublicId],
+        actorDisplayName = this[OperationLogs.actorDisplayName],
+        workshiftId = this[OperationLogs.workshiftId]?.toString(),
+        action = this[OperationLogs.action],
+        entityType = this[OperationLogs.entityType],
+        entityId = this[OperationLogs.entityId],
+        title = this[OperationLogs.title],
+        details = this[OperationLogs.details],
+        metadata = this[OperationLogs.metadata],
+        createdAtMillis = this[OperationLogs.createdAtMillis]
+    )
+}
+
+private fun operationLogStoreIdsForScopeInsideTransaction(storeId: UUID, scope: String): List<UUID> {
+    val rootStoreId = rootStoreIdForAccessInsideTransaction(storeId)
+    val parentScope = scope.equals(OPERATION_LOG_SCOPE_ROOT, ignoreCase = true) || storeId == rootStoreId
+
+    return if (parentScope) {
+        listOf(rootStoreId) + Stores
+            .select(Stores.id)
+            .where { Stores.parentStoreId eq rootStoreId }
+            .map { it[Stores.id] }
+    } else {
+        listOf(storeId)
+    }
+}
+
+
+private fun operationLogActionForHttpMutation(method: String, path: String): String {
+    val normalized = path.lowercase()
+    return when {
+        "transactions/complete" in normalized -> OPERATION_LOG_ACTION_COMPLETED
+        "cashregister/extract" in normalized -> OPERATION_LOG_ACTION_EXTRACTED
+        "workshifts/start" in normalized -> OPERATION_LOG_ACTION_STARTED
+        "workshifts/end" in normalized -> OPERATION_LOG_ACTION_ENDED
+        "workers/accept" in normalized || "invitations/accept" in normalized -> OPERATION_LOG_ACTION_ACCEPTED
+        "workers/decline" in normalized || "invitations/decline" in normalized -> OPERATION_LOG_ACTION_DECLINED
+        "workers/invite" in normalized -> OPERATION_LOG_ACTION_INVITED
+        "stockbatches/move" in normalized -> OPERATION_LOG_ACTION_MOVED
+        method.equals("DELETE", ignoreCase = true) || normalized.contains("delete") -> OPERATION_LOG_ACTION_DELETED
+        method.equals("PUT", ignoreCase = true) || normalized.contains("update") -> OPERATION_LOG_ACTION_UPDATED
+        else -> OPERATION_LOG_ACTION_CREATED
+    }
+}
+
+private fun operationLogEntityForPath(path: String): String {
+    val normalized = path.lowercase()
+    return when {
+        normalized.startsWith("stockbatches") -> OPERATION_LOG_ENTITY_STOCK_BATCH
+        normalized.startsWith("stock") -> OPERATION_LOG_ENTITY_STOCK_ITEM
+        normalized.startsWith("transactions") -> OPERATION_LOG_ENTITY_TRANSACTION
+        normalized.startsWith("cashregister") -> OPERATION_LOG_ENTITY_CASH_REGISTER
+        normalized.startsWith("workers") -> OPERATION_LOG_ENTITY_WORKER
+        normalized.startsWith("workshifts") -> OPERATION_LOG_ENTITY_WORKSHIFT
+        normalized.startsWith("stores") -> OPERATION_LOG_ENTITY_STORE
+        normalized.startsWith("suppliers") -> OPERATION_LOG_ENTITY_SUPPLIER
+        normalized.startsWith("subscriptions") -> OPERATION_LOG_ENTITY_SUBSCRIPTION
+        normalized.startsWith("finance") -> OPERATION_LOG_ENTITY_FINANCE
+        else -> path.substringBefore('/').ifBlank { "system" }
+    }
+}
+
+private fun insertOperationLogInsideTransaction(
+    actorUserId: UUID,
+    storeId: UUID,
+    action: String,
+    entityType: String,
+    entityId: String? = null,
+    title: List<LocalizedStringDataModel>,
+    details: List<LocalizedStringDataModel> = emptyList(),
+    metadata: Map<String, String> = emptyMap(),
+    now: Long = System.currentTimeMillis()
+) {
+    runCatching {
+        val rootStoreId = rootStoreIdForAccessInsideTransaction(storeId)
+        val storeRow = Stores
+            .select(Stores.publicId, Stores.name)
+            .where { Stores.id eq storeId }
+            .singleOrNull()
+        val actorRow = Users
+            .select(Users.publicId, Users.firstName, Users.lastName, Users.phoneNumber, Users.email)
+            .where { Users.id eq actorUserId }
+            .singleOrNull()
+        val actorDisplayName = actorRow?.let { row ->
+            "${row[Users.firstName]} ${row[Users.lastName]}".trim().ifBlank { row[Users.phoneNumber].ifBlank { row[Users.email] } }
+        }.orEmpty()
+
+        OperationLogs.insert {
+            it[OperationLogs.id] = UUID.randomUUID()
+            it[OperationLogs.rootStoreId] = rootStoreId
+            it[OperationLogs.storeId] = storeId
+            it[OperationLogs.storePublicId] = storeRow?.get(Stores.publicId).orEmpty()
+            it[OperationLogs.storeName] = storeRow?.get(Stores.name).orEmpty()
+            it[OperationLogs.actorUserId] = actorUserId
+            it[OperationLogs.actorPublicId] = actorRow?.get(Users.publicId).orEmpty()
+            it[OperationLogs.actorDisplayName] = actorDisplayName
+            it[OperationLogs.workshiftId] = activeWorkshiftIdInsideTransaction(actorUserId, storeId)
+            it[OperationLogs.action] = action
+            it[OperationLogs.entityType] = entityType
+            it[OperationLogs.entityId] = entityId
+            it[OperationLogs.title] = title
+            it[OperationLogs.details] = details
+            it[OperationLogs.metadata] = metadata
+            it[OperationLogs.createdAtMillis] = now
+        }
+    }
 }
 
 private fun storeLegalIdFormatForCountry(countryLocale: String?): LegalIdFormatDataModel {
@@ -3174,7 +3353,7 @@ fun Application.module() {
     Database.connect(ds)
 
     org.jetbrains.exposed.sql.transactions.transaction {
-        SchemaUtils.createMissingTablesAndColumns(Users, Stores, StockItems, StockBatchesV2, StockBatchMovements, Suppliers, Debtors, Notifications, StoreWorkerRequests, StoreWorkerMemberships, Workshifts, CashRegisters, CashRegisterEvents, UserWallets, UserWalletLedgerEntries, TopUpPaymentIntents, StoreSubscriptionStates, StoreSubscriptionChargeEvents)
+        SchemaUtils.createMissingTablesAndColumns(Users, Stores, StockItems, StockBatchesV2, StockBatchMovements, Suppliers, Debtors, Notifications, StoreWorkerRequests, StoreWorkerMemberships, Workshifts, CashRegisters, CashRegisterEvents, UserWallets, UserWalletLedgerEntries, TopUpPaymentIntents, StoreSubscriptionStates, StoreSubscriptionChargeEvents, OperationLogs)
     }
 
     configureJwtAuth()
@@ -3198,11 +3377,51 @@ fun Application.module() {
                 ?: call.request.header("store-id")
                 ?: call.request.queryParameters["store_id"]
 
+            val entityPath = path.trim('/').ifBlank { "all" }
+
             RealtimeServerBus.publish(
-                entity = path.trim('/').ifBlank { "all" },
+                entity = entityPath,
                 storeId = storeId,
                 reason = "mutation"
             )
+
+            val actorUserId = runCatching { call.principal<JWTPrincipal>()?.subject?.let { UUID.fromString(it) } }.getOrNull()
+            val logStoreId = storeId?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+            val methodText = method.value
+            val ipText = call.request.header("X-Forwarded-For") ?: call.request.origin.remoteHost
+            val userAgentText = call.request.userAgent().orEmpty()
+
+            if (actorUserId != null && logStoreId != null && !entityPath.startsWith("logs/")) {
+                kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+                    runCatching {
+                        newSuspendedTransaction(Dispatchers.IO) {
+                            insertOperationLogInsideTransaction(
+                                actorUserId = actorUserId,
+                                storeId = logStoreId,
+                                action = operationLogActionForHttpMutation(methodText, entityPath),
+                                entityType = operationLogEntityForPath(entityPath),
+                                entityId = null,
+                                title = simpleMessage(
+                                    main = "Operation completed",
+                                    ru = "Операция выполнена",
+                                    kk = "Операция орындалды"
+                                ),
+                                details = simpleMessage(
+                                    main = "$methodText /$entityPath",
+                                    ru = "$methodText /$entityPath",
+                                    kk = "$methodText /$entityPath"
+                                ),
+                                metadata = mapOf(
+                                    "path" to entityPath,
+                                    "method" to methodText,
+                                    "ip" to ipText,
+                                    "userAgent" to userAgentText
+                                )
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -3737,7 +3956,7 @@ fun Application.module() {
                         ?: return@get call.respond(UnauthorizedResponse())
 
                     val result = newSuspendedTransaction(Dispatchers.IO) {
-                        if (!userHasStoreAccessInsideTransaction(userId, storeId))
+                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_READ))
                             return@newSuspendedTransaction null
 
                         StockItems
@@ -3765,7 +3984,7 @@ fun Application.module() {
                         val storeId = runCatching { UUID.fromString(body.storeId) }.getOrNull()
                             ?: return@newSuspendedTransaction null
 
-                        if (!userHasStoreAccessInsideTransaction(userId, storeId))
+                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_WRITE, requireWorkshift = true))
                             return@newSuspendedTransaction null
 
                         val cleanBarcodes = body.barcodes.cleanBarcodes()
@@ -3815,6 +4034,18 @@ fun Application.module() {
                             it[StockItems.isActive] = true
                         }
 
+                        insertOperationLogInsideTransaction(
+                            actorUserId = userId,
+                            storeId = storeId,
+                            action = OPERATION_LOG_ACTION_CREATED,
+                            entityType = OPERATION_LOG_ENTITY_STOCK_ITEM,
+                            entityId = id.toString(),
+                            title = simpleMessage("Stock item added", ru = "Товар добавлен", kk = "Тауар қосылды"),
+                            details = body.name.takeIf { it.isNotEmpty() } ?: simpleMessage(cleanBarcodes.firstOrNull().orEmpty()),
+                            metadata = mapOf("barcode" to cleanBarcodes.joinToString(",")),
+                            now = now
+                        )
+
                         body.copy(
                             id = id.toString(),
                             userId = userId.toString(),
@@ -3858,7 +4089,7 @@ fun Application.module() {
                         val storeId = runCatching { UUID.fromString(body.storeId) }.getOrNull()
                             ?: return@newSuspendedTransaction null
 
-                        if (!userHasStoreAccessInsideTransaction(userId, storeId))
+                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_WRITE, requireWorkshift = true))
                             return@newSuspendedTransaction null
 
                         val cleanBarcodes = body.barcodes.cleanBarcodes()
@@ -3873,8 +4104,7 @@ fun Application.module() {
 
                         val affected = StockItems.update({
                             (StockItems.id eq id) and
-                                    (StockItems.storeId eq storeId) and
-                                    (StockItems.userId eq userId)
+                                    (StockItems.storeId eq storeId)
                         }) {
                             it[StockItems.barcodes] = cleanBarcodes
                             it[StockItems.name] = body.name
@@ -3944,7 +4174,7 @@ fun Application.module() {
                         ?: return@delete call.respond(UnauthorizedResponse())
 
                     val deletedId = newSuspendedTransaction(Dispatchers.IO) {
-                        if (!userHasStoreAccessInsideTransaction(userId, storeId))
+                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_WRITE, requireWorkshift = true))
                             return@newSuspendedTransaction null
 
                         val id = runCatching { UUID.fromString(rawId) }.getOrNull()
@@ -3954,8 +4184,7 @@ fun Application.module() {
 
                         val affected = StockItems.update({
                             (StockItems.id eq id) and
-                                    (StockItems.storeId eq storeId) and
-                                    (StockItems.userId eq userId)
+                                    (StockItems.storeId eq storeId)
                         }) {
                             it[StockItems.isActive] = false
                             it[StockItems.updatedAtMillis] = now
@@ -3966,8 +4195,7 @@ fun Application.module() {
 
                         StockBatchesV2.update({
                             (StockBatchesV2.goodsItemId eq id) and
-                                    (StockBatchesV2.storeId eq storeId) and
-                                    (StockBatchesV2.userId eq userId)
+                                    (StockBatchesV2.storeId eq storeId)
                         }) {
                             it[StockBatchesV2.isActive] = false
                             it[StockBatchesV2.updatedAtMillis] = now
@@ -3995,7 +4223,7 @@ fun Application.module() {
                         ?: return@get call.respond(UnauthorizedResponse())
 
                     val result = newSuspendedTransaction(Dispatchers.IO) {
-                        if (!userHasStoreAccessInsideTransaction(userId, storeId))
+                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_READ))
                             return@newSuspendedTransaction null
 
                         StockBatchesV2
@@ -4023,7 +4251,7 @@ fun Application.module() {
                         ?: return@get call.genericResponseNoPayload(HttpStatusCode.BadRequest, message = getResponse("13").message)
 
                     val availability = newSuspendedTransaction(Dispatchers.IO) {
-                        if (!userHasStoreAccessInsideTransaction(userId, storeId))
+                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_READ))
                             return@newSuspendedTransaction null
 
                         buildStockBranchAvailabilityInsideTransaction(storeId, goodsItemId)
@@ -4061,10 +4289,10 @@ fun Application.module() {
                         if (rootSourceStoreId != rootDestinationStoreId)
                             return@newSuspendedTransaction null
 
-                        if (!userHasStorePermissionInsideTransaction(userId, sourceStoreId, STORE_PERMISSION_STOCK_WRITE))
+                        if (!userCanUseStoreActionInsideTransaction(userId, sourceStoreId, STORE_PERMISSION_STOCK_WRITE))
                             return@newSuspendedTransaction null
 
-                        if (!userHasStorePermissionInsideTransaction(userId, destinationStoreId, STORE_PERMISSION_STOCK_WRITE))
+                        if (!userCanUseStoreActionInsideTransaction(userId, destinationStoreId, STORE_PERMISSION_STOCK_WRITE))
                             return@newSuspendedTransaction null
 
                         val sourceItemRow = StockItems
@@ -4227,7 +4455,7 @@ fun Application.module() {
                             val goodsItemId = runCatching { UUID.fromString(body.goodsItemId) }.getOrNull()
                                 ?: return@newSuspendedTransaction null
 
-                            if (!userHasStoreAccessInsideTransaction(userId, storeId))
+                            if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_WRITE, requireWorkshift = true))
                                 return@newSuspendedTransaction null
 
                             val itemExists = StockItems
@@ -4349,12 +4577,11 @@ fun Application.module() {
                             val goodsItemId = runCatching { UUID.fromString(body.goodsItemId) }.getOrNull()
                                 ?: return@newSuspendedTransaction null
 
-                            if (!userHasStoreAccessInsideTransaction(userId, storeId))
+                            if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_WRITE, requireWorkshift = true))
                                 return@newSuspendedTransaction null
 
                             val affected = StockBatchesV2.update({
                                 (StockBatchesV2.id eq id) and
-                                        (StockBatchesV2.userId eq userId) and
                                         (StockBatchesV2.storeId eq storeId)
                             }) {
                                 it[StockBatchesV2.goodsItemId] = goodsItemId
@@ -4429,7 +4656,7 @@ fun Application.module() {
                         ?: return@delete call.respond(UnauthorizedResponse())
 
                     val deletedIds = newSuspendedTransaction(Dispatchers.IO) {
-                        if (!userHasStoreAccessInsideTransaction(userId, storeId))
+                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_WRITE, requireWorkshift = true))
                             return@newSuspendedTransaction null
 
                         val now = System.currentTimeMillis()
@@ -4441,7 +4668,6 @@ fun Application.module() {
 
                             val affected = StockBatchesV2.update({
                                 (StockBatchesV2.id eq id) and
-                                        (StockBatchesV2.userId eq userId) and
                                         (StockBatchesV2.storeId eq storeId)
                             }) {
                                 it[StockBatchesV2.isActive] = false
@@ -4478,7 +4704,7 @@ fun Application.module() {
                         val storeId = runCatching { UUID.fromString(body.storeId) }.getOrNull()
                             ?: return@newSuspendedTransaction null
 
-                        if (!userHasStoreAccessInsideTransaction(userId, storeId))
+                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_WRITE, requireWorkshift = true))
                             return@newSuspendedTransaction null
 
                         val batchExists = StockBatchesV2
@@ -4788,7 +5014,7 @@ fun Application.module() {
 
                     val parentAccessOk = newSuspendedTransaction(Dispatchers.IO) {
                         parentStoreIdForBranch?.let { parentId ->
-                            userHasStorePermissionInsideTransaction(userId, parentId, STORE_PERMISSION_STORE_MANAGE) &&
+                            userCanUseStoreActionInsideTransaction(userId, parentId, STORE_PERMISSION_STORE_MANAGE) &&
                                     Stores.select(Stores.parentStoreId).where { Stores.id eq parentId }.singleOrNull()?.get(Stores.parentStoreId) == null
                         } ?: true
                     }
@@ -4909,7 +5135,7 @@ fun Application.module() {
 
                         val id = runCatching { UUID.fromString(body.id) }.getOrNull() ?: return@newSuspendedTransaction 2
 
-                        if (!userHasStorePermissionInsideTransaction(userId, id, STORE_PERMISSION_STORE_MANAGE))
+                        if (!userCanUseStoreActionInsideTransaction(userId, id, STORE_PERMISSION_STORE_MANAGE))
                             return@newSuspendedTransaction 1
 
                         val currentParentStoreId = Stores
@@ -5831,7 +6057,7 @@ fun Application.module() {
                         if (!userHasStoreAccessInsideTransaction(userId, storeId))
                             return@newSuspendedTransaction null
 
-                        if (!userHasStorePermissionInsideTransaction(userId, storeId, STORE_PERMISSION_CASH_REGISTER_VIEW))
+                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_CASH_REGISTER_VIEW))
                             return@newSuspendedTransaction null
 
                         cashRegisterStateInsideTransaction(storeId)
@@ -5857,7 +6083,7 @@ fun Application.module() {
                         if (!userHasStoreAccessInsideTransaction(userId, storeId))
                             return@newSuspendedTransaction null
 
-                        if (!userHasStorePermissionInsideTransaction(userId, storeId, STORE_PERMISSION_CASH_REGISTER_EXTRACT)) {
+                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_CASH_REGISTER_EXTRACT)) {
                             failureMessage = getResponse("59").message
                             return@newSuspendedTransaction null
                         }
@@ -5931,7 +6157,7 @@ fun Application.module() {
                     val storeId = call.headerUuid("store_id") ?: return@get call.respond(UnauthorizedResponse())
 
                     val result = newSuspendedTransaction(Dispatchers.IO) {
-                        if (!userHasStorePermissionInsideTransaction(userId, storeId, STORE_PERMISSION_WORKERS_VIEW))
+                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_WORKERS_VIEW))
                             return@newSuspendedTransaction null
 
                         StoreWorkerMemberships
@@ -5966,7 +6192,7 @@ fun Application.module() {
                     val storeId = call.headerUuid("store_id") ?: return@get call.respond(UnauthorizedResponse())
 
                     val result = newSuspendedTransaction(Dispatchers.IO) {
-                        if (!isStoreOwnerInsideTransaction(userId, storeId) && !userHasStorePermissionInsideTransaction(userId, storeId, STORE_PERMISSION_WORKERS_MANAGE))
+                        if (!isStoreOwnerInsideTransaction(userId, storeId) && !userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_WORKERS_MANAGE))
                             return@newSuspendedTransaction null
 
                         val requestStoreIds = storeGroupIdsInsideTransaction(rootStoreIdForAccessInsideTransaction(storeId))
@@ -6069,7 +6295,7 @@ fun Application.module() {
                     var failureMessage: List<LocalizedStringDataModel>? = null
 
                     val request = newSuspendedTransaction(Dispatchers.IO) {
-                        if (!isStoreOwnerInsideTransaction(userId, storeId) && !userHasStorePermissionInsideTransaction(userId, storeId, STORE_PERMISSION_WORKERS_MANAGE)) {
+                        if (!isStoreOwnerInsideTransaction(userId, storeId) && !userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_WORKERS_MANAGE)) {
                             failureMessage = getResponse("59").message
                             return@newSuspendedTransaction null
                         }
@@ -6282,7 +6508,7 @@ fun Application.module() {
                     var failureMessage: List<LocalizedStringDataModel>? = null
 
                     val worker = newSuspendedTransaction(Dispatchers.IO) {
-                        if (!isStoreOwnerInsideTransaction(userId, storeId) && !userHasStorePermissionInsideTransaction(userId, storeId, STORE_PERMISSION_WORKERS_MANAGE)) {
+                        if (!isStoreOwnerInsideTransaction(userId, storeId) && !userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_WORKERS_MANAGE)) {
                             failureMessage = getResponse("59").message
                             return@newSuspendedTransaction null
                         }
@@ -6369,7 +6595,7 @@ fun Application.module() {
                     var failureMessage: List<LocalizedStringDataModel>? = null
 
                     val request = newSuspendedTransaction(Dispatchers.IO) {
-                        if (!isStoreOwnerInsideTransaction(userId, storeId) && !userHasStorePermissionInsideTransaction(userId, storeId, STORE_PERMISSION_WORKERS_MANAGE)) {
+                        if (!isStoreOwnerInsideTransaction(userId, storeId) && !userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_WORKERS_MANAGE)) {
                             failureMessage = getResponse("59").message
                             return@newSuspendedTransaction null
                         }
@@ -6411,7 +6637,7 @@ fun Application.module() {
                     var failureMessage: List<LocalizedStringDataModel>? = null
 
                     val worker = newSuspendedTransaction(Dispatchers.IO) {
-                        if (!isStoreOwnerInsideTransaction(userId, storeId) && !userHasStorePermissionInsideTransaction(userId, storeId, STORE_PERMISSION_WORKERS_MANAGE)) {
+                        if (!isStoreOwnerInsideTransaction(userId, storeId) && !userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_WORKERS_MANAGE)) {
                             failureMessage = getResponse("59").message
                             return@newSuspendedTransaction null
                         }
@@ -6548,6 +6774,18 @@ fun Application.module() {
                             it[Workshifts.isActive] = true
                         }
 
+                        insertOperationLogInsideTransaction(
+                            actorUserId = userId,
+                            storeId = storeId,
+                            action = OPERATION_LOG_ACTION_STARTED,
+                            entityType = OPERATION_LOG_ENTITY_WORKSHIFT,
+                            entityId = workshiftId.toString(),
+                            title = simpleMessage("Workshift started", ru = "Смена начата", kk = "Ауысым басталды"),
+                            details = simpleMessage(membershipRow[Users.publicId]),
+                            metadata = mapOf("worker_user_id" to workerUserId.toString(), "membership_id" to membershipRow[StoreWorkerMemberships.id].toString()),
+                            now = now
+                        )
+
                         Workshifts
                             .innerJoin(Stores, { Workshifts.storeId }, { Stores.id })
                             .innerJoin(Users, { Workshifts.workerUserId }, { Users.id })
@@ -6595,6 +6833,18 @@ fun Application.module() {
                             it[Workshifts.updatedAt] = Instant.now()
                         }
 
+                        insertOperationLogInsideTransaction(
+                            actorUserId = userId,
+                            storeId = storeId,
+                            action = OPERATION_LOG_ACTION_ENDED,
+                            entityType = OPERATION_LOG_ENTITY_WORKSHIFT,
+                            entityId = workshiftId.toString(),
+                            title = simpleMessage("Workshift ended", ru = "Смена завершена", kk = "Ауысым аяқталды"),
+                            details = simpleMessage(userId.toString()),
+                            metadata = mapOf("workshift_id" to workshiftId.toString()),
+                            now = now
+                        )
+
                         Workshifts
                             .innerJoin(Stores, { Workshifts.storeId }, { Stores.id })
                             .innerJoin(Users, { Workshifts.workerUserId }, { Users.id })
@@ -6610,6 +6860,39 @@ fun Application.module() {
             }
         }
 
+        route("/logs") {
+            authenticate("auth-jwt") {
+                get("/get") {
+                    val userId = call.checkPrincipal() ?: return@get
+                    val storeId = call.headerUuid("store_id")
+                        ?: return@get call.respond(UnauthorizedResponse())
+                    val scope = call.request.queryParameters["scope"].orEmpty().ifBlank { OPERATION_LOG_SCOPE_CURRENT }
+
+                    val logs = newSuspendedTransaction(Dispatchers.IO) {
+                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_LOGS_VIEW))
+                            return@newSuspendedTransaction null
+
+                        val storeIds = operationLogStoreIdsForScopeInsideTransaction(storeId, scope)
+
+                        OperationLogs
+                            .selectAll()
+                            .where { OperationLogs.storeId inList storeIds }
+                            .orderBy(OperationLogs.createdAtMillis, SortOrder.DESC)
+                            .limit(500)
+                            .map { it.toOperationLogDataModel() }
+                    }
+
+                    logs?.let {
+                        call.genericListResponse(
+                            status = HttpStatusCode.OK,
+                            payload = it,
+                            message = getResponse("92").message
+                        )
+                    } ?: call.respond(UnauthorizedResponse())
+                }
+            }
+        }
+
         route("/transactions") {
             authenticate("auth-jwt") {
                 get("/get") {
@@ -6619,13 +6902,7 @@ fun Application.module() {
                     }.getOrNull() ?: return@get call.respond(UnauthorizedResponse())
 
                     val transactions = newSuspendedTransaction(Dispatchers.IO) {
-                        val hasStoreAccess = StoreUsers
-                            .selectAll()
-                            .where { (StoreUsers.userId eq userId) and (StoreUsers.storeId eq storeId) }
-                            .empty()
-                            .not()
-
-                        if (!hasStoreAccess)
+                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_TRANSACTION_HISTORY_VIEW))
                             return@newSuspendedTransaction null
 
                         Transactions
@@ -6669,17 +6946,11 @@ fun Application.module() {
                     var transactionFailureMessage: List<LocalizedStringDataModel>? = null
 
                     val completed = newSuspendedTransaction(Dispatchers.IO) {
-                        val hasStoreAccess = StoreUsers
-                            .selectAll()
-                            .where { (StoreUsers.userId eq userId) and (StoreUsers.storeId eq storeId) }
-                            .empty()
-                            .not()
-
-                        if (!hasStoreAccess)
+                        if (!userHasStoreAccessInsideTransaction(userId, storeId))
                             return@newSuspendedTransaction null
 
                         val requiredPermission = requiredPermissionForTransactionType(body.type)
-                        if (requiredPermission != null && !userHasStorePermissionInsideTransaction(userId, storeId, requiredPermission)) {
+                        if (requiredPermission != null && !userCanUseStoreActionInsideTransaction(userId, storeId, requiredPermission, requireWorkshift = true)) {
                             transactionFailureMessage = getResponse("59").message
                             return@newSuspendedTransaction null
                         }
@@ -6792,6 +7063,18 @@ fun Application.module() {
                             transactionId = id,
                             transactionType = transactionToSave.type,
                             cashAmount = transactionToSave.paidCash,
+                            now = timeMillis
+                        )
+
+                        insertOperationLogInsideTransaction(
+                            actorUserId = userId,
+                            storeId = storeId,
+                            action = OPERATION_LOG_ACTION_COMPLETED,
+                            entityType = OPERATION_LOG_ENTITY_TRANSACTION,
+                            entityId = id.toString(),
+                            title = simpleMessage("Transaction completed", ru = "Транзакция завершена", kk = "Транзакция аяқталды"),
+                            details = simpleMessage("${transactionToSave.type} • $transactionTotal", ru = "${transactionToSave.type} • $transactionTotal", kk = "${transactionToSave.type} • $transactionTotal"),
+                            metadata = mapOf("type" to transactionToSave.type, "total" to transactionTotal.toString(), "cash" to transactionToSave.paidCash.toString(), "card" to transactionToSave.paidCard.toString()),
                             now = timeMillis
                         )
 

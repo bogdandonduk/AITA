@@ -8,7 +8,7 @@
       "second": "0"
     },
     "serverUrl": {
-      "first": "http://10.168.22.26:8080",
+      "first": "http://172.20.10.2:8080",
       "second": "1"
     },
     "globalAppConfigurationPath": {
@@ -1098,6 +1098,10 @@
     "endWorkshiftPath": {
       "first": "workshifts/end",
       "second": "88"
+    },
+    "getOperationLogsPath": {
+      "first": "logs/get",
+      "second": "92"
     }
   }
 }

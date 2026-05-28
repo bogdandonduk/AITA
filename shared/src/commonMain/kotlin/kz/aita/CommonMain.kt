@@ -10,6 +10,7 @@ import app.cash.sqldelight.db.SqlDriver
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.*
+import io.ktor.client.plugins.ResponseException
 import io.ktor.client.plugins.auth.*
 import io.ktor.client.plugins.auth.providers.*
 import io.ktor.client.plugins.cache.*
@@ -2007,6 +2008,32 @@ fun updateStoreWorkerPermissions(
 }
 
 
+fun getOperationLogs(
+    storeId: String,
+    scope: String = OPERATION_LOG_SCOPE_CURRENT,
+    onCompleted: ((DataState<List<OperationLogDataModel>>) -> Unit)? = null
+) {
+    if (!getOperationLogsMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getOperationLogsMutex.withLock {
+                val response = networkRequest<List<OperationLogDataModel>, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getOperationLogsPath.first,
+                    headers = mapOf("store_id" to storeId),
+                    query = mapOf("scope" to scope)
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    operationLogsState.emit(DataState.Success(response.payload, response.message))
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
 fun currentUserOwnsStore(storeId: String?): Boolean {
     val cleanStoreId = storeId?.takeIf { it.isNotBlank() } ?: return false
     val currentUserId = userAccountState.payloadValue?.id.orEmpty()
@@ -2153,6 +2180,55 @@ fun currentUserHasStorePermission(storeId: String?, permission: String): Boolean
 fun currentUserCanExtractCashRegister(storeId: String?): Boolean {
     return currentUserHasStorePermission(storeId, STORE_PERMISSION_CASH_REGISTER_EXTRACT)
 }
+
+fun currentUserCanViewLogs(storeId: String?): Boolean {
+    return currentUserOwnsStore(storeId) || currentUserHasStorePermission(storeId, STORE_PERMISSION_LOGS_VIEW)
+}
+
+fun currentUserCanViewWorkers(storeId: String?): Boolean {
+    return currentUserOwnsStore(storeId) || currentUserHasStorePermission(storeId, STORE_PERMISSION_WORKERS_VIEW) || currentUserHasStorePermission(storeId, STORE_PERMISSION_WORKERS_MANAGE)
+}
+
+fun currentUserCanManageWorkers(storeId: String?): Boolean {
+    return currentUserOwnsStore(storeId) || currentUserHasStorePermission(storeId, STORE_PERMISSION_WORKERS_MANAGE)
+}
+
+fun currentUserCanViewAnalytics(storeId: String?): Boolean {
+    return currentUserOwnsStore(storeId) || currentUserHasStorePermission(storeId, STORE_PERMISSION_ANALYTICS_VIEW)
+}
+
+fun currentUserCanViewCashRegister(storeId: String?): Boolean {
+    return currentUserOwnsStore(storeId) || currentUserHasStorePermission(storeId, STORE_PERMISSION_CASH_REGISTER_VIEW)
+}
+
+fun currentUserCanViewStock(storeId: String?): Boolean {
+    return currentUserOwnsStore(storeId) || currentUserHasStorePermission(storeId, STORE_PERMISSION_STOCK_READ) || currentUserHasStorePermission(storeId, STORE_PERMISSION_STOCK_WRITE)
+}
+
+fun currentUserCanEditStock(storeId: String?): Boolean {
+    return currentUserOwnsStore(storeId) || currentUserHasStorePermission(storeId, STORE_PERMISSION_STOCK_WRITE)
+}
+
+fun currentUserCanViewTransactionHistory(storeId: String?): Boolean {
+    return currentUserOwnsStore(storeId) || currentUserHasStorePermission(storeId, STORE_PERMISSION_TRANSACTION_HISTORY_VIEW)
+}
+
+fun currentUserCanUseTransactionType(storeId: String?, transactionTypeIndex: Int): Boolean {
+    val permission = when (transactionTypeIndex) {
+        0 -> STORE_PERMISSION_SALE_TRANSACTION
+        1 -> STORE_PERMISSION_RETURN_TRANSACTION
+        2 -> STORE_PERMISSION_SUPPLY_TRANSACTION
+        else -> null
+    } ?: return true
+    return currentUserOwnsStore(storeId) || currentUserHasStorePermission(storeId, permission)
+}
+
+fun currentUserPermissionDeniedMessage(): List<LocalizedStringDataModel> = localizedStringResourceMessage(
+    id = 665,
+    main = "You do not have permission for this action",
+    ru = "У вас нет прав для этого действия",
+    kk = "Бұл әрекетке рұқсатыңыз жоқ"
+)
 
 fun completeTransaction(
     transaction: TransactionDataModel,
@@ -2506,7 +2582,7 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
     initial = GlobalAppConfigurationDataModel(
         realtimeUpdatesPath = "rt/updates",
         appName = Pair("AITA", "0"),
-        serverUrl = Pair("http://10.168.22.26", "1"),
+        serverUrl = Pair("http://172.20.10.2:8080", "1"),
         globalAppConfigurationPath = Pair("config/global", "2"),
         logInPath = Pair("auth/logIn", "3"),
         signUpPath = Pair("auth/signUp", "4"),
@@ -3163,55 +3239,106 @@ var httpClient =
 
                 refreshTokens {
                     withContext(Dispatchers.ourIo) {
-
                         tokenRefreshMutex.withLock {
-                            val current = getStoredUserAuthTokens?.invoke()
+                            val current = getStoredUserAuthTokens?.invoke() ?: return@withLock null
 
-                            current ?: return@withLock null
-
-                            val httpClient = HttpClient(getHttpClientEngine()) {
-                                install(ContentNegotiation) {
-                                    json(jsonBase)
+                            val refreshResponse = runCatching {
+                                val refreshHttpClient = HttpClient(getHttpClientEngine()) {
+                                    install(ContentNegotiation) {
+                                        json(jsonBase)
+                                    }
+                                    expectSuccess = false
                                 }
+
+                                try {
+                                    val httpResponse = refreshHttpClient.request(
+                                        "${globalAppConfigurationState.payloadValue.serverUrl.first}/${globalAppConfigurationState.payloadValue.refreshPath.first}"
+                                    ) {
+                                        method = HttpMethod.Post
+                                        contentType(ContentType.Application.Json)
+                                        setBody(current.refreshToken)
+                                    }
+
+                                    if (httpResponse.status == HttpStatusCode.Unauthorized) {
+                                        ResponseDataModel<TokenPair>(
+                                            message = localizedStringResourceMessage(
+                                                id = 91,
+                                                main = "Session time expired. Logging out",
+                                                ru = "Время сеанса истекло. Выполняется выход",
+                                                kk = "Сеанс мерзімі аяқталды. Аккаунттан шығу орындалуда"
+                                            ),
+                                            payload = null,
+                                            negative = true,
+                                            httpStatusCode = httpResponse.status.value,
+                                            transportFailure = false
+                                        )
+                                    } else {
+                                        val rawBody = httpResponse.bodyAsText()
+                                        runCatching {
+                                            jsonBase
+                                                .decodeFromString<GenericResponseDataModel>(rawBody)
+                                                .toResponseDataModel<TokenPair>()
+                                                .copy(httpStatusCode = httpResponse.status.value)
+                                        }.getOrElse {
+                                            runCatching {
+                                                jsonBase.decodeFromString<ResponseDataModel<TokenPair>>(rawBody)
+                                                    .copy(httpStatusCode = httpResponse.status.value)
+                                            }.getOrElse {
+                                                ResponseDataModel<TokenPair>(
+                                                    message = localizedStringResourceMessage(
+                                                        id = 225,
+                                                        main = "Server response could not be read",
+                                                        ru = "Не удалось прочитать ответ сервера",
+                                                        kk = "Сервер жауабын оқу мүмкін болмады"
+                                                    ),
+                                                    payload = null,
+                                                    negative = true,
+                                                    httpStatusCode = httpResponse.status.value,
+                                                    transportFailure = false
+                                                )
+                                            }
+                                        }
+                                    }
+                                } finally {
+                                    refreshHttpClient.close()
+                                }
+                            }.getOrElse {
+                                ResponseDataModel<TokenPair>(
+                                    message = localizedStringResourceMessage(
+                                        id = 214,
+                                        main = "Cannot reach server. Keeping you signed in offline.",
+                                        ru = "Сервер недоступен. Вы остаётесь в аккаунте офлайн.",
+                                        kk = "Сервер қолжетімсіз. Сіз офлайн режимде аккаунтта қаласыз."
+                                    ),
+                                    payload = null,
+                                    negative = true,
+                                    transportFailure = true
+                                )
                             }
 
-                            val response = networkRequest<TokenPair, String>(
-                                HttpMethod.Post,
-                                endpointUrl = globalAppConfigurationState.payloadValue.refreshPath.first,
-                                body = current.refreshToken
-                            )
+                            when {
+                                refreshResponse.payload != null -> {
+                                    setStoredUserAuthTokens?.invoke(refreshResponse.payload)
+                                    BearerTokens(refreshResponse.payload.accessToken, refreshResponse.payload.refreshToken)
+                                }
 
-                            if (response.negative && response.payload == null) {
-                                if (response.transportFailure) {
-                                    postInAppNotification(
-                                        localizedStringResourceMessage(
-                                            id = 214,
-                                            main = "Cannot reach server. Keeping you signed in offline.",
-                                            ru = "Сервер недоступен. Вы остаётесь в аккаунте офлайн.",
-                                            kk = "Сервер қолжетімсіз. Сіз офлайн режимде аккаунтта қаласыз."
+                                refreshResponse.transportFailure -> {
+                                    postInAppNotification(refreshResponse.message, NotificationType.Neutral)
+                                    BearerTokens(current.accessToken, current.refreshToken)
+                                }
+
+                                else -> {
+                                    forceLogOutUser(
+                                        message = refreshResponse.message ?: localizedStringResourceMessage(
+                                            id = 91,
+                                            main = "Session time expired. Logging out",
+                                            ru = "Время сеанса истекло. Выполняется выход",
+                                            kk = "Сеанс мерзімі аяқталды. Аккаунттан шығу орындалуда"
                                         ),
-                                        NotificationType.Neutral
+                                        postMessage = true
                                     )
-                                } else {
-                                    postInAppNotification(
-                                        stringSessionTimeExpiredLoggingOutState.value,
-                                        NotificationType.Negative
-                                    )
-                                    delay(3000)
-                                    forceLogOutUser()
+                                    null
                                 }
-                            }
-
-                            httpClient.close()
-
-                            if (response.payload != null) {
-                                setStoredUserAuthTokens?.invoke(response.payload)
-                                BearerTokens(response.payload.accessToken, response.payload.refreshToken)
-                            } else if (response.transportFailure) {
-                                current?.let { BearerTokens(it.accessToken, it.refreshToken) }
-                            } else {
-                                setStoredUserAuthTokens?.invoke(null)
-                                null
                             }
                         }
                     }
@@ -3294,6 +3421,7 @@ val incomingWorkerRequestsState = MutableDataStateFlow<List<StoreWorkerRequestDa
 val myWorkerRequestsState = MutableDataStateFlow<List<StoreWorkerRequestDataModel>>(GlobalScope)
 val activeWorkshiftState = MutableDataStateFlow<WorkshiftDataModel>(GlobalScope)
 val workshiftLoginInProgressState = MutableStateFlow(false)
+val operationLogsState = MutableDataStateFlow<List<OperationLogDataModel>>(GlobalScope)
 
 private val getCashRegisterMutex = Mutex()
 private val extractCashRegisterMutex = Mutex()
@@ -3308,6 +3436,7 @@ private val updateStoreWorkerPermissionsMutex = Mutex()
 private val getCurrentWorkshiftMutex = Mutex()
 private val startWorkshiftMutex = Mutex()
 private val endWorkshiftMutex = Mutex()
+private val getOperationLogsMutex = Mutex()
 
 
 
@@ -5097,6 +5226,9 @@ private suspend fun loadCachedStoreScopedData(storeId: String) {
     getJsonCache<List<StoreWorkerRequestDataModel>>(storeScopedCacheKey("incoming_worker_requests", storeId))?.let {
         incomingWorkerRequestsState.emit(DataState.Success(it, cacheMessage()))
     }
+    getJsonCache<List<OperationLogDataModel>>(storeScopedCacheKey("operation_logs", storeId))?.let {
+        operationLogsState.emit(DataState.Success(it, cacheMessage()))
+    }
 }
 
 private suspend fun loadCachedApplicationData() {
@@ -5175,6 +5307,13 @@ private fun startAppCacheCollectors() {
     GlobalScope.launch(Dispatchers.ourIo) { myWorkerRequestsState.payload.collect { it?.let { putJsonCache(CACHE_MY_WORKER_REQUESTS, it) } } }
     GlobalScope.launch(Dispatchers.ourIo) { userFinanceDashboardState.payload.collect { it?.let { putJsonCache(CACHE_USER_FINANCE_DASHBOARD, it) } } }
     GlobalScope.launch(Dispatchers.ourIo) { subscriptionPlansState.payload.collect { it?.let { putJsonCache(CACHE_SUBSCRIPTION_PLANS, it) } } }
+
+    GlobalScope.launch(Dispatchers.ourIo) {
+        operationLogsState.payload.collect { payload ->
+            val storeId = activeStoreIdState.value
+            if (!storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("operation_logs", storeId), payload)
+        }
+    }
 
     GlobalScope.launch(Dispatchers.ourIo) {
         stockState.payload.collect { payload ->
@@ -5260,6 +5399,7 @@ private fun refreshEverythingFromServerAfterRealtimeUpdate() {
         getStoreWorkers(storeId)
         getIncomingWorkerRequests(storeId)
         getStoreSubscription(storeId)
+        getOperationLogs(storeId, OPERATION_LOG_SCOPE_CURRENT)
     }
 }
 
@@ -5782,6 +5922,25 @@ fun logOutUser() {
             logOutUserMutex.withLock {
                 val refreshToken = getStoredUserAuthTokens?.invoke()?.refreshToken
 
+                // Logout must never trap the cashier inside account screen. Local logout is immediate;
+                // server refresh-session revoke is best-effort and can fail silently when the server token is already expired.
+                stopRealtimeUpdates()
+                setStoredUserAuthTokens?.invoke(null)
+                setStoredUserAccountDataModel?.invoke(null)
+                setActiveStoreId(null, syncServer = false)
+                httpClient.authProvider<BearerAuthProvider>()?.clearToken()
+
+                userAccountState.emit(DataState.Empty())
+                storesState.emit(DataState.Empty())
+                activeStoreIdState.emit(null)
+                stockState.emit(DataState.Empty())
+                stockBatchesState.emit(DataState.Empty())
+                transactionsState.emit(DataState.Empty())
+                securitySessionsState.emit(DataState.Empty())
+                activeWorkshiftState.emit(DataState.Empty())
+                latestInAppNotificationState.emit(null)
+                activeInAppNotificationsState.emit(emptyList())
+
                 val response = if (!refreshToken.isNullOrBlank()) {
                     networkRequest<Unit, String>(
                         HttpMethod.Delete,
@@ -5800,18 +5959,6 @@ fun logOutUser() {
                         negative = false
                     )
                 }
-
-                // Logout must never trap the cashier inside account screen. Server revoke is best-effort.
-                stopRealtimeUpdates()
-                setStoredUserAuthTokens?.invoke(null)
-                setStoredUserAccountDataModel?.invoke(null)
-                setActiveStoreId(null, syncServer = false)
-                httpClient.authProvider<BearerAuthProvider>()?.clearToken()
-
-                userAccountState.emit(DataState.Empty())
-                storesState.emit(DataState.Empty())
-                securitySessionsState.emit(DataState.Empty())
-                activeStoreIdState.emit(null)
 
                 postInAppNotification(
                     if (response.negative)
@@ -5909,15 +6056,50 @@ fun updateUser(
         }
 }
 
-fun forceLogOutUser() {
+fun forceLogOutUser(
+    message: List<LocalizedStringDataModel>? = null,
+    postMessage: Boolean = false
+) {
     GlobalScope.launch(Dispatchers.ourIo) {
         stopRealtimeUpdates()
         setStoredUserAuthTokens?.invoke(null)
         setStoredUserAccountDataModel?.invoke(null)
         setActiveStoreId(null, syncServer = false)
+        httpClient.authProvider<BearerAuthProvider>()?.clearToken()
 
         userAccountState.emit(DataState.Empty())
+        storesState.emit(DataState.Empty())
+        activeStoreIdState.emit(null)
+        stockState.emit(DataState.Empty())
+        stockBatchesState.emit(DataState.Empty())
+        stockItemBranchAvailabilityState.emit(DataState.Empty())
+        stockBatchMoveResultState.emit(DataState.Empty())
+        transactionsState.emit(DataState.Empty())
+        debtorsState.emit(DataState.Empty())
         securitySessionsState.emit(DataState.Empty())
+        storeWorkerMembershipsState.emit(DataState.Empty())
+        activeWorkshiftState.emit(DataState.Empty())
+        operationLogsState.emit(DataState.Empty())
+        cashRegisterState.emit(DataState.Empty())
+        cashRegisterEventsState.emit(DataState.Empty())
+        userFinanceDashboardState.emit(DataState.Empty())
+        activeStoreSubscriptionState.emit(DataState.Empty())
+        activeStoreSubscriptionChargesState.emit(DataState.Empty())
+        latestInAppNotificationState.emit(null)
+        activeInAppNotificationsState.emit(emptyList())
+
+        if (postMessage) {
+            postInAppNotification(
+                message ?: localizedStringResourceMessage(
+                    id = 91,
+                    main = "Session time expired. Logging out",
+                    ru = "Время сеанса истекло. Выполняется выход",
+                    kk = "Сеанс мерзімі аяқталды. Аккаунттан шығу орындалуда"
+                ),
+                NotificationType.Negative,
+                transient = true
+            )
+        }
     }
 }
 
@@ -5955,11 +6137,23 @@ suspend inline fun <reified Response, reified Body> networkRequest(
             }
 
         if (response.status == HttpStatusCode.Unauthorized) {
+            val expiredMessage = localizedStringResourceMessage(
+                id = 91,
+                main = "Session time expired. Logging out",
+                ru = "Время сеанса истекло. Выполняется выход",
+                kk = "Сеанс мерзімі аяқталды. Аккаунттан шығу орындалуда"
+            )
+
+            if (!endpointUrl.startsWith("auth/logIn") && !endpointUrl.startsWith("auth/signUp")) {
+                forceLogOutUser(message = expiredMessage, postMessage = true)
+            }
+
             ResponseDataModel(
-                message = stringRawAuthenticationFailedState.value,
+                message = expiredMessage,
                 payload = null,
                 negative = true,
-                httpStatusCode = response.status.value
+                httpStatusCode = response.status.value,
+                transportFailure = false
             )
         } else {
             val rawBody = response.bodyAsText()
@@ -6003,17 +6197,41 @@ suspend inline fun <reified Response, reified Body> networkRequest(
             }
         }
     } catch (throwable: Throwable) {
-        ResponseDataModel(
-            message = localizedStringResourceMessage(
-                id = 223,
-                main = "Cannot reach server",
-                ru = "Сервер недоступен",
-                kk = "Сервер қолжетімсіз"
-            ),
-            payload = null,
-            negative = true,
-            transportFailure = true
-        )
+        val responseException = throwable as? ResponseException
+        val status = responseException?.response?.status
+
+        if (status == HttpStatusCode.Unauthorized) {
+            val expiredMessage = localizedStringResourceMessage(
+                id = 91,
+                main = "Session time expired. Logging out",
+                ru = "Время сеанса истекло. Выполняется выход",
+                kk = "Сеанс мерзімі аяқталды. Аккаунттан шығу орындалуда"
+            )
+
+            if (!endpointUrl.startsWith("auth/logIn") && !endpointUrl.startsWith("auth/signUp")) {
+                forceLogOutUser(message = expiredMessage, postMessage = true)
+            }
+
+            ResponseDataModel(
+                message = expiredMessage,
+                payload = null,
+                negative = true,
+                httpStatusCode = status.value,
+                transportFailure = false
+            )
+        } else {
+            ResponseDataModel(
+                message = localizedStringResourceMessage(
+                    id = 223,
+                    main = "Cannot reach server",
+                    ru = "Сервер недоступен",
+                    kk = "Сервер қолжетімсіз"
+                ),
+                payload = null,
+                negative = true,
+                transportFailure = true
+            )
+        }
     }
 }
 
@@ -6831,6 +7049,32 @@ const val STORE_PERMISSION_CASH_REGISTER_EXTRACT = "cash_register_extract"
 const val STORE_PERMISSION_WORKERS_VIEW = "workers_view"
 const val STORE_PERMISSION_WORKERS_MANAGE = "workers_manage"
 const val STORE_PERMISSION_STORE_MANAGE = "store_manage"
+const val STORE_PERMISSION_LOGS_VIEW = "logs_view"
+
+const val OPERATION_LOG_SCOPE_CURRENT = "current"
+const val OPERATION_LOG_SCOPE_ROOT = "root"
+const val OPERATION_LOG_ENTITY_STORE = "store"
+const val OPERATION_LOG_ENTITY_WORKER = "worker"
+const val OPERATION_LOG_ENTITY_WORKSHIFT = "workshift"
+const val OPERATION_LOG_ENTITY_STOCK_ITEM = "stock_item"
+const val OPERATION_LOG_ENTITY_STOCK_BATCH = "stock_batch"
+const val OPERATION_LOG_ENTITY_TRANSACTION = "transaction"
+const val OPERATION_LOG_ENTITY_CASH_REGISTER = "cash_register"
+const val OPERATION_LOG_ENTITY_SUPPLIER = "supplier"
+const val OPERATION_LOG_ENTITY_SUBSCRIPTION = "subscription"
+const val OPERATION_LOG_ENTITY_FINANCE = "finance"
+const val OPERATION_LOG_ACTION_CREATED = "created"
+const val OPERATION_LOG_ACTION_UPDATED = "updated"
+const val OPERATION_LOG_ACTION_DELETED = "deleted"
+const val OPERATION_LOG_ACTION_COMPLETED = "completed"
+const val OPERATION_LOG_ACTION_EXTRACTED = "extracted"
+const val OPERATION_LOG_ACTION_STARTED = "started"
+const val OPERATION_LOG_ACTION_ENDED = "ended"
+const val OPERATION_LOG_ACTION_ACCEPTED = "accepted"
+const val OPERATION_LOG_ACTION_DECLINED = "declined"
+const val OPERATION_LOG_ACTION_INVITED = "invited"
+const val OPERATION_LOG_ACTION_MOVED = "moved"
+
 
 val ALL_STORE_PERMISSION_IDS = listOf(
     STORE_PERMISSION_SALE_TRANSACTION,
@@ -6844,12 +7088,14 @@ val ALL_STORE_PERMISSION_IDS = listOf(
     STORE_PERMISSION_CASH_REGISTER_EXTRACT,
     STORE_PERMISSION_WORKERS_VIEW,
     STORE_PERMISSION_WORKERS_MANAGE,
-    STORE_PERMISSION_STORE_MANAGE
+    STORE_PERMISSION_STORE_MANAGE,
+    STORE_PERMISSION_LOGS_VIEW
 )
 
 val STANDARD_STORE_PERMISSION_IDS = listOf(
     STORE_PERMISSION_SALE_TRANSACTION,
     STORE_PERMISSION_RETURN_TRANSACTION,
+    STORE_PERMISSION_SUPPLY_TRANSACTION,
     STORE_PERMISSION_STOCK_READ,
     STORE_PERMISSION_TRANSACTION_HISTORY_VIEW,
     STORE_PERMISSION_CASH_REGISTER_VIEW
@@ -7471,6 +7717,7 @@ data class GlobalAppConfigurationDataModel(
     val getCurrentWorkshiftPath: Pair<String, String> = Pair("workshifts/current", "86"),
     val startWorkshiftPath: Pair<String, String> = Pair("workshifts/start", "87"),
     val endWorkshiftPath: Pair<String, String> = Pair("workshifts/end", "88"),
+    val getOperationLogsPath: Pair<String, String> = Pair("logs/get", "92"),
     val getUserFinanceDashboardPath: Pair<String, String> = Pair("finance/dashboard", "77"),
     val createTopUpPaymentPath: Pair<String, String> = Pair("finance/topup/create", "78"),
     val confirmDevelopmentTopUpPath: Pair<String, String> = Pair("finance/topup/confirmDevelopment", "79"),
@@ -8406,6 +8653,26 @@ data class WorkshiftDataModel(
     val startedByUserId: String = "",
     val endedByUserId: String? = null,
     val isActive: Boolean = true
+)
+
+@kotlinx.serialization.Serializable
+data class OperationLogDataModel(
+    val id: String = "",
+    val rootStoreId: String = "",
+    val storeId: String = "",
+    val storePublicId: String = "",
+    val storeName: List<LocalizedStringDataModel> = emptyList(),
+    val actorUserId: String = "",
+    val actorPublicId: String = "",
+    val actorDisplayName: String = "",
+    val workshiftId: String? = null,
+    val action: String = "",
+    val entityType: String = "",
+    val entityId: String? = null,
+    val title: List<LocalizedStringDataModel> = emptyList(),
+    val details: List<LocalizedStringDataModel> = emptyList(),
+    val metadata: Map<String, String> = emptyMap(),
+    val createdAtMillis: Long = 0L
 )
 
 @kotlinx.serialization.Serializable
