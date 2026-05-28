@@ -85,9 +85,11 @@ kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serializa
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationCore" }
 ktor-client-auth = { module = "io.ktor:ktor-client-auth", version.ref = "ktor" }
 ktor-client-cache = { module = "io.ktor:ktor-client-cache", version.ref = "ktorClientCache" }
+ktor-client-websockets = { module = "io.ktor:ktor-client-websockets", version.ref = "ktor" }
 ktor-server-auth = { module = "io.ktor:ktor-server-auth", version.ref = "ktor" }
 ktor-server-auth-jwt = { module = "io.ktor:ktor-server-auth-jwt", version.ref = "ktor" }
 ktor-server-config-yaml = { module = "io.ktor:ktor-server-config-yaml", version.ref = "ktor" }
+ktor-server-websockets = { module = "io.ktor:ktor-server-websockets", version.ref = "ktor" }
 logback = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 ktor-serverCore = { module = "io.ktor:ktor-server-core-jvm", version.ref = "ktor" }
 ktor-serverNetty = { module = "io.ktor:ktor-server-netty-jvm", version.ref = "ktor" }
@@ -122,4 +124,3 @@ kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref =
 sqldelight = { id = "app.cash.sqldelight", version.ref = "sqldelight" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hiltAndroid" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
-

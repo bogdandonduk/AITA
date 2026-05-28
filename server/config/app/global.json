@@ -8,7 +8,7 @@
       "second": "0"
     },
     "serverUrl": {
-      "first": "http://10.202.10.165:8080",
+      "first": "http://10.168.22.26:8080",
       "second": "1"
     },
     "globalAppConfigurationPath": {
@@ -648,6 +648,456 @@
     "deleteSupplierGoodsPricesPath": {
       "first": "supplierGoodsPrices/delete",
       "second": "33"
+    },
+    "getCashRegisterPath": {
+      "first": "cashRegister/get",
+      "second": "49"
+    },
+    "extractCashRegisterPath": {
+      "first": "cashRegister/extract",
+      "second": "50"
+    },
+    "getStoreWorkersPath": {
+      "first": "workers/store/get",
+      "second": "51"
+    },
+    "getMyWorkerMembershipsPath": {
+      "first": "workers/my/get",
+      "second": "52"
+    },
+    "getIncomingWorkerRequestsPath": {
+      "first": "workers/requests/incoming",
+      "second": "53"
+    },
+    "getMyWorkerRequestsPath": {
+      "first": "workers/requests/my",
+      "second": "54"
+    },
+    "requestStoreEmploymentPath": {
+      "first": "workers/request",
+      "second": "55"
+    },
+    "acceptStoreEmploymentPath": {
+      "first": "workers/accept",
+      "second": "56"
+    },
+    "declineStoreEmploymentPath": {
+      "first": "workers/decline",
+      "second": "57"
+    },
+    "updateStoreWorkerPermissionsPath": {
+      "first": "workers/updatePermissions",
+      "second": "58"
+    },
+    "inviteStoreWorkerPath": {
+      "first": "workers/invite",
+      "second": "65"
+    },
+    "acceptStoreWorkerInvitationPath": {
+      "first": "workers/invitations/accept",
+      "second": "66"
+    },
+    "declineStoreWorkerInvitationPath": {
+      "first": "workers/invitations/decline",
+      "second": "67"
+    },
+    "legalIdFormats": [
+      {
+        "id": "kz_bin",
+        "countryLocales": [
+          "kz"
+        ],
+        "name": [
+          {
+            "language": "main",
+            "value": "BIN"
+          },
+          {
+            "language": "en",
+            "value": "BIN"
+          },
+          {
+            "language": "ru",
+            "value": "БИН"
+          },
+          {
+            "language": "kk",
+            "value": "БИН"
+          }
+        ],
+        "label": [
+          {
+            "language": "main",
+            "value": "Business Identification Number"
+          },
+          {
+            "language": "en",
+            "value": "Business Identification Number"
+          },
+          {
+            "language": "ru",
+            "value": "Бизнес-идентификационный номер"
+          },
+          {
+            "language": "kk",
+            "value": "Бизнес сәйкестендіру нөмірі"
+          }
+        ],
+        "placeholder": [
+          {
+            "language": "main",
+            "value": "12 digits"
+          },
+          {
+            "language": "en",
+            "value": "12 digits"
+          },
+          {
+            "language": "ru",
+            "value": "12 цифр"
+          },
+          {
+            "language": "kk",
+            "value": "12 сан"
+          }
+        ],
+        "required": true,
+        "length": 12,
+        "minLength": null,
+        "maxLength": null,
+        "digitsOnly": true,
+        "regex": "^[0-9]{12}$"
+      },
+      {
+        "id": "tj_tin",
+        "countryLocales": [
+          "tj"
+        ],
+        "name": [
+          {
+            "language": "main",
+            "value": "TIN"
+          },
+          {
+            "language": "en",
+            "value": "TIN"
+          },
+          {
+            "language": "ru",
+            "value": "ИНН / РМА"
+          },
+          {
+            "language": "kk",
+            "value": "СТН / РМА"
+          }
+        ],
+        "label": [
+          {
+            "language": "main",
+            "value": "Taxpayer Identification Number"
+          },
+          {
+            "language": "en",
+            "value": "Taxpayer Identification Number"
+          },
+          {
+            "language": "ru",
+            "value": "Идентификационный номер налогоплательщика"
+          },
+          {
+            "language": "kk",
+            "value": "Салық төлеушінің сәйкестендіру нөмірі"
+          }
+        ],
+        "placeholder": [
+          {
+            "language": "main",
+            "value": "9 digits"
+          },
+          {
+            "language": "en",
+            "value": "9 digits"
+          },
+          {
+            "language": "ru",
+            "value": "9 цифр"
+          },
+          {
+            "language": "kk",
+            "value": "9 сан"
+          }
+        ],
+        "required": true,
+        "length": 9,
+        "minLength": null,
+        "maxLength": null,
+        "digitsOnly": true,
+        "regex": "^[0-9]{9}$"
+      }
+    ],
+    "getStockItemBranchAvailabilityPath": {
+      "first": "stockBatches/branchAvailability",
+      "second": "73"
+    },
+    "moveStockBatchPath": {
+      "first": "stockBatches/move",
+      "second": "74"
+    },
+    "getUserFinanceDashboardPath": {
+      "first": "finance/dashboard",
+      "second": "77"
+    },
+    "createTopUpPaymentPath": {
+      "first": "finance/topup/create",
+      "second": "78"
+    },
+    "confirmDevelopmentTopUpPath": {
+      "first": "finance/topup/confirmDevelopment",
+      "second": "79"
+    },
+    "getSubscriptionPlansPath": {
+      "first": "subscriptions/plans",
+      "second": "80"
+    },
+    "getStoreSubscriptionPath": {
+      "first": "subscriptions/store/get",
+      "second": "81"
+    },
+    "updateStoreSubscriptionPath": {
+      "first": "subscriptions/store/update",
+      "second": "82"
+    },
+    "pagingDefaultPageSize": 40,
+    "pagingMaxPageSize": 200,
+    "paymentProviders": [
+      {
+        "id": "kaspi_invoice",
+        "name": [
+          {
+            "language": "main",
+            "value": "Kaspi invoice"
+          },
+          {
+            "language": "en",
+            "value": "Kaspi invoice"
+          },
+          {
+            "language": "ru",
+            "value": "Счёт Kaspi"
+          },
+          {
+            "language": "kk",
+            "value": "Kaspi шоты"
+          }
+        ],
+        "countryLocales": [
+          "kz"
+        ],
+        "currencyCodes": [
+          "KZT"
+        ],
+        "enabled": false,
+        "sandbox": true,
+        "apiKeyEnvironmentVariable": "AITA_KASPI_API_KEY",
+        "webhookSecretEnvironmentVariable": "AITA_KASPI_WEBHOOK_SECRET",
+        "description": [
+          {
+            "language": "main",
+            "value": "Prepared integration placeholder. Real API call is disabled until merchant credentials are connected."
+          },
+          {
+            "language": "ru",
+            "value": "Заготовка интеграции. Реальный вызов API отключён до подключения данных мерчанта."
+          },
+          {
+            "language": "kk",
+            "value": "Интеграция дайындығы. Мерчант деректері қосылғанша нақты API шақыруы өшірулі."
+          }
+        ]
+      },
+      {
+        "id": "manual_development",
+        "name": [
+          {
+            "language": "main",
+            "value": "Manual development top-up"
+          },
+          {
+            "language": "en",
+            "value": "Manual development top-up"
+          },
+          {
+            "language": "ru",
+            "value": "Тестовое ручное пополнение"
+          },
+          {
+            "language": "kk",
+            "value": "Қолмен тест толтыру"
+          }
+        ],
+        "countryLocales": [],
+        "currencyCodes": [],
+        "enabled": true,
+        "sandbox": true,
+        "apiKeyEnvironmentVariable": "",
+        "webhookSecretEnvironmentVariable": "",
+        "description": []
+      }
+    ],
+    "subscriptionPlans": [
+      {
+        "id": "starter_monthly_kzt",
+        "name": [
+          {
+            "language": "main",
+            "value": "Starter"
+          },
+          {
+            "language": "en",
+            "value": "Starter"
+          },
+          {
+            "language": "ru",
+            "value": "Старт"
+          },
+          {
+            "language": "kk",
+            "value": "Бастау"
+          }
+        ],
+        "description": [
+          {
+            "language": "main",
+            "value": "Small store, one branch, basic analytics"
+          },
+          {
+            "language": "ru",
+            "value": "Небольшой магазин, один филиал, базовая аналитика"
+          },
+          {
+            "language": "kk",
+            "value": "Шағын дүкен, бір филиал, негізгі аналитика"
+          }
+        ],
+        "priceMinor": 499000,
+        "currencyCode": "KZT",
+        "periodUnit": "month",
+        "periodCount": 1,
+        "maxBranches": 1,
+        "maxWorkers": 3,
+        "maxStockItems": 2000,
+        "isActive": true
+      },
+      {
+        "id": "business_monthly_kzt",
+        "name": [
+          {
+            "language": "main",
+            "value": "Business"
+          },
+          {
+            "language": "en",
+            "value": "Business"
+          },
+          {
+            "language": "ru",
+            "value": "Бизнес"
+          },
+          {
+            "language": "kk",
+            "value": "Бизнес"
+          }
+        ],
+        "description": [
+          {
+            "language": "main",
+            "value": "Branches, workers, cash register, realtime sync"
+          },
+          {
+            "language": "ru",
+            "value": "Филиалы, сотрудники, касса, онлайн-синхронизация"
+          },
+          {
+            "language": "kk",
+            "value": "Филиалдар, қызметкерлер, касса, нақты уақыт синхрондауы"
+          }
+        ],
+        "priceMinor": 1499000,
+        "currencyCode": "KZT",
+        "periodUnit": "month",
+        "periodCount": 1,
+        "maxBranches": 5,
+        "maxWorkers": 20,
+        "maxStockItems": 20000,
+        "isActive": true
+      },
+      {
+        "id": "business_yearly_kzt",
+        "name": [
+          {
+            "language": "main",
+            "value": "Business yearly"
+          },
+          {
+            "language": "en",
+            "value": "Business yearly"
+          },
+          {
+            "language": "ru",
+            "value": "Бизнес на год"
+          },
+          {
+            "language": "kk",
+            "value": "Жылдық бизнес"
+          }
+        ],
+        "description": [
+          {
+            "language": "main",
+            "value": "Twelve months for the price of ten"
+          },
+          {
+            "language": "ru",
+            "value": "Двенадцать месяцев по цене десяти"
+          },
+          {
+            "language": "kk",
+            "value": "Он ай бағасына он екі ай"
+          }
+        ],
+        "priceMinor": 14990000,
+        "currencyCode": "KZT",
+        "periodUnit": "year",
+        "periodCount": 1,
+        "maxBranches": 5,
+        "maxWorkers": 20,
+        "maxStockItems": 20000,
+        "isActive": true
+      }
+    ],
+    "addSupplierPath": {
+      "first": "suppliers/add",
+      "second": "83"
+    },
+    "updateSupplierPath": {
+      "first": "suppliers/update",
+      "second": "84"
+    },
+    "deleteSupplierPath": {
+      "first": "suppliers/delete",
+      "second": "85"
+    },
+    "getCurrentWorkshiftPath": {
+      "first": "workshifts/current",
+      "second": "86"
+    },
+    "startWorkshiftPath": {
+      "first": "workshifts/start",
+      "second": "87"
+    },
+    "endWorkshiftPath": {
+      "first": "workshifts/end",
+      "second": "88"
     }
   }
 }

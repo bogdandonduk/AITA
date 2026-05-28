@@ -523,5 +523,908 @@
         "value": "Ағымдағы сеансты тоқтату үшін аккаунттан шығыңыз"
       }
     ]
+  },
+  {
+    "id": "49",
+    "message": [
+      {
+        "language": "main",
+        "value": "Cash register loaded"
+      },
+      {
+        "language": "en",
+        "value": "Cash register loaded"
+      },
+      {
+        "language": "ru",
+        "value": "Касса загружена"
+      },
+      {
+        "language": "kk",
+        "value": "Касса жүктелді"
+      }
+    ]
+  },
+  {
+    "id": "50",
+    "message": [
+      {
+        "language": "main",
+        "value": "Cash extracted"
+      },
+      {
+        "language": "en",
+        "value": "Cash extracted"
+      },
+      {
+        "language": "ru",
+        "value": "Наличные извлечены"
+      },
+      {
+        "language": "kk",
+        "value": "Қолма-қол ақша алынды"
+      }
+    ]
+  },
+  {
+    "id": "51",
+    "message": [
+      {
+        "language": "main",
+        "value": "Workers loaded"
+      },
+      {
+        "language": "en",
+        "value": "Workers loaded"
+      },
+      {
+        "language": "ru",
+        "value": "Сотрудники загружены"
+      },
+      {
+        "language": "kk",
+        "value": "Қызметкерлер жүктелді"
+      }
+    ]
+  },
+  {
+    "id": "52",
+    "message": [
+      {
+        "language": "main",
+        "value": "My work loaded"
+      },
+      {
+        "language": "en",
+        "value": "My work loaded"
+      },
+      {
+        "language": "ru",
+        "value": "Мои места работы загружены"
+      },
+      {
+        "language": "kk",
+        "value": "Менің жұмыс орындарым жүктелді"
+      }
+    ]
+  },
+  {
+    "id": "53",
+    "message": [
+      {
+        "language": "main",
+        "value": "Incoming requests loaded"
+      },
+      {
+        "language": "en",
+        "value": "Incoming requests loaded"
+      },
+      {
+        "language": "ru",
+        "value": "Входящие заявки загружены"
+      },
+      {
+        "language": "kk",
+        "value": "Кіріс өтінімдер жүктелді"
+      }
+    ]
+  },
+  {
+    "id": "54",
+    "message": [
+      {
+        "language": "main",
+        "value": "My requests loaded"
+      },
+      {
+        "language": "en",
+        "value": "My requests loaded"
+      },
+      {
+        "language": "ru",
+        "value": "Мои заявки загружены"
+      },
+      {
+        "language": "kk",
+        "value": "Менің өтінімдерім жүктелді"
+      }
+    ]
+  },
+  {
+    "id": "55",
+    "message": [
+      {
+        "language": "main",
+        "value": "Employment request sent"
+      },
+      {
+        "language": "en",
+        "value": "Employment request sent"
+      },
+      {
+        "language": "ru",
+        "value": "Заявка на работу отправлена"
+      },
+      {
+        "language": "kk",
+        "value": "Жұмысқа өтінім жіберілді"
+      }
+    ]
+  },
+  {
+    "id": "56",
+    "message": [
+      {
+        "language": "main",
+        "value": "Worker accepted"
+      },
+      {
+        "language": "en",
+        "value": "Worker accepted"
+      },
+      {
+        "language": "ru",
+        "value": "Сотрудник принят"
+      },
+      {
+        "language": "kk",
+        "value": "Қызметкер қабылданды"
+      }
+    ]
+  },
+  {
+    "id": "57",
+    "message": [
+      {
+        "language": "main",
+        "value": "Request declined"
+      },
+      {
+        "language": "en",
+        "value": "Request declined"
+      },
+      {
+        "language": "ru",
+        "value": "Заявка отклонена"
+      },
+      {
+        "language": "kk",
+        "value": "Өтінім қабылданбады"
+      }
+    ]
+  },
+  {
+    "id": "58",
+    "message": [
+      {
+        "language": "main",
+        "value": "Worker permissions updated"
+      },
+      {
+        "language": "en",
+        "value": "Worker permissions updated"
+      },
+      {
+        "language": "ru",
+        "value": "Права сотрудника обновлены"
+      },
+      {
+        "language": "kk",
+        "value": "Қызметкер рұқсаттары жаңартылды"
+      }
+    ]
+  },
+  {
+    "id": "59",
+    "message": [
+      {
+        "language": "main",
+        "value": "Permission denied"
+      },
+      {
+        "language": "en",
+        "value": "Permission denied"
+      },
+      {
+        "language": "ru",
+        "value": "Недостаточно прав"
+      },
+      {
+        "language": "kk",
+        "value": "Рұқсат жеткіліксіз"
+      }
+    ]
+  },
+  {
+    "id": "60",
+    "message": [
+      {
+        "language": "main",
+        "value": "Cash register amount is not enough"
+      },
+      {
+        "language": "en",
+        "value": "Cash register amount is not enough"
+      },
+      {
+        "language": "ru",
+        "value": "В кассе недостаточно наличных"
+      },
+      {
+        "language": "kk",
+        "value": "Кассада қолма-қол ақша жеткіліксіз"
+      }
+    ]
+  },
+  {
+    "id": "61",
+    "message": [
+      {
+        "language": "main",
+        "value": "Request is already pending"
+      },
+      {
+        "language": "en",
+        "value": "Request is already pending"
+      },
+      {
+        "language": "ru",
+        "value": "Заявка уже ожидает решения"
+      },
+      {
+        "language": "kk",
+        "value": "Өтінім қазірдің өзінде күтуде"
+      }
+    ]
+  },
+  {
+    "id": "62",
+    "message": [
+      {
+        "language": "main",
+        "value": "User is already a worker in this store"
+      },
+      {
+        "language": "en",
+        "value": "User is already a worker in this store"
+      },
+      {
+        "language": "ru",
+        "value": "Пользователь уже сотрудник этого магазина"
+      },
+      {
+        "language": "kk",
+        "value": "Пайдаланушы бұл дүкеннің қызметкері"
+      }
+    ]
+  },
+  {
+    "id": "63",
+    "message": [
+      {
+        "language": "main",
+        "value": "User not found"
+      },
+      {
+        "language": "en",
+        "value": "User not found"
+      },
+      {
+        "language": "ru",
+        "value": "Пользователь не найден"
+      },
+      {
+        "language": "kk",
+        "value": "Пайдаланушы табылмады"
+      }
+    ]
+  },
+  {
+    "id": "64",
+    "message": [
+      {
+        "language": "main",
+        "value": "Invite already exists"
+      },
+      {
+        "language": "en",
+        "value": "Invite already exists"
+      },
+      {
+        "language": "ru",
+        "value": "Приглашение уже существует"
+      },
+      {
+        "language": "kk",
+        "value": "Шақыру бұрыннан бар"
+      }
+    ]
+  },
+  {
+    "id": "65",
+    "message": [
+      {
+        "language": "main",
+        "value": "Worker invite sent"
+      },
+      {
+        "language": "en",
+        "value": "Worker invite sent"
+      },
+      {
+        "language": "ru",
+        "value": "Приглашение сотруднику отправлено"
+      },
+      {
+        "language": "kk",
+        "value": "Қызметкерге шақыру жіберілді"
+      }
+    ]
+  },
+  {
+    "id": "66",
+    "message": [
+      {
+        "language": "main",
+        "value": "Worker invitation accepted"
+      },
+      {
+        "language": "en",
+        "value": "Worker invitation accepted"
+      },
+      {
+        "language": "ru",
+        "value": "Приглашение сотрудника принято"
+      },
+      {
+        "language": "kk",
+        "value": "Қызметкер шақыруы қабылданды"
+      }
+    ]
+  },
+  {
+    "id": "67",
+    "message": [
+      {
+        "language": "main",
+        "value": "Worker invitation declined"
+      },
+      {
+        "language": "en",
+        "value": "Worker invitation declined"
+      },
+      {
+        "language": "ru",
+        "value": "Приглашение сотрудника отклонено"
+      },
+      {
+        "language": "kk",
+        "value": "Қызметкер шақыруы қабылданбады"
+      }
+    ]
+  },
+  {
+    "id": "68",
+    "message": [
+      {
+        "language": "main",
+        "value": "Public ID is required"
+      },
+      {
+        "language": "en",
+        "value": "Public ID is required"
+      },
+      {
+        "language": "ru",
+        "value": "Нужен публичный ID"
+      },
+      {
+        "language": "kk",
+        "value": "Жария ID қажет"
+      }
+    ]
+  },
+  {
+    "id": "69",
+    "message": [
+      {
+        "language": "main",
+        "value": "Address is required"
+      },
+      {
+        "language": "en",
+        "value": "Address is required"
+      },
+      {
+        "language": "ru",
+        "value": "Адрес обязателен"
+      },
+      {
+        "language": "kk",
+        "value": "Мекенжай қажет"
+      }
+    ]
+  },
+  {
+    "id": "70",
+    "message": [
+      {
+        "language": "main",
+        "value": "Legal ID format is invalid"
+      },
+      {
+        "language": "en",
+        "value": "Legal ID format is invalid"
+      },
+      {
+        "language": "ru",
+        "value": "Неверный формат юридического ID"
+      },
+      {
+        "language": "kk",
+        "value": "Заңды ID пішімі қате"
+      }
+    ]
+  },
+  {
+    "id": "71",
+    "message": [
+      {
+        "language": "main",
+        "value": "Parent store can be selected as active"
+      },
+      {
+        "language": "en",
+        "value": "Parent store can be selected as active"
+      },
+      {
+        "language": "ru",
+        "value": "Головной магазин можно выбрать активным"
+      },
+      {
+        "language": "kk",
+        "value": "Негізгі дүкенді белсенді етіп таңдауға болады"
+      }
+    ]
+  },
+  {
+    "id": "72",
+    "message": [
+      {
+        "language": "main",
+        "value": "Branch saved"
+      },
+      {
+        "language": "en",
+        "value": "Branch saved"
+      },
+      {
+        "language": "ru",
+        "value": "Филиал сохранён"
+      },
+      {
+        "language": "kk",
+        "value": "Филиал сақталды"
+      }
+    ]
+  },
+  {
+    "id": "73",
+    "message": [
+      {
+        "language": "main",
+        "value": "Branch stock availability loaded"
+      },
+      {
+        "language": "en",
+        "value": "Branch stock availability loaded"
+      },
+      {
+        "language": "ru",
+        "value": "Остатки по филиалам загружены"
+      },
+      {
+        "language": "kk",
+        "value": "Филиалдар бойынша қор жүктелді"
+      }
+    ]
+  },
+  {
+    "id": "74",
+    "message": [
+      {
+        "language": "main",
+        "value": "Stock batch moved"
+      },
+      {
+        "language": "en",
+        "value": "Stock batch moved"
+      },
+      {
+        "language": "ru",
+        "value": "Партия перемещена"
+      },
+      {
+        "language": "kk",
+        "value": "Партия жылжытылды"
+      }
+    ]
+  },
+  {
+    "id": "75",
+    "message": [
+      {
+        "language": "main",
+        "value": "Batch cannot be moved. Check source, destination and quantity."
+      },
+      {
+        "language": "en",
+        "value": "Batch cannot be moved. Check source, destination and quantity."
+      },
+      {
+        "language": "ru",
+        "value": "Партию нельзя переместить. Проверьте источник, назначение и количество."
+      },
+      {
+        "language": "kk",
+        "value": "Партияны жылжыту мүмкін емес. Бастапқы орынды, баратын орынды және санын тексеріңіз."
+      }
+    ]
+  },
+  {
+    "id": "76",
+    "message": [
+      {
+        "language": "main",
+        "value": "Source and destination must belong to the same store entity"
+      },
+      {
+        "language": "en",
+        "value": "Source and destination must belong to the same store entity"
+      },
+      {
+        "language": "ru",
+        "value": "Источник и назначение должны относиться к одной торговой сети"
+      },
+      {
+        "language": "kk",
+        "value": "Бастапқы және баратын орын бір дүкен құрылымына жатуы керек"
+      }
+    ]
+  },
+  {
+    "id": "77",
+    "message": [
+      {
+        "language": "main",
+        "value": "Finance dashboard loaded"
+      },
+      {
+        "language": "en",
+        "value": "Finance dashboard loaded"
+      },
+      {
+        "language": "ru",
+        "value": "Финансы загружены"
+      },
+      {
+        "language": "kk",
+        "value": "Қаржы жүктелді"
+      }
+    ]
+  },
+  {
+    "id": "78",
+    "message": [
+      {
+        "language": "main",
+        "value": "Top-up invoice created"
+      },
+      {
+        "language": "en",
+        "value": "Top-up invoice created"
+      },
+      {
+        "language": "ru",
+        "value": "Счёт на пополнение создан"
+      },
+      {
+        "language": "kk",
+        "value": "Толтыру шоты жасалды"
+      }
+    ]
+  },
+  {
+    "id": "79",
+    "message": [
+      {
+        "language": "main",
+        "value": "Balance topped up"
+      },
+      {
+        "language": "en",
+        "value": "Balance topped up"
+      },
+      {
+        "language": "ru",
+        "value": "Баланс пополнен"
+      },
+      {
+        "language": "kk",
+        "value": "Баланс толтырылды"
+      }
+    ]
+  },
+  {
+    "id": "80",
+    "message": [
+      {
+        "language": "main",
+        "value": "Subscription plans loaded"
+      },
+      {
+        "language": "en",
+        "value": "Subscription plans loaded"
+      },
+      {
+        "language": "ru",
+        "value": "Планы подписки загружены"
+      },
+      {
+        "language": "kk",
+        "value": "Жазылым жоспарлары жүктелді"
+      }
+    ]
+  },
+  {
+    "id": "81",
+    "message": [
+      {
+        "language": "main",
+        "value": "Store subscription loaded"
+      },
+      {
+        "language": "en",
+        "value": "Store subscription loaded"
+      },
+      {
+        "language": "ru",
+        "value": "Подписка магазина загружена"
+      },
+      {
+        "language": "kk",
+        "value": "Дүкен жазылымы жүктелді"
+      }
+    ]
+  },
+  {
+    "id": "82",
+    "message": [
+      {
+        "language": "main",
+        "value": "Subscription updated"
+      },
+      {
+        "language": "en",
+        "value": "Subscription updated"
+      },
+      {
+        "language": "ru",
+        "value": "Подписка обновлена"
+      },
+      {
+        "language": "kk",
+        "value": "Жазылым жаңартылды"
+      }
+    ]
+  },
+  {
+    "id": "83",
+    "message": [
+      {
+        "language": "main",
+        "value": "Supplier added"
+      },
+      {
+        "language": "en",
+        "value": "Supplier added"
+      },
+      {
+        "language": "ru",
+        "value": "Поставщик добавлен"
+      },
+      {
+        "language": "kk",
+        "value": "Жеткізуші қосылды"
+      }
+    ]
+  },
+  {
+    "id": "84",
+    "message": [
+      {
+        "language": "main",
+        "value": "Supplier updated"
+      },
+      {
+        "language": "en",
+        "value": "Supplier updated"
+      },
+      {
+        "language": "ru",
+        "value": "Поставщик обновлён"
+      },
+      {
+        "language": "kk",
+        "value": "Жеткізуші жаңартылды"
+      }
+    ]
+  },
+  {
+    "id": "85",
+    "message": [
+      {
+        "language": "main",
+        "value": "Supplier deleted"
+      },
+      {
+        "language": "en",
+        "value": "Supplier deleted"
+      },
+      {
+        "language": "ru",
+        "value": "Поставщик удалён"
+      },
+      {
+        "language": "kk",
+        "value": "Жеткізуші жойылды"
+      }
+    ]
+  },
+  {
+    "id": "86",
+    "message": [
+      {
+        "language": "main",
+        "value": "Current workshift loaded"
+      },
+      {
+        "language": "en",
+        "value": "Current workshift loaded"
+      },
+      {
+        "language": "ru",
+        "value": "Текущая смена загружена"
+      },
+      {
+        "language": "kk",
+        "value": "Ағымдағы ауысым жүктелді"
+      }
+    ]
+  },
+  {
+    "id": "87",
+    "message": [
+      {
+        "language": "main",
+        "value": "Workshift started"
+      },
+      {
+        "language": "en",
+        "value": "Workshift started"
+      },
+      {
+        "language": "ru",
+        "value": "Смена начата"
+      },
+      {
+        "language": "kk",
+        "value": "Ауысым басталды"
+      }
+    ]
+  },
+  {
+    "id": "88",
+    "message": [
+      {
+        "language": "main",
+        "value": "Workshift ended"
+      },
+      {
+        "language": "en",
+        "value": "Workshift ended"
+      },
+      {
+        "language": "ru",
+        "value": "Смена завершена"
+      },
+      {
+        "language": "kk",
+        "value": "Ауысым аяқталды"
+      }
+    ]
+  },
+  {
+    "id": "89",
+    "message": [
+      {
+        "language": "main",
+        "value": "Workshift password is not set for this worker"
+      },
+      {
+        "language": "en",
+        "value": "Workshift password is not set for this worker"
+      },
+      {
+        "language": "ru",
+        "value": "Пароль смены для этого сотрудника не задан"
+      },
+      {
+        "language": "kk",
+        "value": "Бұл қызметкер үшін ауысым құпия сөзі орнатылмаған"
+      }
+    ]
+  },
+  {
+    "id": "90",
+    "message": [
+      {
+        "language": "main",
+        "value": "Incorrect worker credentials"
+      },
+      {
+        "language": "en",
+        "value": "Incorrect worker credentials"
+      },
+      {
+        "language": "ru",
+        "value": "Неверные данные сотрудника"
+      },
+      {
+        "language": "kk",
+        "value": "Қызметкер деректері қате"
+      }
+    ]
+  },
+  {
+    "id": "91",
+    "message": [
+      {
+        "language": "main",
+        "value": "Only this worker account can start this workshift"
+      },
+      {
+        "language": "en",
+        "value": "Only this worker account can start this workshift"
+      },
+      {
+        "language": "ru",
+        "value": "Эту смену может начать только аккаунт этого сотрудника"
+      },
+      {
+        "language": "kk",
+        "value": "Бұл ауысымды тек осы қызметкер аккаунты бастай алады"
+      }
+    ]
   }
 ]

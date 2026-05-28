@@ -2,6 +2,8 @@
 package kz.aita.android
 
 import android.app.Application
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
@@ -10,6 +12,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
+import android.provider.Settings
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
@@ -547,6 +550,23 @@ class AITA : Application() {
         setStoredUserAccountDataModel = { value ->
             runBlocking {
                 setEncryptedValue("key_user_account", value?.run { jsonBase.encodeToString(this) })
+            }
+        }
+
+        setClipboardText = { text ->
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            clipboard.setPrimaryClip(ClipData.newPlainText("AITA", text))
+        }
+
+        openSystemDevicesSettings = {
+            runCatching {
+                val intent = Intent(Settings.ACTION_BLUETOOTH_SETTINGS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                startActivity(intent)
+                ReceiptPlatformActionResult(true, "Device settings opened")
+            }.getOrElse {
+                ReceiptPlatformActionResult(false, it.message ?: "Could not open device settings")
             }
         }
 

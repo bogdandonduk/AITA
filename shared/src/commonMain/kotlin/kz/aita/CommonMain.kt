@@ -14,11 +14,13 @@ import io.ktor.client.plugins.auth.*
 import io.ktor.client.plugins.auth.providers.*
 import io.ktor.client.plugins.cache.*
 import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.websocket.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.utils.io.core.*
+import io.ktor.websocket.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.flow.*
@@ -59,6 +61,325 @@ data class BatchDiscountDataModel(
     val isActive: Boolean = true
 )
 
+const val AITA_CURRENCY_PREFIX = "AITA"
+const val PAYMENT_PROVIDER_KASPI_INVOICE = "kaspi_invoice"
+const val PAYMENT_PROVIDER_MANUAL_DEVELOPMENT = "manual_development"
+const val PAYMENT_STATUS_CREATED = "created"
+const val PAYMENT_STATUS_WAITING = "waiting"
+const val PAYMENT_STATUS_PAID = "paid"
+const val PAYMENT_STATUS_CANCELLED = "cancelled"
+const val PAYMENT_STATUS_EXPIRED = "expired"
+const val WALLET_LEDGER_TOP_UP = "top_up"
+const val WALLET_LEDGER_SUBSCRIPTION_CHARGE = "subscription_charge"
+const val SUBSCRIPTION_STATUS_INACTIVE = "inactive"
+const val SUBSCRIPTION_STATUS_ACTIVE = "active"
+const val SUBSCRIPTION_STATUS_PAST_DUE = "past_due"
+const val SUBSCRIPTION_STATUS_CANCELLED = "cancelled"
+const val SUBSCRIPTION_PERIOD_MONTH = "month"
+const val SUBSCRIPTION_PERIOD_YEAR = "year"
+
+@kotlinx.serialization.Serializable
+data class PagingRequestDataModel(
+    val page: Int = 0,
+    val pageSize: Int = 40,
+    val query: String = "",
+    val sortBy: String = "",
+    val sortDirection: String = "asc"
+) {
+    fun normalized(maxPageSize: Int = 200): PagingRequestDataModel = copy(
+        page = page.coerceAtLeast(0),
+        pageSize = pageSize.coerceIn(1, maxPageSize),
+        query = query.trim(),
+        sortDirection = if (sortDirection.equals("desc", true)) "desc" else "asc"
+    )
+}
+
+@kotlinx.serialization.Serializable
+data class PagedResponseDataModel<T>(
+    val items: List<T>,
+    val page: Int,
+    val pageSize: Int,
+    val totalItems: Int,
+    val totalPages: Int,
+    val hasPreviousPage: Boolean,
+    val hasNextPage: Boolean
+)
+
+fun <T> List<T>.toPagedResponse(request: PagingRequestDataModel): PagedResponseDataModel<T> {
+    val normalized = request.normalized()
+    val total = size
+    val totalPages = if (total == 0) 0 else ((total - 1) / normalized.pageSize) + 1
+    val page = normalized.page.coerceIn(0, (totalPages - 1).coerceAtLeast(0))
+    val start = (page * normalized.pageSize).coerceAtMost(total)
+    val end = (start + normalized.pageSize).coerceAtMost(total)
+    return PagedResponseDataModel(
+        items = subList(start, end),
+        page = page,
+        pageSize = normalized.pageSize,
+        totalItems = total,
+        totalPages = totalPages,
+        hasPreviousPage = page > 0,
+        hasNextPage = page + 1 < totalPages
+    )
+}
+
+@kotlinx.serialization.Serializable
+data class PaymentProviderConfigDataModel(
+    val id: String,
+    val name: List<LocalizedStringDataModel>,
+    val countryLocales: List<String> = emptyList(),
+    val currencyCodes: List<String> = emptyList(),
+    val enabled: Boolean = true,
+    val sandbox: Boolean = true,
+    val apiKeyEnvironmentVariable: String = "",
+    val webhookSecretEnvironmentVariable: String = "",
+    val description: List<LocalizedStringDataModel> = emptyList()
+)
+
+fun defaultPaymentProviders(): List<PaymentProviderConfigDataModel> = listOf(
+    PaymentProviderConfigDataModel(
+        id = PAYMENT_PROVIDER_KASPI_INVOICE,
+        name = listOf(
+            LocalizedStringDataModel("main", "Kaspi invoice"),
+            LocalizedStringDataModel("en", "Kaspi invoice"),
+            LocalizedStringDataModel("ru", "Счёт Kaspi"),
+            LocalizedStringDataModel("kk", "Kaspi шоты")
+        ),
+        countryLocales = listOf("kz"),
+        currencyCodes = listOf("KZT"),
+        enabled = false,
+        sandbox = true,
+        apiKeyEnvironmentVariable = "AITA_KASPI_API_KEY",
+        webhookSecretEnvironmentVariable = "AITA_KASPI_WEBHOOK_SECRET",
+        description = listOf(
+            LocalizedStringDataModel("main", "Prepared integration placeholder. Real API call is disabled until merchant credentials are connected."),
+            LocalizedStringDataModel("ru", "Заготовка интеграции. Реальный вызов API отключён до подключения данных мерчанта."),
+            LocalizedStringDataModel("kk", "Интеграция дайындығы. Мерчант деректері қосылғанша нақты API шақыруы өшірулі.")
+        )
+    ),
+    PaymentProviderConfigDataModel(
+        id = PAYMENT_PROVIDER_MANUAL_DEVELOPMENT,
+        name = listOf(
+            LocalizedStringDataModel("main", "Manual development top-up"),
+            LocalizedStringDataModel("en", "Manual development top-up"),
+            LocalizedStringDataModel("ru", "Тестовое ручное пополнение"),
+            LocalizedStringDataModel("kk", "Қолмен тест толтыру")
+        ),
+        enabled = true,
+        sandbox = true
+    )
+)
+
+@kotlinx.serialization.Serializable
+data class UserWalletDataModel(
+    val id: String = "",
+    val userId: String = "",
+    val currencyCode: String = "KZT",
+    val aitaCurrencyCode: String = "AITA KZT",
+    val balanceMinor: Long = 0L,
+    val reservedMinor: Long = 0L,
+    val updatedAtMillis: Long = 0L
+) {
+    val balance: Double
+        get() = balanceMinor / 100.0
+    val reserved: Double
+        get() = reservedMinor / 100.0
+    val available: Double
+        get() = (balanceMinor - reservedMinor) / 100.0
+}
+
+@kotlinx.serialization.Serializable
+data class WalletLedgerEntryDataModel(
+    val id: String = "",
+    val userId: String = "",
+    val walletId: String = "",
+    val type: String = "",
+    val amountMinor: Long = 0L,
+    val balanceBeforeMinor: Long = 0L,
+    val balanceAfterMinor: Long = 0L,
+    val currencyCode: String = "KZT",
+    val referenceType: String = "",
+    val referenceId: String = "",
+    val note: String = "",
+    val createdAtMillis: Long = 0L
+) {
+    val amount: Double get() = amountMinor / 100.0
+    val balanceBefore: Double get() = balanceBeforeMinor / 100.0
+    val balanceAfter: Double get() = balanceAfterMinor / 100.0
+}
+
+@kotlinx.serialization.Serializable
+data class TopUpCreateRequestDataModel(
+    val amount: Double,
+    val currencyCode: String,
+    val providerId: String = PAYMENT_PROVIDER_KASPI_INVOICE,
+    val returnUrl: String = "",
+    val comment: String = ""
+)
+
+@kotlinx.serialization.Serializable
+data class TopUpConfirmDevelopmentRequestDataModel(
+    val paymentIntentId: String
+)
+
+@kotlinx.serialization.Serializable
+data class TopUpPaymentIntentDataModel(
+    val id: String = "",
+    val userId: String = "",
+    val providerId: String = "",
+    val amountMinor: Long = 0L,
+    val currencyCode: String = "KZT",
+    val aitaCurrencyCode: String = "AITA KZT",
+    val status: String = PAYMENT_STATUS_CREATED,
+    val providerInvoiceId: String = "",
+    val paymentUrl: String = "",
+    val qrPayload: String = "",
+    val createdAtMillis: Long = 0L,
+    val expiresAtMillis: Long? = null,
+    val paidAtMillis: Long? = null,
+    val metadata: Map<String, String> = emptyMap()
+) {
+    val amount: Double get() = amountMinor / 100.0
+}
+
+@kotlinx.serialization.Serializable
+data class StoreSubscriptionPlanDataModel(
+    val id: String,
+    val name: List<LocalizedStringDataModel>,
+    val description: List<LocalizedStringDataModel> = emptyList(),
+    val priceMinor: Long,
+    val currencyCode: String = "KZT",
+    val periodUnit: String = SUBSCRIPTION_PERIOD_MONTH,
+    val periodCount: Int = 1,
+    val maxBranches: Int = 1,
+    val maxWorkers: Int = 1,
+    val maxStockItems: Int = 1000,
+    val isActive: Boolean = true
+) {
+    val price: Double get() = priceMinor / 100.0
+}
+
+fun defaultStoreSubscriptionPlans(): List<StoreSubscriptionPlanDataModel> = listOf(
+    StoreSubscriptionPlanDataModel(
+        id = "starter_monthly_kzt",
+        name = listOf(
+            LocalizedStringDataModel("main", "Starter"),
+            LocalizedStringDataModel("en", "Starter"),
+            LocalizedStringDataModel("ru", "Старт"),
+            LocalizedStringDataModel("kk", "Бастау")
+        ),
+        description = listOf(
+            LocalizedStringDataModel("main", "Small store, one branch, basic analytics"),
+            LocalizedStringDataModel("ru", "Небольшой магазин, один филиал, базовая аналитика"),
+            LocalizedStringDataModel("kk", "Шағын дүкен, бір филиал, негізгі аналитика")
+        ),
+        priceMinor = 499000L,
+        maxBranches = 1,
+        maxWorkers = 3,
+        maxStockItems = 2000
+    ),
+    StoreSubscriptionPlanDataModel(
+        id = "business_monthly_kzt",
+        name = listOf(
+            LocalizedStringDataModel("main", "Business"),
+            LocalizedStringDataModel("en", "Business"),
+            LocalizedStringDataModel("ru", "Бизнес"),
+            LocalizedStringDataModel("kk", "Бизнес")
+        ),
+        description = listOf(
+            LocalizedStringDataModel("main", "Branches, workers, cash register, realtime sync"),
+            LocalizedStringDataModel("ru", "Филиалы, сотрудники, касса, онлайн-синхронизация"),
+            LocalizedStringDataModel("kk", "Филиалдар, қызметкерлер, касса, нақты уақыт синхрондауы")
+        ),
+        priceMinor = 1499000L,
+        maxBranches = 5,
+        maxWorkers = 20,
+        maxStockItems = 20000
+    ),
+    StoreSubscriptionPlanDataModel(
+        id = "business_yearly_kzt",
+        name = listOf(
+            LocalizedStringDataModel("main", "Business yearly"),
+            LocalizedStringDataModel("en", "Business yearly"),
+            LocalizedStringDataModel("ru", "Бизнес на год"),
+            LocalizedStringDataModel("kk", "Жылдық бизнес")
+        ),
+        description = listOf(
+            LocalizedStringDataModel("main", "Twelve months for the price of ten"),
+            LocalizedStringDataModel("ru", "Двенадцать месяцев по цене десяти"),
+            LocalizedStringDataModel("kk", "Он ай бағасына он екі ай")
+        ),
+        priceMinor = 14990000L,
+        periodUnit = SUBSCRIPTION_PERIOD_YEAR,
+        maxBranches = 5,
+        maxWorkers = 20,
+        maxStockItems = 20000
+    )
+)
+
+@kotlinx.serialization.Serializable
+data class StoreSubscriptionStateDataModel(
+    val id: String = "",
+    val storeId: String = "",
+    val ownerUserId: String = "",
+    val planId: String = "",
+    val status: String = SUBSCRIPTION_STATUS_INACTIVE,
+    val autoRenew: Boolean = false,
+    val startedAtMillis: Long? = null,
+    val currentPeriodStartMillis: Long? = null,
+    val currentPeriodEndMillis: Long? = null,
+    val nextChargeAtMillis: Long? = null,
+    val cancelledAtMillis: Long? = null,
+    val pastDueSinceMillis: Long? = null,
+    val updatedAtMillis: Long = 0L
+)
+
+@kotlinx.serialization.Serializable
+data class StoreSubscriptionChargeDataModel(
+    val id: String = "",
+    val storeId: String = "",
+    val userId: String = "",
+    val planId: String = "",
+    val amountMinor: Long = 0L,
+    val currencyCode: String = "KZT",
+    val periodStartMillis: Long = 0L,
+    val periodEndMillis: Long = 0L,
+    val status: String = "created",
+    val walletLedgerEntryId: String = "",
+    val createdAtMillis: Long = 0L,
+    val note: String = ""
+) {
+    val amount: Double get() = amountMinor / 100.0
+}
+
+@kotlinx.serialization.Serializable
+data class StoreSubscriptionUpdateRequestDataModel(
+    val storeId: String,
+    val planId: String,
+    val autoRenew: Boolean = true,
+    val activateNow: Boolean = true
+)
+
+@kotlinx.serialization.Serializable
+data class SubscriptionDashboardDataModel(
+    val subscription: StoreSubscriptionStateDataModel,
+    val charges: List<StoreSubscriptionChargeDataModel>,
+    val plans: List<StoreSubscriptionPlanDataModel>
+)
+
+@kotlinx.serialization.Serializable
+data class UserFinanceDashboardDataModel(
+    val wallet: UserWalletDataModel,
+    val ledger: List<WalletLedgerEntryDataModel> = emptyList(),
+    val paymentIntents: List<TopUpPaymentIntentDataModel> = emptyList(),
+    val paymentProviders: List<PaymentProviderConfigDataModel> = emptyList(),
+    val subscriptionPlans: List<StoreSubscriptionPlanDataModel> = emptyList()
+)
+
+fun Double.toMinorCurrencyUnits(): Long = kotlin.math.round(this * 100.0).toLong()
+fun Long.fromMinorCurrencyUnits(): Double = this / 100.0
+fun String.aitaCurrencyCode(): String = "$AITA_CURRENCY_PREFIX ${uppercase()}"
+
 @kotlinx.serialization.Serializable
 enum class StockBatchStatusDataModel {
     Ordered,
@@ -86,6 +407,21 @@ val transactionsState = MutableDataStateFlow<List<TransactionDataModel>>(GlobalS
 
 
 val debtorsState = MutableDataStateFlow<List<DebtorDataModel>>(GlobalScope)
+
+val userFinanceDashboardState = MutableDataStateFlow<UserFinanceDashboardDataModel>(GlobalScope)
+val userWalletState = MutableDataStateFlow<UserWalletDataModel>(GlobalScope)
+val userWalletLedgerState = MutableDataStateFlow<List<WalletLedgerEntryDataModel>>(GlobalScope)
+val paymentIntentsState = MutableDataStateFlow<List<TopUpPaymentIntentDataModel>>(GlobalScope)
+val subscriptionPlansState = MutableDataStateFlow<List<StoreSubscriptionPlanDataModel>>(GlobalScope)
+val activeStoreSubscriptionState = MutableDataStateFlow<StoreSubscriptionStateDataModel>(GlobalScope)
+val activeStoreSubscriptionChargesState = MutableDataStateFlow<List<StoreSubscriptionChargeDataModel>>(GlobalScope)
+
+private val getUserFinanceDashboardMutex = Mutex()
+private val createTopUpPaymentMutex = Mutex()
+private val confirmDevelopmentTopUpMutex = Mutex()
+private val getSubscriptionPlansMutex = Mutex()
+private val getStoreSubscriptionMutex = Mutex()
+private val updateStoreSubscriptionMutex = Mutex()
 
 private val getDebtorsMutex = Mutex()
 private val addDebtorMutex = Mutex()
@@ -690,6 +1026,30 @@ fun clearTransactionPaymentDraft(transactionTypeIndex: Int, clientId: Int) {
     }
 }
 
+private val transactionSupplySupplierIdsState = MutableStateFlow<Map<String, String>>(emptyMap())
+
+fun getTransactionSupplySupplierIdsState(): StateFlow<Map<String, String>> = transactionSupplySupplierIdsState.asStateFlow()
+
+fun transactionSupplySupplierKey(transactionTypeIndex: Int, clientId: Int): String = "$transactionTypeIndex:$clientId"
+
+fun currentTransactionSupplySupplierId(transactionTypeIndex: Int, clientId: Int): String? =
+    transactionSupplySupplierIdsState.value[transactionSupplySupplierKey(transactionTypeIndex, clientId)]
+
+fun setTransactionSupplySupplierId(transactionTypeIndex: Int, clientId: Int, supplierId: String?) {
+    GlobalScope.launch {
+        val key = transactionSupplySupplierKey(transactionTypeIndex, clientId)
+        transactionSupplySupplierIdsState.emit(
+            transactionSupplySupplierIdsState.value.toMutableMap().apply {
+                if (supplierId.isNullOrBlank()) remove(key) else put(key, supplierId)
+            }
+        )
+    }
+}
+
+fun clearTransactionSupplySupplierId(transactionTypeIndex: Int, clientId: Int) {
+    setTransactionSupplySupplierId(transactionTypeIndex, clientId, null)
+}
+
 fun transactionServerType(transactionTypeIndex: Int): String {
     return when (transactionTypeIndex) {
         0 -> "purchase"
@@ -1096,6 +1456,704 @@ fun getTransactions(storeId: String) {
         }
 }
 
+fun getUserFinanceDashboard(
+    onCompleted: ((DataState<UserFinanceDashboardDataModel>) -> Unit)? = null
+) {
+    if (!getUserFinanceDashboardMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getUserFinanceDashboardMutex.withLock {
+                val response = networkRequest<UserFinanceDashboardDataModel, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getUserFinanceDashboardPath.first
+                )
+
+                if (response.negative || response.payload == null) {
+                    if (!response.transportFailure) postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    applyUserFinanceDashboard(response.payload, response.message)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+private suspend fun applyUserFinanceDashboard(
+    payload: UserFinanceDashboardDataModel,
+    message: List<LocalizedStringDataModel>? = null
+) {
+    userFinanceDashboardState.emit(DataState.Success(payload, message))
+    userWalletState.emit(DataState.Success(payload.wallet, message))
+    userWalletLedgerState.emit(DataState.Success(payload.ledger, message))
+    paymentIntentsState.emit(DataState.Success(payload.paymentIntents, message))
+    subscriptionPlansState.emit(DataState.Success(payload.subscriptionPlans, message))
+}
+
+fun createTopUpPayment(
+    request: TopUpCreateRequestDataModel,
+    onCompleted: ((DataState<TopUpPaymentIntentDataModel>) -> Unit)? = null
+) {
+    if (!createTopUpPaymentMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            createTopUpPaymentMutex.withLock {
+                val response = networkRequest<TopUpPaymentIntentDataModel, TopUpCreateRequestDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.createTopUpPaymentPath.first,
+                    body = request
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    paymentIntentsState.emit(
+                        DataState.Success(
+                            paymentIntentsState.payloadValue.orEmpty().upsertById(response.payload) { it.id },
+                            response.message
+                        )
+                    )
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun confirmDevelopmentTopUpPayment(
+    paymentIntentId: String,
+    onCompleted: ((DataState<UserFinanceDashboardDataModel>) -> Unit)? = null
+) {
+    if (!confirmDevelopmentTopUpMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            confirmDevelopmentTopUpMutex.withLock {
+                val response = networkRequest<UserFinanceDashboardDataModel, TopUpConfirmDevelopmentRequestDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.confirmDevelopmentTopUpPath.first,
+                    body = TopUpConfirmDevelopmentRequestDataModel(paymentIntentId)
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    applyUserFinanceDashboard(response.payload, response.message)
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun getSubscriptionPlans(
+    onCompleted: ((DataState<List<StoreSubscriptionPlanDataModel>>) -> Unit)? = null
+) {
+    if (!getSubscriptionPlansMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getSubscriptionPlansMutex.withLock {
+                val response = networkRequest<List<StoreSubscriptionPlanDataModel>, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getSubscriptionPlansPath.first
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    subscriptionPlansState.emit(DataState.Success(response.payload, response.message))
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun getStoreSubscription(
+    storeId: String,
+    onCompleted: ((DataState<SubscriptionDashboardDataModel>) -> Unit)? = null
+) {
+    if (!getStoreSubscriptionMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getStoreSubscriptionMutex.withLock {
+                val response = networkRequest<SubscriptionDashboardDataModel, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getStoreSubscriptionPath.first,
+                    headers = mapOf("store_id" to storeId)
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    activeStoreSubscriptionState.emit(DataState.Success(response.payload.subscription, response.message))
+                    activeStoreSubscriptionChargesState.emit(DataState.Success(response.payload.charges, response.message))
+                    subscriptionPlansState.emit(DataState.Success(response.payload.plans, response.message))
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun updateStoreSubscription(
+    request: StoreSubscriptionUpdateRequestDataModel,
+    onCompleted: ((DataState<SubscriptionDashboardDataModel>) -> Unit)? = null
+) {
+    if (!updateStoreSubscriptionMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            updateStoreSubscriptionMutex.withLock {
+                val response = networkRequest<SubscriptionDashboardDataModel, StoreSubscriptionUpdateRequestDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.updateStoreSubscriptionPath.first,
+                    body = request,
+                    headers = mapOf("store_id" to request.storeId)
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    activeStoreSubscriptionState.emit(DataState.Success(response.payload.subscription, response.message))
+                    activeStoreSubscriptionChargesState.emit(DataState.Success(response.payload.charges, response.message))
+                    subscriptionPlansState.emit(DataState.Success(response.payload.plans, response.message))
+                    getUserFinanceDashboard()
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+private suspend fun applyCashRegisterStatePayload(
+    payload: CashRegisterStateDataModel,
+    message: List<LocalizedStringDataModel>? = null
+) {
+    cashRegisterState.emit(DataState.Success(payload.register, message))
+    cashRegisterEventsState.emit(DataState.Success(payload.events, message))
+    cashRegisterAmountState.emit(payload.register.currentAmount)
+    cashRegisterExtractionsState.emit(
+        DataState.Success(
+            payload.events
+                .filter { it.type == CASH_REGISTER_EVENT_EXTRACTION }
+                .map { it.toExtractionEntry() },
+            message
+        )
+    )
+}
+
+fun getCashRegister(
+    storeId: String,
+    onCompleted: ((DataState<StoreCashRegisterDataModel>) -> Unit)? = null
+) {
+    if (!getCashRegisterMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getCashRegisterMutex.withLock {
+                val response = networkRequest<CashRegisterStateDataModel, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getCashRegisterPath.first,
+                    headers = mapOf("store_id" to storeId)
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    applyCashRegisterStatePayload(response.payload, response.message)
+                    onCompleted?.invoke(DataState.Success(response.payload.register, response.message))
+                }
+            }
+        }
+}
+
+fun extractCashRegister(
+    request: CashRegisterExtractionRequestDataModel,
+    onCompleted: ((DataState<StoreCashRegisterDataModel>) -> Unit)? = null
+) {
+    if (!extractCashRegisterMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            extractCashRegisterMutex.withLock {
+                val response = networkRequest<CashRegisterStateDataModel, CashRegisterExtractionRequestDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.extractCashRegisterPath.first,
+                    body = request,
+                    headers = mapOf("store_id" to request.storeId)
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    applyCashRegisterStatePayload(response.payload, response.message)
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload.register, response.message))
+                }
+            }
+        }
+}
+
+fun getStoreWorkers(
+    storeId: String,
+    onCompleted: ((DataState<List<StoreWorkerDataModel>>) -> Unit)? = null
+) {
+    if (!getStoreWorkersMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getStoreWorkersMutex.withLock {
+                val response = networkRequest<List<StoreWorkerDataModel>, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getStoreWorkersPath.first,
+                    headers = mapOf("store_id" to storeId)
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    storeWorkerMembershipsState.emit(DataState.Success(response.payload, response.message))
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun getMyWorkerMemberships(
+    onCompleted: ((DataState<List<StoreWorkerDataModel>>) -> Unit)? = null
+) {
+    if (!getMyWorkerMembershipsMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getMyWorkerMembershipsMutex.withLock {
+                val response = networkRequest<List<StoreWorkerDataModel>, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getMyWorkerMembershipsPath.first
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    myWorkerMembershipsState.emit(DataState.Success(response.payload, response.message))
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun getIncomingWorkerRequests(
+    storeId: String,
+    onCompleted: ((DataState<List<StoreWorkerRequestDataModel>>) -> Unit)? = null
+) {
+    if (!getIncomingWorkerRequestsMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getIncomingWorkerRequestsMutex.withLock {
+                val response = networkRequest<List<StoreWorkerRequestDataModel>, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getIncomingWorkerRequestsPath.first,
+                    headers = mapOf("store_id" to storeId)
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    incomingWorkerRequestsState.emit(DataState.Success(response.payload, response.message))
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun getMyWorkerRequests(
+    onCompleted: ((DataState<List<StoreWorkerRequestDataModel>>) -> Unit)? = null
+) {
+    if (!getMyWorkerRequestsMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getMyWorkerRequestsMutex.withLock {
+                val response = networkRequest<List<StoreWorkerRequestDataModel>, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getMyWorkerRequestsPath.first
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    myWorkerRequestsState.emit(DataState.Success(response.payload, response.message))
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun requestStoreEmployment(
+    storeId: String,
+    onCompleted: ((DataState<StoreWorkerRequestDataModel>) -> Unit)? = null
+) {
+    if (!requestStoreEmploymentMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            requestStoreEmploymentMutex.withLock {
+                val response = networkRequest<StoreWorkerRequestDataModel, WorkerEmploymentRequestCreateDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.requestStoreEmploymentPath.first,
+                    body = WorkerEmploymentRequestCreateDataModel(storeId.trim())
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    myWorkerRequestsState.emit(
+                        DataState.Success(
+                            myWorkerRequestsState.payloadValue.orEmpty().filterNot { it.id == response.payload.id } + response.payload,
+                            response.message
+                        )
+                    )
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun inviteStoreWorker(
+    storeId: String,
+    userId: String,
+    roleId: String,
+    permissions: List<String>,
+    note: String? = null,
+    workerPassword: String? = null,
+    onCompleted: ((DataState<StoreWorkerRequestDataModel>) -> Unit)? = null
+) {
+    if (!inviteStoreWorkerMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            inviteStoreWorkerMutex.withLock {
+                val response = networkRequest<StoreWorkerRequestDataModel, WorkerStoreInviteCreateDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.inviteStoreWorkerPath.first,
+                    body = WorkerStoreInviteCreateDataModel(userId.trim(), roleId, permissions, note, workerPassword?.takeIf { it.isNotBlank() }),
+                    headers = mapOf("store_id" to storeId)
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    incomingWorkerRequestsState.emit(
+                        DataState.Success(
+                            incomingWorkerRequestsState.payloadValue.orEmpty().filterNot { it.id == response.payload.id } + response.payload,
+                            response.message
+                        )
+                    )
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun acceptMyStoreWorkerInvitation(
+    requestId: String,
+    note: String? = null,
+    onCompleted: ((DataState<StoreWorkerDataModel>) -> Unit)? = null
+) {
+    if (!decideStoreEmploymentMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            decideStoreEmploymentMutex.withLock {
+                val response = networkRequest<StoreWorkerDataModel, WorkerStoreInvitationDecisionDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.acceptStoreWorkerInvitationPath.first,
+                    body = WorkerStoreInvitationDecisionDataModel(requestId, note)
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    myWorkerMembershipsState.emit(
+                        DataState.Success(
+                            myWorkerMembershipsState.payloadValue.orEmpty().filterNot { it.id == response.payload.id } + response.payload,
+                            response.message
+                        )
+                    )
+                    getMyWorkerRequests()
+                    getStores()
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun declineMyStoreWorkerInvitation(
+    requestId: String,
+    note: String? = null,
+    onCompleted: ((DataState<StoreWorkerRequestDataModel>) -> Unit)? = null
+) {
+    if (!decideStoreEmploymentMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            decideStoreEmploymentMutex.withLock {
+                val response = networkRequest<StoreWorkerRequestDataModel, WorkerStoreInvitationDecisionDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.declineStoreWorkerInvitationPath.first,
+                    body = WorkerStoreInvitationDecisionDataModel(requestId, note)
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    getMyWorkerRequests()
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun acceptStoreEmploymentRequest(
+    storeId: String,
+    requestId: String,
+    roleId: String,
+    permissions: List<String>,
+    note: String? = null,
+    workerPassword: String? = null,
+    onCompleted: ((DataState<StoreWorkerDataModel>) -> Unit)? = null
+) {
+    if (!decideStoreEmploymentMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            decideStoreEmploymentMutex.withLock {
+                val response = networkRequest<StoreWorkerDataModel, WorkerEmploymentDecisionRequestDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.acceptStoreEmploymentPath.first,
+                    body = WorkerEmploymentDecisionRequestDataModel(requestId, roleId, permissions, note, workerPassword?.takeIf { it.isNotBlank() }),
+                    headers = mapOf("store_id" to storeId)
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    storeWorkerMembershipsState.emit(
+                        DataState.Success(
+                            storeWorkerMembershipsState.payloadValue.orEmpty().filterNot { it.id == response.payload.id } + response.payload,
+                            response.message
+                        )
+                    )
+                    getIncomingWorkerRequests(storeId)
+                    getStores()
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun declineStoreEmploymentRequest(
+    storeId: String,
+    requestId: String,
+    note: String? = null,
+    onCompleted: ((DataState<StoreWorkerRequestDataModel>) -> Unit)? = null
+) {
+    if (!decideStoreEmploymentMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            decideStoreEmploymentMutex.withLock {
+                val response = networkRequest<StoreWorkerRequestDataModel, WorkerEmploymentDecisionRequestDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.declineStoreEmploymentPath.first,
+                    body = WorkerEmploymentDecisionRequestDataModel(requestId, WORKER_ROLE_STANDARD, emptyList(), note, null),
+                    headers = mapOf("store_id" to storeId)
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    getIncomingWorkerRequests(storeId)
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun updateStoreWorkerPermissions(
+    storeId: String,
+    workerId: String,
+    roleId: String,
+    permissions: List<String>,
+    workerPassword: String? = null,
+    onCompleted: ((DataState<StoreWorkerDataModel>) -> Unit)? = null
+) {
+    if (!updateStoreWorkerPermissionsMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            updateStoreWorkerPermissionsMutex.withLock {
+                val response = networkRequest<StoreWorkerDataModel, WorkerPermissionsUpdateRequestDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.updateStoreWorkerPermissionsPath.first,
+                    body = WorkerPermissionsUpdateRequestDataModel(workerId, roleId, permissions, workerPassword?.takeIf { it.isNotBlank() }),
+                    headers = mapOf("store_id" to storeId)
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    storeWorkerMembershipsState.emit(
+                        DataState.Success(
+                            storeWorkerMembershipsState.payloadValue.orEmpty().filterNot { it.id == response.payload.id } + response.payload,
+                            response.message
+                        )
+                    )
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+
+fun currentUserOwnsStore(storeId: String?): Boolean {
+    val cleanStoreId = storeId?.takeIf { it.isNotBlank() } ?: return false
+    val currentUserId = userAccountState.payloadValue?.id.orEmpty()
+    if (currentUserId.isBlank()) return false
+    val stores = storesState.payloadValue.orEmpty()
+    val store = stores.findStoreOrBranch(cleanStoreId) ?: return false
+    val rootStore = store.parentStoreId?.let { parentId -> stores.findStoreOrBranch(parentId) } ?: store
+    return rootStore.userIds.contains(currentUserId)
+}
+
+fun activeStoreWorkerMembership(): StoreWorkerDataModel? {
+    val activeStoreId = activeStoreIdState.value ?: return null
+    val currentUserId = userAccountState.payloadValue?.id.orEmpty()
+    if (currentUserId.isBlank()) return null
+    val stores = storesState.payloadValue.orEmpty()
+    val rootStoreId = stores.findStoreOrBranch(activeStoreId)?.parentStoreId ?: activeStoreId
+    return myWorkerMembershipsState.payloadValue.orEmpty().firstOrNull {
+        it.userId == currentUserId && it.isActive && (it.storeId == activeStoreId || it.storeId == rootStoreId)
+    }
+}
+
+fun activeStoreRequiresWorkshift(): Boolean {
+    val activeStoreId = activeStoreIdState.value ?: return false
+    if (currentUserOwnsStore(activeStoreId)) return false
+    return activeStoreWorkerMembership() != null
+}
+
+fun hasActiveWorkshiftForActiveStore(): Boolean {
+    val activeStoreId = activeStoreIdState.value ?: return false
+    val workshift = activeWorkshiftState.payloadValue ?: return false
+    return workshift.isActive && workshift.endedAtMillis == null && workshift.storeId == activeStoreId
+}
+
+fun shouldBlockAppForWorkshift(): Boolean {
+    return userAccountState.payloadValue != null && activeStoreRequiresWorkshift() && !hasActiveWorkshiftForActiveStore()
+}
+
+fun getCurrentWorkshift(
+    storeId: String? = activeStoreIdState.value,
+    onCompleted: ((DataState<WorkshiftDataModel>) -> Unit)? = null
+) {
+    val id = storeId?.takeIf { it.isNotBlank() } ?: return
+    if (!getCurrentWorkshiftMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getCurrentWorkshiftMutex.withLock {
+                val response = networkRequest<WorkshiftDataModel, Unit>(
+                    endpointUrl = globalAppConfigurationState.payloadValue.getCurrentWorkshiftPath.first,
+                    method = HttpMethod.Get,
+                    headers = mapOf("store_id" to id)
+                )
+
+                if (response.negative || response.payload == null) {
+                    activeWorkshiftState.emit(DataState.Empty(response.message))
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    activeWorkshiftState.emit(DataState.Success(response.payload, response.message))
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun startWorkshift(
+    storeId: String,
+    workerIdentifier: String,
+    password: String,
+    onCompleted: ((DataState<WorkshiftDataModel>) -> Unit)? = null
+) {
+    if (!startWorkshiftMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            startWorkshiftMutex.withLock {
+                workshiftLoginInProgressState.emit(true)
+                try {
+                    val response = networkRequest<WorkshiftDataModel, WorkshiftStartRequestDataModel>(
+                        method = HttpMethod.Post,
+                        endpointUrl = globalAppConfigurationState.payloadValue.startWorkshiftPath.first,
+                        body = WorkshiftStartRequestDataModel(workerIdentifier.trim(), password),
+                        headers = mapOf("store_id" to storeId)
+                    )
+
+                    if (response.negative || response.payload == null) {
+                        postInAppNotification(response.message, NotificationType.Negative)
+                        activeWorkshiftState.emit(DataState.Empty(response.message))
+                        onCompleted?.invoke(DataState.Empty(response.message))
+                    } else {
+                        activeWorkshiftState.emit(DataState.Success(response.payload, response.message))
+                        postInAppNotification(response.message, NotificationType.Positive)
+                        onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                    }
+                } finally {
+                    workshiftLoginInProgressState.emit(false)
+                }
+            }
+        }
+}
+
+fun endCurrentWorkshift(
+    storeId: String? = activeStoreIdState.value,
+    onCompleted: ((DataState<WorkshiftDataModel>) -> Unit)? = null
+) {
+    val id = storeId?.takeIf { it.isNotBlank() } ?: return
+    if (!endWorkshiftMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            endWorkshiftMutex.withLock {
+                val response = networkRequest<WorkshiftDataModel, Unit>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.endWorkshiftPath.first,
+                    headers = mapOf("store_id" to id)
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    activeWorkshiftState.emit(DataState.Empty(response.message))
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun currentUserStorePermissions(storeId: String?): Set<String> {
+    val cleanStoreId = storeId?.takeIf { it.isNotBlank() } ?: return emptySet()
+    val currentUserId = userAccountState.payloadValue?.id.orEmpty()
+    if (currentUserId.isBlank()) return emptySet()
+
+    val stores = storesState.payloadValue.orEmpty()
+    val cleanRootStoreId = stores.findStoreOrBranch(cleanStoreId)?.parentStoreId ?: cleanStoreId
+
+    if (currentUserOwnsStore(cleanStoreId)) return ALL_STORE_PERMISSION_IDS.toSet()
+
+    return myWorkerMembershipsState.payloadValue.orEmpty()
+        .find { it.userId == currentUserId && it.isActive && (it.storeId == cleanStoreId || it.storeId == cleanRootStoreId) }
+        ?.permissions
+        ?.toSet()
+        .orEmpty()
+}
+
+fun currentUserHasStorePermission(storeId: String?, permission: String): Boolean {
+    return permission in currentUserStorePermissions(storeId)
+}
+
+fun currentUserCanExtractCashRegister(storeId: String?): Boolean {
+    return currentUserHasStorePermission(storeId, STORE_PERMISSION_CASH_REGISTER_EXTRACT)
+}
+
 fun completeTransaction(
     transaction: TransactionDataModel,
     transactionTypeIndex: Int,
@@ -1160,6 +2218,8 @@ fun completeTransaction(
                 activeStoreIdState.value?.let {
                     getStock(it)
                     getStockBatches(it)
+                    getTransactions(it)
+                    getCashRegister(it)
                 }
 
                 postInAppNotification(response.message, NotificationType.Positive)
@@ -1184,6 +2244,71 @@ expect var getSystemLocaleLanguage: () -> String
 expect var getPlatformName: () -> String
 
 var getClientDeviceInfo: (() -> ClientDeviceInfoDataModel?)? = null
+
+var setClipboardText: ((String) -> Unit)? = null
+
+var openSystemDevicesSettings: (suspend () -> ReceiptPlatformActionResult)? = null
+
+fun openPlatformDevicesSettings() {
+    GlobalScope.launch(Dispatchers.ourIo) {
+        val result = runCatching {
+            openSystemDevicesSettings?.invoke()
+                ?: ReceiptPlatformActionResult(false, "Device settings are not configured on this platform")
+        }.getOrElse {
+            ReceiptPlatformActionResult(false, it.message ?: "Could not open device settings")
+        }
+
+        val successMessage = listOf(
+            LocalizedStringDataModel("main", "Device settings opened"),
+            LocalizedStringDataModel("en", "Device settings opened"),
+            LocalizedStringDataModel("ru", "Настройки устройств открыты"),
+            LocalizedStringDataModel("kk", "Құрылғы баптаулары ашылды")
+        ).extractLocalizedString(appLanguageState.value) ?: "Device settings opened"
+
+        val errorMessage = listOf(
+            LocalizedStringDataModel("main", "Could not open device settings"),
+            LocalizedStringDataModel("en", "Could not open device settings"),
+            LocalizedStringDataModel("ru", "Не удалось открыть настройки устройств"),
+            LocalizedStringDataModel("kk", "Құрылғы баптауларын ашу мүмкін болмады")
+        ).extractLocalizedString(appLanguageState.value) ?: "Could not open device settings"
+
+        postInAppNotification(
+            message = if (result.success) successMessage else errorMessage,
+            type = if (result.success) NotificationType.Positive else NotificationType.Negative,
+            transient = true
+        )
+    }
+}
+
+fun copyTextToClipboard(text: String, label: String = "AITA") {
+    if (text.isBlank()) return
+
+    runCatching { setClipboardText?.invoke(text) }
+        .onSuccess {
+            postInAppNotification(
+                localizedStringResourceMessage(
+                    id = 501,
+                    main = "Copied to clipboard",
+                    ru = "Скопировано в буфер обмена",
+                    kk = "Алмасу буферіне көшірілді"
+                ),
+                NotificationType.Positive,
+                transient = true
+            )
+        }
+        .onFailure { throwable ->
+            postInAppNotification(
+                listOf(
+                    LocalizedStringDataModel("main", throwable.message ?: "Could not copy"),
+                    LocalizedStringDataModel("en", throwable.message ?: "Could not copy"),
+                    LocalizedStringDataModel("ru", "Не удалось скопировать"),
+                    LocalizedStringDataModel("kk", "Көшіру мүмкін болмады")
+                ),
+                NotificationType.Negative,
+                transient = true
+            )
+        }
+}
 
 expect var getSqlDelightDriver: (() -> SqlDriver?)?
 
@@ -1349,6 +2474,7 @@ private fun <T> List<T>.upsertById(
             is SupplierOrderLineDataModel -> it.id
             is GoodsBatchDataModel -> it.id
             is GoodsItemDataModel -> it.id
+            is TopUpPaymentIntentDataModel -> it.id
             else -> ""
         }
     }
@@ -1380,7 +2506,7 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
     initial = GlobalAppConfigurationDataModel(
         realtimeUpdatesPath = "rt/updates",
         appName = Pair("AITA", "0"),
-        serverUrl = Pair("http://10.202.10.165:8080", "1"),
+        serverUrl = Pair("http://10.168.22.26", "1"),
         globalAppConfigurationPath = Pair("config/global", "2"),
         logInPath = Pair("auth/logIn", "3"),
         signUpPath = Pair("auth/signUp", "4"),
@@ -1403,9 +2529,14 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
         addStockBatchPath = Pair("stockBatches/add", "18"),
         updateStockBatchPath = Pair("stockBatches/update", "19"),
         deleteStockBatchPath = Pair("stockBatches/delete", "20"),
+        getStockItemBranchAvailabilityPath = Pair("stockBatches/branchAvailability", "73"),
+        moveStockBatchPath = Pair("stockBatches/move", "74"),
         getGenericGoodsItemsPath = Pair("generic/goodsItems/get", "21"),
         getGenericGoodsCategoriesPath = Pair("generic/goodsCategories/get", "22"),
         getSuppliersPath = Pair("suppliers/get", "23"),
+        addSupplierPath = Pair("suppliers/add", "83"),
+        updateSupplierPath = Pair("suppliers/update", "84"),
+        deleteSupplierPath = Pair("suppliers/delete", "85"),
         stringResourcesPath = Pair("res/string", "24"),
         dimensionResourcesPath = Pair("res/dimension", "25"),
         colorResourcesPath = Pair("res/color", "26"),
@@ -1426,6 +2557,29 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
         updateSupplierOrderPath = Pair("supplierOrders/update", "36"),
         deleteSupplierOrdersPath = Pair("supplierOrders/delete", "37"),
         receiveSupplierOrderPath = Pair("supplierOrders/receive", "38"),
+        getCashRegisterPath = Pair("cashRegister/get", "49"),
+        extractCashRegisterPath = Pair("cashRegister/extract", "50"),
+        getStoreWorkersPath = Pair("workers/store/get", "51"),
+        getMyWorkerMembershipsPath = Pair("workers/my/get", "52"),
+        getIncomingWorkerRequestsPath = Pair("workers/requests/incoming", "53"),
+        getMyWorkerRequestsPath = Pair("workers/requests/my", "54"),
+        requestStoreEmploymentPath = Pair("workers/request", "55"),
+        acceptStoreEmploymentPath = Pair("workers/accept", "56"),
+        declineStoreEmploymentPath = Pair("workers/decline", "57"),
+        updateStoreWorkerPermissionsPath = Pair("workers/updatePermissions", "58"),
+        inviteStoreWorkerPath = Pair("workers/invite", "65"),
+        acceptStoreWorkerInvitationPath = Pair("workers/invitations/accept", "66"),
+        declineStoreWorkerInvitationPath = Pair("workers/invitations/decline", "67"),
+        getUserFinanceDashboardPath = Pair("finance/dashboard", "77"),
+        createTopUpPaymentPath = Pair("finance/topup/create", "78"),
+        confirmDevelopmentTopUpPath = Pair("finance/topup/confirmDevelopment", "79"),
+        getSubscriptionPlansPath = Pair("subscriptions/plans", "80"),
+        getStoreSubscriptionPath = Pair("subscriptions/store/get", "81"),
+        updateStoreSubscriptionPath = Pair("subscriptions/store/update", "82"),
+        pagingDefaultPageSize = 40,
+        pagingMaxPageSize = 200,
+        paymentProviders = defaultPaymentProviders(),
+        subscriptionPlans = defaultStoreSubscriptionPlans(),
         companyForms = listOf(
             CompanyFormDataModel(
                 id = "0",
@@ -1984,6 +3138,7 @@ var httpClient =
         expectSuccess = false
 
         install(HttpCache)
+        install(WebSockets)
 //
 //    install(Logging) {
 //      level = LogLevel.ALL
@@ -2073,6 +3228,7 @@ val activeStoreIdState = MutableStateFlow<String?>(null)
 val getStoresMutex = Mutex()
 val addStoreMutex = Mutex()
 val updateStoreMutex = Mutex()
+val deleteStoreMutex = Mutex()
 
 const val KEY_ACTIVE_STORE_ID = "key_activeStoreId"
 
@@ -2099,12 +3255,16 @@ val cartTransactionType2_clientId4_state = MutableStateFlow<List<GoodsItemInCart
 val stockState = MutableDataStateFlow<List<GoodsItemDataModel>>(GlobalScope)
 
 val stockBatchesState = MutableDataStateFlow<List<GoodsBatchDataModel>>(GlobalScope)
+val stockItemBranchAvailabilityState = MutableDataStateFlow<StockItemBranchAvailabilityDataModel>(GlobalScope)
+val stockBatchMoveResultState = MutableDataStateFlow<StockBatchMoveResultDataModel>(GlobalScope)
 
 val getStockMutex = Mutex()
 val getStockBatchesMutex = Mutex()
 val addGoodsItemMutex = Mutex()
 val updateGoodsItemMutex = Mutex()
 val deleteGoodsItemMutex = Mutex()
+val getStockItemBranchAvailabilityMutex = Mutex()
+val moveStockBatchMutex = Mutex()
 
 val logInMutex = Mutex()
 val signUpUserMutex = Mutex()
@@ -2125,6 +3285,29 @@ val cashRegisterExtractionsState =
     MutableDataStateFlow<List<CashRegisterExtractionEntryDataModel>>(GlobalScope)
 
 val cashRegisterAmountState = MutableStateFlow(0.0)
+val cashRegisterState = MutableDataStateFlow<StoreCashRegisterDataModel>(GlobalScope)
+val cashRegisterEventsState = MutableDataStateFlow<List<CashRegisterEventDataModel>>(GlobalScope)
+
+val storeWorkerMembershipsState = MutableDataStateFlow<List<StoreWorkerDataModel>>(GlobalScope)
+val myWorkerMembershipsState = MutableDataStateFlow<List<StoreWorkerDataModel>>(GlobalScope)
+val incomingWorkerRequestsState = MutableDataStateFlow<List<StoreWorkerRequestDataModel>>(GlobalScope)
+val myWorkerRequestsState = MutableDataStateFlow<List<StoreWorkerRequestDataModel>>(GlobalScope)
+val activeWorkshiftState = MutableDataStateFlow<WorkshiftDataModel>(GlobalScope)
+val workshiftLoginInProgressState = MutableStateFlow(false)
+
+private val getCashRegisterMutex = Mutex()
+private val extractCashRegisterMutex = Mutex()
+private val getStoreWorkersMutex = Mutex()
+private val getMyWorkerMembershipsMutex = Mutex()
+private val getIncomingWorkerRequestsMutex = Mutex()
+private val getMyWorkerRequestsMutex = Mutex()
+private val requestStoreEmploymentMutex = Mutex()
+private val inviteStoreWorkerMutex = Mutex()
+private val decideStoreEmploymentMutex = Mutex()
+private val updateStoreWorkerPermissionsMutex = Mutex()
+private val getCurrentWorkshiftMutex = Mutex()
+private val startWorkshiftMutex = Mutex()
+private val endWorkshiftMutex = Mutex()
 
 
 
@@ -2198,20 +3381,6 @@ fun String.filterAsPersonName(): Boolean {
 
 infix fun String.localized(locale: String): LocalizedStringDataModel {
     return LocalizedStringDataModel(locale, this)
-}
-
-fun getStoreWorkers() {
-    TODO("Not yet implemented")
-}
-
-fun addStoreWorker(
-    phoneNumber: String,
-    email: String,
-    firstName: String,
-    lastName: String,
-    password: String
-) {
-    TODO("Not yet implemented")
 }
 
 fun getGoodsCategories() {
@@ -2323,6 +3492,13 @@ fun List<CountryDataModel>.getFirstCurrencyByCountry(locale: String): CurrencyDa
 }
 
 fun init() {
+    startAppCacheCollectors()
+
+    GlobalScope.launch(Dispatchers.ourIo) {
+        loadCachedApplicationData()
+        if (getStoredUserAuthTokens?.invoke() != null) startRealtimeUpdates()
+    }
+
     GlobalScope.launch {
         observeLocalKv(KEY_APP_LOCALE)
             .collect {
@@ -2364,9 +3540,16 @@ fun init() {
             .collect {
                 activeStoreIdState.emit(it)
                 it?.let {
+                    loadCachedStoreScopedData(it)
                     getStock(it)
                     getStockBatches(it)
                     getTransactions(it)
+                    getCashRegister(it)
+                    getStoreWorkers(it)
+                    getIncomingWorkerRequests(it)
+                    getMyWorkerMemberships()
+                    getMyWorkerRequests()
+                    getStoreSubscription(it)
                 }
             }
     }
@@ -2374,8 +3557,9 @@ fun init() {
     GlobalScope.launch(Dispatchers.ourIo) {
         storesState.payload.collect {
             it?.let {
-                if (it.size == 1 && activeStoreIdState.value != it.first().id) {
-                    setActiveStoreId(it.first().id)
+                val settableStores = it.settableActiveStores()
+                if (settableStores.size == 1 && activeStoreIdState.value != settableStores.first().id) {
+                    setActiveStoreId(settableStores.first().id)
                 }
             }
         }
@@ -2581,6 +3765,8 @@ fun init() {
     }
     getGlobalAppConfiguration(true)
     getUser()
+    getUserFinanceDashboard()
+    getSubscriptionPlans()
     getSuppliers()
     getGoodsCategories()
     getStores()
@@ -3815,6 +5001,359 @@ fun observeLocalKv(key: String): Flow<String?> =
             it?.value_
         }
 
+
+private const val CACHE_PREFIX = "cache_json:"
+private const val CACHE_GLOBAL_CONFIG = "global_config"
+private const val CACHE_STRINGS = "strings"
+private const val CACHE_DIMENSIONS = "dimensions"
+private const val CACHE_COLORS = "colors"
+private const val CACHE_DRAWABLES = "drawables"
+private const val CACHE_USER = "user"
+private const val CACHE_STORES = "stores"
+private const val CACHE_SUPPLIERS = "suppliers"
+private const val CACHE_GENERIC_GOODS_CATEGORIES = "generic_goods_categories"
+private const val CACHE_NOTIFICATIONS = "notifications"
+private const val CACHE_SECURITY_SESSIONS = "security_sessions"
+private const val CACHE_MY_WORKER_MEMBERSHIPS = "my_worker_memberships"
+private const val CACHE_MY_WORKER_REQUESTS = "my_worker_requests"
+private const val CACHE_USER_FINANCE_DASHBOARD = "user_finance_dashboard"
+private const val CACHE_SUBSCRIPTION_PLANS = "subscription_plans"
+
+private fun storeScopedCacheKey(name: String, storeId: String): String = "$name:$storeId"
+
+private suspend inline fun <reified T> putJsonCache(key: String, value: T) {
+    try {
+        putLocalKv(CACHE_PREFIX + key, jsonBase.encodeToString(value))
+    } catch (_: Throwable) {
+    }
+}
+
+private suspend inline fun <reified T> getJsonCache(key: String): T? {
+    return try {
+        getLocalKv(CACHE_PREFIX + key)?.let { jsonBase.decodeFromString<T>(it) }
+    } catch (_: Throwable) {
+        null
+    }
+}
+
+private fun cacheMessage(): List<LocalizedStringDataModel> = localizedStringResourceMessage(
+    id = 572,
+    main = "Loaded cached data",
+    ru = "Загружены сохранённые данные",
+    kk = "Сақталған деректер жүктелді"
+)
+
+private fun realtimeConnectedMessage(): List<LocalizedStringDataModel> = localizedStringResourceMessage(
+    id = 573,
+    main = "Live updates connected",
+    ru = "Онлайн-обновления подключены",
+    kk = "Нақты уақыттағы жаңартулар қосылды"
+)
+
+private fun realtimeDisconnectedMessage(): List<LocalizedStringDataModel> = localizedStringResourceMessage(
+    id = 574,
+    main = "Live updates disconnected. Using cached data while reconnecting.",
+    ru = "Онлайн-обновления отключены. Пока идёт переподключение, используются сохранённые данные.",
+    kk = "Нақты уақыттағы жаңартулар ажыратылды. Қайта қосылғанша сақталған деректер қолданылады."
+)
+
+private fun realtimeRefreshingMessage(): List<LocalizedStringDataModel> = localizedStringResourceMessage(
+    id = 575,
+    main = "Refreshing changed data",
+    ru = "Обновление изменённых данных",
+    kk = "Өзгерген деректер жаңартылуда"
+)
+
+private var appCacheCollectorsStarted = false
+private var realtimeUpdatesJob: Job? = null
+private var realtimeRefreshJob: Job? = null
+private val realtimeRefreshMutex = Mutex()
+val realtimeUpdatesConnectedState = MutableStateFlow(false)
+
+private suspend fun loadCachedStoreScopedData(storeId: String) {
+    getJsonCache<List<GoodsItemDataModel>>(storeScopedCacheKey("stock", storeId))?.let {
+        stockState.emit(DataState.Success(it, cacheMessage()))
+    }
+    getJsonCache<List<GoodsBatchDataModel>>(storeScopedCacheKey("stock_batches", storeId))?.let {
+        stockBatchesState.emit(DataState.Success(it, cacheMessage()))
+    }
+    getJsonCache<List<TransactionDataModel>>(storeScopedCacheKey("transactions", storeId))?.let {
+        transactionsState.emit(DataState.Success(it, cacheMessage()))
+    }
+    getJsonCache<List<DebtorDataModel>>(storeScopedCacheKey("debtors", storeId))?.let {
+        debtorsState.emit(DataState.Success(it, cacheMessage()))
+    }
+    getJsonCache<StoreCashRegisterDataModel>(storeScopedCacheKey("cash_register", storeId))?.let {
+        cashRegisterState.emit(DataState.Success(it, cacheMessage()))
+        cashRegisterAmountState.emit(it.currentAmount)
+    }
+    getJsonCache<List<CashRegisterEventDataModel>>(storeScopedCacheKey("cash_register_events", storeId))?.let { events ->
+        cashRegisterEventsState.emit(DataState.Success(events, cacheMessage()))
+        cashRegisterExtractionsState.emit(DataState.Success(events.filter { it.type == CASH_REGISTER_EVENT_EXTRACTION }.map { it.toExtractionEntry() }, cacheMessage()))
+    }
+    getJsonCache<List<StoreWorkerDataModel>>(storeScopedCacheKey("store_workers", storeId))?.let {
+        storeWorkerMembershipsState.emit(DataState.Success(it, cacheMessage()))
+    }
+    getJsonCache<List<StoreWorkerRequestDataModel>>(storeScopedCacheKey("incoming_worker_requests", storeId))?.let {
+        incomingWorkerRequestsState.emit(DataState.Success(it, cacheMessage()))
+    }
+}
+
+private suspend fun loadCachedApplicationData() {
+    getJsonCache<GlobalAppConfigurationDataModel>(CACHE_GLOBAL_CONFIG)?.let {
+        globalAppConfigurationState.emit(DataState.Success(it, cacheMessage()))
+    }
+    getJsonCache<List<LocalizedStringGroupDataModel>>(CACHE_STRINGS)?.let {
+        stringsState.emit(DataState.Success(it, cacheMessage()))
+    }
+    getJsonCache<List<StylizedDimensionGroupDataModel>>(CACHE_DIMENSIONS)?.let {
+        dimensionsState.emit(DataState.Success(it, cacheMessage()))
+    }
+    getJsonCache<List<StylizedColorGroupDataModel>>(CACHE_COLORS)?.let {
+        colorsState.emit(DataState.Success(it, cacheMessage()))
+    }
+    getJsonCache<List<StylizedDrawablePathsGroupDataModel>>(CACHE_DRAWABLES)?.let {
+        drawablesState.emit(DataState.Success(it, cacheMessage()))
+    }
+    getJsonCache<UserAccountDataModel>(CACHE_USER)?.let {
+        userAccountState.emit(DataState.Success(it, cacheMessage()))
+    }
+    getJsonCache<List<StoreDataModel>>(CACHE_STORES)?.let {
+        storesState.emit(DataState.Success(it, cacheMessage()))
+    }
+    getJsonCache<List<SupplierDataModel>>(CACHE_SUPPLIERS)?.let {
+        suppliersState.emit(DataState.Success(it, cacheMessage()))
+    }
+    getJsonCache<List<GenericGoodsCategoryDataModel>>(CACHE_GENERIC_GOODS_CATEGORIES)?.let {
+        genericGoodsCategoriesState.emit(DataState.Success(it, cacheMessage()))
+        categoriesState.emit(DataState.Success(it, cacheMessage()))
+    }
+    getJsonCache<List<NotificationDataModel>>(CACHE_NOTIFICATIONS)?.let {
+        notificationsState.emit(DataState.Success(it, cacheMessage()))
+    }
+    getJsonCache<List<SecuritySessionDataModel>>(CACHE_SECURITY_SESSIONS)?.let {
+        securitySessionsState.emit(DataState.Success(it, cacheMessage()))
+    }
+    getJsonCache<List<StoreWorkerDataModel>>(CACHE_MY_WORKER_MEMBERSHIPS)?.let {
+        myWorkerMembershipsState.emit(DataState.Success(it, cacheMessage()))
+    }
+    getJsonCache<List<StoreWorkerRequestDataModel>>(CACHE_MY_WORKER_REQUESTS)?.let {
+        myWorkerRequestsState.emit(DataState.Success(it, cacheMessage()))
+    }
+    getJsonCache<UserFinanceDashboardDataModel>(CACHE_USER_FINANCE_DASHBOARD)?.let {
+        userFinanceDashboardState.emit(DataState.Success(it, cacheMessage()))
+        userWalletState.emit(DataState.Success(it.wallet, cacheMessage()))
+        userWalletLedgerState.emit(DataState.Success(it.ledger, cacheMessage()))
+        paymentIntentsState.emit(DataState.Success(it.paymentIntents, cacheMessage()))
+    }
+    getJsonCache<List<StoreSubscriptionPlanDataModel>>(CACHE_SUBSCRIPTION_PLANS)?.let {
+        subscriptionPlansState.emit(DataState.Success(it, cacheMessage()))
+    }
+
+    getLocalKv(KEY_ACTIVE_STORE_ID)?.takeIf { it.isNotBlank() }?.let { storeId ->
+        activeStoreIdState.emit(storeId)
+        loadCachedStoreScopedData(storeId)
+    }
+}
+
+private fun startAppCacheCollectors() {
+    if (appCacheCollectorsStarted) return
+    appCacheCollectorsStarted = true
+
+    GlobalScope.launch(Dispatchers.ourIo) { globalAppConfigurationState.payload.collect { putJsonCache(CACHE_GLOBAL_CONFIG, it) } }
+    GlobalScope.launch(Dispatchers.ourIo) { stringsState.payload.collect { it?.let { putJsonCache(CACHE_STRINGS, it) } } }
+    GlobalScope.launch(Dispatchers.ourIo) { dimensionsState.payload.collect { it?.let { putJsonCache(CACHE_DIMENSIONS, it) } } }
+    GlobalScope.launch(Dispatchers.ourIo) { colorsState.payload.collect { it?.let { putJsonCache(CACHE_COLORS, it) } } }
+    GlobalScope.launch(Dispatchers.ourIo) { drawablesState.payload.collect { it?.let { putJsonCache(CACHE_DRAWABLES, it) } } }
+    GlobalScope.launch(Dispatchers.ourIo) { userAccountState.payload.collect { it?.let { putJsonCache(CACHE_USER, it) } } }
+    GlobalScope.launch(Dispatchers.ourIo) { storesState.payload.collect { it?.let { putJsonCache(CACHE_STORES, it) } } }
+    GlobalScope.launch(Dispatchers.ourIo) { suppliersState.payload.collect { it?.let { putJsonCache(CACHE_SUPPLIERS, it) } } }
+    GlobalScope.launch(Dispatchers.ourIo) { genericGoodsCategoriesState.payload.collect { it?.let { putJsonCache(CACHE_GENERIC_GOODS_CATEGORIES, it) } } }
+    GlobalScope.launch(Dispatchers.ourIo) { notificationsState.payload.collect { it?.let { putJsonCache(CACHE_NOTIFICATIONS, it) } } }
+    GlobalScope.launch(Dispatchers.ourIo) { securitySessionsState.payload.collect { it?.let { putJsonCache(CACHE_SECURITY_SESSIONS, it) } } }
+    GlobalScope.launch(Dispatchers.ourIo) { myWorkerMembershipsState.payload.collect { it?.let { putJsonCache(CACHE_MY_WORKER_MEMBERSHIPS, it) } } }
+    GlobalScope.launch(Dispatchers.ourIo) { myWorkerRequestsState.payload.collect { it?.let { putJsonCache(CACHE_MY_WORKER_REQUESTS, it) } } }
+    GlobalScope.launch(Dispatchers.ourIo) { userFinanceDashboardState.payload.collect { it?.let { putJsonCache(CACHE_USER_FINANCE_DASHBOARD, it) } } }
+    GlobalScope.launch(Dispatchers.ourIo) { subscriptionPlansState.payload.collect { it?.let { putJsonCache(CACHE_SUBSCRIPTION_PLANS, it) } } }
+
+    GlobalScope.launch(Dispatchers.ourIo) {
+        stockState.payload.collect { payload ->
+            val storeId = activeStoreIdState.value
+            if (!storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("stock", storeId), payload)
+        }
+    }
+    GlobalScope.launch(Dispatchers.ourIo) {
+        stockBatchesState.payload.collect { payload ->
+            val storeId = activeStoreIdState.value
+            if (!storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("stock_batches", storeId), payload)
+        }
+    }
+    GlobalScope.launch(Dispatchers.ourIo) {
+        transactionsState.payload.collect { payload ->
+            val storeId = activeStoreIdState.value
+            if (!storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("transactions", storeId), payload)
+        }
+    }
+    GlobalScope.launch(Dispatchers.ourIo) {
+        debtorsState.payload.collect { payload ->
+            val storeId = activeStoreIdState.value
+            if (!storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("debtors", storeId), payload)
+        }
+    }
+    GlobalScope.launch(Dispatchers.ourIo) {
+        cashRegisterState.payload.collect { payload ->
+            val storeId = activeStoreIdState.value
+            if (!storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("cash_register", storeId), payload)
+        }
+    }
+    GlobalScope.launch(Dispatchers.ourIo) {
+        cashRegisterEventsState.payload.collect { payload ->
+            val storeId = activeStoreIdState.value
+            if (!storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("cash_register_events", storeId), payload)
+        }
+    }
+    GlobalScope.launch(Dispatchers.ourIo) {
+        storeWorkerMembershipsState.payload.collect { payload ->
+            val storeId = activeStoreIdState.value
+            if (!storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("store_workers", storeId), payload)
+        }
+    }
+    GlobalScope.launch(Dispatchers.ourIo) {
+        incomingWorkerRequestsState.payload.collect { payload ->
+            val storeId = activeStoreIdState.value
+            if (!storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("incoming_worker_requests", storeId), payload)
+        }
+    }
+}
+
+private fun String.toRealtimeWebSocketUrl(path: String): String {
+    val base = trim().removeSuffix("/")
+    val wsBase = when {
+        base.startsWith("https://", ignoreCase = true) -> "wss://" + base.substringAfter("https://")
+        base.startsWith("http://", ignoreCase = true) -> "ws://" + base.substringAfter("http://")
+        base.startsWith("ws://", ignoreCase = true) || base.startsWith("wss://", ignoreCase = true) -> base
+        else -> "ws://$base"
+    }
+
+    return wsBase.removeSuffix("/") + "/" + path.trimStart('/')
+}
+
+private fun refreshEverythingFromServerAfterRealtimeUpdate() {
+    getGlobalAppConfiguration(loadAll = false)
+    getUser(forceLogOut = false)
+    getStores()
+    getSuppliers()
+    getGenericGoodsCategories()
+    getNotifications()
+    getSecuritySessions()
+    getMyWorkerMemberships()
+    getMyWorkerRequests()
+    getUserFinanceDashboard()
+    getSubscriptionPlans()
+
+    activeStoreIdState.value?.let { storeId ->
+        getStock(storeId)
+        getStockBatches(storeId)
+        getTransactions(storeId)
+        getDebtors(storeId)
+        getCashRegister(storeId)
+        getStoreWorkers(storeId)
+        getIncomingWorkerRequests(storeId)
+        getStoreSubscription(storeId)
+    }
+}
+
+private fun scheduleRealtimeRefresh(reason: String? = null) {
+    realtimeRefreshJob?.cancel()
+    realtimeRefreshJob = GlobalScope.launch(Dispatchers.ourIo) {
+        delay(350)
+        realtimeRefreshMutex.withLock {
+            refreshEverythingFromServerAfterRealtimeUpdate()
+        }
+    }
+}
+
+fun stopRealtimeUpdates() {
+    realtimeUpdatesJob?.cancel()
+    realtimeUpdatesJob = null
+    realtimeUpdatesConnectedState.value = false
+}
+
+fun startRealtimeUpdates() {
+    if (realtimeUpdatesJob?.isActive == true) return
+
+    realtimeUpdatesJob = GlobalScope.launch(Dispatchers.ourIo) {
+        var reconnectDelayMillis = 1_000L
+
+        while (isActive) {
+            val accessToken = getStoredUserAuthTokens?.invoke()?.accessToken
+
+            if (accessToken.isNullOrBlank()) {
+                realtimeUpdatesConnectedState.emit(false)
+                delay(2_000)
+                continue
+            }
+
+            val realtimeUrl = globalAppConfigurationState.payloadValue.serverUrl.first.toRealtimeWebSocketUrl(
+                globalAppConfigurationState.payloadValue.realtimeUpdatesPath
+            )
+
+            val wasConnected = realtimeUpdatesConnectedState.value
+
+            try {
+                val session = httpClient.webSocketSession {
+                    url(realtimeUrl)
+                    header(HttpHeaders.Authorization, "Bearer $accessToken")
+                }
+
+                try {
+                    val becameConnected = !realtimeUpdatesConnectedState.value
+                    realtimeUpdatesConnectedState.emit(true)
+                    reconnectDelayMillis = 1_000L
+
+                    if (becameConnected) {
+                        postInAppNotification(realtimeConnectedMessage(), NotificationType.Positive, transient = true)
+                        scheduleRealtimeRefresh("connected")
+                    }
+
+                    session.outgoing.send(
+                        Frame.Text(
+                            jsonBase.encodeToString(
+                                RealtimeClientHelloDataModel(
+                                    activeStoreId = activeStoreIdState.value,
+                                    language = appLanguageState.value,
+                                    platform = getPlatformName(),
+                                    clientTimeMillis = getCurrentTimeMillis()
+                                )
+                            )
+                        )
+                    )
+
+                    for (frame in session.incoming) {
+                        val text = (frame as? Frame.Text)?.readText() ?: continue
+                        val update = runCatching { jsonBase.decodeFromString<RealtimeUpdateDataModel>(text) }.getOrNull()
+                        if (update != null && update.type != "connected") {
+                            scheduleRealtimeRefresh(update.reason ?: update.entity)
+                        }
+                    }
+                } finally {
+                    try {
+                        session.close()
+                    } catch (_: Throwable) {
+                    }
+                }
+            } catch (_: Throwable) {
+                if (wasConnected || realtimeUpdatesConnectedState.value) {
+                    postInAppNotification(realtimeDisconnectedMessage(), NotificationType.Neutral, transient = true)
+                }
+                realtimeUpdatesConnectedState.emit(false)
+                delay(reconnectDelayMillis)
+                reconnectDelayMillis = (reconnectDelayMillis * 2).coerceAtMost(30_000L)
+            }
+        }
+    }
+}
+
 fun upsertCart(
     id: String,
     transactionTypeIndex: Int,
@@ -3834,6 +5373,9 @@ fun upsertCart(
 suspend fun deleteCart(transactionTypeIndex: Int, clientId: Int) {
     appDatabase.app_databaseQueries.deleteCart(transactionTypeIndex.toLong(), clientId.toLong())
     removeCartSaleMethodIds(transactionTypeIndex, clientId)
+    if (transactionTypeIndex == 2) {
+        clearTransactionSupplySupplierId(transactionTypeIndex, clientId)
+    }
 }
 
 fun deleteCartById(id: String, transactionTypeIndex: Int, clientId: Int) {
@@ -3942,6 +5484,20 @@ fun clearInAppNotification() {
     GlobalScope.launch(Dispatchers.ourIo) {
         latestInAppNotificationState.emit(null)
         activeInAppNotificationsState.emit(emptyList())
+    }
+}
+
+fun dismissInAppNotification(notificationId: String, markAsRead: Boolean = true) {
+    GlobalScope.launch(Dispatchers.ourIo) {
+        val remaining = activeInAppNotificationsState.value.filter { it.id != notificationId }
+        activeInAppNotificationsState.emit(remaining)
+        if (latestInAppNotificationState.value?.id == notificationId) {
+            latestInAppNotificationState.emit(remaining.firstOrNull())
+        }
+    }
+
+    if (markAsRead) {
+        markNotificationRead(notificationId)
     }
 }
 
@@ -4246,6 +5802,7 @@ fun logOutUser() {
                 }
 
                 // Logout must never trap the cashier inside account screen. Server revoke is best-effort.
+                stopRealtimeUpdates()
                 setStoredUserAuthTokens?.invoke(null)
                 setStoredUserAccountDataModel?.invoke(null)
                 setActiveStoreId(null, syncServer = false)
@@ -4319,6 +5876,7 @@ fun getUser(forceLogOut: Boolean = true) {
                     getStores()
                     getSuppliers()
                     getGenericGoodsCategories()
+                    startRealtimeUpdates()
                 }
             }
     }
@@ -4353,6 +5911,7 @@ fun updateUser(
 
 fun forceLogOutUser() {
     GlobalScope.launch(Dispatchers.ourIo) {
+        stopRealtimeUpdates()
         setStoredUserAuthTokens?.invoke(null)
         setStoredUserAccountDataModel?.invoke(null)
         setActiveStoreId(null, syncServer = false)
@@ -4468,9 +6027,19 @@ fun getStores() {
                 )
 
                 if (!response.negative) {
-                    storesState.emit(DataState.Success(response.payload!!, response.message))
-                    if (response.payload.size == 1 && activeStoreIdState.value != response.payload.first().id)
-                        setActiveStoreId(response.payload.first().id)
+                    val stores = response.payload!!
+                    storesState.emit(DataState.Success(stores, response.message))
+
+                    val activeStore = stores.findStoreOrBranch(activeStoreIdState.value)
+                    when {
+                        activeStoreIdState.value != null && activeStore == null ->
+                            setActiveStoreId(null)
+
+                        activeStoreIdState.value == null -> {
+                            val settableStores = stores.settableActiveStores()
+                            if (settableStores.size == 1) setActiveStoreId(settableStores.first().id)
+                        }
+                    }
                 }
             }
         }
@@ -4508,6 +6077,7 @@ fun addStore(store: StoreDataModel, onCompleted: ((DataState<StoreDataModel>) ->
                         )
                     )
 
+                    getStores()
                     onCompleted?.invoke(DataState.Success(response.payload!!))
                 }
             }
@@ -4552,6 +6122,46 @@ fun updateStore(store: StoreDataModel, onCompleted: ((DataState<StoreDataModel>)
         }
 }
 
+fun deleteStore(store: StoreDataModel, onCompleted: ((DataState<Unit>) -> Unit)? = null) {
+    if (!deleteStoreMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            deleteStoreMutex.withLock {
+                val response = networkRequest<Unit, String>(
+                    HttpMethod.Delete,
+                    endpointUrl = globalAppConfigurationState.payloadValue.deleteStoresPath.first,
+                    body = store.id
+                )
+
+                if (response.negative) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty())
+                } else {
+                    postInAppNotification(response.message, NotificationType.Positive)
+
+                    val removedIds = buildSet {
+                        add(store.id)
+                        store.branches.forEach { add(it.id) }
+                    }
+
+                    storesState.emit(
+                        DataState.Success(
+                            storesState.payloadValue
+                                .orEmpty()
+                                .filterNot { it.id in removedIds || (it.parentStoreId?.let { parentId -> parentId in removedIds } == true) }
+                        )
+                    )
+
+                    if (activeStoreIdState.value in removedIds) {
+                        setActiveStoreId(null)
+                    }
+
+                    getStores()
+                    onCompleted?.invoke(DataState.Success(Unit, response.message))
+                }
+            }
+        }
+}
+
 fun setActiveStoreId(
     id: String?,
     syncServer: Boolean = true
@@ -4583,6 +6193,9 @@ fun setActiveStoreId(
 val suppliersState = MutableDataStateFlow<List<SupplierDataModel>>(GlobalScope)
 
 private val getSuppliersMutex = Mutex()
+private val addSupplierMutex = Mutex()
+private val updateSupplierMutex = Mutex()
+private val deleteSupplierMutex = Mutex()
 
 fun getSuppliers() {
     if (!getSuppliersMutex.isLocked)
@@ -4595,6 +6208,81 @@ fun getSuppliers() {
 
                 if (!response.negative) {
                     suppliersState.emit(DataState.Success(response.payload!!, response.message))
+                }
+            }
+        }
+}
+
+
+fun addSupplier(
+    supplier: SupplierDataModel,
+    onCompleted: ((DataState<SupplierDataModel>) -> Unit)? = null
+) {
+    if (!addSupplierMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            addSupplierMutex.withLock {
+                val response = networkRequest<SupplierDataModel, SupplierDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.addSupplierPath.first,
+                    body = supplier
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    val supplier = response.payload!!
+                    suppliersState.emit(DataState.Success(suppliersState.payloadValue.orEmpty().upsertById(supplier), response.message))
+                    onCompleted?.invoke(DataState.Success(supplier, response.message))
+                }
+            }
+        }
+}
+
+fun updateSupplier(
+    supplier: SupplierDataModel,
+    onCompleted: ((DataState<SupplierDataModel>) -> Unit)? = null
+) {
+    if (!updateSupplierMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            updateSupplierMutex.withLock {
+                val response = networkRequest<SupplierDataModel, SupplierDataModel>(
+                    method = HttpMethod.Put,
+                    endpointUrl = globalAppConfigurationState.payloadValue.updateSupplierPath.first,
+                    body = supplier
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    val supplier = response.payload!!
+                    suppliersState.emit(DataState.Success(suppliersState.payloadValue.orEmpty().upsertById(supplier), response.message))
+                    onCompleted?.invoke(DataState.Success(supplier, response.message))
+                }
+            }
+        }
+}
+
+fun deleteSupplier(
+    supplierId: String,
+    onCompleted: ((DataState<String>) -> Unit)? = null
+) {
+    if (!deleteSupplierMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            deleteSupplierMutex.withLock {
+                val response = networkRequest<String, String>(
+                    method = HttpMethod.Delete,
+                    endpointUrl = globalAppConfigurationState.payloadValue.deleteSupplierPath.first,
+                    body = supplierId
+                )
+
+                if (response.negative) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    suppliersState.emit(DataState.Success(suppliersState.payloadValue.orEmpty().filterNot { it.id == supplierId }, response.message))
+                    onCompleted?.invoke(DataState.Success(supplierId, response.message))
                 }
             }
         }
@@ -4798,6 +6486,68 @@ fun getStockBatches(storeId: String) {
 
                 if (!response.negative)
                     stockBatchesState.emit(DataState.Success(response.payload!!, response.message))
+            }
+        }
+}
+
+fun getStockItemBranchAvailability(
+    storeId: String,
+    goodsItemId: String,
+    onCompleted: ((DataState<StockItemBranchAvailabilityDataModel>) -> Unit)? = null
+) {
+    if (!getStockItemBranchAvailabilityMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getStockItemBranchAvailabilityMutex.withLock {
+                val response = networkRequest<StockItemBranchAvailabilityDataModel, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getStockItemBranchAvailabilityPath.first,
+                    headers = mapOf(
+                        "store_id" to storeId,
+                        "goods_item_id" to goodsItemId
+                    )
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    stockItemBranchAvailabilityState.emit(DataState.Success(response.payload, response.message))
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun moveStockBatchBetweenStores(
+    request: StockBatchMoveRequestDataModel,
+    onCompleted: ((DataState<StockBatchMoveResultDataModel>) -> Unit)? = null
+) {
+    if (!moveStockBatchMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            moveStockBatchMutex.withLock {
+                val response = networkRequest<StockBatchMoveResultDataModel, StockBatchMoveRequestDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.moveStockBatchPath.first,
+                    body = request,
+                    headers = mapOf("store_id" to request.sourceStoreId)
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    stockBatchMoveResultState.emit(DataState.Success(response.payload, response.message))
+                    stockItemBranchAvailabilityState.emit(DataState.Success(response.payload.availability, response.message))
+
+                    val activeStoreId = activeStoreIdState.value
+                    if (!activeStoreId.isNullOrBlank()) {
+                        getStock(activeStoreId)
+                        getStockBatches(activeStoreId)
+                    }
+
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
             }
         }
 }
@@ -5057,12 +6807,185 @@ data class AppLanguageDataModel(
     val name: List<LocalizedStringDataModel>,
     val flagDrawablePath: String
 )
+const val CASH_REGISTER_EVENT_SALE_CASH_IN = "sale_cash_in"
+const val CASH_REGISTER_EVENT_RETURN_CASH_OUT = "return_cash_out"
+const val CASH_REGISTER_EVENT_EXTRACTION = "extraction"
+const val CASH_REGISTER_EVENT_MANUAL_ADJUSTMENT = "manual_adjustment"
+
+const val WORKER_REQUEST_DIRECTION_USER_TO_STORE = "user_to_store"
+const val WORKER_REQUEST_DIRECTION_STORE_TO_USER = "store_to_user"
+
+const val WORKER_ROLE_OWNER = "owner"
+const val WORKER_ROLE_ADMIN = "admin"
+const val WORKER_ROLE_STANDARD = "standard"
+
+const val STORE_PERMISSION_SALE_TRANSACTION = "sale_transaction"
+const val STORE_PERMISSION_RETURN_TRANSACTION = "return_transaction"
+const val STORE_PERMISSION_SUPPLY_TRANSACTION = "supply_transaction"
+const val STORE_PERMISSION_STOCK_READ = "stock_read"
+const val STORE_PERMISSION_STOCK_WRITE = "stock_write"
+const val STORE_PERMISSION_TRANSACTION_HISTORY_VIEW = "transaction_history_view"
+const val STORE_PERMISSION_ANALYTICS_VIEW = "analytics_view"
+const val STORE_PERMISSION_CASH_REGISTER_VIEW = "cash_register_view"
+const val STORE_PERMISSION_CASH_REGISTER_EXTRACT = "cash_register_extract"
+const val STORE_PERMISSION_WORKERS_VIEW = "workers_view"
+const val STORE_PERMISSION_WORKERS_MANAGE = "workers_manage"
+const val STORE_PERMISSION_STORE_MANAGE = "store_manage"
+
+val ALL_STORE_PERMISSION_IDS = listOf(
+    STORE_PERMISSION_SALE_TRANSACTION,
+    STORE_PERMISSION_RETURN_TRANSACTION,
+    STORE_PERMISSION_SUPPLY_TRANSACTION,
+    STORE_PERMISSION_STOCK_READ,
+    STORE_PERMISSION_STOCK_WRITE,
+    STORE_PERMISSION_TRANSACTION_HISTORY_VIEW,
+    STORE_PERMISSION_ANALYTICS_VIEW,
+    STORE_PERMISSION_CASH_REGISTER_VIEW,
+    STORE_PERMISSION_CASH_REGISTER_EXTRACT,
+    STORE_PERMISSION_WORKERS_VIEW,
+    STORE_PERMISSION_WORKERS_MANAGE,
+    STORE_PERMISSION_STORE_MANAGE
+)
+
+val STANDARD_STORE_PERMISSION_IDS = listOf(
+    STORE_PERMISSION_SALE_TRANSACTION,
+    STORE_PERMISSION_RETURN_TRANSACTION,
+    STORE_PERMISSION_STOCK_READ,
+    STORE_PERMISSION_TRANSACTION_HISTORY_VIEW,
+    STORE_PERMISSION_CASH_REGISTER_VIEW
+)
+
+fun defaultStorePermissionsForRole(roleId: String): List<String> {
+    return when (roleId) {
+        WORKER_ROLE_ADMIN -> ALL_STORE_PERMISSION_IDS
+        WORKER_ROLE_OWNER -> ALL_STORE_PERMISSION_IDS
+        else -> STANDARD_STORE_PERMISSION_IDS
+    }
+}
+
+@kotlinx.serialization.Serializable
+data class StoreCashRegisterDataModel(
+    val storeId: String,
+    val currentAmount: Double = 0.0,
+    val currencyCode: String = "KZT",
+    val updatedAtMillis: Long = 0L
+)
+
+@kotlinx.serialization.Serializable
+data class CashRegisterEventDataModel(
+    val id: String = "",
+    val storeId: String = "",
+    val userId: String = "",
+    val userName: String = "",
+    val type: String = CASH_REGISTER_EVENT_MANUAL_ADJUSTMENT,
+    val amount: Double = 0.0,
+    val balanceBefore: Double = 0.0,
+    val balanceAfter: Double = 0.0,
+    val transactionId: String? = null,
+    val note: String? = null,
+    val timeMillis: Long = 0L,
+    val metadata: Map<String, String> = emptyMap()
+)
+
 @kotlinx.serialization.Serializable
 data class CashRegisterExtractionEntryDataModel(
     val id: String,
     val amount: Double,
-    val timeMillis: Long
+    val timeMillis: Long,
+    val extractedByUserId: String = "",
+    val extractedByName: String = "",
+    val note: String? = null,
+    val balanceBefore: Double = 0.0,
+    val balanceAfter: Double = 0.0
 )
+
+@kotlinx.serialization.Serializable
+data class CashRegisterStateDataModel(
+    val register: StoreCashRegisterDataModel,
+    val events: List<CashRegisterEventDataModel> = emptyList()
+)
+
+@kotlinx.serialization.Serializable
+data class CashRegisterExtractionRequestDataModel(
+    val storeId: String,
+    val amount: Double,
+    val note: String? = null,
+    val timeMillis: Long = 0L
+)
+@kotlinx.serialization.Serializable
+data class StockBranchQuantityDataModel(
+    val storeId: String = "",
+    val publicId: String = "",
+    val parentStoreId: String? = null,
+    val name: List<LocalizedStringDataModel> = emptyList(),
+    val address: String = "",
+    val isCurrentStore: Boolean = false,
+    val isParentStore: Boolean = false,
+    val goodsItemId: String? = null,
+    val totalQuantity: QuantityDataModel? = null,
+    val batchCount: Int = 0,
+    val batches: List<GoodsBatchDataModel> = emptyList()
+)
+
+@kotlinx.serialization.Serializable
+data class StockBatchMovementDataModel(
+    val id: String = "",
+    val rootStoreId: String = "",
+    val sourceStoreId: String = "",
+    val destinationStoreId: String = "",
+    val sourceGoodsItemId: String = "",
+    val destinationGoodsItemId: String = "",
+    val sourceBatchId: String = "",
+    val destinationBatchId: String = "",
+    val quantity: QuantityDataModel,
+    val movedByUserId: String = "",
+    val movedByName: String = "",
+    val movedAtMillis: Long = 0L,
+    val note: String? = null
+)
+
+@kotlinx.serialization.Serializable
+data class StockItemBranchAvailabilityDataModel(
+    val rootStoreId: String = "",
+    val currentStoreId: String = "",
+    val sourceGoodsItemId: String = "",
+    val locations: List<StockBranchQuantityDataModel> = emptyList(),
+    val movements: List<StockBatchMovementDataModel> = emptyList()
+)
+
+@kotlinx.serialization.Serializable
+data class StockBatchMoveRequestDataModel(
+    val sourceStoreId: String,
+    val destinationStoreId: String,
+    val sourceGoodsItemId: String,
+    val sourceBatchId: String,
+    val quantity: QuantityDataModel,
+    val note: String? = null
+)
+
+@kotlinx.serialization.Serializable
+data class StockBatchMoveResultDataModel(
+    val sourceBatch: GoodsBatchDataModel,
+    val destinationBatch: GoodsBatchDataModel,
+    val sourceGoodsItem: GoodsItemDataModel,
+    val destinationGoodsItem: GoodsItemDataModel,
+    val movement: StockBatchMovementDataModel,
+    val availability: StockItemBranchAvailabilityDataModel
+)
+
+
+fun CashRegisterEventDataModel.toExtractionEntry(): CashRegisterExtractionEntryDataModel {
+    return CashRegisterExtractionEntryDataModel(
+        id = id,
+        amount = amount,
+        timeMillis = timeMillis,
+        extractedByUserId = userId,
+        extractedByName = userName,
+        note = note,
+        balanceBefore = balanceBefore,
+        balanceAfter = balanceAfter
+    )
+}
 
 private val setActiveShelfBatchMutex = Mutex()
 
@@ -5117,10 +7040,13 @@ data class AppThemeDataModel(
 
 @kotlinx.serialization.Serializable
 data class BalanceHistoryEntryDataModel(
-    val id: String,
-    val type: Int,
-    val amount: Double,
-    val currency: String
+    val id: String = "",
+    val type: Int = 0,
+    val amount: Double = 0.0,
+    val currency: String = "KZT",
+    val note: String = "",
+    val referenceId: String = "",
+    val timeMillis: Long = 0L
 )
 
 @kotlinx.serialization.Serializable
@@ -5140,6 +7066,92 @@ data class CompanyFormDataModel(
     val name: List<LocalizedStringDataModel>,
     val parameters: List<ParameterDataModel>
 )
+
+@kotlinx.serialization.Serializable
+data class LegalIdFormatDataModel(
+    val id: String,
+    val countryLocales: List<String>,
+    val name: List<LocalizedStringDataModel>,
+    val label: List<LocalizedStringDataModel>,
+    val placeholder: List<LocalizedStringDataModel>,
+    val required: Boolean = true,
+    val length: Int? = null,
+    val minLength: Int? = null,
+    val maxLength: Int? = null,
+    val digitsOnly: Boolean = true,
+    val regex: String? = null
+)
+
+fun defaultLegalIdFormats(): List<LegalIdFormatDataModel> = listOf(
+    LegalIdFormatDataModel(
+        id = "kz_bin",
+        countryLocales = listOf("kz"),
+        name = listOf(
+            LocalizedStringDataModel("main", "BIN"),
+            LocalizedStringDataModel("en", "BIN"),
+            LocalizedStringDataModel("ru", "БИН"),
+            LocalizedStringDataModel("kk", "БИН")
+        ),
+        label = listOf(
+            LocalizedStringDataModel("main", "Business Identification Number"),
+            LocalizedStringDataModel("en", "Business Identification Number"),
+            LocalizedStringDataModel("ru", "Бизнес-идентификационный номер"),
+            LocalizedStringDataModel("kk", "Бизнес сәйкестендіру нөмірі")
+        ),
+        placeholder = listOf(
+            LocalizedStringDataModel("main", "12 digits"),
+            LocalizedStringDataModel("en", "12 digits"),
+            LocalizedStringDataModel("ru", "12 цифр"),
+            LocalizedStringDataModel("kk", "12 сан")
+        ),
+        length = 12,
+        digitsOnly = true,
+        regex = "^[0-9]{12}$"
+    ),
+    LegalIdFormatDataModel(
+        id = "tj_tin",
+        countryLocales = listOf("tj"),
+        name = listOf(
+            LocalizedStringDataModel("main", "TIN"),
+            LocalizedStringDataModel("en", "TIN"),
+            LocalizedStringDataModel("ru", "ИНН / РМА"),
+            LocalizedStringDataModel("kk", "СТН / РМА")
+        ),
+        label = listOf(
+            LocalizedStringDataModel("main", "Taxpayer Identification Number"),
+            LocalizedStringDataModel("en", "Taxpayer Identification Number"),
+            LocalizedStringDataModel("ru", "Идентификационный номер налогоплательщика"),
+            LocalizedStringDataModel("kk", "Салық төлеушінің сәйкестендіру нөмірі")
+        ),
+        placeholder = listOf(
+            LocalizedStringDataModel("main", "9 digits"),
+            LocalizedStringDataModel("en", "9 digits"),
+            LocalizedStringDataModel("ru", "9 цифр"),
+            LocalizedStringDataModel("kk", "9 сан")
+        ),
+        length = 9,
+        digitsOnly = true,
+        regex = "^[0-9]{9}$"
+    )
+)
+
+fun GlobalAppConfigurationDataModel.legalIdFormatForCountry(countryLocale: String?): LegalIdFormatDataModel {
+    val normalized = countryLocale?.trim()?.lowercase().orEmpty()
+    return legalIdFormats.firstOrNull { format ->
+        format.countryLocales.any { it.equals(normalized, ignoreCase = true) }
+    } ?: legalIdFormats.firstOrNull() ?: defaultLegalIdFormats().first()
+}
+
+fun String.matchesLegalIdFormat(format: LegalIdFormatDataModel): Boolean {
+    val normalized = trim()
+    if (format.required && normalized.isBlank()) return false
+    if (!format.required && normalized.isBlank()) return true
+    if (format.digitsOnly && !normalized.all { it.isDigit() }) return false
+    format.length?.let { if (normalized.length != it) return false }
+    format.minLength?.let { if (normalized.length < it) return false }
+    format.maxLength?.let { if (normalized.length > it) return false }
+    return format.regex?.let { Regex(it).matches(normalized) } ?: true
+}
 
 @kotlinx.serialization.Serializable
 data class CountryDataModel(
@@ -5413,10 +7425,15 @@ data class GlobalAppConfigurationDataModel(
     val addStockBatchPath: Pair<String, String>,
     val updateStockBatchPath: Pair<String, String>,
     val deleteStockBatchPath: Pair<String, String>,
+    val getStockItemBranchAvailabilityPath: Pair<String, String> = Pair("stockBatches/branchAvailability", "73"),
+    val moveStockBatchPath: Pair<String, String> = Pair("stockBatches/move", "74"),
 
     val getGenericGoodsItemsPath: Pair<String, String>,
     val getGenericGoodsCategoriesPath: Pair<String, String>,
     val getSuppliersPath: Pair<String, String>,
+    val addSupplierPath: Pair<String, String> = Pair("suppliers/add", "83"),
+    val updateSupplierPath: Pair<String, String> = Pair("suppliers/update", "84"),
+    val deleteSupplierPath: Pair<String, String> = Pair("suppliers/delete", "85"),
     val stringResourcesPath: Pair<String, String>,
     val dimensionResourcesPath: Pair<String, String>,
     val colorResourcesPath: Pair<String, String>,
@@ -5438,8 +7455,35 @@ data class GlobalAppConfigurationDataModel(
     val updateSupplierOrderPath: Pair<String, String> = Pair("supplierOrders/update", "36"),
     val deleteSupplierOrdersPath: Pair<String, String> = Pair("supplierOrders/delete", "37"),
     val receiveSupplierOrderPath: Pair<String, String> = Pair("supplierOrders/receive", "38"),
+    val getCashRegisterPath: Pair<String, String> = Pair("cashRegister/get", "49"),
+    val extractCashRegisterPath: Pair<String, String> = Pair("cashRegister/extract", "50"),
+    val getStoreWorkersPath: Pair<String, String> = Pair("workers/store/get", "51"),
+    val getMyWorkerMembershipsPath: Pair<String, String> = Pair("workers/my/get", "52"),
+    val getIncomingWorkerRequestsPath: Pair<String, String> = Pair("workers/requests/incoming", "53"),
+    val getMyWorkerRequestsPath: Pair<String, String> = Pair("workers/requests/my", "54"),
+    val requestStoreEmploymentPath: Pair<String, String> = Pair("workers/request", "55"),
+    val acceptStoreEmploymentPath: Pair<String, String> = Pair("workers/accept", "56"),
+    val declineStoreEmploymentPath: Pair<String, String> = Pair("workers/decline", "57"),
+    val updateStoreWorkerPermissionsPath: Pair<String, String> = Pair("workers/updatePermissions", "58"),
+    val inviteStoreWorkerPath: Pair<String, String> = Pair("workers/invite", "65"),
+    val acceptStoreWorkerInvitationPath: Pair<String, String> = Pair("workers/invitations/accept", "66"),
+    val declineStoreWorkerInvitationPath: Pair<String, String> = Pair("workers/invitations/decline", "67"),
+    val getCurrentWorkshiftPath: Pair<String, String> = Pair("workshifts/current", "86"),
+    val startWorkshiftPath: Pair<String, String> = Pair("workshifts/start", "87"),
+    val endWorkshiftPath: Pair<String, String> = Pair("workshifts/end", "88"),
+    val getUserFinanceDashboardPath: Pair<String, String> = Pair("finance/dashboard", "77"),
+    val createTopUpPaymentPath: Pair<String, String> = Pair("finance/topup/create", "78"),
+    val confirmDevelopmentTopUpPath: Pair<String, String> = Pair("finance/topup/confirmDevelopment", "79"),
+    val getSubscriptionPlansPath: Pair<String, String> = Pair("subscriptions/plans", "80"),
+    val getStoreSubscriptionPath: Pair<String, String> = Pair("subscriptions/store/get", "81"),
+    val updateStoreSubscriptionPath: Pair<String, String> = Pair("subscriptions/store/update", "82"),
+    val pagingDefaultPageSize: Int = 40,
+    val pagingMaxPageSize: Int = 200,
+    val paymentProviders: List<PaymentProviderConfigDataModel> = defaultPaymentProviders(),
+    val subscriptionPlans: List<StoreSubscriptionPlanDataModel> = defaultStoreSubscriptionPlans(),
     val companyForms: List<CompanyFormDataModel>,
     val countries: List<CountryDataModel>,
+    val legalIdFormats: List<LegalIdFormatDataModel> = defaultLegalIdFormats(),
     val languages: List<AppLanguageDataModel>,
     val themes: List<AppThemeDataModel>,
     val goodsItemsQuantityUnits: List<QuantityDataModel>
@@ -5613,6 +7657,7 @@ data class GoodsItemDataModel(
 
     val note: String? = null,
     val noteLocalized: List<LocalizedStringDataModel> = emptyList(),
+    val conditions: List<String> = emptyList(),
 
     val createdAtMillis: Long = 0L,
     val updatedAtMillis: Long = 0L,
@@ -5629,6 +7674,7 @@ data class GoodsItemDataModel(
             addAll(supplyPrices.map { it.price })
             addAll(wholesalePrices.map { it.price })
             addAll(noteLocalized.map { it.value })
+            addAll(conditions)
             note?.let { add(it) }
             addAll(salePrices.map { it.currency })
             addAll(returnPrices.map { it.currency })
@@ -5645,6 +7691,7 @@ data class GoodsItemDataModel(
             addAll(supplyPrices.map { it.price })
             addAll(wholesalePrices.map { it.price })
             addAll(noteLocalized.map { it.value })
+            addAll(conditions)
             note?.let { add(it) }
             addAll(salePrices.map { it.currency })
             addAll(returnPrices.map { it.currency })
@@ -5680,7 +7727,8 @@ data class GoodsItemInTransactionDataModel(
     val quantity: Double,
     val pricePerUnit: Double,
     val supplierId: Long? = null,
-    val saleMethodId: String = SALE_METHOD_RETAIL
+    val saleMethodId: String = SALE_METHOD_RETAIL,
+    val supplierIdText: String? = null
 )
 
 @kotlinx.serialization.Serializable
@@ -5786,6 +7834,24 @@ data class RemoteResponseDataModel(
 )
 
 @kotlinx.serialization.Serializable
+data class RealtimeUpdateDataModel(
+    val id: String = "",
+    val type: String = "changed",
+    val entity: String = "all",
+    val storeId: String? = null,
+    val reason: String? = null,
+    val createdAtMillis: Long = 0L
+)
+
+@kotlinx.serialization.Serializable
+data class RealtimeClientHelloDataModel(
+    val activeStoreId: String? = null,
+    val language: String = "",
+    val platform: String = "",
+    val clientTimeMillis: Long = 0L
+)
+
+@kotlinx.serialization.Serializable
 data class ResponseDataModel<T>(
     val message: List<LocalizedStringDataModel>?,
     val payload: T?,
@@ -5864,6 +7930,8 @@ abstract class StateHost {
 @kotlinx.serialization.Serializable
 data class StoreDataModel(
     val id: String,
+    val publicId: String = "",
+    val parentStoreId: String? = null,
     val userIds: List<String>,
     val storeTypeIds: List<String>,
     val name: List<LocalizedStringDataModel>,
@@ -5871,16 +7939,23 @@ data class StoreDataModel(
     val description: List<LocalizedStringDataModel>,
     val companyForms: List<CompanyFormDataModel>,
     val location: LocationDataModel,
+    val address: String = "",
+    val legalIdTypeId: String = "",
+    val legalId: String = "",
     val phoneNumbers: List<String>,
     val emails: List<String>,
     val countryLocales: List<String>,
-    val createdAt: Long
+    val createdAt: Long,
+    val branches: List<StoreDataModel> = emptyList()
 ): Searchable {
 
     override val exactSearchOperands: List<String>
         get() {
             return mutableListOf<String>()
                 .apply {
+                    add(id)
+                    parentStoreId?.let { add(it) }
+                    add(publicId)
                     name.forEach {
                         add(it.value)
                     }
@@ -5894,6 +7969,15 @@ data class StoreDataModel(
                     }
 
                     add(location.name)
+                    add(address)
+                    add(legalIdTypeId)
+                    add(legalId)
+                    branches.forEach { branch ->
+                        add(branch.id)
+                        add(branch.publicId)
+                        add(branch.address)
+                        branch.name.forEach { add(it.value) }
+                    }
                     add(location.postalIndex)
                     add(location.latitude.toString())
                     add(location.longitude.toString())
@@ -5906,6 +7990,9 @@ data class StoreDataModel(
         get() {
             return mutableListOf<String>()
                 .apply {
+                    add(id)
+                    parentStoreId?.let { add(it) }
+                    add(publicId)
                     name.forEach {
                         add(it.value)
                     }
@@ -5919,6 +8006,15 @@ data class StoreDataModel(
                     }
 
                     add(location.name)
+                    add(address)
+                    add(legalIdTypeId)
+                    add(legalId)
+                    branches.forEach { branch ->
+                        add(branch.id)
+                        add(branch.publicId)
+                        add(branch.address)
+                        branch.name.forEach { add(it.value) }
+                    }
                     add(location.postalIndex)
                     add(location.latitude.toString())
                     add(location.longitude.toString())
@@ -5929,9 +8025,42 @@ data class StoreDataModel(
         }
     override val uniqueSearchOperands: List<String>
         get() {
-            return emptyList()
+            return listOf(id, publicId).filter { it.isNotBlank() }
         }
 }
+
+fun StoreDataModel.isBranchStore(): Boolean = !parentStoreId.isNullOrBlank()
+
+fun StoreDataModel.rootStoreId(): String = parentStoreId?.takeIf { it.isNotBlank() } ?: id
+
+fun StoreDataModel.canBeSelectedAsActiveStore(): Boolean = true
+
+fun StoreDataModel.displayAddress(): String = address.ifBlank { location.name }
+
+fun List<StoreDataModel>.flattenStoresWithBranches(): List<StoreDataModel> {
+    val result = linkedMapOf<String, StoreDataModel>()
+
+    fun addStore(store: StoreDataModel) {
+        if (store.id.isNotBlank()) result[store.id] = store
+        store.branches.forEach { branch -> addStore(branch) }
+    }
+
+    forEach { addStore(it) }
+    return result.values.toList()
+}
+
+fun List<StoreDataModel>.topLevelStores(): List<StoreDataModel> =
+    filter { it.parentStoreId.isNullOrBlank() }
+
+fun List<StoreDataModel>.findStoreOrBranch(id: String?): StoreDataModel? {
+    if (id.isNullOrBlank()) return null
+    return flattenStoresWithBranches().firstOrNull { store ->
+        store.id == id || store.publicId.equals(id, ignoreCase = true)
+    }
+}
+
+fun List<StoreDataModel>.settableActiveStores(): List<StoreDataModel> =
+    flattenStoresWithBranches().filter { it.canBeSelectedAsActiveStore() }
 
 @kotlinx.serialization.Serializable
 sealed interface StoreJobDataModel {
@@ -6017,14 +8146,24 @@ data class SubscriptionPlanDataModel(
 
 @kotlinx.serialization.Serializable
 data class SupplierDataModel(
-    val id: String,
-    val typeIds: List<String>?,
-    val name: List<LocalizedStringDataModel>,
-    val phoneNumbers: List<String>?,
-    val emails: List<String>?,
-    val addedAt: Long,
-    val isActive: Boolean
-)
+    val id: String = "",
+    val userIds: List<String> = emptyList(),
+    val typeIds: List<String>? = null,
+    val categoryIds: List<String> = emptyList(),
+    val name: List<LocalizedStringDataModel> = emptyList(),
+    val phoneNumbers: List<String>? = null,
+    val emails: List<String>? = null,
+    val addedAt: Long = 0L,
+    val isActive: Boolean = true
+) {
+    fun isMineForUser(userId: String?): Boolean = !userId.isNullOrBlank() && userIds.contains(userId)
+    fun isGenericSupplier(): Boolean = userIds.isEmpty()
+}
+
+fun List<SupplierDataModel>.upsertById(item: SupplierDataModel): List<SupplierDataModel> {
+    val index = indexOfFirst { it.id == item.id }
+    return if (index < 0) this + item else toMutableList().also { it[index] = item }
+}
 
 @kotlinx.serialization.Serializable
 data class TokenPair(
@@ -6097,9 +8236,15 @@ data class TransactionDataModel(
     val timeMillis: Long
 )
 
+
+fun UserAccountDataModel.visibleWorkerInviteId(): String = publicId.ifBlank { id }
+
+fun StoreDataModel.visibleEmploymentId(): String = publicId.ifBlank { id }
+
 @kotlinx.serialization.Serializable
 data class UserAccountDataModel(
     val id: String,
+    val publicId: String = "",
     val phoneNumber: String,
     val email: String,
     val firstName: String,
@@ -6138,10 +8283,11 @@ data class UserAuthSignUpDataModel(
 )
 
 @kotlinx.serialization.Serializable
-class UserBalanceDataModel(
-    val value: String,
-    val currencyCode: String,
-    val history: List<BalanceHistoryEntryDataModel>
+data class UserBalanceDataModel(
+    val value: String = "0",
+    val currencyCode: String = "KZT",
+    val history: List<BalanceHistoryEntryDataModel> = emptyList(),
+    val aitaCurrencyCode: String = currencyCode.aitaCurrencyCode()
 )
 
 @kotlinx.serialization.Serializable
@@ -6150,6 +8296,116 @@ data class UserSettingsDataModel(
     val appLanguage: String,
     val appThemeId: Long,
     val appSizeModeId: Long
+)
+
+@kotlinx.serialization.Serializable
+data class StoreWorkerDataModel(
+    val id: String = "",
+    val storeId: String = "",
+    val storePublicId: String = "",
+    val storeName: List<LocalizedStringDataModel> = emptyList(),
+    val userId: String = "",
+    val userPublicId: String = "",
+    val phoneNumber: String = "",
+    val email: String = "",
+    val firstName: String = "",
+    val lastName: String = "",
+    val roleId: String = WORKER_ROLE_STANDARD,
+    val permissions: List<String> = STANDARD_STORE_PERMISSION_IDS,
+    val requestedAtMillis: Long = 0L,
+    val acceptedAtMillis: Long = 0L,
+    val acceptedByUserId: String = "",
+    val isActive: Boolean = true,
+    val hasWorkshiftPassword: Boolean = false
+) {
+    val displayName: String
+        get() = "${firstName.trim()} ${lastName.trim()}".trim().ifBlank { phoneNumber.ifBlank { email.ifBlank { userId } } }
+}
+
+@kotlinx.serialization.Serializable
+data class StoreWorkerRequestDataModel(
+    val id: String = "",
+    val storeId: String = "",
+    val storePublicId: String = "",
+    val storeName: List<LocalizedStringDataModel> = emptyList(),
+    val requesterUserId: String = "",
+    val requesterPublicId: String = "",
+    val direction: String = WORKER_REQUEST_DIRECTION_USER_TO_STORE,
+    val invitedByUserId: String? = null,
+    val phoneNumber: String = "",
+    val email: String = "",
+    val firstName: String = "",
+    val lastName: String = "",
+    val status: String = "pending",
+    val requestedAtMillis: Long = 0L,
+    val decidedAtMillis: Long? = null,
+    val decidedByUserId: String? = null,
+    val roleId: String = WORKER_ROLE_STANDARD,
+    val permissions: List<String> = STANDARD_STORE_PERMISSION_IDS,
+    val note: String? = null
+) {
+    val displayName: String
+        get() = "${firstName.trim()} ${lastName.trim()}".trim().ifBlank { phoneNumber.ifBlank { email.ifBlank { requesterPublicId.ifBlank { requesterUserId } } } }
+}
+
+@kotlinx.serialization.Serializable
+data class WorkerEmploymentRequestCreateDataModel(
+    val storeId: String
+)
+
+@kotlinx.serialization.Serializable
+data class WorkerEmploymentDecisionRequestDataModel(
+    val requestId: String,
+    val roleId: String = WORKER_ROLE_STANDARD,
+    val permissions: List<String> = STANDARD_STORE_PERMISSION_IDS,
+    val note: String? = null,
+    val workerPassword: String? = null
+)
+
+@kotlinx.serialization.Serializable
+data class WorkerStoreInviteCreateDataModel(
+    val userId: String,
+    val roleId: String = WORKER_ROLE_STANDARD,
+    val permissions: List<String> = STANDARD_STORE_PERMISSION_IDS,
+    val note: String? = null,
+    val workerPassword: String? = null
+)
+
+@kotlinx.serialization.Serializable
+data class WorkerStoreInvitationDecisionDataModel(
+    val requestId: String,
+    val note: String? = null
+)
+
+@kotlinx.serialization.Serializable
+data class WorkerPermissionsUpdateRequestDataModel(
+    val workerId: String,
+    val roleId: String,
+    val permissions: List<String>,
+    val workerPassword: String? = null
+)
+
+@kotlinx.serialization.Serializable
+data class WorkshiftStartRequestDataModel(
+    val workerIdentifier: String,
+    val password: String
+)
+
+@kotlinx.serialization.Serializable
+data class WorkshiftDataModel(
+    val id: String = "",
+    val storeId: String = "",
+    val storePublicId: String = "",
+    val storeName: List<LocalizedStringDataModel> = emptyList(),
+    val workerMembershipId: String = "",
+    val workerUserId: String = "",
+    val workerPublicId: String = "",
+    val workerDisplayName: String = "",
+    val startedAtMillis: Long = 0L,
+    val endedAtMillis: Long? = null,
+    val startedByUserId: String = "",
+    val endedByUserId: String? = null,
+    val isActive: Boolean = true
 )
 
 @kotlinx.serialization.Serializable
@@ -6173,12 +8429,4 @@ data class WorkerDataModel(
 data class WorkerPrivilegeModeDataModel(
     val id: String,
     val parameters: List<ParameterDataModel>
-)
-
-@kotlinx.serialization.Serializable
-data class WorkshiftDataModel(
-    val id: Long,
-    val startTime: Long,
-    val endTime: Long,
-    val employeeId: Long
 )

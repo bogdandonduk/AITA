@@ -27,118 +27,118 @@ actual var setStoredUserAccountDataModel: ((UserAccountDataModel?) -> Unit)? = n
 
 actual var cacheDirPath: String = ""
 actual val Dispatchers.ourIo: CoroutineDispatcher
-  get() = Dispatchers.IO
+    get() = Dispatchers.IO
 
 actual var getHttpClientEngine: () -> HttpClientEngine = {
-  OkHttp.create {
-    preconfigured = OkHttpClient.Builder()
-      .cache(
-        Cache(
-          File(cacheDirPath, "http"),
-          cacheSize
-        )
-      ).build()
-  }
+    OkHttp.create {
+        preconfigured = OkHttpClient.Builder()
+            .cache(
+                Cache(
+                    File(cacheDirPath, "http"),
+                    cacheSize
+                )
+            ).build()
+    }
 }
 
 actual var getSystemLocaleLanguage: () -> String = {
-  Locale.getDefault()?.language ?: "ru"
+    Locale.getDefault()?.language ?: "ru"
 }
 
 actual var getPlatformName: () -> String = {
-  "jvm"
+    "jvm"
 }
 
 actual var getSqlDelightDriver: (() -> SqlDriver?)? = {
-  Unit.run {
-    val dir = Path(cacheDirPath)
-    val dbPath = dir.resolve("app_database.db").toAbsolutePath()
+    Unit.run {
+        val dir = Path(cacheDirPath)
+        val dbPath = dir.resolve("app_database.db").toAbsolutePath()
 
-    val url = "jdbc:sqlite:$dbPath"
-    val firstRun = !Files.exists(dbPath)
+        val url = "jdbc:sqlite:$dbPath"
+        val firstRun = !Files.exists(dbPath)
 
-    val driver: SqlDriver = JdbcSqliteDriver(url)
+        val driver: SqlDriver = JdbcSqliteDriver(url)
 
-    val schema = AppDatabase.Schema.synchronous()
-    if (firstRun) {
-      schema.create(driver)
-    } else {
-      val cursor = driver
-        .executeQuery(
-          identifier = null,
-          sql = "PRAGMA user_version",
-          parameters = 0,
-          mapper = { cursor: SqlCursor ->
-            QueryResult.Value(
-              if (cursor.next().value)
-                cursor.getLong(0)?.toInt() ?: 0
-              else
-                0
-            )
-          }
-        )
-      val currentVersion = cursor.value
-      val targetVersion = AppDatabase.Schema.version.toInt()
-      if (currentVersion < targetVersion) {
-        schema.migrate(driver, currentVersion.toLong(), schema.version)
-      }
+        val schema = AppDatabase.Schema.synchronous()
+        if (firstRun) {
+            schema.create(driver)
+        } else {
+            val cursor = driver
+                .executeQuery(
+                    identifier = null,
+                    sql = "PRAGMA user_version",
+                    parameters = 0,
+                    mapper = { cursor: SqlCursor ->
+                        QueryResult.Value(
+                            if (cursor.next().value)
+                                cursor.getLong(0)?.toInt() ?: 0
+                            else
+                                0
+                        )
+                    }
+                )
+            val currentVersion = cursor.value
+            val targetVersion = AppDatabase.Schema.version.toInt()
+            if (currentVersion < targetVersion) {
+                schema.migrate(driver, currentVersion.toLong(), schema.version)
+            }
+        }
+
+        driver
     }
-
-    driver
-  }
 }
 
 object ReceiptPlatformJvmBridge {
-  /**
-   * Optional desktop ESC/POS writer. Configure it for a USB serial, COM port, or network printer.
-   */
-  var writeEscPosBytes: (suspend (ByteArray) -> Boolean)? = null
+    /**
+     * Optional desktop ESC/POS writer. Configure it for a USB serial, COM port, or network printer.
+     */
+    var writeEscPosBytes: (suspend (ByteArray) -> Boolean)? = null
 }
 
 fun installReceiptPlatformJvm() {
-  saveReceiptPdfFile = { fileName, pdfBytes ->
-    withContext(Dispatchers.IO) {
-      runCatching {
-        val downloads = File(System.getProperty("user.home"), "Downloads").takeIf { it.exists() }
-          ?: File(System.getProperty("user.home"))
-        val file = File(downloads, fileName)
-        file.writeBytes(pdfBytes)
-        ReceiptPlatformActionResult(true, "Saved to ${file.absolutePath}")
-      }.getOrElse {
-        ReceiptPlatformActionResult(false, it.message ?: "Could not save PDF")
-      }
-    }
-  }
-
-  shareReceiptPdfFile = { fileName, pdfBytes, whatsappOnly ->
-    withContext(Dispatchers.IO) {
-      runCatching {
-        val file = File(System.getProperty("java.io.tmpdir"), fileName)
-        file.writeBytes(pdfBytes)
-        if (Desktop.isDesktopSupported()) {
-          Desktop.getDesktop().open(file)
-          ReceiptPlatformActionResult(true, if (whatsappOnly) "Opened PDF; send it through WhatsApp Desktop manually" else "Opened PDF")
-        } else {
-          ReceiptPlatformActionResult(true, "PDF created at ${file.absolutePath}")
+    saveReceiptPdfFile = { fileName, pdfBytes ->
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val downloads = File(System.getProperty("user.home"), "Downloads").takeIf { it.exists() }
+                    ?: File(System.getProperty("user.home"))
+                val file = File(downloads, fileName)
+                file.writeBytes(pdfBytes)
+                ReceiptPlatformActionResult(true, "Saved to ${file.absolutePath}")
+            }.getOrElse {
+                ReceiptPlatformActionResult(false, it.message ?: "Could not save PDF")
+            }
         }
-      }.getOrElse {
-        ReceiptPlatformActionResult(false, it.message ?: "Could not share PDF")
-      }
     }
-  }
 
-  printReceiptEscPosBytes = { printerBytes ->
-    runCatching {
-      val writer = ReceiptPlatformJvmBridge.writeEscPosBytes
-        ?: return@runCatching ReceiptPlatformActionResult(false, "No desktop ESC/POS printer writer is configured")
-
-      if (writer(printerBytes)) {
-        ReceiptPlatformActionResult(true, "Sent to printer")
-      } else {
-        ReceiptPlatformActionResult(false, "Printer rejected the receipt")
-      }
-    }.getOrElse {
-      ReceiptPlatformActionResult(false, it.message ?: "Could not print receipt")
+    shareReceiptPdfFile = { fileName, pdfBytes, whatsappOnly ->
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val file = File(System.getProperty("java.io.tmpdir"), fileName)
+                file.writeBytes(pdfBytes)
+                if (Desktop.isDesktopSupported()) {
+                    Desktop.getDesktop().open(file)
+                    ReceiptPlatformActionResult(true, if (whatsappOnly) "Opened PDF; send it through WhatsApp Desktop manually" else "Opened PDF")
+                } else {
+                    ReceiptPlatformActionResult(true, "PDF created at ${file.absolutePath}")
+                }
+            }.getOrElse {
+                ReceiptPlatformActionResult(false, it.message ?: "Could not share PDF")
+            }
+        }
     }
-  }
+
+    printReceiptEscPosBytes = { printerBytes ->
+        runCatching {
+            val writer = ReceiptPlatformJvmBridge.writeEscPosBytes
+                ?: return@runCatching ReceiptPlatformActionResult(false, "No desktop ESC/POS printer writer is configured")
+
+            if (writer(printerBytes)) {
+                ReceiptPlatformActionResult(true, "Sent to printer")
+            } else {
+                ReceiptPlatformActionResult(false, "Printer rejected the receipt")
+            }
+        }.getOrElse {
+            ReceiptPlatformActionResult(false, it.message ?: "Could not print receipt")
+        }
+    }
 }

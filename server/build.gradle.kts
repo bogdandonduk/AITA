@@ -1,3 +1,4 @@
+// THIS IS build.gradle of server module
 plugins {
     alias(libs.plugins.kotlinJvm)
     alias(libs.plugins.ktor)
@@ -8,7 +9,7 @@ group = "kz.aita"
 version = "1.0.0"
 application {
     mainClass.set("kz.aita.ServerKt")
-    
+
     applicationDefaultJvmArgs = listOf("-Dio.ktor.development=false")
 }
 
@@ -18,6 +19,7 @@ dependencies {
     implementation(libs.hikaricp)
 
     implementation("io.ktor:ktor-server-auth:${property("ktor.version")}")
+    implementation(libs.ktor.server.websockets)
     implementation("io.ktor:ktor-server-auth-jwt:${property("ktor.version")}")
 
     implementation("io.ktor:ktor-server-default-headers:${property("ktor.version")}")

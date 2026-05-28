@@ -9010,6 +9010,4899 @@
           "value": "Соңына"
         }
       ]
+    },
+    {
+      "id": 429,
+      "values": [
+        {
+          "language": "main",
+          "value": "Active workers"
+        },
+        {
+          "language": "en",
+          "value": "Active workers"
+        },
+        {
+          "language": "ru",
+          "value": "Активные сотрудники"
+        },
+        {
+          "language": "kk",
+          "value": "Белсенді қызметкерлер"
+        }
+      ]
+    },
+    {
+      "id": 430,
+      "values": [
+        {
+          "language": "main",
+          "value": "Employees connected to this store"
+        },
+        {
+          "language": "en",
+          "value": "Employees connected to this store"
+        },
+        {
+          "language": "ru",
+          "value": "Сотрудники, привязанные к этому магазину"
+        },
+        {
+          "language": "kk",
+          "value": "Осы дүкенге қосылған қызметкерлер"
+        }
+      ]
+    },
+    {
+      "id": 431,
+      "values": [
+        {
+          "language": "main",
+          "value": "Admins"
+        },
+        {
+          "language": "en",
+          "value": "Admins"
+        },
+        {
+          "language": "ru",
+          "value": "Администраторы"
+        },
+        {
+          "language": "kk",
+          "value": "Әкімшілер"
+        }
+      ]
+    },
+    {
+      "id": 432,
+      "values": [
+        {
+          "language": "main",
+          "value": "Standard workers"
+        },
+        {
+          "language": "en",
+          "value": "Standard workers"
+        },
+        {
+          "language": "ru",
+          "value": "Стандартные сотрудники"
+        },
+        {
+          "language": "kk",
+          "value": "Стандартты қызметкерлер"
+        }
+      ]
+    },
+    {
+      "id": 433,
+      "values": [
+        {
+          "language": "main",
+          "value": "Cash physically expected in the drawer"
+        },
+        {
+          "language": "en",
+          "value": "Cash physically expected in the drawer"
+        },
+        {
+          "language": "ru",
+          "value": "Наличные, которые должны быть в кассе"
+        },
+        {
+          "language": "kk",
+          "value": "Кассада болуы тиіс қолма-қол ақша"
+        }
+      ]
+    },
+    {
+      "id": 434,
+      "values": [
+        {
+          "language": "main",
+          "value": "Cash from sales"
+        },
+        {
+          "language": "en",
+          "value": "Cash from sales"
+        },
+        {
+          "language": "ru",
+          "value": "Наличные от продаж"
+        },
+        {
+          "language": "kk",
+          "value": "Сатылымнан түскен қолма-қол ақша"
+        }
+      ]
+    },
+    {
+      "id": 435,
+      "values": [
+        {
+          "language": "main",
+          "value": "Cash paid for returns"
+        },
+        {
+          "language": "en",
+          "value": "Cash paid for returns"
+        },
+        {
+          "language": "ru",
+          "value": "Наличные, выданные по возвратам"
+        },
+        {
+          "language": "kk",
+          "value": "Қайтарымдарға берілген қолма-қол ақша"
+        }
+      ]
+    },
+    {
+      "id": 436,
+      "values": [
+        {
+          "language": "main",
+          "value": "Cash events"
+        },
+        {
+          "language": "en",
+          "value": "Cash events"
+        },
+        {
+          "language": "ru",
+          "value": "Операции с наличными"
+        },
+        {
+          "language": "kk",
+          "value": "Қолма-қол ақша оқиғалары"
+        }
+      ]
+    },
+    {
+      "id": 437,
+      "values": [
+        {
+          "language": "main",
+          "value": "Extract cash"
+        },
+        {
+          "language": "en",
+          "value": "Extract cash"
+        },
+        {
+          "language": "ru",
+          "value": "Изъять наличные"
+        },
+        {
+          "language": "kk",
+          "value": "Қолма-қол ақшаны алу"
+        }
+      ]
+    },
+    {
+      "id": 438,
+      "values": [
+        {
+          "language": "main",
+          "value": "You do not have permission to extract cash from this register"
+        },
+        {
+          "language": "en",
+          "value": "You do not have permission to extract cash from this register"
+        },
+        {
+          "language": "ru",
+          "value": "У вас нет прав изымать наличные из этой кассы"
+        },
+        {
+          "language": "kk",
+          "value": "Бұл кассадан қолма-қол ақша алуға рұқсатыңыз жоқ"
+        }
+      ]
+    },
+    {
+      "id": 439,
+      "values": [
+        {
+          "language": "main",
+          "value": "Amount to extract"
+        },
+        {
+          "language": "en",
+          "value": "Amount to extract"
+        },
+        {
+          "language": "ru",
+          "value": "Сумма изъятия"
+        },
+        {
+          "language": "kk",
+          "value": "Алынатын сома"
+        }
+      ]
+    },
+    {
+      "id": 440,
+      "values": [
+        {
+          "language": "main",
+          "value": "Extract"
+        },
+        {
+          "language": "en",
+          "value": "Extract"
+        },
+        {
+          "language": "ru",
+          "value": "Изъять"
+        },
+        {
+          "language": "kk",
+          "value": "Алу"
+        }
+      ]
+    },
+    {
+      "id": 441,
+      "values": [
+        {
+          "language": "main",
+          "value": "Extraction note"
+        },
+        {
+          "language": "en",
+          "value": "Extraction note"
+        },
+        {
+          "language": "ru",
+          "value": "Заметка к изъятию"
+        },
+        {
+          "language": "kk",
+          "value": "Алу туралы ескерту"
+        }
+      ]
+    },
+    {
+      "id": 442,
+      "values": [
+        {
+          "language": "main",
+          "value": "No cash register events in this period"
+        },
+        {
+          "language": "en",
+          "value": "No cash register events in this period"
+        },
+        {
+          "language": "ru",
+          "value": "Нет операций с кассой за этот период"
+        },
+        {
+          "language": "kk",
+          "value": "Бұл кезеңде касса оқиғалары жоқ"
+        }
+      ]
+    },
+    {
+      "id": 443,
+      "values": [
+        {
+          "language": "main",
+          "value": "Balance"
+        },
+        {
+          "language": "en",
+          "value": "Balance"
+        },
+        {
+          "language": "ru",
+          "value": "Баланс"
+        },
+        {
+          "language": "kk",
+          "value": "Баланс"
+        }
+      ]
+    },
+    {
+      "id": 444,
+      "values": [
+        {
+          "language": "main",
+          "value": "Sale cash received"
+        },
+        {
+          "language": "en",
+          "value": "Sale cash received"
+        },
+        {
+          "language": "ru",
+          "value": "Наличные от продажи"
+        },
+        {
+          "language": "kk",
+          "value": "Сатылымнан қолма-қол ақша түсті"
+        }
+      ]
+    },
+    {
+      "id": 445,
+      "values": [
+        {
+          "language": "main",
+          "value": "Return cash paid out"
+        },
+        {
+          "language": "en",
+          "value": "Return cash paid out"
+        },
+        {
+          "language": "ru",
+          "value": "Наличные выданы по возврату"
+        },
+        {
+          "language": "kk",
+          "value": "Қайтарым бойынша қолма-қол ақша берілді"
+        }
+      ]
+    },
+    {
+      "id": 446,
+      "values": [
+        {
+          "language": "main",
+          "value": "Cash extraction"
+        },
+        {
+          "language": "en",
+          "value": "Cash extraction"
+        },
+        {
+          "language": "ru",
+          "value": "Изъятие наличных"
+        },
+        {
+          "language": "kk",
+          "value": "Қолма-қол ақшаны алу"
+        }
+      ]
+    },
+    {
+      "id": 447,
+      "values": [
+        {
+          "language": "main",
+          "value": "Cash register adjustment"
+        },
+        {
+          "language": "en",
+          "value": "Cash register adjustment"
+        },
+        {
+          "language": "ru",
+          "value": "Корректировка кассы"
+        },
+        {
+          "language": "kk",
+          "value": "Кассаны түзету"
+        }
+      ]
+    },
+    {
+      "id": 448,
+      "values": [
+        {
+          "language": "main",
+          "value": "Admin"
+        },
+        {
+          "language": "en",
+          "value": "Admin"
+        },
+        {
+          "language": "ru",
+          "value": "Администратор"
+        },
+        {
+          "language": "kk",
+          "value": "Әкімші"
+        }
+      ]
+    },
+    {
+      "id": 449,
+      "values": [
+        {
+          "language": "main",
+          "value": "Owner"
+        },
+        {
+          "language": "en",
+          "value": "Owner"
+        },
+        {
+          "language": "ru",
+          "value": "Владелец"
+        },
+        {
+          "language": "kk",
+          "value": "Иесі"
+        }
+      ]
+    },
+    {
+      "id": 450,
+      "values": [
+        {
+          "language": "main",
+          "value": "Standard"
+        },
+        {
+          "language": "en",
+          "value": "Standard"
+        },
+        {
+          "language": "ru",
+          "value": "Стандартный"
+        },
+        {
+          "language": "kk",
+          "value": "Стандартты"
+        }
+      ]
+    },
+    {
+      "id": 451,
+      "values": [
+        {
+          "language": "main",
+          "value": "Sale transaction"
+        },
+        {
+          "language": "en",
+          "value": "Sale transaction"
+        },
+        {
+          "language": "ru",
+          "value": "Продажа"
+        },
+        {
+          "language": "kk",
+          "value": "Сату операциясы"
+        }
+      ]
+    },
+    {
+      "id": 452,
+      "values": [
+        {
+          "language": "main",
+          "value": "Return transaction"
+        },
+        {
+          "language": "en",
+          "value": "Return transaction"
+        },
+        {
+          "language": "ru",
+          "value": "Возврат"
+        },
+        {
+          "language": "kk",
+          "value": "Қайтару операциясы"
+        }
+      ]
+    },
+    {
+      "id": 453,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supply transaction"
+        },
+        {
+          "language": "en",
+          "value": "Supply transaction"
+        },
+        {
+          "language": "ru",
+          "value": "Поставка / приёмка"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізу / қабылдау операциясы"
+        }
+      ]
+    },
+    {
+      "id": 454,
+      "values": [
+        {
+          "language": "main",
+          "value": "View stock"
+        },
+        {
+          "language": "en",
+          "value": "View stock"
+        },
+        {
+          "language": "ru",
+          "value": "Просмотр склада"
+        },
+        {
+          "language": "kk",
+          "value": "Қойманы көру"
+        }
+      ]
+    },
+    {
+      "id": 455,
+      "values": [
+        {
+          "language": "main",
+          "value": "Edit stock"
+        },
+        {
+          "language": "en",
+          "value": "Edit stock"
+        },
+        {
+          "language": "ru",
+          "value": "Редактирование склада"
+        },
+        {
+          "language": "kk",
+          "value": "Қойманы өңдеу"
+        }
+      ]
+    },
+    {
+      "id": 456,
+      "values": [
+        {
+          "language": "main",
+          "value": "View transaction history"
+        },
+        {
+          "language": "en",
+          "value": "View transaction history"
+        },
+        {
+          "language": "ru",
+          "value": "Просмотр истории транзакций"
+        },
+        {
+          "language": "kk",
+          "value": "Транзакция тарихын көру"
+        }
+      ]
+    },
+    {
+      "id": 457,
+      "values": [
+        {
+          "language": "main",
+          "value": "View analytics"
+        },
+        {
+          "language": "en",
+          "value": "View analytics"
+        },
+        {
+          "language": "ru",
+          "value": "Просмотр аналитики"
+        },
+        {
+          "language": "kk",
+          "value": "Аналитиканы көру"
+        }
+      ]
+    },
+    {
+      "id": 458,
+      "values": [
+        {
+          "language": "main",
+          "value": "View cash register"
+        },
+        {
+          "language": "en",
+          "value": "View cash register"
+        },
+        {
+          "language": "ru",
+          "value": "Просмотр кассы"
+        },
+        {
+          "language": "kk",
+          "value": "Кассаны көру"
+        }
+      ]
+    },
+    {
+      "id": 459,
+      "values": [
+        {
+          "language": "main",
+          "value": "Extract cash"
+        },
+        {
+          "language": "en",
+          "value": "Extract cash"
+        },
+        {
+          "language": "ru",
+          "value": "Изъятие наличных"
+        },
+        {
+          "language": "kk",
+          "value": "Қолма-қол ақша алу"
+        }
+      ]
+    },
+    {
+      "id": 460,
+      "values": [
+        {
+          "language": "main",
+          "value": "View workers"
+        },
+        {
+          "language": "en",
+          "value": "View workers"
+        },
+        {
+          "language": "ru",
+          "value": "Просмотр сотрудников"
+        },
+        {
+          "language": "kk",
+          "value": "Қызметкерлерді көру"
+        }
+      ]
+    },
+    {
+      "id": 461,
+      "values": [
+        {
+          "language": "main",
+          "value": "Manage workers"
+        },
+        {
+          "language": "en",
+          "value": "Manage workers"
+        },
+        {
+          "language": "ru",
+          "value": "Управление сотрудниками"
+        },
+        {
+          "language": "kk",
+          "value": "Қызметкерлерді басқару"
+        }
+      ]
+    },
+    {
+      "id": 462,
+      "values": [
+        {
+          "language": "main",
+          "value": "Manage store"
+        },
+        {
+          "language": "en",
+          "value": "Manage store"
+        },
+        {
+          "language": "ru",
+          "value": "Управление магазином"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкенді басқару"
+        }
+      ]
+    },
+    {
+      "id": 463,
+      "values": [
+        {
+          "language": "main",
+          "value": "Cashier/basic worker"
+        },
+        {
+          "language": "en",
+          "value": "Cashier/basic worker"
+        },
+        {
+          "language": "ru",
+          "value": "Кассир / базовый сотрудник"
+        },
+        {
+          "language": "kk",
+          "value": "Кассир / негізгі қызметкер"
+        }
+      ]
+    },
+    {
+      "id": 464,
+      "values": [
+        {
+          "language": "main",
+          "value": "Can manage most store operations"
+        },
+        {
+          "language": "en",
+          "value": "Can manage most store operations"
+        },
+        {
+          "language": "ru",
+          "value": "Может управлять большинством операций магазина"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен операцияларының көбін басқара алады"
+        }
+      ]
+    },
+    {
+      "id": 465,
+      "values": [
+        {
+          "language": "main",
+          "value": "Requested"
+        },
+        {
+          "language": "en",
+          "value": "Requested"
+        },
+        {
+          "language": "ru",
+          "value": "Запрошено"
+        },
+        {
+          "language": "kk",
+          "value": "Сұралды"
+        }
+      ]
+    },
+    {
+      "id": 466,
+      "values": [
+        {
+          "language": "main",
+          "value": "Role"
+        },
+        {
+          "language": "en",
+          "value": "Role"
+        },
+        {
+          "language": "ru",
+          "value": "Роль"
+        },
+        {
+          "language": "kk",
+          "value": "Рөл"
+        }
+      ]
+    },
+    {
+      "id": 467,
+      "values": [
+        {
+          "language": "main",
+          "value": "Allowed actions"
+        },
+        {
+          "language": "en",
+          "value": "Allowed actions"
+        },
+        {
+          "language": "ru",
+          "value": "Разрешённые действия"
+        },
+        {
+          "language": "kk",
+          "value": "Рұқсат етілген әрекеттер"
+        }
+      ]
+    },
+    {
+      "id": 468,
+      "values": [
+        {
+          "language": "main",
+          "value": "Accept"
+        },
+        {
+          "language": "en",
+          "value": "Accept"
+        },
+        {
+          "language": "ru",
+          "value": "Принять"
+        },
+        {
+          "language": "kk",
+          "value": "Қабылдау"
+        }
+      ]
+    },
+    {
+      "id": 469,
+      "values": [
+        {
+          "language": "main",
+          "value": "Decline"
+        },
+        {
+          "language": "en",
+          "value": "Decline"
+        },
+        {
+          "language": "ru",
+          "value": "Отклонить"
+        },
+        {
+          "language": "kk",
+          "value": "Қабылдамау"
+        }
+      ]
+    },
+    {
+      "id": 470,
+      "values": [
+        {
+          "language": "main",
+          "value": "Accepted"
+        },
+        {
+          "language": "en",
+          "value": "Accepted"
+        },
+        {
+          "language": "ru",
+          "value": "Принят"
+        },
+        {
+          "language": "kk",
+          "value": "Қабылданды"
+        }
+      ]
+    },
+    {
+      "id": 471,
+      "values": [
+        {
+          "language": "main",
+          "value": "Save permissions"
+        },
+        {
+          "language": "en",
+          "value": "Save permissions"
+        },
+        {
+          "language": "ru",
+          "value": "Сохранить права"
+        },
+        {
+          "language": "kk",
+          "value": "Рұқсаттарды сақтау"
+        }
+      ]
+    },
+    {
+      "id": 472,
+      "values": [
+        {
+          "language": "main",
+          "value": "My work"
+        },
+        {
+          "language": "en",
+          "value": "My work"
+        },
+        {
+          "language": "ru",
+          "value": "Моя работа"
+        },
+        {
+          "language": "kk",
+          "value": "Менің жұмысым"
+        }
+      ]
+    },
+    {
+      "id": 473,
+      "values": [
+        {
+          "language": "main",
+          "value": "Store workers"
+        },
+        {
+          "language": "en",
+          "value": "Store workers"
+        },
+        {
+          "language": "ru",
+          "value": "Сотрудники магазина"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен қызметкерлері"
+        }
+      ]
+    },
+    {
+      "id": 474,
+      "values": [
+        {
+          "language": "main",
+          "value": "Requests"
+        },
+        {
+          "language": "en",
+          "value": "Requests"
+        },
+        {
+          "language": "ru",
+          "value": "Заявки"
+        },
+        {
+          "language": "kk",
+          "value": "Өтінімдер"
+        }
+      ]
+    },
+    {
+      "id": 475,
+      "values": [
+        {
+          "language": "main",
+          "value": "Request employment in a store"
+        },
+        {
+          "language": "en",
+          "value": "Request employment in a store"
+        },
+        {
+          "language": "ru",
+          "value": "Подать заявку на работу в магазине"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкенге жұмысқа өтінім беру"
+        }
+      ]
+    },
+    {
+      "id": 476,
+      "values": [
+        {
+          "language": "main",
+          "value": "Enter store public ID"
+        },
+        {
+          "language": "en",
+          "value": "Enter store public ID"
+        },
+        {
+          "language": "ru",
+          "value": "Введите публичный ID магазина"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкеннің жария ID-ін енгізіңіз"
+        }
+      ]
+    },
+    {
+      "id": 477,
+      "values": [
+        {
+          "language": "main",
+          "value": "Send request"
+        },
+        {
+          "language": "en",
+          "value": "Send request"
+        },
+        {
+          "language": "ru",
+          "value": "Отправить заявку"
+        },
+        {
+          "language": "kk",
+          "value": "Өтінім жіберу"
+        }
+      ]
+    },
+    {
+      "id": 478,
+      "values": [
+        {
+          "language": "main",
+          "value": "Managed stores"
+        },
+        {
+          "language": "en",
+          "value": "Managed stores"
+        },
+        {
+          "language": "ru",
+          "value": "Управляемые магазины"
+        },
+        {
+          "language": "kk",
+          "value": "Басқарылатын дүкендер"
+        }
+      ]
+    },
+    {
+      "id": 479,
+      "values": [
+        {
+          "language": "main",
+          "value": "You are not employed in other stores yet"
+        },
+        {
+          "language": "en",
+          "value": "You are not employed in other stores yet"
+        },
+        {
+          "language": "ru",
+          "value": "Вы пока не работаете в других магазинах"
+        },
+        {
+          "language": "kk",
+          "value": "Сіз әзірге басқа дүкендерде жұмыс істемейсіз"
+        }
+      ]
+    },
+    {
+      "id": 480,
+      "values": [
+        {
+          "language": "main",
+          "value": "My employment requests"
+        },
+        {
+          "language": "en",
+          "value": "My employment requests"
+        },
+        {
+          "language": "ru",
+          "value": "Мои заявки на работу"
+        },
+        {
+          "language": "kk",
+          "value": "Менің жұмысқа өтінімдерім"
+        }
+      ]
+    },
+    {
+      "id": 481,
+      "values": [
+        {
+          "language": "main",
+          "value": "No employment requests yet"
+        },
+        {
+          "language": "en",
+          "value": "No employment requests yet"
+        },
+        {
+          "language": "ru",
+          "value": "Заявок на работу пока нет"
+        },
+        {
+          "language": "kk",
+          "value": "Әзірге жұмысқа өтінімдер жоқ"
+        }
+      ]
+    },
+    {
+      "id": 482,
+      "values": [
+        {
+          "language": "main",
+          "value": "Status"
+        },
+        {
+          "language": "en",
+          "value": "Status"
+        },
+        {
+          "language": "ru",
+          "value": "Статус"
+        },
+        {
+          "language": "kk",
+          "value": "Күй"
+        }
+      ]
+    },
+    {
+      "id": 483,
+      "values": [
+        {
+          "language": "main",
+          "value": "You do not have permission to view workers in this store"
+        },
+        {
+          "language": "en",
+          "value": "You do not have permission to view workers in this store"
+        },
+        {
+          "language": "ru",
+          "value": "У вас нет прав просматривать сотрудников этого магазина"
+        },
+        {
+          "language": "kk",
+          "value": "Бұл дүкеннің қызметкерлерін көруге рұқсатыңыз жоқ"
+        }
+      ]
+    },
+    {
+      "id": 484,
+      "values": [
+        {
+          "language": "main",
+          "value": "No workers in this store yet"
+        },
+        {
+          "language": "en",
+          "value": "No workers in this store yet"
+        },
+        {
+          "language": "ru",
+          "value": "В этом магазине пока нет сотрудников"
+        },
+        {
+          "language": "kk",
+          "value": "Бұл дүкенде әзірге қызметкерлер жоқ"
+        }
+      ]
+    },
+    {
+      "id": 485,
+      "values": [
+        {
+          "language": "main",
+          "value": "Incoming employment requests"
+        },
+        {
+          "language": "en",
+          "value": "Incoming employment requests"
+        },
+        {
+          "language": "ru",
+          "value": "Входящие заявки на работу"
+        },
+        {
+          "language": "kk",
+          "value": "Кіріс жұмыс өтінімдері"
+        }
+      ]
+    },
+    {
+      "id": 486,
+      "values": [
+        {
+          "language": "main",
+          "value": "Only store owners and worker managers can accept employment requests"
+        },
+        {
+          "language": "en",
+          "value": "Only store owners and worker managers can accept employment requests"
+        },
+        {
+          "language": "ru",
+          "value": "Только владелец магазина и управляющие сотрудниками могут принимать заявки"
+        },
+        {
+          "language": "kk",
+          "value": "Жұмыс өтінімдерін тек дүкен иелері мен қызметкер менеджерлері қабылдай алады"
+        }
+      ]
+    },
+    {
+      "id": 487,
+      "values": [
+        {
+          "language": "main",
+          "value": "No incoming employment requests"
+        },
+        {
+          "language": "en",
+          "value": "No incoming employment requests"
+        },
+        {
+          "language": "ru",
+          "value": "Нет входящих заявок на работу"
+        },
+        {
+          "language": "kk",
+          "value": "Кіріс жұмыс өтінімдері жоқ"
+        }
+      ]
+    },
+    {
+      "id": 488,
+      "values": [
+        {
+          "language": "main",
+          "value": "Pending"
+        },
+        {
+          "language": "en",
+          "value": "Pending"
+        },
+        {
+          "language": "ru",
+          "value": "Ожидает"
+        },
+        {
+          "language": "kk",
+          "value": "Күтуде"
+        }
+      ]
+    },
+    {
+      "id": 489,
+      "values": [
+        {
+          "language": "main",
+          "value": "My stores"
+        },
+        {
+          "language": "en",
+          "value": "My stores"
+        },
+        {
+          "language": "ru",
+          "value": "Мои магазины"
+        },
+        {
+          "language": "kk",
+          "value": "Менің дүкендерім"
+        }
+      ]
+    },
+    {
+      "id": 490,
+      "values": [
+        {
+          "language": "main",
+          "value": "Owned by me"
+        },
+        {
+          "language": "en",
+          "value": "Owned by me"
+        },
+        {
+          "language": "ru",
+          "value": "Принадлежат мне"
+        },
+        {
+          "language": "kk",
+          "value": "Маған тиесілі"
+        }
+      ]
+    },
+    {
+      "id": 491,
+      "values": [
+        {
+          "language": "main",
+          "value": "Managed by me"
+        },
+        {
+          "language": "en",
+          "value": "Managed by me"
+        },
+        {
+          "language": "ru",
+          "value": "Я администрирую"
+        },
+        {
+          "language": "kk",
+          "value": "Мен басқарамын"
+        }
+      ]
+    },
+    {
+      "id": 492,
+      "values": [
+        {
+          "language": "main",
+          "value": "Declined"
+        },
+        {
+          "language": "en",
+          "value": "Declined"
+        },
+        {
+          "language": "ru",
+          "value": "Отклонена"
+        },
+        {
+          "language": "kk",
+          "value": "Қабылданбады"
+        }
+      ]
+    },
+    {
+      "id": 493,
+      "values": [
+        {
+          "language": "main",
+          "value": "Public IDs"
+        },
+        {
+          "language": "en",
+          "value": "Public IDs"
+        },
+        {
+          "language": "ru",
+          "value": "Публичные ID"
+        },
+        {
+          "language": "kk",
+          "value": "Жария ID-лер"
+        }
+      ]
+    },
+    {
+      "id": 494,
+      "values": [
+        {
+          "language": "main",
+          "value": "Public IDs are short safe codes for invitations and employment requests"
+        },
+        {
+          "language": "en",
+          "value": "Public IDs are short safe codes for invitations and employment requests"
+        },
+        {
+          "language": "ru",
+          "value": "Публичные ID — короткие безопасные коды для приглашений и заявок на работу"
+        },
+        {
+          "language": "kk",
+          "value": "Жария ID — шақырулар мен жұмыс сұрауларына арналған қысқа қауіпсіз кодтар"
+        }
+      ]
+    },
+    {
+      "id": 495,
+      "values": [
+        {
+          "language": "main",
+          "value": "Store owner invite"
+        },
+        {
+          "language": "en",
+          "value": "Store owner invite"
+        },
+        {
+          "language": "ru",
+          "value": "Приглашение от владельца магазина"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен иесінің шақыруы"
+        }
+      ]
+    },
+    {
+      "id": 496,
+      "values": [
+        {
+          "language": "main",
+          "value": "User invite ID"
+        },
+        {
+          "language": "en",
+          "value": "User invite ID"
+        },
+        {
+          "language": "ru",
+          "value": "ID пользователя для приглашения"
+        },
+        {
+          "language": "kk",
+          "value": "Шақыруға арналған пайдаланушы ID-і"
+        }
+      ]
+    },
+    {
+      "id": 497,
+      "values": [
+        {
+          "language": "main",
+          "value": "Invitation accepted"
+        },
+        {
+          "language": "en",
+          "value": "Invitation accepted"
+        },
+        {
+          "language": "ru",
+          "value": "Приглашение принято"
+        },
+        {
+          "language": "kk",
+          "value": "Шақыру қабылданды"
+        }
+      ]
+    },
+    {
+      "id": 498,
+      "values": [
+        {
+          "language": "main",
+          "value": "Invitation declined"
+        },
+        {
+          "language": "en",
+          "value": "Invitation declined"
+        },
+        {
+          "language": "ru",
+          "value": "Приглашение отклонено"
+        },
+        {
+          "language": "kk",
+          "value": "Шақыру қабылданбады"
+        }
+      ]
+    },
+    {
+      "id": 499,
+      "values": [
+        {
+          "language": "main",
+          "value": "Worker invited"
+        },
+        {
+          "language": "en",
+          "value": "Worker invited"
+        },
+        {
+          "language": "ru",
+          "value": "Сотрудник приглашён"
+        },
+        {
+          "language": "kk",
+          "value": "Қызметкер шақырылды"
+        }
+      ]
+    },
+    {
+      "id": 500,
+      "values": [
+        {
+          "language": "main",
+          "value": "Worker already invited"
+        },
+        {
+          "language": "en",
+          "value": "Worker already invited"
+        },
+        {
+          "language": "ru",
+          "value": "Сотрудник уже приглашён"
+        },
+        {
+          "language": "kk",
+          "value": "Қызметкер бұрын шақырылған"
+        }
+      ]
+    },
+    {
+      "id": 501,
+      "values": [
+        {
+          "language": "main",
+          "value": "Copied to clipboard"
+        },
+        {
+          "language": "en",
+          "value": "Copied to clipboard"
+        },
+        {
+          "language": "ru",
+          "value": "Скопировано в буфер обмена"
+        },
+        {
+          "language": "kk",
+          "value": "Алмасу буферіне көшірілді"
+        }
+      ]
+    },
+    {
+      "id": 502,
+      "values": [
+        {
+          "language": "main",
+          "value": "Public store ID"
+        },
+        {
+          "language": "en",
+          "value": "Public store ID"
+        },
+        {
+          "language": "ru",
+          "value": "Публичный ID магазина"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкеннің жария ID-і"
+        }
+      ]
+    },
+    {
+      "id": 503,
+      "values": [
+        {
+          "language": "main",
+          "value": "Copy"
+        },
+        {
+          "language": "en",
+          "value": "Copy"
+        },
+        {
+          "language": "ru",
+          "value": "Копировать"
+        },
+        {
+          "language": "kk",
+          "value": "Көшіру"
+        }
+      ]
+    },
+    {
+      "id": 504,
+      "values": [
+        {
+          "language": "main",
+          "value": "Your public worker ID"
+        },
+        {
+          "language": "en",
+          "value": "Your public worker ID"
+        },
+        {
+          "language": "ru",
+          "value": "Ваш публичный ID сотрудника"
+        },
+        {
+          "language": "kk",
+          "value": "Сіздің жария қызметкер ID-іңіз"
+        }
+      ]
+    },
+    {
+      "id": 505,
+      "values": [
+        {
+          "language": "main",
+          "value": "Invite worker"
+        },
+        {
+          "language": "en",
+          "value": "Invite worker"
+        },
+        {
+          "language": "ru",
+          "value": "Пригласить сотрудника"
+        },
+        {
+          "language": "kk",
+          "value": "Қызметкерді шақыру"
+        }
+      ]
+    },
+    {
+      "id": 506,
+      "values": [
+        {
+          "language": "main",
+          "value": "Enter user public ID"
+        },
+        {
+          "language": "en",
+          "value": "Enter user public ID"
+        },
+        {
+          "language": "ru",
+          "value": "Введите публичный ID пользователя"
+        },
+        {
+          "language": "kk",
+          "value": "Пайдаланушының жария ID-ін енгізіңіз"
+        }
+      ]
+    },
+    {
+      "id": 507,
+      "values": [
+        {
+          "language": "main",
+          "value": "Send invite"
+        },
+        {
+          "language": "en",
+          "value": "Send invite"
+        },
+        {
+          "language": "ru",
+          "value": "Отправить приглашение"
+        },
+        {
+          "language": "kk",
+          "value": "Шақыру жіберу"
+        }
+      ]
+    },
+    {
+      "id": 508,
+      "values": [
+        {
+          "language": "main",
+          "value": "Invited"
+        },
+        {
+          "language": "en",
+          "value": "Invited"
+        },
+        {
+          "language": "ru",
+          "value": "Приглашён"
+        },
+        {
+          "language": "kk",
+          "value": "Шақырылды"
+        }
+      ]
+    },
+    {
+      "id": 509,
+      "values": [
+        {
+          "language": "main",
+          "value": "Worker invitations"
+        },
+        {
+          "language": "en",
+          "value": "Worker invitations"
+        },
+        {
+          "language": "ru",
+          "value": "Приглашения сотрудников"
+        },
+        {
+          "language": "kk",
+          "value": "Қызметкер шақырулары"
+        }
+      ]
+    },
+    {
+      "id": 510,
+      "values": [
+        {
+          "language": "main",
+          "value": "Accept invite"
+        },
+        {
+          "language": "en",
+          "value": "Accept invite"
+        },
+        {
+          "language": "ru",
+          "value": "Принять приглашение"
+        },
+        {
+          "language": "kk",
+          "value": "Шақыруды қабылдау"
+        }
+      ]
+    },
+    {
+      "id": 511,
+      "values": [
+        {
+          "language": "main",
+          "value": "Decline invite"
+        },
+        {
+          "language": "en",
+          "value": "Decline invite"
+        },
+        {
+          "language": "ru",
+          "value": "Отклонить приглашение"
+        },
+        {
+          "language": "kk",
+          "value": "Шақырудан бас тарту"
+        }
+      ]
+    },
+    {
+      "id": 512,
+      "values": [
+        {
+          "language": "main",
+          "value": "Sort by"
+        },
+        {
+          "language": "en",
+          "value": "Sort by"
+        },
+        {
+          "language": "ru",
+          "value": "Сортировать по"
+        },
+        {
+          "language": "kk",
+          "value": "Бойынша сұрыптау"
+        }
+      ]
+    },
+    {
+      "id": 513,
+      "values": [
+        {
+          "language": "main",
+          "value": "Quantity"
+        },
+        {
+          "language": "en",
+          "value": "Quantity"
+        },
+        {
+          "language": "ru",
+          "value": "Количество"
+        },
+        {
+          "language": "kk",
+          "value": "Саны"
+        }
+      ]
+    },
+    {
+      "id": 514,
+      "values": [
+        {
+          "language": "main",
+          "value": "Time added"
+        },
+        {
+          "language": "en",
+          "value": "Time added"
+        },
+        {
+          "language": "ru",
+          "value": "Время добавления"
+        },
+        {
+          "language": "kk",
+          "value": "Қосылған уақыты"
+        }
+      ]
+    },
+    {
+      "id": 515,
+      "values": [
+        {
+          "language": "main",
+          "value": "Ascending"
+        },
+        {
+          "language": "en",
+          "value": "Ascending"
+        },
+        {
+          "language": "ru",
+          "value": "По возрастанию"
+        },
+        {
+          "language": "kk",
+          "value": "Өсу ретімен"
+        }
+      ]
+    },
+    {
+      "id": 516,
+      "values": [
+        {
+          "language": "main",
+          "value": "Descending"
+        },
+        {
+          "language": "en",
+          "value": "Descending"
+        },
+        {
+          "language": "ru",
+          "value": "По убыванию"
+        },
+        {
+          "language": "kk",
+          "value": "Кему ретімен"
+        }
+      ]
+    },
+    {
+      "id": 517,
+      "values": [
+        {
+          "language": "main",
+          "value": "No company form specified"
+        },
+        {
+          "language": "en",
+          "value": "No company form specified"
+        },
+        {
+          "language": "ru",
+          "value": "Форма компании не указана"
+        },
+        {
+          "language": "kk",
+          "value": "Компания түрі көрсетілмеген"
+        }
+      ]
+    },
+    {
+      "id": 518,
+      "values": [
+        {
+          "language": "main",
+          "value": "Use this ID when a store owner invites you as a worker"
+        },
+        {
+          "language": "en",
+          "value": "Use this ID when a store owner invites you as a worker"
+        },
+        {
+          "language": "ru",
+          "value": "Используйте этот ID, когда владелец магазина приглашает вас как сотрудника"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен иесі сізді қызметкер ретінде шақырғанда осы ID-ді пайдаланыңыз"
+        }
+      ]
+    },
+    {
+      "id": 519,
+      "values": [
+        {
+          "language": "main",
+          "value": "Use this ID when requesting employment"
+        },
+        {
+          "language": "en",
+          "value": "Use this ID when requesting employment"
+        },
+        {
+          "language": "ru",
+          "value": "Используйте этот ID для запроса трудоустройства"
+        },
+        {
+          "language": "kk",
+          "value": "Жұмысқа сұрау жіберу үшін осы ID-ді пайдаланыңыз"
+        }
+      ]
+    },
+    {
+      "id": 520,
+      "values": [
+        {
+          "language": "main",
+          "value": "Address"
+        },
+        {
+          "language": "en",
+          "value": "Address"
+        },
+        {
+          "language": "ru",
+          "value": "Адрес"
+        },
+        {
+          "language": "kk",
+          "value": "Мекенжай"
+        }
+      ]
+    },
+    {
+      "id": 521,
+      "values": [
+        {
+          "language": "main",
+          "value": "Enter address"
+        },
+        {
+          "language": "en",
+          "value": "Enter address"
+        },
+        {
+          "language": "ru",
+          "value": "Введите адрес"
+        },
+        {
+          "language": "kk",
+          "value": "Мекенжайды енгізіңіз"
+        }
+      ]
+    },
+    {
+      "id": 522,
+      "values": [
+        {
+          "language": "main",
+          "value": "Address is required"
+        },
+        {
+          "language": "en",
+          "value": "Address is required"
+        },
+        {
+          "language": "ru",
+          "value": "Адрес обязателен"
+        },
+        {
+          "language": "kk",
+          "value": "Мекенжай қажет"
+        }
+      ]
+    },
+    {
+      "id": 523,
+      "values": [
+        {
+          "language": "main",
+          "value": "Legal ID"
+        },
+        {
+          "language": "en",
+          "value": "Legal ID"
+        },
+        {
+          "language": "ru",
+          "value": "Юридический ID"
+        },
+        {
+          "language": "kk",
+          "value": "Заңды ID"
+        }
+      ]
+    },
+    {
+      "id": 524,
+      "values": [
+        {
+          "language": "main",
+          "value": "Enter legal ID"
+        },
+        {
+          "language": "en",
+          "value": "Enter legal ID"
+        },
+        {
+          "language": "ru",
+          "value": "Введите юридический ID"
+        },
+        {
+          "language": "kk",
+          "value": "Заңды ID енгізіңіз"
+        }
+      ]
+    },
+    {
+      "id": 525,
+      "values": [
+        {
+          "language": "main",
+          "value": "Legal ID format is invalid"
+        },
+        {
+          "language": "en",
+          "value": "Legal ID format is invalid"
+        },
+        {
+          "language": "ru",
+          "value": "Неверный формат юридического ID"
+        },
+        {
+          "language": "kk",
+          "value": "Заңды ID пішімі қате"
+        }
+      ]
+    },
+    {
+      "id": 526,
+      "values": [
+        {
+          "language": "main",
+          "value": "Legal ID is selected by the store country"
+        },
+        {
+          "language": "en",
+          "value": "Legal ID is selected by the store country"
+        },
+        {
+          "language": "ru",
+          "value": "Тип юридического ID выбирается по стране магазина"
+        },
+        {
+          "language": "kk",
+          "value": "Заңды ID түрі дүкен елі бойынша таңдалады"
+        }
+      ]
+    },
+    {
+      "id": 527,
+      "values": [
+        {
+          "language": "main",
+          "value": "Store name is required"
+        },
+        {
+          "language": "en",
+          "value": "Store name is required"
+        },
+        {
+          "language": "ru",
+          "value": "Название магазина обязательно"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен атауы қажет"
+        }
+      ]
+    },
+    {
+      "id": 528,
+      "values": [
+        {
+          "language": "main",
+          "value": "Branch name is required"
+        },
+        {
+          "language": "en",
+          "value": "Branch name is required"
+        },
+        {
+          "language": "ru",
+          "value": "Название филиала обязательно"
+        },
+        {
+          "language": "kk",
+          "value": "Филиал атауы қажет"
+        }
+      ]
+    },
+    {
+      "id": 529,
+      "values": [
+        {
+          "language": "main",
+          "value": "Parent store can be active as the main warehouse."
+        },
+        {
+          "language": "en",
+          "value": "Parent store can be active as the main warehouse."
+        },
+        {
+          "language": "ru",
+          "value": "Головной магазин можно сделать активным как главный склад."
+        },
+        {
+          "language": "kk",
+          "value": "Негізгі дүкенді басты қойма ретінде белсенді етуге болады."
+        }
+      ]
+    },
+    {
+      "id": 530,
+      "values": [
+        {
+          "language": "main",
+          "value": "Branch"
+        },
+        {
+          "language": "en",
+          "value": "Branch"
+        },
+        {
+          "language": "ru",
+          "value": "Филиал"
+        },
+        {
+          "language": "kk",
+          "value": "Филиал"
+        }
+      ]
+    },
+    {
+      "id": 531,
+      "values": [
+        {
+          "language": "main",
+          "value": "Branch name"
+        },
+        {
+          "language": "en",
+          "value": "Branch name"
+        },
+        {
+          "language": "ru",
+          "value": "Название филиала"
+        },
+        {
+          "language": "kk",
+          "value": "Филиал атауы"
+        }
+      ]
+    },
+    {
+      "id": 532,
+      "values": [
+        {
+          "language": "main",
+          "value": "Branches"
+        },
+        {
+          "language": "en",
+          "value": "Branches"
+        },
+        {
+          "language": "ru",
+          "value": "Филиалы"
+        },
+        {
+          "language": "kk",
+          "value": "Филиалдар"
+        }
+      ]
+    },
+    {
+      "id": 533,
+      "values": [
+        {
+          "language": "main",
+          "value": "Add branch"
+        },
+        {
+          "language": "en",
+          "value": "Add branch"
+        },
+        {
+          "language": "ru",
+          "value": "Добавить филиал"
+        },
+        {
+          "language": "kk",
+          "value": "Филиал қосу"
+        }
+      ]
+    },
+    {
+      "id": 534,
+      "values": [
+        {
+          "language": "main",
+          "value": "Edit branch"
+        },
+        {
+          "language": "en",
+          "value": "Edit branch"
+        },
+        {
+          "language": "ru",
+          "value": "Редактировать филиал"
+        },
+        {
+          "language": "kk",
+          "value": "Филиалды өңдеу"
+        }
+      ]
+    },
+    {
+      "id": 535,
+      "values": [
+        {
+          "language": "main",
+          "value": "Parent store"
+        },
+        {
+          "language": "en",
+          "value": "Parent store"
+        },
+        {
+          "language": "ru",
+          "value": "Родительский магазин"
+        },
+        {
+          "language": "kk",
+          "value": "Негізгі дүкен"
+        }
+      ]
+    },
+    {
+      "id": 536,
+      "values": [
+        {
+          "language": "main",
+          "value": "Enter branch name"
+        },
+        {
+          "language": "en",
+          "value": "Enter branch name"
+        },
+        {
+          "language": "ru",
+          "value": "Введите название филиала"
+        },
+        {
+          "language": "kk",
+          "value": "Филиал атауын енгізіңіз"
+        }
+      ]
+    },
+    {
+      "id": 537,
+      "values": [
+        {
+          "language": "main",
+          "value": "Add branch name translation"
+        },
+        {
+          "language": "en",
+          "value": "Add branch name translation"
+        },
+        {
+          "language": "ru",
+          "value": "Добавить перевод названия филиала"
+        },
+        {
+          "language": "kk",
+          "value": "Филиал атауының аудармасын қосу"
+        }
+      ]
+    },
+    {
+      "id": 538,
+      "values": [
+        {
+          "language": "main",
+          "value": "Delete store"
+        },
+        {
+          "language": "en",
+          "value": "Delete store"
+        },
+        {
+          "language": "ru",
+          "value": "Удалить магазин"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкенді жою"
+        }
+      ]
+    },
+    {
+      "id": 539,
+      "values": [
+        {
+          "language": "main",
+          "value": "Delete branch"
+        },
+        {
+          "language": "en",
+          "value": "Delete branch"
+        },
+        {
+          "language": "ru",
+          "value": "Удалить филиал"
+        },
+        {
+          "language": "kk",
+          "value": "Филиалды жою"
+        }
+      ]
+    },
+    {
+      "id": 540,
+      "values": [
+        {
+          "language": "main",
+          "value": "Store address"
+        },
+        {
+          "language": "en",
+          "value": "Store address"
+        },
+        {
+          "language": "ru",
+          "value": "Адрес магазина"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен мекенжайы"
+        }
+      ]
+    },
+    {
+      "id": 541,
+      "values": [
+        {
+          "language": "main",
+          "value": "Branch address"
+        },
+        {
+          "language": "en",
+          "value": "Branch address"
+        },
+        {
+          "language": "ru",
+          "value": "Адрес филиала"
+        },
+        {
+          "language": "kk",
+          "value": "Филиал мекенжайы"
+        }
+      ]
+    },
+    {
+      "id": 542,
+      "values": [
+        {
+          "language": "main",
+          "value": "Parent store is active as the main warehouse"
+        },
+        {
+          "language": "en",
+          "value": "Parent store is active as the main warehouse"
+        },
+        {
+          "language": "ru",
+          "value": "Головной магазин активен как главный склад"
+        },
+        {
+          "language": "kk",
+          "value": "Негізгі дүкен басты қойма ретінде белсенді"
+        }
+      ]
+    },
+    {
+      "id": 543,
+      "values": [
+        {
+          "language": "main",
+          "value": "Business identification number"
+        },
+        {
+          "language": "en",
+          "value": "Business identification number"
+        },
+        {
+          "language": "ru",
+          "value": "Бизнес-идентификационный номер"
+        },
+        {
+          "language": "kk",
+          "value": "Бизнес сәйкестендіру нөмірі"
+        }
+      ]
+    },
+    {
+      "id": 544,
+      "values": [
+        {
+          "language": "main",
+          "value": "Taxpayer identification number"
+        },
+        {
+          "language": "en",
+          "value": "Taxpayer identification number"
+        },
+        {
+          "language": "ru",
+          "value": "Идентификационный номер налогоплательщика"
+        },
+        {
+          "language": "kk",
+          "value": "Салық төлеушінің сәйкестендіру нөмірі"
+        }
+      ]
+    },
+    {
+      "id": 545,
+      "values": [
+        {
+          "language": "main",
+          "value": "Store branch"
+        },
+        {
+          "language": "en",
+          "value": "Store branch"
+        },
+        {
+          "language": "ru",
+          "value": "Филиал магазина"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен филиалы"
+        }
+      ]
+    },
+    {
+      "id": 546,
+      "values": [
+        {
+          "language": "main",
+          "value": "Branch stock"
+        },
+        {
+          "language": "en",
+          "value": "Branch stock"
+        },
+        {
+          "language": "ru",
+          "value": "Остатки по филиалам"
+        },
+        {
+          "language": "kk",
+          "value": "Филиалдардағы қор"
+        }
+      ]
+    },
+    {
+      "id": 547,
+      "values": [
+        {
+          "language": "main",
+          "value": "Across branches"
+        },
+        {
+          "language": "en",
+          "value": "Across branches"
+        },
+        {
+          "language": "ru",
+          "value": "По филиалам"
+        },
+        {
+          "language": "kk",
+          "value": "Филиалдар бойынша"
+        }
+      ]
+    },
+    {
+      "id": 548,
+      "values": [
+        {
+          "language": "main",
+          "value": "Current location"
+        },
+        {
+          "language": "en",
+          "value": "Current location"
+        },
+        {
+          "language": "ru",
+          "value": "Текущая точка"
+        },
+        {
+          "language": "kk",
+          "value": "Ағымдағы орын"
+        }
+      ]
+    },
+    {
+      "id": 549,
+      "values": [
+        {
+          "language": "main",
+          "value": "Move"
+        },
+        {
+          "language": "en",
+          "value": "Move"
+        },
+        {
+          "language": "ru",
+          "value": "Переместить"
+        },
+        {
+          "language": "kk",
+          "value": "Жылжыту"
+        }
+      ]
+    },
+    {
+      "id": 550,
+      "values": [
+        {
+          "language": "main",
+          "value": "Move batch"
+        },
+        {
+          "language": "en",
+          "value": "Move batch"
+        },
+        {
+          "language": "ru",
+          "value": "Переместить партию"
+        },
+        {
+          "language": "kk",
+          "value": "Партияны жылжыту"
+        }
+      ]
+    },
+    {
+      "id": 551,
+      "values": [
+        {
+          "language": "main",
+          "value": "Import"
+        },
+        {
+          "language": "en",
+          "value": "Import"
+        },
+        {
+          "language": "ru",
+          "value": "Импортировать"
+        },
+        {
+          "language": "kk",
+          "value": "Импорттау"
+        }
+      ]
+    },
+    {
+      "id": 552,
+      "values": [
+        {
+          "language": "main",
+          "value": "Export"
+        },
+        {
+          "language": "en",
+          "value": "Export"
+        },
+        {
+          "language": "ru",
+          "value": "Экспортировать"
+        },
+        {
+          "language": "kk",
+          "value": "Экспорттау"
+        }
+      ]
+    },
+    {
+      "id": 553,
+      "values": [
+        {
+          "language": "main",
+          "value": "Destination"
+        },
+        {
+          "language": "en",
+          "value": "Destination"
+        },
+        {
+          "language": "ru",
+          "value": "Назначение"
+        },
+        {
+          "language": "kk",
+          "value": "Баратын орын"
+        }
+      ]
+    },
+    {
+      "id": 554,
+      "values": [
+        {
+          "language": "main",
+          "value": "Source"
+        },
+        {
+          "language": "en",
+          "value": "Source"
+        },
+        {
+          "language": "ru",
+          "value": "Источник"
+        },
+        {
+          "language": "kk",
+          "value": "Бастапқы орын"
+        }
+      ]
+    },
+    {
+      "id": 555,
+      "values": [
+        {
+          "language": "main",
+          "value": "Quantity to move"
+        },
+        {
+          "language": "en",
+          "value": "Quantity to move"
+        },
+        {
+          "language": "ru",
+          "value": "Количество для перемещения"
+        },
+        {
+          "language": "kk",
+          "value": "Жылжытылатын сан"
+        }
+      ]
+    },
+    {
+      "id": 556,
+      "values": [
+        {
+          "language": "main",
+          "value": "Move here"
+        },
+        {
+          "language": "en",
+          "value": "Move here"
+        },
+        {
+          "language": "ru",
+          "value": "Переместить сюда"
+        },
+        {
+          "language": "kk",
+          "value": "Осында жылжыту"
+        }
+      ]
+    },
+    {
+      "id": 557,
+      "values": [
+        {
+          "language": "main",
+          "value": "Available in this store entity"
+        },
+        {
+          "language": "en",
+          "value": "Available in this store entity"
+        },
+        {
+          "language": "ru",
+          "value": "Доступно в этой структуре магазина"
+        },
+        {
+          "language": "kk",
+          "value": "Осы дүкен құрылымында бар"
+        }
+      ]
+    },
+    {
+      "id": 558,
+      "values": [
+        {
+          "language": "main",
+          "value": "No other locations"
+        },
+        {
+          "language": "en",
+          "value": "No other locations"
+        },
+        {
+          "language": "ru",
+          "value": "Других точек нет"
+        },
+        {
+          "language": "kk",
+          "value": "Басқа орындар жоқ"
+        }
+      ]
+    },
+    {
+      "id": 559,
+      "values": [
+        {
+          "language": "main",
+          "value": "Movement history"
+        },
+        {
+          "language": "en",
+          "value": "Movement history"
+        },
+        {
+          "language": "ru",
+          "value": "История перемещений"
+        },
+        {
+          "language": "kk",
+          "value": "Жылжыту тарихы"
+        }
+      ]
+    },
+    {
+      "id": 560,
+      "values": [
+        {
+          "language": "main",
+          "value": "Moved by"
+        },
+        {
+          "language": "en",
+          "value": "Moved by"
+        },
+        {
+          "language": "ru",
+          "value": "Переместил"
+        },
+        {
+          "language": "kk",
+          "value": "Жылжытқан"
+        }
+      ]
+    },
+    {
+      "id": 561,
+      "values": [
+        {
+          "language": "main",
+          "value": "Refresh availability"
+        },
+        {
+          "language": "en",
+          "value": "Refresh availability"
+        },
+        {
+          "language": "ru",
+          "value": "Обновить остатки"
+        },
+        {
+          "language": "kk",
+          "value": "Қорды жаңарту"
+        }
+      ]
+    },
+    {
+      "id": 562,
+      "values": [
+        {
+          "language": "main",
+          "value": "From"
+        },
+        {
+          "language": "en",
+          "value": "From"
+        },
+        {
+          "language": "ru",
+          "value": "Из"
+        },
+        {
+          "language": "kk",
+          "value": "Қайдан"
+        }
+      ]
+    },
+    {
+      "id": 563,
+      "values": [
+        {
+          "language": "main",
+          "value": "To"
+        },
+        {
+          "language": "en",
+          "value": "To"
+        },
+        {
+          "language": "ru",
+          "value": "В"
+        },
+        {
+          "language": "kk",
+          "value": "Қайда"
+        }
+      ]
+    },
+    {
+      "id": 564,
+      "values": [
+        {
+          "language": "main",
+          "value": "Stock moved"
+        },
+        {
+          "language": "en",
+          "value": "Stock moved"
+        },
+        {
+          "language": "ru",
+          "value": "Склад перемещён"
+        },
+        {
+          "language": "kk",
+          "value": "Қор жылжытылды"
+        }
+      ]
+    },
+    {
+      "id": 565,
+      "values": [
+        {
+          "language": "main",
+          "value": "This item is not created in that location yet. It will be copied automatically."
+        },
+        {
+          "language": "en",
+          "value": "This item is not created in that location yet. It will be copied automatically."
+        },
+        {
+          "language": "ru",
+          "value": "В этой точке товар ещё не создан. Он будет скопирован автоматически."
+        },
+        {
+          "language": "kk",
+          "value": "Бұл жерде тауар әлі жасалмаған. Ол автоматты түрде көшіріледі."
+        }
+      ]
+    },
+    {
+      "id": 566,
+      "values": [
+        {
+          "language": "main",
+          "value": "Import from this location"
+        },
+        {
+          "language": "en",
+          "value": "Import from this location"
+        },
+        {
+          "language": "ru",
+          "value": "Импортировать из этой точки"
+        },
+        {
+          "language": "kk",
+          "value": "Осы орыннан импорттау"
+        }
+      ]
+    },
+    {
+      "id": 567,
+      "values": [
+        {
+          "language": "main",
+          "value": "Export to another location"
+        },
+        {
+          "language": "en",
+          "value": "Export to another location"
+        },
+        {
+          "language": "ru",
+          "value": "Экспортировать в другую точку"
+        },
+        {
+          "language": "kk",
+          "value": "Басқа орынға экспорттау"
+        }
+      ]
+    },
+    {
+      "id": 568,
+      "values": [
+        {
+          "language": "main",
+          "value": "Parent warehouse"
+        },
+        {
+          "language": "en",
+          "value": "Parent warehouse"
+        },
+        {
+          "language": "ru",
+          "value": "Головной склад"
+        },
+        {
+          "language": "kk",
+          "value": "Негізгі қойма"
+        }
+      ]
+    },
+    {
+      "id": 569,
+      "values": [
+        {
+          "language": "main",
+          "value": "Branch warehouse"
+        },
+        {
+          "language": "en",
+          "value": "Branch warehouse"
+        },
+        {
+          "language": "ru",
+          "value": "Склад филиала"
+        },
+        {
+          "language": "kk",
+          "value": "Филиал қоймасы"
+        }
+      ]
+    },
+    {
+      "id": 570,
+      "values": [
+        {
+          "language": "main",
+          "value": "Quantity after move"
+        },
+        {
+          "language": "en",
+          "value": "Quantity after move"
+        },
+        {
+          "language": "ru",
+          "value": "Количество после перемещения"
+        },
+        {
+          "language": "kk",
+          "value": "Жылжытудан кейінгі сан"
+        }
+      ]
+    },
+    {
+      "id": 571,
+      "values": [
+        {
+          "language": "main",
+          "value": "No movable batches here"
+        },
+        {
+          "language": "en",
+          "value": "No movable batches here"
+        },
+        {
+          "language": "ru",
+          "value": "Здесь нет партий для перемещения"
+        },
+        {
+          "language": "kk",
+          "value": "Мұнда жылжытатын партия жоқ"
+        }
+      ]
+    },
+    {
+      "id": 572,
+      "values": [
+        {
+          "language": "main",
+          "value": "Loaded cached data"
+        },
+        {
+          "language": "en",
+          "value": "Loaded cached data"
+        },
+        {
+          "language": "ru",
+          "value": "Загружены сохранённые данные"
+        },
+        {
+          "language": "kk",
+          "value": "Сақталған деректер жүктелді"
+        }
+      ]
+    },
+    {
+      "id": 573,
+      "values": [
+        {
+          "language": "main",
+          "value": "Live updates connected"
+        },
+        {
+          "language": "en",
+          "value": "Live updates connected"
+        },
+        {
+          "language": "ru",
+          "value": "Онлайн-обновления подключены"
+        },
+        {
+          "language": "kk",
+          "value": "Нақты уақыттағы жаңартулар қосылды"
+        }
+      ]
+    },
+    {
+      "id": 574,
+      "values": [
+        {
+          "language": "main",
+          "value": "Live updates disconnected. Using cached data while reconnecting."
+        },
+        {
+          "language": "en",
+          "value": "Live updates disconnected. Using cached data while reconnecting."
+        },
+        {
+          "language": "ru",
+          "value": "Онлайн-обновления отключены. Пока идёт переподключение, используются сохранённые данные."
+        },
+        {
+          "language": "kk",
+          "value": "Нақты уақыттағы жаңартулар ажыратылды. Қайта қосылғанша сақталған деректер қолданылады."
+        }
+      ]
+    },
+    {
+      "id": 575,
+      "values": [
+        {
+          "language": "main",
+          "value": "Refreshing changed data"
+        },
+        {
+          "language": "en",
+          "value": "Refreshing changed data"
+        },
+        {
+          "language": "ru",
+          "value": "Обновление изменённых данных"
+        },
+        {
+          "language": "kk",
+          "value": "Өзгерген деректер жаңартылуда"
+        }
+      ]
+    },
+    {
+      "id": 576,
+      "values": [
+        {
+          "language": "main",
+          "value": "Offline cache"
+        },
+        {
+          "language": "en",
+          "value": "Offline cache"
+        },
+        {
+          "language": "ru",
+          "value": "Офлайн-кэш"
+        },
+        {
+          "language": "kk",
+          "value": "Офлайн кэш"
+        }
+      ]
+    },
+    {
+      "id": 577,
+      "values": [
+        {
+          "language": "main",
+          "value": "Previous"
+        },
+        {
+          "language": "en",
+          "value": "Previous"
+        },
+        {
+          "language": "ru",
+          "value": "Назад"
+        },
+        {
+          "language": "kk",
+          "value": "Артқа"
+        }
+      ]
+    },
+    {
+      "id": 578,
+      "values": [
+        {
+          "language": "main",
+          "value": "Page"
+        },
+        {
+          "language": "en",
+          "value": "Page"
+        },
+        {
+          "language": "ru",
+          "value": "Страница"
+        },
+        {
+          "language": "kk",
+          "value": "Бет"
+        }
+      ]
+    },
+    {
+      "id": 579,
+      "values": [
+        {
+          "language": "main",
+          "value": "Next"
+        },
+        {
+          "language": "en",
+          "value": "Next"
+        },
+        {
+          "language": "ru",
+          "value": "Далее"
+        },
+        {
+          "language": "kk",
+          "value": "Келесі"
+        }
+      ]
+    },
+    {
+      "id": 580,
+      "values": [
+        {
+          "language": "main",
+          "value": "Top up balance"
+        },
+        {
+          "language": "en",
+          "value": "Top up balance"
+        },
+        {
+          "language": "ru",
+          "value": "Пополнить баланс"
+        },
+        {
+          "language": "kk",
+          "value": "Балансты толтыру"
+        }
+      ]
+    },
+    {
+      "id": 581,
+      "values": [
+        {
+          "language": "main",
+          "value": "Amount"
+        },
+        {
+          "language": "en",
+          "value": "Amount"
+        },
+        {
+          "language": "ru",
+          "value": "Сумма"
+        },
+        {
+          "language": "kk",
+          "value": "Сома"
+        }
+      ]
+    },
+    {
+      "id": 582,
+      "values": [
+        {
+          "language": "main",
+          "value": "Kaspi call is prepared but disabled until merchant API credentials are connected."
+        },
+        {
+          "language": "en",
+          "value": "Kaspi call is prepared but disabled until merchant API credentials are connected."
+        },
+        {
+          "language": "ru",
+          "value": "Вызов Kaspi подготовлен, но отключён до подключения данных мерчанта."
+        },
+        {
+          "language": "kk",
+          "value": "Kaspi шақыруы дайын, бірақ мерчант деректері қосылғанша өшірулі."
+        }
+      ]
+    },
+    {
+      "id": 583,
+      "values": [
+        {
+          "language": "main",
+          "value": "Create invoice"
+        },
+        {
+          "language": "en",
+          "value": "Create invoice"
+        },
+        {
+          "language": "ru",
+          "value": "Создать счёт"
+        },
+        {
+          "language": "kk",
+          "value": "Шот жасау"
+        }
+      ]
+    },
+    {
+      "id": 584,
+      "values": [
+        {
+          "language": "main",
+          "value": "Payment invoices"
+        },
+        {
+          "language": "en",
+          "value": "Payment invoices"
+        },
+        {
+          "language": "ru",
+          "value": "Счета на оплату"
+        },
+        {
+          "language": "kk",
+          "value": "Төлем шоттары"
+        }
+      ]
+    },
+    {
+      "id": 585,
+      "values": [
+        {
+          "language": "main",
+          "value": "Balance history"
+        },
+        {
+          "language": "en",
+          "value": "Balance history"
+        },
+        {
+          "language": "ru",
+          "value": "История баланса"
+        },
+        {
+          "language": "kk",
+          "value": "Баланс тарихы"
+        }
+      ]
+    },
+    {
+      "id": 586,
+      "values": [
+        {
+          "language": "main",
+          "value": "No balance operations yet"
+        },
+        {
+          "language": "en",
+          "value": "No balance operations yet"
+        },
+        {
+          "language": "ru",
+          "value": "Операций по балансу пока нет"
+        },
+        {
+          "language": "kk",
+          "value": "Баланс операциялары әлі жоқ"
+        }
+      ]
+    },
+    {
+      "id": 587,
+      "values": [
+        {
+          "language": "main",
+          "value": "Current subscription"
+        },
+        {
+          "language": "en",
+          "value": "Current subscription"
+        },
+        {
+          "language": "ru",
+          "value": "Текущая подписка"
+        },
+        {
+          "language": "kk",
+          "value": "Ағымдағы жазылым"
+        }
+      ]
+    },
+    {
+      "id": 588,
+      "values": [
+        {
+          "language": "main",
+          "value": "Balance"
+        },
+        {
+          "language": "en",
+          "value": "Balance"
+        },
+        {
+          "language": "ru",
+          "value": "Баланс"
+        },
+        {
+          "language": "kk",
+          "value": "Баланс"
+        }
+      ]
+    },
+    {
+      "id": 589,
+      "values": [
+        {
+          "language": "main",
+          "value": "Subscription charges"
+        },
+        {
+          "language": "en",
+          "value": "Subscription charges"
+        },
+        {
+          "language": "ru",
+          "value": "Списания подписки"
+        },
+        {
+          "language": "kk",
+          "value": "Жазылым төлемдері"
+        }
+      ]
+    },
+    {
+      "id": 590,
+      "values": [
+        {
+          "language": "main",
+          "value": "Top-up"
+        },
+        {
+          "language": "en",
+          "value": "Top-up"
+        },
+        {
+          "language": "ru",
+          "value": "Пополнение"
+        },
+        {
+          "language": "kk",
+          "value": "Толтыру"
+        }
+      ]
+    },
+    {
+      "id": 591,
+      "values": [
+        {
+          "language": "main",
+          "value": "Subscription charge"
+        },
+        {
+          "language": "en",
+          "value": "Subscription charge"
+        },
+        {
+          "language": "ru",
+          "value": "Списание подписки"
+        },
+        {
+          "language": "kk",
+          "value": "Жазылым төлемі"
+        }
+      ]
+    },
+    {
+      "id": 592,
+      "values": [
+        {
+          "language": "main",
+          "value": "AITA balance"
+        },
+        {
+          "language": "en",
+          "value": "AITA balance"
+        },
+        {
+          "language": "ru",
+          "value": "Баланс AITA"
+        },
+        {
+          "language": "kk",
+          "value": "AITA балансы"
+        }
+      ]
+    },
+    {
+      "id": 593,
+      "values": [
+        {
+          "language": "main",
+          "value": "1 AITA unit equals 1 unit of your national currency"
+        },
+        {
+          "language": "en",
+          "value": "1 AITA unit equals 1 unit of your national currency"
+        },
+        {
+          "language": "ru",
+          "value": "1 единица AITA равна 1 единице вашей национальной валюты"
+        },
+        {
+          "language": "kk",
+          "value": "1 AITA бірлігі ұлттық валютаңыздың 1 бірлігіне тең"
+        }
+      ]
+    },
+    {
+      "id": 594,
+      "values": [
+        {
+          "language": "main",
+          "value": "Confirm test payment"
+        },
+        {
+          "language": "en",
+          "value": "Confirm test payment"
+        },
+        {
+          "language": "ru",
+          "value": "Подтвердить тестовый платёж"
+        },
+        {
+          "language": "kk",
+          "value": "Тест төлемін растау"
+        }
+      ]
+    },
+    {
+      "id": 595,
+      "values": [
+        {
+          "language": "main",
+          "value": "Branches"
+        },
+        {
+          "language": "en",
+          "value": "Branches"
+        },
+        {
+          "language": "ru",
+          "value": "Филиалы"
+        },
+        {
+          "language": "kk",
+          "value": "Филиалдар"
+        }
+      ]
+    },
+    {
+      "id": 596,
+      "values": [
+        {
+          "language": "main",
+          "value": "Stock items"
+        },
+        {
+          "language": "en",
+          "value": "Stock items"
+        },
+        {
+          "language": "ru",
+          "value": "Товары на складе"
+        },
+        {
+          "language": "kk",
+          "value": "Қойма тауарлары"
+        }
+      ]
+    },
+    {
+      "id": 597,
+      "values": [
+        {
+          "language": "main",
+          "value": "Activate plan"
+        },
+        {
+          "language": "en",
+          "value": "Activate plan"
+        },
+        {
+          "language": "ru",
+          "value": "Активировать план"
+        },
+        {
+          "language": "kk",
+          "value": "Жоспарды қосу"
+        }
+      ]
+    },
+    {
+      "id": 598,
+      "values": [
+        {
+          "language": "main",
+          "value": "Finance dashboard loaded"
+        },
+        {
+          "language": "en",
+          "value": "Finance dashboard loaded"
+        },
+        {
+          "language": "ru",
+          "value": "Финансы загружены"
+        },
+        {
+          "language": "kk",
+          "value": "Қаржы жүктелді"
+        }
+      ]
+    },
+    {
+      "id": 599,
+      "values": [
+        {
+          "language": "main",
+          "value": "Top-up invoice created"
+        },
+        {
+          "language": "en",
+          "value": "Top-up invoice created"
+        },
+        {
+          "language": "ru",
+          "value": "Счёт на пополнение создан"
+        },
+        {
+          "language": "kk",
+          "value": "Толтыру шоты жасалды"
+        }
+      ]
+    },
+    {
+      "id": 600,
+      "values": [
+        {
+          "language": "main",
+          "value": "Balance topped up"
+        },
+        {
+          "language": "en",
+          "value": "Balance topped up"
+        },
+        {
+          "language": "ru",
+          "value": "Баланс пополнен"
+        },
+        {
+          "language": "kk",
+          "value": "Баланс толтырылды"
+        }
+      ]
+    },
+    {
+      "id": 601,
+      "values": [
+        {
+          "language": "main",
+          "value": "Subscription updated"
+        },
+        {
+          "language": "en",
+          "value": "Subscription updated"
+        },
+        {
+          "language": "ru",
+          "value": "Подписка обновлена"
+        },
+        {
+          "language": "kk",
+          "value": "Жазылым жаңартылды"
+        }
+      ]
+    },
+    {
+      "id": 602,
+      "values": [
+        {
+          "language": "main",
+          "value": "Subscription plans loaded"
+        },
+        {
+          "language": "en",
+          "value": "Subscription plans loaded"
+        },
+        {
+          "language": "ru",
+          "value": "Планы подписки загружены"
+        },
+        {
+          "language": "kk",
+          "value": "Жазылым жоспарлары жүктелді"
+        }
+      ]
+    },
+    {
+      "id": 603,
+      "values": [
+        {
+          "language": "main",
+          "value": "Store subscription loaded"
+        },
+        {
+          "language": "en",
+          "value": "Store subscription loaded"
+        },
+        {
+          "language": "ru",
+          "value": "Подписка магазина загружена"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен жазылымы жүктелді"
+        }
+      ]
+    },
+    {
+      "id": 604,
+      "values": [
+        {
+          "language": "main",
+          "value": "Cannot update subscription. Check balance and permissions."
+        },
+        {
+          "language": "en",
+          "value": "Cannot update subscription. Check balance and permissions."
+        },
+        {
+          "language": "ru",
+          "value": "Не удалось обновить подписку. Проверьте баланс и права."
+        },
+        {
+          "language": "kk",
+          "value": "Жазылымды жаңарту мүмкін болмады. Баланс пен құқықтарды тексеріңіз."
+        }
+      ]
+    },
+    {
+      "id": 605,
+      "values": [
+        {
+          "language": "main",
+          "value": "Paging"
+        },
+        {
+          "language": "en",
+          "value": "Paging"
+        },
+        {
+          "language": "ru",
+          "value": "Постранично"
+        },
+        {
+          "language": "kk",
+          "value": "Беттер бойынша"
+        }
+      ]
+    },
+    {
+      "id": 606,
+      "values": [
+        {
+          "language": "main",
+          "value": "AITA KZT"
+        },
+        {
+          "language": "en",
+          "value": "AITA KZT"
+        },
+        {
+          "language": "ru",
+          "value": "AITA KZT"
+        },
+        {
+          "language": "kk",
+          "value": "AITA KZT"
+        }
+      ]
+    },
+    {
+      "id": 607,
+      "values": [
+        {
+          "language": "main",
+          "value": "Manual development top-up"
+        },
+        {
+          "language": "en",
+          "value": "Manual development top-up"
+        },
+        {
+          "language": "ru",
+          "value": "Тестовое ручное пополнение"
+        },
+        {
+          "language": "kk",
+          "value": "Қолмен тест толтыру"
+        }
+      ]
+    },
+    {
+      "id": 608,
+      "values": [
+        {
+          "language": "main",
+          "value": "Kaspi invoice"
+        },
+        {
+          "language": "en",
+          "value": "Kaspi invoice"
+        },
+        {
+          "language": "ru",
+          "value": "Счёт Kaspi"
+        },
+        {
+          "language": "kk",
+          "value": "Kaspi шоты"
+        }
+      ]
+    },
+    {
+      "id": 609,
+      "values": [
+        {
+          "language": "main",
+          "value": "Conditions"
+        },
+        {
+          "language": "en",
+          "value": "Conditions"
+        },
+        {
+          "language": "ru",
+          "value": "Условия"
+        },
+        {
+          "language": "kk",
+          "value": "Шарттар"
+        }
+      ]
+    },
+    {
+      "id": 610,
+      "values": [
+        {
+          "language": "main",
+          "value": "Add condition"
+        },
+        {
+          "language": "en",
+          "value": "Add condition"
+        },
+        {
+          "language": "ru",
+          "value": "Добавить условие"
+        },
+        {
+          "language": "kk",
+          "value": "Шарт қосу"
+        }
+      ]
+    },
+    {
+      "id": 611,
+      "values": [
+        {
+          "language": "main",
+          "value": "Enter condition"
+        },
+        {
+          "language": "en",
+          "value": "Enter condition"
+        },
+        {
+          "language": "ru",
+          "value": "Введите условие"
+        },
+        {
+          "language": "kk",
+          "value": "Шартты енгізіңіз"
+        }
+      ]
+    },
+    {
+      "id": 612,
+      "values": [
+        {
+          "language": "main",
+          "value": "Check all conditions"
+        },
+        {
+          "language": "en",
+          "value": "Check all conditions"
+        },
+        {
+          "language": "ru",
+          "value": "Отметьте все условия"
+        },
+        {
+          "language": "kk",
+          "value": "Барлық шарттарды белгілеңіз"
+        }
+      ]
+    },
+    {
+      "id": 613,
+      "values": [
+        {
+          "language": "main",
+          "value": "Item in acceptable condition"
+        },
+        {
+          "language": "en",
+          "value": "Item in acceptable condition"
+        },
+        {
+          "language": "ru",
+          "value": "Товар в приемлемом состоянии"
+        },
+        {
+          "language": "kk",
+          "value": "Тауар қабылдауға жарамды күйде"
+        }
+      ]
+    },
+    {
+      "id": 614,
+      "values": [
+        {
+          "language": "main",
+          "value": "Cart total"
+        },
+        {
+          "language": "en",
+          "value": "Cart total"
+        },
+        {
+          "language": "ru",
+          "value": "Итого в корзине"
+        },
+        {
+          "language": "kk",
+          "value": "Себет қорытындысы"
+        }
+      ]
+    },
+    {
+      "id": 615,
+      "values": [
+        {
+          "language": "main",
+          "value": "items"
+        },
+        {
+          "language": "en",
+          "value": "items"
+        },
+        {
+          "language": "ru",
+          "value": "товаров"
+        },
+        {
+          "language": "kk",
+          "value": "тауар"
+        }
+      ]
+    },
+    {
+      "id": 616,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open system devices"
+        },
+        {
+          "language": "en",
+          "value": "Open system devices"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть устройства системы"
+        },
+        {
+          "language": "kk",
+          "value": "Жүйе құрылғыларын ашу"
+        }
+      ]
+    },
+    {
+      "id": 617,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open Bluetooth/devices settings"
+        },
+        {
+          "language": "en",
+          "value": "Open Bluetooth/devices settings"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть настройки Bluetooth/устройств"
+        },
+        {
+          "language": "kk",
+          "value": "Bluetooth/құрылғылар баптауларын ашу"
+        }
+      ]
+    },
+    {
+      "id": 618,
+      "values": [
+        {
+          "language": "main",
+          "value": "Mine"
+        },
+        {
+          "language": "en",
+          "value": "Mine"
+        },
+        {
+          "language": "ru",
+          "value": "Мои"
+        },
+        {
+          "language": "kk",
+          "value": "Менің"
+        }
+      ]
+    },
+    {
+      "id": 619,
+      "values": [
+        {
+          "language": "main",
+          "value": "Generic"
+        },
+        {
+          "language": "en",
+          "value": "Generic"
+        },
+        {
+          "language": "ru",
+          "value": "Общие"
+        },
+        {
+          "language": "kk",
+          "value": "Жалпы"
+        }
+      ]
+    },
+    {
+      "id": 620,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier phone number"
+        },
+        {
+          "language": "en",
+          "value": "Supplier phone number"
+        },
+        {
+          "language": "ru",
+          "value": "Телефон поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші телефоны"
+        }
+      ]
+    },
+    {
+      "id": 621,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier email"
+        },
+        {
+          "language": "en",
+          "value": "Supplier email"
+        },
+        {
+          "language": "ru",
+          "value": "Email поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші email"
+        }
+      ]
+    },
+    {
+      "id": 622,
+      "values": [
+        {
+          "language": "main",
+          "value": "Enter supplier name"
+        },
+        {
+          "language": "en",
+          "value": "Enter supplier name"
+        },
+        {
+          "language": "ru",
+          "value": "Введите название поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші атауын енгізіңіз"
+        }
+      ]
+    },
+    {
+      "id": 623,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier added"
+        },
+        {
+          "language": "en",
+          "value": "Supplier added"
+        },
+        {
+          "language": "ru",
+          "value": "Поставщик добавлен"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші қосылды"
+        }
+      ]
+    },
+    {
+      "id": 624,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier updated"
+        },
+        {
+          "language": "en",
+          "value": "Supplier updated"
+        },
+        {
+          "language": "ru",
+          "value": "Поставщик обновлён"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші жаңартылды"
+        }
+      ]
+    },
+    {
+      "id": 625,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier deleted"
+        },
+        {
+          "language": "en",
+          "value": "Supplier deleted"
+        },
+        {
+          "language": "ru",
+          "value": "Поставщик удалён"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші жойылды"
+        }
+      ]
+    },
+    {
+      "id": 626,
+      "values": [
+        {
+          "language": "main",
+          "value": "No suppliers yet"
+        },
+        {
+          "language": "en",
+          "value": "No suppliers yet"
+        },
+        {
+          "language": "ru",
+          "value": "Поставщиков пока нет"
+        },
+        {
+          "language": "kk",
+          "value": "Әзірге жеткізушілер жоқ"
+        }
+      ]
+    },
+    {
+      "id": 627,
+      "values": [
+        {
+          "language": "main",
+          "value": "Add mine supplier"
+        },
+        {
+          "language": "en",
+          "value": "Add mine supplier"
+        },
+        {
+          "language": "ru",
+          "value": "Добавить моего поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Менің жеткізушімді қосу"
+        }
+      ]
+    },
+    {
+      "id": 628,
+      "values": [
+        {
+          "language": "main",
+          "value": "Generic suppliers"
+        },
+        {
+          "language": "en",
+          "value": "Generic suppliers"
+        },
+        {
+          "language": "ru",
+          "value": "Общие поставщики"
+        },
+        {
+          "language": "kk",
+          "value": "Жалпы жеткізушілер"
+        }
+      ]
+    },
+    {
+      "id": 629,
+      "values": [
+        {
+          "language": "main",
+          "value": "Mine suppliers"
+        },
+        {
+          "language": "en",
+          "value": "Mine suppliers"
+        },
+        {
+          "language": "ru",
+          "value": "Мои поставщики"
+        },
+        {
+          "language": "kk",
+          "value": "Менің жеткізушілерім"
+        }
+      ]
+    },
+    {
+      "id": 630,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier data"
+        },
+        {
+          "language": "en",
+          "value": "Supplier data"
+        },
+        {
+          "language": "ru",
+          "value": "Данные поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші деректері"
+        }
+      ]
+    },
+    {
+      "id": 631,
+      "values": [
+        {
+          "language": "main",
+          "value": "Save supplier"
+        },
+        {
+          "language": "en",
+          "value": "Save supplier"
+        },
+        {
+          "language": "ru",
+          "value": "Сохранить поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізушіні сақтау"
+        }
+      ]
+    },
+    {
+      "id": 632,
+      "values": [
+        {
+          "language": "main",
+          "value": "This supplier is generic and cannot be edited here"
+        },
+        {
+          "language": "en",
+          "value": "This supplier is generic and cannot be edited here"
+        },
+        {
+          "language": "ru",
+          "value": "Это общий поставщик, здесь его нельзя редактировать"
+        },
+        {
+          "language": "kk",
+          "value": "Бұл жалпы жеткізуші, оны мұнда өңдеуге болмайды"
+        }
+      ]
+    },
+    {
+      "id": 633,
+      "values": [
+        {
+          "language": "main",
+          "value": "Device settings opened"
+        },
+        {
+          "language": "en",
+          "value": "Device settings opened"
+        },
+        {
+          "language": "ru",
+          "value": "Настройки устройств открыты"
+        },
+        {
+          "language": "kk",
+          "value": "Құрылғы баптаулары ашылды"
+        }
+      ]
+    },
+    {
+      "id": 634,
+      "values": [
+        {
+          "language": "main",
+          "value": "Could not open device settings"
+        },
+        {
+          "language": "en",
+          "value": "Could not open device settings"
+        },
+        {
+          "language": "ru",
+          "value": "Не удалось открыть настройки устройств"
+        },
+        {
+          "language": "kk",
+          "value": "Құрылғы баптауларын ашу мүмкін болмады"
+        }
+      ]
+    },
+    {
+      "id": 635,
+      "values": [
+        {
+          "language": "main",
+          "value": "Add supplier here"
+        },
+        {
+          "language": "en",
+          "value": "Add supplier here"
+        },
+        {
+          "language": "ru",
+          "value": "Добавить поставщика здесь"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізушіні осында қосу"
+        }
+      ]
+    },
+    {
+      "id": 636,
+      "values": [
+        {
+          "language": "main",
+          "value": "Quick add item"
+        },
+        {
+          "language": "en",
+          "value": "Quick add item"
+        },
+        {
+          "language": "ru",
+          "value": "Быстро добавить товар"
+        },
+        {
+          "language": "kk",
+          "value": "Тауарды жылдам қосу"
+        }
+      ]
+    },
+    {
+      "id": 637,
+      "values": [
+        {
+          "language": "main",
+          "value": "Save item and add to cart"
+        },
+        {
+          "language": "en",
+          "value": "Save item and add to cart"
+        },
+        {
+          "language": "ru",
+          "value": "Сохранить товар и добавить в корзину"
+        },
+        {
+          "language": "kk",
+          "value": "Тауарды сақтап, себетке қосу"
+        }
+      ]
+    },
+    {
+      "id": 638,
+      "values": [
+        {
+          "language": "main",
+          "value": "No supplier selected"
+        },
+        {
+          "language": "en",
+          "value": "No supplier selected"
+        },
+        {
+          "language": "ru",
+          "value": "Поставщик не выбран"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші таңдалмаған"
+        }
+      ]
+    },
+    {
+      "id": 639,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier for supply"
+        },
+        {
+          "language": "en",
+          "value": "Supplier for supply"
+        },
+        {
+          "language": "ru",
+          "value": "Поставщик для поставки"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуге арналған жеткізуші"
+        }
+      ]
+    },
+    {
+      "id": 640,
+      "values": [
+        {
+          "language": "main",
+          "value": "Select supplier for supply"
+        },
+        {
+          "language": "en",
+          "value": "Select supplier for supply"
+        },
+        {
+          "language": "ru",
+          "value": "Выберите поставщика для поставки"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізу үшін жеткізушіні таңдаңыз"
+        }
+      ]
+    },
+    {
+      "id": 641,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier selected"
+        },
+        {
+          "language": "en",
+          "value": "Supplier selected"
+        },
+        {
+          "language": "ru",
+          "value": "Поставщик выбран"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші таңдалды"
+        }
+      ]
+    },
+    {
+      "id": 642,
+      "values": [
+        {
+          "language": "main",
+          "value": "New barcode was not found. Add item now."
+        },
+        {
+          "language": "en",
+          "value": "New barcode was not found. Add item now."
+        },
+        {
+          "language": "ru",
+          "value": "Новый штрих-код не найден. Добавьте товар сейчас."
+        },
+        {
+          "language": "kk",
+          "value": "Жаңа штрих-код табылмады. Тауарды қазір қосыңыз."
+        }
+      ]
+    },
+    {
+      "id": 643,
+      "values": [
+        {
+          "language": "main",
+          "value": "Start workshift"
+        },
+        {
+          "language": "en",
+          "value": "Start workshift"
+        },
+        {
+          "language": "ru",
+          "value": "Начать смену"
+        },
+        {
+          "language": "kk",
+          "value": "Ауысымды бастау"
+        }
+      ]
+    },
+    {
+      "id": 644,
+      "values": [
+        {
+          "language": "main",
+          "value": "Workshift required"
+        },
+        {
+          "language": "en",
+          "value": "Workshift required"
+        },
+        {
+          "language": "ru",
+          "value": "Требуется смена"
+        },
+        {
+          "language": "kk",
+          "value": "Ауысым қажет"
+        }
+      ]
+    },
+    {
+      "id": 645,
+      "values": [
+        {
+          "language": "main",
+          "value": "This workplace is locked until the worker starts a workshift. Store owners can work without this step."
+        },
+        {
+          "language": "en",
+          "value": "This workplace is locked until the worker starts a workshift. Store owners can work without this step."
+        },
+        {
+          "language": "ru",
+          "value": "Рабочее место заблокировано, пока сотрудник не начнёт смену. Владелец магазина может работать без этого шага."
+        },
+        {
+          "language": "kk",
+          "value": "Қызметкер ауысымды бастамайынша жұмыс орны бұғатталған. Дүкен иесі бұл қадамсыз жұмыс істей алады."
+        }
+      ]
+    },
+    {
+      "id": 646,
+      "values": [
+        {
+          "language": "main",
+          "value": "Worker ID / phone / email"
+        },
+        {
+          "language": "en",
+          "value": "Worker ID / phone / email"
+        },
+        {
+          "language": "ru",
+          "value": "ID сотрудника / телефон / email"
+        },
+        {
+          "language": "kk",
+          "value": "Қызметкер ID / телефон / email"
+        }
+      ]
+    },
+    {
+      "id": 647,
+      "values": [
+        {
+          "language": "main",
+          "value": "Enter worker ID or account phone"
+        },
+        {
+          "language": "en",
+          "value": "Enter worker ID or account phone"
+        },
+        {
+          "language": "ru",
+          "value": "Введите ID сотрудника или телефон аккаунта"
+        },
+        {
+          "language": "kk",
+          "value": "Қызметкер ID немесе аккаунт телефонын енгізіңіз"
+        }
+      ]
+    },
+    {
+      "id": 648,
+      "values": [
+        {
+          "language": "main",
+          "value": "Workshift password"
+        },
+        {
+          "language": "en",
+          "value": "Workshift password"
+        },
+        {
+          "language": "ru",
+          "value": "Пароль смены"
+        },
+        {
+          "language": "kk",
+          "value": "Ауысым құпия сөзі"
+        }
+      ]
+    },
+    {
+      "id": 649,
+      "values": [
+        {
+          "language": "main",
+          "value": "Enter workshift password"
+        },
+        {
+          "language": "en",
+          "value": "Enter workshift password"
+        },
+        {
+          "language": "ru",
+          "value": "Введите пароль смены"
+        },
+        {
+          "language": "kk",
+          "value": "Ауысым құпия сөзін енгізіңіз"
+        }
+      ]
+    },
+    {
+      "id": 650,
+      "values": [
+        {
+          "language": "main",
+          "value": "End workshift"
+        },
+        {
+          "language": "en",
+          "value": "End workshift"
+        },
+        {
+          "language": "ru",
+          "value": "Завершить смену"
+        },
+        {
+          "language": "kk",
+          "value": "Ауысымды аяқтау"
+        }
+      ]
+    },
+    {
+      "id": 651,
+      "values": [
+        {
+          "language": "main",
+          "value": "Invites"
+        },
+        {
+          "language": "en",
+          "value": "Invites"
+        },
+        {
+          "language": "ru",
+          "value": "Приглашения"
+        },
+        {
+          "language": "kk",
+          "value": "Шақырулар"
+        }
+      ]
+    },
+    {
+      "id": 652,
+      "values": [
+        {
+          "language": "main",
+          "value": "Incoming invites from stores"
+        },
+        {
+          "language": "en",
+          "value": "Incoming invites from stores"
+        },
+        {
+          "language": "ru",
+          "value": "Входящие приглашения от магазинов"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкендерден келген шақырулар"
+        }
+      ]
+    },
+    {
+      "id": 653,
+      "values": [
+        {
+          "language": "main",
+          "value": "No worker invites yet"
+        },
+        {
+          "language": "en",
+          "value": "No worker invites yet"
+        },
+        {
+          "language": "ru",
+          "value": "Приглашений пока нет"
+        },
+        {
+          "language": "kk",
+          "value": "Әзірше шақырулар жоқ"
+        }
+      ]
+    },
+    {
+      "id": 654,
+      "values": [
+        {
+          "language": "main",
+          "value": "Worker job password"
+        },
+        {
+          "language": "en",
+          "value": "Worker job password"
+        },
+        {
+          "language": "ru",
+          "value": "Пароль рабочего места"
+        },
+        {
+          "language": "kk",
+          "value": "Жұмыс орнының құпия сөзі"
+        }
+      ]
+    },
+    {
+      "id": 655,
+      "values": [
+        {
+          "language": "main",
+          "value": "Set or replace the password used to start this worker’s shifts"
+        },
+        {
+          "language": "en",
+          "value": "Set or replace the password used to start this worker’s shifts"
+        },
+        {
+          "language": "ru",
+          "value": "Задайте или замените пароль, которым сотрудник будет начинать смены"
+        },
+        {
+          "language": "kk",
+          "value": "Қызметкер ауысым бастау үшін қолданатын құпия сөзді орнатыңыз немесе ауыстырыңыз"
+        }
+      ]
+    },
+    {
+      "id": 656,
+      "values": [
+        {
+          "language": "main",
+          "value": "Store or branch public ID"
+        },
+        {
+          "language": "en",
+          "value": "Store or branch public ID"
+        },
+        {
+          "language": "ru",
+          "value": "Публичный ID магазина или филиала"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен немесе филиалдың жария ID"
+        }
+      ]
+    },
+    {
+      "id": 657,
+      "values": [
+        {
+          "language": "main",
+          "value": "Enter store or branch public ID"
+        },
+        {
+          "language": "en",
+          "value": "Enter store or branch public ID"
+        },
+        {
+          "language": "ru",
+          "value": "Введите публичный ID магазина или филиала"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен немесе филиалдың жария ID енгізіңіз"
+        }
+      ]
+    },
+    {
+      "id": 658,
+      "values": [
+        {
+          "language": "main",
+          "value": "Requests to this store or branch"
+        },
+        {
+          "language": "en",
+          "value": "Requests to this store or branch"
+        },
+        {
+          "language": "ru",
+          "value": "Заявки в этот магазин или филиал"
+        },
+        {
+          "language": "kk",
+          "value": "Осы дүкенге немесе филиалға өтініштер"
+        }
+      ]
+    },
+    {
+      "id": 659,
+      "values": [
+        {
+          "language": "main",
+          "value": "Tap a menu item to open it. Long names wrap naturally."
+        },
+        {
+          "language": "en",
+          "value": "Tap a menu item to open it. Long names wrap naturally."
+        },
+        {
+          "language": "ru",
+          "value": "Нажмите пункт меню, чтобы открыть. Длинные названия переносятся автоматически."
+        },
+        {
+          "language": "kk",
+          "value": "Ашу үшін мәзір тармағын басыңыз. Ұзын атаулар автоматты түрде тасымалданады."
+        }
+      ]
+    },
+    {
+      "id": 660,
+      "values": [
+        {
+          "language": "main",
+          "value": "This password is separate for this store job only"
+        },
+        {
+          "language": "en",
+          "value": "This password is separate for this store job only"
+        },
+        {
+          "language": "ru",
+          "value": "Этот пароль отдельный только для этой работы в магазине"
+        },
+        {
+          "language": "kk",
+          "value": "Бұл құпия сөз тек осы дүкендегі жұмысқа бөлек"
+        }
+      ]
+    },
+    {
+      "id": 661,
+      "values": [
+        {
+          "language": "main",
+          "value": "Active workshift"
+        },
+        {
+          "language": "en",
+          "value": "Active workshift"
+        },
+        {
+          "language": "ru",
+          "value": "Активная смена"
+        },
+        {
+          "language": "kk",
+          "value": "Белсенді ауысым"
+        }
+      ]
     }
   ]
 }

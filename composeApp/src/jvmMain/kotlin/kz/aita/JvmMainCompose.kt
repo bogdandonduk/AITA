@@ -9,6 +9,8 @@ import com.github.javakeyring.Keyring
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.awt.Desktop
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Paths
@@ -238,6 +240,34 @@ fun main() {
             }
         } catch (thr: Throwable) {
             thr.printStackTrace()
+        }
+    }
+
+    setClipboardText = { text ->
+        val selection = StringSelection(text)
+        Toolkit.getDefaultToolkit().systemClipboard.setContents(selection, null)
+    }
+
+    openSystemDevicesSettings = {
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val osName = System.getProperty("os.name").orEmpty().lowercase()
+                when {
+                    osName.contains("mac") -> {
+                        Runtime.getRuntime().exec(arrayOf("open", "x-apple.systempreferences:com.apple.BluetoothSettings"))
+                    }
+                    osName.contains("win") -> {
+                        Runtime.getRuntime().exec(arrayOf("cmd", "/c", "start", "ms-settings:bluetooth"))
+                    }
+                    else -> {
+                        runCatching { Runtime.getRuntime().exec(arrayOf("blueman-manager")) }
+                            .getOrElse { Runtime.getRuntime().exec(arrayOf("gnome-control-center", "bluetooth")) }
+                    }
+                }
+                ReceiptPlatformActionResult(true, "Device settings opened")
+            }.getOrElse {
+                ReceiptPlatformActionResult(false, it.message ?: "Could not open device settings")
+            }
         }
     }
 
