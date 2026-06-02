@@ -1468,5 +1468,173 @@
         "value": "Операция журналға жазылды"
       }
     ]
+  },
+  {
+    "id": "94",
+    "message": [
+      {
+        "language": "main",
+        "value": "Analytics loaded"
+      },
+      {
+        "language": "en",
+        "value": "Analytics loaded"
+      },
+      {
+        "language": "ru",
+        "value": "Аналитика загружена"
+      },
+      {
+        "language": "kk",
+        "value": "Аналитика жүктелді"
+      }
+    ]
+  },
+  {
+    "id": "96",
+    "message": [
+      {
+        "language": "main",
+        "value": "Support tickets loaded"
+      },
+      {
+        "language": "en",
+        "value": "Support tickets loaded"
+      },
+      {
+        "language": "ru",
+        "value": "Обращения в поддержку загружены"
+      },
+      {
+        "language": "kk",
+        "value": "Қолдау өтініштері жүктелді"
+      }
+    ]
+  },
+  {
+    "id": "97",
+    "message": [
+      {
+        "language": "main",
+        "value": "Support request created"
+      },
+      {
+        "language": "en",
+        "value": "Support request created"
+      },
+      {
+        "language": "ru",
+        "value": "Обращение в поддержку создано"
+      },
+      {
+        "language": "kk",
+        "value": "Қолдау өтініші жасалды"
+      }
+    ]
+  },
+  {
+    "id": "98",
+    "message": [
+      {
+        "language": "main",
+        "value": "Support request closed"
+      },
+      {
+        "language": "en",
+        "value": "Support request closed"
+      },
+      {
+        "language": "ru",
+        "value": "Обращение закрыто"
+      },
+      {
+        "language": "kk",
+        "value": "Өтініш жабылды"
+      }
+    ]
+  },
+  {
+    "id": "99",
+    "message": [
+      {
+        "language": "main",
+        "value": "Support request reopened"
+      },
+      {
+        "language": "en",
+        "value": "Support request reopened"
+      },
+      {
+        "language": "ru",
+        "value": "Обращение снова открыто"
+      },
+      {
+        "language": "kk",
+        "value": "Өтініш қайта ашылды"
+      }
+    ]
+  },
+  {
+    "id": "100",
+    "message": [
+      {
+        "language": "main",
+        "value": "Support messages loaded"
+      },
+      {
+        "language": "en",
+        "value": "Support messages loaded"
+      },
+      {
+        "language": "ru",
+        "value": "Сообщения поддержки загружены"
+      },
+      {
+        "language": "kk",
+        "value": "Қолдау хабарламалары жүктелді"
+      }
+    ]
+  },
+  {
+    "id": "101",
+    "message": [
+      {
+        "language": "main",
+        "value": "Support message sent"
+      },
+      {
+        "language": "en",
+        "value": "Support message sent"
+      },
+      {
+        "language": "ru",
+        "value": "Сообщение в поддержку отправлено"
+      },
+      {
+        "language": "kk",
+        "value": "Қолдау хабарламасы жіберілді"
+      }
+    ]
+  },
+  {
+    "id": "102",
+    "message": [
+      {
+        "language": "main",
+        "value": "Support messages marked as read"
+      },
+      {
+        "language": "en",
+        "value": "Support messages marked as read"
+      },
+      {
+        "language": "ru",
+        "value": "Сообщения поддержки отмечены прочитанными"
+      },
+      {
+        "language": "kk",
+        "value": "Қолдау хабарламалары оқылған деп белгіленді"
+      }
+    ]
   }
 ]

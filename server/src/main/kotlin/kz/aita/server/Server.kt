@@ -11,6 +11,7 @@ import io.ktor.http.*
 import io.ktor.http.content.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
+import io.ktor.server.config.ApplicationConfig
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
 import io.ktor.server.http.content.*
@@ -29,14 +30,21 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import io.ktor.websocket.*
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -45,13 +53,19 @@ import org.flywaydb.core.Flyway
 import org.jetbrains.exposed.exceptions.ExposedSQLException
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNotNull
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.lessEq
 import org.jetbrains.exposed.sql.javatime.CurrentTimestamp
 import org.jetbrains.exposed.sql.javatime.timestamp
+import org.jetbrains.exposed.sql.statements.InsertStatement
+import org.jetbrains.exposed.sql.statements.UpdateBuilder
 import org.jetbrains.exposed.sql.json.contains
 import org.jetbrains.exposed.sql.json.jsonb
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.postgresql.util.PSQLException
-import java.io.File
+import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -81,10 +95,42 @@ object Transactions: Table("transactions") {
     val cardPaymentOptionId = integer("card_payment_option_id")
     val debtor = text("debtor").nullable()
     val timeMillis = long("time_millis")
+    val clientOperationId = text("client_operation_id").nullable().uniqueIndex()
     val createdAt = timestamp("created_at").defaultExpression(CurrentTimestamp)
 
     override val primaryKey = PrimaryKey(id)
 }
+
+
+private fun hardDeleteStoreOwnedDataInsideTransaction(storeIds: List<UUID>) {
+    val cleanStoreIds = storeIds.distinct()
+    if (cleanStoreIds.isEmpty()) return
+
+    val nullableStoreIds = cleanStoreIds.map { it as UUID? }
+
+    SupplierOrders.deleteWhere { SupplierOrders.storeId inList cleanStoreIds }
+    Transactions.deleteWhere { Transactions.storeId inList cleanStoreIds }
+    Debtors.deleteWhere { Debtors.storeId inList cleanStoreIds }
+    Notifications.deleteWhere { Notifications.storeId inList nullableStoreIds }
+    SupportTickets.update({ SupportTickets.storeId inList nullableStoreIds }) {
+        it[SupportTickets.storeId] = null
+    }
+    StockItems.deleteWhere { StockItems.storeId inList cleanStoreIds }
+}
+
+private fun ResultRow.toTransactionDataModel(): TransactionDataModel = TransactionDataModel(
+    id = this[Transactions.id].toString(),
+    workshiftId = this[Transactions.workshiftId],
+    type = this[Transactions.type],
+    storeId = this[Transactions.storeId].toString(),
+    goodsInTransaction = this[Transactions.goodsInTransaction],
+    paidCash = this[Transactions.paidCash],
+    paidCard = this[Transactions.paidCard],
+    cardPaymentOptionId = this[Transactions.cardPaymentOptionId],
+    debtor = this[Transactions.debtor]?.let { raw -> jsonBase.decodeFromString<DebtorDataModel>(raw) },
+    timeMillis = this[Transactions.timeMillis],
+    clientOperationId = this[Transactions.clientOperationId].orEmpty()
+)
 
 object Debtors: Table("debtors") {
     val id = uuid("id").uniqueIndex()
@@ -115,8 +161,147 @@ object Debtors: Table("debtors") {
 }
 
 
-const val serverFilesPath = "AITA/server"
-const val configAppPath = "$serverFilesPath/config/app"
+private const val DEFAULT_SERVER_FILES_PATH = "AITA/server"
+private const val LOCAL_ENVIRONMENT_NAME = "local"
+
+private fun envOrSystem(name: String): String? =
+    System.getenv(name)?.trim()?.takeIf { it.isNotEmpty() }
+        ?: System.getProperty(name)?.trim()?.takeIf { it.isNotEmpty() }
+
+private fun String.toBooleanLenientOrNull(): Boolean? =
+    when (trim().lowercase(Locale.ROOT)) {
+        "true", "1", "yes", "y", "on" -> true
+        "false", "0", "no", "n", "off" -> false
+        else -> null
+    }
+
+private fun runtimeEnvironmentName(): String =
+    envOrSystem("AITA_ENV")?.lowercase(Locale.ROOT) ?: LOCAL_ENVIRONMENT_NAME
+
+private fun isProductionRuntime(): Boolean =
+    runtimeEnvironmentName() in setOf("prod", "production", "stage", "staging", "cloud")
+
+private fun Path.normalizedAbsolute(): Path = toAbsolutePath().normalize()
+
+private fun resolveServerFilesRootPath(): Path {
+    envOrSystem("AITA_SERVER_FILES_ROOT")?.let { return Path.of(it).normalizedAbsolute() }
+
+    val projectRootStyle = Path.of(DEFAULT_SERVER_FILES_PATH)
+    if (Files.exists(projectRootStyle.resolve("assets")) || Files.exists(projectRootStyle.resolve("config/app"))) {
+        return projectRootStyle.normalizedAbsolute()
+    }
+
+    val moduleRootStyle = Path.of(".")
+    if (Files.exists(moduleRootStyle.resolve("assets")) || Files.exists(moduleRootStyle.resolve("config/app"))) {
+        return moduleRootStyle.normalizedAbsolute()
+    }
+
+    val nestedServerStyle = Path.of("server")
+    if (Files.exists(nestedServerStyle.resolve("assets")) || Files.exists(nestedServerStyle.resolve("config/app"))) {
+        return nestedServerStyle.normalizedAbsolute()
+    }
+
+    return projectRootStyle.normalizedAbsolute()
+}
+
+private val serverFilesRootPath: Path by lazy(::resolveServerFilesRootPath)
+
+private val configAppRootPath: Path by lazy {
+    envOrSystem("AITA_CONFIG_APP_ROOT")
+        ?.let { Path.of(it).normalizedAbsolute() }
+        ?: serverFilesRootPath.resolve("config/app").normalizedAbsolute()
+}
+
+private val assetsRootPath: Path by lazy {
+    envOrSystem("AITA_ASSETS_ROOT")
+        ?.let { Path.of(it).normalizedAbsolute() }
+        ?: serverFilesRootPath.resolve("assets").normalizedAbsolute()
+}
+
+private fun ApplicationConfig.optionalString(path: String): String? =
+    runCatching { propertyOrNull(path)?.getString()?.trim()?.takeIf { it.isNotEmpty() } }.getOrNull()
+
+private fun Application.configString(path: String, envName: String, default: String): String =
+    environment.config.optionalString(path) ?: envOrSystem(envName) ?: default
+
+private fun Application.configBoolean(path: String, envName: String, default: Boolean): Boolean {
+    val raw = environment.config.optionalString(path) ?: envOrSystem(envName)
+    return raw?.toBooleanLenientOrNull() ?: default
+}
+
+private fun Application.configInt(path: String, envName: String, default: Int): Int {
+    val raw = environment.config.optionalString(path) ?: envOrSystem(envName)
+    return raw?.toIntOrNull() ?: default
+}
+
+private fun Application.configLong(path: String, envName: String, default: Long): Long {
+    val raw = environment.config.optionalString(path) ?: envOrSystem(envName)
+    return raw?.toLongOrNull() ?: default
+}
+
+private fun Application.isProductionMode(): Boolean {
+    val configured = environment.config.optionalString("app.environment") ?: envOrSystem("AITA_ENV") ?: LOCAL_ENVIRONMENT_NAME
+    return configured.lowercase(Locale.ROOT) in setOf("prod", "production", "stage", "staging", "cloud")
+}
+
+private data class AllowedCorsOrigin(
+    val host: String,
+    val scheme: String
+)
+
+private fun parseAllowedCorsOrigins(raw: String): List<AllowedCorsOrigin> {
+    return raw
+        .split(',')
+        .map { it.trim().trimEnd('/') }
+        .filter { it.isNotBlank() }
+        .mapNotNull { origin ->
+            if (origin == "*") return@mapNotNull AllowedCorsOrigin("*", "*")
+
+            val candidate = if (origin.contains("://")) origin else "https://$origin"
+            val uri = runCatching { URI(candidate) }.getOrNull() ?: return@mapNotNull null
+            val scheme = uri.scheme?.lowercase(Locale.ROOT)?.takeIf { it.isNotBlank() } ?: "https"
+            val host = uri.host?.lowercase(Locale.ROOT)?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            val hostWithPort = if (uri.port >= 0) "$host:${uri.port}" else host
+            AllowedCorsOrigin(hostWithPort, scheme)
+        }
+}
+
+private fun Application.publicServerUrl(): String? =
+    (environment.config.optionalString("app.publicServerUrl")
+        ?: envOrSystem("AITA_PUBLIC_SERVER_URL")
+        ?: envOrSystem("AITA_PUBLIC_BASE_URL"))
+        ?.trimEnd('/')
+        ?.takeIf { it.isNotBlank() }
+
+private fun Application.buildGlobalConfigurationJson(): String {
+    val globalConfigPath = configAppRootPath.resolve("global.json")
+    val raw = Files.readString(globalConfigPath)
+    val publicUrl = publicServerUrl() ?: return raw
+
+    return runCatching {
+        val root = Json.parseToJsonElement(raw).jsonObject
+        val payload = root["payload"]?.jsonObject ?: return@runCatching raw
+        val serverUrl = payload["serverUrl"]?.jsonObject ?: return@runCatching raw
+
+        val updatedServerUrl = JsonObject(serverUrl + ("first" to JsonPrimitive(publicUrl)))
+        val updatedPayload = JsonObject(payload + ("serverUrl" to updatedServerUrl))
+        val updatedRoot = JsonObject(root + ("payload" to updatedPayload))
+        updatedRoot.toString()
+    }.getOrElse { throwable ->
+        environment.log.error("Failed to apply configured public server URL to global configuration", throwable)
+        raw
+    }
+}
+
+private suspend fun ApplicationCall.respondStaticJsonFile(path: Path) {
+    val normalizedPath = path.normalizedAbsolute()
+    if (!Files.isRegularFile(normalizedPath)) {
+        application.environment.log.error("Missing configured static file: $normalizedPath")
+        respond(HttpStatusCode.NotFound)
+        return
+    }
+    respondFile(normalizedPath.toFile())
+}
 
 fun metaFrom(call: ApplicationCall, deviceInfo: ClientDeviceInfoDataModel? = null): Map<String, String> {
     val base = linkedMapOf(
@@ -154,6 +339,48 @@ fun ResultRow.toNotificationDataModel(): NotificationDataModel {
         isSavedOnServer = true
     )
 }
+
+
+private fun ResultRow.toSupportTicketDataModel(): SupportTicketDataModel = SupportTicketDataModel(
+    id = this[SupportTickets.id].toString(),
+    publicId = this[SupportTickets.publicId],
+    userId = this[SupportTickets.userId].toString(),
+    storeId = this[SupportTickets.storeId]?.toString(),
+    subject = this[SupportTickets.subject],
+    category = this[SupportTickets.category],
+    priority = this[SupportTickets.priority],
+    status = this[SupportTickets.status],
+    assignedAgentUserId = this[SupportTickets.assignedAgentUserId]?.toString(),
+    lastMessage = this[SupportTickets.lastMessage],
+    lastMessageAtMillis = this[SupportTickets.lastMessageAtMillis],
+    lastCustomerMessageAtMillis = this[SupportTickets.lastCustomerMessageAtMillis],
+    lastAgentMessageAtMillis = this[SupportTickets.lastAgentMessageAtMillis],
+    unreadForUserCount = this[SupportTickets.unreadForUserCount],
+    unreadForAgentCount = this[SupportTickets.unreadForAgentCount],
+    metadata = this[SupportTickets.metadata],
+    createdAtMillis = this[SupportTickets.createdAtMillis],
+    updatedAtMillis = this[SupportTickets.updatedAtMillis],
+    closedAtMillis = this[SupportTickets.closedAtMillis],
+    isActive = this[SupportTickets.isActive]
+)
+
+private fun ResultRow.toSupportMessageDataModel(): SupportMessageDataModel = SupportMessageDataModel(
+    id = this[SupportMessages.id].toString(),
+    ticketId = this[SupportMessages.ticketId].toString(),
+    userId = this[SupportMessages.userId].toString(),
+    senderUserId = this[SupportMessages.senderUserId].toString(),
+    senderRole = this[SupportMessages.senderRole],
+    senderDisplayName = this[SupportMessages.senderDisplayName],
+    body = this[SupportMessages.body],
+    attachments = this[SupportMessages.attachments],
+    metadata = this[SupportMessages.metadata],
+    clientMessageId = this[SupportMessages.clientMessageId],
+    createdAtMillis = this[SupportMessages.createdAtMillis],
+    editedAtMillis = this[SupportMessages.editedAtMillis],
+    readByCustomerAtMillis = this[SupportMessages.readByCustomerAtMillis],
+    readByAgentAtMillis = this[SupportMessages.readByAgentAtMillis],
+    isActive = this[SupportMessages.isActive]
+)
 
 suspend fun RoutingCall.genericResponseNoPayload(
     status: HttpStatusCode,
@@ -232,7 +459,7 @@ suspend fun RoutingCall.respondJsonError(
     messageText: String,
     throwable: Throwable? = null
 ) {
-    throwable?.printStackTrace()
+    throwable?.let { application.environment.log.error(messageText, it) }
 
     genericResponseNoPayload(
         status = status,
@@ -308,9 +535,83 @@ suspend fun loadSecuritySessionsForUser(userId: UUID, currentSessionId: UUID?): 
             .filter { it.active }
     }
 
+@Volatile
+private var responsesCache: List<RemoteResponseDataModel>? = null
+private val responsesCacheLock = Any()
+
 fun getResponses(): List<RemoteResponseDataModel> {
-    return Json.decodeFromString(Files.readString(Path.of(configAppPath).resolve("responses.json")))
+    responsesCache?.let { return it }
+
+    return synchronized(responsesCacheLock) {
+        responsesCache ?: Json.decodeFromString<List<RemoteResponseDataModel>>(
+            Files.readString(configAppRootPath.resolve("responses.json"))
+        ).also { responsesCache = it }
+    }
 }
+
+private fun ResultRow.toUserAccountDataModel(): UserAccountDataModel {
+    val userId = this[Users.id]
+    val userIdText = userId.toString()
+
+    val ownedStoreIds = Stores
+        .selectAll()
+        .mapNotNull { row -> row[Stores.id].toString().takeIf { row[Stores.ownerUserIds].contains(userIdText) } }
+        .distinct()
+
+    val managedStoreIds = StoreUsers
+        .select(StoreUsers.storeId)
+        .where { StoreUsers.userId eq userId }
+        .map { it[StoreUsers.storeId].toString() }
+        .distinct()
+
+    val supplierIds = Suppliers
+        .select(Suppliers.id, Suppliers.userIds)
+        .where { Suppliers.isActive eq true }
+        .mapNotNull { row ->
+            row[Suppliers.id].toString().takeIf { decodeSupplierStringList(row[Suppliers.userIds]).contains(userIdText) }
+        }
+        .distinct()
+
+    val manufacturerIds = Manufacturers
+        .select(Manufacturers.id, Manufacturers.userIds)
+        .where { Manufacturers.isActive eq true }
+        .mapNotNull { row ->
+            row[Manufacturers.id].toString().takeIf { decodeSupplierStringList(row[Manufacturers.userIds]).contains(userIdText) }
+        }
+        .distinct()
+
+    val roleIds = buildList {
+        add(USER_ROLE_BUYER)
+        if (ownedStoreIds.isNotEmpty()) add(USER_ROLE_STORE_OWNER)
+        if (managedStoreIds.isNotEmpty()) add(USER_ROLE_STORE_WORKER)
+        if (supplierIds.isNotEmpty()) add(USER_ROLE_SUPPLIER)
+        if (manufacturerIds.isNotEmpty()) add(USER_ROLE_MANUFACTURER)
+    }.distinct()
+
+    return UserAccountDataModel(
+        id = userIdText,
+        publicId = this[Users.publicId],
+        phoneNumber = this[Users.phoneNumber],
+        email = this[Users.email],
+        firstName = this[Users.firstName],
+        lastName = this[Users.lastName],
+        countryLocale = this[Users.countryLocale],
+        workerAccountIds = this[Users.workerIds],
+        supplierAccountIds = supplierIds.takeIf { it.isNotEmpty() }?.let { jsonBase.encodeToString(it) } ?: this[Users.supplierIds],
+        roleIds = roleIds,
+        ownedStoreIds = ownedStoreIds,
+        managedStoreIds = managedStoreIds,
+        manufacturerAccountIds = manufacturerIds.takeIf { it.isNotEmpty() }?.let { jsonBase.encodeToString(it) },
+        buyerAccountId = userIdText,
+        activeStoreId = this[Users.activeStoreId]?.toString(),
+        appLanguage = this[Users.appLanguage],
+        appThemeId = this[Users.appThemeId],
+        appSizeModeId = this[Users.appSizeModeId],
+        createdAt = this[Users.createdAt].toEpochMilli(),
+        isActive = this[Users.isActive]
+    )
+}
+
 
 private fun fallbackResponseMessage(id: String): List<LocalizedStringDataModel> {
     return when (id) {
@@ -453,6 +754,13 @@ private fun fallbackResponseMessage(id: String): List<LocalizedStringDataModel> 
         "60" -> simpleMessage("Cash register amount is not enough", ru = "В кассе недостаточно наличных", kk = "Кассада қолма-қол ақша жеткіліксіз")
         "61" -> simpleMessage("Request is already pending", ru = "Заявка уже ожидает решения", kk = "Өтінім қазірдің өзінде күтуде")
         "62" -> simpleMessage("User is already a worker in this store", ru = "Пользователь уже сотрудник этого магазина", kk = "Пайдаланушы бұл дүкеннің қызметкері")
+        "96" -> simpleMessage("Support tickets loaded", ru = "Обращения в поддержку загружены", kk = "Қолдау өтініштері жүктелді")
+        "97" -> simpleMessage("Support request created", ru = "Обращение в поддержку создано", kk = "Қолдау өтініші жасалды")
+        "98" -> simpleMessage("Support request closed", ru = "Обращение закрыто", kk = "Өтініш жабылды")
+        "99" -> simpleMessage("Support request reopened", ru = "Обращение снова открыто", kk = "Өтініш қайта ашылды")
+        "100" -> simpleMessage("Support messages loaded", ru = "Сообщения поддержки загружены", kk = "Қолдау хабарламалары жүктелді")
+        "101" -> simpleMessage("Support message sent", ru = "Сообщение в поддержку отправлено", kk = "Қолдау хабарламасы жіберілді")
+        "102" -> simpleMessage("Support messages marked as read", ru = "Сообщения поддержки отмечены прочитанными", kk = "Қолдау хабарламалары оқылған деп белгіленді")
         "92" -> simpleMessage("Operation logs loaded", ru = "Журнал операций загружен", kk = "Операциялар журналы жүктелді")
         "93" -> simpleMessage("Operation logged", ru = "Операция записана в журнал", kk = "Операция журналға жазылды")
         else -> simpleMessage(
@@ -503,6 +811,9 @@ object Users: Table("users") {
     val workerIds = text("worker_ids").nullable().default(null)
     val supplierIds = text("supplier_ids").nullable().default(null)
     val activeStoreId = uuid("active_store_id").nullable()
+    val appLanguage = varchar("app_language", 16).default(DEFAULT_APP_LANGUAGE)
+    val appThemeId = long("app_theme_id").default(DEFAULT_APP_THEME_ID)
+    val appSizeModeId = long("app_size_mode_id").default(DEFAULT_APP_SIZE_MODE_ID)
     val passwordHash = varchar("password_hash", 100) // BCrypt ~60 chars, give some headroom
     val createdAt = timestamp("created_at").defaultExpression(CurrentTimestamp)
     val isActive = bool("is_active").default(true)
@@ -808,6 +1119,8 @@ object StockItems: Table("stock_items") {
 
     val activeShelfBatchId = uuid("active_shelf_batch_id").nullable()
 
+    val promotions = jsonb("promotions", Json, ListSerializer(StockPromotionDataModel.serializer())).default(emptyList())
+
     val note = text("note").nullable()
     val noteLocalized = jsonb("note_localized", Json, ListSerializer(LocalizedStringDataModel.serializer())).default(emptyList())
     val conditions = jsonb("conditions", Json, ListSerializer(String.serializer())).default(emptyList())
@@ -840,12 +1153,14 @@ object StockBatchesV2: Table("stock_batches") {
     val expirationDateMillis = long("expiration_date_millis").nullable()
 
     val discounts = jsonb("discounts", Json, ListSerializer(BatchDiscountDataModel.serializer()))
+    val promotions = jsonb("promotions", Json, ListSerializer(StockPromotionDataModel.serializer())).default(emptyList())
 
     val shelfPosition = text("shelf_position").nullable()
     val shelfPriority = integer("shelf_priority")
 
     val status = text("status")
     val additionalNotes = text("additional_notes").nullable()
+    val additionalNotesLocalized = jsonb("additional_notes_localized", Json, ListSerializer(LocalizedStringDataModel.serializer())).default(emptyList())
 
     val createdAtMillis = long("created_at_millis")
     val updatedAtMillis = long("updated_at_millis")
@@ -913,6 +1228,12 @@ object SupplierOrders: Table("supplier_orders") {
     val storeAddress = jsonb("store_address", Json, LocationDataModel.serializer()).nullable()
 
     val additionalNotes = text("additional_notes").nullable()
+    val additionalNotesLocalized = jsonb("additional_notes_localized", Json, ListSerializer(LocalizedStringDataModel.serializer())).default(emptyList())
+    val supplierComment = text("supplier_comment").nullable()
+    val supplierCommentLocalized = jsonb("supplier_comment_localized", Json, ListSerializer(LocalizedStringDataModel.serializer())).default(emptyList())
+    val paymentTerms = text("payment_terms").nullable()
+    val externalReference = text("external_reference").nullable()
+    val storeContactUserId = uuid("store_contact_user_id").nullable()
     val status = text("status")
 
     val createdAtMillis = long("created_at_millis")
@@ -932,6 +1253,12 @@ object SupplierOrderLines: Table("supplier_order_lines") {
 
     val desiredExpirationDateMillis = long("desired_expiration_date_millis").nullable()
     val additionalNotes = text("additional_notes").nullable()
+    val additionalNotesLocalized = jsonb("additional_notes_localized", Json, ListSerializer(LocalizedStringDataModel.serializer())).default(emptyList())
+    val supplierComment = text("supplier_comment").nullable()
+    val supplierCommentLocalized = jsonb("supplier_comment_localized", Json, ListSerializer(LocalizedStringDataModel.serializer())).default(emptyList())
+    val supplierAcceptedQuantity = jsonb("supplier_accepted_quantity", Json, QuantityDataModel.serializer()).nullable()
+    val supplierOfferedSupplyPrice = jsonb("supplier_offered_supply_price", Json, PriceDataModel.serializer()).nullable()
+    val substituteGoodsItemId = uuid("substitute_goods_item_id").nullable()
 
     val deliveredBatchIds = jsonb("delivered_batch_ids", Json, ListSerializer(String.serializer()))
     val isActive = bool("is_active")
@@ -1033,6 +1360,52 @@ object Notifications: Table("user_notifications") {
     override val primaryKey = PrimaryKey(id)
 }
 
+
+object SupportTickets: Table("support_tickets") {
+    val id = uuid("id").uniqueIndex()
+    val publicId = text("public_id").uniqueIndex()
+    val userId = uuid("user_id").references(Users.id, onDelete = ReferenceOption.CASCADE).index()
+    val storeId = uuid("store_id").nullable().index()
+    val subject = text("subject")
+    val category = text("category").default("general")
+    val priority = text("priority").default("normal")
+    val status = text("status").default("open").index()
+    val assignedAgentUserId = uuid("assigned_agent_user_id").nullable().index()
+    val lastMessage = text("last_message").default("")
+    val lastMessageAtMillis = long("last_message_at_millis").default(0L)
+    val lastCustomerMessageAtMillis = long("last_customer_message_at_millis").nullable()
+    val lastAgentMessageAtMillis = long("last_agent_message_at_millis").nullable()
+    val unreadForUserCount = integer("unread_for_user_count").default(0)
+    val unreadForAgentCount = integer("unread_for_agent_count").default(0)
+    val metadata = jsonb("meta", Json, MapSerializer(String.serializer(), String.serializer())).default(emptyMap())
+    val createdAtMillis = long("created_at_millis")
+    val updatedAtMillis = long("updated_at_millis")
+    val closedAtMillis = long("closed_at_millis").nullable()
+    val isActive = bool("is_active").default(true)
+
+    override val primaryKey = PrimaryKey(id)
+}
+
+object SupportMessages: Table("support_messages") {
+    val id = uuid("id").uniqueIndex()
+    val ticketId = uuid("ticket_id").references(SupportTickets.id, onDelete = ReferenceOption.CASCADE).index()
+    val userId = uuid("user_id").references(Users.id, onDelete = ReferenceOption.CASCADE).index()
+    val senderUserId = uuid("sender_user_id").references(Users.id, onDelete = ReferenceOption.CASCADE).index()
+    val senderRole = text("sender_role").default("customer").index()
+    val senderDisplayName = text("sender_display_name").default("")
+    val body = text("body")
+    val attachments = jsonb("attachments", Json, ListSerializer(String.serializer())).default(emptyList())
+    val metadata = jsonb("meta", Json, MapSerializer(String.serializer(), String.serializer())).default(emptyMap())
+    val clientMessageId = text("client_message_id").nullable().uniqueIndex()
+    val createdAtMillis = long("created_at_millis")
+    val editedAtMillis = long("edited_at_millis").nullable()
+    val readByCustomerAtMillis = long("read_by_customer_at_millis").nullable()
+    val readByAgentAtMillis = long("read_by_agent_at_millis").nullable()
+    val isActive = bool("is_active").default(true)
+
+    override val primaryKey = PrimaryKey(id)
+}
+
 object Manufacturers: Table("manufacturers") {
 
     val id = uuid("id").uniqueIndex()
@@ -1077,8 +1450,325 @@ object GenericGoodsCategories: Table("generic_goods_categories") {
     val description = jsonb("description", Json, ListSerializer(LocalizedStringDataModel.serializer())).nullable()
     val quantityUnitId = text("quantity_unit_id")
     val imagePaths = jsonb("image_paths", Json, ListSerializer(StylizedDrawablePathsGroupDataModel.serializer()))
+    val conditions = jsonb("conditions", Json, ListSerializer(String.serializer())).default(emptyList())
 
     override val primaryKey = PrimaryKey(id)
+}
+
+
+private const val STOCK_CONDITION_STORAGE_PREFIX = "aita-stock-condition-v1:"
+private const val STOCK_CONDITION_KIND_BUYER_MINIMUM_AGE = "buyer_minimum_age"
+private const val STOCK_CONDITION_KIND_TRANSACTION_TIME_WINDOW = "transaction_time_window"
+
+private fun encodedSeedStockCondition(
+    kind: String,
+    minimumAge: Int = 18,
+    startsAtMinutes: Int = 6 * 60,
+    endsAtMinutes: Int = 22 * 60,
+    transactionTypeIndex: Int = 0
+): String = STOCK_CONDITION_STORAGE_PREFIX +
+        "{\"kind\":\"$kind\",\"transactionTypeIndex\":$transactionTypeIndex,\"text\":[],\"minimumAge\":$minimumAge,\"startsAtMinutes\":$startsAtMinutes,\"endsAtMinutes\":$endsAtMinutes}"
+
+private fun defaultAgeRestrictedAlcoholCategoryConditions(): List<String> = listOf(
+    encodedSeedStockCondition(STOCK_CONDITION_KIND_BUYER_MINIMUM_AGE, minimumAge = 21),
+    encodedSeedStockCondition(STOCK_CONDITION_KIND_TRANSACTION_TIME_WINDOW, startsAtMinutes = 6 * 60, endsAtMinutes = 22 * 60)
+)
+
+private data class GenericGoodsCategorySeed(
+    val slug: String,
+    val typeIds: List<String>,
+    val name: List<LocalizedStringDataModel>,
+    val quantityUnitId: String,
+    val alias: List<LocalizedStringDataModel>? = null,
+    val description: List<LocalizedStringDataModel>? = null,
+    val imagePaths: List<StylizedDrawablePathsGroupDataModel> = emptyList(),
+    val conditions: List<String> = emptyList()
+)
+
+private fun categoryText(
+    en: String,
+    ru: String,
+    kk: String,
+    main: String = en
+): List<LocalizedStringDataModel> = listOf(
+    LocalizedStringDataModel("main", main),
+    LocalizedStringDataModel("en", en),
+    LocalizedStringDataModel("ru", ru),
+    LocalizedStringDataModel("kk", kk)
+)
+
+private fun String.withoutSeededGoodsCategoryPrefix(): String {
+    return trim()
+        .replace(
+            Regex(
+                pattern = """^(Goods\s+(categor(?:y|ies)|section)|Product\s+category|Category|Категория\s+товаров|Раздел\s+товар(?:ов|а)?|Товарный\s+раздел|Категория|Тауар(?:лар)?\s+(санаты|бөлімі)|Товар(?:лар)?\s+(санаты|бөлімі)|Өнім(?:дер)?\s+(санаты|бөлімі)|Санат|Бөлім)\s*[:：\-—]?\s*""",
+                option = RegexOption.IGNORE_CASE
+            ),
+            ""
+        )
+        .trim()
+        .trimStart(':', '：', '-', '—')
+        .trim()
+}
+
+private fun List<LocalizedStringDataModel>.cleanSeededGoodsCategoryPrefixes(): List<LocalizedStringDataModel> =
+    map { it.copy(value = it.value.withoutSeededGoodsCategoryPrefix()) }
+
+private fun genericGoodsCategorySeedId(slug: String): UUID =
+    UUID.nameUUIDFromBytes("aita:generic-goods-category:$slug".toByteArray(StandardCharsets.UTF_8))
+
+private fun genericGoodsCategoryNameKey(values: List<LocalizedStringDataModel>): String {
+    return (
+            values.firstOrNull { it.language.equals("en", true) }
+                ?: values.firstOrNull { it.language.equals("main", true) }
+                ?: values.firstOrNull()
+            )
+        ?.value
+        ?.withoutSeededGoodsCategoryPrefix()
+        ?.lowercase()
+        .orEmpty()
+}
+
+private val seededGenericGoodsCategoryRootSlugs = setOf(
+    "food",
+    "bakery",
+    "dairy",
+    "plant_based",
+    "meat",
+    "seafood",
+    "eggs",
+    "grocery_staples",
+    "beverages",
+    "snacks",
+    "sweets",
+    "frozen",
+    "ready_meals",
+    "baby",
+    "pet",
+    "household",
+    "personal_care",
+    "health",
+    "stationery",
+    "electronics",
+    "clothing",
+    "toys",
+    "garden",
+    "tools",
+    "auto",
+    "regulated",
+    "seasonal"
+)
+
+private fun seededGenericGoodsCategoryRootSlug(slug: String): String? {
+    if (slug == "grocery_staples" || slug.startsWith("grocery_")) return "grocery_staples"
+
+    return seededGenericGoodsCategoryRootSlugs
+        .filter { root -> slug == root || slug.startsWith("${root}_") }
+        .maxByOrNull { it.length }
+}
+
+private fun GenericGoodsCategorySeed.parentCategoryIds(): List<String> {
+    val rootSlug = seededGenericGoodsCategoryRootSlug(slug) ?: return emptyList()
+    return if (rootSlug == slug) {
+        emptyList()
+    } else {
+        listOf(genericGoodsCategorySeedId(rootSlug).toString())
+    }
+}
+
+private fun defaultGenericGoodsCategorySeeds(): List<GenericGoodsCategorySeed> = listOf(
+    GenericGoodsCategorySeed("food", listOf("food"), categoryText("Food", "Продукты питания", "Азық-түлік"), "1"),
+    GenericGoodsCategorySeed("food_fresh_produce", listOf("food", "fresh"), categoryText("Food / Fresh produce", "Продукты / Свежие овощи и фрукты", "Азық-түлік / Жаңа көкөніс пен жеміс"), "1"),
+    GenericGoodsCategorySeed("food_fruits", listOf("food", "fresh", "fruit"), categoryText("Food / Fruits", "Продукты / Фрукты", "Азық-түлік / Жемістер"), "1"),
+    GenericGoodsCategorySeed("food_fruits_apples_pears", listOf("food", "fruit", "apple", "pear"), categoryText("Food / Fruits / Apples and pears", "Продукты / Фрукты / Яблоки и груши", "Азық-түлік / Жемістер / Алма және алмұрт"), "1"),
+    GenericGoodsCategorySeed("food_fruits_citrus", listOf("food", "fruit", "citrus"), categoryText("Food / Fruits / Citrus", "Продукты / Фрукты / Цитрусовые", "Азық-түлік / Жемістер / Цитрус"), "1"),
+    GenericGoodsCategorySeed("food_fruits_berries", listOf("food", "fruit", "berries"), categoryText("Food / Fruits / Berries", "Продукты / Фрукты / Ягоды", "Азық-түлік / Жемістер / Жидектер"), "1"),
+    GenericGoodsCategorySeed("food_fruits_bananas", listOf("food", "fruit", "banana"), categoryText("Food / Fruits / Bananas", "Продукты / Фрукты / Бананы", "Азық-түлік / Жемістер / Банан"), "1"),
+    GenericGoodsCategorySeed("food_fruits_grapes", listOf("food", "fruit", "grape"), categoryText("Food / Fruits / Grapes", "Продукты / Фрукты / Виноград", "Азық-түлік / Жемістер / Жүзім"), "1"),
+    GenericGoodsCategorySeed("food_fruits_melons", listOf("food", "fruit", "melon"), categoryText("Food / Fruits / Melons", "Продукты / Фрукты / Дыни и арбузы", "Азық-түлік / Жемістер / Қауын және қарбыз"), "1"),
+    GenericGoodsCategorySeed("food_vegetables", listOf("food", "vegetable"), categoryText("Food / Vegetables", "Продукты / Овощи", "Азық-түлік / Көкөністер"), "1"),
+    GenericGoodsCategorySeed("food_vegetables_leafy", listOf("food", "vegetable", "greens"), categoryText("Food / Vegetables / Leafy greens", "Продукты / Овощи / Листовая зелень", "Азық-түлік / Көкөністер / Жапырақты көк"), "1"),
+    GenericGoodsCategorySeed("food_vegetables_root", listOf("food", "vegetable", "root"), categoryText("Food / Vegetables / Root vegetables", "Продукты / Овощи / Корнеплоды", "Азық-түлік / Көкөністер / Тамыржемістер"), "1"),
+    GenericGoodsCategorySeed("food_vegetables_tomatoes_cucumbers", listOf("food", "vegetable", "tomato", "cucumber"), categoryText("Food / Vegetables / Tomatoes and cucumbers", "Продукты / Овощи / Помидоры и огурцы", "Азық-түлік / Көкөністер / Қызанақ және қияр"), "1"),
+    GenericGoodsCategorySeed("food_vegetables_onion_garlic", listOf("food", "vegetable", "onion", "garlic"), categoryText("Food / Vegetables / Onion and garlic", "Продукты / Овощи / Лук и чеснок", "Азық-түлік / Көкөністер / Пияз және сарымсақ"), "1"),
+    GenericGoodsCategorySeed("food_vegetables_cabbage", listOf("food", "vegetable", "cabbage"), categoryText("Food / Vegetables / Cabbage", "Продукты / Овощи / Капуста", "Азық-түлік / Көкөністер / Қырыққабат"), "1"),
+    GenericGoodsCategorySeed("food_herbs", listOf("food", "herbs"), categoryText("Food / Herbs", "Продукты / Зелень и травы", "Азық-түлік / Көк және шөптер"), "1"),
+    GenericGoodsCategorySeed("food_mushrooms", listOf("food", "mushrooms"), categoryText("Food / Mushrooms", "Продукты / Грибы", "Азық-түлік / Саңырауқұлақтар"), "1"),
+    GenericGoodsCategorySeed("bakery", listOf("food", "bakery"), categoryText("Bakery", "Выпечка и хлеб", "Нан-тоқаш өнімдері"), "0"),
+    GenericGoodsCategorySeed("bakery_bread", listOf("food", "bakery", "bread"), categoryText("Bakery / Bread", "Выпечка / Хлеб", "Нан-тоқаш / Нан"), "0"),
+    GenericGoodsCategorySeed("bakery_flatbread", listOf("food", "bakery", "flatbread"), categoryText("Bakery / Flatbread and lavash", "Выпечка / Лепёшки и лаваш", "Нан-тоқаш / Тандыр нан және лаваш"), "0"),
+    GenericGoodsCategorySeed("bakery_buns", listOf("food", "bakery", "buns"), categoryText("Bakery / Buns", "Выпечка / Булочки", "Нан-тоқаш / Тоқаштар"), "0"),
+    GenericGoodsCategorySeed("bakery_pastry", listOf("food", "bakery", "pastry"), categoryText("Bakery / Pastry", "Выпечка / Слойки и пирожки", "Нан-тоқаш / Қаттама және бәліштер"), "0"),
+    GenericGoodsCategorySeed("bakery_cakes", listOf("food", "bakery", "cake"), categoryText("Bakery / Cakes and desserts", "Выпечка / Торты и десерты", "Нан-тоқаш / Торттар және десерттер"), "0"),
+    GenericGoodsCategorySeed("bakery_cookies", listOf("food", "bakery", "cookies"), categoryText("Bakery / Cookies and biscuits", "Выпечка / Печенье и бисквиты", "Нан-тоқаш / Печенье және бисквиттер"), "0"),
+    GenericGoodsCategorySeed("dairy", listOf("food", "dairy"), categoryText("Dairy and alternatives", "Молочные продукты и альтернативы", "Сүт өнімдері және баламалар"), "0"),
+    GenericGoodsCategorySeed("dairy_milk", listOf("food", "dairy", "milk"), categoryText("Dairy / Milk", "Молочные продукты / Молоко", "Сүт өнімдері / Сүт"), "0"),
+    GenericGoodsCategorySeed("dairy_yogurt", listOf("food", "dairy", "yogurt"), categoryText("Dairy / Yogurt and kefir", "Молочные продукты / Йогурт и кефир", "Сүт өнімдері / Йогурт және айран"), "0"),
+    GenericGoodsCategorySeed("dairy_cheese", listOf("food", "dairy", "cheese"), categoryText("Dairy / Cheese", "Молочные продукты / Сыр", "Сүт өнімдері / Ірімшік"), "0"),
+    GenericGoodsCategorySeed("dairy_cottage_cheese", listOf("food", "dairy", "cottage_cheese"), categoryText("Dairy / Cottage cheese", "Молочные продукты / Творог", "Сүт өнімдері / Сүзбе"), "0"),
+    GenericGoodsCategorySeed("dairy_butter_cream", listOf("food", "dairy", "butter", "cream"), categoryText("Dairy / Butter and cream", "Молочные продукты / Масло и сливки", "Сүт өнімдері / Май және кілегей"), "0"),
+    GenericGoodsCategorySeed("plant_based", listOf("food", "plant_based"), categoryText("Plant-based foods", "Растительные продукты", "Өсімдік негізіндегі өнімдер"), "0"),
+    GenericGoodsCategorySeed("plant_based_milk", listOf("food", "plant_based", "milk"), categoryText("Plant-based / Milk alternatives", "Растительные продукты / Растительное молоко", "Өсімдік өнімдері / Өсімдік сүті"), "0"),
+    GenericGoodsCategorySeed("plant_based_tofu", listOf("food", "plant_based", "tofu"), categoryText("Plant-based / Tofu and tempeh", "Растительные продукты / Тофу и темпе", "Өсімдік өнімдері / Тофу және темпе"), "0"),
+    GenericGoodsCategorySeed("plant_based_meat", listOf("food", "plant_based", "meat_alternative"), categoryText("Plant-based / Meat alternatives", "Растительные продукты / Альтернативы мясу", "Өсімдік өнімдері / Ет баламалары"), "0"),
+    GenericGoodsCategorySeed("plant_based_cheese", listOf("food", "plant_based", "cheese_alternative"), categoryText("Plant-based / Cheese alternatives", "Растительные продукты / Альтернативы сыру", "Өсімдік өнімдері / Ірімшік баламалары"), "0"),
+    GenericGoodsCategorySeed("meat", listOf("food", "meat"), categoryText("Meat", "Мясо", "Ет"), "1"),
+    GenericGoodsCategorySeed("meat_beef", listOf("food", "meat", "beef"), categoryText("Meat / Beef", "Мясо / Говядина", "Ет / Сиыр еті"), "1"),
+    GenericGoodsCategorySeed("meat_lamb", listOf("food", "meat", "lamb"), categoryText("Meat / Lamb", "Мясо / Баранина", "Ет / Қой еті"), "1"),
+    GenericGoodsCategorySeed("meat_poultry", listOf("food", "meat", "poultry"), categoryText("Meat / Poultry", "Мясо / Птица", "Ет / Құс еті"), "1"),
+    GenericGoodsCategorySeed("meat_sausages", listOf("food", "meat", "sausage"), categoryText("Meat / Sausages and deli", "Мясо / Колбасы и деликатесы", "Ет / Шұжық және деликатестер"), "0"),
+    GenericGoodsCategorySeed("seafood", listOf("food", "seafood"), categoryText("Fish and seafood", "Рыба и морепродукты", "Балық және теңіз өнімдері"), "1"),
+    GenericGoodsCategorySeed("seafood_fish", listOf("food", "seafood", "fish"), categoryText("Seafood / Fish", "Морепродукты / Рыба", "Теңіз өнімдері / Балық"), "1"),
+    GenericGoodsCategorySeed("seafood_canned", listOf("food", "seafood", "canned"), categoryText("Seafood / Canned fish", "Морепродукты / Рыбные консервы", "Теңіз өнімдері / Балық консервілері"), "0"),
+    GenericGoodsCategorySeed("eggs", listOf("food", "eggs"), categoryText("Eggs", "Яйца", "Жұмыртқа"), "0"),
+    GenericGoodsCategorySeed("grocery_staples", listOf("food", "grocery"), categoryText("Grocery staples", "Бакалея", "Бакалея"), "0"),
+    GenericGoodsCategorySeed("grocery_grains", listOf("food", "grocery", "grains"), categoryText("Grocery / Grains and cereals", "Бакалея / Крупы", "Бакалея / Жармалар"), "1"),
+    GenericGoodsCategorySeed("grocery_rice", listOf("food", "grocery", "rice"), categoryText("Grocery / Rice", "Бакалея / Рис", "Бакалея / Күріш"), "1"),
+    GenericGoodsCategorySeed("grocery_pasta", listOf("food", "grocery", "pasta"), categoryText("Grocery / Pasta and noodles", "Бакалея / Макароны и лапша", "Бакалея / Макарон және кеспе"), "0"),
+    GenericGoodsCategorySeed("grocery_flour", listOf("food", "grocery", "flour"), categoryText("Grocery / Flour and baking mixes", "Бакалея / Мука и смеси для выпечки", "Бакалея / Ұн және пісіру қоспалары"), "1"),
+    GenericGoodsCategorySeed("grocery_sugar", listOf("food", "grocery", "sugar"), categoryText("Grocery / Sugar and sweeteners", "Бакалея / Сахар и подсластители", "Бакалея / Қант және тәттілендіргіштер"), "1"),
+    GenericGoodsCategorySeed("grocery_salt", listOf("food", "grocery", "salt"), categoryText("Grocery / Salt", "Бакалея / Соль", "Бакалея / Тұз"), "1"),
+    GenericGoodsCategorySeed("grocery_spices", listOf("food", "grocery", "spices"), categoryText("Grocery / Spices and seasonings", "Бакалея / Специи и приправы", "Бакалея / Дәмдеуіштер"), "0"),
+    GenericGoodsCategorySeed("grocery_oil", listOf("food", "grocery", "oil"), categoryText("Grocery / Oils", "Бакалея / Масла", "Бакалея / Майлар"), "0"),
+    GenericGoodsCategorySeed("grocery_sauces", listOf("food", "grocery", "sauce"), categoryText("Grocery / Sauces and dressings", "Бакалея / Соусы и заправки", "Бакалея / Тұздықтар"), "0"),
+    GenericGoodsCategorySeed("grocery_canned", listOf("food", "grocery", "canned"), categoryText("Grocery / Canned food", "Бакалея / Консервы", "Бакалея / Консервілер"), "0"),
+    GenericGoodsCategorySeed("grocery_pickles", listOf("food", "grocery", "pickles"), categoryText("Grocery / Pickles and marinades", "Бакалея / Соленья и маринады", "Бакалея / Тұздалған және маринадталған өнімдер"), "0"),
+    GenericGoodsCategorySeed("grocery_breakfast", listOf("food", "grocery", "breakfast"), categoryText("Grocery / Breakfast foods", "Бакалея / Завтраки", "Бакалея / Таңғы ас өнімдері"), "0"),
+    GenericGoodsCategorySeed("grocery_instant", listOf("food", "grocery", "instant"), categoryText("Grocery / Instant foods", "Бакалея / Быстрое питание", "Бакалея / Жылдам дайындалатын тағамдар"), "0"),
+    GenericGoodsCategorySeed("beverages", listOf("food", "beverage"), categoryText("Beverages", "Напитки", "Сусындар"), "0"),
+    GenericGoodsCategorySeed("beverages_water", listOf("food", "beverage", "water"), categoryText("Beverages / Water", "Напитки / Вода", "Сусындар / Су"), "0"),
+    GenericGoodsCategorySeed("beverages_juice", listOf("food", "beverage", "juice"), categoryText("Beverages / Juice and nectar", "Напитки / Соки и нектары", "Сусындар / Шырын және нектар"), "0"),
+    GenericGoodsCategorySeed("beverages_soda", listOf("food", "beverage", "soda"), categoryText("Beverages / Soda", "Напитки / Газировка", "Сусындар / Газдалған сусын"), "0"),
+    GenericGoodsCategorySeed("beverages_tea", listOf("food", "beverage", "tea"), categoryText("Beverages / Tea", "Напитки / Чай", "Сусындар / Шай"), "0"),
+    GenericGoodsCategorySeed("beverages_coffee", listOf("food", "beverage", "coffee"), categoryText("Beverages / Coffee", "Напитки / Кофе", "Сусындар / Кофе"), "0"),
+    GenericGoodsCategorySeed("beverages_energy", listOf("food", "beverage", "energy"), categoryText("Beverages / Energy drinks", "Напитки / Энергетики", "Сусындар / Энергетикалық сусындар"), "0"),
+    GenericGoodsCategorySeed("snacks", listOf("food", "snacks"), categoryText("Snacks", "Снеки", "Тіскебасарлар"), "0"),
+    GenericGoodsCategorySeed("snacks_chips", listOf("food", "snacks", "chips"), categoryText("Snacks / Chips and crisps", "Снеки / Чипсы", "Тіскебасар / Чипстер"), "0"),
+    GenericGoodsCategorySeed("snacks_nuts", listOf("food", "snacks", "nuts"), categoryText("Snacks / Nuts and seeds", "Снеки / Орехи и семечки", "Тіскебасар / Жаңғақ және дәндер"), "1"),
+    GenericGoodsCategorySeed("snacks_crackers", listOf("food", "snacks", "crackers"), categoryText("Snacks / Crackers and breadsticks", "Снеки / Крекеры и хлебцы", "Тіскебасар / Крекер және қытырлақ нан"), "0"),
+    GenericGoodsCategorySeed("sweets", listOf("food", "sweets"), categoryText("Sweets", "Сладости", "Тәттілер"), "0"),
+    GenericGoodsCategorySeed("sweets_chocolate", listOf("food", "sweets", "chocolate"), categoryText("Sweets / Chocolate", "Сладости / Шоколад", "Тәттілер / Шоколад"), "0"),
+    GenericGoodsCategorySeed("sweets_candy", listOf("food", "sweets", "candy"), categoryText("Sweets / Candy", "Сладости / Конфеты", "Тәттілер / Кәмпиттер"), "0"),
+    GenericGoodsCategorySeed("sweets_cookies", listOf("food", "sweets", "cookies"), categoryText("Sweets / Cookies and wafers", "Сладости / Печенье и вафли", "Тәттілер / Печенье және вафли"), "0"),
+    GenericGoodsCategorySeed("sweets_ice_cream", listOf("food", "sweets", "ice_cream"), categoryText("Sweets / Ice cream", "Сладости / Мороженое", "Тәттілер / Балмұздақ"), "0"),
+    GenericGoodsCategorySeed("frozen", listOf("food", "frozen"), categoryText("Frozen foods", "Замороженные продукты", "Мұздатылған өнімдер"), "0"),
+    GenericGoodsCategorySeed("frozen_vegetables", listOf("food", "frozen", "vegetables"), categoryText("Frozen / Vegetables and berries", "Заморозка / Овощи и ягоды", "Мұздатылған / Көкөніс және жидек"), "0"),
+    GenericGoodsCategorySeed("frozen_ready_meals", listOf("food", "frozen", "ready_meals"), categoryText("Frozen / Ready meals", "Заморозка / Готовые блюда", "Мұздатылған / Дайын тағамдар"), "0"),
+    GenericGoodsCategorySeed("ready_meals", listOf("food", "ready_meals"), categoryText("Ready meals and salads", "Готовая еда и салаты", "Дайын тағам және салаттар"), "0"),
+    GenericGoodsCategorySeed("ready_meals_salads", listOf("food", "ready_meals", "salads"), categoryText("Ready meals / Salads", "Готовая еда / Салаты", "Дайын тағам / Салаттар"), "0"),
+    GenericGoodsCategorySeed("ready_meals_soups", listOf("food", "ready_meals", "soups"), categoryText("Ready meals / Soups", "Готовая еда / Супы", "Дайын тағам / Сорпалар"), "0"),
+    GenericGoodsCategorySeed("baby", listOf("baby"), categoryText("Baby products", "Детские товары", "Балалар тауарлары"), "0"),
+    GenericGoodsCategorySeed("baby_food", listOf("baby", "food"), categoryText("Baby / Food", "Детские товары / Питание", "Балалар / Тағам"), "0"),
+    GenericGoodsCategorySeed("baby_diapers", listOf("baby", "diapers"), categoryText("Baby / Diapers and wipes", "Детские товары / Подгузники и салфетки", "Балалар / Жөргек және майлық"), "0"),
+    GenericGoodsCategorySeed("baby_care", listOf("baby", "care"), categoryText("Baby / Care", "Детские товары / Уход", "Балалар / Күтім"), "0"),
+    GenericGoodsCategorySeed("pet", listOf("pet"), categoryText("Pet supplies", "Товары для животных", "Үй жануарларына арналған тауарлар"), "0"),
+    GenericGoodsCategorySeed("pet_food_cats", listOf("pet", "cat_food"), categoryText("Pet / Cat food", "Животные / Корм для кошек", "Жануарлар / Мысық азығы"), "0"),
+    GenericGoodsCategorySeed("pet_food_dogs", listOf("pet", "dog_food"), categoryText("Pet / Dog food", "Животные / Корм для собак", "Жануарлар / Ит азығы"), "0"),
+    GenericGoodsCategorySeed("pet_litter", listOf("pet", "hygiene"), categoryText("Pet / Litter and hygiene", "Животные / Наполнители и гигиена", "Жануарлар / Толтырғыш және гигиена"), "0"),
+    GenericGoodsCategorySeed("household", listOf("household"), categoryText("Household goods", "Хозяйственные товары", "Шаруашылық тауарлары"), "0"),
+    GenericGoodsCategorySeed("household_cleaning", listOf("household", "cleaning"), categoryText("Household / Cleaning products", "Хозтовары / Чистящие средства", "Шаруашылық / Тазалау құралдары"), "0"),
+    GenericGoodsCategorySeed("household_laundry", listOf("household", "laundry"), categoryText("Household / Laundry", "Хозтовары / Стирка", "Шаруашылық / Кір жуу"), "0"),
+    GenericGoodsCategorySeed("household_dishwashing", listOf("household", "dishwashing"), categoryText("Household / Dishwashing", "Хозтовары / Мытьё посуды", "Шаруашылық / Ыдыс жуу"), "0"),
+    GenericGoodsCategorySeed("household_paper", listOf("household", "paper"), categoryText("Household / Paper goods", "Хозтовары / Бумажные товары", "Шаруашылық / Қағаз өнімдері"), "0"),
+    GenericGoodsCategorySeed("household_bags_foil", listOf("household", "bags", "foil"), categoryText("Household / Bags, foil and film", "Хозтовары / Пакеты, фольга и плёнка", "Шаруашылық / Қап, фольга және үлдір"), "0"),
+    GenericGoodsCategorySeed("personal_care", listOf("personal_care"), categoryText("Personal care", "Личная гигиена", "Жеке күтім"), "0"),
+    GenericGoodsCategorySeed("personal_care_hair", listOf("personal_care", "hair"), categoryText("Personal care / Hair care", "Личная гигиена / Уход за волосами", "Жеке күтім / Шаш күтімі"), "0"),
+    GenericGoodsCategorySeed("personal_care_body", listOf("personal_care", "body"), categoryText("Personal care / Body care", "Личная гигиена / Уход за телом", "Жеке күтім / Дене күтімі"), "0"),
+    GenericGoodsCategorySeed("personal_care_oral", listOf("personal_care", "oral"), categoryText("Personal care / Oral care", "Личная гигиена / Уход за полостью рта", "Жеке күтім / Ауыз қуысы күтімі"), "0"),
+    GenericGoodsCategorySeed("personal_care_shaving", listOf("personal_care", "shaving"), categoryText("Personal care / Shaving", "Личная гигиена / Бритьё", "Жеке күтім / Қырыну"), "0"),
+    GenericGoodsCategorySeed("health", listOf("health"), categoryText("Health and wellness", "Здоровье", "Денсаулық"), "0"),
+    GenericGoodsCategorySeed("health_first_aid", listOf("health", "first_aid"), categoryText("Health / First aid", "Здоровье / Первая помощь", "Денсаулық / Алғашқы көмек"), "0"),
+    GenericGoodsCategorySeed("health_hygiene", listOf("health", "hygiene"), categoryText("Health / Hygiene goods", "Здоровье / Гигиенические товары", "Денсаулық / Гигиена тауарлары"), "0"),
+    GenericGoodsCategorySeed("stationery", listOf("stationery"), categoryText("Stationery and office", "Канцелярия и офис", "Кеңсе тауарлары"), "0"),
+    GenericGoodsCategorySeed("stationery_paper", listOf("stationery", "paper"), categoryText("Stationery / Paper", "Канцелярия / Бумага", "Кеңсе / Қағаз"), "0"),
+    GenericGoodsCategorySeed("stationery_writing", listOf("stationery", "writing"), categoryText("Stationery / Pens and writing", "Канцелярия / Ручки и письмо", "Кеңсе / Қалам және жазу құралдары"), "0"),
+    GenericGoodsCategorySeed("electronics", listOf("electronics"), categoryText("Electronics", "Электроника", "Электроника"), "0"),
+    GenericGoodsCategorySeed("electronics_accessories", listOf("electronics", "accessories"), categoryText("Electronics / Accessories", "Электроника / Аксессуары", "Электроника / Аксессуарлар"), "0"),
+    GenericGoodsCategorySeed("electronics_batteries", listOf("electronics", "batteries"), categoryText("Electronics / Batteries", "Электроника / Батарейки", "Электроника / Батареялар"), "0"),
+    GenericGoodsCategorySeed("electronics_lighting", listOf("electronics", "lighting"), categoryText("Electronics / Lighting", "Электроника / Освещение", "Электроника / Жарықтандыру"), "0"),
+    GenericGoodsCategorySeed("clothing", listOf("clothing"), categoryText("Clothing and textiles", "Одежда и текстиль", "Киім және тоқыма"), "0"),
+    GenericGoodsCategorySeed("clothing_socks_underwear", listOf("clothing", "socks", "underwear"), categoryText("Clothing / Socks and underwear", "Одежда / Носки и бельё", "Киім / Шұлық және іш киім"), "0"),
+    GenericGoodsCategorySeed("clothing_home_textiles", listOf("clothing", "home_textile"), categoryText("Textiles / Home textiles", "Текстиль / Домашний текстиль", "Тоқыма / Үй тоқыма бұйымдары"), "0"),
+    GenericGoodsCategorySeed("toys", listOf("toys"), categoryText("Toys and games", "Игрушки и игры", "Ойыншықтар және ойындар"), "0"),
+    GenericGoodsCategorySeed("garden", listOf("garden"), categoryText("Garden and plants", "Сад и растения", "Бақша және өсімдіктер"), "0"),
+    GenericGoodsCategorySeed("garden_soil", listOf("garden", "soil", "fertilizer"), categoryText("Garden / Soil and fertilizers", "Сад / Грунт и удобрения", "Бақша / Топырақ және тыңайтқыш"), "0"),
+    GenericGoodsCategorySeed("tools", listOf("tools"), categoryText("Tools and repair", "Инструменты и ремонт", "Құралдар және жөндеу"), "0"),
+    GenericGoodsCategorySeed("auto", listOf("auto"), categoryText("Auto goods", "Автотовары", "Автотауарлар"), "0"),
+    GenericGoodsCategorySeed("regulated", listOf("regulated"), categoryText("Age-restricted goods", "Товары с ограничениями", "Шектеулі тауарлар"), "0"),
+    GenericGoodsCategorySeed("regulated_alcohol", listOf("regulated", "alcohol"), categoryText("Age-restricted / Alcohol", "Ограничения / Алкоголь", "Шектеулер / Алкоголь"), "0", conditions = defaultAgeRestrictedAlcoholCategoryConditions()),
+    GenericGoodsCategorySeed("seasonal", listOf("seasonal"), categoryText("Seasonal goods", "Сезонные товары", "Маусымдық тауарлар"), "0"),
+)
+
+private fun sanitizeGenericGoodsCategoryPrefixesInsideTransaction() {
+    GenericGoodsCategories.selectAll().forEach { row ->
+        val categoryId = row[GenericGoodsCategories.id]
+        val cleanName = row[GenericGoodsCategories.name].cleanSeededGoodsCategoryPrefixes()
+        val cleanAlias = row[GenericGoodsCategories.alias]?.cleanSeededGoodsCategoryPrefixes()
+        val cleanDescription = row[GenericGoodsCategories.description]?.cleanSeededGoodsCategoryPrefixes()
+
+        if (
+            cleanName != row[GenericGoodsCategories.name] ||
+            cleanAlias != row[GenericGoodsCategories.alias] ||
+            cleanDescription != row[GenericGoodsCategories.description]
+        ) {
+            GenericGoodsCategories.update({ GenericGoodsCategories.id eq categoryId }) { update ->
+                update[GenericGoodsCategories.name] = cleanName
+                update[GenericGoodsCategories.alias] = cleanAlias
+                update[GenericGoodsCategories.description] = cleanDescription
+            }
+        }
+    }
+}
+
+private fun seedGenericGoodsCategoriesInsideTransaction() {
+    val existingRows = GenericGoodsCategories.selectAll().toList()
+    val existingIds = existingRows
+        .map { it[GenericGoodsCategories.id] }
+        .toMutableSet()
+
+    val existingByName = linkedMapOf<String, UUID>()
+    existingRows
+        .forEach { row ->
+            val key = genericGoodsCategoryNameKey(row[GenericGoodsCategories.name])
+            if (key.isNotBlank()) existingByName.putIfAbsent(key, row[GenericGoodsCategories.id])
+        }
+
+    defaultGenericGoodsCategorySeeds().forEach { seed ->
+        val cleanName = seed.name.cleanSeededGoodsCategoryPrefixes()
+        val cleanAlias = seed.alias?.cleanSeededGoodsCategoryPrefixes()
+        val cleanDescription = seed.description?.cleanSeededGoodsCategoryPrefixes()
+        val parentCategoryIds = seed.parentCategoryIds()
+        val existingId = existingByName[genericGoodsCategoryNameKey(cleanName)]
+        val categoryId = existingId ?: genericGoodsCategorySeedId(seed.slug)
+
+        if (categoryId in existingIds) {
+            GenericGoodsCategories.update({ GenericGoodsCategories.id eq categoryId }) { row ->
+                row[GenericGoodsCategories.typeIds] = parentCategoryIds.distinct()
+                row[GenericGoodsCategories.name] = cleanName
+                row[GenericGoodsCategories.alias] = cleanAlias
+                row[GenericGoodsCategories.description] = cleanDescription
+                row[GenericGoodsCategories.quantityUnitId] = seed.quantityUnitId
+                row[GenericGoodsCategories.imagePaths] = seed.imagePaths
+                if (seed.conditions.isNotEmpty()) {
+                    row[GenericGoodsCategories.conditions] = seed.conditions
+                }
+            }
+        } else {
+            GenericGoodsCategories.insert { row ->
+                row[GenericGoodsCategories.id] = categoryId
+                row[GenericGoodsCategories.typeIds] = parentCategoryIds.distinct()
+                row[GenericGoodsCategories.name] = cleanName
+                row[GenericGoodsCategories.alias] = cleanAlias
+                row[GenericGoodsCategories.description] = cleanDescription
+                row[GenericGoodsCategories.quantityUnitId] = seed.quantityUnitId
+                row[GenericGoodsCategories.imagePaths] = seed.imagePaths
+                row[GenericGoodsCategories.conditions] = seed.conditions
+            }
+            existingIds += categoryId
+        }
+
+        existingByName[genericGoodsCategoryNameKey(cleanName)] = categoryId
+    }
 }
 
 object Pw {
@@ -1105,11 +1795,16 @@ object Refresh {
     private val HEX = "0123456789abcdef".toCharArray()
 
     private val hmacKey: SecretKeySpec by lazy {
-        val pepper = System.getenv("AITA_REFRESH_PEPPER")
-            ?.takeIf { it.isNotBlank() }
-            ?: System.getProperty("AITA_REFRESH_PEPPER")
-                ?.takeIf { it.isNotBlank() }
-            ?: "aita-local-dev-refresh-pepper-change-this-before-production-2026"
+        val pepper = envOrSystem("AITA_REFRESH_PEPPER")
+            ?: if (isProductionRuntime()) {
+                error("AITA_REFRESH_PEPPER must be configured in production")
+            } else {
+                "aita-local-dev-refresh-pepper-change-this-before-production-2026"
+            }
+
+        if (isProductionRuntime() && pepper.length < 64) {
+            error("AITA_REFRESH_PEPPER must be at least 64 characters in production")
+        }
 
         SecretKeySpec(pepper.toByteArray(StandardCharsets.UTF_8), "HmacSHA256")
     }
@@ -1151,15 +1846,32 @@ data class JwtConfig(
     val refreshTTL: Long
 )
 
+private const val MIN_ACCESS_TOKEN_TTL_MILLIS = 15L * 60L * 1000L
+private const val MIN_REFRESH_TOKEN_TTL_MILLIS = 365L * 24L * 60L * 60L * 1000L
+private const val REFRESH_TOKEN_ROTATION_GRACE_MILLIS = 5L * 60L * 1000L
+
 fun Application.jwtConfig(): JwtConfig {
     val c = environment.config.config("ktor.security.jwt")
+    val configuredAccessTtl = (c.optionalString("accessTTL") ?: envOrSystem("AITA_JWT_ACCESS_TTL_MILLIS") ?: "900000").toLong()
+    val configuredRefreshTtl = (c.optionalString("refreshTTL") ?: envOrSystem("AITA_JWT_REFRESH_TTL_MILLIS") ?: "31536000000").toLong()
+    val issuer = c.optionalString("issuer") ?: envOrSystem("AITA_JWT_ISSUER").orEmpty()
+    val audience = c.optionalString("audience") ?: envOrSystem("AITA_JWT_AUDIENCE").orEmpty()
+    val realm = c.optionalString("realm") ?: "AITA API"
+    val secret = c.optionalString("secret") ?: envOrSystem("AITA_JWT_SECRET") ?: if (isProductionMode()) "" else "aita-local-dev-jwt-secret-change-this-before-production-2026-very-long-local-secret"
+
+    if (isProductionMode()) {
+        require(issuer.isNotBlank()) { "AITA_JWT_ISSUER must be configured in production" }
+        require(audience.isNotBlank()) { "AITA_JWT_AUDIENCE must be configured in production" }
+        require(secret.length >= 64) { "AITA_JWT_SECRET must be at least 64 characters in production" }
+    }
+
     return JwtConfig(
-        issuer = c.property("issuer").getString(),
-        audience = c.property("audience").getString(),
-        realm = c.property("realm").getString(),
-        secret = c.property("secret").getString(),
-        accessTTL = c.property("accessTTL").getString().toLong(),
-        refreshTTL = c.property("refreshTTL").getString().toLong()
+        issuer = issuer,
+        audience = audience,
+        realm = realm,
+        secret = secret,
+        accessTTL = configuredAccessTtl.coerceAtLeast(MIN_ACCESS_TOKEN_TTL_MILLIS),
+        refreshTTL = configuredRefreshTtl.coerceAtLeast(MIN_REFRESH_TOKEN_TTL_MILLIS)
     )
 }
 
@@ -1257,7 +1969,7 @@ class TokenService(private val cfg: JwtConfig) {
 
             if (oldSameDeviceSessionIds.isNotEmpty()) {
                 RefreshSessions.update({ RefreshSessions.id inList oldSameDeviceSessionIds }) {
-                    it[revokedAt] = now
+                    it[RefreshSessions.revokedAt] = now
                 }
             }
 
@@ -1283,14 +1995,24 @@ class TokenService(private val cfg: JwtConfig) {
         val hash = Refresh.hash(refreshPlain)
 
         val oldSession = newSuspendedTransaction(Dispatchers.IO) {
-            RefreshSessions.selectAll().where { RefreshSessions.tokenHash eq hash and RefreshSessions.revokedAt.isNull() }
-                .forUpdate().singleOrNull() ?: throw IllegalAccessException("No valid previous refresh token")
+            RefreshSessions
+                .selectAll()
+                .where { RefreshSessions.tokenHash eq hash }
+                .forUpdate()
+                .singleOrNull() ?: throw IllegalAccessException("No refresh token session")
         }
 
         val now = Instant.now()
 
         if (oldSession[RefreshSessions.expiresAt].isBefore(now))
-            throw IllegalAccessException()
+            throw IllegalAccessException("Refresh token expired")
+
+        val revokedAt = oldSession[RefreshSessions.revokedAt]
+        val activeToken = revokedAt == null
+        val withinRotationGrace = revokedAt?.isAfter(now.minus(REFRESH_TOKEN_ROTATION_GRACE_MILLIS, ChronoUnit.MILLIS)) == true
+
+        if (!activeToken && !withinRotationGrace)
+            throw IllegalAccessException("Refresh token was already rotated or revoked")
 
         val rotatedMeta = oldSession[RefreshSessions.meta].orEmpty() + metaParam.orEmpty()
 
@@ -1308,9 +2030,11 @@ class TokenService(private val cfg: JwtConfig) {
             signAccess(oldSession[RefreshSessions.userId], sessionId, now)
         }
 
-        newSuspendedTransaction(Dispatchers.IO) {
-            RefreshSessions.update({ RefreshSessions.id eq oldSession[RefreshSessions.id] }) {
-                it[revokedAt] = now
+        if (activeToken) {
+            newSuspendedTransaction(Dispatchers.IO) {
+                RefreshSessions.update({ RefreshSessions.id eq oldSession[RefreshSessions.id] }) {
+                    it[RefreshSessions.revokedAt] = now
+                }
             }
         }
 
@@ -1337,7 +2061,7 @@ class TokenService(private val cfg: JwtConfig) {
     suspend fun revoke(refreshPlain: String) = newSuspendedTransaction(Dispatchers.IO) {
         val hash = Refresh.hash(refreshPlain)
         RefreshSessions.update({ (RefreshSessions.tokenHash eq hash) and RefreshSessions.revokedAt.isNull() }) {
-            it[revokedAt] = Instant.now()
+            it[RefreshSessions.revokedAt] = Instant.now()
         }
     }
 }
@@ -1346,6 +2070,7 @@ fun main() = EngineMain.main(emptyArray())
 
 private object RealtimeServerBus {
     private val updates = MutableSharedFlow<RealtimeUpdateDataModel>(
+        replay = 1,
         extraBufferCapacity = 512
     )
 
@@ -1366,6 +2091,87 @@ private object RealtimeServerBus {
                 createdAtMillis = System.currentTimeMillis()
             )
         )
+    }
+}
+
+private suspend fun publishWorkerRealtimeBundle(storeId: String?, reason: String) {
+    RealtimeServerBus.publish(entity = "workers/requests", storeId = storeId, reason = reason)
+    RealtimeServerBus.publish(entity = "workers/memberships", storeId = storeId, reason = reason)
+    RealtimeServerBus.publish(entity = "workers", storeId = storeId, reason = reason)
+    RealtimeServerBus.publish(entity = "notifications", storeId = storeId, reason = reason)
+    RealtimeServerBus.publish(entity = "stores", storeId = storeId, reason = reason)
+}
+
+private fun Throwable.isExpectedRealtimeDisconnect(): Boolean {
+    val combined = listOfNotNull(
+        this::class.simpleName,
+        message,
+        cause?.message
+    ).joinToString(" ").lowercase()
+
+    return "ping timeout" in combined ||
+            "closedreceivechannel" in combined ||
+            "closedsendchannel" in combined ||
+            "closed channel" in combined ||
+            "connection reset" in combined ||
+            "broken pipe" in combined ||
+            "channel was closed" in combined
+}
+
+
+private const val NOTIFICATION_RECENT_DUPLICATE_WINDOW_MILLIS = 10L * 60L * 1000L
+private const val NOTIFICATION_RETENTION_READ_MILLIS = 90L * 24L * 60L * 60L * 1000L
+private const val NOTIFICATION_RETENTION_UNREAD_MILLIS = 180L * 24L * 60L * 60L * 1000L
+private const val NOTIFICATION_RETENTION_INACTIVE_MILLIS = 30L * 24L * 60L * 60L * 1000L
+private const val NOTIFICATION_RETENTION_CHECK_INTERVAL_MILLIS = 24L * 60L * 60L * 1000L
+private const val NOTIFICATION_RETENTION_MAX_PER_USER = 1_000
+
+@Volatile
+private var notificationRetentionDaemonStarted = false
+
+private fun cleanupNotificationsInsideTransaction(nowMillis: Long = System.currentTimeMillis()) {
+    val readCutoff = nowMillis - NOTIFICATION_RETENTION_READ_MILLIS
+    val unreadCutoff = nowMillis - NOTIFICATION_RETENTION_UNREAD_MILLIS
+    val inactiveCutoff = nowMillis - NOTIFICATION_RETENTION_INACTIVE_MILLIS
+
+    Notifications.deleteWhere {
+        ((Notifications.readAtMillis.isNotNull()) and (Notifications.createdAtMillis lessEq readCutoff)) or
+                ((Notifications.readAtMillis.isNull()) and (Notifications.createdAtMillis lessEq unreadCutoff)) or
+                ((Notifications.isActive eq false) and (Notifications.createdAtMillis lessEq inactiveCutoff))
+    }
+
+    org.jetbrains.exposed.sql.transactions.TransactionManager.current().exec(
+        """
+        DELETE FROM user_notifications
+        WHERE id IN (
+            SELECT id FROM (
+                SELECT id,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY user_id
+                           ORDER BY created_at_millis DESC, shown_at_millis DESC, id DESC
+                       ) AS row_number_per_user
+                FROM user_notifications
+            ) ranked_notifications
+            WHERE ranked_notifications.row_number_per_user > $NOTIFICATION_RETENTION_MAX_PER_USER
+        )
+        """.trimIndent()
+    )
+}
+
+private fun Application.startNotificationRetentionDaemon(backgroundScope: CoroutineScope) {
+    if (notificationRetentionDaemonStarted) return
+    notificationRetentionDaemonStarted = true
+
+    backgroundScope.launch {
+        while (true) {
+            runCatching {
+                newSuspendedTransaction(Dispatchers.IO) {
+                    cleanupNotificationsInsideTransaction()
+                }
+            }.onFailure { log.error("Notification retention daemon iteration failed", it) }
+
+            delay(NOTIFICATION_RETENTION_CHECK_INTERVAL_MILLIS)
+        }
     }
 }
 
@@ -1694,13 +2500,14 @@ private fun runDueSubscriptionRenewalsOnce() {
 }
 
 private var subscriptionRenewalDaemonStarted = false
-private fun startSubscriptionRenewalDaemon() {
+private fun Application.startSubscriptionRenewalDaemon(backgroundScope: CoroutineScope) {
     if (subscriptionRenewalDaemonStarted) return
     subscriptionRenewalDaemonStarted = true
-    kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+    backgroundScope.launch {
         while (true) {
             runCatching { runDueSubscriptionRenewalsOnce() }
-            kotlinx.coroutines.delay(60_000L)
+                .onFailure { log.error("Subscription renewal daemon iteration failed", it) }
+            delay(60_000L)
         }
     }
 }
@@ -1749,6 +2556,16 @@ private fun rootStoreIdForAccessInsideTransaction(storeId: UUID): UUID {
         ?: storeId
 }
 
+private fun stockVisibleStoreIdsInsideTransaction(storeId: UUID): List<UUID> {
+    val rootStoreId = rootStoreIdForAccessInsideTransaction(storeId)
+    val directBranches = Stores
+        .select(Stores.id)
+        .where { Stores.parentStoreId eq rootStoreId }
+        .map { it[Stores.id] }
+
+    return (listOf(rootStoreId) + directBranches).distinct()
+}
+
 private fun userHasStoreAccessInsideTransaction(
     userId: UUID,
     storeId: UUID
@@ -1775,6 +2592,19 @@ private fun userHasStoreAccessInsideTransaction(
         }
         .empty()
         .not()
+}
+
+private fun userHasSupplierAccessInsideTransaction(
+    userId: UUID,
+    supplierId: UUID
+): Boolean {
+    val supplier = Suppliers
+        .select(Suppliers.userIds)
+        .where { (Suppliers.id eq supplierId) and (Suppliers.isActive eq true) }
+        .singleOrNull()
+        ?: return false
+
+    return decodeSupplierStringList(supplier[Suppliers.userIds]).contains(userId.toString())
 }
 
 
@@ -1930,6 +2760,266 @@ private fun operationLogEntityForPath(path: String): String {
     }
 }
 
+
+private data class OperationLogHumanText(
+    val main: String,
+    val en: String = main,
+    val ru: String = main,
+    val kk: String = main
+)
+
+private fun operationLogEntityHumanText(entityType: String): OperationLogHumanText {
+    return when (entityType) {
+        OPERATION_LOG_ENTITY_STORE -> OperationLogHumanText("Store", ru = "Магазин", kk = "Дүкен")
+        OPERATION_LOG_ENTITY_WORKER -> OperationLogHumanText("Worker", ru = "Сотрудник", kk = "Қызметкер")
+        OPERATION_LOG_ENTITY_WORKSHIFT -> OperationLogHumanText("Workshift", ru = "Смена", kk = "Ауысым")
+        OPERATION_LOG_ENTITY_STOCK_ITEM -> OperationLogHumanText("Stock item", ru = "Товар", kk = "Тауар")
+        OPERATION_LOG_ENTITY_STOCK_BATCH -> OperationLogHumanText("Stock batch", ru = "Партия", kk = "Партия")
+        OPERATION_LOG_ENTITY_TRANSACTION -> OperationLogHumanText("Transaction", ru = "Транзакция", kk = "Транзакция")
+        OPERATION_LOG_ENTITY_CASH_REGISTER -> OperationLogHumanText("Cash register", ru = "Касса", kk = "Касса")
+        OPERATION_LOG_ENTITY_SUPPLIER -> OperationLogHumanText("Supplier", ru = "Поставщик", kk = "Жеткізуші")
+        OPERATION_LOG_ENTITY_SUBSCRIPTION -> OperationLogHumanText("Subscription", ru = "Подписка", kk = "Жазылым")
+        OPERATION_LOG_ENTITY_FINANCE -> OperationLogHumanText("Finance", ru = "Финансы", kk = "Қаржы")
+        else -> OperationLogHumanText("Operation", ru = "Операция", kk = "Операция")
+    }
+}
+
+private fun operationLogTransactionTypeHumanText(type: String): OperationLogHumanText {
+    return when (type.trim().lowercase(Locale.ROOT)) {
+        "purchase", "sale" -> OperationLogHumanText("Sale", ru = "Продажа", kk = "Сату")
+        "return" -> OperationLogHumanText("Return", ru = "Возврат", kk = "Қайтару")
+        "supply" -> OperationLogHumanText("Supply", ru = "Поставка", kk = "Жеткізу")
+        else -> OperationLogHumanText(type.ifBlank { "Transaction" }, ru = type.ifBlank { "Транзакция" }, kk = type.ifBlank { "Транзакция" })
+    }
+}
+
+private fun operationLogHumanTitleFor(action: String, entityType: String): List<LocalizedStringDataModel> {
+    val entity = operationLogEntityHumanText(entityType)
+    return when (action) {
+        OPERATION_LOG_ACTION_CREATED -> simpleMessage(
+            main = "${entity.main} saved",
+            en = "${entity.en} saved",
+            ru = "${entity.ru} сохранён",
+            kk = "${entity.kk} сақталды"
+        )
+        OPERATION_LOG_ACTION_UPDATED -> simpleMessage(
+            main = "${entity.main} updated",
+            en = "${entity.en} updated",
+            ru = "${entity.ru} обновлён",
+            kk = "${entity.kk} жаңартылды"
+        )
+        OPERATION_LOG_ACTION_DELETED -> simpleMessage(
+            main = "${entity.main} deleted",
+            en = "${entity.en} deleted",
+            ru = "${entity.ru} удалён",
+            kk = "${entity.kk} жойылды"
+        )
+        OPERATION_LOG_ACTION_COMPLETED -> simpleMessage(
+            main = "${entity.main} completed",
+            en = "${entity.en} completed",
+            ru = "${entity.ru} завершена",
+            kk = "${entity.kk} аяқталды"
+        )
+        OPERATION_LOG_ACTION_EXTRACTED -> simpleMessage(
+            main = "Cash extracted",
+            ru = "Наличные изъяты",
+            kk = "Қолма-қол ақша алынды"
+        )
+        OPERATION_LOG_ACTION_STARTED -> simpleMessage(
+            main = "Workshift started",
+            ru = "Смена начата",
+            kk = "Ауысым басталды"
+        )
+        OPERATION_LOG_ACTION_ENDED -> simpleMessage(
+            main = "Workshift ended",
+            ru = "Смена завершена",
+            kk = "Ауысым аяқталды"
+        )
+        OPERATION_LOG_ACTION_ACCEPTED -> simpleMessage(
+            main = "Request accepted",
+            ru = "Заявка принята",
+            kk = "Өтінім қабылданды"
+        )
+        OPERATION_LOG_ACTION_DECLINED -> simpleMessage(
+            main = "Request declined",
+            ru = "Заявка отклонена",
+            kk = "Өтінім қабылданбады"
+        )
+        OPERATION_LOG_ACTION_INVITED -> simpleMessage(
+            main = "Worker invited",
+            ru = "Сотрудник приглашён",
+            kk = "Қызметкер шақырылды"
+        )
+        OPERATION_LOG_ACTION_MOVED -> simpleMessage(
+            main = "Stock moved",
+            ru = "Склад перемещён",
+            kk = "Қор жылжытылды"
+        )
+        else -> simpleMessage(
+            main = "Operation completed",
+            ru = "Операция выполнена",
+            kk = "Операция орындалды"
+        )
+    }
+}
+
+private fun operationLogHumanDetailsFor(action: String, entityType: String): List<LocalizedStringDataModel> {
+    val entity = operationLogEntityHumanText(entityType)
+    return simpleMessage(
+        main = "${entity.main}: ${operationLogHumanTitleFor(action, entityType).extractLocalizedString("main").orEmpty()}",
+        en = "${entity.en}: ${operationLogHumanTitleFor(action, entityType).extractLocalizedString("en").orEmpty()}",
+        ru = "${entity.ru}: ${operationLogHumanTitleFor(action, entityType).extractLocalizedString("ru").orEmpty()}",
+        kk = "${entity.kk}: ${operationLogHumanTitleFor(action, entityType).extractLocalizedString("kk").orEmpty()}"
+    )
+}
+
+
+private fun Double.operationLogNumberText(): String {
+    val longValue = toLong()
+    return if (this == longValue.toDouble()) {
+        longValue.toString()
+    } else {
+        toString().trimEnd('0').trimEnd('.')
+    }
+}
+
+private fun List<LocalizedStringDataModel>.operationLogVisibleText(fallback: String = ""): String {
+    return extractLocalizedString("main")
+        ?: extractLocalizedString("en")
+        ?: extractLocalizedString("ru")
+        ?: extractLocalizedString("kk")
+        ?: firstOrNull { it.value.isNotBlank() }?.value
+        ?: fallback
+}
+
+private fun PriceDataModel?.operationLogPriceText(): String? {
+    val price = this?.price?.trim().orEmpty()
+    if (price.isBlank()) return null
+    return listOf(price, this?.currency.orEmpty().trim()).filter { it.isNotBlank() }.joinToString(" ")
+}
+
+private fun QuantityDataModel.operationLogQuantityText(fallbackUnitId: String = ""): String {
+    val unit = id.ifBlank { fallbackUnitId }.trim()
+    return listOf(total.operationLogNumberText(), unit).filter { it.isNotBlank() }.joinToString(" ")
+}
+
+private data class StockBatchOperationLogText(
+    val title: List<LocalizedStringDataModel>,
+    val details: List<LocalizedStringDataModel>,
+    val metadata: Map<String, String>
+)
+
+private fun stockBatchOperationLogTextInsideTransaction(
+    action: String,
+    batchId: UUID,
+    goodsItemId: UUID,
+    batch: GoodsBatchDataModel
+): StockBatchOperationLogText {
+    val itemRow = StockItems
+        .select(StockItems.name, StockItems.barcodes, StockItems.measurementUnitId)
+        .where { StockItems.id eq goodsItemId }
+        .singleOrNull()
+
+    val goodsName = itemRow
+        ?.get(StockItems.name)
+        ?.operationLogVisibleText(goodsItemId.toString())
+        ?.ifBlank { goodsItemId.toString() }
+        ?: goodsItemId.toString()
+
+    val barcode = itemRow
+        ?.get(StockItems.barcodes)
+        ?.firstOrNull()
+        .orEmpty()
+
+    val unitId = itemRow?.get(StockItems.measurementUnitId).orEmpty()
+    val quantityText = batch.quantity.operationLogQuantityText(unitId)
+
+    val supplierId = batch.supplierId
+        ?.takeIf { it.isNotBlank() }
+        ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+
+    val supplierName = supplierId
+        ?.let { id -> Suppliers.select(Suppliers.name).where { Suppliers.id eq id }.singleOrNull()?.get(Suppliers.name) }
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+
+    val supplyText = batch.supplyPrice.operationLogPriceText()
+    val saleText = batch.salePriceOverride.operationLogPriceText()
+    val returnText = batch.returnPriceOverride.operationLogPriceText()
+    val wholesaleText = batch.wholesalePriceOverride.operationLogPriceText()
+    val statusText = batch.status.name
+
+    val isUpdate = action == OPERATION_LOG_ACTION_UPDATED
+
+    val title = if (isUpdate) {
+        simpleMessage(
+            main = "Batch updated: $goodsName",
+            en = "Batch updated: $goodsName",
+            ru = "Партия обновлена: $goodsName",
+            kk = "Партия жаңартылды: $goodsName"
+        )
+    } else {
+        simpleMessage(
+            main = "Batch added: $goodsName",
+            en = "Batch added: $goodsName",
+            ru = "Партия добавлена: $goodsName",
+            kk = "Партия қосылды: $goodsName"
+        )
+    }
+
+    fun detailLine(
+        quantityLabel: String,
+        supplierLabel: String,
+        barcodeLabel: String,
+        supplyLabel: String,
+        saleLabel: String,
+        returnLabel: String,
+        wholesaleLabel: String,
+        statusLabel: String
+    ): String {
+        return listOfNotNull(
+            goodsName,
+            barcode.takeIf { it.isNotBlank() }?.let { "$barcodeLabel: $it" },
+            "$quantityLabel: $quantityText",
+            supplierName?.let { "$supplierLabel: $it" },
+            supplyText?.let { "$supplyLabel: $it" },
+            saleText?.let { "$saleLabel: $it" },
+            returnText?.let { "$returnLabel: $it" },
+            wholesaleText?.let { "$wholesaleLabel: $it" },
+            "$statusLabel: $statusText"
+        ).joinToString(" • ")
+    }
+
+    val details = simpleMessage(
+        main = detailLine("Qty", "Supplier", "Barcode", "Supply", "Sale", "Return", "Wholesale", "Status"),
+        en = detailLine("Qty", "Supplier", "Barcode", "Supply", "Sale", "Return", "Wholesale", "Status"),
+        ru = detailLine("Кол-во", "Поставщик", "Штрихкод", "Закупка", "Продажа", "Возврат", "Опт", "Статус"),
+        kk = detailLine("Саны", "Жеткізуші", "Штрихкод", "Жеткізу", "Сату", "Қайтару", "Көтерме", "Күйі")
+    )
+
+    val metadata = linkedMapOf(
+        "batch_id" to batchId.toString(),
+        "goods_item_id" to goodsItemId.toString(),
+        "goods_name" to goodsName,
+        "barcode" to barcode,
+        "quantity" to batch.quantity.total.toString(),
+        "quantity_unit" to batch.quantity.id.ifBlank { unitId },
+        "supplier_id" to batch.supplierId.orEmpty(),
+        "supplier_name" to supplierName.orEmpty(),
+        "supply_price" to supplyText.orEmpty(),
+        "sale_price" to saleText.orEmpty(),
+        "return_price" to returnText.orEmpty(),
+        "wholesale_price" to wholesaleText.orEmpty(),
+        "status" to statusText
+    ).filterValues { it.isNotBlank() }
+
+    return StockBatchOperationLogText(
+        title = title,
+        details = details,
+        metadata = metadata
+    )
+}
+
 private fun insertOperationLogInsideTransaction(
     actorUserId: UUID,
     storeId: UUID,
@@ -1954,6 +3044,30 @@ private fun insertOperationLogInsideTransaction(
         val actorDisplayName = actorRow?.let { row ->
             "${row[Users.firstName]} ${row[Users.lastName]}".trim().ifBlank { row[Users.phoneNumber].ifBlank { row[Users.email] } }
         }.orEmpty()
+
+        val duplicateCutoff = now - 2_500L
+        val sameEntityCondition = entityId
+            ?.takeIf { it.isNotBlank() }
+            ?.let { OperationLogs.entityId eq it }
+            ?: OperationLogs.entityId.isNull()
+
+        val duplicateAlreadyExists = OperationLogs
+            .select(OperationLogs.id)
+            .where {
+                (OperationLogs.rootStoreId eq rootStoreId) and
+                        (OperationLogs.storeId eq storeId) and
+                        (OperationLogs.actorUserId eq actorUserId) and
+                        (OperationLogs.action eq action) and
+                        (OperationLogs.entityType eq entityType) and
+                        sameEntityCondition and
+                        (OperationLogs.createdAtMillis greaterEq duplicateCutoff)
+            }
+            .limit(1)
+            .empty()
+            .not()
+
+        if (duplicateAlreadyExists)
+            return@runCatching
 
         OperationLogs.insert {
             it[OperationLogs.id] = UUID.randomUUID()
@@ -2010,6 +3124,449 @@ private fun generateUniqueStorePublicIdInsideTransaction(): String {
         candidate = nextPublicId("S")
     } while (!Stores.select(Stores.id).where { Stores.publicId eq candidate }.empty())
     return candidate
+}
+
+
+private fun generateUniqueSupportTicketPublicIdInsideTransaction(): String {
+    var candidate: String
+    do {
+        candidate = nextPublicId("Q")
+    } while (!SupportTickets.select(SupportTickets.id).where { SupportTickets.publicId eq candidate }.empty())
+    return candidate
+}
+
+private fun sanitizeSupportSubject(subject: String, message: String): String {
+    val source = subject.trim().ifBlank { message.trim().lineSequence().firstOrNull().orEmpty() }
+    return source.take(96).ifBlank { "Support request" }
+}
+
+private fun sanitizeSupportCategory(category: String): String = when (category.trim().lowercase()) {
+    "billing", "payments", "subscriptions" -> "billing"
+    "technical", "devices", "printing", "sync" -> "technical"
+    "stock", "sales", "transactions", "suppliers" -> "operations"
+    "security", "account", "workers" -> "account"
+    else -> "general"
+}
+
+private fun sanitizeSupportPriority(priority: String): String = when (priority.trim().lowercase()) {
+    "urgent", "high" -> "high"
+    "low" -> "low"
+    else -> "normal"
+}
+
+private fun supportTicketForUserInsideTransaction(userId: UUID, ticketId: UUID): ResultRow? = SupportTickets
+    .selectAll()
+    .where { (SupportTickets.id eq ticketId) and (SupportTickets.userId eq userId) and (SupportTickets.isActive eq true) }
+    .singleOrNull()
+
+private fun userDisplayNameInsideTransaction(userId: UUID): String = Users
+    .select(Users.firstName, Users.lastName)
+    .where { Users.id eq userId }
+    .singleOrNull()
+    ?.let { row -> listOf(row[Users.firstName], row[Users.lastName]).filter { it.isNotBlank() }.joinToString(" ") }
+    .orEmpty()
+
+private fun storeDisplayNameInsideTransaction(storeId: UUID): String = Stores
+    .select(Stores.publicId, Stores.name)
+    .where { Stores.id eq storeId }
+    .singleOrNull()
+    ?.let { row -> row[Stores.name].extractLocalizedString("main").orEmpty().ifBlank { row[Stores.publicId] } }
+    .orEmpty()
+
+private fun userDisplayNameOrPublicIdInsideTransaction(userId: UUID): String {
+    val displayName = userDisplayNameInsideTransaction(userId)
+    if (displayName.isNotBlank()) return displayName
+
+    return Users
+        .select(Users.publicId)
+        .where { Users.id eq userId }
+        .singleOrNull()
+        ?.get(Users.publicId)
+        .orEmpty()
+}
+
+private fun storeWorkerNotificationRecipientUserIdsInsideTransaction(
+    storeId: UUID,
+    managersOnly: Boolean = true
+): List<UUID> {
+    val rootStoreId = rootStoreIdForAccessInsideTransaction(storeId)
+    val storeIds = storeGroupIdsInsideTransaction(rootStoreId)
+
+    val ownerIds = Stores
+        .select(Stores.ownerUserIds)
+        .where { Stores.id eq rootStoreId }
+        .singleOrNull()
+        ?.get(Stores.ownerUserIds)
+        ?.mapNotNull { raw -> runCatching { UUID.fromString(raw) }.getOrNull() }
+        .orEmpty()
+
+    val workerIds = StoreWorkerMemberships
+        .select(StoreWorkerMemberships.userId, StoreWorkerMemberships.permissions)
+        .where { (StoreWorkerMemberships.storeId inList storeIds) and (StoreWorkerMemberships.isActive eq true) }
+        .filter { row -> !managersOnly || row[StoreWorkerMemberships.permissions].contains(STORE_PERMISSION_WORKERS_MANAGE) }
+        .map { it[StoreWorkerMemberships.userId] }
+
+    return (ownerIds + workerIds).distinct()
+}
+
+private fun notificationOperationIdFromId(id: String?): String? {
+    val cleanId = id?.trim().orEmpty()
+    return when {
+        cleanId.startsWith("loading_") -> cleanId.removePrefix("loading_")
+        cleanId.startsWith("operation_") -> cleanId.removePrefix("operation_")
+        else -> null
+    }?.takeIf { it.isNotBlank() }
+}
+
+private fun notificationOperationIdFromMetadata(metadata: Map<String, String>): String? {
+    val direct = listOf(
+        "operationId",
+        "operation_id",
+        "temporaryOperationId",
+        "temporary_operation_id",
+        "clientOperationId",
+        "client_operation_id",
+        "resultOfOperationId",
+        "result_of_operation_id",
+        "replacesOperationId",
+        "replaces_operation_id"
+    ).firstNotNullOfOrNull { key -> metadata[key]?.trim()?.takeIf { it.isNotBlank() } }
+
+    if (!direct.isNullOrBlank()) return direct
+
+    return listOf(
+        "notificationId",
+        "notification_id",
+        "loadingNotificationId",
+        "loading_notification_id",
+        "previousNotificationId",
+        "previous_notification_id",
+        "replacesNotificationId",
+        "replaces_notification_id"
+    ).firstNotNullOfOrNull { key -> notificationOperationIdFromId(metadata[key]) }
+}
+
+private fun notificationOperationStatusFromMetadata(metadata: Map<String, String>): String = listOf(
+    "operationStatus",
+    "operation_status",
+    "operationStage",
+    "operation_stage",
+    "stage",
+    "status",
+    "state"
+).firstNotNullOfOrNull { key -> metadata[key]?.trim()?.lowercase()?.takeIf { it.isNotBlank() } }.orEmpty()
+
+private fun isLoadingNotificationIntent(
+    type: NotificationType,
+    category: String,
+    metadata: Map<String, String>,
+    title: String,
+    message: String
+): Boolean {
+    val status = notificationOperationStatusFromMetadata(metadata)
+    if (status in setOf("loading", "pending", "progress", "in_progress", "working", "started")) return true
+    if (metadata["loading"] == "true" || metadata["isLoading"] == "true" || metadata["inProgress"] == "true" || metadata["in_progress"] == "true") return true
+
+    val text = listOf(category, title, message).joinToString(" ").lowercase()
+    return type == NotificationType.Neutral && (
+            "loading" in text ||
+                    "in progress" in text ||
+                    "working" in text ||
+                    "загрузка" in text ||
+                    "выполня" in text ||
+                    "орындал" in text
+            )
+}
+
+private fun isResultNotificationIntent(
+    type: NotificationType,
+    metadata: Map<String, String>
+): Boolean {
+    val status = notificationOperationStatusFromMetadata(metadata)
+    return status in setOf("result", "done", "success", "succeeded", "failed", "failure", "error", "cancelled", "canceled", "completed") ||
+            metadata["resultOfOperationId"]?.isNotBlank() == true ||
+            metadata["result_of_operation_id"]?.isNotBlank() == true ||
+            metadata["replacesOperationId"]?.isNotBlank() == true ||
+            metadata["replaces_operation_id"]?.isNotBlank() == true ||
+            type != NotificationType.Neutral
+}
+
+private fun notificationRowMatchesOperation(row: ResultRow, operationId: String): Boolean {
+    val metadata = row[Notifications.metadata]
+    return notificationOperationIdFromMetadata(metadata) == operationId ||
+            row[Notifications.id] == "loading_$operationId" ||
+            row[Notifications.id] == "operation_$operationId" ||
+            row[Notifications.id].endsWith("_$operationId")
+}
+
+private fun notificationRowIsLoading(row: ResultRow): Boolean {
+    val type = runCatching { NotificationType.valueOf(row[Notifications.type]) }.getOrDefault(NotificationType.Neutral)
+    return isLoadingNotificationIntent(
+        type = type,
+        category = row[Notifications.category],
+        metadata = row[Notifications.metadata],
+        title = row[Notifications.title],
+        message = row[Notifications.message]
+    )
+}
+
+private fun existingNotificationByOperationInsideTransaction(
+    userId: UUID,
+    operationId: String,
+    loadingOnly: Boolean = false
+): ResultRow? {
+    if (operationId.isBlank()) return null
+
+    return Notifications
+        .selectAll()
+        .where { (Notifications.userId eq userId) and (Notifications.isActive eq true) }
+        .orderBy(Notifications.createdAtMillis, SortOrder.DESC)
+        .limit(500)
+        .firstOrNull { row ->
+            notificationRowMatchesOperation(row, operationId) && (!loadingOnly || notificationRowIsLoading(row))
+        }
+}
+
+private fun existingNotificationForIncomingOperationInsideTransaction(
+    userId: UUID,
+    operationId: String?,
+    incomingIsLoading: Boolean,
+    incomingIsResult: Boolean
+): ResultRow? {
+    val cleanOperationId = operationId?.takeIf { it.isNotBlank() } ?: return null
+    return when {
+        incomingIsResult -> existingNotificationByOperationInsideTransaction(userId, cleanOperationId, loadingOnly = true)
+            ?: existingNotificationByOperationInsideTransaction(userId, cleanOperationId, loadingOnly = false)
+        incomingIsLoading -> existingNotificationByOperationInsideTransaction(userId, cleanOperationId, loadingOnly = true)
+        else -> existingNotificationByOperationInsideTransaction(userId, cleanOperationId, loadingOnly = false)
+    }
+}
+
+private fun notificationReplacementIdFromMetadata(metadata: Map<String, String>): String? = listOf(
+    metadata["replacesNotificationId"],
+    metadata["replaces_notification_id"],
+    metadata["loadingNotificationId"],
+    metadata["loading_notification_id"],
+    metadata["previousNotificationId"],
+    metadata["previous_notification_id"]
+).firstOrNull { !it.isNullOrBlank() }?.trim()
+
+private fun notificationMetadataForStorage(
+    metadata: Map<String, String>,
+    operationId: String?,
+    incomingIsLoading: Boolean,
+    incomingIsResult: Boolean
+): Map<String, String> {
+    val status = notificationOperationStatusFromMetadata(metadata)
+    return metadata
+        .let { data -> operationId?.let { data + ("operationId" to it) } ?: data }
+        .let { data ->
+            if (status.isNotBlank()) data else data + ("operationStatus" to when {
+                incomingIsLoading -> "loading"
+                incomingIsResult -> "result"
+                else -> "info"
+            })
+        }
+}
+
+private fun insertServerNotificationInsideTransaction(
+    userId: UUID,
+    storeId: UUID?,
+    title: String,
+    message: String,
+    type: NotificationType = NotificationType.Neutral,
+    category: String = "general",
+    source: String = "server",
+    metadata: Map<String, String> = emptyMap(),
+    nowMillis: Long = System.currentTimeMillis()
+): NotificationDataModel {
+    cleanupNotificationsInsideTransaction(nowMillis)
+
+    val operationId = notificationOperationIdFromMetadata(metadata)
+    val incomingIsLoading = isLoadingNotificationIntent(type, category, metadata, title, message)
+    val incomingIsResult = isResultNotificationIntent(type, metadata)
+    val metadataForStorage = notificationMetadataForStorage(metadata, operationId, incomingIsLoading, incomingIsResult)
+    val requestedNotificationId = metadataForStorage["notificationId"]
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+        ?: operationId?.let { if (incomingIsLoading) "loading_${userId}_$it" else "operation_${userId}_$it" }
+        ?: "server_${nowMillis}_${UUID.randomUUID()}"
+
+    val replacementNotificationId = notificationReplacementIdFromMetadata(metadataForStorage)
+    val existingByReplacementId = replacementNotificationId?.let { replacementId ->
+        Notifications
+            .selectAll()
+            .where { (Notifications.id eq replacementId) and (Notifications.userId eq userId) and (Notifications.isActive eq true) }
+            .firstOrNull()
+    }
+    val existingByOperation = existingNotificationForIncomingOperationInsideTransaction(userId, operationId, incomingIsLoading, incomingIsResult)
+    val existingById = Notifications
+        .selectAll()
+        .where { (Notifications.id eq requestedNotificationId) and (Notifications.userId eq userId) }
+        .firstOrNull()
+    val existing = existingByReplacementId ?: existingByOperation ?: existingById
+    val finalNotificationId = existing?.get(Notifications.id) ?: requestedNotificationId
+
+    if (existing != null) {
+        Notifications.update({ (Notifications.id eq finalNotificationId) and (Notifications.userId eq userId) }) {
+            it[Notifications.title] = title
+            it[Notifications.message] = message
+            it[Notifications.type] = type.name
+            it[Notifications.category] = category.ifBlank { type.name.lowercase() }
+            it[Notifications.notificationSource] = source.ifBlank { "server" }
+            it[Notifications.metadata] = metadataForStorage
+            it[Notifications.storeId] = storeId
+            it[Notifications.createdAtMillis] = nowMillis
+            it[Notifications.shownAtMillis] = nowMillis
+            it[Notifications.readAtMillis] = null
+            it[Notifications.isActive] = true
+        }
+    } else {
+        Notifications.insert {
+            it[Notifications.id] = finalNotificationId
+            it[Notifications.userId] = userId
+            it[Notifications.storeId] = storeId
+            it[Notifications.title] = title
+            it[Notifications.message] = message
+            it[Notifications.type] = type.name
+            it[Notifications.category] = category.ifBlank { type.name.lowercase() }
+            it[Notifications.notificationSource] = source.ifBlank { "server" }
+            it[Notifications.metadata] = metadataForStorage
+            it[Notifications.createdAtMillis] = nowMillis
+            it[Notifications.shownAtMillis] = nowMillis
+            it[Notifications.readAtMillis] = null
+            it[Notifications.isActive] = true
+        }
+    }
+
+    return Notifications
+        .selectAll()
+        .where { (Notifications.id eq finalNotificationId) and (Notifications.userId eq userId) }
+        .single()
+        .toNotificationDataModel()
+}
+
+private fun notifyEmploymentRequestCreatedInsideTransaction(
+    requesterUserId: UUID,
+    storeId: UUID,
+    requestId: UUID,
+    nowMillis: Long
+) {
+    val requesterName = userDisplayNameOrPublicIdInsideTransaction(requesterUserId).ifBlank { "A user" }
+    val storeName = storeDisplayNameInsideTransaction(storeId).ifBlank { "this store" }
+    val operationId = "worker_request_$requestId"
+
+    storeWorkerNotificationRecipientUserIdsInsideTransaction(storeId, managersOnly = true)
+        .filter { it != requesterUserId }
+        .forEach { recipientId ->
+            insertServerNotificationInsideTransaction(
+                userId = recipientId,
+                storeId = storeId,
+                title = "Employment request",
+                message = "$requesterName requested to work in $storeName.",
+                type = NotificationType.Neutral,
+                category = "workers",
+                metadata = mapOf("operationId" to operationId, "requestId" to requestId.toString(), "direction" to WORKER_REQUEST_DIRECTION_USER_TO_STORE),
+                nowMillis = nowMillis
+            )
+        }
+
+    insertServerNotificationInsideTransaction(
+        userId = requesterUserId,
+        storeId = storeId,
+        title = "Employment request sent",
+        message = "Your request to work in $storeName is waiting for review.",
+        type = NotificationType.Positive,
+        category = "workers",
+        metadata = mapOf("operationId" to "worker_request_sent_$requestId", "requestId" to requestId.toString(), "direction" to WORKER_REQUEST_DIRECTION_USER_TO_STORE),
+        nowMillis = nowMillis
+    )
+}
+
+private fun notifyEmploymentInviteCreatedInsideTransaction(
+    invitedUserId: UUID,
+    inviterUserId: UUID,
+    storeId: UUID,
+    requestId: UUID,
+    nowMillis: Long
+) {
+    val inviterName = userDisplayNameOrPublicIdInsideTransaction(inviterUserId).ifBlank { "A store manager" }
+    val storeName = storeDisplayNameInsideTransaction(storeId).ifBlank { "this store" }
+
+    insertServerNotificationInsideTransaction(
+        userId = invitedUserId,
+        storeId = storeId,
+        title = "Store invitation",
+        message = "$inviterName invited you to work in $storeName.",
+        type = NotificationType.Neutral,
+        category = "workers",
+        metadata = mapOf("operationId" to "worker_invite_$requestId", "requestId" to requestId.toString(), "direction" to WORKER_REQUEST_DIRECTION_STORE_TO_USER),
+        nowMillis = nowMillis
+    )
+}
+
+private fun notifyEmploymentDecisionInsideTransaction(
+    requestId: UUID,
+    storeId: UUID,
+    workerUserId: UUID,
+    actorUserId: UUID,
+    accepted: Boolean,
+    direction: String,
+    nowMillis: Long
+) {
+    val workerName = userDisplayNameOrPublicIdInsideTransaction(workerUserId).ifBlank { "The worker" }
+    val storeName = storeDisplayNameInsideTransaction(storeId).ifBlank { "this store" }
+    val actionText = if (accepted) "accepted" else "declined"
+    val notificationType = if (accepted) NotificationType.Positive else NotificationType.Negative
+
+    insertServerNotificationInsideTransaction(
+        userId = workerUserId,
+        storeId = storeId,
+        title = if (accepted) "Employment accepted" else "Employment declined",
+        message = if (direction == WORKER_REQUEST_DIRECTION_STORE_TO_USER) {
+            "Your invitation for $storeName was $actionText."
+        } else {
+            "Your request to work in $storeName was $actionText."
+        },
+        type = notificationType,
+        category = "workers",
+        metadata = mapOf("operationId" to "worker_decision_${requestId}_$workerUserId", "requestId" to requestId.toString(), "status" to actionText, "direction" to direction),
+        nowMillis = nowMillis
+    )
+
+    storeWorkerNotificationRecipientUserIdsInsideTransaction(storeId, managersOnly = true)
+        .filter { it != actorUserId }
+        .forEach { recipientId ->
+            insertServerNotificationInsideTransaction(
+                userId = recipientId,
+                storeId = storeId,
+                title = if (accepted) "Worker accepted" else "Worker declined",
+                message = "$workerName $actionText employment in $storeName.",
+                type = notificationType,
+                category = "workers",
+                metadata = mapOf("operationId" to "worker_manager_decision_${requestId}_$recipientId", "requestId" to requestId.toString(), "status" to actionText, "direction" to direction),
+                nowMillis = nowMillis
+            )
+        }
+}
+
+private fun notifyWorkerPermissionsUpdatedInsideTransaction(
+    storeId: UUID,
+    workerUserId: UUID,
+    workerId: UUID,
+    nowMillis: Long
+) {
+    val storeName = storeDisplayNameInsideTransaction(storeId).ifBlank { "this store" }
+    insertServerNotificationInsideTransaction(
+        userId = workerUserId,
+        storeId = storeId,
+        title = "Worker permissions updated",
+        message = "Your permissions in $storeName were updated.",
+        type = NotificationType.Neutral,
+        category = "workers",
+        metadata = mapOf("operationId" to "worker_permissions_$workerId", "workerId" to workerId.toString()),
+        nowMillis = nowMillis
+    )
 }
 
 private fun resolveUserIdByPublicOrPrivateIdInsideTransaction(value: String): UUID? {
@@ -2280,6 +3837,8 @@ private fun ResultRow.toGoodsItemDataModel(): GoodsItemDataModel {
 
         activeShelfBatchId = this[StockItems.activeShelfBatchId]?.toString(),
 
+        promotions = this[StockItems.promotions],
+
         note = this[StockItems.note],
         noteLocalized = this[StockItems.noteLocalized],
         conditions = this[StockItems.conditions],
@@ -2310,6 +3869,186 @@ private fun ResultRow.toSupplierDataModel(): SupplierDataModel {
         addedAt = this[Suppliers.addedAt].toEpochMilli(),
         isActive = this[Suppliers.isActive]
     )
+}
+
+private fun ResultRow.toSupplierOrderDataModel(): SupplierOrderDataModel = SupplierOrderDataModel(
+    id = this[SupplierOrders.id].toString(),
+    userId = this[SupplierOrders.userId].toString(),
+    storeId = this[SupplierOrders.storeId].toString(),
+    supplierId = this[SupplierOrders.supplierId].toString(),
+    amount = this[SupplierOrders.amount],
+    orderedAtMillis = this[SupplierOrders.orderedAtMillis],
+    desiredDeliveryTimeMillis = this[SupplierOrders.desiredDeliveryTimeMillis],
+    confirmedDeliveryTimeMillis = this[SupplierOrders.confirmedDeliveryTimeMillis],
+    deliveredAtMillis = this[SupplierOrders.deliveredAtMillis],
+    storeAddress = this[SupplierOrders.storeAddress],
+    additionalNotes = this[SupplierOrders.additionalNotes],
+    additionalNotesLocalized = this[SupplierOrders.additionalNotesLocalized],
+    supplierComment = this[SupplierOrders.supplierComment],
+    supplierCommentLocalized = this[SupplierOrders.supplierCommentLocalized],
+    paymentTerms = this[SupplierOrders.paymentTerms],
+    externalReference = this[SupplierOrders.externalReference],
+    storeContactUserId = this[SupplierOrders.storeContactUserId]?.toString(),
+    status = runCatching { SupplierOrderStatusDataModel.valueOf(this[SupplierOrders.status]) }.getOrDefault(SupplierOrderStatusDataModel.Draft),
+    createdAtMillis = this[SupplierOrders.createdAtMillis],
+    updatedAtMillis = this[SupplierOrders.updatedAtMillis],
+    isActive = this[SupplierOrders.isActive]
+)
+
+private fun ResultRow.toSupplierOrderLineDataModel(): SupplierOrderLineDataModel = SupplierOrderLineDataModel(
+    id = this[SupplierOrderLines.id].toString(),
+    orderId = this[SupplierOrderLines.orderId].toString(),
+    goodsItemId = this[SupplierOrderLines.goodsItemId].toString(),
+    requestedQuantity = this[SupplierOrderLines.requestedQuantity],
+    expectedSupplyPrice = this[SupplierOrderLines.expectedSupplyPrice],
+    desiredExpirationDateMillis = this[SupplierOrderLines.desiredExpirationDateMillis],
+    additionalNotes = this[SupplierOrderLines.additionalNotes],
+    additionalNotesLocalized = this[SupplierOrderLines.additionalNotesLocalized],
+    supplierComment = this[SupplierOrderLines.supplierComment],
+    supplierCommentLocalized = this[SupplierOrderLines.supplierCommentLocalized],
+    supplierAcceptedQuantity = this[SupplierOrderLines.supplierAcceptedQuantity],
+    supplierOfferedSupplyPrice = this[SupplierOrderLines.supplierOfferedSupplyPrice],
+    substituteGoodsItemId = this[SupplierOrderLines.substituteGoodsItemId]?.toString(),
+    deliveredBatchIds = this[SupplierOrderLines.deliveredBatchIds],
+    isActive = this[SupplierOrderLines.isActive]
+)
+
+private fun SupplierOrderDataModel.cleanForStorage(userId: UUID, storeId: UUID, supplierId: UUID, now: Long): SupplierOrderDataModel = copy(
+    userId = userId.toString(),
+    storeId = storeId.toString(),
+    supplierId = supplierId.toString(),
+    orderedAtMillis = orderedAtMillis.takeIf { it > 0L } ?: now,
+    additionalNotes = additionalNotes?.trim()?.takeIf { it.isNotBlank() },
+    additionalNotesLocalized = additionalNotesLocalized
+        .map { it.copy(language = it.language.trim(), value = it.value.trim()) }
+        .filter { it.language.isNotBlank() && it.value.isNotBlank() }
+        .distinctBy { it.language },
+    supplierComment = supplierComment?.trim()?.takeIf { it.isNotBlank() },
+    supplierCommentLocalized = supplierCommentLocalized
+        .map { it.copy(language = it.language.trim(), value = it.value.trim()) }
+        .filter { it.language.isNotBlank() && it.value.isNotBlank() }
+        .distinctBy { it.language },
+    paymentTerms = paymentTerms?.trim()?.takeIf { it.isNotBlank() },
+    externalReference = externalReference?.trim()?.takeIf { it.isNotBlank() },
+    updatedAtMillis = now,
+    createdAtMillis = createdAtMillis.takeIf { it > 0L } ?: now,
+    isActive = isActive
+)
+
+private fun SupplierOrderLineDataModel.cleanForStorage(orderId: UUID): SupplierOrderLineDataModel = copy(
+    orderId = orderId.toString(),
+    requestedQuantity = requestedQuantity.copy(total = requestedQuantity.total.coerceAtLeast(0.0)),
+    additionalNotes = additionalNotes?.trim()?.takeIf { it.isNotBlank() },
+    additionalNotesLocalized = additionalNotesLocalized
+        .map { it.copy(language = it.language.trim(), value = it.value.trim()) }
+        .filter { it.language.isNotBlank() && it.value.isNotBlank() }
+        .distinctBy { it.language },
+    supplierComment = supplierComment?.trim()?.takeIf { it.isNotBlank() },
+    supplierCommentLocalized = supplierCommentLocalized
+        .map { it.copy(language = it.language.trim(), value = it.value.trim()) }
+        .filter { it.language.isNotBlank() && it.value.isNotBlank() }
+        .distinctBy { it.language }
+)
+
+private fun supplierOrderWithLinesInsideTransaction(orderId: UUID): SupplierOrderWithLinesDataModel? {
+    val order = SupplierOrders
+        .selectAll()
+        .where { SupplierOrders.id eq orderId }
+        .singleOrNull()
+        ?.toSupplierOrderDataModel()
+        ?: return null
+
+    val lines = SupplierOrderLines
+        .selectAll()
+        .where { SupplierOrderLines.orderId eq orderId }
+        .map { it.toSupplierOrderLineDataModel() }
+
+    return SupplierOrderWithLinesDataModel(order, lines)
+}
+
+private fun InsertStatement<Number>.setSupplierOrderColumns(
+    orderId: UUID,
+    clean: SupplierOrderDataModel,
+    userId: UUID,
+    storeId: UUID,
+    supplierId: UUID
+) {
+    this[SupplierOrders.id] = orderId
+    this[SupplierOrders.userId] = userId
+    this[SupplierOrders.storeId] = storeId
+    this[SupplierOrders.supplierId] = supplierId
+    this[SupplierOrders.amount] = clean.amount
+    this[SupplierOrders.orderedAtMillis] = clean.orderedAtMillis
+    this[SupplierOrders.desiredDeliveryTimeMillis] = clean.desiredDeliveryTimeMillis
+    this[SupplierOrders.confirmedDeliveryTimeMillis] = clean.confirmedDeliveryTimeMillis
+    this[SupplierOrders.deliveredAtMillis] = clean.deliveredAtMillis
+    this[SupplierOrders.storeAddress] = clean.storeAddress
+    this[SupplierOrders.additionalNotes] = clean.additionalNotes
+    this[SupplierOrders.additionalNotesLocalized] = clean.additionalNotesLocalized
+    this[SupplierOrders.supplierComment] = clean.supplierComment
+    this[SupplierOrders.supplierCommentLocalized] = clean.supplierCommentLocalized
+    this[SupplierOrders.paymentTerms] = clean.paymentTerms
+    this[SupplierOrders.externalReference] = clean.externalReference
+    this[SupplierOrders.storeContactUserId] = clean.storeContactUserId?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+    this[SupplierOrders.status] = clean.status.name
+    this[SupplierOrders.createdAtMillis] = clean.createdAtMillis
+    this[SupplierOrders.updatedAtMillis] = clean.updatedAtMillis
+    this[SupplierOrders.isActive] = clean.isActive
+}
+
+private fun UpdateBuilder<*>.setSupplierOrderUpdateColumns(clean: SupplierOrderDataModel) {
+    this[SupplierOrders.amount] = clean.amount
+    this[SupplierOrders.desiredDeliveryTimeMillis] = clean.desiredDeliveryTimeMillis
+    this[SupplierOrders.confirmedDeliveryTimeMillis] = clean.confirmedDeliveryTimeMillis
+    this[SupplierOrders.deliveredAtMillis] = clean.deliveredAtMillis
+    this[SupplierOrders.storeAddress] = clean.storeAddress
+    this[SupplierOrders.additionalNotes] = clean.additionalNotes
+    this[SupplierOrders.additionalNotesLocalized] = clean.additionalNotesLocalized
+    this[SupplierOrders.supplierComment] = clean.supplierComment
+    this[SupplierOrders.supplierCommentLocalized] = clean.supplierCommentLocalized
+    this[SupplierOrders.paymentTerms] = clean.paymentTerms
+    this[SupplierOrders.externalReference] = clean.externalReference
+    this[SupplierOrders.storeContactUserId] = clean.storeContactUserId?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+    this[SupplierOrders.status] = clean.status.name
+    this[SupplierOrders.updatedAtMillis] = clean.updatedAtMillis
+    this[SupplierOrders.isActive] = clean.isActive
+}
+
+private fun InsertStatement<Number>.setSupplierOrderLineColumns(
+    lineId: UUID,
+    clean: SupplierOrderLineDataModel,
+    orderId: UUID,
+    goodsItemId: UUID
+) {
+    this[SupplierOrderLines.id] = lineId
+    this[SupplierOrderLines.orderId] = orderId
+    this[SupplierOrderLines.goodsItemId] = goodsItemId
+    this[SupplierOrderLines.requestedQuantity] = clean.requestedQuantity
+    this[SupplierOrderLines.expectedSupplyPrice] = clean.expectedSupplyPrice
+    this[SupplierOrderLines.desiredExpirationDateMillis] = clean.desiredExpirationDateMillis
+    this[SupplierOrderLines.additionalNotes] = clean.additionalNotes
+    this[SupplierOrderLines.additionalNotesLocalized] = clean.additionalNotesLocalized
+    this[SupplierOrderLines.supplierComment] = clean.supplierComment
+    this[SupplierOrderLines.supplierCommentLocalized] = clean.supplierCommentLocalized
+    this[SupplierOrderLines.supplierAcceptedQuantity] = clean.supplierAcceptedQuantity
+    this[SupplierOrderLines.supplierOfferedSupplyPrice] = clean.supplierOfferedSupplyPrice
+    this[SupplierOrderLines.substituteGoodsItemId] = clean.substituteGoodsItemId?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+    this[SupplierOrderLines.deliveredBatchIds] = clean.deliveredBatchIds
+    this[SupplierOrderLines.isActive] = clean.isActive
+}
+
+private fun UpdateBuilder<*>.setSupplierOrderLineUpdateColumns(clean: SupplierOrderLineDataModel) {
+    this[SupplierOrderLines.requestedQuantity] = clean.requestedQuantity
+    this[SupplierOrderLines.expectedSupplyPrice] = clean.expectedSupplyPrice
+    this[SupplierOrderLines.desiredExpirationDateMillis] = clean.desiredExpirationDateMillis
+    this[SupplierOrderLines.additionalNotes] = clean.additionalNotes
+    this[SupplierOrderLines.additionalNotesLocalized] = clean.additionalNotesLocalized
+    this[SupplierOrderLines.supplierComment] = clean.supplierComment
+    this[SupplierOrderLines.supplierCommentLocalized] = clean.supplierCommentLocalized
+    this[SupplierOrderLines.supplierAcceptedQuantity] = clean.supplierAcceptedQuantity
+    this[SupplierOrderLines.supplierOfferedSupplyPrice] = clean.supplierOfferedSupplyPrice
+    this[SupplierOrderLines.substituteGoodsItemId] = clean.substituteGoodsItemId?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+    this[SupplierOrderLines.isActive] = clean.isActive
 }
 
 private fun SupplierDataModel.cleanedForStorage(ownerUserId: UUID? = null, existingUserIds: List<String> = emptyList()): SupplierDataModel {
@@ -2349,6 +4088,7 @@ private fun ResultRow.toGoodsBatchDataModel(): GoodsBatchDataModel {
         expirationDateMillis = this[StockBatchesV2.expirationDateMillis],
 
         discounts = this[StockBatchesV2.discounts],
+        promotions = this[StockBatchesV2.promotions],
 
         shelfPosition = this[StockBatchesV2.shelfPosition],
         shelfPriority = this[StockBatchesV2.shelfPriority],
@@ -2358,6 +4098,7 @@ private fun ResultRow.toGoodsBatchDataModel(): GoodsBatchDataModel {
         }.getOrDefault(StockBatchStatusDataModel.Delivered),
 
         additionalNotes = this[StockBatchesV2.additionalNotes],
+        additionalNotesLocalized = this[StockBatchesV2.additionalNotesLocalized],
 
         createdAtMillis = this[StockBatchesV2.createdAtMillis],
         updatedAtMillis = this[StockBatchesV2.updatedAtMillis],
@@ -2587,6 +4328,7 @@ private fun cloneStockItemToStoreInsideTransaction(
         it[StockItems.isQuickItem] = sourceItemRow[StockItems.isQuickItem]
         it[StockItems.imagePaths] = sourceItemRow[StockItems.imagePaths]
         it[StockItems.activeShelfBatchId] = null
+        it[StockItems.promotions] = sourceItemRow[StockItems.promotions]
         it[StockItems.note] = sourceItemRow[StockItems.note]
         it[StockItems.noteLocalized] = sourceItemRow[StockItems.noteLocalized]
         it[StockItems.conditions] = sourceItemRow[StockItems.conditions]
@@ -2970,6 +4712,14 @@ private fun normalizeTransactionGoodsInsideTransaction(
             SALE_METHOD_RETAIL
         }
 
+        goodsItem.firstViolatedPromotionRestriction(
+            transactionTypeIndex = transactionTypeIndex,
+            quantityTotal = line.quantity,
+            batch = activeBatch
+        )?.let {
+            return NormalizedTransactionGoodsResult(null, "promotion_restriction")
+        }
+
         val resolvedPrice = goodsItem.priceForTransaction(
             transactionTypeIndex = transactionTypeIndex,
             saleMethodId = appliedSaleMethodId,
@@ -2986,11 +4736,86 @@ private fun normalizeTransactionGoodsInsideTransaction(
 
         normalizedLines += line.copy(
             pricePerUnit = kotlin.math.round(normalizedPricePerUnit.coerceAtLeast(0.0) * 100.0) / 100.0,
-            saleMethodId = appliedSaleMethodId
+            saleMethodId = appliedSaleMethodId,
+            name = goodsItem.name.takeIf { it.isNotEmpty() } ?: line.name,
+            goodsItemId = goodsItem.id.takeIf { it.isNotBlank() } ?: line.goodsItemId,
+            quantityUnit = line.quantityUnit ?: defaultServerQuantityForGoodsItem(goodsItem.measurementUnitId, line.quantity),
+            currencyCode = line.currencyCode?.takeIf { it.isNotBlank() }
+                ?: resolvedPrice.currency.takeIf { it.isNotBlank() }
         )
     }
 
     return NormalizedTransactionGoodsResult(normalizedLines)
+}
+
+private fun preserveGoodsItemNameInTransactionsInsideTransaction(
+    storeId: UUID,
+    goodsItemRow: ResultRow
+): Int {
+    val goodsItem = goodsItemRow.toGoodsItemDataModel()
+    val goodsItemIdText = goodsItemRow[StockItems.id].toString()
+    val goodsItemBarcodes = goodsItemRow[StockItems.barcodes].toSet()
+    val goodsItemName = goodsItemRow[StockItems.name]
+    val fallbackCurrencyCode = (
+            goodsItem.salePrices + goodsItem.returnPrices + goodsItem.supplyPrices + goodsItem.wholesalePrices
+            ).firstOrNull { it.currency.isNotBlank() }?.currency
+    var updatedTransactions = 0
+
+    Transactions
+        .selectAll()
+        .where { Transactions.storeId eq storeId }
+        .forEach { transactionRow ->
+            val transactionId = transactionRow[Transactions.id]
+            val originalLines = transactionRow[Transactions.goodsInTransaction]
+            var changed = false
+
+            val updatedLines = originalLines.map { line ->
+                val belongsToDeletedItem = line.goodsItemId == goodsItemIdText || goodsItemBarcodes.any { storedBarcode ->
+                    storedBarcodeMatchesScannedTransactionBarcode(
+                        storedBarcode = storedBarcode,
+                        scannedBarcode = line.barcode
+                    ) || storedBarcodeMatchesScannedTransactionBarcode(
+                        storedBarcode = line.barcode,
+                        scannedBarcode = storedBarcode
+                    )
+                }
+
+                if (!belongsToDeletedItem) {
+                    line
+                } else {
+                    val updatedLine = line.copy(
+                        name = line.name.takeIf { it.isNotEmpty() } ?: goodsItemName,
+                        goodsItemId = line.goodsItemId?.takeIf { it.isNotBlank() } ?: goodsItemIdText,
+                        quantityUnit = line.quantityUnit ?: defaultServerQuantityForGoodsItem(goodsItem.measurementUnitId, line.quantity),
+                        currencyCode = line.currencyCode?.takeIf { it.isNotBlank() } ?: fallbackCurrencyCode
+                    )
+                    if (updatedLine != line) changed = true
+                    updatedLine
+                }
+            }
+
+            if (changed) {
+                Transactions.update({ Transactions.id eq transactionId }) { update ->
+                    update[Transactions.goodsInTransaction] = updatedLines
+                }
+                updatedTransactions += 1
+            }
+        }
+
+    return updatedTransactions
+}
+
+private fun preserveExistingGoodsItemNamesInTransactionHistoryInsideTransaction(): Int {
+    var updatedTransactions = 0
+    StockItems
+        .selectAll()
+        .forEach { goodsItemRow ->
+            updatedTransactions += preserveGoodsItemNameInTransactionsInsideTransaction(
+                storeId = goodsItemRow[StockItems.storeId],
+                goodsItemRow = goodsItemRow
+            )
+        }
+    return updatedTransactions
 }
 
 private fun updateGoodsItemActiveShelfBatchInsideTransaction(
@@ -3198,10 +5023,12 @@ private fun addStockForTransactionLineInsideTransaction(
         it[StockBatchesV2.manufacturedAtMillis] = null
         it[StockBatchesV2.expirationDateMillis] = null
         it[StockBatchesV2.discounts] = emptyList()
+        it[StockBatchesV2.promotions] = emptyList()
         it[StockBatchesV2.shelfPosition] = null
         it[StockBatchesV2.shelfPriority] = 0
         it[StockBatchesV2.status] = StockBatchStatusDataModel.Delivered.name
         it[StockBatchesV2.additionalNotes] = null
+        it[StockBatchesV2.additionalNotesLocalized] = emptyList()
         it[StockBatchesV2.createdAtMillis] = now
         it[StockBatchesV2.updatedAtMillis] = now
         it[StockBatchesV2.createdByUserId] = userId
@@ -3262,6 +5089,9 @@ fun Application.module() {
     }
     install(DefaultHeaders) {
         header(HttpHeaders.Vary, "Accept-Encoding")
+        header("X-Content-Type-Options", "nosniff")
+        header("X-Frame-Options", "DENY")
+        header("Referrer-Policy", "no-referrer")
     }
     install(ConditionalHeaders) // adds ETag/Last-Modified when possible
     install(CachingHeaders) {
@@ -3281,17 +5111,52 @@ fun Application.module() {
             }
         }
     }
+    val productionMode = isProductionMode()
+    val allowedCorsOrigins = parseAllowedCorsOrigins(
+        environment.config.optionalString("cors.allowedOrigins") ?: envOrSystem("AITA_CORS_ALLOWED_ORIGINS").orEmpty()
+    )
+
     install(CORS) {
-        anyHost() // for LAN/dev; lock down in prod
+        when {
+            allowedCorsOrigins.any { it.host == "*" } && productionMode -> {
+                error("Wildcard CORS is not allowed in production. Configure AITA_CORS_ALLOWED_ORIGINS explicitly.")
+            }
+
+            allowedCorsOrigins.any { it.host == "*" } -> {
+                anyHost()
+            }
+
+            allowedCorsOrigins.isEmpty() && productionMode -> {
+                error("AITA_CORS_ALLOWED_ORIGINS must be configured in production")
+            }
+
+            allowedCorsOrigins.isEmpty() -> {
+                anyHost()
+            }
+
+            else -> {
+                allowedCorsOrigins.forEach { origin ->
+                    allowHost(origin.host, schemes = listOf(origin.scheme))
+                }
+            }
+        }
+
+        allowHeader(HttpHeaders.Authorization)
         allowHeader(HttpHeaders.ContentType)
+        allowHeader(HttpHeaders.Accept)
+        allowHeader("store_id")
+        allowHeader("store-id")
+        allowHeader("worker_job_password")
         allowMethod(HttpMethod.Get)
         allowMethod(HttpMethod.Post)
         allowMethod(HttpMethod.Put)
         allowMethod(HttpMethod.Delete)
+        allowMethod(HttpMethod.Options)
+        maxAgeInSeconds = 24 * 60 * 60
     }
     install(ContentNegotiation) {
         json(Json {
-            prettyPrint = true
+            prettyPrint = !productionMode
             isLenient = true
             ignoreUnknownKeys = true
             explicitNulls = true
@@ -3299,23 +5164,43 @@ fun Application.module() {
         })
     }
 
+    val websocketMaxFrameSize = configLong("websocket.maxFrameSize", "AITA_WEBSOCKET_MAX_FRAME_SIZE", 1_048_576L)
     install(WebSockets) {
-        pingPeriod = 15.seconds
-        timeout = 30.seconds
-        maxFrameSize = Long.MAX_VALUE
+        pingPeriod = 30.seconds
+        timeout = 90.seconds
+        maxFrameSize = websocketMaxFrameSize
         masking = false
     }
 
     install(StatusPages) {
-        exception<Throwable> { call, cause ->
-            cause.printStackTrace()
+        exception<BadRequestException> { call, cause ->
+            call.application.environment.log.warn("Bad request: ${cause.message}")
             val response = GenericResponseDataModel(
                 message = jsonBase.encodeToString(
-                    listOf(
-                        LocalizedStringDataModel(
-                            language = "main",
-                            value = cause.message ?: cause::class.simpleName.orEmpty().ifBlank { "Internal server error" }
-                        )
+                    simpleMessage(
+                        main = "Bad request",
+                        ru = "Неверный запрос",
+                        kk = "Қате сұрау"
+                    )
+                ),
+                payload = null,
+                negative = true
+            )
+            call.respondText(
+                text = jsonBase.encodeToString(response),
+                contentType = ContentType.Application.Json,
+                status = HttpStatusCode.BadRequest
+            )
+        }
+
+        exception<Throwable> { call, cause ->
+            call.application.environment.log.error("Unhandled server error", cause)
+            val response = GenericResponseDataModel(
+                message = jsonBase.encodeToString(
+                    simpleMessage(
+                        main = "Internal server error",
+                        ru = "Внутренняя ошибка сервера",
+                        kk = "Сервердің ішкі қатесі"
                     )
                 ),
                 payload = null,
@@ -3332,32 +5217,88 @@ fun Application.module() {
 //    val ct = call.request.headers[HttpHeaders.ContentType]
 //
 //  }
+    environment.log.info("AITA server files root: $serverFilesRootPath")
+    environment.log.info("AITA config root: $configAppRootPath")
+    environment.log.info("AITA assets root: $assetsRootPath")
+
+    val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    environment.monitor.subscribe(ApplicationStopped) {
+        backgroundScope.cancel()
+        subscriptionRenewalDaemonStarted = false
+        notificationRetentionDaemonStarted = false
+    }
+
+    val dbUrl = environment.config.optionalString("db.url") ?: envOrSystem("AITA_DB_URL").orEmpty()
+    val dbUser = environment.config.optionalString("db.user") ?: envOrSystem("DB_USER").orEmpty()
+    val dbPass = environment.config.optionalString("db.pass") ?: envOrSystem("DB_PASS").orEmpty()
+
+    require(dbUrl.isNotBlank()) { "AITA_DB_URL must be configured" }
+    require(dbUser.isNotBlank()) { "DB_USER must be configured" }
+    require(dbPass.isNotBlank()) { "DB_PASS must be configured" }
+
+    val hikariMaxPoolSize = configInt("db.maximumPoolSize", "AITA_DB_MAX_POOL_SIZE", 10).coerceAtLeast(1)
+    val hikariMinimumIdle = configInt("db.minimumIdle", "AITA_DB_MIN_IDLE", 2).coerceIn(0, hikariMaxPoolSize)
+    val hikariConnectionTimeoutMillis = configLong("db.connectionTimeoutMillis", "AITA_DB_CONNECTION_TIMEOUT_MILLIS", 30_000L)
+    val hikariValidationTimeoutMillis = configLong("db.validationTimeoutMillis", "AITA_DB_VALIDATION_TIMEOUT_MILLIS", 5_000L)
+    val hikariIdleTimeoutMillis = configLong("db.idleTimeoutMillis", "AITA_DB_IDLE_TIMEOUT_MILLIS", 600_000L)
+    val hikariMaxLifetimeMillis = configLong("db.maxLifetimeMillis", "AITA_DB_MAX_LIFETIME_MILLIS", 1_800_000L)
+    val hikariLeakDetectionThresholdMillis = configLong("db.leakDetectionThresholdMillis", "AITA_DB_LEAK_DETECTION_THRESHOLD_MILLIS", 0L)
+    val hikariPoolName = configString("db.poolName", "AITA_DB_POOL_NAME", "aita-postgres-pool")
+
     val ds = HikariDataSource(HikariConfig().apply {
-        jdbcUrl = environment.config.property("db.url").getString()
-        username = environment.config.property("db.user").getString()
-        password = environment.config.property("db.pass").getString()
+        jdbcUrl = dbUrl
+        username = dbUser
+        password = dbPass
         driverClassName = "org.postgresql.Driver"
-        maximumPoolSize = 10
-        minimumIdle = 2
+        maximumPoolSize = hikariMaxPoolSize
+        minimumIdle = hikariMinimumIdle
+        connectionTimeout = hikariConnectionTimeoutMillis
+        validationTimeout = hikariValidationTimeoutMillis
+        idleTimeout = hikariIdleTimeoutMillis
+        maxLifetime = hikariMaxLifetimeMillis
+        leakDetectionThreshold = hikariLeakDetectionThresholdMillis
+        poolName = hikariPoolName
         isAutoCommit = false
     })
 
-    Flyway.configure()
+    environment.monitor.subscribe(ApplicationStopped) {
+        ds.close()
+    }
+
+    val flywayRunOnStart = configBoolean("flyway.runOnStart", "AITA_FLYWAY_RUN_ON_START", true)
+    val flywayValidateOnMigrate = configBoolean("flyway.validateOnMigrate", "AITA_FLYWAY_VALIDATE_ON_MIGRATE", true)
+    val flywayCleanDisabled = configBoolean("flyway.cleanDisabled", "AITA_FLYWAY_CLEAN_DISABLED", true)
+    val flywayBaselineOnMigrate = configBoolean("flyway.baselineOnMigrate", "AITA_FLYWAY_BASELINE_ON_MIGRATE", true)
+
+    val flyway = Flyway.configure()
         .dataSource(ds)
-        .locations(environment.config.propertyOrNull("flyway.locations")?.getString() ?: "classpath:db/migration")
-        .baselineOnMigrate(true)
-        .validateOnMigrate(true)
+        .locations(environment.config.optionalString("flyway.locations") ?: "classpath:db/migration")
+        .baselineOnMigrate(flywayBaselineOnMigrate)
+        .validateOnMigrate(flywayValidateOnMigrate)
+        .cleanDisabled(flywayCleanDisabled)
         .load()
-        .migrate()
+
+    if (flywayRunOnStart) {
+        flyway.migrate()
+    } else if (flywayValidateOnMigrate) {
+        flyway.validate()
+    }
 
     Database.connect(ds)
 
     org.jetbrains.exposed.sql.transactions.transaction {
-        SchemaUtils.createMissingTablesAndColumns(Users, Stores, StockItems, StockBatchesV2, StockBatchMovements, Suppliers, Debtors, Notifications, StoreWorkerRequests, StoreWorkerMemberships, Workshifts, CashRegisters, CashRegisterEvents, UserWallets, UserWalletLedgerEntries, TopUpPaymentIntents, StoreSubscriptionStates, StoreSubscriptionChargeEvents, OperationLogs)
+        if (configBoolean("app.schemaAutoRepair", "AITA_SCHEMA_AUTO_REPAIR", false)) {
+            SchemaUtils.createMissingTablesAndColumns(Users, Stores, StockItems, StockBatchesV2, StockBatchMovements, Suppliers, SupplierGoodsPrices, SupplierOrders, SupplierOrderLines, Debtors, Notifications, SupportTickets, SupportMessages, StoreWorkerRequests, StoreWorkerMemberships, Workshifts, CashRegisters, CashRegisterEvents, UserWallets, UserWalletLedgerEntries, TopUpPaymentIntents, StoreSubscriptionStates, StoreSubscriptionChargeEvents, OperationLogs, Manufacturers, GenericGoodsItems, GenericGoodsCategories)
+        }
+        sanitizeGenericGoodsCategoryPrefixesInsideTransaction()
+        seedGenericGoodsCategoriesInsideTransaction()
+        preserveExistingGoodsItemNamesInTransactionHistoryInsideTransaction()
+        cleanupNotificationsInsideTransaction()
     }
 
     configureJwtAuth()
-    startSubscriptionRenewalDaemon()
+    startSubscriptionRenewalDaemon(backgroundScope)
+    startNotificationRetentionDaemon(backgroundScope)
 
     intercept(ApplicationCallPipeline.Call) {
         proceed()
@@ -3388,37 +5329,37 @@ fun Application.module() {
             val actorUserId = runCatching { call.principal<JWTPrincipal>()?.subject?.let { UUID.fromString(it) } }.getOrNull()
             val logStoreId = storeId?.let { runCatching { UUID.fromString(it) }.getOrNull() }
             val methodText = method.value
-            val ipText = call.request.header("X-Forwarded-For") ?: call.request.origin.remoteHost
-            val userAgentText = call.request.userAgent().orEmpty()
+            val logAction = operationLogActionForHttpMutation(methodText, entityPath)
+            val logEntityType = operationLogEntityForPath(entityPath)
+            val normalizedEntityPath = entityPath.lowercase()
+            val routeWritesSpecificOperationLog = normalizedEntityPath.startsWith("notifications") ||
+                    normalizedEntityPath.startsWith("operationlogs") ||
+                    normalizedEntityPath.startsWith("logs/") ||
+                    normalizedEntityPath.startsWith("stock/add") ||
+                    normalizedEntityPath.startsWith("stockbatches/add") ||
+                    normalizedEntityPath.startsWith("stockbatches/update") ||
+                    normalizedEntityPath.startsWith("stockbatches/setactiveshelfbatch") ||
+                    normalizedEntityPath.startsWith("transactions/complete") ||
+                    normalizedEntityPath.startsWith("workshifts/start") ||
+                    normalizedEntityPath.startsWith("workshifts/end")
 
-            if (actorUserId != null && logStoreId != null && !entityPath.startsWith("logs/")) {
-                kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+            if (actorUserId != null && logStoreId != null && !routeWritesSpecificOperationLog) {
+                backgroundScope.launch {
                     runCatching {
                         newSuspendedTransaction(Dispatchers.IO) {
                             insertOperationLogInsideTransaction(
                                 actorUserId = actorUserId,
                                 storeId = logStoreId,
-                                action = operationLogActionForHttpMutation(methodText, entityPath),
-                                entityType = operationLogEntityForPath(entityPath),
+                                action = logAction,
+                                entityType = logEntityType,
                                 entityId = null,
-                                title = simpleMessage(
-                                    main = "Operation completed",
-                                    ru = "Операция выполнена",
-                                    kk = "Операция орындалды"
-                                ),
-                                details = simpleMessage(
-                                    main = "$methodText /$entityPath",
-                                    ru = "$methodText /$entityPath",
-                                    kk = "$methodText /$entityPath"
-                                ),
-                                metadata = mapOf(
-                                    "path" to entityPath,
-                                    "method" to methodText,
-                                    "ip" to ipText,
-                                    "userAgent" to userAgentText
-                                )
+                                title = operationLogHumanTitleFor(logAction, logEntityType),
+                                details = operationLogHumanDetailsFor(logAction, logEntityType),
+                                metadata = mapOf("http_method" to methodText, "http_path" to entityPath)
                             )
                         }
+                    }.onFailure { throwable ->
+                        this@module.environment.log.error("Failed to write operation log", throwable)
                     }
                 }
             }
@@ -3428,6 +5369,28 @@ fun Application.module() {
     val tokenService = TokenService(jwtConfig())
 
     routing {
+        get("/healthz") {
+            call.respondText(
+                text = "{\"status\":\"ok\"}",
+                contentType = ContentType.Application.Json,
+                status = HttpStatusCode.OK
+            )
+        }
+
+        get("/readyz") {
+            val ready = runCatching {
+                newSuspendedTransaction(Dispatchers.IO) {
+                    exec("SELECT 1") { }
+                }
+            }.isSuccess
+
+            call.respondText(
+                text = if (ready) "{\"status\":\"ready\"}" else "{\"status\":\"not_ready\"}",
+                contentType = ContentType.Application.Json,
+                status = if (ready) HttpStatusCode.OK else HttpStatusCode.ServiceUnavailable
+            )
+        }
+
         authenticate("auth-jwt") {
             webSocket("/rt/updates") {
                 val principal = call.principal<JWTPrincipal>()
@@ -3438,35 +5401,68 @@ fun Application.module() {
                     return@webSocket
                 }
 
-                send(
-                    Frame.Text(
-                        jsonBase.encodeToString(
-                            RealtimeUpdateDataModel(
-                                id = UUID.randomUUID().toString(),
-                                type = "connected",
-                                entity = "connection",
-                                createdAtMillis = System.currentTimeMillis()
-                            )
-                        )
-                    )
-                )
-
-                val collector = launch {
-                    RealtimeServerBus.sharedUpdates.collect { update ->
-                        send(Frame.Text(jsonBase.encodeToString(update)))
-                    }
+                suspend fun sendRealtimeUpdate(update: RealtimeUpdateDataModel) {
+                    send(Frame.Text(jsonBase.encodeToString(update)))
                 }
 
                 try {
-                    for (frame in incoming) {
-                        if (frame is Frame.Text) {
-                            // The current protocol only needs the client hello to keep the connection warm.
-                            // The client refreshes itself when the server broadcasts mutation notices.
-                            frame.readText()
+                    val now = System.currentTimeMillis()
+                    sendRealtimeUpdate(
+                        RealtimeUpdateDataModel(
+                            id = UUID.randomUUID().toString(),
+                            type = "connected",
+                            entity = "connection",
+                            reason = "websocket_connected",
+                            createdAtMillis = now
+                        )
+                    )
+
+                    // A reconnect usually means the app has been offline or the server has restarted.
+                    // Send a broad refresh hint immediately so the client does not wait for the next mutation.
+                    sendRealtimeUpdate(
+                        RealtimeUpdateDataModel(
+                            id = UUID.randomUUID().toString(),
+                            type = "changed",
+                            entity = "all",
+                            reason = "connection_sync",
+                            createdAtMillis = now
+                        )
+                    )
+
+                    val collector = launch {
+                        RealtimeServerBus.sharedUpdates.collect { update ->
+                            try {
+                                sendRealtimeUpdate(update)
+                            } catch (throwable: Throwable) {
+                                if (throwable.isExpectedRealtimeDisconnect()) {
+                                    call.application.environment.log.debug(
+                                        "Realtime WebSocket send stopped after normal disconnect: ${throwable.message ?: throwable::class.simpleName}"
+                                    )
+                                    cancel("Realtime client disconnected", throwable)
+                                } else {
+                                    throw throwable
+                                }
+                            }
                         }
                     }
-                } finally {
-                    collector.cancel()
+
+                    try {
+                        for (frame in incoming) {
+                            if (frame is Frame.Text) {
+                                // The current protocol only needs the client hello to keep the connection warm.
+                                // The client refreshes itself when the server broadcasts mutation notices.
+                                frame.readText()
+                            }
+                        }
+                    } finally {
+                        collector.cancel()
+                    }
+                } catch (throwable: Throwable) {
+                    if (throwable.isExpectedRealtimeDisconnect()) {
+                        call.application.environment.log.debug("Realtime WebSocket disconnected normally: ${throwable.message ?: throwable::class.simpleName}")
+                    } else {
+                        throw throwable
+                    }
                 }
             }
         }
@@ -3550,6 +5546,9 @@ fun Application.module() {
                                     it[Users.countryLocale] = countryLocale
                                     it[Users.workerIds] = null
                                     it[Users.supplierIds] = null
+                                    it[Users.appLanguage] = DEFAULT_APP_LANGUAGE
+                                    it[Users.appThemeId] = DEFAULT_APP_THEME_ID
+                                    it[Users.appSizeModeId] = DEFAULT_APP_SIZE_MODE_ID
                                     it[Users.passwordHash] = hash
                                     it[Users.createdAt] = instant
                                     it[Users.isActive] = true
@@ -3581,7 +5580,7 @@ fun Application.module() {
                         status = HttpStatusCode.InternalServerError,
                         message = getResponse("3").message
                     )
-                    throwable.printStackTrace()
+                    call.application.environment.log.error("Sign-up failed", throwable)
                 }
             }
 
@@ -3604,7 +5603,7 @@ fun Application.module() {
 
                     call.genericResponse<TokenPair>(HttpStatusCode.OK, tokenPair)
                 } catch (throwable: Throwable) {
-                    throwable.printStackTrace()
+                    call.application.environment.log.error("Log-in failed", throwable)
                     call.genericResponseNoPayload(
                         status = HttpStatusCode.InternalServerError,
                         message = getResponse("3").message
@@ -3622,7 +5621,7 @@ fun Application.module() {
                     try {
                         tokenService.revoke(refreshToken)
                     } catch (throwable: Throwable) {
-                        throwable.printStackTrace()
+                        call.application.environment.log.error("Logout token revoke failed", throwable)
                     }
                 }
 
@@ -3636,7 +5635,9 @@ fun Application.module() {
                     call.genericResponse(HttpStatusCode.OK, newTokens)
                 } catch (throwable: Throwable) {
                     call.respond(UnauthorizedResponse())
-                    throwable.printStackTrace()
+                    if (throwable !is IllegalAccessException) {
+                        call.application.environment.log.warn("Refresh token rotation failed", throwable)
+                    }
                 }
             }
         }
@@ -3685,7 +5686,7 @@ fun Application.module() {
                                     (RefreshSessions.userId eq userId) and
                                     RefreshSessions.revokedAt.isNull()
                         }) {
-                            it[revokedAt] = Instant.now()
+                            it[RefreshSessions.revokedAt] = Instant.now()
                         }
                     }
 
@@ -3707,7 +5708,7 @@ fun Application.module() {
                                     RefreshSessions.revokedAt.isNull() and
                                     (RefreshSessions.id neq sessionToKeep)
                         }) {
-                            it[revokedAt] = Instant.now()
+                            it[RefreshSessions.revokedAt] = Instant.now()
                         }
                     }
 
@@ -3716,6 +5717,269 @@ fun Application.module() {
                         payload = loadSecuritySessionsForUser(userId, currentSessionId),
                         message = getResponse("46").message
                     )
+                }
+            }
+        }
+
+
+        route("/support") {
+            authenticate("auth-jwt") {
+                route("/tickets") {
+                    get("/get") {
+                        val userId = call.checkPrincipal() ?: return@get
+
+                        val tickets = newSuspendedTransaction(Dispatchers.IO) {
+                            SupportTickets
+                                .selectAll()
+                                .where { (SupportTickets.userId eq userId) and (SupportTickets.isActive eq true) }
+                                .orderBy(SupportTickets.updatedAtMillis to SortOrder.DESC)
+                                .limit(100)
+                                .map { it.toSupportTicketDataModel() }
+                        }
+
+                        call.genericResponse(HttpStatusCode.OK, tickets, getResponse("96").message)
+                    }
+
+                    post("/create") {
+                        val userId = call.checkPrincipal() ?: return@post
+                        val body = call.receive<SupportTicketCreateRequestDataModel>()
+                        val messageText = body.initialMessage.trim()
+
+                        if (messageText.isBlank()) {
+                            return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
+                        }
+
+                        val ticket = newSuspendedTransaction(Dispatchers.IO) {
+                            val now = System.currentTimeMillis()
+                            val ticketId = UUID.randomUUID()
+                            val ticketPublicId = generateUniqueSupportTicketPublicIdInsideTransaction()
+                            val storeId = body.storeId?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                            val subject = sanitizeSupportSubject(body.subject, messageText)
+                            val category = sanitizeSupportCategory(body.category)
+                            val priority = sanitizeSupportPriority(body.priority)
+                            val displayName = userDisplayNameInsideTransaction(userId)
+                            val clientMessageId = body.clientMessageId?.takeIf { it.isNotBlank() }
+
+                            SupportTickets.insert {
+                                it[SupportTickets.id] = ticketId
+                                it[SupportTickets.publicId] = ticketPublicId
+                                it[SupportTickets.userId] = userId
+                                it[SupportTickets.storeId] = storeId
+                                it[SupportTickets.subject] = subject
+                                it[SupportTickets.category] = category
+                                it[SupportTickets.priority] = priority
+                                it[SupportTickets.status] = "open"
+                                it[SupportTickets.assignedAgentUserId] = null
+                                it[SupportTickets.lastMessage] = messageText.take(500)
+                                it[SupportTickets.lastMessageAtMillis] = now
+                                it[SupportTickets.lastCustomerMessageAtMillis] = now
+                                it[SupportTickets.lastAgentMessageAtMillis] = null
+                                it[SupportTickets.unreadForUserCount] = 0
+                                it[SupportTickets.unreadForAgentCount] = 1
+                                it[SupportTickets.metadata] = body.metadata
+                                it[SupportTickets.createdAtMillis] = now
+                                it[SupportTickets.updatedAtMillis] = now
+                                it[SupportTickets.closedAtMillis] = null
+                                it[SupportTickets.isActive] = true
+                            }
+
+                            SupportMessages.insert {
+                                it[SupportMessages.id] = UUID.randomUUID()
+                                it[SupportMessages.ticketId] = ticketId
+                                it[SupportMessages.userId] = userId
+                                it[SupportMessages.senderUserId] = userId
+                                it[SupportMessages.senderRole] = "customer"
+                                it[SupportMessages.senderDisplayName] = displayName
+                                it[SupportMessages.body] = messageText
+                                it[SupportMessages.attachments] = emptyList()
+                                it[SupportMessages.metadata] = body.metadata
+                                it[SupportMessages.clientMessageId] = clientMessageId
+                                it[SupportMessages.createdAtMillis] = now
+                                it[SupportMessages.editedAtMillis] = null
+                                it[SupportMessages.readByCustomerAtMillis] = now
+                                it[SupportMessages.readByAgentAtMillis] = null
+                                it[SupportMessages.isActive] = true
+                            }
+
+                            SupportTickets.selectAll().where { SupportTickets.id eq ticketId }.single().toSupportTicketDataModel()
+                        }
+
+                        call.genericResponse(HttpStatusCode.Created, ticket, getResponse("97").message)
+                    }
+
+                    post("/close") {
+                        val userId = call.checkPrincipal() ?: return@post
+                        val body = call.receive<SupportTicketActionRequestDataModel>()
+                        val ticketId = runCatching { UUID.fromString(body.ticketId) }.getOrNull()
+                            ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
+
+                        val ticket = newSuspendedTransaction(Dispatchers.IO) {
+                            val existing = supportTicketForUserInsideTransaction(userId, ticketId) ?: return@newSuspendedTransaction null
+                            val now = System.currentTimeMillis()
+                            SupportTickets.update({ SupportTickets.id eq ticketId }) {
+                                it[SupportTickets.status] = "closed"
+                                it[SupportTickets.closedAtMillis] = now
+                                it[SupportTickets.updatedAtMillis] = now
+                                it[SupportTickets.unreadForUserCount] = 0
+                            }
+                            SupportTickets.selectAll().where { SupportTickets.id eq existing[SupportTickets.id] }.single().toSupportTicketDataModel()
+                        }
+
+                        ticket?.let { call.genericResponse(HttpStatusCode.OK, it, getResponse("98").message) }
+                            ?: call.genericResponseNoPayload(HttpStatusCode.NotFound, getResponse("13").message)
+                    }
+
+                    post("/reopen") {
+                        val userId = call.checkPrincipal() ?: return@post
+                        val body = call.receive<SupportTicketActionRequestDataModel>()
+                        val ticketId = runCatching { UUID.fromString(body.ticketId) }.getOrNull()
+                            ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
+
+                        val ticket = newSuspendedTransaction(Dispatchers.IO) {
+                            val existing = supportTicketForUserInsideTransaction(userId, ticketId) ?: return@newSuspendedTransaction null
+                            val now = System.currentTimeMillis()
+                            SupportTickets.update({ SupportTickets.id eq ticketId }) {
+                                it[SupportTickets.status] = "open"
+                                it[SupportTickets.closedAtMillis] = null
+                                it[SupportTickets.updatedAtMillis] = now
+                            }
+                            SupportTickets.selectAll().where { SupportTickets.id eq existing[SupportTickets.id] }.single().toSupportTicketDataModel()
+                        }
+
+                        ticket?.let { call.genericResponse(HttpStatusCode.OK, it, getResponse("99").message) }
+                            ?: call.genericResponseNoPayload(HttpStatusCode.NotFound, getResponse("13").message)
+                    }
+                }
+
+                route("/messages") {
+                    get("/get") {
+                        val userId = call.checkPrincipal() ?: return@get
+                        val ticketId = (call.request.header("ticket_id") ?: call.request.queryParameters["ticket_id"])
+                            ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                            ?: return@get call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
+                        val markRead = (call.request.header("mark_read") ?: call.request.queryParameters["mark_read"])
+                            ?.equals("true", ignoreCase = true) != false
+
+                        val messages = newSuspendedTransaction(Dispatchers.IO) {
+                            supportTicketForUserInsideTransaction(userId, ticketId) ?: return@newSuspendedTransaction null
+                            val now = System.currentTimeMillis()
+
+                            if (markRead) {
+                                SupportMessages.update({
+                                    (SupportMessages.ticketId eq ticketId) and
+                                            (SupportMessages.userId eq userId) and
+                                            (SupportMessages.senderRole neq "customer") and
+                                            SupportMessages.readByCustomerAtMillis.isNull()
+                                }) {
+                                    it[SupportMessages.readByCustomerAtMillis] = now
+                                }
+                                SupportTickets.update({ SupportTickets.id eq ticketId }) {
+                                    it[SupportTickets.unreadForUserCount] = 0
+                                }
+                            }
+
+                            SupportMessages
+                                .selectAll()
+                                .where { (SupportMessages.ticketId eq ticketId) and (SupportMessages.userId eq userId) and (SupportMessages.isActive eq true) }
+                                .orderBy(SupportMessages.createdAtMillis to SortOrder.ASC)
+                                .map { it.toSupportMessageDataModel() }
+                        }
+
+                        messages?.let { call.genericResponse(HttpStatusCode.OK, it, getResponse("100").message) }
+                            ?: call.genericResponseNoPayload(HttpStatusCode.NotFound, getResponse("13").message)
+                    }
+
+                    post("/send") {
+                        val userId = call.checkPrincipal() ?: return@post
+                        val body = call.receive<SupportMessageSendRequestDataModel>()
+                        val ticketId = runCatching { UUID.fromString(body.ticketId) }.getOrNull()
+                            ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
+                        val messageText = body.body.trim()
+
+                        if (messageText.isBlank()) {
+                            return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
+                        }
+
+                        val message = newSuspendedTransaction(Dispatchers.IO) {
+                            val existingTicket = supportTicketForUserInsideTransaction(userId, ticketId) ?: return@newSuspendedTransaction null
+                            val clientMessageId = body.clientMessageId?.takeIf { it.isNotBlank() }
+                            clientMessageId?.let { id ->
+                                SupportMessages.selectAll()
+                                    .where { (SupportMessages.clientMessageId eq id) and (SupportMessages.userId eq userId) }
+                                    .singleOrNull()
+                                    ?.let { return@newSuspendedTransaction it.toSupportMessageDataModel() }
+                            }
+
+                            val now = System.currentTimeMillis()
+                            val messageId = UUID.randomUUID()
+                            val displayName = userDisplayNameInsideTransaction(userId)
+
+                            SupportMessages.insert {
+                                it[SupportMessages.id] = messageId
+                                it[SupportMessages.ticketId] = ticketId
+                                it[SupportMessages.userId] = userId
+                                it[SupportMessages.senderUserId] = userId
+                                it[SupportMessages.senderRole] = "customer"
+                                it[SupportMessages.senderDisplayName] = displayName
+                                it[SupportMessages.body] = messageText
+                                it[SupportMessages.attachments] = body.attachments
+                                it[SupportMessages.metadata] = body.metadata
+                                it[SupportMessages.clientMessageId] = clientMessageId
+                                it[SupportMessages.createdAtMillis] = now
+                                it[SupportMessages.editedAtMillis] = null
+                                it[SupportMessages.readByCustomerAtMillis] = now
+                                it[SupportMessages.readByAgentAtMillis] = null
+                                it[SupportMessages.isActive] = true
+                            }
+
+                            SupportTickets.update({ SupportTickets.id eq ticketId }) {
+                                it[SupportTickets.status] = "open"
+                                it[SupportTickets.lastMessage] = messageText.take(500)
+                                it[SupportTickets.lastMessageAtMillis] = now
+                                it[SupportTickets.lastCustomerMessageAtMillis] = now
+                                it[SupportTickets.updatedAtMillis] = now
+                                it[SupportTickets.closedAtMillis] = null
+                                it[SupportTickets.unreadForAgentCount] = existingTicket[SupportTickets.unreadForAgentCount] + 1
+                            }
+
+                            SupportMessages.selectAll().where { SupportMessages.id eq messageId }.single().toSupportMessageDataModel()
+                        }
+
+                        message?.let { call.genericResponse(HttpStatusCode.Created, it, getResponse("101").message) }
+                            ?: call.genericResponseNoPayload(HttpStatusCode.NotFound, getResponse("13").message)
+                    }
+
+                    post("/read") {
+                        val userId = call.checkPrincipal() ?: return@post
+                        val body = call.receive<SupportMessagesReadRequestDataModel>()
+                        val ticketId = runCatching { UUID.fromString(body.ticketId) }.getOrNull()
+                            ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
+
+                        val messages = newSuspendedTransaction(Dispatchers.IO) {
+                            supportTicketForUserInsideTransaction(userId, ticketId) ?: return@newSuspendedTransaction null
+                            val now = System.currentTimeMillis()
+                            SupportMessages.update({
+                                (SupportMessages.ticketId eq ticketId) and
+                                        (SupportMessages.userId eq userId) and
+                                        (SupportMessages.senderRole neq "customer") and
+                                        SupportMessages.readByCustomerAtMillis.isNull()
+                            }) {
+                                it[SupportMessages.readByCustomerAtMillis] = now
+                            }
+                            SupportTickets.update({ SupportTickets.id eq ticketId }) {
+                                it[SupportTickets.unreadForUserCount] = 0
+                                it[SupportTickets.updatedAtMillis] = now
+                            }
+                            SupportMessages
+                                .selectAll()
+                                .where { (SupportMessages.ticketId eq ticketId) and (SupportMessages.userId eq userId) and (SupportMessages.isActive eq true) }
+                                .orderBy(SupportMessages.createdAtMillis to SortOrder.ASC)
+                                .map { it.toSupportMessageDataModel() }
+                        }
+
+                        messages?.let { call.genericResponse(HttpStatusCode.OK, it, getResponse("102").message) }
+                            ?: call.genericResponseNoPayload(HttpStatusCode.NotFound, getResponse("13").message)
+                    }
                 }
             }
         }
@@ -3741,40 +6005,78 @@ fun Application.module() {
                     val userId = call.checkPrincipal() ?: return@post
                     val body = call.receive<NotificationDataModel>()
                     val now = System.currentTimeMillis()
-                    val notificationId = body.id.ifBlank { "${now}_${body.type.name}_${body.message.hashCode()}" }
                     val storeId = body.storeId?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                    val category = body.category.ifBlank { body.type.name.lowercase() }
+                    val source = body.source.ifBlank { "app" }
+                    val dedupeCutoff = now - NOTIFICATION_RECENT_DUPLICATE_WINDOW_MILLIS
+                    val operationId = notificationOperationIdFromMetadata(body.metadata) ?: notificationOperationIdFromId(body.id)
+                    val incomingIsLoading = isLoadingNotificationIntent(body.type, category, body.metadata, body.title, body.message)
+                    val incomingIsResult = isResultNotificationIntent(body.type, body.metadata)
+                    val metadataForStorage = notificationMetadataForStorage(body.metadata, operationId, incomingIsLoading, incomingIsResult)
+                    val requestedNotificationId = body.id.ifBlank {
+                        operationId?.let { if (incomingIsLoading) "loading_${userId}_$it" else "operation_${userId}_$it" }
+                            ?: "${now}_${body.type.name}_${body.message.hashCode()}"
+                    }
+                    val replacementNotificationId = notificationReplacementIdFromMetadata(metadataForStorage)
 
                     val saved = newSuspendedTransaction(Dispatchers.IO) {
-                        val exists = Notifications
-                            .selectAll()
-                            .where { (Notifications.id eq notificationId) and (Notifications.userId eq userId) }
-                            .empty()
-                            .not()
+                        cleanupNotificationsInsideTransaction(now)
 
-                        if (exists) {
-                            Notifications.update({ (Notifications.id eq notificationId) and (Notifications.userId eq userId) }) {
+                        val existingById = Notifications
+                            .selectAll()
+                            .where { (Notifications.id eq requestedNotificationId) and (Notifications.userId eq userId) }
+                            .firstOrNull()
+
+                        val existingByReplacementId = replacementNotificationId?.let { replacementId ->
+                            Notifications
+                                .selectAll()
+                                .where { (Notifications.id eq replacementId) and (Notifications.userId eq userId) and (Notifications.isActive eq true) }
+                                .firstOrNull()
+                        }
+                        val existingByOperation = existingNotificationForIncomingOperationInsideTransaction(userId, operationId, incomingIsLoading, incomingIsResult)
+
+                        val existingDuplicate = existingByReplacementId ?: existingByOperation ?: existingById ?: Notifications
+                            .selectAll()
+                            .where {
+                                (Notifications.userId eq userId) and
+                                        (Notifications.message eq body.message) and
+                                        (Notifications.type eq body.type.name) and
+                                        (Notifications.category eq category) and
+                                        (Notifications.notificationSource eq source) and
+                                        (Notifications.createdAtMillis greaterEq dedupeCutoff) and
+                                        (if (storeId == null) Notifications.storeId.isNull() else Notifications.storeId eq storeId)
+                            }
+                            .orderBy(Notifications.createdAtMillis, SortOrder.DESC)
+                            .limit(1)
+                            .firstOrNull()
+
+                        val finalNotificationId = existingDuplicate?.get(Notifications.id) ?: requestedNotificationId
+
+                        if (existingDuplicate != null) {
+                            Notifications.update({ (Notifications.id eq finalNotificationId) and (Notifications.userId eq userId) }) {
                                 it[title] = body.title
                                 it[message] = body.message
                                 it[type] = body.type.name
-                                it[category] = body.category.ifBlank { body.type.name.lowercase() }
-                                it[notificationSource] = body.source.ifBlank { "app" }
-                                it[metadata] = body.metadata
+                                it[Notifications.category] = category
+                                it[notificationSource] = source
+                                it[metadata] = metadataForStorage
                                 it[Notifications.storeId] = storeId
+                                it[createdAtMillis] = now
                                 it[shownAtMillis] = body.shownAtMillis.takeIf { value -> value > 0L } ?: now
                                 it[readAtMillis] = body.readAtMillis
                                 it[isActive] = true
                             }
                         } else {
                             Notifications.insert {
-                                it[id] = notificationId
+                                it[id] = finalNotificationId
                                 it[Notifications.userId] = userId
                                 it[Notifications.storeId] = storeId
                                 it[title] = body.title
                                 it[message] = body.message
                                 it[type] = body.type.name
-                                it[category] = body.category.ifBlank { body.type.name.lowercase() }
-                                it[notificationSource] = body.source.ifBlank { "app" }
-                                it[metadata] = body.metadata
+                                it[Notifications.category] = category
+                                it[notificationSource] = source
+                                it[metadata] = metadataForStorage
                                 it[createdAtMillis] = body.createdAtMillis.takeIf { value -> value > 0L } ?: now
                                 it[shownAtMillis] = body.shownAtMillis.takeIf { value -> value > 0L } ?: now
                                 it[readAtMillis] = body.readAtMillis
@@ -3784,11 +6086,16 @@ fun Application.module() {
 
                         Notifications
                             .selectAll()
-                            .where { (Notifications.id eq notificationId) and (Notifications.userId eq userId) }
+                            .where { (Notifications.id eq finalNotificationId) and (Notifications.userId eq userId) }
                             .single()
                             .toNotificationDataModel()
                     }
 
+                    RealtimeServerBus.publish(
+                        entity = "notifications",
+                        storeId = saved.storeId,
+                        reason = operationId?.let { "operation_notification" } ?: "notification"
+                    )
                     call.genericResponse(HttpStatusCode.Created, saved)
                 }
 
@@ -3819,6 +6126,7 @@ fun Application.module() {
                             .map { it.toNotificationDataModel() }
                     }
 
+                    RealtimeServerBus.publish(entity = "notifications", reason = "notification_read")
                     call.genericResponse(HttpStatusCode.OK, updated)
                 }
             }
@@ -3940,13 +6248,31 @@ fun Application.module() {
             }
         }
 
-        staticFiles("config/global", File("AITA/server/config/app/global.json"))
+        get("/config/global") {
+            call.respondText(
+                text = call.application.buildGlobalConfigurationJson(),
+                contentType = ContentType.Application.Json,
+                status = HttpStatusCode.OK
+            )
+        }
 
-        staticFiles("res/string", File("AITA/server/assets/values/strings.json"))
-        staticFiles("res/dimension", File("AITA/server/assets/values/dimensions.json"))
-        staticFiles("res/color", File("AITA/server/assets/values/colors.json"))
-        staticFiles("res/drawableConfig", File("AITA/server/assets/drawable/drawables.json"))
-        staticFiles("res/drawable", File("AITA/server/assets/drawable"))
+        get("/res/string") {
+            call.respondStaticJsonFile(assetsRootPath.resolve("values/strings.json"))
+        }
+
+        get("/res/dimension") {
+            call.respondStaticJsonFile(assetsRootPath.resolve("values/dimensions.json"))
+        }
+
+        get("/res/color") {
+            call.respondStaticJsonFile(assetsRootPath.resolve("values/colors.json"))
+        }
+
+        get("/res/drawableConfig") {
+            call.respondStaticJsonFile(assetsRootPath.resolve("drawable/drawables.json"))
+        }
+
+        staticFiles("/res/drawable", assetsRootPath.resolve("drawable").toFile())
 
         route("/stock") {
             authenticate("auth-jwt") {
@@ -3956,15 +6282,18 @@ fun Application.module() {
                         ?: return@get call.respond(UnauthorizedResponse())
 
                     val result = newSuspendedTransaction(Dispatchers.IO) {
-                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_READ))
+                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_READ, requireWorkshift = false))
                             return@newSuspendedTransaction null
+
+                        val visibleStoreIds = stockVisibleStoreIdsInsideTransaction(storeId)
 
                         StockItems
                             .selectAll()
                             .where {
-                                (StockItems.storeId eq storeId) and
+                                (StockItems.storeId inList visibleStoreIds) and
                                         (StockItems.isActive eq true)
                             }
+                            .orderBy(StockItems.updatedAtMillis, SortOrder.DESC)
                             .map { it.toGoodsItemDataModel() }
                     }
 
@@ -4025,6 +6354,8 @@ fun Application.module() {
                                 ?.takeIf { value -> value.isNotBlank() }
                                 ?.let { value -> runCatching { UUID.fromString(value) }.getOrNull() }
 
+                            it[StockItems.promotions] = body.promotions.sanitizedStockPromotions()
+
                             it[StockItems.note] = body.note
                             it[StockItems.noteLocalized] = body.noteLocalized
                             it[StockItems.conditions] = body.conditions.map { condition -> condition.trim() }.filter { condition -> condition.isNotBlank() }.distinct()
@@ -4051,6 +6382,7 @@ fun Application.module() {
                             userId = userId.toString(),
                             storeId = storeId.toString(),
                             barcodes = cleanBarcodes,
+                            promotions = body.promotions.sanitizedStockPromotions(),
                             conditions = body.conditions.map { condition -> condition.trim() }.filter { condition -> condition.isNotBlank() }.distinct(),
                             createdAtMillis = now,
                             updatedAtMillis = now,
@@ -4100,7 +6432,20 @@ fun Application.module() {
                         if (barcodeClashesInsideTransaction(storeId, id, cleanBarcodes))
                             return@newSuspendedTransaction null
 
-                        val now = System.currentTimeMillis()
+                        val goodsItemRow = StockItems
+                            .selectAll()
+                            .where {
+                                (StockItems.id eq id) and
+                                        (StockItems.storeId eq storeId)
+                            }
+                            .firstOrNull()
+                            ?: return@newSuspendedTransaction null
+
+                        if (body.name != goodsItemRow[StockItems.name] || cleanBarcodes.toSet() != goodsItemRow[StockItems.barcodes].toSet()) {
+                            preserveGoodsItemNameInTransactionsInsideTransaction(storeId, goodsItemRow)
+                        }
+
+                        val now = Instant.now().toEpochMilli()
 
                         val affected = StockItems.update({
                             (StockItems.id eq id) and
@@ -4128,6 +6473,8 @@ fun Application.module() {
                                 ?.takeIf { value -> value.isNotBlank() }
                                 ?.let { value -> runCatching { UUID.fromString(value) }.getOrNull() }
 
+                            it[StockItems.promotions] = body.promotions.sanitizedStockPromotions()
+
                             it[StockItems.note] = body.note
                             it[StockItems.noteLocalized] = body.noteLocalized
                             it[StockItems.conditions] = body.conditions.map { condition -> condition.trim() }.filter { condition -> condition.isNotBlank() }.distinct()
@@ -4142,6 +6489,7 @@ fun Application.module() {
                             userId = userId.toString(),
                             storeId = storeId.toString(),
                             barcodes = cleanBarcodes,
+                            promotions = body.promotions.sanitizedStockPromotions(),
                             conditions = body.conditions.map { condition -> condition.trim() }.filter { condition -> condition.isNotBlank() }.distinct(),
                             updatedAtMillis = now
                         )
@@ -4180,26 +6528,24 @@ fun Application.module() {
                         val id = runCatching { UUID.fromString(rawId) }.getOrNull()
                             ?: return@newSuspendedTransaction null
 
-                        val now = System.currentTimeMillis()
+                        val goodsItemRow = StockItems
+                            .selectAll()
+                            .where {
+                                (StockItems.id eq id) and
+                                        (StockItems.storeId eq storeId)
+                            }
+                            .firstOrNull()
+                            ?: return@newSuspendedTransaction null
 
-                        val affected = StockItems.update({
+                        preserveGoodsItemNameInTransactionsInsideTransaction(storeId, goodsItemRow)
+
+                        val affected = StockItems.deleteWhere {
                             (StockItems.id eq id) and
                                     (StockItems.storeId eq storeId)
-                        }) {
-                            it[StockItems.isActive] = false
-                            it[StockItems.updatedAtMillis] = now
                         }
 
                         if (affected <= 0)
                             return@newSuspendedTransaction null
-
-                        StockBatchesV2.update({
-                            (StockBatchesV2.goodsItemId eq id) and
-                                    (StockBatchesV2.storeId eq storeId)
-                        }) {
-                            it[StockBatchesV2.isActive] = false
-                            it[StockBatchesV2.updatedAtMillis] = now
-                        }
 
                         rawId
                     }
@@ -4223,13 +6569,15 @@ fun Application.module() {
                         ?: return@get call.respond(UnauthorizedResponse())
 
                     val result = newSuspendedTransaction(Dispatchers.IO) {
-                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_READ))
+                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_READ, requireWorkshift = false))
                             return@newSuspendedTransaction null
+
+                        val visibleStoreIds = stockVisibleStoreIdsInsideTransaction(storeId)
 
                         StockBatchesV2
                             .selectAll()
                             .where {
-                                (StockBatchesV2.storeId eq storeId) and
+                                (StockBatchesV2.storeId inList visibleStoreIds) and
                                         (StockBatchesV2.isActive eq true)
                             }
                             .map { it.toGoodsBatchDataModel() }
@@ -4251,7 +6599,7 @@ fun Application.module() {
                         ?: return@get call.genericResponseNoPayload(HttpStatusCode.BadRequest, message = getResponse("13").message)
 
                     val availability = newSuspendedTransaction(Dispatchers.IO) {
-                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_READ))
+                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_READ, requireWorkshift = false))
                             return@newSuspendedTransaction null
 
                         buildStockBranchAvailabilityInsideTransaction(storeId, goodsItemId)
@@ -4374,10 +6722,12 @@ fun Application.module() {
                             it[StockBatchesV2.manufacturedAtMillis] = sourceBatchRow[StockBatchesV2.manufacturedAtMillis]
                             it[StockBatchesV2.expirationDateMillis] = sourceBatchRow[StockBatchesV2.expirationDateMillis]
                             it[StockBatchesV2.discounts] = sourceBatchRow[StockBatchesV2.discounts]
+                            it[StockBatchesV2.promotions] = sourceBatchRow[StockBatchesV2.promotions]
                             it[StockBatchesV2.shelfPosition] = sourceBatchRow[StockBatchesV2.shelfPosition]
                             it[StockBatchesV2.shelfPriority] = activePhysicalBatchRowsForGoodsItemInsideTransaction(destinationStoreId, destinationGoodsItemId).size
                             it[StockBatchesV2.status] = StockBatchStatusDataModel.Delivered.name
                             it[StockBatchesV2.additionalNotes] = request.note?.takeIf { note -> note.isNotBlank() }
+                            it[StockBatchesV2.additionalNotesLocalized] = request.note?.takeIf { note -> note.isNotBlank() }?.let { note -> listOf(LocalizedStringDataModel("main", note)) } ?: emptyList()
                             it[StockBatchesV2.createdAtMillis] = now
                             it[StockBatchesV2.updatedAtMillis] = now
                             it[StockBatchesV2.createdByUserId] = userId
@@ -4448,7 +6798,7 @@ fun Application.module() {
                         val result = mutableListOf<GoodsBatchDataModel>()
                         val now = System.currentTimeMillis()
 
-                        for (body in bodies) {
+                        batchAddLoop@ for (body in bodies) {
                             val storeId = runCatching { UUID.fromString(body.storeId) }.getOrNull()
                                 ?: return@newSuspendedTransaction null
 
@@ -4471,7 +6821,28 @@ fun Application.module() {
                             if (!itemExists)
                                 return@newSuspendedTransaction null
 
-                            val id = UUID.randomUUID()
+                            val requestedBatchId = body.id
+                                .trim()
+                                .takeIf { it.isNotBlank() }
+                                ?.let { rawId -> runCatching { UUID.fromString(rawId) }.getOrNull() }
+
+                            if (requestedBatchId != null) {
+                                val existingRow = StockBatchesV2
+                                    .selectAll()
+                                    .where { StockBatchesV2.id eq requestedBatchId }
+                                    .singleOrNull()
+
+                                if (existingRow != null) {
+                                    if (existingRow[StockBatchesV2.storeId] != storeId || existingRow[StockBatchesV2.goodsItemId] != goodsItemId) {
+                                        return@newSuspendedTransaction null
+                                    }
+
+                                    result += existingRow.toGoodsBatchDataModel()
+                                    continue@batchAddLoop
+                                }
+                            }
+
+                            val id = requestedBatchId ?: UUID.randomUUID()
 
                             StockBatchesV2.insert {
                                 it[StockBatchesV2.id] = id
@@ -4494,12 +6865,14 @@ fun Application.module() {
                                 it[StockBatchesV2.expirationDateMillis] = body.expirationDateMillis
 
                                 it[StockBatchesV2.discounts] = body.discounts
+                                it[StockBatchesV2.promotions] = body.promotions.sanitizedStockPromotions()
 
                                 it[StockBatchesV2.shelfPosition] = body.shelfPosition
                                 it[StockBatchesV2.shelfPriority] = body.shelfPriority
 
                                 it[StockBatchesV2.status] = body.status.name
                                 it[StockBatchesV2.additionalNotes] = body.additionalNotes
+                                it[StockBatchesV2.additionalNotesLocalized] = body.additionalNotesLocalized
 
                                 it[StockBatchesV2.createdAtMillis] = now
                                 it[StockBatchesV2.updatedAtMillis] = now
@@ -4535,11 +6908,31 @@ fun Application.module() {
                                 }
                             }
 
+                            val logText = stockBatchOperationLogTextInsideTransaction(
+                                action = OPERATION_LOG_ACTION_CREATED,
+                                batchId = id,
+                                goodsItemId = goodsItemId,
+                                batch = body.copy(id = id.toString())
+                            )
+
+                            insertOperationLogInsideTransaction(
+                                actorUserId = userId,
+                                storeId = storeId,
+                                action = OPERATION_LOG_ACTION_CREATED,
+                                entityType = OPERATION_LOG_ENTITY_STOCK_BATCH,
+                                entityId = id.toString(),
+                                title = logText.title,
+                                details = logText.details,
+                                metadata = logText.metadata,
+                                now = now
+                            )
+
                             result += body.copy(
                                 id = id.toString(),
                                 userId = userId.toString(),
                                 storeId = storeId.toString(),
                                 deliveredAtMillis = body.deliveredAtMillis ?: now,
+                                promotions = body.promotions.sanitizedStockPromotions(),
                                 createdAtMillis = now,
                                 updatedAtMillis = now,
                                 createdByUserId = userId.toString(),
@@ -4580,14 +6973,52 @@ fun Application.module() {
                             if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_WRITE, requireWorkshift = true))
                                 return@newSuspendedTransaction null
 
-                            val affected = StockBatchesV2.update({
+                            val nextSupplierId = body.supplierId
+                                ?.trim()
+                                ?.takeIf { it.isNotBlank() }
+                                ?.let { rawId -> runCatching { UUID.fromString(rawId) }.getOrNull() }
+                            val nextSupplierOrderId = body.supplierOrderId
+                                ?.trim()
+                                ?.takeIf { it.isNotBlank() }
+                                ?.let { rawId -> runCatching { UUID.fromString(rawId) }.getOrNull() }
+                            val sanitizedPromotions = body.promotions.sanitizedStockPromotions()
+
+                            val previousBatchRow = StockBatchesV2
+                                .selectAll()
+                                .where {
+                                    (StockBatchesV2.id eq id) and
+                                            (StockBatchesV2.storeId eq storeId)
+                                }
+                                .singleOrNull()
+                                ?: return@newSuspendedTransaction null
+
+                            val meaningfulBatchContentChanged =
+                                previousBatchRow[StockBatchesV2.goodsItemId] != goodsItemId ||
+                                        previousBatchRow[StockBatchesV2.supplierId] != nextSupplierId ||
+                                        previousBatchRow[StockBatchesV2.supplierOrderId] != nextSupplierOrderId ||
+                                        previousBatchRow[StockBatchesV2.quantity] != body.quantity ||
+                                        previousBatchRow[StockBatchesV2.supplyPrice] != body.supplyPrice ||
+                                        previousBatchRow[StockBatchesV2.salePriceOverride] != body.salePriceOverride ||
+                                        previousBatchRow[StockBatchesV2.returnPriceOverride] != body.returnPriceOverride ||
+                                        previousBatchRow[StockBatchesV2.wholesalePriceOverride] != body.wholesalePriceOverride ||
+                                        previousBatchRow[StockBatchesV2.deliveredAtMillis] != body.deliveredAtMillis ||
+                                        previousBatchRow[StockBatchesV2.manufacturedAtMillis] != body.manufacturedAtMillis ||
+                                        previousBatchRow[StockBatchesV2.expirationDateMillis] != body.expirationDateMillis ||
+                                        previousBatchRow[StockBatchesV2.discounts] != body.discounts ||
+                                        previousBatchRow[StockBatchesV2.promotions] != sanitizedPromotions ||
+                                        previousBatchRow[StockBatchesV2.status] != body.status.name ||
+                                        previousBatchRow[StockBatchesV2.additionalNotes] != body.additionalNotes ||
+                                        previousBatchRow[StockBatchesV2.additionalNotesLocalized] != body.additionalNotesLocalized ||
+                                        previousBatchRow[StockBatchesV2.isActive] != body.isActive
+
+                            StockBatchesV2.update({
                                 (StockBatchesV2.id eq id) and
                                         (StockBatchesV2.storeId eq storeId)
                             }) {
                                 it[StockBatchesV2.goodsItemId] = goodsItemId
 
-                                it[StockBatchesV2.supplierId] = body.supplierId?.let(UUID::fromString)
-                                it[StockBatchesV2.supplierOrderId] = body.supplierOrderId?.let(UUID::fromString)
+                                it[StockBatchesV2.supplierId] = nextSupplierId
+                                it[StockBatchesV2.supplierOrderId] = nextSupplierOrderId
 
                                 it[StockBatchesV2.quantity] = body.quantity
 
@@ -4601,19 +7032,18 @@ fun Application.module() {
                                 it[StockBatchesV2.expirationDateMillis] = body.expirationDateMillis
 
                                 it[StockBatchesV2.discounts] = body.discounts
+                                it[StockBatchesV2.promotions] = sanitizedPromotions
 
                                 it[StockBatchesV2.shelfPosition] = body.shelfPosition
                                 it[StockBatchesV2.shelfPriority] = body.shelfPriority
 
                                 it[StockBatchesV2.status] = body.status.name
                                 it[StockBatchesV2.additionalNotes] = body.additionalNotes
+                                it[StockBatchesV2.additionalNotesLocalized] = body.additionalNotesLocalized
 
                                 it[StockBatchesV2.updatedAtMillis] = now
                                 it[StockBatchesV2.isActive] = body.isActive
                             }
-
-                            if (affected <= 0)
-                                return@newSuspendedTransaction null
 
                             body.supplierId?.let { rawSupplierId ->
                                 val supplierId = runCatching { UUID.fromString(rawSupplierId) }.getOrNull()
@@ -4630,9 +7060,31 @@ fun Application.module() {
                                 }
                             }
 
+                            if (meaningfulBatchContentChanged) {
+                                val logText = stockBatchOperationLogTextInsideTransaction(
+                                    action = OPERATION_LOG_ACTION_UPDATED,
+                                    batchId = id,
+                                    goodsItemId = goodsItemId,
+                                    batch = body.copy(id = id.toString())
+                                )
+
+                                insertOperationLogInsideTransaction(
+                                    actorUserId = userId,
+                                    storeId = storeId,
+                                    action = OPERATION_LOG_ACTION_UPDATED,
+                                    entityType = OPERATION_LOG_ENTITY_STOCK_BATCH,
+                                    entityId = id.toString(),
+                                    title = logText.title,
+                                    details = logText.details,
+                                    metadata = logText.metadata,
+                                    now = now
+                                )
+                            }
+
                             result += body.copy(
                                 userId = userId.toString(),
                                 storeId = storeId.toString(),
+                                promotions = body.promotions.sanitizedStockPromotions(),
                                 updatedAtMillis = now
                             )
                         }
@@ -5200,7 +7652,17 @@ fun Application.module() {
                         if (!ownsStore) {
                             1
                         } else {
-                            Stores.deleteWhere { Stores.parentStoreId eq (id as UUID?) }
+                            val branchIds = Stores
+                                .select(Stores.id)
+                                .where { Stores.parentStoreId eq (id as UUID?) }
+                                .map { it[Stores.id] }
+                            val storeIdsToDelete = listOf(id) + branchIds
+
+                            hardDeleteStoreOwnedDataInsideTransaction(storeIdsToDelete)
+
+                            if (branchIds.isNotEmpty()) {
+                                Stores.deleteWhere { Stores.id inList branchIds }
+                            }
                             if (Stores.deleteWhere { Stores.id eq id } > 0) 0 else 1
                         }
                     }
@@ -5344,6 +7806,352 @@ fun Application.module() {
                     } else {
                         call.respond(UnauthorizedResponse())
                     }
+                }
+            }
+        }
+
+        route("/supplierOrders") {
+            authenticate("auth-jwt") {
+                get("/get") {
+                    val userId = call.checkPrincipal() ?: return@get
+                    val storeId = call.headerUuid("store_id")
+                    val supplierId = call.headerUuid("supplier_id")
+
+                    val result = newSuspendedTransaction(Dispatchers.IO) {
+                        val accessibleSupplierIds = if (storeId == null && supplierId == null) {
+                            Suppliers
+                                .select(Suppliers.id, Suppliers.userIds)
+                                .where { Suppliers.isActive eq true }
+                                .mapNotNull { row ->
+                                    row[Suppliers.id].takeIf { decodeSupplierStringList(row[Suppliers.userIds]).contains(userId.toString()) }
+                                }
+                        } else {
+                            emptyList()
+                        }
+
+                        if (storeId != null && !userHasStoreAccessInsideTransaction(userId, storeId)) return@newSuspendedTransaction null
+                        if (supplierId != null && !userHasSupplierAccessInsideTransaction(userId, supplierId)) return@newSuspendedTransaction null
+                        if (storeId == null && supplierId == null && accessibleSupplierIds.isEmpty()) return@newSuspendedTransaction null
+
+                        var orderFilter: Op<Boolean> = SupplierOrders.isActive eq true
+                        storeId?.let { orderFilter = orderFilter and (SupplierOrders.storeId eq it) }
+                        supplierId?.let { orderFilter = orderFilter and (SupplierOrders.supplierId eq it) }
+                        if (storeId == null && supplierId == null) {
+                            orderFilter = orderFilter and (SupplierOrders.supplierId inList accessibleSupplierIds)
+                        }
+
+                        val orders = SupplierOrders
+                            .selectAll()
+                            .where { orderFilter }
+                            .map { it.toSupplierOrderDataModel() }
+                            .sortedByDescending { it.updatedAtMillis.takeIf { value -> value > 0L } ?: it.orderedAtMillis }
+
+                        val orderIds = orders.mapNotNull { runCatching { UUID.fromString(it.id) }.getOrNull() }
+                        val lines = if (orderIds.isEmpty()) {
+                            emptyList()
+                        } else {
+                            SupplierOrderLines
+                                .selectAll()
+                                .where { (SupplierOrderLines.orderId inList orderIds) and (SupplierOrderLines.isActive eq true) }
+                                .map { it.toSupplierOrderLineDataModel() }
+                        }
+
+                        orders.map { order ->
+                            SupplierOrderWithLinesDataModel(
+                                order = order,
+                                lines = lines.filter { it.orderId == order.id }
+                            )
+                        }
+                    }
+
+                    result?.let {
+                        call.genericListResponse(
+                            status = HttpStatusCode.OK,
+                            payload = it,
+                            message = simpleMessage(
+                                main = "Supplier orders loaded",
+                                ru = "Заказы поставщикам загружены",
+                                kk = "Жеткізуші тапсырыстары жүктелді"
+                            )
+                        )
+                    } ?: call.respond(UnauthorizedResponse())
+                }
+
+                post("/add") {
+                    val userId = call.checkPrincipal() ?: return@post
+                    val body = call.receive<SupplierOrderWithLinesDataModel>()
+
+                    val result = newSuspendedTransaction(Dispatchers.IO) {
+                        val storeId = runCatching { UUID.fromString(body.order.storeId) }.getOrNull()
+                            ?: return@newSuspendedTransaction null
+                        val supplierId = runCatching { UUID.fromString(body.order.supplierId) }.getOrNull()
+                            ?: return@newSuspendedTransaction null
+
+                        if (!userHasStoreAccessInsideTransaction(userId, storeId)) return@newSuspendedTransaction null
+                        if (Suppliers.select(Suppliers.id).where { (Suppliers.id eq supplierId) and (Suppliers.isActive eq true) }.empty()) return@newSuspendedTransaction null
+
+                        val now = System.currentTimeMillis()
+                        val orderId = UUID.randomUUID()
+                        val cleanOrder = body.order.cleanForStorage(userId, storeId, supplierId, now)
+
+                        SupplierOrders.insert {
+                            it.setSupplierOrderColumns(orderId, cleanOrder, userId, storeId, supplierId)
+                        }
+
+                        body.lines
+                            .mapNotNull { line ->
+                                val goodsItemId = runCatching { UUID.fromString(line.goodsItemId) }.getOrNull()
+                                    ?: return@mapNotNull null
+                                val itemBelongsToStore = StockItems
+                                    .select(StockItems.id)
+                                    .where { (StockItems.id eq goodsItemId) and (StockItems.storeId eq storeId) and (StockItems.isActive eq true) }
+                                    .empty()
+                                    .not()
+                                if (!itemBelongsToStore) return@mapNotNull null
+                                line.cleanForStorage(orderId) to goodsItemId
+                            }
+                            .filter { (line, _) -> line.requestedQuantity.total > 0.0 }
+                            .forEach { (line, goodsItemId) ->
+                                val lineId = UUID.randomUUID()
+                                SupplierOrderLines.insert {
+                                    it.setSupplierOrderLineColumns(lineId, line, orderId, goodsItemId)
+                                }
+                            }
+
+                        supplierOrderWithLinesInsideTransaction(orderId)
+                    }
+
+                    result?.let {
+                        call.genericResponse(
+                            status = HttpStatusCode.Created,
+                            payload = it,
+                            message = simpleMessage(
+                                main = "Supplier order created",
+                                ru = "Заказ поставщику создан",
+                                kk = "Жеткізушіге тапсырыс жасалды"
+                            )
+                        )
+                    } ?: call.genericResponseNoPayload(
+                        HttpStatusCode.BadRequest,
+                        simpleMessage(
+                            main = "Cannot create supplier order",
+                            ru = "Не удалось создать заказ поставщику",
+                            kk = "Жеткізушіге тапсырыс жасау мүмкін болмады"
+                        )
+                    )
+                }
+
+                put("/update") {
+                    val userId = call.checkPrincipal() ?: return@put
+                    val body = call.receive<SupplierOrderWithLinesDataModel>()
+
+                    val result = newSuspendedTransaction(Dispatchers.IO) {
+                        val orderId = runCatching { UUID.fromString(body.order.id) }.getOrNull()
+                            ?: return@newSuspendedTransaction null
+                        val existing = SupplierOrders.selectAll().where { SupplierOrders.id eq orderId }.singleOrNull()
+                            ?: return@newSuspendedTransaction null
+                        val storeId = existing[SupplierOrders.storeId]
+                        val supplierId = existing[SupplierOrders.supplierId]
+                        val canEditFromStore = userHasStoreAccessInsideTransaction(userId, storeId)
+                        val canEditFromSupplier = userHasSupplierAccessInsideTransaction(userId, supplierId)
+                        if (!canEditFromStore && !canEditFromSupplier) return@newSuspendedTransaction null
+
+                        val now = System.currentTimeMillis()
+                        val cleanOrder = body.order.cleanForStorage(existing[SupplierOrders.userId], storeId, supplierId, now)
+                        SupplierOrders.update({ SupplierOrders.id eq orderId }) {
+                            it.setSupplierOrderUpdateColumns(cleanOrder)
+                        }
+
+                        val requestedLineIds = body.lines.mapNotNull { runCatching { UUID.fromString(it.id) }.getOrNull() }.toSet()
+                        SupplierOrderLines
+                            .select(SupplierOrderLines.id)
+                            .where { SupplierOrderLines.orderId eq orderId }
+                            .map { it[SupplierOrderLines.id] }
+                            .filter { it !in requestedLineIds }
+                            .forEach { obsoleteLineId ->
+                                SupplierOrderLines.update({ SupplierOrderLines.id eq obsoleteLineId }) { it[SupplierOrderLines.isActive] = false }
+                            }
+
+                        body.lines
+                            .mapNotNull { line ->
+                                val goodsItemId = runCatching { UUID.fromString(line.goodsItemId) }.getOrNull()
+                                    ?: return@mapNotNull null
+                                val itemBelongsToStore = StockItems
+                                    .select(StockItems.id)
+                                    .where { (StockItems.id eq goodsItemId) and (StockItems.storeId eq storeId) and (StockItems.isActive eq true) }
+                                    .empty()
+                                    .not()
+                                if (!itemBelongsToStore) return@mapNotNull null
+                                line.cleanForStorage(orderId) to goodsItemId
+                            }
+                            .filter { (line, _) -> line.requestedQuantity.total > 0.0 }
+                            .forEach { (line, goodsItemId) ->
+                                val lineId = runCatching { UUID.fromString(line.id) }.getOrNull() ?: UUID.randomUUID()
+                                val exists = SupplierOrderLines.select(SupplierOrderLines.id).where { SupplierOrderLines.id eq lineId }.empty().not()
+                                if (exists) {
+                                    SupplierOrderLines.update({ SupplierOrderLines.id eq lineId }) {
+                                        it.setSupplierOrderLineUpdateColumns(line.copy(isActive = true))
+                                    }
+                                } else {
+                                    SupplierOrderLines.insert {
+                                        it.setSupplierOrderLineColumns(lineId, line.copy(isActive = true), orderId, goodsItemId)
+                                    }
+                                }
+                            }
+
+                        supplierOrderWithLinesInsideTransaction(orderId)
+                    }
+
+                    result?.let {
+                        call.genericResponse(
+                            status = HttpStatusCode.OK,
+                            payload = it,
+                            message = simpleMessage(
+                                main = "Supplier order updated",
+                                ru = "Заказ поставщику обновлён",
+                                kk = "Жеткізуші тапсырысы жаңартылды"
+                            )
+                        )
+                    } ?: call.respond(UnauthorizedResponse())
+                }
+
+                delete("/delete") {
+                    val userId = call.checkPrincipal() ?: return@delete
+                    val orderId = runCatching { UUID.fromString(call.receive<String>().trim()) }.getOrNull()
+                        ?: return@delete call.respond(UnauthorizedResponse())
+
+                    val deleted = newSuspendedTransaction(Dispatchers.IO) {
+                        val existing = SupplierOrders.selectAll().where { SupplierOrders.id eq orderId }.singleOrNull()
+                            ?: return@newSuspendedTransaction false
+                        if (!userHasStoreAccessInsideTransaction(userId, existing[SupplierOrders.storeId])) return@newSuspendedTransaction false
+                        SupplierOrders.update({ SupplierOrders.id eq orderId }) {
+                            it[SupplierOrders.status] = SupplierOrderStatusDataModel.Cancelled.name
+                            it[SupplierOrders.isActive] = false
+                            it[SupplierOrders.updatedAtMillis] = System.currentTimeMillis()
+                        } > 0
+                    }
+
+                    if (deleted) {
+                        call.genericResponse(
+                            status = HttpStatusCode.OK,
+                            payload = orderId.toString(),
+                            message = simpleMessage(
+                                main = "Supplier order cancelled",
+                                ru = "Заказ поставщику отменён",
+                                kk = "Жеткізуші тапсырысы тоқтатылды"
+                            )
+                        )
+                    } else {
+                        call.respond(UnauthorizedResponse())
+                    }
+                }
+
+                post("/receive") {
+                    val userId = call.checkPrincipal() ?: return@post
+                    val request = call.receive<ReceiveSupplierOrderRequestDataModel>()
+
+                    val result = newSuspendedTransaction(Dispatchers.IO) {
+                        val orderId = runCatching { UUID.fromString(request.orderId) }.getOrNull()
+                            ?: return@newSuspendedTransaction null
+                        val orderRow = SupplierOrders.selectAll().where { SupplierOrders.id eq orderId }.singleOrNull()
+                            ?: return@newSuspendedTransaction null
+                        val storeId = orderRow[SupplierOrders.storeId]
+                        val supplierId = orderRow[SupplierOrders.supplierId]
+                        if (!userHasStoreAccessInsideTransaction(userId, storeId)) return@newSuspendedTransaction null
+
+                        val now = System.currentTimeMillis()
+                        request.receivedLines.forEach { received ->
+                            val lineId = runCatching { UUID.fromString(received.orderLineId) }.getOrNull() ?: return@forEach
+                            val lineRow = SupplierOrderLines
+                                .selectAll()
+                                .where { (SupplierOrderLines.id eq lineId) and (SupplierOrderLines.orderId eq orderId) and (SupplierOrderLines.isActive eq true) }
+                                .singleOrNull()
+                                ?: return@forEach
+                            val goodsItemId = runCatching { UUID.fromString(received.goodsItemId) }.getOrNull() ?: lineRow[SupplierOrderLines.goodsItemId]
+                            val itemRow = StockItems
+                                .selectAll()
+                                .where { (StockItems.id eq goodsItemId) and (StockItems.storeId eq storeId) and (StockItems.isActive eq true) }
+                                .singleOrNull()
+                                ?: return@forEach
+                            val quantity = received.receivedQuantity.copy(total = received.receivedQuantity.total.coerceAtLeast(0.0))
+                            if (quantity.total <= 0.0) return@forEach
+
+                            val batchId = UUID.randomUUID()
+                            val shelfPriority = StockBatchesV2
+                                .select(StockBatchesV2.id)
+                                .where { (StockBatchesV2.goodsItemId eq goodsItemId) and (StockBatchesV2.storeId eq storeId) and (StockBatchesV2.isActive eq true) }
+                                .count()
+                                .toInt()
+
+                            StockBatchesV2.insert {
+                                it[StockBatchesV2.id] = batchId
+                                it[StockBatchesV2.goodsItemId] = goodsItemId
+                                it[StockBatchesV2.userId] = userId
+                                it[StockBatchesV2.storeId] = storeId
+                                it[StockBatchesV2.supplierId] = supplierId
+                                it[StockBatchesV2.supplierOrderId] = orderId
+                                it[StockBatchesV2.quantity] = quantity
+                                it[StockBatchesV2.supplyPrice] = received.actualSupplyPrice.copy(supplierId = supplierId.toString())
+                                it[StockBatchesV2.salePriceOverride] = null
+                                it[StockBatchesV2.returnPriceOverride] = null
+                                it[StockBatchesV2.wholesalePriceOverride] = null
+                                it[StockBatchesV2.deliveredAtMillis] = now
+                                it[StockBatchesV2.manufacturedAtMillis] = received.manufacturedAtMillis
+                                it[StockBatchesV2.expirationDateMillis] = received.expirationDateMillis
+                                it[StockBatchesV2.discounts] = received.discounts
+                                it[StockBatchesV2.promotions] = received.promotions.sanitizedStockPromotions()
+                                it[StockBatchesV2.shelfPosition] = (shelfPriority + 1).toString()
+                                it[StockBatchesV2.shelfPriority] = shelfPriority
+                                it[StockBatchesV2.status] = StockBatchStatusDataModel.Delivered.name
+                                it[StockBatchesV2.additionalNotes] = received.notes?.takeIf { note -> note.isNotBlank() }
+                                it[StockBatchesV2.additionalNotesLocalized] = received.notesLocalized
+                                    .map { note -> note.copy(language = note.language.trim(), value = note.value.trim()) }
+                                    .filter { note -> note.language.isNotBlank() && note.value.isNotBlank() }
+                                    .distinctBy { note -> note.language }
+                                it[StockBatchesV2.createdAtMillis] = now
+                                it[StockBatchesV2.updatedAtMillis] = now
+                                it[StockBatchesV2.createdByUserId] = userId
+                                it[StockBatchesV2.isActive] = true
+                            }
+
+                            val deliveredBatchIds = (lineRow[SupplierOrderLines.deliveredBatchIds] + batchId.toString()).distinct()
+                            SupplierOrderLines.update({ SupplierOrderLines.id eq lineId }) {
+                                it[SupplierOrderLines.deliveredBatchIds] = deliveredBatchIds
+                            }
+                        }
+
+                        val activeLines = SupplierOrderLines
+                            .selectAll()
+                            .where { (SupplierOrderLines.orderId eq orderId) and (SupplierOrderLines.isActive eq true) }
+                            .map { it.toSupplierOrderLineDataModel() }
+                        val fullyDelivered = activeLines.isNotEmpty() && activeLines.all { it.deliveredBatchIds.isNotEmpty() }
+                        SupplierOrders.update({ SupplierOrders.id eq orderId }) {
+                            it[SupplierOrders.status] = if (fullyDelivered) SupplierOrderStatusDataModel.Delivered.name else SupplierOrderStatusDataModel.PartiallyDelivered.name
+                            it[SupplierOrders.deliveredAtMillis] = if (fullyDelivered) now else null
+                            it[SupplierOrders.updatedAtMillis] = now
+                        }
+
+                        supplierOrderWithLinesInsideTransaction(orderId)
+                    }
+
+                    result?.let {
+                        call.genericResponse(
+                            status = HttpStatusCode.OK,
+                            payload = it,
+                            message = simpleMessage(
+                                main = "Supplier order received",
+                                ru = "Заказ поставщика принят",
+                                kk = "Жеткізуші тапсырысы қабылданды"
+                            )
+                        )
+                    } ?: call.genericResponseNoPayload(
+                        HttpStatusCode.BadRequest,
+                        simpleMessage(
+                            main = "Cannot receive supplier order",
+                            ru = "Не удалось принять заказ поставщика",
+                            kk = "Жеткізуші тапсырысын қабылдау мүмкін болмады"
+                        )
+                    )
                 }
             }
         }
@@ -5701,24 +8509,48 @@ fun Application.module() {
                             }
                             .limit(1)
                             .singleOrNull()
+                            ?.toUserAccountDataModel()
                     } ?: return@get call.respond(UnauthorizedResponse())
 
                     call.genericResponse(
                         HttpStatusCode.OK,
-                        UserAccountDataModel(
-                            id = user[Users.id].toString(),
-                            publicId = user[Users.publicId],
-                            phoneNumber = user[Users.phoneNumber],
-                            email = user[Users.email],
-                            firstName = user[Users.firstName],
-                            lastName = user[Users.lastName],
-                            countryLocale = user[Users.countryLocale],
-                            workerAccountIds = user[Users.workerIds],
-                            supplierAccountIds = user[Users.supplierIds],
-                            activeStoreId = user[Users.activeStoreId]?.toString(),
-                            createdAt = user[Users.createdAt].toEpochMilli(),
-                            isActive = user[Users.isActive]
-                        )
+                        user
+                    )
+                }
+
+                put("/preferences/update") {
+                    val uuid = call.checkPrincipal() ?: return@put
+                    val body = call.receive<UserPreferencesDataModel>()
+                    val language = normalizeAppLanguagePreference(body.appLanguage)
+                    val themeId = normalizeAppThemePreference(body.appThemeId)
+                    val sizeModeId = normalizeAppSizeModePreference(body.appSizeModeId)
+
+                    val updatedUser = newSuspendedTransaction(Dispatchers.IO) {
+                        val existing = Users
+                            .selectAll()
+                            .where { Users.id eq uuid }
+                            .forUpdate()
+                            .limit(1)
+                            .singleOrNull() ?: return@newSuspendedTransaction null
+
+                        Users.update({ Users.id eq uuid }) {
+                            if (existing[Users.appLanguage] != language) it[Users.appLanguage] = language
+                            if (existing[Users.appThemeId] != themeId) it[Users.appThemeId] = themeId
+                            if (existing[Users.appSizeModeId] != sizeModeId) it[Users.appSizeModeId] = sizeModeId
+                        }
+
+                        Users
+                            .selectAll()
+                            .where { Users.id eq uuid }
+                            .limit(1)
+                            .singleOrNull()
+                            ?.toUserAccountDataModel()
+                    } ?: return@put call.respond(UnauthorizedResponse())
+
+                    call.genericResponse(
+                        HttpStatusCode.OK,
+                        updatedUser,
+                        message = getResponse("9").message
                     )
                 }
 
@@ -5798,6 +8630,19 @@ fun Application.module() {
                             if (existingUser[Users.countryLocale] != countryLocale)
                                 it[Users.countryLocale] = countryLocale
 
+                            val appLanguage = normalizeAppLanguagePreference(newAccount.appLanguage)
+                            val appThemeId = normalizeAppThemePreference(newAccount.appThemeId)
+                            val appSizeModeId = normalizeAppSizeModePreference(newAccount.appSizeModeId)
+
+                            if (existingUser[Users.appLanguage] != appLanguage)
+                                it[Users.appLanguage] = appLanguage
+
+                            if (existingUser[Users.appThemeId] != appThemeId)
+                                it[Users.appThemeId] = appThemeId
+
+                            if (existingUser[Users.appSizeModeId] != appSizeModeId)
+                                it[Users.appSizeModeId] = appSizeModeId
+
                             newHash?.run {
                                 it[Users.passwordHash] = this
                             }
@@ -5810,11 +8655,22 @@ fun Application.module() {
                     }
 
                     when (updated) {
-                        "ok" -> call.genericResponse(
-                            HttpStatusCode.OK,
-                            payload = body.account,
-                            message = getResponse("9").message
-                        )
+                        "ok" -> {
+                            val refreshed = newSuspendedTransaction(Dispatchers.IO) {
+                                Users
+                                    .selectAll()
+                                    .where { Users.id eq uuid }
+                                    .limit(1)
+                                    .singleOrNull()
+                                    ?.toUserAccountDataModel()
+                            }
+
+                            call.genericResponse(
+                                HttpStatusCode.OK,
+                                payload = refreshed ?: body.account,
+                                message = getResponse("9").message
+                            )
+                        }
 
                         "unauthorized", "password_mismatch" -> call.respond(UnauthorizedResponse())
 
@@ -6057,7 +8913,7 @@ fun Application.module() {
                         if (!userHasStoreAccessInsideTransaction(userId, storeId))
                             return@newSuspendedTransaction null
 
-                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_CASH_REGISTER_VIEW))
+                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_CASH_REGISTER_VIEW, requireWorkshift = false))
                             return@newSuspendedTransaction null
 
                         cashRegisterStateInsideTransaction(storeId)
@@ -6157,7 +9013,7 @@ fun Application.module() {
                     val storeId = call.headerUuid("store_id") ?: return@get call.respond(UnauthorizedResponse())
 
                     val result = newSuspendedTransaction(Dispatchers.IO) {
-                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_WORKERS_VIEW))
+                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_WORKERS_VIEW, requireWorkshift = false))
                             return@newSuspendedTransaction null
 
                         StoreWorkerMemberships
@@ -6272,6 +9128,13 @@ fun Application.module() {
                             it[StoreWorkerRequests.updatedAt] = Instant.now()
                         }
 
+                        notifyEmploymentRequestCreatedInsideTransaction(
+                            requesterUserId = userId,
+                            storeId = storeId,
+                            requestId = requestId,
+                            nowMillis = now
+                        )
+
                         StoreWorkerRequests
                             .innerJoin(Stores, { StoreWorkerRequests.storeId }, { Stores.id })
                             .innerJoin(Users, { StoreWorkerRequests.requesterUserId }, { Users.id })
@@ -6281,8 +9144,10 @@ fun Application.module() {
                             .toStoreWorkerRequestDataModel()
                     }
 
-                    request?.let { call.genericResponse(HttpStatusCode.Created, payload = it, message = getResponse("55").message) }
-                        ?: call.genericResponseNoPayload(HttpStatusCode.Conflict, failureMessage ?: getResponse("3").message)
+                    request?.let {
+                        publishWorkerRealtimeBundle(it.storeId, "employment_request_created")
+                        call.genericResponse(HttpStatusCode.Created, payload = it, message = getResponse("55").message)
+                    } ?: call.genericResponseNoPayload(HttpStatusCode.Conflict, failureMessage ?: getResponse("3").message)
                 }
 
                 post("/invite") {
@@ -6360,6 +9225,14 @@ fun Application.module() {
                             it[StoreWorkerRequests.updatedAt] = Instant.now()
                         }
 
+                        notifyEmploymentInviteCreatedInsideTransaction(
+                            invitedUserId = invitedUserId,
+                            inviterUserId = userId,
+                            storeId = storeId,
+                            requestId = requestId,
+                            nowMillis = now
+                        )
+
                         StoreWorkerRequests
                             .innerJoin(Stores, { StoreWorkerRequests.storeId }, { Stores.id })
                             .innerJoin(Users, { StoreWorkerRequests.requesterUserId }, { Users.id })
@@ -6369,8 +9242,10 @@ fun Application.module() {
                             .toStoreWorkerRequestDataModel()
                     }
 
-                    request?.let { call.genericResponse(HttpStatusCode.Created, payload = it, message = getResponse("65").message) }
-                        ?: call.genericResponseNoPayload(HttpStatusCode.Conflict, failureMessage ?: getResponse("3").message)
+                    request?.let {
+                        publishWorkerRealtimeBundle(it.storeId, "employment_invite_created")
+                        call.genericResponse(HttpStatusCode.Created, payload = it, message = getResponse("65").message)
+                    } ?: call.genericResponseNoPayload(HttpStatusCode.Conflict, failureMessage ?: getResponse("3").message)
                 }
 
                 post("/invitations/accept") {
@@ -6397,7 +9272,7 @@ fun Application.module() {
                         }
 
                         val storeId = requestRow[StoreWorkerRequests.storeId]
-                        val accepterUserId = requestRow[StoreWorkerRequests.invitedByUserId] ?: userId
+                        val accepterUserId = userId
                         val existing = StoreWorkerMemberships
                             .selectAll()
                             .where { (StoreWorkerMemberships.storeId eq storeId) and (StoreWorkerMemberships.userId eq userId) and (StoreWorkerMemberships.isActive eq true) }
@@ -6443,6 +9318,16 @@ fun Application.module() {
                             it[StoreWorkerRequests.updatedAt] = Instant.now()
                         }
 
+                        notifyEmploymentDecisionInsideTransaction(
+                            requestId = requestId,
+                            storeId = storeId,
+                            workerUserId = userId,
+                            actorUserId = userId,
+                            accepted = true,
+                            direction = WORKER_REQUEST_DIRECTION_STORE_TO_USER,
+                            nowMillis = now
+                        )
+
                         StoreWorkerMemberships
                             .innerJoin(Stores, { StoreWorkerMemberships.storeId }, { Stores.id })
                             .innerJoin(Users, { StoreWorkerMemberships.userId }, { Users.id })
@@ -6452,8 +9337,10 @@ fun Application.module() {
                             .toStoreWorkerDataModel()
                     }
 
-                    worker?.let { call.genericResponse(HttpStatusCode.OK, payload = it, message = getResponse("66").message) }
-                        ?: call.genericResponseNoPayload(HttpStatusCode.Conflict, failureMessage ?: getResponse("3").message)
+                    worker?.let {
+                        publishWorkerRealtimeBundle(it.storeId, "employment_invitation_accepted")
+                        call.genericResponse(HttpStatusCode.OK, payload = it, message = getResponse("66").message)
+                    } ?: call.genericResponseNoPayload(HttpStatusCode.Conflict, failureMessage ?: getResponse("3").message)
                 }
 
                 post("/invitations/decline") {
@@ -6483,17 +9370,30 @@ fun Application.module() {
                             return@newSuspendedTransaction null
                         }
 
-                        StoreWorkerRequests
+                        val requestRow = StoreWorkerRequests
                             .innerJoin(Stores, { StoreWorkerRequests.storeId }, { Stores.id })
                             .innerJoin(Users, { StoreWorkerRequests.requesterUserId }, { Users.id })
                             .selectAll()
                             .where { StoreWorkerRequests.id eq requestId }
                             .single()
-                            .toStoreWorkerRequestDataModel()
+
+                        notifyEmploymentDecisionInsideTransaction(
+                            requestId = requestId,
+                            storeId = requestRow[StoreWorkerRequests.storeId],
+                            workerUserId = userId,
+                            actorUserId = userId,
+                            accepted = false,
+                            direction = WORKER_REQUEST_DIRECTION_STORE_TO_USER,
+                            nowMillis = now
+                        )
+
+                        requestRow.toStoreWorkerRequestDataModel()
                     }
 
-                    request?.let { call.genericResponse(HttpStatusCode.OK, payload = it, message = getResponse("67").message) }
-                        ?: call.genericResponseNoPayload(HttpStatusCode.Conflict, failureMessage ?: getResponse("3").message)
+                    request?.let {
+                        publishWorkerRealtimeBundle(it.storeId, "employment_invitation_declined")
+                        call.genericResponse(HttpStatusCode.OK, payload = it, message = getResponse("67").message)
+                    } ?: call.genericResponseNoPayload(HttpStatusCode.Conflict, failureMessage ?: getResponse("3").message)
                 }
 
                 post("/accept") {
@@ -6572,6 +9472,16 @@ fun Application.module() {
                             it[StoreWorkerRequests.updatedAt] = Instant.now()
                         }
 
+                        notifyEmploymentDecisionInsideTransaction(
+                            requestId = requestId,
+                            storeId = storeId,
+                            workerUserId = workerUserId,
+                            actorUserId = userId,
+                            accepted = true,
+                            direction = WORKER_REQUEST_DIRECTION_USER_TO_STORE,
+                            nowMillis = now
+                        )
+
                         StoreWorkerMemberships
                             .innerJoin(Stores, { StoreWorkerMemberships.storeId }, { Stores.id })
                             .innerJoin(Users, { StoreWorkerMemberships.userId }, { Users.id })
@@ -6581,8 +9491,10 @@ fun Application.module() {
                             .toStoreWorkerDataModel()
                     }
 
-                    worker?.let { call.genericResponse(HttpStatusCode.OK, payload = it, message = getResponse("56").message) }
-                        ?: call.genericResponseNoPayload(HttpStatusCode.Conflict, failureMessage ?: getResponse("3").message)
+                    worker?.let {
+                        publishWorkerRealtimeBundle(it.storeId, "employment_request_accepted")
+                        call.genericResponse(HttpStatusCode.OK, payload = it, message = getResponse("56").message)
+                    } ?: call.genericResponseNoPayload(HttpStatusCode.Conflict, failureMessage ?: getResponse("3").message)
                 }
 
                 post("/decline") {
@@ -6613,17 +9525,30 @@ fun Application.module() {
                             return@newSuspendedTransaction null
                         }
 
-                        StoreWorkerRequests
+                        val requestRow = StoreWorkerRequests
                             .innerJoin(Stores, { StoreWorkerRequests.storeId }, { Stores.id })
                             .innerJoin(Users, { StoreWorkerRequests.requesterUserId }, { Users.id })
                             .selectAll()
                             .where { StoreWorkerRequests.id eq requestId }
                             .single()
-                            .toStoreWorkerRequestDataModel()
+
+                        notifyEmploymentDecisionInsideTransaction(
+                            requestId = requestId,
+                            storeId = storeId,
+                            workerUserId = requestRow[StoreWorkerRequests.requesterUserId],
+                            actorUserId = userId,
+                            accepted = false,
+                            direction = WORKER_REQUEST_DIRECTION_USER_TO_STORE,
+                            nowMillis = now
+                        )
+
+                        requestRow.toStoreWorkerRequestDataModel()
                     }
 
-                    request?.let { call.genericResponse(HttpStatusCode.OK, payload = it, message = getResponse("57").message) }
-                        ?: call.genericResponseNoPayload(HttpStatusCode.Conflict, failureMessage ?: getResponse("3").message)
+                    request?.let {
+                        publishWorkerRealtimeBundle(it.storeId, "employment_request_declined")
+                        call.genericResponse(HttpStatusCode.OK, payload = it, message = getResponse("57").message)
+                    } ?: call.genericResponseNoPayload(HttpStatusCode.Conflict, failureMessage ?: getResponse("3").message)
                 }
 
                 post("/updatePermissions") {
@@ -6634,6 +9559,7 @@ fun Application.module() {
                         ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
                     val role = body.roleId.takeIf { it == WORKER_ROLE_ADMIN || it == WORKER_ROLE_STANDARD } ?: WORKER_ROLE_STANDARD
                     val permissions = cleanPermissionIds(body.permissions)
+                    val now = System.currentTimeMillis()
                     var failureMessage: List<LocalizedStringDataModel>? = null
 
                     val worker = newSuspendedTransaction(Dispatchers.IO) {
@@ -6654,17 +9580,27 @@ fun Application.module() {
                             return@newSuspendedTransaction null
                         }
 
-                        StoreWorkerMemberships
+                        val workerRow = StoreWorkerMemberships
                             .innerJoin(Stores, { StoreWorkerMemberships.storeId }, { Stores.id })
                             .innerJoin(Users, { StoreWorkerMemberships.userId }, { Users.id })
                             .selectAll()
                             .where { StoreWorkerMemberships.id eq workerId }
                             .single()
-                            .toStoreWorkerDataModel()
+
+                        notifyWorkerPermissionsUpdatedInsideTransaction(
+                            storeId = storeId,
+                            workerUserId = workerRow[StoreWorkerMemberships.userId],
+                            workerId = workerId,
+                            nowMillis = now
+                        )
+
+                        workerRow.toStoreWorkerDataModel()
                     }
 
-                    worker?.let { call.genericResponse(HttpStatusCode.OK, payload = it, message = getResponse("58").message) }
-                        ?: call.genericResponseNoPayload(HttpStatusCode.Conflict, failureMessage ?: getResponse("3").message)
+                    worker?.let {
+                        publishWorkerRealtimeBundle(it.storeId, "worker_permissions_updated")
+                        call.genericResponse(HttpStatusCode.OK, payload = it, message = getResponse("58").message)
+                    } ?: call.genericResponseNoPayload(HttpStatusCode.Conflict, failureMessage ?: getResponse("3").message)
                 }
             }
         }
@@ -6869,7 +9805,7 @@ fun Application.module() {
                     val scope = call.request.queryParameters["scope"].orEmpty().ifBlank { OPERATION_LOG_SCOPE_CURRENT }
 
                     val logs = newSuspendedTransaction(Dispatchers.IO) {
-                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_LOGS_VIEW))
+                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_LOGS_VIEW, requireWorkshift = false))
                             return@newSuspendedTransaction null
 
                         val storeIds = operationLogStoreIdsForScopeInsideTransaction(storeId, scope)
@@ -6893,6 +9829,68 @@ fun Application.module() {
             }
         }
 
+        route("/analytics") {
+            authenticate("auth-jwt") {
+                get("/store/get") {
+                    val userId = call.checkPrincipal() ?: return@get
+                    val storeId = runCatching { UUID.fromString(call.request.header("store_id")) }.getOrNull()
+                        ?: return@get call.respond(UnauthorizedResponse())
+                    val startMillis = call.request.queryParameters["startMillis"]?.toLongOrNull() ?: 0L
+                    val endMillisExclusive = call.request.queryParameters["endMillisExclusive"]?.toLongOrNull()
+                        ?: Long.MAX_VALUE
+
+                    val dashboard = newSuspendedTransaction(Dispatchers.IO) {
+                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_ANALYTICS_VIEW, requireWorkshift = false))
+                            return@newSuspendedTransaction null
+
+                        val transactions = Transactions
+                            .selectAll()
+                            .where {
+                                (Transactions.storeId eq storeId) and
+                                        (Transactions.timeMillis greaterEq startMillis) and
+                                        (Transactions.timeMillis less endMillisExclusive)
+                            }
+                            .orderBy(Transactions.timeMillis, SortOrder.DESC)
+                            .map {
+                                it.toTransactionDataModel()
+                            }
+
+                        val stock = StockItems
+                            .selectAll()
+                            .where { StockItems.storeId eq storeId }
+                            .map { it.toGoodsItemDataModel() }
+
+                        val batches = StockBatchesV2
+                            .selectAll()
+                            .where { StockBatchesV2.storeId eq storeId }
+                            .map { it.toGoodsBatchDataModel() }
+
+                        buildStoreAnalyticsDashboard(
+                            storeId = storeId.toString(),
+                            startMillis = startMillis,
+                            endMillisExclusive = endMillisExclusive,
+                            transactions = transactions,
+                            stock = stock,
+                            batches = batches,
+                            fallbackCurrencyCode = stock.asSequence()
+                                .flatMap { item -> (item.salePrices + item.supplyPrices + item.returnPrices + item.wholesalePrices).asSequence() }
+                                .map { it.currency }
+                                .firstOrNull { it.isNotBlank() }
+                                ?: batches.firstOrNull()?.supplyPrice?.currency.orEmpty()
+                        )
+                    }
+
+                    dashboard?.let {
+                        call.genericResponse(
+                            status = HttpStatusCode.OK,
+                            payload = it,
+                            message = getResponse("94").message
+                        )
+                    } ?: call.respond(UnauthorizedResponse())
+                }
+            }
+        }
+
         route("/transactions") {
             authenticate("auth-jwt") {
                 get("/get") {
@@ -6902,7 +9900,7 @@ fun Application.module() {
                     }.getOrNull() ?: return@get call.respond(UnauthorizedResponse())
 
                     val transactions = newSuspendedTransaction(Dispatchers.IO) {
-                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_TRANSACTION_HISTORY_VIEW))
+                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_TRANSACTION_HISTORY_VIEW, requireWorkshift = false))
                             return@newSuspendedTransaction null
 
                         Transactions
@@ -6910,20 +9908,7 @@ fun Application.module() {
                             .where { Transactions.storeId eq storeId }
                             .orderBy(Transactions.timeMillis, SortOrder.DESC)
                             .map {
-                                TransactionDataModel(
-                                    id = it[Transactions.id].toString(),
-                                    workshiftId = it[Transactions.workshiftId],
-                                    type = it[Transactions.type],
-                                    storeId = it[Transactions.storeId].toString(),
-                                    goodsInTransaction = it[Transactions.goodsInTransaction],
-                                    paidCash = it[Transactions.paidCash],
-                                    paidCard = it[Transactions.paidCard],
-                                    cardPaymentOptionId = it[Transactions.cardPaymentOptionId],
-                                    debtor = it[Transactions.debtor]?.let { raw ->
-                                        jsonBase.decodeFromString<DebtorDataModel>(raw)
-                                    },
-                                    timeMillis = it[Transactions.timeMillis]
-                                )
+                                it.toTransactionDataModel()
                             }
                     }
 
@@ -6938,6 +9923,7 @@ fun Application.module() {
                 post("/complete") {
                     val userId = call.checkPrincipal() ?: return@post
                     val body = call.receive<TransactionDataModel>()
+                    val requestClientOperationId = body.clientOperationId.trim().takeIf { it.isNotBlank() }
 
                     val storeId = runCatching {
                         UUID.fromString(body.storeId)
@@ -6948,6 +9934,14 @@ fun Application.module() {
                     val completed = newSuspendedTransaction(Dispatchers.IO) {
                         if (!userHasStoreAccessInsideTransaction(userId, storeId))
                             return@newSuspendedTransaction null
+
+                        requestClientOperationId?.let { operationId ->
+                            Transactions
+                                .selectAll()
+                                .where { (Transactions.clientOperationId eq operationId) and (Transactions.storeId eq storeId) }
+                                .singleOrNull()
+                                ?.let { return@newSuspendedTransaction it.toTransactionDataModel() }
+                        }
 
                         val requiredPermission = requiredPermissionForTransactionType(body.type)
                         if (requiredPermission != null && !userCanUseStoreActionInsideTransaction(userId, storeId, requiredPermission, requireWorkshift = true)) {
@@ -6983,6 +9977,11 @@ fun Application.module() {
                                     main = "Transaction price is not available",
                                     ru = "Цена для транзакции недоступна",
                                     kk = "Транзакция бағасы қолжетімсіз"
+                                )
+                                "promotion_restriction" -> simpleMessage(
+                                    main = "Promotion restriction is not satisfied",
+                                    ru = "Условие промо-периода не выполнено",
+                                    kk = "Промо-кезең шарты орындалмады"
                                 )
                                 else -> simpleMessage(
                                     main = "Not enough stock or item barcode was not found",
@@ -7055,6 +10054,7 @@ fun Application.module() {
                                 jsonBase.encodeToString(debtor)
                             }
                             it[Transactions.timeMillis] = timeMillis
+                            it[Transactions.clientOperationId] = requestClientOperationId
                         }
 
                         applyCashRegisterTransactionEventInsideTransaction(
@@ -7066,14 +10066,26 @@ fun Application.module() {
                             now = timeMillis
                         )
 
+                        val transactionTypeText = operationLogTransactionTypeHumanText(transactionToSave.type)
+
                         insertOperationLogInsideTransaction(
                             actorUserId = userId,
                             storeId = storeId,
                             action = OPERATION_LOG_ACTION_COMPLETED,
                             entityType = OPERATION_LOG_ENTITY_TRANSACTION,
                             entityId = id.toString(),
-                            title = simpleMessage("Transaction completed", ru = "Транзакция завершена", kk = "Транзакция аяқталды"),
-                            details = simpleMessage("${transactionToSave.type} • $transactionTotal", ru = "${transactionToSave.type} • $transactionTotal", kk = "${transactionToSave.type} • $transactionTotal"),
+                            title = simpleMessage(
+                                main = "${transactionTypeText.main} completed",
+                                en = "${transactionTypeText.en} completed",
+                                ru = "${transactionTypeText.ru} завершена",
+                                kk = "${transactionTypeText.kk} аяқталды"
+                            ),
+                            details = simpleMessage(
+                                main = "${transactionTypeText.main} • $transactionTotal",
+                                en = "${transactionTypeText.en} • $transactionTotal",
+                                ru = "${transactionTypeText.ru} • $transactionTotal",
+                                kk = "${transactionTypeText.kk} • $transactionTotal"
+                            ),
                             metadata = mapOf("type" to transactionToSave.type, "total" to transactionTotal.toString(), "cash" to transactionToSave.paidCash.toString(), "card" to transactionToSave.paidCard.toString()),
                             now = timeMillis
                         )

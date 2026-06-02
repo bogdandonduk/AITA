@@ -8,9 +8,15 @@ plugins {
 group = "kz.aita"
 version = "1.0.0"
 application {
-    mainClass.set("kz.aita.ServerKt")
+    mainClass.set("kz.aita.server.ServerKt")
 
-    applicationDefaultJvmArgs = listOf("-Dio.ktor.development=false")
+    applicationDefaultJvmArgs = listOf(
+        "-Dio.ktor.development=false",
+        "-Dfile.encoding=UTF-8",
+        "-Duser.timezone=UTC",
+        "-XX:+ExitOnOutOfMemoryError",
+        "-XX:MaxRAMPercentage=75.0"
+    )
 }
 
 dependencies {
@@ -66,6 +72,5 @@ dependencies {
     testImplementation(libs.ktor.serverTestHost)
     testImplementation(libs.kotlin.testJunit)
 
-    implementation(projects.shared)
 
 }

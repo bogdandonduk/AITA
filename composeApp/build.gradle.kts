@@ -1,3 +1,4 @@
+// THIS IS build.gradle of composeApp module
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
@@ -5,184 +6,196 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig
 
 plugins {
-  alias(libs.plugins.kotlinMultiplatform)
-  alias(libs.plugins.androidApplication)
-  alias(libs.plugins.composeMultiplatform)
-  alias(libs.plugins.composeCompiler)
-  alias(libs.plugins.composeHotReload)
-  alias(libs.plugins.hilt)
-  alias(libs.plugins.ksp)
+    alias(libs.plugins.kotlinMultiplatform)
+    alias(libs.plugins.androidApplication)
+    alias(libs.plugins.composeMultiplatform)
+    alias(libs.plugins.composeCompiler)
+    alias(libs.plugins.composeHotReload)
+    alias(libs.plugins.hilt)
+    alias(libs.plugins.ksp)
 }
 
 java {
-  toolchain { languageVersion.set(JavaLanguageVersion.of(21)) }
+    toolchain { languageVersion.set(JavaLanguageVersion.of(21)) }
 }
 
 kotlin {
-  androidTarget {
-    @OptIn(ExperimentalKotlinGradlePluginApi::class)
-    compilerOptions {
-      jvmTarget.set(JvmTarget.JVM_11)
-    }
-  }
-
-  listOf(
-    iosX64(),
-    iosArm64(),
-    iosSimulatorArm64()
-  ).forEach { iosTarget ->
-    iosTarget.binaries.framework {
-      baseName = "ComposeApp"
-      isStatic = true
-    }
-  }
-
-  jvm()
-
-  @OptIn(ExperimentalWasmDsl::class)
-  wasmJs {
-    outputModuleName.set("composeApp")
-    browser {
-      val rootDirPath = project.rootDir.path
-      val projectDirPath = project.projectDir.path
-      commonWebpackConfig {
-        outputFileName = "composeApp.js"
-        devServer = (devServer ?: KotlinWebpackConfig.DevServer()).apply {
-          static = (static ?: mutableListOf()).apply {
-            // Serve sources to debug inside browser
-            add(rootDirPath)
-            add(projectDirPath)
-          }
+    androidTarget {
+        @OptIn(ExperimentalKotlinGradlePluginApi::class)
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_11)
         }
-      }
     }
-    binaries.executable()
-  }
 
-  sourceSets {
-    androidMain.dependencies {
-      implementation(libs.androidx.datastore.preferences)
-
-      implementation(libs.sqlDelightAndroidDriver)
-
-      implementation(libs.androidx.core.ktx)
-
-      implementation(libs.hilt.android)
-
-      implementation(libs.kamel.fetcher.resources.android)
-      implementation(compose.preview)
-      implementation(libs.androidx.activity.compose)
+    listOf(
+        iosX64(),
+        iosArm64(),
+        iosSimulatorArm64()
+    ).forEach { iosTarget ->
+        iosTarget.binaries.framework {
+            baseName = "ComposeApp"
+            isStatic = true
+            linkerOpts.addAll(listOf("-framework", "AVFoundation", "-framework", "Speech"))
+        }
     }
-    commonMain.dependencies {
-      implementation(libs.kotlinx.datetime)
 
-      implementation(libs.kotlinx.serialization.json)
+    jvm()
+
+    @OptIn(ExperimentalWasmDsl::class)
+    wasmJs {
+        outputModuleName.set("composeApp")
+        browser {
+            val rootDirPath = project.rootDir.path
+            val projectDirPath = project.projectDir.path
+            commonWebpackConfig {
+                outputFileName = "composeApp.js"
+                devServer = (devServer ?: KotlinWebpackConfig.DevServer()).apply {
+                    static = (static ?: mutableListOf()).apply {
+                        // Serve sources to debug inside browser
+                        add(rootDirPath)
+                        add(projectDirPath)
+                    }
+                }
+            }
+        }
+        binaries.executable()
+    }
+
+    sourceSets {
+        androidMain.dependencies {
+            implementation(libs.androidx.datastore.preferences)
+
+            implementation(libs.sqlDelightAndroidDriver)
+
+            implementation(libs.androidx.core.ktx)
+
+            implementation(libs.hilt.android)
+
+            implementation(libs.kamel.fetcher.resources.android)
+            implementation(compose.preview)
+            implementation(libs.androidx.activity.compose)
+            implementation(libs.androidx.camera.core)
+            implementation(libs.androidx.camera.camera2)
+            implementation(libs.androidx.camera.lifecycle)
+            implementation(libs.androidx.camera.view)
+            implementation(libs.mlkit.barcode.scanning)
+        }
+        commonMain.dependencies {
+            implementation(libs.kotlinx.datetime)
+
+            implementation(libs.kotlinx.serialization.json)
 //            implementation(libs.kamel.image.default)
 
-      implementation(libs.kamel.image)
-      implementation("io.ktor:ktor-client-core:${property("ktor.version")}")
-      implementation("io.ktor:ktor-http:${property("ktor.version")}")
+            implementation(libs.kamel.image)
+            implementation("io.ktor:ktor-client-core:${property("ktor.version")}")
+            implementation("io.ktor:ktor-http:${property("ktor.version")}")
 //            implementation(libs.kamel.fetcher.ktor)
-      // Note: When using `kamel-image` a ktor engine is not included.
-      // To fetch remote images you also must ensure you add your own
-      // ktor engine for each target.
+            // Note: When using `kamel-image` a ktor engine is not included.
+            // To fetch remote images you also must ensure you add your own
+            // ktor engine for each target.
 
-      // optional modules (choose what you need and add them to your kamel config)
-      implementation(libs.kamel.decoder.image.bitmap)
+            // optional modules (choose what you need and add them to your kamel config)
+            implementation(libs.kamel.decoder.image.bitmap)
 //            implementation(libs.kamel.decoder.image.bitmap.resizing) // android only right now
-      implementation(libs.kamel.decoder.image.vector)
+            implementation(libs.kamel.decoder.image.vector)
 //            implementation(libs.kamel.decoder.svg.batik)
-      implementation(libs.kamel.decoder.svg.std)
+            implementation(libs.kamel.decoder.svg.std)
 //            implementation(libs.kamel.decoder.animated.image) // .gif support
 
-      implementation(compose.runtime)
-      implementation(compose.foundation)
-      implementation(compose.material3)
-      implementation(compose.ui)
-      implementation(compose.components.resources)
-      implementation(compose.components.uiToolingPreview)
-      implementation(libs.androidx.lifecycle.viewmodelCompose)
-      implementation(libs.androidx.lifecycle.runtimeCompose)
+            implementation(compose.runtime)
+            implementation(compose.foundation)
+            implementation(compose.material3)
+            implementation(compose.ui)
+            implementation(compose.components.resources)
+            implementation(compose.components.uiToolingPreview)
+            implementation(libs.androidx.lifecycle.viewmodelCompose)
+            implementation(libs.androidx.lifecycle.runtimeCompose)
 
-      implementation(projects.shared)
+            implementation(projects.shared)
 
+        }
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
+        }
+        iosMain.dependencies {
+            implementation(libs.kamel.fetcher.ktor)
+        }
+        wasmJsMain.dependencies {
+            implementation(libs.kotlinx.browser)
+        }
+        jvmMain.dependencies {
+            implementation(libs.java.keyring.v103)
+
+            implementation(libs.kamel.decoder.svg.batik)
+
+            implementation(libs.kamel.fetcher.resources.jvm)
+            implementation(compose.desktop.currentOs)
+            implementation(libs.kotlinx.coroutinesSwing)
+        }
     }
-    commonTest.dependencies {
-      implementation(libs.kotlin.test)
-    }
-    jvmMain.dependencies {
-      implementation(libs.java.keyring.v103)
-
-      implementation(libs.kamel.decoder.svg.batik)
-
-      implementation(libs.kamel.fetcher.resources.jvm)
-      implementation(compose.desktop.currentOs)
-      implementation(libs.kotlinx.coroutinesSwing)
-    }
-  }
 }
 
 dependencies {
-  add("kspAndroid", libs.hilt.android.compiler)
+    add("kspAndroid", libs.hilt.android.compiler)
 }
 
 android {
-  namespace = "kz.aita"
-  compileSdk = libs.versions.android.compileSdk.get().toInt()
+    namespace = "kz.aita"
+    compileSdk = libs.versions.android.compileSdk.get().toInt()
 
-  defaultConfig {
-    applicationId = "kz.aita"
-    minSdk = libs.versions.android.minSdk.get().toInt()
-    targetSdk = libs.versions.android.targetSdk.get().toInt()
-    versionCode = 1
-    versionName = "1.0"
-  }
-  packaging {
-    resources {
-      excludes += "/META-INF/{AL2.0,LGPL2.1}"
+    defaultConfig {
+        applicationId = "kz.aita"
+        minSdk = libs.versions.android.minSdk.get().toInt()
+        targetSdk = libs.versions.android.targetSdk.get().toInt()
+        versionCode = 1
+        versionName = "1.0"
     }
-  }
-  buildTypes {
-    getByName("release") {
-      isMinifyEnabled = false
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
     }
-  }
-  compileOptions {
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
-  }
+    buildTypes {
+        getByName("release") {
+            isMinifyEnabled = false
+        }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
 }
 
 dependencies {
-  debugImplementation(compose.uiTooling)
+    debugImplementation(compose.uiTooling)
 }
 
 compose.desktop {
-  application {
-    mainClass = "kz.aita.jvm.app.system.MainKt"
+    application {
+        mainClass = "kz.aita.jvm.app.system.MainKt"
 
-    nativeDistributions {
-      // Only the formats you need:
-      targetFormats(TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Dmg)
-      modules("java.sql", "java.logging", "java.xml", "jdk.crypto.ec")
-      // MSI requires a 3-part numeric version:
-      packageVersion = "1.0.0"
+        nativeDistributions {
+            // Only the formats you need:
+            targetFormats(TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Dmg)
+            modules("java.sql", "java.logging", "java.xml", "jdk.crypto.ec")
+            // MSI requires a 3-part numeric version:
+            packageVersion = "1.0.0"
 
-      // MSI metadata:
-      packageName = "AITA"
-      description = "AITA"
-      vendor = "AITA"
+            // MSI metadata:
+            packageName = "AITA"
+            description = "AITA"
+            vendor = "AITA"
 
-      // Windows-specific:
-      windows {
-        // Use a proper .ico; path must exist:
-        iconFile.set(project.file("src/jvmMain/resources/drawable/app_icon.ico"))
-        // Optional but nice:
-        console = true
-        // perUserInstall = true
-        // upgradeUuid = "YOUR-STABLE-GUID-HERE" // keep stable across releases
-      }
-    }
+            // Windows-specific:
+            windows {
+                // Use a proper .ico; path must exist:
+                iconFile.set(project.file("src/jvmMain/resources/drawable/app_icon.ico"))
+                // Optional but nice:
+                console = true
+                // perUserInstall = true
+                // upgradeUuid = "YOUR-STABLE-GUID-HERE" // keep stable across releases
+            }
+        }
 
 //    nativeDistributions {
 //      targetFormats(TargetFormat.Exe, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Dmg)
@@ -202,23 +215,23 @@ compose.desktop {
 //        iconFile.set(project.file("src/jvmMain/resources/drawable/app_icon.png"))
 //      }
 //    }
-  }
+    }
 }
 
 afterEvaluate {
-  // Collect every generate*Resource* task in this module (debug/release/common/main)
-  val resourceGen = tasks.matching {
-    it.name.startsWith("generate") && it.name.contains("Resource")
-  }
-  // Also the common res class task used by compose-resources
-  val composeRes = tasks.matching { it.name == "generateComposeResClass" }
-
-  // Apply to *all* Android KSP tasks (debug/release, etc.)
-  tasks.matching { it.name.startsWith("ksp") && it.name.endsWith("KotlinAndroid") }
-    .configureEach {
-      dependsOn(resourceGen)
-      dependsOn(composeRes)
-      mustRunAfter(resourceGen)
-      mustRunAfter(composeRes)
+    // Collect every generate*Resource* task in this module (debug/release/common/main)
+    val resourceGen = tasks.matching {
+        it.name.startsWith("generate") && it.name.contains("Resource")
     }
+    // Also the common res class task used by compose-resources
+    val composeRes = tasks.matching { it.name == "generateComposeResClass" }
+
+    // Apply to *all* Android KSP tasks (debug/release, etc.)
+    tasks.matching { it.name.startsWith("ksp") && it.name.endsWith("KotlinAndroid") }
+        .configureEach {
+            dependsOn(resourceGen)
+            dependsOn(composeRes)
+            mustRunAfter(resourceGen)
+            mustRunAfter(composeRes)
+        }
 }

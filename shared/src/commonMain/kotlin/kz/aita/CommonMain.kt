@@ -62,6 +62,45 @@ data class BatchDiscountDataModel(
     val isActive: Boolean = true
 )
 
+const val STOCK_PROMOTION_TYPE_DISCOUNT = "discount"
+const val STOCK_PROMOTION_TYPE_SPECIAL_PRICE = "special_price"
+const val STOCK_PROMOTION_TYPE_RESTRICTION = "restriction"
+const val STOCK_PROMOTION_MODE_PERCENT = "percent"
+const val STOCK_PROMOTION_MODE_FIXED = "fixed"
+const val STOCK_PROMOTION_MODE_PRICE = "price"
+
+const val USER_ROLE_STORE_OWNER = "store_owner"
+const val USER_ROLE_STORE_WORKER = "store_worker"
+const val USER_ROLE_SUPPLIER = "supplier"
+const val USER_ROLE_MANUFACTURER = "manufacturer"
+const val USER_ROLE_BUYER = "buyer"
+
+@kotlinx.serialization.Serializable
+data class StockPromotionDataModel(
+    val id: String = "",
+    val title: List<LocalizedStringDataModel> = emptyList(),
+    val type: String = STOCK_PROMOTION_TYPE_DISCOUNT, // discount, special_price, restriction
+    val mode: String = STOCK_PROMOTION_MODE_PERCENT, // percent, fixed, price
+    val value: String = "0",
+    val transactionTypeIndices: List<Int> = listOf(0), // 0 sale, 1 return, 2 supply; empty = all
+    val minQuantity: Double? = null,
+    val startsAtMillis: Long? = null,
+    val endsAtMillis: Long? = null,
+    val note: String? = null,
+    val noteLocalized: List<LocalizedStringDataModel> = emptyList(),
+    val isActive: Boolean = true
+)
+
+@kotlinx.serialization.Serializable
+data class PromotedPriceDataModel(
+    val originalPrice: PriceDataModel,
+    val finalPrice: PriceDataModel,
+    val promotion: StockPromotionDataModel? = null
+) {
+    val hasPriceChange: Boolean
+        get() = promotion != null && finalPrice.price.toMoneyDouble() + 0.000001 < originalPrice.price.toMoneyDouble()
+}
+
 const val AITA_CURRENCY_PREFIX = "AITA"
 const val PAYMENT_PROVIDER_KASPI_INVOICE = "kaspi_invoice"
 const val PAYMENT_PROVIDER_MANUAL_DEVELOPMENT = "manual_development"
@@ -78,6 +117,26 @@ const val SUBSCRIPTION_STATUS_PAST_DUE = "past_due"
 const val SUBSCRIPTION_STATUS_CANCELLED = "cancelled"
 const val SUBSCRIPTION_PERIOD_MONTH = "month"
 const val SUBSCRIPTION_PERIOD_YEAR = "year"
+
+const val DEFAULT_APP_LANGUAGE = "ru"
+const val DEFAULT_APP_THEME_ID = 0L
+const val DEFAULT_APP_SIZE_MODE_ID = 0L
+
+fun normalizeAppLanguagePreference(language: String?): String {
+    val value = language?.trim()?.lowercase().orEmpty()
+    return when (value) {
+        "system", "en", "ru", "kk" -> value
+        else -> DEFAULT_APP_LANGUAGE
+    }
+}
+
+fun normalizeAppThemePreference(themeId: Long?): Long {
+    return if (themeId == 1L) 1L else DEFAULT_APP_THEME_ID
+}
+
+fun normalizeAppSizeModePreference(sizeModeId: Long?): Long {
+    return if (sizeModeId == 1L) 1L else DEFAULT_APP_SIZE_MODE_ID
+}
 
 @kotlinx.serialization.Serializable
 data class PagingRequestDataModel(
@@ -262,59 +321,27 @@ data class StoreSubscriptionPlanDataModel(
 
 fun defaultStoreSubscriptionPlans(): List<StoreSubscriptionPlanDataModel> = listOf(
     StoreSubscriptionPlanDataModel(
-        id = "starter_monthly_kzt",
+        id = "standard_monthly_kzt",
         name = listOf(
-            LocalizedStringDataModel("main", "Starter"),
-            LocalizedStringDataModel("en", "Starter"),
-            LocalizedStringDataModel("ru", "Старт"),
-            LocalizedStringDataModel("kk", "Бастау")
+            LocalizedStringDataModel("main", "Standard"),
+            LocalizedStringDataModel("en", "Standard"),
+            LocalizedStringDataModel("ru", "Стандартный"),
+            LocalizedStringDataModel("kk", "Стандартты")
         ),
         description = listOf(
-            LocalizedStringDataModel("main", "Small store, one branch, basic analytics"),
-            LocalizedStringDataModel("ru", "Небольшой магазин, один филиал, базовая аналитика"),
-            LocalizedStringDataModel("kk", "Шағын дүкен, бір филиал, негізгі аналитика")
+            LocalizedStringDataModel("main", "3 branches, 21 workers, 1000 stock items"),
+            LocalizedStringDataModel("en", "3 branches, 21 workers, 1000 stock items"),
+            LocalizedStringDataModel("ru", "3 филиала, 21 сотрудник, 1000 товаров на складе"),
+            LocalizedStringDataModel("kk", "3 филиал, 21 қызметкер, қоймада 1000 тауар")
         ),
-        priceMinor = 499000L,
-        maxBranches = 1,
-        maxWorkers = 3,
-        maxStockItems = 2000
-    ),
-    StoreSubscriptionPlanDataModel(
-        id = "business_monthly_kzt",
-        name = listOf(
-            LocalizedStringDataModel("main", "Business"),
-            LocalizedStringDataModel("en", "Business"),
-            LocalizedStringDataModel("ru", "Бизнес"),
-            LocalizedStringDataModel("kk", "Бизнес")
-        ),
-        description = listOf(
-            LocalizedStringDataModel("main", "Branches, workers, cash register, realtime sync"),
-            LocalizedStringDataModel("ru", "Филиалы, сотрудники, касса, онлайн-синхронизация"),
-            LocalizedStringDataModel("kk", "Филиалдар, қызметкерлер, касса, нақты уақыт синхрондауы")
-        ),
-        priceMinor = 1499000L,
-        maxBranches = 5,
-        maxWorkers = 20,
-        maxStockItems = 20000
-    ),
-    StoreSubscriptionPlanDataModel(
-        id = "business_yearly_kzt",
-        name = listOf(
-            LocalizedStringDataModel("main", "Business yearly"),
-            LocalizedStringDataModel("en", "Business yearly"),
-            LocalizedStringDataModel("ru", "Бизнес на год"),
-            LocalizedStringDataModel("kk", "Жылдық бизнес")
-        ),
-        description = listOf(
-            LocalizedStringDataModel("main", "Twelve months for the price of ten"),
-            LocalizedStringDataModel("ru", "Двенадцать месяцев по цене десяти"),
-            LocalizedStringDataModel("kk", "Он ай бағасына он екі ай")
-        ),
-        priceMinor = 14990000L,
-        periodUnit = SUBSCRIPTION_PERIOD_YEAR,
-        maxBranches = 5,
-        maxWorkers = 20,
-        maxStockItems = 20000
+        priceMinor = 799000L,
+        currencyCode = "KZT",
+        periodUnit = SUBSCRIPTION_PERIOD_MONTH,
+        periodCount = 1,
+        maxBranches = 3,
+        maxWorkers = 21,
+        maxStockItems = 1000,
+        isActive = true
     )
 )
 
@@ -396,9 +423,13 @@ enum class StockBatchStatusDataModel {
 enum class SupplierOrderStatusDataModel {
     Draft,
     Sent,
+    SeenBySupplier,
     Confirmed,
+    Packed,
+    InDelivery,
     PartiallyDelivered,
     Delivered,
+    IssueReported,
     Cancelled
 }
 
@@ -674,6 +705,7 @@ data class ReceiptTextLabelsDataModel(
 var saveReceiptPdfFile: (suspend (fileName: String, pdfBytes: ByteArray) -> ReceiptPlatformActionResult)? = null
 var shareReceiptPdfFile: (suspend (fileName: String, pdfBytes: ByteArray, whatsappOnly: Boolean) -> ReceiptPlatformActionResult)? = null
 var printReceiptEscPosBytes: (suspend (printerBytes: ByteArray) -> ReceiptPlatformActionResult)? = null
+var printReceiptPlatformAction: (suspend (fileName: String, pdfBytes: ByteArray, printerBytes: ByteArray) -> ReceiptPlatformActionResult)? = null
 
 suspend fun saveReceiptPdf(fileName: String, pdfBytes: ByteArray, labels: ReceiptTextLabelsDataModel = ReceiptTextLabelsDataModel()): ReceiptPlatformActionResult {
     return saveReceiptPdfFile?.invoke(fileName, pdfBytes)
@@ -687,6 +719,17 @@ suspend fun shareReceiptPdf(fileName: String, pdfBytes: ByteArray, whatsappOnly:
 
 suspend fun printReceiptEscPos(printerBytes: ByteArray, labels: ReceiptTextLabelsDataModel = ReceiptTextLabelsDataModel()): ReceiptPlatformActionResult {
     return printReceiptEscPosBytes?.invoke(printerBytes)
+        ?: ReceiptPlatformActionResult(false, labels.printerNotConfigured)
+}
+
+suspend fun printReceipt(
+    fileName: String,
+    pdfBytes: ByteArray,
+    printerBytes: ByteArray,
+    labels: ReceiptTextLabelsDataModel = ReceiptTextLabelsDataModel()
+): ReceiptPlatformActionResult {
+    return printReceiptPlatformAction?.invoke(fileName, pdfBytes, printerBytes)
+        ?: printReceiptEscPosBytes?.invoke(printerBytes)
         ?: ReceiptPlatformActionResult(false, labels.printerNotConfigured)
 }
 
@@ -726,6 +769,16 @@ private fun receiptQuantityText(quantity: QuantityDataModel, language: String): 
     val unit = receiptVisibleString(quantity.immutableUnitName, language, quantity.id.ifBlank { "unit" })
     return "$value $unit".trim()
 }
+
+fun String.asDisplayPhoneNumber(): String {
+    val clean = trim()
+    if (clean.isBlank()) return ""
+    if (clean.startsWith("+")) return clean
+    return "+${clean.trimStart('+')}"
+}
+
+fun Iterable<String>.asDisplayPhoneNumbers(): List<String> =
+    map { it.asDisplayPhoneNumber() }.filter { it.isNotBlank() }
 
 private fun receiptDateTimeText(timeMillis: Long): String {
     return runCatching {
@@ -774,7 +827,7 @@ fun TransactionReceiptSnapshotDataModel.buildReceiptPlainText(language: String, 
 
     builder.appendLine(storeName)
     store?.location?.name?.takeIf { it.isNotBlank() }?.let { builder.appendLine(it) }
-    store?.phoneNumbers?.takeIf { it.isNotEmpty() }?.let { builder.appendLine("${labels.phone}: ${it.joinToString()}") }
+    store?.phoneNumbers?.asDisplayPhoneNumbers()?.takeIf { it.isNotEmpty() }?.let { builder.appendLine("${labels.phone}: ${it.joinToString()}") }
     store?.emails?.takeIf { it.isNotEmpty() }?.let { builder.appendLine("${labels.email}: ${it.joinToString()}") }
     builder.appendLine("--------------------------------")
     builder.appendLine(labels.goodsReceiptTitle)
@@ -811,7 +864,7 @@ fun TransactionReceiptSnapshotDataModel.buildReceiptPlainText(language: String, 
             builder.appendLine("Type: ${debtor.debtorType}")
             debtor.idNumber.takeIf { it.isNotBlank() }?.let { builder.appendLine("ID number: $it") }
             debtor.companyIdNumber.takeIf { it.isNotBlank() }?.let { builder.appendLine("Company ID: $it") }
-            debtor.phoneNumber.takeIf { it.isNotBlank() }?.let { builder.appendLine("${labels.debtorPhone}: $it") }
+            debtor.phoneNumber.asDisplayPhoneNumber().takeIf { it.isNotBlank() }?.let { builder.appendLine("${labels.debtorPhone}: $it") }
             debtor.debtDueAtMillis?.let { builder.appendLine("Debt due at: ${receiptDateTimeText(it)}") }
             debtor.interest?.takeIf { it.enabled && it.ratePercent > 0.0 }?.let {
                 builder.appendLine("Interest: ${it.ratePercent}% per ${it.periodUnit}")
@@ -1080,7 +1133,7 @@ fun GoodsItemDataModel.isWholesaleEligible(quantityTotal: Double): Boolean {
     return hasWholesalePrice() && minimum > 0.0 && quantityTotal >= minimum
 }
 
-fun GoodsItemDataModel.priceForTransaction(
+fun GoodsItemDataModel.basePriceForTransaction(
     transactionTypeIndex: Int,
     saleMethodId: String = SALE_METHOD_RETAIL,
     quantityTotal: Double = 1.0,
@@ -1111,6 +1164,46 @@ fun GoodsItemDataModel.priceForTransaction(
         supplierId = ""
     )
 }
+
+fun GoodsItemDataModel.allPromotionsForBatch(batch: GoodsBatchDataModel?): List<StockPromotionDataModel> =
+    (promotions + batch?.promotions.orEmpty() + batch?.discounts.orEmpty().map { it.toStockPromotionDataModel() })
+        .sanitizedStockPromotions()
+
+fun GoodsItemDataModel.promotedPriceForTransaction(
+    transactionTypeIndex: Int,
+    saleMethodId: String = SALE_METHOD_RETAIL,
+    quantityTotal: Double = 1.0,
+    batch: GoodsBatchDataModel? = null,
+    nowMillis: Long = getCurrentTimeMillis()
+): PromotedPriceDataModel {
+    val base = basePriceForTransaction(transactionTypeIndex, saleMethodId, quantityTotal, batch)
+    return allPromotionsForBatch(batch).bestPromotedPrice(
+        originalPrice = base,
+        transactionTypeIndex = transactionTypeIndex,
+        quantityTotal = quantityTotal,
+        nowMillis = nowMillis
+    )
+}
+
+fun GoodsItemDataModel.firstViolatedPromotionRestriction(
+    transactionTypeIndex: Int,
+    quantityTotal: Double,
+    batch: GoodsBatchDataModel? = null,
+    nowMillis: Long = getCurrentTimeMillis()
+): StockPromotionDataModel? =
+    allPromotionsForBatch(batch).firstViolatedRestriction(transactionTypeIndex, quantityTotal, nowMillis)
+
+fun GoodsItemDataModel.priceForTransaction(
+    transactionTypeIndex: Int,
+    saleMethodId: String = SALE_METHOD_RETAIL,
+    quantityTotal: Double = 1.0,
+    batch: GoodsBatchDataModel? = null
+): PriceDataModel = promotedPriceForTransaction(
+    transactionTypeIndex = transactionTypeIndex,
+    saleMethodId = saleMethodId,
+    quantityTotal = quantityTotal,
+    batch = batch
+).finalPrice
 
 fun GoodsItemDataModel.defaultCartQuantity(
     configuration: GlobalAppConfigurationDataModel
@@ -1344,6 +1437,147 @@ fun String.toMoneyDouble(): Double {
         ?: 0.0
 }
 
+fun Double.toStockMoneyText(): String {
+    val fixed = roundMoney()
+    val whole = fixed.toLong()
+    val cents = kotlin.math.round((fixed - whole) * 100.0).toInt()
+    return if (cents == 0) {
+        whole.toString()
+    } else {
+        "${whole}.${cents.toString().padStart(2, '0')}"
+    }
+}
+
+fun PriceDataModel.withMoneyAmount(amount: Double): PriceDataModel =
+    copy(price = amount.coerceAtLeast(0.0).roundMoney().toStockMoneyText())
+
+fun BatchDiscountDataModel.toStockPromotionDataModel(): StockPromotionDataModel = StockPromotionDataModel(
+    id = id,
+    title = title,
+    type = STOCK_PROMOTION_TYPE_DISCOUNT,
+    mode = if (mode == STOCK_PROMOTION_MODE_FIXED) STOCK_PROMOTION_MODE_FIXED else STOCK_PROMOTION_MODE_PERCENT,
+    value = value,
+    transactionTypeIndices = listOf(0),
+    startsAtMillis = startsAtMillis,
+    endsAtMillis = endsAtMillis,
+    note = note,
+    noteLocalized = note?.takeIf { it.isNotBlank() }?.let { listOf(LocalizedStringDataModel("main", it)) } ?: emptyList(),
+    isActive = isActive
+)
+
+fun StockPromotionDataModel.normalized(): StockPromotionDataModel = copy(
+    id = id.ifBlank { buildString { append("promo_"); append(kotlin.random.Random.nextLong().toString().replace("-", "")) } },
+    title = title.filter { it.value.isNotBlank() },
+    type = when (type) {
+        STOCK_PROMOTION_TYPE_SPECIAL_PRICE, STOCK_PROMOTION_TYPE_RESTRICTION -> type
+        else -> STOCK_PROMOTION_TYPE_DISCOUNT
+    },
+    mode = when (mode) {
+        STOCK_PROMOTION_MODE_FIXED, STOCK_PROMOTION_MODE_PRICE -> mode
+        else -> STOCK_PROMOTION_MODE_PERCENT
+    },
+    value = value.trim().replace(',', '.').takeIf { it.toDoubleOrNull() != null } ?: "0",
+    transactionTypeIndices = transactionTypeIndices.filter { it in 0..2 }.distinct(),
+    minQuantity = minQuantity?.takeIf { it > 0.0 },
+    note = note?.trim()?.takeIf { it.isNotBlank() },
+    noteLocalized = noteLocalized
+        .map { it.copy(language = it.language.trim(), value = it.value.trim()) }
+        .filter { it.language.isNotBlank() && it.value.isNotBlank() }
+        .distinctBy { it.language }
+)
+
+fun List<StockPromotionDataModel>.sanitizedStockPromotions(): List<StockPromotionDataModel> =
+    map { it.normalized() }
+        .filter { promo ->
+            promo.isActive ||
+                    promo.title.isNotEmpty() ||
+                    promo.note?.isNotBlank() == true ||
+                    promo.noteLocalized.any { it.value.isNotBlank() } ||
+                    promo.value.toMoneyDouble() > 0.0 ||
+                    promo.minQuantity != null
+        }
+        .distinctBy { it.id }
+
+fun StockPromotionDataModel.isActiveAt(nowMillis: Long = getCurrentTimeMillis()): Boolean {
+    if (!isActive) return false
+    if (startsAtMillis != null && nowMillis < startsAtMillis) return false
+    if (endsAtMillis != null && nowMillis > endsAtMillis) return false
+    return true
+}
+
+fun StockPromotionDataModel.appliesToTransaction(
+    transactionTypeIndex: Int,
+    quantityTotal: Double,
+    nowMillis: Long = getCurrentTimeMillis()
+): Boolean {
+    if (!isActiveAt(nowMillis)) return false
+    if (transactionTypeIndices.isNotEmpty() && transactionTypeIndex !in transactionTypeIndices) return false
+    val minimum = minQuantity
+    if (type != STOCK_PROMOTION_TYPE_RESTRICTION && minimum != null && quantityTotal + 0.000001 < minimum) return false
+    return true
+}
+
+fun StockPromotionDataModel.violatesRestriction(
+    transactionTypeIndex: Int,
+    quantityTotal: Double,
+    nowMillis: Long = getCurrentTimeMillis()
+): Boolean {
+    if (type != STOCK_PROMOTION_TYPE_RESTRICTION) return false
+    if (!isActiveAt(nowMillis)) return false
+    if (transactionTypeIndices.isNotEmpty() && transactionTypeIndex !in transactionTypeIndices) return false
+    val minimum = minQuantity ?: return false
+    return quantityTotal + 0.000001 < minimum
+}
+
+fun List<StockPromotionDataModel>.firstViolatedRestriction(
+    transactionTypeIndex: Int,
+    quantityTotal: Double,
+    nowMillis: Long = getCurrentTimeMillis()
+): StockPromotionDataModel? =
+    firstOrNull { it.violatesRestriction(transactionTypeIndex, quantityTotal, nowMillis) }
+
+private fun StockPromotionDataModel.applyToPrice(price: PriceDataModel): PriceDataModel? {
+    if (type == STOCK_PROMOTION_TYPE_RESTRICTION) return null
+    val current = price.price.toMoneyDouble()
+    if (current < 0.0) return null
+
+    val rawValue = value.toMoneyDouble()
+    val promoted = when (type) {
+        STOCK_PROMOTION_TYPE_SPECIAL_PRICE -> rawValue
+        else -> when (mode) {
+            STOCK_PROMOTION_MODE_FIXED -> current - rawValue
+            STOCK_PROMOTION_MODE_PRICE -> rawValue
+            else -> current * (1.0 - rawValue.coerceIn(0.0, 100.0) / 100.0)
+        }
+    }.coerceAtLeast(0.0).roundMoney()
+
+    return price.withMoneyAmount(promoted)
+}
+
+fun List<StockPromotionDataModel>.bestPromotedPrice(
+    originalPrice: PriceDataModel,
+    transactionTypeIndex: Int,
+    quantityTotal: Double,
+    nowMillis: Long = getCurrentTimeMillis()
+): PromotedPriceDataModel {
+    val originalAmount = originalPrice.price.toMoneyDouble()
+    val best = asSequence()
+        .map { it.normalized() }
+        .filter { it.type != STOCK_PROMOTION_TYPE_RESTRICTION }
+        .filter { it.appliesToTransaction(transactionTypeIndex, quantityTotal, nowMillis) }
+        .mapNotNull { promo -> promo.applyToPrice(originalPrice)?.let { promo to it } }
+        .filter { (_, price) -> price.price.toMoneyDouble() + 0.000001 < originalAmount }
+        .minByOrNull { (_, price) -> price.price.toMoneyDouble() }
+
+    return best?.let { (promo, price) ->
+        PromotedPriceDataModel(
+            originalPrice = originalPrice,
+            finalPrice = price,
+            promotion = promo
+        )
+    } ?: PromotedPriceDataModel(originalPrice, originalPrice, null)
+}
+
 @kotlinx.serialization.Serializable
 data class ReceiveSupplierOrderRequestDataModel(
     val orderId: String,
@@ -1359,7 +1593,9 @@ data class ReceiveSupplierOrderLineDataModel(
     val expirationDateMillis: Long? = null,
     val manufacturedAtMillis: Long? = null,
     val discounts: List<BatchDiscountDataModel> = emptyList(),
-    val notes: String? = null
+    val promotions: List<StockPromotionDataModel> = emptyList(),
+    val notes: String? = null,
+    val notesLocalized: List<LocalizedStringDataModel> = emptyList()
 )
 
 fun changeCartQuantity(
@@ -2034,6 +2270,35 @@ fun getOperationLogs(
         }
 }
 
+fun getStoreAnalytics(
+    storeId: String,
+    startMillis: Long = 0L,
+    endMillisExclusive: Long = Long.MAX_VALUE,
+    onCompleted: ((DataState<StoreAnalyticsDashboardDataModel>) -> Unit)? = null
+) {
+    if (!getStoreAnalyticsMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getStoreAnalyticsMutex.withLock {
+                val response = networkRequest<StoreAnalyticsDashboardDataModel, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getStoreAnalyticsPath.first,
+                    headers = mapOf("store_id" to storeId),
+                    query = mapOf(
+                        "startMillis" to startMillis,
+                        "endMillisExclusive" to endMillisExclusive
+                    )
+                )
+
+                if (response.negative || response.payload == null) {
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    storeAnalyticsDashboardState.emit(DataState.Success(response.payload, response.message))
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
 fun currentUserOwnsStore(storeId: String?): Boolean {
     val cleanStoreId = storeId?.takeIf { it.isNotBlank() } ?: return false
     val currentUserId = userAccountState.payloadValue?.id.orEmpty()
@@ -2240,6 +2505,7 @@ fun completeTransaction(
     if (!completeTransactionMutex.isLocked)
         GlobalScope.launch(Dispatchers.ourIo) {
             completeTransactionMutex.withLock {
+                val transactionWithOperationId = transaction.withClientOperationId()
                 postInAppNotification(
                     localizedStringResourceMessage(
                         id = 224,
@@ -2254,10 +2520,30 @@ fun completeTransaction(
                 val response = networkRequest<TransactionDataModel, TransactionDataModel>(
                     method = HttpMethod.Post,
                     endpointUrl = globalAppConfigurationState.payloadValue.completeTransactionPath.first,
-                    body = transaction
+                    body = transactionWithOperationId
                 )
 
                 if (response.negative || response.payload == null) {
+                    if (response.transportFailure && localNetworkState.value.enabled) {
+                        val localCompleted = queueTransactionThroughLocalNetwork(transactionWithOperationId)
+                        if (localCompleted != null) {
+                            latestTransactionReceiptSnapshotState.emit(receiptSnapshot.copy(transaction = localCompleted))
+                            deleteCart(transactionTypeIndex, clientId)
+                            clearTransactionPaymentDraft(transactionTypeIndex, clientId)
+                            postInAppNotification(
+                                localNetworkMessage(
+                                    id = 733,
+                                    main = "Queued locally for cloud sync",
+                                    ru = "Сохранено локально для синхронизации",
+                                    kk = "Бұлтпен синхрондау үшін жергілікті сақталды"
+                                ),
+                                NotificationType.Positive
+                            )
+                            onCompleted?.invoke()
+                            return@withLock
+                        }
+                    }
+
                     postInAppNotification(response.message, NotificationType.Negative)
                     onCompleted?.invoke()
                     return@withLock
@@ -2274,7 +2560,7 @@ fun completeTransaction(
                         mutableListOf<TransactionDataModel>().apply {
                             transactionsState.payloadValue?.let { addAll(it) }
                             add(completed)
-                        },
+                        }.distinctBy { transactionItem -> transactionItem.clientOperationId.ifBlank { transactionItem.id } },
                         response.message
                     )
                 )
@@ -2387,6 +2673,20 @@ fun copyTextToClipboard(text: String, label: String = "AITA") {
 }
 
 expect var getSqlDelightDriver: (() -> SqlDriver?)?
+
+expect object LocalAitaLanTransport {
+    fun start(
+        deviceId: String,
+        tcpPort: Int,
+        discoveryPort: Int,
+        onMessage: suspend (message: String, senderHost: String) -> String
+    ): Boolean
+
+    fun stop()
+    fun broadcast(message: String, discoveryPort: Int)
+    suspend fun send(host: String, port: Int, message: String, timeoutMillis: Int = 2500): String?
+    fun localHostAddress(): String
+}
 
 val supplierGoodsPricesState =
     MutableDataStateFlow<List<SupplierGoodsPriceDataModel>>(GlobalScope)
@@ -2501,6 +2801,62 @@ fun getSupplierOrders(
         }
 }
 
+fun getSupplierOrdersForSupplier(
+    supplierId: String,
+    onCompleted: ((DataState<List<SupplierOrderWithLinesDataModel>>) -> Unit)? = null
+) {
+    if (!getSupplierOrdersMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getSupplierOrdersMutex.withLock {
+                val response = networkRequest<List<SupplierOrderWithLinesDataModel>, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getSupplierOrdersPath.first,
+                    headers = mapOf("supplier_id" to supplierId)
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    supplierOrdersState.emit(
+                        DataState.Success(response.payload.map { it.order }, response.message)
+                    )
+                    supplierOrderLinesState.emit(
+                        DataState.Success(response.payload.flatMap { it.lines }, response.message)
+                    )
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun getMySupplierSideOrders(
+    onCompleted: ((DataState<List<SupplierOrderWithLinesDataModel>>) -> Unit)? = null
+) {
+    if (!getSupplierOrdersMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getSupplierOrdersMutex.withLock {
+                val response = networkRequest<List<SupplierOrderWithLinesDataModel>, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getSupplierOrdersPath.first
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    supplierOrdersState.emit(
+                        DataState.Success(response.payload.map { it.order }, response.message)
+                    )
+                    supplierOrderLinesState.emit(
+                        DataState.Success(response.payload.flatMap { it.lines }, response.message)
+                    )
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
 fun addSupplierOrder(
     orderWithLines: SupplierOrderWithLinesDataModel,
     onCompleted: ((DataState<SupplierOrderWithLinesDataModel>) -> Unit)? = null
@@ -2534,6 +2890,117 @@ fun addSupplierOrder(
                         )
                     )
 
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun updateSupplierOrder(
+    orderWithLines: SupplierOrderWithLinesDataModel,
+    onCompleted: ((DataState<SupplierOrderWithLinesDataModel>) -> Unit)? = null
+) {
+    if (!updateSupplierOrderMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            updateSupplierOrderMutex.withLock {
+                val response = networkRequest<SupplierOrderWithLinesDataModel, SupplierOrderWithLinesDataModel>(
+                    method = HttpMethod.Put,
+                    endpointUrl = globalAppConfigurationState.payloadValue.updateSupplierOrderPath.first,
+                    body = orderWithLines
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    supplierOrdersState.emit(
+                        DataState.Success(
+                            supplierOrdersState.payloadValue.orEmpty().upsertById(response.payload.order),
+                            response.message
+                        )
+                    )
+                    supplierOrderLinesState.emit(
+                        DataState.Success(
+                            supplierOrderLinesState.payloadValue.orEmpty()
+                                .filterNot { line -> line.orderId == response.payload.order.id } + response.payload.lines,
+                            response.message
+                        )
+                    )
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun deleteSupplierOrder(
+    orderId: String,
+    onCompleted: ((DataState<String>) -> Unit)? = null
+) {
+    if (!deleteSupplierOrderMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            deleteSupplierOrderMutex.withLock {
+                val response = networkRequest<String, String>(
+                    method = HttpMethod.Delete,
+                    endpointUrl = globalAppConfigurationState.payloadValue.deleteSupplierOrdersPath.first,
+                    body = orderId
+                )
+
+                if (response.negative) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    supplierOrdersState.emit(
+                        DataState.Success(
+                            supplierOrdersState.payloadValue.orEmpty().filterNot { it.id == orderId },
+                            response.message
+                        )
+                    )
+                    supplierOrderLinesState.emit(
+                        DataState.Success(
+                            supplierOrderLinesState.payloadValue.orEmpty().filterNot { it.orderId == orderId },
+                            response.message
+                        )
+                    )
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(orderId, response.message))
+                }
+            }
+        }
+}
+
+fun receiveSupplierOrder(
+    request: ReceiveSupplierOrderRequestDataModel,
+    onCompleted: ((DataState<SupplierOrderWithLinesDataModel>) -> Unit)? = null
+) {
+    if (!receiveSupplierOrderMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            receiveSupplierOrderMutex.withLock {
+                val response = networkRequest<SupplierOrderWithLinesDataModel, ReceiveSupplierOrderRequestDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.receiveSupplierOrderPath.first,
+                    body = request
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    supplierOrdersState.emit(
+                        DataState.Success(
+                            supplierOrdersState.payloadValue.orEmpty().upsertById(response.payload.order),
+                            response.message
+                        )
+                    )
+                    supplierOrderLinesState.emit(
+                        DataState.Success(
+                            supplierOrderLinesState.payloadValue.orEmpty()
+                                .filterNot { line -> line.orderId == response.payload.order.id } + response.payload.lines,
+                            response.message
+                        )
+                    )
+                    response.payload.order.storeId.takeIf { it.isNotBlank() }?.let { getStockBatches(it) }
                     postInAppNotification(response.message, NotificationType.Positive)
                     onCompleted?.invoke(DataState.Success(response.payload, response.message))
                 }
@@ -2582,7 +3049,7 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
     initial = GlobalAppConfigurationDataModel(
         realtimeUpdatesPath = "rt/updates",
         appName = Pair("AITA", "0"),
-        serverUrl = Pair("http://172.20.10.2:8080", "1"),
+        serverUrl = Pair("http://172.22.101.116:8080", "1"),
         globalAppConfigurationPath = Pair("config/global", "2"),
         logInPath = Pair("auth/logIn", "3"),
         signUpPath = Pair("auth/signUp", "4"),
@@ -2593,6 +3060,7 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
         revokeOtherSecuritySessionsPath = Pair("security/sessions/revokeOthers", "46"),
         getUserPath = Pair("user/get", "7"),
         updateUserPath = Pair("user/update", "8"),
+        updateUserPreferencesPath = Pair("user/preferences/update", "95"),
         getStoresPath = Pair("stores/get", "9"),
         addStoresPath = Pair("stores/add", "10"),
         updateStoresPath = Pair("stores/update", "11"),
@@ -2652,6 +3120,13 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
         getSubscriptionPlansPath = Pair("subscriptions/plans", "80"),
         getStoreSubscriptionPath = Pair("subscriptions/store/get", "81"),
         updateStoreSubscriptionPath = Pair("subscriptions/store/update", "82"),
+        getSupportTicketsPath = Pair("support/tickets/get", "96"),
+        createSupportTicketPath = Pair("support/tickets/create", "97"),
+        closeSupportTicketPath = Pair("support/tickets/close", "98"),
+        reopenSupportTicketPath = Pair("support/tickets/reopen", "99"),
+        getSupportMessagesPath = Pair("support/messages/get", "100"),
+        sendSupportMessagePath = Pair("support/messages/send", "101"),
+        markSupportMessagesReadPath = Pair("support/messages/read", "102"),
         pagingDefaultPageSize = 40,
         pagingMaxPageSize = 200,
         paymentProviders = defaultPaymentProviders(),
@@ -2936,9 +3411,22 @@ val stringsState = MutableDataStateFlow<List<LocalizedStringGroupDataModel>>(Glo
 val dimensionsState = MutableDataStateFlow<List<StylizedDimensionGroupDataModel>>(GlobalScope)
 val colorsState = MutableDataStateFlow<List<StylizedColorGroupDataModel>>(GlobalScope)
 val drawablesState = MutableDataStateFlow<List<StylizedDrawablePathsGroupDataModel>>(GlobalScope)
-val appLanguageState = MutableStateFlow("system")
-val appThemeIdState = MutableStateFlow(0L)
-val appSizeModeIdState = MutableStateFlow(0L)
+val appLanguageState = MutableStateFlow(DEFAULT_APP_LANGUAGE)
+val appThemeIdState = MutableStateFlow(DEFAULT_APP_THEME_ID)
+val appSizeModeIdState = MutableStateFlow(DEFAULT_APP_SIZE_MODE_ID)
+
+data class AuthScreenPreferenceOverrideDataModel(
+    val appLanguage: String? = null,
+    val appThemeId: Long? = null,
+    val appSizeModeId: Long? = null,
+    val languageTouched: Boolean = false,
+    val themeTouched: Boolean = false,
+    val sizeModeTouched: Boolean = false
+) {
+    val touched: Boolean get() = languageTouched || themeTouched || sizeModeTouched
+}
+
+val authScreenPreferenceOverrideState = MutableStateFlow(AuthScreenPreferenceOverrideDataModel())
 val stringRawAuthenticationFailedState = MutableStateFlow(
     listOf(
         LocalizedStringDataModel("main", "Authentication failed"),
@@ -3048,7 +3536,7 @@ val stringConfirmationPasswordState = MutableStateFlow("Confirmation password")
 val stringRequiredToEditAccountState = MutableStateFlow("Required to edit account")
 val stringAccountSuccessfullyUpdatedState = MutableStateFlow("Account successfully updated")
 val stringLoggingOutState = MutableStateFlow("Logging out")
-val stringSessionTimeExpiredLoggingOutState = MutableStateFlow("Session expired")
+val stringSessionTimeExpiredLoggingOutState = MutableStateFlow("Cloud session needs refresh")
 val stringAliasState = MutableStateFlow("Alias")
 val stringDescriptionState = MutableStateFlow("Description")
 val stringEnterAliasState = MutableStateFlow("Enter alias")
@@ -3157,6 +3645,7 @@ val drawablePathIconUserAccountState = MutableStateFlow("svg/17_0.svg")
 val drawablePathIconGoodsCategoriesState = MutableStateFlow("svg/18_0.svg")
 val drawablePathIconStoresState = MutableStateFlow("svg/19_0.svg")
 val drawablePathIconTransactionHistoryState = MutableStateFlow("svg/20_0.svg")
+val drawablePathIconLogState = MutableStateFlow("svg/49_0.svg")
 val drawablePathIconAnalyticsState = MutableStateFlow("svg/21_0.svg")
 val drawablePathIconWorkersState = MutableStateFlow("svg/22_0.svg")
 val drawablePathIconSuppliersState = MutableStateFlow("svg/23_0.svg")
@@ -3164,11 +3653,14 @@ val drawablePathIconDebtorsState = MutableStateFlow("svg/24_0.svg")
 val drawablePathIconDevicesState = MutableStateFlow("svg/25_0.svg")
 val drawablePathIconAppLanguageState = MutableStateFlow("svg/26_0.svg")
 val drawablePathIconAppThemeState = MutableStateFlow("svg/27_0.svg")
+val drawablePathIconAppScaleState = MutableStateFlow("svg/48_0.svg")
 val drawablePathIconCheckState = MutableStateFlow("svg/28_0.svg")
 val drawablePathIconEditState = MutableStateFlow("svg/29_0.svg")
 val drawablePathIconSettingsState = MutableStateFlow("svg/30_0.svg")
 val drawablePathIconSearchState = MutableStateFlow("svg/31_0.svg")
 val drawablePathIconBarcodeCamScannerState = MutableStateFlow("svg/32_0.svg")
+val drawablePathIconBarcodeScannerState = MutableStateFlow("svg/51_0.svg")
+val drawablePathIconVoiceInputState = MutableStateFlow("svg/52_0.svg")
 val drawablePathIconDeleteState = MutableStateFlow("svg/33_0.svg")
 val drawablePathIconExitState = MutableStateFlow("svg/34_0.svg")
 val drawablePathIconSwitchState = MutableStateFlow("svg/35_0.svg")
@@ -3177,6 +3669,13 @@ val drawablePathIconAddCartState = MutableStateFlow("svg/37_0.svg")
 val drawablePathIconSubtractState = MutableStateFlow("svg/38_0.svg")
 val drawablePathIconReceiptState = MutableStateFlow("svg/39_0.svg")
 val drawablePathIconFinancesState = MutableStateFlow("svg/40_0.svg")
+val drawablePathIconClipboardState = MutableStateFlow("svg/41_0.svg")
+val drawablePathIconSupportState = MutableStateFlow("svg/42_0.svg")
+val drawablePathIconSubscriptionState = MutableStateFlow("svg/43_0.svg")
+val drawablePathIconThemeLightState = MutableStateFlow("svg/44_0.svg")
+val drawablePathIconThemeDarkState = MutableStateFlow("svg/45_0.svg")
+val drawablePathIconShareState = MutableStateFlow("svg/46_0.svg")
+val drawablePathIconWhatsAppState = MutableStateFlow("svg/47_0.svg")
 
 val getGlobalAppConfigurationMutex = Mutex()
 val getStringsMutex = Mutex()
@@ -3194,6 +3693,7 @@ val cacheSize = 4000L * 1024 * 1024
 val cacheMaxAgeSec = 30 * 24 * 3600
 
 val tokenRefreshMutex = Mutex()
+val activeNetworkOperationsState = MutableStateFlow(0)
 
 val appDatabase = AppDatabase(getSqlDelightDriver?.invoke()!!)
 
@@ -3263,9 +3763,9 @@ var httpClient =
                                         ResponseDataModel<TokenPair>(
                                             message = localizedStringResourceMessage(
                                                 id = 91,
-                                                main = "Session time expired. Logging out",
-                                                ru = "Время сеанса истекло. Выполняется выход",
-                                                kk = "Сеанс мерзімі аяқталды. Аккаунттан шығу орындалуда"
+                                                main = "Cloud session needs refresh. You remain signed in locally.",
+                                                ru = "Облачный сеанс нужно обновить. Вы остаётесь в аккаунте локально.",
+                                                kk = "Бұлттық сеансты жаңарту қажет. Сіз жергілікті түрде аккаунтта қаласыз."
                                             ),
                                             payload = null,
                                             negative = true,
@@ -3323,21 +3823,21 @@ var httpClient =
                                 }
 
                                 refreshResponse.transportFailure -> {
-                                    postInAppNotification(refreshResponse.message, NotificationType.Neutral)
+                                    // The persistent connection banner represents server outage; keep the user signed in locally.
                                     BearerTokens(current.accessToken, current.refreshToken)
                                 }
 
                                 else -> {
-                                    forceLogOutUser(
-                                        message = refreshResponse.message ?: localizedStringResourceMessage(
+                                    postInAppNotification(
+                                        refreshResponse.message ?: localizedStringResourceMessage(
                                             id = 91,
-                                            main = "Session time expired. Logging out",
-                                            ru = "Время сеанса истекло. Выполняется выход",
-                                            kk = "Сеанс мерзімі аяқталды. Аккаунттан шығу орындалуда"
+                                            main = "Cloud session needs refresh. You remain signed in locally.",
+                                            ru = "Облачный сеанс нужно обновить. Вы остаётесь в аккаунте локально.",
+                                            kk = "Бұлттық сеансты жаңарту қажет. Сіз жергілікті түрде аккаунтта қаласыз."
                                         ),
-                                        postMessage = true
+                                        NotificationType.Neutral
                                     )
-                                    null
+                                    BearerTokens(current.accessToken, current.refreshToken)
                                 }
                             }
                         }
@@ -3401,12 +3901,28 @@ val signUpInProgressState = MutableStateFlow(false)
 val logOutUserMutex = Mutex()
 val getUserAccountMutex = Mutex()
 val updateUserMutex = Mutex()
+val updateUserPreferencesMutex = Mutex()
 val latestInAppNotificationState = MutableStateFlow<NotificationDataModel?>(null)
 val activeInAppNotificationsState = MutableStateFlow<List<NotificationDataModel>>(emptyList())
 val notificationsState = MutableDataStateFlow<List<NotificationDataModel>>(GlobalScope)
 val getNotificationsMutex = Mutex()
 val saveNotificationMutex = Mutex()
 val markNotificationReadMutex = Mutex()
+val syncPendingNotificationsMutex = Mutex()
+private val notificationPopupJobs = mutableMapOf<String, Job>()
+private val notificationPopupMutex = Mutex()
+
+val supportTicketsState = MutableDataStateFlow<List<SupportTicketDataModel>>(GlobalScope)
+val supportMessagesState = MutableDataStateFlow<List<SupportMessageDataModel>>(GlobalScope)
+val activeSupportTicketIdState = MutableStateFlow<String?>(null)
+val supportMessageSendingState = MutableStateFlow(false)
+val getSupportTicketsMutex = Mutex()
+val createSupportTicketMutex = Mutex()
+val closeSupportTicketMutex = Mutex()
+val reopenSupportTicketMutex = Mutex()
+val getSupportMessagesMutex = Mutex()
+val sendSupportMessageMutex = Mutex()
+val markSupportMessagesReadMutex = Mutex()
 
 val cashRegisterExtractionsState =
     MutableDataStateFlow<List<CashRegisterExtractionEntryDataModel>>(GlobalScope)
@@ -3422,6 +3938,11 @@ val myWorkerRequestsState = MutableDataStateFlow<List<StoreWorkerRequestDataMode
 val activeWorkshiftState = MutableDataStateFlow<WorkshiftDataModel>(GlobalScope)
 val workshiftLoginInProgressState = MutableStateFlow(false)
 val operationLogsState = MutableDataStateFlow<List<OperationLogDataModel>>(GlobalScope)
+val localNetworkState = MutableStateFlow(LocalNetworkStateDataModel())
+val localNetworkDevicesState = MutableStateFlow<List<LocalNetworkDeviceDataModel>>(emptyList())
+val localNetworkQueuedOperationsState = MutableStateFlow<List<LocalNetworkQueuedOperationDataModel>>(emptyList())
+
+val storeAnalyticsDashboardState = MutableDataStateFlow<StoreAnalyticsDashboardDataModel>(GlobalScope)
 
 private val getCashRegisterMutex = Mutex()
 private val extractCashRegisterMutex = Mutex()
@@ -3437,6 +3958,7 @@ private val getCurrentWorkshiftMutex = Mutex()
 private val startWorkshiftMutex = Mutex()
 private val endWorkshiftMutex = Mutex()
 private val getOperationLogsMutex = Mutex()
+private val getStoreAnalyticsMutex = Mutex()
 
 
 
@@ -3526,22 +4048,62 @@ fun getGoodsCategories() {
 }
 
 fun List<LocalizedStringGroupDataModel>?.extractString(id: Long, language: String): String? {
-    return this
+    val values = this
         ?.find { it.id == id }
         ?.values
-        ?.extractLocalizedString(language)
+        ?: return null
+
+    return values.extractLocalizedString(language)
+        ?: values.extractLocalizedString("main")
+        ?: values.extractLocalizedString(DEFAULT_APP_LANGUAGE)
+        ?: values.extractLocalizedString("en")
+        ?: values.firstOrNull { it.value.isNotBlank() }?.value
 }
 
 fun List<StylizedDimensionGroupDataModel>.extractValue(id: Long, sizeModeId: Long): Float? {
-    return find { it.id == id }?.values?.find { it.sizeModeId == -1L || it.sizeModeId == sizeModeId }?.value
+    val normalizedSizeModeId = normalizeAppSizeModePreference(sizeModeId)
+    val values = find { it.id == id }?.values
+
+    return values?.firstOrNull { it.sizeModeId == normalizedSizeModeId }?.value
+        ?: values?.firstOrNull { it.sizeModeId == -1L }?.value
+        ?: values?.firstOrNull { it.sizeModeId == DEFAULT_APP_SIZE_MODE_ID }?.value
+        ?: values?.firstOrNull()?.value
+        ?: when (id) {
+            0L -> if (normalizedSizeModeId == 1L) 16f else 14f
+            1L -> if (normalizedSizeModeId == 1L) 23f else 20f
+            2L -> if (normalizedSizeModeId == 1L) 18f else 16f
+            3L -> if (normalizedSizeModeId == 1L) 14f else 12f
+            4L -> 600f
+            5L -> 1f
+            6L -> 0.5f
+            7L -> if (normalizedSizeModeId == 1L) 16f else 14f
+            8L -> if (normalizedSizeModeId == 1L) 28f else 24f
+            9L -> if (normalizedSizeModeId == 1L) 340f else 300f
+            10L -> if (normalizedSizeModeId == 1L) 2.75f else 2.6f
+            11L -> if (normalizedSizeModeId == 1L) 10f else 9f
+            else -> null
+        }
 }
 
 fun List<StylizedColorGroupDataModel>.extractColor(id: Long, themeId: Long): String? {
-    return find { it.id == id }?.values?.find { it.themeId == -1L || it.themeId == themeId }?.valueHex
+    val normalizedThemeId = normalizeAppThemePreference(themeId)
+    val values = find { it.id == id }?.values
+
+    return values?.firstOrNull { it.themeId == normalizedThemeId }?.valueHex
+        ?: values?.firstOrNull { it.themeId == -1L }?.valueHex
+        ?: values?.firstOrNull { it.themeId == DEFAULT_APP_THEME_ID }?.valueHex
+        ?: values?.firstOrNull()?.valueHex
 }
 
 fun List<StylizedDrawablePathsGroupDataModel>.extractPath(id: Long, themeId: Long): String? {
-    return find { it.id == id }?.values?.find { it.themeId == -1L || it.themeId == themeId }?.path
+    val normalizedThemeId = normalizeAppThemePreference(themeId)
+    val values = find { it.id == id }?.values
+
+    return values?.firstOrNull { it.themeId == normalizedThemeId }?.path
+        ?: values?.firstOrNull { it.themeId == -1L }?.path
+        ?: values?.firstOrNull { it.themeId == DEFAULT_APP_THEME_ID }?.path
+        ?: values?.firstOrNull()?.path
+        ?: if (id in 0L..200L) "svg/${id}_${normalizedThemeId}.svg" else null
 }
 
 fun getFullDrawableRemoteResourceUrl(path: String): String {
@@ -3625,14 +4187,17 @@ fun init() {
 
     GlobalScope.launch(Dispatchers.ourIo) {
         loadCachedApplicationData()
+        initializeLocalBranchNetwork()
         if (getStoredUserAuthTokens?.invoke() != null) startRealtimeUpdates()
     }
 
     GlobalScope.launch {
         observeLocalKv(KEY_APP_LOCALE)
             .collect {
-                it?.let {
-                    appLanguageState.emit(it)
+                it?.let { stored ->
+                    val normalized = normalizeAppLanguagePreference(stored)
+                    appLanguageState.emit(normalized)
+                    if (stored != normalized) putLocalKv(KEY_APP_LOCALE, normalized)
                 }
             }
     }
@@ -3640,8 +4205,8 @@ fun init() {
     GlobalScope.launch {
         observeLocalKv(KEY_APP_THEME)
             .collect {
-                it?.let {
-                    appThemeIdState.emit(it.toLong())
+                it?.let { stored ->
+                    appThemeIdState.emit(normalizeAppThemePreference(stored.toLongOrNull()))
                 }
             }
     }
@@ -3649,8 +4214,10 @@ fun init() {
     GlobalScope.launch {
         observeLocalKv(KEY_APP_SIZE_MODE)
             .collect {
-                it?.let {
-                    appSizeModeIdState.emit(it.toLong())
+                it?.let { stored ->
+                    val normalized = normalizeAppSizeModePreference(stored.toLongOrNull())
+                    appSizeModeIdState.emit(normalized)
+                    if (stored != normalized.toString()) putLocalKv(KEY_APP_SIZE_MODE, normalized.toString())
                 }
             }
     }
@@ -3910,8 +4477,8 @@ fun getGlobalAppConfiguration(loadAll: Boolean = true) {
                     endpointUrl = globalAppConfigurationState.payloadValue.globalAppConfigurationPath.first
                 )
 
-                if (!response.negative) {
-                    globalAppConfigurationState.emit(DataState.Success(response.payload!!, response.message))
+                if (!response.negative && response.payload != null) {
+                    globalAppConfigurationState.emit(DataState.Success(response.payload, response.message))
 
                     if (loadAll) {
                         getStrings()
@@ -3985,33 +4552,67 @@ fun getDrawables() {
                     endpointUrl = globalAppConfigurationState.payloadValue.drawableResourcesConfigurationPath.first
                 )
 
-                if (response.negative) {
+                if (response.negative || response.payload == null) {
                     drawablesState.emit(DataState.Empty(response.message))
                 } else {
-                    drawablesState.emit(DataState.Success(response.payload!!, response.message))
+                    drawablesState.emit(DataState.Success(response.payload, response.message))
                 }
             }
         }
 }
 
-fun setAppLocale(language: String) {
+fun setAppLocale(language: String, syncServer: Boolean = true) {
     GlobalScope.launch(Dispatchers.ourIo) {
-        appLanguageState.emit(language)
-        putLocalKv(KEY_APP_LOCALE, language)
+        val normalized = normalizeAppLanguagePreference(language)
+        appLanguageState.emit(normalized)
+        putLocalKv(KEY_APP_LOCALE, normalized)
+        if (syncServer) syncUserPreferencesToServer()
     }
 }
 
-fun setAppTheme(themeId: Long) {
+fun setAppTheme(themeId: Long, syncServer: Boolean = true) {
     GlobalScope.launch(Dispatchers.ourIo) {
+        val normalized = normalizeAppThemePreference(themeId)
         // Emit immediately so UI changes now; local storage observer will keep it persistent.
-        appThemeIdState.emit(themeId)
-        putLocalKv(KEY_APP_THEME, themeId.toString())
+        appThemeIdState.emit(normalized)
+        putLocalKv(KEY_APP_THEME, normalized.toString())
+        if (syncServer) syncUserPreferencesToServer()
     }
 }
 
-fun setAppSizeMode(sizeModeId: Long) {
-    GlobalScope.launch {
-        putLocalKv(KEY_APP_SIZE_MODE, sizeModeId.toString())
+fun setAuthScreenAppLocale(language: String) {
+    val normalized = normalizeAppLanguagePreference(language)
+    authScreenPreferenceOverrideState.value = authScreenPreferenceOverrideState.value.copy(
+        appLanguage = normalized,
+        languageTouched = true
+    )
+    setAppLocale(normalized, syncServer = false)
+}
+
+fun setAuthScreenAppTheme(themeId: Long) {
+    val normalized = normalizeAppThemePreference(themeId)
+    authScreenPreferenceOverrideState.value = authScreenPreferenceOverrideState.value.copy(
+        appThemeId = normalized,
+        themeTouched = true
+    )
+    setAppTheme(normalized, syncServer = false)
+}
+
+fun setAuthScreenAppSizeMode(sizeModeId: Long) {
+    val normalized = normalizeAppSizeModePreference(sizeModeId)
+    authScreenPreferenceOverrideState.value = authScreenPreferenceOverrideState.value.copy(
+        appSizeModeId = normalized,
+        sizeModeTouched = true
+    )
+    setAppSizeMode(normalized, syncServer = false)
+}
+
+fun setAppSizeMode(sizeModeId: Long, syncServer: Boolean = true) {
+    GlobalScope.launch(Dispatchers.ourIo) {
+        val normalized = normalizeAppSizeModePreference(sizeModeId)
+        appSizeModeIdState.emit(normalized)
+        putLocalKv(KEY_APP_SIZE_MODE, normalized.toString())
+        if (syncServer) syncUserPreferencesToServer()
     }
 }
 
@@ -4970,143 +5571,170 @@ fun updateDrawables(
     resourceDrawables: List<StylizedDrawablePathsGroupDataModel>
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
+        val themeId = appThemeIdState.value
+        fun drawablePath(id: Long): String {
+            val normalizedThemeId = if (themeId == 1L) 1L else 0L
+            return drawables.extractPath(id, themeId)
+                ?: drawables.extractPath(id, normalizedThemeId)
+                ?: resourceDrawables.extractPath(id, themeId)
+                ?: resourceDrawables.extractPath(id, normalizedThemeId)
+                ?: "svg/${id}_${normalizedThemeId}.svg"
+        }
         drawablePathAITALogoState.emit(
-            drawables.extractPath(0, appThemeIdState.value) ?: resourceDrawables.extractPath(0, appThemeIdState.value)!!
+            drawablePath(0L)
         )
         drawablePathIconPasswordState.emit(
-            drawables.extractPath(1, appThemeIdState.value) ?: resourceDrawables.extractPath(1, appThemeIdState.value)!!
+            drawablePath(1L)
         )
         drawablePathIconCancelState.emit(
-            drawables.extractPath(2, appThemeIdState.value) ?: resourceDrawables.extractPath(2, appThemeIdState.value)!!
+            drawablePath(2L)
         )
         drawablePathIconEyeHideState.emit(
-            drawables.extractPath(3, appThemeIdState.value) ?: resourceDrawables.extractPath(3, appThemeIdState.value)!!
+            drawablePath(3L)
         )
         drawablePathIconEyeShowState.emit(
-            drawables.extractPath(4, appThemeIdState.value) ?: resourceDrawables.extractPath(4, appThemeIdState.value)!!
+            drawablePath(4L)
         )
         drawablePathIconEmailState.emit(
-            drawables.extractPath(5, appThemeIdState.value) ?: resourceDrawables.extractPath(
-                5,
-                appThemeIdState.value
-            )!!
+            drawablePath(5L)
         )
         drawablePathIconPhoneState.emit(
-            drawables.extractPath(6, appThemeIdState.value) ?: resourceDrawables.extractPath(
-                6,
-                appThemeIdState.value
-            )!!
+            drawablePath(6L)
         )
         drawablePathIconExpandMoreState.emit(
-            drawables.extractPath(7, appThemeIdState.value) ?: resourceDrawables.extractPath(7, appThemeIdState.value)!!
+            drawablePath(7L)
         )
         drawablePathIconExpandLessState.emit(
-            drawables.extractPath(8, appThemeIdState.value) ?: resourceDrawables.extractPath(8, appThemeIdState.value)!!
+            drawablePath(8L)
         )
         drawablePathIconPersonState.emit(
-            drawables.extractPath(9, appThemeIdState.value) ?: resourceDrawables.extractPath(9, appThemeIdState.value)!!
+            drawablePath(9L)
         )
         drawablePathIconTransactionSaleState.emit(
-            drawables.extractPath(10, appThemeIdState.value) ?: resourceDrawables.extractPath(10, appThemeIdState.value)!!
+            drawablePath(10L)
         )
         drawablePathIconTransactionReturnState.emit(
-            drawables.extractPath(11, appThemeIdState.value) ?: resourceDrawables.extractPath(11, appThemeIdState.value)!!
+            drawablePath(11L)
         )
         drawablePathIconTransactionSupplyState.emit(
-            drawables.extractPath(12, appThemeIdState.value) ?: resourceDrawables.extractPath(12, appThemeIdState.value)!!
+            drawablePath(12L)
         )
         drawablePathIconStockState.emit(
-            drawables.extractPath(13, appThemeIdState.value) ?: resourceDrawables.extractPath(13, appThemeIdState.value)!!
+            drawablePath(13L)
         )
         drawablePathIconMenuState.emit(
-            drawables.extractPath(14, appThemeIdState.value) ?: resourceDrawables.extractPath(
-                14,
-                appThemeIdState.value
-            )!!
+            drawablePath(14L)
         )
         drawablePathIconBackArrowState.emit(
-            drawables.extractPath(15, appThemeIdState.value) ?: resourceDrawables.extractPath(15, appThemeIdState.value)!!
+            drawablePath(15L)
         )
         drawablePathIconAddState.emit(
-            drawables.extractPath(16, appThemeIdState.value) ?: resourceDrawables.extractPath(
-                16,
-                appThemeIdState.value
-            )!!
+            drawablePath(16L)
         )
         drawablePathIconUserAccountState.emit(
-            drawables.extractPath(17, appThemeIdState.value) ?: resourceDrawables.extractPath(17, appThemeIdState.value)!!
+            drawablePath(17L)
         )
         drawablePathIconGoodsCategoriesState.emit(
-            drawables.extractPath(18, appThemeIdState.value) ?: resourceDrawables.extractPath(18, appThemeIdState.value)!!
+            drawablePath(18L)
         )
         drawablePathIconStoresState.emit(
-            drawables.extractPath(19, appThemeIdState.value) ?: resourceDrawables.extractPath(19, appThemeIdState.value)!!
+            drawablePath(19L)
         )
         drawablePathIconTransactionHistoryState.emit(
-            drawables.extractPath(20, appThemeIdState.value) ?: resourceDrawables.extractPath(20, appThemeIdState.value)!!
+            drawablePath(20L)
+        )
+        drawablePathIconLogState.emit(
+            drawablePath(49L)
         )
         drawablePathIconAnalyticsState.emit(
-            drawables.extractPath(21, appThemeIdState.value) ?: resourceDrawables.extractPath(21, appThemeIdState.value)!!
+            drawablePath(21L)
         )
         drawablePathIconWorkersState.emit(
-            drawables.extractPath(22, appThemeIdState.value) ?: resourceDrawables.extractPath(22, appThemeIdState.value)!!
+            drawablePath(22L)
         )
         drawablePathIconSuppliersState.emit(
-            drawables.extractPath(23, appThemeIdState.value) ?: resourceDrawables.extractPath(23, appThemeIdState.value)!!
+            drawablePath(23L)
         )
         drawablePathIconDebtorsState.emit(
-            drawables.extractPath(24, appThemeIdState.value) ?: resourceDrawables.extractPath(24, appThemeIdState.value)!!
+            drawablePath(24L)
         )
         drawablePathIconDevicesState.emit(
-            drawables.extractPath(25, appThemeIdState.value) ?: resourceDrawables.extractPath(25, appThemeIdState.value)!!
+            drawablePath(25L)
         )
         drawablePathIconAppLanguageState.emit(
-            drawables.extractPath(26, appThemeIdState.value) ?: resourceDrawables.extractPath(26, appThemeIdState.value)!!
+            drawablePath(26L)
         )
         drawablePathIconAppThemeState.emit(
-            drawables.extractPath(27, appThemeIdState.value) ?: resourceDrawables.extractPath(27, appThemeIdState.value)!!
+            drawablePath(27L)
         )
         drawablePathIconCheckState.emit(
-            drawables.extractPath(28, appThemeIdState.value) ?: resourceDrawables.extractPath(28, appThemeIdState.value)!!
+            drawablePath(28L)
         )
         drawablePathIconEditState.emit(
-            drawables.extractPath(29, appThemeIdState.value) ?: resourceDrawables.extractPath(
-                29,
-                appThemeIdState.value
-            )!!
+            drawablePath(29L)
         )
         drawablePathIconSettingsState.emit(
-            drawables.extractPath(30, appThemeIdState.value) ?: resourceDrawables.extractPath(30, appThemeIdState.value)!!
+            drawablePath(30L)
         )
         drawablePathIconSearchState.emit(
-            drawables.extractPath(31, appThemeIdState.value) ?: resourceDrawables.extractPath(31, appThemeIdState.value)!!
+            drawablePath(31L)
         )
         drawablePathIconBarcodeCamScannerState.emit(
-            drawables.extractPath(32, appThemeIdState.value) ?: resourceDrawables.extractPath(32, appThemeIdState.value)!!
+            drawablePath(32L)
+        )
+        drawablePathIconBarcodeScannerState.emit(
+            drawablePath(51L)
+        )
+        drawablePathIconVoiceInputState.emit(
+            drawablePath(52L)
         )
         drawablePathIconDeleteState.emit(
-            drawables.extractPath(33, appThemeIdState.value) ?: resourceDrawables.extractPath(33, appThemeIdState.value)!!
+            drawablePath(33L)
         )
         drawablePathIconExitState.emit(
-            drawables.extractPath(34, appThemeIdState.value) ?: resourceDrawables.extractPath(34, appThemeIdState.value)!!
+            drawablePath(34L)
         )
         drawablePathIconSwitchState.emit(
-            drawables.extractPath(35, appThemeIdState.value) ?: resourceDrawables.extractPath(35, appThemeIdState.value)!!
+            drawablePath(35L)
         )
         drawablePathIconCartState.emit(
-            drawables.extractPath(36, appThemeIdState.value) ?: resourceDrawables.extractPath(36, appThemeIdState.value)!!
+            drawablePath(36L)
         )
         drawablePathIconAddCartState.emit(
-            drawables.extractPath(37, appThemeIdState.value) ?: resourceDrawables.extractPath(37, appThemeIdState.value)!!
+            drawablePath(37L)
         )
         drawablePathIconSubtractState.emit(
-            drawables.extractPath(38, appThemeIdState.value) ?: resourceDrawables.extractPath(38, appThemeIdState.value)!!
+            drawablePath(38L)
         )
         drawablePathIconReceiptState.emit(
-            drawables.extractPath(39, appThemeIdState.value) ?: resourceDrawables.extractPath(39, appThemeIdState.value)!!
+            drawablePath(39L)
         )
         drawablePathIconFinancesState.emit(
-            drawables.extractPath(40, appThemeIdState.value) ?: resourceDrawables.extractPath(40, appThemeIdState.value)!!
+            drawablePath(40L)
+        )
+        drawablePathIconClipboardState.emit(
+            drawablePath(41L)
+        )
+        drawablePathIconSupportState.emit(
+            drawablePath(42L)
+        )
+        drawablePathIconSubscriptionState.emit(
+            drawablePath(43L)
+        )
+        drawablePathIconThemeLightState.emit(
+            drawablePath(44L)
+        )
+        drawablePathIconThemeDarkState.emit(
+            drawablePath(45L)
+        )
+        drawablePathIconShareState.emit(
+            drawablePath(46L)
+        )
+        drawablePathIconWhatsAppState.emit(
+            drawablePath(47L)
+        )
+        drawablePathIconAppScaleState.emit(
+            drawablePath(48L)
         )
     }
 }
@@ -5147,6 +5775,11 @@ private const val CACHE_MY_WORKER_MEMBERSHIPS = "my_worker_memberships"
 private const val CACHE_MY_WORKER_REQUESTS = "my_worker_requests"
 private const val CACHE_USER_FINANCE_DASHBOARD = "user_finance_dashboard"
 private const val CACHE_SUBSCRIPTION_PLANS = "subscription_plans"
+private const val CACHE_LOCAL_NETWORK_STATE = "local_network_state"
+private const val CACHE_LOCAL_NETWORK_QUEUE = "local_network_queue"
+private const val LOCAL_NETWORK_DEFAULT_TCP_PORT = 45720
+private const val LOCAL_NETWORK_DEFAULT_DISCOVERY_PORT = 45721
+private const val LOCAL_NETWORK_STALE_DEVICE_MILLIS = 45_000L
 
 private fun storeScopedCacheKey(name: String, storeId: String): String = "$name:$storeId"
 
@@ -5162,6 +5795,651 @@ private suspend inline fun <reified T> getJsonCache(key: String): T? {
         getLocalKv(CACHE_PREFIX + key)?.let { jsonBase.decodeFromString<T>(it) }
     } catch (_: Throwable) {
         null
+    }
+}
+
+private fun localNetworkMessage(id: Long, main: String, ru: String, kk: String): List<LocalizedStringDataModel> =
+    localizedStringResourceMessage(id = id, main = main, ru = ru, kk = kk)
+
+private fun localNetworkDeviceId(): String {
+    val installation = getClientDeviceInfo?.invoke()?.installationId.orEmpty().ifBlank { getPlatformName() }
+    val user = userAccountState.payloadValue?.id.orEmpty().ifBlank { "anonymous" }
+    return "${getPlatformName()}_${user}_${installation}".replace(Regex("[^A-Za-z0-9_-]"), "_").take(96)
+}
+
+private fun createClientOperationId(prefix: String, seed: String = ""): String {
+    val device = localNetworkDeviceId()
+    val now = getCurrentTimeMillis()
+    val hash = (device + seed + now.toString()).hashCode().toUInt().toString(16)
+    return "$prefix-$device-$now-$hash".take(160)
+}
+
+private fun localBranchNetworkAllowedForActiveStore(): Boolean {
+    val activeStore = storesState.payloadValue?.findStoreOrBranch(activeStoreIdState.value) ?: return false
+    return activeStore.isBranchStore() || activeStore.branches.isEmpty()
+}
+
+private fun localBranchNetworkRestrictionMessage(): List<LocalizedStringDataModel> = localNetworkMessage(
+    id = 751,
+    main = "Select one physical branch first. Local branch network cannot run on a parent warehouse with several branches.",
+    ru = "Сначала выберите один физический филиал. Локальная сеть филиала не работает на головном складе с несколькими филиалами.",
+    kk = "Алдымен бір нақты филиалды таңдаңыз. Филиалдың жергілікті желісі бірнеше филиалы бар негізгі қоймада жұмыс істемейді."
+)
+
+private fun currentLocalNetworkDevice(roleOverride: String? = null): LocalNetworkDeviceDataModel {
+    val user = userAccountState.payloadValue
+    val state = localNetworkState.value
+    val activeStore = storesState.payloadValue?.findStoreOrBranch(activeStoreIdState.value)
+    return LocalNetworkDeviceDataModel(
+        deviceId = state.deviceId.ifBlank { localNetworkDeviceId() },
+        userId = user?.id.orEmpty(),
+        userName = listOf(user?.firstName.orEmpty(), user?.lastName.orEmpty()).filter { it.isNotBlank() }.joinToString(" ").ifBlank { user?.phoneNumber.orEmpty().asDisplayPhoneNumber() },
+        platform = getPlatformName(),
+        host = LocalAitaLanTransport.localHostAddress(),
+        port = state.tcpPort.takeIf { it > 0 } ?: LOCAL_NETWORK_DEFAULT_TCP_PORT,
+        role = roleOverride ?: state.role,
+        storeId = activeStore?.rootStoreId() ?: activeStoreIdState.value,
+        branchStoreId = activeStoreIdState.value,
+        queueSize = localNetworkQueuedOperationsState.value.count { it.status != LOCAL_NETWORK_QUEUE_SYNCED },
+        online = true,
+        lastSeenMillis = getCurrentTimeMillis()
+    )
+}
+
+private suspend fun persistLocalNetworkState() {
+    putJsonCache(CACHE_LOCAL_NETWORK_STATE, localNetworkState.value)
+}
+
+private suspend fun persistLocalNetworkQueue() {
+    putJsonCache(CACHE_LOCAL_NETWORK_QUEUE, localNetworkQueuedOperationsState.value)
+}
+
+private suspend fun loadLocalNetworkCache() {
+    val cachedState = getJsonCache<LocalNetworkStateDataModel>(CACHE_LOCAL_NETWORK_STATE)
+    if (cachedState != null) {
+        localNetworkState.emit(
+            cachedState.copy(
+                deviceId = cachedState.deviceId.ifBlank { localNetworkDeviceId() },
+                tcpPort = cachedState.tcpPort.takeIf { it > 0 } ?: LOCAL_NETWORK_DEFAULT_TCP_PORT,
+                discoveryPort = cachedState.discoveryPort.takeIf { it > 0 } ?: LOCAL_NETWORK_DEFAULT_DISCOVERY_PORT,
+                activeStoreId = activeStoreIdState.value
+            )
+        )
+    } else {
+        localNetworkState.emit(
+            LocalNetworkStateDataModel(
+                enabled = false,
+                role = LOCAL_NETWORK_ROLE_DISABLED,
+                deviceId = localNetworkDeviceId(),
+                tcpPort = LOCAL_NETWORK_DEFAULT_TCP_PORT,
+                discoveryPort = LOCAL_NETWORK_DEFAULT_DISCOVERY_PORT,
+                activeStoreId = activeStoreIdState.value
+            )
+        )
+    }
+
+    localNetworkQueuedOperationsState.emit(
+        getJsonCache<List<LocalNetworkQueuedOperationDataModel>>(CACHE_LOCAL_NETWORK_QUEUE).orEmpty()
+            .distinctBy { it.id }
+            .sortedBy { it.createdAtMillis }
+    )
+}
+
+private fun localNetworkSnapshot(): LocalNetworkSnapshotDataModel {
+    val storeId = activeStoreIdState.value.orEmpty()
+    return LocalNetworkSnapshotDataModel(
+        storeId = storeId,
+        stock = stockState.payloadValue.orEmpty(),
+        stockBatches = stockBatchesState.payloadValue.orEmpty(),
+        transactions = transactionsState.payloadValue.orEmpty(),
+        debtors = debtorsState.payloadValue.orEmpty(),
+        cashRegister = cashRegisterState.payloadValue,
+        updatedAtMillis = getCurrentTimeMillis()
+    )
+}
+
+private suspend fun applyLocalNetworkSnapshot(snapshot: LocalNetworkSnapshotDataModel) {
+    val message = localNetworkMessage(734, "Local branch state updated", "Локальное состояние филиала обновлено", "Филиалдың жергілікті күйі жаңартылды")
+    if (snapshot.stock.isNotEmpty()) stockState.emit(DataState.Success(snapshot.stock, message))
+    if (snapshot.stockBatches.isNotEmpty()) stockBatchesState.emit(DataState.Success(snapshot.stockBatches, message))
+    if (snapshot.transactions.isNotEmpty()) transactionsState.emit(DataState.Success(snapshot.transactions, message))
+    if (snapshot.debtors.isNotEmpty()) debtorsState.emit(DataState.Success(snapshot.debtors, message))
+    snapshot.cashRegister?.let {
+        cashRegisterState.emit(DataState.Success(it, message))
+        cashRegisterAmountState.emit(it.currentAmount)
+    }
+}
+
+private fun updateLocalNetworkDevice(device: LocalNetworkDeviceDataModel) {
+    if (device.deviceId.isBlank() || device.deviceId == localNetworkState.value.deviceId) return
+    val now = getCurrentTimeMillis()
+    val fresh = device.copy(lastSeenMillis = now, online = true)
+    localNetworkDevicesState.value = (localNetworkDevicesState.value
+        .filter { it.deviceId != fresh.deviceId }
+        .plus(fresh))
+        .filter { now - it.lastSeenMillis <= LOCAL_NETWORK_STALE_DEVICE_MILLIS }
+        .sortedWith(compareByDescending<LocalNetworkDeviceDataModel> { it.role == LOCAL_NETWORK_ROLE_SERVER }.thenBy { it.userName }.thenBy { it.deviceId })
+}
+
+private fun localNetworkEnvelope(type: String, operation: LocalNetworkQueuedOperationDataModel? = null, snapshot: LocalNetworkSnapshotDataModel? = null, accepted: Boolean = true, error: String? = null): LocalNetworkEnvelopeDataModel =
+    LocalNetworkEnvelopeDataModel(
+        messageId = createClientOperationId("lan-msg", type + (operation?.id ?: "")),
+        type = type,
+        device = currentLocalNetworkDevice(),
+        operation = operation,
+        snapshot = snapshot,
+        accepted = accepted,
+        error = error,
+        createdAtMillis = getCurrentTimeMillis()
+    )
+
+private suspend fun broadcastLocalNetworkSnapshot() {
+    val state = localNetworkState.value
+    if (!state.enabled || state.role != LOCAL_NETWORK_ROLE_SERVER) return
+    val envelope = localNetworkEnvelope("state", snapshot = localNetworkSnapshot())
+    val text = jsonBase.encodeToString(envelope)
+    localNetworkDevicesState.value
+        .filter { it.deviceId != state.deviceId && it.host.isNotBlank() }
+        .forEach { device ->
+            GlobalScope.launch(Dispatchers.ourIo) {
+                runCatching { LocalAitaLanTransport.send(device.host, device.port, text, 1500) }
+            }
+        }
+}
+
+private fun nextLocalNetworkOperationTimestamp(): Long {
+    val last = localNetworkQueuedOperationsState.value.maxOfOrNull { it.createdAtMillis } ?: 0L
+    return maxOf(getCurrentTimeMillis(), last + 1L)
+}
+
+private suspend fun enqueueLocalNetworkOperation(operation: LocalNetworkQueuedOperationDataModel) {
+    val existing = localNetworkQueuedOperationsState.value.firstOrNull { it.id == operation.id }
+    if (existing != null) return
+    localNetworkQueuedOperationsState.emit(
+        (localNetworkQueuedOperationsState.value + operation)
+            .distinctBy { it.id }
+            .sortedBy { it.createdAtMillis }
+    )
+    persistLocalNetworkQueue()
+}
+
+private fun transactionLocalId(operationId: String): String = "local_${operationId.takeLast(48)}"
+
+private fun TransactionDataModel.withClientOperationId(): TransactionDataModel =
+    if (clientOperationId.isNotBlank()) this else copy(
+        clientOperationId = createClientOperationId(
+            "txn",
+            listOf(storeId, type, timeMillis.toString(), paidCash.toString(), paidCard.toString(), goodsInTransaction.joinToString("|") { "${it.goodsItemId}:${it.barcode}:${it.quantity}:${it.pricePerUnit}" }).joinToString(";")
+        )
+    )
+
+private fun queuedTransactionOperation(transaction: TransactionDataModel): LocalNetworkQueuedOperationDataModel =
+    LocalNetworkQueuedOperationDataModel(
+        id = transaction.clientOperationId.ifBlank { createClientOperationId("txn") },
+        operationType = LOCAL_NETWORK_OPERATION_TRANSACTION_COMPLETE,
+        storeId = transaction.storeId,
+        branchStoreId = activeStoreIdState.value,
+        endpointPath = globalAppConfigurationState.payloadValue.completeTransactionPath.first,
+        httpMethod = "POST",
+        bodyJson = jsonBase.encodeToString(transaction),
+        createdByUserId = userAccountState.payloadValue?.id.orEmpty(),
+        createdByDeviceId = localNetworkState.value.deviceId.ifBlank { localNetworkDeviceId() },
+        createdAtMillis = getCurrentTimeMillis(),
+        status = LOCAL_NETWORK_QUEUE_PENDING
+    )
+
+private fun mutateLocalBatchQuantity(batches: List<GoodsBatchDataModel>, item: GoodsItemDataModel?, line: GoodsItemInTransactionDataModel, transactionType: String): List<GoodsBatchDataModel> {
+    if (item == null) return batches
+    val delta = when (transactionType) {
+        "sale", "purchase" -> -line.quantity
+        "return", "supply", "acceptance" -> line.quantity
+        else -> 0.0
+    }
+    if (delta == 0.0) return batches
+
+    val candidateIds = listOfNotNull(item.activeShelfBatchId).toMutableList().apply {
+        addAll(batches.filter { it.goodsItemId == item.id && it.isActive }.sortedBy { it.shelfPriority }.map { it.id })
+    }.distinct()
+    val targetId = candidateIds.firstOrNull { id -> batches.any { it.id == id } } ?: return batches
+    return batches.map { batch ->
+        if (batch.id == targetId) {
+            val updatedQuantity = batch.quantity.copy(total = (batch.quantity.total + delta).coerceAtLeast(0.0))
+            batch.copy(quantity = updatedQuantity, updatedAtMillis = getCurrentTimeMillis())
+        } else batch
+    }
+}
+
+private suspend fun applyLocalQueuedTransaction(transaction: TransactionDataModel, operationId: String): TransactionDataModel {
+    val localId = transaction.id.ifBlank { transactionLocalId(operationId) }
+    val completed = transaction.copy(id = localId, clientOperationId = operationId, timeMillis = transaction.timeMillis.takeIf { it > 0 } ?: getCurrentTimeMillis())
+    val message = localNetworkMessage(733, "Queued locally for cloud sync", "Сохранено локально для синхронизации", "Бұлтпен синхрондау үшін жергілікті сақталды")
+
+    val existingTransactions = transactionsState.payloadValue.orEmpty()
+    if (existingTransactions.any { it.clientOperationId == operationId || it.id == localId }) return completed
+
+    var updatedBatches = stockBatchesState.payloadValue.orEmpty()
+    val stock = stockState.payloadValue.orEmpty()
+    completed.goodsInTransaction.forEach { line ->
+        val item = stock.firstOrNull { goods ->
+            goods.id == line.goodsItemId || goods.barcodes.any { it == line.barcode || it.toStoredGoodsItemBarcode() == line.barcode.toStoredGoodsItemBarcode() }
+        }
+        updatedBatches = mutateLocalBatchQuantity(updatedBatches, item, line, completed.type)
+    }
+    stockBatchesState.emit(DataState.Success(updatedBatches, message))
+
+    transactionsState.emit(
+        DataState.Success(
+            (existingTransactions + completed).distinctBy { it.clientOperationId.ifBlank { it.id } }.sortedByDescending { it.timeMillis },
+            message
+        )
+    )
+
+    completed.debtor?.let { debtor ->
+        debtorsState.emit(DataState.Success(debtorsState.payloadValue.orEmpty().upsertDebtor(debtor), message))
+    }
+
+    val cashDelta = when (completed.type) {
+        "sale", "purchase" -> completed.paidCash
+        "return" -> -completed.paidCash
+        else -> 0.0
+    }
+    if (cashDelta != 0.0) {
+        val current = cashRegisterState.payloadValue ?: StoreCashRegisterDataModel(storeId = completed.storeId, currentAmount = cashRegisterAmountState.value)
+        val updated = current.copy(currentAmount = (current.currentAmount + cashDelta).roundMoney(), updatedAtMillis = getCurrentTimeMillis())
+        cashRegisterState.emit(DataState.Success(updated, message))
+        cashRegisterAmountState.emit(updated.currentAmount)
+    }
+
+    return completed
+}
+
+private suspend fun handleLocalNetworkOperation(operation: LocalNetworkQueuedOperationDataModel): LocalNetworkEnvelopeDataModel {
+    return try {
+        when (operation.operationType) {
+            LOCAL_NETWORK_OPERATION_TRANSACTION_COMPLETE -> {
+                val transaction = jsonBase.decodeFromString<TransactionDataModel>(operation.bodyJson).withClientOperationId()
+                val opId = operation.id.ifBlank { transaction.clientOperationId }
+                val serverOrderedOperation = operation.copy(
+                    id = opId,
+                    bodyJson = jsonBase.encodeToString(transaction.copy(clientOperationId = opId)),
+                    createdAtMillis = nextLocalNetworkOperationTimestamp(),
+                    status = LOCAL_NETWORK_QUEUE_PENDING,
+                    lastError = null
+                )
+                enqueueLocalNetworkOperation(serverOrderedOperation)
+                applyLocalQueuedTransaction(transaction.copy(clientOperationId = opId), opId)
+                broadcastLocalNetworkSnapshot()
+                localNetworkEnvelope("ack", operation = serverOrderedOperation, snapshot = localNetworkSnapshot())
+            }
+            else -> localNetworkEnvelope("ack", operation = operation, accepted = false, error = "Unsupported local operation")
+        }
+    } catch (throwable: Throwable) {
+        localNetworkEnvelope("ack", operation = operation, accepted = false, error = throwable.message ?: "Local operation failed")
+    }
+}
+
+private suspend fun handleLocalNetworkMessage(message: String, senderHost: String): String {
+    return try {
+        val envelope = jsonBase.decodeFromString<LocalNetworkEnvelopeDataModel>(message)
+        envelope.device?.let { updateLocalNetworkDevice(it.copy(host = it.host.ifBlank { senderHost })) }
+        when (envelope.type) {
+            "hello" -> {
+                if (localNetworkState.value.enabled) {
+                    jsonBase.encodeToString(localNetworkEnvelope("hello_ack", snapshot = if (localNetworkState.value.isServer) localNetworkSnapshot() else null))
+                } else ""
+            }
+            "hello_ack" -> {
+                envelope.snapshot?.let { snapshot -> applyLocalNetworkSnapshot(snapshot) }
+                ""
+            }
+            "operation" -> {
+                val operation = envelope.operation
+                if (operation == null) {
+                    jsonBase.encodeToString(localNetworkEnvelope("ack", accepted = false, error = "Missing operation"))
+                } else if (!localNetworkState.value.isServer) {
+                    jsonBase.encodeToString(localNetworkEnvelope("ack", operation = operation, accepted = false, error = "This device is not the local server"))
+                } else {
+                    jsonBase.encodeToString(handleLocalNetworkOperation(operation))
+                }
+            }
+            "state" -> {
+                envelope.snapshot?.let { snapshot -> applyLocalNetworkSnapshot(snapshot) }
+                jsonBase.encodeToString(localNetworkEnvelope("ack"))
+            }
+            else -> jsonBase.encodeToString(localNetworkEnvelope("ack"))
+        }
+    } catch (throwable: Throwable) {
+        jsonBase.encodeToString(localNetworkEnvelope("ack", accepted = false, error = throwable.message ?: "Bad local network message"))
+    }
+}
+
+private var localNetworkDiscoveryJob: Job? = null
+private var localNetworkSyncJob: Job? = null
+private val localNetworkCloudSyncMutex = Mutex()
+
+private fun startLocalNetworkTransportIfNeeded() {
+    val state = localNetworkState.value
+    if (!state.enabled) return
+    val started = runCatching {
+        LocalAitaLanTransport.start(
+            deviceId = state.deviceId.ifBlank { localNetworkDeviceId() },
+            tcpPort = state.tcpPort,
+            discoveryPort = state.discoveryPort,
+            onMessage = ::handleLocalNetworkMessage
+        )
+    }.getOrDefault(false)
+    if (!started) {
+        localNetworkState.value = state.copy(lastError = "Could not start local network listener")
+    }
+}
+
+private fun startLocalNetworkDiscoveryLoop() {
+    localNetworkDiscoveryJob?.cancel()
+    localNetworkDiscoveryJob = GlobalScope.launch(Dispatchers.ourIo) {
+        while (isActive) {
+            val state = localNetworkState.value
+            if (state.enabled) {
+                val envelope = localNetworkEnvelope("hello")
+                runCatching { LocalAitaLanTransport.broadcast(jsonBase.encodeToString(envelope), state.discoveryPort) }
+                localNetworkState.emit(state.copy(lastDiscoveryMillis = getCurrentTimeMillis()))
+                localNetworkDevicesState.value = localNetworkDevicesState.value.filter { getCurrentTimeMillis() - it.lastSeenMillis <= LOCAL_NETWORK_STALE_DEVICE_MILLIS }
+
+                val updatedState = localNetworkState.value
+                val devices = localNetworkDevicesState.value
+                val self = currentLocalNetworkDevice()
+                val visibleServers = devices.filter { it.role == LOCAL_NETWORK_ROLE_SERVER }
+                when (updatedState.role) {
+                    LOCAL_NETWORK_ROLE_SERVER -> {
+                        visibleServers
+                            .filter { it.deviceId < self.deviceId }
+                            .minByOrNull { it.deviceId }
+                            ?.let { joinLocalBranchServer(it) }
+                    }
+                    LOCAL_NETWORK_ROLE_AUTO, LOCAL_NETWORK_ROLE_CLIENT -> {
+                        val server = visibleServers.minByOrNull { it.deviceId }
+                        when {
+                            server != null && updatedState.serverDeviceId != server.deviceId -> joinLocalBranchServer(server)
+                            server == null && updatedState.role == LOCAL_NETWORK_ROLE_AUTO -> {
+                                val elected = (devices + self).minByOrNull { it.deviceId }
+                                if (elected?.deviceId == self.deviceId) becomeLocalBranchServer()
+                            }
+                        }
+                    }
+                }
+            }
+            delay(5_000)
+        }
+    }
+}
+
+private fun startLocalNetworkSyncLoop() {
+    localNetworkSyncJob?.cancel()
+    localNetworkSyncJob = GlobalScope.launch(Dispatchers.ourIo) {
+        while (isActive) {
+            delay(8_000)
+            if (realtimeUpdatesConnectedState.value) syncLocalNetworkOperationsToCloud()
+        }
+    }
+}
+
+fun initializeLocalBranchNetwork() {
+    GlobalScope.launch(Dispatchers.ourIo) {
+        loadLocalNetworkCache()
+        if (localNetworkState.value.enabled) {
+            startLocalNetworkTransportIfNeeded()
+            startLocalNetworkDiscoveryLoop()
+            startLocalNetworkSyncLoop()
+        }
+    }
+}
+
+fun enableLocalBranchNetwork(asServer: Boolean = false) {
+    GlobalScope.launch(Dispatchers.ourIo) {
+        if (!localBranchNetworkAllowedForActiveStore()) {
+            postInAppNotification(localBranchNetworkRestrictionMessage(), NotificationType.Negative)
+            return@launch
+        }
+
+        val role = if (asServer) LOCAL_NETWORK_ROLE_SERVER else LOCAL_NETWORK_ROLE_AUTO
+        val state = localNetworkState.value.copy(
+            enabled = true,
+            role = role,
+            deviceId = localNetworkState.value.deviceId.ifBlank { localNetworkDeviceId() },
+            tcpPort = localNetworkState.value.tcpPort.takeIf { it > 0 } ?: LOCAL_NETWORK_DEFAULT_TCP_PORT,
+            discoveryPort = localNetworkState.value.discoveryPort.takeIf { it > 0 } ?: LOCAL_NETWORK_DEFAULT_DISCOVERY_PORT,
+            activeStoreId = activeStoreIdState.value,
+            branchStoreId = activeStoreIdState.value,
+            serverDeviceId = if (asServer) localNetworkDeviceId() else localNetworkState.value.serverDeviceId,
+            serverHost = if (asServer) LocalAitaLanTransport.localHostAddress() else localNetworkState.value.serverHost,
+            lastError = null
+        )
+        localNetworkState.emit(state)
+        persistLocalNetworkState()
+        startLocalNetworkTransportIfNeeded()
+        startLocalNetworkDiscoveryLoop()
+        startLocalNetworkSyncLoop()
+        postInAppNotification(
+            localNetworkMessage(728, "Local branch network enabled", "Локальная сеть филиала включена", "Филиалдың жергілікті желісі қосылды"),
+            NotificationType.Positive,
+            transient = true
+        )
+    }
+}
+
+fun disableLocalBranchNetwork() {
+    GlobalScope.launch(Dispatchers.ourIo) {
+        LocalAitaLanTransport.stop()
+        localNetworkDiscoveryJob?.cancel()
+        localNetworkSyncJob?.cancel()
+        localNetworkState.emit(localNetworkState.value.copy(enabled = false, role = LOCAL_NETWORK_ROLE_DISABLED, serverDeviceId = null, serverHost = null))
+        persistLocalNetworkState()
+        postInAppNotification(
+            localNetworkMessage(729, "Local branch network disabled", "Локальная сеть филиала выключена", "Филиалдың жергілікті желісі өшірілді"),
+            NotificationType.Neutral,
+            transient = true
+        )
+    }
+}
+
+fun becomeLocalBranchServer() {
+    GlobalScope.launch(Dispatchers.ourIo) {
+        if (!localBranchNetworkAllowedForActiveStore()) {
+            postInAppNotification(localBranchNetworkRestrictionMessage(), NotificationType.Negative)
+            return@launch
+        }
+
+        val state = localNetworkState.value.copy(
+            enabled = true,
+            role = LOCAL_NETWORK_ROLE_SERVER,
+            deviceId = localNetworkState.value.deviceId.ifBlank { localNetworkDeviceId() },
+            serverDeviceId = localNetworkState.value.deviceId.ifBlank { localNetworkDeviceId() },
+            serverHost = LocalAitaLanTransport.localHostAddress(),
+            serverPort = localNetworkState.value.tcpPort.takeIf { it > 0 } ?: LOCAL_NETWORK_DEFAULT_TCP_PORT,
+            activeStoreId = activeStoreIdState.value,
+            branchStoreId = activeStoreIdState.value,
+            lastError = null
+        )
+        localNetworkState.emit(state)
+        persistLocalNetworkState()
+        startLocalNetworkTransportIfNeeded()
+        startLocalNetworkDiscoveryLoop()
+        startLocalNetworkSyncLoop()
+        broadcastLocalNetworkSnapshot()
+        postInAppNotification(
+            localNetworkMessage(730, "This device is the local server", "Это устройство — локальный сервер", "Бұл құрылғы жергілікті сервер"),
+            NotificationType.Positive,
+            transient = true
+        )
+    }
+}
+
+fun joinLocalBranchServer(device: LocalNetworkDeviceDataModel) {
+    if (device.host.isBlank()) return
+    GlobalScope.launch(Dispatchers.ourIo) {
+        if (!localBranchNetworkAllowedForActiveStore()) {
+            postInAppNotification(localBranchNetworkRestrictionMessage(), NotificationType.Negative)
+            return@launch
+        }
+
+        localNetworkState.emit(
+            localNetworkState.value.copy(
+                enabled = true,
+                role = LOCAL_NETWORK_ROLE_CLIENT,
+                deviceId = localNetworkState.value.deviceId.ifBlank { localNetworkDeviceId() },
+                serverDeviceId = device.deviceId,
+                serverHost = device.host,
+                serverPort = device.port,
+                activeStoreId = activeStoreIdState.value,
+                branchStoreId = activeStoreIdState.value,
+                lastError = null
+            )
+        )
+        persistLocalNetworkState()
+        startLocalNetworkTransportIfNeeded()
+        startLocalNetworkDiscoveryLoop()
+        startLocalNetworkSyncLoop()
+        val response = runCatching { LocalAitaLanTransport.send(device.host, device.port, jsonBase.encodeToString(localNetworkEnvelope("hello")), 2500) }.getOrNull()
+        response?.let { handleLocalNetworkMessage(it, device.host) }
+        postInAppNotification(
+            localNetworkMessage(731, "Joined local server", "Подключено к локальному серверу", "Жергілікті серверге қосылды"),
+            NotificationType.Positive,
+            transient = true
+        )
+    }
+}
+
+fun scanLocalBranchNetworkNow() {
+    GlobalScope.launch(Dispatchers.ourIo) {
+        if (!localNetworkState.value.enabled) enableLocalBranchNetwork(asServer = false)
+        runCatching { LocalAitaLanTransport.broadcast(jsonBase.encodeToString(localNetworkEnvelope("hello")), localNetworkState.value.discoveryPort) }
+    }
+}
+
+private suspend fun sendOperationToLocalServer(operation: LocalNetworkQueuedOperationDataModel): LocalNetworkEnvelopeDataModel? {
+    val state = localNetworkState.value
+    val host = state.serverHost ?: return null
+    val envelope = localNetworkEnvelope("operation", operation = operation)
+    val response = runCatching { LocalAitaLanTransport.send(host, state.serverPort, jsonBase.encodeToString(envelope), 3500) }.getOrNull()
+    return response?.let { jsonBase.decodeFromString<LocalNetworkEnvelopeDataModel>(it) }
+}
+
+private suspend fun queueTransactionThroughLocalNetwork(transaction: TransactionDataModel): TransactionDataModel? {
+    if (!localBranchNetworkAllowedForActiveStore()) {
+        postInAppNotification(localBranchNetworkRestrictionMessage(), NotificationType.Negative)
+        return null
+    }
+
+    val tx = transaction.withClientOperationId()
+    val operation = queuedTransactionOperation(tx)
+    val state = localNetworkState.value
+    return when {
+        state.enabled && state.isServer -> {
+            val serverOrderedOperation = operation.copy(createdAtMillis = nextLocalNetworkOperationTimestamp())
+            enqueueLocalNetworkOperation(serverOrderedOperation)
+            val completed = applyLocalQueuedTransaction(tx, serverOrderedOperation.id)
+            broadcastLocalNetworkSnapshot()
+            completed
+        }
+        state.enabled && state.hasServer -> {
+            val ack = sendOperationToLocalServer(operation)
+            if (ack?.accepted == true) {
+                ack.snapshot?.let { applyLocalNetworkSnapshot(it) }
+                tx.copy(id = transactionLocalId(operation.id), clientOperationId = operation.id)
+            } else null
+        }
+        else -> null
+    }
+}
+
+fun clearSyncedLocalNetworkOperations() {
+    GlobalScope.launch(Dispatchers.ourIo) {
+        localNetworkQueuedOperationsState.emit(localNetworkQueuedOperationsState.value.filter { it.status != LOCAL_NETWORK_QUEUE_SYNCED })
+        persistLocalNetworkQueue()
+    }
+}
+
+fun syncLocalNetworkOperationsToCloud() {
+    if (localNetworkState.value.enabled && localNetworkState.value.role != LOCAL_NETWORK_ROLE_SERVER) return
+    GlobalScope.launch(Dispatchers.ourIo) {
+        if (localNetworkCloudSyncMutex.isLocked) return@launch
+        localNetworkCloudSyncMutex.withLock {
+            val pending = localNetworkQueuedOperationsState.value
+                .filter { it.status != LOCAL_NETWORK_QUEUE_SYNCED }
+                .sortedBy { it.createdAtMillis }
+            if (pending.isEmpty()) return@withLock
+
+            for (operation in pending) {
+                when (operation.operationType) {
+                    LOCAL_NETWORK_OPERATION_TRANSACTION_COMPLETE -> {
+                        val tx = runCatching { jsonBase.decodeFromString<TransactionDataModel>(operation.bodyJson) }.getOrNull()
+                        if (tx == null) {
+                            localNetworkQueuedOperationsState.emit(
+                                localNetworkQueuedOperationsState.value.map {
+                                    if (it.id == operation.id) it.copy(status = LOCAL_NETWORK_QUEUE_FAILED, lastError = "Could not decode transaction") else it
+                                }
+                            )
+                            persistLocalNetworkQueue()
+                            continue
+                        }
+
+                        val response = networkRequest<TransactionDataModel, TransactionDataModel>(
+                            method = HttpMethod.Post,
+                            endpointUrl = operation.endpointPath.ifBlank { globalAppConfigurationState.payloadValue.completeTransactionPath.first },
+                            body = tx.copy(clientOperationId = operation.id)
+                        )
+
+                        if (response.transportFailure) break
+
+                        if (response.negative || response.payload == null) {
+                            localNetworkQueuedOperationsState.emit(
+                                localNetworkQueuedOperationsState.value.map {
+                                    if (it.id == operation.id) it.copy(
+                                        status = LOCAL_NETWORK_QUEUE_FAILED,
+                                        attemptCount = it.attemptCount + 1,
+                                        lastError = response.message?.extractLocalizedString(appLanguageState.value)
+                                    ) else it
+                                }
+                            )
+                            persistLocalNetworkQueue()
+                            break
+                        }
+
+                        val synced = response.payload
+                        localNetworkQueuedOperationsState.emit(
+                            localNetworkQueuedOperationsState.value.map {
+                                if (it.id == operation.id) it.copy(
+                                    status = LOCAL_NETWORK_QUEUE_SYNCED,
+                                    cloudSyncedAtMillis = getCurrentTimeMillis(),
+                                    attemptCount = it.attemptCount + 1,
+                                    lastError = null
+                                ) else it
+                            }
+                        )
+                        persistLocalNetworkQueue()
+                        transactionsState.emit(
+                            DataState.Success(
+                                transactionsState.payloadValue.orEmpty().map { existing ->
+                                    if (existing.clientOperationId == operation.id || existing.id == transactionLocalId(operation.id)) synced else existing
+                                }.plus(synced).distinctBy { it.clientOperationId.ifBlank { it.id } }.sortedByDescending { it.timeMillis },
+                                response.message
+                            )
+                        )
+
+                        activeStoreIdState.value?.let { storeId ->
+                            getStock(storeId)
+                            getStockBatches(storeId)
+                            getTransactions(storeId)
+                            getCashRegister(storeId)
+                        }
+
+                        broadcastLocalNetworkSnapshot()
+                    }
+                }
+            }
+
+            localNetworkState.emit(localNetworkState.value.copy(lastSyncMillis = getCurrentTimeMillis()))
+            persistLocalNetworkState()
+        }
     }
 }
 
@@ -5197,6 +6475,7 @@ private var appCacheCollectorsStarted = false
 private var realtimeUpdatesJob: Job? = null
 private var realtimeRefreshJob: Job? = null
 private val realtimeRefreshMutex = Mutex()
+private var realtimeOfflineNoticePosted = false
 val realtimeUpdatesConnectedState = MutableStateFlow(false)
 
 private suspend fun loadCachedStoreScopedData(storeId: String) {
@@ -5278,8 +6557,10 @@ private suspend fun loadCachedApplicationData() {
         userWalletLedgerState.emit(DataState.Success(it.ledger, cacheMessage()))
         paymentIntentsState.emit(DataState.Success(it.paymentIntents, cacheMessage()))
     }
-    getJsonCache<List<StoreSubscriptionPlanDataModel>>(CACHE_SUBSCRIPTION_PLANS)?.let {
-        subscriptionPlansState.emit(DataState.Success(it, cacheMessage()))
+    getJsonCache<List<StoreSubscriptionPlanDataModel>>(CACHE_SUBSCRIPTION_PLANS)?.let { cachedPlans ->
+        val allowedPlanIds = defaultStoreSubscriptionPlans().map { it.id }.toSet()
+        val visiblePlans = cachedPlans.filter { it.id in allowedPlanIds }.ifEmpty { defaultStoreSubscriptionPlans() }
+        subscriptionPlansState.emit(DataState.Success(visiblePlans, cacheMessage()))
     }
 
     getLocalKv(KEY_ACTIVE_STORE_ID)?.takeIf { it.isNotBlank() }?.let { storeId ->
@@ -5384,6 +6665,8 @@ private fun refreshEverythingFromServerAfterRealtimeUpdate() {
     getSuppliers()
     getGenericGoodsCategories()
     getNotifications()
+    getSupportTickets()
+    activeSupportTicketIdState.value?.let { getSupportMessages(it, markRead = true) }
     getSecuritySessions()
     getMyWorkerMemberships()
     getMyWorkerRequests()
@@ -5416,6 +6699,7 @@ private fun scheduleRealtimeRefresh(reason: String? = null) {
 fun stopRealtimeUpdates() {
     realtimeUpdatesJob?.cancel()
     realtimeUpdatesJob = null
+    realtimeOfflineNoticePosted = false
     realtimeUpdatesConnectedState.value = false
 }
 
@@ -5448,12 +6732,16 @@ fun startRealtimeUpdates() {
 
                 try {
                     val becameConnected = !realtimeUpdatesConnectedState.value
+                    val recoveredFromOffline = realtimeOfflineNoticePosted
                     realtimeUpdatesConnectedState.emit(true)
+                    realtimeOfflineNoticePosted = false
                     reconnectDelayMillis = 1_000L
 
-                    if (becameConnected) {
-                        postInAppNotification(realtimeConnectedMessage(), NotificationType.Positive, transient = true)
+                    if (becameConnected || recoveredFromOffline) {
+                        postInAppNotification(realtimeConnectedMessage(), NotificationType.Positive)
                         scheduleRealtimeRefresh("connected")
+                        syncPendingNotificationsToServer()
+                        syncLocalNetworkOperationsToCloud()
                     }
 
                     session.outgoing.send(
@@ -5482,9 +6770,18 @@ fun startRealtimeUpdates() {
                     } catch (_: Throwable) {
                     }
                 }
+
+                if (isActive) {
+                    realtimeOfflineNoticePosted = true
+                    realtimeUpdatesConnectedState.emit(false)
+                    delay(reconnectDelayMillis)
+                    reconnectDelayMillis = (reconnectDelayMillis * 2).coerceAtMost(30_000L)
+                }
             } catch (_: Throwable) {
-                if (wasConnected || realtimeUpdatesConnectedState.value) {
-                    postInAppNotification(realtimeDisconnectedMessage(), NotificationType.Neutral, transient = true)
+                if (!realtimeOfflineNoticePosted || wasConnected || realtimeUpdatesConnectedState.value) {
+                    // The persistent top connection banner represents this state. Do not create
+                    // repeating notification history entries while the same outage continues.
+                    realtimeOfflineNoticePosted = true
                 }
                 realtimeUpdatesConnectedState.emit(false)
                 delay(reconnectDelayMillis)
@@ -5545,6 +6842,11 @@ fun observeCart(transactionTypeIndex: Int, clientId: Int): Flow<List<GoodsItemIn
             }
         }
 
+private const val IN_APP_NOTIFICATION_DEDUPE_WINDOW_MILLIS = 10_000L
+private const val IN_APP_NOTIFICATION_ID_BUCKET_MILLIS = 10_000L
+private const val ACTIVE_IN_APP_NOTIFICATION_LIMIT = 5
+private const val LOCAL_NOTIFICATION_HISTORY_LIMIT = 200
+
 private fun createNotificationDataModel(
     message: String,
     type: NotificationType,
@@ -5556,10 +6858,20 @@ private fun createNotificationDataModel(
     }
 ): NotificationDataModel {
     val now = getCurrentTimeMillis()
+    val storeId = activeStoreIdState.value
+    val bucket = now / IN_APP_NOTIFICATION_ID_BUCKET_MILLIS
+    val stableKey = listOf(
+        userAccountState.payloadValue?.id.orEmpty(),
+        storeId.orEmpty(),
+        type.name,
+        category,
+        message
+    ).joinToString("|")
+
     return NotificationDataModel(
-        id = "${now}_${message.hashCode()}_${type.name}",
+        id = "${bucket}_${stableKey.hashCode()}_${type.name}",
         userId = userAccountState.payloadValue?.id,
-        storeId = activeStoreIdState.value,
+        storeId = storeId,
         title = title,
         message = message,
         type = type,
@@ -5573,6 +6885,16 @@ private fun createNotificationDataModel(
     )
 }
 
+private fun NotificationDataModel.dedupeKey(): String = listOf(
+    userId.orEmpty(),
+    storeId.orEmpty(),
+    type.name,
+    category,
+    source,
+    title,
+    message
+).joinToString("|")
+
 private suspend fun appendNotificationLocally(notification: NotificationDataModel) {
     val old = notificationsState.payloadValue.orEmpty()
     notificationsState.emit(
@@ -5580,28 +6902,66 @@ private suspend fun appendNotificationLocally(notification: NotificationDataMode
             (listOf(notification) + old)
                 .distinctBy { it.id }
                 .sortedByDescending { it.createdAtMillis }
-                .take(500)
+                .take(LOCAL_NOTIFICATION_HISTORY_LIMIT)
         )
     )
 }
 
+private suspend fun removeActiveInAppNotification(notificationId: String) {
+    notificationPopupMutex.withLock {
+        notificationPopupJobs.remove(notificationId)?.cancel()
+        val remaining = activeInAppNotificationsState.value.filter { it.id != notificationId }
+        activeInAppNotificationsState.emit(remaining)
+        if (latestInAppNotificationState.value?.id == notificationId) {
+            latestInAppNotificationState.emit(remaining.firstOrNull())
+        }
+        notificationPopupJobs.remove(notificationId)
+    }
+}
+
+private fun scheduleNotificationPopupRemoval(notificationId: String, delayMillis: Long = 5_000L) {
+    notificationPopupJobs.remove(notificationId)?.cancel()
+    notificationPopupJobs[notificationId] = GlobalScope.launch(Dispatchers.ourIo) {
+        delay(delayMillis)
+        removeActiveInAppNotification(notificationId)
+    }
+}
+
 private fun pushInAppNotification(notification: NotificationDataModel, transient: Boolean) {
     GlobalScope.launch(Dispatchers.ourIo) {
-        latestInAppNotificationState.emit(notification)
-        activeInAppNotificationsState.emit(
-            (listOf(notification) + activeInAppNotificationsState.value)
-                .distinctBy { it.id }
-                .take(25)
-        )
-        appendNotificationLocally(notification)
-        saveNotificationToServer(notification)
+        val now = getCurrentTimeMillis()
+        val key = notification.dedupeKey()
 
-        // Popup cards are temporary visual toasts; the notification itself stays in history.
-        // The transient flag is kept for call-site compatibility, but popups always disappear.
-        delay(5000)
-        activeInAppNotificationsState.emit(activeInAppNotificationsState.value.filter { it.id != notification.id })
-        if (latestInAppNotificationState.value?.id == notification.id) {
-            latestInAppNotificationState.emit(activeInAppNotificationsState.value.firstOrNull())
+        notificationPopupMutex.withLock {
+            val duplicateActive = activeInAppNotificationsState.value.firstOrNull { existing ->
+                existing.dedupeKey() == key && now - existing.shownAtMillis <= IN_APP_NOTIFICATION_DEDUPE_WINDOW_MILLIS
+            }
+            val duplicateRecent = notificationsState.payloadValue.orEmpty().firstOrNull { existing ->
+                existing.dedupeKey() == key && now - existing.createdAtMillis <= IN_APP_NOTIFICATION_DEDUPE_WINDOW_MILLIS
+            }
+
+            if (duplicateActive != null) {
+                latestInAppNotificationState.emit(duplicateActive)
+                scheduleNotificationPopupRemoval(duplicateActive.id)
+                return@launch
+            }
+
+            if (duplicateRecent != null) {
+                return@launch
+            }
+
+            latestInAppNotificationState.emit(notification)
+            activeInAppNotificationsState.emit(
+                (listOf(notification) + activeInAppNotificationsState.value)
+                    .distinctBy { it.id }
+                    .take(ACTIVE_IN_APP_NOTIFICATION_LIMIT)
+            )
+            scheduleNotificationPopupRemoval(notification.id)
+        }
+
+        if (!transient) {
+            appendNotificationLocally(notification)
+            saveNotificationToServer(notification)
         }
     }
 }
@@ -5609,19 +6969,21 @@ private fun pushInAppNotification(notification: NotificationDataModel, transient
 fun postInAppNotification(
     message: List<LocalizedStringDataModel>?,
     type: NotificationType,
-    transient: Boolean = true
+    transient: Boolean = false
 ) {
     message?.extractLocalizedString(appLanguageState.value)?.run {
         postInAppNotification(this, type, transient)
     }
 }
 
-fun postInAppNotification(message: String, type: NotificationType, transient: Boolean = true) {
+fun postInAppNotification(message: String, type: NotificationType, transient: Boolean = false) {
     pushInAppNotification(createNotificationDataModel(message, type), transient)
 }
 
 fun clearInAppNotification() {
     GlobalScope.launch(Dispatchers.ourIo) {
+        notificationPopupJobs.values.forEach { it.cancel() }
+        notificationPopupJobs.clear()
         latestInAppNotificationState.emit(null)
         activeInAppNotificationsState.emit(emptyList())
     }
@@ -5629,6 +6991,7 @@ fun clearInAppNotification() {
 
 fun dismissInAppNotification(notificationId: String, markAsRead: Boolean = true) {
     GlobalScope.launch(Dispatchers.ourIo) {
+        notificationPopupJobs.remove(notificationId)?.cancel()
         val remaining = activeInAppNotificationsState.value.filter { it.id != notificationId }
         activeInAppNotificationsState.emit(remaining)
         if (latestInAppNotificationState.value?.id == notificationId) {
@@ -5641,11 +7004,60 @@ fun dismissInAppNotification(notificationId: String, markAsRead: Boolean = true)
     }
 }
 
+private suspend fun saveNotificationToServerNow(notification: NotificationDataModel) {
+    if (notification.message.isBlank()) return
+    if (getStoredUserAuthTokens?.invoke() == null) return
+    if (userAccountState.payloadValue == null) return
+
+    saveNotificationMutex.withLock {
+        val response = networkRequest<NotificationDataModel, NotificationDataModel>(
+            method = HttpMethod.Post,
+            endpointUrl = "notifications/add",
+            body = notification
+        )
+
+        if (!response.negative && response.payload != null) {
+            val saved = response.payload.copy(isSavedOnServer = true)
+            val old = notificationsState.payloadValue.orEmpty()
+            notificationsState.emit(
+                DataState.Success(
+                    (listOf(saved) + old.filter { it.id != notification.id && it.id != saved.id })
+                        .distinctBy { it.id }
+                        .sortedByDescending { it.createdAtMillis }
+                        .take(LOCAL_NOTIFICATION_HISTORY_LIMIT)
+                )
+            )
+        } else if (response.transportFailure) {
+            // Leave the local copy with isSavedOnServer=false. It will be retried after reconnect.
+        }
+    }
+}
+
+fun syncPendingNotificationsToServer() {
+    if (syncPendingNotificationsMutex.isLocked) return
+    if (getStoredUserAuthTokens?.invoke() == null) return
+    if (userAccountState.payloadValue == null) return
+
+    GlobalScope.launch(Dispatchers.ourIo) {
+        syncPendingNotificationsMutex.withLock {
+            val pending = notificationsState.payloadValue.orEmpty()
+                .filter { !it.isSavedOnServer && it.message.isNotBlank() }
+                .sortedBy { it.createdAtMillis }
+
+            pending.forEach { notification ->
+                saveNotificationToServerNow(notification)
+            }
+        }
+    }
+}
+
 fun getNotifications() {
     if (!getNotificationsMutex.isLocked)
         GlobalScope.launch(Dispatchers.ourIo) {
             getNotificationsMutex.withLock {
                 if (getStoredUserAuthTokens?.invoke() == null) return@withLock
+
+                val localPending = notificationsState.payloadValue.orEmpty().filter { !it.isSavedOnServer }
 
                 val response = networkRequest<List<NotificationDataModel>, Unit>(
                     method = HttpMethod.Get,
@@ -5653,7 +7065,15 @@ fun getNotifications() {
                 )
 
                 if (!response.negative) {
-                    notificationsState.emit(DataState.Success(response.payload.orEmpty(), response.message))
+                    val merged = (localPending + response.payload.orEmpty())
+                        .distinctBy { it.id }
+                        .sortedByDescending { it.createdAtMillis }
+                        .take(LOCAL_NOTIFICATION_HISTORY_LIMIT)
+                    notificationsState.emit(DataState.Success(merged, response.message))
+                    syncPendingNotificationsToServer()
+                } else if (response.transportFailure) {
+                    // Keep local notification history available offline.
+                    notificationsState.emit(DataState.Success(notificationsState.payloadValue.orEmpty(), response.message))
                 }
             }
         }
@@ -5665,28 +7085,7 @@ fun saveNotificationToServer(notification: NotificationDataModel) {
     if (userAccountState.payloadValue == null) return
 
     GlobalScope.launch(Dispatchers.ourIo) {
-        if (!saveNotificationMutex.isLocked) {
-            saveNotificationMutex.withLock {
-                val response = networkRequest<NotificationDataModel, NotificationDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = "notifications/add",
-                    body = notification
-                )
-
-                if (!response.negative && response.payload != null) {
-                    val saved = response.payload
-                    val old = notificationsState.payloadValue.orEmpty()
-                    notificationsState.emit(
-                        DataState.Success(
-                            (listOf(saved) + old)
-                                .distinctBy { it.id }
-                                .sortedByDescending { it.createdAtMillis }
-                                .take(500)
-                        )
-                    )
-                }
-            }
-        }
+        saveNotificationToServerNow(notification)
     }
 }
 
@@ -5738,6 +7137,213 @@ fun markAllNotificationsRead() {
             notificationsState.emit(DataState.Success(response.payload))
         }
     }
+}
+
+
+private fun List<SupportTicketDataModel>.upsertSupportTicket(ticket: SupportTicketDataModel): List<SupportTicketDataModel> {
+    val index = indexOfFirst { it.id == ticket.id }
+    return (if (index == -1) listOf(ticket) + this else toMutableList().also { it[index] = ticket })
+        .sortedByDescending { it.updatedAtMillis }
+}
+
+private fun List<SupportMessageDataModel>.upsertSupportMessage(message: SupportMessageDataModel): List<SupportMessageDataModel> {
+    val index = indexOfFirst { it.id == message.id || (message.clientMessageId != null && it.clientMessageId == message.clientMessageId) }
+    return (if (index == -1) this + message else toMutableList().also { it[index] = message })
+        .sortedBy { it.createdAtMillis }
+}
+
+fun getSupportTickets(onCompleted: ((DataState<List<SupportTicketDataModel>>) -> Unit)? = null) {
+    if (!getSupportTicketsMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getSupportTicketsMutex.withLock {
+                if (getStoredUserAuthTokens?.invoke() == null) return@withLock
+
+                val response = networkRequest<List<SupportTicketDataModel>, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getSupportTicketsPath.first
+                )
+
+                if (response.negative || response.payload == null) {
+                    if (!response.transportFailure) postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    supportTicketsState.emit(DataState.Success(response.payload, response.message))
+                    activeSupportTicketIdState.emit(
+                        activeSupportTicketIdState.value?.takeIf { activeId -> response.payload.any { it.id == activeId } }
+                            ?: response.payload.firstOrNull { it.status != "closed" }?.id
+                            ?: response.payload.firstOrNull()?.id
+                    )
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun createSupportTicket(
+    request: SupportTicketCreateRequestDataModel,
+    onCompleted: ((DataState<SupportTicketDataModel>) -> Unit)? = null
+) {
+    if (request.initialMessage.isBlank()) return
+    if (!createSupportTicketMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            createSupportTicketMutex.withLock {
+                supportMessageSendingState.emit(true)
+                val response = networkRequest<SupportTicketDataModel, SupportTicketCreateRequestDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.createSupportTicketPath.first,
+                    body = request.copy(
+                        subject = request.subject.ifBlank { request.initialMessage.take(80) },
+                        initialMessage = request.initialMessage.trim()
+                    )
+                )
+                supportMessageSendingState.emit(false)
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, if (response.transportFailure) NotificationType.Neutral else NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    val ticket = response.payload
+                    supportTicketsState.emit(DataState.Success(supportTicketsState.payloadValue.orEmpty().upsertSupportTicket(ticket), response.message))
+                    activeSupportTicketIdState.emit(ticket.id)
+                    getSupportMessages(ticket.id, markRead = true)
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(ticket, response.message))
+                }
+            }
+        }
+}
+
+fun getSupportMessages(
+    ticketId: String,
+    markRead: Boolean = true,
+    onCompleted: ((DataState<List<SupportMessageDataModel>>) -> Unit)? = null
+) {
+    if (ticketId.isBlank()) return
+    if (!getSupportMessagesMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getSupportMessagesMutex.withLock {
+                activeSupportTicketIdState.emit(ticketId)
+                val response = networkRequest<List<SupportMessageDataModel>, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getSupportMessagesPath.first,
+                    headers = mapOf(
+                        "ticket_id" to ticketId,
+                        "mark_read" to markRead.toString()
+                    )
+                )
+
+                if (response.negative || response.payload == null) {
+                    if (!response.transportFailure) postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    supportMessagesState.emit(DataState.Success(response.payload, response.message))
+                    if (markRead) {
+                        supportTicketsState.emit(
+                            DataState.Success(
+                                supportTicketsState.payloadValue.orEmpty().map { if (it.id == ticketId) it.copy(unreadForUserCount = 0) else it }
+                            )
+                        )
+                    }
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun sendSupportMessage(
+    request: SupportMessageSendRequestDataModel,
+    onCompleted: ((DataState<SupportMessageDataModel>) -> Unit)? = null
+) {
+    if (request.ticketId.isBlank() || request.body.isBlank()) return
+    if (!sendSupportMessageMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            sendSupportMessageMutex.withLock {
+                supportMessageSendingState.emit(true)
+                val response = networkRequest<SupportMessageDataModel, SupportMessageSendRequestDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.sendSupportMessagePath.first,
+                    body = request.copy(body = request.body.trim())
+                )
+                supportMessageSendingState.emit(false)
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, if (response.transportFailure) NotificationType.Neutral else NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    val message = response.payload
+                    supportMessagesState.emit(DataState.Success(supportMessagesState.payloadValue.orEmpty().upsertSupportMessage(message), response.message))
+                    getSupportTickets()
+                    onCompleted?.invoke(DataState.Success(message, response.message))
+                }
+            }
+        }
+}
+
+fun closeSupportTicket(ticketId: String, onCompleted: ((DataState<SupportTicketDataModel>) -> Unit)? = null) {
+    if (ticketId.isBlank()) return
+    if (!closeSupportTicketMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            closeSupportTicketMutex.withLock {
+                val response = networkRequest<SupportTicketDataModel, SupportTicketActionRequestDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.closeSupportTicketPath.first,
+                    body = SupportTicketActionRequestDataModel(ticketId)
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    supportTicketsState.emit(DataState.Success(supportTicketsState.payloadValue.orEmpty().upsertSupportTicket(response.payload), response.message))
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun reopenSupportTicket(ticketId: String, onCompleted: ((DataState<SupportTicketDataModel>) -> Unit)? = null) {
+    if (ticketId.isBlank()) return
+    if (!reopenSupportTicketMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            reopenSupportTicketMutex.withLock {
+                val response = networkRequest<SupportTicketDataModel, SupportTicketActionRequestDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.reopenSupportTicketPath.first,
+                    body = SupportTicketActionRequestDataModel(ticketId)
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    supportTicketsState.emit(DataState.Success(supportTicketsState.payloadValue.orEmpty().upsertSupportTicket(response.payload), response.message))
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun markSupportMessagesRead(ticketId: String) {
+    if (ticketId.isBlank()) return
+    if (!markSupportMessagesReadMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            markSupportMessagesReadMutex.withLock {
+                networkRequest<List<SupportMessageDataModel>, SupportMessagesReadRequestDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.markSupportMessagesReadPath.first,
+                    body = SupportMessagesReadRequestDataModel(ticketId)
+                ).takeIf { !it.negative && it.payload != null }?.payload?.let { messages ->
+                    supportMessagesState.emit(DataState.Success(messages))
+                    supportTicketsState.emit(
+                        DataState.Success(
+                            supportTicketsState.payloadValue.orEmpty().map { if (it.id == ticketId) it.copy(unreadForUserCount = 0) else it }
+                        )
+                    )
+                }
+            }
+        }
 }
 
 fun getSecuritySessions(onCompleted: ((DataState<List<SecuritySessionDataModel>>) -> Unit)? = null) {
@@ -5938,6 +7544,10 @@ fun logOutUser() {
                 transactionsState.emit(DataState.Empty())
                 securitySessionsState.emit(DataState.Empty())
                 activeWorkshiftState.emit(DataState.Empty())
+                supportTicketsState.emit(DataState.Empty())
+                supportMessagesState.emit(DataState.Empty())
+                activeSupportTicketIdState.emit(null)
+                supportMessageSendingState.emit(false)
                 latestInAppNotificationState.emit(null)
                 activeInAppNotificationsState.emit(emptyList())
 
@@ -5992,34 +7602,29 @@ fun getUser(forceLogOut: Boolean = true) {
                 if (response.negative) {
                     when {
                         response.transportFailure -> {
-                            postInAppNotification(
-                                localizedStringResourceMessage(
-                                    id = 214,
-                                    main = "Cannot reach server. Keeping you signed in offline.",
-                                    ru = "Сервер недоступен. Вы остаётесь в аккаунте офлайн.",
-                                    kk = "Сервер қолжетімсіз. Сіз офлайн режимде аккаунтта қаласыз."
-                                ),
-                                NotificationType.Neutral
-                            )
+                            // The persistent connection banner represents server outage; keep the cached account active.
                         }
                         response.httpStatusCode == HttpStatusCode.Unauthorized.value && forceLogOut -> {
-                            forceLogOutUser()
-                            postInAppNotification(response.message, NotificationType.Negative)
+                            postInAppNotification(response.message, NotificationType.Neutral)
                         }
                         else -> postInAppNotification(response.message, NotificationType.Negative)
                     }
                 } else {
                     clearInAppNotification()
-                    setStoredUserAccountDataModel?.invoke(response.payload)
-                    userAccountState.emit(DataState.Success(response.payload!!, response.message))
+                    val account = response.payload!!
+                    setStoredUserAccountDataModel?.invoke(account)
+                    userAccountState.emit(DataState.Success(account, response.message))
+                    applyUserAccountPreferencesAfterLogin(account)
 
-                    response.payload.activeStoreId?.takeIf { it.isNotBlank() }?.let { savedStoreId ->
+                    account.activeStoreId?.takeIf { it.isNotBlank() }?.let { savedStoreId ->
                         putLocalKv(KEY_ACTIVE_STORE_ID, savedStoreId)
                         activeStoreIdState.emit(savedStoreId)
                     }
 
                     getGlobalAppConfiguration()
                     getNotifications()
+                    syncPendingNotificationsToServer()
+                    getSupportTickets()
                     getStores()
                     getSuppliers()
                     getGenericGoodsCategories()
@@ -6056,6 +7661,90 @@ fun updateUser(
         }
 }
 
+@kotlinx.serialization.Serializable
+data class UserPreferencesDataModel(
+    val appLanguage: String = DEFAULT_APP_LANGUAGE,
+    val appThemeId: Long = DEFAULT_APP_THEME_ID,
+    val appSizeModeId: Long = DEFAULT_APP_SIZE_MODE_ID
+)
+
+private suspend fun applyUserPreferencesLocally(
+    appLanguage: String?,
+    appThemeId: Long?,
+    appSizeModeId: Long? = null
+) {
+    val normalizedLanguage = normalizeAppLanguagePreference(appLanguage)
+    val normalizedThemeId = normalizeAppThemePreference(appThemeId)
+    val normalizedSizeModeId = normalizeAppSizeModePreference(appSizeModeId)
+    appLanguageState.emit(normalizedLanguage)
+    appThemeIdState.emit(normalizedThemeId)
+    appSizeModeIdState.emit(normalizedSizeModeId)
+    putLocalKv(KEY_APP_LOCALE, normalizedLanguage)
+    putLocalKv(KEY_APP_THEME, normalizedThemeId.toString())
+    putLocalKv(KEY_APP_SIZE_MODE, normalizedSizeModeId.toString())
+}
+
+private suspend fun applyUserAccountPreferencesAfterLogin(account: UserAccountDataModel) {
+    val override = authScreenPreferenceOverrideState.value
+    if (override.touched) {
+        val preferredLanguage = if (override.languageTouched) {
+            normalizeAppLanguagePreference(override.appLanguage)
+        } else {
+            normalizeAppLanguagePreference(account.appLanguage)
+        }
+        val preferredThemeId = if (override.themeTouched) {
+            normalizeAppThemePreference(override.appThemeId)
+        } else {
+            normalizeAppThemePreference(account.appThemeId)
+        }
+        val preferredSizeModeId = if (override.sizeModeTouched) {
+            normalizeAppSizeModePreference(override.appSizeModeId)
+        } else {
+            normalizeAppSizeModePreference(account.appSizeModeId)
+        }
+
+        applyUserPreferencesLocally(preferredLanguage, preferredThemeId, preferredSizeModeId)
+        authScreenPreferenceOverrideState.emit(AuthScreenPreferenceOverrideDataModel())
+        syncUserPreferencesToServer(preferredLanguage, preferredThemeId, preferredSizeModeId, postFailure = false)
+    } else {
+        applyUserPreferencesLocally(account.appLanguage, account.appThemeId, account.appSizeModeId)
+    }
+}
+
+fun syncUserPreferencesToServer(
+    appLanguage: String = appLanguageState.value,
+    appThemeId: Long = appThemeIdState.value,
+    appSizeModeId: Long = appSizeModeIdState.value,
+    postFailure: Boolean = true
+) {
+    if (getStoredUserAuthTokens?.invoke() == null || updateUserPreferencesMutex.isLocked) return
+
+    GlobalScope.launch(Dispatchers.ourIo) {
+        updateUserPreferencesMutex.withLock {
+            val request = UserPreferencesDataModel(
+                appLanguage = normalizeAppLanguagePreference(appLanguage),
+                appThemeId = normalizeAppThemePreference(appThemeId),
+                appSizeModeId = normalizeAppSizeModePreference(appSizeModeId)
+            )
+
+            val response = networkRequest<UserAccountDataModel, UserPreferencesDataModel>(
+                method = HttpMethod.Put,
+                endpointUrl = globalAppConfigurationState.payloadValue.updateUserPreferencesPath.first,
+                body = request
+            )
+
+            if (response.negative || response.payload == null) {
+                if (postFailure) {
+                    postInAppNotification(response.message, NotificationType.Neutral, transient = true)
+                }
+            } else {
+                userAccountState.emit(DataState.Success(response.payload, response.message))
+                setStoredUserAccountDataModel?.invoke(response.payload)
+            }
+        }
+    }
+}
+
 fun forceLogOutUser(
     message: List<LocalizedStringDataModel>? = null,
     postMessage: Boolean = false
@@ -6080,11 +7769,14 @@ fun forceLogOutUser(
         storeWorkerMembershipsState.emit(DataState.Empty())
         activeWorkshiftState.emit(DataState.Empty())
         operationLogsState.emit(DataState.Empty())
+        storeAnalyticsDashboardState.emit(DataState.Empty())
         cashRegisterState.emit(DataState.Empty())
         cashRegisterEventsState.emit(DataState.Empty())
         userFinanceDashboardState.emit(DataState.Empty())
         activeStoreSubscriptionState.emit(DataState.Empty())
         activeStoreSubscriptionChargesState.emit(DataState.Empty())
+        notificationPopupJobs.values.forEach { it.cancel() }
+        notificationPopupJobs.clear()
         latestInAppNotificationState.emit(null)
         activeInAppNotificationsState.emit(emptyList())
 
@@ -6092,9 +7784,9 @@ fun forceLogOutUser(
             postInAppNotification(
                 message ?: localizedStringResourceMessage(
                     id = 91,
-                    main = "Session time expired. Logging out",
-                    ru = "Время сеанса истекло. Выполняется выход",
-                    kk = "Сеанс мерзімі аяқталды. Аккаунттан шығу орындалуда"
+                    main = "Cloud session needs refresh. You remain signed in locally.",
+                    ru = "Облачный сеанс нужно обновить. Вы остаётесь в аккаунте локально.",
+                    kk = "Бұлттық сеансты жаңарту қажет. Сіз жергілікті түрде аккаунтта қаласыз."
                 ),
                 NotificationType.Negative,
                 transient = true
@@ -6112,6 +7804,8 @@ suspend inline fun <reified Response, reified Body> networkRequest(
     body: Body? = null,
     contentType: ContentType? = ContentType.Application.Json
 ): ResponseDataModel<Response> {
+    activeNetworkOperationsState.update { it + 1 }
+
     return try {
         val response = httpClient
             .request("$serverUrl/$endpointUrl") {
@@ -6139,16 +7833,14 @@ suspend inline fun <reified Response, reified Body> networkRequest(
         if (response.status == HttpStatusCode.Unauthorized) {
             val expiredMessage = localizedStringResourceMessage(
                 id = 91,
-                main = "Session time expired. Logging out",
-                ru = "Время сеанса истекло. Выполняется выход",
-                kk = "Сеанс мерзімі аяқталды. Аккаунттан шығу орындалуда"
+                main = "Cloud session needs refresh. You remain signed in locally.",
+                ru = "Облачный сеанс нужно обновить. Вы остаётесь в аккаунте локально.",
+                kk = "Бұлттық сеансты жаңарту қажет. Сіз жергілікті түрде аккаунтта қаласыз."
             )
 
-            if (!endpointUrl.startsWith("auth/logIn") && !endpointUrl.startsWith("auth/signUp")) {
-                forceLogOutUser(message = expiredMessage, postMessage = true)
-            }
-
-            ResponseDataModel(
+            // Do not destroy the local account on a single 401. The refresh token/session may be rotating,
+            // the server may have just restarted, or the user may be temporarily offline. Local logout remains manual.
+            ResponseDataModel<Response>(
                 message = expiredMessage,
                 payload = null,
                 negative = true,
@@ -6158,40 +7850,56 @@ suspend inline fun <reified Response, reified Body> networkRequest(
         } else {
             val rawBody = response.bodyAsText()
 
-            try {
+            runCatching {
                 jsonBase.decodeFromString<GenericResponseDataModel>(rawBody).toResponseDataModel<Response>()
-            } catch (_: Throwable) {
-                try {
+            }.getOrElse {
+                runCatching {
                     jsonBase.decodeFromString<ResponseDataModel<Response>>(rawBody)
-                } catch (decodeThrowable: Throwable) {
-                    val rawPreview = rawBody
-                        .replace("\n", " ")
-                        .replace("\r", " ")
-                        .take(1200)
-                        .ifBlank { "<empty response body>" }
-
-                    ResponseDataModel(
-                        message = listOf(
-                            LocalizedStringDataModel(
-                                language = "main",
-                                value = "Server returned an unreadable response: HTTP ${response.status.value} ${response.status.description}: $rawPreview"
-                            ),
-                            LocalizedStringDataModel(
-                                language = "en",
-                                value = "Server returned an unreadable response: HTTP ${response.status.value} ${response.status.description}: $rawPreview"
-                            ),
-                            LocalizedStringDataModel(
-                                language = "ru",
-                                value = "Сервер вернул нечитаемый ответ: HTTP ${response.status.value} ${response.status.description}: $rawPreview"
-                            ),
-                            LocalizedStringDataModel(
-                                language = "kk",
-                                value = "Сервер оқылмайтын жауап қайтарды: HTTP ${response.status.value} ${response.status.description}: $rawPreview"
+                }.getOrElse {
+                    runCatching {
+                        jsonBase.decodeFromString<Response>(rawBody)
+                    }.fold(
+                        onSuccess = { payload ->
+                            ResponseDataModel<Response>(
+                                message = null,
+                                payload = payload,
+                                negative = !response.status.isSuccess(),
+                                httpStatusCode = response.status.value,
+                                transportFailure = false
                             )
-                        ),
-                        payload = null,
-                        negative = true,
-                        httpStatusCode = response.status.value
+                        },
+                        onFailure = {
+                            val rawPreview = rawBody
+                                .replace("\n", " ")
+                                .replace("\r", " ")
+                                .take(1200)
+                                .ifBlank { "<empty response body>" }
+
+                            ResponseDataModel<Response>(
+                                message = listOf(
+                                    LocalizedStringDataModel(
+                                        language = "main",
+                                        value = "Server returned an unreadable response: HTTP ${response.status.value} ${response.status.description}: $rawPreview"
+                                    ),
+                                    LocalizedStringDataModel(
+                                        language = "en",
+                                        value = "Server returned an unreadable response: HTTP ${response.status.value} ${response.status.description}: $rawPreview"
+                                    ),
+                                    LocalizedStringDataModel(
+                                        language = "ru",
+                                        value = "Сервер вернул нечитаемый ответ: HTTP ${response.status.value} ${response.status.description}: $rawPreview"
+                                    ),
+                                    LocalizedStringDataModel(
+                                        language = "kk",
+                                        value = "Сервер оқылмайтын жауап қайтарды: HTTP ${response.status.value} ${response.status.description}: $rawPreview"
+                                    )
+                                ),
+                                payload = null,
+                                negative = true,
+                                httpStatusCode = response.status.value,
+                                transportFailure = false
+                            )
+                        }
                     )
                 }
             }
@@ -6203,16 +7911,14 @@ suspend inline fun <reified Response, reified Body> networkRequest(
         if (status == HttpStatusCode.Unauthorized) {
             val expiredMessage = localizedStringResourceMessage(
                 id = 91,
-                main = "Session time expired. Logging out",
-                ru = "Время сеанса истекло. Выполняется выход",
-                kk = "Сеанс мерзімі аяқталды. Аккаунттан шығу орындалуда"
+                main = "Cloud session needs refresh. You remain signed in locally.",
+                ru = "Облачный сеанс нужно обновить. Вы остаётесь в аккаунте локально.",
+                kk = "Бұлттық сеансты жаңарту қажет. Сіз жергілікті түрде аккаунтта қаласыз."
             )
 
-            if (!endpointUrl.startsWith("auth/logIn") && !endpointUrl.startsWith("auth/signUp")) {
-                forceLogOutUser(message = expiredMessage, postMessage = true)
-            }
-
-            ResponseDataModel(
+            // Do not destroy the local account on a single 401. The refresh token/session may be rotating,
+            // the server may have just restarted, or the user may be temporarily offline. Local logout remains manual.
+            ResponseDataModel<Response>(
                 message = expiredMessage,
                 payload = null,
                 negative = true,
@@ -6220,7 +7926,7 @@ suspend inline fun <reified Response, reified Body> networkRequest(
                 transportFailure = false
             )
         } else {
-            ResponseDataModel(
+            ResponseDataModel<Response>(
                 message = localizedStringResourceMessage(
                     id = 223,
                     main = "Cannot reach server",
@@ -6232,6 +7938,8 @@ suspend inline fun <reified Response, reified Body> networkRequest(
                 transportFailure = true
             )
         }
+    } finally {
+        activeNetworkOperationsState.update { (it - 1).coerceAtLeast(0) }
     }
 }
 
@@ -6614,9 +8322,12 @@ fun updateGoodsItem(
                                     newList.addAll(this)
                                 }
 
-                                stockState.payloadValue?.indexOfFirst { it.id == response.payload!!.id }?.let { index ->
-                                    newList[index] = response.payload!!
-                                } ?: newList.add(response.payload!!)
+                                val existingIndex = newList.indexOfFirst { it.id == response.payload!!.id }
+                                if (existingIndex >= 0) {
+                                    newList[existingIndex] = response.payload!!
+                                } else {
+                                    newList.add(response.payload!!)
+                                }
                             }
                         )
                     )
@@ -7581,7 +9292,7 @@ data class DebtorDataModel(
         get() = if (debtorType == "company") {
             companyName.ifBlank { companyIdNumber.ifBlank { id } }
         } else {
-            "${firstName.trim()} ${lastName.trim()}".trim().ifBlank { phoneNumber.ifBlank { id } }
+            "${firstName.trim()} ${lastName.trim()}".trim().ifBlank { phoneNumber.asDisplayPhoneNumber().ifBlank { id } }
         }
 }
 
@@ -7659,6 +9370,7 @@ data class GlobalAppConfigurationDataModel(
     val revokeOtherSecuritySessionsPath: Pair<String, String> = Pair("security/sessions/revokeOthers", "46"),
     val getUserPath: Pair<String, String>,
     val updateUserPath: Pair<String, String>,
+    val updateUserPreferencesPath: Pair<String, String> = Pair("user/preferences/update", "95"),
     val getStoresPath: Pair<String, String>,
     val addStoresPath: Pair<String, String>,
     val updateStoresPath: Pair<String, String>,
@@ -7718,12 +9430,20 @@ data class GlobalAppConfigurationDataModel(
     val startWorkshiftPath: Pair<String, String> = Pair("workshifts/start", "87"),
     val endWorkshiftPath: Pair<String, String> = Pair("workshifts/end", "88"),
     val getOperationLogsPath: Pair<String, String> = Pair("logs/get", "92"),
+    val getStoreAnalyticsPath: Pair<String, String> = Pair("analytics/store/get", "94"),
     val getUserFinanceDashboardPath: Pair<String, String> = Pair("finance/dashboard", "77"),
     val createTopUpPaymentPath: Pair<String, String> = Pair("finance/topup/create", "78"),
     val confirmDevelopmentTopUpPath: Pair<String, String> = Pair("finance/topup/confirmDevelopment", "79"),
     val getSubscriptionPlansPath: Pair<String, String> = Pair("subscriptions/plans", "80"),
     val getStoreSubscriptionPath: Pair<String, String> = Pair("subscriptions/store/get", "81"),
     val updateStoreSubscriptionPath: Pair<String, String> = Pair("subscriptions/store/update", "82"),
+    val getSupportTicketsPath: Pair<String, String> = Pair("support/tickets/get", "96"),
+    val createSupportTicketPath: Pair<String, String> = Pair("support/tickets/create", "97"),
+    val closeSupportTicketPath: Pair<String, String> = Pair("support/tickets/close", "98"),
+    val reopenSupportTicketPath: Pair<String, String> = Pair("support/tickets/reopen", "99"),
+    val getSupportMessagesPath: Pair<String, String> = Pair("support/messages/get", "100"),
+    val sendSupportMessagePath: Pair<String, String> = Pair("support/messages/send", "101"),
+    val markSupportMessagesReadPath: Pair<String, String> = Pair("support/messages/read", "102"),
     val pagingDefaultPageSize: Int = 40,
     val pagingMaxPageSize: Int = 200,
     val paymentProviders: List<PaymentProviderConfigDataModel> = defaultPaymentProviders(),
@@ -7748,6 +9468,13 @@ data class SupplierOrderLineDataModel(
 
     val desiredExpirationDateMillis: Long? = null,
     val additionalNotes: String? = null,
+    val additionalNotesLocalized: List<LocalizedStringDataModel> = emptyList(),
+
+    val supplierComment: String? = null,
+    val supplierCommentLocalized: List<LocalizedStringDataModel> = emptyList(),
+    val supplierAcceptedQuantity: QuantityDataModel? = null,
+    val supplierOfferedSupplyPrice: PriceDataModel? = null,
+    val substituteGoodsItemId: String? = null,
 
     val deliveredBatchIds: List<String> = emptyList(),
 
@@ -7771,6 +9498,13 @@ data class SupplierOrderDataModel(
     val storeAddress: LocationDataModel? = null,
 
     val additionalNotes: String? = null,
+    val additionalNotesLocalized: List<LocalizedStringDataModel> = emptyList(),
+
+    val supplierComment: String? = null,
+    val supplierCommentLocalized: List<LocalizedStringDataModel> = emptyList(),
+    val paymentTerms: String? = null,
+    val externalReference: String? = null,
+    val storeContactUserId: String? = null,
 
     val status: SupplierOrderStatusDataModel = SupplierOrderStatusDataModel.Draft,
 
@@ -7824,6 +9558,7 @@ data class GoodsBatchDataModel(
     val expirationDateMillis: Long? = null,
 
     val discounts: List<BatchDiscountDataModel> = emptyList(),
+    val promotions: List<StockPromotionDataModel> = emptyList(),
 
     val shelfPosition: String? = null,
     val shelfPriority: Int = 0,
@@ -7831,6 +9566,7 @@ data class GoodsBatchDataModel(
     val status: StockBatchStatusDataModel = StockBatchStatusDataModel.Delivered,
 
     val additionalNotes: String? = null,
+    val additionalNotesLocalized: List<LocalizedStringDataModel> = emptyList(),
 
     val createdAtMillis: Long = 0L,
     val updatedAtMillis: Long = 0L,
@@ -7902,6 +9638,8 @@ data class GoodsItemDataModel(
 
     val activeShelfBatchId: String? = null,
 
+    val promotions: List<StockPromotionDataModel> = emptyList(),
+
     val note: String? = null,
     val noteLocalized: List<LocalizedStringDataModel> = emptyList(),
     val conditions: List<String> = emptyList(),
@@ -7922,6 +9660,7 @@ data class GoodsItemDataModel(
             addAll(wholesalePrices.map { it.price })
             addAll(noteLocalized.map { it.value })
             addAll(conditions)
+            addAll(promotions.flatMap { promotion -> promotion.title.map { it.value } + listOfNotNull(promotion.note) })
             note?.let { add(it) }
             addAll(salePrices.map { it.currency })
             addAll(returnPrices.map { it.currency })
@@ -7939,6 +9678,7 @@ data class GoodsItemDataModel(
             addAll(wholesalePrices.map { it.price })
             addAll(noteLocalized.map { it.value })
             addAll(conditions)
+            addAll(promotions.flatMap { promotion -> promotion.title.map { it.value } + listOfNotNull(promotion.note) })
             note?.let { add(it) }
             addAll(salePrices.map { it.currency })
             addAll(returnPrices.map { it.currency })
@@ -7975,7 +9715,11 @@ data class GoodsItemInTransactionDataModel(
     val pricePerUnit: Double,
     val supplierId: Long? = null,
     val saleMethodId: String = SALE_METHOD_RETAIL,
-    val supplierIdText: String? = null
+    val supplierIdText: String? = null,
+    val name: List<LocalizedStringDataModel> = emptyList(),
+    val goodsItemId: String? = null,
+    val quantityUnit: QuantityDataModel? = null,
+    val currencyCode: String? = null
 )
 
 @kotlinx.serialization.Serializable
@@ -8037,6 +9781,98 @@ enum class NotificationType {
 }
 
 @kotlinx.serialization.Serializable
+data class SupportTicketDataModel(
+    val id: String,
+    val publicId: String,
+    val userId: String,
+    val storeId: String? = null,
+    val subject: String,
+    val category: String = "general",
+    val priority: String = "normal",
+    val status: String = "open",
+    val assignedAgentUserId: String? = null,
+    val lastMessage: String = "",
+    val lastMessageAtMillis: Long = 0L,
+    val lastCustomerMessageAtMillis: Long? = null,
+    val lastAgentMessageAtMillis: Long? = null,
+    val unreadForUserCount: Int = 0,
+    val unreadForAgentCount: Int = 0,
+    val metadata: Map<String, String> = emptyMap(),
+    val createdAtMillis: Long = 0L,
+    val updatedAtMillis: Long = 0L,
+    val closedAtMillis: Long? = null,
+    val isActive: Boolean = true
+): Searchable {
+    override val exactSearchOperands: List<String>
+        get() = listOf(id, publicId, subject, category, priority, status, lastMessage) + metadata.values
+
+    override val containsSearchOperands: List<String>
+        get() = listOf(id, publicId, subject, category, priority, status, lastMessage) + metadata.values
+
+    override val uniqueSearchOperands: List<String>
+        get() = listOf(id, publicId)
+}
+
+@kotlinx.serialization.Serializable
+data class SupportMessageDataModel(
+    val id: String,
+    val ticketId: String,
+    val userId: String,
+    val senderUserId: String,
+    val senderRole: String,
+    val senderDisplayName: String = "",
+    val body: String,
+    val attachments: List<String> = emptyList(),
+    val metadata: Map<String, String> = emptyMap(),
+    val clientMessageId: String? = null,
+    val createdAtMillis: Long = 0L,
+    val editedAtMillis: Long? = null,
+    val readByCustomerAtMillis: Long? = null,
+    val readByAgentAtMillis: Long? = null,
+    val isActive: Boolean = true
+): Searchable {
+    override val exactSearchOperands: List<String>
+        get() = listOf(id, ticketId, senderRole, senderDisplayName, body) + metadata.values + attachments
+
+    override val containsSearchOperands: List<String>
+        get() = listOf(id, ticketId, senderRole, senderDisplayName, body) + metadata.values + attachments
+
+    override val uniqueSearchOperands: List<String>
+        get() = listOf(id)
+}
+
+@kotlinx.serialization.Serializable
+data class SupportTicketCreateRequestDataModel(
+    val subject: String,
+    val initialMessage: String,
+    val category: String = "general",
+    val priority: String = "normal",
+    val storeId: String? = null,
+    val metadata: Map<String, String> = emptyMap(),
+    val clientMessageId: String? = null
+)
+
+@kotlinx.serialization.Serializable
+data class SupportMessageSendRequestDataModel(
+    val ticketId: String,
+    val body: String,
+    val attachments: List<String> = emptyList(),
+    val metadata: Map<String, String> = emptyMap(),
+    val clientMessageId: String? = null
+)
+
+@kotlinx.serialization.Serializable
+data class SupportTicketActionRequestDataModel(
+    val ticketId: String
+)
+
+@kotlinx.serialization.Serializable
+data class SupportMessagesReadRequestDataModel(
+    val ticketId: String
+)
+
+
+@kotlinx.serialization.Serializable
 data class ParameterDataModel(
     val name: List<LocalizedStringDataModel>,
     val value: String,
@@ -8096,6 +9932,94 @@ data class RealtimeClientHelloDataModel(
     val language: String = "",
     val platform: String = "",
     val clientTimeMillis: Long = 0L
+)
+
+const val LOCAL_NETWORK_ROLE_DISABLED = "disabled"
+const val LOCAL_NETWORK_ROLE_AUTO = "auto"
+const val LOCAL_NETWORK_ROLE_SERVER = "server"
+const val LOCAL_NETWORK_ROLE_CLIENT = "client"
+const val LOCAL_NETWORK_OPERATION_TRANSACTION_COMPLETE = "transaction_complete"
+const val LOCAL_NETWORK_QUEUE_PENDING = "pending"
+const val LOCAL_NETWORK_QUEUE_SYNCED = "synced"
+const val LOCAL_NETWORK_QUEUE_FAILED = "failed"
+
+@kotlinx.serialization.Serializable
+data class LocalNetworkDeviceDataModel(
+    val deviceId: String = "",
+    val userId: String = "",
+    val userName: String = "",
+    val platform: String = "",
+    val host: String = "",
+    val port: Int = 45720,
+    val role: String = LOCAL_NETWORK_ROLE_CLIENT,
+    val storeId: String? = null,
+    val branchStoreId: String? = null,
+    val queueSize: Int = 0,
+    val online: Boolean = true,
+    val lastSeenMillis: Long = 0L
+)
+
+@kotlinx.serialization.Serializable
+data class LocalNetworkStateDataModel(
+    val enabled: Boolean = false,
+    val role: String = LOCAL_NETWORK_ROLE_DISABLED,
+    val deviceId: String = "",
+    val tcpPort: Int = 45720,
+    val discoveryPort: Int = 45721,
+    val serverDeviceId: String? = null,
+    val serverHost: String? = null,
+    val serverPort: Int = 45720,
+    val activeStoreId: String? = null,
+    val branchStoreId: String? = null,
+    val lastDiscoveryMillis: Long = 0L,
+    val lastSyncMillis: Long = 0L,
+    val lastError: String? = null
+) {
+    val isServer: Boolean get() = enabled && role == LOCAL_NETWORK_ROLE_SERVER
+    val isClient: Boolean get() = enabled && role == LOCAL_NETWORK_ROLE_CLIENT
+    val hasServer: Boolean get() = !serverHost.isNullOrBlank() && !serverDeviceId.isNullOrBlank()
+}
+
+@kotlinx.serialization.Serializable
+data class LocalNetworkSnapshotDataModel(
+    val storeId: String = "",
+    val stock: List<GoodsItemDataModel> = emptyList(),
+    val stockBatches: List<GoodsBatchDataModel> = emptyList(),
+    val transactions: List<TransactionDataModel> = emptyList(),
+    val debtors: List<DebtorDataModel> = emptyList(),
+    val cashRegister: StoreCashRegisterDataModel? = null,
+    val updatedAtMillis: Long = 0L
+)
+
+@kotlinx.serialization.Serializable
+data class LocalNetworkQueuedOperationDataModel(
+    val id: String = "",
+    val operationType: String = LOCAL_NETWORK_OPERATION_TRANSACTION_COMPLETE,
+    val storeId: String = "",
+    val branchStoreId: String? = null,
+    val endpointPath: String = "",
+    val httpMethod: String = "POST",
+    val bodyJson: String = "",
+    val createdByUserId: String = "",
+    val createdByDeviceId: String = "",
+    val createdAtMillis: Long = 0L,
+    val cloudSyncedAtMillis: Long? = null,
+    val status: String = LOCAL_NETWORK_QUEUE_PENDING,
+    val attemptCount: Int = 0,
+    val lastError: String? = null
+)
+
+@kotlinx.serialization.Serializable
+data class LocalNetworkEnvelopeDataModel(
+    val messageId: String = "",
+    val type: String = "hello",
+    val device: LocalNetworkDeviceDataModel? = null,
+    val operation: LocalNetworkQueuedOperationDataModel? = null,
+    val operations: List<LocalNetworkQueuedOperationDataModel> = emptyList(),
+    val snapshot: LocalNetworkSnapshotDataModel? = null,
+    val accepted: Boolean = true,
+    val error: String? = null,
+    val createdAtMillis: Long = 0L
 )
 
 @kotlinx.serialization.Serializable
@@ -8469,6 +10393,82 @@ fun buildCurrentClientDeviceInfo(): ClientDeviceInfoDataModel {
     )
 }
 
+
+@kotlinx.serialization.Serializable
+data class AnalyticsRankedItemDataModel(
+    val id: String = "",
+    val name: List<LocalizedStringDataModel> = emptyList(),
+    val subtitle: String = "",
+    val quantity: Double = 0.0,
+    val transactionCount: Int = 0,
+    val amount: Double = 0.0,
+    val costEstimate: Double = 0.0,
+    val profitEstimate: Double = 0.0,
+    val currencyCode: String = ""
+)
+
+@kotlinx.serialization.Serializable
+data class AnalyticsBucketDataModel(
+    val id: String = "",
+    val label: String = "",
+    val sortKey: Long = 0L,
+    val transactionCount: Int = 0,
+    val amount: Double = 0.0,
+    val quantity: Double = 0.0,
+    val cash: Double = 0.0,
+    val cashless: Double = 0.0,
+    val debt: Double = 0.0
+)
+
+@kotlinx.serialization.Serializable
+data class StoreAnalyticsDashboardDataModel(
+    val storeId: String = "",
+    val startMillis: Long = 0L,
+    val endMillisExclusive: Long = Long.MAX_VALUE,
+    val currencyCode: String = "",
+
+    val grossSales: Double = 0.0,
+    val returnsAmount: Double = 0.0,
+    val supplyCost: Double = 0.0,
+    val netRevenue: Double = 0.0,
+    val estimatedSalesCost: Double = 0.0,
+    val estimatedGrossProfit: Double = 0.0,
+    val estimatedMarginPercent: Double = 0.0,
+
+    val saleCount: Int = 0,
+    val returnCount: Int = 0,
+    val supplyCount: Int = 0,
+    val transactionCount: Int = 0,
+    val averageSale: Double = 0.0,
+    val averageItemsPerSale: Double = 0.0,
+
+    val cashTotal: Double = 0.0,
+    val cashlessTotal: Double = 0.0,
+    val debtTotal: Double = 0.0,
+    val cashSharePercent: Double = 0.0,
+    val cashlessSharePercent: Double = 0.0,
+    val debtSharePercent: Double = 0.0,
+
+    val soldQuantity: Double = 0.0,
+    val returnedQuantity: Double = 0.0,
+    val suppliedQuantity: Double = 0.0,
+
+    val stockValueAtSupplyPrice: Double = 0.0,
+    val stockValueAtSalePrice: Double = 0.0,
+    val activeStockQuantity: Double = 0.0,
+    val lowStockItemCount: Int = 0,
+    val outOfStockItemCount: Int = 0,
+    val expiredBatchCount: Int = 0,
+    val expiringSoonBatchCount: Int = 0,
+    val sellThroughPercentEstimate: Double = 0.0,
+
+    val topItemsByRevenue: List<AnalyticsRankedItemDataModel> = emptyList(),
+    val topItemsByQuantity: List<AnalyticsRankedItemDataModel> = emptyList(),
+    val slowMovingItems: List<AnalyticsRankedItemDataModel> = emptyList(),
+    val salesByDay: List<AnalyticsBucketDataModel> = emptyList(),
+    val salesByHour: List<AnalyticsBucketDataModel> = emptyList()
+)
+
 @kotlinx.serialization.Serializable
 data class TransactionDataModel(
     val id: String,
@@ -8480,11 +10480,377 @@ data class TransactionDataModel(
     val paidCard: Double,
     val cardPaymentOptionId: Int,
     val debtor: DebtorDataModel? = null,
-    val timeMillis: Long
+    val timeMillis: Long,
+    val clientOperationId: String = ""
 )
 
+private data class MutableAnalyticsItemAccumulator(
+    val id: String,
+    var name: List<LocalizedStringDataModel>,
+    var subtitle: String,
+    var quantity: Double = 0.0,
+    var amount: Double = 0.0,
+    var cost: Double = 0.0,
+    val transactionIds: MutableSet<String> = mutableSetOf(),
+    var currencyCode: String = ""
+) {
+    fun toRankedItem(): AnalyticsRankedItemDataModel = AnalyticsRankedItemDataModel(
+        id = id,
+        name = name,
+        subtitle = subtitle,
+        quantity = quantity.roundAnalyticsNumber(),
+        transactionCount = transactionIds.size,
+        amount = amount.roundMoney(),
+        costEstimate = cost.roundMoney(),
+        profitEstimate = (amount - cost).roundMoney(),
+        currencyCode = currencyCode
+    )
+}
+
+private data class MutableAnalyticsBucketAccumulator(
+    val id: String,
+    val label: String,
+    val sortKey: Long,
+    var transactionCount: Int = 0,
+    var amount: Double = 0.0,
+    var quantity: Double = 0.0,
+    var cash: Double = 0.0,
+    var cashless: Double = 0.0,
+    var debt: Double = 0.0
+) {
+    fun toBucket(): AnalyticsBucketDataModel = AnalyticsBucketDataModel(
+        id = id,
+        label = label,
+        sortKey = sortKey,
+        transactionCount = transactionCount,
+        amount = amount.roundMoney(),
+        quantity = quantity.roundAnalyticsNumber(),
+        cash = cash.roundMoney(),
+        cashless = cashless.roundMoney(),
+        debt = debt.roundMoney()
+    )
+}
+
+private fun Double.roundAnalyticsNumber(): Double = kotlin.math.round(this * 1000.0) / 1000.0
+
+private fun analyticsLineAmount(line: GoodsItemInTransactionDataModel): Double =
+    (line.quantity * line.pricePerUnit).roundMoney()
+
+private fun analyticsTransactionTotal(transaction: TransactionDataModel): Double =
+    transaction.goodsInTransaction.sumOf { analyticsLineAmount(it) }.roundMoney()
+
+private fun analyticsLineCurrency(line: GoodsItemInTransactionDataModel, fallback: String): String =
+    line.currencyCode?.takeIf { it.isNotBlank() } ?: fallback
+
+private fun analyticsDateLabel(timeMillis: Long): String {
+    val date = Instant.fromEpochMilliseconds(timeMillis)
+        .toLocalDateTime(TimeZone.currentSystemDefault())
+        .date
+    return "${date.year}-${date.monthNumber.toString().padStart(2, '0')}-${date.dayOfMonth.toString().padStart(2, '0')}"
+}
+
+private fun analyticsDayStartSortKey(timeMillis: Long): Long {
+    val date = Instant.fromEpochMilliseconds(timeMillis)
+        .toLocalDateTime(TimeZone.currentSystemDefault())
+        .date
+    return date.toString().filter { it.isDigit() }.toLongOrNull() ?: timeMillis
+}
+
+private fun analyticsHourOfDay(timeMillis: Long): Int =
+    Instant.fromEpochMilliseconds(timeMillis)
+        .toLocalDateTime(TimeZone.currentSystemDefault())
+        .hour
+
+private fun GoodsItemDataModel.analyticsEstimatedCostPerUnit(batches: List<GoodsBatchDataModel>): Double {
+    val activeBatch = activeShelfBatchId?.let { activeId -> batches.firstOrNull { it.id == activeId } }
+        ?: batches.filter { it.goodsItemId == id && it.isActive }.maxByOrNull { it.updatedAtMillis }
+
+    return activeBatch?.supplyPrice?.price?.toMoneyDouble()
+        ?: supplyPrices.firstOrNull()?.price?.toMoneyDouble()
+        ?: 0.0
+}
+
+private fun GoodsItemDataModel.analyticsEstimatedSalePricePerUnit(batches: List<GoodsBatchDataModel>): Double {
+    val activeBatch = activeShelfBatchId?.let { activeId -> batches.firstOrNull { it.id == activeId } }
+        ?: batches.filter { it.goodsItemId == id && it.isActive }.maxByOrNull { it.updatedAtMillis }
+
+    return activeBatch?.salePriceOverride?.price?.toMoneyDouble()
+        ?: salePrices.firstOrNull()?.price?.toMoneyDouble()
+        ?: 0.0
+}
+
+private fun GoodsItemInTransactionDataModel.analyticsItemId(stockByBarcode: Map<String, GoodsItemDataModel>): String {
+    goodsItemId?.takeIf { it.isNotBlank() }?.let { return it }
+    stockByBarcode[barcode.toStoredGoodsItemBarcode()]?.id?.takeIf { it.isNotBlank() }?.let { return it }
+    stockByBarcode[barcode]?.id?.takeIf { it.isNotBlank() }?.let { return it }
+    return barcode.ifBlank { name.firstOrNull { it.value.isNotBlank() }?.value.orEmpty() }.ifBlank { "unknown" }
+}
+
+private fun GoodsItemInTransactionDataModel.analyticsItemName(
+    item: GoodsItemDataModel?,
+    fallbackId: String
+): List<LocalizedStringDataModel> {
+    return name.takeIf { it.any { value -> value.value.isNotBlank() } }
+        ?: item?.name?.takeIf { it.any { value -> value.value.isNotBlank() } }
+        ?: listOf(LocalizedStringDataModel("main", barcode.ifBlank { fallbackId }))
+}
+
+fun buildStoreAnalyticsDashboard(
+    storeId: String,
+    startMillis: Long = 0L,
+    endMillisExclusive: Long = Long.MAX_VALUE,
+    transactions: List<TransactionDataModel>,
+    stock: List<GoodsItemDataModel> = emptyList(),
+    batches: List<GoodsBatchDataModel> = emptyList(),
+    fallbackCurrencyCode: String = ""
+): StoreAnalyticsDashboardDataModel {
+    val normalizedEnd = if (endMillisExclusive <= 0L) Long.MAX_VALUE else endMillisExclusive
+    val scopedTransactions = transactions
+        .filter { it.storeId == storeId || storeId.isBlank() }
+        .filter { it.timeMillis >= startMillis && it.timeMillis < normalizedEnd }
+
+    val saleTransactions = scopedTransactions.filter { it.type == "purchase" }
+    val returnTransactions = scopedTransactions.filter { it.type == "return" }
+    val supplyTransactions = scopedTransactions.filter { it.type == "accept" }
+
+    val currencyCode = fallbackCurrencyCode.ifBlank {
+        scopedTransactions.asSequence()
+            .flatMap { it.goodsInTransaction.asSequence() }
+            .mapNotNull { it.currencyCode?.takeIf { code -> code.isNotBlank() } }
+            .firstOrNull()
+            ?: stock.asSequence()
+                .flatMap { item -> (item.salePrices + item.supplyPrices + item.returnPrices + item.wholesalePrices).asSequence() }
+                .map { it.currency }
+                .firstOrNull { it.isNotBlank() }
+            ?: batches.asSequence()
+                .map { it.supplyPrice.currency }
+                .firstOrNull { it.isNotBlank() }
+            ?: ""
+    }
+
+    val stockById = stock.associateBy { it.id }
+    val stockByBarcode = stock
+        .flatMap { item -> item.barcodes.flatMap { barcode -> listOf(barcode, barcode.toStoredGoodsItemBarcode()) }.map { it to item } }
+        .associate { it }
+    val batchesByItem = batches.groupBy { it.goodsItemId }
+
+    val grossSales = saleTransactions.sumOf { analyticsTransactionTotal(it) }.roundMoney()
+    val returnsAmount = returnTransactions.sumOf { analyticsTransactionTotal(it) }.roundMoney()
+    val supplyCost = supplyTransactions.sumOf { analyticsTransactionTotal(it) }.roundMoney()
+    val netRevenue = (grossSales - returnsAmount).roundMoney()
+
+    val topRevenue = linkedMapOf<String, MutableAnalyticsItemAccumulator>()
+    val topQuantity = linkedMapOf<String, MutableAnalyticsItemAccumulator>()
+    val soldQuantityByItem = mutableMapOf<String, Double>()
+    var estimatedSalesCost = 0.0
+    var soldQuantity = 0.0
+
+    saleTransactions.forEach { transaction ->
+        transaction.goodsInTransaction.forEach { line ->
+            val itemId = line.analyticsItemId(stockByBarcode)
+            val item = stockById[itemId]
+            val itemBatches = batchesByItem[itemId].orEmpty()
+            val amount = analyticsLineAmount(line)
+            val costPerUnit = item?.analyticsEstimatedCostPerUnit(itemBatches) ?: 0.0
+            val cost = (costPerUnit * line.quantity).roundMoney()
+            val name = line.analyticsItemName(item, itemId)
+            val subtitle = line.barcode.takeIf { it.isNotBlank() } ?: item?.barcodes?.firstOrNull().orEmpty()
+            val lineCurrency = analyticsLineCurrency(line, currencyCode)
+
+            estimatedSalesCost += cost
+            soldQuantity += line.quantity
+            soldQuantityByItem[itemId] = (soldQuantityByItem[itemId] ?: 0.0) + line.quantity
+
+            val revenueAcc = topRevenue.getOrPut(itemId) {
+                MutableAnalyticsItemAccumulator(itemId, name, subtitle, currencyCode = lineCurrency)
+            }
+            revenueAcc.name = if (revenueAcc.name.isEmpty()) name else revenueAcc.name
+            revenueAcc.subtitle = revenueAcc.subtitle.ifBlank { subtitle }
+            revenueAcc.quantity += line.quantity
+            revenueAcc.amount += amount
+            revenueAcc.cost += cost
+            revenueAcc.transactionIds.add(transaction.id)
+            revenueAcc.currencyCode = revenueAcc.currencyCode.ifBlank { lineCurrency }
+
+            val quantityAcc = topQuantity.getOrPut(itemId) {
+                MutableAnalyticsItemAccumulator(itemId, name, subtitle, currencyCode = lineCurrency)
+            }
+            quantityAcc.name = if (quantityAcc.name.isEmpty()) name else quantityAcc.name
+            quantityAcc.subtitle = quantityAcc.subtitle.ifBlank { subtitle }
+            quantityAcc.quantity += line.quantity
+            quantityAcc.amount += amount
+            quantityAcc.cost += cost
+            quantityAcc.transactionIds.add(transaction.id)
+            quantityAcc.currencyCode = quantityAcc.currencyCode.ifBlank { lineCurrency }
+        }
+    }
+
+    val returnedQuantity = returnTransactions.flatMap { it.goodsInTransaction }.sumOf { it.quantity }.roundAnalyticsNumber()
+    val suppliedQuantity = supplyTransactions.flatMap { it.goodsInTransaction }.sumOf { it.quantity }.roundAnalyticsNumber()
+    estimatedSalesCost = estimatedSalesCost.roundMoney()
+    val estimatedGrossProfit = (netRevenue - estimatedSalesCost).roundMoney()
+    val estimatedMarginPercent = if (netRevenue > 0.0) (estimatedGrossProfit / netRevenue * 100.0).roundAnalyticsNumber() else 0.0
+
+    val salePaymentsTotal = saleTransactions.sumOf { it.paidCash + it.paidCard }.roundMoney()
+    val cashTotal = saleTransactions.sumOf { it.paidCash }.roundMoney()
+    val cashlessTotal = saleTransactions.sumOf { it.paidCard }.roundMoney()
+    val debtTotal = saleTransactions.sumOf { tx -> (analyticsTransactionTotal(tx) - tx.paidCash - tx.paidCard).coerceAtLeast(0.0) }.roundMoney()
+    val paymentBase = (salePaymentsTotal + debtTotal).takeIf { it > 0.0 } ?: 0.0
+    val cashShare = if (paymentBase > 0.0) cashTotal / paymentBase * 100.0 else 0.0
+    val cashlessShare = if (paymentBase > 0.0) cashlessTotal / paymentBase * 100.0 else 0.0
+    val debtShare = if (paymentBase > 0.0) debtTotal / paymentBase * 100.0 else 0.0
+
+    val dailyBuckets = linkedMapOf<String, MutableAnalyticsBucketAccumulator>()
+    val hourlyBuckets = linkedMapOf<String, MutableAnalyticsBucketAccumulator>()
+
+    saleTransactions.forEach { transaction ->
+        val amount = analyticsTransactionTotal(transaction)
+        val quantity = transaction.goodsInTransaction.sumOf { it.quantity }
+        val debt = (amount - transaction.paidCash - transaction.paidCard).coerceAtLeast(0.0)
+        val dayLabel = analyticsDateLabel(transaction.timeMillis)
+        val day = dailyBuckets.getOrPut(dayLabel) {
+            MutableAnalyticsBucketAccumulator(dayLabel, dayLabel, analyticsDayStartSortKey(transaction.timeMillis))
+        }
+        day.transactionCount += 1
+        day.amount += amount
+        day.quantity += quantity
+        day.cash += transaction.paidCash
+        day.cashless += transaction.paidCard
+        day.debt += debt
+
+        val hour = analyticsHourOfDay(transaction.timeMillis)
+        val hourId = hour.toString().padStart(2, '0')
+        val hourBucket = hourlyBuckets.getOrPut(hourId) {
+            MutableAnalyticsBucketAccumulator(hourId, "$hourId:00", hour.toLong())
+        }
+        hourBucket.transactionCount += 1
+        hourBucket.amount += amount
+        hourBucket.quantity += quantity
+        hourBucket.cash += transaction.paidCash
+        hourBucket.cashless += transaction.paidCard
+        hourBucket.debt += debt
+    }
+
+    val activeBatches = batches.filter { it.isActive }
+    val activeStockQuantityByItem = activeBatches.groupBy { it.goodsItemId }.mapValues { (_, itemBatches) ->
+        itemBatches.sumOf { it.quantity.total }
+    }
+    val now = getCurrentTimeMillis()
+    val expiringSoonCutoff = now + 14L * 24L * 60L * 60L * 1000L
+
+    var stockValueAtSupplyPrice = 0.0
+    var stockValueAtSalePrice = 0.0
+    activeBatches.forEach { batch ->
+        val item = stockById[batch.goodsItemId]
+        val quantity = batch.quantity.total.coerceAtLeast(0.0)
+        val supplyPrice = batch.supplyPrice.price.toMoneyDouble()
+        val salePrice = batch.salePriceOverride?.price?.toMoneyDouble()
+            ?: item?.analyticsEstimatedSalePricePerUnit(batchesByItem[batch.goodsItemId].orEmpty())
+            ?: 0.0
+        stockValueAtSupplyPrice += quantity * supplyPrice
+        stockValueAtSalePrice += quantity * salePrice
+    }
+
+    val activeItems = stock.filter { it.isActive }
+    val outOfStockItemCount = activeItems.count { (activeStockQuantityByItem[it.id] ?: 0.0) <= 0.0 }
+    val lowStockItemCount = activeItems.count { item ->
+        val quantity = activeStockQuantityByItem[item.id] ?: 0.0
+        quantity > 0.0 && quantity <= 5.0
+    }
+    val expiredBatchCount = activeBatches.count { batch -> batch.expirationDateMillis?.let { it < now } == true }
+    val expiringSoonBatchCount = activeBatches.count { batch -> batch.expirationDateMillis?.let { it in now..expiringSoonCutoff } == true }
+    val activeStockQuantity = activeStockQuantityByItem.values.sum().roundAnalyticsNumber()
+    val sellThroughBase = soldQuantity + activeStockQuantity
+    val sellThroughPercentEstimate = if (sellThroughBase > 0.0) (soldQuantity / sellThroughBase * 100.0).roundAnalyticsNumber() else 0.0
+
+    val slowMovingItems = activeItems
+        .map { item ->
+            val stockQuantity = activeStockQuantityByItem[item.id] ?: 0.0
+            val sold = soldQuantityByItem[item.id] ?: 0.0
+            val cost = item.analyticsEstimatedCostPerUnit(batchesByItem[item.id].orEmpty()) * stockQuantity
+            val saleValue = item.analyticsEstimatedSalePricePerUnit(batchesByItem[item.id].orEmpty()) * stockQuantity
+            MutableAnalyticsItemAccumulator(
+                id = item.id,
+                name = item.name.ifEmpty { listOf(LocalizedStringDataModel("main", item.barcodes.firstOrNull().orEmpty().ifBlank { item.id })) },
+                subtitle = item.barcodes.firstOrNull().orEmpty(),
+                quantity = stockQuantity,
+                amount = saleValue,
+                cost = cost,
+                currencyCode = currencyCode
+            ).apply {
+                if (sold > 0.0) transactionIds.add("sold")
+            }.toRankedItem().copy(
+                profitEstimate = sold.roundAnalyticsNumber()
+            )
+        }
+        .filter { it.quantity > 0.0 }
+        .sortedWith(compareBy<AnalyticsRankedItemDataModel> { it.profitEstimate > 0.0 }.thenByDescending { it.quantity })
+        .take(10)
+
+    return StoreAnalyticsDashboardDataModel(
+        storeId = storeId,
+        startMillis = startMillis,
+        endMillisExclusive = normalizedEnd,
+        currencyCode = currencyCode,
+        grossSales = grossSales,
+        returnsAmount = returnsAmount,
+        supplyCost = supplyCost,
+        netRevenue = netRevenue,
+        estimatedSalesCost = estimatedSalesCost,
+        estimatedGrossProfit = estimatedGrossProfit,
+        estimatedMarginPercent = estimatedMarginPercent,
+        saleCount = saleTransactions.size,
+        returnCount = returnTransactions.size,
+        supplyCount = supplyTransactions.size,
+        transactionCount = scopedTransactions.size,
+        averageSale = if (saleTransactions.isNotEmpty()) (grossSales / saleTransactions.size).roundMoney() else 0.0,
+        averageItemsPerSale = if (saleTransactions.isNotEmpty()) (soldQuantity / saleTransactions.size).roundAnalyticsNumber() else 0.0,
+        cashTotal = cashTotal,
+        cashlessTotal = cashlessTotal,
+        debtTotal = debtTotal,
+        cashSharePercent = cashShare.roundAnalyticsNumber(),
+        cashlessSharePercent = cashlessShare.roundAnalyticsNumber(),
+        debtSharePercent = debtShare.roundAnalyticsNumber(),
+        soldQuantity = soldQuantity.roundAnalyticsNumber(),
+        returnedQuantity = returnedQuantity,
+        suppliedQuantity = suppliedQuantity,
+        stockValueAtSupplyPrice = stockValueAtSupplyPrice.roundMoney(),
+        stockValueAtSalePrice = stockValueAtSalePrice.roundMoney(),
+        activeStockQuantity = activeStockQuantity,
+        lowStockItemCount = lowStockItemCount,
+        outOfStockItemCount = outOfStockItemCount,
+        expiredBatchCount = expiredBatchCount,
+        expiringSoonBatchCount = expiringSoonBatchCount,
+        sellThroughPercentEstimate = sellThroughPercentEstimate,
+        topItemsByRevenue = topRevenue.values.map { it.toRankedItem() }.sortedByDescending { it.amount }.take(10),
+        topItemsByQuantity = topQuantity.values.map { it.toRankedItem() }.sortedByDescending { it.quantity }.take(10),
+        slowMovingItems = slowMovingItems,
+        salesByDay = dailyBuckets.values.map { it.toBucket() }.sortedBy { it.sortKey },
+        salesByHour = hourlyBuckets.values.map { it.toBucket() }.sortedBy { it.sortKey }
+    )
+}
+
+
+fun GoodsItemInTransactionDataModel.lineTotalValue(): Double = quantity * pricePerUnit
+fun TransactionDataModel.paidTotalValue(): Double = paidCash + paidCard
+fun TransactionDataModel.grossLineTotalValue(): Double = goodsInTransaction.sumOf { it.lineTotalValue() }
+fun TransactionDataModel.debtCreatedValue(): Double = (grossLineTotalValue() - paidTotalValue()).coerceAtLeast(0.0)
 
 fun UserAccountDataModel.visibleWorkerInviteId(): String = publicId.ifBlank { id }
+
+fun UserAccountDataModel.hasRole(roleId: String): Boolean = roleIds.contains(roleId)
+fun UserAccountDataModel.canActAsStoreOwner(): Boolean = hasRole(USER_ROLE_STORE_OWNER) || ownedStoreIds.isNotEmpty()
+fun UserAccountDataModel.canActAsStoreWorker(): Boolean = hasRole(USER_ROLE_STORE_WORKER) || managedStoreIds.isNotEmpty()
+fun UserAccountDataModel.canActAsSupplier(): Boolean = hasRole(USER_ROLE_SUPPLIER) || decodeUserAccountIds(supplierAccountIds).isNotEmpty()
+fun UserAccountDataModel.canActAsManufacturer(): Boolean = hasRole(USER_ROLE_MANUFACTURER) || decodeUserAccountIds(manufacturerAccountIds).isNotEmpty()
+fun UserAccountDataModel.canActAsBuyer(): Boolean = hasRole(USER_ROLE_BUYER) || buyerAccountId != null
+
+fun decodeUserAccountIds(raw: String?): List<String> = raw
+    ?.let { value -> runCatching { jsonBase.decodeFromString<List<String>>(value) }.getOrNull() ?: value.split(',', ';', ' ') }
+    .orEmpty()
+    .map { it.trim() }
+    .filter { it.isNotBlank() }
+    .distinct()
 
 fun StoreDataModel.visibleEmploymentId(): String = publicId.ifBlank { id }
 
@@ -8499,7 +10865,15 @@ data class UserAccountDataModel(
     val countryLocale: String,
     val workerAccountIds: String?,
     val supplierAccountIds: String?,
+    val roleIds: List<String> = emptyList(),
+    val ownedStoreIds: List<String> = emptyList(),
+    val managedStoreIds: List<String> = emptyList(),
+    val manufacturerAccountIds: String? = null,
+    val buyerAccountId: String? = null,
     val activeStoreId: String? = null,
+    val appLanguage: String = DEFAULT_APP_LANGUAGE,
+    val appThemeId: Long = DEFAULT_APP_THEME_ID,
+    val appSizeModeId: Long = DEFAULT_APP_SIZE_MODE_ID,
     val createdAt: Long,
     val isActive: Boolean
 )
@@ -8566,7 +10940,7 @@ data class StoreWorkerDataModel(
     val hasWorkshiftPassword: Boolean = false
 ) {
     val displayName: String
-        get() = "${firstName.trim()} ${lastName.trim()}".trim().ifBlank { phoneNumber.ifBlank { email.ifBlank { userId } } }
+        get() = "${firstName.trim()} ${lastName.trim()}".trim().ifBlank { phoneNumber.asDisplayPhoneNumber().ifBlank { email.ifBlank { userId } } }
 }
 
 @kotlinx.serialization.Serializable
@@ -8592,7 +10966,7 @@ data class StoreWorkerRequestDataModel(
     val note: String? = null
 ) {
     val displayName: String
-        get() = "${firstName.trim()} ${lastName.trim()}".trim().ifBlank { phoneNumber.ifBlank { email.ifBlank { requesterPublicId.ifBlank { requesterUserId } } } }
+        get() = "${firstName.trim()} ${lastName.trim()}".trim().ifBlank { phoneNumber.asDisplayPhoneNumber().ifBlank { email.ifBlank { requesterPublicId.ifBlank { requesterUserId } } } }
 }
 
 @kotlinx.serialization.Serializable
@@ -8697,3 +11071,6 @@ data class WorkerPrivilegeModeDataModel(
     val id: String,
     val parameters: List<ParameterDataModel>
 )
+
+expect var getPersistentUiDraftValue: (suspend (String) -> String?)?
+expect var setPersistentUiDraftValue: (suspend (String, String?) -> Unit)?

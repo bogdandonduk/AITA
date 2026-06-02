@@ -1,21 +1,19 @@
-import UIKit
-import SwiftUI
+// THIS IS ContentView.swift - place in iosApp/iosApp/ContentView.swift
 import ComposeApp
+import SwiftUI
 
 struct ComposeView: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> UIViewController {
-        MainViewControllerKt.MainViewController()
+        IosMainComposeKt.MainViewController()
     }
 
-    func updateUIViewController(_ uiViewController: UIViewController, context: Context) { }
+    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}
 }
 
 struct ContentView: View {
     var body: some View {
         ComposeView()
-            .ignoresSafeArea()
+            .ignoresSafeArea(.keyboard)
+            .ignoresSafeArea(.container)
     }
 }
-
-
-

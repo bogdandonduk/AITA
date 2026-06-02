@@ -8,6 +8,10 @@
         {
           "sizeModeId": 0,
           "value": 14
+        },
+        {
+          "sizeModeId": 1,
+          "value": 16
         }
       ]
     },
@@ -17,6 +21,10 @@
         {
           "sizeModeId": 0,
           "value": 20
+        },
+        {
+          "sizeModeId": 1,
+          "value": 23
         }
       ]
     },
@@ -26,6 +34,10 @@
         {
           "sizeModeId": 0,
           "value": 16
+        },
+        {
+          "sizeModeId": 1,
+          "value": 18
         }
       ]
     },
@@ -35,6 +47,10 @@
         {
           "sizeModeId": 0,
           "value": 12
+        },
+        {
+          "sizeModeId": 1,
+          "value": 14
         }
       ]
     },
@@ -71,6 +87,10 @@
         {
           "sizeModeId": 0,
           "value": 14
+        },
+        {
+          "sizeModeId": 1,
+          "value": 16
         }
       ]
     },
@@ -80,6 +100,10 @@
         {
           "sizeModeId": 0,
           "value": 24
+        },
+        {
+          "sizeModeId": 1,
+          "value": 28
         }
       ]
     },
@@ -89,6 +113,10 @@
         {
           "sizeModeId": 0,
           "value": 300
+        },
+        {
+          "sizeModeId": 1,
+          "value": 340
         }
       ]
     },
@@ -98,6 +126,10 @@
         {
           "sizeModeId": 0,
           "value": 2.6
+        },
+        {
+          "sizeModeId": 1,
+          "value": 2.75
         }
       ]
     },
@@ -107,6 +139,10 @@
         {
           "sizeModeId": 0,
           "value": 9
+        },
+        {
+          "sizeModeId": 1,
+          "value": 10
         }
       ]
     }

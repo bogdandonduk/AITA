@@ -1,11 +1,18 @@
 // THIS IS AndroidCompose.kt - in androidMain compose module of kmp compose app
 package kz.aita.android
 
+import aita.composeapp.generated.resources.Res
+import aita.composeapp.generated.resources._0_0
+import android.Manifest
+import android.annotation.SuppressLint
+import android.bluetooth.BluetoothAdapter
 import android.app.Application
+import android.content.pm.PackageManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.ContentValues
 import android.content.Context
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -13,15 +20,66 @@ import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
 import android.provider.Settings
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import android.view.WindowManager
+import android.view.inputmethod.InputMethodManager
+import androidx.camera.core.Camera
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ExperimentalGetImage
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.ui.res.painterResource
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -45,100 +103,804 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.common.InputImage
 import kz.aita.*
+import android.os.CancellationSignal
+import android.os.ParcelFileDescriptor
+import android.print.PageRange
+import android.print.PrintAttributes
+import android.print.PrintDocumentAdapter
+import android.print.PrintDocumentInfo
+import android.print.PrintManager
+import androidx.compose.runtime.Composable
+import java.io.FileOutputStream
 import java.io.File
 import java.security.KeyStore
+import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.Executors
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 import javax.inject.Inject
 
+
+private fun installAndroidSoftKeyboardHider(context: Context) {
+    forceHidePlatformSoftKeyboard = {
+        val activity = MainActivity.getOrNull()
+        val targetContext = activity ?: context
+        val inputMethodManager = targetContext.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        val decorView = activity?.window?.decorView
+        val hideAction = {
+            val token = activity?.currentFocus?.windowToken ?: decorView?.windowToken
+            if (token != null) {
+                inputMethodManager?.hideSoftInputFromWindow(token, 0)
+            }
+        }
+
+        if (decorView != null) {
+            decorView.post { hideAction() }
+        } else {
+            hideAction()
+        }
+    }
+}
+
+private var activeAndroidSpeechRecognizer: SpeechRecognizer? = null
+
+private const val ANDROID_SPEECH_EXTRA_ENABLE_LANGUAGE_DETECTION = "android.speech.extra.ENABLE_LANGUAGE_DETECTION"
+private const val ANDROID_SPEECH_EXTRA_LANGUAGE_DETECTION_ALLOWED_LANGUAGES = "android.speech.extra.LANGUAGE_DETECTION_ALLOWED_LANGUAGES"
+private const val ANDROID_SPEECH_EXTRA_ENABLE_LANGUAGE_SWITCH = "android.speech.extra.ENABLE_LANGUAGE_SWITCH"
+private const val ANDROID_SPEECH_EXTRA_LANGUAGE_SWITCH_ALLOWED_LANGUAGES = "android.speech.extra.LANGUAGE_SWITCH_ALLOWED_LANGUAGES"
+private const val ANDROID_SPEECH_EXTRA_LANGUAGE_SWITCH_INITIAL_ACTIVE_DURATION_TIME_MILLIS = "android.speech.extra.LANGUAGE_SWITCH_INITIAL_ACTIVE_DURATION_TIME_MILLIS"
+private const val ANDROID_SPEECH_EXTRA_LANGUAGE_SWITCH_MAX_SWITCHES = "android.speech.extra.LANGUAGE_SWITCH_MAX_SWITCHES"
+private const val ANDROID_SPEECH_LANGUAGE_SWITCH_BALANCED = "balanced"
+private const val ANDROID_SPEECH_EXTRA_DETECTED_LANGUAGE = "android.speech.extra.DETECTED_LANGUAGE"
+private const val ANDROID_SPEECH_EXTRA_LANGUAGE = "android.speech.extra.LANGUAGE"
+private const val ANDROID_SPEECH_EXTRA_LANGUAGE_TAG = "android.speech.extra.LANGUAGE_TAG"
+
+private fun androidSpeechLocaleTag(languageOrTag: String): String {
+    val clean = languageOrTag.trim().replace('_', '-').takeIf { it.isNotBlank() } ?: return Locale.getDefault().toLanguageTag()
+    val lower = clean.lowercase(Locale.ROOT)
+    return when (lower) {
+        "ru", "ru-ru" -> "ru-RU"
+        "kk", "kk-kz", "kz", "kz-kz" -> "kk-KZ"
+        "en", "en-us" -> "en-US"
+        "en-gb" -> "en-GB"
+        "main", "system" -> Locale.getDefault().toLanguageTag()
+        else -> clean
+    }
+}
+
+private fun androidSpeechLocaleTags(texts: VoiceInputPermissionRequestText): List<String> {
+    val candidates = (listOf(texts.primaryLanguageTag) + texts.languageTags + appLanguageState.value + Locale.getDefault().toLanguageTag() + listOf("ru-RU", "kk-KZ", "en-US"))
+        .map(::androidSpeechLocaleTag)
+        .filter { it.isNotBlank() }
+        .distinctBy { it.lowercase(Locale.ROOT) }
+    return candidates.ifEmpty { listOf(Locale.getDefault().toLanguageTag()) }
+}
+
+private fun Bundle?.detectedAndroidSpeechLanguageTag(): String = this?.let { bundle ->
+    listOf(
+        bundle.getString(ANDROID_SPEECH_EXTRA_DETECTED_LANGUAGE),
+        bundle.getString(ANDROID_SPEECH_EXTRA_LANGUAGE_TAG),
+        bundle.getString(ANDROID_SPEECH_EXTRA_LANGUAGE)
+    ).firstOrNull { !it.isNullOrBlank() }.orEmpty()
+}.orEmpty()
+
+private fun androidSpeechShouldTryNextLanguage(error: Int): Boolean = when (error) {
+    SpeechRecognizer.ERROR_NO_MATCH,
+    SpeechRecognizer.ERROR_SPEECH_TIMEOUT,
+    12,
+    13,
+    14,
+    15 -> true
+    else -> false
+}
+
+private fun androidSpeechErrorMessage(error: Int): String = when (error) {
+    SpeechRecognizer.ERROR_AUDIO -> "Audio recording error"
+    SpeechRecognizer.ERROR_CLIENT -> "Voice input client error"
+    SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Microphone permission is missing"
+    SpeechRecognizer.ERROR_NETWORK -> "Network error during voice input"
+    SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Voice input network timeout"
+    SpeechRecognizer.ERROR_NO_MATCH -> "Nothing was recognized"
+    SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Voice recognizer is busy"
+    SpeechRecognizer.ERROR_SERVER -> "Voice recognizer server error"
+    SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech heard"
+    10 -> "Too many voice input requests. Wait a moment and try again"
+    11 -> "Voice recognizer disconnected. Try again"
+    12 -> "This speech language is not supported on this device"
+    13 -> "This speech language is not downloaded or available on this device"
+    14 -> "Could not check speech recognition support"
+    15 -> "Voice recognizer is temporarily unavailable"
+    else -> "Voice input error ($error)"
+}
+
+private fun androidPermissionKind(permission: String): PlatformPermissionKind = when (permission) {
+    Manifest.permission.CAMERA -> PlatformPermissionKind.Camera
+    Manifest.permission.RECORD_AUDIO -> PlatformPermissionKind.Microphone
+    else -> PlatformPermissionKind.AppSettings
+}
+
+private fun Context.openAndroidApplicationSettingsResult(): ReceiptPlatformActionResult {
+    return runCatching {
+        val detailsIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.parse("package:$packageName")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        startActivity(detailsIntent)
+        ReceiptPlatformActionResult(true, "App settings opened")
+    }.getOrElse { firstError ->
+        runCatching {
+            val fallbackIntent = Intent(Settings.ACTION_APPLICATION_SETTINGS).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(fallbackIntent)
+            ReceiptPlatformActionResult(true, "Android settings opened")
+        }.getOrElse {
+            ReceiptPlatformActionResult(false, firstError.message ?: it.message ?: "Could not open app settings")
+        }
+    }
+}
+
+private fun installAndroidVoiceInput(context: Context) {
+    isPlatformVoiceInputAvailable = {
+        MainActivity.getOrNull()?.let { SpeechRecognizer.isRecognitionAvailable(it) } == true
+    }
+
+    getVoiceInputPermissionState = {
+        val activity = MainActivity.getOrNull()
+        when {
+            activity == null -> PlatformPermissionState.Unavailable
+            !SpeechRecognizer.isRecognitionAvailable(activity) -> PlatformPermissionState.Unavailable
+            else -> activity.permissionState(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    stopPlatformVoiceInput = {
+        runCatching { activeAndroidSpeechRecognizer?.stopListening() }
+        runCatching { activeAndroidSpeechRecognizer?.cancel() }
+        runCatching { activeAndroidSpeechRecognizer?.destroy() }
+        activeAndroidSpeechRecognizer = null
+    }
+
+    startPlatformVoiceInput = start@{ texts, callbacks ->
+        val activity = MainActivity.getOrNull()
+        if (activity == null) {
+            callbacks.onError(texts.deniedSubtitle)
+            callbacks.onFinished()
+            return@start
+        }
+
+        if (!SpeechRecognizer.isRecognitionAvailable(activity)) {
+            callbacks.onError("Voice recognition is not available on this Android device")
+            callbacks.onFinished()
+            return@start
+        }
+
+        val languageTags = androidSpeechLocaleTags(texts)
+        val languageAttempts: List<String?> = (languageTags + listOf<String?>(null))
+            .distinctBy { it?.lowercase(Locale.ROOT) ?: "auto" }
+
+        fun beginListening(attemptIndex: Int = 0) {
+            activity.runOnUiThread {
+                runCatching { activeAndroidSpeechRecognizer?.destroy() }
+                val recognizer = SpeechRecognizer.createSpeechRecognizer(activity)
+                activeAndroidSpeechRecognizer = recognizer
+                val currentLanguageTag = languageAttempts.getOrNull(attemptIndex)
+
+                fun finishAndDestroy() {
+                    runCatching { recognizer.destroy() }
+                    if (activeAndroidSpeechRecognizer === recognizer) activeAndroidSpeechRecognizer = null
+                }
+
+                fun tryNextLanguageFor(error: Int): Boolean {
+                    val nextIndex = attemptIndex + 1
+                    if (androidSpeechShouldTryNextLanguage(error) && nextIndex < languageAttempts.size) {
+                        finishAndDestroy()
+                        beginListening(nextIndex)
+                        return true
+                    }
+                    return false
+                }
+
+                recognizer.setRecognitionListener(object : RecognitionListener {
+                    override fun onReadyForSpeech(params: Bundle?) {
+                        callbacks.onAmplitude(0.20f)
+                        val detectedLanguage = params.detectedAndroidSpeechLanguageTag()
+                        when {
+                            detectedLanguage.isNotBlank() -> callbacks.onDetectedLanguage(detectedLanguage)
+                            !currentLanguageTag.isNullOrBlank() -> callbacks.onDetectedLanguage(currentLanguageTag)
+                        }
+                    }
+
+                    override fun onBeginningOfSpeech() {
+                        callbacks.onAmplitude(0.40f)
+                    }
+
+                    override fun onRmsChanged(rmsdB: Float) {
+                        callbacks.onAmplitude(((rmsdB + 2f) / 12f).coerceIn(0f, 1f))
+                    }
+
+                    override fun onBufferReceived(buffer: ByteArray?) = Unit
+                    override fun onEndOfSpeech() {
+                        callbacks.onAmplitude(0.12f)
+                    }
+
+                    override fun onError(error: Int) {
+                        if (tryNextLanguageFor(error)) return
+                        callbacks.onError(androidSpeechErrorMessage(error))
+                        callbacks.onFinished()
+                        finishAndDestroy()
+                    }
+
+                    override fun onResults(results: Bundle?) {
+                        results.detectedAndroidSpeechLanguageTag().takeIf { it.isNotBlank() }?.let(callbacks.onDetectedLanguage)
+                        val text = results
+                            ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                            ?.firstOrNull()
+                            .orEmpty()
+                        if (text.isNotBlank()) callbacks.onFinalText(text)
+                        callbacks.onFinished()
+                        finishAndDestroy()
+                    }
+
+                    override fun onPartialResults(partialResults: Bundle?) {
+                        partialResults.detectedAndroidSpeechLanguageTag().takeIf { it.isNotBlank() }?.let(callbacks.onDetectedLanguage)
+                        val text = partialResults
+                            ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                            ?.firstOrNull()
+                            .orEmpty()
+                        if (text.isNotBlank()) callbacks.onPartialText(text)
+                    }
+
+                    override fun onEvent(eventType: Int, params: Bundle?) = Unit
+                })
+
+                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                    currentLanguageTag?.let { putExtra(RecognizerIntent.EXTRA_LANGUAGE, it) }
+                    putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                    putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
+                    putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
+                    putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, activity.packageName)
+                    putExtra(RecognizerIntent.EXTRA_PROMPT, texts.listeningTitle)
+                    if (Build.VERSION.SDK_INT >= 34 && languageTags.size > 1) {
+                        putExtra(ANDROID_SPEECH_EXTRA_ENABLE_LANGUAGE_DETECTION, true)
+                        putStringArrayListExtra(ANDROID_SPEECH_EXTRA_LANGUAGE_DETECTION_ALLOWED_LANGUAGES, ArrayList(languageTags))
+                        putExtra(ANDROID_SPEECH_EXTRA_ENABLE_LANGUAGE_SWITCH, ANDROID_SPEECH_LANGUAGE_SWITCH_BALANCED)
+                        putStringArrayListExtra(ANDROID_SPEECH_EXTRA_LANGUAGE_SWITCH_ALLOWED_LANGUAGES, ArrayList(languageTags))
+                        putExtra(ANDROID_SPEECH_EXTRA_LANGUAGE_SWITCH_INITIAL_ACTIVE_DURATION_TIME_MILLIS, 3500)
+                        putExtra(ANDROID_SPEECH_EXTRA_LANGUAGE_SWITCH_MAX_SWITCHES, languageTags.size.coerceAtLeast(1))
+                    }
+                }
+
+                runCatching { recognizer.startListening(intent) }
+                    .onFailure { throwable ->
+                        if (!tryNextLanguageFor(12)) {
+                            callbacks.onError(throwable.message ?: "Could not start voice input")
+                            callbacks.onFinished()
+                            finishAndDestroy()
+                        }
+                    }
+            }
+        }
+
+        val alreadyGranted = ContextCompat.checkSelfPermission(activity, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        if (alreadyGranted) {
+            beginListening()
+            return@start
+        }
+
+        activity.requestPermissions(
+            permissions = arrayOf(Manifest.permission.RECORD_AUDIO),
+            deniedRationaleTitle = texts.deniedTitle,
+            deniedRationaleSubtitle = texts.deniedSubtitle,
+            dontAskAgainDeniedRationaleTitle = texts.settingsTitle,
+            dontAskAgainDeniedRationaleSubtitle = texts.settingsSubtitle,
+            force = false,
+            permissionGrantedResultAction = { beginListening() },
+            permissionDeniedResultAction = {
+                callbacks.onDenied()
+                callbacks.onFinished()
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalGetImage::class)
+private fun installAndroidCameraBarcodeScanner() {
+    getCameraScannerPermissionState = {
+        val activity = MainActivity.getOrNull()
+        if (activity == null) PlatformPermissionState.Unavailable else activity.permissionState(Manifest.permission.CAMERA)
+    }
+
+    requestCameraScannerPermission = requestCameraScannerPermission@{ texts, onGranted, onDenied ->
+        val activity = MainActivity.getOrNull()
+        if (activity == null) {
+            onDenied()
+            return@requestCameraScannerPermission
+        }
+
+        val alreadyGranted = ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        if (alreadyGranted) {
+            onGranted()
+            return@requestCameraScannerPermission
+        }
+
+        activity.requestPermissions(
+            permissions = arrayOf(Manifest.permission.CAMERA),
+            deniedRationaleTitle = texts.deniedTitle,
+            deniedRationaleSubtitle = texts.deniedSubtitle,
+            dontAskAgainDeniedRationaleTitle = texts.settingsTitle,
+            dontAskAgainDeniedRationaleSubtitle = texts.settingsSubtitle,
+            force = false,
+            permissionGrantedResultAction = { onGranted() },
+            permissionDeniedResultAction = { onDenied() }
+        )
+    }
+
+    barcodeCameraScannerContent = { modifier, onBarcodeDetected, onClose ->
+        AndroidBarcodeCameraScannerPane(
+            modifier = modifier,
+            onBarcodeDetected = onBarcodeDetected,
+            onClose = onClose
+        )
+    }
+}
+
+@androidx.annotation.OptIn(ExperimentalGetImage::class)
+@OptIn(ExperimentalGetImage::class)
+@Composable
+private fun AppConfiguration.AndroidBarcodeCameraScannerPane(
+    modifier: Modifier,
+    onBarcodeDetected: (String) -> Unit,
+    onClose: () -> Unit
+) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val mainExecutor = remember(context) { ContextCompat.getMainExecutor(context) }
+    val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
+    val scanner = remember { BarcodeScanning.getClient() }
+    val previewView = remember(context) {
+        PreviewView(context).apply {
+            scaleType = PreviewView.ScaleType.FILL_CENTER
+            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+        }
+    }
+
+    var lensFacing by remember { mutableStateOf(CameraSelector.LENS_FACING_BACK) }
+    var torchOn by remember { mutableStateOf(false) }
+    var camera by remember { mutableStateOf<Camera?>(null) }
+    var statusText by remember { mutableStateOf("") }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            runCatching { scanner.close() }
+            runCatching { analysisExecutor.shutdown() }
+        }
+    }
+
+    LaunchedEffect(camera, torchOn) {
+        runCatching { camera?.cameraControl?.enableTorch(torchOn) }
+    }
+
+    DisposableEffect(lifecycleOwner, lensFacing) {
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
+        val listener = Runnable {
+            runCatching {
+                val provider = cameraProviderFuture.get()
+                provider.unbindAll()
+
+                val preview = Preview.Builder()
+                    .build()
+                    .also { it.setSurfaceProvider(previewView.surfaceProvider) }
+
+                val imageAnalysis = ImageAnalysis.Builder()
+                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .build()
+                    .also { analysis ->
+                        analysis.setAnalyzer(analysisExecutor) { imageProxy ->
+                            val mediaImage = imageProxy.image
+                            if (mediaImage == null) {
+                                imageProxy.close()
+                                return@setAnalyzer
+                            }
+
+                            val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+                            scanner.process(image)
+                                .addOnSuccessListener { barcodes ->
+                                    val raw = barcodes.firstOrNull { !it.rawValue.isNullOrBlank() }?.rawValue
+                                    if (!raw.isNullOrBlank()) {
+                                        mainExecutor.execute {
+                                            statusText = raw
+                                            onBarcodeDetected(raw)
+                                        }
+                                    }
+                                }
+                                .addOnFailureListener { throwable ->
+                                    mainExecutor.execute {
+                                        statusText = throwable.message ?: "Camera scanner error"
+                                    }
+                                }
+                                .addOnCompleteListener { imageProxy.close() }
+                        }
+                    }
+
+                val selector = CameraSelector.Builder()
+                    .requireLensFacing(lensFacing)
+                    .build()
+
+                camera = provider.bindToLifecycle(lifecycleOwner, selector, preview, imageAnalysis)
+                runCatching { camera?.cameraControl?.enableTorch(torchOn) }
+            }.onFailure { throwable ->
+                statusText = throwable.message ?: "Could not start camera"
+            }
+        }
+
+        cameraProviderFuture.addListener(listener, mainExecutor)
+
+        onDispose {
+            runCatching { cameraProviderFuture.get().unbindAll() }
+            camera = null
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor, RoundedCornerShape(stateValues.cornerRadius))
+            .background(Color.Black)
+    ) {
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { previewView }
+        )
+
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            CameraScannerOverlayIconButton(
+                contentDescription = localizedStringResource(987, "Switch camera"),
+                iconPath = stateValues.drawablePathIconSwitch,
+                onClick = {
+                    lensFacing = if (lensFacing == CameraSelector.LENS_FACING_BACK) {
+                        CameraSelector.LENS_FACING_FRONT
+                    } else {
+                        CameraSelector.LENS_FACING_BACK
+                    }
+                }
+            )
+
+            CameraScannerOverlayIconButton(
+                contentDescription = localizedStringResource(988, "Torch"),
+                enabled = camera?.cameraInfo?.hasFlashUnit() != false,
+                onClick = { torchOn = !torchOn }
+            ) {
+                Text(
+                    text = if (torchOn) "⚡" else "☼",
+                    color = Color.White,
+                    fontSize = stateValues.accentTextSize,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            CameraScannerOverlayIconButton(
+                contentDescription = localizedStringResource(989, "Close scanner"),
+                iconPath = stateValues.drawablePathIconCancel,
+                onClick = onClose
+            )
+        }
+    }
+}
+
+
+@Composable
+private fun AppConfiguration.CameraScannerOverlayIconButton(
+    contentDescription: String,
+    iconPath: String? = null,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+    content: (@Composable () -> Unit)? = null
+) {
+    val shape = RoundedCornerShape(stateValues.cornerRadius)
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .clip(shape)
+            .background(Color.Black.copy(alpha = 0.20f))
+            .border(1.dp, Color.White.copy(alpha = if (enabled) 0.78f else 0.28f), shape)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(9.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        if (content != null) {
+            content()
+        } else if (iconPath != null) {
+            CpImage(
+                modifier = Modifier.fillMaxSize(),
+                url = iconPath,
+                fallbackRes = Res.drawable._0_0,
+                contentDescription = contentDescription,
+                tintColor = Color.White.copy(alpha = if (enabled) 0.94f else 0.34f)
+            )
+        }
+    }
+}
+
+private fun installAndroidVectorDrawableRenderer() {
+    renderAndroidVectorDrawable = renderer@{ modifier, resourceName, contentDescription, contentScale, colorFilter ->
+        val context = LocalContext.current
+        val androidResourceName = remember(resourceName) { "ic_aita_$resourceName" }
+        val resourceId = remember(context.packageName, androidResourceName) {
+            context.resources.getIdentifier(androidResourceName, "drawable", context.packageName)
+        }
+
+        if (resourceId == 0) {
+            false
+        } else {
+            Image(
+                modifier = modifier,
+                painter = painterResource(resourceId),
+                contentDescription = contentDescription,
+                contentScale = contentScale,
+                colorFilter = colorFilter
+            )
+            true
+        }
+    }
+}
+
+private class ReceiptPdfPrintDocumentAdapter(
+    private val fileName: String,
+    private val pdfBytes: ByteArray
+) : PrintDocumentAdapter() {
+    override fun onLayout(
+        oldAttributes: PrintAttributes?,
+        newAttributes: PrintAttributes?,
+        cancellationSignal: CancellationSignal?,
+        callback: LayoutResultCallback?,
+        extras: Bundle?
+    ) {
+        if (cancellationSignal?.isCanceled == true) {
+            callback?.onLayoutCancelled()
+            return
+        }
+
+        val info = PrintDocumentInfo.Builder(fileName)
+            .setContentType(PrintDocumentInfo.CONTENT_TYPE_DOCUMENT)
+            .setPageCount(PrintDocumentInfo.PAGE_COUNT_UNKNOWN)
+            .build()
+
+        callback?.onLayoutFinished(info, true)
+    }
+
+    override fun onWrite(
+        pages: Array<out PageRange>?,
+        destination: ParcelFileDescriptor?,
+        cancellationSignal: CancellationSignal?,
+        callback: WriteResultCallback?
+    ) {
+        if (cancellationSignal?.isCanceled == true) {
+            callback?.onWriteCancelled()
+            return
+        }
+
+        runCatching {
+            val descriptor = destination ?: error("Print destination is not available")
+            FileOutputStream(descriptor.fileDescriptor).use { output ->
+                output.write(pdfBytes)
+                output.flush()
+            }
+            callback?.onWriteFinished(arrayOf(PageRange.ALL_PAGES))
+        }.getOrElse { throwable ->
+            callback?.onWriteFailed(throwable.message ?: "Could not write receipt PDF")
+        }
+    }
+}
+
 object ReceiptPlatformAndroidBridge {
     /**
-     * Set this from your Bluetooth receipt-printer manager.
-     * It should write raw ESC/POS bytes to the already-selected printer socket/output stream.
+     * Optional direct ESC/POS writer. Use this when a real Bluetooth/USB manager owns the connection.
      */
     var writeEscPosBytes: (suspend (ByteArray) -> Boolean)? = null
+
+    /**
+     * Temporary built-in Bluetooth SPP path for common ESC/POS receipt printers.
+     * Configure it later from the devices/settings screen with a paired printer MAC address.
+     */
+    var bluetoothPrinterMacAddress: String? = null
+
+    private val bluetoothSerialPortProfileUuid: UUID =
+        UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+
+    fun configureBluetoothPrinter(macAddress: String?) {
+        bluetoothPrinterMacAddress = macAddress
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+    }
+
+    @SuppressLint("MissingPermission")
+    private suspend fun writeEscPosBytesToConfiguredBluetoothPrinter(printerBytes: ByteArray): Boolean =
+        withContext(Dispatchers.IO) {
+            val address = bluetoothPrinterMacAddress?.trim()?.takeIf { it.isNotBlank() } ?: return@withContext false
+            val adapter = BluetoothAdapter.getDefaultAdapter() ?: return@withContext false
+            val device = runCatching { adapter.getRemoteDevice(address) }.getOrNull() ?: return@withContext false
+            runCatching { adapter.cancelDiscovery() }
+            val socket = device.createRfcommSocketToServiceRecord(bluetoothSerialPortProfileUuid)
+            try {
+                socket.connect()
+                socket.outputStream.write(printerBytes)
+                socket.outputStream.flush()
+                true
+            } finally {
+                runCatching { socket.close() }
+            }
+        }
+
+    suspend fun writeEscPosBytesToConfiguredPrinter(printerBytes: ByteArray): Boolean {
+        writeEscPosBytes?.let { customWriter ->
+            return customWriter(printerBytes)
+        }
+        return writeEscPosBytesToConfiguredBluetoothPrinter(printerBytes)
+    }
 }
 
 fun installReceiptPlatformAndroid(context: Context) {
     val appContext = context.applicationContext
 
-    saveReceiptPdfFile = { fileName, pdfBytes ->
-        withContext(Dispatchers.IO) {
-            runCatching {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    val values = ContentValues().apply {
-                        put(MediaStore.Downloads.DISPLAY_NAME, fileName)
-                        put(MediaStore.Downloads.MIME_TYPE, "application/pdf")
-                        put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-                    }
+    fun createCachedPdfUri(fileName: String, pdfBytes: ByteArray): Uri {
+        val safeFileName = fileName.ifBlank { "receipt.pdf" }
+        val dir = File(appContext.cacheDir, "receipts").apply { mkdirs() }
+        val file = File(dir, safeFileName).apply { writeBytes(pdfBytes) }
 
-                    val uri = appContext.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                        ?: return@runCatching ReceiptPlatformActionResult(false, "Could not create PDF file")
+        return runCatching {
+            FileProvider.getUriForFile(appContext, appContext.packageName + ".fileprovider", file)
+        }.getOrElse {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) throw it
 
-                    appContext.contentResolver.openOutputStream(uri)?.use { it.write(pdfBytes) }
-                        ?: return@runCatching ReceiptPlatformActionResult(false, "Could not open PDF output stream")
+            val values = ContentValues().apply {
+                put(MediaStore.Downloads.DISPLAY_NAME, safeFileName)
+                put(MediaStore.Downloads.MIME_TYPE, "application/pdf")
+                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                put(MediaStore.Downloads.IS_PENDING, 1)
+            }
+            val uri = appContext.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                ?: throw it
+            appContext.contentResolver.openOutputStream(uri)?.use { output -> output.write(pdfBytes) }
+                ?: throw it
+            val doneValues = ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }
+            appContext.contentResolver.update(uri, doneValues, null, null)
+            uri
+        }
+    }
 
-                    ReceiptPlatformActionResult(true, "Saved to Downloads")
-                } else {
-                    val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                    if (!dir.exists()) dir.mkdirs()
-                    val file = File(dir, fileName)
-                    file.writeBytes(pdfBytes)
-                    ReceiptPlatformActionResult(true, "Saved to ${file.absolutePath}")
+    fun savePdfToDownloadsOrPrivateDocuments(fileName: String, pdfBytes: ByteArray): ReceiptPlatformActionResult {
+        return runCatching {
+            val safeFileName = fileName.ifBlank { "receipt.pdf" }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val values = ContentValues().apply {
+                    put(MediaStore.Downloads.DISPLAY_NAME, safeFileName)
+                    put(MediaStore.Downloads.MIME_TYPE, "application/pdf")
+                    put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                    put(MediaStore.Downloads.IS_PENDING, 1)
                 }
+
+                val uri = appContext.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                    ?: error("Could not create PDF file")
+
+                appContext.contentResolver.openOutputStream(uri)?.use { it.write(pdfBytes) }
+                    ?: error("Could not open PDF output stream")
+
+                val doneValues = ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }
+                appContext.contentResolver.update(uri, doneValues, null, null)
+
+                ReceiptPlatformActionResult(true, "Saved to Downloads")
+            } else {
+                val publicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                val targetDir = if (publicDir.exists() || publicDir.mkdirs()) {
+                    publicDir
+                } else {
+                    appContext.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS) ?: appContext.filesDir
+                }
+                val file = File(targetDir, safeFileName)
+                file.writeBytes(pdfBytes)
+                ReceiptPlatformActionResult(true, "Saved to ${file.absolutePath}")
+            }
+        }.getOrElse { throwable ->
+            val fallbackDir = appContext.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS) ?: appContext.filesDir
+            runCatching {
+                val file = File(fallbackDir, fileName.ifBlank { "receipt.pdf" })
+                file.writeBytes(pdfBytes)
+                ReceiptPlatformActionResult(true, "Saved to ${file.absolutePath}")
             }.getOrElse {
-                ReceiptPlatformActionResult(false, it.message ?: "Could not save PDF")
+                ReceiptPlatformActionResult(false, throwable.message ?: it.message ?: "Could not save PDF")
             }
         }
     }
 
-    shareReceiptPdfFile = { fileName, pdfBytes, whatsappOnly ->
+    saveReceiptPdfFile = { fileName, pdfBytes ->
         withContext(Dispatchers.IO) {
-            runCatching {
-                val dir = File(appContext.cacheDir, "receipts").apply { mkdirs() }
-                val file = File(dir, fileName).apply { writeBytes(pdfBytes) }
-                val uri: Uri = FileProvider.getUriForFile(
-                    appContext,
-                    appContext.packageName + ".fileprovider",
-                    file
-                )
+            savePdfToDownloadsOrPrivateDocuments(fileName, pdfBytes)
+        }
+    }
 
-                val intent = Intent(Intent.ACTION_SEND).apply {
+    shareReceiptPdfFile = { fileName, pdfBytes, whatsappOnly ->
+        withContext(Dispatchers.Main) {
+            runCatching {
+                val uri = withContext(Dispatchers.IO) { createCachedPdfUri(fileName, pdfBytes) }
+                val baseIntent = Intent(Intent.ACTION_SEND).apply {
                     type = "application/pdf"
                     putExtra(Intent.EXTRA_STREAM, uri)
+                    putExtra(Intent.EXTRA_TEXT, "AITA receipt")
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     if (whatsappOnly) setPackage("com.whatsapp")
                 }
 
-                val chooser = if (whatsappOnly) intent else Intent.createChooser(intent, "Share receipt").apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                try {
+                    if (whatsappOnly) {
+                        context.startActivity(baseIntent)
+                    } else {
+                        context.startActivity(Intent.createChooser(baseIntent, "Share receipt").apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        })
+                    }
+                    ReceiptPlatformActionResult(true, if (whatsappOnly) "Opening WhatsApp" else "Opening share sheet")
+                } catch (notFound: ActivityNotFoundException) {
+                    if (!whatsappOnly) throw notFound
+                    val chooserIntent = Intent.createChooser(
+                        Intent(Intent.ACTION_SEND).apply {
+                            type = "application/pdf"
+                            putExtra(Intent.EXTRA_STREAM, uri)
+                            putExtra(Intent.EXTRA_TEXT, "AITA receipt")
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        },
+                        "Share receipt"
+                    ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                    context.startActivity(chooserIntent)
+                    ReceiptPlatformActionResult(true, "WhatsApp is not installed; opening share sheet")
                 }
+            }.getOrElse { throwable ->
+                ReceiptPlatformActionResult(false, throwable.message ?: "Could not share PDF")
+            }
+        }
+    }
 
-                appContext.startActivity(chooser)
-                ReceiptPlatformActionResult(true, if (whatsappOnly) "Opening WhatsApp" else "Opening share sheet")
-            }.getOrElse {
-                ReceiptPlatformActionResult(false, it.message ?: "Could not share PDF")
+    printReceiptPlatformAction = { _, _, printerBytes ->
+        withContext(Dispatchers.IO) {
+            runCatching {
+                if (ReceiptPlatformAndroidBridge.writeEscPosBytesToConfiguredPrinter(printerBytes)) {
+                    ReceiptPlatformActionResult(true, "Receipt sent to printer")
+                } else {
+                    ReceiptPlatformActionResult(false, "Android Bluetooth ESC/POS receipt printer is not configured")
+                }
+            }.getOrElse { throwable ->
+                ReceiptPlatformActionResult(false, throwable.message ?: "Could not print receipt")
             }
         }
     }
 
     printReceiptEscPosBytes = { printerBytes ->
-        runCatching {
-            val writer = ReceiptPlatformAndroidBridge.writeEscPosBytes
-                ?: return@runCatching ReceiptPlatformActionResult(false, "No Android ESC/POS printer writer is configured")
-
-            if (writer(printerBytes)) {
-                ReceiptPlatformActionResult(true, "Sent to printer")
-            } else {
-                ReceiptPlatformActionResult(false, "Printer rejected the receipt")
+        withContext(Dispatchers.IO) {
+            runCatching {
+                if (ReceiptPlatformAndroidBridge.writeEscPosBytesToConfiguredPrinter(printerBytes)) {
+                    ReceiptPlatformActionResult(true, "Receipt sent to printer")
+                } else {
+                    ReceiptPlatformActionResult(false, "Android Bluetooth ESC/POS receipt printer is not configured")
+                }
+            }.getOrElse {
+                ReceiptPlatformActionResult(false, it.message ?: "Could not print receipt")
             }
-        }.getOrElse {
-            ReceiptPlatformActionResult(false, it.message ?: "Could not print receipt")
         }
     }
 }
@@ -188,47 +950,48 @@ class MainActivityViewModel @Inject constructor(): ViewModel() {
     }
 
 
+    private fun String?.permissionList(): List<String> =
+        this
+            ?.split("|")
+            ?.map { it.trim() }
+            ?.filter { it.isNotBlank() }
+            ?.distinct()
+            ?: emptyList()
+
+    private suspend fun putPermissionList(key: String, permissions: List<String>) {
+        val cleaned = permissions.map { it.trim() }.filter { it.isNotBlank() }.distinct()
+        if (cleaned.isEmpty()) deleteLocalKv(key) else putLocalKv(key, cleaned.joinToString("|"))
+    }
+
     suspend fun getRequestedPermissions(): List<String> {
-        return getLocalKv(KEY_REQUESTED_PERMISSIONS)?.run { split("|") } ?: emptyList()
+        return getLocalKv(KEY_REQUESTED_PERMISSIONS).permissionList()
     }
 
     suspend fun getRequestedPermissionsRepliedWithDontAskAgain(): List<String> {
-        return getLocalKv(KEY_REQUESTED_PERMISSIONS_REPLIED_WITH_DONT_ASK_AGAIN)?.run { split("|") } ?: emptyList()
+        return getLocalKv(KEY_REQUESTED_PERMISSIONS_REPLIED_WITH_DONT_ASK_AGAIN).permissionList()
     }
 
     fun addRequestedPermission(permission: String) {
         viewModelScope.launch {
-            val permissions = getRequestedPermissions()
-
-            if (!permissions.contains(permission))
-                putLocalKv(KEY_REQUESTED_PERMISSIONS, permission)
+            putPermissionList(KEY_REQUESTED_PERMISSIONS, getRequestedPermissions() + permission)
         }
     }
 
     fun addRequestedPermissionRepliedWithDontAskAgain(permission: String) {
         viewModelScope.launch {
-            val permissions = getRequestedPermissionsRepliedWithDontAskAgain()
-
-            if (!permissions.contains(permission))
-                putLocalKv(KEY_REQUESTED_PERMISSIONS_REPLIED_WITH_DONT_ASK_AGAIN, permission)
+            putPermissionList(KEY_REQUESTED_PERMISSIONS_REPLIED_WITH_DONT_ASK_AGAIN, getRequestedPermissionsRepliedWithDontAskAgain() + permission)
         }
     }
 
     fun removeRequestedPermission(permission: String) {
         viewModelScope.launch {
-            val permissions = getRequestedPermissions()
-
-            if (permissions.contains(permission))
-                deleteLocalKv(KEY_REQUESTED_PERMISSIONS)
+            putPermissionList(KEY_REQUESTED_PERMISSIONS, getRequestedPermissions().filterNot { it == permission })
         }
     }
 
     fun removeRequestedPermissionRepliedWithDontAskAgain(permission: String) {
         viewModelScope.launch {
-            val permissions = getRequestedPermissionsRepliedWithDontAskAgain()
-
-            if (permissions.contains(permission))
-                deleteLocalKv(KEY_REQUESTED_PERMISSIONS_REPLIED_WITH_DONT_ASK_AGAIN)
+            putPermissionList(KEY_REQUESTED_PERMISSIONS_REPLIED_WITH_DONT_ASK_AGAIN, getRequestedPermissionsRepliedWithDontAskAgain().filterNot { it == permission })
         }
     }
 }
@@ -341,6 +1104,12 @@ class MainActivity: ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         instance = this
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
+        installAndroidSoftKeyboardHider(this)
+        installReceiptPlatformAndroid(this)
+        installAndroidVectorDrawableRenderer()
+        installAndroidCameraBarcodeScanner()
+        installAndroidVoiceInput(this)
 
         permissionLauncher = registerForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()
@@ -395,6 +1164,25 @@ class MainActivity: ComponentActivity() {
         viewModel.postCurrentRequestedPermission(
             "", "", null
         )
+    }
+
+    suspend fun permissionState(permission: String): PlatformPermissionState {
+        if (ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED) {
+            viewModel.removeRequestedPermission(permission)
+            viewModel.removeRequestedPermissionRepliedWithDontAskAgain(permission)
+            return PlatformPermissionState.Granted
+        }
+
+        val requestedBefore = viewModel.getRequestedPermissions().contains(permission)
+        val storedPermanentlyDenied = viewModel.getRequestedPermissionsRepliedWithDontAskAgain().contains(permission)
+        val systemWantsRationale = ActivityCompat.shouldShowRequestPermissionRationale(this, permission)
+
+        return when {
+            storedPermanentlyDenied && !systemWantsRationale -> PlatformPermissionState.PermanentlyDenied
+            requestedBefore && !systemWantsRationale -> PlatformPermissionState.PermanentlyDenied
+            systemWantsRationale -> PlatformPermissionState.Denied
+            else -> PlatformPermissionState.NotDetermined
+        }
     }
 
     suspend fun requestPermissionDirectly(
@@ -453,64 +1241,49 @@ class MainActivity: ComponentActivity() {
         permissionGrantedResultAction: ((String) -> Unit)? = null,
         permissionDeniedResultAction: ((String) -> Unit)? = null
     ) {
-        viewModel.removeRequestedPermission(permissions.first())
-        val deniedBefore = viewModel.getRequestedPermissions()
-            .contains(permissions.first()) && ActivityCompat.shouldShowRequestPermissionRationale(
-            this@MainActivity,
-            permissions.first()
-        )
+        val permission = permissions.firstOrNull() ?: return
 
-        val deniedBeforeWithDontAskAgain = viewModel.getRequestedPermissionsRepliedWithDontAskAgain()
-            .contains(permissions.first()) && !ActivityCompat.shouldShowRequestPermissionRationale(
-            this@MainActivity,
-            permissions.first()
-        )
+        if (permissions.all { ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED }) {
+            permissions.forEach { granted ->
+                viewModel.removeRequestedPermission(granted)
+                viewModel.removeRequestedPermissionRepliedWithDontAskAgain(granted)
+                permissionGrantedResultAction?.invoke(granted)
+            }
+            return
+        }
 
-        if (force || !deniedBefore && !deniedBeforeWithDontAskAgain) {
+        if (permissionState(permission) == PlatformPermissionState.PermanentlyDenied) {
+            openPlatformAppSettings?.invoke(androidPermissionKind(permission))
+            permissionDeniedResultAction?.invoke(permission)
+            return
+        }
 
-            if (deniedBeforeWithDontAskAgain) {
-                viewModel.postCurrentRequestedPermission(
-                    dontAskAgainDeniedRationaleTitle, dontAskAgainDeniedRationaleSubtitle, permissions
-                )
-            } else if (deniedBefore) {
-                viewModel.postCurrentRequestedPermission(
-                    deniedRationaleTitle, deniedRationaleSubtitle, permissions
-                )
-            } else {
-                this.permissionGrantedResultAction = {
-                    viewModel.removeRequestedPermission(it)
-                    viewModel.removeRequestedPermissionRepliedWithDontAskAgain(it)
+        this.permissionGrantedResultAction = { granted ->
+            viewModel.removeRequestedPermission(granted)
+            viewModel.removeRequestedPermissionRepliedWithDontAskAgain(granted)
+            permissionGrantedResultAction?.invoke(granted)
+        }
 
-                    permissionGrantedResultAction?.invoke(it)
+        this.permissionDeniedResultAction = { denied ->
+            lifecycleScope.launch {
+                val requestedBefore = viewModel.getRequestedPermissions().contains(denied)
+                viewModel.addRequestedPermission(denied)
+                if (requestedBefore && !ActivityCompat.shouldShowRequestPermissionRationale(this@MainActivity, denied)) {
+                    viewModel.addRequestedPermissionRepliedWithDontAskAgain(denied)
                 }
-
-                this.permissionDeniedResultAction = {
-                    lifecycleScope.launch {
-                        val deniedBeforeWithDontAskAgain2 = viewModel.getRequestedPermissionsRepliedWithDontAskAgain()
-                            .contains(it) && !ActivityCompat.shouldShowRequestPermissionRationale(
-                            this@MainActivity,
-                            it
-                        )
-
-                        viewModel.addRequestedPermission(it)
-
-                        if (deniedBeforeWithDontAskAgain2) {
-                            viewModel.addRequestedPermissionRepliedWithDontAskAgain(it)
-                        }
-
-                        permissionDeniedResultAction?.invoke(it)
-                    }
-                }
-
-                permissionLauncher.launch(permissions)
+                permissionDeniedResultAction?.invoke(denied)
             }
         }
+
+        permissionLauncher.launch(permissions)
     }
 
     companion object {
         private lateinit var instance: MainActivity
 
         fun get() = instance
+
+        fun getOrNull(): MainActivity? = if (::instance.isInitialized) instance else null
 
     }
 }
@@ -553,9 +1326,20 @@ class AITA : Application() {
             }
         }
 
+        getPersistentUiDraftValue = { key ->
+            getEncryptedValue("key_ui_draft_" + key.hashCode().toString())
+        }
+        setPersistentUiDraftValue = { key, value ->
+            setEncryptedValue("key_ui_draft_" + key.hashCode().toString(), value)
+        }
+
         setClipboardText = { text ->
             val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             clipboard.setPrimaryClip(ClipData.newPlainText("AITA", text))
+        }
+
+        openPlatformAppSettings = { _ ->
+            openAndroidApplicationSettingsResult()
         }
 
         openSystemDevicesSettings = {

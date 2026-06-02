@@ -8,7 +8,7 @@
       "second": "0"
     },
     "serverUrl": {
-      "first": "http://172.20.10.2:8080",
+      "first": "http://172.22.101.116:8080",
       "second": "1"
     },
     "globalAppConfigurationPath": {
@@ -50,6 +50,10 @@
     "updateUserPath": {
       "first": "user/update",
       "second": "8"
+    },
+    "updateUserPreferencesPath": {
+      "first": "user/preferences/update",
+      "second": "95"
     },
     "getStoresPath": {
       "first": "stores/get",
@@ -946,132 +950,50 @@
     ],
     "subscriptionPlans": [
       {
-        "id": "starter_monthly_kzt",
+        "id": "standard_monthly_kzt",
         "name": [
           {
             "language": "main",
-            "value": "Starter"
+            "value": "Standard"
           },
           {
             "language": "en",
-            "value": "Starter"
+            "value": "Standard"
           },
           {
             "language": "ru",
-            "value": "Старт"
+            "value": "Стандартный"
           },
           {
             "language": "kk",
-            "value": "Бастау"
+            "value": "Стандартты"
           }
         ],
         "description": [
           {
             "language": "main",
-            "value": "Small store, one branch, basic analytics"
+            "value": "3 branches, 21 workers, 1000 stock items"
+          },
+          {
+            "language": "en",
+            "value": "3 branches, 21 workers, 1000 stock items"
           },
           {
             "language": "ru",
-            "value": "Небольшой магазин, один филиал, базовая аналитика"
+            "value": "3 филиала, 21 сотрудник, 1000 товаров на складе"
           },
           {
             "language": "kk",
-            "value": "Шағын дүкен, бір филиал, негізгі аналитика"
+            "value": "3 филиал, 21 қызметкер, қоймада 1000 тауар"
           }
         ],
-        "priceMinor": 499000,
+        "priceMinor": 799000,
         "currencyCode": "KZT",
         "periodUnit": "month",
         "periodCount": 1,
-        "maxBranches": 1,
-        "maxWorkers": 3,
-        "maxStockItems": 2000,
-        "isActive": true
-      },
-      {
-        "id": "business_monthly_kzt",
-        "name": [
-          {
-            "language": "main",
-            "value": "Business"
-          },
-          {
-            "language": "en",
-            "value": "Business"
-          },
-          {
-            "language": "ru",
-            "value": "Бизнес"
-          },
-          {
-            "language": "kk",
-            "value": "Бизнес"
-          }
-        ],
-        "description": [
-          {
-            "language": "main",
-            "value": "Branches, workers, cash register, realtime sync"
-          },
-          {
-            "language": "ru",
-            "value": "Филиалы, сотрудники, касса, онлайн-синхронизация"
-          },
-          {
-            "language": "kk",
-            "value": "Филиалдар, қызметкерлер, касса, нақты уақыт синхрондауы"
-          }
-        ],
-        "priceMinor": 1499000,
-        "currencyCode": "KZT",
-        "periodUnit": "month",
-        "periodCount": 1,
-        "maxBranches": 5,
-        "maxWorkers": 20,
-        "maxStockItems": 20000,
-        "isActive": true
-      },
-      {
-        "id": "business_yearly_kzt",
-        "name": [
-          {
-            "language": "main",
-            "value": "Business yearly"
-          },
-          {
-            "language": "en",
-            "value": "Business yearly"
-          },
-          {
-            "language": "ru",
-            "value": "Бизнес на год"
-          },
-          {
-            "language": "kk",
-            "value": "Жылдық бизнес"
-          }
-        ],
-        "description": [
-          {
-            "language": "main",
-            "value": "Twelve months for the price of ten"
-          },
-          {
-            "language": "ru",
-            "value": "Двенадцать месяцев по цене десяти"
-          },
-          {
-            "language": "kk",
-            "value": "Он ай бағасына он екі ай"
-          }
-        ],
-        "priceMinor": 14990000,
-        "currencyCode": "KZT",
-        "periodUnit": "year",
-        "periodCount": 1,
-        "maxBranches": 5,
-        "maxWorkers": 20,
-        "maxStockItems": 20000,
+        "maxBranches": 3,
+        "maxWorkers": 21,
+        "maxStockItems": 1000,
         "isActive": true
       }
     ],
@@ -1102,6 +1024,42 @@
     "getOperationLogsPath": {
       "first": "logs/get",
       "second": "92"
+    },
+    "getStoreAnalyticsPath": {
+      "first": "analytics/store/get",
+      "second": "94"
+    },
+    "getSupportTicketsPath": {
+      "first": "support/tickets/get",
+      "second": "96"
+    },
+    "createSupportTicketPath": {
+      "first": "support/tickets/create",
+      "second": "97"
+    },
+    "closeSupportTicketPath": {
+      "first": "support/tickets/close",
+      "second": "98"
+    },
+    "reopenSupportTicketPath": {
+      "first": "support/tickets/reopen",
+      "second": "99"
+    },
+    "getSupportMessagesPath": {
+      "first": "support/messages/get",
+      "second": "100"
+    },
+    "sendSupportMessagePath": {
+      "first": "support/messages/send",
+      "second": "101"
+    },
+    "markSupportMessagesReadPath": {
+      "first": "support/messages/read",
+      "second": "102"
     }
+  },
+  "getStoreAnalyticsPath": {
+    "first": "analytics/store/get",
+    "second": "94"
   }
 }
