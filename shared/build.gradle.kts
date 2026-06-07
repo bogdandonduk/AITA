@@ -14,6 +14,10 @@ plugins {
 
 }
 
+java {
+    toolchain { languageVersion.set(JavaLanguageVersion.of(21)) }
+}
+
 sqldelight {
     databases {
         create("AppDatabase") {
@@ -35,7 +39,9 @@ kotlin {
     iosArm64()
     iosSimulatorArm64()
 
-    jvm()
+    jvm {
+        testRuns["test"].executionTask.configure { useJUnit() }
+    }
 
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
@@ -84,6 +90,26 @@ kotlin {
             implementation(libs.kotlin.test)
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${property("coroutines.version")}")
 
+        }
+        jvmTest.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlin.testJunit)
+            implementation(libs.sqlDelightJvmDriver)
+            implementation(libs.sqlDelightAsyncExtensions)
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${property("coroutines.version")}")
+            implementation("io.ktor:ktor-client-mock:${property("ktor.version")}")
+        }
+        androidInstrumentedTest.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.junit)
+            implementation(libs.sqlDelightAndroidDriver)
+            implementation(libs.sqlDelightAsyncExtensions)
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${property("coroutines.version")}")
+            implementation(libs.androidx.testExt.junit)
+            implementation(libs.androidx.espresso.core)
+            implementation("androidx.test:core:1.7.0")
+            implementation("androidx.test:runner:1.7.0")
+            implementation("io.ktor:ktor-client-mock:${property("ktor.version")}")
         }
         androidMain.dependencies {
             implementation(libs.androidx.datastore.preferences)
@@ -167,5 +193,6 @@ android {
     }
     defaultConfig {
         minSdk = libs.versions.android.minSdk.get().toInt()
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 }

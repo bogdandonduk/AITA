@@ -8,7 +8,7 @@
       "second": "0"
     },
     "serverUrl": {
-      "first": "http://172.22.101.116:8080",
+      "first": "http://192.168.1.51:8080",
       "second": "1"
     },
     "globalAppConfigurationPath": {
@@ -693,6 +693,10 @@
       "first": "workers/updatePermissions",
       "second": "58"
     },
+    "updateMyWorkerPasswordPath": {
+      "first": "workers/my/password",
+      "second": "103"
+    },
     "inviteStoreWorkerPath": {
       "first": "workers/invite",
       "second": "65"
@@ -1056,6 +1060,10 @@
     "markSupportMessagesReadPath": {
       "first": "support/messages/read",
       "second": "102"
+    },
+    "removeStoreWorkerPath": {
+      "first": "workers/remove",
+      "second": "105"
     }
   },
   "getStoreAnalyticsPath": {

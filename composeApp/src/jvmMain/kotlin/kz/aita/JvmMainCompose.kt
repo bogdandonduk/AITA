@@ -25,10 +25,82 @@ import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
 private val keyringService = "aita_keyring"
-private val keyring: Keyring = Keyring.create()
+private val keyring: Keyring by lazy { Keyring.create() }
 
 private val rng = SecureRandom()
 private val fallbackEncryptionKeys = ConcurrentHashMap<String, ByteArray>()
+
+
+private const val JVM_SECURE_STORE_DIR = "secure"
+
+private fun String.toJvmBooleanLenientOrNull(): Boolean? = when (trim().lowercase(Locale.ROOT)) {
+    "true", "1", "yes", "y", "on" -> true
+    "false", "0", "no", "n", "off" -> false
+    else -> null
+}
+
+private fun jvmKeyringEnabled(): Boolean =
+    (System.getenv("AITA_ENABLE_KEYRING") ?: System.getProperty("AITA_ENABLE_KEYRING"))
+        ?.toJvmBooleanLenientOrNull()
+        ?: false
+
+private fun secureStoreRootDir(): File? = runCatching {
+    val userHome = System.getProperty("user.home").orEmpty().takeIf { it.isNotBlank() } ?: "."
+    val osName = System.getProperty("os.name").orEmpty().lowercase(Locale.ROOT)
+    val base = when {
+        osName.contains("win") -> File(System.getenv("APPDATA") ?: userHome, "AITA")
+        osName.contains("mac") -> File(userHome, ".aita/AITA")
+        else -> File(System.getenv("XDG_CONFIG_HOME") ?: File(userHome, ".config").absolutePath, "aita")
+    }
+    File(base, JVM_SECURE_STORE_DIR).apply { mkdirs() }
+}.getOrNull()
+
+private fun secureStoreFile(account: String): File? {
+    val safeName = account
+        .replace(Regex("[^A-Za-z0-9._-]+"), "_")
+        .trim('_')
+        .ifBlank { "secret" }
+    return secureStoreRootDir()?.let { File(it, "$safeName.txt") }
+}
+
+private fun readJvmSecret(account: String): String? {
+    secureStoreFile(account)
+        ?.takeIf { it.exists() && it.isFile }
+        ?.let { file ->
+            runCatching { file.readText().trim().takeIf { it.isNotBlank() } }.getOrNull()
+        }
+        ?.let { return it }
+
+    if (!jvmKeyringEnabled()) return null
+
+    return runCatching { keyring.getPassword(keyringService, account)?.takeIf { it.isNotBlank() } }.getOrNull()
+}
+
+private fun writeJvmSecret(account: String, value: String) {
+    val writtenToFile = runCatching {
+        val file = secureStoreFile(account) ?: return@runCatching false
+        file.parentFile?.mkdirs()
+        val tmp = File(file.parentFile, file.name + ".tmp")
+        tmp.writeText(value)
+        runCatching {
+            Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        }.getOrElse {
+            Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        }
+        true
+    }.getOrDefault(false)
+
+    if (!writtenToFile && jvmKeyringEnabled()) {
+        runCatching { keyring.setPassword(keyringService, account, value) }
+    }
+}
+
+private fun deleteJvmSecret(account: String) {
+    runCatching { secureStoreFile(account)?.delete() }
+    if (jvmKeyringEnabled()) {
+        runCatching { keyring.deletePassword(keyringService, account) }
+    }
+}
 
 object ReceiptPlatformJvmBridge {
     /**
@@ -270,18 +342,10 @@ fun installReceiptPlatformJvm() {
 }
 
 fun loadOrCreateInstallationId(): String {
-    val existing = try {
-        keyring.getPassword(keyringService, "installation_id")?.takeIf { it.isNotBlank() }
-    } catch (_: Throwable) {
-        null
-    }
-
-    if (existing != null) return existing
+    readJvmSecret("installation_id")?.takeIf { it.isNotBlank() }?.let { return it }
 
     val fresh = UUID.randomUUID().toString()
-    try {
-        keyring.setPassword(keyringService, "installation_id", fresh)
-    } catch (_: Throwable) { }
+    writeJvmSecret("installation_id", fresh)
 
     return fresh
 }
@@ -294,7 +358,7 @@ fun loadOrCreateKey(account: String): ByteArray {
     }.getOrNull()
 
     val existingKey = runCatching {
-        keyring.getPassword(keyringService, account)
+        readJvmSecret(account)
             ?.let { Base64.getUrlDecoder().decode(it) }
             ?.takeIf { it.size == 32 }
     }.getOrNull()
@@ -316,7 +380,7 @@ fun loadOrCreateKey(account: String): ByteArray {
     val raw = ByteArray(32).also { rng.nextBytes(it) }
     val b64 = Base64.getUrlEncoder().withoutPadding().encodeToString(raw)
 
-    runCatching { keyring.setPassword(keyringService, account, b64) }
+    runCatching { writeJvmSecret(account, b64) }
         .onFailure {
             runCatching {
                 keyFile?.parentFile?.mkdirs()
@@ -367,21 +431,18 @@ fun main() {
 
     getStoredUserAuthTokens = {
         try {
-            val raw = keyring.getPassword(keyringService, "auth_tokens")
-            jsonBase.decodeFromString<TokenPair>(raw)
+            readJvmSecret("auth_tokens")?.let { raw -> jsonBase.decodeFromString<TokenPair>(raw) }
         } catch (_: Throwable) {
             null
         }
     }
     setStoredUserAuthTokens = {
         if (it == null) {
-            try {
-                keyring.deletePassword(keyringService, "auth_tokens")
-            } catch (_: Throwable) { }
+            deleteJvmSecret("auth_tokens")
         } else {
             try {
                 val payload = jsonBase.encodeToString(it)
-                keyring.setPassword(keyringService, "auth_tokens", payload)
+                writeJvmSecret("auth_tokens", payload)
             } catch (_: Throwable) { }
         }
     }
@@ -418,7 +479,7 @@ fun main() {
             if (value == null) {
                 try {
                     cacheFile.delete()
-                    keyring.deletePassword(keyringService, "user_account_encryption_key")
+                    deleteJvmSecret("user_account_encryption_key")
                 } catch (_: Throwable) { }
             } else {
                 val key = loadOrCreateKey("user_account_encryption_key")
@@ -502,7 +563,7 @@ fun main() {
             installationId = loadOrCreateInstallationId(),
             deviceName = deviceName,
             platformName = "Desktop JVM",
-            osName = listOf(osName, osVersion, arch).filter { it.isNotBlank() }.joinToString(" • "),
+            osName = listOf(osName, osVersion, arch).filter { it.isNotBlank() }.joinToString(" - "),
             appName = "AITA",
             appVersion = "desktop",
             localeLanguage = Locale.getDefault().language

@@ -70,6 +70,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
@@ -584,13 +585,19 @@ private fun AppConfiguration.AndroidBarcodeCameraScannerPane(
                 enabled = camera?.cameraInfo?.hasFlashUnit() != false,
                 onClick = { torchOn = !torchOn }
             ) {
-                Text(
-                    text = if (torchOn) "⚡" else "☼",
-                    color = Color.White,
-                    fontSize = stateValues.accentTextSize,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (torchOn) "⚡" else "🔦",
+                        color = Color.White.copy(alpha = if (camera?.cameraInfo?.hasFlashUnit() != false) 0.96f else 0.38f),
+                        fontSize = 21.sp,
+                        lineHeight = 21.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
 
             CameraScannerOverlayIconButton(
@@ -1278,12 +1285,32 @@ class MainActivity: ComponentActivity() {
         permissionLauncher.launch(permissions)
     }
 
+    override fun onResume() {
+        super.onResume()
+        instance = this
+        installAndroidSoftKeyboardHider(this)
+        installReceiptPlatformAndroid(this)
+        installAndroidVectorDrawableRenderer()
+        installAndroidCameraBarcodeScanner()
+        installAndroidVoiceInput(this)
+    }
+
+    override fun onStop() {
+        runCatching { stopPlatformVoiceInput?.invoke() }
+        super.onStop()
+    }
+
+    override fun onDestroy() {
+        if (instance === this) instance = null
+        super.onDestroy()
+    }
+
     companion object {
-        private lateinit var instance: MainActivity
+        private var instance: MainActivity? = null
 
-        fun get() = instance
+        fun get(): MainActivity = instance ?: error("MainActivity is not available")
 
-        fun getOrNull(): MainActivity? = if (::instance.isInitialized) instance else null
+        fun getOrNull(): MainActivity? = instance
 
     }
 }

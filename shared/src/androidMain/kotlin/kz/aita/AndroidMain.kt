@@ -39,12 +39,29 @@ actual var setStoredUserAuthTokens: ((TokenPair?) -> Unit)? = null
 actual var getStoredUserAccountDataModel: (() -> UserAccountDataModel?)? = null
 actual var setStoredUserAccountDataModel: ((UserAccountDataModel?) -> Unit)? = null
 
+actual var getPersistentUiDraftValue: (suspend (String) -> String?)? = null
+actual var setPersistentUiDraftValue: (suspend (String, String?) -> Unit)? = null
+
 actual var cacheDirPath: String = ""
 actual val Dispatchers.ourIo: CoroutineDispatcher
     get() = Dispatchers.IO
 
+private fun buildAitaOkHttpClient(): OkHttpClient {
+    val builder = OkHttpClient.Builder()
+    runCatching {
+        cacheDirPath
+            .trim()
+            .takeIf { it.isNotBlank() }
+            ?.let { basePath ->
+                val httpCacheDirectory = File(basePath, "http").apply { mkdirs() }
+                builder.cache(Cache(httpCacheDirectory, cacheSize))
+            }
+    }
+    return builder.build()
+}
+
 actual var getHttpClientEngine: () -> HttpClientEngine = {
-    OkHttp.create { preconfigured = OkHttpClient.Builder().cache(Cache(File(cacheDirPath, "http"), cacheSize)).build() }
+    OkHttp.create { preconfigured = buildAitaOkHttpClient() }
 }
 
 actual var getSystemLocaleLanguage: () -> String = {

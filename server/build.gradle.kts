@@ -1,6 +1,7 @@
 // THIS IS build.gradle of server module
 plugins {
     alias(libs.plugins.kotlinJvm)
+    alias(libs.plugins.kotlinSerialization)
     alias(libs.plugins.ktor)
     application
 }
@@ -65,7 +66,9 @@ dependencies {
     implementation(libs.java.jwt)
 
 
-    implementation(projects.shared)
+    // Let Kotlin/Gradle choose the correct shared JVM variants:
+    // jvmApiElements for compile classpath and jvmRuntimeElements for runtime classpath.
+    implementation(project(":shared"))
     implementation(libs.logback)
     implementation(libs.ktor.serverCore)
     implementation(libs.ktor.serverNetty)

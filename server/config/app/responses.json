@@ -1636,5 +1636,68 @@
         "value": "Қолдау хабарламалары оқылған деп белгіленді"
       }
     ]
+  },
+  {
+    "id": "103",
+    "message": [
+      {
+        "language": "main",
+        "value": "Workshift password updated"
+      },
+      {
+        "language": "en",
+        "value": "Workshift password updated"
+      },
+      {
+        "language": "ru",
+        "value": "Пароль смены обновлён"
+      },
+      {
+        "language": "kk",
+        "value": "Ауысым құпия сөзі жаңартылды"
+      }
+    ]
+  },
+  {
+    "id": "104",
+    "message": [
+      {
+        "language": "main",
+        "value": "Security history loaded"
+      },
+      {
+        "language": "en",
+        "value": "Security history loaded"
+      },
+      {
+        "language": "ru",
+        "value": "История безопасности загружена"
+      },
+      {
+        "language": "kk",
+        "value": "Қауіпсіздік тарихы жүктелді"
+      }
+    ]
+  },
+  {
+    "id": "105",
+    "message": [
+      {
+        "language": "main",
+        "value": "Worker removed"
+      },
+      {
+        "language": "en",
+        "value": "Worker removed"
+      },
+      {
+        "language": "ru",
+        "value": "Сотрудник удалён"
+      },
+      {
+        "language": "kk",
+        "value": "Қызметкер жойылды"
+      }
+    ]
   }
 ]

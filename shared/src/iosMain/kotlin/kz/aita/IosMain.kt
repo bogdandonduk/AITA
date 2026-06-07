@@ -129,16 +129,12 @@ actual var setStoredUserAccountDataModel: ((UserAccountDataModel?) -> Unit)? = {
     }
 }
 
-@Suppress("unused")
-private val iosPersistentUiDraftHooksInstalled = run {
-    getPersistentUiDraftValue = { key ->
-        keychainGetString("ui_draft_" + key.hashCode().toString())
-    }
+actual var getPersistentUiDraftValue: (suspend (String) -> String?)? = { key ->
+    keychainGetString("ui_draft_" + key.hashCode().toString())
+}
 
-    setPersistentUiDraftValue = { key, value ->
-        keychainSetString("ui_draft_" + key.hashCode().toString(), value)
-    }
-    true
+actual var setPersistentUiDraftValue: (suspend (String, String?) -> Unit)? = { key, value ->
+    keychainSetString("ui_draft_" + key.hashCode().toString(), value)
 }
 
 actual var cacheDirPath: String = iosCacheDirectoryPath()

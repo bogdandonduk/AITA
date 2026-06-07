@@ -21,6 +21,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -77,6 +78,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -124,9 +126,6 @@ data class VoiceInputCallbacks(
     val onError: (String) -> Unit = {},
     val onFinished: () -> Unit = {}
 )
-
-var getPersistentUiDraftValue: (suspend (String) -> String?)? = null
-var setPersistentUiDraftValue: (suspend (String, String?) -> Unit)? = null
 
 enum class PlatformPermissionKind {
     Camera,
@@ -300,6 +299,39 @@ private fun shouldPersistUiTextDraft(keyboardType: KeyboardType, stateKey: Strin
     return stateKey?.isNotBlank() == true
 }
 
+private const val PERSISTENT_TEXT_FIELD_META_STATE_SUFFIX = "__aita_text_field_meta"
+
+private data class PersistentTextFieldMeta(
+    val selection: TextRange,
+    val focused: Boolean
+)
+
+private fun persistentUiTextFieldMetaStateKey(stateKey: String?): String? =
+    stateKey
+        ?.takeIf { it.isNotBlank() }
+        ?.let { "${it}$PERSISTENT_TEXT_FIELD_META_STATE_SUFFIX" }
+
+private fun encodePersistentTextFieldMeta(value: TextFieldValue, focused: Boolean): String =
+    listOf(
+        value.selection.start.coerceIn(0, value.text.length).toString(),
+        value.selection.end.coerceIn(0, value.text.length).toString(),
+        if (focused) "1" else "0"
+    ).joinToString(":")
+
+private fun decodePersistentTextFieldMeta(encoded: String?, textLength: Int): PersistentTextFieldMeta {
+    val parts = encoded
+        ?.split(':')
+        ?.takeIf { it.size >= 2 }
+        ?: return PersistentTextFieldMeta(TextRange(textLength.coerceAtLeast(0)), false)
+
+    val safeLength = textLength.coerceAtLeast(0)
+    val start = parts.getOrNull(0)?.toIntOrNull()?.coerceIn(0, safeLength) ?: safeLength
+    val end = parts.getOrNull(1)?.toIntOrNull()?.coerceIn(0, safeLength) ?: start
+    val focused = parts.getOrNull(2) == "1"
+
+    return PersistentTextFieldMeta(TextRange(start, end), focused)
+}
+
 private fun platformAllowsAutomaticTextFieldFocus(): Boolean {
     val platformName = runCatching { getPlatformName() }.getOrDefault("")
     return platformName.contains("desktop", ignoreCase = true) ||
@@ -418,7 +450,144 @@ private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallb
     put(1062L, mapOf("main" to "Now", "en" to "Now", "ru" to "Стало", "kk" to "Қазір"))
     put(1063L, mapOf("main" to "This item belongs to another branch. Switch to that branch or move the batch here before selling it.", "en" to "This item belongs to another branch. Switch to that branch or move the batch here before selling it.", "ru" to "Этот товар относится к другому филиалу. Переключитесь на этот филиал или переместите партию сюда перед продажей.", "kk" to "Бұл тауар басқа филиалға тиесілі. Оны сатар алдында сол филиалға ауысыңыз немесе партияны осы жерге жылжытыңыз."))
     put(1064L, mapOf("main" to "In cart", "en" to "In cart", "ru" to "В корзине", "kk" to "Себетте"))
+    put(1065L, mapOf("main" to "No due date", "en" to "No due date", "ru" to "Без срока", "kk" to "Мерзімі жоқ"))
+    put(1066L, mapOf("main" to "Due in", "en" to "Due in", "ru" to "Через", "kk" to "Қалғаны"))
+    put(1067L, mapOf("main" to "days", "en" to "days", "ru" to "дн.", "kk" to "күн"))
+    put(1068L, mapOf("main" to "Due tomorrow", "en" to "Due tomorrow", "ru" to "Срок завтра", "kk" to "Мерзімі ертең"))
+    put(1069L, mapOf("main" to "Due today", "en" to "Due today", "ru" to "Срок сегодня", "kk" to "Мерзімі бүгін"))
+    put(1070L, mapOf("main" to "Overdue by", "en" to "Overdue by", "ru" to "Просрочено на", "kk" to "Кешікті"))
+    put(1071L, mapOf("main" to "Add movement note translation", "en" to "Add movement note translation", "ru" to "Добавить перевод заметки о перемещении", "kk" to "Жылжыту ескертпесінің аудармасын қосу"))
+    put(1072L, mapOf("main" to "Add debt plan note translation", "en" to "Add debt plan note translation", "ru" to "Добавить перевод заметки к плану долга", "kk" to "Қарыз жоспары ескертпесінің аудармасын қосу"))
+    put(1073L, mapOf("main" to "Add cash extraction note translation", "en" to "Add cash extraction note translation", "ru" to "Добавить перевод заметки об изъятии наличных", "kk" to "Қолма-қол алу ескертпесінің аудармасын қосу"))
+    put(1074L, mapOf("main" to "Local app preferences changed", "en" to "Local app preferences changed", "ru" to "Локальные настройки приложения изменены", "kk" to "Қолданбаның жергілікті баптаулары өзгерді"))
+    put(1075L, mapOf("main" to "View operation logs", "en" to "View operation logs", "ru" to "Просмотр журнала операций", "kk" to "Операциялар журналын көру"))
+    put(1076L, mapOf("main" to "The worker sets their own workshift password after approval.", "en" to "The worker sets their own workshift password after approval.", "ru" to "Сотрудник сам задаст пароль смены после принятия.", "kk" to "Қызметкер қабылданғаннан кейін ауысым құпия сөзін өзі қояды."))
+    put(1077L, mapOf("main" to "Approve the role and permissions only. Store owners and managers never need to know the worker’s shift password.", "en" to "Approve the role and permissions only. Store owners and managers never need to know the worker’s shift password.", "ru" to "Подтвердите только роль и права. Владелец и управляющие не должны знать пароль смены сотрудника.", "kk" to "Тек рөл мен рұқсаттарды бекітіңіз. Ие мен менеджерлер қызметкердің ауысым құпия сөзін білмеуі керек."))
+    put(1078L, mapOf("main" to "Workshift password", "en" to "Workshift password", "ru" to "Пароль смены", "kk" to "Ауысым құпия сөзі"))
+    put(1079L, mapOf("main" to "Set my workshift password", "en" to "Set my workshift password", "ru" to "Задать мой пароль смены", "kk" to "Менің ауысым құпия сөзімді қою"))
+    put(1080L, mapOf("main" to "Password is set", "en" to "Password is set", "ru" to "Пароль задан", "kk" to "Құпия сөз қойылған"))
+    put(1081L, mapOf("main" to "Password is not set yet", "en" to "Password is not set yet", "ru" to "Пароль ещё не задан", "kk" to "Құпия сөз әлі қойылмаған"))
+    put(1082L, mapOf("main" to "You use this password to start workshifts in this store. Only you set it; store managers can only edit your role and permissions.", "en" to "You use this password to start workshifts in this store. Only you set it; store managers can only edit your role and permissions.", "ru" to "Вы используете этот пароль для начала смен в этом магазине. Его задаёте только вы; управляющие могут менять только вашу роль и права.", "kk" to "Бұл құпия сөзді осы дүкенде ауысым бастау үшін қолданасыз. Оны тек сіз қоясыз; менеджерлер тек рөліңіз бен рұқсаттарыңызды өзгерте алады."))
+    put(1083L, mapOf("main" to "Store public ID", "en" to "Store public ID", "ru" to "Публичный ID магазина", "kk" to "Дүкеннің жария ID"))
+    put(1084L, mapOf("main" to "Employment permissions", "en" to "Employment permissions", "ru" to "Права сотрудника", "kk" to "Қызметкер рұқсаттары"))
+    put(1085L, mapOf("main" to "Shift password status", "en" to "Shift password status", "ru" to "Статус пароля смены", "kk" to "Ауысым құпия сөзінің күйі"))
+    put(1086L, mapOf("main" to "Workshift password updated", "en" to "Workshift password updated", "ru" to "Пароль смены обновлён", "kk" to "Ауысым құпия сөзі жаңартылды"))
+    put(1087L, mapOf("main" to "Worker will set their shift password after accepting the invite.", "en" to "Worker will set their shift password after accepting the invite.", "ru" to "Сотрудник задаст пароль смены после принятия приглашения.", "kk" to "Қызметкер шақыруды қабылдағаннан кейін ауысым құпия сөзін қояды."))
+    put(1088L, mapOf("main" to "You can edit role and permissions here. The worker manages their own shift password from My work.", "en" to "You can edit role and permissions here. The worker manages their own shift password from My work.", "ru" to "Здесь можно менять роль и права. Пароль смены сотрудник задаёт сам в разделе «Моя работа».", "kk" to "Мұнда рөл мен рұқсаттарды өзгертуге болады. Ауысым құпия сөзін қызметкер «Менің жұмысым» бөлімінде өзі басқарады."))
+    put(1089L, mapOf("main" to "Set your workshift password in Workers → My work, then start the shift here.", "en" to "Set your workshift password in Workers → My work, then start the shift here.", "ru" to "Задайте пароль смены в разделе «Сотрудники» → «Моя работа», затем начните смену здесь.", "kk" to "Ауысым құпия сөзін «Қызметкерлер» → «Менің жұмысым» бөлімінде қойып, содан кейін ауысымды осы жерден бастаңыз."))
+    put(1090L, mapOf("main" to "Open My work", "en" to "Open My work", "ru" to "Открыть «Моя работа»", "kk" to "«Менің жұмысым» ашу"))
+    put(1091L, mapOf("main" to "Start shift", "en" to "Start shift", "ru" to "Начать смену", "kk" to "Ауысымды бастау"))
+    put(1092L, mapOf("main" to "Responses", "en" to "Responses", "ru" to "Ответы", "kk" to "Жауаптар"))
+    put(1093L, mapOf("main" to "Employment responses", "en" to "Employment responses", "ru" to "Ответы по трудоустройству", "kk" to "Жұмысқа орналасу жауаптары"))
+    put(1094L, mapOf("main" to "No employment responses yet", "en" to "No employment responses yet", "ru" to "Ответов по трудоустройству пока нет", "kk" to "Жұмысқа орналасу бойынша жауаптар әзірге жоқ"))
+    put(1095L, mapOf("main" to "Response time", "en" to "Response time", "ru" to "Время ответа", "kk" to "Жауап уақыты"))
+    put(1096L, mapOf("main" to "Request time", "en" to "Request time", "ru" to "Время заявки", "kk" to "Өтінім уақыты"))
+    put(1097L, mapOf("main" to "Response note", "en" to "Response note", "ru" to "Заметка ответа", "kk" to "Жауап ескертпесі"))
+    put(1098L, mapOf("main" to "Add an optional note for the other party", "en" to "Add an optional note for the other party", "ru" to "Добавьте необязательную заметку для другой стороны", "kk" to "Екінші тарапқа міндетті емес ескертпе қосыңыз"))
+    put(1099L, mapOf("main" to "Send response", "en" to "Send response", "ru" to "Отправить ответ", "kk" to "Жауап жіберу"))
+    put(1100L, mapOf("main" to "Requested by", "en" to "Requested by", "ru" to "Заявитель", "kk" to "Өтініш беруші"))
+    put(1101L, mapOf("main" to "Responded by", "en" to "Responded by", "ru" to "Ответил(а)", "kk" to "Жауап берген"))
+    put(1102L, mapOf("main" to "From worker to store", "en" to "From worker to store", "ru" to "От сотрудника магазину", "kk" to "Қызметкерден дүкенге"))
+    put(1103L, mapOf("main" to "From store to worker", "en" to "From store to worker", "ru" to "От магазина сотруднику", "kk" to "Дүкеннен қызметкерге"))
+    put(1104L, mapOf("main" to "My response history", "en" to "My response history", "ru" to "Моя история ответов", "kk" to "Менің жауаптар тарихым"))
+    put(1105L, mapOf("main" to "Store response history", "en" to "Store response history", "ru" to "История ответов магазина", "kk" to "Дүкен жауаптарының тарихы"))
+    put(1106L, mapOf("main" to "No note from responding party", "en" to "No note from responding party", "ru" to "Ответ без заметки", "kk" to "Жауапта ескертпе жоқ"))
+    put(1107L, mapOf("main" to "Waiting for store response", "en" to "Waiting for store response", "ru" to "Ожидает ответа магазина", "kk" to "Дүкен жауабын күтуде"))
+    put(1108L, mapOf("main" to "Waiting for worker response", "en" to "Waiting for worker response", "ru" to "Ожидает ответа сотрудника", "kk" to "Қызметкер жауабын күтуде"))
+    put(1109L, mapOf("main" to "Accept employment request?", "en" to "Accept employment request?", "ru" to "Принять заявку на работу?", "kk" to "Жұмысқа өтінімді қабылдайсыз ба?"))
+    put(1110L, mapOf("main" to "Decline employment request?", "en" to "Decline employment request?", "ru" to "Отклонить заявку на работу?", "kk" to "Жұмысқа өтінімді қабылдамайсыз ба?"))
+    put(1111L, mapOf("main" to "Accept invitation?", "en" to "Accept invitation?", "ru" to "Принять приглашение?", "kk" to "Шақыруды қабылдайсыз ба?"))
+    put(1112L, mapOf("main" to "Decline invitation?", "en" to "Decline invitation?", "ru" to "Отклонить приглашение?", "kk" to "Шақырудан бас тартасыз ба?"))
+    put(1113L, mapOf("main" to "You requested work in this store", "en" to "You requested work in this store", "ru" to "Вы отправили заявку в этот магазин", "kk" to "Сіз осы дүкенге жұмысқа өтінім жібердіңіз"))
+    put(1114L, mapOf("main" to "Store invited this worker", "en" to "Store invited this worker", "ru" to "Магазин пригласил этого сотрудника", "kk" to "Дүкен бұл қызметкерді шақырды"))
+    put(1115L, mapOf("main" to "Response details", "en" to "Response details", "ru" to "Детали ответа", "kk" to "Жауап мәліметтері"))
+    put(1116L, mapOf("main" to "Request direction", "en" to "Request direction", "ru" to "Направление заявки", "kk" to "Өтінім бағыты"))
+    put(1117L, mapOf("main" to "No pending employment requests", "en" to "No pending employment requests", "ru" to "Ожидающих заявок на работу нет", "kk" to "Күтіп тұрған жұмыс өтінімдері жоқ"))
+    put(1118L, mapOf("main" to "Original note", "en" to "Original note", "ru" to "Исходная заметка", "kk" to "Бастапқы ескертпе"))
+    put(1119L, mapOf("main" to "Invite note", "en" to "Invite note", "ru" to "Заметка приглашения", "kk" to "Шақыру ескертпесі"))
+    put(1120L, mapOf("main" to "Request note", "en" to "Request note", "ru" to "Заметка заявки", "kk" to "Өтінім ескертпесі"))
+    put(1121L, mapOf("main" to "Active sessions", "en" to "Active sessions", "ru" to "Активные сеансы", "kk" to "Белсенді сеанстар"))
+    put(1122L, mapOf("main" to "Security history", "en" to "Security history", "ru" to "История безопасности", "kk" to "Қауіпсіздік тарихы"))
+    put(1123L, mapOf("main" to "All sign-ins, refreshes and revocations are stored here.", "en" to "All sign-ins, refreshes and revocations are stored here.", "ru" to "Здесь хранятся все входы, обновления сеансов и завершения сеансов.", "kk" to "Мұнда барлық кірулер, сеанс жаңартулары және сеанс тоқтатулары сақталады."))
+    put(1124L, mapOf("main" to "Event time", "en" to "Event time", "ru" to "Время события", "kk" to "Оқиға уақыты"))
+    put(1125L, mapOf("main" to "No security history loaded yet", "en" to "No security history loaded yet", "ru" to "История безопасности ещё не загружена", "kk" to "Қауіпсіздік тарихы әлі жүктелмеді"))
+    put(1126L, mapOf("main" to "Device", "en" to "Device", "ru" to "Устройство", "kk" to "Құрылғы"))
+    put(1127L, mapOf("main" to "Details", "en" to "Details", "ru" to "Детали", "kk" to "Мәліметтер"))
+    put(1128L, mapOf("main" to "Session ID", "en" to "Session ID", "ru" to "ID сеанса", "kk" to "Сеанс ID"))
+    put(1129L, mapOf("main" to "Session created", "en" to "Session created", "ru" to "Сеанс создан", "kk" to "Сеанс жасалды"))
+    put(1130L, mapOf("main" to "Session refreshed", "en" to "Session refreshed", "ru" to "Сеанс обновлён", "kk" to "Сеанс жаңартылды"))
+    put(1131L, mapOf("main" to "Older session replaced", "en" to "Older session replaced", "ru" to "Старый сеанс заменён", "kk" to "Ескі сеанс ауыстырылды"))
+    put(1132L, mapOf("main" to "Session revoked", "en" to "Session revoked", "ru" to "Сеанс завершён", "kk" to "Сеанс тоқтатылды"))
+    put(1133L, mapOf("main" to "Other session revoked", "en" to "Other session revoked", "ru" to "Другой сеанс завершён", "kk" to "Басқа сеанс тоқтатылды"))
+    put(1134L, mapOf("main" to "Logged out", "en" to "Logged out", "ru" to "Выполнен выход", "kk" to "Шығу орындалды"))
+    put(1135L, mapOf("main" to "Session expired", "en" to "Session expired", "ru" to "Сеанс истёк", "kk" to "Сеанс мерзімі өтті"))
+    put(1136L, mapOf("main" to "Security event", "en" to "Security event", "ru" to "Событие безопасности", "kk" to "Қауіпсіздік оқиғасы"))
+    put(1137L, mapOf("main" to "Related data", "en" to "Related data", "ru" to "Связанные данные", "kk" to "Байланысты деректер"))
+    put(1138L, mapOf("main" to "Server connection available", "en" to "Server connection available", "ru" to "Сервер доступен", "kk" to "Сервер қолжетімді"))
+    put(1139L, mapOf("main" to "Checking server connection…", "en" to "Checking server connection…", "ru" to "Проверяем соединение с сервером…", "kk" to "Сервермен байланыс тексерілуде…"))
+    put(1140L, mapOf("main" to "Server unavailable. Check local server address or Wi‑Fi.", "en" to "Server unavailable. Check local server address or Wi‑Fi.", "ru" to "Сервер недоступен. Проверьте адрес локального сервера или Wi‑Fi.", "kk" to "Сервер қолжетімсіз. Жергілікті сервер мекенжайын немесе Wi‑Fi желісін тексеріңіз."))
+    put(1141L, mapOf("main" to "Please wait…", "en" to "Please wait…", "ru" to "Пожалуйста, подождите…", "kk" to "Күте тұрыңыз…"))
+    put(1142L, mapOf("main" to "Updating workshift password…", "en" to "Updating workshift password…", "ru" to "Обновляем пароль смены…", "kk" to "Ауысым құпия сөзі жаңартылуда…"))
+    put(1143L, mapOf("main" to "Account password", "en" to "Account password", "ru" to "Пароль аккаунта", "kk" to "Аккаунт құпия сөзі"))
+    put(1144L, mapOf("main" to "Enter your account password", "en" to "Enter your account password", "ru" to "Введите пароль аккаунта", "kk" to "Аккаунт құпия сөзін енгізіңіз"))
+    put(1145L, mapOf("main" to "Account password is required to change the workshift password", "en" to "Account password is required to change the workshift password", "ru" to "Для изменения пароля смены нужен пароль аккаунта", "kk" to "Ауысым құпия сөзін өзгерту үшін аккаунт құпия сөзі қажет"))
+    put(1146L, mapOf("main" to "Confirm with your account password so nobody can change the shift password on an unlocked device.", "en" to "Confirm with your account password so nobody can change the shift password on an unlocked device.", "ru" to "Подтвердите паролем аккаунта, чтобы никто не смог сменить пароль смены на разблокированном устройстве.", "kk" to "Құрылғы құлыптан ашық тұрғанда ешкім ауысым құпия сөзін өзгерте алмауы үшін аккаунт құпия сөзімен растаңыз."))
+    put(1148L, mapOf("main" to "Logged out locally; server session cleanup is queued", "en" to "Logged out locally; server session cleanup is queued", "ru" to "Выход выполнен локально; завершение серверного сеанса поставлено в очередь", "kk" to "Жергілікті түрде шығу орындалды; сервердегі сеансты аяқтау кезекке қойылды"))
+    put(1149L, mapOf("main" to "Server could not refresh session. Keeping local login active.", "en" to "Server could not refresh session. Keeping local login active.", "ru" to "Сервер не смог обновить сеанс. Локальный вход сохранён.", "kk" to "Сервер сеансты жаңарта алмады. Жергілікті кіру сақталды."))
+    put(1153L, mapOf("main" to "Standard", "en" to "Standard", "ru" to "Стандартный", "kk" to "Стандартты"))
+    put(1154L, mapOf("main" to "Internal", "en" to "Internal", "ru" to "Внутренний", "kk" to "Ішкі"))
+    put(1155L, mapOf("main" to "Internal store barcode", "en" to "Internal store barcode", "ru" to "Внутренний штрих-код магазина", "kk" to "Дүкеннің ішкі штрих-коды"))
+    put(1156L, mapOf("main" to "Logged in", "en" to "Logged in", "ru" to "Вход выполнен", "kk" to "Кіру орындалды"))
+    put(1157L, mapOf("main" to "Signed up", "en" to "Signed up", "ru" to "Регистрация выполнена", "kk" to "Тіркелу орындалды"))
+    put(1158L, mapOf("main" to "Server address", "en" to "Server address", "ru" to "Адрес сервера", "kk" to "Сервер мекенжайы"))
+    put(1159L, mapOf("main" to "Enter server address", "en" to "Enter server address", "ru" to "Введите адрес сервера", "kk" to "Сервер мекенжайын енгізіңіз"))
+    put(1160L, mapOf("main" to "Save server address", "en" to "Save server address", "ru" to "Сохранить адрес сервера", "kk" to "Сервер мекенжайын сақтау"))
+    put(1161L, mapOf("main" to "Server address saved", "en" to "Server address saved", "ru" to "Адрес сервера сохранён", "kk" to "Сервер мекенжайы сақталды"))
+    put(1162L, mapOf("main" to "Invalid server address", "en" to "Invalid server address", "ru" to "Неверный адрес сервера", "kk" to "Сервер мекенжайы қате"))
+    put(1163L, mapOf("main" to "Analytics scope", "en" to "Analytics scope", "ru" to "Область аналитики", "kk" to "Аналитика ауқымы"))
+    put(1164L, mapOf("main" to "All goods", "en" to "All goods", "ru" to "Все товары", "kk" to "Барлық тауарлар"))
+    put(1165L, mapOf("main" to "Goods item", "en" to "Goods item", "ru" to "Товар", "kk" to "Тауар"))
+    put(1166L, mapOf("main" to "Supplier", "en" to "Supplier", "ru" to "Поставщик", "kk" to "Жеткізуші"))
+    put(1167L, mapOf("main" to "Category", "en" to "Category", "ru" to "Категория", "kk" to "Санат"))
+    put(1168L, mapOf("main" to "Select exact analytics target", "en" to "Select exact analytics target", "ru" to "Выберите точную цель аналитики", "kk" to "Аналитиканың нақты нысанын таңдаңыз"))
+    put(1169L, mapOf("main" to "Global goods", "en" to "Global goods", "ru" to "Глобальные товары", "kk" to "Ғаламдық тауарлар"))
+    put(1170L, mapOf("main" to "Use template", "en" to "Use template", "ru" to "Использовать шаблон", "kk" to "Үлгіні қолдану"))
+    put(1171L, mapOf("main" to "Search global goods", "en" to "Search global goods", "ru" to "Поиск глобальных товаров", "kk" to "Ғаламдық тауарларды іздеу"))
+    put(1172L, mapOf("main" to "Start from a standard item, then set your own prices, supplier and stock batches.", "en" to "Start from a standard item, then set your own prices, supplier and stock batches.", "ru" to "Начните со стандартного товара, затем задайте свои цены, поставщика и партии.", "kk" to "Стандартты тауардан бастап, кейін өз бағаларыңызды, жеткізушіні және партияларды қойыңыз."))
+    put(1173L, mapOf("main" to "Barcode match", "en" to "Barcode match", "ru" to "Совпадение штрих-кода", "kk" to "Штрих-код сәйкес"))
+    put(1174L, mapOf("main" to "No global suggestions yet", "en" to "No global suggestions yet", "ru" to "Глобальных подсказок пока нет", "kk" to "Әзірге ғаламдық ұсыныстар жоқ"))
+    put(1175L, mapOf("main" to "Template applied", "en" to "Template applied", "ru" to "Шаблон применён", "kk" to "Үлгі қолданылды"))
+    put(1176L, mapOf("main" to "Clear cart?", "en" to "Clear cart?", "ru" to "Очистить корзину?", "kk" to "Себетті тазалайсыз ба?"))
+    put(1177L, mapOf("main" to "This will remove all items and reset this cart's payment and receipt navigation.", "en" to "This will remove all items and reset this cart's payment and receipt navigation.", "ru" to "Все товары будут удалены, а экран оплаты и чека для этой корзины сбросится.", "kk" to "Барлық тауарлар өшіріліп, осы себеттің төлем және чек экраны қалпына келеді."))
+    put(1178L, mapOf("main" to "Cart cleared", "en" to "Cart cleared", "ru" to "Корзина очищена", "kk" to "Себет тазартылды"))
+    put(1179L, mapOf("main" to "Browse standard goods", "en" to "Browse standard goods", "ru" to "Смотреть стандартные товары", "kk" to "Стандартты тауарларды қарау"))
+    put(1180L, mapOf("main" to "In stock", "en" to "In stock", "ru" to "В наличии", "kk" to "Қоймада бар"))
+    put(1181L, mapOf("main" to "Available total", "en" to "Available total", "ru" to "Доступно всего", "kk" to "Барлығы қолжетімді"))
+    put(1182L, mapOf("main" to "All categories", "en" to "All categories", "ru" to "Все категории", "kk" to "Барлық санаттар"))
+    put(1183L, mapOf("main" to "All subcategories", "en" to "All subcategories", "ru" to "Все подкатегории", "kk" to "Барлық ішкі санаттар"))
+    put(1184L, mapOf("main" to "Undo template", "en" to "Undo template", "ru" to "Отменить шаблон", "kk" to "Үлгіні қайтару"))
+    put(1185L, mapOf("main" to "Template reverted", "en" to "Template reverted", "ru" to "Шаблон отменён", "kk" to "Үлгі қайтарылды"))
+    put(1186L, mapOf("main" to "Tags", "en" to "Tags", "ru" to "Метки", "kk" to "Белгілер"))
+    put(1187L, mapOf("main" to "References", "en" to "References", "ru" to "Связи", "kk" to "Байланыстар"))
+    put(1188L, mapOf("main" to "Loading more goods…", "en" to "Loading more goods…", "ru" to "Загружаем ещё товары…", "kk" to "Тағы тауарлар жүктелуде…"))
+    put(1189L, mapOf("main" to "No global goods match these filters", "en" to "No global goods match these filters", "ru" to "По этим фильтрам глобальные товары не найдены", "kk" to "Бұл сүзгілер бойынша ғаламдық тауарлар табылмады"))
+    put(1190L, mapOf("main" to "Incoming transfer", "en" to "Incoming transfer", "ru" to "Входящее перемещение", "kk" to "Кіріс ауыстыру"))
+    put(1191L, mapOf("main" to "Incoming batch en route", "en" to "Incoming batch en route", "ru" to "Входящая партия в пути", "kk" to "Кіріс партия жолда"))
+    put(1192L, mapOf("main" to "Waiting for acceptance", "en" to "Waiting for acceptance", "ru" to "Ожидает приёмки", "kk" to "Қабылдауды күтуде"))
+    put(1193L, mapOf("main" to "Transfer metadata is still loading. Refresh branch stock.", "en" to "Transfer metadata is still loading. Refresh branch stock.", "ru" to "Данные перемещения ещё загружаются. Обновите склад филиала.", "kk" to "Ауыстыру деректері әлі жүктелуде. Филиал қоймасын жаңартыңыз."))
+    put(1194L, mapOf("main" to "Decline", "en" to "Decline", "ru" to "Отклонить", "kk" to "Бас тарту"))
+    put(1195L, mapOf("main" to "Accept", "en" to "Accept", "ru" to "Принять", "kk" to "Қабылдау"))
+    put(1196L, mapOf("main" to "Incoming batches", "en" to "Incoming batches", "ru" to "Входящие партии", "kk" to "Кіріс партиялар"))
+    put(1197L, mapOf("main" to "Manufacturers", "en" to "Manufacturers", "ru" to "Производители", "kk" to "Өндірушілер"))
+    put(1198L, mapOf("main" to "Ordered", "en" to "Ordered", "ru" to "Заказано", "kk" to "Тапсырыс берілді"))
+    put(1199L, mapOf("main" to "On shelf", "en" to "On shelf", "ru" to "На полке", "kk" to "Сөреде"))
+    put(1200L, mapOf("main" to "Reserved", "en" to "Reserved", "ru" to "Зарезервировано", "kk" to "Резервтелген"))
+    put(1201L, mapOf("main" to "In transit", "en" to "In transit", "ru" to "В пути", "kk" to "Жолда"))
+    put(1202L, mapOf("main" to "Sold out", "en" to "Sold out", "ru" to "Распродано", "kk" to "Сатылып бітті"))
+    put(1203L, mapOf("main" to "Written off", "en" to "Written off", "ru" to "Списано", "kk" to "Есептен шығарылды"))
+    put(1204L, mapOf("main" to "Deleted", "en" to "Deleted", "ru" to "Удалено", "kk" to "Жойылды"))
 }
+
 
 
 private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallbacksPart0() {
@@ -435,7 +604,7 @@ private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallb
     put(10L, mapOf("main" to "Authentication failed", "en" to "Authentication failed", "ru" to "Аутентификация не удалась", "kk" to "Аутентификация сәтсіз аяқталды"))
     put(11L, mapOf("main" to "Incorrect phone number length", "en" to "Incorrect phone number length", "ru" to "Неправильная длина номера телефона", "kk" to "Телефон нөмірі дұрыс емес"))
     put(12L, mapOf("main" to "Incorrect email address format", "en" to "Incorrect email address format", "ru" to "Неправильный формат email адреса", "kk" to "Қате электрондық пошта мекенжайы пішімі"))
-    put(13L, mapOf("main" to "Password must be 8 or more symbols long and contain at least one digit", "en" to "Password must be 8 or more symbols long and contain at least one digit", "ru" to "Пароль должен быть длиной 8 или более символов и содержать хотя бы одну цифру", "kk" to "Құпия сөз ұзындығы 8 немесе одан да көп таңбадан тұруы және кемінде бір саннан тұруы керек"))
+    put(13L, mapOf("main" to "Password must be 8 or more symbols long and contain at least one digit and one special symbol", "en" to "Password must be 8 or more symbols long and contain at least one digit and one special symbol", "ru" to "Пароль должен быть длиной 8 или более символов и содержать хотя бы одну цифру и один специальный символ", "kk" to "Құпия сөз ұзындығы 8 немесе одан да көп таңбадан тұруы және кемінде бір сан мен бір арнайы таңбадан тұруы керек"))
     put(14L, mapOf("main" to "Repeat password", "en" to "Repeat password", "ru" to "Повторите пароль", "kk" to "Құпия сөзді қайталаңыз"))
     put(15L, mapOf("main" to "Passwords must match", "en" to "Passwords must match", "ru" to "Пароли должны совпадать", "kk" to "Құпия сөздер бірдей болуы тиіс"))
     put(16L, mapOf("main" to "First name", "en" to "First name", "ru" to "Имя", "kk" to "Аты"))
@@ -1163,7 +1332,7 @@ private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallb
     put(642L, mapOf("main" to "New barcode was not found. Add item now.", "en" to "New barcode was not found. Add item now.", "ru" to "Новый штрих-код не найден. Добавьте товар сейчас.", "kk" to "Жаңа штрих-код табылмады. Тауарды қазір қосыңыз."))
     put(643L, mapOf("main" to "Start workshift", "en" to "Start workshift", "ru" to "Начать смену", "kk" to "Ауысымды бастау"))
     put(644L, mapOf("main" to "Workshift required", "en" to "Workshift required", "ru" to "Требуется смена", "kk" to "Ауысым қажет"))
-    put(645L, mapOf("main" to "This workplace is locked until the worker starts a workshift. Store owners can work without this step.", "en" to "This workplace is locked until the worker starts a workshift. Store owners can work without this step.", "ru" to "Рабочее место заблокировано, пока сотрудник не начнёт смену. Владелец магазина может работать без этого шага.", "kk" to "Қызметкер ауысымды бастамайынша жұмыс орны бұғатталған. Дүкен иесі бұл қадамсыз жұмыс істей алады."))
+    put(645L, mapOf("main" to "Start a workshift before taking payments or changing cash. You can still browse the store and prepare work without starting a shift.", "en" to "Start a workshift before taking payments or changing cash. You can still browse the store and prepare work without starting a shift.", "ru" to "Начните смену перед приёмом оплат или изменением кассы. Просматривать магазин и готовить работу можно и без начала смены.", "kk" to "Төлем қабылдау немесе кассаны өзгерту алдында ауысымды бастаңыз. Дүкенді қарап, жұмысты дайындауды ауысымсыз да жасауға болады."))
     put(646L, mapOf("main" to "Worker ID / phone / email", "en" to "Worker ID / phone / email", "ru" to "ID сотрудника / телефон / email", "kk" to "Қызметкер ID / телефон / email"))
     put(647L, mapOf("main" to "Enter worker ID or account phone", "en" to "Enter worker ID or account phone", "ru" to "Введите ID сотрудника или телефон аккаунта", "kk" to "Қызметкер ID немесе аккаунт телефонын енгізіңіз"))
     put(648L, mapOf("main" to "Workshift password", "en" to "Workshift password", "ru" to "Пароль смены", "kk" to "Ауысым құпия сөзі"))
@@ -1172,8 +1341,8 @@ private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallb
     put(651L, mapOf("main" to "Invites", "en" to "Invites", "ru" to "Приглашения", "kk" to "Шақырулар"))
     put(652L, mapOf("main" to "Incoming invites from stores", "en" to "Incoming invites from stores", "ru" to "Входящие приглашения от магазинов", "kk" to "Дүкендерден келген шақырулар"))
     put(653L, mapOf("main" to "No worker invites yet", "en" to "No worker invites yet", "ru" to "Приглашений пока нет", "kk" to "Әзірше шақырулар жоқ"))
-    put(654L, mapOf("main" to "Worker job password", "en" to "Worker job password", "ru" to "Пароль рабочего места", "kk" to "Жұмыс орнының құпия сөзі"))
-    put(655L, mapOf("main" to "Set or replace the password used to start this worker’s shifts", "en" to "Set or replace the password used to start this worker’s shifts", "ru" to "Задайте или замените пароль, которым сотрудник будет начинать смены", "kk" to "Қызметкер ауысым бастау үшін қолданатын құпия сөзді орнатыңыз немесе ауыстырыңыз"))
+    put(654L, mapOf("main" to "Workshift password", "en" to "Workshift password", "ru" to "Пароль смены", "kk" to "Ауысым құпия сөзі"))
+    put(655L, mapOf("main" to "Set or replace your password for starting workshifts", "en" to "Set or replace your password for starting workshifts", "ru" to "Задайте или замените ваш пароль для начала смен", "kk" to "Ауысым бастауға арналған құпия сөзіңізді қойыңыз немесе ауыстырыңыз"))
     put(656L, mapOf("main" to "Store or branch public ID", "en" to "Store or branch public ID", "ru" to "Публичный ID магазина или филиала", "kk" to "Дүкен немесе филиалдың жария ID"))
     put(657L, mapOf("main" to "Enter store or branch public ID", "en" to "Enter store or branch public ID", "ru" to "Введите публичный ID магазина или филиала", "kk" to "Дүкен немесе филиалдың жария ID енгізіңіз"))
     put(658L, mapOf("main" to "Requests to this store or branch", "en" to "Requests to this store or branch", "ru" to "Заявки в этот магазин или филиал", "kk" to "Осы дүкенге немесе филиалға өтініштер"))
@@ -1181,7 +1350,7 @@ private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallb
 }
 
 private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallbacksPart33() {
-    put(660L, mapOf("main" to "This password is separate for this store job only", "en" to "This password is separate for this store job only", "ru" to "Этот пароль отдельный только для этой работы в магазине", "kk" to "Бұл құпия сөз тек осы дүкендегі жұмысқа бөлек"))
+    put(660L, mapOf("main" to "This password is private to this store job only", "en" to "This password is private to this store job only", "ru" to "Этот пароль личный и относится только к работе в этом магазине", "kk" to "Бұл құпия сөз жеке және тек осы дүкендегі жұмысқа арналған"))
     put(661L, mapOf("main" to "Active workshift", "en" to "Active workshift", "ru" to "Активная смена", "kk" to "Белсенді ауысым"))
     put(662L, mapOf("main" to "Operation logs", "en" to "Operation logs", "ru" to "Журнал операций", "kk" to "Операциялар журналы"))
     put(663L, mapOf("main" to "Search logs", "en" to "Search logs", "ru" to "Поиск в журнале", "kk" to "Журналдан іздеу"))
@@ -1602,6 +1771,69 @@ private fun AppConfiguration.PagingControls(
     }
 }
 
+@Composable
+private fun AppConfiguration.AitaRoundCheckbox(
+    checked: Boolean,
+    onCheckedChange: ((Boolean) -> Unit)?,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    blocked: Boolean = false,
+    borderColor: Color? = null,
+    containerSize: Dp = 48.dp,
+    circleSize: Dp = 20.dp
+) {
+    val shape = RoundedCornerShape(999.dp)
+    val effectiveBorderColor = borderColor ?: when {
+        blocked -> stateValues.ErrorColor
+        checked -> stateValues.AccentColor
+        else -> stateValues.PlaceholderTextColor
+    }
+    val clickModifier = if (enabled && onCheckedChange != null) {
+        Modifier.clickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = ripple(color = if (checked) stateValues.AccentColor else effectiveBorderColor),
+            onClick = { onCheckedChange(!checked) }
+        )
+    } else {
+        Modifier
+    }
+
+    Box(
+        modifier = modifier
+            .size(containerSize)
+            .clip(shape)
+            .then(clickModifier),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(circleSize)
+                .clip(shape)
+                .background(if (checked) stateValues.AccentColor else Color.Transparent)
+                .border(stateValues.unfocusedBorderWidth, effectiveBorderColor, shape),
+            contentAlignment = Alignment.Center
+        ) {
+            when {
+                checked -> Text(
+                    text = "✓",
+                    color = stateValues.AccentTextColor,
+                    fontSize = stateValues.smallTextSize,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+
+                blocked -> Text(
+                    text = "!",
+                    color = stateValues.ErrorColor,
+                    fontSize = stateValues.smallTextSize,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+}
+
 private fun Modifier.foregroundTactileShadow(
     cornerRadius: Dp,
     elevated: Boolean = false
@@ -1795,6 +2027,7 @@ private fun AppConfiguration.AuthPreferencesChooser(
                         iconRes = language.mapIconRes(),
                         contentDescription = language.name.visibleLocalizedString(stateValues.appLanguage, language.language.uppercase())
                     ) {
+                        markExplicitLocalAppPreferences(language = language.language)
                         setAuthScreenAppLocale(language.language)
                     }
                 }
@@ -1820,6 +2053,7 @@ private fun AppConfiguration.AuthPreferencesChooser(
                         iconRes = if (darkThemeChoice) stateValues.drawableResIconThemeDark.value else stateValues.drawableResIconThemeLight.value,
                         contentDescription = theme.name.visibleLocalizedString(stateValues.appLanguage, theme.id.toString())
                     ) {
+                        markExplicitLocalAppPreferences(themeId = theme.id)
                         setAuthScreenAppTheme(theme.id)
                     }
                 }
@@ -1842,12 +2076,14 @@ private fun AppConfiguration.AuthPreferencesChooser(
                     iconRes = stateValues.drawableResIconAppScale.value,
                     contentDescription = label
                 ) {
+                    markExplicitLocalAppPreferences(sizeModeId = id)
                     setAuthScreenAppSizeMode(id)
                 }
             }
         }
     }
 }
+
 
 @Composable
 fun AppConfiguration.UserAuthSignUpScreen(
@@ -1961,8 +2197,8 @@ fun AppConfiguration.UserAuthSignUpScreen(
                 text = stateValues.stringSignUp,
                 enabled = !signingUp,
                 loading = signingUp,
-                loadingText = stateValues.stringSigningUp
-            ) {
+                loadingText = stateValues.stringSigningUp,
+                onClick = signUpAction@{
                 phoneNumberTextFieldContent.checkContentValidity()
                 emailTextFieldContent.checkContentValidity()
 
@@ -1993,7 +2229,8 @@ fun AppConfiguration.UserAuthSignUpScreen(
                         )
                     )
 
-            }
+                }
+            )
 
             if (stateValues.isNarrowScreen) {
                 Spacer(modifier = Modifier.height(2.dp))
@@ -2016,14 +2253,31 @@ fun AppConfiguration.UserAuthSignUpScreen(
     }
 }
 
+private var userAuthScreenScrollFirstVisibleItemIndex: Int = 0
+private var userAuthScreenScrollFirstVisibleItemScrollOffset: Int = 0
+
 @Composable
 fun AppConfiguration.UserAuthScreen() {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        val authListState = rememberLazyListState(
+            initialFirstVisibleItemIndex = userAuthScreenScrollFirstVisibleItemIndex.coerceAtLeast(0),
+            initialFirstVisibleItemScrollOffset = userAuthScreenScrollFirstVisibleItemScrollOffset.coerceAtLeast(0)
+        )
+
+        LaunchedEffect(authListState) {
+            snapshotFlow { authListState.firstVisibleItemIndex to authListState.firstVisibleItemScrollOffset }
+                .collect { (index, offset) ->
+                    userAuthScreenScrollFirstVisibleItemIndex = index
+                    userAuthScreenScrollFirstVisibleItemScrollOffset = offset
+                }
+        }
+
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize(),
+            state = authListState,
             contentPadding = PaddingValues(
                 top = if (stateValues.isNarrowScreen) 0.dp else stateValues.screenHeight / 18,
                 bottom = stateValues.screenHeight / 12
@@ -2191,7 +2445,7 @@ fun AppConfiguration.UserAuthLogInScreen() {
 
             Spacer(modifier = Modifier.height(outerSpace))
 
-            goAction = {
+            goAction = loginAction@{
                 softKeyboardController?.hide()
                 passwordTextFieldContent.checkContentValidity()
 
@@ -2370,7 +2624,7 @@ private fun String.looksLikeCompleteRetailBarcodeInput(): Boolean {
 }
 
 private fun GoodsItemDataModel.matchesScannedBarcode(candidate: String): Boolean {
-    return barcodes.any { barcode ->
+    return allBarcodeValues().any { barcode ->
         storedBarcodeMatchesScannedTransactionBarcode(
             storedBarcode = barcode,
             scannedBarcode = candidate
@@ -2403,11 +2657,19 @@ private fun AppConfiguration.weightQuantityFromBarcode(
         .withTotalValue(embeddedWeightBarcode.weightKilograms)
 }
 
+private fun AppConfiguration.batchBelongsToInventoryStoreForUi(batchStoreId: String?, activeStoreId: String?): Boolean {
+    val cleanActiveStoreId = activeStoreId?.takeIf { it.isNotBlank() } ?: return true
+    val cleanBatchStoreId = batchStoreId?.takeIf { it.isNotBlank() } ?: return false
+    return cleanBatchStoreId == cleanActiveStoreId || sameInventoryStoreGroupForUi(cleanActiveStoreId, cleanBatchStoreId)
+}
+
 private fun AppConfiguration.availableSaleQuantityFor(goodsItem: GoodsItemDataModel): Double {
+    val activeStoreId = stateValues.activeStoreId
+
     return stateValues.stockBatches.orEmpty()
         .filter { batch ->
             batch.goodsItemId == goodsItem.id &&
-                    batch.storeId == goodsItem.storeId &&
+                    batchBelongsToInventoryStoreForUi(batch.storeId, activeStoreId) &&
                     batch.isActive &&
                     batch.status != StockBatchStatusDataModel.Deleted &&
                     batch.status != StockBatchStatusDataModel.WrittenOff &&
@@ -2437,6 +2699,60 @@ private fun AppConfiguration.canAddSaleQuantityToCart(
     return requestedTotal <= availableSaleQuantityFor(goodsItem) + 0.000001
 }
 
+private fun AppConfiguration.sameInventoryStoreGroupForUi(firstStoreId: String?, secondStoreId: String?): Boolean {
+    val first = firstStoreId?.takeIf { it.isNotBlank() } ?: return false
+    val second = secondStoreId?.takeIf { it.isNotBlank() } ?: return false
+    if (first == second) return true
+
+    val stores = stateValues.stores.orEmpty()
+    fun rootId(storeId: String): String {
+        val store = stores.find { it.id == storeId }
+        return store?.parentStoreId?.takeIf { it.isNotBlank() } ?: store?.id ?: storeId
+    }
+
+    return rootId(first) == rootId(second)
+}
+
+private fun AppConfiguration.itemHasSellableBatchInStoreForUi(goodsItemId: String, storeId: String?): Boolean {
+    val cleanStoreId = storeId?.takeIf { it.isNotBlank() } ?: return false
+    return stateValues.stockBatches.orEmpty().any { batch ->
+        batch.goodsItemId == goodsItemId &&
+                batchBelongsToInventoryStoreForUi(batch.storeId, cleanStoreId) &&
+                batch.isActive &&
+                batch.quantity.total > 0.0 &&
+                batch.status != StockBatchStatusDataModel.Deleted &&
+                batch.status != StockBatchStatusDataModel.WrittenOff &&
+                batch.status != StockBatchStatusDataModel.SoldOut &&
+                batch.status != StockBatchStatusDataModel.InTransit
+    }
+}
+
+private fun AppConfiguration.transactionStockCandidatesForUi(): List<GoodsItemDataModel> {
+    val activeStoreId = stateValues.activeStoreId
+    val stock = stateValues.stock.orEmpty()
+    if (activeStoreId.isNullOrBlank()) return stock
+
+    val batches = stateValues.stockBatches.orEmpty()
+    return stock
+        .filter { item -> sameInventoryStoreGroupForUi(activeStoreId, item.storeId) || itemHasSellableBatchInStoreForUi(item.id, activeStoreId) }
+        .sortedWith(
+            compareBy<GoodsItemDataModel> { item -> if (item.storeId == activeStoreId) 0 else 1 }
+                .thenByDescending { item ->
+                    batches.any { batch ->
+                        batch.goodsItemId == item.id &&
+                                batchBelongsToInventoryStoreForUi(batch.storeId, activeStoreId) &&
+                                batch.isActive &&
+                                batch.quantity.total > 0.0 &&
+                                batch.status != StockBatchStatusDataModel.Deleted &&
+                                batch.status != StockBatchStatusDataModel.WrittenOff &&
+                                batch.status != StockBatchStatusDataModel.SoldOut &&
+                                batch.status != StockBatchStatusDataModel.InTransit
+                    }
+                }
+                .thenBy { item -> item.name.extractLocalizedString(stateValues.appLanguage).orEmpty().lowercase() }
+        )
+}
+
 private fun AppConfiguration.postCartQuantityLimitNotification(goodsItem: GoodsItemDataModel) {
     postInAppNotification(
         message = "${goodsItem.name.visibleLocalizedString(stateValues.appLanguage, localizedStringResource(365, "Goods item"))} • ${cartQuantityLimitMessage(goodsItem)}",
@@ -2456,7 +2772,7 @@ private fun AppConfiguration.tryHandleTransactionBarcodeInput(
     if (candidate.length > 32) return true
 
     val embeddedWeightBarcodes = candidate.parseEmbeddedWeightBarcodeFormats()
-    val stock = stateValues.stock.orEmpty()
+    val stock = transactionStockCandidatesForUi()
 
     val weightedMatch = embeddedWeightBarcodes.firstNotNullOfOrNull { barcode ->
         stock.firstOrNull { item ->
@@ -2687,7 +3003,21 @@ private data class TransactionSelectionSmartSets(
 )
 
 private fun GoodsBatchDataModel.isSelectableActiveStockBatch(): Boolean {
-    return isActive && status != StockBatchStatusDataModel.Deleted && status != StockBatchStatusDataModel.WrittenOff
+    return isActive &&
+            quantity.total > 0.0 &&
+            status != StockBatchStatusDataModel.Deleted &&
+            status != StockBatchStatusDataModel.WrittenOff &&
+            status != StockBatchStatusDataModel.SoldOut &&
+            status != StockBatchStatusDataModel.InTransit
+}
+
+private fun AppConfiguration.itemHasPresentStockBatchForTransactionSelection(item: GoodsItemDataModel): Boolean {
+    val activeStoreId = stateValues.activeStoreId
+    return stateValues.stockBatches.orEmpty().any { batch ->
+        batch.goodsItemId == item.id &&
+                batch.isSelectableActiveStockBatch() &&
+                (activeStoreId.isNullOrBlank() || batchBelongsToInventoryStoreForUi(batch.storeId, activeStoreId))
+    }
 }
 
 private fun GoodsItemDataModel.transactionSelectionQuantity(activeBatches: List<GoodsBatchDataModel>): Double {
@@ -2711,7 +3041,7 @@ private fun GoodsItemInTransactionDataModel.transactionSelectionStockItemId(
 
 private fun GoodsItemDataModel.transactionSelectionMatchesIdSet(ids: Collection<String>): Boolean {
     if (id in ids) return true
-    return barcodes.any { barcode -> barcode in ids || barcode.toStoredGoodsItemBarcode() in ids }
+    return allBarcodeValues().any { barcode -> barcode in ids || barcode.toStoredGoodsItemBarcode() in ids }
 }
 
 private fun AppConfiguration.buildTransactionSelectionSmartSets(
@@ -2729,7 +3059,7 @@ private fun AppConfiguration.buildTransactionSelectionSmartSets(
     val stockById = stock.associateBy { it.id }
     val stockByBarcode = stock
         .flatMap { item ->
-            item.barcodes.flatMap { barcode ->
+            item.allBarcodeValues().flatMap { barcode ->
                 listOf(barcode, barcode.toStoredGoodsItemBarcode())
             }.filter { it.isNotBlank() }.map { it to item }
         }
@@ -2894,6 +3224,7 @@ fun AppConfiguration.TransactionSelectionScreen(
             buildList {
                 add(TabContent("all", stateValues.stringAll))
                 add(TabContent("quick", stateValues.stringQuick))
+                add(TabContent("in_stock", localizedStringResource(1180, "In stock")))
 
                 if (context.transactionTypeIndex != 2 && transactionSmartSets.popularIds.isNotEmpty()) {
                     add(TabContent("popular", localizedStringResource(713, "Most popular")))
@@ -2956,12 +3287,13 @@ fun AppConfiguration.TransactionSelectionScreen(
 
         val scopeRowContent = tabRowWidget(
             modifier = Modifier.padding(horizontal = stateValues.marginTextField),
-            tabs = transactionSelectionTabs
+            tabs = transactionSelectionTabs,
+            selectedIndexInitial = "quick"
         )
 
         val addToCartAction: (GoodsItemDataModel) -> Unit = { goodsItem ->
             val activeStoreId = stateValues.activeStoreId
-            if (!activeStoreId.isNullOrBlank() && goodsItem.storeId != activeStoreId) {
+            if (!activeStoreId.isNullOrBlank() && !sameInventoryStoreGroupForUi(activeStoreId, goodsItem.storeId) && !itemHasSellableBatchInStoreForUi(goodsItem.id, activeStoreId)) {
                 postInAppNotification(
                     message = localizedStringResource(1063, "This item belongs to another branch. Switch to that branch or move the batch here before selling it."),
                     type = NotificationType.Negative,
@@ -3018,9 +3350,14 @@ fun AppConfiguration.TransactionSelectionScreen(
             showBatches = false,
             transactionTypeIndex = context.transactionTypeIndex,
             preferredOrderIds = selectedPreferredOrderIds,
+            scrollStateHost = context.stateHost,
+            scrollStateKey = "transaction_selection_scroll_${context.transactionTypeIndex}_${context.clientId}_${scopeRowContent.id}",
             onFilter = when (scopeRowContent.id) {
                 "quick" -> {
                     { it.isQuickItem }
+                }
+                "in_stock" -> {
+                    { item -> itemHasPresentStockBatchForTransactionSelection(item) }
                 }
                 "popular" -> {
                     { item -> item.transactionSelectionMatchesIdSet(transactionSmartSets.popularIds) }
@@ -3160,6 +3497,39 @@ fun AppConfiguration.TransactionSelectionScreen(
 //  }
 //}
 
+
+private suspend fun resetTransactionCartNavigationState(transactionTypeIndex: Int, clientId: Int) {
+    when (transactionTypeIndex) {
+        0 -> Navigation.TransactionSale.run {
+            when (clientId) {
+                0 -> { clearLeftClient1(); clearRightClient1() }
+                1 -> { clearLeftClient2(); clearRightClient2() }
+                2 -> { clearLeftClient3(); clearRightClient3() }
+                3 -> { clearLeftClient4(); clearRightClient4() }
+                else -> { clearLeftClient5(); clearRightClient5() }
+            }
+        }
+        1 -> Navigation.TransactionReturn.run {
+            when (clientId) {
+                0 -> { clearLeftClient1(); clearRightClient1() }
+                1 -> { clearLeftClient2(); clearRightClient2() }
+                2 -> { clearLeftClient3(); clearRightClient3() }
+                3 -> { clearLeftClient4(); clearRightClient4() }
+                else -> { clearLeftClient5(); clearRightClient5() }
+            }
+        }
+        else -> Navigation.TransactionSupply.run {
+            when (clientId) {
+                0 -> { clearLeftClient1(); clearRightClient1() }
+                1 -> { clearLeftClient2(); clearRightClient2() }
+                2 -> { clearLeftClient3(); clearRightClient3() }
+                3 -> { clearLeftClient4(); clearRightClient4() }
+                else -> { clearLeftClient5(); clearRightClient5() }
+            }
+        }
+    }
+}
+
 @Composable
 fun AppConfiguration.TransactionScreen() {
     Column(
@@ -3213,6 +3583,42 @@ fun AppConfiguration.TransactionScreen() {
             }
 
             val goodsInCart by getCartState(transactionTypeIndex, clientId).collectAsState()
+            val cancelIconRes by stateValues.drawableResIconCancel.collectAsState()
+            var clearCartClientIdToConfirm by rememberSaveable(transactionTypeIndex) { mutableStateOf<Int?>(null) }
+
+            clearCartClientIdToConfirm?.let { targetClientId ->
+                val targetCart by getCartState(transactionTypeIndex, targetClientId).collectAsState()
+                if (targetCart.isEmpty()) {
+                    LaunchedEffect(targetClientId) { clearCartClientIdToConfirm = null }
+                } else {
+                    ModalDialogWidget(
+                        title = localizedStringResource(1176, "Clear cart?"),
+                        subTitle = localizedStringResource(1177, "This will remove all items and reset this cart's payment and receipt navigation."),
+                        negativeButtonText = stateValues.stringCancel,
+                        positiveButtonText = stateValues.stringClear,
+                        positiveAction = {
+                            coroutineScope.launch {
+                                deleteCart(transactionTypeIndex, targetClientId)
+                                resetTransactionCartNavigationState(transactionTypeIndex, targetClientId)
+                                latestTransactionReceiptSnapshotState.value
+                                    ?.takeIf { snapshot ->
+                                        snapshot.paymentDraft.transactionTypeIndex == transactionTypeIndex &&
+                                                snapshot.paymentDraft.clientId == targetClientId
+                                    }
+                                    ?.let { latestTransactionReceiptSnapshotState.emit(null) }
+                                clearCartClientIdToConfirm = null
+                                postInAppNotification(
+                                    localizedStringResource(1178, "Cart cleared"),
+                                    NotificationType.Positive,
+                                    transient = true
+                                )
+                            }
+                        },
+                        negativeAction = { clearCartClientIdToConfirm = null },
+                        onDismiss = { clearCartClientIdToConfirm = null }
+                    )
+                }
+            }
 
             TransactionBarcodeHidInput(
                 transactionTypeIndex = transactionTypeIndex,
@@ -3279,8 +3685,11 @@ fun AppConfiguration.TransactionScreen() {
 //      }
 
             val latestReceiptSnapshot by latestTransactionReceiptSnapshotState.collectAsState()
+            val cartPersistenceHydrated by cartPersistenceHydratedState.collectAsState()
 
-            LaunchedEffect(goodsInCart, latestReceiptSnapshot) {
+            LaunchedEffect(cartPersistenceHydrated, goodsInCart, latestReceiptSnapshot) {
+                if (!cartPersistenceHydrated) return@LaunchedEffect
+
                 val currentScreens = Navigation
                     .getCurrentTransactionScreens(transactionTypeIndex, clientId, stateValues.isNarrowScreen)
                     .value
@@ -3445,6 +3854,31 @@ fun AppConfiguration.TransactionScreen() {
                             color = if (clientId == index) stateValues.AccentTextColor else stateValues.TextColor,
                             fontWeight = FontWeight.Bold
                         )
+
+                        AnimatedVisibility(visible = cart.isNotEmpty()) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .clip(RoundedCornerShape(999.dp))
+                                        .clickable(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = ripple(color = if (clientId == index) stateValues.AccentTextColor else stateValues.TextColor),
+                                            onClick = { clearCartClientIdToConfirm = index }
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CpImage(
+                                        modifier = Modifier.size(16.dp),
+                                        url = stateValues.drawablePathIconCancel,
+                                        fallbackRes = cancelIconRes,
+                                        contentDescription = localizedStringResource(1176, "Clear cart?"),
+                                        tintColor = if (clientId == index) stateValues.AccentTextColor else stateValues.TextColor
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -3958,11 +4392,9 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
 
         val latestSnapshot by latestTransactionReceiptSnapshotState.collectAsState()
         val saleMethodIds by cartSaleMethodIdsState.collectAsState()
+        val paymentDrafts by getTransactionPaymentDraftsState().collectAsState()
 
-        val paymentDraft = getTransactionPaymentDraft(
-            context.transactionTypeIndex,
-            context.clientId
-        )
+        val paymentDraft = paymentDrafts[transactionSupplySupplierKey(context.transactionTypeIndex, context.clientId)]
 
         val liveLines = remember(goodsInCart, stateValues.stock, stateValues.stockBatches, context.transactionTypeIndex, context.clientId, saleMethodIds) {
             buildTransactionReceiptLines(
@@ -4002,7 +4434,7 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
                     val selectedMethodId = saleMethodIds["${context.transactionTypeIndex}:${context.clientId}:${cartItem.id}"]
                     val goodsItem = stateValues.stock?.find { it.id == cartItem.id }
                     if (selectedMethodId == SALE_METHOD_WHOLESALE && goodsItem != null && !goodsItem.isWholesaleEligible(cartItem.quantity.total)) {
-                        goodsItem.name.extractLocalizedString(stateValues.appLanguage) ?: goodsItem.barcodes.firstOrNull() ?: cartItem.id
+                        goodsItem.name.extractLocalizedString(stateValues.appLanguage) ?: goodsItem.firstBarcode().ifBlank { cartItem.id }
                     } else {
                         null
                     }
@@ -4131,7 +4563,9 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
 
                 actionButton(
                     text = stateValues.stringComplete,
-                    enabled = snapshotForScreen.lines.isNotEmpty() && stateValues.latestNotification == null && invalidWholesaleReceiptItems.isEmpty(),
+                    loading = stateValues.completeTransactionInProgress,
+                    loadingText = localizedStringResource(224, "Completing transaction"),
+                    enabled = snapshotForScreen.lines.isNotEmpty() && !stateValues.completeTransactionInProgress && stateValues.latestNotification == null && invalidWholesaleReceiptItems.isEmpty(),
                     iconPath = stateValues.drawablePathIconCheck,
                     onClick = {
                         completeTransaction(
@@ -4719,6 +5153,54 @@ private fun List<LocalizedStringDataModel>.visibleLocalizedString(
         ?: fallback
 }
 
+private const val LOCALIZED_NOTE_STORAGE_PREFIX = "aita.localized.note.v1:"
+
+private fun List<LocalizedStringDataModel>.cleanLocalizedNoteValues(): List<LocalizedStringDataModel> =
+    map { item ->
+        LocalizedStringDataModel(
+            language = item.language.ifBlank { "main" },
+            value = item.value.trim()
+        )
+    }
+        .filter { it.language.isNotBlank() && it.value.isNotBlank() }
+        .distinctBy { it.language.lowercase() }
+
+private fun List<LocalizedStringDataModel>.toStoredLocalizedNoteOrNull(): String? {
+    val cleaned = cleanLocalizedNoteValues()
+    if (cleaned.isEmpty()) return null
+    return LOCALIZED_NOTE_STORAGE_PREFIX + jsonBase.encodeToString(
+        ListSerializer(LocalizedStringDataModel.serializer()),
+        cleaned
+    )
+}
+
+private fun String?.decodeStoredLocalizedNoteOrNull(): List<LocalizedStringDataModel>? {
+    val raw = this?.trim().orEmpty()
+    if (!raw.startsWith(LOCALIZED_NOTE_STORAGE_PREFIX)) return null
+    val payload = raw.removePrefix(LOCALIZED_NOTE_STORAGE_PREFIX)
+    return runCatching {
+        jsonBase.decodeFromString(
+            ListSerializer(LocalizedStringDataModel.serializer()),
+            payload
+        )
+    }.getOrNull()?.cleanLocalizedNoteValues()
+}
+
+private fun String?.toLocalizedNoteEditorValues(): List<LocalizedStringDataModel> {
+    val decoded = decodeStoredLocalizedNoteOrNull()
+    if (!decoded.isNullOrEmpty()) return decoded
+    val legacy = this?.trim().orEmpty()
+    return if (legacy.isNotBlank()) listOf(LocalizedStringDataModel("main", legacy)) else listOf(LocalizedStringDataModel("main", ""))
+}
+
+private fun String?.visibleStoredLocalizedNote(language: String): String? {
+    val decoded = decodeStoredLocalizedNoteOrNull()
+    val visible = decoded?.visibleLocalizedString(language, "")?.trim().orEmpty()
+    if (visible.isNotBlank()) return visible
+    return this?.trim()
+        ?.takeIf { it.isNotBlank() && !it.startsWith(LOCALIZED_NOTE_STORAGE_PREFIX) }
+}
+
 private fun String.withoutGoodsCategoryPrefix(): String {
     return trim()
         .replace(
@@ -5136,14 +5618,14 @@ private fun debtorDisplayName(debtor: DebtorDataModel): String {
     }
 }
 
-private fun debtDueStatusText(debtor: DebtorDataModel, now: Long = getCurrentTimeMillis()): String {
-    val due = debtor.debtDueAtMillis ?: return "No due date"
+private fun AppConfiguration.debtDueStatusText(debtor: DebtorDataModel, now: Long = getCurrentTimeMillis()): String {
+    val due = debtor.debtDueAtMillis ?: return localizedStringResource(1065, "No due date")
     val days = kotlin.math.floor((due - now).toDouble() / (24.0 * 60.0 * 60.0 * 1000.0)).toInt()
     return when {
-        days > 1 -> "Due in $days days"
-        days == 1 -> "Due tomorrow"
-        days == 0 -> "Due today"
-        else -> "Overdue by ${-days} days"
+        days > 1 -> "${localizedStringResource(1066, "Due in")} $days ${localizedStringResource(1067, "days")}"
+        days == 1 -> localizedStringResource(1068, "Due tomorrow")
+        days == 0 -> localizedStringResource(1069, "Due today")
+        else -> "${localizedStringResource(1070, "Overdue by")} ${-days} ${localizedStringResource(1067, "days")}"
     }
 }
 
@@ -5425,10 +5907,14 @@ private fun AppConfiguration.TransactionPlainTextField(
     placeholder: String,
     leadingIconPath: String? = null,
     keyboardType: KeyboardType = KeyboardType.Text,
+    stateHost: StateHost? = null,
+    stateKey: String? = null,
     onValueChange: (String) -> Unit
-) {
-    genericTextField(
+): GenericTextFieldContent {
+    val textFieldContent = genericTextField(
         titleText = title,
+        stateHost = stateHost,
+        stateKey = stateKey,
         valueInitial = value,
         placeholderText = placeholder,
         leadingIconPath = leadingIconPath,
@@ -5440,6 +5926,14 @@ private fun AppConfiguration.TransactionPlainTextField(
             applyChange()
         }
     )
+
+    LaunchedEffect(stateHost, stateKey, textFieldContent.value.text, value) {
+        if (stateHost != null && !stateKey.isNullOrBlank() && textFieldContent.value.text != value) {
+            onValueChange(textFieldContent.value.text)
+        }
+    }
+
+    return textFieldContent
 }
 
 
@@ -5641,6 +6135,9 @@ fun AppConfiguration.TransactionPaymentScreen() {
             lines.sumOf { it.total }.roundMoney()
         }
 
+        val paymentDrafts by getTransactionPaymentDraftsState().collectAsState()
+        val persistedPaymentDraft = paymentDrafts[transactionSupplySupplierKey(context.transactionTypeIndex, context.clientId)]
+
         val country = stateValues.globalAppConfiguration.countries.find {
             it.locale.equals(stateValues.userAccount?.countryLocale, true)
         } ?: stateValues.globalAppConfiguration.countries.first()
@@ -5659,42 +6156,123 @@ fun AppConfiguration.TransactionPaymentScreen() {
 
         val debtors by debtorsState.payload.collectAsState()
 
-        var selectedCashlessPaymentMethodId by rememberSaveable {
-            mutableStateOf(country.preferredCashlessPaymentOptionId)
+        var selectedCashlessPaymentMethodId by rememberSaveable(context.transactionTypeIndex, context.clientId) {
+            mutableStateOf(
+                persistedPaymentDraft?.cardPaymentOptionId
+                    ?.takeIf { it > 0 }
+                    ?.toString()
+                    ?: country.preferredCashlessPaymentOptionId
+            )
         }
 
         var cashText by rememberSaveable(context.transactionTypeIndex, context.clientId) {
-            mutableStateOf("")
+            mutableStateOf(
+                persistedPaymentDraft?.cashInputText?.takeIf { it.isNotBlank() }
+                    ?: persistedPaymentDraft?.paidCash?.takeIf { it > 0.0 }?.let { moneyInputFromDouble(it) }
+                    ?: ""
+            )
         }
 
         var cardText by rememberSaveable(context.transactionTypeIndex, context.clientId) {
-            mutableStateOf("")
+            mutableStateOf(
+                persistedPaymentDraft?.cardInputText?.takeIf { it.isNotBlank() }
+                    ?: persistedPaymentDraft?.paidCard?.takeIf { it > 0.0 }?.let { moneyInputFromDouble(it) }
+                    ?: ""
+            )
         }
 
         var debtText by rememberSaveable(context.transactionTypeIndex, context.clientId) {
-            mutableStateOf("")
+            mutableStateOf(
+                persistedPaymentDraft?.debtInputText?.takeIf { it.isNotBlank() }
+                    ?: persistedPaymentDraft?.debtor?.debtAmount?.takeIf { it > 0.0 }?.let { moneyInputFromDouble(it) }
+                    ?: ""
+            )
         }
 
-        var activeAmountField by rememberSaveable {
-            mutableStateOf("cash")
+        var activeAmountField by rememberSaveable(context.transactionTypeIndex, context.clientId) {
+            mutableStateOf(
+                persistedPaymentDraft?.activeAmountField?.takeIf { it in listOf("cash", "card", "debt") }
+                    ?: when {
+                        persistedPaymentDraft?.paidCash?.let { it > 0.0 } == true -> "cash"
+                        persistedPaymentDraft?.paidCard?.let { it > 0.0 } == true -> "card"
+                        persistedPaymentDraft?.debtor?.debtAmount?.let { it > 0.0 } == true -> "debt"
+                        else -> "card"
+                    }
+            )
         }
 
-        var selectedDebtorId by rememberSaveable {
-            mutableStateOf<String?>(null)
+        var selectedDebtorId by rememberSaveable(context.transactionTypeIndex, context.clientId) {
+            mutableStateOf(
+                persistedPaymentDraft?.selectedDebtorId?.takeIf { it.isNotBlank() }
+                    ?: persistedPaymentDraft?.debtor?.id?.takeIf { it.isNotBlank() }
+            )
         }
 
-        var newDebtorFirstName by rememberSaveable { mutableStateOf("") }
-        var newDebtorLastName by rememberSaveable { mutableStateOf("") }
-        var newDebtorPhone by rememberSaveable { mutableStateOf("") }
-        var newDebtorEmail by rememberSaveable { mutableStateOf("") }
-        var newDebtorType by rememberSaveable { mutableStateOf("individual") }
-        var newDebtorIdNumber by rememberSaveable { mutableStateOf("") }
-        var newDebtorCompanyName by rememberSaveable { mutableStateOf("") }
-        var newDebtorCompanyIdNumber by rememberSaveable { mutableStateOf("") }
-        var newDebtDueDateText by rememberSaveable { mutableStateOf("") }
+        var newDebtorFirstName by rememberSaveable(context.transactionTypeIndex, context.clientId) { mutableStateOf(persistedPaymentDraft?.debtor?.firstName.orEmpty()) }
+        var newDebtorLastName by rememberSaveable(context.transactionTypeIndex, context.clientId) { mutableStateOf(persistedPaymentDraft?.debtor?.lastName.orEmpty()) }
+        var newDebtorPhone by rememberSaveable(context.transactionTypeIndex, context.clientId) { mutableStateOf(persistedPaymentDraft?.debtor?.phoneNumber.orEmpty()) }
+        var newDebtorEmail by rememberSaveable(context.transactionTypeIndex, context.clientId) { mutableStateOf(persistedPaymentDraft?.debtor?.email.orEmpty()) }
+        var newDebtorType by rememberSaveable(context.transactionTypeIndex, context.clientId) { mutableStateOf(persistedPaymentDraft?.debtor?.debtorType?.ifBlank { "individual" } ?: "individual") }
+        var newDebtorIdNumber by rememberSaveable(context.transactionTypeIndex, context.clientId) { mutableStateOf(persistedPaymentDraft?.debtor?.idNumber.orEmpty()) }
+        var newDebtorCompanyName by rememberSaveable(context.transactionTypeIndex, context.clientId) { mutableStateOf(persistedPaymentDraft?.debtor?.companyName.orEmpty()) }
+        var newDebtorCompanyIdNumber by rememberSaveable(context.transactionTypeIndex, context.clientId) { mutableStateOf(persistedPaymentDraft?.debtor?.companyIdNumber.orEmpty()) }
+        var newDebtDueDateText by rememberSaveable(context.transactionTypeIndex, context.clientId) {
+            mutableStateOf(
+                persistedPaymentDraft?.newDebtDueDateText?.takeIf { it.isNotBlank() }
+                    ?: persistedPaymentDraft?.debtor?.debtDueAtMillis?.takeIf { it > 0L }?.toStockDateInputText()
+                    ?: ""
+            )
+        }
 
         val paymentScreenState by context.stateHost.state.collectAsState()
         val paymentModeStateKey = "payment_mode_${context.transactionTypeIndex}_${context.clientId}"
+
+        var persistedPaymentDraftApplied by rememberSaveable(context.transactionTypeIndex, context.clientId) { mutableStateOf(false) }
+        var paymentModeDefaultsInitializedFor by rememberSaveable(context.transactionTypeIndex, context.clientId) { mutableStateOf<String?>(null) }
+
+        LaunchedEffect(context.transactionTypeIndex, context.clientId, persistedPaymentDraft?.updatedAtMillis) {
+            val draft = persistedPaymentDraft ?: return@LaunchedEffect
+            if (persistedPaymentDraftApplied) return@LaunchedEffect
+
+            selectedCashlessPaymentMethodId = draft.cardPaymentOptionId
+                .takeIf { it > 0 }
+                ?.toString()
+                ?: country.preferredCashlessPaymentOptionId
+            cashText = draft.cashInputText.takeIf { it.isNotBlank() }
+                ?: draft.paidCash.takeIf { it > 0.0 }?.let { moneyInputFromDouble(it) }
+                ?: ""
+            cardText = draft.cardInputText.takeIf { it.isNotBlank() }
+                ?: draft.paidCard.takeIf { it > 0.0 }?.let { moneyInputFromDouble(it) }
+                ?: ""
+            debtText = draft.debtInputText.takeIf { it.isNotBlank() }
+                ?: draft.debtor?.debtAmount?.takeIf { it > 0.0 }?.let { moneyInputFromDouble(it) }
+                ?: ""
+            activeAmountField = draft.activeAmountField.takeIf { it in listOf("cash", "card", "debt") }
+                ?: activeAmountField
+            selectedDebtorId = draft.selectedDebtorId?.takeIf { it.isNotBlank() }
+                ?: draft.debtor?.id?.takeIf { it.isNotBlank() }
+
+            val debtor = draft.debtor
+            newDebtorFirstName = debtor?.firstName.orEmpty()
+            newDebtorLastName = debtor?.lastName.orEmpty()
+            newDebtorPhone = debtor?.phoneNumber.orEmpty()
+            newDebtorEmail = debtor?.email.orEmpty()
+            newDebtorType = debtor?.debtorType?.ifBlank { "individual" } ?: "individual"
+            newDebtorIdNumber = debtor?.idNumber.orEmpty()
+            newDebtorCompanyName = debtor?.companyName.orEmpty()
+            newDebtorCompanyIdNumber = debtor?.companyIdNumber.orEmpty()
+            newDebtDueDateText = draft.newDebtDueDateText.takeIf { it.isNotBlank() }
+                ?: debtor?.debtDueAtMillis?.takeIf { it > 0L }?.toStockDateInputText()
+                ?: ""
+
+            draft.paymentModeId.takeIf { it in listOf("0", "1", "2") }?.let { restoredModeId ->
+                paymentModeDefaultsInitializedFor = restoredModeId
+                context.stateHost.setState(paymentModeStateKey to restoredModeId)
+            }
+            persistedPaymentDraftApplied = true
+        }
+
+        val restoredPaymentModeId = persistedPaymentDraft?.paymentModeId?.takeIf { it in listOf("0", "1", "2") }
 
         val paymentMode = tabRowWidget(
             modifier = Modifier.padding(
@@ -5702,7 +6280,7 @@ fun AppConfiguration.TransactionPaymentScreen() {
                 top = stateValues.marginTextField,
                 end = stateValues.marginTextField
             ),
-            selectedIndexInitial = paymentScreenState[paymentModeStateKey] ?: "0",
+            selectedIndexInitial = paymentScreenState[paymentModeStateKey] ?: restoredPaymentModeId ?: "1",
             tabs = listOf(
                 TabContent("0", stateValues.stringCash) {
                     coroutineScope.launch { context.stateHost.setState(paymentModeStateKey to it) }
@@ -5717,6 +6295,14 @@ fun AppConfiguration.TransactionPaymentScreen() {
         )
 
         LaunchedEffect(paymentMode.id, total) {
+            if (persistedPaymentDraft != null && paymentModeDefaultsInitializedFor == null && paymentMode.id == persistedPaymentDraft.paymentModeId) {
+                paymentModeDefaultsInitializedFor = paymentMode.id
+                return@LaunchedEffect
+            }
+
+            if (paymentModeDefaultsInitializedFor == paymentMode.id) return@LaunchedEffect
+            paymentModeDefaultsInitializedFor = paymentMode.id
+
             when (paymentMode.id) {
                 "0" -> {
                     cashText = moneyInputFromDouble(total)
@@ -5827,6 +6413,51 @@ fun AppConfiguration.TransactionPaymentScreen() {
             )
         } else null
 
+        LaunchedEffect(
+            context.transactionTypeIndex,
+            context.clientId,
+            paymentMode.id,
+            cashText,
+            cardText,
+            debtText,
+            activeAmountField,
+            paidCash,
+            paidCard,
+            selectedCashlessPaymentMethodId,
+            debtAmount,
+            selectedDebtorId,
+            newDebtorType,
+            newDebtorFirstName,
+            newDebtorLastName,
+            newDebtorPhone,
+            newDebtorEmail,
+            newDebtorIdNumber,
+            newDebtorCompanyName,
+            newDebtorCompanyIdNumber,
+            newDebtDueDateText,
+            currencyCode
+        ) {
+            delay(180L)
+            setTransactionPaymentDraft(
+                TransactionPaymentDraftDataModel(
+                    transactionTypeIndex = context.transactionTypeIndex,
+                    clientId = context.clientId,
+                    paymentModeId = paymentMode.id,
+                    paidCash = paidCash,
+                    paidCard = paidCard,
+                    cardPaymentOptionId = selectedCashlessPaymentMethodId.toIntOrNull() ?: 0,
+                    debtor = draftDebtor,
+                    cashInputText = cashText,
+                    cardInputText = cardText,
+                    debtInputText = debtText,
+                    activeAmountField = activeAmountField,
+                    selectedDebtorId = selectedDebtorId,
+                    newDebtDueDateText = newDebtDueDateText,
+                    updatedAtMillis = getCurrentTimeMillis()
+                )
+            )
+        }
+
         val debtorValid = debtAmount <= 0.0 || (
                 selectedDebtor != null ||
                         newDebtorFirstName.trim().isNotBlank() ||
@@ -5875,7 +6506,13 @@ fun AppConfiguration.TransactionPaymentScreen() {
 
         Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
+        val paymentListState = rememberPersistentLazyListState(
+            stateHost = context.stateHost,
+            stateKey = "transaction_payment_scroll_${context.transactionTypeIndex}_${context.clientId}"
+        )
+
         LazyColumn(
+            state = paymentListState,
             modifier = Modifier
                 .weight(1f)
                 .padding(horizontal = stateValues.marginTextField)
@@ -6207,7 +6844,14 @@ fun AppConfiguration.TransactionPaymentScreen() {
                         paidCash = paidCash,
                         paidCard = paidCard,
                         cardPaymentOptionId = selectedCashlessPaymentMethodId.toIntOrNull() ?: 0,
-                        debtor = draftDebtor
+                        debtor = draftDebtor,
+                        cashInputText = cashText,
+                        cardInputText = cardText,
+                        debtInputText = debtText,
+                        activeAmountField = activeAmountField,
+                        selectedDebtorId = selectedDebtorId,
+                        newDebtDueDateText = newDebtDueDateText,
+                        updatedAtMillis = getCurrentTimeMillis()
                     )
 
                     setTransactionPaymentDraft(draft)
@@ -6477,7 +7121,8 @@ fun AppConfiguration.GoodsItemInCartWidget(
     Row(
         modifier
             .padding(bottom = 4.dp)
-            .fillMaxHeight()
+            .fillMaxWidth()
+            .heightIn(min = stateValues.textFieldHeight * 1.25f)
             .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
             .clip(RoundedCornerShape(stateValues.cornerRadius))
             .background(stateValues.BackgroundColor)
@@ -6588,7 +7233,7 @@ fun AppConfiguration.GoodsItemInCartWidget(
                     .height(6.dp)
             )
 
-            goodsItem.barcodes.run {
+            goodsItem.allBarcodeValues().run {
                 if (size == 1) {
                     this[0]
                 } else {
@@ -6621,7 +7266,12 @@ fun AppConfiguration.GoodsItemInCartWidget(
 
             val cartUnitText = goodsItemInCart.quantity.immutableUnitName.extractLocalizedString(stateValues.appLanguage).orEmpty()
             val quantityText = goodsItemInCart.quantity.quantityText(stateValues.appLanguage)
-            val itemBatches = stateValues.stockBatches.orEmpty().filter { it.goodsItemId == goodsItem.id && it.isActive }
+            val activeStoreId = stateValues.activeStoreId
+            val itemBatches = stateValues.stockBatches.orEmpty().filter {
+                it.goodsItemId == goodsItem.id &&
+                        it.isActive &&
+                        (transactionTypeIndex != 0 || batchBelongsToInventoryStoreForUi(it.storeId, activeStoreId))
+            }
             val activeBatch = itemBatches.sortedForShelf(goodsItem).firstOrNull { it.id == goodsItem.activeShelfBatchId }
                 ?: itemBatches.sortedForShelf(goodsItem).firstOrNull()
             val promotedItemPrice = goodsItem.promotedPriceForTransaction(
@@ -6678,18 +7328,29 @@ fun AppConfiguration.GoodsItemInCartWidget(
             }
 
             StockCardInfoLine(
-                title = localizedStringResource(264, "Available"),
+                title = localizedStringResource(1181, "Available total"),
                 value = "${availableQuantity.quantityAmountText(goodsItemInCart.quantity.roundTotal)} $cartUnitText".trim(),
                 textColor = textColor
             )
 
             activeBatch?.let { batch ->
+                val batchSupplierText = stateValues.suppliers
+                    .orEmpty()
+                    .find { it.id == batch.supplierId }
+                    ?.name
+                    ?.extractLocalizedString(stateValues.appLanguage)
+                    ?: batch.supplierId?.takeIf { it.isNotBlank() }
+                    ?: localizedStringResource(638, "No supplier selected")
+
                 StockCardInfoLine(
                     title = localizedStringResource(265, "Active batch"),
                     value = listOfNotNull(
                         "#${itemBatches.sortedForShelf(goodsItem).indexOfFirst { it.id == batch.id } + 1}",
-                        batch.expirationDateMillis?.toStockDateInputText()?.let { "${localizedStringResource(234, "Expires")} $it" },
-                        batch.status.name
+                        batchSupplierText,
+                        batch.quantity.quantityText(stateValues.appLanguage),
+                        batch.deliveredAtMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let { "${localizedStringResource(342, "Delivered")} $it" },
+                        batch.expirationDateMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let { "${localizedStringResource(234, "Expires")} $it" },
+                        stockBatchStatusText(batch.status)
                     ).joinToString(" • "),
                     textColor = textColor
                 )
@@ -6755,35 +7416,14 @@ fun AppConfiguration.GoodsItemInCartWidget(
                             .padding(horizontal = 6.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(20.dp)
-                                .clip(RoundedCornerShape(5.dp))
-                                .background(if (checked) stateValues.AccentColor else Color.Transparent)
-                                .border(
-                                    stateValues.unfocusedBorderWidth,
-                                    borderColor,
-                                    RoundedCornerShape(5.dp)
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            when {
-                                checked -> Text(
-                                    text = "✓",
-                                    color = stateValues.AccentTextColor,
-                                    fontSize = stateValues.smallTextSize,
-                                    fontWeight = FontWeight.Bold,
-                                    textAlign = TextAlign.Center
-                                )
-                                blocked -> Text(
-                                    text = "!",
-                                    color = stateValues.ErrorColor,
-                                    fontSize = stateValues.smallTextSize,
-                                    fontWeight = FontWeight.Bold,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
+                        AitaRoundCheckbox(
+                            checked = checked,
+                            onCheckedChange = null,
+                            blocked = blocked,
+                            borderColor = borderColor,
+                            containerSize = 20.dp,
+                            circleSize = 20.dp
+                        )
 
                         Spacer(modifier = Modifier.width(6.dp))
 
@@ -6968,14 +7608,33 @@ fun AppConfiguration.TransactionCartScreen() {
                 1 -> stateValues.drawablePathIconTransactionReturn
                 else -> stateValues.drawablePathIconTransactionSupply
             },
-            trailingIcons = listOf(
-                Triple(stateValues.drawablePathIconStock, stateValues.drawableResIconStock.value) {
-                    openQuickStockAddSheet(
-                        transactionTypeIndex = context.transactionTypeIndex,
-                        clientId = context.clientId
+            trailingIcons = buildList<Triple<String, DrawableResource, () -> Unit>> {
+                add(
+                    Triple(stateValues.drawablePathIconStock, stateValues.drawableResIconStock.value) {
+                        openQuickStockAddSheet(
+                            transactionTypeIndex = context.transactionTypeIndex,
+                            clientId = context.clientId
+                        )
+                    }
+                )
+
+                if (stateValues.isNarrowScreen) {
+                    add(
+                        Triple(
+                            stateValues.drawablePathIconTransactionSelection,
+                            stateValues.drawableResIconTransactionSelection.value
+                        ) {
+                            coroutineScope.launch {
+                                when (context.transactionTypeIndex) {
+                                    0 -> Navigation.TransactionSale.go(NavigationScreenModel.Transaction.Selection)
+                                    1 -> Navigation.TransactionReturn.go(NavigationScreenModel.Transaction.Selection)
+                                    else -> Navigation.TransactionSupply.go(NavigationScreenModel.Transaction.Selection)
+                                }
+                            }
+                        }
                     )
                 }
-            )
+            }
         )
 
         val goodsInCart by getCartState(
@@ -6983,12 +7642,49 @@ fun AppConfiguration.TransactionCartScreen() {
             context.clientId
         ).collectAsState()
         val saleMethodIds by cartSaleMethodIdsState.collectAsState()
-        val cartListState = rememberLazyListState()
-        val cartConditionChecks = remember { mutableStateMapOf<String, Boolean>() }
+        val cartConditionChecks by getCartConditionChecksState().collectAsState()
+        val cartScrollStates by getTransactionCartScrollStatesState().collectAsState()
+        val cartStateKey = transactionSupplySupplierKey(context.transactionTypeIndex, context.clientId)
+        val persistedCartScrollState = cartScrollStates[cartStateKey]
+        val cartListState = rememberLazyListState(
+            initialFirstVisibleItemIndex = persistedCartScrollState?.firstVisibleItemIndex ?: 0,
+            initialFirstVisibleItemScrollOffset = persistedCartScrollState?.firstVisibleItemScrollOffset ?: 0
+        )
+        var restoredCartScrollKey by rememberSaveable { mutableStateOf("") }
         var highlightedConditionKey by rememberSaveable { mutableStateOf<String?>(null) }
         val acceptableConditionText = localizedStringResource(613, "Item in acceptable condition")
         val rememberedCartAvailability = remember { mutableStateMapOf<String, Double>() }
         var cartStockUpdateDialogText by rememberSaveable { mutableStateOf<String?>(null) }
+
+        LaunchedEffect(cartStateKey, persistedCartScrollState?.updatedAtMillis, goodsInCart.size) {
+            val target = persistedCartScrollState ?: return@LaunchedEffect
+            if (restoredCartScrollKey == cartStateKey || goodsInCart.isEmpty()) return@LaunchedEffect
+
+            cartListState.scrollToItem(
+                target.firstVisibleItemIndex.coerceIn(0, goodsInCart.lastIndex),
+                target.firstVisibleItemScrollOffset.coerceAtLeast(0)
+            )
+            restoredCartScrollKey = cartStateKey
+        }
+
+        LaunchedEffect(cartStateKey, cartListState) {
+            var pendingSaveJob: kotlinx.coroutines.Job? = null
+            snapshotFlow { cartListState.firstVisibleItemIndex to cartListState.firstVisibleItemScrollOffset }
+                .collect { (firstIndex, firstOffset) ->
+                    pendingSaveJob?.cancel()
+                    pendingSaveJob = launch {
+                        delay(220L)
+                        setTransactionCartScrollState(
+                            TransactionCartScrollStateDataModel(
+                                transactionTypeIndex = context.transactionTypeIndex,
+                                clientId = context.clientId,
+                                firstVisibleItemIndex = firstIndex,
+                                firstVisibleItemScrollOffset = firstOffset
+                            )
+                        )
+                    }
+                }
+        }
 
         val cartAvailabilityByItem = remember(goodsInCart, stateValues.stock, stateValues.stockBatches, stateValues.appLanguage) {
             goodsInCart.mapNotNull { cartItem ->
@@ -7092,6 +7788,28 @@ fun AppConfiguration.TransactionCartScreen() {
             return stockConditions + transactionCondition
         }
 
+        val cartItemsWithGoods = remember(goodsInCart, stateValues.stock) {
+            goodsInCart.mapIndexedNotNull { index, cartItem ->
+                stateValues.stock?.find { it.id == cartItem.id }?.let { Triple(index, cartItem, it) }
+            }
+        }
+
+        val validCartConditionKeys = remember(
+            cartItemsWithGoods,
+            stateValues.appLanguage,
+            context.transactionTypeIndex,
+            context.clientId,
+            acceptableConditionText
+        ) {
+            cartItemsWithGoods.flatMap { (_, cartItem, goodsItem) ->
+                cartConditionsFor(cartItem, goodsItem).map { it.key }
+            }.toSet()
+        }
+
+        LaunchedEffect(context.transactionTypeIndex, context.clientId, validCartConditionKeys.joinToString("|")) {
+            pruneCartConditionChecks(context.transactionTypeIndex, context.clientId, validCartConditionKeys)
+        }
+
         if (goodsInCart.isEmpty()) {
             MessageText(
                 modifier = Modifier.fillMaxSize(),
@@ -7119,7 +7837,7 @@ fun AppConfiguration.TransactionCartScreen() {
                             conditionChecks = cartConditionChecks,
                             highlightedConditionKey = highlightedConditionKey,
                             onConditionCheckedChange = { conditionKey, checked ->
-                                cartConditionChecks[conditionKey] = checked
+                                setCartConditionChecked(conditionKey, checked)
                             },
                             setSaleMethodAction = { methodId ->
                                 setCartSaleMethodId(
@@ -7187,16 +7905,12 @@ fun AppConfiguration.TransactionCartScreen() {
                     val selectedMethodId = saleMethodIds["${context.transactionTypeIndex}:${context.clientId}:${cartItem.id}"]
                     val goodsItem = stateValues.stock?.find { it.id == cartItem.id }
                     if (selectedMethodId == SALE_METHOD_WHOLESALE && goodsItem != null && !goodsItem.isWholesaleEligible(cartItem.quantity.total)) {
-                        goodsItem.name.extractLocalizedString(stateValues.appLanguage) ?: goodsItem.barcodes.firstOrNull() ?: cartItem.id
+                        goodsItem.name.extractLocalizedString(stateValues.appLanguage) ?: goodsItem.firstBarcode().ifBlank { cartItem.id }
                     } else {
                         null
                     }
                 }
             }
-        }
-
-        val cartItemsWithGoods = goodsInCart.mapIndexedNotNull { index, cartItem ->
-            stateValues.stock?.find { it.id == cartItem.id }?.let { Triple(index, cartItem, it) }
         }
 
         val firstUncheckedCondition = cartItemsWithGoods.firstNotNullOfOrNull { (index, cartItem, goodsItem) ->
@@ -7466,6 +8180,79 @@ fun AppConfiguration.TransactionCartScreen() {
 //      }
 //  }
 //}
+
+
+private fun decodeLazyListScrollState(encoded: String?): Pair<Int, Int> {
+    val parts = encoded
+        ?.split(':')
+        ?.takeIf { it.size == 2 }
+        ?: return 0 to 0
+    return (parts.getOrNull(0)?.toIntOrNull()?.coerceAtLeast(0) ?: 0) to
+            (parts.getOrNull(1)?.toIntOrNull()?.coerceAtLeast(0) ?: 0)
+}
+
+private fun encodeLazyListScrollState(index: Int, offset: Int): String =
+    "${index.coerceAtLeast(0)}:${offset.coerceAtLeast(0)}"
+
+@Composable
+private fun AppConfiguration.rememberPersistentLazyListState(
+    stateHost: StateHost,
+    stateKey: String
+): LazyListState {
+    val hostState by stateHost.state.collectAsState()
+    val persisted = hostState[stateKey]
+    val initial = remember(stateKey) { decodeLazyListScrollState(persisted) }
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = initial.first,
+        initialFirstVisibleItemScrollOffset = initial.second
+    )
+    var restoredKey by rememberSaveable(stateKey) { mutableStateOf("") }
+
+    LaunchedEffect(stateKey, persisted) {
+        val encoded = persisted ?: return@LaunchedEffect
+        val restoreKey = "$stateKey|$encoded"
+        if (restoreKey == restoredKey) return@LaunchedEffect
+        val (index, offset) = decodeLazyListScrollState(encoded)
+        runCatching { listState.scrollToItem(index, offset) }
+        restoredKey = restoreKey
+    }
+
+    LaunchedEffect(stateHost, stateKey, listState) {
+        var pendingSaveJob: kotlinx.coroutines.Job? = null
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .collect { (index, offset) ->
+                pendingSaveJob?.cancel()
+                pendingSaveJob = launch {
+                    delay(220L)
+                    stateHost.setState(stateKey to encodeLazyListScrollState(index, offset))
+                }
+            }
+    }
+
+    return listState
+}
+
+private fun menuPersistentScrollSuffix(raw: String): String =
+    raw
+        .ifBlank { "main" }
+        .map { char -> if (char.isLetterOrDigit() || char == '_' || char == '-') char else '_' }
+        .joinToString("")
+        .take(80)
+        .ifBlank { "main" }
+
+@Composable
+private fun AppConfiguration.rememberMenuScreenLazyListState(
+    screen: NavigationScreenModel.Menu,
+    suffix: String = "main"
+): LazyListState = rememberPersistentLazyListState(
+    stateHost = screen,
+    stateKey = listOf(
+        "menu_scroll_v2",
+        if (stateValues.isNarrowScreen) "narrow" else "wide",
+        screen.route,
+        menuPersistentScrollSuffix(suffix)
+    ).joinToString(":")
+)
 
 @Composable
 fun AppConfiguration.tabRowWidget(
@@ -7958,7 +8745,7 @@ fun AppConfiguration.StockWarehouseScreen() {
             modifier = Modifier
                 .weight(1f),
             onDelete = {
-                deleteGoodsItem(id = it.id, storeId = stateValues.activeStoreId!!) {
+                deleteGoodsItem(id = it.id, storeId = it.storeId.ifBlank { stateValues.activeStoreId.orEmpty() }) {
 
                 }
             },
@@ -8000,6 +8787,8 @@ fun AppConfiguration.StockWarehouseScreenContent(
     sortMode: String? = null,
     sortAscending: Boolean = true,
     preferredOrderIds: List<String> = emptyList(),
+    scrollStateHost: StateHost = NavigationScreenModel.Stock.Warehouse,
+    scrollStateKey: String = "stock_warehouse_scroll",
     onExactSearchHit: ((GoodsItemDataModel) -> Unit)? = null,
     onExactSearchHitWithQuery: ((GoodsItemDataModel, String) -> Unit)? = null
 ){
@@ -8056,7 +8845,7 @@ fun AppConfiguration.StockWarehouseScreenContent(
                             filtered
                         } else {
                             val activeStoreId = stateValues.activeStoreId
-                            filtered.filter { item -> activeStoreId.isNullOrBlank() || item.storeId == activeStoreId }
+                            filtered.filter { item -> activeStoreId.isNullOrBlank() || sameInventoryStoreGroupForUi(activeStoreId, item.storeId) || itemHasSellableBatchInStoreForUi(item.id, activeStoreId) }
                         }
                     }
                 val items = lSearchQuery
@@ -8124,20 +8913,36 @@ fun AppConfiguration.StockWarehouseScreenContent(
                         stateValues.stringNoMatches
                     )
                 } else {
+                    val warehouseListState = rememberPersistentLazyListState(
+                        stateHost = scrollStateHost,
+                        stateKey = scrollStateKey
+                    )
+
                     LazyColumn(
+                        state = warehouseListState,
                         modifier = modifier
                             .fillMaxWidth()
                             .padding(8.dp)
                     ) {
                         items(visibleItems, key = { it.id }) { item ->
-                            val itemBatches = stateValues.stockBatches.orEmpty().filter { it.goodsItemId == item.id && it.isActive }
+                            val activeStoreId = stateValues.activeStoreId
+                            val itemBatches = stateValues.stockBatches.orEmpty().filter { batch ->
+                                batch.goodsItemId == item.id &&
+                                        batch.isActive &&
+                                        (transactionTypeIndex == null || (batchBelongsToInventoryStoreForUi(batch.storeId, activeStoreId) && batch.isSelectableActiveStockBatch()))
+                            }
                             val availableQuantity = itemBatches
-                                .filter { it.status != StockBatchStatusDataModel.Deleted && it.status != StockBatchStatusDataModel.WrittenOff }
+                                .filter { batch ->
+                                    if (transactionTypeIndex == null) {
+                                        batch.status != StockBatchStatusDataModel.Deleted && batch.status != StockBatchStatusDataModel.WrittenOff
+                                    } else {
+                                        batch.isSelectableActiveStockBatch()
+                                    }
+                                }
                                 .sumOf { it.quantity.total }
                             val trulyOutOfStock = disableIfOutOfStock && availableQuantity <= 0.0
 
-                            val activeStoreId = stateValues.activeStoreId
-                            val canOperateThisStoreInventory = activeStoreId.isNullOrBlank() || item.storeId == activeStoreId
+                            val canOperateThisStoreInventory = activeStoreId.isNullOrBlank() || sameInventoryStoreGroupForUi(activeStoreId, item.storeId) || itemHasSellableBatchInStoreForUi(item.id, activeStoreId)
 
                             GoodsItemInStockWidget(
                                 modifier = Modifier
@@ -8658,6 +9463,7 @@ private fun List<String>.missingDefaultStockConditions(defaults: List<StockCondi
 data class StockAddEditDraft(
     val id: String = "",
     val barcodes: List<String> = listOf(""),
+    val barcodeTypes: List<String> = listOf(GOODS_ITEM_BARCODE_TYPE_STANDARD),
     val name: List<LocalizedStringDataModel> = emptyList(),
     val description: List<LocalizedStringDataModel> = emptyList(),
     val measurementUnitId: String = "0",
@@ -8674,6 +9480,21 @@ data class StockAddEditDraft(
     val noteLocalized: List<LocalizedStringDataModel> = emptyList(),
     val conditions: List<String> = emptyList()
 )
+
+private fun List<String>.alignedStockBarcodeTypes(barcodes: List<String>): List<String> {
+    val targetBarcodes = barcodes.ifEmpty { listOf("") }
+    return List(targetBarcodes.size.coerceAtLeast(1)) { index ->
+        val barcode = targetBarcodes.getOrNull(index).orEmpty()
+        getOrNull(index)?.normalizedGoodsItemBarcodeType(barcode) ?: GOODS_ITEM_BARCODE_TYPE_STANDARD
+    }
+}
+
+private fun List<String>.alignedStockBarcodeTypes(size: Int): List<String> {
+    return alignedStockBarcodeTypes(List(size.coerceAtLeast(1)) { "" })
+}
+
+private fun StockAddEditDraft.visibleBarcodes(): List<String> = barcodes.ifEmpty { listOf("") }
+private fun StockAddEditDraft.visibleBarcodeTypes(): List<String> = barcodeTypes.alignedStockBarcodeTypes(visibleBarcodes())
 
 private const val STOCK_ADD_EDIT_DRAFT_STORAGE_PREFIX = "aita-stock-add-edit-draft-v1:"
 private const val STOCK_ADD_EDIT_DRAFT_SEPARATOR = "\u001E"
@@ -8698,7 +9519,8 @@ private fun StockAddEditDraft.toPersistentDraftStateString(): String {
         isQuickItem.toString(),
         note,
         jsonBase.encodeToString(ListSerializer(LocalizedStringDataModel.serializer()), noteLocalized),
-        jsonBase.encodeToString(ListSerializer(String.serializer()), conditions)
+        jsonBase.encodeToString(ListSerializer(String.serializer()), conditions),
+        jsonBase.encodeToString(ListSerializer(String.serializer()), visibleBarcodeTypes())
     ).joinToString(STOCK_ADD_EDIT_DRAFT_SEPARATOR) { it.cleanForStockAddEditDraftState() }
 }
 
@@ -8709,9 +9531,17 @@ private fun String.toPersistentStockAddEditDraftOrNull(): StockAddEditDraft? {
     if (values.size < 17) return null
 
     return runCatching {
+        val decodedBarcodes = jsonBase.decodeFromString(ListSerializer(String.serializer()), values[1]).ifEmpty { listOf("") }
+        val decodedBarcodeTypes = values.getOrNull(17)
+            ?.takeIf { it.isNotBlank() }
+            ?.let { jsonBase.decodeFromString(ListSerializer(String.serializer()), it) }
+            .orEmpty()
+            .alignedStockBarcodeTypes(decodedBarcodes)
+
         StockAddEditDraft(
             id = values[0],
-            barcodes = jsonBase.decodeFromString(ListSerializer(String.serializer()), values[1]).ifEmpty { listOf("") },
+            barcodes = decodedBarcodes,
+            barcodeTypes = decodedBarcodeTypes,
             name = jsonBase.decodeFromString(ListSerializer(LocalizedStringDataModel.serializer()), values[2]),
             description = jsonBase.decodeFromString(ListSerializer(LocalizedStringDataModel.serializer()), values[3]),
             measurementUnitId = values[4].ifBlank { "0" },
@@ -8734,9 +9564,17 @@ private fun String.toPersistentStockAddEditDraftOrNull(): StockAddEditDraft? {
 }
 
 fun GoodsItemDataModel.toStockAddEditDraft(): StockAddEditDraft {
+    val effectiveBarcodeModels = effectiveBarcodeModels()
+    val visibleBarcodeValues = effectiveBarcodeModels.toLegacyBarcodeStrings().ifEmpty { barcodes.ifEmpty { listOf("") } }
+    val visibleBarcodeTypes = effectiveBarcodeModels
+        .map { it.type.normalizedGoodsItemBarcodeType(it.value) }
+        .ifEmpty { visibleBarcodeValues.map { GOODS_ITEM_BARCODE_TYPE_STANDARD } }
+        .alignedStockBarcodeTypes(visibleBarcodeValues)
+
     return StockAddEditDraft(
         id = id,
-        barcodes = barcodes.ifEmpty { listOf("") },
+        barcodes = visibleBarcodeValues,
+        barcodeTypes = visibleBarcodeTypes,
         name = name,
         description = description,
         measurementUnitId = measurementUnitId,
@@ -8784,12 +9622,27 @@ fun StockAddEditDraft.toGoodsItem(
     val legacyNote = cleanNoteLocalized.extractLocalizedString("main")
         ?: cleanNoteLocalized.firstOrNull()?.value
         ?: note.takeIf { it.isNotBlank() }
+    val cleanBarcodeModels = visibleBarcodes().flatMapIndexed { index, rawBarcode ->
+        val cleanType = visibleBarcodeTypes()
+            .getOrNull(index)
+            ?.normalizedGoodsItemBarcodeType(rawBarcode)
+            ?: GOODS_ITEM_BARCODE_TYPE_STANDARD
+        rawBarcode.trim().toStoredGoodsItemBarcodeCandidates().map { candidate ->
+            GoodsItemBarcodeDataModel(
+                value = candidate,
+                type = cleanType,
+                storeId = if (cleanType == GOODS_ITEM_BARCODE_TYPE_INTERNAL) storeId else null
+            )
+        }
+    }.normalizedGoodsItemBarcodesForStore(storeId)
+    val cleanBarcodes = cleanBarcodeModels.toLegacyBarcodeStrings()
 
     return GoodsItemDataModel(
         id = id,
         userId = current?.userId.orEmpty(),
         storeId = storeId,
-        barcodes = barcodes.flatMap { it.trim().toStoredGoodsItemBarcodeCandidates() }.filter { it.isNotEmpty() }.distinct(),
+        barcodes = cleanBarcodes,
+        barcodeModels = cleanBarcodeModels,
         name = name.filter { it.value.isNotBlank() },
         description = description.filter { it.value.isNotBlank() },
         measurementUnitId = measurementUnitId,
@@ -8957,7 +9810,7 @@ private fun AppConfiguration.StockPromotionListEditor(
                         ?: promotion.title.extractLocalizedString("main")
                         ?: "",
                     placeholder = localizedStringResource(923, "Promo title"),
-                    leadingIconPath = "svg/50_${stateValues.appThemeId}.svg",
+                    leadingIconPath = stateValues.drawablePathIconPromos,
                     onValueChange = { value ->
                         replacePromotion(index, promotion.copy(title = promotion.title.withSingleLanguageValue(stateValues.appLanguage, value)))
                     }
@@ -9085,7 +9938,7 @@ private fun AppConfiguration.StockPromotionListEditor(
                 Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(
+                    AitaRoundCheckbox(
                         checked = promotion.isActive,
                         onCheckedChange = { checked -> replacePromotion(index, promotion.copy(isActive = checked)) }
                     )
@@ -9105,7 +9958,7 @@ private fun AppConfiguration.StockPromotionListEditor(
             Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(
+                AitaRoundCheckbox(
                     checked = applyToSameSupplier,
                     onCheckedChange = onApplyToSameSupplierChanged
                 )
@@ -9124,7 +9977,8 @@ private fun AppConfiguration.StockPromotionListEditor(
 
         actionButton(
             text = localizedStringResource(921, "Add promo"),
-            iconPath = "svg/50_${stateValues.appThemeId}.svg",
+            iconPath = stateValues.drawablePathIconPromos,
+            iconRes = stateValues.drawableResIconPromos.value,
             confirmationRequired = false,
             fillMaxWidthIfTextPresent = false,
             onClick = { onPromotionsChanged(promotions + defaultStockPromotion(stateValues.appLanguage)) }
@@ -9362,7 +10216,6 @@ private fun AppConfiguration.QuickSupplierAddBottomSheet(
     onSaved: (SupplierDataModel) -> Unit
 ) {
     var supplierName by rememberSaveable { mutableStateOf("") }
-    var supplierPhone by rememberSaveable { mutableStateOf("") }
     var supplierEmail by rememberSaveable { mutableStateOf("") }
 
     AitaBottomSheet(
@@ -9396,15 +10249,11 @@ private fun AppConfiguration.QuickSupplierAddBottomSheet(
 
                 Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
-                genericTextField(
+                val supplierPhoneTextFieldContent = countrySelectionPhoneNumberTextField(
                     titleText = localizedStringResource(620, "Supplier phone number"),
-                    placeholderText = stateValues.stringPhoneNumber,
-                    valueInitial = supplierPhone,
-                    keyboardType = KeyboardType.Phone,
-                    onValueChange = { value, apply ->
-                        supplierPhone = value
-                        apply()
-                    }
+                    placeholderText = stateValues.stringEnterPhoneNumber,
+                    stateHost = NavigationScreenModel.Transaction.Selection,
+                    stateKey = "quick_supplier_phone_number"
                 )
 
                 Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
@@ -9419,39 +10268,52 @@ private fun AppConfiguration.QuickSupplierAddBottomSheet(
                         apply()
                     }
                 )
+
+                Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(631, "Save supplier"),
+                    iconPath = stateValues.drawablePathIconCheck,
+                    enabled = supplierName.isNotBlank() && stateValues.latestNotification == null,
+                    confirmationRequired = false,
+                    onClick = {
+                        val phoneLocal = supplierPhoneTextFieldContent.value.text.trim()
+                        val phoneNumber = if (phoneLocal.isBlank()) {
+                            ""
+                        } else {
+                            supplierPhoneTextFieldContent.checkContentValidity()
+                            if (!supplierPhoneTextFieldContent.isContentValid) {
+                                postInAppNotification(stateValues.stringPhoneNumberMustBe, NotificationType.Negative, transient = true)
+                                return@actionButton
+                            }
+                            supplierPhoneTextFieldContent.selectedSecondaryId.orEmpty().removePrefix("+") + phoneLocal
+                        }
+
+                        val supplier = SupplierDataModel(
+                            id = "",
+                            userIds = emptyList(),
+                            typeIds = null,
+                            categoryIds = emptyList(),
+                            name = listOf(LocalizedStringDataModel("main", supplierName.trim())),
+                            phoneNumbers = listOf(phoneNumber).filter { it.isNotBlank() },
+                            emails = listOf(supplierEmail.trim().lowercase()).filter { it.isNotBlank() },
+                            addedAt = getCurrentTimeMillis(),
+                            isActive = true
+                        )
+
+                        addSupplier(supplier) { result ->
+                            if (result is DataState.Success) {
+                                onSaved(result.payload)
+                            }
+                        }
+                    }
+                )
             }
         }
-
-        actionButton(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp),
-            text = localizedStringResource(631, "Save supplier"),
-            iconPath = stateValues.drawablePathIconCheck,
-            enabled = supplierName.isNotBlank() && stateValues.latestNotification == null,
-            confirmationRequired = false,
-            onClick = {
-                val supplier = SupplierDataModel(
-                    id = "",
-                    userIds = emptyList(),
-                    typeIds = null,
-                    categoryIds = emptyList(),
-                    name = listOf(LocalizedStringDataModel("main", supplierName.trim())),
-                    phoneNumbers = listOf(supplierPhone.trim()).filter { it.isNotBlank() },
-                    emails = listOf(supplierEmail.trim().lowercase()).filter { it.isNotBlank() },
-                    addedAt = getCurrentTimeMillis(),
-                    isActive = true
-                )
-
-                addSupplier(supplier) { result ->
-                    if (result is DataState.Success) {
-                        onSaved(result.payload)
-                    }
-                }
-            }
-        )
     }
 }
+
 
 @Composable
 private fun AppConfiguration.SupplierPickerBottomSheet(
@@ -9633,6 +10495,7 @@ private fun AppConfiguration.QuickStockAddBottomSheet(
 
     fun newQuickDraft(): StockAddEditDraft = StockAddEditDraft(
         barcodes = listOf(request.barcode.takeIf { it.isNotBlank() }.orEmpty()),
+        barcodeTypes = listOf(GOODS_ITEM_BARCODE_TYPE_STANDARD),
         name = emptyLocalizedItemForCurrentLanguage(),
         description = emptyLocalizedItemForCurrentLanguage(),
         measurementUnitId = defaultMeasurementUnitId,
@@ -10118,7 +10981,11 @@ fun List<GoodsBatchDataModel>.bestBatchForSale(
     val active = firstOrNull {
         it.id == goodsItem.activeShelfBatchId &&
                 it.isActive &&
-                it.quantity.total > 0.0
+                it.quantity.total > 0.0 &&
+                it.status != StockBatchStatusDataModel.SoldOut &&
+                it.status != StockBatchStatusDataModel.Deleted &&
+                it.status != StockBatchStatusDataModel.WrittenOff &&
+                it.status != StockBatchStatusDataModel.InTransit
     }
 
     if (active != null) return active
@@ -10128,7 +10995,9 @@ fun List<GoodsBatchDataModel>.bestBatchForSale(
                 it.isActive &&
                 it.quantity.total > 0.0 &&
                 it.status != StockBatchStatusDataModel.SoldOut &&
-                it.status != StockBatchStatusDataModel.Deleted
+                it.status != StockBatchStatusDataModel.Deleted &&
+                it.status != StockBatchStatusDataModel.WrittenOff &&
+                it.status != StockBatchStatusDataModel.InTransit
     }
         .sortedWith(
             compareBy<GoodsBatchDataModel> {
@@ -10907,7 +11776,7 @@ fun AppConfiguration.StockBatchCard(
 
         StockCardInfoLine(
             title = localizedStringResource(200, "Status"),
-            value = batch.status.name,
+            value = stockBatchStatusText(batch.status),
             textColor = stateValues.TextColor
         )
 
@@ -11356,47 +12225,47 @@ fun AppConfiguration.StockBatchEditor(
                             ?: defaultUnit
 
                         val batch = GoodsBatchDataModel(
-                            id = draft.id,
-                            goodsItemId = goodsItem.id,
-                            userId = existingBatch?.userId.orEmpty(),
-                            storeId = goodsItem.storeId,
-                            supplierId = draft.supplierId?.takeIf { it.isNotBlank() },
-                            supplierOrderId = existingBatch?.supplierOrderId,
-                            quantity = quantityUnit.copy(
-                                total = draft.quantityText.toDoubleOrNull() ?: 0.0
-                            ),
-                            supplyPrice = draft.supplyPrice.copy(supplierId = draft.supplierId.orEmpty()),
-                            salePriceOverride = draft.salePriceOverride?.takeIf { it.price.isNotBlank() },
-                            returnPriceOverride = draft.returnPriceOverride?.takeIf { it.price.isNotBlank() },
-                            wholesalePriceOverride = draft.wholesalePriceOverride?.takeIf { it.price.isNotBlank() },
-                            deliveredAtMillis = existingBatch?.deliveredAtMillis ?: now,
-                            manufacturedAtMillis = stockDateInputTextToMillis(draft.manufacturedDateText),
-                            expirationDateMillis = stockDateInputTextToMillis(draft.expirationDateText),
-                            discounts = existingBatch?.discounts.orEmpty(),
-                            promotions = draft.promotions.sanitizedStockPromotions(),
-                            shelfPosition = existingBatch?.shelfPosition,
-                            shelfPriority = existingBatch?.shelfPriority ?: stateValues.stockBatches.orEmpty().count { it.goodsItemId == goodsItem.id },
-                            status = draft.status,
-                            additionalNotes = draft.additionalNotes.takeIf { it.isNotBlank() },
-                            additionalNotesLocalized = draft.additionalNotesLocalized.filter { it.value.isNotBlank() },
-                            createdAtMillis = existingBatch?.createdAtMillis ?: now,
-                            updatedAtMillis = now,
-                            createdByUserId = existingBatch?.createdByUserId.orEmpty(),
-                            isActive = true
-                        )
+                        id = draft.id,
+                        goodsItemId = goodsItem.id,
+                        userId = existingBatch?.userId.orEmpty(),
+                        storeId = goodsItem.storeId,
+                        supplierId = draft.supplierId?.takeIf { it.isNotBlank() },
+                        supplierOrderId = existingBatch?.supplierOrderId,
+                        quantity = quantityUnit.copy(
+                            total = draft.quantityText.toDoubleOrNull() ?: 0.0
+                        ),
+                        supplyPrice = draft.supplyPrice.copy(supplierId = draft.supplierId.orEmpty()),
+                        salePriceOverride = draft.salePriceOverride?.takeIf { it.price.isNotBlank() },
+                        returnPriceOverride = draft.returnPriceOverride?.takeIf { it.price.isNotBlank() },
+                        wholesalePriceOverride = draft.wholesalePriceOverride?.takeIf { it.price.isNotBlank() },
+                        deliveredAtMillis = existingBatch?.deliveredAtMillis ?: now,
+                        manufacturedAtMillis = stockDateInputTextToMillis(draft.manufacturedDateText),
+                        expirationDateMillis = stockDateInputTextToMillis(draft.expirationDateText),
+                        discounts = existingBatch?.discounts.orEmpty(),
+                        promotions = draft.promotions.sanitizedStockPromotions(),
+                        shelfPosition = existingBatch?.shelfPosition,
+                        shelfPriority = existingBatch?.shelfPriority ?: stateValues.stockBatches.orEmpty().count { it.goodsItemId == goodsItem.id },
+                        status = draft.status,
+                        additionalNotes = draft.additionalNotes.takeIf { it.isNotBlank() },
+                        additionalNotesLocalized = draft.additionalNotesLocalized.filter { it.value.isNotBlank() },
+                        createdAtMillis = existingBatch?.createdAtMillis ?: now,
+                        updatedAtMillis = now,
+                        createdByUserId = existingBatch?.createdByUserId.orEmpty(),
+                        isActive = true
+                    )
 
-                        val sameSupplierPromoCopies = if (applyPromotionsToSameSupplier && !batch.supplierId.isNullOrBlank()) {
-                            stateValues.stockBatches.orEmpty()
-                                .filter { other ->
-                                    other.goodsItemId == goodsItem.id &&
-                                            other.id != batch.id &&
-                                            other.supplierId == batch.supplierId &&
-                                            other.isActive
-                                }
-                                .map { other -> other.copy(promotions = batch.promotions, updatedAtMillis = now) }
-                        } else {
-                            emptyList()
-                        }
+                    val sameSupplierPromoCopies = if (applyPromotionsToSameSupplier && !batch.supplierId.isNullOrBlank()) {
+                        stateValues.stockBatches.orEmpty()
+                            .filter { other ->
+                                other.goodsItemId == goodsItem.id &&
+                                        other.id != batch.id &&
+                                        other.supplierId == batch.supplierId &&
+                                        other.isActive
+                            }
+                            .map { other -> other.copy(promotions = batch.promotions, updatedAtMillis = now) }
+                    } else {
+                        emptyList()
+                    }
 
                         if (existingBatch == null) {
                             addGoodsBatches(listOf(batch)) { state ->
@@ -11446,8 +12315,29 @@ fun AppConfiguration.StockAddEditIdentityPage(
         item {
             BarcodeListEditor(
                 title = stateValues.stringBarcode,
-                barcodes = draft.barcodes,
-                onChanged = { onDraftChanged(draft.copy(barcodes = it)) }
+                barcodes = draft.visibleBarcodes(),
+                barcodeTypes = draft.visibleBarcodeTypes(),
+                onChanged = { changedBarcodes ->
+                    val nextBarcodes = changedBarcodes.ifEmpty { listOf("") }
+                    onDraftChanged(
+                        draft.copy(
+                            barcodes = nextBarcodes,
+                            barcodeTypes = draft.barcodeTypes.alignedStockBarcodeTypes(nextBarcodes)
+                        )
+                    )
+                },
+                onTypesChanged = { changedTypes ->
+                    onDraftChanged(draft.copy(barcodeTypes = changedTypes.alignedStockBarcodeTypes(draft.visibleBarcodes())))
+                },
+                onBarcodesAndTypesChanged = { changedBarcodes, changedTypes ->
+                    val nextBarcodes = changedBarcodes.ifEmpty { listOf("") }
+                    onDraftChanged(
+                        draft.copy(
+                            barcodes = nextBarcodes,
+                            barcodeTypes = changedTypes.alignedStockBarcodeTypes(nextBarcodes)
+                        )
+                    )
+                }
             )
 
             Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
@@ -11654,50 +12544,48 @@ private fun AppConfiguration.StockLocationAvailabilityCard(
             textColor = stateValues.TextColor
         )
 
-        if (!isCurrent) {
-            val movableBatches = location.batches.filter { it.quantity.total > 0.0 && it.isActive }
-            Spacer(modifier = Modifier.height(8.dp))
+        val movableBatches = location.batches.filter { it.quantity.total > 0.0 && it.isActive && it.status != StockBatchStatusDataModel.InTransit }
+        Spacer(modifier = Modifier.height(8.dp))
 
-            if (movableBatches.isEmpty()) {
-                Text(
-                    text = localizedStringResource(571, "No movable batches here"),
-                    color = stateValues.PlaceholderTextColor,
-                    fontSize = stateValues.smallTextSize
-                )
-            } else {
-                movableBatches.take(5).forEachIndexed { index, batch ->
-                    if (index > 0) Spacer(modifier = Modifier.height(6.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "#${index + 1} • ${batch.quantity.quantityText(stateValues.appLanguage)}",
-                                color = stateValues.TextColor,
-                                fontSize = stateValues.smallTextSize,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = listOfNotNull(
-                                    batch.status.name,
-                                    batch.expirationDateMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }
-                                ).joinToString(" • "),
-                                color = stateValues.PlaceholderTextColor,
-                                fontSize = stateValues.smallTextSize,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        actionButton(
-                            text = localizedStringResource(551, "Import"),
-                            fillMaxWidthIfTextPresent = false,
-                            iconPath = stateValues.drawablePathIconAdd,
-                            confirmationRequired = false,
-                            onClick = { onMoveBatch(batch, currentStoreId) }
+        if (movableBatches.isEmpty()) {
+            Text(
+                text = if (isCurrent) localizedStringResource(1176, "No sendable batches here") else localizedStringResource(571, "No movable batches here"),
+                color = stateValues.PlaceholderTextColor,
+                fontSize = stateValues.smallTextSize
+            )
+        } else {
+            movableBatches.take(5).forEachIndexed { index, batch ->
+                if (index > 0) Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "#${index + 1} • ${batch.quantity.quantityText(stateValues.appLanguage)}",
+                            color = stateValues.TextColor,
+                            fontSize = stateValues.smallTextSize,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = listOfNotNull(
+                                stockBatchStatusText(batch.status),
+                                batch.expirationDateMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }
+                            ).joinToString(" • "),
+                            color = stateValues.PlaceholderTextColor,
+                            fontSize = stateValues.smallTextSize,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
+                    actionButton(
+                        text = if (isCurrent) localizedStringResource(1177, "Send") else localizedStringResource(551, "Import"),
+                        fillMaxWidthIfTextPresent = false,
+                        iconPath = if (isCurrent) stateValues.drawablePathIconSwitch else stateValues.drawablePathIconAdd,
+                        confirmationRequired = false,
+                        onClick = { onMoveBatch(batch, if (isCurrent) null else currentStoreId) }
+                    )
                 }
             }
         }
@@ -11721,6 +12609,15 @@ private fun AppConfiguration.StockBatchMoveDialog(
                 ?.takeIf { preferred -> destinationOptions.any { it.storeId == preferred } }
                 ?: destinationOptions.firstOrNull()?.storeId.orEmpty()
         )
+    }
+    val selectedDestinationLocation = destinationOptions.find { it.storeId == selectedDestinationId }
+    val activeLocation = locations.find { it.storeId == stateValues.activeStoreId }
+    val willRequireReceivingAcceptance = sourceLocation?.isParentStore == false &&
+            selectedDestinationLocation?.isParentStore == false &&
+            activeLocation?.isParentStore != true
+
+    var movementNoteLocalized by remember(sourceBatch.id, selectedDestinationId) {
+        mutableStateOf(emptyLocalizedItemForCurrentLanguage())
     }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -11838,13 +12735,27 @@ private fun AppConfiguration.StockBatchMoveDialog(
                 }
             }
 
+            if (willRequireReceivingAcceptance) {
+                Spacer(modifier = Modifier.height(6.dp))
+                MessageText(
+                    text = localizedStringResource(
+                        1168,
+                        "This branch-to-branch transfer will be sent en route. The receiving branch will accept it before it becomes shelf stock."
+                    )
+                )
+            }
+
             Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
-            val noteField = genericTextField(
-                titleText = localizedStringResource(201, "Notes"),
-                placeholderText = stateValues.stringOptional,
+            StockLocalizedStringGroupEditor(
+                title = localizedStringResource(201, "Notes"),
+                placeholder = stateValues.stringOptional,
+                values = movementNoteLocalized,
+                addText = localizedStringResource(1071, "Add movement note translation"),
+                required = false,
                 singleLine = true,
-                showClearButton = true
+                persistentKey = "stock-batch-movement-note:${sourceBatch.id}:$selectedDestinationId",
+                onChanged = { movementNoteLocalized = it }
             )
 
             Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
@@ -11866,7 +12777,7 @@ private fun AppConfiguration.StockBatchMoveDialog(
 
                 actionButton(
                     modifier = Modifier.weight(1f),
-                    text = localizedStringResource(549, "Move"),
+                    text = if (willRequireReceivingAcceptance) localizedStringResource(1169, "Send en route") else localizedStringResource(549, "Move"),
                     enabled = canMove,
                     iconPath = stateValues.drawablePathIconSwitch,
                     confirmationRequired = false,
@@ -11878,7 +12789,8 @@ private fun AppConfiguration.StockBatchMoveDialog(
                                 sourceGoodsItemId = sourceBatch.goodsItemId,
                                 sourceBatchId = sourceBatch.id,
                                 quantity = sourceBatch.quantity.copy(total = quantityValue),
-                                note = noteField.value.text.trim().takeIf { it.isNotBlank() }
+                                note = movementNoteLocalized.toStoredLocalizedNoteOrNull(),
+                                actorStoreId = stateValues.activeStoreId
                             )
                         ) { state ->
                             if (state is DataState.Success) {
@@ -12024,6 +12936,171 @@ private fun AppConfiguration.StockBranchAvailabilitySection(
 }
 
 @Composable
+private fun AppConfiguration.IncomingStockBatchTransferCard(
+    batch: GoodsBatchDataModel,
+    movement: StockBatchMovementDataModel?,
+    availability: StockItemBranchAvailabilityDataModel?,
+    onDecided: () -> Unit
+) {
+    val source = movement?.sourceStoreId?.let { sourceId -> availability?.locations.orEmpty().find { it.storeId == sourceId } }
+    val destination = movement?.destinationStoreId?.let { destinationId -> availability?.locations.orEmpty().find { it.storeId == destinationId } }
+    val supplierName = stateValues.suppliers
+        .orEmpty()
+        .find { it.id == batch.supplierId }
+        ?.name
+        ?.extractLocalizedString(stateValues.appLanguage)
+        ?: localizedStringResource(638, "No supplier selected")
+    val sourceName = source?.name?.visibleLocalizedString(stateValues.appLanguage, movement?.sourceStoreId.orEmpty())
+        ?: movement?.sourceStoreId.orEmpty()
+    val destinationName = destination?.name?.visibleLocalizedString(stateValues.appLanguage, movement?.destinationStoreId.orEmpty())
+        ?: movement?.destinationStoreId.orEmpty()
+    var deciding by remember(batch.id, movement?.id) { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .border(stateValues.focusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
+            .padding(stateValues.marginTextFieldGroup)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(stateValues.AccentColor),
+                contentAlignment = Alignment.Center
+            ) {
+                CpImage(
+                    modifier = Modifier.size(24.dp),
+                    url = stateValues.drawablePathIconSwitch,
+                    fallbackRes = Res.drawable._24_0,
+                    contentDescription = localizedStringResource(1190, "Incoming transfer"),
+                    tintColor = stateValues.AccentTextColor
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = localizedStringResource(1191, "Incoming batch en route"),
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.accentTextSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = listOfNotNull(
+                        movement?.movedAtMillis?.toStockDateInputText(),
+                        movement?.movedByName?.takeIf { it.isNotBlank() }
+                    ).joinToString(" • ").ifBlank { localizedStringResource(1192, "Waiting for acceptance") },
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Text(
+                text = batch.quantity.quantityText(stateValues.appLanguage),
+                color = stateValues.AccentColor,
+                fontSize = stateValues.accentTextSize,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.End
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        StockCardInfoLine(
+            title = localizedStringResource(562, "From"),
+            value = sourceName,
+            textColor = stateValues.TextColor
+        )
+        StockCardInfoLine(
+            title = localizedStringResource(563, "To"),
+            value = destinationName,
+            textColor = stateValues.TextColor
+        )
+        StockCardInfoLine(
+            title = stateValues.stringSupplier,
+            value = supplierName,
+            textColor = stateValues.TextColor
+        )
+        batch.expirationDateMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let {
+            StockCardInfoLine(
+                title = localizedStringResource(202, "Expiration"),
+                value = it,
+                textColor = stateValues.TextColor
+            )
+        }
+        movement?.note?.takeIf { it.isNotBlank() }?.let {
+            StockCardInfoLine(
+                title = localizedStringResource(201, "Notes"),
+                value = it,
+                textColor = stateValues.TextColor
+            )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        if (movement == null) {
+            MessageText(text = localizedStringResource(1193, "Transfer metadata is still loading. Refresh branch stock."))
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1194, "Decline"),
+                    iconPath = stateValues.drawablePathIconCancel,
+                    enabled = !deciding,
+                    enabledColor = stateValues.ErrorColor,
+                    confirmationRequired = true,
+                    onClick = {
+                        deciding = true
+                        decideStockBatchMove(
+                            StockBatchMoveDecisionRequestDataModel(
+                                movementId = movement.id,
+                                accept = false
+                            )
+                        ) { state ->
+                            deciding = false
+                            if (state is DataState.Success) onDecided()
+                        }
+                    }
+                )
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1195, "Accept"),
+                    iconPath = stateValues.drawablePathIconCheck,
+                    enabled = !deciding,
+                    enabledColor = stateValues.OkayColor,
+                    confirmationRequired = true,
+                    onClick = {
+                        deciding = true
+                        decideStockBatchMove(
+                            StockBatchMoveDecisionRequestDataModel(
+                                movementId = movement.id,
+                                accept = true
+                            )
+                        ) { state ->
+                            deciding = false
+                            if (state is DataState.Success) onDecided()
+                        }
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
 fun AppConfiguration.StockAddEditBatchesPage(
     modifier: Modifier = Modifier,
     goodsItem: GoodsItemDataModel?,
@@ -12052,7 +13129,7 @@ fun AppConfiguration.StockAddEditBatchesPage(
     val batches = stateValues.stockBatches
         .orEmpty()
         .filter {
-            it.goodsItemId == goodsItem.id && it.isActive
+            it.goodsItemId == goodsItem.id && it.isActive && it.status != StockBatchStatusDataModel.InTransit
         }
         .sortedForShelf(goodsItem)
 
@@ -12099,6 +13176,15 @@ fun AppConfiguration.StockAddEditBatchesPage(
     var draggedBatchId by remember(goodsItem.id) { mutableStateOf<String?>(null) }
     var dragTargetIndex by remember(goodsItem.id) { mutableStateOf<Int?>(null) }
     val activeStoreIdForBatches = stateValues.activeStoreId ?: goodsItem.storeId
+    val incomingBatches = stateValues.stockBatches
+        .orEmpty()
+        .filter {
+            it.goodsItemId == goodsItem.id &&
+                    it.storeId == activeStoreIdForBatches &&
+                    it.isActive &&
+                    it.status == StockBatchStatusDataModel.InTransit
+        }
+        .sortedWith(compareBy<GoodsBatchDataModel> { it.deliveredAtMillis ?: it.createdAtMillis }.thenBy { it.id })
     val availabilityPayload by stockItemBranchAvailabilityState.payload.collectAsState()
     val branchAvailability = availabilityPayload?.takeIf { availability ->
         availability.sourceGoodsItemId == goodsItem.id || availability.locations.any { it.goodsItemId == goodsItem.id }
@@ -12144,6 +13230,38 @@ fun AppConfiguration.StockAddEditBatchesPage(
                 )
 
                 Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+                if (incomingBatches.isNotEmpty()) {
+                    Text(
+                        text = localizedStringResource(1196, "Incoming batches"),
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.titleTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+                    incomingBatches.forEach { incomingBatch ->
+                        val movement = branchAvailability?.movements.orEmpty()
+                            .firstOrNull {
+                                it.destinationBatchId == incomingBatch.id &&
+                                        it.status == StockBatchMovementStatusDataModel.PendingAcceptance
+                            }
+
+                        IncomingStockBatchTransferCard(
+                            batch = incomingBatch,
+                            movement = movement,
+                            availability = branchAvailability,
+                            onDecided = {
+                                getStockItemBranchAvailability(activeStoreIdForBatches, goodsItem.id)
+                            }
+                        )
+
+                        Spacer(modifier = Modifier.height(stateValues.marginTextField))
+                    }
+
+                    Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+                }
 
                 Text(
                     text = localizedStringResource(197, "Shelf order"),
@@ -13546,6 +14664,699 @@ private fun AppConfiguration.rememberLatestStockAddEditCategorySelection(rootCat
     }
 }
 
+
+private fun AppConfiguration.globalGoodsIconPath(): String =
+    if (stateValues.appThemeId == 1L) "svg/56_1.svg" else "svg/56_0.svg"
+
+private fun AppConfiguration.globalGoodsIconFallback(): DrawableResource =
+    if (stateValues.appThemeId == 1L) Res.drawable._56_1 else Res.drawable._56_0
+
+private fun AppConfiguration.undoTemplateIconPath(): String =
+    if (stateValues.appThemeId == 1L) "svg/58_1.svg" else "svg/58_0.svg"
+
+private fun AppConfiguration.undoTemplateIconFallback(): DrawableResource =
+    if (stateValues.appThemeId == 1L) Res.drawable._58_1 else Res.drawable._58_0
+
+private fun AppConfiguration.stockBatchStatusText(status: StockBatchStatusDataModel): String = when (status) {
+    StockBatchStatusDataModel.Ordered -> localizedStringResource(1198, "Ordered")
+    StockBatchStatusDataModel.Delivered -> localizedStringResource(342, "Delivered")
+    StockBatchStatusDataModel.OnShelf -> localizedStringResource(1199, "On shelf")
+    StockBatchStatusDataModel.Reserved -> localizedStringResource(1200, "Reserved")
+    StockBatchStatusDataModel.InTransit -> localizedStringResource(1201, "In transit")
+    StockBatchStatusDataModel.SoldOut -> localizedStringResource(1202, "Sold out")
+    StockBatchStatusDataModel.WrittenOff -> localizedStringResource(1203, "Written off")
+    StockBatchStatusDataModel.Deleted -> localizedStringResource(1204, "Deleted")
+}
+
+private fun GenericGoodsItemDataModel.visibleGlobalGoodsName(language: String): String =
+    name.visibleLocalizedString(language, id.ifBlank { barcode.orEmpty().firstOrNull().orEmpty() })
+
+private fun GenericGoodsItemDataModel.primaryGlobalGoodsBarcode(): String =
+    barcode.orEmpty().firstOrNull { it.isNotBlank() }.orEmpty()
+
+private fun GenericGoodsItemDataModel.globalGoodsBarcodeText(): String =
+    barcode.orEmpty().filter { it.isNotBlank() }.take(3).joinToString(" • ")
+
+private fun StockAddEditDraft.standardBarcodeForGenericLookup(): String? =
+    visibleBarcodes()
+        .zip(visibleBarcodeTypes())
+        .firstOrNull { (barcode, type) ->
+            barcode.isNotBlank() && type.normalizedGoodsItemBarcodeType(barcode) == GOODS_ITEM_BARCODE_TYPE_STANDARD
+        }
+        ?.first
+        ?.toStoredGoodsItemBarcode()
+        ?.takeIf { it.isNotBlank() }
+
+private fun StockAddEditDraft.globalGoodsAutoQuery(language: String): String? =
+    name.visibleLocalizedString(language, "")
+        .takeIf { it.length >= 2 }
+        ?: name.firstOrNull { it.value.isNotBlank() }?.value?.takeIf { it.length >= 2 }
+
+private fun AppConfiguration.globalGoodsCategoryName(categoryId: String): String? =
+    stateValues.goodsCategories
+        .orEmpty()
+        .find { it.id == categoryId }
+        ?.name
+        ?.visibleGoodsCategoryName(stateValues.appLanguage, categoryId)
+
+private fun AppConfiguration.applyGlobalGoodsTemplateToDraft(
+    draft: StockAddEditDraft,
+    item: GenericGoodsItemDataModel
+): StockAddEditDraft {
+    val templateBarcodes = item.barcode
+        .orEmpty()
+        .flatMap { it.toStoredGoodsItemBarcodeCandidates() }
+        .map { it.toStoredGoodsItemBarcode() }
+        .filter { it.isNotBlank() }
+        .distinct()
+    val nextBarcodes = templateBarcodes.ifEmpty { draft.visibleBarcodes().filter { it.isNotBlank() } }.ifEmpty { listOf("") }
+    val templateCategoryIds = item.categoryIds.orEmpty().filter { it.isNotBlank() }
+    val templateCategory = templateCategoryIds.firstOrNull()?.let { categoryId ->
+        stateValues.goodsCategories.orEmpty().find { it.id == categoryId }
+    }
+
+    return draft.copy(
+        barcodes = nextBarcodes,
+        barcodeTypes = nextBarcodes.map { barcode -> GOODS_ITEM_BARCODE_TYPE_STANDARD.normalizedGoodsItemBarcodeType(barcode) },
+        name = item.name.takeIf { it.isNotEmpty() } ?: draft.name,
+        categoryIds = templateCategoryIds.ifEmpty { draft.categoryIds },
+        measurementUnitId = templateCategory?.quantityUnitId?.takeIf { it.isNotBlank() } ?: draft.measurementUnitId
+    )
+}
+
+@Composable
+private fun AppConfiguration.GlobalGoodsSuggestionCard(
+    item: GenericGoodsItemDataModel,
+    barcodeMatched: Boolean,
+    onApply: () -> Unit
+) {
+    val name = item.visibleGlobalGoodsName(stateValues.appLanguage)
+    val barcodeText = item.globalGoodsBarcodeText()
+    val categoryText = item.categoryIds
+        .orEmpty()
+        .mapNotNull { globalGoodsCategoryName(it) }
+        .distinct()
+        .take(2)
+        .joinToString(" • ")
+
+    Column(
+        modifier = Modifier
+            .widthIn(min = 230.dp, max = 280.dp)
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .border(
+                stateValues.unfocusedBorderWidth,
+                if (barcodeMatched) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+                RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple(color = stateValues.AccentColor),
+                onClick = onApply
+            )
+            .padding(10.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            CpImage(
+                modifier = Modifier.size(26.dp),
+                url = globalGoodsIconPath(),
+                fallbackRes = globalGoodsIconFallback(),
+                contentDescription = localizedStringResource(1169, "Global goods"),
+                tintColor = if (barcodeMatched) stateValues.AccentColor else stateValues.TextColor
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = name,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.textSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (barcodeMatched) {
+                    Text(
+                        text = localizedStringResource(1173, "Barcode match"),
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+
+        barcodeText.takeIf { it.isNotBlank() }?.let {
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "${stateValues.stringBarcode}: $it",
+                color = stateValues.PlaceholderTextColor,
+                fontSize = stateValues.smallTextSize,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        categoryText.takeIf { it.isNotBlank() }?.let {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = it,
+                color = stateValues.PlaceholderTextColor,
+                fontSize = stateValues.smallTextSize,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        actionButton(
+            text = localizedStringResource(1170, "Use template"),
+            iconPath = globalGoodsIconPath(),
+            fillMaxWidthIfTextPresent = true,
+            confirmationRequired = false,
+            onClick = onApply
+        )
+    }
+}
+
+@Composable
+private fun AppConfiguration.GlobalGoodsSuggestionsPanel(
+    suggestions: List<GenericGoodsItemDataModel>,
+    loading: Boolean,
+    searchText: String,
+    barcodeLookup: String?,
+    onSearchTextChanged: (String) -> Unit,
+    onRefresh: () -> Unit,
+    onApply: (GenericGoodsItemDataModel) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .foregroundSubtleShadow(stateValues.cornerRadius)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor, RoundedCornerShape(stateValues.cornerRadius))
+            .padding(stateValues.marginTextFieldGroup)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            CpImage(
+                modifier = Modifier.size(28.dp),
+                url = globalGoodsIconPath(),
+                fallbackRes = globalGoodsIconFallback(),
+                contentDescription = localizedStringResource(1169, "Global goods"),
+                tintColor = stateValues.AccentColor
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = localizedStringResource(1169, "Global goods"),
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.accentTextSize,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = localizedStringResource(1172, "Start from a standard item, then set your own prices, supplier and stock batches."),
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = ripple(color = stateValues.AccentColor),
+                        onClick = onRefresh
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                CpImage(
+                    modifier = Modifier.size(20.dp),
+                    url = stateValues.drawablePathIconRefresh,
+                    fallbackRes = Res.drawable._54_0,
+                    contentDescription = localizedStringResource(561, "Refresh availability"),
+                    tintColor = stateValues.TextColor
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+        SimpleTextInput(
+            modifier = Modifier.fillMaxWidth(),
+            value = searchText,
+            placeholder = localizedStringResource(1171, "Search global goods"),
+            leadingIconPath = stateValues.drawablePathIconSearch,
+            onValueChange = onSearchTextChanged
+        )
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+        if (loading) {
+            MessageText(
+                modifier = Modifier.fillMaxWidth().height(54.dp),
+                text = localizedStringResource(1141, "Please wait…"),
+                textSize = stateValues.textSize,
+                textColor = stateValues.PlaceholderTextColor
+            )
+        } else if (suggestions.isEmpty()) {
+            MessageText(
+                modifier = Modifier.fillMaxWidth().height(54.dp),
+                text = localizedStringResource(1174, "No global suggestions yet"),
+                textSize = stateValues.textSize,
+                textColor = stateValues.PlaceholderTextColor
+            )
+        } else {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(suggestions, key = { it.id }) { item ->
+                    val barcodeMatched = barcodeLookup != null &&
+                            item.barcode.orEmpty().flatMap { it.toStoredGoodsItemBarcodeCandidates() }.any { it == barcodeLookup }
+                    GlobalGoodsSuggestionCard(
+                        item = item,
+                        barcodeMatched = barcodeMatched,
+                        onApply = { onApply(item) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+
+private const val GLOBAL_GOODS_CATEGORY_ALL_ID = "__aita_all_global_goods_categories__"
+private const val GLOBAL_GOODS_SUBCATEGORY_ALL_ID = "__aita_all_global_goods_subcategories__"
+
+private fun List<GenericGoodsCategoryDataModel>.globalGoodsCategoryTreeIds(categoryId: String): Set<String> {
+    if (categoryId.isBlank()) return emptySet()
+    val result = mutableSetOf(categoryId)
+    var changed = true
+    while (changed) {
+        changed = false
+        forEach { category ->
+            if (category.id !in result && category.typeIds.orEmpty().any { it in result }) {
+                result += category.id
+                changed = true
+            }
+        }
+    }
+    return result
+}
+
+private fun GenericGoodsItemDataModel.matchesGlobalGoodsPickerFilter(
+    rawQuery: String,
+    categoryFilterIds: Set<String>
+): Boolean {
+    val queryTokens = rawQuery
+        .trim()
+        .lowercase()
+        .split(Regex("\\s+"))
+        .filter { it.isNotBlank() }
+
+    val categoryMatches = categoryFilterIds.isEmpty() || categoryIds.orEmpty().any { it in categoryFilterIds }
+    if (!categoryMatches) return false
+    if (queryTokens.isEmpty()) return true
+
+    val searchableText = buildList {
+        add(id)
+        addAll(barcode.orEmpty())
+        addAll(name.map { it.value })
+        addAll(typeIds.orEmpty())
+        addAll(categoryIds.orEmpty())
+        addAll(supplierIds.orEmpty())
+        addAll(manufacturerIds.orEmpty())
+    }.joinToString(" ").lowercase()
+
+    return queryTokens.all { token -> searchableText.contains(token) }
+}
+
+private fun AppConfiguration.globalGoodsCategoryDomain(category: GenericGoodsCategoryDataModel): SelectableDomain {
+    val categoryName = category.name.visibleGoodsCategoryName(stateValues.appLanguage, category.id).toLocalizedSingleMain()
+    val categoryDescription = category.description?.visibleLocalizedString(stateValues.appLanguage, "")?.withoutGoodsCategoryPrefix()
+        ?: category.alias?.visibleLocalizedString(stateValues.appLanguage, "")?.withoutGoodsCategoryPrefix()
+        ?: ""
+
+    return SelectableDomain(
+        id = category.id,
+        displayId = categoryName,
+        name = categoryDescription.takeIf { it.isNotBlank() }?.toLocalizedSingleMain() ?: categoryName,
+        iconPath = null,
+        iconRes = null
+    )
+}
+
+@Composable
+private fun AppConfiguration.GlobalGoodsPickerItemCard(
+    item: GenericGoodsItemDataModel,
+    selectedCategoryIds: Set<String>,
+    onApply: () -> Unit
+) {
+    val name = item.visibleGlobalGoodsName(stateValues.appLanguage)
+    val barcodeText = item.globalGoodsBarcodeText()
+    val categories = stateValues.goodsCategories.orEmpty()
+    val categoryText = item.categoryIds
+        .orEmpty()
+        .mapNotNull { globalGoodsCategoryName(it) }
+        .distinct()
+        .take(4)
+        .joinToString(" • ")
+    val matchingCategoryCount = item.categoryIds.orEmpty().count { it in selectedCategoryIds }.takeIf { selectedCategoryIds.isNotEmpty() }
+    val unitText = item.categoryIds
+        .orEmpty()
+        .firstNotNullOfOrNull { categoryId -> categories.find { it.id == categoryId }?.quantityUnitId?.takeIf { it.isNotBlank() } }
+        ?.let { unitId ->
+            stateValues.globalAppConfiguration.goodsItemsQuantityUnits
+                .find { it.id == unitId }
+                ?.immutableUnitName
+                ?.extractLocalizedString(stateValues.appLanguage)
+                ?: unitId
+        }
+        .orEmpty()
+    val tagsText = item.typeIds.orEmpty().filter { it.isNotBlank() }.take(5).joinToString(" • ")
+    val referencesText = listOfNotNull(
+        item.supplierIds.orEmpty().size.takeIf { it > 0 }?.let { "${localizedStringResource(74, "Supplier")}: $it" },
+        item.manufacturerIds.orEmpty().size.takeIf { it > 0 }?.let { "${localizedStringResource(1197, "Manufacturers")}: $it" }
+    ).joinToString(" • ")
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .border(
+                stateValues.unfocusedBorderWidth,
+                if (matchingCategoryCount != null) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+                RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple(color = stateValues.AccentColor),
+                onClick = onApply
+            )
+            .padding(10.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            CpImage(
+                modifier = Modifier.size(30.dp),
+                url = globalGoodsIconPath(),
+                fallbackRes = globalGoodsIconFallback(),
+                contentDescription = localizedStringResource(1169, "Global goods"),
+                tintColor = stateValues.AccentColor
+            )
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = name,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.textSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = item.id,
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            actionButton(
+                text = localizedStringResource(1170, "Use template"),
+                iconPath = globalGoodsIconPath(),
+                fillMaxWidthIfTextPresent = false,
+                confirmationRequired = false,
+                onClick = onApply
+            )
+        }
+
+        val detailLines = listOfNotNull(
+            barcodeText.takeIf { it.isNotBlank() }?.let { "${stateValues.stringBarcode}: $it" },
+            categoryText.takeIf { it.isNotBlank() }?.let { "${stateValues.stringCategory}: $it" },
+            unitText.takeIf { it.isNotBlank() }?.let { "${stateValues.stringMeasurementUnit}: $it" },
+            tagsText.takeIf { it.isNotBlank() }?.let { "${localizedStringResource(1186, "Tags")}: $it" },
+            referencesText.takeIf { it.isNotBlank() }?.let { "${localizedStringResource(1187, "References")}: $it" }
+        )
+
+        detailLines.forEachIndexed { index, line ->
+            Spacer(modifier = Modifier.height(if (index == 0) 8.dp else 4.dp))
+            Text(
+                text = line,
+                color = stateValues.PlaceholderTextColor,
+                fontSize = stateValues.smallTextSize,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun AppConfiguration.GlobalGoodsSelectionBottomSheet(
+    draft: StockAddEditDraft,
+    onDismiss: () -> Unit,
+    onApply: (GenericGoodsItemDataModel) -> Unit
+) {
+    val pickerPageSize = if (stateValues.isNarrowScreen) 18 else 32
+    val cachedGenericGoodsItems by genericGoodsItemsState.payload.collectAsState()
+    val autoFocusSearch = platformAllowsAutomaticTextFieldFocus()
+    var pickerPage by rememberSaveable { mutableStateOf(0) }
+    var serverLoadedItems by remember { mutableStateOf<List<GenericGoodsItemDataModel>>(emptyList()) }
+    var serverEndReached by rememberSaveable { mutableStateOf(false) }
+    var loading by remember { mutableStateOf(false) }
+
+    AitaBottomSheet(
+        title = localizedStringResource(1169, "Global goods"),
+        iconPath = globalGoodsIconPath(),
+        onDismiss = onDismiss
+    ) {
+        Text(
+            text = localizedStringResource(1172, "Start from a standard item, then set your own prices, supplier and stock batches."),
+            color = stateValues.PlaceholderTextColor,
+            fontSize = stateValues.smallTextSize,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+        Text(
+            text = localizedStringResource(1171, "Search global goods"),
+            color = stateValues.TextColor,
+            fontSize = stateValues.accentTextSize,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 4.dp)
+        )
+
+        val searchTextFieldContent = searchTextField(
+            modifier = Modifier.fillMaxWidth(),
+            stateHost = NavigationScreenModel.Stock.AddEditGoodsItem,
+            stateKey = "stock_global_goods_sheet_search",
+            isFocusedInitial = autoFocusSearch,
+            autoFocus = autoFocusSearch,
+            barcodeCamScanner = false
+        )
+        val cleanQuery = searchTextFieldContent.value.text.trim()
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+        val allCategories = stateValues.goodsCategories.orEmpty()
+        val rootCategories = allCategories
+            .filter { category -> category.typeIds.orEmpty().none { parentId -> allCategories.any { it.id == parentId } } }
+            .sortedBy { it.name.visibleGoodsCategoryName(stateValues.appLanguage, it.id) }
+        val allCategoryDomain = SelectableDomain(
+            id = GLOBAL_GOODS_CATEGORY_ALL_ID,
+            displayId = localizedStringResource(1182, "All categories").toLocalizedSingleMain(),
+            name = localizedStringResource(1182, "All categories").toLocalizedSingleMain(),
+            iconPath = null,
+            iconRes = null
+        )
+        val rootCategoryDropdown = dropdownListWidget(
+            titleText = stateValues.stringCategory,
+            domains = listOf(allCategoryDomain) + rootCategories.map { globalGoodsCategoryDomain(it) },
+            selectedInitial = GLOBAL_GOODS_CATEGORY_ALL_ID,
+            showId = false,
+            showName = true,
+            search = Triple(stateValues.stringSearchByAnyData, NavigationScreenModel.Stock.AddEditGoodsItem, "stock_global_goods_category_search")
+        )
+        val selectedRootId = rootCategoryDropdown.selectedId
+        val subcategories = allCategories
+            .filter { it.typeIds.orEmpty().contains(selectedRootId) }
+            .sortedBy { it.name.visibleGoodsCategoryName(stateValues.appLanguage, it.id) }
+        val selectedSubcategoryId = if (selectedRootId != GLOBAL_GOODS_CATEGORY_ALL_ID && subcategories.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(stateValues.marginTextField))
+            val allSubcategoryDomain = SelectableDomain(
+                id = GLOBAL_GOODS_SUBCATEGORY_ALL_ID,
+                displayId = localizedStringResource(1183, "All subcategories").toLocalizedSingleMain(),
+                name = localizedStringResource(1183, "All subcategories").toLocalizedSingleMain(),
+                iconPath = null,
+                iconRes = null
+            )
+            dropdownListWidget(
+                titleText = localizedStringResource(184, "Subcategory"),
+                domains = listOf(allSubcategoryDomain) + subcategories.map { globalGoodsCategoryDomain(it) },
+                selectedInitial = GLOBAL_GOODS_SUBCATEGORY_ALL_ID,
+                showId = false,
+                showName = true,
+                search = Triple(stateValues.stringSearchByAnyData, NavigationScreenModel.Stock.AddEditGoodsItem, "stock_global_goods_subcategory_search")
+            ).selectedId
+        } else {
+            GLOBAL_GOODS_SUBCATEGORY_ALL_ID
+        }
+
+        val selectedCategoryIds = remember(selectedRootId, selectedSubcategoryId, allCategories) {
+            when {
+                selectedRootId == GLOBAL_GOODS_CATEGORY_ALL_ID -> emptySet()
+                selectedSubcategoryId != GLOBAL_GOODS_SUBCATEGORY_ALL_ID -> allCategories.globalGoodsCategoryTreeIds(selectedSubcategoryId)
+                else -> allCategories.globalGoodsCategoryTreeIds(selectedRootId)
+            }
+        }
+        val selectedCategoryKey = remember(selectedCategoryIds) { selectedCategoryIds.sorted().joinToString("|") }
+
+        LaunchedEffect(cleanQuery, selectedCategoryKey) {
+            pickerPage = 0
+            serverLoadedItems = emptyList()
+            serverEndReached = false
+            loading = true
+            try {
+                delay(220)
+                getGenericGoodsItems(
+                    query = cleanQuery.takeIf { it.length >= 2 },
+                    categoryIds = selectedCategoryIds.toList(),
+                    limit = pickerPageSize,
+                    offset = 0,
+                    updateSharedState = true,
+                    appendToSharedState = true
+                ).collect { state ->
+                    val payload = (state as? DataState.Success)?.payload.orEmpty()
+                    serverLoadedItems = payload
+                    serverEndReached = state is DataState.Empty || payload.size < pickerPageSize
+                }
+            } finally {
+                loading = false
+            }
+        }
+
+        LaunchedEffect(pickerPage, cleanQuery, selectedCategoryKey, serverLoadedItems.size, serverEndReached) {
+            val desiredOffset = pickerPage * pickerPageSize
+            if (desiredOffset <= 0 || desiredOffset < serverLoadedItems.size || serverEndReached || loading) return@LaunchedEffect
+            loading = true
+            try {
+                getGenericGoodsItems(
+                    query = cleanQuery.takeIf { it.length >= 2 },
+                    categoryIds = selectedCategoryIds.toList(),
+                    limit = pickerPageSize,
+                    offset = desiredOffset,
+                    updateSharedState = true,
+                    appendToSharedState = true
+                ).collect { state ->
+                    val payload = (state as? DataState.Success)?.payload.orEmpty()
+                    serverLoadedItems = (serverLoadedItems + payload).distinctBy { it.id }
+                    serverEndReached = state is DataState.Empty || payload.size < pickerPageSize
+                }
+            } finally {
+                loading = false
+            }
+        }
+
+        val cachedFilteredItems = cachedGenericGoodsItems
+            .orEmpty()
+            .filter { it.matchesGlobalGoodsPickerFilter(cleanQuery, selectedCategoryIds) }
+        val filteredItems = (serverLoadedItems + cachedFilteredItems)
+            .distinctBy { it.id }
+            .sortedWith(
+                compareByDescending<GenericGoodsItemDataModel> { item ->
+                    draft.standardBarcodeForGenericLookup()?.let { lookup ->
+                        item.barcode.orEmpty().flatMap { it.toStoredGoodsItemBarcodeCandidates() }.any { it == lookup }
+                    } == true
+                }.thenBy { it.visibleGlobalGoodsName(stateValues.appLanguage).lowercase() }
+                    .thenBy { it.id }
+            )
+        val displayItems = filteredItems.clientPaged(pickerPage, pickerPageSize)
+        val pageWaitingForServer = !serverEndReached && pickerPage * pickerPageSize >= serverLoadedItems.size
+        val totalItemsForPaging = if (serverEndReached) {
+            filteredItems.size
+        } else {
+            ((pickerPage + 2) * pickerPageSize).coerceAtLeast(filteredItems.size)
+        }
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(bottom = stateValues.screenHeight / 8)
+        ) {
+            when {
+                displayItems.isEmpty() && (loading || pageWaitingForServer) -> item {
+                    MessageText(
+                        modifier = Modifier.fillMaxWidth().height(64.dp),
+                        text = localizedStringResource(1141, "Please wait…"),
+                        textSize = stateValues.textSize,
+                        textColor = stateValues.PlaceholderTextColor
+                    )
+                }
+
+                displayItems.isEmpty() -> item {
+                    MessageText(
+                        modifier = Modifier.fillMaxWidth().height(64.dp),
+                        text = localizedStringResource(1189, "No global goods match these filters"),
+                        textSize = stateValues.textSize,
+                        textColor = stateValues.PlaceholderTextColor
+                    )
+                }
+
+                else -> {
+                    items(displayItems, key = { it.id }) { item ->
+                        GlobalGoodsPickerItemCard(
+                            item = item,
+                            selectedCategoryIds = selectedCategoryIds,
+                            onApply = { onApply(item) }
+                        )
+                    }
+
+                    if (loading) {
+                        item {
+                            MessageText(
+                                modifier = Modifier.fillMaxWidth().height(48.dp),
+                                text = localizedStringResource(1188, "Loading more goods…"),
+                                textSize = stateValues.smallTextSize,
+                                textColor = stateValues.PlaceholderTextColor
+                            )
+                        }
+                    }
+
+                    item {
+                        PagingControls(
+                            page = pickerPage,
+                            totalItems = totalItemsForPaging,
+                            pageSize = pickerPageSize,
+                            onPageChange = { pickerPage = it.coerceAtLeast(0) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun AppConfiguration.StockAddEditInfoTab(
     modifier: Modifier = Modifier,
@@ -13566,9 +15377,28 @@ private fun AppConfiguration.StockAddEditInfoTab(
         item {
             BarcodeListEditor(
                 title = stateValues.stringBarcode,
-                barcodes = draft.barcodes.ifEmpty { listOf("") },
-                onChanged = {
-                    onDraftChanged(draft.copy(barcodes = it.ifEmpty { listOf("") }))
+                barcodes = draft.visibleBarcodes(),
+                barcodeTypes = draft.visibleBarcodeTypes(),
+                onChanged = { changedBarcodes ->
+                    val nextBarcodes = changedBarcodes.ifEmpty { listOf("") }
+                    onDraftChanged(
+                        draft.copy(
+                            barcodes = nextBarcodes,
+                            barcodeTypes = draft.barcodeTypes.alignedStockBarcodeTypes(nextBarcodes)
+                        )
+                    )
+                },
+                onTypesChanged = { changedTypes ->
+                    onDraftChanged(draft.copy(barcodeTypes = changedTypes.alignedStockBarcodeTypes(draft.visibleBarcodes())))
+                },
+                onBarcodesAndTypesChanged = { changedBarcodes, changedTypes ->
+                    val nextBarcodes = changedBarcodes.ifEmpty { listOf("") }
+                    onDraftChanged(
+                        draft.copy(
+                            barcodes = nextBarcodes,
+                            barcodeTypes = changedTypes.alignedStockBarcodeTypes(nextBarcodes)
+                        )
+                    )
                 }
             )
 
@@ -13764,16 +15594,11 @@ private fun AppConfiguration.StockAddEditInfoTab(
                     .padding(horizontal = stateValues.marginTextFieldGroup),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Checkbox(
+                AitaRoundCheckbox(
                     checked = draft.isQuickItem,
                     onCheckedChange = {
                         onDraftChanged(draft.copy(isQuickItem = it))
-                    },
-                    colors = CheckboxDefaults.colors(
-                        checkedColor = stateValues.AccentColor,
-                        uncheckedColor = stateValues.PlaceholderTextColor,
-                        checkmarkColor = stateValues.AccentTextColor
-                    )
+                    }
                 )
 
                 Spacer(modifier = Modifier.width(8.dp))
@@ -14420,6 +16245,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
 
         return StockAddEditDraft(
             barcodes = listOf(""),
+            barcodeTypes = listOf(GOODS_ITEM_BARCODE_TYPE_STANDARD),
             name = emptyLocalizedItemForCurrentLanguage(),
             description = emptyLocalizedItemForCurrentLanguage(),
             measurementUnitId = defaultMeasurementUnitId,
@@ -14465,6 +16291,13 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
         )
     }
 
+    var showGlobalGoodsSheet by rememberSaveable(existing?.id ?: "new_stock_item") {
+        mutableStateOf(false)
+    }
+    var stockAddEditUndoDraft by remember(existing?.id) {
+        mutableStateOf<StockAddEditDraft?>(null)
+    }
+
     var persistentDraftLoaded by rememberSaveable(draftStorageKey) {
         mutableStateOf(false)
     }
@@ -14502,6 +16335,23 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
             }
         }
         persistentDraftLoaded = true
+    }
+
+    LaunchedEffect(addEditState["stock_add_edit_global_template"], existing?.id, persistentDraftLoaded, stateValues.goodsCategories.orEmpty().size) {
+        if (!persistentDraftLoaded || existing != null) return@LaunchedEffect
+        val rawTemplate = addEditState["stock_add_edit_global_template"]?.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
+        runCatching { jsonBase.decodeFromString<GenericGoodsItemDataModel>(rawTemplate) }
+            .getOrNull()
+            ?.let { template ->
+                stockAddEditUndoDraft = draft
+                draft = applyGlobalGoodsTemplateToDraft(draft, template)
+                NavigationScreenModel.Stock.AddEditGoodsItem.removeState("stock_add_edit_global_template")
+                postInAppNotification(
+                    "${localizedStringResource(1175, "Template applied")}: ${template.visibleGlobalGoodsName(stateValues.appLanguage)}",
+                    NotificationType.Positive,
+                    transient = true
+                )
+            }
     }
 
     LaunchedEffect(draft, draftStorageKey, persistentDraftLoaded) {
@@ -14542,6 +16392,33 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
     }
 
     val canPopStockScreen = !Navigation.Stock.isVeryFirstScreen(stateValues.isNarrowScreen)
+    val stockAddEditTrailingIcons = buildList<Triple<String, DrawableResource, () -> Unit>> {
+        stockAddEditUndoDraft?.let { previousDraft ->
+            add(
+                Triple(
+                    undoTemplateIconPath(),
+                    undoTemplateIconFallback()
+                ) {
+                    draft = previousDraft
+                    stockAddEditUndoDraft = null
+                    postInAppNotification(
+                        localizedStringResource(1185, "Template reverted"),
+                        NotificationType.Neutral,
+                        transient = true
+                    )
+                }
+            )
+        }
+        add(
+            Triple(
+                globalGoodsIconPath(),
+                globalGoodsIconFallback()
+            ) {
+                showGlobalGoodsSheet = true
+                refreshGenericGoodsItems(limit = 32, appendToSharedState = true)
+            }
+        )
+    }
 
     val tabs = listOf(
         StockAddEditTabContent(
@@ -14562,7 +16439,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
         StockAddEditTabContent(
             id = "promos",
             title = localizedStringResource(920, "Promos"),
-            iconPath = "svg/50_${stateValues.appThemeId}.svg"
+            iconPath = stateValues.drawablePathIconPromos
         ),
         StockAddEditTabContent(
             id = "batches",
@@ -14581,6 +16458,23 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
         )
     )
 
+    if (showGlobalGoodsSheet) {
+        GlobalGoodsSelectionBottomSheet(
+            draft = draft,
+            onDismiss = { showGlobalGoodsSheet = false },
+            onApply = { genericItem ->
+                stockAddEditUndoDraft = draft
+                draft = applyGlobalGoodsTemplateToDraft(draft, genericItem)
+                showGlobalGoodsSheet = false
+                postInAppNotification(
+                    "${localizedStringResource(1175, "Template applied")}: ${genericItem.visibleGlobalGoodsName(stateValues.appLanguage)}",
+                    NotificationType.Positive,
+                    transient = true
+                )
+            }
+        )
+    }
+
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -14588,6 +16482,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
         ScreenAppBarWidget(
             title = if (existing == null) stateValues.stringAddGoodsItem else stateValues.stringEditGoodsItem,
             iconPath = if (existing == null) stateValues.drawablePathIconAdd else stateValues.drawablePathIconEdit,
+            trailingIcons = stockAddEditTrailingIcons,
             onBack = if (canPopStockScreen) {
                 {
                     coroutineScope.launch {
@@ -15193,11 +17088,15 @@ fun AppConfiguration.SimpleTextInput(
     singleLine: Boolean = true,
     keyboardType: KeyboardType = KeyboardType.Text,
     leadingIconPath: String? = null,
+    stateHost: StateHost? = null,
+    stateKey: String? = null,
     onTransformValue: ((String) -> String)? = null,
     onValueChange: (String) -> Unit
-) {
-    genericTextField(
+): GenericTextFieldContent {
+    val textFieldContent = genericTextField(
         modifier = modifier,
+        stateHost = stateHost,
+        stateKey = stateKey,
         valueInitial = value,
         placeholderText = placeholder,
         leadingIcon = leadingIconPath?.let { path ->
@@ -15225,6 +17124,14 @@ fun AppConfiguration.SimpleTextInput(
             applyChange()
         }
     )
+
+    LaunchedEffect(stateHost, stateKey, textFieldContent.value.text, value) {
+        if (stateHost != null && !stateKey.isNullOrBlank() && textFieldContent.value.text != value) {
+            onValueChange(textFieldContent.value.text)
+        }
+    }
+
+    return textFieldContent
 }
 
 
@@ -15579,7 +17486,10 @@ fun AppConfiguration.BarcodeTextInput(
 fun AppConfiguration.BarcodeListEditor(
     title: String,
     barcodes: List<String>,
-    onChanged: (List<String>) -> Unit
+    barcodeTypes: List<String> = barcodes.map { GOODS_ITEM_BARCODE_TYPE_STANDARD },
+    onChanged: (List<String>) -> Unit,
+    onTypesChanged: (List<String>) -> Unit = {},
+    onBarcodesAndTypesChanged: ((List<String>, List<String>) -> Unit)? = null
 ) {
     var focusTargetIndex by rememberSaveable {
         mutableStateOf(0)
@@ -15597,6 +17507,19 @@ fun AppConfiguration.BarcodeListEditor(
 
     Column {
         val currentBarcodes = barcodes.ifEmpty { listOf("") }
+        val currentBarcodeTypes = barcodeTypes.alignedStockBarcodeTypes(currentBarcodes)
+        val barcodeTypeIconRes by stateValues.drawableResIconBarcodeType.collectAsState()
+
+        fun emitBarcodeEditorState(nextBarcodesRaw: List<String>, nextTypesRaw: List<String>) {
+            val nextBarcodes = nextBarcodesRaw.ifEmpty { listOf("") }
+            val nextTypes = nextTypesRaw.alignedStockBarcodeTypes(nextBarcodes)
+            if (onBarcodesAndTypesChanged != null) {
+                onBarcodesAndTypesChanged(nextBarcodes, nextTypes)
+            } else {
+                onChanged(nextBarcodes)
+                onTypesChanged(nextTypes)
+            }
+        }
 
         currentBarcodes.forEachIndexed { index, barcode ->
             BarcodeTextInput(
@@ -15612,14 +17535,59 @@ fun AppConfiguration.BarcodeListEditor(
                     if (visible) focusTargetIndex = index
                 },
                 onValueChange = { storedValue ->
-                    onChanged(
-                        currentBarcodes.toMutableList().also {
-                            while (it.size <= index) it.add("")
-                            it[index] = storedValue
-                        }
-                    )
+                    val previousBarcode = currentBarcodes.getOrNull(index).orEmpty()
+                    val currentType = currentBarcodeTypes
+                        .getOrNull(index)
+                        ?.normalizedGoodsItemBarcodeType(previousBarcode)
+                        ?: GOODS_ITEM_BARCODE_TYPE_STANDARD
+                    val nextBarcodes = currentBarcodes.toMutableList().also {
+                        while (it.size <= index) it.add("")
+                        it[index] = storedValue
+                    }
+                    val nextTypes = currentBarcodeTypes.toMutableList().also {
+                        while (it.size <= index) it.add(GOODS_ITEM_BARCODE_TYPE_STANDARD)
+                        it[index] = currentType
+                    }
+                    emitBarcodeEditorState(nextBarcodes, nextTypes)
                 }
             )
+
+            val selectedType = currentBarcodeTypes.getOrNull(index)?.normalizedGoodsItemBarcodeType(barcode)
+                ?: GOODS_ITEM_BARCODE_TYPE_STANDARD
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                AuthTinyChoiceChip(
+                    selected = selectedType == GOODS_ITEM_BARCODE_TYPE_STANDARD,
+                    label = localizedStringResource(1153, "Standard"),
+                    iconPath = stateValues.drawablePathIconBarcodeType,
+                    iconRes = barcodeTypeIconRes,
+                    onClick = {
+                        val nextTypes = currentBarcodeTypes.toMutableList().also {
+                            while (it.size <= index) it.add(GOODS_ITEM_BARCODE_TYPE_STANDARD)
+                            it[index] = GOODS_ITEM_BARCODE_TYPE_STANDARD
+                        }
+                        emitBarcodeEditorState(currentBarcodes, nextTypes)
+                    }
+                )
+                AuthTinyChoiceChip(
+                    selected = selectedType == GOODS_ITEM_BARCODE_TYPE_INTERNAL,
+                    label = localizedStringResource(1154, "Internal"),
+                    iconPath = stateValues.drawablePathIconBarcodeType,
+                    iconRes = barcodeTypeIconRes,
+                    onClick = {
+                        val nextTypes = currentBarcodeTypes.toMutableList().also {
+                            while (it.size <= index) it.add(GOODS_ITEM_BARCODE_TYPE_STANDARD)
+                            it[index] = GOODS_ITEM_BARCODE_TYPE_INTERNAL
+                        }
+                        emitBarcodeEditorState(currentBarcodes, nextTypes)
+                    }
+                )
+            }
 
             Spacer(modifier = Modifier.height(stateValues.marginTextField))
         }
@@ -15630,8 +17598,10 @@ fun AppConfiguration.BarcodeListEditor(
             fillMaxWidthIfTextPresent = false
         ) {
             val nextIndex = currentBarcodes.size
+            val nextBarcodes = currentBarcodes + ""
+            val nextTypes = currentBarcodeTypes + GOODS_ITEM_BARCODE_TYPE_STANDARD
             focusTargetIndex = nextIndex
-            onChanged(currentBarcodes + "")
+            emitBarcodeEditorState(nextBarcodes, nextTypes)
         }
     }
 }
@@ -16484,7 +18454,8 @@ fun AppConfiguration.passwordTextField(
     stateHost: StateHost,
     stateKey: String,
     contentInvalidText: String? = null,
-    imeWithAction: ImeWithAction? = null
+    imeWithAction: ImeWithAction? = null,
+    onContentValidityCheck: ((String) -> Boolean)? = null
 ): GenericTextFieldContent {
 
     var showPassword by rememberSaveable {
@@ -16506,7 +18477,7 @@ fun AppConfiguration.passwordTextField(
         },
         contentInvalidText = contentInvalidText ?: stateValues.stringPasswordMustBe,
         onContentValidityCheck = {
-            it.checkAsPassword()
+            onContentValidityCheck?.invoke(it) ?: it.checkAsPassword()
         },
         visualTransformation =
             if (showPassword) {
@@ -16651,9 +18622,9 @@ sealed class NavigationScreenModel(
 
         data object Selection: Transaction("TransactionSelectionNavigationScreenModelRoute") {
             override val iconPath: String
-                get() = ""
+                get() = AppConfiguration.stateValues.drawablePathIconTransactionSelection
             override val iconRes: DrawableResource
-                get() = AppConfiguration.stateValues.drawableResIconCart.value
+                get() = AppConfiguration.stateValues.drawableResIconTransactionSelection.value
             override val name: String
                 get() = AppConfiguration.stateValues.stringSelect
         }
@@ -16994,6 +18965,213 @@ sealed class NavigationScreenModel(
     }
 }
 
+@kotlinx.serialization.Serializable
+internal data class PersistedTransactionNavigationSectionDataModel(
+    val clientId: Int = 0,
+    val left: List<List<String>> = emptyList(),
+    val right: List<List<String>> = emptyList()
+)
+
+@kotlinx.serialization.Serializable
+private data class PersistedTransactionNavigationStateDataModel(
+    val sale: PersistedTransactionNavigationSectionDataModel = PersistedTransactionNavigationSectionDataModel(),
+    val returns: PersistedTransactionNavigationSectionDataModel = PersistedTransactionNavigationSectionDataModel(),
+    val supply: PersistedTransactionNavigationSectionDataModel = PersistedTransactionNavigationSectionDataModel()
+)
+
+
+@kotlinx.serialization.Serializable
+internal data class PersistedSplitNavigationStackDataModel(
+    val left: List<String> = emptyList(),
+    val right: List<String> = emptyList()
+)
+
+@kotlinx.serialization.Serializable
+private data class PersistedAppNavigationStateDataModel(
+    val main: List<String> = emptyList(),
+    val stock: PersistedSplitNavigationStackDataModel = PersistedSplitNavigationStackDataModel(),
+    val menu: PersistedSplitNavigationStackDataModel = PersistedSplitNavigationStackDataModel(),
+    val userAuth: PersistedSplitNavigationStackDataModel = PersistedSplitNavigationStackDataModel(),
+    val stateHosts: Map<String, Map<String, String>> = emptyMap(),
+    val updatedAtMillis: Long = 0L
+)
+
+private const val APP_NAVIGATION_CACHE_KEY = "cache_json:app_navigation_state_v1"
+private val appNavigationRestoredState = MutableStateFlow(false)
+
+private fun persistentAppNavigationScreens(): List<NavigationScreenModel> = listOf(
+    NavigationScreenModel.Splash,
+    NavigationScreenModel.Notifications,
+    NavigationScreenModel.Transaction.MainSale,
+    NavigationScreenModel.Transaction.MainReturn,
+    NavigationScreenModel.Transaction.MainSupply,
+    NavigationScreenModel.Transaction.Cart,
+    NavigationScreenModel.Transaction.Selection,
+    NavigationScreenModel.Transaction.Payment,
+    NavigationScreenModel.Transaction.ReceiptPreview,
+    NavigationScreenModel.Stock.Main,
+    NavigationScreenModel.Stock.Warehouse,
+    NavigationScreenModel.Stock.AddEditGoodsItem,
+    NavigationScreenModel.Stock.GoodsItemDetails,
+    NavigationScreenModel.Stock.GoodsItemBatches,
+    NavigationScreenModel.Stock.GoodsItemSupplierPrices,
+    NavigationScreenModel.Stock.GoodsItemOrders,
+    NavigationScreenModel.Menu.Main,
+    NavigationScreenModel.Menu.List,
+    NavigationScreenModel.Menu.UserAccount,
+    NavigationScreenModel.Menu.Notifications,
+    NavigationScreenModel.Menu.Finances,
+    NavigationScreenModel.Menu.AppMode,
+    NavigationScreenModel.Menu.StoreSubscription,
+    NavigationScreenModel.Menu.StoreSubscriptionPlans,
+    NavigationScreenModel.Menu.Workers,
+    NavigationScreenModel.Menu.AddEditWorker,
+    NavigationScreenModel.Menu.Stores,
+    NavigationScreenModel.Menu.AddEditStore,
+    NavigationScreenModel.Menu.Analytics,
+    NavigationScreenModel.Menu.TransactionHistory,
+    NavigationScreenModel.Menu.TransactionHistoryReceiptPreview,
+    NavigationScreenModel.Menu.OperationLogs,
+    NavigationScreenModel.Menu.Debtors,
+    NavigationScreenModel.Menu.CloseDebt,
+    NavigationScreenModel.Menu.Suppliers,
+    NavigationScreenModel.Menu.AddEditSupplier,
+    NavigationScreenModel.Menu.GoodsCategories,
+    NavigationScreenModel.Menu.AddEditGoodsCategory,
+    NavigationScreenModel.Menu.Devices,
+    NavigationScreenModel.Menu.Security,
+    NavigationScreenModel.Menu.Support,
+    NavigationScreenModel.Menu.AppLanguage,
+    NavigationScreenModel.Menu.AppTheme,
+    NavigationScreenModel.Menu.AppScale,
+    NavigationScreenModel.UserAuth.Main,
+    NavigationScreenModel.UserAuth.LogIn,
+    NavigationScreenModel.UserAuth.SignUp,
+    NavigationScreenModel.Buyer.Main.Home,
+    NavigationScreenModel.Buyer.Main.Search,
+    NavigationScreenModel.Buyer.Cart.Main,
+    NavigationScreenModel.Buyer.Orders.Main
+)
+
+private fun persistentAppRouteToScreen(route: String): NavigationScreenModel? =
+    persistentAppNavigationScreens().firstOrNull { it.route == route }
+
+private fun NavigationScreenModel.toPersistentAppRoute(): String = route
+
+private fun Map<String, String>.withoutSensitiveTransientUiState(): Map<String, String> =
+    filterKeys { key ->
+        val normalized = key.lowercase()
+        !normalized.contains("password") && !normalized.contains("confirmation")
+    }
+
+private fun persistentAppStateHostsSnapshot(): Map<String, Map<String, String>> =
+    persistentAppNavigationScreens()
+        .associate { screen -> screen.route to screen.state.value.withoutSensitiveTransientUiState() }
+        .filterValues { it.isNotEmpty() }
+
+private suspend fun restorePersistentAppStateHosts(stateHosts: Map<String, Map<String, String>>) {
+    stateHosts.forEach { (route, stateMap) ->
+        val host = persistentAppRouteToScreen(route) ?: return@forEach
+        stateMap.withoutSensitiveTransientUiState().forEach { (key, value) ->
+            if (key.isNotBlank()) host.setState(key to value)
+        }
+    }
+}
+
+private fun List<NavigationScreenModel>.toPersistentAppRoutes(): List<String> =
+    map { it.toPersistentAppRoute() }
+
+private fun List<String>?.toPersistentMainStack(): List<NavigationScreenModel> {
+    val restored = orEmpty()
+        .mapNotNull { persistentAppRouteToScreen(it) }
+        .filterNot { it.route == NavigationScreenModel.Splash.route }
+        .ifEmpty { listOf(NavigationScreenModel.Transaction.MainSale) }
+
+    return restored
+        .fold(emptyList<NavigationScreenModel>()) { acc, item ->
+            if (acc.lastOrNull()?.route == item.route) acc else acc + item
+        }
+        .ifEmpty { listOf(NavigationScreenModel.Transaction.MainSale) }
+}
+
+private fun List<String>?.toPersistentStockStack(defaultFirst: NavigationScreenModel.Stock): List<NavigationScreenModel.Stock> {
+    val restored = orEmpty().mapNotNull { persistentAppRouteToScreen(it) as? NavigationScreenModel.Stock }
+    val withDefault = if (restored.firstOrNull()?.route == defaultFirst.route) {
+        restored
+    } else {
+        listOf(defaultFirst) + restored.filterNot { it.route == defaultFirst.route }
+    }
+
+    return withDefault
+        .fold(emptyList<NavigationScreenModel.Stock>()) { acc, item ->
+            if (acc.lastOrNull()?.route == item.route) acc else acc + item
+        }
+        .ifEmpty { listOf(defaultFirst) }
+}
+
+private fun List<String>?.toPersistentMenuStack(defaultFirst: NavigationScreenModel.Menu): List<NavigationScreenModel.Menu> {
+    val restored = orEmpty().mapNotNull { persistentAppRouteToScreen(it) as? NavigationScreenModel.Menu }
+    val withDefault = if (restored.firstOrNull()?.route == defaultFirst.route) {
+        restored
+    } else {
+        listOf(defaultFirst) + restored.filterNot { it.route == defaultFirst.route }
+    }
+
+    return withDefault
+        .fold(emptyList<NavigationScreenModel.Menu>()) { acc, item ->
+            if (acc.lastOrNull()?.route == item.route) acc else acc + item
+        }
+        .ifEmpty { listOf(defaultFirst) }
+}
+
+private fun List<String>?.toPersistentUserAuthStack(defaultFirst: NavigationScreenModel.UserAuth): List<NavigationScreenModel.UserAuth> {
+    val restored = orEmpty().mapNotNull { persistentAppRouteToScreen(it) as? NavigationScreenModel.UserAuth }
+    val withDefault = if (restored.firstOrNull()?.route == defaultFirst.route) {
+        restored
+    } else {
+        listOf(defaultFirst) + restored.filterNot { it.route == defaultFirst.route }
+    }
+
+    return withDefault
+        .fold(emptyList<NavigationScreenModel.UserAuth>()) { acc, item ->
+            if (acc.lastOrNull()?.route == item.route) acc else acc + item
+        }
+        .ifEmpty { listOf(defaultFirst) }
+}
+
+private fun NavigationScreenModel.Transaction.toPersistentTransactionRoute(): String = route
+
+private fun persistentTransactionRouteToScreen(route: String): NavigationScreenModel.Transaction? = when (route) {
+    NavigationScreenModel.Transaction.Cart.route -> NavigationScreenModel.Transaction.Cart
+    NavigationScreenModel.Transaction.Selection.route -> NavigationScreenModel.Transaction.Selection
+    NavigationScreenModel.Transaction.Payment.route -> NavigationScreenModel.Transaction.Payment
+    NavigationScreenModel.Transaction.ReceiptPreview.route -> NavigationScreenModel.Transaction.ReceiptPreview
+    else -> null
+}
+
+private fun List<NavigationScreenModel.Transaction>.toPersistentTransactionRoutes(): List<String> =
+    map { it.toPersistentTransactionRoute() }
+
+private fun List<String>?.toPersistentTransactionStack(
+    defaultFirst: NavigationScreenModel.Transaction
+): List<NavigationScreenModel.Transaction> {
+    val restored = orEmpty().mapNotNull { persistentTransactionRouteToScreen(it) }
+    val withDefault = if (restored.firstOrNull()?.route == defaultFirst.route) {
+        restored
+    } else {
+        listOf(defaultFirst) + restored.filterNot { it.route == defaultFirst.route }
+    }
+
+    return withDefault
+        .fold(emptyList<NavigationScreenModel.Transaction>()) { acc, item ->
+            if (acc.lastOrNull()?.route == item.route) acc else acc + item
+        }
+        .ifEmpty { listOf(defaultFirst) }
+}
+
+private const val TRANSACTION_NAVIGATION_CACHE_KEY = "cache_json:transaction_navigation_state_v1"
+private val transactionNavigationRestoredState = MutableStateFlow(false)
+
 object Navigation {
     val bottomNavBarScreensStore = listOf(
         NavigationScreenModel.Transaction.MainSale,
@@ -17017,6 +19195,58 @@ object Navigation {
             )
         )
     val Main = _Main.asStateFlow()
+
+    private var appNavigationPersistenceStarted = false
+
+    private fun appNavigationSnapshot(): PersistedAppNavigationStateDataModel =
+        PersistedAppNavigationStateDataModel(
+            main = Main.value.toPersistentAppRoutes(),
+            stock = Stock.persistentSnapshot(),
+            menu = Menu.persistentSnapshot(),
+            userAuth = UserAuth.persistentSnapshot(),
+            stateHosts = persistentAppStateHostsSnapshot()
+        )
+
+    private suspend fun restorePersistedAppNavigation() {
+        try {
+            val snapshot = runCatching {
+                getLocalKv(APP_NAVIGATION_CACHE_KEY)
+                    ?.let { jsonBase.decodeFromString<PersistedAppNavigationStateDataModel>(it) }
+            }.getOrNull() ?: return
+
+            restorePersistentAppStateHosts(snapshot.stateHosts)
+            _Main.emit(snapshot.main.toPersistentMainStack())
+            Stock.restorePersistentSnapshot(snapshot.stock)
+            Menu.restorePersistentSnapshot(snapshot.menu)
+            UserAuth.restorePersistentSnapshot(snapshot.userAuth)
+        } finally {
+            appNavigationRestoredState.emit(true)
+        }
+    }
+
+    suspend fun awaitAppNavigationRestore() {
+        while (!appNavigationRestoredState.value) {
+            delay(10)
+        }
+    }
+
+    fun startAppNavigationPersistence() {
+        if (appNavigationPersistenceStarted) return
+        appNavigationPersistenceStarted = true
+
+        CoroutineScope(Dispatchers.ourIo).launch {
+            restorePersistedAppNavigation()
+            var lastRaw = ""
+            while (true) {
+                val raw = runCatching { jsonBase.encodeToString(appNavigationSnapshot()) }.getOrNull().orEmpty()
+                if (raw.isNotBlank() && raw != lastRaw) {
+                    putLocalKv(APP_NAVIGATION_CACHE_KEY, raw)
+                    lastRaw = raw
+                }
+                delay(320)
+            }
+        }
+    }
 
     suspend fun goMain(model: NavigationScreenModel) {
         if (model::class != _Main.value.last()::class)
@@ -17051,6 +19281,54 @@ object Navigation {
                     3 -> if (isNarrowScreen) TransactionSupply.LeftClient4 else TransactionSupply.RightClient4
                     else -> if (isNarrowScreen) TransactionSupply.LeftClient5 else TransactionSupply.RightClient5
                 }
+            }
+        }
+    }
+
+    private var transactionNavigationPersistenceStarted = false
+
+    private fun transactionNavigationSnapshot(): PersistedTransactionNavigationStateDataModel =
+        PersistedTransactionNavigationStateDataModel(
+            sale = TransactionSale.persistentSnapshot(),
+            returns = TransactionReturn.persistentSnapshot(),
+            supply = TransactionSupply.persistentSnapshot()
+        )
+
+    private suspend fun restorePersistedTransactionNavigation() {
+        try {
+            val snapshot = runCatching {
+                getLocalKv(TRANSACTION_NAVIGATION_CACHE_KEY)
+                    ?.let { jsonBase.decodeFromString<PersistedTransactionNavigationStateDataModel>(it) }
+            }.getOrNull() ?: return
+
+            TransactionSale.restorePersistentSnapshot(snapshot.sale)
+            TransactionReturn.restorePersistentSnapshot(snapshot.returns)
+            TransactionSupply.restorePersistentSnapshot(snapshot.supply)
+        } finally {
+            transactionNavigationRestoredState.emit(true)
+        }
+    }
+
+    suspend fun awaitTransactionNavigationRestore() {
+        while (!transactionNavigationRestoredState.value) {
+            delay(10)
+        }
+    }
+
+    fun startTransactionNavigationPersistence() {
+        if (transactionNavigationPersistenceStarted) return
+        transactionNavigationPersistenceStarted = true
+
+        CoroutineScope(Dispatchers.ourIo).launch {
+            restorePersistedTransactionNavigation()
+            var lastRaw = ""
+            while (true) {
+                val raw = runCatching { jsonBase.encodeToString(transactionNavigationSnapshot()) }.getOrNull().orEmpty()
+                if (raw.isNotBlank() && raw != lastRaw) {
+                    putLocalKv(TRANSACTION_NAVIGATION_CACHE_KEY, raw)
+                    lastRaw = raw
+                }
+                delay(220)
             }
         }
     }
@@ -17220,6 +19498,39 @@ object Navigation {
             MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.Selection))
         val RightClient5 =
             _RightClient5.asStateFlow()
+
+        internal fun persistentSnapshot(): PersistedTransactionNavigationSectionDataModel =
+            PersistedTransactionNavigationSectionDataModel(
+                clientId = ClientId.value.coerceIn(0, 4),
+                left = listOf(
+                    LeftClient1.value.toPersistentTransactionRoutes(),
+                    LeftClient2.value.toPersistentTransactionRoutes(),
+                    LeftClient3.value.toPersistentTransactionRoutes(),
+                    LeftClient4.value.toPersistentTransactionRoutes(),
+                    LeftClient5.value.toPersistentTransactionRoutes()
+                ),
+                right = listOf(
+                    RightClient1.value.toPersistentTransactionRoutes(),
+                    RightClient2.value.toPersistentTransactionRoutes(),
+                    RightClient3.value.toPersistentTransactionRoutes(),
+                    RightClient4.value.toPersistentTransactionRoutes(),
+                    RightClient5.value.toPersistentTransactionRoutes()
+                )
+            )
+
+        internal suspend fun restorePersistentSnapshot(snapshot: PersistedTransactionNavigationSectionDataModel) {
+            _ClientId.emit(snapshot.clientId.coerceIn(0, 4))
+            _LeftClient1.emit(snapshot.left.getOrNull(0).toPersistentTransactionStack(NavigationScreenModel.Transaction.Cart))
+            _LeftClient2.emit(snapshot.left.getOrNull(1).toPersistentTransactionStack(NavigationScreenModel.Transaction.Cart))
+            _LeftClient3.emit(snapshot.left.getOrNull(2).toPersistentTransactionStack(NavigationScreenModel.Transaction.Cart))
+            _LeftClient4.emit(snapshot.left.getOrNull(3).toPersistentTransactionStack(NavigationScreenModel.Transaction.Cart))
+            _LeftClient5.emit(snapshot.left.getOrNull(4).toPersistentTransactionStack(NavigationScreenModel.Transaction.Cart))
+            _RightClient1.emit(snapshot.right.getOrNull(0).toPersistentTransactionStack(NavigationScreenModel.Transaction.Selection))
+            _RightClient2.emit(snapshot.right.getOrNull(1).toPersistentTransactionStack(NavigationScreenModel.Transaction.Selection))
+            _RightClient3.emit(snapshot.right.getOrNull(2).toPersistentTransactionStack(NavigationScreenModel.Transaction.Selection))
+            _RightClient4.emit(snapshot.right.getOrNull(3).toPersistentTransactionStack(NavigationScreenModel.Transaction.Selection))
+            _RightClient5.emit(snapshot.right.getOrNull(4).toPersistentTransactionStack(NavigationScreenModel.Transaction.Selection))
+        }
 
         suspend fun goLeftClient1(
             model: NavigationScreenModel.Transaction,
@@ -17970,6 +20281,39 @@ object Navigation {
         val RightClient5 =
             _RightClient5.asStateFlow()
 
+        internal fun persistentSnapshot(): PersistedTransactionNavigationSectionDataModel =
+            PersistedTransactionNavigationSectionDataModel(
+                clientId = ClientId.value.coerceIn(0, 4),
+                left = listOf(
+                    LeftClient1.value.toPersistentTransactionRoutes(),
+                    LeftClient2.value.toPersistentTransactionRoutes(),
+                    LeftClient3.value.toPersistentTransactionRoutes(),
+                    LeftClient4.value.toPersistentTransactionRoutes(),
+                    LeftClient5.value.toPersistentTransactionRoutes()
+                ),
+                right = listOf(
+                    RightClient1.value.toPersistentTransactionRoutes(),
+                    RightClient2.value.toPersistentTransactionRoutes(),
+                    RightClient3.value.toPersistentTransactionRoutes(),
+                    RightClient4.value.toPersistentTransactionRoutes(),
+                    RightClient5.value.toPersistentTransactionRoutes()
+                )
+            )
+
+        internal suspend fun restorePersistentSnapshot(snapshot: PersistedTransactionNavigationSectionDataModel) {
+            _ClientId.emit(snapshot.clientId.coerceIn(0, 4))
+            _LeftClient1.emit(snapshot.left.getOrNull(0).toPersistentTransactionStack(NavigationScreenModel.Transaction.Cart))
+            _LeftClient2.emit(snapshot.left.getOrNull(1).toPersistentTransactionStack(NavigationScreenModel.Transaction.Cart))
+            _LeftClient3.emit(snapshot.left.getOrNull(2).toPersistentTransactionStack(NavigationScreenModel.Transaction.Cart))
+            _LeftClient4.emit(snapshot.left.getOrNull(3).toPersistentTransactionStack(NavigationScreenModel.Transaction.Cart))
+            _LeftClient5.emit(snapshot.left.getOrNull(4).toPersistentTransactionStack(NavigationScreenModel.Transaction.Cart))
+            _RightClient1.emit(snapshot.right.getOrNull(0).toPersistentTransactionStack(NavigationScreenModel.Transaction.Selection))
+            _RightClient2.emit(snapshot.right.getOrNull(1).toPersistentTransactionStack(NavigationScreenModel.Transaction.Selection))
+            _RightClient3.emit(snapshot.right.getOrNull(2).toPersistentTransactionStack(NavigationScreenModel.Transaction.Selection))
+            _RightClient4.emit(snapshot.right.getOrNull(3).toPersistentTransactionStack(NavigationScreenModel.Transaction.Selection))
+            _RightClient5.emit(snapshot.right.getOrNull(4).toPersistentTransactionStack(NavigationScreenModel.Transaction.Selection))
+        }
+
         suspend fun goLeftClient1(
             model: NavigationScreenModel.Transaction,
             remove: Boolean = false
@@ -18426,7 +20770,7 @@ object Navigation {
         }
 
         suspend fun init(isNarrowScreen: Boolean) {
-            TransactionSupply.run {
+            TransactionReturn.run {
                 if (isNarrowScreen) {
                     if (RightClient1.value.size > 1) {
                         _LeftClient1.emit(
@@ -18718,6 +21062,39 @@ object Navigation {
             MutableStateFlow<List<NavigationScreenModel.Transaction>>(listOf(NavigationScreenModel.Transaction.Selection))
         val RightClient5 =
             _RightClient5.asStateFlow()
+
+        internal fun persistentSnapshot(): PersistedTransactionNavigationSectionDataModel =
+            PersistedTransactionNavigationSectionDataModel(
+                clientId = ClientId.value.coerceIn(0, 4),
+                left = listOf(
+                    LeftClient1.value.toPersistentTransactionRoutes(),
+                    LeftClient2.value.toPersistentTransactionRoutes(),
+                    LeftClient3.value.toPersistentTransactionRoutes(),
+                    LeftClient4.value.toPersistentTransactionRoutes(),
+                    LeftClient5.value.toPersistentTransactionRoutes()
+                ),
+                right = listOf(
+                    RightClient1.value.toPersistentTransactionRoutes(),
+                    RightClient2.value.toPersistentTransactionRoutes(),
+                    RightClient3.value.toPersistentTransactionRoutes(),
+                    RightClient4.value.toPersistentTransactionRoutes(),
+                    RightClient5.value.toPersistentTransactionRoutes()
+                )
+            )
+
+        internal suspend fun restorePersistentSnapshot(snapshot: PersistedTransactionNavigationSectionDataModel) {
+            _ClientId.emit(snapshot.clientId.coerceIn(0, 4))
+            _LeftClient1.emit(snapshot.left.getOrNull(0).toPersistentTransactionStack(NavigationScreenModel.Transaction.Cart))
+            _LeftClient2.emit(snapshot.left.getOrNull(1).toPersistentTransactionStack(NavigationScreenModel.Transaction.Cart))
+            _LeftClient3.emit(snapshot.left.getOrNull(2).toPersistentTransactionStack(NavigationScreenModel.Transaction.Cart))
+            _LeftClient4.emit(snapshot.left.getOrNull(3).toPersistentTransactionStack(NavigationScreenModel.Transaction.Cart))
+            _LeftClient5.emit(snapshot.left.getOrNull(4).toPersistentTransactionStack(NavigationScreenModel.Transaction.Cart))
+            _RightClient1.emit(snapshot.right.getOrNull(0).toPersistentTransactionStack(NavigationScreenModel.Transaction.Selection))
+            _RightClient2.emit(snapshot.right.getOrNull(1).toPersistentTransactionStack(NavigationScreenModel.Transaction.Selection))
+            _RightClient3.emit(snapshot.right.getOrNull(2).toPersistentTransactionStack(NavigationScreenModel.Transaction.Selection))
+            _RightClient4.emit(snapshot.right.getOrNull(3).toPersistentTransactionStack(NavigationScreenModel.Transaction.Selection))
+            _RightClient5.emit(snapshot.right.getOrNull(4).toPersistentTransactionStack(NavigationScreenModel.Transaction.Selection))
+        }
 
         suspend fun goLeftClient1(
             model: NavigationScreenModel.Transaction,
@@ -19326,6 +21703,17 @@ object Navigation {
         val Right =
             _Right.asStateFlow()
 
+        internal fun persistentSnapshot(): PersistedSplitNavigationStackDataModel =
+            PersistedSplitNavigationStackDataModel(
+                left = Left.value.map { it.route },
+                right = Right.value.map { it.route }
+            )
+
+        internal suspend fun restorePersistentSnapshot(snapshot: PersistedSplitNavigationStackDataModel) {
+            _Left.emit(snapshot.left.toPersistentStockStack(NavigationScreenModel.Stock.Warehouse))
+            _Right.emit(snapshot.right.toPersistentStockStack(NavigationScreenModel.Stock.AddEditGoodsItem))
+        }
+
         suspend fun go(
             model: NavigationScreenModel.Stock,
             isNarrowScreen: Boolean = AppConfiguration.stateValues.isNarrowScreen,
@@ -19510,6 +21898,17 @@ object Navigation {
         val Right =
             _Right.asStateFlow()
 
+        internal fun persistentSnapshot(): PersistedSplitNavigationStackDataModel =
+            PersistedSplitNavigationStackDataModel(
+                left = Left.value.map { it.route },
+                right = Right.value.map { it.route }
+            )
+
+        internal suspend fun restorePersistentSnapshot(snapshot: PersistedSplitNavigationStackDataModel) {
+            _Left.emit(snapshot.left.toPersistentMenuStack(NavigationScreenModel.Menu.List))
+            _Right.emit(snapshot.right.toPersistentMenuStack(NavigationScreenModel.Menu.UserAccount))
+        }
+
         suspend fun go(
             model: NavigationScreenModel.Menu,
             isNarrowScreen: Boolean = AppConfiguration.stateValues.isNarrowScreen,
@@ -19672,6 +22071,17 @@ object Navigation {
             MutableStateFlow<List<NavigationScreenModel.UserAuth>>(listOf(NavigationScreenModel.UserAuth.SignUp))
         val Right =
             _Right.asStateFlow()
+
+        internal fun persistentSnapshot(): PersistedSplitNavigationStackDataModel =
+            PersistedSplitNavigationStackDataModel(
+                left = Left.value.map { it.route },
+                right = Right.value.map { it.route }
+            )
+
+        internal suspend fun restorePersistentSnapshot(snapshot: PersistedSplitNavigationStackDataModel) {
+            _Left.emit(snapshot.left.toPersistentUserAuthStack(NavigationScreenModel.UserAuth.LogIn))
+            _Right.emit(snapshot.right.toPersistentUserAuthStack(NavigationScreenModel.UserAuth.SignUp))
+        }
 
         suspend fun goLeft(
             model: NavigationScreenModel.UserAuth,
@@ -19948,6 +22358,7 @@ private fun AppConfiguration.workerPermissionLabel(permissionId: String): String
         STORE_PERMISSION_WORKERS_VIEW -> localizedStringResource(460, "View workers")
         STORE_PERMISSION_WORKERS_MANAGE -> localizedStringResource(461, "Manage workers")
         STORE_PERMISSION_STORE_MANAGE -> localizedStringResource(462, "Manage store")
+        STORE_PERMISSION_LOGS_VIEW -> localizedStringResource(1075, "View operation logs")
         else -> permissionId
     }
 }
@@ -19958,6 +22369,263 @@ private fun permissionsFromSerialized(value: String): List<String> {
         .map { it.trim() }
         .filter { it.isNotBlank() }
         .distinct()
+}
+
+
+private fun AppConfiguration.workerRequestDirectionLabel(request: StoreWorkerRequestDataModel): String {
+    return if (request.direction == WORKER_REQUEST_DIRECTION_STORE_TO_USER) {
+        localizedStringResource(1103, "From store to worker")
+    } else {
+        localizedStringResource(1102, "From worker to store")
+    }
+}
+
+private fun AppConfiguration.workerRequestStoreTitle(request: StoreWorkerRequestDataModel): String {
+    return request.storeName.extractLocalizedString(stateValues.appLanguage).orEmpty()
+        .ifBlank { request.storePublicId }
+        .ifBlank { request.storeId }
+}
+
+private fun AppConfiguration.workerRequestPersonLine(request: StoreWorkerRequestDataModel): String {
+    return listOf(
+        request.requesterPublicId,
+        request.phoneNumber.asDisplayPhoneNumber(),
+        request.email
+    ).filter { it.isNotBlank() }.joinToString(" • ")
+}
+
+private fun AppConfiguration.workerResponseStatusColor(status: String): Color {
+    return when (status) {
+        WORKER_REQUEST_STATUS_ACCEPTED -> stateValues.OkayColor
+        WORKER_REQUEST_STATUS_DECLINED -> stateValues.ErrorColor
+        else -> stateValues.AccentColor
+    }
+}
+
+@Composable
+private fun AppConfiguration.WorkerDecisionNoteDialog(
+    title: String,
+    subtitle: String,
+    positiveButtonText: String,
+    positiveColor: Color = stateValues.AccentColor,
+    positiveIconPath: String = stateValues.drawablePathIconCheck,
+    onDismiss: () -> Unit,
+    onConfirm: (String?) -> Unit
+) {
+    var note by rememberSaveable(title, subtitle) { mutableStateOf("") }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(if (stateValues.isNarrowScreen) 0.92f else 0.52f)
+                .widthIn(max = 520.dp)
+                .foregroundTactileShadow(stateValues.cornerRadius, elevated = true)
+                .clip(RoundedCornerShape(stateValues.cornerRadius))
+                .background(stateValues.BackgroundColor)
+                .border(stateValues.focusedBorderWidth, positiveColor, RoundedCornerShape(stateValues.cornerRadius))
+                .padding(stateValues.marginTextFieldGroup),
+            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            CpImage(
+                modifier = Modifier.size(44.dp),
+                url = stateValues.drawablePathIconResponse,
+                fallbackRes = stateValues.drawableResIconResponse.value,
+                contentDescription = title,
+                tintColor = positiveColor
+            )
+
+            Text(
+                text = title,
+                color = stateValues.TextColor,
+                fontSize = stateValues.titleTextSize,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+
+            Text(
+                text = subtitle,
+                color = stateValues.PlaceholderTextColor,
+                fontSize = stateValues.smallTextSize,
+                textAlign = TextAlign.Center
+            )
+
+            SimpleTextInput(
+                modifier = Modifier.fillMaxWidth(),
+                value = note,
+                placeholder = localizedStringResource(1098, "Add an optional note for the other party"),
+                singleLine = false,
+                leadingIconPath = stateValues.drawablePathIconResponse,
+                onValueChange = { note = it.take(240) }
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = stateValues.stringCancel,
+                    iconPath = stateValues.drawablePathIconCancel,
+                    enabledColor = stateValues.DisabledColor,
+                    confirmationRequired = false,
+                    onClick = onDismiss
+                )
+
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = positiveButtonText,
+                    iconPath = positiveIconPath,
+                    enabledColor = positiveColor,
+                    confirmationRequired = false,
+                    onClick = { onConfirm(note.trim().takeIf { it.isNotBlank() }) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppConfiguration.WorkerResponseInfoRow(
+    label: String,
+    value: String,
+    accent: Boolean = false
+) {
+    if (value.isBlank()) return
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            modifier = Modifier.weight(0.42f),
+            text = label,
+            color = stateValues.PlaceholderTextColor,
+            fontSize = stateValues.smallTextSize,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            modifier = Modifier.weight(0.58f),
+            text = value,
+            color = if (accent) stateValues.AccentColor else stateValues.TextColor,
+            fontSize = stateValues.smallTextSize,
+            fontWeight = if (accent) FontWeight.Bold else FontWeight.Normal
+        )
+    }
+}
+
+@Composable
+private fun AppConfiguration.WorkerResponseCard(
+    request: StoreWorkerRequestDataModel,
+    storePerspective: Boolean
+) {
+    val statusColor = workerResponseStatusColor(request.status)
+    val storeTitle = workerRequestStoreTitle(request)
+    val workerLine = workerRequestPersonLine(request)
+    val title = if (storePerspective) request.displayName.ifBlank { request.requesterPublicId } else storeTitle
+    val secondaryLine = if (storePerspective) {
+        listOf(storeTitle, workerLine).filter { it.isNotBlank() }.joinToString(" • ")
+    } else {
+        workerLine.ifBlank { request.storePublicId }
+    }
+    val directionHint = if (request.direction == WORKER_REQUEST_DIRECTION_STORE_TO_USER) {
+        localizedStringResource(1114, "Store invited this worker")
+    } else {
+        localizedStringResource(1113, "You requested work in this store")
+    }
+    val permissionLine = request.permissions.joinToString(" • ") { workerPermissionLabel(it) }
+    val noteText = request.responseNoteVisible(stateValues.appLanguage).orEmpty().trim()
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .border(stateValues.unfocusedBorderWidth, statusColor, RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .padding(stateValues.marginTextFieldGroup),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            CpImage(
+                modifier = Modifier.size(34.dp),
+                url = stateValues.drawablePathIconResponse,
+                fallbackRes = stateValues.drawableResIconResponse.value,
+                contentDescription = localizedStringResource(1093, "Employment responses"),
+                tintColor = statusColor
+            )
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.accentTextSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (secondaryLine.isNotBlank()) {
+                    Text(
+                        text = secondaryLine,
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            Text(
+                text = workerRequestStatusLabel(request.status),
+                color = statusColor,
+                fontSize = stateValues.textSize,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.End
+            )
+        }
+
+        Text(
+            text = directionHint,
+            color = stateValues.PlaceholderTextColor,
+            fontSize = stateValues.smallTextSize,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        Spacer(modifier = Modifier.height(2.dp))
+
+        WorkerResponseInfoRow(localizedStringResource(1116, "Request direction"), workerRequestDirectionLabel(request))
+        WorkerResponseInfoRow(localizedStringResource(466, "Role"), workerRoleLabel(request.roleId.ifBlank { WORKER_ROLE_STANDARD }))
+        WorkerResponseInfoRow(localizedStringResource(467, "Allowed actions"), permissionLine)
+        WorkerResponseInfoRow(localizedStringResource(1096, "Request time"), receiptUiDateTime(request.requestedAtMillis))
+        WorkerResponseInfoRow(localizedStringResource(1095, "Response time"), request.decidedAtMillis?.let { receiptUiDateTime(it) }.orEmpty(), accent = true)
+        WorkerResponseInfoRow(localizedStringResource(1101, "Responded by"), request.decidedByUserId.orEmpty())
+
+        Spacer(modifier = Modifier.height(2.dp))
+
+        Text(
+            text = localizedStringResource(1097, "Response note"),
+            color = stateValues.PlaceholderTextColor,
+            fontSize = stateValues.smallTextSize,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = noteText.ifBlank { localizedStringResource(1106, "No note from responding party") },
+            color = if (noteText.isBlank()) stateValues.PlaceholderTextColor else stateValues.TextColor,
+            fontSize = stateValues.smallTextSize,
+            maxLines = 4,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
 }
 
 @Composable
@@ -19993,16 +22661,11 @@ private fun AppConfiguration.WorkerPermissionEditor(
                             .padding(vertical = 2.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Checkbox(
+                        AitaRoundCheckbox(
                             checked = checked,
                             onCheckedChange = { isChecked ->
                                 onChanged(if (isChecked) permissions + permissionId else permissions - permissionId)
-                            },
-                            colors = CheckboxDefaults.colors(
-                                checkedColor = stateValues.AccentColor,
-                                uncheckedColor = stateValues.PlaceholderTextColor,
-                                checkmarkColor = stateValues.AccentTextColor
-                            )
+                            }
                         )
 
                         Text(
@@ -20030,14 +22693,44 @@ private fun AppConfiguration.WorkerRequestCard(
 ) {
     var roleId by rememberSaveable(request.id) { mutableStateOf(request.roleId.ifBlank { WORKER_ROLE_STANDARD }) }
     var permissionsText by rememberSaveable(request.id) {
-        mutableStateOf(defaultStorePermissionsForRole(roleId).joinToString("|"))
+        mutableStateOf(request.permissions.ifEmpty { defaultStorePermissionsForRole(roleId) }.joinToString("|"))
     }
     val permissions = permissionsFromSerialized(permissionsText)
-    var workerPassword by rememberSaveable(request.id) { mutableStateOf("") }
     val roleOptions = listOf(
         DropdownOption(WORKER_ROLE_STANDARD, workerRoleLabel(WORKER_ROLE_STANDARD), localizedStringResource(463, "Cashier/basic worker")),
         DropdownOption(WORKER_ROLE_ADMIN, workerRoleLabel(WORKER_ROLE_ADMIN), localizedStringResource(464, "Can manage most store operations"))
     )
+    var decisionDialog by rememberSaveable(request.id) { mutableStateOf<String?>(null) }
+
+    decisionDialog?.let { action ->
+        val accepting = action == "accept"
+        WorkerDecisionNoteDialog(
+            title = if (accepting) localizedStringResource(1109, "Accept employment request?") else localizedStringResource(1110, "Decline employment request?"),
+            subtitle = listOf(request.displayName, workerRequestDirectionLabel(request)).filter { it.isNotBlank() }.joinToString(" • "),
+            positiveButtonText = if (accepting) localizedStringResource(468, "Accept") else localizedStringResource(469, "Decline"),
+            positiveColor = if (accepting) stateValues.AccentColor else stateValues.ErrorColor,
+            positiveIconPath = if (accepting) stateValues.drawablePathIconCheck else stateValues.drawablePathIconCancel,
+            onDismiss = { decisionDialog = null },
+            onConfirm = { responseNote ->
+                decisionDialog = null
+                if (accepting) {
+                    acceptStoreEmploymentRequest(
+                        storeId = request.storeId.ifBlank { storeId },
+                        requestId = request.id,
+                        roleId = roleId,
+                        permissions = permissions,
+                        note = responseNote
+                    )
+                } else {
+                    declineStoreEmploymentRequest(
+                        storeId = request.storeId.ifBlank { storeId },
+                        requestId = request.id,
+                        note = responseNote
+                    )
+                }
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -20099,16 +22792,15 @@ private fun AppConfiguration.WorkerRequestCard(
 
         Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
-        SimpleTextInput(
-            modifier = Modifier.fillMaxWidth(),
-            value = workerPassword,
-            placeholder = localizedStringResource(654, "Worker job password"),
-            leadingIconPath = stateValues.drawablePathIconSecurity,
-            onValueChange = { workerPassword = it }
+        Text(
+            text = localizedStringResource(1076, "The worker sets their own workshift password after approval."),
+            color = stateValues.AccentColor,
+            fontSize = stateValues.smallTextSize,
+            fontWeight = FontWeight.Bold
         )
 
         Text(
-            text = localizedStringResource(660, "This password is separate for this store job only"),
+            text = localizedStringResource(1077, "Approve the role and permissions only. Store owners and managers never need to know the worker’s shift password."),
             color = stateValues.PlaceholderTextColor,
             fontSize = stateValues.smallTextSize
         )
@@ -20122,18 +22814,9 @@ private fun AppConfiguration.WorkerRequestCard(
             actionButton(
                 modifier = Modifier.weight(1f),
                 text = localizedStringResource(468, "Accept"),
-                enabled = workerPassword.isNotBlank(),
                 iconPath = stateValues.drawablePathIconCheck,
                 confirmationRequired = false,
-                onClick = {
-                    acceptStoreEmploymentRequest(
-                        storeId = storeId,
-                        requestId = request.id,
-                        roleId = roleId,
-                        permissions = permissions,
-                        workerPassword = workerPassword
-                    )
-                }
+                onClick = { decisionDialog = "accept" }
             )
 
             actionButton(
@@ -20141,10 +22824,8 @@ private fun AppConfiguration.WorkerRequestCard(
                 enabledColor = stateValues.ErrorColor,
                 text = localizedStringResource(469, "Decline"),
                 iconPath = stateValues.drawablePathIconCancel,
-                confirmationRequired = true,
-                onClick = {
-                    declineStoreEmploymentRequest(storeId, request.id)
-                }
+                confirmationRequired = false,
+                onClick = { decisionDialog = "decline" }
             )
         }
     }
@@ -20154,16 +22835,22 @@ private fun AppConfiguration.WorkerRequestCard(
 private fun AppConfiguration.WorkerMembershipCard(
     worker: StoreWorkerDataModel,
     editable: Boolean,
-    storeId: String? = null
+    storeId: String? = null,
+    showSelfPasswordEditor: Boolean = false
 ) {
     var roleId by rememberSaveable(worker.id) { mutableStateOf(worker.roleId.ifBlank { WORKER_ROLE_STANDARD }) }
     var permissionsText by rememberSaveable(worker.id) { mutableStateOf(worker.permissions.joinToString("|")) }
     val permissions = permissionsFromSerialized(permissionsText).ifEmpty { defaultStorePermissionsForRole(roleId) }
-    var workerPassword by rememberSaveable(worker.id) { mutableStateOf("") }
+    var selfWorkshiftPasswordSaving by rememberSaveable(worker.id) { mutableStateOf(false) }
     val roleOptions = listOf(
         DropdownOption(WORKER_ROLE_STANDARD, workerRoleLabel(WORKER_ROLE_STANDARD)),
         DropdownOption(WORKER_ROLE_ADMIN, workerRoleLabel(WORKER_ROLE_ADMIN))
     )
+    val storeName = worker.storeName.extractLocalizedString(stateValues.appLanguage).orEmpty()
+    val contactLine = listOf(worker.userPublicId, worker.phoneNumber.asDisplayPhoneNumber(), worker.email)
+        .filter { it.isNotBlank() }
+        .joinToString(" • ")
+    val permissionLine = permissions.joinToString(" • ") { workerPermissionLabel(it) }
 
     Column(
         modifier = Modifier
@@ -20181,16 +22868,20 @@ private fun AppConfiguration.WorkerMembershipCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = worker.displayName,
+                    text = if (showSelfPasswordEditor) storeName.ifBlank { worker.storePublicId.ifBlank { worker.displayName } } else worker.displayName,
                     color = stateValues.TextColor,
                     fontSize = stateValues.accentTextSize,
                     fontWeight = FontWeight.Bold
                 )
 
-                val storeName = worker.storeName.extractLocalizedString(stateValues.appLanguage).orEmpty()
-                if (storeName.isNotBlank()) {
+                val secondaryLine = if (showSelfPasswordEditor) {
+                    worker.displayName.takeIf { it.isNotBlank() }
+                } else {
+                    storeName.takeIf { it.isNotBlank() }
+                }
+                if (!secondaryLine.isNullOrBlank()) {
                     Text(
-                        text = storeName,
+                        text = secondaryLine,
                         color = stateValues.TextColor,
                         fontSize = stateValues.smallTextSize
                     )
@@ -20207,16 +22898,33 @@ private fun AppConfiguration.WorkerMembershipCard(
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        Text(
-            text = listOf(worker.userPublicId, worker.phoneNumber.asDisplayPhoneNumber(), worker.email).filter { it.isNotBlank() }.joinToString(" • "),
-            color = stateValues.TextColor,
-            fontSize = stateValues.smallTextSize
-        )
+        if (contactLine.isNotBlank()) {
+            Text(
+                text = contactLine,
+                color = stateValues.TextColor,
+                fontSize = stateValues.smallTextSize
+            )
+        }
+
+        if (worker.storePublicId.isNotBlank()) {
+            Text(
+                text = "${localizedStringResource(1083, "Store public ID")}: ${worker.storePublicId}",
+                color = stateValues.TextColor,
+                fontSize = stateValues.smallTextSize
+            )
+        }
 
         Text(
             text = "${localizedStringResource(470, "Accepted")}: ${receiptUiDateTime(worker.acceptedAtMillis)}",
             color = stateValues.PlaceholderTextColor,
             fontSize = stateValues.smallTextSize
+        )
+
+        Text(
+            text = "${localizedStringResource(1085, "Shift password status")}: ${if (worker.hasWorkshiftPassword) localizedStringResource(1080, "Password is set") else localizedStringResource(1081, "Password is not set yet")}",
+            color = if (worker.hasWorkshiftPassword) stateValues.OkayColor else stateValues.ErrorColor,
+            fontSize = stateValues.smallTextSize,
+            fontWeight = FontWeight.Bold
         )
 
         Spacer(modifier = Modifier.height(stateValues.marginTextField))
@@ -20243,12 +22951,10 @@ private fun AppConfiguration.WorkerMembershipCard(
 
             Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
-            SimpleTextInput(
-                modifier = Modifier.fillMaxWidth(),
-                value = workerPassword,
-                placeholder = if (worker.hasWorkshiftPassword) localizedStringResource(655, "Set or replace the password used to start this worker’s shifts") else localizedStringResource(654, "Worker job password"),
-                leadingIconPath = stateValues.drawablePathIconSecurity,
-                onValueChange = { workerPassword = it }
+            Text(
+                text = localizedStringResource(1088, "You can edit role and permissions here. The worker manages their own shift password from My work."),
+                color = stateValues.PlaceholderTextColor,
+                fontSize = stateValues.smallTextSize
             )
 
             Spacer(modifier = Modifier.height(stateValues.marginTextField))
@@ -20262,19 +22968,124 @@ private fun AppConfiguration.WorkerMembershipCard(
                         storeId = storeId,
                         workerId = worker.id,
                         roleId = roleId,
-                        permissions = permissions,
-                        workerPassword = workerPassword
-                    ) {
-                        workerPassword = ""
-                    }
+                        permissions = permissions
+                    )
                 }
             )
+
+            val currentUserId = stateValues.userAccount?.id.orEmpty()
+            if (worker.userId.isNotBlank() && worker.userId != currentUserId) {
+                Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+                actionButton(
+                    text = stateValues.stringDelete,
+                    enabledColor = stateValues.ErrorColor,
+                    iconPath = stateValues.drawablePathIconDelete,
+                    iconContentDescription = stateValues.stringDelete,
+                    confirmationRequired = true,
+                    onClick = {
+                        removeStoreWorker(
+                            storeId = storeId,
+                            workerId = worker.id
+                        )
+                    }
+                )
+            }
         } else {
             Text(
-                text = permissions.joinToString(" • ") { workerPermissionLabel(it) },
+                text = localizedStringResource(1084, "Employment permissions"),
+                color = stateValues.TextColor,
+                fontSize = stateValues.textSize,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = permissionLine,
                 color = stateValues.TextColor,
                 fontSize = stateValues.smallTextSize
             )
+
+            if (showSelfPasswordEditor) {
+                Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+                val passwordStateKey = "keyState_workshiftPassword_${worker.id}"
+                val repeatedPasswordStateKey = "keyState_workshiftRepeatedPassword_${worker.id}"
+                val (workshiftPasswordField, repeatedWorkshiftPasswordField) = repeatedPasswordTextFieldGroup(
+                    modifier = Modifier.fillMaxWidth(),
+                    stateHost = NavigationScreenModel.Menu.Workers,
+                    stateKey = passwordStateKey,
+                    repeatedStateKey = repeatedPasswordStateKey,
+                    passwordTitleText = localizedStringResource(1078, "Workshift password"),
+                    passwordPlaceholderText = if (worker.hasWorkshiftPassword) localizedStringResource(655, "Set or replace your password for starting workshifts") else localizedStringResource(1078, "Workshift password"),
+                    repeatPasswordTitleText = stateValues.stringRepeatPassword,
+                    repeatPasswordPlaceholderText = stateValues.stringRepeatPassword
+                )
+
+                Text(
+                    text = stateValues.stringPasswordMustBe,
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize
+                )
+
+                Text(
+                    text = localizedStringResource(1082, "You use this password to start workshifts in this store. Only you set it; store managers can only edit your role and permissions."),
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize
+                )
+
+                Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+                val accountPasswordStateKey = "keyState_workshiftAccountPassword_${worker.id}"
+                val accountPasswordField = passwordTextField(
+                    modifier = Modifier.fillMaxWidth(),
+                    stateHost = NavigationScreenModel.Menu.Workers,
+                    stateKey = accountPasswordStateKey,
+                    titleText = localizedStringResource(1143, "Account password"),
+                    placeholderText = localizedStringResource(1144, "Enter your account password"),
+                    contentInvalidText = localizedStringResource(1145, "Account password is required to change the workshift password"),
+                    onContentValidityCheck = { it.isNotBlank() }
+                )
+
+                Text(
+                    text = localizedStringResource(1146, "Confirm with your account password so nobody can change the shift password on an unlocked device."),
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize
+                )
+
+                Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+                actionButton(
+                    text = localizedStringResource(1079, "Set my workshift password"),
+                    enabled = !selfWorkshiftPasswordSaving && workshiftPasswordField.value.text.isNotBlank() && repeatedWorkshiftPasswordField.value.text.isNotBlank() && accountPasswordField.value.text.isNotBlank(),
+                    loading = selfWorkshiftPasswordSaving,
+                    loadingText = localizedStringResource(1142, "Updating workshift password…"),
+                    iconPath = stateValues.drawablePathIconSecurity,
+                    confirmationRequired = false,
+                    onClick = {
+                        workshiftPasswordField.checkContentValidity()
+                        repeatedWorkshiftPasswordField.checkContentValidity()
+                        accountPasswordField.checkContentValidity()
+
+                        if (workshiftPasswordField.isContentValid && repeatedWorkshiftPasswordField.isContentValid && accountPasswordField.isContentValid) {
+                            selfWorkshiftPasswordSaving = true
+                            updateMyWorkerPassword(
+                                workerId = worker.id,
+                                workerPassword = workshiftPasswordField.value.text,
+                                accountPassword = accountPasswordField.value.text
+                            ) { result ->
+                                selfWorkshiftPasswordSaving = false
+                                if (result is DataState.Success) {
+                                    workshiftPasswordField.reset()
+                                    repeatedWorkshiftPasswordField.reset()
+                                    accountPasswordField.reset()
+                                }
+                            }
+                        }
+                    }
+                )
+            }
         }
     }
 }
@@ -20315,12 +23126,14 @@ fun AppConfiguration.MenuWorkersScreen() {
             tabs = listOf(
                 TabContent("my_work", localizedStringResource(472, "My work")),
                 TabContent("invites", localizedStringResource(651, "Invites")),
+                TabContent("responses", localizedStringResource(1092, "Responses")),
                 TabContent("store_workers", localizedStringResource(473, "Store workers")),
                 TabContent("requests", localizedStringResource(474, "Requests"))
             )
         )
 
         LazyColumn(
+            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Workers, selectedTab.id),
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
@@ -20353,6 +23166,8 @@ fun AppConfiguration.MenuWorkersScreen() {
                                 value = storeIdText,
                                 placeholder = localizedStringResource(657, "Enter store or branch public ID"),
                                 leadingIconPath = stateValues.drawablePathIconStores,
+                                stateHost = NavigationScreenModel.Menu.Workers,
+                                stateKey = "menu_workers_request_store_id",
                                 onValueChange = { storeIdText = it.trim() }
                             )
 
@@ -20363,8 +23178,8 @@ fun AppConfiguration.MenuWorkersScreen() {
                                 iconPath = stateValues.drawablePathIconCheck,
                                 confirmationRequired = false,
                                 onClick = {
-                                    requestStoreEmployment(storeIdText) {
-                                        storeIdText = ""
+                                    requestStoreEmployment(storeIdText) { result ->
+                                        if (result is DataState.Success) storeIdText = ""
                                     }
                                 }
                             )
@@ -20385,7 +23200,7 @@ fun AppConfiguration.MenuWorkersScreen() {
                         item { MessageText(modifier = Modifier.fillMaxWidth(), text = localizedStringResource(479, "You are not employed in other stores yet")) }
                     } else {
                         items(memberships, key = { it.id }) { worker ->
-                            WorkerMembershipCard(worker = worker, editable = false)
+                            WorkerMembershipCard(worker = worker, editable = false, showSelfPasswordEditor = true)
                         }
                     }
 
@@ -20399,9 +23214,9 @@ fun AppConfiguration.MenuWorkersScreen() {
                         )
                     }
 
-                    val requests = myRequestsPayload.orEmpty().filter { it.direction == WORKER_REQUEST_DIRECTION_USER_TO_STORE }
+                    val requests = myRequestsPayload.orEmpty().filter { it.direction == WORKER_REQUEST_DIRECTION_USER_TO_STORE && it.status == WORKER_REQUEST_STATUS_PENDING }
                     if (requests.isEmpty()) {
-                        item { MessageText(modifier = Modifier.fillMaxWidth(), text = localizedStringResource(481, "No employment requests yet")) }
+                        item { MessageText(modifier = Modifier.fillMaxWidth(), text = localizedStringResource(1117, "No pending employment requests")) }
                     } else {
                         items(requests, key = { it.id }) { request ->
                             Column(
@@ -20432,7 +23247,7 @@ fun AppConfiguration.MenuWorkersScreen() {
                                     fontSize = stateValues.smallTextSize
                                 )
 
-                                if (request.direction == WORKER_REQUEST_DIRECTION_STORE_TO_USER && request.status == "invited") {
+                                if (request.direction == WORKER_REQUEST_DIRECTION_STORE_TO_USER && request.status == WORKER_REQUEST_STATUS_INVITED) {
                                     Spacer(modifier = Modifier.height(stateValues.marginTextField))
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
@@ -20472,12 +23287,34 @@ fun AppConfiguration.MenuWorkersScreen() {
                     }
 
                     val invitations = myRequestsPayload.orEmpty()
-                        .filter { it.direction == WORKER_REQUEST_DIRECTION_STORE_TO_USER && it.status == "invited" }
+                        .filter { it.direction == WORKER_REQUEST_DIRECTION_STORE_TO_USER && it.status == WORKER_REQUEST_STATUS_INVITED }
 
                     if (invitations.isEmpty()) {
                         item { MessageText(modifier = Modifier.fillMaxWidth(), text = localizedStringResource(653, "No worker invites yet")) }
                     } else {
                         items(invitations, key = { it.id }) { request ->
+                            var decisionDialog by rememberSaveable(request.id) { mutableStateOf<String?>(null) }
+
+                            decisionDialog?.let { action ->
+                                val accepting = action == "accept"
+                                WorkerDecisionNoteDialog(
+                                    title = if (accepting) localizedStringResource(1111, "Accept invitation?") else localizedStringResource(1112, "Decline invitation?"),
+                                    subtitle = listOf(workerRequestStoreTitle(request), workerRequestDirectionLabel(request)).filter { it.isNotBlank() }.joinToString(" • "),
+                                    positiveButtonText = if (accepting) localizedStringResource(510, "Accept invite") else localizedStringResource(511, "Decline invite"),
+                                    positiveColor = if (accepting) stateValues.AccentColor else stateValues.ErrorColor,
+                                    positiveIconPath = if (accepting) stateValues.drawablePathIconCheck else stateValues.drawablePathIconCancel,
+                                    onDismiss = { decisionDialog = null },
+                                    onConfirm = { responseNote ->
+                                        decisionDialog = null
+                                        if (accepting) {
+                                            acceptMyStoreWorkerInvitation(request.id, note = responseNote)
+                                        } else {
+                                            declineMyStoreWorkerInvitation(request.id, note = responseNote)
+                                        }
+                                    }
+                                )
+                            }
+
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -20520,17 +23357,87 @@ fun AppConfiguration.MenuWorkersScreen() {
                                         text = localizedStringResource(510, "Accept invite"),
                                         iconPath = stateValues.drawablePathIconCheck,
                                         confirmationRequired = false,
-                                        onClick = { acceptMyStoreWorkerInvitation(request.id) }
+                                        onClick = { decisionDialog = "accept" }
                                     )
                                     actionButton(
                                         modifier = Modifier.weight(1f),
                                         text = localizedStringResource(511, "Decline invite"),
                                         enabledColor = stateValues.ErrorColor,
                                         iconPath = stateValues.drawablePathIconCancel,
-                                        confirmationRequired = true,
-                                        onClick = { declineMyStoreWorkerInvitation(request.id) }
+                                        confirmationRequired = false,
+                                        onClick = { decisionDialog = "decline" }
                                     )
                                 }
+                            }
+                        }
+                    }
+                }
+
+                "responses" -> {
+                    item {
+                        Text(
+                            text = localizedStringResource(1093, "Employment responses"),
+                            color = stateValues.TextColor,
+                            fontSize = stateValues.titleTextSize,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    val myResponses = myRequestsPayload.orEmpty()
+                        .filter { it.isEmploymentResponse() }
+                        .distinctBy { it.id }
+
+                    item {
+                        Text(
+                            text = localizedStringResource(1104, "My response history"),
+                            color = stateValues.TextColor,
+                            fontSize = stateValues.accentTextSize,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    if (myResponses.isEmpty()) {
+                        item {
+                            MessageText(
+                                modifier = Modifier.fillMaxWidth(),
+                                text = localizedStringResource(1094, "No employment responses yet")
+                            )
+                        }
+                    } else {
+                        items(myResponses, key = { "my_response_${it.id}" }) { request ->
+                            WorkerResponseCard(request = request, storePerspective = false)
+                        }
+                    }
+
+                    item {
+                        Text(
+                            text = localizedStringResource(1105, "Store response history"),
+                            color = stateValues.TextColor,
+                            fontSize = stateValues.accentTextSize,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(top = stateValues.marginTextFieldGroup)
+                        )
+                    }
+
+                    if (activeStoreId == null) {
+                        item { MessageText(modifier = Modifier.fillMaxWidth(), text = stateValues.stringNoActiveStore) }
+                    } else if (!currentUserCanManageWorkers(activeStoreId)) {
+                        item { MessageText(modifier = Modifier.fillMaxWidth(), text = localizedStringResource(486, "Only store owners and worker managers can accept employment requests")) }
+                    } else {
+                        val storeResponses = incomingRequestsPayload.orEmpty()
+                            .filter { it.isEmploymentResponse() }
+                            .distinctBy { it.id }
+
+                        if (storeResponses.isEmpty()) {
+                            item {
+                                MessageText(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    text = localizedStringResource(1094, "No employment responses yet")
+                                )
+                            }
+                        } else {
+                            items(storeResponses, key = { "store_response_${it.id}" }) { request ->
+                                WorkerResponseCard(request = request, storePerspective = true)
                             }
                         }
                     }
@@ -20548,15 +23455,14 @@ fun AppConfiguration.MenuWorkersScreen() {
 
                     if (activeStoreId == null) {
                         item { MessageText(modifier = Modifier.fillMaxWidth(), text = stateValues.stringNoActiveStore) }
-                    } else if (!currentUserHasStorePermission(activeStoreId, STORE_PERMISSION_WORKERS_VIEW)) {
+                    } else if (!currentUserCanViewWorkers(activeStoreId)) {
                         item { MessageText(modifier = Modifier.fillMaxWidth(), text = localizedStringResource(483, "You do not have permission to view workers in this store")) }
                     } else {
-                        if (currentUserHasStorePermission(activeStoreId, STORE_PERMISSION_WORKERS_MANAGE)) {
+                        if (currentUserCanManageWorkers(activeStoreId)) {
                             item {
                                 var invitedUserId by rememberSaveable { mutableStateOf("") }
                                 var roleId by rememberSaveable { mutableStateOf(WORKER_ROLE_STANDARD) }
                                 var permissionsText by rememberSaveable { mutableStateOf(defaultStorePermissionsForRole(WORKER_ROLE_STANDARD).joinToString("|")) }
-                                var workerPassword by rememberSaveable { mutableStateOf("") }
                                 val permissions = permissionsFromSerialized(permissionsText).ifEmpty { defaultStorePermissionsForRole(roleId) }
 
                                 Column(
@@ -20582,6 +23488,8 @@ fun AppConfiguration.MenuWorkersScreen() {
                                         value = invitedUserId,
                                         placeholder = localizedStringResource(506, "Enter user public ID"),
                                         leadingIconPath = stateValues.drawablePathIconPerson,
+                                        stateHost = NavigationScreenModel.Menu.Workers,
+                                        stateKey = "menu_workers_invited_user_id",
                                         onValueChange = { invitedUserId = it.trim().uppercase() }
                                     )
 
@@ -20611,19 +23519,17 @@ fun AppConfiguration.MenuWorkersScreen() {
 
                                     Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
-                                    SimpleTextInput(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        value = workerPassword,
-                                        placeholder = localizedStringResource(654, "Worker job password"),
-                                        leadingIconPath = stateValues.drawablePathIconSecurity,
-                                        onValueChange = { workerPassword = it }
+                                    Text(
+                                        text = localizedStringResource(1087, "Worker will set their shift password after accepting the invite."),
+                                        color = stateValues.PlaceholderTextColor,
+                                        fontSize = stateValues.smallTextSize
                                     )
 
                                     Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
                                     actionButton(
                                         text = localizedStringResource(507, "Send invite"),
-                                        enabled = invitedUserId.isNotBlank() && workerPassword.isNotBlank(),
+                                        enabled = invitedUserId.isNotBlank(),
                                         iconPath = stateValues.drawablePathIconCheck,
                                         confirmationRequired = false,
                                         onClick = {
@@ -20631,11 +23537,9 @@ fun AppConfiguration.MenuWorkersScreen() {
                                                 storeId = activeStoreId,
                                                 userId = invitedUserId,
                                                 roleId = roleId,
-                                                permissions = permissions,
-                                                workerPassword = workerPassword
-                                            ) {
-                                                invitedUserId = ""
-                                                workerPassword = ""
+                                                permissions = permissions
+                                            ) { result ->
+                                                if (result is DataState.Success) invitedUserId = ""
                                             }
                                         }
                                     )
@@ -20649,7 +23553,7 @@ fun AppConfiguration.MenuWorkersScreen() {
                         } else {
                             val editable = currentUserHasStorePermission(activeStoreId, STORE_PERMISSION_WORKERS_MANAGE)
                             items(workers, key = { it.id }) { worker ->
-                                WorkerMembershipCard(worker = worker, editable = editable, storeId = activeStoreId)
+                                WorkerMembershipCard(worker = worker, editable = editable, storeId = worker.storeId.ifBlank { activeStoreId })
                             }
                         }
                     }
@@ -20667,10 +23571,10 @@ fun AppConfiguration.MenuWorkersScreen() {
 
                     if (activeStoreId == null) {
                         item { MessageText(modifier = Modifier.fillMaxWidth(), text = stateValues.stringNoActiveStore) }
-                    } else if (!currentUserHasStorePermission(activeStoreId, STORE_PERMISSION_WORKERS_MANAGE)) {
+                    } else if (!currentUserCanManageWorkers(activeStoreId)) {
                         item { MessageText(modifier = Modifier.fillMaxWidth(), text = localizedStringResource(486, "Only store owners and worker managers can accept employment requests")) }
                     } else {
-                        val pendingRequests = incomingRequestsPayload.orEmpty().filter { it.direction == WORKER_REQUEST_DIRECTION_USER_TO_STORE && it.status == "pending" }
+                        val pendingRequests = incomingRequestsPayload.orEmpty().filter { it.direction == WORKER_REQUEST_DIRECTION_USER_TO_STORE && it.status == WORKER_REQUEST_STATUS_PENDING }
                         if (pendingRequests.isEmpty()) {
                             item { MessageText(modifier = Modifier.fillMaxWidth(), text = localizedStringResource(487, "No incoming employment requests")) }
                         } else {
@@ -20688,9 +23592,9 @@ fun AppConfiguration.MenuWorkersScreen() {
 
 private fun AppConfiguration.workerRequestStatusLabel(status: String): String {
     return when (status) {
-        "accepted" -> localizedStringResource(470, "Accepted")
-        "declined" -> localizedStringResource(492, "Declined")
-        "invited" -> localizedStringResource(508, "Invited")
+        WORKER_REQUEST_STATUS_ACCEPTED -> localizedStringResource(470, "Accepted")
+        WORKER_REQUEST_STATUS_DECLINED -> localizedStringResource(492, "Declined")
+        WORKER_REQUEST_STATUS_INVITED -> localizedStringResource(508, "Invited")
         else -> localizedStringResource(488, "Pending")
     }
 }
@@ -20778,6 +23682,7 @@ fun AppConfiguration.MenuUserAccountScreen() {
         }
 
         LazyColumn(
+            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.UserAccount),
             modifier = Modifier
                 .fillMaxHeight()
                 .fillMaxWidth(0.5f)
@@ -21076,7 +23981,7 @@ private fun AppConfiguration.transactionHistoryFindGoodsItem(line: GoodsItemInTr
     if (barcode.isBlank()) return null
 
     return stock.firstOrNull { item ->
-        item.matchesScannedBarcode(barcode) || item.barcodes.any { storedBarcode ->
+        item.matchesScannedBarcode(barcode) || item.allBarcodeValues().any { storedBarcode ->
             storedBarcodeMatchesScannedTransactionBarcode(storedBarcode, barcode)
         }
     }
@@ -21695,8 +24600,8 @@ fun AppConfiguration.MenuTransactionHistoryScreen() {
             activeStoreId?.let { getTransactions(it) }
         }
 
-        var periodPresetId by rememberSaveable { mutableStateOf("7") }
-        val initialPeriod = remember { transactionHistoryPresetDates("7") }
+        var periodPresetId by rememberSaveable { mutableStateOf("all") }
+        val initialPeriod = remember { transactionHistoryPresetDates("all") }
         var startDateText by rememberSaveable { mutableStateOf(initialPeriod.first) }
         var endDateText by rememberSaveable { mutableStateOf(initialPeriod.second) }
         var transactionTypeFilter by rememberSaveable { mutableStateOf("all") }
@@ -21773,9 +24678,6 @@ fun AppConfiguration.MenuTransactionHistoryScreen() {
             transactionsPayload.orEmpty()
                 .asSequence()
                 .filter { transaction ->
-                    activeStoreId == null || transaction.storeId == activeStoreId
-                }
-                .filter { transaction ->
                     transactionTypeFilter == "all" || transaction.type.equals(transactionTypeFilter, ignoreCase = true)
                 }
                 .filter { transaction ->
@@ -21806,6 +24708,7 @@ fun AppConfiguration.MenuTransactionHistoryScreen() {
         val visibleTransactions = filteredTransactions.clientPaged(page, pageSize)
 
         LazyColumn(
+            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.TransactionHistory),
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.92f)
@@ -21870,6 +24773,8 @@ fun AppConfiguration.MenuTransactionHistoryScreen() {
                     value = searchQuery,
                     placeholder = localizedStringResource(382, "Search transactions"),
                     leadingIconPath = stateValues.drawablePathIconTransactionHistory,
+                    stateHost = NavigationScreenModel.Menu.TransactionHistory,
+                    stateKey = "menu_transaction_history_search",
                     onValueChange = { searchQuery = it }
                 )
 
@@ -22012,6 +24917,7 @@ fun AppConfiguration.MenuTransactionHistoryReceiptPreviewScreen() {
         }
 
         LazyColumn(
+            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.TransactionHistoryReceiptPreview),
             modifier = Modifier
                 .weight(1f)
                 .padding(8.dp)
@@ -22474,6 +25380,7 @@ fun AppConfiguration.MenuOperationLogsScreen() {
         )
 
         LazyColumn(
+            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.OperationLogs),
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5),
             verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
@@ -22490,6 +25397,8 @@ fun AppConfiguration.MenuOperationLogsScreen() {
                         value = query,
                         placeholder = localizedStringResource(663, "Search logs"),
                         leadingIconPath = stateValues.drawablePathIconSearch,
+                        stateHost = NavigationScreenModel.Menu.OperationLogs,
+                        stateKey = "menu_operation_logs_search",
                         onValueChange = { query = it }
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
@@ -22609,6 +25518,7 @@ fun AppConfiguration.MenuSuppliersScreen() {
         val shownSuppliers = if (selectedTab == "mine") mineSuppliers else genericSuppliers
 
         LazyColumn(
+            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Suppliers, selectedTab),
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
@@ -22691,6 +25601,7 @@ fun AppConfiguration.MenuStoreSubscriptionPlansScreen() {
         )
 
         LazyColumn(
+            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.StoreSubscriptionPlans),
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
@@ -22799,6 +25710,7 @@ fun AppConfiguration.MenuStoresScreen() {
         var storeSearchQuery by rememberSaveable { mutableStateOf("") }
 
         LazyColumn(
+            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Stores, storeTabId),
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.7f)
@@ -22823,6 +25735,8 @@ fun AppConfiguration.MenuStoresScreen() {
                                 value = storeSearchQuery,
                                 placeholder = stateValues.stringSearchByAnyData,
                                 leadingIconPath = stateValues.drawablePathIconSearch,
+                                stateHost = NavigationScreenModel.Menu.Stores,
+                                stateKey = "menu_stores_search",
                                 onValueChange = { storeSearchQuery = it }
                             )
                         }
@@ -23346,6 +26260,157 @@ private fun AppConfiguration.filteredMainBottomDestinations(): List<NavigationSc
 }
 
 @Composable
+private fun AppConfiguration.NoActiveWorkshiftMenuTileText(
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.widthIn(min = 0.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Text(
+            text = localizedStringResource(133, "No active workshift"),
+            color = stateValues.TextColor,
+            fontSize = stateValues.smallTextSize,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = localizedStringResource(645, "Start a workshift before taking payments or changing cash. You can still browse the store and prepare work without starting a shift."),
+            color = stateValues.PlaceholderTextColor,
+            fontSize = stateValues.smallTextSize,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun AppConfiguration.NoActiveWorkshiftMenuTile() {
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2)
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
+            .padding(stateValues.marginTextField)
+    ) {
+        val compact = stateValues.isNarrowScreen || maxWidth < 420.dp
+
+        if (compact) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                NoActiveWorkshiftMenuTileText(modifier = Modifier.fillMaxWidth())
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1091, "Start shift"),
+                    iconPath = stateValues.drawablePathIconWorkers,
+                    confirmationRequired = false,
+                    onClick = { showWorkshiftStartDialog() }
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                NoActiveWorkshiftMenuTileText(modifier = Modifier.weight(1f))
+                actionButton(
+                    modifier = Modifier.widthIn(min = 132.dp, max = 220.dp),
+                    text = localizedStringResource(1091, "Start shift"),
+                    fillMaxWidthIfTextPresent = false,
+                    iconPath = stateValues.drawablePathIconWorkers,
+                    confirmationRequired = false,
+                    onClick = { showWorkshiftStartDialog() }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppConfiguration.ActiveWorkshiftMenuTileText(
+    workshift: WorkshiftDataModel,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.widthIn(min = 0.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Text(
+            text = localizedStringResource(661, "Active workshift"),
+            color = stateValues.AccentColor,
+            fontSize = stateValues.smallTextSize,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = "${workshift.workerDisplayName} • ${receiptUiDateTime(workshift.startedAtMillis)}",
+            color = stateValues.TextColor,
+            fontSize = stateValues.smallTextSize,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun AppConfiguration.ActiveWorkshiftMenuTile(workshift: WorkshiftDataModel) {
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2)
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.AccentColor.copy(alpha = 0.12f))
+            .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
+            .padding(stateValues.marginTextField)
+    ) {
+        val compact = stateValues.isNarrowScreen || maxWidth < 420.dp
+
+        if (compact) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                ActiveWorkshiftMenuTileText(workshift = workshift, modifier = Modifier.fillMaxWidth())
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(650, "End workshift"),
+                    iconPath = stateValues.drawablePathIconCancel,
+                    enabledColor = stateValues.ErrorColor,
+                    confirmationRequired = true,
+                    onClick = { endCurrentWorkshift() }
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                ActiveWorkshiftMenuTileText(workshift = workshift, modifier = Modifier.weight(1f))
+                actionButton(
+                    modifier = Modifier.widthIn(min = 132.dp, max = 220.dp),
+                    text = localizedStringResource(650, "End workshift"),
+                    fillMaxWidthIfTextPresent = false,
+                    iconPath = stateValues.drawablePathIconCancel,
+                    enabledColor = stateValues.ErrorColor,
+                    confirmationRequired = true,
+                    onClick = { endCurrentWorkshift() }
+                )
+            }
+        }
+    }
+}
+
+@Composable
 fun AppConfiguration.MenuListScreen() {
     Column(
         modifier = Modifier
@@ -23357,45 +26422,15 @@ fun AppConfiguration.MenuListScreen() {
         )
 
         stateValues.activeWorkshift?.takeIf { it.isActive && it.endedAtMillis == null && it.storeId == stateValues.activeStoreId }?.let { workshift ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2)
-                    .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
-                    .clip(RoundedCornerShape(stateValues.cornerRadius))
-                    .background(stateValues.AccentColor.copy(alpha = 0.12f))
-                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
-                    .padding(stateValues.marginTextField),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = localizedStringResource(661, "Active workshift"),
-                        color = stateValues.AccentColor,
-                        fontSize = stateValues.smallTextSize,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "${workshift.workerDisplayName} • ${receiptUiDateTime(workshift.startedAtMillis)}",
-                        color = stateValues.TextColor,
-                        fontSize = stateValues.smallTextSize,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                actionButton(
-                    text = localizedStringResource(650, "End workshift"),
-                    fillMaxWidthIfTextPresent = false,
-                    iconPath = stateValues.drawablePathIconCancel,
-                    enabledColor = stateValues.ErrorColor,
-                    confirmationRequired = true,
-                    onClick = { endCurrentWorkshift() }
-                )
-            }
+            ActiveWorkshiftMenuTile(workshift = workshift)
+        }
+
+        if (shouldBlockAppForWorkshift()) {
+            NoActiveWorkshiftMenuTile()
         }
 
         LazyColumn(
+            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.List),
             modifier = Modifier
                 .weight(1f)
         ) {
@@ -23509,6 +26544,7 @@ fun AppConfiguration.MenuFinancesScreen() {
         )
 
         LazyColumn(
+            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Finances),
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
@@ -23550,6 +26586,8 @@ fun AppConfiguration.MenuFinancesScreen() {
                         placeholder = localizedStringResource(581, "Amount"),
                         keyboardType = KeyboardType.Number,
                         leadingIconPath = stateValues.drawablePathIconFinances,
+                        stateHost = NavigationScreenModel.Menu.Finances,
+                        stateKey = "menu_finances_top_up_amount",
                         onTransformValue = { raw -> raw.filter { it.isDigit() || it == '.' || it == ',' }.replace(',', '.') },
                         onValueChange = { topUpAmount = it }
                     )
@@ -23889,14 +26927,96 @@ private fun AppConfiguration.SecuritySessionCard(session: SecuritySessionDataMod
     }
 }
 
+private fun AppConfiguration.securitySessionEventFallbackTitle(eventType: String): String = when (eventType) {
+    "session_created" -> localizedStringResource(1129, "Session created")
+    "session_refreshed" -> localizedStringResource(1130, "Session refreshed")
+    "session_replaced" -> localizedStringResource(1131, "Older session replaced")
+    "session_revoked" -> localizedStringResource(1132, "Session revoked")
+    "session_revoked_others" -> localizedStringResource(1133, "Other session revoked")
+    "session_logout" -> localizedStringResource(1134, "Logged out")
+    "session_expired" -> localizedStringResource(1135, "Session expired")
+    else -> localizedStringResource(1136, "Security event")
+}
+
+@Composable
+private fun AppConfiguration.SecuritySessionHistoryCard(event: SecuritySessionHistoryDataModel) {
+    val title = event.title.visibleLocalizedString(
+        stateValues.appLanguage,
+        securitySessionEventFallbackTitle(event.eventType)
+    )
+    val device = event.deviceName
+        .ifBlank { event.platformName }
+        .ifBlank { localizedStringResource(230, "Unknown device") }
+    val details = event.details.visibleLocalizedString(stateValues.appLanguage, "")
+    val metadataText = event.metadata
+        .filterValues { it.isNotBlank() }
+        .entries
+        .joinToString(" • ") { "${it.key}: ${it.value}" }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .border(
+                stateValues.unfocusedBorderWidth,
+                stateValues.PlaceholderTextColor,
+                RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .padding(stateValues.marginTextFieldGroup)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CpImage(
+                modifier = Modifier.size(30.dp),
+                url = stateValues.drawablePathIconSecurity,
+                fallbackRes = stateValues.drawableResIconSecurity.value,
+                contentDescription = title,
+                tintColor = stateValues.AccentColor
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.accentTextSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = securitySessionDateTimeText(event.createdAtMillis),
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+        SecuritySessionInfoLine(localizedStringResource(1124, "Event time"), securitySessionDateTimeText(event.createdAtMillis))
+        SecuritySessionInfoLine(localizedStringResource(1126, "Device"), device)
+        SecuritySessionInfoLine(localizedStringResource(235, "Language"), event.metadata["localeLanguage"].orEmpty())
+        SecuritySessionInfoLine("IP", event.ipAddress)
+        SecuritySessionInfoLine(localizedStringResource(1128, "Session ID"), event.sessionId?.take(8).orEmpty())
+        SecuritySessionInfoLine(localizedStringResource(1127, "Details"), details)
+        SecuritySessionInfoLine(localizedStringResource(1137, "Related data"), metadataText)
+    }
+}
+
 @Composable
 fun AppConfiguration.MenuSecurityScreen() {
     val sessionsState by securitySessionsState.value.collectAsState()
+    val historyState by securitySessionHistoryState.value.collectAsState()
     val sessions = (sessionsState as? DataState.Success<List<SecuritySessionDataModel>>)?.payload.orEmpty()
+    val history = (historyState as? DataState.Success<List<SecuritySessionHistoryDataModel>>)?.payload.orEmpty()
     val currentSession = sessions.firstOrNull { it.current }
+    var selectedSecurityTab by rememberSaveable { mutableStateOf("sessions") }
 
     LaunchedEffect(Unit) {
         getSecuritySessions()
+        getSecuritySessionHistory()
     }
 
     Column(
@@ -23913,9 +27033,30 @@ fun AppConfiguration.MenuSecurityScreen() {
             }
         )
 
-        LazyColumn(
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
+                .padding(horizontal = stateValues.marginTextField, vertical = 8.dp)
+        ) {
+            val selectedTab = tabRowWidget(
+                modifier = Modifier.fillMaxWidth(),
+                selectedIndexInitial = selectedSecurityTab,
+                tabs = listOf(
+                    TabContent("sessions", localizedStringResource(1121, "Active sessions")),
+                    TabContent("history", localizedStringResource(1122, "Security history"))
+                ),
+                unselectedContainerColor = stateValues.BackgroundColor
+            )
+
+            LaunchedEffect(selectedTab.id) {
+                selectedSecurityTab = selectedTab.id
+            }
+        }
+
+        LazyColumn(
+            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Security, selectedSecurityTab),
+            modifier = Modifier
+                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
                 .weight(1f),
             contentPadding = PaddingValues(stateValues.marginTextFieldGroup),
             verticalArrangement = Arrangement.spacedBy(stateValues.marginTextFieldGroup)
@@ -23942,13 +27083,21 @@ fun AppConfiguration.MenuSecurityScreen() {
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = localizedStringResource(227, "Review where your account is signed in. Revoke sessions you do not recognize."),
+                        text = if (selectedSecurityTab == "history") {
+                            localizedStringResource(1123, "All sign-ins, refreshes and revocations are stored here.")
+                        } else {
+                            localizedStringResource(227, "Review where your account is signed in. Revoke sessions you do not recognize.")
+                        },
                         color = stateValues.PlaceholderTextColor,
                         fontSize = stateValues.smallTextSize
                     )
-                    currentSession?.let {
+                    currentSession?.takeIf { selectedSecurityTab == "sessions" }?.let {
                         Spacer(modifier = Modifier.height(10.dp))
-                        SecuritySessionInfoLine(localizedStringResource(228, "This device"), it.deviceName.ifBlank { it.platformName }.ifBlank { localizedStringResource(229, "Current session") }, accent = true)
+                        SecuritySessionInfoLine(
+                            localizedStringResource(228, "This device"),
+                            it.deviceName.ifBlank { it.platformName }.ifBlank { localizedStringResource(229, "Current session") },
+                            accent = true
+                        )
                     }
                 }
             }
@@ -23962,43 +27111,71 @@ fun AppConfiguration.MenuSecurityScreen() {
                         modifier = Modifier.weight(1f),
                         text = localizedStringResource(237, "Refresh"),
                         iconPath = stateValues.drawablePathIconSearch,
-                        onClick = { getSecuritySessions() }
+                        onClick = {
+                            if (selectedSecurityTab == "history") getSecuritySessionHistory() else getSecuritySessions()
+                        }
                     )
-                    actionButton(
-                        modifier = Modifier.weight(1f),
-                        text = localizedStringResource(238, "Revoke others"),
-                        iconPath = stateValues.drawablePathIconDelete,
-                        enabled = sessions.any { !it.current },
-                        enabledColor = stateValues.ErrorColor,
-                        confirmationRequired = true,
-                        onClick = { revokeOtherSecuritySessions() }
-                    )
+                    if (selectedSecurityTab == "sessions") {
+                        actionButton(
+                            modifier = Modifier.weight(1f),
+                            text = localizedStringResource(238, "Revoke others"),
+                            iconPath = stateValues.drawablePathIconDelete,
+                            enabled = sessions.any { !it.current },
+                            enabledColor = stateValues.ErrorColor,
+                            confirmationRequired = true,
+                            onClick = { revokeOtherSecuritySessions() }
+                        )
+                    }
                 }
             }
 
-            if (sessions.isEmpty()) {
-                item {
-                    Text(
-                        text = when (sessionsState) {
-                            is DataState.Empty -> localizedStringResource(239, "No active sessions loaded yet")
-                            else -> stateValues.stringNoMatches
-                        },
-                        color = stateValues.PlaceholderTextColor,
-                        fontSize = stateValues.textSize,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp)
-                    )
+            if (selectedSecurityTab == "sessions") {
+                if (sessions.isEmpty()) {
+                    item {
+                        Text(
+                            text = when (sessionsState) {
+                                is DataState.Empty -> localizedStringResource(239, "No active sessions loaded yet")
+                                else -> stateValues.stringNoMatches
+                            },
+                            color = stateValues.PlaceholderTextColor,
+                            fontSize = stateValues.textSize,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp)
+                        )
+                    }
+                } else {
+                    items(sessions, key = { it.id }) { session ->
+                        SecuritySessionCard(session)
+                    }
                 }
             } else {
-                items(sessions, key = { it.id }) { session ->
-                    SecuritySessionCard(session)
+                if (history.isEmpty()) {
+                    item {
+                        Text(
+                            text = when (historyState) {
+                                is DataState.Empty -> localizedStringResource(1125, "No security history loaded yet")
+                                else -> stateValues.stringNoMatches
+                            },
+                            color = stateValues.PlaceholderTextColor,
+                            fontSize = stateValues.textSize,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp)
+                        )
+                    }
+                } else {
+                    items(history, key = { it.id }) { event ->
+                        SecuritySessionHistoryCard(event)
+                    }
                 }
             }
         }
     }
 }
+
 
 @Composable
 fun AppConfiguration.MenuDevicesScreen() {
@@ -24272,11 +27449,14 @@ fun AppConfiguration.MenuSupportScreen() {
                     value = faqSearch,
                     placeholder = localizedStringResource(816, "Search FAQ"),
                     leadingIconPath = stateValues.drawablePathIconSearch,
+                    stateHost = NavigationScreenModel.Menu.Support,
+                    stateKey = "menu_support_faq_search",
                     onValueChange = { faqSearch = it }
                 )
             }
 
             LazyColumn(
+                state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Support, "faq"),
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
@@ -24417,6 +27597,7 @@ fun AppConfiguration.MenuSupportScreen() {
                 }
 
                 LazyColumn(
+                    state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Support, selectedTicket?.id ?: "new_ticket"),
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
@@ -24458,6 +27639,8 @@ fun AppConfiguration.MenuSupportScreen() {
                             placeholder = localizedStringResource(824, "Type your message"),
                             singleLine = false,
                             leadingIconPath = stateValues.drawablePathIconSupport,
+                            stateHost = NavigationScreenModel.Menu.Support,
+                            stateKey = "menu_support_draft_message",
                             onValueChange = { draftMessage = it.take(4000) }
                         )
                         actionButton(
@@ -24561,6 +27744,8 @@ fun AppConfiguration.MenuDebtorsScreen() {
                 value = search,
                 placeholder = stateValues.stringSearchByAnyData,
                 leadingIconPath = stateValues.drawablePathIconSearch,
+                stateHost = NavigationScreenModel.Menu.Debtors,
+                stateKey = "menu_debtors_search",
                 onValueChange = { search = it }
             )
             Spacer(modifier = Modifier.height(6.dp))
@@ -24573,6 +27758,7 @@ fun AppConfiguration.MenuDebtorsScreen() {
         }
 
         LazyColumn(
+            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Debtors),
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
@@ -24667,7 +27853,7 @@ fun AppConfiguration.MenuCloseDebtScreen() {
         var paymentAmountText by rememberSaveable(debtor.id) { mutableStateOf(moneyInputFromDouble(debtor.debtAmount)) }
         var planAmountText by rememberSaveable(debtor.id) { mutableStateOf("") }
         var planDateText by rememberSaveable(debtor.id) { mutableStateOf("") }
-        var planNoteText by rememberSaveable(debtor.id) { mutableStateOf("") }
+        var planNoteLocalized by remember(debtor.id) { mutableStateOf(emptyLocalizedItemForCurrentLanguage()) }
 
         val currencySymbol = stateValues.globalAppConfiguration.countries.getCurrency(debtor.currency)?.symbol ?: debtor.currency
         val amountToPay = paymentAmountText.toMoneyDouble().coerceIn(0.0, debtWithInterest(debtor))
@@ -24706,6 +27892,7 @@ fun AppConfiguration.MenuCloseDebtScreen() {
         }
 
         LazyColumn(
+            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.CloseDebt, "${debtor.id}:$selectedTab"),
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.76f)
@@ -24739,20 +27926,20 @@ fun AppConfiguration.MenuCloseDebtScreen() {
                     )
                     Spacer(modifier = Modifier.height(stateValues.marginTextField))
                     if (debtorType == "company") {
-                        SimpleTextInput(Modifier.fillMaxWidth(), companyName, localizedStringResource(291, "Company name"), leadingIconPath = stateValues.drawablePathIconStores) { companyName = it }
+                        SimpleTextInput(Modifier.fillMaxWidth(), companyName, localizedStringResource(291, "Company name"), leadingIconPath = stateValues.drawablePathIconStores, stateHost = NavigationScreenModel.Menu.CloseDebt, stateKey = "menu_close_debt_${debtor.id}_company_name") { companyName = it }
                         Spacer(modifier = Modifier.height(stateValues.marginTextField))
-                        SimpleTextInput(Modifier.fillMaxWidth(), idNumber, localizedStringResource(292, "Company ID / BIN"), keyboardType = KeyboardType.Number, leadingIconPath = stateValues.drawablePathIconStores) { idNumber = it.filter { c -> c.isDigit() }.take(32) }
+                        SimpleTextInput(Modifier.fillMaxWidth(), idNumber, localizedStringResource(292, "Company ID / BIN"), keyboardType = KeyboardType.Number, leadingIconPath = stateValues.drawablePathIconStores, stateHost = NavigationScreenModel.Menu.CloseDebt, stateKey = "menu_close_debt_${debtor.id}_company_id_number") { idNumber = it.filter { c -> c.isDigit() }.take(32) }
                     } else {
-                        SimpleTextInput(Modifier.fillMaxWidth(), firstName, stateValues.stringFirstName, leadingIconPath = stateValues.drawablePathIconPerson) { firstName = it }
+                        SimpleTextInput(Modifier.fillMaxWidth(), firstName, stateValues.stringFirstName, leadingIconPath = stateValues.drawablePathIconPerson, stateHost = NavigationScreenModel.Menu.CloseDebt, stateKey = "menu_close_debt_${debtor.id}_first_name") { firstName = it }
                         Spacer(modifier = Modifier.height(stateValues.marginTextField))
-                        SimpleTextInput(Modifier.fillMaxWidth(), lastName, stateValues.stringLastName, leadingIconPath = stateValues.drawablePathIconPerson) { lastName = it }
+                        SimpleTextInput(Modifier.fillMaxWidth(), lastName, stateValues.stringLastName, leadingIconPath = stateValues.drawablePathIconPerson, stateHost = NavigationScreenModel.Menu.CloseDebt, stateKey = "menu_close_debt_${debtor.id}_last_name") { lastName = it }
                         Spacer(modifier = Modifier.height(stateValues.marginTextField))
-                        SimpleTextInput(Modifier.fillMaxWidth(), idNumber, localizedStringResource(293, "ID number"), keyboardType = KeyboardType.Number, leadingIconPath = stateValues.drawablePathIconPerson) { idNumber = it.filter { c -> c.isDigit() }.take(32) }
+                        SimpleTextInput(Modifier.fillMaxWidth(), idNumber, localizedStringResource(293, "ID number"), keyboardType = KeyboardType.Number, leadingIconPath = stateValues.drawablePathIconPerson, stateHost = NavigationScreenModel.Menu.CloseDebt, stateKey = "menu_close_debt_${debtor.id}_id_number") { idNumber = it.filter { c -> c.isDigit() }.take(32) }
                     }
                     Spacer(modifier = Modifier.height(stateValues.marginTextField))
-                    SimpleTextInput(Modifier.fillMaxWidth(), phone, stateValues.stringPhoneNumber, keyboardType = KeyboardType.Phone, leadingIconPath = stateValues.drawablePathIconPerson) { phone = it }
+                    SimpleTextInput(Modifier.fillMaxWidth(), phone, stateValues.stringPhoneNumber, keyboardType = KeyboardType.Phone, leadingIconPath = stateValues.drawablePathIconPerson, stateHost = NavigationScreenModel.Menu.CloseDebt, stateKey = "menu_close_debt_${debtor.id}_phone") { phone = it }
                     Spacer(modifier = Modifier.height(stateValues.marginTextField))
-                    SimpleTextInput(Modifier.fillMaxWidth(), email, stateValues.stringEmail, keyboardType = KeyboardType.Email, leadingIconPath = stateValues.drawablePathIconEmail) { email = it }
+                    SimpleTextInput(Modifier.fillMaxWidth(), email, stateValues.stringEmail, keyboardType = KeyboardType.Email, leadingIconPath = stateValues.drawablePathIconEmail, stateHost = NavigationScreenModel.Menu.CloseDebt, stateKey = "menu_close_debt_${debtor.id}_email") { email = it }
                     Spacer(modifier = Modifier.height(stateValues.marginTextField))
                     TransactionPaymentAmountField(
                         title = localizedStringResource(362, "Debt amount"),
@@ -24783,7 +27970,7 @@ fun AppConfiguration.MenuCloseDebtScreen() {
                     if (interestEnabled) {
                         Spacer(modifier = Modifier.height(stateValues.marginTextField))
                         Row(horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField), modifier = Modifier.fillMaxWidth()) {
-                            SimpleTextInput(Modifier.weight(1f), interestRateText, localizedStringResource(811, "Rate %"), keyboardType = KeyboardType.Decimal, leadingIconPath = stateValues.drawablePathIconFinances) { interestRateText = it.filter { c -> c.isDigit() || c == '.' || c == ',' }.replace(',', '.') }
+                            SimpleTextInput(Modifier.weight(1f), interestRateText, localizedStringResource(811, "Rate %"), keyboardType = KeyboardType.Decimal, leadingIconPath = stateValues.drawablePathIconFinances, stateHost = NavigationScreenModel.Menu.CloseDebt, stateKey = "menu_close_debt_${debtor.id}_interest_rate") { interestRateText = it.filter { c -> c.isDigit() || c == '.' || c == ',' }.replace(',', '.') }
                             SimpleDropdownField(
                                 modifier = Modifier.weight(1f),
                                 title = localizedStringResource(363, "Period"),
@@ -24816,7 +28003,17 @@ fun AppConfiguration.MenuCloseDebtScreen() {
                     Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
                     StockDatePartsEditor(localizedStringResource(372, "Planned payment date"), planDateText) { planDateText = it }
                     Spacer(modifier = Modifier.height(stateValues.marginTextField))
-                    SimpleTextInput(Modifier.fillMaxWidth(), planNoteText, localizedStringResource(373, "Plan note"), leadingIconPath = stateValues.drawablePathIconEdit) { planNoteText = it }
+                    StockLocalizedStringGroupEditor(
+                        title = localizedStringResource(373, "Plan note"),
+                        placeholder = stateValues.stringOptional,
+                        values = planNoteLocalized,
+                        addText = localizedStringResource(1072, "Add debt plan note translation"),
+                        required = false,
+                        singleLine = false,
+                        adaptiveMultiline = true,
+                        persistentKey = "debtor-plan-note:${debtor.id}",
+                        onChanged = { planNoteLocalized = it }
+                    )
                     Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
                     actionButton(
                         text = localizedStringResource(348, "Add planned payment"),
@@ -24830,12 +28027,12 @@ fun AppConfiguration.MenuCloseDebtScreen() {
                                 amount = amount,
                                 percent = pct,
                                 dueAtMillis = stockDateInputTextToMillis(planDateText),
-                                note = planNoteText.takeIf { it.isNotBlank() }
+                                note = planNoteLocalized.toStoredLocalizedNoteOrNull()
                             )
                             updateDebtor(storeId, debtor.copy(plannedPayments = debtor.plannedPayments + plan))
                             planAmountText = ""
                             planDateText = ""
-                            planNoteText = ""
+                            planNoteLocalized = emptyLocalizedItemForCurrentLanguage()
                         }
                     )
                     Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
@@ -24852,7 +28049,7 @@ fun AppConfiguration.MenuCloseDebtScreen() {
                             DebtorInfoLine("${index + 1}. ${localizedStringResource(374, "Planned")}", "${moneyInputFromDouble(plan.amount)} ${debtor.currency}", accent = true)
                             plan.percent?.let { DebtorInfoLine(localizedStringResource(375, "Percent"), "${it}%") }
                             plan.dueAtMillis?.toStockDateInputText()?.let { DebtorInfoLine(stateValues.stringDate, it) }
-                            plan.note?.let { DebtorInfoLine(localizedStringResource(266, "Note"), it) }
+                            plan.note.visibleStoredLocalizedNote(stateValues.appLanguage)?.let { DebtorInfoLine(localizedStringResource(266, "Note"), it) }
                         }
                         Spacer(modifier = Modifier.height(stateValues.marginTextField))
                     }
@@ -24875,7 +28072,7 @@ fun AppConfiguration.MenuCloseDebtScreen() {
                     debtor.paymentHistory.sortedByDescending { it.timeMillis }.forEach { record ->
                         DebtorInfoLine(receiptUiDateTime(record.timeMillis), "${moneyInputFromDouble(record.amount)} ${record.currency} • ${record.paymentKind}", accent = true)
                         DebtorInfoLine(localizedStringResource(378, "Before / after"), "${moneyInputFromDouble(record.debtBefore)} → ${moneyInputFromDouble(record.debtAfter)}")
-                        record.note?.let { DebtorInfoLine(localizedStringResource(266, "Note"), it) }
+                        record.note.visibleStoredLocalizedNote(stateValues.appLanguage)?.let { DebtorInfoLine(localizedStringResource(266, "Note"), it) }
                     }
                 }
 
@@ -24980,6 +28177,7 @@ fun AppConfiguration.MenuAppThemeScreen() {
         )
 
         LazyColumn(
+            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.AppTheme),
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(
@@ -25015,6 +28213,7 @@ fun AppConfiguration.MenuAppScaleScreen() {
         )
 
         LazyColumn(
+            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.AppScale),
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(
@@ -25192,6 +28391,7 @@ fun AppConfiguration.MenuAppLanguageScreen() {
         )
 
         LazyColumn(
+            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.AppLanguage),
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(
@@ -25256,6 +28456,11 @@ private data class AnalyticsPeriod(
     val startMillis: Long,
     val endMillisExclusive: Long
 )
+
+private const val ANALYTICS_SCOPE_ALL = "all"
+private const val ANALYTICS_SCOPE_GOODS_ITEM = "goods_item"
+private const val ANALYTICS_SCOPE_SUPPLIER = "supplier"
+private const val ANALYTICS_SCOPE_CATEGORY = "category"
 
 private data class AnalyticsHistoryRow(
     val title: String,
@@ -25340,12 +28545,26 @@ fun AppConfiguration.MenuAnalyticsScreen() {
             )
         }
 
+        var analyticsScopeType by rememberSaveable { mutableStateOf(ANALYTICS_SCOPE_ALL) }
+        var selectedAnalyticsGoodsItemId by rememberSaveable { mutableStateOf("") }
+        var selectedAnalyticsSupplierId by rememberSaveable { mutableStateOf("") }
+        var selectedAnalyticsCategoryId by rememberSaveable { mutableStateOf("") }
+
+        val stockForAnalytics = stateValues.stock.orEmpty()
+        val stockBatchesForAnalytics = stateValues.stockBatches.orEmpty()
+        val suppliersForAnalytics = stateValues.suppliers.orEmpty().filter { it.isActive }
+        val categoriesForAnalytics = stateValues.goodsCategories.orEmpty()
+
+        val analyticsGoodsItemFilter = selectedAnalyticsGoodsItemId.takeIf { analyticsScopeType == ANALYTICS_SCOPE_GOODS_ITEM && it.isNotBlank() }
+        val analyticsSupplierFilter = selectedAnalyticsSupplierId.takeIf { analyticsScopeType == ANALYTICS_SCOPE_SUPPLIER && it.isNotBlank() }
+        val analyticsCategoryFilter = selectedAnalyticsCategoryId.takeIf { analyticsScopeType == ANALYTICS_SCOPE_CATEGORY && it.isNotBlank() }
+
         val startMillis = stockDateInputTextToMillis(startDateText)
         val endExclusiveMillis = stockDateInputTextToLocalDate(endDateText)
             ?.let { transactionHistoryPlusDays(it, 1).atStartOfDayIn(TimeZone.currentSystemDefault()).toEpochMilliseconds() }
 
-        val scopedTransactions = remember(transactions, activeStoreId, periodPresetId, startDateText, endDateText) {
-            transactions
+        val scopedTransactions = remember(transactions, activeStoreId, periodPresetId, startDateText, endDateText, stockForAnalytics, stockBatchesForAnalytics, analyticsGoodsItemFilter, analyticsSupplierFilter, analyticsCategoryFilter) {
+            val periodTransactions = transactions
                 .filter { transaction -> activeStoreId == null || transaction.storeId == activeStoreId }
                 .filter { transaction ->
                     if (periodPresetId == "all") {
@@ -25356,6 +28575,14 @@ fun AppConfiguration.MenuAnalyticsScreen() {
                         afterStart && beforeEnd
                     }
                 }
+            analyticsScopedTransactions(
+                transactions = periodTransactions,
+                stock = stockForAnalytics,
+                batches = stockBatchesForAnalytics,
+                goodsItemIdFilter = analyticsGoodsItemFilter,
+                supplierIdFilter = analyticsSupplierFilter,
+                categoryIdFilter = analyticsCategoryFilter
+            )
         }
 
         val scopedCashRegisterEvents = remember(cashRegisterEvents, activeStoreId, periodPresetId, startDateText, endDateText) {
@@ -25375,9 +28602,16 @@ fun AppConfiguration.MenuAnalyticsScreen() {
         val analyticsStartMillis = if (periodPresetId == "all") 0L else startMillis ?: 0L
         val analyticsEndMillis = if (periodPresetId == "all") Long.MAX_VALUE else endExclusiveMillis ?: Long.MAX_VALUE
 
-        LaunchedEffect(activeStoreId, analyticsStartMillis, analyticsEndMillis) {
+        LaunchedEffect(activeStoreId, analyticsStartMillis, analyticsEndMillis, analyticsGoodsItemFilter, analyticsSupplierFilter, analyticsCategoryFilter) {
             activeStoreId?.takeIf { currentUserCanViewAnalytics(it) }?.let { storeId ->
-                getStoreAnalytics(storeId, analyticsStartMillis, analyticsEndMillis)
+                getStoreAnalytics(
+                    storeId = storeId,
+                    startMillis = analyticsStartMillis,
+                    endMillisExclusive = analyticsEndMillis,
+                    goodsItemIdFilter = analyticsGoodsItemFilter,
+                    supplierIdFilter = analyticsSupplierFilter,
+                    categoryIdFilter = analyticsCategoryFilter
+                )
             }
         }
 
@@ -25386,9 +28620,12 @@ fun AppConfiguration.MenuAnalyticsScreen() {
             analyticsStartMillis,
             analyticsEndMillis,
             transactions,
-            stateValues.stock,
-            stateValues.stockBatches,
-            cashRegister?.currencyCode
+            stockForAnalytics,
+            stockBatchesForAnalytics,
+            cashRegister?.currencyCode,
+            analyticsGoodsItemFilter,
+            analyticsSupplierFilter,
+            analyticsCategoryFilter
         ) {
             activeStoreId?.let { storeId ->
                 buildStoreAnalyticsDashboard(
@@ -25396,9 +28633,12 @@ fun AppConfiguration.MenuAnalyticsScreen() {
                     startMillis = analyticsStartMillis,
                     endMillisExclusive = analyticsEndMillis,
                     transactions = transactions,
-                    stock = stateValues.stock.orEmpty(),
-                    batches = stateValues.stockBatches.orEmpty(),
-                    fallbackCurrencyCode = cashRegister?.currencyCode?.takeIf { it.isNotBlank() } ?: currentAnalyticsCurrencyCode()
+                    stock = stockForAnalytics,
+                    batches = stockBatchesForAnalytics,
+                    fallbackCurrencyCode = cashRegister?.currencyCode?.takeIf { it.isNotBlank() } ?: currentAnalyticsCurrencyCode(),
+                    goodsItemIdFilter = analyticsGoodsItemFilter,
+                    supplierIdFilter = analyticsSupplierFilter,
+                    categoryIdFilter = analyticsCategoryFilter
                 )
             }
         }
@@ -25407,7 +28647,10 @@ fun AppConfiguration.MenuAnalyticsScreen() {
             ?.takeIf { dashboard ->
                 dashboard.storeId == activeStoreId &&
                         dashboard.startMillis == analyticsStartMillis &&
-                        dashboard.endMillisExclusive == analyticsEndMillis
+                        dashboard.endMillisExclusive == analyticsEndMillis &&
+                        dashboard.goodsItemIdFilter.orEmpty() == analyticsGoodsItemFilter.orEmpty() &&
+                        dashboard.supplierIdFilter.orEmpty() == analyticsSupplierFilter.orEmpty() &&
+                        dashboard.categoryIdFilter.orEmpty() == analyticsCategoryFilter.orEmpty()
             }
             ?: localAnalyticsDashboard
 
@@ -25488,6 +28731,146 @@ fun AppConfiguration.MenuAnalyticsScreen() {
                 }
             )
         }
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+        Text(
+            modifier = Modifier
+                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+                .padding(horizontal = stateValues.marginTextField, vertical = 2.dp),
+            text = localizedStringResource(1163, "Analytics scope"),
+            color = stateValues.TextColor,
+            fontSize = stateValues.smallTextSize,
+            fontWeight = FontWeight.Bold
+        )
+
+        val analyticsScopeOptions = listOf(
+            ANALYTICS_SCOPE_ALL to localizedStringResource(1164, "All goods"),
+            ANALYTICS_SCOPE_GOODS_ITEM to localizedStringResource(1165, "Goods item"),
+            ANALYTICS_SCOPE_SUPPLIER to localizedStringResource(1166, "Supplier"),
+            ANALYTICS_SCOPE_CATEGORY to localizedStringResource(1167, "Category")
+        )
+
+        LazyRow(
+            modifier = Modifier
+                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+                .padding(horizontal = stateValues.marginTextField),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            contentPadding = PaddingValues(vertical = 2.dp)
+        ) {
+            items(analyticsScopeOptions) { option ->
+                TransactionHistoryFilterChip(
+                    text = option.second,
+                    selected = analyticsScopeType == option.first,
+                    onClick = { analyticsScopeType = option.first }
+                )
+            }
+        }
+
+        val analyticsGoodsItemDomains = remember(stockForAnalytics, stateValues.appLanguage) {
+            stockForAnalytics
+                .sortedBy { item -> item.name.extractLocalizedString(stateValues.appLanguage) ?: item.id }
+                .map { item ->
+                    SelectableDomain(
+                        id = item.id,
+                        displayId = item.allBarcodeValues().firstOrNull().orEmpty().ifBlank { item.id.take(8) }.toLocalizedSingleMain(),
+                        name = item.name.ifEmpty { listOf(LocalizedStringDataModel("main", item.id.take(8))) },
+                        iconPath = stateValues.drawablePathIconStock,
+                        iconRes = stateValues.drawableResIconStock.value
+                    )
+                }
+        }
+        val analyticsSupplierDomains = remember(suppliersForAnalytics, stateValues.appLanguage) {
+            suppliersForAnalytics
+                .sortedBy { supplier -> supplier.name.extractLocalizedString(stateValues.appLanguage) ?: supplier.id }
+                .map { supplier ->
+                    SelectableDomain(
+                        id = supplier.id,
+                        displayId = supplier.id.take(8).toLocalizedSingleMain(),
+                        name = supplier.name.ifEmpty { listOf(LocalizedStringDataModel("main", supplier.id.take(8))) },
+                        iconPath = stateValues.drawablePathIconSuppliers,
+                        iconRes = stateValues.drawableResIconSuppliers.value
+                    )
+                }
+        }
+        val analyticsCategoryDomains = remember(categoriesForAnalytics, stateValues.appLanguage) {
+            categoriesForAnalytics
+                .sortedBy { category -> category.name.extractLocalizedString(stateValues.appLanguage) ?: category.id }
+                .map { category ->
+                    SelectableDomain(
+                        id = category.id,
+                        displayId = category.id.take(8).toLocalizedSingleMain(),
+                        name = category.name.ifEmpty { listOf(LocalizedStringDataModel("main", category.id.take(8))) },
+                        iconPath = stateValues.drawablePathIconGoodsCategories,
+                        iconRes = stateValues.drawableResIconGoodsCategories.value
+                    )
+                }
+        }
+
+        when (analyticsScopeType) {
+            ANALYTICS_SCOPE_GOODS_ITEM -> {
+                if (analyticsGoodsItemDomains.isNotEmpty()) {
+                    val selectedInitial = selectedAnalyticsGoodsItemId.takeIf { selected -> analyticsGoodsItemDomains.any { it.id == selected } }
+                        ?: analyticsGoodsItemDomains.first().id
+                    val selector = domainSelectionTextField(
+                        modifier = Modifier
+                            .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+                            .padding(horizontal = stateValues.marginTextField, vertical = 4.dp),
+                        titleText = localizedStringResource(1168, "Select exact analytics target"),
+                        stateHost = NavigationScreenModel.Menu.Analytics,
+                        stateKey = "analytics_scope_goods_item",
+                        domains = analyticsGoodsItemDomains,
+                        selectedInitial = selectedInitial,
+                        valueInitial = analyticsGoodsItemDomains.firstOrNull { it.id == selectedInitial }?.name?.extractLocalizedString(stateValues.appLanguage).orEmpty(),
+                        selectionSecondaryEnabled = false,
+                        keyboardType = KeyboardType.Text
+                    )
+                    LaunchedEffect(selector.selectedId) { selectedAnalyticsGoodsItemId = selector.selectedId }
+                }
+            }
+            ANALYTICS_SCOPE_SUPPLIER -> {
+                if (analyticsSupplierDomains.isNotEmpty()) {
+                    val selectedInitial = selectedAnalyticsSupplierId.takeIf { selected -> analyticsSupplierDomains.any { it.id == selected } }
+                        ?: analyticsSupplierDomains.first().id
+                    val selector = domainSelectionTextField(
+                        modifier = Modifier
+                            .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+                            .padding(horizontal = stateValues.marginTextField, vertical = 4.dp),
+                        titleText = localizedStringResource(1168, "Select exact analytics target"),
+                        stateHost = NavigationScreenModel.Menu.Analytics,
+                        stateKey = "analytics_scope_supplier",
+                        domains = analyticsSupplierDomains,
+                        selectedInitial = selectedInitial,
+                        valueInitial = analyticsSupplierDomains.firstOrNull { it.id == selectedInitial }?.name?.extractLocalizedString(stateValues.appLanguage).orEmpty(),
+                        selectionSecondaryEnabled = false,
+                        keyboardType = KeyboardType.Text
+                    )
+                    LaunchedEffect(selector.selectedId) { selectedAnalyticsSupplierId = selector.selectedId }
+                }
+            }
+            ANALYTICS_SCOPE_CATEGORY -> {
+                if (analyticsCategoryDomains.isNotEmpty()) {
+                    val selectedInitial = selectedAnalyticsCategoryId.takeIf { selected -> analyticsCategoryDomains.any { it.id == selected } }
+                        ?: analyticsCategoryDomains.first().id
+                    val selector = domainSelectionTextField(
+                        modifier = Modifier
+                            .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+                            .padding(horizontal = stateValues.marginTextField, vertical = 4.dp),
+                        titleText = localizedStringResource(1168, "Select exact analytics target"),
+                        stateHost = NavigationScreenModel.Menu.Analytics,
+                        stateKey = "analytics_scope_category",
+                        domains = analyticsCategoryDomains,
+                        selectedInitial = selectedInitial,
+                        valueInitial = analyticsCategoryDomains.firstOrNull { it.id == selectedInitial }?.name?.extractLocalizedString(stateValues.appLanguage).orEmpty(),
+                        selectionSecondaryEnabled = false,
+                        keyboardType = KeyboardType.Text
+                    )
+                    LaunchedEffect(selector.selectedId) { selectedAnalyticsCategoryId = selector.selectedId }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
         val selectedTab = MenuAnalyticsTab.fromId(selectedTabContent.id)
         val currencyCode = cashRegister?.currencyCode?.takeIf { it.isNotBlank() } ?: currentAnalyticsCurrencyCode()
@@ -25636,6 +29019,7 @@ private fun AppConfiguration.MenuAnalyticsTransactionScreen(
     }
 
     LazyColumn(
+        state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Analytics, "transaction_$transactionType"),
         modifier = Modifier
             .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
             .padding(stateValues.marginTextField),
@@ -25766,6 +29150,7 @@ private fun AppConfiguration.MenuAnalyticsStockScreen(
     val currencyCode = dashboard?.currencyCode?.takeIf { it.isNotBlank() } ?: currentAnalyticsCurrencyCode()
 
     LazyColumn(
+        state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Analytics, "stock"),
         modifier = Modifier
             .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
             .padding(stateValues.marginTextField),
@@ -25848,6 +29233,7 @@ private fun AppConfiguration.MenuAnalyticsSuppliersScreen(
     }
 
     LazyColumn(
+        state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Analytics, "suppliers"),
         modifier = Modifier
             .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
             .padding(stateValues.marginTextField),
@@ -25914,6 +29300,7 @@ private fun AppConfiguration.MenuAnalyticsWorkersScreen(
     }
 
     LazyColumn(
+        state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Analytics, "workers"),
         modifier = Modifier
             .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
             .padding(stateValues.marginTextField),
@@ -25972,11 +29359,12 @@ private fun AppConfiguration.MenuAnalyticsCashRegisterScreen(
     }
 
     var extractionAmountText by rememberSaveable { mutableStateOf("") }
-    var extractionNoteText by rememberSaveable { mutableStateOf("") }
+    var extractionNoteLocalized by remember { mutableStateOf(emptyLocalizedItemForCurrentLanguage()) }
     val canExtract = currentUserCanExtractCashRegister(stateValues.activeStoreId)
     val extractionAmount = extractionAmountText.toMoneyDouble()
 
     LazyColumn(
+        state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Analytics, "cash_register"),
         modifier = Modifier
             .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
             .padding(stateValues.marginTextField),
@@ -26051,6 +29439,8 @@ private fun AppConfiguration.MenuAnalyticsCashRegisterScreen(
                         placeholder = localizedStringResource(439, "Amount to extract"),
                         keyboardType = KeyboardType.Decimal,
                         leadingIconPath = stateValues.drawablePathIconFinances,
+                        stateHost = NavigationScreenModel.Menu.Analytics,
+                        stateKey = "menu_analytics_cash_register_extraction_amount",
                         onTransformValue = { value -> paymentInputNormalize(value) },
                         onValueChange = { extractionAmountText = paymentInputNormalize(it) }
                     )
@@ -26067,12 +29457,12 @@ private fun AppConfiguration.MenuAnalyticsCashRegisterScreen(
                                     CashRegisterExtractionRequestDataModel(
                                         storeId = storeId,
                                         amount = extractionAmount,
-                                        note = extractionNoteText.takeIf { it.isNotBlank() },
+                                        note = extractionNoteLocalized.toStoredLocalizedNoteOrNull(),
                                         timeMillis = getCurrentTimeMillis()
                                     )
                                 ) {
                                     extractionAmountText = ""
-                                    extractionNoteText = ""
+                                    extractionNoteLocalized = emptyLocalizedItemForCurrentLanguage()
                                 }
                             }
                         }
@@ -26081,13 +29471,16 @@ private fun AppConfiguration.MenuAnalyticsCashRegisterScreen(
 
                 Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
-                SimpleTextInput(
-                    modifier = Modifier.fillMaxWidth(),
-                    value = extractionNoteText,
-                    placeholder = localizedStringResource(441, "Extraction note"),
+                StockLocalizedStringGroupEditor(
+                    title = localizedStringResource(441, "Extraction note"),
+                    placeholder = stateValues.stringOptional,
+                    values = extractionNoteLocalized,
+                    addText = localizedStringResource(1073, "Add cash extraction note translation"),
+                    required = false,
                     singleLine = false,
-                    leadingIconPath = stateValues.drawablePathIconEdit,
-                    onValueChange = { extractionNoteText = it }
+                    adaptiveMultiline = true,
+                    persistentKey = "cash-extraction-note:${stateValues.activeStoreId.orEmpty()}",
+                    onChanged = { extractionNoteLocalized = it }
                 )
             }
         }
@@ -26197,7 +29590,7 @@ private fun AppConfiguration.CashRegisterEventCard(
             )
         }
 
-        event.note?.takeIf { it.isNotBlank() }?.let {
+        event.note.visibleStoredLocalizedNote(stateValues.appLanguage)?.let {
             Text(
                 text = "${localizedStringResource(201, "Notes")}: $it",
                 color = stateValues.TextColor,
@@ -26222,6 +29615,7 @@ private fun AppConfiguration.MenuAnalyticsSimpleScreen(
     cards: List<AnalyticsSummaryCardData>
 ) {
     LazyColumn(
+        state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Analytics, title),
         modifier = Modifier
 //      .weight(1f) h1
             .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
@@ -26753,6 +30147,7 @@ fun AppConfiguration.MenuAddEditWorkerScreen() {
         )
 
         LazyColumn(
+            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.AddEditWorker),
             modifier = Modifier
                 .fillMaxHeight()
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.6f)
@@ -26806,9 +30201,6 @@ fun AppConfiguration.MenuAddEditSupplierScreen() {
     var supplierName by rememberSaveable(editedSupplierId) {
         mutableStateOf(editedSupplier?.name?.visibleLocalizedString(stateValues.appLanguage, "").orEmpty())
     }
-    var supplierPhone by rememberSaveable(editedSupplierId) {
-        mutableStateOf(editedSupplier?.phoneNumbers.orEmpty().firstOrNull().orEmpty())
-    }
     var supplierEmail by rememberSaveable(editedSupplierId) {
         mutableStateOf(editedSupplier?.emails.orEmpty().firstOrNull().orEmpty())
     }
@@ -26824,6 +30216,7 @@ fun AppConfiguration.MenuAddEditSupplierScreen() {
         )
 
         LazyColumn(
+            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.AddEditSupplier),
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.62f)
@@ -26850,15 +30243,12 @@ fun AppConfiguration.MenuAddEditSupplierScreen() {
 
                 Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
-                genericTextField(
+                val supplierPhoneTextFieldContent = countrySelectionPhoneNumberTextField(
                     titleText = localizedStringResource(620, "Supplier phone number"),
-                    placeholderText = stateValues.stringPhoneNumber,
-                    valueInitial = supplierPhone,
-                    keyboardType = KeyboardType.Phone,
-                    onValueChange = { value, apply ->
-                        supplierPhone = value
-                        apply()
-                    }
+                    placeholderText = stateValues.stringEnterPhoneNumber,
+                    valueInitial = editedSupplier?.phoneNumbers.orEmpty().firstOrNull().orEmpty(),
+                    stateHost = NavigationScreenModel.Menu.AddEditSupplier,
+                    stateKey = "supplier_phone_number_$editedSupplierId"
                 )
 
                 Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
@@ -26882,13 +30272,25 @@ fun AppConfiguration.MenuAddEditSupplierScreen() {
                     enabled = supplierName.isNotBlank(),
                     confirmationRequired = false,
                     onClick = {
+                        val phoneLocal = supplierPhoneTextFieldContent.value.text.trim()
+                        val phoneNumber = if (phoneLocal.isBlank()) {
+                            ""
+                        } else {
+                            supplierPhoneTextFieldContent.checkContentValidity()
+                            if (!supplierPhoneTextFieldContent.isContentValid) {
+                                postInAppNotification(stateValues.stringPhoneNumberMustBe, NotificationType.Negative, transient = true)
+                                return@actionButton
+                            }
+                            supplierPhoneTextFieldContent.selectedSecondaryId.orEmpty().removePrefix("+") + phoneLocal
+                        }
+
                         val supplier = SupplierDataModel(
                             id = editedSupplier?.id.orEmpty(),
                             userIds = editedSupplier?.userIds.orEmpty(),
                             typeIds = editedSupplier?.typeIds,
                             categoryIds = editedSupplier?.categoryIds.orEmpty(),
                             name = listOf(LocalizedStringDataModel("main", supplierName.trim())),
-                            phoneNumbers = listOf(supplierPhone.trim()).filter { it.isNotBlank() },
+                            phoneNumbers = listOf(phoneNumber).filter { it.isNotBlank() },
                             emails = listOf(supplierEmail.trim().lowercase()).filter { it.isNotBlank() },
                             addedAt = editedSupplier?.addedAt ?: getCurrentTimeMillis(),
                             isActive = true
@@ -27000,6 +30402,7 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
         )
 
         LazyColumn(
+            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.AddEditStore),
             modifier = Modifier
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.6f)
                 .weight(1f)
@@ -27363,55 +30766,156 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
 fun MenuAddEditGoodsCategoryScreen() {
 }
 
+private const val LOCAL_APP_PREFERENCES_DIRTY_DRAFT_KEY = "app.preferences.last.explicit.local.v1"
+private const val LOCAL_APP_PREFERENCES_SEPARATOR = "\u001F"
+
+private data class LocalAppPreferencesSnapshot(
+    val language: String,
+    val themeId: Long,
+    val sizeModeId: Long,
+    val changedAtMillis: Long
+)
+
+private fun LocalAppPreferencesSnapshot.toPersistentString(): String =
+    listOf(language, themeId.toString(), sizeModeId.toString(), changedAtMillis.toString())
+        .joinToString(LOCAL_APP_PREFERENCES_SEPARATOR)
+
+private fun String?.toLocalAppPreferencesSnapshotOrNull(): LocalAppPreferencesSnapshot? {
+    val parts = this?.split(LOCAL_APP_PREFERENCES_SEPARATOR) ?: return null
+    if (parts.size < 4) return null
+    return LocalAppPreferencesSnapshot(
+        language = parts[0].ifBlank { DEFAULT_APP_LANGUAGE },
+        themeId = parts[1].toLongOrNull() ?: DEFAULT_APP_THEME_ID,
+        sizeModeId = parts[2].toLongOrNull() ?: DEFAULT_APP_SIZE_MODE_ID,
+        changedAtMillis = parts[3].toLongOrNull() ?: 0L
+    )
+}
+
+private fun AppConfiguration.markExplicitLocalAppPreferences(
+    language: String = stateValues.appLanguage,
+    themeId: Long = stateValues.appThemeId,
+    sizeModeId: Long = stateValues.appSizeModeId
+) {
+    val snapshot = LocalAppPreferencesSnapshot(
+        language = normalizeAppLanguagePreference(language),
+        themeId = normalizeAppThemePreference(themeId),
+        sizeModeId = normalizeAppSizeModePreference(sizeModeId),
+        changedAtMillis = getCurrentTimeMillis()
+    )
+
+    coroutineScope.launch {
+        setPersistentUiDraftValue?.invoke(LOCAL_APP_PREFERENCES_DIRTY_DRAFT_KEY, snapshot.toPersistentString())
+    }
+}
+
 @Composable
-private fun AppConfiguration.CloudConnectionStatusBanner() {
-    if (stateValues.userAccount == null) return
+private fun AppConfiguration.LocalAppPreferencesPriorityEffect() {
+    LaunchedEffect(stateValues.realtimeUpdatesConnected, stateValues.userAccount?.id) {
+        if (!stateValues.realtimeUpdatesConnected || stateValues.userAccount == null) return@LaunchedEffect
+        val snapshot = getPersistentUiDraftValue
+            ?.invoke(LOCAL_APP_PREFERENCES_DIRTY_DRAFT_KEY)
+            .toLocalAppPreferencesSnapshotOrNull()
+            ?: return@LaunchedEffect
 
-    val connected = stateValues.realtimeUpdatesConnected
-    val localNetwork = stateValues.localNetworkState
-    val localMode = localNetwork.enabled && !connected
-    var heartbeatTick by remember { mutableStateOf(0) }
+        setAppLocale(snapshot.language)
+        setAppTheme(snapshot.themeId)
+        setAppSizeMode(snapshot.sizeModeId)
+    }
 
-    LaunchedEffect(connected, localMode) {
-        while (true) {
-            delay(650)
-            heartbeatTick = (heartbeatTick + 1) % 4
+    LaunchedEffect(
+        stateValues.userAccount?.appLanguage,
+        stateValues.userAccount?.appThemeId,
+        stateValues.userAccount?.appSizeModeId
+    ) {
+        val snapshot = getPersistentUiDraftValue
+            ?.invoke(LOCAL_APP_PREFERENCES_DIRTY_DRAFT_KEY)
+            .toLocalAppPreferencesSnapshotOrNull()
+            ?: return@LaunchedEffect
+        val account = stateValues.userAccount ?: return@LaunchedEffect
+        val accountMatchesLocal = normalizeAppLanguagePreference(account.appLanguage) == snapshot.language &&
+                normalizeAppThemePreference(account.appThemeId) == snapshot.themeId &&
+                normalizeAppSizeModePreference(account.appSizeModeId) == snapshot.sizeModeId
+        if (accountMatchesLocal) {
+            setPersistentUiDraftValue?.invoke(LOCAL_APP_PREFERENCES_DIRTY_DRAFT_KEY, null)
         }
     }
+}
 
-    val text = when {
-        connected -> localizedStringResource(573, "Live updates connected")
-        localMode -> localizedStringResource(914, "Server is not connected. Branch local network mode is active.")
-        else -> localizedStringResource(574, "Live updates disconnected. Using cached data while reconnecting.")
+@Composable
+private fun AppConfiguration.CloudConnectionStatusBanner() {
+    val userAccount = stateValues.userAccount
+    val connectedToRealtime = stateValues.realtimeUpdatesConnected
+    val manualRefreshInProgress = stateValues.cloudConnectionManualRefreshInProgress
+    val refreshIconRes by stateValues.drawableResIconRefresh.collectAsState()
+    val transportStatus = stateValues.cloudTransportStatus
+    val transportReachable = transportStatus == CLOUD_TRANSPORT_STATUS_REACHABLE
+    val authRefreshRequired = transportStatus == CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED
+    val transportUnavailable = transportStatus == CLOUD_TRANSPORT_STATUS_UNAVAILABLE
+    val localNetwork = stateValues.localNetworkState
+    val connected = !authRefreshRequired && (connectedToRealtime || transportReachable)
+    val localMode = userAccount != null && localNetwork.enabled && !connected && !authRefreshRequired
+
+    val rawStatusKey = when {
+        authRefreshRequired -> "auth_refresh"
+        manualRefreshInProgress -> "checking"
+        connectedToRealtime -> "realtime"
+        localMode -> "local"
+        transportReachable -> "reachable"
+        transportUnavailable -> "unavailable"
+        else -> "checking"
+    }
+    var displayedStatusKey by rememberSaveable { mutableStateOf(rawStatusKey) }
+    LaunchedEffect(rawStatusKey) {
+        if (rawStatusKey == displayedStatusKey) return@LaunchedEffect
+        val delayMillis = when {
+            rawStatusKey == "auth_refresh" || rawStatusKey == "realtime" || rawStatusKey == "reachable" -> 0L
+            displayedStatusKey == "auth_refresh" && rawStatusKey == "checking" -> 3_000L
+            rawStatusKey == "checking" -> 1_200L
+            else -> 900L
+        }
+        if (delayMillis > 0L) delay(delayMillis)
+        displayedStatusKey = rawStatusKey
     }
 
-    val targetColor = when {
-        connected -> stateValues.OkayColor
-        localMode -> stateValues.AccentColor
-        else -> stateValues.ErrorColor
+    val text = when (displayedStatusKey) {
+        "auth_refresh" -> localizedStringResource(91, "Cloud session needs refresh. You remain signed in locally.")
+        "checking" -> localizedStringResource(1139, "Checking server connection…")
+        "realtime" -> localizedStringResource(573, "Live updates connected")
+        "local" -> localizedStringResource(914, "Server is not connected. Branch local network mode is active.")
+        "reachable" -> localizedStringResource(1138, "Server connection available")
+        "unavailable" -> localizedStringResource(1140, "Server unavailable. Check local server address or Wi‑Fi.")
+        else -> localizedStringResource(1139, "Checking server connection…")
     }
+
+    val targetColor = when (displayedStatusKey) {
+        "auth_refresh" -> stateValues.AccentColor
+        "checking" -> stateValues.AccentColor
+        "realtime" -> stateValues.OkayColor
+        "local" -> stateValues.AccentColor
+        "reachable" -> stateValues.OkayColor
+        "unavailable" -> stateValues.ErrorColor
+        else -> stateValues.AccentColor
+    }
+
     val backgroundColor by animateColorAsState(
         targetValue = targetColor,
         animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS),
         label = "cloudConnectionStatusColor"
     )
 
-    val heartbeat = when (heartbeatTick) {
-        0 -> "●"
-        1 -> "●●"
-        2 -> "●●●"
-        else -> "●●"
-    }
-
-    Box(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(backgroundColor)
-            .padding(horizontal = 12.dp, vertical = 4.dp),
-        contentAlignment = Alignment.Center
+            .padding(horizontal = 12.dp, vertical = 0.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
     ) {
+        Spacer(modifier = Modifier.width(28.dp))
+
         Text(
-            text = "$text $heartbeat",
+            text = text,
+            modifier = Modifier.weight(1f),
             color = stateValues.AccentTextColor,
             fontSize = stateValues.smallTextSize,
             fontWeight = FontWeight.Bold,
@@ -27419,6 +30923,36 @@ private fun AppConfiguration.CloudConnectionStatusBanner() {
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
+
+        Box(
+            modifier = Modifier
+                .padding(start = 4.dp)
+                .size(28.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .clickable(
+                    enabled = !manualRefreshInProgress,
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = ripple(color = stateValues.AccentTextColor, radius = 14.dp),
+                    onClick = { refreshCloudConnectionManually() }
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            if (manualRefreshInProgress) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                    color = stateValues.AccentTextColor
+                )
+            } else {
+                CpImage(
+                    modifier = Modifier.size(18.dp),
+                    url = stateValues.drawablePathIconRefresh,
+                    fallbackRes = refreshIconRes,
+                    contentDescription = localizedStringResource(237, "Refresh"),
+                    tintColor = stateValues.AccentTextColor
+                )
+            }
+        }
     }
 }
 
@@ -27448,6 +30982,16 @@ private fun NotificationDataModel.isConnectionStatusPopupNoise(): Boolean {
         "live updates disconnected",
         "connection unavailable",
         "cannot reach server",
+        "keeping you signed in offline",
+        "security sessions will refresh",
+        "using cached data",
+        "while reconnecting",
+        "reconnecting",
+        "cloud session needs refresh",
+        "остаётесь в аккаунте офлайн",
+        "сеансы безопасности обновятся",
+        "используются сохранённые данные",
+        "идёт переподключение",
         "сервер недоступ",
         "сервер не подключ",
         "нет соединения",
@@ -27458,8 +31002,7 @@ private fun NotificationDataModel.isConnectionStatusPopupNoise(): Boolean {
 
 private fun List<NotificationDataModel>.compactForPopupDisplay(): List<NotificationDataModel> {
     val seen = mutableSetOf<String>()
-    return filterNot { it.isConnectionStatusPopupNoise() }
-        .filter { seen.add(it.popupDeduplicationKey()) }
+    return filter { seen.add(it.popupDeduplicationKey()) }
 }
 
 @Composable
@@ -27470,6 +31013,7 @@ fun AppConfiguration.MainScreen() {
 
     val activeNotifications = stateValues.activeNotifications.compactForPopupDisplay()
     val visibleNotifications = activeNotifications.take(if (stateValues.isNarrowScreen) 1 else 5)
+    val workshiftStartDialogVisible by workshiftStartDialogVisibleState.collectAsState()
     val activeWorkshiftForGate by activeWorkshiftState.payload.collectAsState()
     val myMembershipsForGate by myWorkerMembershipsState.payload.collectAsState()
 
@@ -27487,10 +31031,15 @@ fun AppConfiguration.MainScreen() {
             .windowInsetsPadding(WindowInsets.systemBars)
             .fillMaxSize()
     ) {
-        coroutineScope.launch(Dispatchers.ourIo) {
+        LaunchedEffect(Unit) {
+            Navigation.startAppNavigationPersistence()
+            Navigation.awaitAppNavigationRestore()
             userAccountState.value.collect {
                 if (it is DataState.Empty) {
-                    Navigation.goMain(NavigationScreenModel.UserAuth.Main)
+                    val hasStoredTokens = withContext(Dispatchers.ourIo) { getStoredUserAuthTokens?.invoke() != null }
+                    if (!hasStoredTokens) {
+                        Navigation.goMain(NavigationScreenModel.UserAuth.Main)
+                    }
                 } else if ((it is DataState.Success) && Navigation.Main.value.last()
                         .run { this is NavigationScreenModel.UserAuth || this is NavigationScreenModel.Splash }
                 ) Navigation.goMain(NavigationScreenModel.Transaction.MainSale)
@@ -27498,6 +31047,7 @@ fun AppConfiguration.MainScreen() {
         }
 
         CloudConnectionStatusBanner()
+        LocalAppPreferencesPriorityEffect()
 
         if (stateValues.isNarrowScreen && visibleNotifications.isNotEmpty()) {
             AnimatedVisibility(
@@ -27551,8 +31101,10 @@ fun AppConfiguration.MainScreen() {
                 }
             }
 
-            if (shouldBlockAppForWorkshift()) {
-                WorkshiftGateOverlay()
+            val blockingWorkshiftGate = shouldBlockAppForWorkshift() &&
+                    stateValues.navigationScreensMain.last() is NavigationScreenModel.Transaction
+            if (blockingWorkshiftGate || workshiftStartDialogVisible) {
+                WorkshiftGateOverlay(blockingTransactionScreen = blockingWorkshiftGate)
             }
 
             if (!stateValues.isNarrowScreen && visibleNotifications.isNotEmpty()) {
@@ -27698,21 +31250,27 @@ fun AppConfiguration.MainScreen() {
 
 
 @Composable
-private fun AppConfiguration.WorkshiftGateOverlay() {
-    var workerIdentifier by rememberSaveable(stateValues.activeStoreId) {
-        mutableStateOf(
-            activeStoreWorkerMembership()?.let { worker ->
-                worker.userPublicId.ifBlank { worker.phoneNumber.asDisplayPhoneNumber().ifBlank { worker.email.ifBlank { worker.id } } }
-            }.orEmpty()
-        )
-    }
-    var password by rememberSaveable(stateValues.activeStoreId) { mutableStateOf("") }
+private fun AppConfiguration.WorkshiftGateOverlay(
+    blockingTransactionScreen: Boolean = false
+) {
     val activeStoreName = stateValues.stores.orEmpty()
         .findStoreOrBranch(stateValues.activeStoreId)
         ?.name
         ?.extractLocalizedString(stateValues.appLanguage)
         .orEmpty()
     val membership = activeStoreWorkerMembership()
+    val workerIdentifier = membership?.let { worker ->
+        worker.userPublicId.ifBlank { worker.phoneNumber.asDisplayPhoneNumber().ifBlank { worker.email.ifBlank { worker.id } } }
+    }.orEmpty()
+
+    fun closeWorkshiftDialog() {
+        hideWorkshiftStartDialog()
+        if (blockingTransactionScreen) {
+            coroutineScope.launch {
+                Navigation.goMain(NavigationScreenModel.Menu.Main)
+            }
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -27758,7 +31316,7 @@ private fun AppConfiguration.WorkshiftGateOverlay() {
             )
 
             Text(
-                text = localizedStringResource(645, "This workplace is locked until the worker starts a workshift. Store owners can work without this step."),
+                text = localizedStringResource(645, "Start a workshift before taking payments or changing cash. You can still browse the store and prepare work without starting a shift."),
                 color = stateValues.PlaceholderTextColor,
                 fontSize = stateValues.textSize,
                 textAlign = TextAlign.Center
@@ -27766,49 +31324,68 @@ private fun AppConfiguration.WorkshiftGateOverlay() {
 
             if (membership?.hasWorkshiftPassword == false) {
                 Text(
-                    text = localizedStringResource(655, "Set or replace the password used to start this worker’s shifts"),
+                    text = localizedStringResource(1089, "Set your workshift password in Workers → My work, then start the shift here."),
                     color = stateValues.ErrorColor,
                     fontSize = stateValues.smallTextSize,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 )
+
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1090, "Open My work"),
+                    iconPath = stateValues.drawablePathIconWorkers,
+                    confirmationRequired = false,
+                    onClick = {
+                        hideWorkshiftStartDialog()
+                        coroutineScope.launch {
+                            Navigation.goMain(NavigationScreenModel.Menu.Main)
+                            Navigation.Menu.go(NavigationScreenModel.Menu.Workers, stateValues.isNarrowScreen)
+                        }
+                    }
+                )
+            } else if (membership != null) {
+                val startPasswordField = passwordTextField(
+                    modifier = Modifier.fillMaxWidth(),
+                    stateHost = NavigationScreenModel.Menu.Main,
+                    stateKey = "keyState_startWorkshiftPassword_${stateValues.activeStoreId.orEmpty()}",
+                    titleText = localizedStringResource(1078, "Workshift password"),
+                    placeholderText = localizedStringResource(649, "Enter workshift password")
+                )
+
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1091, "Start shift"),
+                    iconPath = stateValues.drawablePathIconCheck,
+                    confirmationRequired = false,
+                    enabled = workerIdentifier.isNotBlank() && startPasswordField.value.text.isNotBlank() && !stateValues.workshiftLoginInProgress,
+                    loading = stateValues.workshiftLoginInProgress,
+                    loadingText = localizedStringResource(908, "Starting workshift…"),
+                    onClick = {
+                        stateValues.activeStoreId?.let { storeId ->
+                            startWorkshift(
+                                storeId = storeId,
+                                workerIdentifier = workerIdentifier,
+                                password = startPasswordField.value.text
+                            ) { result ->
+                                if (result is DataState.Success) {
+                                    startPasswordField.reset()
+                                    hideWorkshiftStartDialog()
+                                    getCurrentWorkshift(storeId)
+                                }
+                            }
+                        }
+                    }
+                )
             }
-
-            SimpleTextInput(
-                modifier = Modifier.fillMaxWidth(),
-                value = workerIdentifier,
-                placeholder = localizedStringResource(647, "Enter worker ID or account phone"),
-                leadingIconPath = stateValues.drawablePathIconPerson,
-                onValueChange = { workerIdentifier = it }
-            )
-
-            SimpleTextInput(
-                modifier = Modifier.fillMaxWidth(),
-                value = password,
-                placeholder = localizedStringResource(649, "Enter workshift password"),
-                leadingIconPath = stateValues.drawablePathIconSecurity,
-                onValueChange = { password = it }
-            )
 
             actionButton(
                 modifier = Modifier.fillMaxWidth(),
-                text = localizedStringResource(643, "Start workshift"),
-                iconPath = stateValues.drawablePathIconCheck,
+                text = localizedStringResource(8, "Cancel"),
+                iconPath = stateValues.drawablePathIconCancel,
+                enabledColor = stateValues.PlaceholderTextColor,
                 confirmationRequired = false,
-                enabled = workerIdentifier.isNotBlank() && password.isNotBlank() && !stateValues.workshiftLoginInProgress,
-                loading = stateValues.workshiftLoginInProgress,
-                loadingText = localizedStringResource(908, "Starting workshift…"),
-                onClick = {
-                    stateValues.activeStoreId?.let { storeId ->
-                        startWorkshift(
-                            storeId = storeId,
-                            workerIdentifier = workerIdentifier,
-                            password = password
-                        ) {
-                            if (it is DataState.Success) password = ""
-                        }
-                    }
-                }
+                onClick = { closeWorkshiftDialog() }
             )
         }
     }
@@ -28087,6 +31664,8 @@ private fun AppConfiguration.localizedNotificationMessage(message: String): Stri
         "Login is already in progress", "Вход уже выполняется", "Кіру қазірдің өзінде орындалып жатыр" -> localizedStringResource(219, normalized)
         "Logged out locally", "Вы вышли локально", "Сіз жергілікті түрде шықтыңыз" -> localizedStringResource(220, normalized)
         "Logged out locally; server session cleanup failed", "Вы вышли локально; не удалось завершить сеанс на сервере", "Сіз жергілікті түрде шықтыңыз; сервердегі сеансты аяқтау мүмкін болмады" -> localizedStringResource(221, normalized)
+        "Logged out locally; server session cleanup is queued", "Выход выполнен локально; завершение серверного сеанса поставлено в очередь", "Жергілікті түрде шығу орындалды; сервердегі сеансты аяқтау кезекке қойылды" -> localizedStringResource(1148, normalized)
+        "Server could not refresh session. Keeping local login active.", "Сервер не смог обновить сеанс. Локальный вход сохранён.", "Сервер сеансты жаңарта алмады. Жергілікті кіру сақталды." -> localizedStringResource(1149, normalized)
         "Login failed: empty token response", "Не удалось войти: сервер не вернул токены", "Кіру орындалмады: сервер токендерді қайтармады" -> localizedStringResource(222, normalized)
         "Cannot reach server", "Сервер недоступен", "Сервер қолжетімсіз" -> localizedStringResource(223, normalized)
         "Completing transaction", "Завершение операции", "Операция аяқталуда" -> localizedStringResource(224, normalized)
@@ -28222,6 +31801,16 @@ suspend fun postSimpleDialogContent(
 
 suspend fun resetSimpleDialogContent() {
     _simpleDialogContent.emit(null)
+}
+
+private val workshiftStartDialogVisibleState = MutableStateFlow(false)
+
+fun showWorkshiftStartDialog() {
+    workshiftStartDialogVisibleState.value = true
+}
+
+fun hideWorkshiftStartDialog() {
+    workshiftStartDialogVisibleState.value = false
 }
 
 @Composable
@@ -28407,6 +31996,18 @@ private fun localDrawableResourceForPath(
         "51_1" -> Res.drawable._51_1
         "52_0" -> Res.drawable._52_0
         "52_1" -> Res.drawable._52_1
+        "53_0" -> Res.drawable._53_0
+        "53_1" -> Res.drawable._53_1
+        "54_0" -> Res.drawable._54_0
+        "54_1" -> Res.drawable._54_1
+        "55_0" -> Res.drawable._55_0
+        "55_1" -> Res.drawable._55_1
+        "56_0" -> Res.drawable._56_0
+        "56_1" -> Res.drawable._56_1
+        "57_0" -> Res.drawable._57_0
+        "57_1" -> Res.drawable._57_1
+        "58_0" -> Res.drawable._58_0
+        "58_1" -> Res.drawable._58_1
         else -> fallbackRes
     }
 }
@@ -28754,7 +32355,7 @@ private fun AppConfiguration.StockBatchShelfPreviewCard(
 
         StockCardInfoLine(
             title = localizedStringResource(200, "Status"),
-            value = batch.status.name,
+            value = stockBatchStatusText(batch.status),
             textColor = stateValues.TextColor
         )
 
@@ -28838,9 +32439,17 @@ fun AppConfiguration.GoodsItemInStockWidget(
 ) {
     val itemName = goodsItem.name.visibleLocalizedString(stateValues.appLanguage, "Unnamed item")
 
-    val barcodesText = goodsItem.barcodes
+    val standardBarcodesText = goodsItem.standardBarcodeValues()
         .filter { it.isNotBlank() }
         .joinToString(", ")
+    val internalBarcodesText = goodsItem.internalBarcodeValues()
+        .filter { it.isNotBlank() }
+        .joinToString(", ")
+    val internalBarcodeLabel = localizedStringResource(1154, "Internal")
+    val barcodesText = listOf(
+        standardBarcodesText.takeIf { it.isNotBlank() },
+        internalBarcodesText.takeIf { it.isNotBlank() }?.let { "$internalBarcodeLabel: $it" }
+    ).filterNotNull().joinToString(" • ")
 
     val categoriesText = goodsItem.categoryIds
         .mapNotNull { categoryId ->
@@ -28865,13 +32474,14 @@ fun AppConfiguration.GoodsItemInStockWidget(
         ?: shelfBatches.bestBatchForSale(goodsItem)
 
     val expirationStatusText = activeBatch?.expirationDateMillis?.toStockDateInputText()?.let {
-        "Exp: $it"
+        "${localizedStringResource(234, "Expires")}: $it"
     }
 
     Row(
         modifier
             .padding(bottom = 4.dp)
-            .fillMaxHeight()
+            .fillMaxWidth()
+            .heightIn(min = stateValues.textFieldHeight * 1.25f)
             .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
             .clip(RoundedCornerShape(stateValues.cornerRadius))
             .background(stateValues.BackgroundColor)
@@ -28890,7 +32500,6 @@ fun AppConfiguration.GoodsItemInStockWidget(
         Column(
             modifier = Modifier
                 .weight(1f)
-                .fillMaxHeight()
                 .padding(start = 16.dp, end = 12.dp, top = 14.dp, bottom = 12.dp),
         ) {
             Row(
@@ -28947,14 +32556,38 @@ fun AppConfiguration.GoodsItemInStockWidget(
                 textColor = if (shelfBatches.isEmpty()) stateValues.ErrorColor else textColor
             )
 
-            activeBatch?.let {
+            activeBatch?.let { batch ->
+                if (transactionTypeIndex == null) {
+                    StockCardInfoLine(
+                        title = localizedStringResource(361, "Shelf"),
+                        value = listOfNotNull(
+                            if (batch.id == goodsItem.activeShelfBatchId) localizedStringResource(812, "active") else localizedStringResource(671, "Default"),
+                            "#${shelfBatches.indexOfFirst { candidate -> candidate.id == batch.id } + 1}",
+                            expirationStatusText
+                        ).joinToString(" • "),
+                        textColor = stateValues.AccentColor
+                    )
+                }
+
+                val activeBatchSupplier = stateValues.suppliers
+                    .orEmpty()
+                    .find { it.id == batch.supplierId }
+                    ?.name
+                    ?.extractLocalizedString(stateValues.appLanguage)
+                    ?: batch.supplierId?.takeIf { it.isNotBlank() }
+                    ?: localizedStringResource(638, "No supplier selected")
+
+                val activeBatchInfo = listOfNotNull(
+                    activeBatchSupplier,
+                    batch.quantity.quantityText(stateValues.appLanguage),
+                    batch.deliveredAtMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let { "${localizedStringResource(342, "Delivered")} $it" },
+                    batch.expirationDateMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let { "${localizedStringResource(234, "Expires")} $it" },
+                    batch.shelfPosition?.takeIf { transactionTypeIndex == null && it.isNotBlank() }?.let { "${localizedStringResource(344, "Shelf position")} $it" }
+                )
+
                 StockCardInfoLine(
-                    title = localizedStringResource(361, "Shelf"),
-                    value = listOfNotNull(
-                        if (it.id == goodsItem.activeShelfBatchId) localizedStringResource(812, "active") else localizedStringResource(671, "Default"),
-                        "#${shelfBatches.indexOfFirst { batch -> batch.id == it.id } + 1}",
-                        expirationStatusText
-                    ).joinToString(" • "),
+                    title = localizedStringResource(125, "Current batch data"),
+                    value = activeBatchInfo.joinToString(" • "),
                     textColor = stateValues.AccentColor
                 )
             }
@@ -29237,7 +32870,7 @@ fun AppConfiguration.StockGoodsItemDetailsScreen() {
 
                 Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
-                StockCardInfoLine(stateValues.stringBarcode, goodsItem.barcodes.joinToString(", "), stateValues.TextColor)
+                StockCardInfoLine(stateValues.stringBarcode, goodsItem.allBarcodeValues().joinToString(", "), stateValues.TextColor)
                 StockCardInfoLine(
                     stateValues.stringCategory,
                     goodsItem.categoryIds.mapNotNull { goodsCategoryName(it) }.joinToString(", "),
@@ -29451,35 +33084,91 @@ fun AppConfiguration.genericTextField(
     } else {
         null
     }
+    val persistentTextDraftMetaKey = if (persistentTextDraftKey != null) {
+        persistentUiDraftKey(stateHost, stateKey, suffix = "meta")
+    } else {
+        null
+    }
+    val textFieldMetaStateKey = if (persistentTextDraftKey != null) persistentUiTextFieldMetaStateKey(stateKey) else null
+    val stateMetaValue = textFieldMetaStateKey?.let { state?.get(it) }
+
+    val initialTextFieldText = stateValue ?: valueInitial ?: ""
+    val initialTextFieldMeta = decodePersistentTextFieldMeta(stateMetaValue, initialTextFieldText.length)
 
     var textFieldValue by rememberSaveable(stateSaver = TextFieldValue.Saver) {
-        val initial = stateValue ?: valueInitial ?: ""
-        mutableStateOf(TextFieldValue(initial, selection = TextRange(initial.length)))
+        mutableStateOf(TextFieldValue(initialTextFieldText, selection = initialTextFieldMeta.selection))
     }
 
     var persistentTextDraftLoaded by rememberSaveable(persistentTextDraftKey ?: "no_persistent_text_draft") {
         mutableStateOf(false)
     }
 
+    var pendingPersistentTextDraft by remember(persistentTextDraftKey) { mutableStateOf<String?>(null) }
+    var pendingPersistentTextDraftVersion by remember(persistentTextDraftKey) { mutableStateOf(0) }
+    var pendingPersistentTextFieldMeta by remember(persistentTextDraftMetaKey) { mutableStateOf<String?>(null) }
+    var pendingPersistentTextFieldMetaVersion by remember(persistentTextDraftMetaKey) { mutableStateOf(0) }
+
     fun savePersistentTextDraft(nextText: String?) {
-        val key = persistentTextDraftKey ?: return
-        coroutineScope.launch {
-            setPersistentUiDraftValue?.invoke(key, nextText)
+        if (persistentTextDraftKey == null) return
+        pendingPersistentTextDraft = nextText
+        pendingPersistentTextDraftVersion += 1
+    }
+
+    fun savePersistentTextFieldMeta(nextValue: TextFieldValue, focused: Boolean) {
+        if (textFieldMetaStateKey == null && persistentTextDraftMetaKey == null) return
+        val encoded = encodePersistentTextFieldMeta(nextValue, focused)
+
+        textFieldMetaStateKey?.let { keyName ->
+            coroutineScope.launch {
+                stateHost?.setState(keyName to encoded)
+            }
+        }
+
+        if (persistentTextDraftMetaKey != null) {
+            pendingPersistentTextFieldMeta = encoded
+            pendingPersistentTextFieldMetaVersion += 1
         }
     }
 
-    LaunchedEffect(persistentTextDraftKey) {
+    LaunchedEffect(persistentTextDraftKey, pendingPersistentTextDraftVersion) {
+        val key = persistentTextDraftKey ?: return@LaunchedEffect
+        if (pendingPersistentTextDraftVersion <= 0) return@LaunchedEffect
+        val textSnapshot = pendingPersistentTextDraft
+        // Debounce per-keystroke disk / keychain / encrypted-storage writes.
+        // The field state updates immediately; persistence is flushed after the user pauses.
+        delay(360)
+        setPersistentUiDraftValue?.invoke(key, textSnapshot)
+    }
+
+    LaunchedEffect(persistentTextDraftMetaKey, pendingPersistentTextFieldMetaVersion) {
+        val key = persistentTextDraftMetaKey ?: return@LaunchedEffect
+        if (pendingPersistentTextFieldMetaVersion <= 0) return@LaunchedEffect
+        val metaSnapshot = pendingPersistentTextFieldMeta
+        delay(360)
+        setPersistentUiDraftValue?.invoke(key, metaSnapshot)
+    }
+
+    LaunchedEffect(persistentTextDraftKey, persistentTextDraftMetaKey) {
         persistentTextDraftLoaded = false
         val key = persistentTextDraftKey ?: return@LaunchedEffect
         val stored = getPersistentUiDraftValue?.invoke(key)
+        val storedMeta = persistentTextDraftMetaKey?.let { getPersistentUiDraftValue?.invoke(it) }
         persistentTextDraftLoaded = true
         if (stored != null && stored != stateValue && stored != textFieldValue.text) {
             val externalInitial = stateValue ?: valueInitial
             if (externalInitial == null || textFieldValue.text == externalInitial || textFieldValue.text.isBlank()) {
-                textFieldValue = TextFieldValue(stored, selection = TextRange(stored.length))
+                val restoredMeta = decodePersistentTextFieldMeta(storedMeta, stored.length)
+                textFieldValue = TextFieldValue(stored, selection = restoredMeta.selection)
                 stateKey?.let { keyName ->
                     stateHost?.setState(keyName to stored)
                 }
+                textFieldMetaStateKey?.let { keyName ->
+                    stateHost?.setState(keyName to encodePersistentTextFieldMeta(textFieldValue.copy(text = stored, selection = restoredMeta.selection), restoredMeta.focused))
+                }
+            }
+        } else if (storedMeta != null) {
+            textFieldMetaStateKey?.let { keyName ->
+                stateHost?.setState(keyName to storedMeta)
             }
         }
     }
@@ -29489,11 +33178,32 @@ fun AppConfiguration.genericTextField(
     }
 
     var isFocused by rememberSaveable {
-        mutableStateOf(isFocusedInitial)
+        mutableStateOf(isFocusedInitial || (initialTextFieldMeta.focused && platformAllowsAutomaticTextFieldFocus()))
     }
 
     var focusRequester by remember {
         mutableStateOf(FocusRequester())
+    }
+
+    var restoredPersistentFocusKey by rememberSaveable(textFieldMetaStateKey ?: "no_persistent_text_field_meta") {
+        mutableStateOf("")
+    }
+
+    LaunchedEffect(stateMetaValue, enabled, readOnly) {
+        val encoded = stateMetaValue ?: return@LaunchedEffect
+        val meta = decodePersistentTextFieldMeta(encoded, textFieldValue.text.length)
+        if (!isFocused && textFieldValue.selection != meta.selection) {
+            textFieldValue = textFieldValue.copy(selection = meta.selection)
+        }
+        if (!isFocused && meta.focused && platformAllowsAutomaticTextFieldFocus() && enabled && !readOnly) {
+            val focusKey = listOf(textFieldMetaStateKey.orEmpty(), encoded, textFieldValue.text).joinToString("|")
+            if (focusKey != restoredPersistentFocusKey) {
+                restoredPersistentFocusKey = focusKey
+                delay(280)
+                isFocused = true
+                focusRequester.requestFocus()
+            }
+        }
     }
 
     var isContentValid by rememberSaveable {
@@ -29548,6 +33258,7 @@ fun AppConfiguration.genericTextField(
                 }
             }
             savePersistentTextDraft(nextText)
+            savePersistentTextFieldMeta(nextValue, isFocused)
             Unit
         }
 
@@ -29678,8 +33389,12 @@ fun AppConfiguration.genericTextField(
     LaunchedEffect(valueInitial) {
         if (valueInitial != null && valueInitial != textFieldValue.text) {
             val cameRightAfterLocalEdit = getCurrentTimeMillis() - lastLocalTextEditMillis < 450L
-            if (!isFocused && !cameRightAfterLocalEdit) {
-                textFieldValue = TextFieldValue(valueInitial, selection = TextRange(valueInitial.length))
+            val externalClearAfterSuccessfulAction = valueInitial.isEmpty()
+            if (externalClearAfterSuccessfulAction || (!isFocused && !cameRightAfterLocalEdit)) {
+                val nextValue = TextFieldValue(valueInitial, selection = TextRange(valueInitial.length))
+                textFieldValue = nextValue
+                if (externalClearAfterSuccessfulAction) savePersistentTextDraft("")
+                savePersistentTextFieldMeta(nextValue, isFocused)
             }
         }
     }
@@ -29687,8 +33402,12 @@ fun AppConfiguration.genericTextField(
     LaunchedEffect(stateValue) {
         if (stateKey != null && stateValue != null && stateValue != textFieldValue.text) {
             val cameRightAfterLocalEdit = getCurrentTimeMillis() - lastLocalTextEditMillis < 450L
-            if (!isFocused && !cameRightAfterLocalEdit) {
-                textFieldValue = TextFieldValue(stateValue, selection = TextRange(stateValue.length))
+            val externalClearAfterSuccessfulAction = stateValue.isEmpty()
+            if (externalClearAfterSuccessfulAction || (!isFocused && !cameRightAfterLocalEdit)) {
+                val nextValue = TextFieldValue(stateValue, selection = TextRange(stateValue.length))
+                textFieldValue = nextValue
+                if (externalClearAfterSuccessfulAction) savePersistentTextDraft("")
+                savePersistentTextFieldMeta(nextValue, isFocused)
             }
         }
     }
@@ -29795,13 +33514,15 @@ fun AppConfiguration.genericTextField(
 
                     val barcodeHandler = if (captureTransactionBarcodeInput) activeTransactionBarcodeHandler else null
                     if (barcodeHandler != null && barcodeHandler(nextText)) {
-                        textFieldValue = TextFieldValue("")
+                        val emptyValue = TextFieldValue("")
+                        textFieldValue = emptyValue
                         stateKey?.run {
                             coroutineScope.launch {
                                 stateHost?.setState(stateKey to "")
                             }
                         }
                         savePersistentTextDraft("")
+                        savePersistentTextFieldMeta(emptyValue, isFocused)
                         return@onValueChange
                     }
 
@@ -29816,6 +33537,7 @@ fun AppConfiguration.genericTextField(
                                     }
                                 }
                                 savePersistentTextDraft(nextText)
+                                savePersistentTextFieldMeta(nextValue, isFocused)
                             }
                         }
                     } else {
@@ -29827,6 +33549,7 @@ fun AppConfiguration.genericTextField(
                                 }
                             }
                             savePersistentTextDraft(nextText)
+                            savePersistentTextFieldMeta(nextValue, isFocused)
                         }
                     }
                 },
@@ -29851,6 +33574,7 @@ fun AppConfiguration.genericTextField(
                     .focusRequester(focusRequester)
                     .onFocusChanged {
                         isFocused = it.isFocused
+                        savePersistentTextFieldMeta(textFieldValue, it.isFocused)
 
                         updateIsFocusedAction?.invoke(it)
                     },
@@ -29989,20 +33713,22 @@ fun AppConfiguration.genericTextField(
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxHeight()
+                                                .width(stateValues.textFieldHeight)
                                                 .clickable(
                                                     interactionSource = remember {
                                                         MutableInteractionSource()
                                                     },
                                                     indication = ripple(color = textColor, radius = cornerRadius),
                                                     onClick = {
-                                                        trailingIconExtraOnClick?.invoke()
+                                                        focusRequester.requestFocus()
                                                         isFocused = true
+                                                        trailingIconExtraOnClick?.invoke()
                                                     }
-                                                )
+                                                ),
+                                            contentAlignment = Alignment.Center
                                         ) {
                                             CpImage(
                                                 modifier = Modifier
-                                                    .padding(horizontal = 10.dp, vertical = stateValues.textFieldIconPadding)
                                                     .size(stateValues.iconSize),
                                                 url = trailingIconExtraPath,
                                                 fallbackRes = Res.drawable._9_0,
@@ -30016,6 +33742,7 @@ fun AppConfiguration.genericTextField(
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxHeight()
+                                                .width(stateValues.textFieldHeight)
                                                 .clickable(
                                                     interactionSource = remember {
                                                         MutableInteractionSource()
@@ -30024,7 +33751,8 @@ fun AppConfiguration.genericTextField(
                                                 ) {
                                                     val applyClear = {
                                                         lastLocalTextEditMillis = getCurrentTimeMillis()
-                                                        textFieldValue = TextFieldValue("")
+                                                        val emptyValue = TextFieldValue("")
+                                                        textFieldValue = emptyValue
 
                                                         stateKey?.run {
                                                             coroutineScope.launch {
@@ -30032,6 +33760,7 @@ fun AppConfiguration.genericTextField(
                                                             }
                                                         }
                                                         savePersistentTextDraft("")
+                                                        savePersistentTextFieldMeta(emptyValue, true)
                                                     }
 
                                                     if (onValueChange != null) {
@@ -30044,16 +33773,11 @@ fun AppConfiguration.genericTextField(
 
                                                     isFocused = true
                                                     focusRequester.requestFocus()
-                                                }
+                                                },
+                                            contentAlignment = Alignment.Center
                                         ) {
                                             CpImage(
                                                 modifier = Modifier
-                                                    .padding(
-                                                        start = 4.dp,
-                                                        top = stateValues.textFieldIconPadding,
-                                                        bottom = stateValues.textFieldIconPadding,
-                                                        end = 12.dp
-                                                    )
                                                     .size(stateValues.iconSize),
                                                 url = stateValues.drawablePathIconCancel,
                                                 fallbackRes = Res.drawable._9_0,
@@ -30179,13 +33903,15 @@ fun AppConfiguration.genericTextField(
             }
         },
         onReset = {
-            textFieldValue = TextFieldValue()
+            val emptyValue = TextFieldValue()
+            textFieldValue = emptyValue
             stateKey?.let { keyName ->
                 coroutineScope.launch {
                     stateHost?.setState(keyName to "")
                 }
             }
             savePersistentTextDraft("")
+            savePersistentTextFieldMeta(emptyValue, false)
         },
         onReplaceText = { rawText, applyTransform ->
             applyExternalTextReplacement(rawText, applyTransform)
@@ -30629,6 +34355,9 @@ fun AppConfiguration.domainSelectionTextFieldGroupWidget(
     LaunchedEffect(data, persistentGroupLoaded, persistentGroupKey) {
         if (persistentGroupLoaded) {
             persistentGroupKey?.let { key ->
+                // Localized rows can update on every typed symbol. Persist after a tiny pause
+                // instead of doing a storage write for every recomposition/change.
+                delay(360)
                 setPersistentUiDraftValue?.invoke(key, data.toLocalizedGroupEditorStateString())
             }
         }
@@ -31250,9 +34979,12 @@ object AppConfiguration {
         val notificationsState: DataState<List<NotificationDataModel>>
         val notifications: List<NotificationDataModel>?
         val realtimeUpdatesConnected: Boolean
+        val cloudTransportStatus: Int
+        val cloudConnectionManualRefreshInProgress: Boolean
         val localNetworkState: LocalNetworkStateDataModel
         val logInInProgress: Boolean
         val signUpInProgress: Boolean
+        val completeTransactionInProgress: Boolean
         val workshiftLoginInProgress: Boolean
         val activeWorkshiftState: DataState<WorkshiftDataModel>
         val activeWorkshift: WorkshiftDataModel?
@@ -31550,6 +35282,10 @@ object AppConfiguration {
         val drawableResIconPassword: StateFlow<DrawableResource>
 
         val drawablePathIconSecurity: String
+        val drawableResIconSecurity: StateFlow<DrawableResource>
+
+        val drawablePathIconResponse: String
+        val drawableResIconResponse: StateFlow<DrawableResource>
 
         val drawablePathIconCancel: String
         val drawableResIconCancel: StateFlow<DrawableResource>
@@ -31583,6 +35319,9 @@ object AppConfiguration {
         val drawablePathIconTransactionSupply: String
         val drawableResIconTransactionSupply: StateFlow<DrawableResource>
 
+        val drawablePathIconTransactionSelection: String
+        val drawableResIconTransactionSelection: StateFlow<DrawableResource>
+
         val drawablePathIconStock: String
         val drawableResIconStock: StateFlow<DrawableResource>
 
@@ -31609,6 +35348,9 @@ object AppConfiguration {
 
         val drawablePathIconLog: String
         val drawableResIconLog: StateFlow<DrawableResource>
+
+        val drawablePathIconPromos: String
+        val drawableResIconPromos: StateFlow<DrawableResource>
 
         val drawablePathIconAnalytics: String
         val drawableResIconAnalytics: StateFlow<DrawableResource>
@@ -31651,6 +35393,9 @@ object AppConfiguration {
 
         val drawablePathIconBarcodeScanner: String
         val drawableResIconBarcodeScanner: StateFlow<DrawableResource>
+
+        val drawablePathIconBarcodeType: String
+        val drawableResIconBarcodeType: StateFlow<DrawableResource>
 
         val drawablePathIconVoiceInput: String
         val drawableResIconVoiceInput: StateFlow<DrawableResource>
@@ -31699,6 +35444,10 @@ object AppConfiguration {
 
         val drawablePathIconWhatsApp: String
         val drawableResIconWhatsApp: StateFlow<DrawableResource>
+
+        val drawablePathIconRefresh: String
+        val drawableResIconRefresh: StateFlow<DrawableResource>
+
 
         suspend fun updateDrawableResources()
     }
@@ -31758,9 +35507,12 @@ object AppConfiguration {
             override val notificationsState: DataState<List<NotificationDataModel>> by kz.aita.notificationsState.value.collectAsState()
             override val notifications: List<NotificationDataModel>? by kz.aita.notificationsState.payload.collectAsState()
             override val realtimeUpdatesConnected: Boolean by realtimeUpdatesConnectedState.collectAsState()
+            override val cloudTransportStatus: Int by cloudTransportStatusState.collectAsState()
+            override val cloudConnectionManualRefreshInProgress: Boolean by cloudConnectionManualRefreshInProgressState.collectAsState()
             override val localNetworkState: LocalNetworkStateDataModel by kz.aita.localNetworkState.collectAsState()
             override val logInInProgress: Boolean by logInInProgressState.collectAsState()
             override val signUpInProgress: Boolean by signUpInProgressState.collectAsState()
+            override val completeTransactionInProgress: Boolean by completeTransactionInProgressState.collectAsState()
             override val workshiftLoginInProgress: Boolean by workshiftLoginInProgressState.collectAsState()
             override val activeWorkshiftState: DataState<WorkshiftDataModel> by kz.aita.activeWorkshiftState.value.collectAsState()
             override val activeWorkshift: WorkshiftDataModel? by kz.aita.activeWorkshiftState.payload.collectAsState()
@@ -32059,8 +35811,13 @@ object AppConfiguration {
             private val _drawableResIconPassword = MutableStateFlow(Res.drawable._1_0)
             override val drawableResIconPassword = _drawableResIconPassword.asStateFlow()
 
-            override val drawablePathIconSecurity: String
-                get() = drawablePathIconPassword
+            override val drawablePathIconSecurity: String by drawablePathIconSecurityState.collectAsState()
+            private val _drawableResIconSecurity = MutableStateFlow(Res.drawable._1_0)
+            override val drawableResIconSecurity: StateFlow<DrawableResource> = _drawableResIconSecurity.asStateFlow()
+
+            override val drawablePathIconResponse: String by drawablePathIconResponseState.collectAsState()
+            private val _drawableResIconResponse = MutableStateFlow(Res.drawable._53_0)
+            override val drawableResIconResponse: StateFlow<DrawableResource> = _drawableResIconResponse.asStateFlow()
 
             override val drawablePathIconCancel: String by drawablePathIconCancelState.collectAsState()
             private val _drawableResIconCancel = MutableStateFlow(Res.drawable._2_0)
@@ -32109,6 +35866,11 @@ object AppConfiguration {
             override val drawableResIconTransactionSupply: StateFlow<DrawableResource> =
                 _drawableResIconTransactionSupply.asStateFlow()
 
+            override val drawablePathIconTransactionSelection: String by drawablePathIconTransactionSelectionState.collectAsState()
+            private val _drawableResIconTransactionSelection = MutableStateFlow(Res.drawable._57_0)
+            override val drawableResIconTransactionSelection: StateFlow<DrawableResource> =
+                _drawableResIconTransactionSelection.asStateFlow()
+
             override val drawablePathIconStock: String by drawablePathIconStockState.collectAsState()
             private val _drawableResIconStock = MutableStateFlow(Res.drawable._13_0)
             override val drawableResIconStock: StateFlow<DrawableResource> = _drawableResIconStock.asStateFlow()
@@ -32146,6 +35908,10 @@ object AppConfiguration {
             override val drawablePathIconLog: String by drawablePathIconLogState.collectAsState()
             private val _drawableResIconLog = MutableStateFlow(Res.drawable._49_0)
             override val drawableResIconLog: StateFlow<DrawableResource> = _drawableResIconLog.asStateFlow()
+
+            override val drawablePathIconPromos: String by drawablePathIconPromosState.collectAsState()
+            private val _drawableResIconPromos = MutableStateFlow(Res.drawable._50_0)
+            override val drawableResIconPromos: StateFlow<DrawableResource> = _drawableResIconPromos.asStateFlow()
 
             override val drawablePathIconAnalytics: String by drawablePathIconAnalyticsState.collectAsState()
             private val _drawableResIconAnalytics = MutableStateFlow(Res.drawable._21_0)
@@ -32204,6 +35970,11 @@ object AppConfiguration {
             private val _drawableResIconBarcodeScanner = MutableStateFlow(Res.drawable._51_0)
             override val drawableResIconBarcodeScanner: StateFlow<DrawableResource> =
                 _drawableResIconBarcodeScanner.asStateFlow()
+
+            override val drawablePathIconBarcodeType: String by drawablePathIconBarcodeTypeState.collectAsState()
+            private val _drawableResIconBarcodeType = MutableStateFlow(Res.drawable._55_0)
+            override val drawableResIconBarcodeType: StateFlow<DrawableResource> =
+                _drawableResIconBarcodeType.asStateFlow()
 
             override val drawablePathIconVoiceInput: String by drawablePathIconVoiceInputState.collectAsState()
             private val _drawableResIconVoiceInput = MutableStateFlow(Res.drawable._52_0)
@@ -32270,10 +36041,19 @@ object AppConfiguration {
             private val _drawableResIconWhatsApp = MutableStateFlow(Res.drawable._47_0)
             override val drawableResIconWhatsApp: StateFlow<DrawableResource> = _drawableResIconWhatsApp.asStateFlow()
 
+            override val drawablePathIconRefresh: String by drawablePathIconRefreshState.collectAsState()
+            private val _drawableResIconRefresh = MutableStateFlow(Res.drawable._54_0)
+            override val drawableResIconRefresh: StateFlow<DrawableResource> = _drawableResIconRefresh.asStateFlow()
+
+
             override suspend fun updateDrawableResources() {
                 _drawableResAITALogo.emit(if (stateValues.appThemeId == 1L) Res.drawable._0_1 else Res.drawable._0_0)
 
                 _drawableResIconPassword.emit(if (stateValues.appThemeId == 1L) Res.drawable._1_1 else Res.drawable._1_0)
+
+                _drawableResIconSecurity.emit(if (stateValues.appThemeId == 1L) Res.drawable._1_1 else Res.drawable._1_0)
+
+                _drawableResIconResponse.emit(if (stateValues.appThemeId == 1L) Res.drawable._53_1 else Res.drawable._53_0)
 
                 _drawableResIconCancel.emit(if (stateValues.appThemeId == 1L) Res.drawable._2_1 else Res.drawable._2_0)
 
@@ -32297,6 +36077,8 @@ object AppConfiguration {
 
                 _drawableResIconTransactionSupply.emit(if (stateValues.appThemeId == 1L) Res.drawable._12_1 else Res.drawable._12_0)
 
+                _drawableResIconTransactionSelection.emit(if (stateValues.appThemeId == 1L) Res.drawable._57_1 else Res.drawable._57_0)
+
                 _drawableResIconStock.emit(if (stateValues.appThemeId == 1L) Res.drawable._13_1 else Res.drawable._13_0)
 
                 _drawableResIconMenu.emit(if (stateValues.appThemeId == 1L) Res.drawable._14_1 else Res.drawable._14_0)
@@ -32314,6 +36096,8 @@ object AppConfiguration {
                 _drawableResIconTransactionHistory.emit(if (stateValues.appThemeId == 1L) Res.drawable._20_1 else Res.drawable._20_0)
 
                 _drawableResIconLog.emit(if (stateValues.appThemeId == 1L) Res.drawable._49_1 else Res.drawable._49_0)
+
+                _drawableResIconPromos.emit(if (stateValues.appThemeId == 1L) Res.drawable._50_1 else Res.drawable._50_0)
 
                 _drawableResIconAnalytics.emit(if (stateValues.appThemeId == 1L) Res.drawable._21_1 else Res.drawable._21_0)
 
@@ -32343,6 +36127,10 @@ object AppConfiguration {
 
                 _drawableResIconBarcodeScanner.emit(if (stateValues.appThemeId == 1L) Res.drawable._51_1 else Res.drawable._51_0)
 
+                _drawableResIconBarcodeType.emit(if (stateValues.appThemeId == 1L) Res.drawable._55_1 else Res.drawable._55_0)
+
+                _drawableResIconVoiceInput.emit(if (stateValues.appThemeId == 1L) Res.drawable._52_1 else Res.drawable._52_0)
+
                 _drawableResIconDelete.emit(if (stateValues.appThemeId == 1L) Res.drawable._33_1 else Res.drawable._33_0)
 
                 _drawableResIconExit.emit(if (stateValues.appThemeId == 1L) Res.drawable._34_1 else Res.drawable._34_0)
@@ -32364,6 +36152,7 @@ object AppConfiguration {
                 _drawableResIconThemeDark.emit(if (stateValues.appThemeId == 1L) Res.drawable._45_1 else Res.drawable._45_0)
                 _drawableResIconShare.emit(if (stateValues.appThemeId == 1L) Res.drawable._46_1 else Res.drawable._46_0)
                 _drawableResIconWhatsApp.emit(if (stateValues.appThemeId == 1L) Res.drawable._47_1 else Res.drawable._47_0)
+                _drawableResIconRefresh.emit(if (stateValues.appThemeId == 1L) Res.drawable._54_1 else Res.drawable._54_0)
             }
         }
 
@@ -32422,11 +36211,13 @@ object AppConfiguration {
 
                 content()
 
-                coroutineScope.launch(Dispatchers.ourIo) {
+                LaunchedEffect(maxWidth, maxHeight, stateValues.wideScreenMinWidth) {
                     _screenWidthState.emit(maxWidth)
                     _screenHeightState.emit(maxHeight)
                     _isNarrowScreenState.emit(maxWidth.value < stateValues.wideScreenMinWidth)
+                }
 
+                LaunchedEffect(Unit) {
                     val resourceStrings = loadResourceStrings()
                     val resourceDimensions = loadResourceDimensions()
                     val resourceColors = loadResourceColors()
@@ -32453,95 +36244,81 @@ object AppConfiguration {
                     )
 
                     stateValues.updateDrawableResources()
+                    Navigation.startAppNavigationPersistence()
+                    Navigation.startTransactionNavigationPersistence()
 
-                    launch(Dispatchers.ourIo) {
-                        _isNarrowScreenState
-                            .collect {
-                                Navigation.TransactionSale.init(it)
-                                Navigation.TransactionReturn.init(it)
-                                Navigation.TransactionSupply.init(it)
-                                Navigation.Stock.init(it)
-                                Navigation.Menu.init(it)
-                                Navigation.UserAuth.init(it)
-                            }
+                    launch {
+                        _isNarrowScreenState.collect { isNarrow ->
+                            Navigation.awaitAppNavigationRestore()
+                            Navigation.awaitTransactionNavigationRestore()
+                            Navigation.TransactionSale.init(isNarrow)
+                            Navigation.TransactionReturn.init(isNarrow)
+                            Navigation.TransactionSupply.init(isNarrow)
+                            Navigation.Stock.init(isNarrow)
+                            Navigation.Menu.init(isNarrow)
+                            Navigation.UserAuth.init(isNarrow)
+                        }
                     }
 
-                    launch(Dispatchers.ourIo) {
-                        stringsState
-                            .payload
-                            .collect {
-                                it?.let {
-                                    updateStrings(it, resourceStrings)
-                                }
-                            }
+                    launch {
+                        stringsState.payload.collect { strings ->
+                            strings?.let { updateStrings(it, resourceStrings) }
+                        }
                     }
 
-                    launch(Dispatchers.ourIo) {
-                        appLanguageState
-                            .collect {
-                                updateStrings(
-                                    strings = stringsState.payloadValue ?: resourceStrings,
-                                    resourceStrings = resourceStrings
-                                )
-                            }
+                    launch {
+                        appLanguageState.collect {
+                            updateStrings(
+                                strings = stringsState.payloadValue ?: resourceStrings,
+                                resourceStrings = resourceStrings
+                            )
+                        }
                     }
 
-                    launch(Dispatchers.ourIo) {
-                        dimensionsState
-                            .payload
-                            .collect {
-                                it?.let {
-                                    updateDimensions(it, resourceDimensions)
-                                }
-                            }
+                    launch {
+                        dimensionsState.payload.collect { dimensions ->
+                            dimensions?.let { updateDimensions(it, resourceDimensions) }
+                        }
                     }
 
-                    launch(Dispatchers.ourIo) {
-                        colorsState
-                            .payload
-                            .collect {
-                                it?.let {
-                                    updateColors(it, resourceColors)
-                                }
-                            }
+                    launch {
+                        colorsState.payload.collect { colors ->
+                            colors?.let { updateColors(it, resourceColors) }
+                        }
                     }
 
-                    launch(Dispatchers.ourIo) {
-                        drawablesState
-                            .payload
-                            .collect {
-                                it?.let {
-                                    updateDrawables(it, resourceDrawables)
-                                    stateValues.updateDrawableResources()
-                                }
-                            }
-                    }
-
-                    launch(Dispatchers.ourIo) {
-                        appThemeIdState
-                            .collect {
-                                updateColors(
-                                    colors = colorsState.payloadValue ?: resourceColors,
-                                    resourceColors = resourceColors
-                                )
-
-                                updateDrawables(
-                                    drawables = drawablesState.payloadValue ?: resourceDrawables,
-                                    resourceDrawables = resourceDrawables
-                                )
-
+                    launch {
+                        drawablesState.payload.collect { drawables ->
+                            drawables?.let {
+                                updateDrawables(it, resourceDrawables)
                                 stateValues.updateDrawableResources()
                             }
+                        }
                     }
 
-                    launch(Dispatchers.ourIo) {
-                        appSizeModeIdState
-                            .collect {
-                                updateDimensions(
-                                    dimensions = dimensionsState.payloadValue ?: resourceDimensions,
-                                    resourceDimensions = resourceDimensions
-                                )
-                            }
+                    launch {
+                        appThemeIdState.collect {
+                            updateColors(
+                                colors = colorsState.payloadValue ?: resourceColors,
+                                resourceColors = resourceColors
+                            )
+
+                            updateDrawables(
+                                drawables = drawablesState.payloadValue ?: resourceDrawables,
+                                resourceDrawables = resourceDrawables
+                            )
+
+                            stateValues.updateDrawableResources()
+                        }
+                    }
+
+                    launch {
+                        appSizeModeIdState.collect {
+                            updateDimensions(
+                                dimensions = dimensionsState.payloadValue ?: resourceDimensions,
+                                resourceDimensions = resourceDimensions
+                            )
+                        }
                     }
                 }
             }
@@ -32772,7 +36549,10 @@ fun AppConfiguration.AppSizeModeSettingsItemWidget(
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(color = stateValues.TextColor),
-                onClick = { setAppSizeMode(id) }
+                onClick = {
+                    markExplicitLocalAppPreferences(sizeModeId = id)
+                    setAppSizeMode(id)
+                }
             )
             .padding(horizontal = 12.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -32839,6 +36619,7 @@ fun AppConfiguration.AppThemeSettingsItemWidget(
                 },
                 indication = ripple(color = stateValues.TextColor),
                 onClick = {
+                    markExplicitLocalAppPreferences(themeId = id)
                     coroutineScope.launch {
                         setAppTheme(id)
                     }
@@ -32914,6 +36695,7 @@ fun AppConfiguration.AppLanguageSettingsItemWidget(
                 },
                 indication = ripple(color = stateValues.TextColor),
                 onClick = {
+                    markExplicitLocalAppPreferences(language = language)
                     coroutineScope.launch {
                         setAppLocale(language)
                     }
@@ -33020,19 +36802,27 @@ fun AppConfiguration.actionButton(
     var autoLoadingStartNetworkOperations by rememberSaveable {
         mutableStateOf<Int?>(null)
     }
+    var autoLoadingNetworkObserved by rememberSaveable {
+        mutableStateOf(false)
+    }
 
     LaunchedEffect(loading) {
         if (!loading) {
             autoLoadingActive = false
             autoLoadingStartNetworkOperations = null
+            autoLoadingNetworkObserved = false
         }
     }
 
     LaunchedEffect(activeNetworkOperations, autoLoadingStartNetworkOperations) {
         val startedAt = autoLoadingStartNetworkOperations
-        if (startedAt != null && activeNetworkOperations <= startedAt && !loading) {
-            autoLoadingActive = false
-            autoLoadingStartNetworkOperations = null
+        if (startedAt != null) {
+            if (activeNetworkOperations > startedAt) autoLoadingNetworkObserved = true
+            if (autoLoadingNetworkObserved && activeNetworkOperations <= startedAt && !loading) {
+                autoLoadingActive = false
+                autoLoadingStartNetworkOperations = null
+                autoLoadingNetworkObserved = false
+            }
         }
     }
 
@@ -33041,9 +36831,10 @@ fun AppConfiguration.actionButton(
         val startedAt = activeNetworkOperations
         autoLoadingActive = true
         autoLoadingStartNetworkOperations = startedAt
+        autoLoadingNetworkObserved = false
         actionButtonScope.launch {
-            delay(350)
-            if (autoLoadingStartNetworkOperations == startedAt && activeNetworkOperationsState.value <= startedAt && !loading) {
+            delay(1_400)
+            if (autoLoadingStartNetworkOperations == startedAt && !autoLoadingNetworkObserved && !loading) {
                 autoLoadingActive = false
                 autoLoadingStartNetworkOperations = null
             }
@@ -33056,7 +36847,8 @@ fun AppConfiguration.actionButton(
 
     val effectiveLoading = loading || autoLoadingActive
     val originalTextPresent = text.isNotEmpty() && text.isNotBlank()
-    val displayedText = if (effectiveLoading && originalTextPresent) loadingText ?: text else if (effectiveLoading) "" else text
+    val genericLoadingText = localizedStringResource(1141, "Please wait…")
+    val displayedText = if (effectiveLoading && originalTextPresent) loadingText ?: genericLoadingText else if (effectiveLoading) "" else text
     val visuallyEnabled = isEnabled && !effectiveLoading
 
     val backgroundColor by animateColorAsState(

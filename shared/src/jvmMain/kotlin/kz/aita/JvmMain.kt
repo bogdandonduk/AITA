@@ -36,45 +36,49 @@ private fun persistentUiDraftFileForKey(key: String): File {
     return File(dir, "$safeName.txt")
 }
 
-@Suppress("unused")
-private val jvmPersistentUiDraftHooksInstalled = run {
-    getPersistentUiDraftValue = { key ->
-        runCatching {
-            val file = persistentUiDraftFileForKey(key)
-            if (file.exists()) file.readText() else null
-        }.getOrNull()
-    }
+actual var getPersistentUiDraftValue: (suspend (String) -> String?)? = { key ->
+    runCatching {
+        val file = persistentUiDraftFileForKey(key)
+        if (file.exists()) file.readText() else null
+    }.getOrNull()
+}
 
-    setPersistentUiDraftValue = { key, value ->
-        runCatching {
-            val file = persistentUiDraftFileForKey(key)
-            file.parentFile?.mkdirs()
-            if (value == null) {
-                file.delete()
-            } else {
-                val tmp = File(file.parentFile, file.name + ".tmp")
-                tmp.writeText(value)
-                tmp.renameTo(file) || run { file.writeText(value); true }
-            }
+actual var setPersistentUiDraftValue: (suspend (String, String?) -> Unit)? = { key, value ->
+    runCatching {
+        val file = persistentUiDraftFileForKey(key)
+        file.parentFile?.mkdirs()
+        if (value == null) {
+            file.delete()
+        } else {
+            val tmp = File(file.parentFile, file.name + ".tmp")
+            tmp.writeText(value)
+            tmp.renameTo(file) || run { file.writeText(value); true }
         }
-        Unit
     }
-    true
+    Unit
 }
 
 actual var cacheDirPath: String = ""
 actual val Dispatchers.ourIo: CoroutineDispatcher
     get() = Dispatchers.IO
 
+private fun buildAitaOkHttpClient(): OkHttpClient {
+    val builder = OkHttpClient.Builder()
+    runCatching {
+        cacheDirPath
+            .trim()
+            .takeIf { it.isNotBlank() }
+            ?.let { basePath ->
+                val httpCacheDirectory = File(basePath, "http").apply { mkdirs() }
+                builder.cache(Cache(httpCacheDirectory, cacheSize))
+            }
+    }
+    return builder.build()
+}
+
 actual var getHttpClientEngine: () -> HttpClientEngine = {
     OkHttp.create {
-        preconfigured = OkHttpClient.Builder()
-            .cache(
-                Cache(
-                    File(cacheDirPath, "http"),
-                    cacheSize
-                )
-            ).build()
+        preconfigured = buildAitaOkHttpClient()
     }
 }
 

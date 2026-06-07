@@ -44,16 +44,12 @@ actual var setStoredUserAccountDataModel: ((UserAccountDataModel?) -> Unit)? = {
     browserSet("user_account", user?.let { jsonBase.encodeToString(it) })
 }
 
-@Suppress("unused")
-private val wasmPersistentUiDraftHooksInstalled = run {
-    getPersistentUiDraftValue = { key ->
-        browserGet("ui_draft_" + key.hashCode().toString())
-    }
+actual var getPersistentUiDraftValue: (suspend (String) -> String?)? = { key ->
+    browserGet("ui_draft_" + key.hashCode().toString())
+}
 
-    setPersistentUiDraftValue = { key, value ->
-        browserSet("ui_draft_" + key.hashCode().toString(), value)
-    }
-    true
+actual var setPersistentUiDraftValue: (suspend (String, String?) -> Unit)? = { key, value ->
+    browserSet("ui_draft_" + key.hashCode().toString(), value)
 }
 
 actual var cacheDirPath: String = "browser"
