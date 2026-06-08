@@ -88,6 +88,7 @@ tasks.withType<JavaExec>().configureEach {
     systemProperty("io.ktor.development", "false")
     systemProperty("ktor.development", "false")
     jvmArgs("-Dio.ktor.development=false", "-Dktor.development=false")
+    classpath = sourceSets.main.get().runtimeClasspath
 }
 
 tasks.withType<Test>().configureEach {

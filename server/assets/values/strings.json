@@ -23857,6 +23857,1161 @@
           "value": "Ең аз сан"
         }
       ]
+    },
+    {
+      "id": 1221,
+      "values": [
+        {
+          "language": "main",
+          "value": "Removal request from store"
+        },
+        {
+          "language": "en",
+          "value": "Removal request from store"
+        },
+        {
+          "language": "ru",
+          "value": "Запрос на удаление от магазина"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкеннен шығару сұрауы"
+        }
+      ]
+    },
+    {
+      "id": 1222,
+      "values": [
+        {
+          "language": "main",
+          "value": "Removal confirmed"
+        },
+        {
+          "language": "en",
+          "value": "Removal confirmed"
+        },
+        {
+          "language": "ru",
+          "value": "Удаление подтверждено"
+        },
+        {
+          "language": "kk",
+          "value": "Шығару расталды"
+        }
+      ]
+    },
+    {
+      "id": 1223,
+      "values": [
+        {
+          "language": "main",
+          "value": "Worker kept access"
+        },
+        {
+          "language": "en",
+          "value": "Worker kept access"
+        },
+        {
+          "language": "ru",
+          "value": "Сотрудник сохранил доступ"
+        },
+        {
+          "language": "kk",
+          "value": "Қызметкер қолжетімділікті сақтады"
+        }
+      ]
+    },
+    {
+      "id": 1224,
+      "values": [
+        {
+          "language": "main",
+          "value": "Waiting for worker"
+        },
+        {
+          "language": "en",
+          "value": "Waiting for worker"
+        },
+        {
+          "language": "ru",
+          "value": "Ожидаем сотрудника"
+        },
+        {
+          "language": "kk",
+          "value": "Қызметкерді күтеміз"
+        }
+      ]
+    },
+    {
+      "id": 1225,
+      "values": [
+        {
+          "language": "main",
+          "value": "Removal requests"
+        },
+        {
+          "language": "en",
+          "value": "Removal requests"
+        },
+        {
+          "language": "ru",
+          "value": "Запросы на удаление"
+        },
+        {
+          "language": "kk",
+          "value": "Шығару сұраулары"
+        }
+      ]
+    },
+    {
+      "id": 1226,
+      "values": [
+        {
+          "language": "main",
+          "value": "Confirm removal request?"
+        },
+        {
+          "language": "en",
+          "value": "Confirm removal request?"
+        },
+        {
+          "language": "ru",
+          "value": "Подтвердить запрос на удаление?"
+        },
+        {
+          "language": "kk",
+          "value": "Шығару сұрауын растайсыз ба?"
+        }
+      ]
+    },
+    {
+      "id": 1227,
+      "values": [
+        {
+          "language": "main",
+          "value": "Keep your access?"
+        },
+        {
+          "language": "en",
+          "value": "Keep your access?"
+        },
+        {
+          "language": "ru",
+          "value": "Сохранить доступ?"
+        },
+        {
+          "language": "kk",
+          "value": "Қолжетімділікті сақтау керек пе?"
+        }
+      ]
+    },
+    {
+      "id": 1228,
+      "values": [
+        {
+          "language": "main",
+          "value": "Confirm removal"
+        },
+        {
+          "language": "en",
+          "value": "Confirm removal"
+        },
+        {
+          "language": "ru",
+          "value": "Подтвердить удаление"
+        },
+        {
+          "language": "kk",
+          "value": "Шығаруды растау"
+        }
+      ]
+    },
+    {
+      "id": 1229,
+      "values": [
+        {
+          "language": "main",
+          "value": "Keep my access"
+        },
+        {
+          "language": "en",
+          "value": "Keep my access"
+        },
+        {
+          "language": "ru",
+          "value": "Сохранить мой доступ"
+        },
+        {
+          "language": "kk",
+          "value": "Қолжетімділігімді сақтау"
+        }
+      ]
+    },
+    {
+      "id": 1230,
+      "values": [
+        {
+          "language": "main",
+          "value": "This store asked to end your worker access. Confirm only if you agree."
+        },
+        {
+          "language": "en",
+          "value": "This store asked to end your worker access. Confirm only if you agree."
+        },
+        {
+          "language": "ru",
+          "value": "Магазин просит завершить ваш рабочий доступ. Подтверждайте только если согласны."
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен сіздің жұмыс қолжетімділігіңізді аяқтауды сұрады. Келіскенде ғана растаңыз."
+        }
+      ]
+    },
+    {
+      "id": 1231,
+      "values": [
+        {
+          "language": "main",
+          "value": "Removal request is waiting for worker confirmation"
+        },
+        {
+          "language": "en",
+          "value": "Removal request is waiting for worker confirmation"
+        },
+        {
+          "language": "ru",
+          "value": "Запрос на удаление ждёт подтверждения сотрудника"
+        },
+        {
+          "language": "kk",
+          "value": "Шығару сұрауы қызметкердің растауын күтуде"
+        }
+      ]
+    },
+    {
+      "id": 1232,
+      "values": [
+        {
+          "language": "main",
+          "value": "Request removal"
+        },
+        {
+          "language": "en",
+          "value": "Request removal"
+        },
+        {
+          "language": "ru",
+          "value": "Запросить удаление"
+        },
+        {
+          "language": "kk",
+          "value": "Шығаруды сұрау"
+        }
+      ]
+    },
+    {
+      "id": 1233,
+      "values": [
+        {
+          "language": "main",
+          "value": "No invites or removal requests"
+        },
+        {
+          "language": "en",
+          "value": "No invites or removal requests"
+        },
+        {
+          "language": "ru",
+          "value": "Нет приглашений или запросов на удаление"
+        },
+        {
+          "language": "kk",
+          "value": "Шақырулар немесе шығару сұраулары жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1234,
+      "values": [
+        {
+          "language": "main",
+          "value": "No worker removal requests"
+        },
+        {
+          "language": "en",
+          "value": "No worker removal requests"
+        },
+        {
+          "language": "ru",
+          "value": "Запросов на удаление нет"
+        },
+        {
+          "language": "kk",
+          "value": "Шығару сұраулары жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1235,
+      "values": [
+        {
+          "language": "main",
+          "value": "The worker stays active until they confirm this request."
+        },
+        {
+          "language": "en",
+          "value": "The worker stays active until they confirm this request."
+        },
+        {
+          "language": "ru",
+          "value": "Сотрудник остаётся активным, пока не подтвердит этот запрос."
+        },
+        {
+          "language": "kk",
+          "value": "Қызметкер бұл сұрауды растамайынша белсенді қалады."
+        }
+      ]
+    },
+    {
+      "id": 1236,
+      "values": [
+        {
+          "language": "main",
+          "value": "No removal requests"
+        },
+        {
+          "language": "en",
+          "value": "No removal requests"
+        },
+        {
+          "language": "ru",
+          "value": "Запросов на удаление нет"
+        },
+        {
+          "language": "kk",
+          "value": "Шығару сұраулары жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1237,
+      "values": [
+        {
+          "language": "main",
+          "value": "Store asked this worker to confirm removal"
+        },
+        {
+          "language": "en",
+          "value": "Store asked this worker to confirm removal"
+        },
+        {
+          "language": "ru",
+          "value": "Магазин попросил сотрудника подтвердить удаление"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен қызметкерден шығаруды растауды сұрады"
+        }
+      ]
+    },
+    {
+      "id": 1238,
+      "values": [
+        {
+          "language": "main",
+          "value": "Worker responses"
+        },
+        {
+          "language": "en",
+          "value": "Worker responses"
+        },
+        {
+          "language": "ru",
+          "value": "Ответы сотрудников"
+        },
+        {
+          "language": "kk",
+          "value": "Қызметкерлердің жауаптары"
+        }
+      ]
+    },
+    {
+      "id": 1239,
+      "values": [
+        {
+          "language": "main",
+          "value": "Analytics report"
+        },
+        {
+          "language": "en",
+          "value": "Analytics report"
+        },
+        {
+          "language": "ru",
+          "value": "Аналитический отчёт"
+        },
+        {
+          "language": "kk",
+          "value": "Аналитикалық есеп"
+        }
+      ]
+    },
+    {
+      "id": 1240,
+      "values": [
+        {
+          "language": "main",
+          "value": "Printable summary"
+        },
+        {
+          "language": "en",
+          "value": "Printable summary"
+        },
+        {
+          "language": "ru",
+          "value": "Сводка для печати"
+        },
+        {
+          "language": "kk",
+          "value": "Басып шығарылатын қорытынды"
+        }
+      ]
+    },
+    {
+      "id": 1241,
+      "values": [
+        {
+          "language": "main",
+          "value": "A4 paper printer"
+        },
+        {
+          "language": "en",
+          "value": "A4 paper printer"
+        },
+        {
+          "language": "ru",
+          "value": "Бумажный принтер A4"
+        },
+        {
+          "language": "kk",
+          "value": "A4 қағаз принтері"
+        }
+      ]
+    },
+    {
+      "id": 1242,
+      "values": [
+        {
+          "language": "main",
+          "value": "Thermal receipt printer"
+        },
+        {
+          "language": "en",
+          "value": "Thermal receipt printer"
+        },
+        {
+          "language": "ru",
+          "value": "Термопринтер чеков"
+        },
+        {
+          "language": "kk",
+          "value": "Термо чек принтері"
+        }
+      ]
+    },
+    {
+      "id": 1243,
+      "values": [
+        {
+          "language": "main",
+          "value": "Save report PDF"
+        },
+        {
+          "language": "en",
+          "value": "Save report PDF"
+        },
+        {
+          "language": "ru",
+          "value": "Сохранить PDF отчёта"
+        },
+        {
+          "language": "kk",
+          "value": "Есеп PDF сақтау"
+        }
+      ]
+    },
+    {
+      "id": 1244,
+      "values": [
+        {
+          "language": "main",
+          "value": "Share report PDF"
+        },
+        {
+          "language": "en",
+          "value": "Share report PDF"
+        },
+        {
+          "language": "ru",
+          "value": "Поделиться PDF отчётом"
+        },
+        {
+          "language": "kk",
+          "value": "Есеп PDF бөлісу"
+        }
+      ]
+    },
+    {
+      "id": 1245,
+      "values": [
+        {
+          "language": "main",
+          "value": "Print report"
+        },
+        {
+          "language": "en",
+          "value": "Print report"
+        },
+        {
+          "language": "ru",
+          "value": "Напечатать отчёт"
+        },
+        {
+          "language": "kk",
+          "value": "Есепті басып шығару"
+        }
+      ]
+    },
+    {
+      "id": 1246,
+      "values": [
+        {
+          "language": "main",
+          "value": "Report PDF saved"
+        },
+        {
+          "language": "en",
+          "value": "Report PDF saved"
+        },
+        {
+          "language": "ru",
+          "value": "PDF отчёта сохранён"
+        },
+        {
+          "language": "kk",
+          "value": "Есеп PDF сақталды"
+        }
+      ]
+    },
+    {
+      "id": 1247,
+      "values": [
+        {
+          "language": "main",
+          "value": "Report PDF shared"
+        },
+        {
+          "language": "en",
+          "value": "Report PDF shared"
+        },
+        {
+          "language": "ru",
+          "value": "Открыта отправка PDF отчёта"
+        },
+        {
+          "language": "kk",
+          "value": "Есеп PDF бөлісу ашылды"
+        }
+      ]
+    },
+    {
+      "id": 1248,
+      "values": [
+        {
+          "language": "main",
+          "value": "Report opened for printing"
+        },
+        {
+          "language": "en",
+          "value": "Report opened for printing"
+        },
+        {
+          "language": "ru",
+          "value": "Отчёт открыт для печати"
+        },
+        {
+          "language": "kk",
+          "value": "Есеп басып шығаруға ашылды"
+        }
+      ]
+    },
+    {
+      "id": 1249,
+      "values": [
+        {
+          "language": "main",
+          "value": "Transaction receipts use ESC/POS thermal printers. Analytics reports use A4 paper printing."
+        },
+        {
+          "language": "en",
+          "value": "Transaction receipts use ESC/POS thermal printers. Analytics reports use A4 paper printing."
+        },
+        {
+          "language": "ru",
+          "value": "Чеки операций печатаются на термопринтерах ESC/POS. Аналитические отчёты печатаются как документы A4."
+        },
+        {
+          "language": "kk",
+          "value": "Операция чектері ESC/POS термо принтерлерінде басылады. Аналитикалық есептер A4 құжаты ретінде басылады."
+        }
+      ]
+    },
+    {
+      "id": 1250,
+      "values": [
+        {
+          "language": "main",
+          "value": "Report preview"
+        },
+        {
+          "language": "en",
+          "value": "Report preview"
+        },
+        {
+          "language": "ru",
+          "value": "Предпросмотр отчёта"
+        },
+        {
+          "language": "kk",
+          "value": "Есепті алдын ала көру"
+        }
+      ]
+    },
+    {
+      "id": 1251,
+      "values": [
+        {
+          "language": "main",
+          "value": "Receipt printer device"
+        },
+        {
+          "language": "en",
+          "value": "Receipt printer device"
+        },
+        {
+          "language": "ru",
+          "value": "Устройство чекового принтера"
+        },
+        {
+          "language": "kk",
+          "value": "Чек принтері құрылғысы"
+        }
+      ]
+    },
+    {
+      "id": 1252,
+      "values": [
+        {
+          "language": "main",
+          "value": "A4 paper printer"
+        },
+        {
+          "language": "en",
+          "value": "A4 paper printer"
+        },
+        {
+          "language": "ru",
+          "value": "Бумажный принтер A4"
+        },
+        {
+          "language": "kk",
+          "value": "A4 қағаз принтері"
+        }
+      ]
+    },
+    {
+      "id": 1253,
+      "values": [
+        {
+          "language": "main",
+          "value": "Analytics reports use the regular system print dialog for A4 paper printers."
+        },
+        {
+          "language": "en",
+          "value": "Analytics reports use the regular system print dialog for A4 paper printers."
+        },
+        {
+          "language": "ru",
+          "value": "Аналитические отчёты используют обычное системное окно печати для принтеров A4."
+        },
+        {
+          "language": "kk",
+          "value": "Аналитикалық есептер A4 принтерлері үшін жүйелік басып шығару терезесін қолданады."
+        }
+      ]
+    },
+    {
+      "id": 1254,
+      "values": [
+        {
+          "language": "main",
+          "value": "Thermal receipt printer"
+        },
+        {
+          "language": "en",
+          "value": "Thermal receipt printer"
+        },
+        {
+          "language": "ru",
+          "value": "Термопринтер чеков"
+        },
+        {
+          "language": "kk",
+          "value": "Термо чек принтері"
+        }
+      ]
+    },
+    {
+      "id": 1255,
+      "values": [
+        {
+          "language": "main",
+          "value": "Detected receipt printers"
+        },
+        {
+          "language": "en",
+          "value": "Detected receipt printers"
+        },
+        {
+          "language": "ru",
+          "value": "Найденные чековые принтеры"
+        },
+        {
+          "language": "kk",
+          "value": "Табылған чек принтерлері"
+        }
+      ]
+    },
+    {
+      "id": 1256,
+      "values": [
+        {
+          "language": "main",
+          "value": "No paired thermal receipt printers found"
+        },
+        {
+          "language": "en",
+          "value": "No paired thermal receipt printers found"
+        },
+        {
+          "language": "ru",
+          "value": "Спаренные термопринтеры чеков не найдены"
+        },
+        {
+          "language": "kk",
+          "value": "Жұпталған термо чек принтерлері табылмады"
+        }
+      ]
+    },
+    {
+      "id": 1257,
+      "values": [
+        {
+          "language": "main",
+          "value": "Use this printer"
+        },
+        {
+          "language": "en",
+          "value": "Use this printer"
+        },
+        {
+          "language": "ru",
+          "value": "Использовать этот принтер"
+        },
+        {
+          "language": "kk",
+          "value": "Осы принтерді қолдану"
+        }
+      ]
+    },
+    {
+      "id": 1258,
+      "values": [
+        {
+          "language": "main",
+          "value": "Selected printer"
+        },
+        {
+          "language": "en",
+          "value": "Selected printer"
+        },
+        {
+          "language": "ru",
+          "value": "Выбранный принтер"
+        },
+        {
+          "language": "kk",
+          "value": "Таңдалған принтер"
+        }
+      ]
+    },
+    {
+      "id": 1259,
+      "values": [
+        {
+          "language": "main",
+          "value": "Refresh printers"
+        },
+        {
+          "language": "en",
+          "value": "Refresh printers"
+        },
+        {
+          "language": "ru",
+          "value": "Обновить принтеры"
+        },
+        {
+          "language": "kk",
+          "value": "Принтерлерді жаңарту"
+        }
+      ]
+    },
+    {
+      "id": 1260,
+      "values": [
+        {
+          "language": "main",
+          "value": "Receipt printer selected"
+        },
+        {
+          "language": "en",
+          "value": "Receipt printer selected"
+        },
+        {
+          "language": "ru",
+          "value": "Чековый принтер выбран"
+        },
+        {
+          "language": "kk",
+          "value": "Чек принтері таңдалды"
+        }
+      ]
+    },
+    {
+      "id": 1261,
+      "values": [
+        {
+          "language": "main",
+          "value": "Receipt printer test"
+        },
+        {
+          "language": "en",
+          "value": "Receipt printer test"
+        },
+        {
+          "language": "ru",
+          "value": "Тест чекового принтера"
+        },
+        {
+          "language": "kk",
+          "value": "Чек принтерін тексеру"
+        }
+      ]
+    },
+    {
+      "id": 1262,
+      "values": [
+        {
+          "language": "main",
+          "value": "Send test receipt"
+        },
+        {
+          "language": "en",
+          "value": "Send test receipt"
+        },
+        {
+          "language": "ru",
+          "value": "Отправить тестовый чек"
+        },
+        {
+          "language": "kk",
+          "value": "Сынақ чегін жіберу"
+        }
+      ]
+    },
+    {
+      "id": 1263,
+      "values": [
+        {
+          "language": "main",
+          "value": "Test receipt sent"
+        },
+        {
+          "language": "en",
+          "value": "Test receipt sent"
+        },
+        {
+          "language": "ru",
+          "value": "Тестовый чек отправлен"
+        },
+        {
+          "language": "kk",
+          "value": "Сынақ чегі жіберілді"
+        }
+      ]
+    },
+    {
+      "id": 1264,
+      "values": [
+        {
+          "language": "main",
+          "value": "Receipt printer cleared"
+        },
+        {
+          "language": "en",
+          "value": "Receipt printer cleared"
+        },
+        {
+          "language": "ru",
+          "value": "Чековый принтер сброшен"
+        },
+        {
+          "language": "kk",
+          "value": "Чек принтері тазартылды"
+        }
+      ]
+    },
+    {
+      "id": 1265,
+      "values": [
+        {
+          "language": "main",
+          "value": "Clear receipt printer"
+        },
+        {
+          "language": "en",
+          "value": "Clear receipt printer"
+        },
+        {
+          "language": "ru",
+          "value": "Сбросить чековый принтер"
+        },
+        {
+          "language": "kk",
+          "value": "Чек принтерін тазарту"
+        }
+      ]
+    },
+    {
+      "id": 1266,
+      "values": [
+        {
+          "language": "main",
+          "value": "Pair or connect the printer in system settings, then refresh this list."
+        },
+        {
+          "language": "en",
+          "value": "Pair or connect the printer in system settings, then refresh this list."
+        },
+        {
+          "language": "ru",
+          "value": "Подключите или спарьте принтер в системных настройках, затем обновите этот список."
+        },
+        {
+          "language": "kk",
+          "value": "Принтерді жүйе баптауларында қосыңыз немесе жұптаңыз, содан кейін осы тізімді жаңартыңыз."
+        }
+      ]
+    },
+    {
+      "id": 1267,
+      "values": [
+        {
+          "language": "main",
+          "value": "PDF export is not configured for this platform"
+        },
+        {
+          "language": "en",
+          "value": "PDF export is not configured for this platform"
+        },
+        {
+          "language": "ru",
+          "value": "Экспорт PDF не настроен для этой платформы"
+        },
+        {
+          "language": "kk",
+          "value": "Бұл платформада PDF экспорты бапталмаған"
+        }
+      ]
+    },
+    {
+      "id": 1268,
+      "values": [
+        {
+          "language": "main",
+          "value": "PDF sharing is not configured for this platform"
+        },
+        {
+          "language": "en",
+          "value": "PDF sharing is not configured for this platform"
+        },
+        {
+          "language": "ru",
+          "value": "Отправка PDF не настроена для этой платформы"
+        },
+        {
+          "language": "kk",
+          "value": "Бұл платформада PDF бөлісу бапталмаған"
+        }
+      ]
+    },
+    {
+      "id": 1269,
+      "values": [
+        {
+          "language": "main",
+          "value": "Paper document printing is not configured for this platform"
+        },
+        {
+          "language": "en",
+          "value": "Paper document printing is not configured for this platform"
+        },
+        {
+          "language": "ru",
+          "value": "Печать бумажных документов не настроена для этой платформы"
+        },
+        {
+          "language": "kk",
+          "value": "Бұл платформада қағаз құжат басып шығару бапталмаған"
+        }
+      ]
+    },
+    {
+      "id": 1270,
+      "values": [
+        {
+          "language": "main",
+          "value": "Receipt printers refreshed"
+        },
+        {
+          "language": "en",
+          "value": "Receipt printers refreshed"
+        },
+        {
+          "language": "ru",
+          "value": "Чековые принтеры обновлены"
+        },
+        {
+          "language": "kk",
+          "value": "Чек принтерлері жаңартылды"
+        }
+      ]
+    },
+    {
+      "id": 1271,
+      "values": [
+        {
+          "language": "main",
+          "value": "Report period"
+        },
+        {
+          "language": "en",
+          "value": "Report period"
+        },
+        {
+          "language": "ru",
+          "value": "Период отчёта"
+        },
+        {
+          "language": "kk",
+          "value": "Есеп кезеңі"
+        }
+      ]
+    },
+    {
+      "id": 1272,
+      "values": [
+        {
+          "language": "main",
+          "value": "Report scope"
+        },
+        {
+          "language": "en",
+          "value": "Report scope"
+        },
+        {
+          "language": "ru",
+          "value": "Область отчёта"
+        },
+        {
+          "language": "kk",
+          "value": "Есеп аясы"
+        }
+      ]
+    },
+    {
+      "id": 1273,
+      "values": [
+        {
+          "language": "main",
+          "value": "Selected analytics tab"
+        },
+        {
+          "language": "en",
+          "value": "Selected analytics tab"
+        },
+        {
+          "language": "ru",
+          "value": "Выбранная вкладка аналитики"
+        },
+        {
+          "language": "kk",
+          "value": "Таңдалған аналитика қойындысы"
+        }
+      ]
+    },
+    {
+      "id": 1274,
+      "values": [
+        {
+          "language": "main",
+          "value": "Filters"
+        },
+        {
+          "language": "en",
+          "value": "Filters"
+        },
+        {
+          "language": "ru",
+          "value": "Фильтры"
+        },
+        {
+          "language": "kk",
+          "value": "Сүзгілер"
+        }
+      ]
+    },
+    {
+      "id": 1275,
+      "values": [
+        {
+          "language": "main",
+          "value": "Generated"
+        },
+        {
+          "language": "en",
+          "value": "Generated"
+        },
+        {
+          "language": "ru",
+          "value": "Сформировано"
+        },
+        {
+          "language": "kk",
+          "value": "Жасалды"
+        }
+      ]
     }
   ]
 }

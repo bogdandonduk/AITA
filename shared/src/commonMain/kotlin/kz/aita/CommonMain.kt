@@ -699,6 +699,35 @@ data class ReceiptPlatformActionResult(
     val message: String = ""
 )
 
+data class PlatformReceiptPrinterDataModel(
+    val id: String,
+    val name: String,
+    val subtitle: String = "",
+    val configured: Boolean = false,
+    val available: Boolean = true
+)
+
+data class AnalyticsReportRowDataModel(
+    val title: String,
+    val value: String,
+    val note: String = ""
+)
+
+data class AnalyticsReportSectionDataModel(
+    val title: String,
+    val rows: List<AnalyticsReportRowDataModel> = emptyList(),
+    val notes: List<String> = emptyList()
+)
+
+data class AnalyticsReportSnapshotDataModel(
+    val title: String,
+    val storeName: String,
+    val periodText: String,
+    val scopeText: String,
+    val generatedAtMillis: Long,
+    val sections: List<AnalyticsReportSectionDataModel>
+)
+
 data class ReceiptTextLabelsDataModel(
     val store: String = "Store",
     val goodsReceiptTitle: String = "Goods receipt",
@@ -736,15 +765,31 @@ var saveReceiptPdfFile: (suspend (fileName: String, pdfBytes: ByteArray) -> Rece
 var shareReceiptPdfFile: (suspend (fileName: String, pdfBytes: ByteArray, whatsappOnly: Boolean) -> ReceiptPlatformActionResult)? = null
 var printReceiptEscPosBytes: (suspend (printerBytes: ByteArray) -> ReceiptPlatformActionResult)? = null
 var printReceiptPlatformAction: (suspend (fileName: String, pdfBytes: ByteArray, printerBytes: ByteArray) -> ReceiptPlatformActionResult)? = null
+var printPdfDocumentPlatformAction: (suspend (fileName: String, pdfBytes: ByteArray) -> ReceiptPlatformActionResult)? = null
+var listPlatformReceiptPrinterDevicesAction: (suspend () -> List<PlatformReceiptPrinterDataModel>)? = null
+var configurePlatformReceiptPrinterDeviceAction: (suspend (deviceId: String?) -> ReceiptPlatformActionResult)? = null
+
+val receiptPrinterDevicesState = MutableStateFlow<List<PlatformReceiptPrinterDataModel>>(emptyList())
+val configuredReceiptPrinterDeviceIdState = MutableStateFlow<String?>(null)
 
 suspend fun saveReceiptPdf(fileName: String, pdfBytes: ByteArray, labels: ReceiptTextLabelsDataModel = ReceiptTextLabelsDataModel()): ReceiptPlatformActionResult {
     return saveReceiptPdfFile?.invoke(fileName, pdfBytes)
         ?: ReceiptPlatformActionResult(false, labels.pdfExportNotConfigured)
 }
 
+suspend fun savePdfDocument(fileName: String, pdfBytes: ByteArray, notConfiguredMessage: String = "PDF export is not configured for this platform"): ReceiptPlatformActionResult {
+    return saveReceiptPdfFile?.invoke(fileName, pdfBytes)
+        ?: ReceiptPlatformActionResult(false, notConfiguredMessage)
+}
+
 suspend fun shareReceiptPdf(fileName: String, pdfBytes: ByteArray, whatsappOnly: Boolean = false, labels: ReceiptTextLabelsDataModel = ReceiptTextLabelsDataModel()): ReceiptPlatformActionResult {
     return shareReceiptPdfFile?.invoke(fileName, pdfBytes, whatsappOnly)
         ?: ReceiptPlatformActionResult(false, labels.pdfSharingNotConfigured)
+}
+
+suspend fun sharePdfDocument(fileName: String, pdfBytes: ByteArray, notConfiguredMessage: String = "PDF sharing is not configured for this platform"): ReceiptPlatformActionResult {
+    return shareReceiptPdfFile?.invoke(fileName, pdfBytes, false)
+        ?: ReceiptPlatformActionResult(false, notConfiguredMessage)
 }
 
 suspend fun printReceiptEscPos(printerBytes: ByteArray, labels: ReceiptTextLabelsDataModel = ReceiptTextLabelsDataModel()): ReceiptPlatformActionResult {
@@ -761,6 +806,63 @@ suspend fun printReceipt(
     return printReceiptPlatformAction?.invoke(fileName, pdfBytes, printerBytes)
         ?: printReceiptEscPosBytes?.invoke(printerBytes)
         ?: ReceiptPlatformActionResult(false, labels.printerNotConfigured)
+}
+
+suspend fun printPdfDocument(fileName: String, pdfBytes: ByteArray, notConfiguredMessage: String = "Document printing is not configured for this platform"): ReceiptPlatformActionResult {
+    return printPdfDocumentPlatformAction?.invoke(fileName, pdfBytes)
+        ?: ReceiptPlatformActionResult(false, notConfiguredMessage)
+}
+
+fun refreshReceiptPrinterDevices(onCompleted: ((ReceiptPlatformActionResult) -> Unit)? = null) {
+    GlobalScope.launch(Dispatchers.ourIo) {
+        val result = runCatching {
+            val devices = listPlatformReceiptPrinterDevicesAction?.invoke().orEmpty()
+            receiptPrinterDevicesState.emit(devices)
+            configuredReceiptPrinterDeviceIdState.emit(devices.firstOrNull { it.configured }?.id)
+            ReceiptPlatformActionResult(true, "Receipt printers refreshed")
+        }.getOrElse { throwable ->
+            ReceiptPlatformActionResult(false, throwable.message ?: "Could not refresh receipt printers")
+        }
+        onCompleted?.invoke(result)
+    }
+}
+
+fun configureReceiptPrinterDevice(deviceId: String?, onCompleted: ((ReceiptPlatformActionResult) -> Unit)? = null) {
+    GlobalScope.launch(Dispatchers.ourIo) {
+        val result = runCatching {
+            configurePlatformReceiptPrinterDeviceAction?.invoke(deviceId)
+                ?: ReceiptPlatformActionResult(false, "Receipt printer configuration is not available on this platform")
+        }.getOrElse { throwable ->
+            ReceiptPlatformActionResult(false, throwable.message ?: "Could not configure receipt printer")
+        }
+
+        if (result.success) {
+            configuredReceiptPrinterDeviceIdState.emit(deviceId)
+            val devices = listPlatformReceiptPrinterDevicesAction?.invoke().orEmpty()
+            receiptPrinterDevicesState.emit(devices)
+        }
+
+        onCompleted?.invoke(result)
+    }
+}
+
+fun buildReceiptPrinterTestEscPosBytes(title: String = "AITA printer test", dateText: String = ""): ByteArray {
+    val bytes = mutableListOf<Byte>()
+    fun add(vararg values: Int) { values.forEach { bytes += it.toByte() } }
+    fun addText(value: String) { bytes += value.escPosSafe().encodeToByteArray().toList() }
+
+    add(0x1B, 0x40)
+    add(0x1B, 0x61, 0x01)
+    add(0x1B, 0x45, 0x01)
+    addText(title.ifBlank { "AITA printer test" } + "\n")
+    add(0x1B, 0x45, 0x00)
+    if (dateText.isNotBlank()) addText(dateText + "\n")
+    addText("--------------------------------\n")
+    addText("Thermal receipt printer is ready.\n")
+    addText("This path uses ESC/POS bytes, not A4 PDF.\n")
+    addText("\n\n")
+    add(0x1D, 0x56, 0x42, 0x00)
+    return bytes.toByteArray()
 }
 
 private fun receiptVisibleString(values: List<LocalizedStringDataModel>, language: String, fallback: String): String {
@@ -969,6 +1071,143 @@ fun TransactionReceiptSnapshotDataModel.buildReceiptPdfBytes(language: String, l
     out.append("trailer\n<< /Size ${objects.size + 1} /Root 1 0 R >>\n")
     out.append("startxref\n$xrefOffset\n%%EOF")
     return out.toString().toByteArray()
+}
+
+fun AnalyticsReportSnapshotDataModel.buildAnalyticsReportPlainText(): String {
+    val builder = StringBuilder()
+    builder.appendLine(storeName.ifBlank { "Store" })
+    builder.appendLine(title.ifBlank { "Analytics report" })
+    builder.appendLine("Generated: ${receiptDateTimeText(generatedAtMillis)}")
+    builder.appendLine("Period: $periodText")
+    builder.appendLine("Scope: $scopeText")
+    builder.appendLine("--------------------------------")
+
+    sections.forEachIndexed { sectionIndex, section ->
+        if (sectionIndex > 0) builder.appendLine()
+        builder.appendLine(section.title)
+        if (section.rows.isEmpty() && section.notes.isEmpty()) {
+            builder.appendLine("- No data")
+        }
+        section.rows.forEach { row ->
+            builder.appendLine("${row.title}: ${row.value}")
+            row.note.takeIf { it.isNotBlank() }?.let { builder.appendLine("  $it") }
+        }
+        section.notes.forEach { note ->
+            if (note.isNotBlank()) builder.appendLine(note)
+        }
+        builder.appendLine("--------------------------------")
+    }
+
+    return builder.toString()
+}
+
+private fun wrapPdfPlainTextLine(line: String, maxChars: Int): List<String> {
+    if (line.isBlank()) return listOf("")
+
+    val result = mutableListOf<String>()
+    var current = StringBuilder()
+
+    fun flush() {
+        if (current.isNotEmpty()) {
+            result += current.toString()
+            current = StringBuilder()
+        }
+    }
+
+    line.split(Regex("\\s+")).forEach { word ->
+        if (word.length > maxChars) {
+            flush()
+            result += word.chunked(maxChars)
+        } else if (current.isEmpty()) {
+            current.append(word)
+        } else if (current.length + 1 + word.length <= maxChars) {
+            current.append(' ').append(word)
+        } else {
+            flush()
+            current.append(word)
+        }
+    }
+
+    flush()
+    return result.ifEmpty { listOf("") }
+}
+
+private fun buildPlainTextPdfBytes(
+    rawLines: List<String>,
+    pageWidth: Double,
+    pageHeight: Double,
+    margin: Double,
+    fontSize: Double,
+    lineHeight: Double,
+    maxCharsPerLine: Int
+): ByteArray {
+    val lines = rawLines.flatMap { wrapPdfPlainTextLine(it, maxCharsPerLine) }
+    val maxLinesPerPage = kotlin.math.floor((pageHeight - margin * 2.0) / lineHeight).toInt().coerceAtLeast(1)
+    val pages = lines.chunked(maxLinesPerPage).ifEmpty { listOf(listOf("")) }
+
+    val objects = mutableListOf<String>()
+    val pageObjectIds = pages.indices.map { 4 + it * 2 }
+    val fontObjectId = 3
+
+    objects += "<< /Type /Catalog /Pages 2 0 R >>"
+    objects += "<< /Type /Pages /Kids [${pageObjectIds.joinToString(" ") { "$it 0 R" }}] /Count ${pages.size} >>"
+    objects += "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"
+
+    pages.forEachIndexed { index, pageLines ->
+        val pageObjectId = 4 + index * 2
+        val contentObjectId = pageObjectId + 1
+        val content = buildString {
+            append("BT\n")
+            append("/F1 $fontSize Tf\n")
+            append("$margin ${pageHeight - margin} Td\n")
+            pageLines.forEachIndexed { lineIndex, line ->
+                if (lineIndex > 0) append("0 -$lineHeight Td\n")
+                append("(${pdfEscape(line)}) Tj\n")
+            }
+            append("ET\n")
+        }
+        objects += "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth.toInt()} ${pageHeight.toInt()}] /Resources << /Font << /F1 $fontObjectId 0 R >> >> /Contents $contentObjectId 0 R >>"
+        objects += "<< /Length ${content.toByteArray().size} >>\nstream\n$content\nendstream"
+    }
+
+    val out = StringBuilder()
+    val offsets = mutableListOf<Int>()
+    out.append("%PDF-1.4\n")
+    objects.forEachIndexed { index, obj ->
+        offsets += out.toString().toByteArray().size
+        out.append("${index + 1} 0 obj\n$obj\nendobj\n")
+    }
+    val xrefOffset = out.toString().toByteArray().size
+    out.append("xref\n0 ${objects.size + 1}\n")
+    out.append("0000000000 65535 f \n")
+    offsets.forEach { offset ->
+        out.append(offset.toString().padStart(10, '0')).append(" 00000 n \n")
+    }
+    out.append("trailer\n<< /Size ${objects.size + 1} /Root 1 0 R >>\n")
+    out.append("startxref\n$xrefOffset\n%%EOF")
+    return out.toString().toByteArray()
+}
+
+fun AnalyticsReportSnapshotDataModel.buildAnalyticsReportPdfBytes(): ByteArray {
+    return buildPlainTextPdfBytes(
+        rawLines = buildAnalyticsReportPlainText().lines(),
+        pageWidth = 595.0,
+        pageHeight = 842.0,
+        margin = 42.0,
+        fontSize = 10.0,
+        lineHeight = 14.0,
+        maxCharsPerLine = 86
+    )
+}
+
+fun AnalyticsReportSnapshotDataModel.analyticsReportPdfFileName(): String {
+    val safeStore = storeName
+        .lowercase()
+        .replace(Regex("[^a-z0-9]+"), "_")
+        .trim('_')
+        .ifBlank { "store" }
+        .take(32)
+    return "analytics_report_${safeStore}_${generatedAtMillis}.pdf"
 }
 
 private fun String.escPosSafe(): String {
@@ -2518,7 +2757,7 @@ fun removeStoreWorker(
     storeId: String,
     workerId: String,
     note: String? = null,
-    onCompleted: ((DataState<StoreWorkerDataModel>) -> Unit)? = null
+    onCompleted: ((DataState<StoreWorkerRequestDataModel>) -> Unit)? = null
 ) {
     val cleanStoreId = storeId.trim()
     val cleanWorkerId = workerId.trim()
@@ -2536,12 +2775,14 @@ fun removeStoreWorker(
     if (!removeStoreWorkerMutex.isLocked)
         GlobalScope.launch(Dispatchers.ourIo) {
             removeStoreWorkerMutex.withLock {
-                val response = networkRequest<StoreWorkerDataModel, WorkerRemovalRequestDataModel>(
+                val cleanNote = note?.trim()?.takeIf { it.isNotBlank() }
+                val response = networkRequest<StoreWorkerRequestDataModel, WorkerRemovalRequestDataModel>(
                     method = HttpMethod.Post,
                     endpointUrl = globalAppConfigurationState.payloadValue.removeStoreWorkerPath.first,
                     body = WorkerRemovalRequestDataModel(
                         workerId = cleanWorkerId,
-                        note = note?.trim()?.takeIf { it.isNotBlank() }
+                        note = cleanNote,
+                        noteLocalized = cleanNote.toLocalizedUserNote()
                     ),
                     headers = mapOf("store_id" to cleanStoreId)
                 )
@@ -2550,24 +2791,134 @@ fun removeStoreWorker(
                     postInAppNotification(response.message, NotificationType.Negative)
                     onCompleted?.invoke(DataState.Empty(response.message))
                 } else {
-                    val removedWorker = response.payload
-                    storeWorkerMembershipsState.emit(
+                    incomingWorkerRequestsState.emit(
                         DataState.Success(
-                            storeWorkerMembershipsState.payloadValue.orEmpty().filterNot { it.id == removedWorker.id },
+                            incomingWorkerRequestsState.payloadValue.orEmpty().filterNot { it.id == response.payload.id } + response.payload,
                             response.message
                         )
                     )
+                    getIncomingWorkerRequests(cleanStoreId)
+                    getStoreWorkers(cleanStoreId)
+                    getNotifications()
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun acceptMyStoreWorkerRemovalRequest(
+    requestId: String,
+    note: String? = null,
+    onCompleted: ((DataState<StoreWorkerDataModel>) -> Unit)? = null
+) {
+    val cleanRequestId = requestId.trim()
+    if (cleanRequestId.isBlank()) {
+        val message = localizedStringResourceMessage(
+            id = 13,
+            main = "Not found",
+            ru = "Не найдено",
+            kk = "Табылмады"
+        )
+        onCompleted?.invoke(DataState.Empty(message))
+        return
+    }
+
+    if (!decideStoreWorkerRemovalMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            decideStoreWorkerRemovalMutex.withLock {
+                val cleanNote = note?.trim()?.takeIf { it.isNotBlank() }
+                val response = networkRequest<StoreWorkerDataModel, WorkerRemovalDecisionRequestDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.confirmStoreWorkerRemovalPath.first,
+                    body = WorkerRemovalDecisionRequestDataModel(
+                        requestId = cleanRequestId,
+                        note = cleanNote,
+                        responseNote = cleanNote,
+                        responseNoteLocalized = cleanNote.toLocalizedUserNote()
+                    )
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    val removedWorker = response.payload
                     myWorkerMembershipsState.emit(
                         DataState.Success(
                             myWorkerMembershipsState.payloadValue.orEmpty().filterNot { it.id == removedWorker.id },
                             response.message
                         )
                     )
-                    getStoreWorkers(cleanStoreId)
+                    storeWorkerMembershipsState.emit(
+                        DataState.Success(
+                            storeWorkerMembershipsState.payloadValue.orEmpty().filterNot { it.id == removedWorker.id },
+                            response.message
+                        )
+                    )
+                    getMyWorkerRequests()
                     getMyWorkerMemberships()
                     getNotifications()
+                    getStores()
+                    removedWorker.storeId.takeIf { it.isNotBlank() }?.let { storeId ->
+                        getStoreWorkers(storeId)
+                        getIncomingWorkerRequests(storeId)
+                    }
                     postInAppNotification(response.message, NotificationType.Positive)
                     onCompleted?.invoke(DataState.Success(removedWorker, response.message))
+                }
+            }
+        }
+}
+
+
+fun declineMyStoreWorkerRemovalRequest(
+    requestId: String,
+    note: String? = null,
+    onCompleted: ((DataState<StoreWorkerRequestDataModel>) -> Unit)? = null
+) {
+    val cleanRequestId = requestId.trim()
+    if (cleanRequestId.isBlank()) {
+        val message = localizedStringResourceMessage(
+            id = 13,
+            main = "Not found",
+            ru = "Не найдено",
+            kk = "Табылмады"
+        )
+        onCompleted?.invoke(DataState.Empty(message))
+        return
+    }
+
+    if (!decideStoreWorkerRemovalMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            decideStoreWorkerRemovalMutex.withLock {
+                val response = networkRequest<StoreWorkerRequestDataModel, WorkerRemovalDecisionRequestDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.declineStoreWorkerRemovalPath.first,
+                    body = WorkerRemovalDecisionRequestDataModel(
+                        requestId = cleanRequestId,
+                        note = note?.trim()?.takeIf { it.isNotBlank() },
+                        responseNote = note?.trim()?.takeIf { it.isNotBlank() },
+                        responseNoteLocalized = note.toLocalizedUserNote()
+                    )
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    myWorkerRequestsState.emit(
+                        DataState.Success(
+                            myWorkerRequestsState.payloadValue.orEmpty().filterNot { it.id == response.payload.id } + response.payload,
+                            response.message
+                        )
+                    )
+                    getMyWorkerRequests()
+                    getMyWorkerMemberships()
+                    getNotifications()
+                    response.payload.storeId.takeIf { it.isNotBlank() }?.let { getStoreWorkers(it) }
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
                 }
             }
         }
@@ -3613,6 +3964,8 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
         declineStoreEmploymentPath = Pair("workers/decline", "57"),
         updateStoreWorkerPermissionsPath = Pair("workers/updatePermissions", "58"),
         removeStoreWorkerPath = Pair("workers/remove", "105"),
+        confirmStoreWorkerRemovalPath = Pair("workers/removal/confirm", "106"),
+        declineStoreWorkerRemovalPath = Pair("workers/removal/decline", "107"),
         updateMyWorkerPasswordPath = Pair("workers/my/password", "103"),
         inviteStoreWorkerPath = Pair("workers/invite", "65"),
         acceptStoreWorkerInvitationPath = Pair("workers/invitations/accept", "66"),
@@ -4153,6 +4506,7 @@ val drawablePathIconTransactionHistoryState = MutableStateFlow("svg/20_0.svg")
 val drawablePathIconLogState = MutableStateFlow("svg/49_0.svg")
 val drawablePathIconPromosState = MutableStateFlow("svg/50_0.svg")
 val drawablePathIconAnalyticsState = MutableStateFlow("svg/21_0.svg")
+val drawablePathIconAnalyticsReportState = MutableStateFlow("svg/62_0.svg")
 val drawablePathIconWorkersState = MutableStateFlow("svg/22_0.svg")
 val drawablePathIconSuppliersState = MutableStateFlow("svg/23_0.svg")
 val drawablePathIconDebtorsState = MutableStateFlow("svg/24_0.svg")
@@ -4172,6 +4526,7 @@ val drawablePathIconResponseState = MutableStateFlow("svg/53_0.svg")
 val drawablePathIconDeleteState = MutableStateFlow("svg/33_0.svg")
 val drawablePathIconExitState = MutableStateFlow("svg/34_0.svg")
 val drawablePathIconSwitchState = MutableStateFlow("svg/35_0.svg")
+val drawablePathIconSortState = MutableStateFlow("svg/61_0.svg")
 val drawablePathIconCartState = MutableStateFlow("svg/36_0.svg")
 val drawablePathIconAddCartState = MutableStateFlow("svg/37_0.svg")
 val drawablePathIconSubtractState = MutableStateFlow("svg/38_0.svg")
@@ -4207,11 +4562,18 @@ private const val AUTH_REFRESH_NON_AUTH_FAILURE_GRACE_MILLIS = 5_000L
 private const val CLOUD_CONNECTION_HEALTH_CHECK_REACHABLE_INTERVAL_MILLIS = 5_000L
 private const val CLOUD_CONNECTION_HEALTH_CHECK_UNKNOWN_INTERVAL_MILLIS = 4_000L
 private const val CLOUD_CONNECTION_HEALTH_CHECK_UNAVAILABLE_INTERVAL_MILLIS = 3_000L
-private const val CLOUD_CONNECTION_HEALTH_CHECK_TIMEOUT_MILLIS = 6_000L
+private const val CLOUD_CONNECTION_HEALTH_CHECK_TIMEOUT_MILLIS = 3_500L
+private const val CLOUD_CONNECTION_AUTH_REFRESH_SUPPRESSION_AFTER_TRANSPORT_FAILURE_MILLIS = 15_000L
+@Volatile
+private var cloudTransportLastUnavailableAtMillis: Long = 0L
+@Volatile
+private var cloudTransportLastReachableAtMillis: Long = 0L
 @Volatile
 private var lastAuthRefreshNonAuthFailureAtMillis: Long = 0L
 @Volatile
 private var lastAuthRefreshNonAuthFailureMessage: List<LocalizedStringDataModel>? = null
+@Volatile
+private var lastAuthRefreshNonAuthFailureWasTransportFailure: Boolean = false
 val activeNetworkOperationsState = MutableStateFlow(0)
 val cloudTransportStatusState = MutableStateFlow(CLOUD_TRANSPORT_STATUS_UNKNOWN)
 val cloudConnectionManualRefreshInProgressState = MutableStateFlow(false)
@@ -4361,6 +4723,11 @@ val updateStoreMutex = Mutex()
 val deleteStoreMutex = Mutex()
 
 const val KEY_ACTIVE_STORE_ID = "key_activeStoreId"
+const val KEY_ACTIVE_STORE_EXPLICIT_NONE = "key_activeStoreExplicitNone"
+
+private suspend fun activeStoreExplicitNoneIsSet(): Boolean =
+    getLocalKv(KEY_ACTIVE_STORE_EXPLICIT_NONE) == "1"
+
 
 val genericGoodsCategoriesState = MutableDataStateFlow<List<GenericGoodsCategoryDataModel>>(GlobalScope)
 val genericGoodsItemsState = MutableDataStateFlow<List<GenericGoodsItemDataModel>>(GlobalScope)
@@ -4471,6 +4838,7 @@ private val inviteStoreWorkerMutex = Mutex()
 private val decideStoreEmploymentMutex = Mutex()
 private val updateStoreWorkerPermissionsMutex = Mutex()
 private val removeStoreWorkerMutex = Mutex()
+private val decideStoreWorkerRemovalMutex = Mutex()
 private val updateMyWorkerPasswordMutex = Mutex()
 private val getCurrentWorkshiftMutex = Mutex()
 private val startWorkshiftMutex = Mutex()
@@ -4703,8 +5071,20 @@ fun List<LocalizedStringDataModel>.normalizedLocalizedStrings(): List<LocalizedS
     }.distinctBy { it.language.lowercase() }
 }
 
+fun StoreWorkerRequestDataModel.isWorkerRemovalRequest(): Boolean {
+    return direction == WORKER_REQUEST_DIRECTION_STORE_REMOVAL_TO_USER
+}
+
+fun StoreWorkerRequestDataModel.isPendingWorkerRemovalRequest(): Boolean {
+    return isWorkerRemovalRequest() && status == WORKER_REQUEST_STATUS_PENDING
+}
+
+fun StoreWorkerRequestDataModel.isWorkerRemovalResponse(): Boolean {
+    return isWorkerRemovalRequest() && (status == WORKER_REQUEST_STATUS_ACCEPTED || status == WORKER_REQUEST_STATUS_DECLINED)
+}
+
 fun StoreWorkerRequestDataModel.isEmploymentResponse(): Boolean {
-    return status == WORKER_REQUEST_STATUS_ACCEPTED || status == WORKER_REQUEST_STATUS_DECLINED
+    return !isWorkerRemovalRequest() && (status == WORKER_REQUEST_STATUS_ACCEPTED || status == WORKER_REQUEST_STATUS_DECLINED)
 }
 
 fun StoreWorkerRequestDataModel.requestNoteVisible(language: String): String? {
@@ -4791,19 +5171,20 @@ fun init() {
 
     GlobalScope.launch(Dispatchers.ourIo) {
         observeLocalKv(KEY_ACTIVE_STORE_ID)
-            .collect {
-                activeStoreIdState.emit(it)
-                it?.let {
-                    loadCachedStoreScopedData(it)
-                    getStock(it)
-                    getStockBatches(it)
-                    getTransactions(it)
-                    getCashRegister(it)
-                    getStoreWorkers(it)
-                    getIncomingWorkerRequests(it)
+            .collect { storedActiveStoreId ->
+                val normalizedStoreId = storedActiveStoreId?.takeIf { it.isNotBlank() }
+                activeStoreIdState.emit(normalizedStoreId)
+                normalizedStoreId?.let { storeId ->
+                    loadCachedStoreScopedData(storeId)
+                    getStock(storeId)
+                    getStockBatches(storeId)
+                    getTransactions(storeId)
+                    getCashRegister(storeId)
+                    getStoreWorkers(storeId)
+                    getIncomingWorkerRequests(storeId)
                     getMyWorkerMemberships()
                     getMyWorkerRequests()
-                    getStoreSubscription(it)
+                    getStoreSubscription(storeId)
                 }
             }
     }
@@ -4812,7 +5193,7 @@ fun init() {
         storesState.payload.collect {
             it?.let {
                 val settableStores = it.settableActiveStores()
-                if (settableStores.size == 1 && activeStoreIdState.value != settableStores.first().id) {
+                if (!activeStoreExplicitNoneIsSet() && settableStores.size == 1 && activeStoreIdState.value != settableStores.first().id) {
                     setActiveStoreId(settableStores.first().id)
                 }
             }
@@ -6130,6 +6511,9 @@ fun updateDrawables(
         drawablePathIconAnalyticsState.emit(
             drawablePath(21L)
         )
+        drawablePathIconAnalyticsReportState.emit(
+            drawablePath(62L)
+        )
         drawablePathIconWorkersState.emit(
             drawablePath(22L)
         )
@@ -6183,6 +6567,9 @@ fun updateDrawables(
         )
         drawablePathIconSwitchState.emit(
             drawablePath(35L)
+        )
+        drawablePathIconSortState.emit(
+            drawablePath(61L)
         )
         drawablePathIconCartState.emit(
             drawablePath(36L)
@@ -6636,7 +7023,36 @@ internal fun networkTransportFailureMessage(
     kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
 )
 
-private const val AITA_NETWORK_VERBOSE_LOGS = false
+@PublishedApi
+internal fun HttpStatusCode.isAitaServerUnhealthyForClientBanner(): Boolean = value >= 500
+
+@PublishedApi
+internal fun <Response> ResponseDataModel<Response>.withAitaTransportFailureFromStatus(status: HttpStatusCode): ResponseDataModel<Response> =
+    if (status.isAitaServerUnhealthyForClientBanner()) copy(transportFailure = true) else this
+
+@PublishedApi
+internal fun cloudEndpointIsPublicReachabilityOnly(endpointUrl: String): Boolean {
+    val endpoint = endpointUrl.trim('/').lowercase()
+    return endpoint.startsWith("config/") || endpoint.startsWith("res/")
+}
+
+@PublishedApi
+internal fun cloudResponseCanMarkReachable(
+    endpointUrl: String,
+    status: HttpStatusCode,
+    hasStoredTokens: Boolean = getStoredUserAuthTokens?.invoke() != null
+): Boolean {
+    if (status.isAitaServerUnhealthyForClientBanner()) return false
+
+    // Static resource/config endpoints can succeed while the authenticated/data side of the server is
+    // crashing with 500s. In a logged-in app they must never be allowed to repaint the top banner green;
+    // only the readiness probe, WebSocket, or real authenticated/data endpoints may clear an outage.
+    if (hasStoredTokens && cloudEndpointIsPublicReachabilityOnly(endpointUrl)) return false
+
+    return true
+}
+
+private const val AITA_NETWORK_VERBOSE_LOGS = true
 
 @PublishedApi
 internal fun logNetworkAttempt(message: String) {
@@ -6646,15 +7062,24 @@ internal fun logNetworkAttempt(message: String) {
 }
 
 @PublishedApi
-internal fun rememberAuthRefreshNonAuthFailure(message: List<LocalizedStringDataModel>?) {
+internal fun rememberAuthRefreshNonAuthFailure(
+    message: List<LocalizedStringDataModel>?,
+    transportFailure: Boolean = false
+) {
     lastAuthRefreshNonAuthFailureAtMillis = getCurrentTimeMillis()
     lastAuthRefreshNonAuthFailureMessage = message
+    lastAuthRefreshNonAuthFailureWasTransportFailure = transportFailure
+    logCloudConnectionDiagnostic(
+        "auth refresh non-auth failure remembered transportFailure=$transportFailure " +
+                "status=${cloudTransportStatusName(cloudTransportStatusState.value)}"
+    )
 }
 
 @PublishedApi
 internal fun clearAuthRefreshNonAuthFailure() {
     lastAuthRefreshNonAuthFailureAtMillis = 0L
     lastAuthRefreshNonAuthFailureMessage = null
+    lastAuthRefreshNonAuthFailureWasTransportFailure = false
 }
 
 @PublishedApi
@@ -6663,11 +7088,51 @@ internal fun recentAuthRefreshNonAuthFailureMessage(): List<LocalizedStringDataM
     if (failureAt <= 0L) return null
     if (getCurrentTimeMillis() - failureAt > AUTH_REFRESH_NON_AUTH_FAILURE_GRACE_MILLIS) return null
 
-    return lastAuthRefreshNonAuthFailureMessage ?: localizedStringResourceMessage(
-        id = 1149,
-        main = "Server could not refresh session. Keeping local login active.",
-        ru = "Сервер не смог обновить сеанс. Локальный вход сохранён.",
-        kk = "Сервер сеансты жаңарта алмады. Жергілікті кіру сақталды."
+    lastAuthRefreshNonAuthFailureMessage?.let { return it }
+
+    return if (lastAuthRefreshNonAuthFailureWasTransportFailure) {
+        localizedStringResourceMessage(
+            id = 1140,
+            main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
+            ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
+            kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
+        )
+    } else {
+        localizedStringResourceMessage(
+            id = 1149,
+            main = "Server could not refresh session. Keeping local login active.",
+            ru = "Сервер не смог обновить сеанс. Локальный вход сохранён.",
+            kk = "Сервер сеансты жаңарта алмады. Жергілікті кіру сақталды."
+        )
+    }
+}
+
+@PublishedApi
+internal fun recentAuthRefreshNonAuthFailureWasTransport(): Boolean {
+    val failureAt = lastAuthRefreshNonAuthFailureAtMillis
+    if (failureAt <= 0L) return false
+    if (getCurrentTimeMillis() - failureAt > AUTH_REFRESH_NON_AUTH_FAILURE_GRACE_MILLIS) return false
+
+    return lastAuthRefreshNonAuthFailureWasTransportFailure || recentCloudTransportFailureIsDominant()
+}
+
+@PublishedApi
+internal fun <Response> authRefreshFailureResponseForNetworkRequest(
+    message: List<LocalizedStringDataModel>
+): ResponseDataModel<Response> {
+    val transportFailure = recentAuthRefreshNonAuthFailureWasTransport()
+    if (transportFailure) {
+        markCloudTransportUnavailableForNotifications()
+    } else {
+        markCloudTransportReachableForNotifications(authenticated = false, authRefreshRequired = false)
+    }
+
+    return ResponseDataModel(
+        message = message,
+        payload = null,
+        negative = true,
+        httpStatusCode = HttpStatusCode.ServiceUnavailable.value,
+        transportFailure = transportFailure
     )
 }
 
@@ -6736,20 +7201,47 @@ internal suspend fun refreshAuthTokensWithServerFallback(refreshToken: String): 
                     forgetReachableServerUrlCandidate(resolvedServerUrl)
                     markCloudTransportUnavailableForNotifications()
                     if (shouldRetryCandidate) continue
-                    rememberAuthRefreshNonAuthFailure(nonAitaResponse.message)
+                    rememberAuthRefreshNonAuthFailure(nonAitaResponse.message, transportFailure = true)
                     return nonAitaResponse
                 }
 
+                val decodedRefreshResponse = decodeNetworkResponseDataModel<TokenPair>(rawBody, httpResponse.status)
+                    .withAitaTransportFailureFromStatus(httpResponse.status)
+
+                if (httpResponse.status.isAitaServerUnhealthyForClientBanner() || decodedRefreshResponse.transportFailure) {
+                    val failureResponse = decodedRefreshResponse.copy(transportFailure = true)
+                    lastServerErrorResponse = failureResponse
+                    markCloudTransportUnavailableForNotifications()
+                    rememberAuthRefreshNonAuthFailure(failureResponse.message, transportFailure = true)
+                    logCloudConnectionDiagnostic(
+                        "auth refresh response treated as unavailable http=${httpResponse.status.value} " +
+                                "aita=$aitaServerResponse negative=${failureResponse.negative}"
+                    )
+                    if (shouldRetryCandidate) continue
+                    return failureResponse
+                }
+
                 if (shouldRetryCandidate) {
-                    lastServerErrorResponse = decodeNetworkResponseDataModel<TokenPair>(rawBody, httpResponse.status)
+                    lastServerErrorResponse = decodedRefreshResponse
                     continue
                 }
 
-                rememberReachableServerUrl(resolvedServerUrl)
-                markCloudTransportReachableForNotifications(
-                    authenticated = httpResponse.status.value in 200..299,
-                    authRefreshRequired = httpResponse.status == HttpStatusCode.Unauthorized
-                )
+                val canMarkReachable = cloudResponseCanMarkReachable(refreshEndpoint, httpResponse.status)
+                if (canMarkReachable) {
+                    rememberReachableServerUrl(resolvedServerUrl)
+                    markCloudTransportReachableForNotifications(
+                        authenticated = httpResponse.status.value in 200..299,
+                        authRefreshRequired = httpResponse.status == HttpStatusCode.Unauthorized
+                    )
+                } else {
+                    logCloudConnectionDiagnostic(
+                        "auth refresh reachable mark suppressed http=${httpResponse.status.value} " +
+                                "status=${cloudTransportStatusName(cloudTransportStatusState.value)}"
+                    )
+                    if (httpResponse.status.value >= 500) {
+                        markCloudTransportUnavailableForNotifications()
+                    }
+                }
 
                 if (httpResponse.status == HttpStatusCode.Unauthorized) {
                     return ResponseDataModel(
@@ -6766,7 +7258,7 @@ internal suspend fun refreshAuthTokensWithServerFallback(refreshToken: String): 
                     )
                 }
 
-                return decodeNetworkResponseDataModel<TokenPair>(rawBody, httpResponse.status)
+                return decodedRefreshResponse
             } catch (throwable: Throwable) {
                 if (throwable is CancellationException) throw throwable
                 markCloudTransportUnavailableForNotifications()
@@ -6806,6 +7298,7 @@ internal suspend fun refreshStoredAuthTokensOnceForNetworkRetry(postNotification
 
     when {
         refreshResponse.transportFailure -> {
+            rememberAuthRefreshNonAuthFailure(refreshResponse.message, transportFailure = true)
             markCloudTransportUnavailableForNotifications()
         }
 
@@ -7067,13 +7560,34 @@ private suspend fun postPendingWorkshiftEndWithAccessToken(
                     return nonAitaResponse
                 }
 
+                val decodedResponse = decodeNetworkResponseDataModel<WorkshiftDataModel>(rawBody, httpResponse.status)
+                    .withAitaTransportFailureFromStatus(httpResponse.status)
+
+                if (httpResponse.status.isAitaServerUnhealthyForClientBanner() || decodedResponse.transportFailure) {
+                    val failureResponse = decodedResponse.copy(transportFailure = true)
+                    lastServerErrorResponse = failureResponse
+                    markCloudTransportUnavailableForNotifications()
+                    logCloudConnectionDiagnostic(
+                        "pending workshift end response treated as unavailable http=${httpResponse.status.value} " +
+                                "negative=${failureResponse.negative}"
+                    )
+                    if (shouldRetryCandidate) continue
+                    return failureResponse
+                }
+
                 if (shouldRetryCandidate) {
-                    lastServerErrorResponse = decodeNetworkResponseDataModel(rawBody, httpResponse.status)
+                    lastServerErrorResponse = decodedResponse
                     continue
                 }
 
-                rememberReachableServerUrl(resolvedServerUrl)
-                return decodeNetworkResponseDataModel(rawBody, httpResponse.status)
+                if (cloudResponseCanMarkReachable(endpoint, httpResponse.status)) {
+                    rememberReachableServerUrl(resolvedServerUrl)
+                    markCloudTransportReachableForNotifications(
+                        authenticated = getStoredUserAuthTokens?.invoke() != null,
+                        authRefreshRequired = false
+                    )
+                }
+                return decodedResponse
             } catch (throwable: Throwable) {
                 if (throwable is CancellationException) throw throwable
                 markCloudTransportUnavailableForNotifications()
@@ -7330,6 +7844,10 @@ private suspend fun loadTransactionCartUiState() {
 private fun localNetworkMessage(id: Long, main: String, ru: String, kk: String): List<LocalizedStringDataModel> =
     localizedStringResourceMessage(id = id, main = main, ru = ru, kk = kk)
 
+private fun logLocalNetworkQueueDiagnostic(message: String) {
+    println("AITA local queue: $message")
+}
+
 private fun localNetworkDeviceId(): String {
     val installation = getClientDeviceInfo?.invoke()?.installationId.orEmpty().ifBlank { getPlatformName() }
     val user = userAccountState.payloadValue?.id.orEmpty().ifBlank { "anonymous" }
@@ -7409,8 +7927,14 @@ private suspend fun loadLocalNetworkCache() {
 
     localNetworkQueuedOperationsState.emit(
         getJsonCache<List<LocalNetworkQueuedOperationDataModel>>(CACHE_LOCAL_NETWORK_QUEUE).orEmpty()
+            .filter { it.id.isNotBlank() && it.bodyJson.isNotBlank() }
+            .map { operation ->
+                if (operation.status == LOCAL_NETWORK_QUEUE_SYNCING) {
+                    operation.copy(status = LOCAL_NETWORK_QUEUE_PENDING, lastError = "Previous sync was interrupted; retry queued")
+                } else operation
+            }
             .distinctBy { it.id }
-            .sortedBy { it.createdAtMillis }
+            .sortedWith(compareBy<LocalNetworkQueuedOperationDataModel> { it.createdAtMillis }.thenBy { it.id })
     )
 }
 
@@ -7482,14 +8006,39 @@ private fun nextLocalNetworkOperationTimestamp(): Long {
 }
 
 private suspend fun enqueueLocalNetworkOperation(operation: LocalNetworkQueuedOperationDataModel) {
+    if (operation.id.isBlank() || operation.bodyJson.isBlank()) return
     val existing = localNetworkQueuedOperationsState.value.firstOrNull { it.id == operation.id }
-    if (existing != null) return
+    val nextOperation = existing?.let { old ->
+        old.copy(
+            operationType = operation.operationType,
+            storeId = operation.storeId.ifBlank { old.storeId },
+            branchStoreId = operation.branchStoreId ?: old.branchStoreId,
+            endpointPath = operation.endpointPath.ifBlank { old.endpointPath },
+            httpMethod = operation.httpMethod.ifBlank { old.httpMethod },
+            bodyJson = operation.bodyJson,
+            createdByUserId = operation.createdByUserId.ifBlank { old.createdByUserId },
+            createdByDeviceId = operation.createdByDeviceId.ifBlank { old.createdByDeviceId },
+            createdAtMillis = listOf(old.createdAtMillis, operation.createdAtMillis)
+                .filter { it > 0L }
+                .minOrNull() ?: nextLocalNetworkOperationTimestamp(),
+            status = if (old.status == LOCAL_NETWORK_QUEUE_SYNCED) old.status else LOCAL_NETWORK_QUEUE_PENDING,
+            lastError = null
+        )
+    } ?: operation.copy(
+        createdAtMillis = operation.createdAtMillis.takeIf { it > 0L } ?: nextLocalNetworkOperationTimestamp(),
+        status = LOCAL_NETWORK_QUEUE_PENDING
+    )
+
     localNetworkQueuedOperationsState.emit(
-        (localNetworkQueuedOperationsState.value + operation)
+        (localNetworkQueuedOperationsState.value.filterNot { it.id == nextOperation.id } + nextOperation)
             .distinctBy { it.id }
-            .sortedBy { it.createdAtMillis }
+            .sortedWith(compareBy<LocalNetworkQueuedOperationDataModel> { it.createdAtMillis }.thenBy { it.id })
     )
     persistLocalNetworkQueue()
+    logLocalNetworkQueueDiagnostic(
+        "queued id=${nextOperation.id} type=${nextOperation.operationType} " +
+                "createdAt=${nextOperation.createdAtMillis} size=${localNetworkQueuedOperationsState.value.count { it.status != LOCAL_NETWORK_QUEUE_SYNCED }}"
+    )
 }
 
 private fun transactionLocalId(operationId: String): String = "local_${operationId.takeLast(48)}"
@@ -7804,7 +8353,9 @@ private fun startLocalNetworkSyncLoop() {
     localNetworkSyncJob = GlobalScope.launch(Dispatchers.ourIo) {
         while (isActive) {
             delay(8_000)
-            if (realtimeUpdatesConnectedState.value) syncLocalNetworkOperationsToCloud()
+            if (realtimeUpdatesConnectedState.value || cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_REACHABLE) {
+                syncLocalNetworkOperationsToCloud()
+            }
         }
     }
 }
@@ -8009,14 +8560,17 @@ suspend fun syncLocalNetworkOperationsToCloudNow(): Int {
 
     return localNetworkCloudSyncMutex.withLock {
         val pending = localNetworkQueuedOperationsState.value
-            .filter { it.status != LOCAL_NETWORK_QUEUE_SYNCED }
-            .sortedBy { it.createdAtMillis }
+            .filter { it.status == LOCAL_NETWORK_QUEUE_PENDING || it.status == LOCAL_NETWORK_QUEUE_SYNCING }
+            .sortedWith(compareBy<LocalNetworkQueuedOperationDataModel> { it.createdAtMillis }.thenBy { it.id })
         if (pending.isEmpty()) return@withLock 0
+
+        logLocalNetworkQueueDiagnostic("sync start count=${pending.size} first=${pending.firstOrNull()?.id.orEmpty()} status=${cloudTransportStatusName(cloudTransportStatusState.value)} realtime=${realtimeUpdatesConnectedState.value}")
 
         var syncedCount = 0
         var activeStoreRefreshNeeded = false
 
         for (operation in pending) {
+            logLocalNetworkQueueDiagnostic("sync attempt id=${operation.id} type=${operation.operationType} attempts=${operation.attemptCount}")
             updateQueuedLocalNetworkOperation(operation.id) {
                 it.copy(status = LOCAL_NETWORK_QUEUE_SYNCING, lastError = null)
             }
@@ -8051,12 +8605,21 @@ suspend fun syncLocalNetworkOperationsToCloudNow(): Int {
                         (response.httpStatusCode ?: 0) >= 500
                     ) {
                         updateQueuedLocalNetworkOperation(operation.id) {
-                            it.copy(status = LOCAL_NETWORK_QUEUE_PENDING, lastError = response.message?.extractLocalizedString(appLanguageState.value))
+                            it.copy(
+                                status = LOCAL_NETWORK_QUEUE_PENDING,
+                                attemptCount = it.attemptCount + 1,
+                                lastError = response.message?.extractLocalizedString(appLanguageState.value)
+                            )
                         }
+                        logLocalNetworkQueueDiagnostic("sync paused id=${operation.id} http=${response.httpStatusCode} transport=${response.transportFailure}")
                         break
                     }
 
                     if (response.negative || response.payload == null) {
+                        logCloudConnectionDiagnostic(
+                            "local outbox sync failed id=${operation.id} type=${operation.operationType} " +
+                                    "http=${response.httpStatusCode ?: -1} negative=${response.negative}"
+                        )
                         updateQueuedLocalNetworkOperation(operation.id) {
                             it.copy(
                                 status = LOCAL_NETWORK_QUEUE_FAILED,
@@ -8068,6 +8631,10 @@ suspend fun syncLocalNetworkOperationsToCloudNow(): Int {
                     }
 
                     val synced = response.payload
+                    logCloudConnectionDiagnostic(
+                        "local outbox sync success id=${operation.id} type=${operation.operationType} " +
+                                "http=${response.httpStatusCode ?: -1}"
+                    )
                     updateQueuedLocalNetworkOperation(operation.id) {
                         it.copy(
                             status = LOCAL_NETWORK_QUEUE_SYNCED,
@@ -8077,6 +8644,7 @@ suspend fun syncLocalNetworkOperationsToCloudNow(): Int {
                         )
                     }
                     syncedCount += 1
+                    logLocalNetworkQueueDiagnostic("sync success id=${operation.id} type=${operation.operationType}")
 
                     transactionsState.emit(
                         DataState.Success(
@@ -8120,12 +8688,21 @@ suspend fun syncLocalNetworkOperationsToCloudNow(): Int {
                         (response.httpStatusCode ?: 0) >= 500
                     ) {
                         updateQueuedLocalNetworkOperation(operation.id) {
-                            it.copy(status = LOCAL_NETWORK_QUEUE_PENDING, lastError = response.message?.extractLocalizedString(appLanguageState.value))
+                            it.copy(
+                                status = LOCAL_NETWORK_QUEUE_PENDING,
+                                attemptCount = it.attemptCount + 1,
+                                lastError = response.message?.extractLocalizedString(appLanguageState.value)
+                            )
                         }
+                        logLocalNetworkQueueDiagnostic("sync paused id=${operation.id} http=${response.httpStatusCode} transport=${response.transportFailure}")
                         break
                     }
 
                     if (response.negative || response.payload == null) {
+                        logCloudConnectionDiagnostic(
+                            "local outbox sync failed id=${operation.id} type=${operation.operationType} " +
+                                    "http=${response.httpStatusCode ?: -1} negative=${response.negative}"
+                        )
                         updateQueuedLocalNetworkOperation(operation.id) {
                             it.copy(
                                 status = LOCAL_NETWORK_QUEUE_FAILED,
@@ -8136,6 +8713,10 @@ suspend fun syncLocalNetworkOperationsToCloudNow(): Int {
                         break
                     }
 
+                    logCloudConnectionDiagnostic(
+                        "local outbox sync success id=${operation.id} type=${operation.operationType} " +
+                                "http=${response.httpStatusCode ?: -1}"
+                    )
                     updateQueuedLocalNetworkOperation(operation.id) {
                         it.copy(
                             status = LOCAL_NETWORK_QUEUE_SYNCED,
@@ -8145,6 +8726,7 @@ suspend fun syncLocalNetworkOperationsToCloudNow(): Int {
                         )
                     }
                     syncedCount += 1
+                    logLocalNetworkQueueDiagnostic("sync success id=${operation.id} type=${operation.operationType}")
 
                     val syncedWorkshift = response.payload
                     if (activeWorkshiftState.payloadValue?.id == syncedWorkshift.id) {
@@ -8185,6 +8767,7 @@ suspend fun syncLocalNetworkOperationsToCloudNow(): Int {
 
         localNetworkState.emit(localNetworkState.value.copy(lastSyncMillis = getCurrentTimeMillis()))
         persistLocalNetworkState()
+        logLocalNetworkQueueDiagnostic("sync finish synced=$syncedCount remaining=${localNetworkQueuedOperationsState.value.count { it.status == LOCAL_NETWORK_QUEUE_PENDING || it.status == LOCAL_NETWORK_QUEUE_SYNCING }}")
         syncedCount
     }
 }
@@ -8640,19 +9223,76 @@ private suspend fun scheduleRealtimeRefresh(
     }
 }
 
-private suspend fun probeCloudServerReachableForRealtimeFallback(): Boolean {
-    val response = networkRequest<Unit, Unit>(
-        method = HttpMethod.Get,
-        endpointUrl = globalAppConfigurationState.payloadValue.connectionCheckPath.first,
-        query = mapOf("silent" to "true"),
-        headers = mapOf(AITA_CONNECTION_PROBE_HEADER to "1"),
-        contentType = null
-    )
+private suspend fun cloudConnectionProbeRequest(reason: String): ResponseDataModel<Unit> {
+    ensureCachedGlobalConfigurationPrimedForNetwork()
+    val endpointUrl = globalAppConfigurationState.payloadValue.connectionCheckPath.first
+    val configuredServerUrl = globalAppConfigurationState.payloadValue.serverUrl.first
+    val resolvedServerUrl = normalizedHttpServerUrlOrNull(configuredServerUrl)
+        ?: return ResponseDataModel(
+            message = localizedStringResourceMessage(
+                id = 1140,
+                main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
+                ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
+                kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
+            ),
+            payload = null,
+            negative = true,
+            httpStatusCode = null,
+            transportFailure = true
+        )
 
-    return !response.negative
+    val requestUrl = networkTargetUrl(resolvedServerUrl, endpointUrl)
+    return try {
+        logNetworkAttempt("TRY ${HttpMethod.Get.value} $requestUrl probe=$reason")
+        val response = httpClient.request(requestUrl) {
+            method = HttpMethod.Get
+            header(AITA_CONNECTION_PROBE_HEADER, "1")
+            header(HttpHeaders.CacheControl, "no-cache")
+            header(HttpHeaders.Pragma, "no-cache")
+            parameter("silent", "true")
+            parameter(reason, "true")
+            currentClientDeviceInfoHeaders().forEach { (key, value) ->
+                safeHttpHeaderValueOrNull(value)?.let { safeValue -> header(key, safeValue) }
+            }
+        }
+        val rawBody = response.bodyAsText()
+        val aitaServerResponse = response.isAitaServerResponse(rawBody)
+        logNetworkAttempt("RESULT ${HttpMethod.Get.value} $requestUrl HTTP ${response.status.value} aita=$aitaServerResponse probe=$reason")
+
+        if (!aitaServerResponse) {
+            nonAitaHttpResponseDataModel(response.status, rawBody, resolvedServerUrl)
+        } else if (response.status.isSuccess()) {
+            rememberReachableServerUrl(resolvedServerUrl)
+            ResponseDataModel(
+                message = null,
+                payload = Unit,
+                negative = false,
+                httpStatusCode = response.status.value,
+                transportFailure = false
+            )
+        } else {
+            decodeNetworkResponseDataModel<Unit>(rawBody, response.status)
+        }
+    } catch (throwable: Throwable) {
+        if (throwable is CancellationException) throw throwable
+        logNetworkAttempt("FAILED ${HttpMethod.Get.value} $requestUrl probe=$reason ${networkFailureSummary(throwable)}")
+        ResponseDataModel(
+            message = networkTransportFailureMessage(resolvedServerUrl, endpointUrl, throwable),
+            payload = null,
+            negative = true,
+            httpStatusCode = null,
+            transportFailure = true
+        )
+    }
 }
 
+private suspend fun probeCloudServerReachableForRealtimeFallback(): Boolean =
+    !cloudConnectionProbeRequest("realtime_fallback").negative
+
 private fun cancelRealtimeUpdatesSocketAfterReachabilityFailure() {
+    if (realtimeUpdatesConnectedState.value || realtimeUpdatesJob != null) {
+        logCloudConnectionDiagnostic("realtime socket cancelled because health probe/server request says unreachable")
+    }
     realtimeUpdatesJob?.cancel()
     realtimeUpdatesJob = null
     realtimeUpdatesConnectedState.value = false
@@ -8676,25 +9316,38 @@ fun startCloudConnectionHealthMonitor() {
             val wasRealtimeConnected = realtimeUpdatesConnectedState.value
             val wasTransportMarkedReachable = cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_REACHABLE
             val hasLocalAccount = getStoredUserAuthTokens?.invoke() != null
+            val probeStartedAt = getCurrentTimeMillis()
+            logCloudConnectionDiagnostic(
+                "health probe start server=$configuredServerUrl status=${cloudTransportStatusName(cloudTransportStatusState.value)} " +
+                        "realtime=$wasRealtimeConnected hasTokens=$hasLocalAccount"
+            )
             val response = cloudConnectionHealthProbeMutex.withLock {
                 withTimeoutOrNull(CLOUD_CONNECTION_HEALTH_CHECK_TIMEOUT_MILLIS) {
-                    networkRequest<Unit, Unit>(
-                        method = HttpMethod.Get,
-                        endpointUrl = globalAppConfigurationState.payloadValue.connectionCheckPath.first,
-                        query = mapOf("silent" to "true"),
-                        headers = mapOf(AITA_CONNECTION_PROBE_HEADER to "1"),
-                        contentType = null
-                    )
+                    cloudConnectionProbeRequest("health")
                 }
             }
 
             val serverAvailable = response != null && !response.negative
+            logCloudConnectionDiagnostic(
+                "health probe result available=$serverAvailable http=${response?.httpStatusCode ?: -1} " +
+                        "negative=${response?.negative} transportFailure=${response?.transportFailure} " +
+                        "elapsed=${getCurrentTimeMillis() - probeStartedAt}ms"
+            )
 
             if (serverAvailable) {
                 realtimeOfflineNoticePosted = false
+                markCloudTransportReachableForNotifications(
+                    authenticated = getStoredUserAuthTokens?.invoke() != null,
+                    authRefreshRequired = false
+                )
 
-                if (getStoredUserAuthTokens?.invoke() != null && realtimeUpdatesJob?.isActive != true) {
-                    startRealtimeUpdates()
+                if (getStoredUserAuthTokens?.invoke() != null) {
+                    if (realtimeUpdatesJob?.isActive != true) {
+                        startRealtimeUpdates()
+                    }
+                    syncPendingSessionCleanupsToServerNow()
+                    syncPendingNotificationsToServerNow()
+                    syncLocalNetworkOperationsToCloudNow()
                 }
             } else {
                 cancelRealtimeUpdatesSocketAfterReachabilityFailure()
@@ -8917,10 +9570,10 @@ fun refreshCloudConnectionManually() {
             cloudConnectionManualRefreshInProgressState.emit(true)
 
             try {
-                val response = networkRequest<Unit, Unit>(
-                    method = HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.connectionCheckPath.first,
-                    contentType = null
+                logCloudConnectionDiagnostic("manual refresh start server=${globalAppConfigurationState.payloadValue.serverUrl.first}")
+                val response = cloudConnectionProbeRequest("manual")
+                logCloudConnectionDiagnostic(
+                    "manual refresh ping result negative=${response.negative} http=${response.httpStatusCode} transportFailure=${response.transportFailure}"
                 )
 
                 if (response.negative) {
@@ -8953,27 +9606,44 @@ fun refreshCloudConnectionManually() {
 
                     if (!authenticatedReady) {
                         val refreshFailureMessage = recentAuthRefreshNonAuthFailureMessage()
-                        if (cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED && refreshFailureMessage == null) {
-                            postInAppNotification(
-                                localizedStringResourceMessage(
-                                    id = 91,
-                                    main = "Cloud session needs refresh. You remain signed in locally.",
-                                    ru = "Облачный сеанс нужно обновить. Вы остаётесь в аккаунте локально.",
-                                    kk = "Бұлттық сеансты жаңарту қажет. Сіз жергілікті түрде аккаунтта қаласыз."
-                                ),
-                                NotificationType.Neutral
-                            )
-                        } else {
-                            postInAppNotification(
-                                refreshFailureMessage ?: localizedStringResourceMessage(
-                                    id = 1149,
-                                    main = "Server could not refresh session. Keeping local login active.",
-                                    ru = "Сервер не смог обновить сеанс. Локальный вход сохранён.",
-                                    kk = "Сервер сеансты жаңарта алмады. Жергілікті кіру сақталды."
-                                ),
-                                NotificationType.Negative,
-                                transient = false
-                            )
+                        when {
+                            cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_UNAVAILABLE -> {
+                                postInAppNotification(
+                                    refreshFailureMessage ?: localizedStringResourceMessage(
+                                        id = 1140,
+                                        main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
+                                        ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
+                                        kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
+                                    ),
+                                    NotificationType.Negative,
+                                    transient = true
+                                )
+                            }
+
+                            cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED && refreshFailureMessage == null -> {
+                                postInAppNotification(
+                                    localizedStringResourceMessage(
+                                        id = 91,
+                                        main = "Cloud session needs refresh. You remain signed in locally.",
+                                        ru = "Облачный сеанс нужно обновить. Вы остаётесь в аккаунте локально.",
+                                        kk = "Бұлттық сеансты жаңарту қажет. Сіз жергілікті түрде аккаунтта қаласыз."
+                                    ),
+                                    NotificationType.Neutral
+                                )
+                            }
+
+                            else -> {
+                                postInAppNotification(
+                                    refreshFailureMessage ?: localizedStringResourceMessage(
+                                        id = 1149,
+                                        main = "Server could not refresh session. Keeping local login active.",
+                                        ru = "Сервер не смог обновить сеанс. Локальный вход сохранён.",
+                                        kk = "Сервер сеансты жаңарта алмады. Жергілікті кіру сақталды."
+                                    ),
+                                    NotificationType.Negative,
+                                    transient = false
+                                )
+                            }
                         }
                         return@withLock
                     }
@@ -8983,7 +9653,7 @@ fun refreshCloudConnectionManually() {
                 syncPendingSessionCleanupsToServerNow()
 
                 if (hasLocalAccount) {
-                    getUser(forceLogOut = false)
+                    getUser(forceLogOut = false, applyServerActiveStore = false)
                     syncPendingNotificationsToServerNow()
                     syncLocalNetworkOperationsToCloudNow()
                     scheduleRealtimeRefresh(reason = "manual_reconnect", entity = "all", force = true)
@@ -8999,7 +9669,23 @@ fun refreshCloudConnectionManually() {
                     ),
                     NotificationType.Positive
                 )
+            } catch (throwable: Throwable) {
+                if (throwable is CancellationException) throw throwable
+                logCloudConnectionDiagnostic("manual refresh failed ${throwable.message ?: throwable.toString()}")
+                cancelRealtimeUpdatesSocketAfterReachabilityFailure()
+                markCloudTransportUnavailableForNotifications()
+                postInAppNotification(
+                    localizedStringResourceMessage(
+                        id = 1140,
+                        main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
+                        ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
+                        kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
+                    ),
+                    NotificationType.Negative,
+                    transient = true
+                )
             } finally {
+                logCloudConnectionDiagnostic("manual refresh finish status=${cloudTransportStatusName(cloudTransportStatusState.value)} realtime=${realtimeUpdatesConnectedState.value}")
                 cloudConnectionManualRefreshInProgressState.emit(false)
             }
         }
@@ -9135,16 +9821,12 @@ private fun String.isCloudSessionRefreshNotificationText(): Boolean {
         "cloud session needs refresh",
         "session needs refresh",
         "you remain signed in locally",
-        "server could not refresh session",
-        "local login active",
         "облачный сеанс",
         "сеанс нужно обновить",
         "остаётесь в аккаунте локально",
-        "локальный вход сохран",
         "бұлттық сеанс",
         "сеансты жаңарту",
         "жергілікті түрде аккаунтта",
-        "жергілікті кіру сақтал"
     ).any { marker -> normalized.contains(marker) }
 }
 
@@ -9308,7 +9990,7 @@ private fun NotificationDataModel.isSessionStatusNotification(): Boolean {
     return normalizedCategory == NOTIFICATION_SESSION_CATEGORY || combined.isCloudSessionRefreshNotificationText()
 }
 
-private fun NotificationDataModel.isLocalOnlyNotification(): Boolean = isConnectionStatusNotification()
+private fun NotificationDataModel.isLocalOnlyNotification(): Boolean = isConnectionStatusNotification() || isSessionStatusNotification()
 
 private fun NotificationDataModel.withHumanFriendlyNotificationText(): NotificationDataModel {
     val combined = notificationStatusCombinedText()
@@ -9336,20 +10018,55 @@ private fun cloudSessionRefreshIsActiveForNotifications(): Boolean {
     return cloudSessionRefreshRequiredForNotifications && getStoredUserAuthTokens?.invoke() != null
 }
 
+private fun cloudTransportStatusName(status: Int): String = when (status) {
+    CLOUD_TRANSPORT_STATUS_REACHABLE -> "reachable"
+    CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED -> "auth_refresh_required"
+    CLOUD_TRANSPORT_STATUS_UNAVAILABLE -> "unavailable"
+    else -> "unknown"
+}
+
+private fun logCloudConnectionDiagnostic(message: String) {
+    println("AITA connection: $message")
+}
+
+private fun setCloudTransportStatusForDiagnostics(nextStatus: Int, reason: String) {
+    val previousStatus = cloudTransportStatusState.value
+    if (previousStatus != nextStatus) {
+        logCloudConnectionDiagnostic(
+            "status ${cloudTransportStatusName(previousStatus)} -> ${cloudTransportStatusName(nextStatus)} " +
+                    "reason=$reason realtime=${realtimeUpdatesConnectedState.value} " +
+                    "hasTokens=${getStoredUserAuthTokens?.invoke() != null} activeStore=${activeStoreIdState.value.orEmpty()}"
+        )
+    }
+    cloudTransportStatusState.value = nextStatus
+}
+
+private fun recentCloudTransportFailureIsDominant(now: Long = getCurrentTimeMillis()): Boolean {
+    val lastUnavailable = cloudTransportLastUnavailableAtMillis
+    val lastReachable = cloudTransportLastReachableAtMillis
+    return cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_UNAVAILABLE &&
+            lastUnavailable > 0L &&
+            lastUnavailable >= lastReachable &&
+            now - lastUnavailable <= CLOUD_CONNECTION_AUTH_REFRESH_SUPPRESSION_AFTER_TRANSPORT_FAILURE_MILLIS
+}
+
 @PublishedApi
 internal fun markCloudTransportUnavailableForNotifications() {
-    val nextStatus = if (cloudSessionRefreshIsActiveForNotifications()) {
-        CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED
-    } else {
-        CLOUD_TRANSPORT_STATUS_UNAVAILABLE
-    }
+    val now = getCurrentTimeMillis()
+    val nextStatus = CLOUD_TRANSPORT_STATUS_UNAVAILABLE
+    cloudTransportLastUnavailableAtMillis = now
+
+    // A real transport failure is stronger evidence than an old or speculative auth-refresh state.
+    // When the device cannot reach the server, the user needs a connection banner, not a session banner.
+    cloudSessionRefreshRequiredForNotifications = false
+    cloudSessionRefreshNotificationPostedForCurrentRequirement = false
 
     if (cloudTransportReachableForNotifications || cloudTransportStatusState.value != nextStatus) {
         cloudTransportFailureNotificationPending = true
         cloudTransportFailureNoticePostedForCurrentOutage = false
     }
 
-    cloudTransportStatusState.value = nextStatus
+    setCloudTransportStatusForDiagnostics(nextStatus, "transport_failure")
     cloudTransportReachableForNotifications = false
     cloudTransportRecoveryNotificationPending = false
 }
@@ -9359,6 +10076,7 @@ internal fun markCloudTransportReachableForNotifications(
     authenticated: Boolean = false,
     authRefreshRequired: Boolean? = null
 ) {
+    cloudTransportLastReachableAtMillis = getCurrentTimeMillis()
     val wasUnavailable = !cloudTransportReachableForNotifications ||
             cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_UNAVAILABLE
     val hadVisibleOutage = cloudTransportFailureNoticePostedForCurrentOutage
@@ -9367,7 +10085,7 @@ internal fun markCloudTransportReachableForNotifications(
         !hasStoredTokens -> cloudSessionRefreshRequiredForNotifications = false
         authenticated -> cloudSessionRefreshRequiredForNotifications = false
         authRefreshRequired == true -> cloudSessionRefreshRequiredForNotifications = true
-        authRefreshRequired == false && !cloudSessionRefreshRequiredForNotifications -> cloudSessionRefreshRequiredForNotifications = false
+        authRefreshRequired == false -> cloudSessionRefreshRequiredForNotifications = false
     }
 
     val nextStatus = if (cloudSessionRefreshRequiredForNotifications && hasStoredTokens) {
@@ -9376,7 +10094,10 @@ internal fun markCloudTransportReachableForNotifications(
         CLOUD_TRANSPORT_STATUS_REACHABLE
     }
 
-    cloudTransportStatusState.value = nextStatus
+    setCloudTransportStatusForDiagnostics(
+        nextStatus,
+        "transport_reachable authenticated=$authenticated authRefreshRequired=$authRefreshRequired"
+    )
     cloudTransportReachableForNotifications = true
     cloudTransportFailureNotificationPending = false
     cloudTransportFailureNoticePostedForCurrentOutage = false
@@ -9385,9 +10106,15 @@ internal fun markCloudTransportReachableForNotifications(
 
 @PublishedApi
 internal fun markCloudSessionNeedsRefreshForNotifications() {
+    if (recentCloudTransportFailureIsDominant()) {
+        logCloudConnectionDiagnostic("session-refresh signal suppressed because transport is currently unavailable")
+        setCloudTransportStatusForDiagnostics(CLOUD_TRANSPORT_STATUS_UNAVAILABLE, "auth_refresh_suppressed_by_transport_failure")
+        return
+    }
+
     cloudSessionRefreshRequiredForNotifications = true
     cloudTransportRecoveryNotificationPending = false
-    cloudTransportStatusState.value = CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED
+    setCloudTransportStatusForDiagnostics(CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED, "auth_refresh_required")
 }
 
 @PublishedApi
@@ -9395,7 +10122,7 @@ internal fun clearCloudSessionRefreshRequirementForNotifications(statusAfterClea
     cloudSessionRefreshRequiredForNotifications = false
     cloudSessionRefreshNotificationPostedForCurrentRequirement = false
     if (cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED) {
-        cloudTransportStatusState.value = statusAfterClear
+        setCloudTransportStatusForDiagnostics(statusAfterClear, "auth_refresh_requirement_cleared")
     }
 }
 
@@ -9405,7 +10132,8 @@ private fun shouldPostNotificationConsideringCloudTransport(
     val text = notification.notificationStatusCombinedText()
 
     if (text.isCloudSessionRefreshNotificationText()) {
-        markCloudSessionNeedsRefreshForNotifications()
+        if (!cloudSessionRefreshIsActiveForNotifications()) return false
+        if (cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_UNAVAILABLE) return false
         return shouldPostCloudSessionRefreshNotificationNow()
     }
 
@@ -9455,7 +10183,7 @@ private fun createNotificationDataModel(
     val now = getCurrentTimeMillis()
     val storeId = activeStoreIdState.value
     val bucket = now / IN_APP_NOTIFICATION_ID_BUCKET_MILLIS
-    val dedupeStoreId = if (cleanCategory == NOTIFICATION_CONNECTION_CATEGORY) "" else storeId.orEmpty()
+    val dedupeStoreId = if (cleanCategory == NOTIFICATION_CONNECTION_CATEGORY || cleanCategory == NOTIFICATION_SESSION_CATEGORY) "" else storeId.orEmpty()
     val stableKey = listOf(
         userAccountState.payloadValue?.id.orEmpty(),
         dedupeStoreId,
@@ -10563,7 +11291,7 @@ fun logOutUser() {
         }
 }
 
-fun getUser(forceLogOut: Boolean = true) {
+fun getUser(forceLogOut: Boolean = true, applyServerActiveStore: Boolean = true) {
     GlobalScope.launch(Dispatchers.ourIo) {
         if (getStoredUserAuthTokens?.invoke() != null)
             getUserAccountMutex.withLock {
@@ -10593,9 +11321,26 @@ fun getUser(forceLogOut: Boolean = true) {
                     userAccountState.emit(DataState.Success(account, response.message))
                     applyUserAccountPreferencesAfterLogin(account)
 
-                    account.activeStoreId?.takeIf { it.isNotBlank() }?.let { savedStoreId ->
-                        putLocalKv(KEY_ACTIVE_STORE_ID, savedStoreId)
-                        activeStoreIdState.emit(savedStoreId)
+                    if (applyServerActiveStore) {
+                        val savedStoreId = account.activeStoreId?.takeIf { it.isNotBlank() }
+                        when {
+                            savedStoreId == null -> {
+                                logCloudConnectionDiagnostic("getUser returned no server active store")
+                            }
+
+                            activeStoreExplicitNoneIsSet() -> {
+                                logCloudConnectionDiagnostic(
+                                    "getUser ignored server active store $savedStoreId because local active store is explicitly cleared"
+                                )
+                            }
+
+                            else -> {
+                                putLocalKv(KEY_ACTIVE_STORE_EXPLICIT_NONE, null)
+                                putLocalKv(KEY_ACTIVE_STORE_ID, savedStoreId)
+                                activeStoreIdState.emit(savedStoreId)
+                                logCloudConnectionDiagnostic("getUser applied server active store $savedStoreId")
+                            }
+                        }
                     }
 
                     getGlobalAppConfiguration()
@@ -10812,14 +11557,7 @@ suspend inline fun <reified Response, reified Body> networkRequest(
                         httpClient.authProvider<BearerAuthProvider>()?.clearToken()
                     } else if (!tokensForAuthPreflight.accessTokenIsStillUsableForNetwork()) {
                         recentAuthRefreshNonAuthFailureMessage()?.let { refreshFailureMessage ->
-                            markCloudTransportReachableForNotifications(authenticated = false, authRefreshRequired = false)
-                            return ResponseDataModel<Response>(
-                                message = refreshFailureMessage,
-                                payload = null,
-                                negative = true,
-                                httpStatusCode = HttpStatusCode.ServiceUnavailable.value,
-                                transportFailure = false
-                            )
+                            return authRefreshFailureResponseForNetworkRequest(refreshFailureMessage)
                         }
 
                         if (cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED) {
@@ -10912,27 +11650,55 @@ suspend inline fun <reified Response, reified Body> networkRequest(
                         return nonAitaResponse
                     }
 
+                    val decodedResponse = decodeNetworkResponseDataModel<Response>(rawBody, response.status)
+                        .withAitaTransportFailureFromStatus(response.status)
+
+                    if (response.status.isAitaServerUnhealthyForClientBanner() || decodedResponse.transportFailure) {
+                        val failureResponse = decodedResponse.copy(transportFailure = true)
+                        lastServerErrorResponse = failureResponse
+                        markCloudTransportUnavailableForNotifications()
+                        logCloudConnectionDiagnostic(
+                            "server response treated as unavailable method=${method.value} endpoint=${endpointUrl.trim('/')} " +
+                                    "http=${response.status.value} aita=$aitaServerResponse negative=${failureResponse.negative}"
+                        )
+                        if (shouldRetryCandidate) {
+                            break@retrySameServer
+                        }
+                        return failureResponse
+                    }
+
                     if (shouldRetryCandidate) {
-                        lastServerErrorResponse = decodeNetworkResponseDataModel<Response>(rawBody, response.status)
+                        lastServerErrorResponse = decodedResponse
                         break@retrySameServer
                     }
 
-                    rememberReachableServerUrl(resolvedServerUrl)
                     val endpointForReachability = endpointUrl.trim('/').lowercase()
                     val publicEndpointForReachability = endpointForReachability.startsWith("auth/") ||
                             endpointForReachability.startsWith("config/") ||
                             endpointForReachability.startsWith("res/")
-                    val authenticatedReachableResponse = response.status != HttpStatusCode.Unauthorized &&
-                            getStoredUserAuthTokens?.invoke() != null &&
-                            !publicEndpointForReachability
-                    markCloudTransportReachableForNotifications(
-                        authenticated = authenticatedReachableResponse,
-                        authRefreshRequired = if (!publicEndpointForReachability && getStoredUserAuthTokens?.invoke() != null) {
-                            response.status == HttpStatusCode.Unauthorized
-                        } else {
-                            null
+                    val canMarkReachable = cloudResponseCanMarkReachable(endpointUrl, response.status)
+                    if (canMarkReachable) {
+                        rememberReachableServerUrl(resolvedServerUrl)
+                        val authenticatedReachableResponse = response.status != HttpStatusCode.Unauthorized &&
+                                getStoredUserAuthTokens?.invoke() != null &&
+                                !publicEndpointForReachability
+                        markCloudTransportReachableForNotifications(
+                            authenticated = authenticatedReachableResponse,
+                            authRefreshRequired = if (!publicEndpointForReachability && getStoredUserAuthTokens?.invoke() != null) {
+                                response.status == HttpStatusCode.Unauthorized
+                            } else {
+                                null
+                            }
+                        )
+                    } else {
+                        logCloudConnectionDiagnostic(
+                            "reachable mark suppressed endpoint=$endpointUrl http=${response.status.value} " +
+                                    "status=${cloudTransportStatusName(cloudTransportStatusState.value)}"
+                        )
+                        if (response.status.value >= 500) {
+                            markCloudTransportUnavailableForNotifications()
                         }
-                    )
+                    }
 
                     if (response.status == HttpStatusCode.Unauthorized) {
                         if (publicEndpointForReachability) {
@@ -10956,14 +11722,7 @@ suspend inline fun <reified Response, reified Body> networkRequest(
                         }
 
                         recentAuthRefreshNonAuthFailureMessage()?.let { refreshFailureMessage ->
-                            markCloudTransportReachableForNotifications(authenticated = false, authRefreshRequired = false)
-                            return ResponseDataModel<Response>(
-                                message = refreshFailureMessage,
-                                payload = null,
-                                negative = true,
-                                httpStatusCode = HttpStatusCode.ServiceUnavailable.value,
-                                transportFailure = false
-                            )
+                            return authRefreshFailureResponseForNetworkRequest(refreshFailureMessage)
                         }
 
                         clearAuthRefreshNonAuthFailure()
@@ -10986,7 +11745,7 @@ suspend inline fun <reified Response, reified Body> networkRequest(
                         )
                     }
 
-                    return decodeNetworkResponseDataModel<Response>(rawBody, response.status)
+                    return decodedResponse
                 } catch (throwable: Throwable) {
                     if (throwable is CancellationException) throw throwable
                     val responseException = throwable as? ResponseException
@@ -11010,14 +11769,7 @@ suspend inline fun <reified Response, reified Body> networkRequest(
                         }
 
                         recentAuthRefreshNonAuthFailureMessage()?.let { refreshFailureMessage ->
-                            markCloudTransportReachableForNotifications(authenticated = false, authRefreshRequired = false)
-                            return ResponseDataModel<Response>(
-                                message = refreshFailureMessage,
-                                payload = null,
-                                negative = true,
-                                httpStatusCode = HttpStatusCode.ServiceUnavailable.value,
-                                transportFailure = false
-                            )
+                            return authRefreshFailureResponseForNetworkRequest(refreshFailureMessage)
                         }
 
                         clearAuthRefreshNonAuthFailure()
@@ -11079,7 +11831,10 @@ internal inline fun <reified Response> decodeNetworkResponseDataModel(
     }.getOrNull()
 
     if (genericEnvelope != null) {
-        return genericEnvelope.copy(httpStatusCode = status.value, transportFailure = false)
+        return genericEnvelope.copy(
+            httpStatusCode = status.value,
+            transportFailure = genericEnvelope.transportFailure || status.isAitaServerUnhealthyForClientBanner()
+        )
     }
 
     val typedEnvelope: ResponseDataModel<Response>? = runCatching<ResponseDataModel<Response>> {
@@ -11087,7 +11842,10 @@ internal inline fun <reified Response> decodeNetworkResponseDataModel(
     }.getOrNull()
 
     if (typedEnvelope != null) {
-        return typedEnvelope.copy(httpStatusCode = status.value, transportFailure = false)
+        return typedEnvelope.copy(
+            httpStatusCode = status.value,
+            transportFailure = typedEnvelope.transportFailure || status.isAitaServerUnhealthyForClientBanner()
+        )
     }
 
     val payloadResult: Result<Response> = runCatching {
@@ -11100,7 +11858,7 @@ internal inline fun <reified Response> decodeNetworkResponseDataModel(
             payload = payloadResult.getOrThrow(),
             negative = !status.isSuccess(),
             httpStatusCode = status.value,
-            transportFailure = false
+            transportFailure = status.isAitaServerUnhealthyForClientBanner()
         )
     }
 
@@ -11193,7 +11951,7 @@ fun getStores() {
 
                         activeStoreIdState.value == null -> {
                             val settableStores = stores.settableActiveStores()
-                            if (settableStores.size == 1) setActiveStoreId(settableStores.first().id)
+                            if (!activeStoreExplicitNoneIsSet() && settableStores.size == 1) setActiveStoreId(settableStores.first().id)
                         }
                     }
                 }
@@ -11324,24 +12082,31 @@ fun setActiveStoreId(
     syncServer: Boolean = true
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-        putLocalKv(KEY_ACTIVE_STORE_ID, id)
-        activeStoreIdState.emit(id)
+        val normalizedId = id?.takeIf { it.isNotBlank() }
+        val explicitNone = normalizedId == null && syncServer
+        putLocalKv(KEY_ACTIVE_STORE_ID, normalizedId)
+        putLocalKv(KEY_ACTIVE_STORE_EXPLICIT_NONE, if (explicitNone) "1" else null)
+        activeStoreIdState.emit(normalizedId)
+        logCloudConnectionDiagnostic(
+            "active store set local id=${normalizedId.orEmpty()} syncServer=$syncServer explicitNone=$explicitNone"
+        )
 
-        if (syncServer && !id.isNullOrBlank() && getStoredUserAuthTokens?.invoke() != null) {
+        if (syncServer && getStoredUserAuthTokens?.invoke() != null) {
             val response = networkRequest<Unit, String>(
                 method = HttpMethod.Put,
                 endpointUrl = "stores/active",
-                body = id
+                body = normalizedId.orEmpty()
             )
 
-            if (response.negative)
+            if (response.negative) {
                 postInAppNotification(response.message, NotificationType.Negative, transient = false)
-            else {
+            } else {
                 (userAccountState.payloadValue)?.let { account ->
-                    val updated = account.copy(activeStoreId = id)
+                    val updated = account.copy(activeStoreId = normalizedId)
                     userAccountState.emit(DataState.Success(updated))
                     setStoredUserAccountDataModel?.invoke(updated)
                 }
+                logCloudConnectionDiagnostic("active store synced to server id=${normalizedId.orEmpty()}")
             }
         }
     }
@@ -12158,6 +12923,7 @@ const val CASH_REGISTER_EVENT_MANUAL_ADJUSTMENT = "manual_adjustment"
 
 const val WORKER_REQUEST_DIRECTION_USER_TO_STORE = "user_to_store"
 const val WORKER_REQUEST_DIRECTION_STORE_TO_USER = "store_to_user"
+const val WORKER_REQUEST_DIRECTION_STORE_REMOVAL_TO_USER = "store_removal_to_user"
 const val WORKER_REQUEST_STATUS_PENDING = "pending"
 const val WORKER_REQUEST_STATUS_INVITED = "invited"
 const val WORKER_REQUEST_STATUS_ACCEPTED = "accepted"
@@ -12382,8 +13148,19 @@ private val setActiveShelfBatchMutex = Mutex()
 fun setActiveShelfBatch(
     batch: GoodsBatchDataModel,
     storeId: String,
-    onCompleted: ((DataState<GoodsItemDataModel>) -> Unit)? = null
+    onCompleted: ((DataState<GoodsItemDataModel>) -> Unit)? = null,
+    previousActiveShelfBatchId: String? = null
 ) {
+    val knownPreviousActiveShelfBatchId = previousActiveShelfBatchId
+        ?: stockState.payloadValue?.firstOrNull { it.id == batch.goodsItemId }?.activeShelfBatchId
+
+    if (knownPreviousActiveShelfBatchId == batch.id) {
+        stockState.payloadValue?.firstOrNull { it.id == batch.goodsItemId }?.let { currentItem ->
+            onCompleted?.invoke(DataState.Success(currentItem))
+        } ?: onCompleted?.invoke(DataState.Empty())
+        return
+    }
+
     if (!setActiveShelfBatchMutex.isLocked)
         GlobalScope.launch(Dispatchers.ourIo) {
             setActiveShelfBatchMutex.withLock {
@@ -12398,7 +13175,11 @@ fun setActiveShelfBatch(
                     postInAppNotification(response.message, NotificationType.Negative)
                     onCompleted?.invoke(DataState.Empty())
                 } else {
-                    postInAppNotification(response.message, NotificationType.Positive)
+                    val isGenuineShelfChange = response.message.orEmpty().isNotEmpty() &&
+                            knownPreviousActiveShelfBatchId != response.payload.activeShelfBatchId
+
+                    if (isGenuineShelfChange)
+                        postInAppNotification(response.message, NotificationType.Positive)
 
                     stockState.emit(
                         DataState.Success(
@@ -12861,6 +13642,8 @@ data class GlobalAppConfigurationDataModel(
     val declineStoreEmploymentPath: Pair<String, String> = Pair("workers/decline", "57"),
     val updateStoreWorkerPermissionsPath: Pair<String, String> = Pair("workers/updatePermissions", "58"),
     val removeStoreWorkerPath: Pair<String, String> = Pair("workers/remove", "105"),
+    val confirmStoreWorkerRemovalPath: Pair<String, String> = Pair("workers/removal/confirm", "106"),
+    val declineStoreWorkerRemovalPath: Pair<String, String> = Pair("workers/removal/decline", "107"),
     val updateMyWorkerPasswordPath: Pair<String, String> = Pair("workers/my/password", "103"),
     val inviteStoreWorkerPath: Pair<String, String> = Pair("workers/invite", "65"),
     val acceptStoreWorkerInvitationPath: Pair<String, String> = Pair("workers/invitations/accept", "66"),
@@ -14760,7 +15543,16 @@ data class WorkerPermissionsUpdateRequestDataModel(
 @kotlinx.serialization.Serializable
 data class WorkerRemovalRequestDataModel(
     val workerId: String,
-    val note: String? = null
+    val note: String? = null,
+    val noteLocalized: List<LocalizedStringDataModel> = emptyList()
+)
+
+@kotlinx.serialization.Serializable
+data class WorkerRemovalDecisionRequestDataModel(
+    val requestId: String,
+    val note: String? = null,
+    val responseNote: String? = null,
+    val responseNoteLocalized: List<LocalizedStringDataModel> = emptyList()
 )
 
 @kotlinx.serialization.Serializable

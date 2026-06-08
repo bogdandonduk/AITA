@@ -39,6 +39,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.ThreadContextElement
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
@@ -76,6 +78,7 @@ import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
+import kotlin.coroutines.CoroutineContext
 import kotlin.time.Duration.Companion.seconds
 
 object Transactions: Table("transactions") {
@@ -398,6 +401,7 @@ suspend fun RoutingCall.genericResponseNoPayload(
     status: HttpStatusCode,
     message: List<LocalizedStringDataModel>? = null
 ) {
+    stabilizeServerRuntimeClassLoader("response-no-payload:${request.httpMethod.value}:${request.path()}")
     val response = GenericResponseDataModel(
         message = message?.let { jsonBase.encodeToString(it) },
         payload = null,
@@ -452,6 +456,7 @@ suspend inline fun <reified T> RoutingCall.genericResponse(
     payload: T?,
     message: List<LocalizedStringDataModel>? = null
 ) {
+    stabilizeServerRuntimeClassLoader("response:${request.httpMethod.value}:${request.path()}:${T::class.qualifiedName}")
     val payloadText = try {
         payload?.let { jsonBase.encodeToString(it) }
     } catch (throwable: Throwable) {
@@ -510,6 +515,7 @@ suspend fun RoutingCall.genericTokenPairResponse(
     payload: TokenPair?,
     message: List<LocalizedStringDataModel>? = null
 ) {
+    stabilizeServerRuntimeClassLoader("response-token:${request.httpMethod.value}:${request.path()}")
     val response = GenericResponseDataModel(
         message = message?.let { jsonBase.encodeToString(it) },
         payload = payload?.toManualPayloadJson(),
@@ -634,7 +640,7 @@ fun ResultRow.toSecuritySessionDataModel(currentSessionId: UUID?): SecuritySessi
 }
 
 suspend fun loadSecuritySessionsForUser(userId: UUID, currentSessionId: UUID?): List<SecuritySessionDataModel> =
-    newSuspendedTransaction(Dispatchers.IO) {
+    newSuspendedTransaction(aitaServerIoContext) {
         RefreshSessions
             .selectAll()
             .where { RefreshSessions.userId eq userId }
@@ -792,7 +798,7 @@ private suspend fun loadRefreshSessionRetryContext(
     metaParam: Map<String, String>?
 ): RefreshSessionRetryContext? {
     val hash = Refresh.hash(refreshPlain)
-    return newSuspendedTransaction(Dispatchers.IO) {
+    return newSuspendedTransaction(aitaServerIoContext) {
         RefreshSessions
             .selectAll()
             .where { RefreshSessions.tokenHash eq hash }
@@ -811,7 +817,7 @@ private suspend fun revokeSameDeviceSessionsBeforeRefreshSessionRetry(
     metaParam: Map<String, String>?,
     replacementSessionId: UUID? = null
 ) {
-    newSuspendedTransaction(Dispatchers.IO) {
+    newSuspendedTransaction(aitaServerIoContext) {
         val now = Instant.now()
         val nowMillis = now.toEpochMilli()
 
@@ -912,7 +918,7 @@ private fun mergedRefreshSessionMeta(vararg values: Map<String, String>?): Map<S
     }
 
 suspend fun loadSecuritySessionHistoryForUser(userId: UUID): List<SecuritySessionHistoryDataModel> =
-    newSuspendedTransaction(Dispatchers.IO) {
+    newSuspendedTransaction(aitaServerIoContext) {
         SecuritySessionEvents
             .selectAll()
             .where { SecuritySessionEvents.userId eq userId }
@@ -2566,7 +2572,7 @@ fun Application.configureJwtAuth() {
                 val sessionId = runCatching { UUID.fromString(cred.payload.getClaim("sessionId").asString()) }.getOrNull()
                     ?: return@validate null
 
-                val ok = newSuspendedTransaction(Dispatchers.IO) {
+                val ok = newSuspendedTransaction(aitaServerIoContext) {
                     val row = RefreshSessions
                         .selectAll()
                         .where { RefreshSessions.id eq sessionId }
@@ -2644,7 +2650,7 @@ class TokenService(private val cfg: JwtConfig) {
             signAccess(userId, sessionId, now)
         }
 
-        newSuspendedTransaction(Dispatchers.IO) {
+        newSuspendedTransaction(aitaServerIoContext) {
             Users
                 .selectAll()
                 .where { Users.id eq userId }
@@ -2733,7 +2739,7 @@ class TokenService(private val cfg: JwtConfig) {
         val expires = REFRESH_SESSION_NEVER_EXPIRES_AT
         val newSessionId = UUID.randomUUID()
 
-        val userId = newSuspendedTransaction(Dispatchers.IO) {
+        val userId = newSuspendedTransaction(aitaServerIoContext) {
             val oldSession = RefreshSessions
                 .selectAll()
                 .where { RefreshSessions.tokenHash eq hash }
@@ -2861,7 +2867,7 @@ class TokenService(private val cfg: JwtConfig) {
         val nowMillis = now.toEpochMilli()
         val expires = REFRESH_SESSION_NEVER_EXPIRES_AT
 
-        val (userId, sessionId) = newSuspendedTransaction(Dispatchers.IO) {
+        val (userId, sessionId) = newSuspendedTransaction(aitaServerIoContext) {
             val session = RefreshSessions
                 .selectAll()
                 .where { RefreshSessions.tokenHash eq hash }
@@ -2930,7 +2936,7 @@ class TokenService(private val cfg: JwtConfig) {
         )
     }
 
-    suspend fun revoke(refreshPlain: String) = newSuspendedTransaction(Dispatchers.IO) {
+    suspend fun revoke(refreshPlain: String) = newSuspendedTransaction(aitaServerIoContext) {
         val hash = Refresh.hash(refreshPlain)
         val now = Instant.now()
         val nowMillis = now.toEpochMilli()
@@ -2959,7 +2965,7 @@ private suspend fun refreshSessionUserIdForPlainToken(refreshPlain: String): UUI
     val clean = refreshPlain.trim().trim('"')
     if (clean.isBlank()) return null
 
-    return newSuspendedTransaction(Dispatchers.IO) {
+    return newSuspendedTransaction(aitaServerIoContext) {
         RefreshSessions
             .select(RefreshSessions.userId)
             .where { RefreshSessions.tokenHash eq Refresh.hash(clean) }
@@ -2971,15 +2977,397 @@ private suspend fun refreshSessionUserIdForPlainToken(refreshPlain: String): UUI
 
 private object AitaServerRuntimeAnchor
 
-private fun stabilizeServerRuntimeClassLoader() {
-    val serverClassLoader = AitaServerRuntimeAnchor::class.java.classLoader ?: ClassLoader.getSystemClassLoader()
+private val aitaServerRuntimeClassLoader: ClassLoader by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+    AitaServerRuntimeAnchor::class.java.classLoader ?: ClassLoader.getSystemClassLoader()
+}
+
+private fun classLoaderDebugName(loader: ClassLoader?): String =
+    loader?.let { "${it::class.java.name}@${Integer.toHexString(System.identityHashCode(it))}" } ?: "null"
+
+@Volatile
+private var sharedRuntimeSerializersPrewarmed = false
+
+private fun stabilizeServerRuntimeClassLoader(reason: String = "runtime") {
+    val serverClassLoader = aitaServerRuntimeClassLoader
+    val before = Thread.currentThread().contextClassLoader
+    if (before !== serverClassLoader) {
+        println(
+            "AITA server classloader: reset reason=$reason " +
+                    "from=${classLoaderDebugName(before)} to=${classLoaderDebugName(serverClassLoader)}"
+        )
+    }
     Thread.currentThread().contextClassLoader = serverClassLoader
     System.setProperty("io.ktor.development", "false")
     System.setProperty("ktor.development", "false")
 }
 
-fun main(args: Array<String>) {
+private class AitaServerClassLoaderContextElement(
+    private val loader: ClassLoader = aitaServerRuntimeClassLoader
+) : ThreadContextElement<ClassLoader?>, CoroutineContext.Element {
+    companion object Key : CoroutineContext.Key<AitaServerClassLoaderContextElement>
+
+    override val key: CoroutineContext.Key<AitaServerClassLoaderContextElement>
+        get() = Key
+
+    override fun updateThreadContext(context: CoroutineContext): ClassLoader? {
+        val thread = Thread.currentThread()
+        val previous = thread.contextClassLoader
+        if (previous !== loader) {
+            thread.contextClassLoader = loader
+        }
+        return previous
+    }
+
+    override fun restoreThreadContext(context: CoroutineContext, oldState: ClassLoader?) {
+        Thread.currentThread().contextClassLoader = oldState
+    }
+}
+
+private fun aitaServerClassLoaderContextElement(): CoroutineContext = AitaServerClassLoaderContextElement()
+private val aitaServerIoContext: CoroutineContext = Dispatchers.IO + AitaServerClassLoaderContextElement()
+
+private fun Throwable.isClassLoadingFailure(): Boolean =
+    this is ClassNotFoundException || this is NoClassDefFoundError || cause?.isClassLoadingFailure() == true
+
+@Synchronized
+private fun prewarmSharedRuntimeSerializers() {
+    if (sharedRuntimeSerializersPrewarmed) return
     stabilizeServerRuntimeClassLoader()
+
+    val touchedSerializers = mutableListOf<String>()
+    fun touch(name: String, block: () -> Any?) {
+        runCatching { block() }
+            .onSuccess { touchedSerializers += name }
+            .onFailure { throwable ->
+                println("AITA server classloader: FAILED to prewarm serializer $name: ${throwable::class.qualifiedName} ${throwable.message}")
+                throw throwable
+            }
+    }
+
+    touch("ActivationHistoryEntryDataModel") { ActivationHistoryEntryDataModel.serializer() }
+    touch("BalanceHistoryEntryDataModel") { BalanceHistoryEntryDataModel.serializer() }
+    touch("BatchDiscountDataModel") { BatchDiscountDataModel.serializer() }
+    touch("CashRegisterExtractionRequestDataModel") { CashRegisterExtractionRequestDataModel.serializer() }
+    touch("CompanyFormDataModel") { CompanyFormDataModel.serializer() }
+    touch("DebtInterestDataModel") { DebtInterestDataModel.serializer() }
+    touch("DebtPartialPaymentPlanDataModel") { DebtPartialPaymentPlanDataModel.serializer() }
+    touch("DebtPaymentRecordDataModel") { DebtPaymentRecordDataModel.serializer() }
+    touch("DebtPaymentRequestDataModel") { DebtPaymentRequestDataModel.serializer() }
+    touch("DebtorDataModel") { DebtorDataModel.serializer() }
+    touch("ExpirationPeriodDataModel") { ExpirationPeriodDataModel.serializer() }
+    touch("GoodsBatchDataModel") { GoodsBatchDataModel.serializer() }
+    touch("GoodsBatchShelfQueueDataModel") { GoodsBatchShelfQueueDataModel.serializer() }
+    touch("GoodsItemBarcodeDataModel") { GoodsItemBarcodeDataModel.serializer() }
+    touch("GoodsItemDataModel") { GoodsItemDataModel.serializer() }
+    touch("GoodsItemInCartDataModel") { GoodsItemInCartDataModel.serializer() }
+    touch("GoodsItemInTransactionDataModel") { GoodsItemInTransactionDataModel.serializer() }
+    touch("LocalizedStringDataModel") { LocalizedStringDataModel.serializer() }
+    touch("LocationDataModel") { LocationDataModel.serializer() }
+    touch("NotificationDataModel") { NotificationDataModel.serializer() }
+    touch("PriceDataModel") { PriceDataModel.serializer() }
+    touch("QuantityDataModel") { QuantityDataModel.serializer() }
+    touch("ReceiveSupplierOrderRequestDataModel") { ReceiveSupplierOrderRequestDataModel.serializer() }
+    touch("SecuritySessionRevokeRequestDataModel") { SecuritySessionRevokeRequestDataModel.serializer() }
+    touch("StockBatchMoveDecisionRequestDataModel") { StockBatchMoveDecisionRequestDataModel.serializer() }
+    touch("StockBatchMoveRequestDataModel") { StockBatchMoveRequestDataModel.serializer() }
+    touch("StockPromotionDataModel") { StockPromotionDataModel.serializer() }
+    touch("StoreDataModel") { StoreDataModel.serializer() }
+    touch("StoreSubscriptionUpdateRequestDataModel") { StoreSubscriptionUpdateRequestDataModel.serializer() }
+    touch("StylizedDrawablePathsGroupDataModel") { StylizedDrawablePathsGroupDataModel.serializer() }
+    touch("SubscriptionDataModel") { SubscriptionDataModel.serializer() }
+    touch("SupplierDataModel") { SupplierDataModel.serializer() }
+    touch("SupplierGoodsPriceDataModel") { SupplierGoodsPriceDataModel.serializer() }
+    touch("SupplierOrderWithLinesDataModel") { SupplierOrderWithLinesDataModel.serializer() }
+    touch("SupportMessageSendRequestDataModel") { SupportMessageSendRequestDataModel.serializer() }
+    touch("SupportMessagesReadRequestDataModel") { SupportMessagesReadRequestDataModel.serializer() }
+    touch("SupportTicketActionRequestDataModel") { SupportTicketActionRequestDataModel.serializer() }
+    touch("SupportTicketCreateRequestDataModel") { SupportTicketCreateRequestDataModel.serializer() }
+    touch("TopUpConfirmDevelopmentRequestDataModel") { TopUpConfirmDevelopmentRequestDataModel.serializer() }
+    touch("TopUpCreateRequestDataModel") { TopUpCreateRequestDataModel.serializer() }
+    touch("TransactionDataModel") { TransactionDataModel.serializer() }
+    touch("UserAccountUpdateDataModel") { UserAccountUpdateDataModel.serializer() }
+    touch("UserAuthLogInDataModel") { UserAuthLogInDataModel.serializer() }
+    touch("UserAuthSignUpDataModel") { UserAuthSignUpDataModel.serializer() }
+    touch("UserPreferencesDataModel") { UserPreferencesDataModel.serializer() }
+    touch("WorkerEmploymentDecisionRequestDataModel") { WorkerEmploymentDecisionRequestDataModel.serializer() }
+    touch("WorkerEmploymentRequestCreateDataModel") { WorkerEmploymentRequestCreateDataModel.serializer() }
+    touch("WorkerPermissionsUpdateRequestDataModel") { WorkerPermissionsUpdateRequestDataModel.serializer() }
+    touch("WorkerPrivilegeModeDataModel") { WorkerPrivilegeModeDataModel.serializer() }
+    touch("WorkerRemovalDecisionRequestDataModel") { WorkerRemovalDecisionRequestDataModel.serializer() }
+    touch("WorkerRemovalRequestDataModel") { WorkerRemovalRequestDataModel.serializer() }
+    touch("WorkerSelfPasswordUpdateRequestDataModel") { WorkerSelfPasswordUpdateRequestDataModel.serializer() }
+    touch("WorkerStoreInvitationDecisionDataModel") { WorkerStoreInvitationDecisionDataModel.serializer() }
+    touch("WorkerStoreInviteCreateDataModel") { WorkerStoreInviteCreateDataModel.serializer() }
+    touch("WorkshiftStartRequestDataModel") { WorkshiftStartRequestDataModel.serializer() }
+    touch("MoneyDataModel") { MoneyDataModel.serializer() }
+    touch("PromotedPriceDataModel") { PromotedPriceDataModel.serializer() }
+    touch("PagingRequestDataModel") { PagingRequestDataModel.serializer() }
+    touch("PagedResponseDataModel<String>") { PagedResponseDataModel.serializer(String.serializer()) }
+    touch("PaymentProviderConfigDataModel") { PaymentProviderConfigDataModel.serializer() }
+    touch("UserWalletDataModel") { UserWalletDataModel.serializer() }
+    touch("WalletLedgerEntryDataModel") { WalletLedgerEntryDataModel.serializer() }
+    touch("TopUpPaymentIntentDataModel") { TopUpPaymentIntentDataModel.serializer() }
+    touch("StoreSubscriptionPlanDataModel") { StoreSubscriptionPlanDataModel.serializer() }
+    touch("StoreSubscriptionStateDataModel") { StoreSubscriptionStateDataModel.serializer() }
+    touch("StoreSubscriptionChargeDataModel") { StoreSubscriptionChargeDataModel.serializer() }
+    touch("SubscriptionDashboardDataModel") { SubscriptionDashboardDataModel.serializer() }
+    touch("UserFinanceDashboardDataModel") { UserFinanceDashboardDataModel.serializer() }
+    touch("TransactionPaymentDraftDataModel") { TransactionPaymentDraftDataModel.serializer() }
+    touch("TransactionCartScrollStateDataModel") { TransactionCartScrollStateDataModel.serializer() }
+    touch("TransactionReceiptSnapshotDataModel") { TransactionReceiptSnapshotDataModel.serializer() }
+    touch("TransactionReceiptLineDataModel") { TransactionReceiptLineDataModel.serializer() }
+    touch("PlatformReceiptPrinterDataModel") { PlatformReceiptPrinterDataModel.serializer() }
+    touch("AnalyticsReportRowDataModel") { AnalyticsReportRowDataModel.serializer() }
+    touch("AnalyticsReportSectionDataModel") { AnalyticsReportSectionDataModel.serializer() }
+    touch("AnalyticsReportSnapshotDataModel") { AnalyticsReportSnapshotDataModel.serializer() }
+    touch("ReceiptTextLabelsDataModel") { ReceiptTextLabelsDataModel.serializer() }
+    touch("EmbeddedWeightBarcodeDataModel") { EmbeddedWeightBarcodeDataModel.serializer() }
+    touch("ReceiveSupplierOrderLineDataModel") { ReceiveSupplierOrderLineDataModel.serializer() }
+    touch("AuthScreenPreferenceOverrideDataModel") { AuthScreenPreferenceOverrideDataModel.serializer() }
+    touch("AccountSubscriptionStatusDataModel") { AccountSubscriptionStatusDataModel.serializer() }
+    touch("AppLanguageDataModel") { AppLanguageDataModel.serializer() }
+    touch("StoreCashRegisterDataModel") { StoreCashRegisterDataModel.serializer() }
+    touch("CashRegisterEventDataModel") { CashRegisterEventDataModel.serializer() }
+    touch("CashRegisterExtractionEntryDataModel") { CashRegisterExtractionEntryDataModel.serializer() }
+    touch("CashRegisterStateDataModel") { CashRegisterStateDataModel.serializer() }
+    touch("StockBranchQuantityDataModel") { StockBranchQuantityDataModel.serializer() }
+    touch("StockBatchMovementDataModel") { StockBatchMovementDataModel.serializer() }
+    touch("StockItemBranchAvailabilityDataModel") { StockItemBranchAvailabilityDataModel.serializer() }
+    touch("StockBatchMoveResultDataModel") { StockBatchMoveResultDataModel.serializer() }
+    touch("AppThemeDataModel") { AppThemeDataModel.serializer() }
+    touch("CityDataModel") { CityDataModel.serializer() }
+    touch("LegalIdFormatDataModel") { LegalIdFormatDataModel.serializer() }
+    touch("CountryDataModel") { CountryDataModel.serializer() }
+    touch("CurrencyDataModel") { CurrencyDataModel.serializer() }
+    touch("GenericGoodsCategoryDataModel") { GenericGoodsCategoryDataModel.serializer() }
+    touch("GenericGoodsItemDataModel") { GenericGoodsItemDataModel.serializer() }
+    touch("GenericResponseDataModel") { GenericResponseDataModel.serializer() }
+    touch("GlobalAppConfigurationDataModel") { GlobalAppConfigurationDataModel.serializer() }
+    touch("SupplierOrderLineDataModel") { SupplierOrderLineDataModel.serializer() }
+    touch("SupplierOrderDataModel") { SupplierOrderDataModel.serializer() }
+    touch("GoodsCategoryDataModel") { GoodsCategoryDataModel.serializer() }
+    touch("GoodsItemInRemovalDataModel") { GoodsItemInRemovalDataModel.serializer() }
+    touch("LocalizedStringGroupDataModel") { LocalizedStringGroupDataModel.serializer() }
+    touch("ManufacturerDataModel") { ManufacturerDataModel.serializer() }
+    touch("SupportTicketDataModel") { SupportTicketDataModel.serializer() }
+    touch("SupportMessageDataModel") { SupportMessageDataModel.serializer() }
+    touch("ParameterDataModel") { ParameterDataModel.serializer() }
+    touch("PaymentOptionDataModel") { PaymentOptionDataModel.serializer() }
+    touch("RemoteResponseDataModel") { RemoteResponseDataModel.serializer() }
+    touch("RealtimeUpdateDataModel") { RealtimeUpdateDataModel.serializer() }
+    touch("RealtimeClientHelloDataModel") { RealtimeClientHelloDataModel.serializer() }
+    touch("LocalNetworkDeviceDataModel") { LocalNetworkDeviceDataModel.serializer() }
+    touch("LocalNetworkStateDataModel") { LocalNetworkStateDataModel.serializer() }
+    touch("LocalNetworkSnapshotDataModel") { LocalNetworkSnapshotDataModel.serializer() }
+    touch("LocalNetworkQueuedOperationDataModel") { LocalNetworkQueuedOperationDataModel.serializer() }
+    touch("LocalNetworkEnvelopeDataModel") { LocalNetworkEnvelopeDataModel.serializer() }
+    touch("ResponseDataModel<Unit>") { ResponseDataModel.serializer(Unit.serializer()) }
+    touch("StylizedColorDataModel") { StylizedColorDataModel.serializer() }
+    touch("StylizedColorGroupDataModel") { StylizedColorGroupDataModel.serializer() }
+    touch("StylizedDimensionDataModel") { StylizedDimensionDataModel.serializer() }
+    touch("StylizedDimensionGroupDataModel") { StylizedDimensionGroupDataModel.serializer() }
+    touch("StylizedDrawablePathsDataModel") { StylizedDrawablePathsDataModel.serializer() }
+    touch("SubscriptionPlanDataModel") { SubscriptionPlanDataModel.serializer() }
+    touch("ClientDeviceInfoDataModel") { ClientDeviceInfoDataModel.serializer() }
+    touch("PendingSessionCleanupDataModel") { PendingSessionCleanupDataModel.serializer() }
+    touch("LogoutCleanupRequestDataModel") { LogoutCleanupRequestDataModel.serializer() }
+    touch("PendingWorkshiftEndDataModel") { PendingWorkshiftEndDataModel.serializer() }
+    touch("SecuritySessionDataModel") { SecuritySessionDataModel.serializer() }
+    touch("SecuritySessionHistoryDataModel") { SecuritySessionHistoryDataModel.serializer() }
+    touch("AnalyticsRankedItemDataModel") { AnalyticsRankedItemDataModel.serializer() }
+    touch("AnalyticsBucketDataModel") { AnalyticsBucketDataModel.serializer() }
+    touch("StoreAnalyticsDashboardDataModel") { StoreAnalyticsDashboardDataModel.serializer() }
+    touch("UserAccountDataModel") { UserAccountDataModel.serializer() }
+    touch("UserBalanceDataModel") { UserBalanceDataModel.serializer() }
+    touch("UserSettingsDataModel") { UserSettingsDataModel.serializer() }
+    touch("StoreWorkerDataModel") { StoreWorkerDataModel.serializer() }
+    touch("StoreWorkerRequestDataModel") { StoreWorkerRequestDataModel.serializer() }
+    touch("WorkshiftEndRequestDataModel") { WorkshiftEndRequestDataModel.serializer() }
+    touch("WorkshiftDataModel") { WorkshiftDataModel.serializer() }
+    touch("OperationLogDataModel") { OperationLogDataModel.serializer() }
+    touch("WorkerDataModel") { WorkerDataModel.serializer() }
+    touch("PagedResponseDataModel") { PagedResponseDataModel.serializer(String.serializer()) }
+    touch("ResponseDataModel") { ResponseDataModel.serializer(String.serializer()) }
+    touch("TokenPair") { TokenPair.serializer() }
+
+
+    listOf(
+        "kz.aita.MoneyDataModel",
+        "kz.aita.ExpirationPeriodDataModel",
+        "kz.aita.BatchDiscountDataModel",
+        "kz.aita.StockPromotionDataModel",
+        "kz.aita.PromotedPriceDataModel",
+        "kz.aita.PagingRequestDataModel",
+        "kz.aita.PagedResponseDataModel",
+        "kz.aita.PaymentProviderConfigDataModel",
+        "kz.aita.UserWalletDataModel",
+        "kz.aita.WalletLedgerEntryDataModel",
+        "kz.aita.TopUpCreateRequestDataModel",
+        "kz.aita.TopUpConfirmDevelopmentRequestDataModel",
+        "kz.aita.TopUpPaymentIntentDataModel",
+        "kz.aita.StoreSubscriptionPlanDataModel",
+        "kz.aita.StoreSubscriptionStateDataModel",
+        "kz.aita.StoreSubscriptionChargeDataModel",
+        "kz.aita.StoreSubscriptionUpdateRequestDataModel",
+        "kz.aita.SubscriptionDashboardDataModel",
+        "kz.aita.UserFinanceDashboardDataModel",
+        "kz.aita.TransactionPaymentDraftDataModel",
+        "kz.aita.TransactionCartScrollStateDataModel",
+        "kz.aita.EmbeddedWeightBarcodeDataModel",
+        "kz.aita.GoodsItemBarcodeDataModel",
+        "kz.aita.ReceiveSupplierOrderRequestDataModel",
+        "kz.aita.ReceiveSupplierOrderLineDataModel",
+        "kz.aita.SupplierOrderWithLinesDataModel",
+        "kz.aita.UserPreferencesDataModel",
+        "kz.aita.AccountSubscriptionStatusDataModel",
+        "kz.aita.ActivationHistoryEntryDataModel",
+        "kz.aita.AppLanguageDataModel",
+        "kz.aita.StoreCashRegisterDataModel",
+        "kz.aita.CashRegisterEventDataModel",
+        "kz.aita.CashRegisterExtractionEntryDataModel",
+        "kz.aita.CashRegisterStateDataModel",
+        "kz.aita.CashRegisterExtractionRequestDataModel",
+        "kz.aita.StockBranchQuantityDataModel",
+        "kz.aita.StockBatchMovementDataModel",
+        "kz.aita.StockItemBranchAvailabilityDataModel",
+        "kz.aita.StockBatchMoveRequestDataModel",
+        "kz.aita.StockBatchMoveDecisionRequestDataModel",
+        "kz.aita.StockBatchMoveResultDataModel",
+        "kz.aita.AppThemeDataModel",
+        "kz.aita.BalanceHistoryEntryDataModel",
+        "kz.aita.CityDataModel",
+        "kz.aita.CompanyFormDataModel",
+        "kz.aita.LegalIdFormatDataModel",
+        "kz.aita.CountryDataModel",
+        "kz.aita.CurrencyDataModel",
+        "kz.aita.DebtInterestDataModel",
+        "kz.aita.DebtPartialPaymentPlanDataModel",
+        "kz.aita.DebtPaymentRecordDataModel",
+        "kz.aita.DebtorDataModel",
+        "kz.aita.DebtPaymentRequestDataModel",
+        "kz.aita.GenericGoodsCategoryDataModel",
+        "kz.aita.GenericGoodsItemDataModel",
+        "kz.aita.GenericResponseDataModel",
+        "kz.aita.GlobalAppConfigurationDataModel",
+        "kz.aita.SupplierOrderLineDataModel",
+        "kz.aita.SupplierOrderDataModel",
+        "kz.aita.SupplierGoodsPriceDataModel",
+        "kz.aita.GoodsBatchDataModel",
+        "kz.aita.GoodsBatchShelfQueueDataModel",
+        "kz.aita.GoodsCategoryDataModel",
+        "kz.aita.GoodsItemDataModel",
+        "kz.aita.GoodsItemInCartDataModel",
+        "kz.aita.GoodsItemInRemovalDataModel",
+        "kz.aita.GoodsItemInTransactionDataModel",
+        "kz.aita.LocalizedStringDataModel",
+        "kz.aita.LocalizedStringGroupDataModel",
+        "kz.aita.LocationDataModel",
+        "kz.aita.ManufacturerDataModel",
+        "kz.aita.NotificationDataModel",
+        "kz.aita.SupportTicketDataModel",
+        "kz.aita.SupportMessageDataModel",
+        "kz.aita.SupportTicketCreateRequestDataModel",
+        "kz.aita.SupportMessageSendRequestDataModel",
+        "kz.aita.SupportTicketActionRequestDataModel",
+        "kz.aita.SupportMessagesReadRequestDataModel",
+        "kz.aita.ParameterDataModel",
+        "kz.aita.PaymentOptionDataModel",
+        "kz.aita.PriceDataModel",
+        "kz.aita.QuantityDataModel",
+        "kz.aita.RemoteResponseDataModel",
+        "kz.aita.RealtimeUpdateDataModel",
+        "kz.aita.RealtimeClientHelloDataModel",
+        "kz.aita.LocalNetworkDeviceDataModel",
+        "kz.aita.LocalNetworkStateDataModel",
+        "kz.aita.LocalNetworkSnapshotDataModel",
+        "kz.aita.LocalNetworkQueuedOperationDataModel",
+        "kz.aita.LocalNetworkEnvelopeDataModel",
+        "kz.aita.ResponseDataModel",
+        "kz.aita.StoreDataModel",
+        "kz.aita.StylizedColorDataModel",
+        "kz.aita.StylizedColorGroupDataModel",
+        "kz.aita.StylizedDimensionDataModel",
+        "kz.aita.StylizedDimensionGroupDataModel",
+        "kz.aita.StylizedDrawablePathsDataModel",
+        "kz.aita.StylizedDrawablePathsGroupDataModel",
+        "kz.aita.SubscriptionDataModel",
+        "kz.aita.SubscriptionPlanDataModel",
+        "kz.aita.SupplierDataModel",
+        "kz.aita.TokenPair",
+        "kz.aita.ClientDeviceInfoDataModel",
+        "kz.aita.PendingSessionCleanupDataModel",
+        "kz.aita.LogoutCleanupRequestDataModel",
+        "kz.aita.PendingWorkshiftEndDataModel",
+        "kz.aita.SecuritySessionDataModel",
+        "kz.aita.SecuritySessionHistoryDataModel",
+        "kz.aita.SecuritySessionRevokeRequestDataModel",
+        "kz.aita.AnalyticsRankedItemDataModel",
+        "kz.aita.AnalyticsBucketDataModel",
+        "kz.aita.StoreAnalyticsDashboardDataModel",
+        "kz.aita.TransactionDataModel",
+        "kz.aita.UserAccountDataModel",
+        "kz.aita.UserAccountUpdateDataModel",
+        "kz.aita.UserAuthLogInDataModel",
+        "kz.aita.UserAuthSignUpDataModel",
+        "kz.aita.UserBalanceDataModel",
+        "kz.aita.UserSettingsDataModel",
+        "kz.aita.StoreWorkerDataModel",
+        "kz.aita.StoreWorkerRequestDataModel",
+        "kz.aita.WorkerEmploymentRequestCreateDataModel",
+        "kz.aita.WorkerEmploymentDecisionRequestDataModel",
+        "kz.aita.WorkerStoreInviteCreateDataModel",
+        "kz.aita.WorkerStoreInvitationDecisionDataModel",
+        "kz.aita.WorkerPermissionsUpdateRequestDataModel",
+        "kz.aita.WorkerRemovalRequestDataModel",
+        "kz.aita.WorkerRemovalDecisionRequestDataModel",
+        "kz.aita.WorkerSelfPasswordUpdateRequestDataModel",
+        "kz.aita.WorkshiftStartRequestDataModel",
+        "kz.aita.WorkshiftEndRequestDataModel",
+        "kz.aita.WorkshiftDataModel",
+        "kz.aita.OperationLogDataModel",
+        "kz.aita.WorkerDataModel",
+        "kz.aita.WorkerPrivilegeModeDataModel",
+    ).forEach { className ->
+        runCatching { Class.forName(className, false, aitaServerRuntimeClassLoader) }
+            .onFailure { throwable ->
+                println("AITA server classloader: FAILED to verify $className in $aitaServerRuntimeClassLoader: ${throwable::class.qualifiedName} ${throwable.message}")
+                throw throwable
+            }
+    }
+
+    sharedRuntimeSerializersPrewarmed = true
+    val developmentProperty = System.getProperty("io.ktor.development")
+    println(
+        "AITA server classloader: stable runtime loader=$aitaServerRuntimeClassLoader " +
+                "prewarmedSerializers=${touchedSerializers.size} development=$developmentProperty"
+    )
+}
+
+private val AitaRuntimeClassLoaderPlugin = createApplicationPlugin(name = "AitaRuntimeClassLoaderPlugin") {
+    onCall { call ->
+        val before = Thread.currentThread().contextClassLoader
+        stabilizeServerRuntimeClassLoader("call:${call.request.httpMethod.value}:${call.request.path()}")
+        val after = Thread.currentThread().contextClassLoader
+        if (before !== after) {
+            call.application.environment.log.warn(
+                "AITA server classloader: call guard reset ${call.request.httpMethod.value} ${call.request.path()} " +
+                        "from=${classLoaderDebugName(before)} to=${classLoaderDebugName(after)}"
+            )
+        }
+    }
+}
+
+fun main(args: Array<String>) {
+    stabilizeServerRuntimeClassLoader("main")
+    Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+        if (throwable.isClassLoadingFailure()) {
+            System.err.println(
+                "AITA server classloader: uncaught classloading failure thread=${thread.name} " +
+                        "threadLoader=${classLoaderDebugName(thread.contextClassLoader)} anchor=${classLoaderDebugName(aitaServerRuntimeClassLoader)}"
+            )
+        }
+    }
+    prewarmSharedRuntimeSerializers()
     EngineMain.main(args)
 }
 
@@ -3129,7 +3517,7 @@ private fun Application.startNotificationRetentionDaemon(backgroundScope: Corout
     backgroundScope.launch {
         while (true) {
             runCatching {
-                newSuspendedTransaction(Dispatchers.IO) {
+                newSuspendedTransaction(aitaServerIoContext) {
                     cleanupNotificationsInsideTransaction()
                 }
             }.onFailure { log.error("Notification retention daemon iteration failed", it) }
@@ -3558,8 +3946,19 @@ private fun RoutingCall.matchesAnyInventoryContextStoreIdInsideTransaction(userI
     return activeStoreId == null || storeIds.any { storesShareInventoryRootInsideTransaction(activeStoreId, it) }
 }
 
+private suspend inline fun <reified T> RoutingCall.receiveAita(): T {
+    stabilizeServerRuntimeClassLoader("receive:${request.httpMethod.value}:${request.path()}:${T::class.qualifiedName}")
+    return receive<T>()
+}
+
+private suspend fun RoutingCall.receiveTextAita(): String {
+    stabilizeServerRuntimeClassLoader("receive-text:${request.httpMethod.value}:${request.path()}")
+    return receiveText()
+}
+
 private suspend inline fun <reified T> RoutingCall.receiveOneOrList(): List<T> {
-    val raw = receiveText().trim()
+    stabilizeServerRuntimeClassLoader("receive-one-or-list:${request.httpMethod.value}:${request.path()}:${T::class.qualifiedName}")
+    val raw = receiveTextAita().trim()
 
     return if (raw.startsWith("[")) {
         jsonBase.decodeFromString<List<T>>(raw)
@@ -3865,10 +4264,12 @@ private fun operationLogActionForHttpMutation(method: String, path: String): Str
         "cashregister/extract" in normalized -> OPERATION_LOG_ACTION_EXTRACTED
         "workshifts/start" in normalized -> OPERATION_LOG_ACTION_STARTED
         "workshifts/end" in normalized -> OPERATION_LOG_ACTION_ENDED
+        "workers/removal/confirm" in normalized -> OPERATION_LOG_ACTION_ACCEPTED
+        "workers/removal/decline" in normalized -> OPERATION_LOG_ACTION_DECLINED
         "workers/accept" in normalized || "invitations/accept" in normalized -> OPERATION_LOG_ACTION_ACCEPTED
         "workers/decline" in normalized || "invitations/decline" in normalized -> OPERATION_LOG_ACTION_DECLINED
         "workers/invite" in normalized -> OPERATION_LOG_ACTION_INVITED
-        "workers/remove" in normalized -> OPERATION_LOG_ACTION_DELETED
+        "workers/remove" in normalized -> OPERATION_LOG_ACTION_CREATED
         "stockbatches/move" in normalized -> OPERATION_LOG_ACTION_MOVED
         method.equals("DELETE", ignoreCase = true) || normalized.contains("delete") -> OPERATION_LOG_ACTION_DELETED
         method.equals("PUT", ignoreCase = true) || normalized.contains("update") -> OPERATION_LOG_ACTION_UPDATED
@@ -4720,6 +5121,114 @@ private fun notifyWorkerRemovedInsideTransaction(
         metadata = mapOf("operationId" to "worker_removed_$workerId", "workerId" to workerId.toString()),
         nowMillis = nowMillis
     )
+}
+
+private fun notifyWorkerRemovalRequestCreatedInsideTransaction(
+    workerUserId: UUID,
+    requesterUserId: UUID,
+    storeId: UUID,
+    requestId: UUID,
+    workerId: UUID,
+    nowMillis: Long
+) {
+    val requesterName = userDisplayNameOrPublicIdInsideTransaction(requesterUserId).ifBlank { "A store manager" }
+    val workerName = userDisplayNameOrPublicIdInsideTransaction(workerUserId).ifBlank { "The worker" }
+    val storeName = storeDisplayNameInsideTransaction(storeId).ifBlank { "this store" }
+
+    insertServerNotificationInsideTransaction(
+        userId = workerUserId,
+        storeId = storeId,
+        title = "Removal request",
+        message = "$requesterName asks to end your worker access to $storeName. Please confirm or decline.",
+        type = NotificationType.Neutral,
+        category = "workers",
+        metadata = mapOf(
+            "operationId" to "worker_removal_request_$requestId",
+            "requestId" to requestId.toString(),
+            "workerId" to workerId.toString(),
+            "direction" to WORKER_REQUEST_DIRECTION_STORE_REMOVAL_TO_USER
+        ),
+        nowMillis = nowMillis
+    )
+
+    storeWorkerNotificationRecipientUserIdsInsideTransaction(storeId, managersOnly = true)
+        .filter { it != workerUserId && it != requesterUserId }
+        .forEach { recipientId ->
+            insertServerNotificationInsideTransaction(
+                userId = recipientId,
+                storeId = storeId,
+                title = "Removal request sent",
+                message = "$workerName will decide whether to end worker access to $storeName.",
+                type = NotificationType.Neutral,
+                category = "workers",
+                metadata = mapOf(
+                    "operationId" to "worker_removal_request_sent_${requestId}_$recipientId",
+                    "requestId" to requestId.toString(),
+                    "workerId" to workerId.toString(),
+                    "direction" to WORKER_REQUEST_DIRECTION_STORE_REMOVAL_TO_USER
+                ),
+                nowMillis = nowMillis
+            )
+        }
+}
+
+private fun notifyWorkerRemovalDecisionInsideTransaction(
+    requestId: UUID,
+    storeId: UUID,
+    workerUserId: UUID,
+    workerId: UUID,
+    actorUserId: UUID,
+    accepted: Boolean,
+    nowMillis: Long
+) {
+    val workerName = userDisplayNameOrPublicIdInsideTransaction(workerUserId).ifBlank { "The worker" }
+    val storeName = storeDisplayNameInsideTransaction(storeId).ifBlank { "this store" }
+
+    insertServerNotificationInsideTransaction(
+        userId = workerUserId,
+        storeId = storeId,
+        title = if (accepted) "Removal confirmed" else "Removal declined",
+        message = if (accepted) {
+            "Your worker access to $storeName ended after your confirmation."
+        } else {
+            "You declined the request to end your worker access to $storeName."
+        },
+        type = if (accepted) NotificationType.Positive else NotificationType.Neutral,
+        category = "workers",
+        metadata = mapOf(
+            "operationId" to "worker_removal_decision_${requestId}_$workerUserId",
+            "requestId" to requestId.toString(),
+            "workerId" to workerId.toString(),
+            "status" to if (accepted) WORKER_REQUEST_STATUS_ACCEPTED else WORKER_REQUEST_STATUS_DECLINED,
+            "direction" to WORKER_REQUEST_DIRECTION_STORE_REMOVAL_TO_USER
+        ),
+        nowMillis = nowMillis
+    )
+
+    storeWorkerNotificationRecipientUserIdsInsideTransaction(storeId, managersOnly = true)
+        .filter { it != actorUserId }
+        .forEach { recipientId ->
+            insertServerNotificationInsideTransaction(
+                userId = recipientId,
+                storeId = storeId,
+                title = if (accepted) "Worker removal confirmed" else "Worker kept access",
+                message = if (accepted) {
+                    "$workerName confirmed removal and no longer has worker access to $storeName."
+                } else {
+                    "$workerName declined removal and keeps worker access to $storeName."
+                },
+                type = if (accepted) NotificationType.Positive else NotificationType.Neutral,
+                category = "workers",
+                metadata = mapOf(
+                    "operationId" to "worker_removal_manager_decision_${requestId}_$recipientId",
+                    "requestId" to requestId.toString(),
+                    "workerId" to workerId.toString(),
+                    "status" to if (accepted) WORKER_REQUEST_STATUS_ACCEPTED else WORKER_REQUEST_STATUS_DECLINED,
+                    "direction" to WORKER_REQUEST_DIRECTION_STORE_REMOVAL_TO_USER
+                ),
+                nowMillis = nowMillis
+            )
+        }
 }
 
 private fun resolveUserIdByPublicOrPrivateIdInsideTransaction(value: String): UUID? {
@@ -6574,7 +7083,16 @@ private fun applyTransactionStockMutationInsideTransaction(
 }
 
 fun Application.module() {
-    stabilizeServerRuntimeClassLoader()
+    stabilizeServerRuntimeClassLoader("module")
+    prewarmSharedRuntimeSerializers()
+    environment.log.info("AITA server classloader: module anchored to ${classLoaderDebugName(aitaServerRuntimeClassLoader)}")
+    install(AitaRuntimeClassLoaderPlugin)
+    intercept(ApplicationCallPipeline.Setup) {
+        val pipelineContext = this
+        withContext(aitaServerClassLoaderContextElement()) {
+            pipelineContext.proceed()
+        }
+    }
 
     install(CallLogging) {
         level = org.slf4j.event.Level.INFO
@@ -6685,42 +7203,36 @@ fun Application.module() {
 
     install(StatusPages) {
         exception<BadRequestException> { call, cause ->
-            call.application.environment.log.warn("Bad request: ${cause.message}")
-            val response = GenericResponseDataModel(
-                message = jsonBase.encodeToString(
-                    simpleMessage(
-                        main = "Bad request",
-                        ru = "Неверный запрос",
-                        kk = "Қате сұрау"
-                    )
+            call.safeGenericResponseNoPayload(
+                status = HttpStatusCode.BadRequest,
+                message = simpleMessage(
+                    main = "Bad request",
+                    ru = "Неверный запрос",
+                    kk = "Қате сұрау"
                 ),
-                payload = null,
-                negative = true
-            )
-            call.respondText(
-                text = jsonBase.encodeToString(response),
-                contentType = ContentType.Application.Json,
-                status = HttpStatusCode.BadRequest
+                logMessage = "Bad request: ${cause.message}"
             )
         }
 
         exception<Throwable> { call, cause ->
-            call.application.environment.log.error("Unhandled server error", cause)
-            val response = GenericResponseDataModel(
-                message = jsonBase.encodeToString(
-                    simpleMessage(
-                        main = "Internal server error",
-                        ru = "Внутренняя ошибка сервера",
-                        kk = "Сервердің ішкі қатесі"
-                    )
+            if (cause.isClassLoadingFailure()) {
+                stabilizeServerRuntimeClassLoader("status-pages-classloading-failure")
+                call.application.environment.log.error(
+                    "AITA server classloader failure on ${call.request.httpMethod.value} ${call.request.path()} " +
+                            "thread=${classLoaderDebugName(Thread.currentThread().contextClassLoader)} " +
+                            "anchor=${classLoaderDebugName(aitaServerRuntimeClassLoader)}",
+                    cause
+                )
+            }
+            call.safeGenericResponseNoPayload(
+                status = HttpStatusCode.InternalServerError,
+                message = simpleMessage(
+                    main = "Internal server error",
+                    ru = "Внутренняя ошибка сервера",
+                    kk = "Сервердің ішкі қатесі"
                 ),
-                payload = null,
-                negative = true
-            )
-            call.respondText(
-                text = jsonBase.encodeToString(response),
-                contentType = ContentType.Application.Json,
-                status = HttpStatusCode.InternalServerError
+                logMessage = "Unhandled server error",
+                throwable = cause
             )
         }
     }
@@ -6732,7 +7244,7 @@ fun Application.module() {
     environment.log.info("AITA config root: $configAppRootPath")
     environment.log.info("AITA assets root: $assetsRootPath")
 
-    val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val backgroundScope = CoroutineScope(SupervisorJob() + aitaServerIoContext)
     environment.monitor.subscribe(ApplicationStopped) {
         backgroundScope.cancel()
         subscriptionRenewalDaemonStarted = false
@@ -6857,7 +7369,7 @@ fun Application.module() {
             if (actorUserId != null && logStoreId != null && !routeWritesSpecificOperationLog) {
                 backgroundScope.launch {
                     runCatching {
-                        newSuspendedTransaction(Dispatchers.IO) {
+                        newSuspendedTransaction(aitaServerIoContext) {
                             insertOperationLogInsideTransaction(
                                 actorUserId = actorUserId,
                                 storeId = logStoreId,
@@ -6890,7 +7402,7 @@ fun Application.module() {
 
         get("/readyz") {
             val ready = runCatching {
-                newSuspendedTransaction(Dispatchers.IO) {
+                newSuspendedTransaction(aitaServerIoContext) {
                     exec("SELECT 1") { }
                 }
             }.isSuccess
@@ -6970,7 +7482,7 @@ fun Application.module() {
         route("/auth") {
             post("/signUp") {
                 try {
-                    val body = call.receive<UserAuthSignUpDataModel>()
+                    val body = call.receiveAita<UserAuthSignUpDataModel>()
                     val phoneNumber = body.phoneNumber.trim().lowercase()
                     val email = body.email.trim().lowercase()
                     val cleanPassword = body.password.trim()
@@ -6982,7 +7494,7 @@ fun Application.module() {
                         )
                     }
 
-                    val conflictResult = newSuspendedTransaction(Dispatchers.IO) {
+                    val conflictResult = newSuspendedTransaction(aitaServerIoContext) {
                         val userWithPhoneNumberExists = Users
                             .select(Users.phoneNumber)
                             .where { Users.phoneNumber eq phoneNumber }
@@ -7043,7 +7555,7 @@ fun Application.module() {
                         state23505Reached = try {
                             id = UUID.randomUUID()
 
-                            newSuspendedTransaction(Dispatchers.IO) {
+                            newSuspendedTransaction(aitaServerIoContext) {
                                 Users.insert {
                                     it[Users.id] = id
                                     it[Users.publicId] = generateUniqueUserPublicIdInsideTransaction()
@@ -7095,7 +7607,7 @@ fun Application.module() {
 
             post("/logIn") {
                 try {
-                    val body = call.receive<UserAuthLogInDataModel>()
+                    val body = call.receiveAita<UserAuthLogInDataModel>()
 
                     val login = body.login.trim().lowercase()
 
@@ -7105,7 +7617,7 @@ fun Application.module() {
                         kk = "Логин немесе құпиясөз қате"
                     )
 
-                    val user = newSuspendedTransaction(Dispatchers.IO) {
+                    val user = newSuspendedTransaction(aitaServerIoContext) {
                         Users.selectAll().where { (Users.phoneNumber eq login) or (Users.email eq login) }.singleOrNull()
                     } ?: return@post call.genericResponseNoPayload(
                         status = HttpStatusCode.Unauthorized,
@@ -7137,6 +7649,30 @@ fun Application.module() {
                 val silentConnectionProbe = call.request.header(AITA_CONNECTION_PROBE_HEADER) == "1" ||
                         call.request.queryParameters["silent"]?.equals("true", ignoreCase = true) == true
 
+                val readinessOk = runCatching {
+                    stabilizeServerRuntimeClassLoader("auth-ping-readiness")
+                    prewarmSharedRuntimeSerializers()
+                    newSuspendedTransaction(aitaServerIoContext) {
+                        Users.select(Users.id).limit(1).toList()
+                    }
+                    true
+                }.getOrElse { throwable ->
+                    call.application.environment.log.error("AITA readiness probe failed", throwable)
+                    false
+                }
+
+                if (!readinessOk) {
+                    return@get call.genericResponseNoPayload(
+                        status = HttpStatusCode.ServiceUnavailable,
+                        message = simpleMessage(
+                            main = "Server is starting or repairing itself. Try again shortly.",
+                            en = "Server is starting or repairing itself. Try again shortly.",
+                            ru = "Сервер запускается или восстанавливается. Повторите чуть позже.",
+                            kk = "Сервер іске қосылып немесе қалпына келіп жатыр. Сәл кейін қайталаңыз."
+                        )
+                    )
+                }
+
                 if (!silentConnectionProbe) {
                     RealtimeServerBus.publish(
                         storeId = call.request.header("store_id") ?: call.request.header("store-id"),
@@ -7156,7 +7692,7 @@ fun Application.module() {
             }
 
             delete("/logOut") {
-                val rawBody = runCatching { call.receiveText().trim() }.getOrNull().orEmpty()
+                val rawBody = runCatching { call.receiveTextAita().trim() }.getOrNull().orEmpty()
                 val cleanup = rawBody
                     .takeIf { it.startsWith("{") }
                     ?.let { body -> runCatching { jsonBase.decodeFromString<LogoutCleanupRequestDataModel>(body) }.getOrNull() }
@@ -7172,7 +7708,7 @@ fun Application.module() {
                     val cleanupWorkshiftEnd = cleanup.workshiftEnd
                     if (cleanupStoreId != null && cleanupWorkshiftEnd != null) {
                         val endedWorkshift = runCatching {
-                            newSuspendedTransaction(Dispatchers.IO) {
+                            newSuspendedTransaction(aitaServerIoContext) {
                                 endWorkshiftForUserInsideTransaction(
                                     workerUserId = cleanupUserId,
                                     storeId = cleanupStoreId,
@@ -7201,7 +7737,7 @@ fun Application.module() {
             }
 
             post("/refresh") {
-                val body = runCatching { call.receiveText().trim().trim('"') }.getOrNull().orEmpty()
+                val body = runCatching { call.receiveTextAita().trim().trim('"') }.getOrNull().orEmpty()
                 try {
                     val newTokens = tokenService.rotate(body, metaFrom(call))
                     call.genericTokenPairResponse(HttpStatusCode.OK, newTokens)
@@ -7259,7 +7795,7 @@ fun Application.module() {
                 post("/revoke") {
                     val userId = call.checkPrincipal() ?: return@post
                     val currentSessionId = call.currentJwtSessionId()
-                    val request = runCatching { call.receive<SecuritySessionRevokeRequestDataModel>() }.getOrNull()
+                    val request = runCatching { call.receiveAita<SecuritySessionRevokeRequestDataModel>() }.getOrNull()
                     val targetSessionId = request
                         ?.sessionId
                         ?.takeIf { it.isNotBlank() }
@@ -7279,7 +7815,7 @@ fun Application.module() {
                         )
                     }
 
-                    newSuspendedTransaction(Dispatchers.IO) {
+                    newSuspendedTransaction(aitaServerIoContext) {
                         val now = Instant.now()
                         val nowMillis = now.toEpochMilli()
                         val rows = RefreshSessions
@@ -7319,7 +7855,7 @@ fun Application.module() {
                     val currentSessionId = call.currentJwtSessionId()
                     val sessionToKeep = currentSessionId ?: UUID(0L, 0L)
 
-                    newSuspendedTransaction(Dispatchers.IO) {
+                    newSuspendedTransaction(aitaServerIoContext) {
                         val now = Instant.now()
                         val nowMillis = now.toEpochMilli()
                         val rows = RefreshSessions
@@ -7363,7 +7899,7 @@ fun Application.module() {
                     get("/get") {
                         val userId = call.checkPrincipal() ?: return@get
 
-                        val tickets = newSuspendedTransaction(Dispatchers.IO) {
+                        val tickets = newSuspendedTransaction(aitaServerIoContext) {
                             SupportTickets
                                 .selectAll()
                                 .where { (SupportTickets.userId eq userId) and (SupportTickets.isActive eq true) }
@@ -7377,14 +7913,14 @@ fun Application.module() {
 
                     post("/create") {
                         val userId = call.checkPrincipal() ?: return@post
-                        val body = call.receive<SupportTicketCreateRequestDataModel>()
+                        val body = call.receiveAita<SupportTicketCreateRequestDataModel>()
                         val messageText = body.initialMessage.trim()
 
                         if (messageText.isBlank()) {
                             return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
                         }
 
-                        val ticket = newSuspendedTransaction(Dispatchers.IO) {
+                        val ticket = newSuspendedTransaction(aitaServerIoContext) {
                             val now = System.currentTimeMillis()
                             val ticketId = UUID.randomUUID()
                             val ticketPublicId = generateUniqueSupportTicketPublicIdInsideTransaction()
@@ -7444,11 +7980,11 @@ fun Application.module() {
 
                     post("/close") {
                         val userId = call.checkPrincipal() ?: return@post
-                        val body = call.receive<SupportTicketActionRequestDataModel>()
+                        val body = call.receiveAita<SupportTicketActionRequestDataModel>()
                         val ticketId = runCatching { UUID.fromString(body.ticketId) }.getOrNull()
                             ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
 
-                        val ticket = newSuspendedTransaction(Dispatchers.IO) {
+                        val ticket = newSuspendedTransaction(aitaServerIoContext) {
                             val existing = supportTicketForUserInsideTransaction(userId, ticketId) ?: return@newSuspendedTransaction null
                             val now = System.currentTimeMillis()
                             SupportTickets.update({ SupportTickets.id eq ticketId }) {
@@ -7466,11 +8002,11 @@ fun Application.module() {
 
                     post("/reopen") {
                         val userId = call.checkPrincipal() ?: return@post
-                        val body = call.receive<SupportTicketActionRequestDataModel>()
+                        val body = call.receiveAita<SupportTicketActionRequestDataModel>()
                         val ticketId = runCatching { UUID.fromString(body.ticketId) }.getOrNull()
                             ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
 
-                        val ticket = newSuspendedTransaction(Dispatchers.IO) {
+                        val ticket = newSuspendedTransaction(aitaServerIoContext) {
                             val existing = supportTicketForUserInsideTransaction(userId, ticketId) ?: return@newSuspendedTransaction null
                             val now = System.currentTimeMillis()
                             SupportTickets.update({ SupportTickets.id eq ticketId }) {
@@ -7495,7 +8031,7 @@ fun Application.module() {
                         val markRead = (call.request.header("mark_read") ?: call.request.queryParameters["mark_read"])
                             ?.equals("true", ignoreCase = true) != false
 
-                        val messages = newSuspendedTransaction(Dispatchers.IO) {
+                        val messages = newSuspendedTransaction(aitaServerIoContext) {
                             supportTicketForUserInsideTransaction(userId, ticketId) ?: return@newSuspendedTransaction null
                             val now = System.currentTimeMillis()
 
@@ -7526,7 +8062,7 @@ fun Application.module() {
 
                     post("/send") {
                         val userId = call.checkPrincipal() ?: return@post
-                        val body = call.receive<SupportMessageSendRequestDataModel>()
+                        val body = call.receiveAita<SupportMessageSendRequestDataModel>()
                         val ticketId = runCatching { UUID.fromString(body.ticketId) }.getOrNull()
                             ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
                         val messageText = body.body.trim()
@@ -7535,7 +8071,7 @@ fun Application.module() {
                             return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
                         }
 
-                        val message = newSuspendedTransaction(Dispatchers.IO) {
+                        val message = newSuspendedTransaction(aitaServerIoContext) {
                             val existingTicket = supportTicketForUserInsideTransaction(userId, ticketId) ?: return@newSuspendedTransaction null
                             val clientMessageId = body.clientMessageId?.takeIf { it.isNotBlank() }
                             clientMessageId?.let { id ->
@@ -7586,11 +8122,11 @@ fun Application.module() {
 
                     post("/read") {
                         val userId = call.checkPrincipal() ?: return@post
-                        val body = call.receive<SupportMessagesReadRequestDataModel>()
+                        val body = call.receiveAita<SupportMessagesReadRequestDataModel>()
                         val ticketId = runCatching { UUID.fromString(body.ticketId) }.getOrNull()
                             ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
 
-                        val messages = newSuspendedTransaction(Dispatchers.IO) {
+                        val messages = newSuspendedTransaction(aitaServerIoContext) {
                             supportTicketForUserInsideTransaction(userId, ticketId) ?: return@newSuspendedTransaction null
                             val now = System.currentTimeMillis()
                             SupportMessages.update({
@@ -7624,7 +8160,7 @@ fun Application.module() {
                 get("/get") {
                     val userId = call.checkPrincipal() ?: return@get
 
-                    val notifications = newSuspendedTransaction(Dispatchers.IO) {
+                    val notifications = newSuspendedTransaction(aitaServerIoContext) {
                         Notifications
                             .selectAll()
                             .where { (Notifications.userId eq userId) and (Notifications.isActive eq true) }
@@ -7640,7 +8176,7 @@ fun Application.module() {
 
                 post("/add") {
                     val userId = call.checkPrincipal() ?: return@post
-                    val body = call.receive<NotificationDataModel>()
+                    val body = call.receiveAita<NotificationDataModel>()
                     val now = System.currentTimeMillis()
                     val storeId = body.storeId?.let { runCatching { UUID.fromString(it) }.getOrNull() }
                     val category = body.category.ifBlank { body.type.name.lowercase() }
@@ -7656,7 +8192,7 @@ fun Application.module() {
                     }
                     val replacementNotificationId = notificationReplacementIdFromMetadata(metadataForStorage)
 
-                    val saved = newSuspendedTransaction(Dispatchers.IO) {
+                    val saved = newSuspendedTransaction(aitaServerIoContext) {
                         cleanupNotificationsInsideTransaction(now)
 
                         val existingById = Notifications
@@ -7738,13 +8274,13 @@ fun Application.module() {
 
                 put("/read") {
                     val userId = call.checkPrincipal() ?: return@put
-                    val ids = runCatching { call.receive<List<String>>() }.getOrElse {
-                        val one = call.receiveText().trim().trim('"')
+                    val ids = runCatching { call.receiveAita<List<String>>() }.getOrElse {
+                        val one = call.receiveTextAita().trim().trim('"')
                         listOf(one)
                     }.filter { it.isNotBlank() }
                     val now = System.currentTimeMillis()
 
-                    val updated = newSuspendedTransaction(Dispatchers.IO) {
+                    val updated = newSuspendedTransaction(aitaServerIoContext) {
                         if (ids.isNotEmpty()) {
                             Notifications.update({
                                 (Notifications.userId eq userId) and
@@ -7776,7 +8312,7 @@ fun Application.module() {
                         val userId = call.checkPrincipal() ?: return@get
 
                         val genericGoodsCategories: Pair<Int, List<GenericGoodsCategoryDataModel>?> =
-                            newSuspendedTransaction(Dispatchers.IO) {
+                            newSuspendedTransaction(aitaServerIoContext) {
                                 val noUser = Users.select(Users.id).where { Users.id eq userId }.empty()
 
                                 if (noUser)
@@ -7840,7 +8376,7 @@ fun Application.module() {
                             ?: 0
 
                         val genericGoodsItems: Pair<Int, List<GenericGoodsItemDataModel>?> =
-                            newSuspendedTransaction(Dispatchers.IO) {
+                            newSuspendedTransaction(aitaServerIoContext) {
                                 val noUser = Users.select(Users.id).where { Users.id eq userId }.empty()
 
                                 if (noUser)
@@ -7915,7 +8451,7 @@ fun Application.module() {
                     val storeId = call.headerUuid("store_id")
                         ?: return@get call.respond(UnauthorizedResponse())
 
-                    val result = newSuspendedTransaction(Dispatchers.IO) {
+                    val result = newSuspendedTransaction(aitaServerIoContext) {
                         if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_READ, requireWorkshift = false))
                             return@newSuspendedTransaction null
 
@@ -7955,7 +8491,7 @@ fun Application.module() {
                         ?.coerceAtLeast(0)
                         ?: 0
 
-                    val result = newSuspendedTransaction(Dispatchers.IO) {
+                    val result = newSuspendedTransaction(aitaServerIoContext) {
                         if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_READ, requireWorkshift = false))
                             return@newSuspendedTransaction null
 
@@ -7990,9 +8526,9 @@ fun Application.module() {
 
                 post("/add") {
                     val userId = call.checkPrincipal() ?: return@post
-                    val body = call.receive<GoodsItemDataModel>()
+                    val body = call.receiveAita<GoodsItemDataModel>()
 
-                    val inserted = newSuspendedTransaction(Dispatchers.IO) {
+                    val inserted = newSuspendedTransaction(aitaServerIoContext) {
                         val storeId = runCatching { UUID.fromString(body.storeId) }.getOrNull()
                             ?: return@newSuspendedTransaction null
 
@@ -8112,9 +8648,9 @@ fun Application.module() {
 
                 put("/update") {
                     val userId = call.checkPrincipal() ?: return@put
-                    val body = call.receive<GoodsItemDataModel>()
+                    val body = call.receiveAita<GoodsItemDataModel>()
 
-                    val updated = newSuspendedTransaction(Dispatchers.IO) {
+                    val updated = newSuspendedTransaction(aitaServerIoContext) {
                         val id = runCatching { UUID.fromString(body.id) }.getOrNull()
                             ?: return@newSuspendedTransaction null
 
@@ -8224,11 +8760,11 @@ fun Application.module() {
 
                 delete("/delete") {
                     val userId = call.checkPrincipal() ?: return@delete
-                    val rawId = call.receive<String>()
+                    val rawId = call.receiveAita<String>()
                     val storeId = call.headerUuid("store_id")
                         ?: return@delete call.respond(UnauthorizedResponse())
 
-                    val deletedId = newSuspendedTransaction(Dispatchers.IO) {
+                    val deletedId = newSuspendedTransaction(aitaServerIoContext) {
                         if (!call.matchesInventoryContextStoreIdInsideTransaction(userId, storeId))
                             return@newSuspendedTransaction null
 
@@ -8279,7 +8815,7 @@ fun Application.module() {
                     val storeId = call.headerUuid("store_id")
                         ?: return@get call.respond(UnauthorizedResponse())
 
-                    val result = newSuspendedTransaction(Dispatchers.IO) {
+                    val result = newSuspendedTransaction(aitaServerIoContext) {
                         if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_READ, requireWorkshift = false))
                             return@newSuspendedTransaction null
 
@@ -8309,7 +8845,7 @@ fun Application.module() {
                     val goodsItemId = call.headerUuid("goods_item_id")
                         ?: return@get call.genericResponseNoPayload(HttpStatusCode.BadRequest, message = getResponse("13").message)
 
-                    val availability = newSuspendedTransaction(Dispatchers.IO) {
+                    val availability = newSuspendedTransaction(aitaServerIoContext) {
                         if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_READ, requireWorkshift = false))
                             return@newSuspendedTransaction null
 
@@ -8327,9 +8863,9 @@ fun Application.module() {
 
                 post("/move") {
                     val userId = call.checkPrincipal() ?: return@post
-                    val request = call.receive<StockBatchMoveRequestDataModel>()
+                    val request = call.receiveAita<StockBatchMoveRequestDataModel>()
 
-                    val result = newSuspendedTransaction(Dispatchers.IO) {
+                    val result = newSuspendedTransaction(aitaServerIoContext) {
                         val sourceStoreId = runCatching { UUID.fromString(request.sourceStoreId) }.getOrNull()
                             ?: return@newSuspendedTransaction null
                         val destinationStoreId = runCatching { UUID.fromString(request.destinationStoreId) }.getOrNull()
@@ -8539,9 +9075,9 @@ fun Application.module() {
 
                 post("/decideMove") {
                     val userId = call.checkPrincipal() ?: return@post
-                    val request = call.receive<StockBatchMoveDecisionRequestDataModel>()
+                    val request = call.receiveAita<StockBatchMoveDecisionRequestDataModel>()
 
-                    val result = newSuspendedTransaction(Dispatchers.IO) {
+                    val result = newSuspendedTransaction(aitaServerIoContext) {
                         val movementId = runCatching { UUID.fromString(request.movementId) }.getOrNull()
                             ?: return@newSuspendedTransaction null
                         val movementRow = StockBatchMovements
@@ -8705,7 +9241,7 @@ fun Application.module() {
                     val userId = call.checkPrincipal() ?: return@post
                     val bodies = call.receiveOneOrList<GoodsBatchDataModel>()
 
-                    val inserted = newSuspendedTransaction(Dispatchers.IO) {
+                    val inserted = newSuspendedTransaction(aitaServerIoContext) {
                         val result = mutableListOf<GoodsBatchDataModel>()
                         val now = System.currentTimeMillis()
 
@@ -8871,7 +9407,7 @@ fun Application.module() {
                     val userId = call.checkPrincipal() ?: return@put
                     val bodies = call.receiveOneOrList<GoodsBatchDataModel>()
 
-                    val updated = newSuspendedTransaction(Dispatchers.IO) {
+                    val updated = newSuspendedTransaction(aitaServerIoContext) {
                         val result = mutableListOf<GoodsBatchDataModel>()
                         val now = System.currentTimeMillis()
 
@@ -9026,7 +9562,7 @@ fun Application.module() {
                     val storeId = call.headerUuid("store_id")
                         ?: return@delete call.respond(UnauthorizedResponse())
 
-                    val deletedIds = newSuspendedTransaction(Dispatchers.IO) {
+                    val deletedIds = newSuspendedTransaction(aitaServerIoContext) {
                         if (!call.matchesInventoryContextStoreIdInsideTransaction(userId, storeId))
                             return@newSuspendedTransaction null
 
@@ -9067,9 +9603,10 @@ fun Application.module() {
 
                 post("/setActiveShelfBatch") {
                     val userId = call.checkPrincipal() ?: return@post
-                    val body = call.receive<GoodsBatchDataModel>()
+                    val body = call.receiveAita<GoodsBatchDataModel>()
+                    var changed = false
 
-                    val updatedItem = newSuspendedTransaction(Dispatchers.IO) {
+                    val updatedItem = newSuspendedTransaction(aitaServerIoContext) {
                         val batchId = runCatching { UUID.fromString(body.id) }.getOrNull()
                             ?: return@newSuspendedTransaction null
 
@@ -9099,15 +9636,26 @@ fun Application.module() {
                         if (!batchExists)
                             return@newSuspendedTransaction null
 
-                        val now = System.currentTimeMillis()
+                        val existingItemRow = StockItems
+                            .selectAll()
+                            .where {
+                                (StockItems.id eq goodsItemId) and
+                                        (StockItems.storeId eq storeId) and
+                                        (StockItems.userId eq userId)
+                            }
+                            .singleOrNull() ?: return@newSuspendedTransaction null
 
-                        StockItems.update({
-                            (StockItems.id eq goodsItemId) and
-                                    (StockItems.storeId eq storeId) and
-                                    (StockItems.userId eq userId)
-                        }) {
-                            it[StockItems.activeShelfBatchId] = batchId
-                            it[StockItems.updatedAtMillis] = now
+                        changed = existingItemRow[StockItems.activeShelfBatchId] != batchId
+
+                        if (changed) {
+                            StockItems.update({
+                                (StockItems.id eq goodsItemId) and
+                                        (StockItems.storeId eq storeId) and
+                                        (StockItems.userId eq userId)
+                            }) {
+                                it[StockItems.activeShelfBatchId] = batchId
+                                it[StockItems.updatedAtMillis] = System.currentTimeMillis()
+                            }
                         }
 
                         StockItems
@@ -9118,15 +9666,15 @@ fun Application.module() {
                     }
 
                     updatedItem?.let {
-                        publishStockRealtimeBundle(it.storeId, "stock_shelf_batch_selected")
+                        if (changed) publishStockRealtimeBundle(it.storeId, "stock_shelf_batch_selected")
                         call.genericResponse(
                             status = HttpStatusCode.OK,
                             payload = it,
-                            message = simpleMessage(
+                            message = if (changed) simpleMessage(
                                 main = "Shelf batch selected",
                                 ru = "Партия на полке выбрана",
                                 kk = "Сөредегі партия таңдалды"
-                            )
+                            ) else null
                         )
                     } ?: call.respond(UnauthorizedResponse())
                 }
@@ -9140,7 +9688,7 @@ fun Application.module() {
                     val storeId = call.headerUuid("store_id")
                         ?: return@get call.respond(UnauthorizedResponse())
 
-                    val result = newSuspendedTransaction(Dispatchers.IO) {
+                    val result = newSuspendedTransaction(aitaServerIoContext) {
                         if (!userHasStoreAccessInsideTransaction(userId, storeId))
                             return@newSuspendedTransaction null
 
@@ -9163,9 +9711,9 @@ fun Application.module() {
 
                 post("/upsert") {
                     val userId = call.checkPrincipal() ?: return@post
-                    val body = call.receive<SupplierGoodsPriceDataModel>()
+                    val body = call.receiveAita<SupplierGoodsPriceDataModel>()
 
-                    val result = newSuspendedTransaction(Dispatchers.IO) {
+                    val result = newSuspendedTransaction(aitaServerIoContext) {
                         val storeId = runCatching { UUID.fromString(body.storeId) }.getOrNull()
                             ?: return@newSuspendedTransaction null
 
@@ -9223,7 +9771,7 @@ fun Application.module() {
                     val storeId = call.headerUuid("store_id")
                         ?: return@delete call.respond(UnauthorizedResponse())
 
-                    val deleted = newSuspendedTransaction(Dispatchers.IO) {
+                    val deleted = newSuspendedTransaction(aitaServerIoContext) {
                         if (!userHasStoreAccessInsideTransaction(userId, storeId))
                             return@newSuspendedTransaction null
 
@@ -9270,7 +9818,7 @@ fun Application.module() {
                 get("/get") {
                     val userId = call.checkPrincipal() ?: return@get
 
-                    val stores = newSuspendedTransaction(Dispatchers.IO) {
+                    val stores = newSuspendedTransaction(aitaServerIoContext) {
                         val noUser = Users
                             .select(Users.id)
                             .where { Users.id eq userId }
@@ -9317,9 +9865,16 @@ fun Application.module() {
 
                 put("/active") {
                     val userId = call.checkPrincipal() ?: return@put
-                    val body = call.receive<String>().trim()
+                    val body = call.receiveAita<String>().trim()
 
-                    val activeResult = newSuspendedTransaction(Dispatchers.IO) {
+                    val activeResult = newSuspendedTransaction(aitaServerIoContext) {
+                        if (body.isBlank()) {
+                            return@newSuspendedTransaction if (Users.update({ Users.id eq userId }) {
+                                    it[Users.activeStoreId] = null
+                                } > 0
+                            ) 0 else 1
+                        }
+
                         val storeId = resolveStoreIdByPublicOrPrivateIdInsideTransaction(body) ?: return@newSuspendedTransaction 1
 
                         if (!userHasStoreAccessInsideTransaction(userId, storeId))
@@ -9348,7 +9903,7 @@ fun Application.module() {
                 post("/add") {
                     val userId = call.checkPrincipal() ?: return@post
 
-                    val noUser = newSuspendedTransaction(Dispatchers.IO) {
+                    val noUser = newSuspendedTransaction(aitaServerIoContext) {
                         Users
                             .select(Users.id)
                             .where {
@@ -9359,7 +9914,7 @@ fun Application.module() {
 
                     if (noUser) return@post call.respond(UnauthorizedResponse())
 
-                    val body = call.receive<StoreDataModel>()
+                    val body = call.receiveAita<StoreDataModel>()
 
                     if (!validateStoreAddress(body)) {
                         return@post call.genericResponseNoPayload(
@@ -9391,7 +9946,7 @@ fun Application.module() {
                         return@post call.respond(UnauthorizedResponse())
                     }
 
-                    val parentAccessOk = newSuspendedTransaction(Dispatchers.IO) {
+                    val parentAccessOk = newSuspendedTransaction(aitaServerIoContext) {
                         parentStoreIdForBranch?.let { parentId ->
                             userCanUseStoreActionInsideTransaction(userId, parentId, STORE_PERMISSION_STORE_MANAGE) &&
                                     Stores.select(Stores.parentStoreId).where { Stores.id eq parentId }.singleOrNull()?.get(Stores.parentStoreId) == null
@@ -9410,7 +9965,7 @@ fun Application.module() {
                             id = UUID.randomUUID()
                             instant = Instant.now()
 
-                            newSuspendedTransaction(Dispatchers.IO) {
+                            newSuspendedTransaction(aitaServerIoContext) {
                                 val publicId = generateUniqueStorePublicIdInsideTransaction()
                                 val parentOwnerUserIds = parentStoreIdForBranch?.let { parentId ->
                                     Stores.select(Stores.ownerUserIds).where { Stores.id eq parentId }.singleOrNull()?.get(Stores.ownerUserIds)
@@ -9469,7 +10024,7 @@ fun Application.module() {
                     } while (state23505Reached)
 
                     id?.let { createdStoreId ->
-                        val publicId = newSuspendedTransaction(Dispatchers.IO) {
+                        val publicId = newSuspendedTransaction(aitaServerIoContext) {
                             Stores.select(Stores.publicId).where { Stores.id eq createdStoreId }.single()[Stores.publicId]
                         }
                         call.genericResponse(
@@ -9486,7 +10041,7 @@ fun Application.module() {
                 put("/update") {
                     val userId = call.checkPrincipal() ?: return@put
 
-                    val body = call.receive<StoreDataModel>()
+                    val body = call.receiveAita<StoreDataModel>()
 
                     if (!validateStoreAddress(body)) {
                         return@put call.genericResponseNoPayload(
@@ -9510,7 +10065,7 @@ fun Application.module() {
                         )
                     }
 
-                    val updated = newSuspendedTransaction(Dispatchers.IO) {
+                    val updated = newSuspendedTransaction(aitaServerIoContext) {
 
                         val id = runCatching { UUID.fromString(body.id) }.getOrNull() ?: return@newSuspendedTransaction 2
 
@@ -9563,9 +10118,9 @@ fun Application.module() {
                 delete("/delete") {
                     val userId = call.checkPrincipal() ?: return@delete
 
-                    val body = call.receive<String>()
+                    val body = call.receiveAita<String>()
 
-                    val deleted = newSuspendedTransaction(Dispatchers.IO) {
+                    val deleted = newSuspendedTransaction(aitaServerIoContext) {
 
                         val id = runCatching { UUID.fromString(body) }.getOrNull() ?: return@newSuspendedTransaction 2
 
@@ -9616,7 +10171,7 @@ fun Application.module() {
                     val userId = call.checkPrincipal() ?: return@get
 
                     val suppliers: Pair<Int, List<SupplierDataModel>?> =
-                        newSuspendedTransaction(Dispatchers.IO) {
+                        newSuspendedTransaction(aitaServerIoContext) {
                             val noUser = Users.select(Users.id).where { Users.id eq userId }.empty()
 
                             if (noUser)
@@ -9650,9 +10205,9 @@ fun Application.module() {
 
                 post("/add") {
                     val userId = call.checkPrincipal() ?: return@post
-                    val body = call.receive<SupplierDataModel>()
+                    val body = call.receiveAita<SupplierDataModel>()
 
-                    val inserted = newSuspendedTransaction(Dispatchers.IO) {
+                    val inserted = newSuspendedTransaction(aitaServerIoContext) {
                         if (Users.select(Users.id).where { Users.id eq userId }.empty())
                             return@newSuspendedTransaction null
 
@@ -9680,9 +10235,9 @@ fun Application.module() {
 
                 put("/update") {
                     val userId = call.checkPrincipal() ?: return@put
-                    val body = call.receive<SupplierDataModel>()
+                    val body = call.receiveAita<SupplierDataModel>()
 
-                    val updated = newSuspendedTransaction(Dispatchers.IO) {
+                    val updated = newSuspendedTransaction(aitaServerIoContext) {
                         val id = runCatching { UUID.fromString(body.id) }.getOrNull()
                             ?: return@newSuspendedTransaction null
                         val row = Suppliers.selectAll().where { Suppliers.id eq id }.singleOrNull()
@@ -9712,9 +10267,9 @@ fun Application.module() {
 
                 delete("/delete") {
                     val userId = call.checkPrincipal() ?: return@delete
-                    val supplierId = call.receive<String>().trim()
+                    val supplierId = call.receiveAita<String>().trim()
 
-                    val deleted = newSuspendedTransaction(Dispatchers.IO) {
+                    val deleted = newSuspendedTransaction(aitaServerIoContext) {
                         val id = runCatching { UUID.fromString(supplierId) }.getOrNull()
                             ?: return@newSuspendedTransaction false
                         val row = Suppliers.selectAll().where { Suppliers.id eq id }.singleOrNull()
@@ -9744,7 +10299,7 @@ fun Application.module() {
                     val storeId = call.headerUuid("store_id")
                     val supplierId = call.headerUuid("supplier_id")
 
-                    val result = newSuspendedTransaction(Dispatchers.IO) {
+                    val result = newSuspendedTransaction(aitaServerIoContext) {
                         val accessibleSupplierIds = if (storeId == null && supplierId == null) {
                             Suppliers
                                 .select(Suppliers.id, Suppliers.userIds)
@@ -9806,9 +10361,9 @@ fun Application.module() {
 
                 post("/add") {
                     val userId = call.checkPrincipal() ?: return@post
-                    val body = call.receive<SupplierOrderWithLinesDataModel>()
+                    val body = call.receiveAita<SupplierOrderWithLinesDataModel>()
 
-                    val result = newSuspendedTransaction(Dispatchers.IO) {
+                    val result = newSuspendedTransaction(aitaServerIoContext) {
                         val storeId = runCatching { UUID.fromString(body.order.storeId) }.getOrNull()
                             ?: return@newSuspendedTransaction null
                         val supplierId = runCatching { UUID.fromString(body.order.supplierId) }.getOrNull()
@@ -9870,9 +10425,9 @@ fun Application.module() {
 
                 put("/update") {
                     val userId = call.checkPrincipal() ?: return@put
-                    val body = call.receive<SupplierOrderWithLinesDataModel>()
+                    val body = call.receiveAita<SupplierOrderWithLinesDataModel>()
 
-                    val result = newSuspendedTransaction(Dispatchers.IO) {
+                    val result = newSuspendedTransaction(aitaServerIoContext) {
                         val orderId = runCatching { UUID.fromString(body.order.id) }.getOrNull()
                             ?: return@newSuspendedTransaction null
                         val existing = SupplierOrders.selectAll().where { SupplierOrders.id eq orderId }.singleOrNull()
@@ -9944,10 +10499,10 @@ fun Application.module() {
 
                 delete("/delete") {
                     val userId = call.checkPrincipal() ?: return@delete
-                    val orderId = runCatching { UUID.fromString(call.receive<String>().trim()) }.getOrNull()
+                    val orderId = runCatching { UUID.fromString(call.receiveAita<String>().trim()) }.getOrNull()
                         ?: return@delete call.respond(UnauthorizedResponse())
 
-                    val deleted = newSuspendedTransaction(Dispatchers.IO) {
+                    val deleted = newSuspendedTransaction(aitaServerIoContext) {
                         val existing = SupplierOrders.selectAll().where { SupplierOrders.id eq orderId }.singleOrNull()
                             ?: return@newSuspendedTransaction false
                         if (!userHasStoreAccessInsideTransaction(userId, existing[SupplierOrders.storeId])) return@newSuspendedTransaction false
@@ -9975,9 +10530,9 @@ fun Application.module() {
 
                 post("/receive") {
                     val userId = call.checkPrincipal() ?: return@post
-                    val request = call.receive<ReceiveSupplierOrderRequestDataModel>()
+                    val request = call.receiveAita<ReceiveSupplierOrderRequestDataModel>()
 
-                    val result = newSuspendedTransaction(Dispatchers.IO) {
+                    val result = newSuspendedTransaction(aitaServerIoContext) {
                         val orderId = runCatching { UUID.fromString(request.orderId) }.getOrNull()
                             ?: return@newSuspendedTransaction null
                         val orderRow = SupplierOrders.selectAll().where { SupplierOrders.id eq orderId }.singleOrNull()
@@ -10087,7 +10642,7 @@ fun Application.module() {
             authenticate("auth-jwt") {
                 get("/dashboard") {
                     val userId = call.checkPrincipal() ?: return@get
-                    val dashboard = newSuspendedTransaction(Dispatchers.IO) {
+                    val dashboard = newSuspendedTransaction(aitaServerIoContext) {
                         financeDashboardInsideTransaction(userId)
                     }
                     dashboard?.let {
@@ -10105,9 +10660,9 @@ fun Application.module() {
 
                 post("/topup/create") {
                     val userId = call.checkPrincipal() ?: return@post
-                    val body = call.receive<TopUpCreateRequestDataModel>()
+                    val body = call.receiveAita<TopUpCreateRequestDataModel>()
 
-                    val result = newSuspendedTransaction(Dispatchers.IO) {
+                    val result = newSuspendedTransaction(aitaServerIoContext) {
                         val wallet = ensureUserWalletInsideTransaction(userId) ?: return@newSuspendedTransaction null
                         val amountMinor = body.amount.toMinorCurrencyUnits()
                         if (amountMinor <= 0L || !body.currencyCode.equals(wallet.currencyCode, ignoreCase = true))
@@ -10168,9 +10723,9 @@ fun Application.module() {
 
                 post("/topup/confirmDevelopment") {
                     val userId = call.checkPrincipal() ?: return@post
-                    val body = call.receive<TopUpConfirmDevelopmentRequestDataModel>()
+                    val body = call.receiveAita<TopUpConfirmDevelopmentRequestDataModel>()
 
-                    val dashboard = newSuspendedTransaction(Dispatchers.IO) {
+                    val dashboard = newSuspendedTransaction(aitaServerIoContext) {
                         val intentId = runCatching { UUID.fromString(body.paymentIntentId) }.getOrNull()
                             ?: return@newSuspendedTransaction null
                         val intent = TopUpPaymentIntents
@@ -10240,7 +10795,7 @@ fun Application.module() {
                 get("/store/get") {
                     val userId = call.checkPrincipal() ?: return@get
                     val storeId = call.headerUuid("store_id") ?: return@get call.respond(UnauthorizedResponse())
-                    val dashboard = newSuspendedTransaction(Dispatchers.IO) {
+                    val dashboard = newSuspendedTransaction(aitaServerIoContext) {
                         if (!userHasStoreAccessInsideTransaction(userId, storeId)) return@newSuspendedTransaction null
                         subscriptionDashboardInsideTransaction(storeId)
                     }
@@ -10259,11 +10814,11 @@ fun Application.module() {
 
                 post("/store/update") {
                     val userId = call.checkPrincipal() ?: return@post
-                    val body = call.receive<StoreSubscriptionUpdateRequestDataModel>()
+                    val body = call.receiveAita<StoreSubscriptionUpdateRequestDataModel>()
                     val storeId = runCatching { UUID.fromString(body.storeId) }.getOrNull()
                         ?: return@post call.respond(UnauthorizedResponse())
 
-                    val dashboard = newSuspendedTransaction(Dispatchers.IO) {
+                    val dashboard = newSuspendedTransaction(aitaServerIoContext) {
                         val rootStoreId = rootStoreIdForAccessInsideTransaction(storeId)
                         if (!isStoreOwnerInsideTransaction(userId, rootStoreId)) return@newSuspendedTransaction null
                         val plan = defaultStoreSubscriptionPlans().firstOrNull { it.id == body.planId && it.isActive }
@@ -10342,7 +10897,7 @@ fun Application.module() {
                 get("/get") {
                     val userId = call.checkPrincipal() ?: return@get
 
-                    val balance = newSuspendedTransaction(Dispatchers.IO) {
+                    val balance = newSuspendedTransaction(aitaServerIoContext) {
                         val noUser = Users
                             .select(Users.id)
                             .where { Users.id eq userId }
@@ -10379,9 +10934,9 @@ fun Application.module() {
 //        put("/topUp") {
 //          val userId = call.checkPrincipal() ?: return@put
 //
-//          val body = call.receive<StoreDataModel>()
+//          val body = call.receiveAita<StoreDataModel>()
 //
-//          val updated = newSuspendedTransaction(Dispatchers.IO) {
+//          val updated = newSuspendedTransaction(aitaServerIoContext) {
 //
 //            val id = runCatching { UUID.fromString(body.id) }.getOrNull() ?: return@newSuspendedTransaction 2
 //
@@ -10428,7 +10983,7 @@ fun Application.module() {
                 get("/get") {
                     val uuid = call.checkPrincipal() ?: return@get
 
-                    val user = newSuspendedTransaction(Dispatchers.IO) {
+                    val user = newSuspendedTransaction(aitaServerIoContext) {
                         Users
                             .selectAll()
                             .where {
@@ -10447,12 +11002,12 @@ fun Application.module() {
 
                 put("/preferences/update") {
                     val uuid = call.checkPrincipal() ?: return@put
-                    val body = call.receive<UserPreferencesDataModel>()
+                    val body = call.receiveAita<UserPreferencesDataModel>()
                     val language = normalizeAppLanguagePreference(body.appLanguage)
                     val themeId = normalizeAppThemePreference(body.appThemeId)
                     val sizeModeId = normalizeAppSizeModePreference(body.appSizeModeId)
 
-                    val updatedUser = newSuspendedTransaction(Dispatchers.IO) {
+                    val updatedUser = newSuspendedTransaction(aitaServerIoContext) {
                         val existing = Users
                             .selectAll()
                             .where { Users.id eq uuid }
@@ -10484,7 +11039,7 @@ fun Application.module() {
                 put("/update") {
                     val uuid = call.checkPrincipal() ?: return@put
 
-                    val body = call.receive<UserAccountUpdateDataModel>()
+                    val body = call.receiveAita<UserAccountUpdateDataModel>()
                     val newAccount = body.account
                     val cleanNewPassword = body.newPassword?.trim()?.takeIf { it.isNotBlank() }
 
@@ -10502,7 +11057,7 @@ fun Application.module() {
                     val countryLocale = newAccount.countryLocale.trim().lowercase()
                     val isActive = newAccount.isActive
 
-                    val updated = newSuspendedTransaction(Dispatchers.IO) {
+                    val updated = newSuspendedTransaction(aitaServerIoContext) {
                         val existingUser =
                             Users
                                 .selectAll()
@@ -10586,7 +11141,7 @@ fun Application.module() {
 
                     when (updated) {
                         "ok" -> {
-                            val refreshed = newSuspendedTransaction(Dispatchers.IO) {
+                            val refreshed = newSuspendedTransaction(aitaServerIoContext) {
                                 Users
                                     .selectAll()
                                     .where { Users.id eq uuid }
@@ -10635,7 +11190,7 @@ fun Application.module() {
                     val userId = call.checkPrincipal() ?: return@get
                     val storeId = call.headerUuid("store_id") ?: return@get call.respond(UnauthorizedResponse())
 
-                    val debtors = newSuspendedTransaction(Dispatchers.IO) {
+                    val debtors = newSuspendedTransaction(aitaServerIoContext) {
                         if (!userHasStoreAccessInsideTransaction(userId, storeId))
                             return@newSuspendedTransaction null
 
@@ -10657,9 +11212,9 @@ fun Application.module() {
                 post("/add") {
                     val userId = call.checkPrincipal() ?: return@post
                     val storeId = call.headerUuid("store_id") ?: return@post call.respond(UnauthorizedResponse())
-                    val body = call.receive<DebtorDataModel>()
+                    val body = call.receiveAita<DebtorDataModel>()
 
-                    val debtor = newSuspendedTransaction(Dispatchers.IO) {
+                    val debtor = newSuspendedTransaction(aitaServerIoContext) {
                         if (!userHasStoreAccessInsideTransaction(userId, storeId))
                             return@newSuspendedTransaction null
 
@@ -10682,11 +11237,11 @@ fun Application.module() {
                 put("/update") {
                     val userId = call.checkPrincipal() ?: return@put
                     val storeId = call.headerUuid("store_id") ?: return@put call.respond(UnauthorizedResponse())
-                    val body = call.receive<DebtorDataModel>()
+                    val body = call.receiveAita<DebtorDataModel>()
                     val debtorId = runCatching { UUID.fromString(body.id) }.getOrNull()
                         ?: return@put call.respond(UnauthorizedResponse())
 
-                    val debtor = newSuspendedTransaction(Dispatchers.IO) {
+                    val debtor = newSuspendedTransaction(aitaServerIoContext) {
                         if (!userHasStoreAccessInsideTransaction(userId, storeId))
                             return@newSuspendedTransaction null
 
@@ -10736,11 +11291,11 @@ fun Application.module() {
                 delete("/delete") {
                     val userId = call.checkPrincipal() ?: return@delete
                     val storeId = call.headerUuid("store_id") ?: return@delete call.respond(UnauthorizedResponse())
-                    val body = call.receive<String>()
+                    val body = call.receiveAita<String>()
                     val debtorId = runCatching { UUID.fromString(body) }.getOrNull()
                         ?: return@delete call.respond(UnauthorizedResponse())
 
-                    val deleted = newSuspendedTransaction(Dispatchers.IO) {
+                    val deleted = newSuspendedTransaction(aitaServerIoContext) {
                         if (!userHasStoreAccessInsideTransaction(userId, storeId))
                             return@newSuspendedTransaction null
 
@@ -10767,13 +11322,13 @@ fun Application.module() {
 
                 post("/pay") {
                     val userId = call.checkPrincipal() ?: return@post
-                    val body = call.receive<DebtPaymentRequestDataModel>()
+                    val body = call.receiveAita<DebtPaymentRequestDataModel>()
                     val storeId = runCatching { UUID.fromString(body.storeId) }.getOrNull()
                         ?: return@post call.respond(UnauthorizedResponse())
                     val debtorId = runCatching { UUID.fromString(body.debtorId) }.getOrNull()
                         ?: return@post call.respond(UnauthorizedResponse())
 
-                    val debtor = newSuspendedTransaction(Dispatchers.IO) {
+                    val debtor = newSuspendedTransaction(aitaServerIoContext) {
                         if (!userHasStoreAccessInsideTransaction(userId, storeId))
                             return@newSuspendedTransaction null
 
@@ -10839,7 +11394,7 @@ fun Application.module() {
                     val userId = call.checkPrincipal() ?: return@get
                     val storeId = call.headerUuid("store_id") ?: return@get call.respond(UnauthorizedResponse())
 
-                    val state = newSuspendedTransaction(Dispatchers.IO) {
+                    val state = newSuspendedTransaction(aitaServerIoContext) {
                         if (!userHasStoreAccessInsideTransaction(userId, storeId))
                             return@newSuspendedTransaction null
 
@@ -10856,7 +11411,7 @@ fun Application.module() {
 
                 post("/extract") {
                     val userId = call.checkPrincipal() ?: return@post
-                    val body = call.receive<CashRegisterExtractionRequestDataModel>()
+                    val body = call.receiveAita<CashRegisterExtractionRequestDataModel>()
                     val storeId = runCatching { UUID.fromString(body.storeId) }.getOrNull()
                         ?: call.headerUuid("store_id")
                         ?: return@post call.respond(UnauthorizedResponse())
@@ -10865,7 +11420,7 @@ fun Application.module() {
 
                     var failureMessage: List<LocalizedStringDataModel>? = null
 
-                    val state = newSuspendedTransaction(Dispatchers.IO) {
+                    val state = newSuspendedTransaction(aitaServerIoContext) {
                         if (!userHasStoreAccessInsideTransaction(userId, storeId))
                             return@newSuspendedTransaction null
 
@@ -10926,7 +11481,7 @@ fun Application.module() {
             authenticate("auth-jwt") {
                 get("/my/get") {
                     val userId = call.checkPrincipal() ?: return@get
-                    val result = newSuspendedTransaction(Dispatchers.IO) {
+                    val result = newSuspendedTransaction(aitaServerIoContext) {
                         StoreWorkerMemberships
                             .innerJoin(Stores, { StoreWorkerMemberships.storeId }, { Stores.id })
                             .innerJoin(Users, { StoreWorkerMemberships.userId }, { Users.id })
@@ -10942,7 +11497,7 @@ fun Application.module() {
                     val userId = call.checkPrincipal() ?: return@get
                     val storeId = call.headerUuid("store_id") ?: return@get call.respond(UnauthorizedResponse())
 
-                    val result = newSuspendedTransaction(Dispatchers.IO) {
+                    val result = newSuspendedTransaction(aitaServerIoContext) {
                         val visibleStoreIds = storeGroupIdsInsideTransaction(rootStoreIdForAccessInsideTransaction(storeId))
                             .filter { candidateStoreId ->
                                 isStoreOwnerInsideTransaction(userId, candidateStoreId) ||
@@ -10968,7 +11523,7 @@ fun Application.module() {
 
                 get("/requests/my") {
                     val userId = call.checkPrincipal() ?: return@get
-                    val result = newSuspendedTransaction(Dispatchers.IO) {
+                    val result = newSuspendedTransaction(aitaServerIoContext) {
                         StoreWorkerRequests
                             .innerJoin(Stores, { StoreWorkerRequests.storeId }, { Stores.id })
                             .innerJoin(Users, { StoreWorkerRequests.requesterUserId }, { Users.id })
@@ -10984,7 +11539,7 @@ fun Application.module() {
                     val userId = call.checkPrincipal() ?: return@get
                     val storeId = call.headerUuid("store_id") ?: return@get call.respond(UnauthorizedResponse())
 
-                    val result = newSuspendedTransaction(Dispatchers.IO) {
+                    val result = newSuspendedTransaction(aitaServerIoContext) {
                         val requestStoreIds = storeGroupIdsInsideTransaction(rootStoreIdForAccessInsideTransaction(storeId))
                             .filter { candidateStoreId ->
                                 isStoreOwnerInsideTransaction(userId, candidateStoreId) ||
@@ -11009,13 +11564,13 @@ fun Application.module() {
 
                 post("/request") {
                     val userId = call.checkPrincipal() ?: return@post
-                    val body = call.receive<WorkerEmploymentRequestCreateDataModel>()
+                    val body = call.receiveAita<WorkerEmploymentRequestCreateDataModel>()
                     val now = System.currentTimeMillis()
                     val requestNote = cleanOptionalText(body.note)
                     val requestNoteLocalized = localizedNoteForStorage(requestNote, body.noteLocalized)
                     var failureMessage: List<LocalizedStringDataModel>? = null
 
-                    val request = newSuspendedTransaction(Dispatchers.IO) {
+                    val request = newSuspendedTransaction(aitaServerIoContext) {
                         val storeId = resolveStoreIdByPublicOrPrivateIdInsideTransaction(body.storeId)
                         if (storeId == null) {
                             failureMessage = getResponse("13").message
@@ -11100,7 +11655,7 @@ fun Application.module() {
                 post("/invite") {
                     val userId = call.checkPrincipal() ?: return@post
                     val storeId = call.headerUuid("store_id") ?: return@post call.respond(UnauthorizedResponse())
-                    val body = call.receive<WorkerStoreInviteCreateDataModel>()
+                    val body = call.receiveAita<WorkerStoreInviteCreateDataModel>()
                     val now = System.currentTimeMillis()
                     val role = body.roleId.takeIf { it == WORKER_ROLE_ADMIN || it == WORKER_ROLE_STANDARD } ?: WORKER_ROLE_STANDARD
                     val permissions = cleanPermissionIds(body.permissions).ifEmpty { defaultStorePermissionsForRole(role) }
@@ -11108,7 +11663,7 @@ fun Application.module() {
                     val inviteNoteLocalized = localizedNoteForStorage(inviteNote, body.noteLocalized)
                     var failureMessage: List<LocalizedStringDataModel>? = null
 
-                    val request = newSuspendedTransaction(Dispatchers.IO) {
+                    val request = newSuspendedTransaction(aitaServerIoContext) {
                         if (!isStoreOwnerInsideTransaction(userId, storeId) && !userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_WORKERS_MANAGE, requireWorkshift = false)) {
                             failureMessage = getResponse("59").message
                             return@newSuspendedTransaction null
@@ -11202,7 +11757,7 @@ fun Application.module() {
 
                 post("/invitations/accept") {
                     val userId = call.checkPrincipal() ?: return@post
-                    val body = call.receive<WorkerStoreInvitationDecisionDataModel>()
+                    val body = call.receiveAita<WorkerStoreInvitationDecisionDataModel>()
                     val requestId = runCatching { UUID.fromString(body.requestId) }.getOrNull()
                         ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
                     val now = System.currentTimeMillis()
@@ -11210,7 +11765,7 @@ fun Application.module() {
                     val responseNoteLocalized = localizedNoteForStorage(responseNote, body.responseNoteLocalized)
                     var failureMessage: List<LocalizedStringDataModel>? = null
 
-                    val worker = newSuspendedTransaction(Dispatchers.IO) {
+                    val worker = newSuspendedTransaction(aitaServerIoContext) {
                         val requestRow = StoreWorkerRequests
                             .selectAll()
                             .where {
@@ -11300,7 +11855,7 @@ fun Application.module() {
 
                 post("/invitations/decline") {
                     val userId = call.checkPrincipal() ?: return@post
-                    val body = call.receive<WorkerStoreInvitationDecisionDataModel>()
+                    val body = call.receiveAita<WorkerStoreInvitationDecisionDataModel>()
                     val requestId = runCatching { UUID.fromString(body.requestId) }.getOrNull()
                         ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
                     val now = System.currentTimeMillis()
@@ -11308,7 +11863,7 @@ fun Application.module() {
                     val responseNoteLocalized = localizedNoteForStorage(responseNote, body.responseNoteLocalized)
                     var failureMessage: List<LocalizedStringDataModel>? = null
 
-                    val request = newSuspendedTransaction(Dispatchers.IO) {
+                    val request = newSuspendedTransaction(aitaServerIoContext) {
                         val updated = StoreWorkerRequests.update({
                             (StoreWorkerRequests.id eq requestId) and
                                     (StoreWorkerRequests.requesterUserId eq userId) and
@@ -11357,7 +11912,7 @@ fun Application.module() {
                 post("/accept") {
                     val userId = call.checkPrincipal() ?: return@post
                     val headerStoreId = call.headerUuid("store_id") ?: return@post call.respond(UnauthorizedResponse())
-                    val body = call.receive<WorkerEmploymentDecisionRequestDataModel>()
+                    val body = call.receiveAita<WorkerEmploymentDecisionRequestDataModel>()
                     val requestId = runCatching { UUID.fromString(body.requestId) }.getOrNull()
                         ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
                     val now = System.currentTimeMillis()
@@ -11368,7 +11923,7 @@ fun Application.module() {
                     var failureMessage: List<LocalizedStringDataModel>? = null
                     var alreadyAccepted = false
 
-                    val worker = newSuspendedTransaction(Dispatchers.IO) {
+                    val worker = newSuspendedTransaction(aitaServerIoContext) {
                         val requestRow = StoreWorkerRequests
                             .selectAll()
                             .where { StoreWorkerRequests.id eq requestId }
@@ -11489,7 +12044,7 @@ fun Application.module() {
                 post("/decline") {
                     val userId = call.checkPrincipal() ?: return@post
                     val headerStoreId = call.headerUuid("store_id") ?: return@post call.respond(UnauthorizedResponse())
-                    val body = call.receive<WorkerEmploymentDecisionRequestDataModel>()
+                    val body = call.receiveAita<WorkerEmploymentDecisionRequestDataModel>()
                     val requestId = runCatching { UUID.fromString(body.requestId) }.getOrNull()
                         ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
                     val now = System.currentTimeMillis()
@@ -11498,7 +12053,7 @@ fun Application.module() {
                     var failureMessage: List<LocalizedStringDataModel>? = null
                     var alreadyDeclined = false
 
-                    val request = newSuspendedTransaction(Dispatchers.IO) {
+                    val request = newSuspendedTransaction(aitaServerIoContext) {
                         val existingRequestRow = StoreWorkerRequests
                             .selectAll()
                             .where { StoreWorkerRequests.id eq requestId }
@@ -11582,7 +12137,7 @@ fun Application.module() {
                 post("/updatePermissions") {
                     val userId = call.checkPrincipal() ?: return@post
                     val storeId = call.headerUuid("store_id") ?: return@post call.respond(UnauthorizedResponse())
-                    val body = call.receive<WorkerPermissionsUpdateRequestDataModel>()
+                    val body = call.receiveAita<WorkerPermissionsUpdateRequestDataModel>()
                     val workerId = runCatching { UUID.fromString(body.workerId) }.getOrNull()
                         ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
                     val role = body.roleId.takeIf { it == WORKER_ROLE_ADMIN || it == WORKER_ROLE_STANDARD } ?: WORKER_ROLE_STANDARD
@@ -11590,7 +12145,7 @@ fun Application.module() {
                     val now = System.currentTimeMillis()
                     var failureMessage: List<LocalizedStringDataModel>? = null
 
-                    val worker = newSuspendedTransaction(Dispatchers.IO) {
+                    val worker = newSuspendedTransaction(aitaServerIoContext) {
                         val existingWorkerRow = StoreWorkerMemberships
                             .selectAll()
                             .where { (StoreWorkerMemberships.id eq workerId) and (StoreWorkerMemberships.isActive eq true) }
@@ -11651,13 +12206,16 @@ fun Application.module() {
                 post("/remove") {
                     val userId = call.checkPrincipal() ?: return@post
                     val storeId = call.headerUuid("store_id") ?: return@post call.respond(UnauthorizedResponse())
-                    val body = call.receive<WorkerRemovalRequestDataModel>()
+                    val body = call.receiveAita<WorkerRemovalRequestDataModel>()
                     val workerId = runCatching { UUID.fromString(body.workerId) }.getOrNull()
                         ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
                     val now = System.currentTimeMillis()
+                    val requestNote = cleanOptionalText(body.note)
+                    val requestNoteLocalized = localizedNoteForStorage(requestNote, body.noteLocalized)
                     var failureMessage: List<LocalizedStringDataModel>? = null
+                    var alreadyPending = false
 
-                    val removedWorker = newSuspendedTransaction(Dispatchers.IO) {
+                    val removalRequest = newSuspendedTransaction(aitaServerIoContext) {
                         val existingWorkerRow = StoreWorkerMemberships
                             .innerJoin(Stores, { StoreWorkerMemberships.storeId }, { Stores.id })
                             .innerJoin(Users, { StoreWorkerMemberships.userId }, { Users.id })
@@ -11679,10 +12237,135 @@ fun Application.module() {
                             return@newSuspendedTransaction null
                         }
 
+                        if (workerUserId == userId) {
+                            failureMessage = simpleMessage(
+                                main = "You cannot request your own removal here",
+                                ru = "Нельзя запросить собственное удаление здесь",
+                                kk = "Бұл жерден өзіңізді алып тастауды сұрай алмайсыз"
+                            )
+                            return@newSuspendedTransaction null
+                        }
+
                         if (!isStoreOwnerInsideTransaction(userId, workerStoreId) && !userCanUseStoreActionInsideTransaction(userId, workerStoreId, STORE_PERMISSION_WORKERS_MANAGE, requireWorkshift = false)) {
                             failureMessage = getResponse("59").message
                             return@newSuspendedTransaction null
                         }
+
+                        StoreWorkerRequests
+                            .innerJoin(Stores, { StoreWorkerRequests.storeId }, { Stores.id })
+                            .innerJoin(Users, { StoreWorkerRequests.requesterUserId }, { Users.id })
+                            .selectAll()
+                            .where {
+                                (StoreWorkerRequests.storeId eq workerStoreId) and
+                                        (StoreWorkerRequests.requesterUserId eq workerUserId) and
+                                        (StoreWorkerRequests.direction eq WORKER_REQUEST_DIRECTION_STORE_REMOVAL_TO_USER) and
+                                        (StoreWorkerRequests.status eq WORKER_REQUEST_STATUS_PENDING)
+                            }
+                            .firstOrNull()
+                            ?.let { pendingRow ->
+                                alreadyPending = true
+                                return@newSuspendedTransaction pendingRow.toStoreWorkerRequestDataModel()
+                            }
+
+                        val requestId = UUID.randomUUID()
+                        StoreWorkerRequests.insert {
+                            it[StoreWorkerRequests.id] = requestId
+                            it[StoreWorkerRequests.storeId] = workerStoreId
+                            it[StoreWorkerRequests.requesterUserId] = workerUserId
+                            it[StoreWorkerRequests.direction] = WORKER_REQUEST_DIRECTION_STORE_REMOVAL_TO_USER
+                            it[StoreWorkerRequests.invitedByUserId] = userId
+                            it[StoreWorkerRequests.status] = WORKER_REQUEST_STATUS_PENDING
+                            it[StoreWorkerRequests.requestedAtMillis] = now
+                            it[StoreWorkerRequests.roleId] = existingWorkerRow[StoreWorkerMemberships.roleId]
+                            it[StoreWorkerRequests.permissions] = existingWorkerRow[StoreWorkerMemberships.permissions]
+                            it[StoreWorkerRequests.workshiftPasswordHash] = null
+                            it[StoreWorkerRequests.note] = requestNote
+                            it[StoreWorkerRequests.noteLocalized] = requestNoteLocalized
+                            it[StoreWorkerRequests.responseNote] = null
+                            it[StoreWorkerRequests.responseNoteLocalized] = emptyList()
+                            it[StoreWorkerRequests.updatedAt] = Instant.now()
+                        }
+
+                        notifyWorkerRemovalRequestCreatedInsideTransaction(
+                            workerUserId = workerUserId,
+                            requesterUserId = userId,
+                            storeId = workerStoreId,
+                            requestId = requestId,
+                            workerId = workerId,
+                            nowMillis = now
+                        )
+
+                        StoreWorkerRequests
+                            .innerJoin(Stores, { StoreWorkerRequests.storeId }, { Stores.id })
+                            .innerJoin(Users, { StoreWorkerRequests.requesterUserId }, { Users.id })
+                            .selectAll()
+                            .where { StoreWorkerRequests.id eq requestId }
+                            .single()
+                            .toStoreWorkerRequestDataModel()
+                    }
+
+                    removalRequest?.let {
+                        if (!alreadyPending) publishWorkerRealtimeBundle(it.storeId, "worker_removal_requested")
+                        call.genericResponse(
+                            HttpStatusCode.OK,
+                            payload = it,
+                            message = if (alreadyPending) simpleMessage(
+                                main = "Removal request is already waiting",
+                                ru = "Запрос на удаление уже ожидает ответа",
+                                kk = "Алып тастау сұрауы жауап күтуде"
+                            ) else simpleMessage(
+                                main = "Removal request sent",
+                                ru = "Запрос на удаление отправлен",
+                                kk = "Алып тастау сұрауы жіберілді"
+                            )
+                        )
+                    } ?: call.genericResponseNoPayload(HttpStatusCode.Conflict, failureMessage ?: getResponse("3").message)
+                }
+
+                post("/removal/confirm") {
+                    val userId = call.checkPrincipal() ?: return@post
+                    val body = call.receiveAita<WorkerRemovalDecisionRequestDataModel>()
+                    val requestId = runCatching { UUID.fromString(body.requestId) }.getOrNull()
+                        ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
+                    val now = System.currentTimeMillis()
+                    val responseNote = cleanOptionalText(body.responseNote ?: body.note)
+                    val responseNoteLocalized = localizedNoteForStorage(responseNote, body.responseNoteLocalized)
+                    var failureMessage: List<LocalizedStringDataModel>? = null
+
+                    val removedWorker = newSuspendedTransaction(aitaServerIoContext) {
+                        val requestRow = StoreWorkerRequests
+                            .selectAll()
+                            .where {
+                                (StoreWorkerRequests.id eq requestId) and
+                                        (StoreWorkerRequests.requesterUserId eq userId) and
+                                        (StoreWorkerRequests.direction eq WORKER_REQUEST_DIRECTION_STORE_REMOVAL_TO_USER) and
+                                        (StoreWorkerRequests.status eq WORKER_REQUEST_STATUS_PENDING)
+                            }
+                            .singleOrNull()
+
+                        if (requestRow == null) {
+                            failureMessage = getResponse("13").message
+                            return@newSuspendedTransaction null
+                        }
+
+                        val requestStoreId = requestRow[StoreWorkerRequests.storeId]
+                        val workerRow = StoreWorkerMemberships
+                            .innerJoin(Stores, { StoreWorkerMemberships.storeId }, { Stores.id })
+                            .innerJoin(Users, { StoreWorkerMemberships.userId }, { Users.id })
+                            .selectAll()
+                            .where {
+                                (StoreWorkerMemberships.storeId eq requestStoreId) and
+                                        (StoreWorkerMemberships.userId eq userId) and
+                                        (StoreWorkerMemberships.isActive eq true)
+                            }
+                            .singleOrNull()
+
+                        if (workerRow == null) {
+                            failureMessage = getResponse("13").message
+                            return@newSuspendedTransaction null
+                        }
+
+                        val workerId = workerRow[StoreWorkerMemberships.id]
 
                         StoreWorkerMemberships.update({ (StoreWorkerMemberships.id eq workerId) and (StoreWorkerMemberships.isActive eq true) }) {
                             it[StoreWorkerMemberships.isActive] = false
@@ -11701,13 +12384,25 @@ fun Application.module() {
                         }
 
                         StoreUsers.deleteWhere {
-                            (StoreUsers.storeId eq workerStoreId) and (StoreUsers.userId eq workerUserId)
+                            (StoreUsers.storeId eq requestStoreId) and (StoreUsers.userId eq userId)
                         }
 
-                        notifyWorkerRemovedInsideTransaction(
-                            storeId = workerStoreId,
-                            workerUserId = workerUserId,
+                        StoreWorkerRequests.update({ StoreWorkerRequests.id eq requestId }) {
+                            it[StoreWorkerRequests.status] = WORKER_REQUEST_STATUS_ACCEPTED
+                            it[StoreWorkerRequests.decidedAtMillis] = now
+                            it[StoreWorkerRequests.decidedByUserId] = userId
+                            it[StoreWorkerRequests.responseNote] = responseNote
+                            it[StoreWorkerRequests.responseNoteLocalized] = responseNoteLocalized
+                            it[StoreWorkerRequests.updatedAt] = Instant.now()
+                        }
+
+                        notifyWorkerRemovalDecisionInsideTransaction(
+                            requestId = requestId,
+                            storeId = requestStoreId,
+                            workerUserId = userId,
                             workerId = workerId,
+                            actorUserId = userId,
+                            accepted = true,
                             nowMillis = now
                         )
 
@@ -11721,15 +12416,94 @@ fun Application.module() {
                     }
 
                     removedWorker?.let {
-                        publishWorkerRealtimeBundle(it.storeId, "worker_removed")
-                        call.genericResponse(HttpStatusCode.OK, payload = it, message = getResponse("105").message)
+                        publishWorkerRealtimeBundle(it.storeId, "worker_removal_confirmed")
+                        call.genericResponse(
+                            HttpStatusCode.OK,
+                            payload = it,
+                            message = simpleMessage(
+                                main = "Removal confirmed",
+                                ru = "Удаление подтверждено",
+                                kk = "Алып тастау расталды"
+                            )
+                        )
                     } ?: call.genericResponseNoPayload(HttpStatusCode.Conflict, failureMessage ?: getResponse("3").message)
                 }
 
+                post("/removal/decline") {
+                    val userId = call.checkPrincipal() ?: return@post
+                    val body = call.receiveAita<WorkerRemovalDecisionRequestDataModel>()
+                    val requestId = runCatching { UUID.fromString(body.requestId) }.getOrNull()
+                        ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
+                    val now = System.currentTimeMillis()
+                    val responseNote = cleanOptionalText(body.responseNote ?: body.note)
+                    val responseNoteLocalized = localizedNoteForStorage(responseNote, body.responseNoteLocalized)
+                    var failureMessage: List<LocalizedStringDataModel>? = null
+
+                    val request = newSuspendedTransaction(aitaServerIoContext) {
+                        val updated = StoreWorkerRequests.update({
+                            (StoreWorkerRequests.id eq requestId) and
+                                    (StoreWorkerRequests.requesterUserId eq userId) and
+                                    (StoreWorkerRequests.direction eq WORKER_REQUEST_DIRECTION_STORE_REMOVAL_TO_USER) and
+                                    (StoreWorkerRequests.status eq WORKER_REQUEST_STATUS_PENDING)
+                        }) {
+                            it[StoreWorkerRequests.status] = WORKER_REQUEST_STATUS_DECLINED
+                            it[StoreWorkerRequests.decidedAtMillis] = now
+                            it[StoreWorkerRequests.decidedByUserId] = userId
+                            it[StoreWorkerRequests.responseNote] = responseNote
+                            it[StoreWorkerRequests.responseNoteLocalized] = responseNoteLocalized
+                            it[StoreWorkerRequests.updatedAt] = Instant.now()
+                        }
+
+                        if (updated <= 0) {
+                            failureMessage = getResponse("13").message
+                            return@newSuspendedTransaction null
+                        }
+
+                        val requestRow = StoreWorkerRequests
+                            .innerJoin(Stores, { StoreWorkerRequests.storeId }, { Stores.id })
+                            .innerJoin(Users, { StoreWorkerRequests.requesterUserId }, { Users.id })
+                            .selectAll()
+                            .where { StoreWorkerRequests.id eq requestId }
+                            .single()
+
+                        val workerRow = StoreWorkerMemberships
+                            .select(StoreWorkerMemberships.id)
+                            .where {
+                                (StoreWorkerMemberships.storeId eq requestRow[StoreWorkerRequests.storeId]) and
+                                        (StoreWorkerMemberships.userId eq userId)
+                            }
+                            .singleOrNull()
+
+                        notifyWorkerRemovalDecisionInsideTransaction(
+                            requestId = requestId,
+                            storeId = requestRow[StoreWorkerRequests.storeId],
+                            workerUserId = userId,
+                            workerId = workerRow?.get(StoreWorkerMemberships.id) ?: UUID(0, 0),
+                            actorUserId = userId,
+                            accepted = false,
+                            nowMillis = now
+                        )
+
+                        requestRow.toStoreWorkerRequestDataModel()
+                    }
+
+                    request?.let {
+                        publishWorkerRealtimeBundle(it.storeId, "worker_removal_declined")
+                        call.genericResponse(
+                            HttpStatusCode.OK,
+                            payload = it,
+                            message = simpleMessage(
+                                main = "Removal request declined",
+                                ru = "Запрос на удаление отклонён",
+                                kk = "Алып тастау сұрауы қабылданбады"
+                            )
+                        )
+                    } ?: call.genericResponseNoPayload(HttpStatusCode.Conflict, failureMessage ?: getResponse("3").message)
+                }
 
                 post("/my/password") {
                     val userId = call.checkPrincipal() ?: return@post
-                    val body = call.receive<WorkerSelfPasswordUpdateRequestDataModel>()
+                    val body = call.receiveAita<WorkerSelfPasswordUpdateRequestDataModel>()
                     val workerId = runCatching { UUID.fromString(body.workerId) }.getOrNull()
                         ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
                     val cleanPassword = body.workerPassword.trim()
@@ -11748,7 +12522,7 @@ fun Application.module() {
                     }
 
                     var failureMessage: List<LocalizedStringDataModel>? = null
-                    val worker = newSuspendedTransaction(Dispatchers.IO) {
+                    val worker = newSuspendedTransaction(aitaServerIoContext) {
                         val membershipRow = StoreWorkerMemberships
                             .innerJoin(Stores, { StoreWorkerMemberships.storeId }, { Stores.id })
                             .innerJoin(Users, { StoreWorkerMemberships.userId }, { Users.id })
@@ -11799,7 +12573,7 @@ fun Application.module() {
                     val userId = call.checkPrincipal() ?: return@get
                     val storeId = call.headerUuid("store_id") ?: return@get call.respond(UnauthorizedResponse())
 
-                    val workshift = newSuspendedTransaction(Dispatchers.IO) {
+                    val workshift = newSuspendedTransaction(aitaServerIoContext) {
                         Workshifts
                             .innerJoin(Stores, { Workshifts.storeId }, { Stores.id })
                             .innerJoin(Users, { Workshifts.workerUserId }, { Users.id })
@@ -11823,11 +12597,11 @@ fun Application.module() {
                 post("/start") {
                     val userId = call.checkPrincipal() ?: return@post
                     val storeId = call.headerUuid("store_id") ?: return@post call.respond(UnauthorizedResponse())
-                    val body = call.receive<WorkshiftStartRequestDataModel>()
+                    val body = call.receiveAita<WorkshiftStartRequestDataModel>()
                     val now = System.currentTimeMillis()
                     var failureMessage: List<LocalizedStringDataModel>? = null
 
-                    val workshift = newSuspendedTransaction(Dispatchers.IO) {
+                    val workshift = newSuspendedTransaction(aitaServerIoContext) {
                         val rootStoreId = rootStoreIdForAccessInsideTransaction(storeId)
                         val identifier = body.workerIdentifier.trim()
                         val identifierUuid = runCatching { UUID.fromString(identifier) }.getOrNull()
@@ -11928,13 +12702,13 @@ fun Application.module() {
                 post("/end") {
                     val userId = call.checkPrincipal() ?: return@post
                     val storeId = call.headerUuid("store_id") ?: return@post call.respond(UnauthorizedResponse())
-                    val rawBody = runCatching { call.receiveText().trim() }.getOrNull().orEmpty()
+                    val rawBody = runCatching { call.receiveTextAita().trim() }.getOrNull().orEmpty()
                     val body = rawBody
                         .takeIf { it.isNotBlank() }
                         ?.let { text -> runCatching { jsonBase.decodeFromString<WorkshiftEndRequestDataModel>(text) }.getOrNull() }
                     val now = System.currentTimeMillis()
 
-                    val workshift = newSuspendedTransaction(Dispatchers.IO) {
+                    val workshift = newSuspendedTransaction(aitaServerIoContext) {
                         endWorkshiftForUserInsideTransaction(
                             workerUserId = userId,
                             storeId = storeId,
@@ -11961,7 +12735,7 @@ fun Application.module() {
                         ?: return@get call.respond(UnauthorizedResponse())
                     val scope = call.request.queryParameters["scope"].orEmpty().ifBlank { OPERATION_LOG_SCOPE_CURRENT }
 
-                    val logs = newSuspendedTransaction(Dispatchers.IO) {
+                    val logs = newSuspendedTransaction(aitaServerIoContext) {
                         if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_LOGS_VIEW, requireWorkshift = false))
                             return@newSuspendedTransaction null
 
@@ -11999,7 +12773,7 @@ fun Application.module() {
                     val supplierIdFilter = call.request.queryParameters["supplierId"]?.trim()?.takeIf { it.isNotBlank() }
                     val categoryIdFilter = call.request.queryParameters["categoryId"]?.trim()?.takeIf { it.isNotBlank() }
 
-                    val dashboard = newSuspendedTransaction(Dispatchers.IO) {
+                    val dashboard = newSuspendedTransaction(aitaServerIoContext) {
                         if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_ANALYTICS_VIEW, requireWorkshift = false))
                             return@newSuspendedTransaction null
 
@@ -12062,7 +12836,7 @@ fun Application.module() {
                         UUID.fromString(call.request.header("store_id"))
                     }.getOrNull() ?: return@get call.respond(UnauthorizedResponse())
 
-                    val transactions = newSuspendedTransaction(Dispatchers.IO) {
+                    val transactions = newSuspendedTransaction(aitaServerIoContext) {
                         if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_TRANSACTION_HISTORY_VIEW, requireWorkshift = false))
                             return@newSuspendedTransaction null
 
@@ -12088,7 +12862,7 @@ fun Application.module() {
                 post("/complete") {
                     try {
                     val userId = call.checkPrincipal() ?: return@post
-                    val body = call.receive<TransactionDataModel>()
+                    val body = call.receiveAita<TransactionDataModel>()
                     val requestClientOperationId = body.clientOperationId.trim().takeIf { it.isNotBlank() }
 
                     val storeId = runCatching {
@@ -12097,7 +12871,7 @@ fun Application.module() {
 
                     var transactionFailureMessage: List<LocalizedStringDataModel>? = null
 
-                    val completed = newSuspendedTransaction(Dispatchers.IO) {
+                    val completed = newSuspendedTransaction(aitaServerIoContext) {
                         if (!call.matchesInventoryContextStoreIdInsideTransaction(userId, storeId))
                             return@newSuspendedTransaction null
 

@@ -1684,19 +1684,61 @@
     "message": [
       {
         "language": "main",
-        "value": "Worker removed"
+        "value": "Removal request sent"
       },
       {
         "language": "en",
-        "value": "Worker removed"
+        "value": "Removal request sent"
       },
       {
         "language": "ru",
-        "value": "Сотрудник удалён"
+        "value": "Запрос на удаление отправлен"
       },
       {
         "language": "kk",
-        "value": "Қызметкер жойылды"
+        "value": "Шығару сұрауы жіберілді"
+      }
+    ]
+  },
+  {
+    "id": "106",
+    "message": [
+      {
+        "language": "main",
+        "value": "Removal confirmed"
+      },
+      {
+        "language": "en",
+        "value": "Removal confirmed"
+      },
+      {
+        "language": "ru",
+        "value": "Удаление подтверждено"
+      },
+      {
+        "language": "kk",
+        "value": "Шығару расталды"
+      }
+    ]
+  },
+  {
+    "id": "107",
+    "message": [
+      {
+        "language": "main",
+        "value": "Removal declined"
+      },
+      {
+        "language": "en",
+        "value": "Removal declined"
+      },
+      {
+        "language": "ru",
+        "value": "Удаление отклонено"
+      },
+      {
+        "language": "kk",
+        "value": "Шығару қабылданбады"
       }
     ]
   }

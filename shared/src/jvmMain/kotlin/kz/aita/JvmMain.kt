@@ -18,6 +18,9 @@ import java.net.URLEncoder
 import java.net.URI
 import java.nio.file.Files
 import java.util.*
+import javax.print.DocFlavor
+import javax.print.PrintServiceLookup
+import javax.print.SimpleDoc
 import kotlin.io.path.Path
 
 actual fun getCurrentTimeMillis(): Long = System.currentTimeMillis()
@@ -146,10 +149,104 @@ object ReceiptPlatformJvmBridge {
         ?.trim()
         ?.takeIf { it.isNotBlank() }
 
+    private const val PRINT_SERVICE_PREFIX = "print-service:"
+    private const val RECEIPT_PRINTER_DEVICE_FILE_NAME = "aita_receipt_printer_device.txt"
+
+    private fun receiptPrinterDevicePreferenceFile(): File {
+        return File(cacheDirPath.ifBlank { System.getProperty("java.io.tmpdir") }, RECEIPT_PRINTER_DEVICE_FILE_NAME)
+    }
+
+    fun loadPersistedEscPosDevicePath() {
+        if (!escPosDevicePath.isNullOrBlank()) return
+        escPosDevicePath = runCatching {
+            receiptPrinterDevicePreferenceFile()
+                .takeIf { it.exists() }
+                ?.readText()
+                ?.trim()
+                ?.takeIf { it.isNotBlank() }
+        }.getOrNull()
+    }
+
     fun configureEscPosDevicePath(path: String?) {
-        escPosDevicePath = path
+        val cleanPath = path
             ?.trim()
             ?.takeIf { it.isNotBlank() }
+        escPosDevicePath = cleanPath
+        runCatching {
+            val file = receiptPrinterDevicePreferenceFile()
+            file.parentFile?.mkdirs()
+            if (cleanPath == null) file.delete() else file.writeText(cleanPath)
+        }
+    }
+
+    private fun likelyReceiptPrinterName(name: String): Boolean {
+        val clean = name.lowercase(Locale.ROOT)
+        return listOf("pos", "esc", "receipt", "thermal", "xprinter", "gprinter", "rongta", "sunmi", "mtp", "rp", "xp-", "чек", "касс")
+            .any { clean.contains(it) }
+    }
+
+    fun knownEscPosDeviceCandidates(): List<String> {
+        val configured = escPosDevicePath?.trim()?.takeIf { it.isNotBlank() && !it.startsWith(PRINT_SERVICE_PREFIX) }
+        val osName = System.getProperty("os.name").orEmpty().lowercase(Locale.ROOT)
+        val candidates = mutableListOf<String>()
+        configured?.let { candidates += it }
+        if (!osName.contains("win")) {
+            candidates += listOf("/dev/usb/lp0", "/dev/usb/lp1", "/dev/usb/lp2", "/dev/ttyUSB0", "/dev/ttyUSB1", "/dev/ttyUSB2", "/dev/ttyACM0", "/dev/ttyACM1")
+            val dev = File("/dev")
+            if (dev.exists() && dev.isDirectory) {
+                dev.listFiles()
+                    .orEmpty()
+                    .filter { file ->
+                        val name = file.name.lowercase(Locale.ROOT)
+                        name.startsWith("cu.usb") || name.startsWith("cu.slab") || name.startsWith("tty.usb") || name.startsWith("tty.slab")
+                    }
+                    .forEach { candidates += it.absolutePath }
+            }
+        }
+        return candidates.distinct()
+    }
+
+    private fun listSystemPrintServiceCandidates(configured: String): List<PlatformReceiptPrinterDataModel> {
+        return runCatching {
+            PrintServiceLookup.lookupPrintServices(null, null)
+                .orEmpty()
+                .mapNotNull { service ->
+                    val serviceName = service.name?.trim().orEmpty()
+                    if (serviceName.isBlank()) return@mapNotNull null
+                    val id = PRINT_SERVICE_PREFIX + serviceName
+                    val probableReceiptPrinter = likelyReceiptPrinterName(serviceName)
+                    val isConfigured = id == configured
+                    if (!probableReceiptPrinter && !isConfigured) return@mapNotNull null
+                    PlatformReceiptPrinterDataModel(
+                        id = id,
+                        name = serviceName,
+                        subtitle = if (isConfigured) "Configured system ESC/POS print service" else "Likely thermal receipt printer from system printers",
+                        configured = isConfigured,
+                        available = true
+                    )
+                }
+        }.getOrElse { emptyList() }
+    }
+
+    fun listConfiguredAndDetectedPrinters(): List<PlatformReceiptPrinterDataModel> {
+        val configured = escPosDevicePath?.trim().orEmpty()
+        val devicePathPrinters = knownEscPosDeviceCandidates()
+            .mapNotNull { rawPath ->
+                val clean = rawPath.trim().takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                val exists = runCatching { File(normalizedDevicePath(clean)).exists() }.getOrDefault(false)
+                val isConfigured = clean == configured
+                if (!isConfigured && !exists) return@mapNotNull null
+                PlatformReceiptPrinterDataModel(
+                    id = clean,
+                    name = clean.substringAfterLast('/').ifBlank { clean },
+                    subtitle = if (isConfigured) "Configured ESC/POS device path" else "Detected local ESC/POS device path",
+                    configured = isConfigured,
+                    available = exists || isConfigured
+                )
+            }
+        return (devicePathPrinters + listSystemPrintServiceCandidates(configured))
+            .distinctBy { it.id }
+            .sortedWith(compareByDescending<PlatformReceiptPrinterDataModel> { it.configured }.thenBy { it.name.lowercase(Locale.ROOT) })
     }
 
     private fun normalizedDevicePath(rawPath: String): String {
@@ -167,20 +264,32 @@ object ReceiptPlatformJvmBridge {
             return customWriter(printerBytes)
         }
 
-        val path = escPosDevicePath?.trim()?.takeIf { it.isNotBlank() } ?: return false
+        val target = escPosDevicePath?.trim()?.takeIf { it.isNotBlank() } ?: return false
 
         return withContext(Dispatchers.IO) {
-            val file = File(normalizedDevicePath(path))
-            file.outputStream().use { output ->
-                output.write(printerBytes)
-                output.flush()
+            if (target.startsWith(PRINT_SERVICE_PREFIX)) {
+                val serviceName = target.removePrefix(PRINT_SERVICE_PREFIX)
+                val service = PrintServiceLookup.lookupPrintServices(null, null)
+                    .orEmpty()
+                    .firstOrNull { it.name == serviceName }
+                    ?: return@withContext false
+                val job = service.createPrintJob()
+                job.print(SimpleDoc(printerBytes, DocFlavor.BYTE_ARRAY.AUTOSENSE, null), null)
+                true
+            } else {
+                val file = File(normalizedDevicePath(target))
+                file.outputStream().use { output ->
+                    output.write(printerBytes)
+                    output.flush()
+                }
+                true
             }
-            true
         }
     }
 }
 
 fun installReceiptPlatformJvm() {
+    ReceiptPlatformJvmBridge.loadPersistedEscPosDevicePath()
     fun writePdfToDownloads(fileName: String, pdfBytes: ByteArray): File {
         val downloads = File(System.getProperty("user.home"), "Downloads").takeIf { it.exists() && it.isDirectory }
             ?: File(System.getProperty("user.home"))
@@ -214,8 +323,9 @@ fun installReceiptPlatformJvm() {
             runCatching {
                 val file = writePdfToTemp(fileName, pdfBytes)
                 val desktop = desktop()
+                val shareLabel = if (fileName.contains("report", true) || fileName.contains("analytics", true)) "AITA analytics report" else "AITA receipt"
                 if (whatsappOnly) {
-                    val text = URLEncoder.encode("AITA receipt: ${file.absolutePath}", "UTF-8")
+                    val text = URLEncoder.encode("$shareLabel: ${file.absolutePath}", "UTF-8")
                     if (desktop != null && desktop.isSupported(Desktop.Action.BROWSE)) {
                         desktop.browse(URI("https://web.whatsapp.com/send?text=$text"))
                     }
@@ -236,6 +346,45 @@ fun installReceiptPlatformJvm() {
             }
         }
     }
+
+
+
+    printPdfDocumentPlatformAction = { fileName, pdfBytes ->
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val file = writePdfToTemp(fileName.ifBlank { "aita-document.pdf" }, pdfBytes)
+                val desktop = desktop()
+                when {
+                    desktop != null && desktop.isSupported(Desktop.Action.PRINT) -> {
+                        desktop.print(file)
+                        ReceiptPlatformActionResult(true, "Opening system print dialog")
+                    }
+                    desktop != null && desktop.isSupported(Desktop.Action.OPEN) -> {
+                        desktop.open(file)
+                        ReceiptPlatformActionResult(true, "Opened PDF; print from the viewer")
+                    }
+                    else -> ReceiptPlatformActionResult(true, "PDF created at ${file.absolutePath}")
+                }
+            }.getOrElse { throwable ->
+                ReceiptPlatformActionResult(false, throwable.message ?: "Could not print PDF document")
+            }
+        }
+    }
+
+    listPlatformReceiptPrinterDevicesAction = {
+        withContext(Dispatchers.IO) {
+            ReceiptPlatformJvmBridge.listConfiguredAndDetectedPrinters()
+        }
+    }
+
+    configurePlatformReceiptPrinterDeviceAction = { deviceId ->
+        ReceiptPlatformJvmBridge.configureEscPosDevicePath(deviceId)
+        ReceiptPlatformActionResult(
+            true,
+            if (deviceId.isNullOrBlank()) "Receipt printer cleared" else "Receipt printer selected"
+        )
+    }
+
 
     printReceiptPlatformAction = { _, _, printerBytes ->
         withContext(Dispatchers.IO) {

@@ -763,6 +763,9 @@ object ReceiptPlatformAndroidBridge {
 
 fun installReceiptPlatformAndroid(context: Context) {
     val appContext = context.applicationContext
+    val receiptPrinterPreferences = appContext.getSharedPreferences("aita_receipt_printer", Context.MODE_PRIVATE)
+    ReceiptPlatformAndroidBridge.configureBluetoothPrinter(receiptPrinterPreferences.getString("bluetooth_printer_mac_address", null))
+
 
     fun createCachedPdfUri(fileName: String, pdfBytes: ByteArray): Uri {
         val safeFileName = fileName.ifBlank { "receipt.pdf" }
@@ -834,6 +837,82 @@ fun installReceiptPlatformAndroid(context: Context) {
         }
     }
 
+
+
+    fun printPdfWithSystemPaperPrinter(fileName: String, pdfBytes: ByteArray): ReceiptPlatformActionResult {
+        return runCatching {
+            val printManager = context.getSystemService(Context.PRINT_SERVICE) as? PrintManager
+                ?: error("Android print service is not available")
+            val safeFileName = fileName.ifBlank { "aita-document.pdf" }
+            val attributes = PrintAttributes.Builder()
+                .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
+                .setColorMode(PrintAttributes.COLOR_MODE_COLOR)
+                .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
+                .build()
+            printManager.print(
+                "AITA ${safeFileName.removeSuffix(".pdf")}",
+                ReceiptPdfPrintDocumentAdapter(safeFileName, pdfBytes),
+                attributes
+            )
+            ReceiptPlatformActionResult(true, "Opening system print dialog")
+        }.getOrElse { throwable ->
+            ReceiptPlatformActionResult(false, throwable.message ?: "Could not open system print dialog")
+        }
+    }
+
+    fun likelyReceiptPrinterName(name: String): Boolean {
+        val clean = name.lowercase()
+        return listOf("pos", "esc", "receipt", "printer", "thermal", "xprinter", "gprinter", "rongta", "sunmi", "mtp", "rp", "xp-")
+            .any { clean.contains(it) }
+    }
+
+    @SuppressLint("MissingPermission")
+    fun listBluetoothReceiptPrinterDevices(): List<PlatformReceiptPrinterDataModel> {
+        val configuredAddress = ReceiptPlatformAndroidBridge.bluetoothPrinterMacAddress?.trim().orEmpty()
+        val discovered = runCatching {
+            val adapter = BluetoothAdapter.getDefaultAdapter() ?: return@runCatching emptyList()
+            adapter.bondedDevices
+                .orEmpty()
+                .mapNotNull { device ->
+                    val address = runCatching { device.address }.getOrNull()?.trim().orEmpty()
+                    val name = runCatching { device.name }.getOrNull()?.trim().orEmpty()
+                    val id = address.ifBlank { name }
+                    if (id.isBlank()) return@mapNotNull null
+                    val probable = likelyReceiptPrinterName(name)
+                    PlatformReceiptPrinterDataModel(
+                        id = id,
+                        name = name.ifBlank { address.ifBlank { "Bluetooth device" } },
+                        subtitle = listOfNotNull(
+                            address.takeIf { it.isNotBlank() },
+                            if (probable) "Likely ESC/POS receipt printer" else "Paired Bluetooth device"
+                        ).joinToString(" • "),
+                        configured = address.equals(configuredAddress, ignoreCase = true) || id.equals(configuredAddress, ignoreCase = true),
+                        available = true
+                    )
+                }
+        }.getOrElse { emptyList() }
+
+        val withSavedConfiguredPrinter = if (configuredAddress.isNotBlank() && discovered.none { it.configured || it.id.equals(configuredAddress, ignoreCase = true) }) {
+            discovered + PlatformReceiptPrinterDataModel(
+                id = configuredAddress,
+                name = "Saved receipt printer",
+                subtitle = "Saved Bluetooth printer; connect or pair it in system settings if unavailable",
+                configured = true,
+                available = false
+            )
+        } else {
+            discovered
+        }
+
+        return withSavedConfiguredPrinter
+            .distinctBy { it.id.lowercase() }
+            .sortedWith(
+                compareByDescending<PlatformReceiptPrinterDataModel> { it.configured }
+                    .thenByDescending { likelyReceiptPrinterName(it.name) }
+                    .thenBy { it.name.lowercase() }
+            )
+    }
+
     saveReceiptPdfFile = { fileName, pdfBytes ->
         withContext(Dispatchers.IO) {
             savePdfToDownloadsOrPrivateDocuments(fileName, pdfBytes)
@@ -844,10 +923,12 @@ fun installReceiptPlatformAndroid(context: Context) {
         withContext(Dispatchers.Main) {
             runCatching {
                 val uri = withContext(Dispatchers.IO) { createCachedPdfUri(fileName, pdfBytes) }
+                val pdfShareLabel = if (fileName.contains("report", true) || fileName.contains("analytics", true)) "AITA analytics report" else "AITA receipt"
+                val pdfShareTitle = if (fileName.contains("report", true) || fileName.contains("analytics", true)) "Share report" else "Share receipt"
                 val baseIntent = Intent(Intent.ACTION_SEND).apply {
                     type = "application/pdf"
                     putExtra(Intent.EXTRA_STREAM, uri)
-                    putExtra(Intent.EXTRA_TEXT, "AITA receipt")
+                    putExtra(Intent.EXTRA_TEXT, pdfShareLabel)
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     if (whatsappOnly) setPackage("com.whatsapp")
@@ -857,7 +938,7 @@ fun installReceiptPlatformAndroid(context: Context) {
                     if (whatsappOnly) {
                         context.startActivity(baseIntent)
                     } else {
-                        context.startActivity(Intent.createChooser(baseIntent, "Share receipt").apply {
+                        context.startActivity(Intent.createChooser(baseIntent, pdfShareTitle).apply {
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         })
                     }
@@ -868,11 +949,11 @@ fun installReceiptPlatformAndroid(context: Context) {
                         Intent(Intent.ACTION_SEND).apply {
                             type = "application/pdf"
                             putExtra(Intent.EXTRA_STREAM, uri)
-                            putExtra(Intent.EXTRA_TEXT, "AITA receipt")
+                            putExtra(Intent.EXTRA_TEXT, pdfShareLabel)
                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         },
-                        "Share receipt"
+                        pdfShareTitle
                     ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
                     context.startActivity(chooserIntent)
                     ReceiptPlatformActionResult(true, "WhatsApp is not installed; opening share sheet")
@@ -881,6 +962,31 @@ fun installReceiptPlatformAndroid(context: Context) {
                 ReceiptPlatformActionResult(false, throwable.message ?: "Could not share PDF")
             }
         }
+    }
+
+    printPdfDocumentPlatformAction = { fileName, pdfBytes ->
+        withContext(Dispatchers.Main) {
+            printPdfWithSystemPaperPrinter(fileName, pdfBytes)
+        }
+    }
+
+    listPlatformReceiptPrinterDevicesAction = {
+        withContext(Dispatchers.IO) {
+            listBluetoothReceiptPrinterDevices()
+        }
+    }
+
+    configurePlatformReceiptPrinterDeviceAction = { deviceId ->
+        ReceiptPlatformAndroidBridge.configureBluetoothPrinter(deviceId)
+        if (deviceId.isNullOrBlank()) {
+            receiptPrinterPreferences.edit().remove("bluetooth_printer_mac_address").apply()
+        } else {
+            receiptPrinterPreferences.edit().putString("bluetooth_printer_mac_address", deviceId.trim()).apply()
+        }
+        ReceiptPlatformActionResult(
+            true,
+            if (deviceId.isNullOrBlank()) "Receipt printer cleared" else "Receipt printer selected"
+        )
     }
 
     printReceiptPlatformAction = { _, _, printerBytes ->

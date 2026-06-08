@@ -349,6 +349,16 @@ private fun AppConfiguration.stockBatchMovementIconPath(): String {
 private fun AppConfiguration.stockBatchMovementIconFallback(): DrawableResource =
     if (normalizeAppThemePreference(stateValues.appThemeId) == 1L) Res.drawable._59_1 else Res.drawable._59_0
 
+@Composable
+private fun AppConfiguration.sortActionIconPath(): String {
+    val normalizedThemeId = normalizeAppThemePreference(stateValues.appThemeId)
+    return stateValues.drawables.orEmpty().extractPath(61L, normalizedThemeId)
+        ?: "svg/61_${normalizedThemeId}.svg"
+}
+
+private fun AppConfiguration.sortActionIconFallback(): DrawableResource =
+    if (normalizeAppThemePreference(stateValues.appThemeId) == 1L) Res.drawable._61_1 else Res.drawable._61_0
+
 private fun StateHost?.autoFocusScopeKey(): String = this?.toString() ?: "global"
 
 private object SupplierPickerAutoFocusStateHost : StateHost()
@@ -616,6 +626,61 @@ private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallb
     put(1218L, mapOf("main" to "Use parent item", "en" to "Use parent item", "ru" to "Взять товар", "kk" to "Тауарды алу"))
     put(1219L, mapOf("main" to "This active store has no parent store", "en" to "This active store has no parent store", "ru" to "У активного магазина нет родительского магазина", "kk" to "Белсенді дүкеннің негізгі дүкені жоқ"))
     put(1220L, mapOf("main" to "Minimum quantity", "en" to "Minimum quantity", "ru" to "Минимальное количество", "kk" to "Ең аз сан"))
+    put(1221L, mapOf("main" to "Removal request from store", "en" to "Removal request from store", "ru" to "Запрос на удаление от магазина", "kk" to "Дүкеннен шығару сұрауы"))
+    put(1222L, mapOf("main" to "Removal confirmed", "en" to "Removal confirmed", "ru" to "Удаление подтверждено", "kk" to "Шығару расталды"))
+    put(1223L, mapOf("main" to "Worker kept access", "en" to "Worker kept access", "ru" to "Сотрудник сохранил доступ", "kk" to "Қызметкер қолжетімділікті сақтады"))
+    put(1224L, mapOf("main" to "Waiting for worker", "en" to "Waiting for worker", "ru" to "Ожидаем сотрудника", "kk" to "Қызметкерді күтеміз"))
+    put(1225L, mapOf("main" to "Removal requests", "en" to "Removal requests", "ru" to "Запросы на удаление", "kk" to "Шығару сұраулары"))
+    put(1226L, mapOf("main" to "Confirm removal request?", "en" to "Confirm removal request?", "ru" to "Подтвердить запрос на удаление?", "kk" to "Шығару сұрауын растайсыз ба?"))
+    put(1227L, mapOf("main" to "Keep your access?", "en" to "Keep your access?", "ru" to "Сохранить доступ?", "kk" to "Қолжетімділікті сақтау керек пе?"))
+    put(1228L, mapOf("main" to "Confirm removal", "en" to "Confirm removal", "ru" to "Подтвердить удаление", "kk" to "Шығаруды растау"))
+    put(1229L, mapOf("main" to "Keep my access", "en" to "Keep my access", "ru" to "Сохранить мой доступ", "kk" to "Қолжетімділігімді сақтау"))
+    put(1230L, mapOf("main" to "This store asked to end your worker access. Confirm only if you agree.", "en" to "This store asked to end your worker access. Confirm only if you agree.", "ru" to "Магазин просит завершить ваш рабочий доступ. Подтверждайте только если согласны.", "kk" to "Дүкен сіздің жұмыс қолжетімділігіңізді аяқтауды сұрады. Келіскенде ғана растаңыз."))
+    put(1231L, mapOf("main" to "Removal request is waiting for worker confirmation", "en" to "Removal request is waiting for worker confirmation", "ru" to "Запрос на удаление ждёт подтверждения сотрудника", "kk" to "Шығару сұрауы қызметкердің растауын күтуде"))
+    put(1232L, mapOf("main" to "Request removal", "en" to "Request removal", "ru" to "Запросить удаление", "kk" to "Шығаруды сұрау"))
+    put(1233L, mapOf("main" to "No invites or removal requests", "en" to "No invites or removal requests", "ru" to "Нет приглашений или запросов на удаление", "kk" to "Шақырулар немесе шығару сұраулары жоқ"))
+    put(1234L, mapOf("main" to "No worker removal requests", "en" to "No worker removal requests", "ru" to "Запросов на удаление нет", "kk" to "Шығару сұраулары жоқ"))
+    put(1235L, mapOf("main" to "The worker stays active until they confirm this request.", "en" to "The worker stays active until they confirm this request.", "ru" to "Сотрудник остаётся активным, пока не подтвердит этот запрос.", "kk" to "Қызметкер бұл сұрауды растамайынша белсенді қалады."))
+    put(1236L, mapOf("main" to "No removal requests", "en" to "No removal requests", "ru" to "Запросов на удаление нет", "kk" to "Шығару сұраулары жоқ"))
+    put(1237L, mapOf("main" to "Store asked this worker to confirm removal", "en" to "Store asked this worker to confirm removal", "ru" to "Магазин попросил сотрудника подтвердить удаление", "kk" to "Дүкен қызметкерден шығаруды растауды сұрады"))
+    put(1238L, mapOf("main" to "Worker responses", "en" to "Worker responses", "ru" to "Ответы сотрудников", "kk" to "Қызметкерлердің жауаптары"))
+    put(1239L, mapOf("main" to "Analytics report", "en" to "Analytics report", "ru" to "Аналитический отчёт", "kk" to "Аналитикалық есеп"))
+    put(1240L, mapOf("main" to "Printable summary", "en" to "Printable summary", "ru" to "Сводка для печати", "kk" to "Басып шығарылатын қорытынды"))
+    put(1241L, mapOf("main" to "A4 paper printer", "en" to "A4 paper printer", "ru" to "Бумажный принтер A4", "kk" to "A4 қағаз принтері"))
+    put(1242L, mapOf("main" to "Thermal receipt printer", "en" to "Thermal receipt printer", "ru" to "Термопринтер чеков", "kk" to "Термо чек принтері"))
+    put(1243L, mapOf("main" to "Save report PDF", "en" to "Save report PDF", "ru" to "Сохранить PDF отчёта", "kk" to "Есеп PDF сақтау"))
+    put(1244L, mapOf("main" to "Share report PDF", "en" to "Share report PDF", "ru" to "Поделиться PDF отчётом", "kk" to "Есеп PDF бөлісу"))
+    put(1245L, mapOf("main" to "Print report", "en" to "Print report", "ru" to "Напечатать отчёт", "kk" to "Есепті басып шығару"))
+    put(1246L, mapOf("main" to "Report PDF saved", "en" to "Report PDF saved", "ru" to "PDF отчёта сохранён", "kk" to "Есеп PDF сақталды"))
+    put(1247L, mapOf("main" to "Report PDF shared", "en" to "Report PDF shared", "ru" to "Открыта отправка PDF отчёта", "kk" to "Есеп PDF бөлісу ашылды"))
+    put(1248L, mapOf("main" to "Report opened for printing", "en" to "Report opened for printing", "ru" to "Отчёт открыт для печати", "kk" to "Есеп басып шығаруға ашылды"))
+    put(1249L, mapOf("main" to "Transaction receipts use ESC/POS thermal printers. Analytics reports use A4 paper printing.", "en" to "Transaction receipts use ESC/POS thermal printers. Analytics reports use A4 paper printing.", "ru" to "Чеки операций печатаются на термопринтерах ESC/POS. Аналитические отчёты печатаются как документы A4.", "kk" to "Операция чектері ESC/POS термо принтерлерінде басылады. Аналитикалық есептер A4 құжаты ретінде басылады."))
+    put(1250L, mapOf("main" to "Report preview", "en" to "Report preview", "ru" to "Предпросмотр отчёта", "kk" to "Есепті алдын ала көру"))
+    put(1251L, mapOf("main" to "Receipt printer device", "en" to "Receipt printer device", "ru" to "Устройство принтера чеков", "kk" to "Түбіртек принтері құрылғысы"))
+    put(1252L, mapOf("main" to "A4 paper printer", "en" to "A4 paper printer", "ru" to "Бумажный принтер A4", "kk" to "A4 қағаз принтері"))
+    put(1253L, mapOf("main" to "Analytics reports use the regular system print dialog for A4 paper printers.", "en" to "Analytics reports use the regular system print dialog for A4 paper printers.", "ru" to "Отчёты аналитики используют обычное системное окно печати для принтеров A4.", "kk" to "Аналитика есептері A4 принтерлері үшін әдеттегі жүйелік басып шығару терезесін қолданады."))
+    put(1254L, mapOf("main" to "Thermal receipt printer", "en" to "Thermal receipt printer", "ru" to "Термопринтер чеков", "kk" to "Түбіртек термопринтері"))
+    put(1255L, mapOf("main" to "Detected receipt printers", "en" to "Detected receipt printers", "ru" to "Найденные принтеры чеков", "kk" to "Табылған түбіртек принтерлері"))
+    put(1256L, mapOf("main" to "No paired thermal receipt printers found", "en" to "No paired thermal receipt printers found", "ru" to "Подключённые термопринтеры чеков не найдены", "kk" to "Жұпталған түбіртек термопринтері табылмады"))
+    put(1257L, mapOf("main" to "Use this printer", "en" to "Use this printer", "ru" to "Использовать этот принтер", "kk" to "Осы принтерді қолдану"))
+    put(1258L, mapOf("main" to "Selected printer", "en" to "Selected printer", "ru" to "Выбранный принтер", "kk" to "Таңдалған принтер"))
+    put(1259L, mapOf("main" to "Refresh printers", "en" to "Refresh printers", "ru" to "Обновить принтеры", "kk" to "Принтерлерді жаңарту"))
+    put(1260L, mapOf("main" to "Receipt printer selected", "en" to "Receipt printer selected", "ru" to "Принтер чеков выбран", "kk" to "Түбіртек принтері таңдалды"))
+    put(1261L, mapOf("main" to "Receipt printer test", "en" to "Receipt printer test", "ru" to "Тест принтера чеков", "kk" to "Түбіртек принтерін тексеру"))
+    put(1262L, mapOf("main" to "Send test receipt", "en" to "Send test receipt", "ru" to "Отправить тестовый чек", "kk" to "Сынақ түбіртегін жіберу"))
+    put(1263L, mapOf("main" to "Test receipt sent", "en" to "Test receipt sent", "ru" to "Тестовый чек отправлен", "kk" to "Сынақ түбіртегі жіберілді"))
+    put(1264L, mapOf("main" to "Receipt printer cleared", "en" to "Receipt printer cleared", "ru" to "Принтер чеков сброшен", "kk" to "Түбіртек принтері тазартылды"))
+    put(1265L, mapOf("main" to "Clear receipt printer", "en" to "Clear receipt printer", "ru" to "Сбросить принтер чеков", "kk" to "Түбіртек принтерін тазарту"))
+    put(1266L, mapOf("main" to "Pair or connect the printer in system settings, then refresh this list.", "en" to "Pair or connect the printer in system settings, then refresh this list.", "ru" to "Подключите или спарьте принтер в системных настройках, затем обновите этот список.", "kk" to "Принтерді жүйелік баптауларда қосыңыз немесе жұптаңыз, содан кейін осы тізімді жаңартыңыз."))
+    put(1267L, mapOf("main" to "PDF export is not configured for this platform", "en" to "PDF export is not configured for this platform", "ru" to "Экспорт PDF не настроен для этой платформы", "kk" to "Бұл платформада PDF экспорты бапталмаған"))
+    put(1268L, mapOf("main" to "PDF sharing is not configured for this platform", "en" to "PDF sharing is not configured for this platform", "ru" to "Отправка PDF не настроена для этой платформы", "kk" to "Бұл платформада PDF бөлісу бапталмаған"))
+    put(1269L, mapOf("main" to "Paper document printing is not configured for this platform", "en" to "Paper document printing is not configured for this platform", "ru" to "Печать бумажных документов не настроена для этой платформы", "kk" to "Бұл платформада қағаз құжаттарды басып шығару бапталмаған"))
+    put(1270L, mapOf("main" to "Receipt printers refreshed", "en" to "Receipt printers refreshed", "ru" to "Принтеры чеков обновлены", "kk" to "Түбіртек принтерлері жаңартылды"))
+    put(1271L, mapOf("main" to "Report period", "en" to "Report period", "ru" to "Период отчёта", "kk" to "Есеп кезеңі"))
+    put(1272L, mapOf("main" to "Report scope", "en" to "Report scope", "ru" to "Область отчёта", "kk" to "Есеп аясы"))
+    put(1273L, mapOf("main" to "Selected analytics tab", "en" to "Selected analytics tab", "ru" to "Выбранная вкладка аналитики", "kk" to "Таңдалған аналитика қойындысы"))
+    put(1274L, mapOf("main" to "Filters", "en" to "Filters", "ru" to "Фильтры", "kk" to "Сүзгілер"))
+    put(1275L, mapOf("main" to "Generated", "en" to "Generated", "ru" to "Сформировано", "kk" to "Жасалды"))
 }
 
 
@@ -8900,8 +8965,8 @@ fun AppConfiguration.StockWarehouseScreen() {
             iconPath = stateValues.drawablePathIconStock,
             trailingIcons = listOf(
                 Triple(
-                    stateValues.drawablePathIconSwitch,
-                    stateValues.drawableResIconSwitch.value
+                    sortActionIconPath(),
+                    sortActionIconFallback()
                 ) {
                     sortMenuExpanded = !sortMenuExpanded
                 }
@@ -8909,13 +8974,12 @@ fun AppConfiguration.StockWarehouseScreen() {
         )
 
         AnimatedVisibility(visible = sortMenuExpanded) {
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(stateValues.BackgroundColor)
                     .padding(horizontal = stateValues.marginTextField, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
                     text = localizedStringResource(512, "Sort by"),
@@ -8924,27 +8988,25 @@ fun AppConfiguration.StockWarehouseScreen() {
                     fontWeight = FontWeight.Bold
                 )
 
-                listOf(
-                    "name" to stateValues.stringName,
-                    "quantity" to localizedStringResource(513, "Quantity"),
-                    "created" to localizedStringResource(514, "Time added")
-                ).forEach { option ->
-                    actionButton(
-                        modifier = Modifier.weight(1f),
-                        text = option.second,
-                        enabledColor = if (sortMode == option.first) stateValues.AccentColor else stateValues.BackgroundColor,
-                        textColor = if (sortMode == option.first) stateValues.AccentTextColor else stateValues.TextColor,
-                        confirmationRequired = false,
-                        onClick = { sortMode = option.first }
-                    )
-                }
+                tabRowWidget(
+                    modifier = Modifier.fillMaxWidth(),
+                    tabs = listOf(
+                        TabContent("name", stateValues.stringName) { sortMode = it },
+                        TabContent("quantity", localizedStringResource(513, "Quantity")) { sortMode = it },
+                        TabContent("created", localizedStringResource(514, "Time added")) { sortMode = it }
+                    ),
+                    selectedIndexInitial = sortMode,
+                    textSize = stateValues.smallTextSize
+                )
 
-                actionButton(
-                    modifier = Modifier.weight(1f),
-                    text = if (sortAscending) localizedStringResource(515, "Ascending") else localizedStringResource(516, "Descending"),
-                    iconPath = if (sortAscending) stateValues.drawablePathIconExpandLess else stateValues.drawablePathIconExpandMore,
-                    confirmationRequired = false,
-                    onClick = { sortAscending = !sortAscending }
+                tabRowWidget(
+                    modifier = Modifier.fillMaxWidth(),
+                    tabs = listOf(
+                        TabContent("asc", localizedStringResource(515, "Ascending")) { sortAscending = true },
+                        TabContent("desc", localizedStringResource(516, "Descending")) { sortAscending = false }
+                    ),
+                    selectedIndexInitial = if (sortAscending) "asc" else "desc",
+                    textSize = stateValues.smallTextSize
                 )
             }
         }
@@ -10421,6 +10483,7 @@ private fun AppConfiguration.StockPromotionPriceInfoLine(
 private fun AppConfiguration.AitaBottomSheet(
     title: String,
     iconPath: String? = null,
+    iconRes: DrawableResource = Res.drawable._0_0,
     onDismiss: () -> Unit,
     content: @Composable ColumnScope.() -> Unit
 ) {
@@ -10473,7 +10536,7 @@ private fun AppConfiguration.AitaBottomSheet(
                         CpImage(
                             modifier = Modifier.size(24.dp),
                             url = it,
-                            fallbackRes = Res.drawable._0_0,
+                            fallbackRes = iconRes,
                             contentDescription = title,
                             tintColor = stateValues.AccentColor
                         )
@@ -10713,8 +10776,7 @@ private fun AppConfiguration.SupplierPickerBottomSheet(
                     item {
                         MessageText(
                             modifier = Modifier.fillParentMaxSize().fillMaxWidth(),
-                            text = if (q.isBlank()) localizedStringResource(626, "No suppliers yet") else stateValues.stringNoMatches,
-                            textColor = stateValues.PlaceholderTextColor
+                            text = if (q.isBlank()) localizedStringResource(626, "No suppliers yet") else stateValues.stringNoMatches
                         )
                     }
                 } else {
@@ -11877,7 +11939,11 @@ private fun AppConfiguration.reorderShelfBatches(
         if (it is DataState.Success) {
             updated.firstOrNull()?.let { firstBatch ->
                 if (firstBatch.id != goodsItem.activeShelfBatchId) {
-                    setActiveShelfBatch(firstBatch, storeId)
+                    setActiveShelfBatch(
+                        batch = firstBatch,
+                        storeId = storeId,
+                        previousActiveShelfBatchId = goodsItem.activeShelfBatchId
+                    )
                 }
             }
         }
@@ -13690,7 +13756,11 @@ fun AppConfiguration.StockAddEditBatchesPage(
                         },
                         onSetActiveShelf = {
                             stateValues.activeStoreId?.let { storeId ->
-                                setActiveShelfBatch(batch, storeId)
+                                setActiveShelfBatch(
+                        batch = batch,
+                        storeId = storeId,
+                        previousActiveShelfBatchId = goodsItem.activeShelfBatchId
+                    )
                             }
                         },
                         onDragStart = { id ->
@@ -15359,8 +15429,7 @@ private fun AppConfiguration.GlobalGoodsSuggestionsPanel(
             MessageText(
                 modifier = Modifier.fillMaxWidth().height(54.dp),
                 text = localizedStringResource(1174, "No global suggestions yet"),
-                textSize = stateValues.textSize,
-                textColor = stateValues.PlaceholderTextColor
+                textSize = stateValues.textSize
             )
         } else {
             LazyRow(
@@ -15850,8 +15919,7 @@ private fun AppConfiguration.ParentStoreStockSelectionBottomSheet(
                     MessageText(
                         modifier = Modifier.fillParentMaxSize().fillMaxWidth(),
                         text = localizedStringResource(1219, "This active store has no parent store"),
-                        textSize = stateValues.textSize,
-                        textColor = stateValues.PlaceholderTextColor
+                        textSize = stateValues.textSize
                     )
                 }
 
@@ -15868,8 +15936,7 @@ private fun AppConfiguration.ParentStoreStockSelectionBottomSheet(
                     MessageText(
                         modifier = Modifier.fillParentMaxSize().fillMaxWidth(),
                         text = localizedStringResource(1215, "No parent store items match these filters"),
-                        textSize = stateValues.textSize,
-                        textColor = stateValues.PlaceholderTextColor
+                        textSize = stateValues.textSize
                     )
                 }
 
@@ -16100,8 +16167,7 @@ private fun AppConfiguration.GlobalGoodsSelectionBottomSheet(
                     MessageText(
                         modifier = Modifier.fillParentMaxSize().fillMaxWidth(),
                         text = localizedStringResource(1189, "No global goods match these filters"),
-                        textSize = stateValues.textSize,
-                        textColor = stateValues.PlaceholderTextColor
+                        textSize = stateValues.textSize
                     )
                 }
 
@@ -19928,61 +19994,52 @@ private fun List<NavigationScreenModel>.toPersistentAppRoutes(): List<String> =
     map { it.toPersistentAppRoute() }
 
 private fun List<String>?.toPersistentMainStack(): List<NavigationScreenModel> {
-    val restored = orEmpty()
+    val restoredCurrent = orEmpty()
         .mapNotNull { persistentAppRouteToScreen(it) }
         .filterNot { it.route == NavigationScreenModel.Splash.route }
-        .ifEmpty { listOf(NavigationScreenModel.Transaction.MainSale) }
+        .lastOrNull()
+        ?: NavigationScreenModel.Transaction.MainSale
 
-    return restored
-        .fold(emptyList<NavigationScreenModel>()) { acc, item ->
-            if (acc.lastOrNull()?.route == item.route) acc else acc + item
-        }
-        .ifEmpty { listOf(NavigationScreenModel.Transaction.MainSale) }
+    return listOf(restoredCurrent)
 }
 
 private fun List<String>?.toPersistentStockStack(defaultFirst: NavigationScreenModel.Stock): List<NavigationScreenModel.Stock> {
-    val restored = orEmpty().mapNotNull { persistentAppRouteToScreen(it) as? NavigationScreenModel.Stock }
-    val withDefault = if (restored.firstOrNull()?.route == defaultFirst.route) {
-        restored
-    } else {
-        listOf(defaultFirst) + restored.filterNot { it.route == defaultFirst.route }
-    }
+    val restoredCurrent = orEmpty()
+        .mapNotNull { persistentAppRouteToScreen(it) as? NavigationScreenModel.Stock }
+        .lastOrNull()
+        ?: defaultFirst
 
-    return withDefault
-        .fold(emptyList<NavigationScreenModel.Stock>()) { acc, item ->
-            if (acc.lastOrNull()?.route == item.route) acc else acc + item
-        }
-        .ifEmpty { listOf(defaultFirst) }
+    return if (restoredCurrent.route == defaultFirst.route) {
+        listOf(defaultFirst)
+    } else {
+        listOf(defaultFirst, restoredCurrent)
+    }
 }
 
 private fun List<String>?.toPersistentMenuStack(defaultFirst: NavigationScreenModel.Menu): List<NavigationScreenModel.Menu> {
-    val restored = orEmpty().mapNotNull { persistentAppRouteToScreen(it) as? NavigationScreenModel.Menu }
-    val withDefault = if (restored.firstOrNull()?.route == defaultFirst.route) {
-        restored
-    } else {
-        listOf(defaultFirst) + restored.filterNot { it.route == defaultFirst.route }
-    }
+    val restoredCurrent = orEmpty()
+        .mapNotNull { persistentAppRouteToScreen(it) as? NavigationScreenModel.Menu }
+        .lastOrNull()
+        ?: defaultFirst
 
-    return withDefault
-        .fold(emptyList<NavigationScreenModel.Menu>()) { acc, item ->
-            if (acc.lastOrNull()?.route == item.route) acc else acc + item
-        }
-        .ifEmpty { listOf(defaultFirst) }
+    return if (restoredCurrent.route == defaultFirst.route) {
+        listOf(defaultFirst)
+    } else {
+        listOf(defaultFirst, restoredCurrent)
+    }
 }
 
 private fun List<String>?.toPersistentUserAuthStack(defaultFirst: NavigationScreenModel.UserAuth): List<NavigationScreenModel.UserAuth> {
-    val restored = orEmpty().mapNotNull { persistentAppRouteToScreen(it) as? NavigationScreenModel.UserAuth }
-    val withDefault = if (restored.firstOrNull()?.route == defaultFirst.route) {
-        restored
-    } else {
-        listOf(defaultFirst) + restored.filterNot { it.route == defaultFirst.route }
-    }
+    val restoredCurrent = orEmpty()
+        .mapNotNull { persistentAppRouteToScreen(it) as? NavigationScreenModel.UserAuth }
+        .lastOrNull()
+        ?: defaultFirst
 
-    return withDefault
-        .fold(emptyList<NavigationScreenModel.UserAuth>()) { acc, item ->
-            if (acc.lastOrNull()?.route == item.route) acc else acc + item
-        }
-        .ifEmpty { listOf(defaultFirst) }
+    return if (restoredCurrent.route == defaultFirst.route) {
+        listOf(defaultFirst)
+    } else {
+        listOf(defaultFirst, restoredCurrent)
+    }
 }
 
 private fun NavigationScreenModel.Transaction.toPersistentTransactionRoute(): String = route
@@ -19998,21 +20055,34 @@ private fun persistentTransactionRouteToScreen(route: String): NavigationScreenM
 private fun List<NavigationScreenModel.Transaction>.toPersistentTransactionRoutes(): List<String> =
     map { it.toPersistentTransactionRoute() }
 
+private fun <T : NavigationScreenModel> List<T>.toCompactPersistentRoutes(defaultFirst: T): List<String> {
+    val current = lastOrNull()
+    return when {
+        current == null -> listOf(defaultFirst.route)
+        current.route == defaultFirst.route -> listOf(defaultFirst.route)
+        else -> listOf(defaultFirst.route, current.route)
+    }
+}
+
+private fun List<NavigationScreenModel>.toCompactPersistentMainRoutes(): List<String> =
+    lastOrNull()
+        ?.takeIf { it.route != NavigationScreenModel.Splash.route }
+        ?.let { listOf(it.route) }
+        ?: listOf(NavigationScreenModel.Transaction.MainSale.route)
+
 private fun List<String>?.toPersistentTransactionStack(
     defaultFirst: NavigationScreenModel.Transaction
 ): List<NavigationScreenModel.Transaction> {
-    val restored = orEmpty().mapNotNull { persistentTransactionRouteToScreen(it) }
-    val withDefault = if (restored.firstOrNull()?.route == defaultFirst.route) {
-        restored
-    } else {
-        listOf(defaultFirst) + restored.filterNot { it.route == defaultFirst.route }
-    }
+    val restoredCurrent = orEmpty()
+        .mapNotNull { persistentTransactionRouteToScreen(it) }
+        .lastOrNull()
+        ?: defaultFirst
 
-    return withDefault
-        .fold(emptyList<NavigationScreenModel.Transaction>()) { acc, item ->
-            if (acc.lastOrNull()?.route == item.route) acc else acc + item
-        }
-        .ifEmpty { listOf(defaultFirst) }
+    return if (restoredCurrent.route == defaultFirst.route) {
+        listOf(defaultFirst)
+    } else {
+        listOf(defaultFirst, restoredCurrent)
+    }
 }
 
 private const val TRANSACTION_NAVIGATION_CACHE_KEY = "cache_json:transaction_navigation_state_v1"
@@ -20046,7 +20116,7 @@ object Navigation {
 
     private fun appNavigationSnapshot(): PersistedAppNavigationStateDataModel =
         PersistedAppNavigationStateDataModel(
-            main = Main.value.toPersistentAppRoutes(),
+            main = Main.value.toCompactPersistentMainRoutes(),
             stock = Stock.persistentSnapshot(),
             menu = Menu.persistentSnapshot(),
             userAuth = UserAuth.persistentSnapshot(),
@@ -20176,6 +20246,51 @@ object Navigation {
                 }
                 delay(220)
             }
+        }
+    }
+
+    suspend fun resetStoreScopedNavigationForNoActiveStore() {
+        TransactionSale.setClientId(0)
+        TransactionSale.clearLeftClient1()
+        TransactionSale.clearLeftClient2()
+        TransactionSale.clearLeftClient3()
+        TransactionSale.clearLeftClient4()
+        TransactionSale.clearLeftClient5()
+        TransactionSale.clearRightClient1()
+        TransactionSale.clearRightClient2()
+        TransactionSale.clearRightClient3()
+        TransactionSale.clearRightClient4()
+        TransactionSale.clearRightClient5()
+
+        TransactionReturn.setClientId(0)
+        TransactionReturn.clearLeftClient1()
+        TransactionReturn.clearLeftClient2()
+        TransactionReturn.clearLeftClient3()
+        TransactionReturn.clearLeftClient4()
+        TransactionReturn.clearLeftClient5()
+        TransactionReturn.clearRightClient1()
+        TransactionReturn.clearRightClient2()
+        TransactionReturn.clearRightClient3()
+        TransactionReturn.clearRightClient4()
+        TransactionReturn.clearRightClient5()
+
+        TransactionSupply.setClientId(0)
+        TransactionSupply.clearLeftClient1()
+        TransactionSupply.clearLeftClient2()
+        TransactionSupply.clearLeftClient3()
+        TransactionSupply.clearLeftClient4()
+        TransactionSupply.clearLeftClient5()
+        TransactionSupply.clearRightClient1()
+        TransactionSupply.clearRightClient2()
+        TransactionSupply.clearRightClient3()
+        TransactionSupply.clearRightClient4()
+        TransactionSupply.clearRightClient5()
+
+        Stock.clearLeft()
+        Stock.clearRight()
+
+        if (Main.value.last() is NavigationScreenModel.Stock) {
+            goMain(NavigationScreenModel.Transaction.MainSale)
         }
     }
 
@@ -20349,18 +20464,18 @@ object Navigation {
             PersistedTransactionNavigationSectionDataModel(
                 clientId = ClientId.value.coerceIn(0, 4),
                 left = listOf(
-                    LeftClient1.value.toPersistentTransactionRoutes(),
-                    LeftClient2.value.toPersistentTransactionRoutes(),
-                    LeftClient3.value.toPersistentTransactionRoutes(),
-                    LeftClient4.value.toPersistentTransactionRoutes(),
-                    LeftClient5.value.toPersistentTransactionRoutes()
+                    LeftClient1.value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Cart),
+                    LeftClient2.value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Cart),
+                    LeftClient3.value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Cart),
+                    LeftClient4.value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Cart),
+                    LeftClient5.value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Cart)
                 ),
                 right = listOf(
-                    RightClient1.value.toPersistentTransactionRoutes(),
-                    RightClient2.value.toPersistentTransactionRoutes(),
-                    RightClient3.value.toPersistentTransactionRoutes(),
-                    RightClient4.value.toPersistentTransactionRoutes(),
-                    RightClient5.value.toPersistentTransactionRoutes()
+                    RightClient1.value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Selection),
+                    RightClient2.value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Selection),
+                    RightClient3.value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Selection),
+                    RightClient4.value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Selection),
+                    RightClient5.value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Selection)
                 )
             )
 
@@ -21131,18 +21246,18 @@ object Navigation {
             PersistedTransactionNavigationSectionDataModel(
                 clientId = ClientId.value.coerceIn(0, 4),
                 left = listOf(
-                    LeftClient1.value.toPersistentTransactionRoutes(),
-                    LeftClient2.value.toPersistentTransactionRoutes(),
-                    LeftClient3.value.toPersistentTransactionRoutes(),
-                    LeftClient4.value.toPersistentTransactionRoutes(),
-                    LeftClient5.value.toPersistentTransactionRoutes()
+                    LeftClient1.value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Cart),
+                    LeftClient2.value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Cart),
+                    LeftClient3.value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Cart),
+                    LeftClient4.value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Cart),
+                    LeftClient5.value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Cart)
                 ),
                 right = listOf(
-                    RightClient1.value.toPersistentTransactionRoutes(),
-                    RightClient2.value.toPersistentTransactionRoutes(),
-                    RightClient3.value.toPersistentTransactionRoutes(),
-                    RightClient4.value.toPersistentTransactionRoutes(),
-                    RightClient5.value.toPersistentTransactionRoutes()
+                    RightClient1.value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Selection),
+                    RightClient2.value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Selection),
+                    RightClient3.value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Selection),
+                    RightClient4.value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Selection),
+                    RightClient5.value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Selection)
                 )
             )
 
@@ -21913,18 +22028,18 @@ object Navigation {
             PersistedTransactionNavigationSectionDataModel(
                 clientId = ClientId.value.coerceIn(0, 4),
                 left = listOf(
-                    LeftClient1.value.toPersistentTransactionRoutes(),
-                    LeftClient2.value.toPersistentTransactionRoutes(),
-                    LeftClient3.value.toPersistentTransactionRoutes(),
-                    LeftClient4.value.toPersistentTransactionRoutes(),
-                    LeftClient5.value.toPersistentTransactionRoutes()
+                    LeftClient1.value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Cart),
+                    LeftClient2.value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Cart),
+                    LeftClient3.value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Cart),
+                    LeftClient4.value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Cart),
+                    LeftClient5.value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Cart)
                 ),
                 right = listOf(
-                    RightClient1.value.toPersistentTransactionRoutes(),
-                    RightClient2.value.toPersistentTransactionRoutes(),
-                    RightClient3.value.toPersistentTransactionRoutes(),
-                    RightClient4.value.toPersistentTransactionRoutes(),
-                    RightClient5.value.toPersistentTransactionRoutes()
+                    RightClient1.value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Selection),
+                    RightClient2.value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Selection),
+                    RightClient3.value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Selection),
+                    RightClient4.value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Selection),
+                    RightClient5.value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Selection)
                 )
             )
 
@@ -22551,8 +22666,8 @@ object Navigation {
 
         internal fun persistentSnapshot(): PersistedSplitNavigationStackDataModel =
             PersistedSplitNavigationStackDataModel(
-                left = Left.value.map { it.route },
-                right = Right.value.map { it.route }
+                left = Left.value.toCompactPersistentRoutes(NavigationScreenModel.Stock.Warehouse),
+                right = Right.value.toCompactPersistentRoutes(NavigationScreenModel.Stock.AddEditGoodsItem)
             )
 
         internal suspend fun restorePersistentSnapshot(snapshot: PersistedSplitNavigationStackDataModel) {
@@ -22746,8 +22861,8 @@ object Navigation {
 
         internal fun persistentSnapshot(): PersistedSplitNavigationStackDataModel =
             PersistedSplitNavigationStackDataModel(
-                left = Left.value.map { it.route },
-                right = Right.value.map { it.route }
+                left = Left.value.toCompactPersistentRoutes(NavigationScreenModel.Menu.List),
+                right = Right.value.toCompactPersistentRoutes(NavigationScreenModel.Menu.UserAccount)
             )
 
         internal suspend fun restorePersistentSnapshot(snapshot: PersistedSplitNavigationStackDataModel) {
@@ -22920,8 +23035,8 @@ object Navigation {
 
         internal fun persistentSnapshot(): PersistedSplitNavigationStackDataModel =
             PersistedSplitNavigationStackDataModel(
-                left = Left.value.map { it.route },
-                right = Right.value.map { it.route }
+                left = Left.value.toCompactPersistentRoutes(NavigationScreenModel.UserAuth.LogIn),
+                right = Right.value.toCompactPersistentRoutes(NavigationScreenModel.UserAuth.SignUp)
             )
 
         internal suspend fun restorePersistentSnapshot(snapshot: PersistedSplitNavigationStackDataModel) {
@@ -23220,10 +23335,10 @@ private fun permissionsFromSerialized(value: String): List<String> {
 
 
 private fun AppConfiguration.workerRequestDirectionLabel(request: StoreWorkerRequestDataModel): String {
-    return if (request.direction == WORKER_REQUEST_DIRECTION_STORE_TO_USER) {
-        localizedStringResource(1103, "From store to worker")
-    } else {
-        localizedStringResource(1102, "From worker to store")
+    return when (request.direction) {
+        WORKER_REQUEST_DIRECTION_STORE_TO_USER -> localizedStringResource(1103, "From store to worker")
+        WORKER_REQUEST_DIRECTION_STORE_REMOVAL_TO_USER -> localizedStringResource(1221, "Removal request from store")
+        else -> localizedStringResource(1102, "From worker to store")
     }
 }
 
@@ -23380,10 +23495,10 @@ private fun AppConfiguration.WorkerResponseCard(
     } else {
         workerLine.ifBlank { request.storePublicId }
     }
-    val directionHint = if (request.direction == WORKER_REQUEST_DIRECTION_STORE_TO_USER) {
-        localizedStringResource(1114, "Store invited this worker")
-    } else {
-        localizedStringResource(1113, "You requested work in this store")
+    val directionHint = when (request.direction) {
+        WORKER_REQUEST_DIRECTION_STORE_TO_USER -> localizedStringResource(1114, "Store invited this worker")
+        WORKER_REQUEST_DIRECTION_STORE_REMOVAL_TO_USER -> localizedStringResource(1237, "Store asked this worker to confirm removal")
+        else -> localizedStringResource(1113, "You requested work in this store")
     }
     val permissionLine = request.permissions.joinToString(" • ") { workerPermissionLabel(it) }
     val noteText = request.responseNoteVisible(stateValues.appLanguage).orEmpty().trim()
@@ -23432,7 +23547,7 @@ private fun AppConfiguration.WorkerResponseCard(
             }
 
             Text(
-                text = workerRequestStatusLabel(request.status),
+                text = workerRequestStatusLabel(request),
                 color = statusColor,
                 fontSize = stateValues.textSize,
                 fontWeight = FontWeight.Bold,
@@ -23679,11 +23794,119 @@ private fun AppConfiguration.WorkerRequestCard(
 }
 
 @Composable
+private fun AppConfiguration.WorkerRemovalRequestCard(
+    request: StoreWorkerRequestDataModel
+) {
+    var decisionDialog by rememberSaveable(request.id) { mutableStateOf<String?>(null) }
+    val storeTitle = workerRequestStoreTitle(request)
+    val subtitle = listOf(storeTitle, workerRequestDirectionLabel(request)).filter { it.isNotBlank() }.joinToString(" • ")
+
+    decisionDialog?.let { action ->
+        val confirming = action == "confirm"
+        WorkerDecisionNoteDialog(
+            title = if (confirming) localizedStringResource(1226, "Confirm removal request?") else localizedStringResource(1227, "Keep your access?"),
+            subtitle = subtitle,
+            positiveButtonText = if (confirming) localizedStringResource(1228, "Confirm removal") else localizedStringResource(1229, "Keep my access"),
+            positiveColor = if (confirming) stateValues.ErrorColor else stateValues.AccentColor,
+            positiveIconPath = if (confirming) stateValues.drawablePathIconCancel else stateValues.drawablePathIconCheck,
+            onDismiss = { decisionDialog = null },
+            onConfirm = { responseNote ->
+                decisionDialog = null
+                if (confirming) {
+                    acceptMyStoreWorkerRemovalRequest(request.id, note = responseNote)
+                } else {
+                    declineMyStoreWorkerRemovalRequest(request.id, note = responseNote)
+                }
+            }
+        )
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .border(stateValues.unfocusedBorderWidth, stateValues.ErrorColor, RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .padding(stateValues.marginTextFieldGroup),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            CpImage(
+                modifier = Modifier.size(34.dp),
+                url = stateValues.drawablePathIconWorkers,
+                fallbackRes = stateValues.drawableResIconWorkers.value,
+                contentDescription = localizedStringResource(1221, "Removal request from store"),
+                tintColor = stateValues.ErrorColor
+            )
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = storeTitle,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.accentTextSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = receiptUiDateTime(request.requestedAtMillis),
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize
+                )
+            }
+        }
+
+        Text(
+            text = localizedStringResource(1230, "This store asked to end your worker access. Confirm only if you agree."),
+            color = stateValues.TextColor,
+            fontSize = stateValues.smallTextSize
+        )
+
+        request.requestNoteVisible(stateValues.appLanguage)?.let { noteText ->
+            Text(
+                text = noteText,
+                color = stateValues.PlaceholderTextColor,
+                fontSize = stateValues.smallTextSize,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            actionButton(
+                modifier = Modifier.weight(1f),
+                text = localizedStringResource(1228, "Confirm removal"),
+                enabledColor = stateValues.ErrorColor,
+                iconPath = stateValues.drawablePathIconCancel,
+                confirmationRequired = false,
+                onClick = { decisionDialog = "confirm" }
+            )
+            actionButton(
+                modifier = Modifier.weight(1f),
+                text = localizedStringResource(1229, "Keep my access"),
+                iconPath = stateValues.drawablePathIconCheck,
+                confirmationRequired = false,
+                onClick = { decisionDialog = "deny" }
+            )
+        }
+    }
+}
+
+@Composable
 private fun AppConfiguration.WorkerMembershipCard(
     worker: StoreWorkerDataModel,
     editable: Boolean,
     storeId: String? = null,
-    showSelfPasswordEditor: Boolean = false
+    showSelfPasswordEditor: Boolean = false,
+    pendingRemovalRequest: StoreWorkerRequestDataModel? = null
 ) {
     var roleId by rememberSaveable(worker.id) { mutableStateOf(worker.roleId.ifBlank { WORKER_ROLE_STANDARD }) }
     var permissionsText by rememberSaveable(worker.id) { mutableStateOf(worker.permissions.joinToString("|")) }
@@ -23824,19 +24047,37 @@ private fun AppConfiguration.WorkerMembershipCard(
             if (worker.userId.isNotBlank() && worker.userId != currentUserId) {
                 Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
-                actionButton(
-                    text = stateValues.stringDelete,
-                    enabledColor = stateValues.ErrorColor,
-                    iconPath = stateValues.drawablePathIconDelete,
-                    iconContentDescription = stateValues.stringDelete,
-                    confirmationRequired = true,
-                    onClick = {
-                        removeStoreWorker(
-                            storeId = storeId,
-                            workerId = worker.id
-                        )
-                    }
-                )
+                if (pendingRemovalRequest != null) {
+                    Text(
+                        text = localizedStringResource(1231, "Removal request is waiting for worker confirmation"),
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Text(
+                        text = localizedStringResource(1235, "The worker stays active until they confirm this request."),
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    actionButton(
+                        text = localizedStringResource(1232, "Request removal"),
+                        enabledColor = stateValues.ErrorColor,
+                        iconPath = stateValues.drawablePathIconDelete,
+                        iconContentDescription = localizedStringResource(1232, "Request removal"),
+                        confirmationRequired = true,
+                        onClick = {
+                            removeStoreWorker(
+                                storeId = storeId,
+                                workerId = worker.id
+                            )
+                        }
+                    )
+                }
             }
         } else {
             Text(
@@ -24051,6 +24292,7 @@ fun AppConfiguration.MenuWorkersScreen() {
                         }
                     }
 
+
                     item {
                         Text(
                             text = localizedStringResource(480, "My employment requests"),
@@ -24083,7 +24325,7 @@ fun AppConfiguration.MenuWorkersScreen() {
                                 )
 
                                 Text(
-                                    text = "${localizedStringResource(482, "Status")}: ${workerRequestStatusLabel(request.status)}",
+                                    text = "${localizedStringResource(482, "Status")}: ${workerRequestStatusLabel(request)}",
                                     color = stateValues.TextColor,
                                     fontSize = stateValues.textSize
                                 )
@@ -24124,97 +24366,119 @@ fun AppConfiguration.MenuWorkersScreen() {
 
 
                 "invites" -> {
-                    item {
-                        Text(
-                            text = localizedStringResource(652, "Incoming invites from stores"),
-                            color = stateValues.TextColor,
-                            fontSize = stateValues.titleTextSize,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
                     val invitations = myRequestsPayload.orEmpty()
                         .filter { it.direction == WORKER_REQUEST_DIRECTION_STORE_TO_USER && it.status == WORKER_REQUEST_STATUS_INVITED }
+                        .distinctBy { it.id }
+                    val removalRequests = myRequestsPayload.orEmpty()
+                        .filter { it.isPendingWorkerRemovalRequest() }
+                        .distinctBy { it.id }
 
-                    if (invitations.isEmpty()) {
-                        item { MessageText(modifier = Modifier.fillMaxWidth(), text = localizedStringResource(653, "No worker invites yet")) }
+                    if (invitations.isEmpty() && removalRequests.isEmpty()) {
+                        item { MessageText(modifier = Modifier.fillMaxWidth(), text = localizedStringResource(1233, "No invites or removal requests")) }
                     } else {
-                        items(invitations, key = { it.id }) { request ->
-                            var decisionDialog by rememberSaveable(request.id) { mutableStateOf<String?>(null) }
-
-                            decisionDialog?.let { action ->
-                                val accepting = action == "accept"
-                                WorkerDecisionNoteDialog(
-                                    title = if (accepting) localizedStringResource(1111, "Accept invitation?") else localizedStringResource(1112, "Decline invitation?"),
-                                    subtitle = listOf(workerRequestStoreTitle(request), workerRequestDirectionLabel(request)).filter { it.isNotBlank() }.joinToString(" • "),
-                                    positiveButtonText = if (accepting) localizedStringResource(510, "Accept invite") else localizedStringResource(511, "Decline invite"),
-                                    positiveColor = if (accepting) stateValues.AccentColor else stateValues.ErrorColor,
-                                    positiveIconPath = if (accepting) stateValues.drawablePathIconCheck else stateValues.drawablePathIconCancel,
-                                    onDismiss = { decisionDialog = null },
-                                    onConfirm = { responseNote ->
-                                        decisionDialog = null
-                                        if (accepting) {
-                                            acceptMyStoreWorkerInvitation(request.id, note = responseNote)
-                                        } else {
-                                            declineMyStoreWorkerInvitation(request.id, note = responseNote)
-                                        }
-                                    }
+                        if (invitations.isNotEmpty()) {
+                            item {
+                                Text(
+                                    text = localizedStringResource(652, "Incoming invites from stores"),
+                                    color = stateValues.TextColor,
+                                    fontSize = stateValues.titleTextSize,
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
 
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
-                                    .clip(RoundedCornerShape(stateValues.cornerRadius))
-                                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
-                                    .background(stateValues.BackgroundColor)
-                                    .padding(stateValues.marginTextFieldGroup)
-                            ) {
-                                Text(
-                                    text = request.storeName.extractLocalizedString(stateValues.appLanguage).orEmpty().ifBlank { request.storePublicId.ifBlank { request.storeId } },
-                                    color = stateValues.TextColor,
-                                    fontSize = stateValues.accentTextSize,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = listOf(request.storePublicId, request.invitedByUserId.orEmpty()).filter { it.isNotBlank() }.joinToString(" • "),
-                                    color = stateValues.PlaceholderTextColor,
-                                    fontSize = stateValues.smallTextSize
-                                )
-                                Text(
-                                    text = "${localizedStringResource(482, "Status")}: ${workerRequestStatusLabel(request.status)}",
-                                    color = stateValues.TextColor,
-                                    fontSize = stateValues.textSize
-                                )
-                                Text(
-                                    text = receiptUiDateTime(request.requestedAtMillis),
-                                    color = stateValues.PlaceholderTextColor,
-                                    fontSize = stateValues.smallTextSize
-                                )
+                            items(invitations, key = { it.id }) { request ->
+                                var decisionDialog by rememberSaveable(request.id) { mutableStateOf<String?>(null) }
 
-                                Spacer(modifier = Modifier.height(stateValues.marginTextField))
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
-                                ) {
-                                    actionButton(
-                                        modifier = Modifier.weight(1f),
-                                        text = localizedStringResource(510, "Accept invite"),
-                                        iconPath = stateValues.drawablePathIconCheck,
-                                        confirmationRequired = false,
-                                        onClick = { decisionDialog = "accept" }
-                                    )
-                                    actionButton(
-                                        modifier = Modifier.weight(1f),
-                                        text = localizedStringResource(511, "Decline invite"),
-                                        enabledColor = stateValues.ErrorColor,
-                                        iconPath = stateValues.drawablePathIconCancel,
-                                        confirmationRequired = false,
-                                        onClick = { decisionDialog = "decline" }
+                                decisionDialog?.let { action ->
+                                    val accepting = action == "accept"
+                                    WorkerDecisionNoteDialog(
+                                        title = if (accepting) localizedStringResource(1111, "Accept invitation?") else localizedStringResource(1112, "Decline invitation?"),
+                                        subtitle = listOf(workerRequestStoreTitle(request), workerRequestDirectionLabel(request)).filter { it.isNotBlank() }.joinToString(" • "),
+                                        positiveButtonText = if (accepting) localizedStringResource(510, "Accept invite") else localizedStringResource(511, "Decline invite"),
+                                        positiveColor = if (accepting) stateValues.AccentColor else stateValues.ErrorColor,
+                                        positiveIconPath = if (accepting) stateValues.drawablePathIconCheck else stateValues.drawablePathIconCancel,
+                                        onDismiss = { decisionDialog = null },
+                                        onConfirm = { responseNote ->
+                                            decisionDialog = null
+                                            if (accepting) {
+                                                acceptMyStoreWorkerInvitation(request.id, note = responseNote)
+                                            } else {
+                                                declineMyStoreWorkerInvitation(request.id, note = responseNote)
+                                            }
+                                        }
                                     )
                                 }
+
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+                                        .clip(RoundedCornerShape(stateValues.cornerRadius))
+                                        .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
+                                        .background(stateValues.BackgroundColor)
+                                        .padding(stateValues.marginTextFieldGroup)
+                                ) {
+                                    Text(
+                                        text = request.storeName.extractLocalizedString(stateValues.appLanguage).orEmpty().ifBlank { request.storePublicId.ifBlank { request.storeId } },
+                                        color = stateValues.TextColor,
+                                        fontSize = stateValues.accentTextSize,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = listOf(request.storePublicId, request.invitedByUserId.orEmpty()).filter { it.isNotBlank() }.joinToString(" • "),
+                                        color = stateValues.PlaceholderTextColor,
+                                        fontSize = stateValues.smallTextSize
+                                    )
+                                    Text(
+                                        text = "${localizedStringResource(482, "Status")}: ${workerRequestStatusLabel(request)}",
+                                        color = stateValues.TextColor,
+                                        fontSize = stateValues.textSize
+                                    )
+                                    Text(
+                                        text = receiptUiDateTime(request.requestedAtMillis),
+                                        color = stateValues.PlaceholderTextColor,
+                                        fontSize = stateValues.smallTextSize
+                                    )
+
+                                    Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                                    ) {
+                                        actionButton(
+                                            modifier = Modifier.weight(1f),
+                                            text = localizedStringResource(510, "Accept invite"),
+                                            iconPath = stateValues.drawablePathIconCheck,
+                                            confirmationRequired = false,
+                                            onClick = { decisionDialog = "accept" }
+                                        )
+                                        actionButton(
+                                            modifier = Modifier.weight(1f),
+                                            text = localizedStringResource(511, "Decline invite"),
+                                            enabledColor = stateValues.ErrorColor,
+                                            iconPath = stateValues.drawablePathIconCancel,
+                                            confirmationRequired = false,
+                                            onClick = { decisionDialog = "decline" }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        if (removalRequests.isNotEmpty()) {
+                            item {
+                                Text(
+                                    text = localizedStringResource(1225, "Removal requests"),
+                                    color = stateValues.TextColor,
+                                    fontSize = stateValues.titleTextSize,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(top = if (invitations.isNotEmpty()) stateValues.marginTextFieldGroup else 0.dp)
+                                )
+                            }
+
+                            items(removalRequests, key = { "removal_${it.id}" }) { request ->
+                                WorkerRemovalRequestCard(request = request)
                             }
                         }
                     }
@@ -24223,7 +24487,7 @@ fun AppConfiguration.MenuWorkersScreen() {
                 "responses" -> {
                     item {
                         Text(
-                            text = localizedStringResource(1093, "Employment responses"),
+                            text = localizedStringResource(1238, "Worker responses"),
                             color = stateValues.TextColor,
                             fontSize = stateValues.titleTextSize,
                             fontWeight = FontWeight.Bold
@@ -24231,7 +24495,7 @@ fun AppConfiguration.MenuWorkersScreen() {
                     }
 
                     val myResponses = myRequestsPayload.orEmpty()
-                        .filter { it.isEmploymentResponse() }
+                        .filter { it.isEmploymentResponse() || it.isWorkerRemovalResponse() }
                         .distinctBy { it.id }
 
                     item {
@@ -24272,7 +24536,7 @@ fun AppConfiguration.MenuWorkersScreen() {
                         item { MessageText(modifier = Modifier.fillMaxWidth(), text = localizedStringResource(486, "Only store owners and worker managers can accept employment requests")) }
                     } else {
                         val storeResponses = incomingRequestsPayload.orEmpty()
-                            .filter { it.isEmploymentResponse() }
+                            .filter { it.isEmploymentResponse() || it.isWorkerRemovalResponse() }
                             .distinctBy { it.id }
 
                         if (storeResponses.isEmpty()) {
@@ -24399,8 +24663,19 @@ fun AppConfiguration.MenuWorkersScreen() {
                             item { MessageText(modifier = Modifier.fillMaxWidth(), text = localizedStringResource(484, "No workers in this store yet")) }
                         } else {
                             val editable = currentUserHasStorePermission(activeStoreId, STORE_PERMISSION_WORKERS_MANAGE)
+                            val pendingRemovalRequests = incomingRequestsPayload.orEmpty()
+                                .filter { it.isPendingWorkerRemovalRequest() }
+                                .distinctBy { it.id }
                             items(workers, key = { it.id }) { worker ->
-                                WorkerMembershipCard(worker = worker, editable = editable, storeId = worker.storeId.ifBlank { activeStoreId })
+                                val pendingRemovalRequest = pendingRemovalRequests.firstOrNull { request ->
+                                    request.storeId == worker.storeId && request.requesterUserId == worker.userId
+                                }
+                                WorkerMembershipCard(
+                                    worker = worker,
+                                    editable = editable,
+                                    storeId = worker.storeId.ifBlank { activeStoreId },
+                                    pendingRemovalRequest = pendingRemovalRequest
+                                )
                             }
                         }
                     }
@@ -24446,6 +24721,18 @@ private fun AppConfiguration.workerRequestStatusLabel(status: String): String {
     }
 }
 
+private fun AppConfiguration.workerRequestStatusLabel(request: StoreWorkerRequestDataModel): String {
+    return if (request.isWorkerRemovalRequest()) {
+        when (request.status) {
+            WORKER_REQUEST_STATUS_ACCEPTED -> localizedStringResource(1222, "Removal confirmed")
+            WORKER_REQUEST_STATUS_DECLINED -> localizedStringResource(1223, "Worker kept access")
+            else -> localizedStringResource(1224, "Waiting for worker")
+        }
+    } else {
+        workerRequestStatusLabel(request.status)
+    }
+}
+
 
 @Composable
 private fun AppConfiguration.WorkerInviteStatusCard(
@@ -24467,7 +24754,7 @@ private fun AppConfiguration.WorkerInviteStatusCard(
             fontWeight = FontWeight.Bold
         )
         Text(
-            text = "${localizedStringResource(482, "Status")}: ${workerRequestStatusLabel(request.status)}",
+            text = "${localizedStringResource(482, "Status")}: ${workerRequestStatusLabel(request)}",
             color = stateValues.TextColor,
             fontSize = stateValues.textSize
         )
@@ -26445,7 +26732,7 @@ fun AppConfiguration.MenuSuppliersScreen() {
             title = stateValues.stringSuppliers,
             iconPath = stateValues.drawablePathIconSuppliers,
             trailingIcons = listOf(
-                Triple(stateValues.drawablePathIconSwitch, stateValues.drawableResIconSwitch.value) {
+                Triple(sortActionIconPath(), sortActionIconFallback()) {
                     sortMenuExpanded = !sortMenuExpanded
                 },
                 Triple(stateValues.drawablePathIconAdd, stateValues.drawableResIconAdd.value) {
@@ -26463,13 +26750,12 @@ fun AppConfiguration.MenuSuppliersScreen() {
         )
 
         AnimatedVisibility(visible = sortMenuExpanded) {
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(stateValues.BackgroundColor)
                     .padding(horizontal = stateValues.marginTextField, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
                     text = localizedStringResource(512, "Sort by"),
@@ -26478,26 +26764,24 @@ fun AppConfiguration.MenuSuppliersScreen() {
                     fontWeight = FontWeight.Bold
                 )
 
-                listOf(
-                    "name" to stateValues.stringName,
-                    "added" to localizedStringResource(514, "Time added")
-                ).forEach { option ->
-                    actionButton(
-                        modifier = Modifier.weight(1f),
-                        text = option.second,
-                        enabledColor = if (sortId == option.first) stateValues.AccentColor else stateValues.BackgroundColor,
-                        textColor = if (sortId == option.first) stateValues.AccentTextColor else stateValues.TextColor,
-                        confirmationRequired = false,
-                        onClick = { sortId = option.first }
-                    )
-                }
+                tabRowWidget(
+                    modifier = Modifier.fillMaxWidth(),
+                    tabs = listOf(
+                        TabContent("name", stateValues.stringName) { sortId = it },
+                        TabContent("added", localizedStringResource(514, "Time added")) { sortId = it }
+                    ),
+                    selectedIndexInitial = sortId,
+                    textSize = stateValues.smallTextSize
+                )
 
-                actionButton(
-                    modifier = Modifier.weight(1f),
-                    text = if (sortAscending) localizedStringResource(515, "Ascending") else localizedStringResource(516, "Descending"),
-                    iconPath = if (sortAscending) stateValues.drawablePathIconExpandLess else stateValues.drawablePathIconExpandMore,
-                    confirmationRequired = false,
-                    onClick = { sortAscending = !sortAscending }
+                tabRowWidget(
+                    modifier = Modifier.fillMaxWidth(),
+                    tabs = listOf(
+                        TabContent("asc", localizedStringResource(515, "Ascending")) { sortAscending = true },
+                        TabContent("desc", localizedStringResource(516, "Descending")) { sortAscending = false }
+                    ),
+                    selectedIndexInitial = if (sortAscending) "asc" else "desc",
+                    textSize = stateValues.smallTextSize
                 )
             }
         }
@@ -26561,8 +26845,7 @@ fun AppConfiguration.MenuSuppliersScreen() {
                 item {
                     MessageText(
                         modifier = Modifier.fillParentMaxSize().fillMaxWidth(),
-                        text = if (q.isBlank()) localizedStringResource(626, "No suppliers yet") else stateValues.stringNoMatches,
-                        textColor = stateValues.PlaceholderTextColor
+                        text = if (q.isBlank()) localizedStringResource(626, "No suppliers yet") else stateValues.stringNoMatches
                     )
                 }
             } else {
@@ -26764,21 +27047,14 @@ fun AppConfiguration.MenuStoresScreen() {
                             ?: allStores
 
                         item {
-                            Row(
+                            tabRowWidget(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
-                            ) {
-                                AnalyticsPill(
-                                    modifier = Modifier.weight(1f),
-                                    text = localizedStringResource(489, "My stores"),
-                                    selected = storeTabId == "owned"
-                                ) { storeTabId = "owned" }
-                                AnalyticsPill(
-                                    modifier = Modifier.weight(1f),
-                                    text = localizedStringResource(478, "Managed stores"),
-                                    selected = storeTabId == "managed"
-                                ) { storeTabId = "managed" }
-                            }
+                                tabs = listOf(
+                                    TabContent("owned", localizedStringResource(489, "My stores")) { storeTabId = it },
+                                    TabContent("managed", localizedStringResource(478, "Managed stores")) { storeTabId = it }
+                                ),
+                                selectedIndexInitial = storeTabId
+                            )
                         }
 
                         val selectedTabId = storeTabId
@@ -28194,9 +28470,35 @@ fun AppConfiguration.MenuSecurityScreen() {
 
 @Composable
 fun AppConfiguration.MenuDevicesScreen() {
+    val receiptPrinters by receiptPrinterDevicesState.collectAsState()
+    val configuredReceiptPrinterId by configuredReceiptPrinterDeviceIdState.collectAsState()
+    var refreshingReceiptPrinters by rememberSaveable { mutableStateOf(false) }
+
+    val refreshButtonText = localizedStringResource(1259, "Refresh printers")
+    val refreshSuccessText = localizedStringResource(1270, "Receipt printers refreshed")
+    val printerSelectedText = localizedStringResource(1260, "Receipt printer selected")
+    val printerClearedText = localizedStringResource(1264, "Receipt printer cleared")
+    val testReceiptTitle = localizedStringResource(1261, "Receipt printer test")
+    val testReceiptButtonText = localizedStringResource(1262, "Send test receipt")
+    val testReceiptSentText = localizedStringResource(1263, "Test receipt sent")
+    val receiptPrinterNotConfiguredText = localizedStringResource(1038, "Receipt printer is not configured")
+
+    fun refreshReceiptPrinters(showNotification: Boolean) {
+        refreshingReceiptPrinters = true
+        refreshReceiptPrinterDevices { result ->
+            coroutineScope.launch {
+                refreshingReceiptPrinters = false
+                if (showNotification) receiptActionNotification(result, refreshSuccessText)
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        refreshReceiptPrinters(showNotification = false)
+    }
+
     Column(
-        modifier = Modifier
-            .fillMaxSize(),
+        modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         ScreenAppBarWidget(
@@ -28209,33 +28511,309 @@ fun AppConfiguration.MenuDevicesScreen() {
             }
         )
 
-        Column(
+        LazyColumn(
+            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Devices),
             modifier = Modifier
                 .weight(1f)
-                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.62f)
-                .padding(stateValues.marginTextFieldGroup),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
+                .padding(stateValues.marginTextField),
+            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextFieldGroup),
+            contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
         ) {
-            MessageText(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = stateValues.marginTextField),
-                text = localizedStringResource(617, "Open Bluetooth/devices settings"),
-                subText = stateValues.stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrinters,
-                textSize = stateValues.titleTextSize,
-                subTextSize = stateValues.textSize
-            )
+            item {
+                MessageText(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(617, "Open Bluetooth/devices settings"),
+                    subText = stateValues.stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrinters,
+                    textSize = stateValues.titleTextSize,
+                    subTextSize = stateValues.textSize
+                )
+            }
 
-            Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+            item {
+                DeviceSettingsCard(
+                    title = localizedStringResource(1252, "A4 paper printer"),
+                    subtitle = localizedStringResource(1253, "Analytics reports use the regular system print dialog for A4 paper printers."),
+                    iconPath = stateValues.drawablePathIconAnalyticsReport,
+                    iconRes = stateValues.drawableResIconAnalyticsReport.value
+                ) {
+                    actionButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(616, "Open system devices"),
+                        iconPath = stateValues.drawablePathIconDevices,
+                        iconRes = stateValues.drawableResIconDevices.value,
+                        confirmationRequired = false,
+                        onClick = { openPlatformDevicesSettings() }
+                    )
+                }
+            }
 
-            actionButton(
-                text = localizedStringResource(616, "Open system devices"),
-                iconPath = stateValues.drawablePathIconDevices,
-                confirmationRequired = false,
-                onClick = { openPlatformDevicesSettings() }
-            )
+            item {
+                DeviceSettingsCard(
+                    title = localizedStringResource(1254, "Thermal receipt printer"),
+                    subtitle = localizedStringResource(1249, "Transaction receipts use ESC/POS thermal printers. Analytics reports use A4 paper printing."),
+                    iconPath = stateValues.drawablePathIconReceipt,
+                    iconRes = stateValues.drawableResIconReceipt.value
+                ) {
+                    if (stateValues.isNarrowScreen) {
+                        Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+                            actionButton(
+                                modifier = Modifier.fillMaxWidth(),
+                                text = refreshButtonText,
+                                iconPath = stateValues.drawablePathIconRefresh,
+                                iconRes = stateValues.drawableResIconRefresh.value,
+                                loading = refreshingReceiptPrinters,
+                                confirmationRequired = false,
+                                onClick = { refreshReceiptPrinters(showNotification = true) }
+                            )
+                            actionButton(
+                                modifier = Modifier.fillMaxWidth(),
+                                text = testReceiptButtonText,
+                                iconPath = stateValues.drawablePathIconReceipt,
+                                iconRes = stateValues.drawableResIconReceipt.value,
+                                enabled = !configuredReceiptPrinterId.isNullOrBlank(),
+                                onDisabledClick = { postInAppNotification(receiptPrinterNotConfiguredText, NotificationType.Negative, transient = true) },
+                                confirmationRequired = false,
+                                onClick = {
+                                    coroutineScope.launch {
+                                        receiptActionNotification(
+                                            printReceiptEscPos(
+                                                buildReceiptPrinterTestEscPosBytes(
+                                                    title = testReceiptTitle,
+                                                    dateText = receiptUiDateTime(getCurrentTimeMillis())
+                                                ),
+                                                ReceiptTextLabelsDataModel(printerNotConfigured = receiptPrinterNotConfiguredText)
+                                            ),
+                                            testReceiptSentText
+                                        )
+                                    }
+                                }
+                            )
+                            actionButton(
+                                modifier = Modifier.fillMaxWidth(),
+                                text = localizedStringResource(1265, "Clear receipt printer"),
+                                iconPath = stateValues.drawablePathIconCancel,
+                                iconRes = stateValues.drawableResIconCancel.value,
+                                enabled = !configuredReceiptPrinterId.isNullOrBlank(),
+                                confirmationRequired = false,
+                                onClick = {
+                                    configureReceiptPrinterDevice(null) { result ->
+                                        coroutineScope.launch {
+                                            receiptActionNotification(result, printerClearedText)
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            actionButton(
+                                modifier = Modifier.weight(1f),
+                                text = refreshButtonText,
+                                iconPath = stateValues.drawablePathIconRefresh,
+                                iconRes = stateValues.drawableResIconRefresh.value,
+                                loading = refreshingReceiptPrinters,
+                                confirmationRequired = false,
+                                onClick = { refreshReceiptPrinters(showNotification = true) }
+                            )
+                            actionButton(
+                                modifier = Modifier.weight(1f),
+                                text = testReceiptButtonText,
+                                iconPath = stateValues.drawablePathIconReceipt,
+                                iconRes = stateValues.drawableResIconReceipt.value,
+                                enabled = !configuredReceiptPrinterId.isNullOrBlank(),
+                                onDisabledClick = { postInAppNotification(receiptPrinterNotConfiguredText, NotificationType.Negative, transient = true) },
+                                confirmationRequired = false,
+                                onClick = {
+                                    coroutineScope.launch {
+                                        receiptActionNotification(
+                                            printReceiptEscPos(
+                                                buildReceiptPrinterTestEscPosBytes(
+                                                    title = testReceiptTitle,
+                                                    dateText = receiptUiDateTime(getCurrentTimeMillis())
+                                                ),
+                                                ReceiptTextLabelsDataModel(printerNotConfigured = receiptPrinterNotConfiguredText)
+                                            ),
+                                            testReceiptSentText
+                                        )
+                                    }
+                                }
+                            )
+                            actionButton(
+                                modifier = Modifier.weight(1f),
+                                text = localizedStringResource(1265, "Clear receipt printer"),
+                                iconPath = stateValues.drawablePathIconCancel,
+                                iconRes = stateValues.drawableResIconCancel.value,
+                                enabled = !configuredReceiptPrinterId.isNullOrBlank(),
+                                confirmationRequired = false,
+                                onClick = {
+                                    configureReceiptPrinterDevice(null) { result ->
+                                        coroutineScope.launch {
+                                            receiptActionNotification(result, printerClearedText)
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+                    Text(
+                        text = localizedStringResource(1255, "Detected receipt printers"),
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.accentTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+                    if (receiptPrinters.isEmpty()) {
+                        MessageText(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = stateValues.marginTextFieldGroup),
+                            text = localizedStringResource(1256, "No paired thermal receipt printers found"),
+                            subText = localizedStringResource(1266, "Pair or connect the printer in system settings, then refresh this list."),
+                            textSize = stateValues.textSize,
+                            subTextSize = stateValues.smallTextSize
+                        )
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+                            receiptPrinters.forEach { printer ->
+                                ThermalReceiptPrinterCard(
+                                    printer = printer,
+                                    selected = printer.id == configuredReceiptPrinterId || printer.configured,
+                                    onSelect = {
+                                        configureReceiptPrinterDevice(printer.id) { result ->
+                                            coroutineScope.launch {
+                                                receiptActionNotification(result, printerSelectedText)
+                                            }
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun AppConfiguration.DeviceSettingsCard(
+    title: String,
+    subtitle: String,
+    iconPath: String,
+    iconRes: DrawableResource,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor, RoundedCornerShape(stateValues.cornerRadius))
+            .padding(stateValues.marginTextFieldGroup)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            CpImage(
+                modifier = Modifier.size(28.dp),
+                url = iconPath,
+                fallbackRes = iconRes,
+                contentDescription = title,
+                tintColor = stateValues.AccentColor
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.titleTextSize,
+                    fontWeight = FontWeight.Bold
+                )
+                subtitle.takeIf { it.isNotBlank() }?.let {
+                    Text(
+                        text = it,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        lineHeight = (stateValues.smallTextSize.value * 1.25f).sp
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+        content()
+    }
+}
+
+@Composable
+private fun AppConfiguration.ThermalReceiptPrinterCard(
+    printer: PlatformReceiptPrinterDataModel,
+    selected: Boolean,
+    onSelect: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(if (selected) stateValues.AccentColor.copy(alpha = 0.08f) else stateValues.BackgroundColor)
+            .border(
+                stateValues.unfocusedBorderWidth,
+                if (selected) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+                RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .padding(stateValues.marginTextField),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+    ) {
+        CpImage(
+            modifier = Modifier.size(24.dp),
+            url = stateValues.drawablePathIconReceipt,
+            fallbackRes = stateValues.drawableResIconReceipt.value,
+            contentDescription = printer.name.ifBlank { printer.id },
+            tintColor = if (selected) stateValues.AccentColor else stateValues.TextColor
+        )
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = printer.name.ifBlank { printer.id },
+                color = stateValues.TextColor,
+                fontSize = stateValues.textSize,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            printer.subtitle.takeIf { it.isNotBlank() }?.let {
+                Text(
+                    text = it,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.smallTextSize,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        actionButton(
+            text = if (selected) localizedStringResource(1258, "Selected printer") else localizedStringResource(1257, "Use this printer"),
+            iconPath = if (selected) stateValues.drawablePathIconCheck else stateValues.drawablePathIconDevices,
+            iconRes = if (selected) stateValues.drawableResIconCheck.value else stateValues.drawableResIconDevices.value,
+            enabled = !selected,
+            confirmationRequired = false,
+            fillMaxWidthIfTextPresent = false,
+            onClick = onSelect
+        )
     }
 }
 
@@ -28383,7 +28961,7 @@ fun AppConfiguration.MenuSupportScreen() {
     val sending by supportMessageSendingState.collectAsState()
     val activeTicketId by activeSupportTicketIdState.collectAsState()
 
-    var selectedTab by rememberSaveable { mutableStateOf(0) }
+    var selectedTab by rememberSaveable { mutableStateOf("faq") }
     var faqSearch by rememberSaveable { mutableStateOf("") }
     var draftMessage by rememberSaveable { mutableStateOf("") }
     var selectedCategory by rememberSaveable { mutableStateOf("general") }
@@ -28421,30 +28999,18 @@ fun AppConfiguration.MenuSupportScreen() {
             onBack = { coroutineScope.launch { Navigation.Menu.pop(stateValues.isNarrowScreen) } }
         )
 
-        Row(
+        tabRowWidget(
             modifier = Modifier
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
                 .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2),
-            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
-        ) {
-            actionButton(
-                modifier = Modifier.weight(1f),
-                text = localizedStringResource(814, "FAQ"),
-                iconPath = stateValues.drawablePathIconSearch,
-                enabledColor = if (selectedTab == 0) stateValues.AccentColor else stateValues.DisabledColor,
-                onClick = { selectedTab = 0 }
-            )
-            actionButton(
-                modifier = Modifier.weight(1f),
-                text = localizedStringResource(815, "Support chat"),
-                iconPath = stateValues.drawablePathIconSupport,
-                iconRes = stateValues.drawableResIconSupport.value,
-                enabledColor = if (selectedTab == 1) stateValues.AccentColor else stateValues.DisabledColor,
-                onClick = { selectedTab = 1 }
-            )
-        }
+            tabs = listOf(
+                TabContent("faq", localizedStringResource(814, "FAQ")) { selectedTab = it },
+                TabContent("chat", localizedStringResource(815, "Support chat")) { selectedTab = it }
+            ),
+            selectedIndexInitial = selectedTab
+        )
 
-        if (selectedTab == 0) {
+        if (selectedTab == "faq") {
             val allEntries = supportFaqEntries()
             val query = faqSearch.trim()
             val filtered = allEntries.filter { entry ->
@@ -28718,7 +29284,7 @@ fun AppConfiguration.MenuDebtorsScreen() {
             title = stateValues.stringDebtors,
             iconPath = stateValues.drawablePathIconDebtors,
             trailingIcons = listOf(
-                Triple(stateValues.drawablePathIconSwitch, stateValues.drawableResIconSwitch.value) {
+                Triple(sortActionIconPath(), sortActionIconFallback()) {
                     sortMenuExpanded = !sortMenuExpanded
                 }
             ),
@@ -28743,14 +29309,12 @@ fun AppConfiguration.MenuDebtorsScreen() {
         var sortAscending by rememberSaveable { mutableStateOf(false) }
 
         AnimatedVisibility(visible = sortMenuExpanded) {
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(stateValues.BackgroundColor)
-                    .horizontalScroll(rememberScrollState())
                     .padding(horizontal = stateValues.marginTextField, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
                     text = localizedStringResource(512, "Sort by"),
@@ -28759,30 +29323,26 @@ fun AppConfiguration.MenuDebtorsScreen() {
                     fontWeight = FontWeight.Bold
                 )
 
-                listOf(
-                    "name" to stateValues.stringName,
-                    "created" to localizedStringResource(514, "Time added"),
-                    "paid" to localizedStringResource(1207, "Time paid"),
-                    "amount" to localizedStringResource(581, "Amount")
-                ).forEach { option ->
-                    actionButton(
-                        modifier = Modifier.widthIn(min = 104.dp),
-                        text = option.second,
-                        enabledColor = if (sortId == option.first) stateValues.AccentColor else stateValues.BackgroundColor,
-                        textColor = if (sortId == option.first) stateValues.AccentTextColor else stateValues.TextColor,
-                        fillMaxWidthIfTextPresent = false,
-                        confirmationRequired = false,
-                        onClick = { sortId = option.first }
-                    )
-                }
+                tabRowWidget(
+                    modifier = Modifier.fillMaxWidth(),
+                    tabs = listOf(
+                        TabContent("name", stateValues.stringName) { sortId = it },
+                        TabContent("created", localizedStringResource(514, "Time added")) { sortId = it },
+                        TabContent("paid", localizedStringResource(1207, "Time paid")) { sortId = it },
+                        TabContent("amount", localizedStringResource(581, "Amount")) { sortId = it }
+                    ),
+                    selectedIndexInitial = sortId,
+                    textSize = stateValues.smallTextSize
+                )
 
-                actionButton(
-                    modifier = Modifier.widthIn(min = 132.dp),
-                    text = if (sortAscending) localizedStringResource(515, "Ascending") else localizedStringResource(516, "Descending"),
-                    iconPath = if (sortAscending) stateValues.drawablePathIconExpandLess else stateValues.drawablePathIconExpandMore,
-                    fillMaxWidthIfTextPresent = false,
-                    confirmationRequired = false,
-                    onClick = { sortAscending = !sortAscending }
+                tabRowWidget(
+                    modifier = Modifier.fillMaxWidth(),
+                    tabs = listOf(
+                        TabContent("asc", localizedStringResource(515, "Ascending")) { sortAscending = true },
+                        TabContent("desc", localizedStringResource(516, "Descending")) { sortAscending = false }
+                    ),
+                    selectedIndexInitial = if (sortAscending) "asc" else "desc",
+                    textSize = stateValues.smallTextSize
                 )
             }
         }
@@ -28843,13 +29403,12 @@ fun AppConfiguration.MenuDebtorsScreen() {
                 .padding(stateValues.marginTextField)
         ) {
             if (storeId == null) {
-                item { MessageText(modifier = Modifier.fillParentMaxSize().fillMaxWidth(), text = stateValues.stringNoActiveStore, textColor = stateValues.PlaceholderTextColor) }
+                item { MessageText(modifier = Modifier.fillParentMaxSize().fillMaxWidth(), text = stateValues.stringNoActiveStore) }
             } else if (shownDebtors.isEmpty()) {
                 item {
                     MessageText(
                         modifier = Modifier.fillParentMaxSize().fillMaxWidth(),
-                        text = if (q.isBlank()) stateValues.stringListEmpty else stateValues.stringNoMatches,
-                        textColor = stateValues.PlaceholderTextColor
+                        text = if (q.isBlank()) stateValues.stringListEmpty else stateValues.stringNoMatches
                     )
                 }
             } else {
@@ -29558,8 +30117,339 @@ private data class AnalyticsSummaryCardData(
     val subtitle: String? = null
 )
 
+private fun TransactionDataModel.analyticsTotal(): Double = goodsInTransaction.sumOf { it.quantity * it.pricePerUnit }
+private fun List<TransactionDataModel>.analyticsTyped(type: String): List<TransactionDataModel> = filter { it.type == type }
+
+@Composable
+private fun AppConfiguration.analyticsReportTabTitle(tab: MenuAnalyticsTab): String = when (tab) {
+    MenuAnalyticsTab.Sales -> stateValues.stringSale
+    MenuAnalyticsTab.Returns -> stateValues.stringReturn
+    MenuAnalyticsTab.Acceptance -> stateValues.stringSupply
+    MenuAnalyticsTab.Stock -> stateValues.stringStock
+    MenuAnalyticsTab.Suppliers -> stateValues.stringSuppliers
+    MenuAnalyticsTab.Workers -> stateValues.stringWorkers
+    MenuAnalyticsTab.CashRegister -> localizedStringResource(256, "Cash registers")
+}
+
+@Composable
+private fun AppConfiguration.analyticsReportScopeText(
+    scopeType: String,
+    selectedGoodsItemId: String,
+    selectedSupplierId: String,
+    selectedCategoryId: String
+): String = when (scopeType) {
+    ANALYTICS_SCOPE_GOODS_ITEM -> {
+        val name = stateValues.stock.orEmpty().find { it.id == selectedGoodsItemId }?.name?.visibleLocalizedString(stateValues.appLanguage, selectedGoodsItemId.take(8))
+            ?: selectedGoodsItemId.takeIf { it.isNotBlank() }
+            ?: localizedStringResource(156, "Not specified")
+        "${localizedStringResource(1165, "Goods item")}: $name"
+    }
+    ANALYTICS_SCOPE_SUPPLIER -> {
+        val name = stateValues.suppliers.orEmpty().find { it.id == selectedSupplierId }?.name?.visibleLocalizedString(stateValues.appLanguage, selectedSupplierId.take(8))
+            ?: selectedSupplierId.takeIf { it.isNotBlank() }
+            ?: localizedStringResource(156, "Not specified")
+        "${localizedStringResource(1166, "Supplier")}: $name"
+    }
+    ANALYTICS_SCOPE_CATEGORY -> {
+        val name = stateValues.goodsCategories.orEmpty().find { it.id == selectedCategoryId }?.name?.visibleLocalizedString(stateValues.appLanguage, selectedCategoryId.take(8))
+            ?: selectedCategoryId.takeIf { it.isNotBlank() }
+            ?: localizedStringResource(156, "Not specified")
+        "${localizedStringResource(1167, "Category")}: $name"
+    }
+    else -> localizedStringResource(1164, "All goods")
+}
+
+@Composable
+private fun AppConfiguration.buildAnalyticsReportSnapshotForUi(
+    selectedTab: MenuAnalyticsTab,
+    periodPresetId: String,
+    startDateText: String,
+    endDateText: String,
+    analyticsScopeType: String,
+    selectedAnalyticsGoodsItemId: String,
+    selectedAnalyticsSupplierId: String,
+    selectedAnalyticsCategoryId: String,
+    scopedTransactions: List<TransactionDataModel>,
+    stock: List<GoodsItemDataModel>,
+    batches: List<GoodsBatchDataModel>,
+    suppliers: List<SupplierDataModel>,
+    workers: List<StoreWorkerDataModel>,
+    cashRegister: StoreCashRegisterDataModel?,
+    cashRegisterEvents: List<CashRegisterEventDataModel>,
+    dashboard: StoreAnalyticsDashboardDataModel?,
+    currencyCode: String,
+    generatedAtMillis: Long
+): AnalyticsReportSnapshotDataModel {
+    fun row(title: String, value: String, note: String = "") = AnalyticsReportRowDataModel(title, value, note)
+    val reportCurrency = dashboard?.currencyCode?.takeIf { it.isNotBlank() } ?: currencyCode
+    val sales = scopedTransactions.analyticsTyped("purchase")
+    val returns = scopedTransactions.analyticsTyped("return")
+    val supply = scopedTransactions.analyticsTyped("accept")
+    val periodText = if (periodPresetId == "all") localizedStringResource(425, "All period") else "$startDateText — $endDateText"
+    val scopeText = analyticsReportScopeText(analyticsScopeType, selectedAnalyticsGoodsItemId, selectedAnalyticsSupplierId, selectedAnalyticsCategoryId)
+    val storeName = stateValues.stores.orEmpty().findStoreOrBranchForUi(stateValues.activeStoreId)?.name?.visibleLocalizedString(stateValues.appLanguage, stateValues.activeStoreId.orEmpty().take(8))
+        ?: localizedStringResource(38, "Store")
+
+    val summaryRows = dashboard?.let { d ->
+        listOf(
+            row(localizedStringResource(694, "Gross sales"), d.grossSales.money(reportCurrency)),
+            row(localizedStringResource(695, "Returns amount"), d.returnsAmount.money(reportCurrency)),
+            row(localizedStringResource(697, "Net revenue"), d.netRevenue.money(reportCurrency)),
+            row(localizedStringResource(673, "Gross profit estimate"), d.estimatedGrossProfit.money(reportCurrency), localizedStringResource(690, "Estimated from current/latest supply prices")),
+            row(localizedStringResource(674, "Margin"), d.estimatedMarginPercent.percentText()),
+            row(localizedStringResource(706, "Transactions"), d.transactionCount.toString()),
+            row(stateValues.stringItems, d.soldQuantity.cleanNumber()),
+            row(stateValues.stringCash, d.cashTotal.money(reportCurrency)),
+            row(localizedStringResource(357, "Cashless"), d.cashlessTotal.money(reportCurrency)),
+            row(stateValues.stringDebt, d.debtTotal.money(reportCurrency))
+        )
+    } ?: listOf(
+        row(localizedStringResource(694, "Gross sales"), sales.sumOf { it.analyticsTotal() }.money(reportCurrency)),
+        row(localizedStringResource(695, "Returns amount"), returns.sumOf { it.analyticsTotal() }.money(reportCurrency)),
+        row(localizedStringResource(706, "Transactions"), scopedTransactions.size.toString()),
+        row(stateValues.stringItems, scopedTransactions.flatMap { it.goodsInTransaction }.sumOf { it.quantity }.cleanNumber()),
+        row(stateValues.stringCash, scopedTransactions.sumOf { it.paidCash }.money(reportCurrency)),
+        row(localizedStringResource(357, "Cashless"), scopedTransactions.sumOf { it.paidCard }.money(reportCurrency))
+    )
+
+    fun transactionRows(transactions: List<TransactionDataModel>): List<AnalyticsReportRowDataModel> {
+        val total = transactions.sumOf { it.analyticsTotal() }
+        val cash = transactions.sumOf { it.paidCash }
+        val cashless = transactions.sumOf { it.paidCard }
+        val debt = (total - cash - cashless).coerceAtLeast(0.0)
+        return listOf(
+            row(localizedStringResource(706, "Transactions"), transactions.size.toString()),
+            row(stateValues.stringTotal, total.money(reportCurrency)),
+            row(stateValues.stringCash, cash.money(reportCurrency)),
+            row(localizedStringResource(357, "Cashless"), cashless.money(reportCurrency)),
+            row(stateValues.stringDebt, debt.money(reportCurrency)),
+            row(stateValues.stringItems, transactions.flatMap { it.goodsInTransaction }.sumOf { it.quantity }.cleanNumber())
+        )
+    }
+
+    val selectedRows = when (selectedTab) {
+        MenuAnalyticsTab.Sales -> transactionRows(sales)
+        MenuAnalyticsTab.Returns -> transactionRows(returns)
+        MenuAnalyticsTab.Acceptance -> transactionRows(supply)
+        MenuAnalyticsTab.Stock -> listOf(
+            row(stateValues.stringItems, stock.size.toString()),
+            row(localizedStringResource(280, "Active items"), stock.count { it.isActive }.toString()),
+            row(stateValues.stringBatches, batches.size.toString()),
+            row(localizedStringResource(284, "Active batches"), batches.count { it.isActive }.toString()),
+            row(localizedStringResource(683, "Inventory value at sale price"), (dashboard?.stockValueAtSalePrice ?: 0.0).money(reportCurrency)),
+            row(localizedStringResource(684, "Inventory value at supply cost"), (dashboard?.stockValueAtSupplyPrice ?: 0.0).money(reportCurrency)),
+            row(localizedStringResource(685, "Low stock items"), (dashboard?.lowStockItemCount ?: 0).toString()),
+            row(localizedStringResource(687, "Expired batches"), (dashboard?.expiredBatchCount ?: 0).toString())
+        )
+        MenuAnalyticsTab.Suppliers -> listOf(
+            row(stateValues.stringSuppliers, suppliers.count { it.isActive }.toString()),
+            row(localizedStringResource(706, "Transactions"), supply.size.toString()),
+            row(localizedStringResource(707, "Accepted goods value"), (dashboard?.supplyCost ?: supply.sumOf { it.analyticsTotal() }).money(reportCurrency))
+        )
+        MenuAnalyticsTab.Workers -> listOf(
+            row(stateValues.stringWorkers, workers.count { it.isActive }.toString()),
+            row(localizedStringResource(654, "Admin"), workers.count { it.roleId == WORKER_ROLE_ADMIN || it.roleId == WORKER_ROLE_OWNER }.toString()),
+            row(localizedStringResource(655, "Worker"), workers.count { it.roleId == WORKER_ROLE_STANDARD }.toString()),
+            row(localizedStringResource(706, "Transactions"), scopedTransactions.size.toString())
+        )
+        MenuAnalyticsTab.CashRegister -> listOf(
+            row(localizedStringResource(327, "Current amount"), (cashRegister?.currentAmount ?: 0.0).money(reportCurrency)),
+            row(localizedStringResource(417, "Events"), cashRegisterEvents.size.toString()),
+            row(stateValues.stringSale, sales.sumOf { it.paidCash }.money(reportCurrency)),
+            row(stateValues.stringReturn, returns.sumOf { it.paidCash }.money(reportCurrency)),
+            row(localizedStringResource(662, "Cash extractions"), cashRegisterEvents.filter { it.type == CASH_REGISTER_EVENT_EXTRACTION }.sumOf { it.amount }.money(reportCurrency))
+        )
+    }
+
+    val selectedNotes = if (selectedTab == MenuAnalyticsTab.Sales) {
+        dashboard?.topItemsByRevenue.orEmpty().take(5).mapIndexed { index, item ->
+            "${index + 1}. ${item.name.visibleLocalizedString(stateValues.appLanguage, item.id.take(8))}: ${item.amount.money(item.currencyCode.ifBlank { reportCurrency })} · ${item.quantity.cleanNumber()}"
+        }
+    } else emptyList()
+
+    return AnalyticsReportSnapshotDataModel(
+        title = localizedStringResource(1239, "Analytics report"),
+        storeName = storeName,
+        periodText = periodText,
+        scopeText = scopeText,
+        generatedAtMillis = generatedAtMillis,
+        sections = listOf(
+            AnalyticsReportSectionDataModel(localizedStringResource(412, "Summary"), summaryRows),
+            AnalyticsReportSectionDataModel(analyticsReportTabTitle(selectedTab), selectedRows, selectedNotes),
+            AnalyticsReportSectionDataModel(
+                localizedStringResource(1274, "Filters"),
+                listOf(
+                    row(localizedStringResource(1271, "Report period"), periodText),
+                    row(localizedStringResource(1272, "Report scope"), scopeText),
+                    row(localizedStringResource(1273, "Selected analytics tab"), analyticsReportTabTitle(selectedTab)),
+                    row(localizedStringResource(1275, "Generated"), receiptUiDateTime(generatedAtMillis))
+                )
+            )
+        )
+    )
+}
+
+@Composable
+private fun AppConfiguration.AnalyticsReportPreview(snapshot: AnalyticsReportSnapshotDataModel, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(Color.White)
+            .border(stateValues.unfocusedBorderWidth, Color(0xFFE0E0E0), RoundedCornerShape(stateValues.cornerRadius))
+            .verticalScroll(rememberScrollState())
+            .padding(18.dp)
+    ) {
+        Text(snapshot.title.uppercase(), color = Color.Black, fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+        Text(snapshot.storeName, color = Color.Black, fontSize = stateValues.textSize, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
+        Text("${snapshot.periodText} · ${snapshot.scopeText}", color = Color(0xFF333333), fontSize = stateValues.smallTextSize, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
+        Text(receiptUiDateTime(snapshot.generatedAtMillis), color = Color(0xFF333333), fontSize = stateValues.smallTextSize, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 2.dp))
+        Spacer(modifier = Modifier.height(12.dp))
+        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFF222222)))
+        Spacer(modifier = Modifier.height(12.dp))
+        snapshot.sections.forEach { section ->
+            Text(section.title, color = Color.Black, fontSize = stateValues.textSize, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp))
+            section.rows.forEach { row ->
+                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.Top) {
+                    Text(row.title, color = Color.Black, fontSize = stateValues.smallTextSize, modifier = Modifier.weight(1f))
+                    Text(row.value, color = Color.Black, fontSize = stateValues.smallTextSize, fontWeight = FontWeight.Bold, textAlign = TextAlign.End, modifier = Modifier.weight(0.8f))
+                }
+                if (row.note.isNotBlank()) {
+                    Text(row.note, color = Color(0xFF333333), fontSize = stateValues.smallTextSize, modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp))
+                }
+            }
+            section.notes.forEach { note ->
+                Text(note, color = Color(0xFF333333), fontSize = stateValues.smallTextSize, modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp))
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFF222222)))
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+    }
+}
+
+@Composable
+private fun AppConfiguration.AnalyticsReportBottomSheet(snapshot: AnalyticsReportSnapshotDataModel, onDismiss: () -> Unit) {
+    val fileName = remember(snapshot) { snapshot.analyticsReportPdfFileName() }
+    val pdfBytes = remember(snapshot) { snapshot.buildAnalyticsReportPdfBytes() }
+    val saveNotConfiguredText = localizedStringResource(1267, "PDF export is not configured for this platform")
+    val shareNotConfiguredText = localizedStringResource(1268, "PDF sharing is not configured for this platform")
+    val printNotConfiguredText = localizedStringResource(1269, "Paper document printing is not configured for this platform")
+    val saveSuccessText = localizedStringResource(1246, "Report PDF saved")
+    val shareSuccessText = localizedStringResource(1247, "Report PDF shared")
+    val printSuccessText = localizedStringResource(1248, "Report opened for printing")
+
+    AitaBottomSheet(
+        title = localizedStringResource(1239, "Analytics report"),
+        iconPath = stateValues.drawablePathIconAnalyticsReport,
+        iconRes = stateValues.drawableResIconAnalyticsReport.value,
+        onDismiss = onDismiss
+    ) {
+        MessageText(
+            modifier = Modifier.fillMaxWidth(),
+            text = localizedStringResource(1240, "Printable summary"),
+            subText = localizedStringResource(1249, "Transaction receipts use ESC/POS thermal printers. Analytics reports use A4 paper printing."),
+            textSize = stateValues.textSize,
+            subTextSize = stateValues.smallTextSize
+        )
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+        AnalyticsReportPreview(snapshot = snapshot, modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+        if (stateValues.isNarrowScreen) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1243, "Save report PDF"),
+                    iconPath = stateValues.drawablePathIconReceipt,
+                    iconRes = stateValues.drawableResIconReceipt.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            receiptActionNotification(savePdfDocument(fileName, pdfBytes, saveNotConfiguredText), saveSuccessText)
+                        }
+                    }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1244, "Share report PDF"),
+                    iconPath = stateValues.drawablePathIconShare,
+                    iconRes = stateValues.drawableResIconShare.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            receiptActionNotification(sharePdfDocument(fileName, pdfBytes, shareNotConfiguredText), shareSuccessText)
+                        }
+                    }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1245, "Print report"),
+                    iconPath = stateValues.drawablePathIconDevices,
+                    iconRes = stateValues.drawableResIconDevices.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            receiptActionNotification(printPdfDocument(fileName, pdfBytes, printNotConfiguredText), printSuccessText)
+                        }
+                    }
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1243, "Save report PDF"),
+                    iconPath = stateValues.drawablePathIconReceipt,
+                    iconRes = stateValues.drawableResIconReceipt.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            receiptActionNotification(savePdfDocument(fileName, pdfBytes, saveNotConfiguredText), saveSuccessText)
+                        }
+                    }
+                )
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1244, "Share report PDF"),
+                    iconPath = stateValues.drawablePathIconShare,
+                    iconRes = stateValues.drawableResIconShare.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            receiptActionNotification(sharePdfDocument(fileName, pdfBytes, shareNotConfiguredText), shareSuccessText)
+                        }
+                    }
+                )
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1245, "Print report"),
+                    iconPath = stateValues.drawablePathIconDevices,
+                    iconRes = stateValues.drawableResIconDevices.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            receiptActionNotification(printPdfDocument(fileName, pdfBytes, printNotConfiguredText), printSuccessText)
+                        }
+                    }
+                )
+            }
+        }
+    }
+}
+
+
 @Composable
 fun AppConfiguration.MenuAnalyticsScreen() {
+    var showAnalyticsReportSheet by rememberSaveable { mutableStateOf(false) }
+
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -29567,6 +30457,11 @@ fun AppConfiguration.MenuAnalyticsScreen() {
         ScreenAppBarWidget(
             title = stateValues.stringAnalytics,
             iconPath = stateValues.drawablePathIconAnalytics,
+            trailingIcons = listOf(
+                Triple(stateValues.drawablePathIconAnalyticsReport, stateValues.drawableResIconAnalyticsReport.value) {
+                    showAnalyticsReportSheet = true
+                }
+            ),
             onBack = {
                 coroutineScope.launch {
                     Navigation.Menu.pop(stateValues.isNarrowScreen)
@@ -29763,28 +30658,23 @@ fun AppConfiguration.MenuAnalyticsScreen() {
             "custom" to localizedStringResource(386, "Custom period")
         )
 
-        LazyRow(
+        tabRowWidget(
             modifier = Modifier
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
                 .padding(horizontal = stateValues.marginTextField),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            contentPadding = PaddingValues(vertical = 2.dp)
-        ) {
-            items(periodOptions) { option ->
-                TransactionHistoryFilterChip(
-                    text = option.second,
-                    selected = periodPresetId == option.first,
-                    onClick = {
-                        periodPresetId = option.first
-                        if (option.first != "custom") {
-                            val range = transactionHistoryPresetDates(option.first)
-                            startDateText = range.first
-                            endDateText = range.second
-                        }
+            tabs = periodOptions.map { option ->
+                TabContent(option.first, option.second) { selectedPeriodId ->
+                    periodPresetId = selectedPeriodId
+                    if (selectedPeriodId != "custom") {
+                        val range = transactionHistoryPresetDates(selectedPeriodId)
+                        startDateText = range.first
+                        endDateText = range.second
                     }
-                )
-            }
-        }
+                }
+            },
+            selectedIndexInitial = periodPresetId,
+            textSize = stateValues.smallTextSize
+        )
 
         Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
@@ -29835,21 +30725,18 @@ fun AppConfiguration.MenuAnalyticsScreen() {
             ANALYTICS_SCOPE_CATEGORY to localizedStringResource(1167, "Category")
         )
 
-        LazyRow(
+        tabRowWidget(
             modifier = Modifier
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
                 .padding(horizontal = stateValues.marginTextField),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            contentPadding = PaddingValues(vertical = 2.dp)
-        ) {
-            items(analyticsScopeOptions) { option ->
-                TransactionHistoryFilterChip(
-                    text = option.second,
-                    selected = analyticsScopeType == option.first,
-                    onClick = { analyticsScopeType = option.first }
-                )
-            }
-        }
+            tabs = analyticsScopeOptions.map { option ->
+                TabContent(option.first, option.second) { selectedScopeId ->
+                    analyticsScopeType = selectedScopeId
+                }
+            },
+            selectedIndexInitial = analyticsScopeType,
+            textSize = stateValues.smallTextSize
+        )
 
         val analyticsGoodsItemDomains = remember(stockForAnalytics, stateValues.appLanguage) {
             stockForAnalytics
@@ -29896,18 +30783,16 @@ fun AppConfiguration.MenuAnalyticsScreen() {
                 if (analyticsGoodsItemDomains.isNotEmpty()) {
                     val selectedInitial = selectedAnalyticsGoodsItemId.takeIf { selected -> analyticsGoodsItemDomains.any { it.id == selected } }
                         ?: analyticsGoodsItemDomains.first().id
-                    val selector = domainSelectionTextField(
+                    val selector = dropdownListWidget(
                         modifier = Modifier
                             .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
                             .padding(horizontal = stateValues.marginTextField, vertical = 4.dp),
                         titleText = localizedStringResource(1168, "Select exact analytics target"),
-                        stateHost = NavigationScreenModel.Menu.Analytics,
-                        stateKey = "analytics_scope_goods_item",
                         domains = analyticsGoodsItemDomains,
                         selectedInitial = selectedInitial,
-                        valueInitial = analyticsGoodsItemDomains.firstOrNull { it.id == selectedInitial }?.name?.extractLocalizedString(stateValues.appLanguage).orEmpty(),
-                        selectionSecondaryEnabled = false,
-                        keyboardType = KeyboardType.Text
+                        showId = true,
+                        showName = true,
+                        search = Triple(stateValues.stringSearchByAnyData, NavigationScreenModel.Menu.Analytics, "analytics_scope_goods_item_search")
                     )
                     LaunchedEffect(selector.selectedId) { selectedAnalyticsGoodsItemId = selector.selectedId }
                 }
@@ -29916,18 +30801,16 @@ fun AppConfiguration.MenuAnalyticsScreen() {
                 if (analyticsSupplierDomains.isNotEmpty()) {
                     val selectedInitial = selectedAnalyticsSupplierId.takeIf { selected -> analyticsSupplierDomains.any { it.id == selected } }
                         ?: analyticsSupplierDomains.first().id
-                    val selector = domainSelectionTextField(
+                    val selector = dropdownListWidget(
                         modifier = Modifier
                             .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
                             .padding(horizontal = stateValues.marginTextField, vertical = 4.dp),
                         titleText = localizedStringResource(1168, "Select exact analytics target"),
-                        stateHost = NavigationScreenModel.Menu.Analytics,
-                        stateKey = "analytics_scope_supplier",
                         domains = analyticsSupplierDomains,
                         selectedInitial = selectedInitial,
-                        valueInitial = analyticsSupplierDomains.firstOrNull { it.id == selectedInitial }?.name?.extractLocalizedString(stateValues.appLanguage).orEmpty(),
-                        selectionSecondaryEnabled = false,
-                        keyboardType = KeyboardType.Text
+                        showId = true,
+                        showName = true,
+                        search = Triple(stateValues.stringSearchByAnyData, NavigationScreenModel.Menu.Analytics, "analytics_scope_supplier_search")
                     )
                     LaunchedEffect(selector.selectedId) { selectedAnalyticsSupplierId = selector.selectedId }
                 }
@@ -29936,18 +30819,16 @@ fun AppConfiguration.MenuAnalyticsScreen() {
                 if (analyticsCategoryDomains.isNotEmpty()) {
                     val selectedInitial = selectedAnalyticsCategoryId.takeIf { selected -> analyticsCategoryDomains.any { it.id == selected } }
                         ?: analyticsCategoryDomains.first().id
-                    val selector = domainSelectionTextField(
+                    val selector = dropdownListWidget(
                         modifier = Modifier
                             .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
                             .padding(horizontal = stateValues.marginTextField, vertical = 4.dp),
                         titleText = localizedStringResource(1168, "Select exact analytics target"),
-                        stateHost = NavigationScreenModel.Menu.Analytics,
-                        stateKey = "analytics_scope_category",
                         domains = analyticsCategoryDomains,
                         selectedInitial = selectedInitial,
-                        valueInitial = analyticsCategoryDomains.firstOrNull { it.id == selectedInitial }?.name?.extractLocalizedString(stateValues.appLanguage).orEmpty(),
-                        selectionSecondaryEnabled = false,
-                        keyboardType = KeyboardType.Text
+                        showId = true,
+                        showName = true,
+                        search = Triple(stateValues.stringSearchByAnyData, NavigationScreenModel.Menu.Analytics, "analytics_scope_category_search")
                     )
                     LaunchedEffect(selector.selectedId) { selectedAnalyticsCategoryId = selector.selectedId }
                 }
@@ -29958,6 +30839,46 @@ fun AppConfiguration.MenuAnalyticsScreen() {
 
         val selectedTab = MenuAnalyticsTab.fromId(selectedTabContent.id)
         val currencyCode = cashRegister?.currencyCode?.takeIf { it.isNotBlank() } ?: currentAnalyticsCurrencyCode()
+        val workersPayload by storeWorkerMembershipsState.payload.collectAsState()
+        val workers = workersPayload.orEmpty()
+        val analyticsReportGeneratedAt = remember(
+            showAnalyticsReportSheet,
+            selectedTab,
+            periodPresetId,
+            startDateText,
+            endDateText,
+            analyticsScopeType,
+            selectedAnalyticsGoodsItemId,
+            selectedAnalyticsSupplierId,
+            selectedAnalyticsCategoryId
+        ) { getCurrentTimeMillis() }
+        val analyticsReportSnapshot = buildAnalyticsReportSnapshotForUi(
+            selectedTab = selectedTab,
+            periodPresetId = periodPresetId,
+            startDateText = startDateText,
+            endDateText = endDateText,
+            analyticsScopeType = analyticsScopeType,
+            selectedAnalyticsGoodsItemId = selectedAnalyticsGoodsItemId,
+            selectedAnalyticsSupplierId = selectedAnalyticsSupplierId,
+            selectedAnalyticsCategoryId = selectedAnalyticsCategoryId,
+            scopedTransactions = scopedTransactions,
+            stock = stockForAnalytics,
+            batches = stockBatchesForAnalytics,
+            suppliers = suppliersForAnalytics,
+            workers = workers,
+            cashRegister = cashRegister,
+            cashRegisterEvents = scopedCashRegisterEvents,
+            dashboard = analyticsDashboard,
+            currencyCode = currencyCode,
+            generatedAtMillis = analyticsReportGeneratedAt
+        )
+
+        if (showAnalyticsReportSheet) {
+            AnalyticsReportBottomSheet(
+                snapshot = analyticsReportSnapshot,
+                onDismiss = { showAnalyticsReportSheet = false }
+            )
+        }
 
         when (selectedTab) {
             MenuAnalyticsTab.Sales -> {
@@ -30004,8 +30925,6 @@ fun AppConfiguration.MenuAnalyticsScreen() {
             }
 
             MenuAnalyticsTab.Workers -> {
-                val workersPayload by storeWorkerMembershipsState.payload.collectAsState()
-                val workers = workersPayload.orEmpty()
                 MenuAnalyticsWorkersScreen(
                     workers = workers,
                     transactions = scopedTransactions,
@@ -30737,22 +31656,18 @@ private fun AppConfiguration.AnalyticsPeriodSelector(
         AnalyticsPeriodPreset.All to stateValues.stringAll
     )
 
-    Row(
+    tabRowWidget(
         modifier = Modifier
             .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
             .padding(horizontal = stateValues.marginTextField),
-        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
-    ) {
-        presets.forEach { (preset, title) ->
-            AnalyticsPill(
-                modifier = Modifier.weight(1f),
-                text = title,
-                selected = selectedPeriodId == preset.id
-            ) {
-                onSelected(preset.id)
+        tabs = presets.map { (preset, title) ->
+            TabContent(preset.id, title) { selectedPresetId ->
+                onSelected(selectedPresetId)
             }
-        }
-    }
+        },
+        selectedIndexInitial = selectedPeriodId,
+        textSize = stateValues.smallTextSize
+    )
 
     Spacer(modifier = Modifier.height(stateValues.marginTextField))
 }
@@ -31940,19 +32855,19 @@ private fun AppConfiguration.CloudConnectionStatusBanner() {
     val localMode = userAccount != null && localNetwork.enabled && !connected && !authRefreshRequired
 
     val rawStatusKey = when {
-        authRefreshRequired -> "auth_refresh"
-        manualRefreshInProgress -> "checking"
         transportUnavailable -> "unavailable"
+        authRefreshRequired -> "auth_refresh"
         connectedToRealtime -> "realtime"
-        localMode -> "local"
         transportReachable -> "reachable"
+        localMode -> "local"
+        manualRefreshInProgress -> "checking"
         else -> "checking"
     }
     var displayedStatusKey by rememberSaveable { mutableStateOf(rawStatusKey) }
     LaunchedEffect(rawStatusKey) {
         if (rawStatusKey == displayedStatusKey) return@LaunchedEffect
         val delayMillis = when {
-            rawStatusKey == "auth_refresh" || rawStatusKey == "realtime" || rawStatusKey == "reachable" -> 0L
+            rawStatusKey == "auth_refresh" || rawStatusKey == "realtime" || rawStatusKey == "reachable" || rawStatusKey == "unavailable" -> 0L
             displayedStatusKey == "auth_refresh" && rawStatusKey == "checking" -> 3_000L
             rawStatusKey == "checking" -> 1_200L
             else -> 900L
@@ -32053,7 +32968,6 @@ private fun String.isSessionRefreshPopupText(): Boolean {
         "cloud session needs refresh",
         "session needs refresh",
         "you remain signed in locally",
-        "server could not refresh session",
         "облачный сеанс",
         "сеанс нужно обновить",
         "остаётесь в аккаунте локально",
@@ -32211,6 +33125,12 @@ fun AppConfiguration.MainScreen() {
         if (stateValues.userAccount != null && !storeId.isNullOrBlank()) {
             getMyWorkerMemberships()
             getCurrentWorkshift(storeId)
+        }
+    }
+
+    LaunchedEffect(stateValues.activeStoreId) {
+        if (stateValues.activeStoreId.isNullOrBlank()) {
+            Navigation.resetStoreScopedNavigationForNoActiveStore()
         }
     }
 
@@ -32778,8 +33698,7 @@ fun AppConfiguration.NotificationsScreen(
                         modifier = Modifier
                             .fillParentMaxSize()
                             .padding(vertical = stateValues.marginTextFieldGroup),
-                        text = if (search.isBlank()) stateValues.stringListEmpty else localizedStringResource(193, "No notifications match this search"),
-                        textColor = stateValues.PlaceholderTextColor
+                        text = if (search.isBlank()) stateValues.stringListEmpty else localizedStringResource(193, "No notifications match this search")
                     )
                 }
             } else {
@@ -33211,6 +34130,12 @@ private fun localDrawableResourceForPath(
         "58_1" -> Res.drawable._58_1
         "59_0" -> Res.drawable._59_0
         "59_1" -> Res.drawable._59_1
+        "60_0" -> Res.drawable._60_0
+        "60_1" -> Res.drawable._60_1
+        "61_0" -> Res.drawable._61_0
+        "61_1" -> Res.drawable._61_1
+        "62_0" -> Res.drawable._62_0
+        "62_1" -> Res.drawable._62_1
         else -> fallbackRes
     }
 }
@@ -33481,7 +34406,11 @@ private fun AppConfiguration.StockBatchShelfPreviewCard(
                 indication = ripple(color = stateValues.AccentColor)
             ) {
                 stateValues.activeStoreId?.let { storeId ->
-                    setActiveShelfBatch(batch, storeId)
+                    setActiveShelfBatch(
+                        batch = batch,
+                        storeId = storeId,
+                        previousActiveShelfBatchId = goodsItem.activeShelfBatchId
+                    )
                 }
             }
             .padding(10.dp)
@@ -35352,7 +36281,7 @@ fun AppConfiguration.dropdownListWidget(
             AnimatedVisibility(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 0.dp, max = stateValues.screenHeight / 3),
+                    .heightIn(min = 0.dp, max = stateValues.screenHeight / 4),
                 visibleState = isDomainSelectionDropdownExpandedState,
                 enter = expandVertically(),
                 exit = shrinkVertically()
@@ -36558,6 +37487,9 @@ object AppConfiguration {
         val drawablePathIconAnalytics: String
         val drawableResIconAnalytics: StateFlow<DrawableResource>
 
+        val drawablePathIconAnalyticsReport: String
+        val drawableResIconAnalyticsReport: StateFlow<DrawableResource>
+
         val drawablePathIconWorkers: String
         val drawableResIconWorkers: StateFlow<DrawableResource>
 
@@ -36611,6 +37543,9 @@ object AppConfiguration {
 
         val drawablePathIconSwitch: String
         val drawableResIconSwitch: StateFlow<DrawableResource>
+
+        val drawablePathIconSort: String
+        val drawableResIconSort: StateFlow<DrawableResource>
 
         val drawablePathIconCart: String
         val drawableResIconCart: StateFlow<DrawableResource>
@@ -37120,6 +38055,10 @@ object AppConfiguration {
             private val _drawableResIconAnalytics = MutableStateFlow(Res.drawable._21_0)
             override val drawableResIconAnalytics: StateFlow<DrawableResource> = _drawableResIconAnalytics.asStateFlow()
 
+            override val drawablePathIconAnalyticsReport: String by drawablePathIconAnalyticsReportState.collectAsState()
+            private val _drawableResIconAnalyticsReport = MutableStateFlow(Res.drawable._62_0)
+            override val drawableResIconAnalyticsReport: StateFlow<DrawableResource> = _drawableResIconAnalyticsReport.asStateFlow()
+
             override val drawablePathIconWorkers: String by drawablePathIconWorkersState.collectAsState()
             private val _drawableResIconWorkers = MutableStateFlow(Res.drawable._22_0)
             override val drawableResIconWorkers: StateFlow<DrawableResource> = _drawableResIconWorkers.asStateFlow()
@@ -37195,6 +38134,10 @@ object AppConfiguration {
             override val drawablePathIconSwitch: String by drawablePathIconSwitchState.collectAsState()
             private val _drawableResIconSwitch = MutableStateFlow(Res.drawable._35_0)
             override val drawableResIconSwitch: StateFlow<DrawableResource> = _drawableResIconSwitch.asStateFlow()
+
+            override val drawablePathIconSort: String by drawablePathIconSortState.collectAsState()
+            private val _drawableResIconSort = MutableStateFlow(Res.drawable._61_0)
+            override val drawableResIconSort: StateFlow<DrawableResource> = _drawableResIconSort.asStateFlow()
 
             override val drawablePathIconCart: String by drawablePathIconCartState.collectAsState()
             private val _drawableResIconCart = MutableStateFlow(Res.drawable._36_0)
@@ -37303,6 +38246,7 @@ object AppConfiguration {
                 _drawableResIconPromos.emit(if (stateValues.appThemeId == 1L) Res.drawable._50_1 else Res.drawable._50_0)
 
                 _drawableResIconAnalytics.emit(if (stateValues.appThemeId == 1L) Res.drawable._21_1 else Res.drawable._21_0)
+                _drawableResIconAnalyticsReport.emit(if (stateValues.appThemeId == 1L) Res.drawable._62_1 else Res.drawable._62_0)
 
                 _drawableResIconWorkers.emit(if (stateValues.appThemeId == 1L) Res.drawable._22_1 else Res.drawable._22_0)
 
@@ -37339,6 +38283,7 @@ object AppConfiguration {
                 _drawableResIconExit.emit(if (stateValues.appThemeId == 1L) Res.drawable._34_1 else Res.drawable._34_0)
 
                 _drawableResIconSwitch.emit(if (stateValues.appThemeId == 1L) Res.drawable._35_1 else Res.drawable._35_0)
+                _drawableResIconSort.emit(if (stateValues.appThemeId == 1L) Res.drawable._61_1 else Res.drawable._61_0)
 
                 _drawableResIconCart.emit(if (stateValues.appThemeId == 1L) Res.drawable._36_1 else Res.drawable._36_0)
 

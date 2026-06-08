@@ -8,7 +8,7 @@
       "second": "0"
     },
     "serverUrl": {
-      "first": "http://172.20.10.2:8080",
+      "first": "http://192.168.1.51:8080",
       "second": "1"
     },
     "globalAppConfigurationPath": {
@@ -1072,10 +1072,14 @@
     "removeStoreWorkerPath": {
       "first": "workers/remove",
       "second": "105"
+    },
+    "confirmStoreWorkerRemovalPath": {
+      "first": "workers/removal/confirm",
+      "second": "106"
+    },
+    "declineStoreWorkerRemovalPath": {
+      "first": "workers/removal/decline",
+      "second": "107"
     }
-  },
-  "getStoreAnalyticsPath": {
-    "first": "analytics/store/get",
-    "second": "94"
   }
 }
