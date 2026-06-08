@@ -777,7 +777,7 @@ object LabelPrinterAndroidBridge {
             ?.takeIf { it.isNotBlank() }
     }
 
-    fun configureProtocol(protocol: String) {
+    fun configureProtocol(protocol: String?) {
         labelPrinterProtocol = normalizeLabelPrinterProtocol(protocol)
     }
 

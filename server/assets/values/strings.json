@@ -25600,6 +25600,258 @@
           "value": "Осы жапсырма принтерін қолдану"
         }
       ]
+    },
+    {
+      "id": 1304,
+      "values": [
+        {
+          "language": "main",
+          "value": "Parent store phone"
+        },
+        {
+          "language": "en",
+          "value": "Parent store phone"
+        },
+        {
+          "language": "ru",
+          "value": "Телефон родительского магазина"
+        },
+        {
+          "language": "kk",
+          "value": "Негізгі дүкен телефоны"
+        }
+      ]
+    },
+    {
+      "id": 1305,
+      "values": [
+        {
+          "language": "main",
+          "value": "My phone"
+        },
+        {
+          "language": "en",
+          "value": "My phone"
+        },
+        {
+          "language": "ru",
+          "value": "Мой телефон"
+        },
+        {
+          "language": "kk",
+          "value": "Менің телефоным"
+        }
+      ]
+    },
+    {
+      "id": 1306,
+      "values": [
+        {
+          "language": "main",
+          "value": "Parent store email"
+        },
+        {
+          "language": "en",
+          "value": "Parent store email"
+        },
+        {
+          "language": "ru",
+          "value": "Email родительского магазина"
+        },
+        {
+          "language": "kk",
+          "value": "Негізгі дүкен email"
+        }
+      ]
+    },
+    {
+      "id": 1307,
+      "values": [
+        {
+          "language": "main",
+          "value": "My email"
+        },
+        {
+          "language": "en",
+          "value": "My email"
+        },
+        {
+          "language": "ru",
+          "value": "Мой email"
+        },
+        {
+          "language": "kk",
+          "value": "Менің email"
+        }
+      ]
+    },
+    {
+      "id": 1308,
+      "values": [
+        {
+          "language": "main",
+          "value": "Return reason"
+        },
+        {
+          "language": "en",
+          "value": "Return reason"
+        },
+        {
+          "language": "ru",
+          "value": "Причина возврата"
+        },
+        {
+          "language": "kk",
+          "value": "Қайтару себебі"
+        }
+      ]
+    },
+    {
+      "id": 1309,
+      "values": [
+        {
+          "language": "main",
+          "value": "Expires very soon"
+        },
+        {
+          "language": "en",
+          "value": "Expires very soon"
+        },
+        {
+          "language": "ru",
+          "value": "Срок скоро истечёт"
+        },
+        {
+          "language": "kk",
+          "value": "Жарамдылық мерзімі жақында бітеді"
+        }
+      ]
+    },
+    {
+      "id": 1310,
+      "values": [
+        {
+          "language": "main",
+          "value": "Fresh"
+        },
+        {
+          "language": "en",
+          "value": "Fresh"
+        },
+        {
+          "language": "ru",
+          "value": "Свежие"
+        },
+        {
+          "language": "kk",
+          "value": "Жарамды"
+        }
+      ]
+    },
+    {
+      "id": 1311,
+      "values": [
+        {
+          "language": "main",
+          "value": "Returned items"
+        },
+        {
+          "language": "en",
+          "value": "Returned items"
+        },
+        {
+          "language": "ru",
+          "value": "Возвращённые товары"
+        },
+        {
+          "language": "kk",
+          "value": "Қайтарылған тауарлар"
+        }
+      ]
+    },
+    {
+      "id": 1312,
+      "values": [
+        {
+          "language": "main",
+          "value": "Return reasons"
+        },
+        {
+          "language": "en",
+          "value": "Return reasons"
+        },
+        {
+          "language": "ru",
+          "value": "Причины возврата"
+        },
+        {
+          "language": "kk",
+          "value": "Қайтару себептері"
+        }
+      ]
+    },
+    {
+      "id": 1313,
+      "values": [
+        {
+          "language": "main",
+          "value": "No reason provided"
+        },
+        {
+          "language": "en",
+          "value": "No reason provided"
+        },
+        {
+          "language": "ru",
+          "value": "Причина не указана"
+        },
+        {
+          "language": "kk",
+          "value": "Себебі көрсетілмеген"
+        }
+      ]
+    },
+    {
+      "id": 1314,
+      "values": [
+        {
+          "language": "main",
+          "value": "Returned quantity"
+        },
+        {
+          "language": "en",
+          "value": "Returned quantity"
+        },
+        {
+          "language": "ru",
+          "value": "Возвращено"
+        },
+        {
+          "language": "kk",
+          "value": "Қайтарылған саны"
+        }
+      ]
+    },
+    {
+      "id": 1315,
+      "values": [
+        {
+          "language": "main",
+          "value": "Returned amount"
+        },
+        {
+          "language": "en",
+          "value": "Returned amount"
+        },
+        {
+          "language": "ru",
+          "value": "Сумма возвратов"
+        },
+        {
+          "language": "kk",
+          "value": "Қайтару сомасы"
+        }
+      ]
     }
   ]
 }

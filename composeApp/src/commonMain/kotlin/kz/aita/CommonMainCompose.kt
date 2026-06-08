@@ -709,7 +709,20 @@ private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallb
     put(1301L, mapOf("main" to "Store name", "en" to "Store name", "ru" to "Название магазина", "kk" to "Дүкен атауы"))
     put(1302L, mapOf("main" to "Label printers refreshed", "en" to "Label printers refreshed", "ru" to "Принтеры наклеек обновлены", "kk" to "Жапсырма принтерлері жаңартылды"))
     put(1303L, mapOf("main" to "Use this label printer", "en" to "Use this label printer", "ru" to "Использовать этот принтер наклеек", "kk" to "Осы жапсырма принтерін қолдану"))
+    put(1304L, mapOf("main" to "Parent store phone", "en" to "Parent store phone", "ru" to "Телефон родительского магазина", "kk" to "Негізгі дүкен телефоны"))
+    put(1305L, mapOf("main" to "My phone", "en" to "My phone", "ru" to "Мой телефон", "kk" to "Менің телефоным"))
+    put(1306L, mapOf("main" to "Parent store email", "en" to "Parent store email", "ru" to "Email родительского магазина", "kk" to "Негізгі дүкен email"))
+    put(1307L, mapOf("main" to "My email", "en" to "My email", "ru" to "Мой email", "kk" to "Менің email"))
+    put(1308L, mapOf("main" to "Return reason", "en" to "Return reason", "ru" to "Причина возврата", "kk" to "Қайтару себебі"))
+    put(1309L, mapOf("main" to "Expires very soon", "en" to "Expires very soon", "ru" to "Срок скоро истечёт", "kk" to "Жарамдылық мерзімі жақында бітеді"))
+    put(1310L, mapOf("main" to "Fresh", "en" to "Fresh", "ru" to "Свежие", "kk" to "Жарамды"))
+    put(1311L, mapOf("main" to "Returned items", "en" to "Returned items", "ru" to "Возвращённые товары", "kk" to "Қайтарылған тауарлар"))
+    put(1312L, mapOf("main" to "Return reasons", "en" to "Return reasons", "ru" to "Причины возврата", "kk" to "Қайтару себептері"))
+    put(1313L, mapOf("main" to "No reason provided", "en" to "No reason provided", "ru" to "Причина не указана", "kk" to "Себебі көрсетілмеген"))
+    put(1314L, mapOf("main" to "Returned quantity", "en" to "Returned quantity", "ru" to "Возвращено", "kk" to "Қайтарылған саны"))
+    put(1315L, mapOf("main" to "Returned amount", "en" to "Returned amount", "ru" to "Сумма возвратов", "kk" to "Қайтару сомасы"))
 }
+
 
 
 
@@ -2338,19 +2351,22 @@ fun AppConfiguration.UserAuthSignUpScreen(
                     && lastNameTextFieldContent.isContentValid
                     && passwordTextFieldContent.isContentValid
                     && repeatedPasswordTextFieldContent.isContentValid
-                )
-                    signUpUser (
+                ) {
+                    val selectedPhoneCountry = stateValues.globalAppConfiguration.countries
+                        .countryByPhoneSelection(phoneNumberTextFieldContent.selectedSecondaryId)
+                        ?: stateValues.globalAppConfiguration.countries.first()
+
+                    signUpUser(
                         UserAuthSignUpDataModel(
-                            phoneNumber = stateValues.globalAppConfiguration.countries.run {
-                                find { it.locale.equals(phoneNumberTextFieldContent.selectedId, true) } ?: first()
-                            }.phoneNumberCode + phoneNumberTextFieldContent.value.text.trim(),
+                            phoneNumber = selectedPhoneCountry.phoneNumberCode + phoneNumberTextFieldContent.value.text.trim(),
                             email = emailTextFieldContent.value.text.trim(),
                             firstName = firstNameTextFieldContent.value.text.trim(),
                             lastName = lastNameTextFieldContent.value.text.trim(),
-                            countryLocale = stateValues.globalAppConfiguration.countries.find { it.phoneNumberCode == phoneNumberTextFieldContent.selectedSecondaryId!!.substringAfter("+") }!!.locale,
+                            countryLocale = selectedPhoneCountry.locale,
                             password = passwordTextFieldContent.value.text
                         )
                     )
+                }
 
                 }
             )
@@ -2590,15 +2606,18 @@ fun AppConfiguration.UserAuthLogInScreen() {
                     loginTextFieldContent.run {
                         checkContentValidity()
 
-                        if (isContentValid && passwordTextFieldContent.isContentValid)
+                        if (isContentValid && passwordTextFieldContent.isContentValid) {
+                            val selectedPhoneCountry = stateValues.globalAppConfiguration.countries
+                                .countryByPhoneSelection(loginTextFieldContent.selectedSecondaryId)
+                                ?: stateValues.globalAppConfiguration.countries.first()
+
                             logInUser(
                                 UserAuthLogInDataModel(
-                                    login = stateValues.globalAppConfiguration.countries.run {
-                                        find { it.locale.equals(loginTextFieldContent.selectedId, true) } ?: first()
-                                    }.phoneNumberCode + loginTextFieldContent.value.text.trim(),
+                                    login = selectedPhoneCountry.phoneNumberCode + loginTextFieldContent.value.text.trim(),
                                     password = passwordTextFieldContent.value.text
                                 )
                             )
+                        }
                     }
                 }
             }
@@ -3122,6 +3141,7 @@ private data class TransactionSelectionSmartSets(
     val restockIds: List<String> = emptyList(),
     val lowStockIds: Set<String> = emptySet(),
     val expiringIds: List<String> = emptyList(),
+    val freshIds: List<String> = emptyList(),
     val slowMovingIds: List<String> = emptyList()
 )
 
@@ -3132,6 +3152,70 @@ private fun GoodsBatchDataModel.isSelectableActiveStockBatch(): Boolean {
             status != StockBatchStatusDataModel.WrittenOff &&
             status != StockBatchStatusDataModel.SoldOut &&
             status != StockBatchStatusDataModel.InTransit
+}
+
+private const val AITA_ONE_DAY_MILLIS = 24L * 60L * 60L * 1000L
+private const val AITA_EXPIRING_REMINDER_WINDOW_MILLIS = 3L * AITA_ONE_DAY_MILLIS
+
+private fun stockDayStartMillis(millis: Long = getCurrentTimeMillis()): Long {
+    val zone = TimeZone.currentSystemDefault()
+    return Instant
+        .fromEpochMilliseconds(millis)
+        .toLocalDateTime(zone)
+        .date
+        .atStartOfDayIn(zone)
+        .toEpochMilliseconds()
+}
+
+private fun GoodsBatchDataModel.isExpiringWithinReminderWindow(nowMillis: Long = getCurrentTimeMillis()): Boolean {
+    val expiration = expirationDateMillis ?: return false
+    val todayStart = stockDayStartMillis(nowMillis)
+    val reminderEndExclusive = todayStart + AITA_EXPIRING_REMINDER_WINDOW_MILLIS + AITA_ONE_DAY_MILLIS
+    return isSelectableActiveStockBatch() && expiration >= todayStart && expiration < reminderEndExclusive
+}
+
+private fun GoodsBatchDataModel.isFreshForTransactionSelection(nowMillis: Long = getCurrentTimeMillis()): Boolean {
+    val expiration = expirationDateMillis
+    return isSelectableActiveStockBatch() && (expiration == null || expiration >= stockDayStartMillis(nowMillis))
+}
+
+private fun AppConfiguration.itemBatchesForActiveInventoryStore(
+    item: GoodsItemDataModel,
+    batches: List<GoodsBatchDataModel> = stateValues.stockBatches.orEmpty()
+): List<GoodsBatchDataModel> {
+    val activeStoreId = stateValues.activeStoreId
+    return batches.filter { batch ->
+        batch.goodsItemId == item.id &&
+                batch.isActive &&
+                (activeStoreId.isNullOrBlank() || batchBelongsToInventoryStoreForUi(batch.storeId, activeStoreId))
+    }
+}
+
+private fun AppConfiguration.itemIsFreshForTransactionSelection(
+    item: GoodsItemDataModel,
+    batches: List<GoodsBatchDataModel> = stateValues.stockBatches.orEmpty(),
+    nowMillis: Long = getCurrentTimeMillis()
+): Boolean {
+    val itemBatches = itemBatchesForActiveInventoryStore(item, batches).filter { it.isSelectableActiveStockBatch() }
+    return itemBatches.isEmpty() || itemBatches.any { it.isFreshForTransactionSelection(nowMillis) }
+}
+
+@Composable
+private fun AppConfiguration.expirationReminderTextForItem(
+    item: GoodsItemDataModel,
+    batches: List<GoodsBatchDataModel> = stateValues.stockBatches.orEmpty()
+): String? {
+    val now = getCurrentTimeMillis()
+    val closestBatch = itemBatchesForActiveInventoryStore(item, batches)
+        .filter { it.isExpiringWithinReminderWindow(now) }
+        .minByOrNull { it.expirationDateMillis ?: Long.MAX_VALUE }
+        ?: return null
+
+    val dateText = closestBatch.expirationDateMillis?.toStockDateInputText().orEmpty()
+    return listOf(
+        localizedStringResource(1309, "Expires very soon"),
+        dateText.takeIf { it.isNotBlank() }
+    ).filterNotNull().joinToString(": ")
 }
 
 private fun AppConfiguration.itemHasPresentStockBatchForTransactionSelection(item: GoodsItemDataModel): Boolean {
@@ -3188,16 +3272,18 @@ private fun AppConfiguration.buildTransactionSelectionSmartSets(
         }
         .associate { it }
 
-    fun rankedIds(source: List<TransactionDataModel>): List<String> {
+    fun popularIds(source: List<TransactionDataModel>): List<String> {
         return source
-            .flatMap { it.goodsInTransaction }
-            .mapNotNull { line ->
-                line.transactionSelectionStockItemId(stockById, stockByBarcode)?.let { id -> id to line.quantity }
+            .flatMap { transaction ->
+                transaction.goodsInTransaction
+                    .mapNotNull { it.transactionSelectionStockItemId(stockById, stockByBarcode) }
+                    .distinct()
+                    .map { itemId -> itemId to transaction.id.ifBlank { "${transaction.timeMillis}:$itemId" } }
             }
             .groupBy({ it.first }, { it.second })
-            .mapValues { (_, quantities) -> quantities.sum() }
+            .mapValues { (_, transactionIds) -> transactionIds.distinct().size }
             .entries
-            .sortedByDescending { it.value }
+            .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { stockById[it.key]?.name?.extractLocalizedString(stateValues.appLanguage).orEmpty().lowercase() })
             .map { it.key }
             .take(30)
     }
@@ -3212,14 +3298,19 @@ private fun AppConfiguration.buildTransactionSelectionSmartSets(
     }
 
     val saleTransactions = scopedTransactions.filter { it.type == "purchase" }
+    val transactionSpecificTransactions = scopedTransactions.filter { it.type == transactionServerType(transactionTypeIndex) }
     val transactionSpecificRecentTransactions = when (transactionTypeIndex) {
-        2 -> scopedTransactions.filter { it.type == "accept" }
-        else -> saleTransactions
+        1 -> saleTransactions
+        else -> transactionSpecificTransactions
     }
 
-    val activeBatches = batches.filter { it.isSelectableActiveStockBatch() }
+    val activeBatches = batches.filter { batch ->
+        batch.isSelectableActiveStockBatch() &&
+                (storeId.isNullOrBlank() || batchBelongsToInventoryStoreForUi(batch.storeId, storeId))
+    }
     val now = getCurrentTimeMillis()
-    val expiringSoonCutoff = now + 14L * 24L * 60L * 60L * 1000L
+    val todayStart = stockDayStartMillis(now)
+    val expiringSoonCutoffExclusive = todayStart + 15L * AITA_ONE_DAY_MILLIS
 
     val lowStockIds = stock
         .filter { it.isActive }
@@ -3236,10 +3327,16 @@ private fun AppConfiguration.buildTransactionSelectionSmartSets(
         .map { it.id }
 
     val expiringIds = activeBatches
-        .filter { batch -> batch.expirationDateMillis?.let { it in now..expiringSoonCutoff } == true }
+        .filter { batch -> batch.expirationDateMillis?.let { it >= todayStart && it < expiringSoonCutoffExclusive } == true }
         .sortedBy { it.expirationDateMillis ?: Long.MAX_VALUE }
         .map { it.goodsItemId }
         .distinct()
+
+    val freshIds = stock
+        .filter { it.isActive }
+        .filter { item -> itemIsFreshForTransactionSelection(item, batches, now) }
+        .sortedBy { it.name.extractLocalizedString(stateValues.appLanguage).orEmpty().lowercase() }
+        .map { it.id }
 
     val dashboard = buildStoreAnalyticsDashboard(
         storeId = storeId.orEmpty(),
@@ -3263,11 +3360,12 @@ private fun AppConfiguration.buildTransactionSelectionSmartSets(
         .take(40)
 
     return TransactionSelectionSmartSets(
-        popularIds = rankedIds(saleTransactions),
+        popularIds = popularIds(transactionSpecificTransactions),
         recentIds = recentIds(transactionSpecificRecentTransactions),
         restockIds = restockIds,
         lowStockIds = lowStockIds,
         expiringIds = expiringIds,
+        freshIds = freshIds,
         slowMovingIds = slowMovingIds
     )
 }
@@ -3348,8 +3446,11 @@ fun AppConfiguration.TransactionSelectionScreen(
                 add(TabContent("all", stateValues.stringAll))
                 add(TabContent("quick", stateValues.stringQuick))
                 add(TabContent("in_stock", localizedStringResource(1180, "In stock")))
+                if (transactionSmartSets.freshIds.isNotEmpty()) {
+                    add(TabContent("fresh", localizedStringResource(1310, "Fresh")))
+                }
 
-                if (context.transactionTypeIndex != 2 && transactionSmartSets.popularIds.isNotEmpty()) {
+                if (transactionSmartSets.popularIds.isNotEmpty()) {
                     add(TabContent("popular", localizedStringResource(713, "Most popular")))
                 }
 
@@ -3459,6 +3560,7 @@ fun AppConfiguration.TransactionSelectionScreen(
             "restock" -> transactionSmartSets.restockIds
             "low_stock" -> transactionSmartSets.restockIds.filter { it in transactionSmartSets.lowStockIds }
             "expiring" -> transactionSmartSets.expiringIds
+            "fresh" -> transactionSmartSets.freshIds
             "slow" -> transactionSmartSets.slowMovingIds
             else -> emptyList()
         }
@@ -3496,6 +3598,9 @@ fun AppConfiguration.TransactionSelectionScreen(
                 }
                 "expiring" -> {
                     { item -> item.transactionSelectionMatchesIdSet(transactionSmartSets.expiringIds) }
+                }
+                "fresh" -> {
+                    { item -> item.transactionSelectionMatchesIdSet(transactionSmartSets.freshIds) }
                 }
                 "slow" -> {
                     { item -> item.transactionSelectionMatchesIdSet(transactionSmartSets.slowMovingIds) }
@@ -4146,6 +4251,7 @@ private fun AppConfiguration.receiptLabels(): ReceiptTextLabelsDataModel {
         saleReceiptTitle = stateValues.stringSaleReceiptTitle,
         returnReceiptTitle = stateValues.stringReturnReceiptTitle,
         supplyReceiptTitle = stateValues.stringSupplyReceiptTitle,
+        returnReason = localizedStringResource(1308, "Return reason"),
         pdfExportNotConfigured = stateValues.stringReceiptActionFailed,
         pdfSharingNotConfigured = stateValues.stringReceiptActionFailed,
         printerNotConfigured = stateValues.stringReceiptActionFailed
@@ -4307,6 +4413,13 @@ private fun AppConfiguration.ReceiptPreviewLine(
         )
     }
 
+    line.returnReason.takeIf { it.isNotBlank() }?.let { reason ->
+        ReceiptPreviewText(
+            text = "${labels.returnReason}: $reason",
+            color = stateValues.TextColor
+        )
+    }
+
     ReceiptPreviewRow(
         title = "$quantityText x ${line.pricePerUnit.moneyText()} ${line.currencySymbol}".trim(),
         value = "${line.total.moneyText()} ${line.currencySymbol}",
@@ -4417,6 +4530,7 @@ private fun AppConfiguration.buildTransactionReceiptLines(
     stockBatches: List<GoodsBatchDataModel>,
     transactionTypeIndex: Int,
     saleMethodIds: Map<String, String> = emptyMap(),
+    returnReasons: Map<String, String> = emptyMap(),
     clientId: Int = 0
 ): List<TransactionReceiptLineDataModel> {
     return cart.mapIndexedNotNull { index, cartItem ->
@@ -4448,7 +4562,12 @@ private fun AppConfiguration.buildTransactionReceiptLines(
             currencyCode = price.currency,
             currencySymbol = currencySymbol,
             saleMethodId = saleMethodId,
-            saleMethodName = saleMethodLocalizedName(saleMethodId)
+            saleMethodName = saleMethodLocalizedName(saleMethodId),
+            returnReason = if (transactionTypeIndex == 1) {
+                returnReasons[cartReturnReasonKey(transactionTypeIndex, clientId, goodsItem.id)].orEmpty()
+            } else {
+                ""
+            }
         )
     }
 }
@@ -4666,17 +4785,19 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
 
         val latestSnapshot by latestTransactionReceiptSnapshotState.collectAsState()
         val saleMethodIds by cartSaleMethodIdsState.collectAsState()
+        val cartReturnReasons by getCartReturnReasonsState().collectAsState()
         val paymentDrafts by getTransactionPaymentDraftsState().collectAsState()
 
         val paymentDraft = paymentDrafts[transactionSupplySupplierKey(context.transactionTypeIndex, context.clientId)]
 
-        val liveLines = remember(goodsInCart, stateValues.stock, stateValues.stockBatches, context.transactionTypeIndex, context.clientId, saleMethodIds) {
+        val liveLines = remember(goodsInCart, stateValues.stock, stateValues.stockBatches, context.transactionTypeIndex, context.clientId, saleMethodIds, cartReturnReasons) {
             buildTransactionReceiptLines(
                 cart = goodsInCart,
                 stock = stateValues.stock.orEmpty(),
                 stockBatches = stateValues.stockBatches.orEmpty(),
                 transactionTypeIndex = context.transactionTypeIndex,
                 saleMethodIds = saleMethodIds,
+                returnReasons = cartReturnReasons,
                 clientId = context.clientId
             )
         }
@@ -4741,7 +4862,8 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
                     name = it.name,
                     goodsItemId = it.goodsItemId,
                     quantityUnit = it.quantity,
-                    currencyCode = it.currencyCode
+                    currencyCode = it.currencyCode,
+                    returnReason = if (context.transactionTypeIndex == 1) it.returnReason.trim() else ""
                 )
             },
             paidCash = draft.paidCash,
@@ -5602,6 +5724,162 @@ private fun AppConfiguration.TransactionQuickAmountButtons(
             }
         }
     }
+}
+
+
+private data class StoreContactQuickFillButton(
+    val id: String,
+    val text: String,
+    val value: String
+)
+
+private data class StorePhoneQuickFillOption(
+    val id: String,
+    val text: String,
+    val selectedSecondaryId: String,
+    val localNumber: String,
+    val fullNumber: String
+)
+
+private fun normalizePhoneDigits(value: String): String = value.filter { it.isDigit() }
+
+private fun List<CountryDataModel>.countryByPhoneSelection(selectedSecondaryId: String?): CountryDataModel? {
+    val selectedCode = selectedSecondaryId
+        ?.trim()
+        ?.removePrefix("+")
+        ?.filter { it.isDigit() }
+        ?.takeIf { it.isNotBlank() }
+        ?: return null
+
+    return withTajikistanFallback()
+        .sortedByDescending { it.phoneNumberCode.length }
+        .firstOrNull { it.phoneNumberCode == selectedCode }
+}
+
+private fun storePhoneQuickFillOption(
+    id: String,
+    label: String,
+    rawPhoneNumber: String?,
+    countries: List<CountryDataModel>
+): StorePhoneQuickFillOption? {
+    val digits = normalizePhoneDigits(rawPhoneNumber.orEmpty())
+    if (digits.isBlank()) return null
+
+    val country = countries
+        .withTajikistanFallback()
+        .sortedByDescending { it.phoneNumberCode.length }
+        .firstOrNull { country ->
+            digits.startsWith(country.phoneNumberCode) && digits.length > country.phoneNumberCode.length
+        }
+        ?: return null
+
+    val localNumber = digits.removePrefix(country.phoneNumberCode).takeIf { it.isNotBlank() } ?: return null
+    val fullNumber = country.phoneNumberCode + localNumber
+
+    return StorePhoneQuickFillOption(
+        id = id,
+        text = "$label: ${fullNumber.asDisplayPhoneNumber()}",
+        selectedSecondaryId = "+${country.phoneNumberCode}",
+        localNumber = localNumber,
+        fullNumber = fullNumber
+    )
+}
+
+private fun DomainSelectionTextFieldContent.fullPhoneDigitsForQuickFill(): String {
+    return normalizePhoneDigits(selectedSecondaryId.orEmpty()) + normalizePhoneDigits(value.text)
+}
+
+@Composable
+private fun AppConfiguration.StoreContactQuickFillButtons(
+    buttons: List<StoreContactQuickFillButton>,
+    currentValue: String,
+    normalize: (String) -> String,
+    onSelected: (StoreContactQuickFillButton) -> Unit
+) {
+    val current = normalize(currentValue)
+    val visibleButtons = buttons
+        .filter { normalize(it.value).isNotBlank() }
+        .distinctBy { normalize(it.value) }
+        .filterNot { normalize(it.value) == current }
+
+    if (visibleButtons.isEmpty()) return
+
+    Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        items(visibleButtons, key = { it.id }) { button ->
+            Box(
+                modifier = Modifier
+                    .widthIn(max = 320.dp)
+                    .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .border(
+                        stateValues.unfocusedBorderWidth,
+                        stateValues.AccentColor,
+                        RoundedCornerShape(stateValues.cornerRadius)
+                    )
+                    .background(stateValues.BackgroundColor)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = ripple(color = stateValues.AccentColor)
+                    ) {
+                        onSelected(button)
+                    }
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = button.text,
+                    color = stateValues.AccentColor,
+                    fontSize = stateValues.smallTextSize,
+                    fontWeight = FontWeight.Bold,
+                    style = TextStyle(shadow = accentTextShadow(stateValues.AccentColor, stateValues.AccentColor)),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppConfiguration.StorePhoneQuickFillButtons(
+    phoneField: DomainSelectionTextFieldContent,
+    options: List<StorePhoneQuickFillOption>
+) {
+    val optionById = options.associateBy { it.id }
+    StoreContactQuickFillButtons(
+        buttons = options.map { option ->
+            StoreContactQuickFillButton(
+                id = option.id,
+                text = option.text,
+                value = option.fullNumber
+            )
+        },
+        currentValue = phoneField.fullPhoneDigitsForQuickFill(),
+        normalize = ::normalizePhoneDigits,
+        onSelected = { button ->
+            val option = optionById[button.id] ?: return@StoreContactQuickFillButtons
+            phoneField.replaceSelectedSecondaryId(option.selectedSecondaryId)
+            phoneField.replaceText(option.localNumber)
+        }
+    )
+}
+
+@Composable
+private fun AppConfiguration.StoreEmailQuickFillButtons(
+    emailField: GenericTextFieldContent,
+    buttons: List<StoreContactQuickFillButton>
+) {
+    StoreContactQuickFillButtons(
+        buttons = buttons,
+        currentValue = emailField.value.text,
+        normalize = { it.trim().lowercase() },
+        onSelected = { button -> emailField.replaceText(button.value.trim().lowercase()) }
+    )
 }
 
 @Composable
@@ -7398,7 +7676,9 @@ fun AppConfiguration.GoodsItemInCartWidget(
     conditions: List<CartConditionUiModel> = emptyList(),
     conditionChecks: Map<String, Boolean> = emptyMap(),
     highlightedConditionKey: String? = null,
+    returnReason: String = "",
     onConditionCheckedChange: (String, Boolean) -> Unit = { _, _ -> },
+    setReturnReasonAction: (String) -> Unit = {},
     setSaleMethodAction: (String) -> Unit = {},
     setQuantityAction: (Double) -> Unit = {},
     increaseQuantityAction: () -> Unit,
@@ -7683,6 +7963,30 @@ fun AppConfiguration.GoodsItemInCartWidget(
                         stockBatchStatusText(batch.status)
                     ).joinToString(" • "),
                     textColor = textColor
+                )
+            }
+
+            expirationReminderTextForItem(goodsItem)?.let { reminder ->
+                StockCardInfoLine(
+                    title = localizedStringResource(1309, "Expires very soon"),
+                    value = reminder.substringAfter(": ", reminder),
+                    textColor = stateValues.ErrorColor
+                )
+            }
+
+            if (transactionTypeIndex == 1) {
+                Spacer(modifier = Modifier.height(6.dp))
+                SimpleTextInput(
+                    modifier = Modifier.fillMaxWidth(),
+                    value = returnReason,
+                    placeholder = localizedStringResource(1308, "Return reason"),
+                    singleLine = false,
+                    isFocusedInitial = false,
+                    autoFocus = false,
+                    stateHost = null,
+                    stateKey = null,
+                    onTransformValue = { it.take(500) },
+                    onValueChange = setReturnReasonAction
                 )
             }
 
@@ -7981,6 +8285,7 @@ fun AppConfiguration.TransactionCartScreen() {
             context.clientId
         ).collectAsState()
         val saleMethodIds by cartSaleMethodIdsState.collectAsState()
+        val cartReturnReasons by getCartReturnReasonsState().collectAsState()
         val cartConditionChecks by getCartConditionChecksState().collectAsState()
         val cartScrollStates by getTransactionCartScrollStatesState().collectAsState()
         val cartStateKey = transactionSupplySupplierKey(context.transactionTypeIndex, context.clientId)
@@ -8175,8 +8480,17 @@ fun AppConfiguration.TransactionCartScreen() {
                             conditions = cartConditionsFor(cartItem, goodsItem),
                             conditionChecks = cartConditionChecks,
                             highlightedConditionKey = highlightedConditionKey,
+                            returnReason = cartReturnReasons[cartReturnReasonKey(context.transactionTypeIndex, context.clientId, cartItem.id)].orEmpty(),
                             onConditionCheckedChange = { conditionKey, checked ->
                                 setCartConditionChecked(conditionKey, checked)
+                            },
+                            setReturnReasonAction = { reason ->
+                                setCartReturnReason(
+                                    transactionTypeIndex = context.transactionTypeIndex,
+                                    clientId = context.clientId,
+                                    goodsItemId = cartItem.id,
+                                    reason = reason
+                                )
                             },
                             setSaleMethodAction = { methodId ->
                                 setCartSaleMethodId(
@@ -18343,6 +18657,8 @@ fun AppConfiguration.SimpleTextInput(
     singleLine: Boolean = true,
     keyboardType: KeyboardType = KeyboardType.Text,
     leadingIconPath: String? = null,
+    isFocusedInitial: Boolean = false,
+    autoFocus: Boolean = true,
     stateHost: StateHost? = null,
     stateKey: String? = null,
     onTransformValue: ((String) -> String)? = null,
@@ -18368,6 +18684,8 @@ fun AppConfiguration.SimpleTextInput(
             }
         },
         keyboardType = keyboardType,
+        isFocusedInitial = isFocusedInitial,
+        autoFocus = autoFocus,
         imeWithAction = ImeWithAction(if (singleLine) ImeAction.Next else ImeAction.Default),
         wide = !singleLine,
         singleLine = singleLine,
@@ -23936,13 +24254,16 @@ private fun AppConfiguration.WorkerResponseCard(
 @Composable
 private fun AppConfiguration.WorkerPermissionEditor(
     permissions: List<String>,
+    availablePermissions: Set<String> = ALL_STORE_PERMISSION_IDS.toSet(),
     onChanged: (List<String>) -> Unit
 ) {
+    val visiblePermissionIds = ALL_STORE_PERMISSION_IDS.filter { it in availablePermissions }
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        ALL_STORE_PERMISSION_IDS.chunked(if (stateValues.isNarrowScreen) 1 else 2).forEach { row ->
+        visiblePermissionIds.chunked(if (stateValues.isNarrowScreen) 1 else 2).forEach { row ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
@@ -23996,11 +24317,27 @@ private fun AppConfiguration.WorkerRequestCard(
     storeId: String,
     request: StoreWorkerRequestDataModel
 ) {
+    val requestStoreId = request.storeId.ifBlank { storeId }
+    val assignablePermissions = currentUserAssignableStorePermissions(requestStoreId)
+    fun defaultAssignablePermissionsForRole(selectedRoleId: String): List<String> {
+        val defaultPermissions = defaultStorePermissionsForRole(selectedRoleId).filter { it in assignablePermissions }
+        return defaultPermissions.ifEmpty {
+            if (selectedRoleId == WORKER_ROLE_ADMIN) ALL_STORE_PERMISSION_IDS.filter { it in assignablePermissions } else emptyList()
+        }
+    }
+
     var roleId by rememberSaveable(request.id) { mutableStateOf(request.roleId.ifBlank { WORKER_ROLE_STANDARD }) }
-    var permissionsText by rememberSaveable(request.id) {
-        mutableStateOf(request.permissions.ifEmpty { defaultStorePermissionsForRole(roleId) }.joinToString("|"))
+    var permissionsText by rememberSaveable(request.id, assignablePermissions.sorted().joinToString("|")) {
+        mutableStateOf(
+            request.permissions
+                .ifEmpty { defaultAssignablePermissionsForRole(roleId) }
+                .filter { it in assignablePermissions }
+                .joinToString("|")
+        )
     }
     val permissions = permissionsFromSerialized(permissionsText)
+        .filter { it in assignablePermissions }
+        .ifEmpty { defaultAssignablePermissionsForRole(roleId) }
     val roleOptions = listOf(
         DropdownOption(WORKER_ROLE_STANDARD, workerRoleLabel(WORKER_ROLE_STANDARD), localizedStringResource(463, "Cashier/basic worker")),
         DropdownOption(WORKER_ROLE_ADMIN, workerRoleLabel(WORKER_ROLE_ADMIN), localizedStringResource(464, "Can manage most store operations"))
@@ -24020,7 +24357,7 @@ private fun AppConfiguration.WorkerRequestCard(
                 decisionDialog = null
                 if (accepting) {
                     acceptStoreEmploymentRequest(
-                        storeId = request.storeId.ifBlank { storeId },
+                        storeId = requestStoreId,
                         requestId = request.id,
                         roleId = roleId,
                         permissions = permissions,
@@ -24028,7 +24365,7 @@ private fun AppConfiguration.WorkerRequestCard(
                     )
                 } else {
                     declineStoreEmploymentRequest(
-                        storeId = request.storeId.ifBlank { storeId },
+                        storeId = requestStoreId,
                         requestId = request.id,
                         note = responseNote
                     )
@@ -24075,7 +24412,7 @@ private fun AppConfiguration.WorkerRequestCard(
             placeholder = workerRoleLabel(WORKER_ROLE_STANDARD),
             onSelected = { selectedRole ->
                 roleId = selectedRole
-                permissionsText = defaultStorePermissionsForRole(selectedRole).joinToString("|")
+                permissionsText = defaultAssignablePermissionsForRole(selectedRole).joinToString("|")
             }
         )
 
@@ -24092,6 +24429,7 @@ private fun AppConfiguration.WorkerRequestCard(
 
         WorkerPermissionEditor(
             permissions = permissions,
+            availablePermissions = assignablePermissions,
             onChanged = { permissionsText = it.distinct().joinToString("|") }
         )
 
@@ -24251,9 +24589,20 @@ private fun AppConfiguration.WorkerMembershipCard(
     showSelfPasswordEditor: Boolean = false,
     pendingRemovalRequest: StoreWorkerRequestDataModel? = null
 ) {
+    val workerStoreId = storeId ?: worker.storeId
+    val assignablePermissions = currentUserAssignableStorePermissions(workerStoreId)
+    fun defaultAssignablePermissionsForRole(selectedRoleId: String): List<String> {
+        val defaultPermissions = defaultStorePermissionsForRole(selectedRoleId).filter { it in assignablePermissions }
+        return defaultPermissions.ifEmpty {
+            if (selectedRoleId == WORKER_ROLE_ADMIN) ALL_STORE_PERMISSION_IDS.filter { it in assignablePermissions } else emptyList()
+        }
+    }
+
     var roleId by rememberSaveable(worker.id) { mutableStateOf(worker.roleId.ifBlank { WORKER_ROLE_STANDARD }) }
     var permissionsText by rememberSaveable(worker.id) { mutableStateOf(worker.permissions.joinToString("|")) }
-    val permissions = permissionsFromSerialized(permissionsText).ifEmpty { defaultStorePermissionsForRole(roleId) }
+    val permissions = permissionsFromSerialized(permissionsText).ifEmpty {
+        if (editable) defaultAssignablePermissionsForRole(roleId) else defaultStorePermissionsForRole(roleId)
+    }
     var selfWorkshiftPasswordSaving by rememberSaveable(worker.id) { mutableStateOf(false) }
     val roleOptions = listOf(
         DropdownOption(WORKER_ROLE_STANDARD, workerRoleLabel(WORKER_ROLE_STANDARD)),
@@ -24351,7 +24700,7 @@ private fun AppConfiguration.WorkerMembershipCard(
                 placeholder = workerRoleLabel(WORKER_ROLE_STANDARD),
                 onSelected = { selectedRole ->
                     roleId = selectedRole
-                    permissionsText = defaultStorePermissionsForRole(selectedRole).joinToString("|")
+                    permissionsText = defaultAssignablePermissionsForRole(selectedRole).joinToString("|")
                 }
             )
 
@@ -24359,6 +24708,7 @@ private fun AppConfiguration.WorkerMembershipCard(
 
             WorkerPermissionEditor(
                 permissions = permissions,
+                availablePermissions = assignablePermissions,
                 onChanged = { permissionsText = it.distinct().joinToString("|") }
             )
 
@@ -24914,10 +25264,22 @@ fun AppConfiguration.MenuWorkersScreen() {
                     } else {
                         if (currentUserCanManageWorkers(activeStoreId)) {
                             item {
+                                val assignablePermissions = currentUserAssignableStorePermissions(activeStoreId)
+                                fun defaultAssignablePermissionsForRole(selectedRoleId: String): List<String> {
+                                    val defaultPermissions = defaultStorePermissionsForRole(selectedRoleId).filter { it in assignablePermissions }
+                                    return defaultPermissions.ifEmpty {
+                                        if (selectedRoleId == WORKER_ROLE_ADMIN) ALL_STORE_PERMISSION_IDS.filter { it in assignablePermissions } else emptyList()
+                                    }
+                                }
+
                                 var invitedUserId by rememberSaveable { mutableStateOf("") }
                                 var roleId by rememberSaveable { mutableStateOf(WORKER_ROLE_STANDARD) }
-                                var permissionsText by rememberSaveable { mutableStateOf(defaultStorePermissionsForRole(WORKER_ROLE_STANDARD).joinToString("|")) }
-                                val permissions = permissionsFromSerialized(permissionsText).ifEmpty { defaultStorePermissionsForRole(roleId) }
+                                var permissionsText by rememberSaveable(assignablePermissions.sorted().joinToString("|")) {
+                                    mutableStateOf(defaultAssignablePermissionsForRole(WORKER_ROLE_STANDARD).joinToString("|"))
+                                }
+                                val permissions = permissionsFromSerialized(permissionsText)
+                                    .filter { it in assignablePermissions }
+                                    .ifEmpty { defaultAssignablePermissionsForRole(roleId) }
 
                                 Column(
                                     modifier = Modifier
@@ -24960,7 +25322,7 @@ fun AppConfiguration.MenuWorkersScreen() {
                                         placeholder = workerRoleLabel(WORKER_ROLE_STANDARD),
                                         onSelected = { selectedRole ->
                                             roleId = selectedRole
-                                            permissionsText = defaultStorePermissionsForRole(selectedRole).joinToString("|")
+                                            permissionsText = defaultAssignablePermissionsForRole(selectedRole).joinToString("|")
                                         }
                                     )
 
@@ -24968,6 +25330,7 @@ fun AppConfiguration.MenuWorkersScreen() {
 
                                     WorkerPermissionEditor(
                                         permissions = permissions,
+                                        availablePermissions = assignablePermissions,
                                         onChanged = { permissionsText = it.distinct().joinToString("|") }
                                     )
 
@@ -25006,6 +25369,7 @@ fun AppConfiguration.MenuWorkersScreen() {
                             item { MessageText(modifier = Modifier.fillMaxWidth(), text = localizedStringResource(484, "No workers in this store yet")) }
                         } else {
                             val editable = currentUserHasStorePermission(activeStoreId, STORE_PERMISSION_WORKERS_MANAGE)
+                            val assignablePermissions = currentUserAssignableStorePermissions(activeStoreId)
                             val pendingRemovalRequests = incomingRequestsPayload.orEmpty()
                                 .filter { it.isPendingWorkerRemovalRequest() }
                                 .distinctBy { it.id }
@@ -25013,9 +25377,10 @@ fun AppConfiguration.MenuWorkersScreen() {
                                 val pendingRemovalRequest = pendingRemovalRequests.firstOrNull { request ->
                                     request.storeId == worker.storeId && request.requesterUserId == worker.userId
                                 }
+                                val canEditWorker = editable && worker.permissions.all { it in assignablePermissions }
                                 WorkerMembershipCard(
                                     worker = worker,
-                                    editable = editable,
+                                    editable = canEditWorker,
                                     storeId = worker.storeId.ifBlank { activeStoreId },
                                     pendingRemovalRequest = pendingRemovalRequest
                                 )
@@ -30844,7 +31209,10 @@ private fun AppConfiguration.buildAnalyticsReportSnapshotForUi(
 
     val selectedRows = when (selectedTab) {
         MenuAnalyticsTab.Sales -> transactionRows(sales)
-        MenuAnalyticsTab.Returns -> transactionRows(returns)
+        MenuAnalyticsTab.Returns -> transactionRows(returns) + listOf(
+            row(localizedStringResource(1311, "Returned items"), (dashboard?.topReturnedItemsByQuantity?.size ?: 0).toString()),
+            row(localizedStringResource(1312, "Return reasons"), dashboard?.topReturnedItemsByQuantity.orEmpty().flatMap { it.returnReasons }.map { it.reason }.distinct().size.toString())
+        )
         MenuAnalyticsTab.Acceptance -> transactionRows(supply)
         MenuAnalyticsTab.Stock -> listOf(
             row(stateValues.stringItems, stock.size.toString()),
@@ -30876,11 +31244,19 @@ private fun AppConfiguration.buildAnalyticsReportSnapshotForUi(
         )
     }
 
-    val selectedNotes = if (selectedTab == MenuAnalyticsTab.Sales) {
-        dashboard?.topItemsByRevenue.orEmpty().take(5).mapIndexed { index, item ->
+    val selectedNotes = when (selectedTab) {
+        MenuAnalyticsTab.Sales -> dashboard?.topItemsByRevenue.orEmpty().take(5).mapIndexed { index, item ->
             "${index + 1}. ${item.name.visibleLocalizedString(stateValues.appLanguage, item.id.take(8))}: ${item.amount.money(item.currencyCode.ifBlank { reportCurrency })} · ${item.quantity.cleanNumber()}"
         }
-    } else emptyList()
+        MenuAnalyticsTab.Returns -> dashboard?.topReturnedItemsByQuantity.orEmpty().take(8).mapIndexed { index, item ->
+            val reasons = item.returnReasons.joinToString("; ") { reason ->
+                val label = reason.reason.takeIf { it.isNotBlank() } ?: localizedStringResource(1313, "No reason provided")
+                "$label × ${reason.quantity.cleanNumber()}"
+            }.ifBlank { localizedStringResource(1313, "No reason provided") }
+            "${index + 1}. ${item.name.visibleLocalizedString(stateValues.appLanguage, item.id.take(8))}: ${item.quantity.cleanNumber()} · $reasons"
+        }
+        else -> emptyList()
+    }
 
     return AnalyticsReportSnapshotDataModel(
         title = localizedStringResource(1239, "Analytics report"),
@@ -31559,6 +31935,23 @@ fun AppConfiguration.MenuAnalyticsScreen() {
 }
 
 @Composable
+private fun AppConfiguration.analyticsReturnReasonsSubtitle(item: AnalyticsRankedItemDataModel, currencyCode: String): String {
+    val reasons = item.returnReasons
+        .takeIf { it.isNotEmpty() }
+        ?.joinToString(" • ") { reason ->
+            val label = reason.reason.takeIf { it.isNotBlank() } ?: localizedStringResource(1313, "No reason provided")
+            val quantityText = reason.quantity.cleanNumber()
+            val amountText = reason.amount.takeIf { it > 0.0 }?.let { " · ${it.money(item.currencyCode.ifBlank { currencyCode })}" }.orEmpty()
+            "$label × $quantityText$amountText"
+        }
+
+    return listOfNotNull(
+        "${localizedStringResource(706, "Transactions")}: ${item.transactionCount}",
+        reasons?.let { "${localizedStringResource(1312, "Return reasons")}: $it" }
+    ).joinToString("\n")
+}
+
+@Composable
 private fun AppConfiguration.MenuAnalyticsTransactionScreen(
     title: String,
     transactionType: String,
@@ -31720,6 +32113,34 @@ private fun AppConfiguration.MenuAnalyticsTransactionScreen(
                     title = localizedStringResource(692, "Sales by hour"),
                     buckets = dashboard.salesByHour.sortedByDescending { it.amount }.take(8),
                     currencyCode = dashboard.currencyCode.ifBlank { currencyCode }
+                )
+            }
+        }
+
+        if (transactionType == "return" && dashboard != null) {
+            item {
+                Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+                AnalyticsRankedItemsSection(
+                    title = localizedStringResource(1311, "Returned items"),
+                    items = dashboard.topReturnedItemsByQuantity,
+                    valueTitle = localizedStringResource(1314, "Returned quantity"),
+                    currencyCode = "",
+                    valueSelector = { it.quantity },
+                    subtitleSelector = { item -> analyticsReturnReasonsSubtitle(item, dashboard.currencyCode.ifBlank { currencyCode }) }
+                )
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+                AnalyticsRankedItemsSection(
+                    title = localizedStringResource(1315, "Returned amount"),
+                    items = dashboard.topReturnedItemsByAmount,
+                    valueTitle = localizedStringResource(1315, "Returned amount"),
+                    currencyCode = dashboard.currencyCode.ifBlank { currencyCode },
+                    valueSelector = { it.amount },
+                    subtitleSelector = { item ->
+                        "${localizedStringResource(1314, "Returned quantity")}: ${item.quantity.cleanNumber()}\n${analyticsReturnReasonsSubtitle(item, dashboard.currencyCode.ifBlank { currencyCode })}"
+                    }
                 )
             }
         }
@@ -32478,7 +32899,7 @@ private fun AppConfiguration.AnalyticsRankedItemsSection(
                                 text = it,
                                 color = stateValues.PlaceholderTextColor,
                                 fontSize = stateValues.smallTextSize,
-                                maxLines = 2,
+                                maxLines = 8,
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
@@ -33101,6 +33522,25 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                     stateKey = NavigationScreenModel.KEY_STATE_PHONE_NUMBER
                 )
 
+                val phoneQuickFillOptions = listOfNotNull(
+                    if (isBranchEditor) {
+                        storePhoneQuickFillOption(
+                            id = "parent_store_phone",
+                            label = localizedStringResource(1304, "Parent store phone"),
+                            rawPhoneNumber = parentStore?.phoneNumbers.orEmpty().firstOrNull(),
+                            countries = stateValues.globalAppConfiguration.countries
+                        )
+                    } else null,
+                    storePhoneQuickFillOption(
+                        id = "my_phone",
+                        label = localizedStringResource(1305, "My phone"),
+                        rawPhoneNumber = stateValues.userAccount?.phoneNumber,
+                        countries = stateValues.globalAppConfiguration.countries
+                    )
+                )
+
+                StorePhoneQuickFillButtons(phoneNumberTextFieldContent, phoneQuickFillOptions)
+
                 Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
                 val emailTextFieldContent = emailTextField(
@@ -33109,10 +33549,31 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                     stateKey = NavigationScreenModel.KEY_STATE_EMAIL
                 )
 
+                val emailQuickFillButtons = listOfNotNull(
+                    if (isBranchEditor) {
+                        parentStore?.emails.orEmpty().firstOrNull()?.trim()?.takeIf { it.isNotBlank() }?.let { email ->
+                            StoreContactQuickFillButton(
+                                id = "parent_store_email",
+                                text = "${localizedStringResource(1306, "Parent store email")}: $email",
+                                value = email
+                            )
+                        }
+                    } else null,
+                    stateValues.userAccount?.email?.trim()?.lowercase()?.takeIf { it.isNotBlank() }?.let { email ->
+                        StoreContactQuickFillButton(
+                            id = "my_email",
+                            text = "${localizedStringResource(1307, "My email")}: $email",
+                            value = email
+                        )
+                    }
+                )
+
+                StoreEmailQuickFillButtons(emailTextFieldContent, emailQuickFillButtons)
+
                 Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
                 val selectedCountry = stateValues.globalAppConfiguration.countries.run {
-                    find { it.locale.equals(phoneNumberTextFieldContent.selectedId, ignoreCase = true) } ?: first()
+                    countryByPhoneSelection(phoneNumberTextFieldContent.selectedSecondaryId) ?: first()
                 }
 
                 val companyFormDropdownListContent = if (!isBranchEditor) {
@@ -35342,6 +35803,14 @@ fun AppConfiguration.GoodsItemInStockWidget(
                 )
             }
 
+            expirationReminderTextForItem(goodsItem, shelfBatches)?.let { reminder ->
+                StockCardInfoLine(
+                    title = localizedStringResource(1309, "Expires very soon"),
+                    value = reminder.substringAfter(": ", reminder),
+                    textColor = stateValues.ErrorColor
+                )
+            }
+
             val promoQuantityTotal = activeBatch?.quantity?.total?.takeIf { it > 0.0 } ?: 1.0
 
             fun promotedStockPriceLineOrNull(
@@ -36727,6 +37196,7 @@ class GenericTextFieldContent(
     }
 
     fun replaceText(rawText: String, applyTransform: Boolean = true) {
+        value = TextFieldValue(rawText, selection = TextRange(rawText.length))
         onReplaceText?.invoke(rawText, applyTransform)
     }
 }
@@ -37732,7 +38202,19 @@ fun AppConfiguration.domainSelectionTextField(
         selectedId = selectedId,
         selectedSecondaryId = selectedSecondaryId,
         isContentValid = textFieldContent.isContentValid,
-        onContentValidityCheck = textFieldContent.onContentValidityCheck
+        onContentValidityCheck = textFieldContent.onContentValidityCheck,
+        onReplaceText = textFieldContent.onReplaceText,
+        onSelectedSecondaryIdChange = { nextSelectedSecondaryId ->
+            if (lockedSecondaryDomainId == null) {
+                val cleanId = nextSelectedSecondaryId?.takeIf { candidate ->
+                    secondaryDomains.orEmpty().any { it.id.equals(candidate, ignoreCase = true) }
+                }
+                if (!cleanId.isNullOrBlank()) {
+                    selectedSecondaryId = cleanId
+                    isSecondaryDomainSelectionDropdownExpandedState.targetState = false
+                }
+            }
+        }
     )
 }
 
@@ -37742,11 +38224,23 @@ class DomainSelectionTextFieldContent(
     var selectedSecondaryId: String?,
     var isFocused: Boolean,
     var isContentValid: Boolean,
-    val onContentValidityCheck: ((String) -> Boolean)? = null
+    val onContentValidityCheck: ((String) -> Boolean)? = null,
+    val onReplaceText: ((String, Boolean) -> Unit)? = null,
+    val onSelectedSecondaryIdChange: ((String?) -> Unit)? = null
 ) {
 
     fun checkContentValidity() {
         isContentValid = onContentValidityCheck?.invoke(value.text) ?: true
+    }
+
+    fun replaceText(rawText: String, applyTransform: Boolean = true) {
+        value = TextFieldValue(rawText, selection = TextRange(rawText.length))
+        onReplaceText?.invoke(rawText, applyTransform)
+    }
+
+    fun replaceSelectedSecondaryId(rawId: String?) {
+        selectedSecondaryId = rawId
+        onSelectedSecondaryIdChange?.invoke(rawId)
     }
 }
 

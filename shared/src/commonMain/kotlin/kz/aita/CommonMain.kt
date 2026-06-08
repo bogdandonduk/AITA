@@ -690,6 +690,7 @@ data class TransactionReceiptLineDataModel(
     val currencySymbol: String,
     val saleMethodId: String = SALE_METHOD_RETAIL,
     val saleMethodName: List<LocalizedStringDataModel> = saleMethodLocalizedName(saleMethodId),
+    val returnReason: String = ""
 ) {
     val total: Double
         get() = quantity.total * pricePerUnit
@@ -797,6 +798,7 @@ data class ReceiptTextLabelsDataModel(
     val saleReceiptTitle: String = "Sale",
     val returnReceiptTitle: String = "Return",
     val supplyReceiptTitle: String = "Acceptance",
+    val returnReason: String = "Return reason",
     val pdfExportNotConfigured: String = "PDF export is not configured for this platform",
     val pdfSharingNotConfigured: String = "PDF sharing is not configured for this platform",
     val printerNotConfigured: String = "Receipt printer is not configured for this platform"
@@ -1221,6 +1223,9 @@ fun TransactionReceiptSnapshotDataModel.buildReceiptPlainText(language: String, 
             if (line.saleMethodId == SALE_METHOD_WHOLESALE) {
                 val saleMethodText = receiptVisibleString(line.saleMethodName, language, "")
                 if (saleMethodText.isNotBlank()) builder.appendLine("   $saleMethodText")
+            }
+            line.returnReason.takeIf { it.isNotBlank() }?.let { reason ->
+                builder.appendLine("   ${labels.returnReason}: $reason")
             }
             builder.appendLine("   ${receiptQuantityText(line.quantity, language)} x ${receiptMoney(line.pricePerUnit)} ${line.currencySymbol} = ${receiptMoney(line.total)} ${line.currencySymbol}")
         }
@@ -1696,6 +1701,70 @@ fun setTransactionSupplySupplierId(transactionTypeIndex: Int, clientId: Int, sup
 
 fun clearTransactionSupplySupplierId(transactionTypeIndex: Int, clientId: Int) {
     setTransactionSupplySupplierId(transactionTypeIndex, clientId, null)
+}
+
+private const val MAX_RETURN_REASON_LENGTH = 500
+private val cartReturnReasonsState = MutableStateFlow<Map<String, String>>(emptyMap())
+
+fun getCartReturnReasonsState(): StateFlow<Map<String, String>> = cartReturnReasonsState.asStateFlow()
+
+fun cartReturnReasonKey(transactionTypeIndex: Int, clientId: Int, goodsItemId: String): String =
+    "${transactionKey(transactionTypeIndex, clientId)}:$goodsItemId"
+
+fun currentCartReturnReason(transactionTypeIndex: Int, clientId: Int, goodsItemId: String): String =
+    cartReturnReasonsState.value[cartReturnReasonKey(transactionTypeIndex, clientId, goodsItemId)].orEmpty()
+
+fun setCartReturnReason(transactionTypeIndex: Int, clientId: Int, goodsItemId: String, reason: String) {
+    GlobalScope.launch(Dispatchers.ourIo) {
+        val key = cartReturnReasonKey(transactionTypeIndex, clientId, goodsItemId)
+        val boundedReason = reason.take(MAX_RETURN_REASON_LENGTH)
+        val updated = cartReturnReasonsState.value.toMutableMap().apply {
+            if (transactionTypeIndex == 1 && boundedReason.trim().isNotBlank()) {
+                this[key] = boundedReason
+            } else {
+                remove(key)
+            }
+        }
+        if (updated != cartReturnReasonsState.value) {
+            cartReturnReasonsState.emit(updated)
+            persistTransactionCartUiState()
+        }
+    }
+}
+
+private fun removeCartReturnReason(transactionTypeIndex: Int, clientId: Int, goodsItemId: String) {
+    GlobalScope.launch(Dispatchers.ourIo) {
+        val updated = cartReturnReasonsState.value.toMutableMap().apply {
+            remove(cartReturnReasonKey(transactionTypeIndex, clientId, goodsItemId))
+        }
+        if (updated != cartReturnReasonsState.value) {
+            cartReturnReasonsState.emit(updated)
+            persistTransactionCartUiState()
+        }
+    }
+}
+
+private fun removeCartReturnReasons(transactionTypeIndex: Int, clientId: Int) {
+    val prefix = cartScopedPrefix(transactionTypeIndex, clientId)
+    GlobalScope.launch(Dispatchers.ourIo) {
+        val updated = cartReturnReasonsState.value.filterKeys { !it.startsWith(prefix) }
+        if (updated != cartReturnReasonsState.value) {
+            cartReturnReasonsState.emit(updated)
+            persistTransactionCartUiState()
+        }
+    }
+}
+
+private fun removeCartReturnReasonsByGoodsItemId(goodsItemId: String) {
+    GlobalScope.launch(Dispatchers.ourIo) {
+        val updated = cartReturnReasonsState.value.filterKeys { key ->
+            key.substringAfterLast(':') != goodsItemId
+        }
+        if (updated != cartReturnReasonsState.value) {
+            cartReturnReasonsState.emit(updated)
+            persistTransactionCartUiState()
+        }
+    }
 }
 
 fun transactionServerType(transactionTypeIndex: Int): String {
@@ -3474,10 +3543,14 @@ fun currentUserStorePermissions(storeId: String?): Set<String> {
     if (currentUserOwnsStore(cleanStoreId)) return ALL_STORE_PERMISSION_IDS.toSet()
 
     return myWorkerMembershipsState.payloadValue.orEmpty()
-        .find { it.userId == currentUserId && it.isActive && (it.storeId == cleanStoreId || it.storeId == cleanRootStoreId) }
-        ?.permissions
-        ?.toSet()
-        .orEmpty()
+        .filter { it.userId == currentUserId && it.isActive && (it.storeId == cleanStoreId || it.storeId == cleanRootStoreId) }
+        .flatMap { it.permissions }
+        .toSet()
+}
+
+fun currentUserAssignableStorePermissions(storeId: String?): Set<String> {
+    val permissions = currentUserStorePermissions(storeId)
+    return permissions.takeIf { STORE_PERMISSION_WORKERS_MANAGE in it }.orEmpty()
 }
 
 fun currentUserHasStorePermission(storeId: String?, permission: String): Boolean {
@@ -6905,6 +6978,7 @@ private const val CACHE_LOCAL_NETWORK_QUEUE = "local_network_queue"
 private const val CACHE_CART_SALE_METHOD_IDS = "transaction_cart_sale_method_ids"
 private const val CACHE_TRANSACTION_PAYMENT_DRAFTS = "transaction_payment_drafts"
 private const val CACHE_TRANSACTION_SUPPLY_SUPPLIER_IDS = "transaction_supply_supplier_ids"
+private const val CACHE_TRANSACTION_RETURN_REASONS = "transaction_return_reasons"
 private const val CACHE_CART_CONDITION_CHECKS = "transaction_cart_condition_checks"
 private const val CACHE_TRANSACTION_CART_SCROLL_STATES = "transaction_cart_scroll_states"
 private const val CACHE_PENDING_SESSION_CLEANUPS = "pending_session_cleanups"
@@ -8065,6 +8139,7 @@ private suspend fun persistTransactionCartUiState() {
     putJsonCache(CACHE_CART_SALE_METHOD_IDS, cartSaleMethodIdsState.value)
     putJsonCache(CACHE_TRANSACTION_PAYMENT_DRAFTS, transactionPaymentDraftsState.value)
     putJsonCache(CACHE_TRANSACTION_SUPPLY_SUPPLIER_IDS, transactionSupplySupplierIdsState.value)
+    putJsonCache(CACHE_TRANSACTION_RETURN_REASONS, cartReturnReasonsState.value)
     putJsonCache(CACHE_CART_CONDITION_CHECKS, cartConditionChecksState.value)
     putJsonCache(CACHE_TRANSACTION_CART_SCROLL_STATES, transactionCartScrollStatesState.value)
 }
@@ -8078,6 +8153,9 @@ private suspend fun loadTransactionCartUiState() {
     }
     getJsonCache<Map<String, String>>(CACHE_TRANSACTION_SUPPLY_SUPPLIER_IDS)?.let { cached ->
         transactionSupplySupplierIdsState.emit(cached.filterValues { it.isNotBlank() })
+    }
+    getJsonCache<Map<String, String>>(CACHE_TRANSACTION_RETURN_REASONS)?.let { cached ->
+        cartReturnReasonsState.emit(cached.mapValues { it.value.take(MAX_RETURN_REASON_LENGTH) }.filterValues { it.trim().isNotBlank() })
     }
     getJsonCache<Map<String, Boolean>>(CACHE_CART_CONDITION_CHECKS)?.let { cached ->
         cartConditionChecksState.emit(cached)
@@ -8293,7 +8371,24 @@ private fun TransactionDataModel.withClientOperationId(): TransactionDataModel =
     if (clientOperationId.isNotBlank()) this else copy(
         clientOperationId = createClientOperationId(
             "txn",
-            listOf(storeId, type, timeMillis.toString(), paidCash.toString(), paidCard.toString(), goodsInTransaction.joinToString("|") { "${it.goodsItemId}:${it.barcode}:${it.quantity}:${it.pricePerUnit}" }).joinToString(";")
+            listOf(
+                storeId,
+                type,
+                timeMillis.toString(),
+                paidCash.toString(),
+                paidCard.toString(),
+                goodsInTransaction.joinToString("|") { line ->
+                    listOf(
+                        line.goodsItemId.orEmpty(),
+                        line.barcode,
+                        line.quantity.toString(),
+                        line.pricePerUnit.toString(),
+                        line.saleMethodId,
+                        line.supplierIdText.orEmpty(),
+                        line.returnReason.trim()
+                    ).joinToString(":")
+                }
+            ).joinToString(";")
         )
     )
 
@@ -9957,6 +10052,7 @@ fun upsertCart(
 suspend fun deleteCart(transactionTypeIndex: Int, clientId: Int) {
     appDatabase.app_databaseQueries.deleteCart(transactionTypeIndex.toLong(), clientId.toLong())
     removeCartSaleMethodIds(transactionTypeIndex, clientId)
+    removeCartReturnReasons(transactionTypeIndex, clientId)
     removeCartConditionChecks(transactionTypeIndex, clientId)
     clearTransactionCartScrollState(transactionTypeIndex, clientId)
     clearTransactionPaymentDraft(transactionTypeIndex, clientId)
@@ -9969,12 +10065,14 @@ fun deleteCartById(id: String, transactionTypeIndex: Int, clientId: Int) {
     GlobalScope.launch {
         appDatabase.app_databaseQueries.deleteCartById(id, transactionTypeIndex.toLong(), clientId.toLong())
         removeCartSaleMethodId(transactionTypeIndex, clientId, id)
+        removeCartReturnReason(transactionTypeIndex, clientId, id)
         removeCartConditionChecks(transactionTypeIndex, clientId, id)
     }
 }
 
 suspend fun deleteCartItemById(id: String) {
     appDatabase.app_databaseQueries.deleteById(id)
+    removeCartReturnReasonsByGoodsItemId(id)
 }
 
 fun observeCart(transactionTypeIndex: Int, clientId: Int): Flow<List<GoodsItemInCartDataModel>?> =
@@ -14190,7 +14288,8 @@ data class GoodsItemInTransactionDataModel(
     val name: List<LocalizedStringDataModel> = emptyList(),
     val goodsItemId: String? = null,
     val quantityUnit: QuantityDataModel? = null,
-    val currencyCode: String? = null
+    val currencyCode: String? = null,
+    val returnReason: String = ""
 )
 
 @kotlinx.serialization.Serializable
@@ -15028,6 +15127,14 @@ fun currentClientDeviceInfoHeaders(deviceInfo: ClientDeviceInfoDataModel = build
 
 
 @kotlinx.serialization.Serializable
+data class AnalyticsReturnReasonDataModel(
+    val reason: String = "",
+    val quantity: Double = 0.0,
+    val transactionCount: Int = 0,
+    val amount: Double = 0.0
+)
+
+@kotlinx.serialization.Serializable
 data class AnalyticsRankedItemDataModel(
     val id: String = "",
     val name: List<LocalizedStringDataModel> = emptyList(),
@@ -15037,7 +15144,8 @@ data class AnalyticsRankedItemDataModel(
     val amount: Double = 0.0,
     val costEstimate: Double = 0.0,
     val profitEstimate: Double = 0.0,
-    val currencyCode: String = ""
+    val currencyCode: String = "",
+    val returnReasons: List<AnalyticsReturnReasonDataModel> = emptyList()
 )
 
 @kotlinx.serialization.Serializable
@@ -15100,6 +15208,8 @@ data class StoreAnalyticsDashboardDataModel(
 
     val topItemsByRevenue: List<AnalyticsRankedItemDataModel> = emptyList(),
     val topItemsByQuantity: List<AnalyticsRankedItemDataModel> = emptyList(),
+    val topReturnedItemsByQuantity: List<AnalyticsRankedItemDataModel> = emptyList(),
+    val topReturnedItemsByAmount: List<AnalyticsRankedItemDataModel> = emptyList(),
     val slowMovingItems: List<AnalyticsRankedItemDataModel> = emptyList(),
     val salesByDay: List<AnalyticsBucketDataModel> = emptyList(),
     val salesByHour: List<AnalyticsBucketDataModel> = emptyList()
@@ -15120,6 +15230,20 @@ data class TransactionDataModel(
     val clientOperationId: String = ""
 )
 
+private data class MutableAnalyticsReturnReasonAccumulator(
+    val reason: String,
+    var quantity: Double = 0.0,
+    var amount: Double = 0.0,
+    val transactionIds: MutableSet<String> = mutableSetOf()
+) {
+    fun toReturnReason(): AnalyticsReturnReasonDataModel = AnalyticsReturnReasonDataModel(
+        reason = reason,
+        quantity = quantity.roundAnalyticsNumber(),
+        transactionCount = transactionIds.size,
+        amount = amount.roundMoney()
+    )
+}
+
 private data class MutableAnalyticsItemAccumulator(
     val id: String,
     var name: List<LocalizedStringDataModel>,
@@ -15128,8 +15252,19 @@ private data class MutableAnalyticsItemAccumulator(
     var amount: Double = 0.0,
     var cost: Double = 0.0,
     val transactionIds: MutableSet<String> = mutableSetOf(),
-    var currencyCode: String = ""
+    var currencyCode: String = "",
+    val returnReasonAccumulators: MutableMap<String, MutableAnalyticsReturnReasonAccumulator> = linkedMapOf()
 ) {
+    fun addReturnReason(reason: String, quantity: Double, amount: Double, transactionId: String) {
+        val normalizedReason = reason.trim().take(MAX_RETURN_REASON_LENGTH)
+        val accumulator = returnReasonAccumulators.getOrPut(normalizedReason) {
+            MutableAnalyticsReturnReasonAccumulator(normalizedReason)
+        }
+        accumulator.quantity += quantity
+        accumulator.amount += amount
+        accumulator.transactionIds.add(transactionId)
+    }
+
     fun toRankedItem(): AnalyticsRankedItemDataModel = AnalyticsRankedItemDataModel(
         id = id,
         name = name,
@@ -15139,7 +15274,10 @@ private data class MutableAnalyticsItemAccumulator(
         amount = amount.roundMoney(),
         costEstimate = cost.roundMoney(),
         profitEstimate = (amount - cost).roundMoney(),
-        currencyCode = currencyCode
+        currencyCode = currencyCode,
+        returnReasons = returnReasonAccumulators.values
+            .map { it.toReturnReason() }
+            .sortedWith(compareByDescending<AnalyticsReturnReasonDataModel> { it.quantity }.thenByDescending { it.transactionCount }.thenBy { it.reason })
     )
 }
 
@@ -15410,6 +15548,8 @@ fun buildStoreAnalyticsDashboard(
 
     val topRevenue = linkedMapOf<String, MutableAnalyticsItemAccumulator>()
     val topQuantity = linkedMapOf<String, MutableAnalyticsItemAccumulator>()
+    val topReturnedQuantity = linkedMapOf<String, MutableAnalyticsItemAccumulator>()
+    val topReturnedAmount = linkedMapOf<String, MutableAnalyticsItemAccumulator>()
     val soldQuantityByItem = mutableMapOf<String, Double>()
     var estimatedSalesCost = 0.0
     var soldQuantity = 0.0
@@ -15451,6 +15591,44 @@ fun buildStoreAnalyticsDashboard(
             quantityAcc.cost += cost
             quantityAcc.transactionIds.add(transaction.id)
             quantityAcc.currencyCode = quantityAcc.currencyCode.ifBlank { lineCurrency }
+        }
+    }
+
+    returnTransactions.forEach { transaction ->
+        transaction.goodsInTransaction.forEach { line ->
+            val itemId = line.analyticsItemId(stockByBarcode)
+            val item = stockById[itemId]
+            val itemBatches = batchesByItem[itemId].orEmpty()
+            val amount = analyticsLineAmount(line)
+            val costPerUnit = item?.analyticsEstimatedCostPerUnit(itemBatches) ?: 0.0
+            val cost = (costPerUnit * line.quantity).roundMoney()
+            val name = line.analyticsItemName(item, itemId)
+            val subtitle = line.barcode.takeIf { it.isNotBlank() } ?: item?.barcodes?.firstOrNull().orEmpty()
+            val lineCurrency = analyticsLineCurrency(line, currencyCode)
+
+            val quantityAcc = topReturnedQuantity.getOrPut(itemId) {
+                MutableAnalyticsItemAccumulator(itemId, name, subtitle, currencyCode = lineCurrency)
+            }
+            quantityAcc.name = if (quantityAcc.name.isEmpty()) name else quantityAcc.name
+            quantityAcc.subtitle = quantityAcc.subtitle.ifBlank { subtitle }
+            quantityAcc.quantity += line.quantity
+            quantityAcc.amount += amount
+            quantityAcc.cost += cost
+            quantityAcc.transactionIds.add(transaction.id)
+            quantityAcc.currencyCode = quantityAcc.currencyCode.ifBlank { lineCurrency }
+            quantityAcc.addReturnReason(line.returnReason, line.quantity, amount, transaction.id)
+
+            val amountAcc = topReturnedAmount.getOrPut(itemId) {
+                MutableAnalyticsItemAccumulator(itemId, name, subtitle, currencyCode = lineCurrency)
+            }
+            amountAcc.name = if (amountAcc.name.isEmpty()) name else amountAcc.name
+            amountAcc.subtitle = amountAcc.subtitle.ifBlank { subtitle }
+            amountAcc.quantity += line.quantity
+            amountAcc.amount += amount
+            amountAcc.cost += cost
+            amountAcc.transactionIds.add(transaction.id)
+            amountAcc.currencyCode = amountAcc.currencyCode.ifBlank { lineCurrency }
+            amountAcc.addReturnReason(line.returnReason, line.quantity, amount, transaction.id)
         }
     }
 
@@ -15596,6 +15774,8 @@ fun buildStoreAnalyticsDashboard(
         sellThroughPercentEstimate = sellThroughPercentEstimate,
         topItemsByRevenue = topRevenue.values.map { it.toRankedItem() }.sortedByDescending { it.amount }.take(10),
         topItemsByQuantity = topQuantity.values.map { it.toRankedItem() }.sortedByDescending { it.quantity }.take(10),
+        topReturnedItemsByQuantity = topReturnedQuantity.values.map { it.toRankedItem() }.sortedByDescending { it.quantity }.take(10),
+        topReturnedItemsByAmount = topReturnedAmount.values.map { it.toRankedItem() }.sortedByDescending { it.amount }.take(10),
         slowMovingItems = slowMovingItems,
         salesByDay = dailyBuckets.values.map { it.toBucket() }.sortedBy { it.sortKey },
         salesByHour = hourlyBuckets.values.map { it.toBucket() }.sortedBy { it.sortKey }

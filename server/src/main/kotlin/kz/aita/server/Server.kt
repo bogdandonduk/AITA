@@ -105,6 +105,30 @@ object Transactions: Table("transactions") {
     override val primaryKey = PrimaryKey(id)
 }
 
+object TransactionReturnItems: Table("transaction_return_items") {
+    val id = uuid("id").uniqueIndex()
+    val transactionId = uuid("transaction_id").references(Transactions.id, onDelete = ReferenceOption.CASCADE)
+    val userId = uuid("user_id")
+    val storeId = uuid("store_id")
+    val lineIndex = integer("line_index")
+    val goodsItemId = uuid("goods_item_id").nullable()
+    val barcode = text("barcode").default("")
+    val name = jsonb(
+        "name",
+        Json,
+        ListSerializer(LocalizedStringDataModel.serializer())
+    )
+    val quantity = double("quantity")
+    val pricePerUnit = double("price_per_unit")
+    val currencyCode = text("currency_code").nullable()
+    val returnReason = text("return_reason").default("")
+    val clientOperationId = text("client_operation_id").nullable()
+    val timeMillis = long("time_millis")
+    val createdAt = timestamp("created_at").defaultExpression(CurrentTimestamp)
+
+    override val primaryKey = PrimaryKey(id)
+}
+
 
 private fun hardDeleteStoreOwnedDataInsideTransaction(storeIds: List<UUID>) {
     val cleanStoreIds = storeIds.distinct()
@@ -113,6 +137,7 @@ private fun hardDeleteStoreOwnedDataInsideTransaction(storeIds: List<UUID>) {
     val nullableStoreIds = cleanStoreIds.map { it as UUID? }
 
     SupplierOrders.deleteWhere { SupplierOrders.storeId inList cleanStoreIds }
+    TransactionReturnItems.deleteWhere { TransactionReturnItems.storeId inList cleanStoreIds }
     Transactions.deleteWhere { Transactions.storeId inList cleanStoreIds }
     Debtors.deleteWhere { Debtors.storeId inList cleanStoreIds }
     Notifications.deleteWhere { Notifications.storeId inList nullableStoreIds }
@@ -4199,9 +4224,8 @@ private fun activeWorkerPermissionsInsideTransaction(userId: UUID, storeId: UUID
                     ((StoreWorkerMemberships.storeId eq storeId) or (StoreWorkerMemberships.storeId eq rootStoreId)) and
                     (StoreWorkerMemberships.isActive eq true)
         }
-        .singleOrNull()
-        ?.get(StoreWorkerMemberships.permissions)
-        .orEmpty()
+        .flatMap { it[StoreWorkerMemberships.permissions] }
+        .distinct()
 }
 
 private fun userHasStorePermissionInsideTransaction(userId: UUID, storeId: UUID, permission: String): Boolean {
@@ -4221,6 +4245,33 @@ private fun requiredPermissionForTransactionType(type: String): String? {
 private fun cleanPermissionIds(input: List<String>): List<String> {
     val known = ALL_STORE_PERMISSION_IDS.toSet()
     return input.filter { it in known }.distinct()
+}
+
+private fun assignableStorePermissionsInsideTransaction(
+    actorUserId: UUID,
+    storeId: UUID,
+    requestedPermissions: List<String>
+): List<String>? {
+    val permissions = cleanPermissionIds(requestedPermissions)
+    if (isStoreOwnerInsideTransaction(actorUserId, storeId)) return permissions
+
+    val actorPermissions = activeWorkerPermissionsInsideTransaction(actorUserId, storeId).toSet()
+    if (STORE_PERMISSION_WORKERS_MANAGE !in actorPermissions) return null
+
+    return permissions.takeIf { requested -> requested.all { it in actorPermissions } }
+}
+
+private fun actorCanManageExistingWorkerPermissionsInsideTransaction(
+    actorUserId: UUID,
+    storeId: UUID,
+    existingPermissions: List<String>
+): Boolean {
+    if (isStoreOwnerInsideTransaction(actorUserId, storeId)) return true
+
+    val actorPermissions = activeWorkerPermissionsInsideTransaction(actorUserId, storeId).toSet()
+    if (STORE_PERMISSION_WORKERS_MANAGE !in actorPermissions) return false
+
+    return cleanPermissionIds(existingPermissions).all { it in actorPermissions }
 }
 
 private fun userRequiresWorkshiftInsideTransaction(userId: UUID, storeId: UUID): Boolean {
@@ -6801,7 +6852,8 @@ private fun normalizeTransactionGoodsInsideTransaction(
             goodsItemId = goodsItem.id.takeIf { it.isNotBlank() } ?: line.goodsItemId,
             quantityUnit = line.quantityUnit ?: defaultServerQuantityForGoodsItem(goodsItem.measurementUnitId, line.quantity),
             currencyCode = line.currencyCode?.takeIf { it.isNotBlank() }
-                ?: resolvedPrice.currency.takeIf { it.isNotBlank() }
+                ?: resolvedPrice.currency.takeIf { it.isNotBlank() },
+            returnReason = if (transactionType == "return") line.returnReason.trim().take(500) else ""
         )
     }
 
@@ -7104,6 +7156,40 @@ private fun addStockForTransactionLineInsideTransaction(
     return true
 }
 
+private fun syncTransactionReturnItemsInsideTransaction(
+    userId: UUID,
+    storeId: UUID,
+    transactionId: UUID,
+    transaction: TransactionDataModel,
+    clientOperationId: String?,
+    timeMillis: Long
+) {
+    if (transaction.type != "return") return
+
+    TransactionReturnItems.deleteWhere { TransactionReturnItems.transactionId eq transactionId }
+
+    transaction.goodsInTransaction.forEachIndexed { index, line ->
+        TransactionReturnItems.insert { row ->
+            row[TransactionReturnItems.id] = UUID.randomUUID()
+            row[TransactionReturnItems.transactionId] = transactionId
+            row[TransactionReturnItems.userId] = userId
+            row[TransactionReturnItems.storeId] = storeId
+            row[TransactionReturnItems.lineIndex] = index
+            row[TransactionReturnItems.goodsItemId] = line.goodsItemId
+                ?.takeIf { it.isNotBlank() }
+                ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+            row[TransactionReturnItems.barcode] = line.barcode
+            row[TransactionReturnItems.name] = line.name
+            row[TransactionReturnItems.quantity] = line.quantity
+            row[TransactionReturnItems.pricePerUnit] = line.pricePerUnit
+            row[TransactionReturnItems.currencyCode] = line.currencyCode?.takeIf { it.isNotBlank() }
+            row[TransactionReturnItems.returnReason] = line.returnReason.trim().take(500)
+            row[TransactionReturnItems.clientOperationId] = clientOperationId?.takeIf { it.isNotBlank() }
+            row[TransactionReturnItems.timeMillis] = timeMillis
+        }
+    }
+}
+
 private fun applyTransactionStockMutationInsideTransaction(
     userId: UUID,
     storeId: UUID,
@@ -7373,7 +7459,7 @@ fun Application.module() {
 
     org.jetbrains.exposed.sql.transactions.transaction {
         if (configBoolean("app.schemaAutoRepair", "AITA_SCHEMA_AUTO_REPAIR", false)) {
-            SchemaUtils.createMissingTablesAndColumns(Users, RefreshSessions, SecuritySessionEvents, Stores, StockItems, StockBatchesV2, StockBatchMovements, Suppliers, SupplierGoodsPrices, SupplierOrders, SupplierOrderLines, Debtors, Notifications, SupportTickets, SupportMessages, StoreWorkerRequests, StoreWorkerMemberships, Workshifts, CashRegisters, CashRegisterEvents, UserWallets, UserWalletLedgerEntries, TopUpPaymentIntents, StoreSubscriptionStates, StoreSubscriptionChargeEvents, OperationLogs, Manufacturers, GenericGoodsItems, GenericGoodsItemCandidates, GenericGoodsCategories)
+            SchemaUtils.createMissingTablesAndColumns(Users, RefreshSessions, SecuritySessionEvents, Stores, StockItems, StockBatchesV2, StockBatchMovements, Suppliers, SupplierGoodsPrices, SupplierOrders, SupplierOrderLines, Debtors, TransactionReturnItems, Notifications, SupportTickets, SupportMessages, StoreWorkerRequests, StoreWorkerMemberships, Workshifts, CashRegisters, CashRegisterEvents, UserWallets, UserWalletLedgerEntries, TopUpPaymentIntents, StoreSubscriptionStates, StoreSubscriptionChargeEvents, OperationLogs, Manufacturers, GenericGoodsItems, GenericGoodsItemCandidates, GenericGoodsCategories)
         }
         sanitizeGenericGoodsCategoryPrefixesInsideTransaction()
         seedGenericGoodsCategoriesInsideTransaction()
@@ -10010,7 +10096,7 @@ fun Application.module() {
 
                     val parentAccessOk = newSuspendedTransaction(aitaServerIoContext) {
                         parentStoreIdForBranch?.let { parentId ->
-                            userCanUseStoreActionInsideTransaction(userId, parentId, STORE_PERMISSION_STORE_MANAGE) &&
+                            userCanUseStoreActionInsideTransaction(userId, parentId, STORE_PERMISSION_STORE_MANAGE, requireWorkshift = false) &&
                                     Stores.select(Stores.parentStoreId).where { Stores.id eq parentId }.singleOrNull()?.get(Stores.parentStoreId) == null
                         } ?: true
                     }
@@ -10131,7 +10217,7 @@ fun Application.module() {
 
                         val id = runCatching { UUID.fromString(body.id) }.getOrNull() ?: return@newSuspendedTransaction 2
 
-                        if (!userCanUseStoreActionInsideTransaction(userId, id, STORE_PERMISSION_STORE_MANAGE))
+                        if (!userCanUseStoreActionInsideTransaction(userId, id, STORE_PERMISSION_STORE_MANAGE, requireWorkshift = false))
                             return@newSuspendedTransaction 1
 
                         val currentParentStoreId = Stores
@@ -11720,13 +11806,14 @@ fun Application.module() {
                     val body = call.receiveAita<WorkerStoreInviteCreateDataModel>()
                     val now = System.currentTimeMillis()
                     val role = body.roleId.takeIf { it == WORKER_ROLE_ADMIN || it == WORKER_ROLE_STANDARD } ?: WORKER_ROLE_STANDARD
-                    val permissions = cleanPermissionIds(body.permissions).ifEmpty { defaultStorePermissionsForRole(role) }
+                    val requestedPermissions = cleanPermissionIds(body.permissions).ifEmpty { defaultStorePermissionsForRole(role) }
                     val inviteNote = cleanOptionalText(body.note)
                     val inviteNoteLocalized = localizedNoteForStorage(inviteNote, body.noteLocalized)
                     var failureMessage: List<LocalizedStringDataModel>? = null
 
                     val request = newSuspendedTransaction(aitaServerIoContext) {
-                        if (!isStoreOwnerInsideTransaction(userId, storeId) && !userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_WORKERS_MANAGE, requireWorkshift = false)) {
+                        val permissions = assignableStorePermissionsInsideTransaction(userId, storeId, requestedPermissions)
+                        if (permissions == null) {
                             failureMessage = getResponse("59").message
                             return@newSuspendedTransaction null
                         }
@@ -11979,7 +12066,7 @@ fun Application.module() {
                         ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
                     val now = System.currentTimeMillis()
                     val role = body.roleId.takeIf { it == WORKER_ROLE_ADMIN || it == WORKER_ROLE_STANDARD } ?: WORKER_ROLE_STANDARD
-                    val permissions = cleanPermissionIds(body.permissions).ifEmpty { defaultStorePermissionsForRole(role) }
+                    val requestedPermissions = cleanPermissionIds(body.permissions).ifEmpty { defaultStorePermissionsForRole(role) }
                     val responseNote = cleanOptionalText(body.responseNote ?: body.note)
                     val responseNoteLocalized = localizedNoteForStorage(responseNote, body.responseNoteLocalized)
                     var failureMessage: List<LocalizedStringDataModel>? = null
@@ -12010,7 +12097,8 @@ fun Application.module() {
                             return@newSuspendedTransaction null
                         }
 
-                        if (!isStoreOwnerInsideTransaction(userId, requestStoreId) && !userCanUseStoreActionInsideTransaction(userId, requestStoreId, STORE_PERMISSION_WORKERS_MANAGE, requireWorkshift = false)) {
+                        val permissions = assignableStorePermissionsInsideTransaction(userId, requestStoreId, requestedPermissions)
+                        if (permissions == null) {
                             failureMessage = getResponse("59").message
                             return@newSuspendedTransaction null
                         }
@@ -12203,7 +12291,7 @@ fun Application.module() {
                     val workerId = runCatching { UUID.fromString(body.workerId) }.getOrNull()
                         ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
                     val role = body.roleId.takeIf { it == WORKER_ROLE_ADMIN || it == WORKER_ROLE_STANDARD } ?: WORKER_ROLE_STANDARD
-                    val permissions = cleanPermissionIds(body.permissions)
+                    val requestedPermissions = cleanPermissionIds(body.permissions)
                     val now = System.currentTimeMillis()
                     var failureMessage: List<LocalizedStringDataModel>? = null
 
@@ -12226,7 +12314,13 @@ fun Application.module() {
                             return@newSuspendedTransaction null
                         }
 
-                        if (!isStoreOwnerInsideTransaction(userId, workerStoreId) && !userCanUseStoreActionInsideTransaction(userId, workerStoreId, STORE_PERMISSION_WORKERS_MANAGE, requireWorkshift = false)) {
+                        if (!actorCanManageExistingWorkerPermissionsInsideTransaction(userId, workerStoreId, existingWorkerRow[StoreWorkerMemberships.permissions])) {
+                            failureMessage = getResponse("59").message
+                            return@newSuspendedTransaction null
+                        }
+
+                        val permissions = assignableStorePermissionsInsideTransaction(userId, workerStoreId, requestedPermissions)
+                        if (permissions == null) {
                             failureMessage = getResponse("59").message
                             return@newSuspendedTransaction null
                         }
@@ -12308,7 +12402,7 @@ fun Application.module() {
                             return@newSuspendedTransaction null
                         }
 
-                        if (!isStoreOwnerInsideTransaction(userId, workerStoreId) && !userCanUseStoreActionInsideTransaction(userId, workerStoreId, STORE_PERMISSION_WORKERS_MANAGE, requireWorkshift = false)) {
+                        if (!actorCanManageExistingWorkerPermissionsInsideTransaction(userId, workerStoreId, existingWorkerRow[StoreWorkerMemberships.permissions])) {
                             failureMessage = getResponse("59").message
                             return@newSuspendedTransaction null
                         }
@@ -12945,7 +13039,18 @@ fun Application.module() {
                                 .selectAll()
                                 .where { (Transactions.clientOperationId eq operationId) and (Transactions.storeId eq storeId) }
                                 .singleOrNull()
-                                ?.let { return@newSuspendedTransaction it.toTransactionDataModel() }
+                                ?.let { row ->
+                                    val existingTransaction = row.toTransactionDataModel()
+                                    syncTransactionReturnItemsInsideTransaction(
+                                        userId = row[Transactions.userId],
+                                        storeId = storeId,
+                                        transactionId = row[Transactions.id],
+                                        transaction = existingTransaction,
+                                        clientOperationId = operationId,
+                                        timeMillis = existingTransaction.timeMillis
+                                    )
+                                    return@newSuspendedTransaction existingTransaction
+                                }
                         }
 
                         val requiredPermission = requiredPermissionForTransactionType(body.type)
@@ -13061,6 +13166,15 @@ fun Application.module() {
                             it[Transactions.timeMillis] = timeMillis
                             it[Transactions.clientOperationId] = requestClientOperationId
                         }
+
+                        syncTransactionReturnItemsInsideTransaction(
+                            userId = userId,
+                            storeId = storeId,
+                            transactionId = id,
+                            transaction = transactionToSave,
+                            clientOperationId = requestClientOperationId,
+                            timeMillis = timeMillis
+                        )
 
                         applyCashRegisterTransactionEventInsideTransaction(
                             storeId = storeId,
