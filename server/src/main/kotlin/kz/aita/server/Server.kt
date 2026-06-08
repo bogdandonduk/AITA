@@ -2969,7 +2969,19 @@ private suspend fun refreshSessionUserIdForPlainToken(refreshPlain: String): UUI
     }
 }
 
-fun main() = EngineMain.main(emptyArray())
+private object AitaServerRuntimeAnchor
+
+private fun stabilizeServerRuntimeClassLoader() {
+    val serverClassLoader = AitaServerRuntimeAnchor::class.java.classLoader ?: ClassLoader.getSystemClassLoader()
+    Thread.currentThread().contextClassLoader = serverClassLoader
+    System.setProperty("io.ktor.development", "false")
+    System.setProperty("ktor.development", "false")
+}
+
+fun main(args: Array<String>) {
+    stabilizeServerRuntimeClassLoader()
+    EngineMain.main(args)
+}
 
 private object RealtimeServerBus {
     private const val DUPLICATE_COALESCE_WINDOW_MILLIS = 260L
@@ -5108,6 +5120,38 @@ private fun ResultRow.toGoodsItemDataModel(): GoodsItemDataModel {
     )
 }
 
+private fun GoodsItemDataModel.matchesParentStockSearchQuery(rawQuery: String?): Boolean {
+    val queryTokens = rawQuery
+        ?.trim()
+        ?.lowercase()
+        ?.split(Regex("\\s+"))
+        ?.filter { it.isNotBlank() }
+        .orEmpty()
+
+    if (queryTokens.isEmpty()) return true
+
+    val searchableText = buildList {
+        add(id)
+        add(userId)
+        add(storeId)
+        addAll(allBarcodeValues())
+        addAll(allBarcodeValues().map { it.toStoredGoodsItemBarcode() })
+        addAll(name.map { it.value })
+        addAll(description.map { it.value })
+        add(measurementUnitId)
+        addAll(categoryIds)
+        addAll(salePrices.flatMap { listOf(it.price, it.currency, it.supplierId) })
+        addAll(returnPrices.flatMap { listOf(it.price, it.currency, it.supplierId) })
+        addAll(supplyPrices.flatMap { listOf(it.price, it.currency, it.supplierId) })
+        addAll(wholesalePrices.flatMap { listOf(it.price, it.currency, it.supplierId) })
+        note?.let { add(it) }
+        addAll(noteLocalized.map { it.value })
+        addAll(conditions)
+    }.joinToString(" ").lowercase()
+
+    return queryTokens.all { token -> searchableText.contains(token) }
+}
+
 private fun decodeSupplierStringList(value: String?): List<String> {
     return value
         ?.takeIf { it.isNotBlank() }
@@ -5632,6 +5676,118 @@ private fun cloneStockItemToStoreInsideTransaction(
     return StockItems.selectAll().where { StockItems.id eq id }.single()
 }
 
+
+private fun stockItemParentMirrorIdentityTokens(row: ResultRow): Set<String> {
+    val standardBarcodeTokens = row.stockBarcodeModels()
+        .filter { model -> model.type.normalizedGoodsItemBarcodeType(model.value) == GOODS_ITEM_BARCODE_TYPE_STANDARD }
+        .flatMap { model -> model.value.toStoredGoodsItemBarcodeCandidates() + listOf(model.value) }
+        .map { token -> "standard:${token.normalizedBarcodeToken()}" }
+        .filter { token -> token.substringAfter(':').isNotBlank() }
+        .toSet()
+    if (standardBarcodeTokens.isNotEmpty()) return standardBarcodeTokens
+
+    val nameTokens = row[StockItems.name]
+        .map { it.value.trim().lowercase() }
+        .filter { it.isNotBlank() }
+        .map { "name:$it" }
+        .toSet()
+    if (nameTokens.isNotEmpty()) return nameTokens
+
+    return row.stockBarcodeModels()
+        .flatMap { model -> model.value.toStoredGoodsItemBarcodeCandidates() + listOf(model.value) }
+        .map { token -> "barcode:${token.normalizedBarcodeToken()}" }
+        .filter { token -> token.substringAfter(':').isNotBlank() }
+        .toSet()
+}
+
+private fun stockItemsMatchForParentMirror(source: ResultRow, candidate: ResultRow): Boolean {
+    val sourceTokens = stockItemParentMirrorIdentityTokens(source)
+    val candidateTokens = stockItemParentMirrorIdentityTokens(candidate)
+    return sourceTokens.isNotEmpty() && candidateTokens.isNotEmpty() && sourceTokens.any { it in candidateTokens }
+}
+
+private fun findMatchingParentMirrorStockItemInsideTransaction(
+    parentStoreId: UUID,
+    sourceItemRow: ResultRow
+): ResultRow? {
+    return StockItems
+        .selectAll()
+        .where {
+            (StockItems.storeId eq parentStoreId) and
+                    (StockItems.isActive eq true)
+        }
+        .firstOrNull { candidate -> stockItemsMatchForParentMirror(sourceItemRow, candidate) }
+}
+
+private fun UpdateBuilder<*>.setParentStockMirrorFieldsFromBranchRow(
+    sourceItemRow: ResultRow,
+    parentStoreId: UUID,
+    now: Long
+) {
+    val cleanBarcodeModels = sourceItemRow.stockBarcodeModels().normalizedGoodsItemBarcodesForStore(
+        storeId = parentStoreId.toString(),
+        legacyBarcodes = sourceItemRow[StockItems.barcodes]
+    )
+    this[StockItems.barcodes] = cleanBarcodeModels.cleanBarcodeStrings().ifEmpty { sourceItemRow[StockItems.barcodes].cleanBarcodes() }
+    this[StockItems.barcodeModels] = cleanBarcodeModels
+    this[StockItems.name] = sourceItemRow[StockItems.name]
+    this[StockItems.description] = sourceItemRow[StockItems.description]
+    this[StockItems.measurementUnitId] = sourceItemRow[StockItems.measurementUnitId]
+    this[StockItems.categoryIds] = sourceItemRow[StockItems.categoryIds]
+    this[StockItems.salePrices] = sourceItemRow[StockItems.salePrices]
+    this[StockItems.returnPrices] = sourceItemRow[StockItems.returnPrices]
+    this[StockItems.supplyPrices] = sourceItemRow[StockItems.supplyPrices]
+    this[StockItems.wholesalePrices] = sourceItemRow[StockItems.wholesalePrices]
+    this[StockItems.wholesaleMinQuantity] = sourceItemRow[StockItems.wholesaleMinQuantity]
+    this[StockItems.genericExpirationPeriod] = sourceItemRow[StockItems.genericExpirationPeriod]
+    this[StockItems.isQuickItem] = sourceItemRow[StockItems.isQuickItem]
+    this[StockItems.imagePaths] = sourceItemRow[StockItems.imagePaths]
+    this[StockItems.activeShelfBatchId] = null
+    this[StockItems.promotions] = sourceItemRow[StockItems.promotions]
+    this[StockItems.note] = sourceItemRow[StockItems.note]
+    this[StockItems.noteLocalized] = sourceItemRow[StockItems.noteLocalized]
+    this[StockItems.conditions] = sourceItemRow[StockItems.conditions]
+    this[StockItems.updatedAtMillis] = now
+    this[StockItems.isActive] = sourceItemRow[StockItems.isActive]
+}
+
+private fun mirrorBranchStockItemToParentInsideTransaction(
+    branchItemRow: ResultRow,
+    previousBranchItemRow: ResultRow? = null,
+    userId: UUID,
+    now: Long
+): ResultRow? {
+    val branchStoreId = branchItemRow[StockItems.storeId]
+    val parentStoreId = Stores
+        .select(Stores.parentStoreId)
+        .where { Stores.id eq branchStoreId }
+        .singleOrNull()
+        ?.get(Stores.parentStoreId)
+        ?: return null
+
+    val existingParentMirror = previousBranchItemRow
+        ?.let { findMatchingParentMirrorStockItemInsideTransaction(parentStoreId, it) }
+        ?: findMatchingParentMirrorStockItemInsideTransaction(parentStoreId, branchItemRow)
+
+    return if (existingParentMirror == null) {
+        val mirrorId = UUID.randomUUID()
+        StockItems.insert {
+            it[StockItems.id] = mirrorId
+            it[StockItems.userId] = userId
+            it[StockItems.storeId] = parentStoreId
+            it[StockItems.createdAtMillis] = now
+            it.setParentStockMirrorFieldsFromBranchRow(branchItemRow, parentStoreId, now)
+        }
+        StockItems.selectAll().where { StockItems.id eq mirrorId }.single()
+    } else {
+        val mirrorId = existingParentMirror[StockItems.id]
+        StockItems.update({ StockItems.id eq mirrorId }) {
+            it.setParentStockMirrorFieldsFromBranchRow(branchItemRow, parentStoreId, now)
+        }
+        StockItems.selectAll().where { StockItems.id eq mirrorId }.single()
+    }
+}
+
 private fun findOrCloneDestinationStockItemInsideTransaction(
     sourceItemRow: ResultRow,
     destinationStoreId: UUID,
@@ -5791,14 +5947,7 @@ private fun barcodeClashesInsideTransaction(
     val incomingModels = barcodeModels.normalizedGoodsItemBarcodesForStore(storeId.toString())
     if (incomingModels.isEmpty()) return false
 
-    val hasStandardBarcode = incomingModels.any { model ->
-        model.type.normalizedGoodsItemBarcodeType(model.value) == GOODS_ITEM_BARCODE_TYPE_STANDARD
-    }
-    val candidateStoreIds = if (hasStandardBarcode) {
-        stockVisibleStoreIdsInsideTransaction(storeId)
-    } else {
-        listOf(storeId)
-    }
+    val candidateStoreIds = listOf(storeId)
 
     return StockItems
         .selectAll()
@@ -6425,6 +6574,7 @@ private fun applyTransactionStockMutationInsideTransaction(
 }
 
 fun Application.module() {
+    stabilizeServerRuntimeClassLoader()
 
     install(CallLogging) {
         level = org.slf4j.event.Level.INFO
@@ -6505,6 +6655,7 @@ fun Application.module() {
         allowHeader(AITA_DEVICE_APP_NAME_HEADER)
         allowHeader(AITA_DEVICE_APP_VERSION_HEADER)
         allowHeader(AITA_DEVICE_LOCALE_HEADER)
+        allowHeader(AITA_CONNECTION_PROBE_HEADER)
         allowHeader("X-AITA-Client-Operation-Id")
         exposeHeader(AITA_SERVER_HEADER)
         allowMethod(HttpMethod.Get)
@@ -6983,11 +7134,16 @@ fun Application.module() {
             }
 
             get("/ping") {
-                RealtimeServerBus.publish(
-                    storeId = call.request.header("store_id") ?: call.request.header("store-id"),
-                    entity = "connection",
-                    reason = "manual_connection_check"
-                )
+                val silentConnectionProbe = call.request.header(AITA_CONNECTION_PROBE_HEADER) == "1" ||
+                        call.request.queryParameters["silent"]?.equals("true", ignoreCase = true) == true
+
+                if (!silentConnectionProbe) {
+                    RealtimeServerBus.publish(
+                        storeId = call.request.header("store_id") ?: call.request.header("store-id"),
+                        entity = "connection",
+                        reason = "manual_connection_check"
+                    )
+                }
                 call.genericResponseNoPayload(
                     status = HttpStatusCode.OK,
                     message = simpleMessage(
@@ -7783,6 +7939,55 @@ fun Application.module() {
                     } ?: call.respond(UnauthorizedResponse())
                 }
 
+                get("/parent/get") {
+                    val userId = call.checkPrincipal() ?: return@get
+                    val storeId = call.headerUuid("store_id")
+                        ?: return@get call.respond(UnauthorizedResponse())
+                    val cleanQuery = call.request.queryParameters["q"]
+                        ?.trim()
+                        ?.takeIf { it.isNotBlank() }
+                    val limit = call.request.queryParameters["limit"]
+                        ?.toIntOrNull()
+                        ?.coerceIn(1, 200)
+                        ?: 80
+                    val offset = call.request.queryParameters["offset"]
+                        ?.toIntOrNull()
+                        ?.coerceAtLeast(0)
+                        ?: 0
+
+                    val result = newSuspendedTransaction(Dispatchers.IO) {
+                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_READ, requireWorkshift = false))
+                            return@newSuspendedTransaction null
+
+                        val parentStoreId = Stores
+                            .select(Stores.parentStoreId)
+                            .where { Stores.id eq storeId }
+                            .singleOrNull()
+                            ?.get(Stores.parentStoreId)
+                            ?: return@newSuspendedTransaction emptyList<GoodsItemDataModel>()
+
+                        StockItems
+                            .selectAll()
+                            .where {
+                                (StockItems.storeId eq parentStoreId) and
+                                        (StockItems.isActive eq true)
+                            }
+                            .orderBy(StockItems.updatedAtMillis, SortOrder.DESC)
+                            .map { it.toGoodsItemDataModel() }
+                            .filter { item -> item.matchesParentStockSearchQuery(cleanQuery) }
+                            .drop(offset)
+                            .take(limit)
+                    }
+
+                    result?.let {
+                        call.genericListResponse(
+                            status = HttpStatusCode.OK,
+                            payload = it
+                        )
+                    } ?: call.respond(UnauthorizedResponse())
+                }
+
+
                 post("/add") {
                     val userId = call.checkPrincipal() ?: return@post
                     val body = call.receive<GoodsItemDataModel>()
@@ -7848,6 +8053,13 @@ fun Application.module() {
                             it[StockItems.isActive] = true
                         }
 
+                        val insertedRow = StockItems.selectAll().where { StockItems.id eq id }.single()
+                        val parentMirrorRow = mirrorBranchStockItemToParentInsideTransaction(
+                            branchItemRow = insertedRow,
+                            userId = userId,
+                            now = now
+                        )
+
                         recordGenericGoodsContributionInsideTransaction(
                             userId = userId,
                             stockItemId = id,
@@ -7874,25 +8086,14 @@ fun Application.module() {
                             now = now
                         )
 
-                        body.copy(
-                            id = id.toString(),
-                            userId = userId.toString(),
-                            storeId = storeId.toString(),
-                            barcodes = cleanBarcodes,
-                            barcodeModels = cleanBarcodeModels,
-                            promotions = body.promotions.sanitizedStockPromotions(),
-                            conditions = body.conditions.map { condition -> condition.trim() }.filter { condition -> condition.isNotBlank() }.distinct(),
-                            createdAtMillis = now,
-                            updatedAtMillis = now,
-                            isActive = true
-                        )
+                        insertedRow.toGoodsItemDataModel() to parentMirrorRow?.get(StockItems.storeId)?.toString()
                     }
 
-                    inserted?.let {
-                        publishStockRealtimeBundle(it.storeId, "stock_item_added")
+                    inserted?.let { (item, parentMirrorStoreId) ->
+                        publishStockRealtimeBundle(listOf(item.storeId, parentMirrorStoreId), "stock_item_added")
                         call.genericResponse(
                             status = HttpStatusCode.Created,
-                            payload = it,
+                            payload = item,
                             message = simpleMessage(
                                 main = "Goods item added",
                                 ru = "Товар добавлен",
@@ -7989,22 +8190,22 @@ fun Application.module() {
                         if (affected <= 0)
                             return@newSuspendedTransaction null
 
-                        body.copy(
-                            userId = userId.toString(),
-                            storeId = storeId.toString(),
-                            barcodes = cleanBarcodes,
-                            barcodeModels = cleanBarcodeModels,
-                            promotions = body.promotions.sanitizedStockPromotions(),
-                            conditions = body.conditions.map { condition -> condition.trim() }.filter { condition -> condition.isNotBlank() }.distinct(),
-                            updatedAtMillis = now
+                        val updatedRow = StockItems.selectAll().where { StockItems.id eq id }.single()
+                        val parentMirrorRow = mirrorBranchStockItemToParentInsideTransaction(
+                            branchItemRow = updatedRow,
+                            previousBranchItemRow = goodsItemRow,
+                            userId = userId,
+                            now = now
                         )
+
+                        updatedRow.toGoodsItemDataModel() to parentMirrorRow?.get(StockItems.storeId)?.toString()
                     }
 
-                    updated?.let {
-                        publishStockRealtimeBundle(it.storeId, "stock_item_updated")
+                    updated?.let { (item, parentMirrorStoreId) ->
+                        publishStockRealtimeBundle(listOf(item.storeId, parentMirrorStoreId), "stock_item_updated")
                         call.genericResponse(
                             status = HttpStatusCode.OK,
-                            payload = it,
+                            payload = item,
                             message = simpleMessage(
                                 main = "Goods item updated",
                                 ru = "Товар обновлён",

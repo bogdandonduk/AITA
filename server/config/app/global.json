@@ -8,7 +8,7 @@
       "second": "0"
     },
     "serverUrl": {
-      "first": "http://192.168.1.51:8080",
+      "first": "http://172.20.10.2:8080",
       "second": "1"
     },
     "globalAppConfigurationPath": {
@@ -74,6 +74,10 @@
     "getStockPath": {
       "first": "stock/get",
       "second": "13"
+    },
+    "getParentStoreStockPath": {
+      "first": "stock/parent/get",
+      "second": "1212"
     },
     "addGoodsItemPath": {
       "first": "stock/add",
@@ -849,6 +853,10 @@
     },
     "moveStockBatchPath": {
       "first": "stockBatches/move",
+      "second": "74"
+    },
+    "decideStockBatchMovePath": {
+      "first": "stockBatches/decideMove",
       "second": "74"
     },
     "getUserFinanceDashboardPath": {

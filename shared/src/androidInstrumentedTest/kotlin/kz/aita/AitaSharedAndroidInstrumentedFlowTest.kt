@@ -46,7 +46,9 @@ private data class RecordedAitaRequest(
     val method: String,
     val path: String,
     val storeIdHeader: String?,
-    val goodsItemIdHeader: String?
+    val goodsItemIdHeader: String?,
+    val supplierIdHeader: String? = null,
+    val queryParameters: Map<String, List<String>> = emptyMap()
 )
 
 private class AitaFlowTestEnvironment {
@@ -63,6 +65,11 @@ private class AitaFlowTestEnvironment {
     var availability: StockItemBranchAvailabilityDataModel = aitaTestAvailability()
     var transactions: List<TransactionDataModel> = emptyList()
     var debtors: List<DebtorDataModel> = emptyList()
+    var suppliers: List<SupplierDataModel> = emptyList()
+    var supplierGoodsPrices: List<SupplierGoodsPriceDataModel> = emptyList()
+    var supplierOrders: List<SupplierOrderWithLinesDataModel> = emptyList()
+    var notifications: List<NotificationDataModel> = emptyList()
+    var operationLogs: List<OperationLogDataModel> = emptyList()
     var nextStoreResponse: StoreDataModel? = null
     var nextDeletedStoreId: String? = null
     var nextWorkerRequestResponse: StoreWorkerRequestDataModel? = null
@@ -79,6 +86,12 @@ private class AitaFlowTestEnvironment {
     var forceNextCompleteTransactionFailure: Boolean = false
     var nextDebtorResponse: DebtorDataModel? = null
     var nextDeletedDebtorId: String? = null
+    var nextSupplierResponse: SupplierDataModel? = null
+    var nextDeletedSupplierId: String? = null
+    var nextSupplierGoodsPriceResponse: SupplierGoodsPriceDataModel? = null
+    var nextSupplierOrderResponse: SupplierOrderWithLinesDataModel? = null
+    var nextDeletedSupplierOrderId: String? = null
+    var nextSavedNotificationResponse: NotificationDataModel? = null
     val requests: MutableList<RecordedAitaRequest> = mutableListOf()
 }
 
@@ -877,6 +890,510 @@ class AitaSharedAndroidInstrumentedFlowTest {
         waitUntilAitaFlowCondition { storeWorkerMembershipsState.payloadValue.orEmpty().none { it.id == updatedWorker.id } }
         assertTrue(environment.requests.any { it.method == "POST" && it.path == "workers/remove" && it.storeIdHeader == AITA_FLOW_SOURCE_STORE_ID })
     }
+
+    @Test
+    fun menuAnalyticsCalculatesTotalsBucketsAndFiltersFromCurrentData() = runBlocking {
+        val fixture = aitaAnalyticsFixture()
+
+        val dashboard = buildStoreAnalyticsDashboard(
+            storeId = AITA_FLOW_SOURCE_STORE_ID,
+            startMillis = fixture.startMillis,
+            endMillisExclusive = fixture.endMillis,
+            transactions = fixture.transactions,
+            stock = fixture.stock,
+            batches = fixture.batches,
+            fallbackCurrencyCode = "KZT"
+        )
+
+        assertEquals(AITA_FLOW_SOURCE_STORE_ID, dashboard.storeId)
+        assertEquals("KZT", dashboard.currencyCode)
+        assertEquals(2, dashboard.saleCount)
+        assertEquals(1, dashboard.returnCount)
+        assertEquals(1, dashboard.supplyCount)
+        assertEquals(4, dashboard.transactionCount)
+        assertAitaDoubleEquals(4_400.0, dashboard.grossSales)
+        assertAitaDoubleEquals(1_000.0, dashboard.returnsAmount)
+        assertAitaDoubleEquals(3_000.0, dashboard.supplyCost)
+        assertAitaDoubleEquals(3_400.0, dashboard.netRevenue)
+        assertAitaDoubleEquals(2_100.0, dashboard.estimatedSalesCost)
+        assertAitaDoubleEquals(1_300.0, dashboard.estimatedGrossProfit)
+        assertAitaDoubleEquals(38.235, dashboard.estimatedMarginPercent, tolerance = 0.002)
+        assertAitaDoubleEquals(2_200.0, dashboard.averageSale)
+        assertAitaDoubleEquals(2.5, dashboard.averageItemsPerSale)
+        assertAitaDoubleEquals(1_000.0, dashboard.cashTotal)
+        assertAitaDoubleEquals(2_900.0, dashboard.cashlessTotal)
+        assertAitaDoubleEquals(500.0, dashboard.debtTotal)
+        assertAitaDoubleEquals(22.727, dashboard.cashSharePercent, tolerance = 0.002)
+        assertAitaDoubleEquals(65.909, dashboard.cashlessSharePercent, tolerance = 0.002)
+        assertAitaDoubleEquals(11.364, dashboard.debtSharePercent, tolerance = 0.002)
+        assertAitaDoubleEquals(5.0, dashboard.soldQuantity)
+        assertAitaDoubleEquals(1.0, dashboard.returnedQuantity)
+        assertAitaDoubleEquals(5.0, dashboard.suppliedQuantity)
+        assertAitaDoubleEquals(6_600.0, dashboard.stockValueAtSupplyPrice)
+        assertAitaDoubleEquals(11_600.0, dashboard.stockValueAtSalePrice)
+        assertAitaDoubleEquals(12.0, dashboard.activeStockQuantity)
+        assertEquals(1, dashboard.lowStockItemCount)
+        assertEquals(0, dashboard.outOfStockItemCount)
+        assertEquals(0, dashboard.expiredBatchCount)
+        assertEquals(0, dashboard.expiringSoonBatchCount)
+        assertAitaDoubleEquals(29.412, dashboard.sellThroughPercentEstimate, tolerance = 0.002)
+        assertEquals(fixture.banana.id, dashboard.topItemsByRevenue.first().id)
+        assertAitaDoubleEquals(2_400.0, dashboard.topItemsByRevenue.first().amount)
+        assertEquals(fixture.banana.id, dashboard.topItemsByQuantity.first().id)
+        assertAitaDoubleEquals(3.0, dashboard.topItemsByQuantity.first().quantity)
+        assertEquals(1, dashboard.salesByDay.size)
+        assertAitaDoubleEquals(4_400.0, dashboard.salesByDay.single().amount)
+        assertAitaDoubleEquals(500.0, dashboard.salesByDay.single().debt)
+        assertTrue(dashboard.salesByHour.isNotEmpty())
+
+        val appleDashboard = buildStoreAnalyticsDashboard(
+            storeId = AITA_FLOW_SOURCE_STORE_ID,
+            startMillis = fixture.startMillis,
+            endMillisExclusive = fixture.endMillis,
+            transactions = fixture.transactions,
+            stock = fixture.stock,
+            batches = fixture.batches,
+            fallbackCurrencyCode = "KZT",
+            goodsItemIdFilter = fixture.apple.id
+        )
+        assertEquals(fixture.apple.id, appleDashboard.goodsItemIdFilter)
+        assertEquals(1, appleDashboard.saleCount)
+        assertEquals(1, appleDashboard.returnCount)
+        assertEquals(1, appleDashboard.supplyCount)
+        assertAitaDoubleEquals(2_000.0, appleDashboard.grossSales)
+        assertAitaDoubleEquals(1_000.0, appleDashboard.returnsAmount)
+        assertAitaDoubleEquals(3_000.0, appleDashboard.supplyCost)
+        assertAitaDoubleEquals(10.0, appleDashboard.activeStockQuantity)
+        assertEquals(fixture.apple.id, appleDashboard.topItemsByRevenue.single().id)
+
+        val supplierDashboard = buildStoreAnalyticsDashboard(
+            storeId = AITA_FLOW_SOURCE_STORE_ID,
+            startMillis = fixture.startMillis,
+            endMillisExclusive = fixture.endMillis,
+            transactions = fixture.transactions,
+            stock = fixture.stock,
+            batches = fixture.batches,
+            fallbackCurrencyCode = "KZT",
+            supplierIdFilter = fixture.supplierAlphaId
+        )
+        assertEquals(fixture.supplierAlphaId, supplierDashboard.supplierIdFilter)
+        assertAitaDoubleEquals(2_000.0, supplierDashboard.grossSales)
+        assertAitaDoubleEquals(10.0, supplierDashboard.activeStockQuantity)
+        assertEquals(fixture.apple.id, supplierDashboard.topItemsByQuantity.single().id)
+
+        val categoryDashboard = buildStoreAnalyticsDashboard(
+            storeId = AITA_FLOW_SOURCE_STORE_ID,
+            startMillis = fixture.startMillis,
+            endMillisExclusive = fixture.endMillis,
+            transactions = fixture.transactions,
+            stock = fixture.stock,
+            batches = fixture.batches,
+            fallbackCurrencyCode = "KZT",
+            categoryIdFilter = fixture.categoryFruitId
+        )
+        assertEquals(fixture.categoryFruitId, categoryDashboard.categoryIdFilter)
+        assertAitaDoubleEquals(2_000.0, categoryDashboard.grossSales)
+        assertEquals(fixture.apple.id, categoryDashboard.topItemsByRevenue.single().id)
+
+        val shortWindowDashboard = buildStoreAnalyticsDashboard(
+            storeId = AITA_FLOW_SOURCE_STORE_ID,
+            startMillis = fixture.startMillis,
+            endMillisExclusive = fixture.startMillis + 2_000L,
+            transactions = fixture.transactions,
+            stock = fixture.stock,
+            batches = fixture.batches,
+            fallbackCurrencyCode = "KZT"
+        )
+        assertEquals(1, shortWindowDashboard.saleCount)
+        assertEquals(1, shortWindowDashboard.transactionCount)
+        assertAitaDoubleEquals(2_000.0, shortWindowDashboard.grossSales)
+        assertEquals(fixture.apple.id, shortWindowDashboard.topItemsByRevenue.single().id)
+
+        environment.stock = fixture.stock
+        environment.batches = fixture.batches
+        environment.transactions = fixture.transactions
+        environment.requests.clear()
+        val callback = CompletableDeferred<DataState<StoreAnalyticsDashboardDataModel>>()
+        getStoreAnalytics(
+            storeId = AITA_FLOW_SOURCE_STORE_ID,
+            startMillis = fixture.startMillis,
+            endMillisExclusive = fixture.endMillis,
+            supplierIdFilter = fixture.supplierAlphaId
+        ) { callback.complete(it) }
+
+        val serverLikeDashboard = requireAitaFlowSuccess(callback).payload
+        waitUntilAitaFlowCondition { storeAnalyticsDashboardState.payloadValue?.supplierIdFilter == fixture.supplierAlphaId }
+        assertAitaDoubleEquals(supplierDashboard.grossSales, serverLikeDashboard.grossSales)
+        assertAitaDoubleEquals(supplierDashboard.activeStockQuantity, serverLikeDashboard.activeStockQuantity)
+        assertTrue(environment.requests.any {
+            it.method == "GET" &&
+                    it.path == "analytics/store/get" &&
+                    it.storeIdHeader == AITA_FLOW_SOURCE_STORE_ID &&
+                    it.queryParameters["supplierId"] == listOf(fixture.supplierAlphaId)
+        })
+    }
+
+    @Test
+    fun menuOperationLogsLoadByScopeAndRecordSupplierMenuActions() = runBlocking {
+        val branch = aitaTestStore(
+            id = AITA_FLOW_DESTINATION_STORE_ID,
+            publicId = "BRANCH-LOG",
+            parentStoreId = AITA_FLOW_SOURCE_STORE_ID,
+            name = "Logs branch"
+        )
+        val root = aitaTestStore(
+            id = AITA_FLOW_SOURCE_STORE_ID,
+            publicId = "ROOT-LOG",
+            name = "Logs root",
+            branches = listOf(branch)
+        )
+        val rootLog = aitaTestOperationLog(
+            id = "log-root-stock",
+            storeId = AITA_FLOW_SOURCE_STORE_ID,
+            action = "stock_add",
+            entityType = "goods_item",
+            entityId = "logged-goods",
+            title = "Stock item added",
+            createdAtMillis = 1_710_000_010_000L
+        )
+        val branchLog = aitaTestOperationLog(
+            id = "log-branch-sale",
+            storeId = AITA_FLOW_DESTINATION_STORE_ID,
+            rootStoreId = AITA_FLOW_SOURCE_STORE_ID,
+            action = "transaction_complete",
+            entityType = "transaction",
+            entityId = "logged-transaction",
+            title = "Sale completed",
+            createdAtMillis = 1_710_000_020_000L
+        )
+        environment.stores = listOf(root)
+        environment.operationLogs = listOf(rootLog, branchLog)
+        storesState.emit(DataState.Success(listOf(root)))
+        operationLogsState.emit(DataState.Empty())
+        environment.requests.clear()
+
+        val currentCallback = CompletableDeferred<DataState<List<OperationLogDataModel>>>()
+        getOperationLogs(AITA_FLOW_SOURCE_STORE_ID, OPERATION_LOG_SCOPE_CURRENT) { currentCallback.complete(it) }
+
+        val currentLogs = requireAitaFlowSuccess(currentCallback).payload
+        assertEquals(listOf(rootLog.id), currentLogs.map { it.id })
+        assertEquals(rootLog.id, operationLogsState.payloadValue?.singleOrNull()?.id)
+        assertTrue(environment.requests.any {
+            it.method == "GET" &&
+                    it.path == "logs/get" &&
+                    it.storeIdHeader == AITA_FLOW_SOURCE_STORE_ID &&
+                    it.queryParameters["scope"] == listOf(OPERATION_LOG_SCOPE_CURRENT)
+        })
+
+        val rootScopeCallback = CompletableDeferred<DataState<List<OperationLogDataModel>>>()
+        getOperationLogs(AITA_FLOW_DESTINATION_STORE_ID, OPERATION_LOG_SCOPE_ROOT) { rootScopeCallback.complete(it) }
+
+        val rootScopeLogs = requireAitaFlowSuccess(rootScopeCallback).payload
+        assertEquals(listOf(branchLog.id, rootLog.id), rootScopeLogs.map { it.id })
+        assertTrue(environment.requests.any {
+            it.method == "GET" &&
+                    it.path == "logs/get" &&
+                    it.storeIdHeader == AITA_FLOW_DESTINATION_STORE_ID &&
+                    it.queryParameters["scope"] == listOf(OPERATION_LOG_SCOPE_ROOT)
+        })
+
+        val supplier = aitaTestSupplier(id = "logged-supplier", name = "Logged supplier")
+        environment.nextSupplierResponse = supplier
+        val addSupplierCallback = CompletableDeferred<DataState<SupplierDataModel>>()
+        addSupplier(supplier) { addSupplierCallback.complete(it) }
+
+        assertEquals(supplier.id, requireAitaFlowSuccess(addSupplierCallback).payload.id)
+        waitUntilAitaFlowCondition { environment.operationLogs.any { it.action == "supplier_add" && it.entityId == supplier.id } }
+
+        val afterActionCallback = CompletableDeferred<DataState<List<OperationLogDataModel>>>()
+        getOperationLogs(AITA_FLOW_SOURCE_STORE_ID, OPERATION_LOG_SCOPE_ROOT) { afterActionCallback.complete(it) }
+        val afterActionLogs = requireAitaFlowSuccess(afterActionCallback).payload
+
+        assertTrue(afterActionLogs.any { it.action == "supplier_add" && it.entityType == "supplier" && it.entityId == supplier.id })
+        assertTrue(afterActionLogs.first().createdAtMillis >= rootLog.createdAtMillis)
+    }
+
+    @Test
+    fun menuNotificationsPersistDedupeMergePopupsAndMarkReadCorrectly() = runBlocking {
+        environment.storedTokens = aitaTestTokenPair("notifications")
+        userAccountState.emit(DataState.Success(aitaTestUserAccount()))
+        activeStoreIdState.emit(AITA_FLOW_SOURCE_STORE_ID)
+        notificationsState.emit(DataState.Success(emptyList()))
+        activeInAppNotificationsState.emit(emptyList())
+        latestInAppNotificationState.emit(null)
+        environment.notifications = emptyList()
+        environment.requests.clear()
+
+        environment.nextSavedNotificationResponse = aitaTestNotification(
+            id = "server-saved-positive",
+            message = "Stock item saved",
+            type = NotificationType.Positive,
+            storeId = AITA_FLOW_SOURCE_STORE_ID,
+            category = "positive",
+            isSavedOnServer = true
+        )
+        postInAppNotification("Stock item saved", NotificationType.Positive)
+
+        waitUntilAitaFlowCondition { latestInAppNotificationState.value?.message == "Stock item saved" }
+        waitUntilAitaFlowCondition { notificationsState.payloadValue.orEmpty().any { it.id == "server-saved-positive" && it.isSavedOnServer } }
+        assertTrue(activeInAppNotificationsState.value.any { it.message == "Stock item saved" && it.type == NotificationType.Positive })
+        assertTrue(environment.requests.any { it.method == "POST" && it.path == "notifications/add" })
+
+        val savedCountBeforeDuplicate = notificationsState.payloadValue.orEmpty().count { it.message == "Stock item saved" }
+        postInAppNotification("Stock item saved", NotificationType.Positive)
+        delay(150L)
+        val savedCountAfterDuplicate = notificationsState.payloadValue.orEmpty().count { it.message == "Stock item saved" }
+        assertTrue(savedCountAfterDuplicate <= savedCountBeforeDuplicate)
+
+        val serverUnread = aitaTestNotification(
+            id = "server-worker-unread",
+            message = "Worker invite received",
+            title = "Worker invite",
+            type = NotificationType.Neutral,
+            storeId = AITA_FLOW_SOURCE_STORE_ID,
+            category = "worker",
+            createdAtMillis = getCurrentTimeMillis(),
+            isSavedOnServer = true
+        )
+        environment.notifications = environment.notifications.upsertAitaTestNotification(serverUnread)
+        getNotifications()
+
+        waitUntilAitaFlowCondition { notificationsState.payloadValue.orEmpty().any { it.id == serverUnread.id } }
+        waitUntilAitaFlowCondition { activeInAppNotificationsState.value.any { it.id == serverUnread.id || it.message == serverUnread.message } }
+        assertTrue(environment.requests.any { it.method == "GET" && it.path == "notifications/get" })
+
+        markNotificationRead(serverUnread.id)
+        waitUntilAitaFlowCondition { notificationsState.payloadValue.orEmpty().firstOrNull { it.id == serverUnread.id }?.readAtMillis != null }
+        assertTrue(environment.requests.any { it.method == "PUT" && it.path == "notifications/read" })
+
+        markAllNotificationsRead()
+        waitUntilAitaFlowCondition { notificationsState.payloadValue.orEmpty().filter { it.isSavedOnServer }.all { it.readAtMillis != null } }
+
+        clearInAppNotification()
+        waitUntilAitaFlowCondition { activeInAppNotificationsState.value.isEmpty() && latestInAppNotificationState.value == null }
+    }
+
+    @Test
+    fun menuSupplierCrudStoresAndFiltersSuppliersCorrectly() = runBlocking {
+        val generic = aitaTestSupplier(
+            id = "supplier-generic",
+            name = "Generic greenhouse",
+            userIds = emptyList(),
+            categoryIds = listOf("vegetables")
+        )
+        val mine = aitaTestSupplier(
+            id = "supplier-mine",
+            name = "My local bakery",
+            userIds = listOf(AITA_FLOW_TEST_USER_ID),
+            categoryIds = listOf("bakery")
+        )
+        environment.suppliers = listOf(generic)
+        suppliersState.emit(DataState.Empty())
+        environment.requests.clear()
+
+        getSuppliers()
+        waitUntilAitaFlowCondition { suppliersState.payloadValue?.singleOrNull()?.id == generic.id }
+        assertTrue(suppliersState.payloadValue.orEmpty().single { it.id == generic.id }.isGenericSupplier())
+        assertTrue(environment.requests.any { it.method == "GET" && it.path == "suppliers/get" })
+
+        environment.nextSupplierResponse = mine
+        val addCallback = CompletableDeferred<DataState<SupplierDataModel>>()
+        addSupplier(mine) { addCallback.complete(it) }
+
+        assertEquals(mine.id, requireAitaFlowSuccess(addCallback).payload.id)
+        waitUntilAitaFlowCondition { suppliersState.payloadValue.orEmpty().any { it.id == mine.id } }
+        assertTrue(suppliersState.payloadValue.orEmpty().single { it.id == mine.id }.isMineForUser(AITA_FLOW_TEST_USER_ID))
+        assertTrue(environment.requests.any { it.method == "POST" && it.path == "suppliers/add" })
+
+        val updated = mine.copy(
+            name = aitaTestLocalized("My local bakery updated"),
+            phoneNumbers = listOf("+77005550101"),
+            emails = listOf("bakery-updated@aita.local"),
+            categoryIds = listOf("bakery", "launch")
+        )
+        environment.nextSupplierResponse = updated
+        val updateCallback = CompletableDeferred<DataState<SupplierDataModel>>()
+        updateSupplier(updated) { updateCallback.complete(it) }
+
+        assertEquals(updated.name, requireAitaFlowSuccess(updateCallback).payload.name)
+        waitUntilAitaFlowCondition { suppliersState.payloadValue.orEmpty().single { it.id == updated.id }.categoryIds.contains("launch") }
+        assertEquals(listOf("+77005550101"), suppliersState.payloadValue.orEmpty().single { it.id == updated.id }.phoneNumbers)
+        assertTrue(environment.requests.any { it.method == "PUT" && it.path == "suppliers/update" })
+
+        environment.nextDeletedSupplierId = generic.id
+        val deleteCallback = CompletableDeferred<DataState<String>>()
+        deleteSupplier(generic.id) { deleteCallback.complete(it) }
+
+        assertEquals(generic.id, requireAitaFlowSuccess(deleteCallback).payload)
+        waitUntilAitaFlowCondition { suppliersState.payloadValue.orEmpty().none { it.id == generic.id } }
+        assertTrue(suppliersState.payloadValue.orEmpty().any { it.id == updated.id })
+        assertTrue(environment.requests.any { it.method == "DELETE" && it.path == "suppliers/delete" })
+    }
+
+    @Test
+    fun menuSupplierPricesOrdersReceivingAndBatchReferencesStayInSync() = runBlocking {
+        val supplier = aitaTestSupplier(id = "supplier-order-flow", name = "North farm")
+        val item = aitaTestGoodsItem(id = "supplier-order-item", name = "North farm tofu")
+        val existingBatch = aitaTestBatch(
+            id = "supplier-order-existing-batch",
+            goodsItemId = item.id,
+            quantityTotal = 4.0,
+            supplierId = supplier.id,
+            supplyPriceValue = "500",
+            salePriceValue = "900"
+        )
+        val price = aitaTestSupplierGoodsPrice(
+            id = "supplier-price-flow",
+            supplierId = supplier.id,
+            goodsItemId = item.id,
+            supplyPriceValue = "500"
+        )
+        val order = aitaTestSupplierOrderWithLines(
+            id = "supplier-order-flow",
+            supplierId = supplier.id,
+            goodsItemId = item.id,
+            requestedQuantity = 8.0,
+            expectedSupplyPriceValue = "500",
+            status = SupplierOrderStatusDataModel.Sent
+        )
+        environment.suppliers = listOf(supplier)
+        environment.stock = listOf(item)
+        environment.batches = listOf(existingBatch)
+        environment.supplierGoodsPrices = listOf(price)
+        environment.supplierOrders = listOf(order)
+        supplierGoodsPricesState.emit(DataState.Empty())
+        supplierOrdersState.emit(DataState.Empty())
+        supplierOrderLinesState.emit(DataState.Empty())
+        environment.requests.clear()
+
+        val pricesCallback = CompletableDeferred<DataState<List<SupplierGoodsPriceDataModel>>>()
+        getSupplierGoodsPrices(AITA_FLOW_SOURCE_STORE_ID) { pricesCallback.complete(it) }
+        val loadedPrices = requireAitaFlowSuccess(pricesCallback).payload
+        assertEquals(listOf(price.id), loadedPrices.map { it.id })
+        waitUntilAitaFlowCondition { supplierGoodsPricesState.payloadValue?.singleOrNull()?.supplierId == supplier.id }
+        assertTrue(environment.requests.any { it.method == "GET" && it.path == "supplierGoodsPrices/get" && it.storeIdHeader == AITA_FLOW_SOURCE_STORE_ID })
+
+        val updatedPrice = price.copy(
+            supplyPrice = aitaTestPrice("550", supplierId = supplier.id),
+            minOrderQuantity = aitaTestQuantity(5.0),
+            packageQuantity = aitaTestQuantity(10.0),
+            supplierGoodsName = "Tofu block 400g updated",
+            updatedAtMillis = 2_000L
+        )
+        environment.nextSupplierGoodsPriceResponse = updatedPrice
+        val upsertPriceCallback = CompletableDeferred<DataState<SupplierGoodsPriceDataModel>>()
+        upsertSupplierGoodsPrice(updatedPrice) { upsertPriceCallback.complete(it) }
+
+        assertEquals(updatedPrice, requireAitaFlowSuccess(upsertPriceCallback).payload)
+        waitUntilAitaFlowCondition { supplierGoodsPricesState.payloadValue.orEmpty().single { it.id == updatedPrice.id }.supplyPrice.price == "550" }
+        assertTrue(environment.requests.any { it.method == "POST" && it.path == "supplierGoodsPrices/upsert" })
+
+        val ordersCallback = CompletableDeferred<DataState<List<SupplierOrderWithLinesDataModel>>>()
+        getSupplierOrders(AITA_FLOW_SOURCE_STORE_ID) { ordersCallback.complete(it) }
+        val loadedOrders = requireAitaFlowSuccess(ordersCallback).payload
+        assertEquals(listOf(order.order.id), loadedOrders.map { it.order.id })
+        waitUntilAitaFlowCondition { supplierOrdersState.payloadValue?.singleOrNull()?.supplierId == supplier.id }
+        waitUntilAitaFlowCondition { supplierOrderLinesState.payloadValue?.singleOrNull()?.goodsItemId == item.id }
+        assertTrue(environment.requests.any { it.method == "GET" && it.path == "supplierOrders/get" && it.storeIdHeader == AITA_FLOW_SOURCE_STORE_ID })
+
+        val supplierSideCallback = CompletableDeferred<DataState<List<SupplierOrderWithLinesDataModel>>>()
+        getSupplierOrdersForSupplier(supplier.id) { supplierSideCallback.complete(it) }
+        assertEquals(listOf(order.order.id), requireAitaFlowSuccess(supplierSideCallback).payload.map { it.order.id })
+        assertTrue(environment.requests.any { it.method == "GET" && it.path == "supplierOrders/get" && it.supplierIdHeader == supplier.id })
+
+        val mySupplierSideCallback = CompletableDeferred<DataState<List<SupplierOrderWithLinesDataModel>>>()
+        getMySupplierSideOrders { mySupplierSideCallback.complete(it) }
+        assertTrue(requireAitaFlowSuccess(mySupplierSideCallback).payload.any { it.order.supplierId == supplier.id })
+
+        val addedOrder = aitaTestSupplierOrderWithLines(
+            id = "supplier-order-added",
+            supplierId = supplier.id,
+            goodsItemId = item.id,
+            requestedQuantity = 12.0,
+            expectedSupplyPriceValue = "530",
+            status = SupplierOrderStatusDataModel.Sent
+        )
+        environment.nextSupplierOrderResponse = addedOrder
+        val addOrderCallback = CompletableDeferred<DataState<SupplierOrderWithLinesDataModel>>()
+        addSupplierOrder(addedOrder) { addOrderCallback.complete(it) }
+
+        assertEquals(addedOrder.order.id, requireAitaFlowSuccess(addOrderCallback).payload.order.id)
+        waitUntilAitaFlowCondition { supplierOrdersState.payloadValue.orEmpty().any { it.id == addedOrder.order.id } }
+        waitUntilAitaFlowCondition { supplierOrderLinesState.payloadValue.orEmpty().any { it.orderId == addedOrder.order.id } }
+        assertTrue(environment.requests.any { it.method == "POST" && it.path == "supplierOrders/add" })
+
+        val confirmedOrder = addedOrder.copy(
+            order = addedOrder.order.copy(
+                status = SupplierOrderStatusDataModel.Confirmed,
+                confirmedDeliveryTimeMillis = 1_720_000_000_000L,
+                amount = aitaTestPrice("6360", supplierId = supplier.id)
+            ),
+            lines = addedOrder.lines.map {
+                it.copy(
+                    supplierAcceptedQuantity = aitaTestQuantity(12.0),
+                    supplierOfferedSupplyPrice = aitaTestPrice("530", supplierId = supplier.id),
+                    supplierComment = "Confirmed for tomorrow"
+                )
+            }
+        )
+        environment.nextSupplierOrderResponse = confirmedOrder
+        val updateOrderCallback = CompletableDeferred<DataState<SupplierOrderWithLinesDataModel>>()
+        updateSupplierOrder(confirmedOrder) { updateOrderCallback.complete(it) }
+
+        assertEquals(SupplierOrderStatusDataModel.Confirmed, requireAitaFlowSuccess(updateOrderCallback).payload.order.status)
+        waitUntilAitaFlowCondition { supplierOrdersState.payloadValue.orEmpty().first { it.id == confirmedOrder.order.id }.status == SupplierOrderStatusDataModel.Confirmed }
+        assertEquals("Confirmed for tomorrow", supplierOrderLinesState.payloadValue.orEmpty().first { it.orderId == confirmedOrder.order.id }.supplierComment)
+        assertTrue(environment.requests.any { it.method == "PUT" && it.path == "supplierOrders/update" })
+
+        val deliveredBatch = aitaTestBatch(
+            id = "supplier-order-delivered-batch",
+            goodsItemId = item.id,
+            quantityTotal = 12.0,
+            supplierId = supplier.id,
+            supplyPriceValue = "530",
+            salePriceValue = "950"
+        )
+        val receivedOrder = confirmedOrder.copy(
+            order = confirmedOrder.order.copy(
+                status = SupplierOrderStatusDataModel.Delivered,
+                deliveredAtMillis = 1_720_000_100_000L
+            ),
+            lines = confirmedOrder.lines.map { it.copy(deliveredBatchIds = listOf(deliveredBatch.id)) }
+        )
+        environment.batches = environment.batches.upsertAitaTestBatch(deliveredBatch)
+        environment.nextSupplierOrderResponse = receivedOrder
+        val receiveCallback = CompletableDeferred<DataState<SupplierOrderWithLinesDataModel>>()
+        receiveSupplierOrder(
+            ReceiveSupplierOrderRequestDataModel(
+                orderId = receivedOrder.order.id,
+                receivedLines = receivedOrder.lines.map { line ->
+                    ReceiveSupplierOrderLineDataModel(
+                        orderLineId = line.id,
+                        goodsItemId = line.goodsItemId,
+                        receivedQuantity = line.requestedQuantity,
+                        actualSupplyPrice = line.supplierOfferedSupplyPrice ?: updatedPrice.supplyPrice,
+                        expirationDateMillis = 1_800_000_000_000L
+                    )
+                }
+            )
+        ) { receiveCallback.complete(it) }
+
+        assertEquals(SupplierOrderStatusDataModel.Delivered, requireAitaFlowSuccess(receiveCallback).payload.order.status)
+        waitUntilAitaFlowCondition { supplierOrderLinesState.payloadValue.orEmpty().any { deliveredBatch.id in it.deliveredBatchIds } }
+        waitUntilAitaFlowCondition { environment.requests.any { it.method == "GET" && it.path == "stockBatches/get" && it.storeIdHeader == AITA_FLOW_SOURCE_STORE_ID } }
+        assertTrue(environment.requests.any { it.method == "POST" && it.path == "supplierOrders/receive" })
+        assertTrue(stockBatchesState.payloadValue.orEmpty().any { it.id == deliveredBatch.id && it.supplierId == supplier.id })
+
+        environment.nextDeletedSupplierOrderId = receivedOrder.order.id
+        val deleteOrderCallback = CompletableDeferred<DataState<String>>()
+        deleteSupplierOrder(receivedOrder.order.id) { deleteOrderCallback.complete(it) }
+
+        assertEquals(receivedOrder.order.id, requireAitaFlowSuccess(deleteOrderCallback).payload)
+        waitUntilAitaFlowCondition { supplierOrdersState.payloadValue.orEmpty().none { it.id == receivedOrder.order.id } }
+        waitUntilAitaFlowCondition { supplierOrderLinesState.payloadValue.orEmpty().none { it.orderId == receivedOrder.order.id } }
+        assertTrue(environment.requests.any { it.method == "DELETE" && it.path == "supplierOrders/delete" })
+    }
+
 }
 
 private suspend fun resetAitaFlowSharedState() {
@@ -889,6 +1406,11 @@ private suspend fun resetAitaFlowSharedState() {
     incomingWorkerRequestsState.emit(DataState.Empty())
     myWorkerRequestsState.emit(DataState.Empty())
     suppliersState.emit(DataState.Empty())
+    supplierGoodsPricesState.emit(DataState.Empty())
+    supplierOrdersState.emit(DataState.Empty())
+    supplierOrderLinesState.emit(DataState.Empty())
+    operationLogsState.emit(DataState.Empty())
+    storeAnalyticsDashboardState.emit(DataState.Empty())
     stockState.emit(DataState.Empty())
     stockBatchesState.emit(DataState.Empty())
     stockItemBranchAvailabilityState.emit(DataState.Empty())
@@ -938,11 +1460,16 @@ private suspend fun currentAitaFlowCart(transactionTypeIndex: Int, clientId: Int
 private fun buildAitaFlowMockClient(environment: AitaFlowTestEnvironment): HttpClient = HttpClient(
     MockEngine { request ->
         val path = request.url.encodedPath.trimStart('/')
+        val queryParameters = request.url.parameters.names().associateWith { name ->
+            request.url.parameters.getAll(name).orEmpty()
+        }
         environment.requests += RecordedAitaRequest(
             method = request.method.value,
             path = path,
             storeIdHeader = request.headers["store_id"],
-            goodsItemIdHeader = request.headers["goods_item_id"]
+            goodsItemIdHeader = request.headers["goods_item_id"],
+            supplierIdHeader = request.headers["supplier_id"],
+            queryParameters = queryParameters
         )
 
         if (path == "transactions/complete" && environment.forceNextCompleteTransactionFailure) {
@@ -978,9 +1505,169 @@ private fun buildAitaFlowMockClient(environment: AitaFlowTestEnvironment): HttpC
                 aitaTestSuccessNullEnvelope()
             }
             "stores/active" -> aitaTestSuccessNullEnvelope()
-            "suppliers/get" -> aitaTestSuccessEnvelope(emptyList<SupplierDataModel>())
+            "suppliers/get" -> aitaTestSuccessEnvelope(environment.suppliers)
+            "suppliers/add" -> {
+                val supplier = environment.nextSupplierResponse ?: aitaTestSupplier(id = "server-added-supplier")
+                environment.suppliers = environment.suppliers.upsertAitaTestSupplier(supplier)
+                environment.recordAitaTestOperationLog(
+                    action = "supplier_add",
+                    entityType = "supplier",
+                    entityId = supplier.id,
+                    title = "Supplier added",
+                    details = supplier.name.extractLocalizedString(DEFAULT_APP_LANGUAGE).orEmpty()
+                )
+                aitaTestSuccessEnvelope(supplier)
+            }
+            "suppliers/update" -> {
+                val supplier = environment.nextSupplierResponse ?: environment.suppliers.firstOrNull() ?: aitaTestSupplier(id = "server-updated-supplier")
+                environment.suppliers = environment.suppliers.upsertAitaTestSupplier(supplier)
+                environment.recordAitaTestOperationLog(
+                    action = "supplier_update",
+                    entityType = "supplier",
+                    entityId = supplier.id,
+                    title = "Supplier updated",
+                    details = supplier.name.extractLocalizedString(DEFAULT_APP_LANGUAGE).orEmpty()
+                )
+                aitaTestSuccessEnvelope(supplier)
+            }
+            "suppliers/delete" -> {
+                val id = environment.nextDeletedSupplierId.orEmpty()
+                environment.suppliers = environment.suppliers.filterNot { it.id == id }
+                environment.recordAitaTestOperationLog(
+                    action = "supplier_delete",
+                    entityType = "supplier",
+                    entityId = id,
+                    title = "Supplier deleted"
+                )
+                aitaTestSuccessEnvelope(id)
+            }
+            "supplierGoodsPrices/get" -> {
+                val storeId = request.headers["store_id"].orEmpty()
+                aitaTestSuccessEnvelope(environment.supplierGoodsPrices.filter { storeId.isBlank() || it.storeId == storeId })
+            }
+            "supplierGoodsPrices/upsert" -> {
+                val price = environment.nextSupplierGoodsPriceResponse ?: environment.supplierGoodsPrices.firstOrNull() ?: aitaTestSupplierGoodsPrice(id = "server-supplier-price")
+                environment.supplierGoodsPrices = environment.supplierGoodsPrices.upsertAitaTestSupplierGoodsPrice(price)
+                environment.recordAitaTestOperationLog(
+                    action = "supplier_goods_price_upsert",
+                    entityType = "supplier_goods_price",
+                    entityId = price.id,
+                    title = "Supplier goods price saved",
+                    details = "${price.supplierId} • ${price.goodsItemId}"
+                )
+                aitaTestSuccessEnvelope(price)
+            }
+            "supplierOrders/get" -> {
+                val storeId = request.headers["store_id"].orEmpty()
+                val supplierId = request.headers["supplier_id"].orEmpty()
+                aitaTestSuccessEnvelope(
+                    environment.supplierOrders.filter { orderWithLines ->
+                        (storeId.isBlank() || orderWithLines.order.storeId == storeId) &&
+                                (supplierId.isBlank() || orderWithLines.order.supplierId == supplierId)
+                    }
+                )
+            }
+            "supplierOrders/add" -> {
+                val orderWithLines = environment.nextSupplierOrderResponse ?: aitaTestSupplierOrderWithLines(id = "server-added-supplier-order")
+                environment.supplierOrders = environment.supplierOrders.upsertAitaTestSupplierOrder(orderWithLines)
+                environment.recordAitaTestOperationLog(
+                    action = "supplier_order_add",
+                    entityType = "supplier_order",
+                    entityId = orderWithLines.order.id,
+                    title = "Supplier order added",
+                    details = orderWithLines.order.supplierId
+                )
+                aitaTestSuccessEnvelope(orderWithLines)
+            }
+            "supplierOrders/update" -> {
+                val orderWithLines = environment.nextSupplierOrderResponse ?: environment.supplierOrders.firstOrNull() ?: aitaTestSupplierOrderWithLines(id = "server-updated-supplier-order")
+                environment.supplierOrders = environment.supplierOrders.upsertAitaTestSupplierOrder(orderWithLines)
+                environment.recordAitaTestOperationLog(
+                    action = "supplier_order_update",
+                    entityType = "supplier_order",
+                    entityId = orderWithLines.order.id,
+                    title = "Supplier order updated",
+                    details = orderWithLines.order.status.name
+                )
+                aitaTestSuccessEnvelope(orderWithLines)
+            }
+            "supplierOrders/delete" -> {
+                val id = environment.nextDeletedSupplierOrderId.orEmpty()
+                environment.supplierOrders = environment.supplierOrders.filterNot { it.order.id == id }
+                environment.recordAitaTestOperationLog(
+                    action = "supplier_order_delete",
+                    entityType = "supplier_order",
+                    entityId = id,
+                    title = "Supplier order deleted"
+                )
+                aitaTestSuccessEnvelope(id)
+            }
+            "supplierOrders/receive" -> {
+                val orderWithLines = environment.nextSupplierOrderResponse ?: environment.supplierOrders.firstOrNull()?.copy(
+                    order = environment.supplierOrders.first().order.copy(status = SupplierOrderStatusDataModel.Delivered)
+                ) ?: aitaTestSupplierOrderWithLines(id = "server-received-supplier-order", status = SupplierOrderStatusDataModel.Delivered)
+                environment.supplierOrders = environment.supplierOrders.upsertAitaTestSupplierOrder(orderWithLines)
+                environment.recordAitaTestOperationLog(
+                    action = "supplier_order_receive",
+                    entityType = "supplier_order",
+                    entityId = orderWithLines.order.id,
+                    title = "Supplier order received",
+                    details = orderWithLines.lines.sumOf { it.requestedQuantity.total }.toString()
+                )
+                aitaTestSuccessEnvelope(orderWithLines)
+            }
             "generic/goodsCategories/get" -> aitaTestSuccessEnvelope(emptyList<GenericGoodsCategoryDataModel>())
-            "notifications/get" -> aitaTestSuccessEnvelope(emptyList<NotificationDataModel>())
+            "notifications/get" -> aitaTestSuccessEnvelope(environment.notifications)
+            "notifications/add" -> {
+                val notification = environment.nextSavedNotificationResponse ?: aitaTestNotification(
+                    id = "server-saved-notification-${environment.notifications.size + 1}",
+                    message = "Saved notification",
+                    type = NotificationType.Positive,
+                    isSavedOnServer = true
+                )
+                val saved = notification.copy(isSavedOnServer = true, readAtMillis = notification.readAtMillis)
+                environment.notifications = environment.notifications.upsertAitaTestNotification(saved)
+                aitaTestSuccessEnvelope(saved)
+            }
+            "notifications/read" -> {
+                val now = getCurrentTimeMillis()
+                environment.notifications = environment.notifications.map { it.copy(readAtMillis = it.readAtMillis ?: now) }
+                aitaTestSuccessEnvelope(environment.notifications)
+            }
+            "logs/get" -> {
+                val storeId = request.headers["store_id"].orEmpty()
+                val scope = request.url.parameters["scope"] ?: OPERATION_LOG_SCOPE_CURRENT
+                val rootStoreId = environment.stores.findAitaTestStoreOrBranch(storeId)?.parentStoreId ?: storeId
+                val logs = environment.operationLogs.filter { log ->
+                    when (scope) {
+                        OPERATION_LOG_SCOPE_ROOT -> log.rootStoreId == rootStoreId || log.storeId == storeId
+                        else -> log.storeId == storeId
+                    }
+                }.sortedByDescending { it.createdAtMillis }
+                aitaTestSuccessEnvelope(logs)
+            }
+            "analytics/store/get" -> {
+                val storeId = request.headers["store_id"].orEmpty()
+                val startMillis = request.url.parameters["startMillis"]?.toLongOrNull() ?: 0L
+                val endMillisExclusive = request.url.parameters["endMillisExclusive"]?.toLongOrNull() ?: Long.MAX_VALUE
+                val goodsItemIdFilter = request.url.parameters["goodsItemId"]
+                val supplierIdFilter = request.url.parameters["supplierId"]
+                val categoryIdFilter = request.url.parameters["categoryId"]
+                aitaTestSuccessEnvelope(
+                    buildStoreAnalyticsDashboard(
+                        storeId = storeId,
+                        startMillis = startMillis,
+                        endMillisExclusive = endMillisExclusive,
+                        transactions = environment.transactions,
+                        stock = environment.stock,
+                        batches = environment.batches,
+                        fallbackCurrencyCode = "KZT",
+                        goodsItemIdFilter = goodsItemIdFilter,
+                        supplierIdFilter = supplierIdFilter,
+                        categoryIdFilter = categoryIdFilter
+                    )
+                )
+            }
             "support/tickets/get" -> aitaTestSuccessEnvelope(emptyList<SupportTicketDataModel>())
             "security/sessions/get" -> aitaTestSuccessEnvelope(emptyList<SecuritySessionDataModel>())
             "security/sessions/history" -> aitaTestSuccessEnvelope(emptyList<SecuritySessionHistoryDataModel>())
@@ -1359,10 +2046,14 @@ private fun aitaTestQuantity(total: Double): QuantityDataModel = QuantityDataMod
     roundTotal = true
 )
 
-private fun aitaTestPrice(price: String = "1000"): PriceDataModel = PriceDataModel(
+private fun aitaTestPrice(
+    price: String = "1000",
+    supplierId: String = "supplier-test",
+    currency: String = "KZT"
+): PriceDataModel = PriceDataModel(
     price = price,
-    currency = "KZT",
-    supplierId = "supplier-test"
+    currency = currency,
+    supplierId = supplierId
 )
 
 private fun aitaTestGoodsItem(
@@ -1393,15 +2084,19 @@ private fun aitaTestBatch(
     goodsItemId: String = "goods-test",
     storeId: String = AITA_FLOW_SOURCE_STORE_ID,
     quantityTotal: Double = 10.0,
-    shelfPriority: Int = 0
+    shelfPriority: Int = 0,
+    supplierId: String = "supplier-test",
+    supplyPriceValue: String = "700",
+    salePriceValue: String? = null
 ): GoodsBatchDataModel = GoodsBatchDataModel(
     id = id,
     goodsItemId = goodsItemId,
     userId = AITA_FLOW_TEST_USER_ID,
     storeId = storeId,
-    supplierId = "supplier-test",
+    supplierId = supplierId,
     quantity = aitaTestQuantity(quantityTotal),
-    supplyPrice = aitaTestPrice("700"),
+    supplyPrice = aitaTestPrice(supplyPriceValue, supplierId = supplierId),
+    salePriceOverride = salePriceValue?.let { aitaTestPrice(it, supplierId = supplierId) },
     deliveredAtMillis = 1_700_000_000_000L,
     expirationDateMillis = 1_800_000_000_000L,
     shelfPosition = "A-1",
@@ -1595,6 +2290,280 @@ private fun aitaTestDebtor(
     transactionIds = emptyList()
 )
 
+
+
+private fun assertAitaDoubleEquals(expected: Double, actual: Double, tolerance: Double = 0.001) {
+    assertTrue(
+        kotlin.math.abs(expected - actual) <= tolerance,
+        "Expected $expected ±$tolerance but got $actual"
+    )
+}
+
+private data class AitaAnalyticsFixture(
+    val startMillis: Long,
+    val endMillis: Long,
+    val supplierAlphaId: String,
+    val supplierBetaId: String,
+    val categoryFruitId: String,
+    val categoryBakeryId: String,
+    val apple: GoodsItemDataModel,
+    val banana: GoodsItemDataModel,
+    val stock: List<GoodsItemDataModel>,
+    val batches: List<GoodsBatchDataModel>,
+    val transactions: List<TransactionDataModel>
+)
+
+private fun aitaAnalyticsFixture(): AitaAnalyticsFixture {
+    val startMillis = 1_710_000_000_000L
+    val supplierAlphaId = "supplier-alpha"
+    val supplierBetaId = "supplier-beta"
+    val categoryFruitId = "category-fruit"
+    val categoryBakeryId = "category-bakery"
+    val apple = aitaTestGoodsItem(
+        id = "analytics-apple",
+        name = "Analytics apple",
+        barcode = "4600000000101",
+        activeShelfBatchId = "analytics-apple-batch"
+    ).copy(
+        categoryIds = listOf(categoryFruitId),
+        salePrices = listOf(aitaTestPrice("1000", supplierId = supplierAlphaId)),
+        supplyPrices = listOf(aitaTestPrice("600", supplierId = supplierAlphaId))
+    )
+    val banana = aitaTestGoodsItem(
+        id = "analytics-banana",
+        name = "Analytics banana",
+        barcode = "4600000000102",
+        activeShelfBatchId = "analytics-banana-batch"
+    ).copy(
+        categoryIds = listOf(categoryBakeryId),
+        salePrices = listOf(aitaTestPrice("800", supplierId = supplierBetaId)),
+        supplyPrices = listOf(aitaTestPrice("300", supplierId = supplierBetaId))
+    )
+    val appleBatch = aitaTestBatch(
+        id = "analytics-apple-batch",
+        goodsItemId = apple.id,
+        quantityTotal = 10.0,
+        supplierId = supplierAlphaId,
+        supplyPriceValue = "600",
+        salePriceValue = "1000"
+    ).copy(status = StockBatchStatusDataModel.OnShelf, expirationDateMillis = null, updatedAtMillis = 10L)
+    val bananaBatch = aitaTestBatch(
+        id = "analytics-banana-batch",
+        goodsItemId = banana.id,
+        quantityTotal = 2.0,
+        supplierId = supplierBetaId,
+        supplyPriceValue = "300",
+        salePriceValue = "800"
+    ).copy(status = StockBatchStatusDataModel.OnShelf, expirationDateMillis = null, updatedAtMillis = 10L)
+    val saleApple = aitaTestTransaction(
+        id = "analytics-sale-apple",
+        type = transactionServerType(0),
+        goodsItem = apple,
+        quantity = 2.0,
+        pricePerUnit = 1000.0,
+        paidCash = 1000.0,
+        paidCard = 500.0
+    ).copy(timeMillis = startMillis + 1_000L)
+    val saleBanana = aitaTestTransaction(
+        id = "analytics-sale-banana",
+        type = transactionServerType(0),
+        goodsItem = banana,
+        quantity = 3.0,
+        pricePerUnit = 800.0,
+        paidCash = 0.0,
+        paidCard = 2400.0
+    ).copy(timeMillis = startMillis + 3_600_000L)
+    val returnApple = aitaTestTransaction(
+        id = "analytics-return-apple",
+        type = transactionServerType(1),
+        goodsItem = apple,
+        quantity = 1.0,
+        pricePerUnit = 1000.0,
+        paidCash = 1000.0,
+        paidCard = 0.0
+    ).copy(timeMillis = startMillis + 7_200_000L)
+    val supplyApple = aitaTestTransaction(
+        id = "analytics-supply-apple",
+        type = transactionServerType(2),
+        goodsItem = apple,
+        quantity = 5.0,
+        pricePerUnit = 600.0,
+        paidCash = 0.0,
+        paidCard = 3000.0
+    ).copy(timeMillis = startMillis + 10_800_000L)
+
+    return AitaAnalyticsFixture(
+        startMillis = startMillis,
+        endMillis = startMillis + 86_400_000L,
+        supplierAlphaId = supplierAlphaId,
+        supplierBetaId = supplierBetaId,
+        categoryFruitId = categoryFruitId,
+        categoryBakeryId = categoryBakeryId,
+        apple = apple,
+        banana = banana,
+        stock = listOf(apple, banana),
+        batches = listOf(appleBatch, bananaBatch),
+        transactions = listOf(saleApple, saleBanana, returnApple, supplyApple)
+    )
+}
+
+private fun aitaTestSupplier(
+    id: String = "supplier-test",
+    name: String = "Aita supplier",
+    userIds: List<String> = listOf(AITA_FLOW_TEST_USER_ID),
+    categoryIds: List<String> = listOf("category-test")
+): SupplierDataModel = SupplierDataModel(
+    id = id,
+    userIds = userIds,
+    typeIds = listOf("wholesale_supplier"),
+    categoryIds = categoryIds,
+    name = aitaTestLocalized(name),
+    phoneNumbers = listOf("+77005550000"),
+    emails = listOf("$id@aita.local"),
+    addedAt = 1_710_000_000_000L,
+    isActive = true
+)
+
+private fun aitaTestSupplierGoodsPrice(
+    id: String = "supplier-price-test",
+    storeId: String = AITA_FLOW_SOURCE_STORE_ID,
+    supplierId: String = "supplier-test",
+    goodsItemId: String = "goods-test",
+    supplyPriceValue: String = "700"
+): SupplierGoodsPriceDataModel = SupplierGoodsPriceDataModel(
+    id = id,
+    userId = AITA_FLOW_TEST_USER_ID,
+    storeId = storeId,
+    supplierId = supplierId,
+    goodsItemId = goodsItemId,
+    supplyPrice = aitaTestPrice(supplyPriceValue, supplierId = supplierId),
+    minOrderQuantity = aitaTestQuantity(1.0),
+    packageQuantity = aitaTestQuantity(1.0),
+    supplierBarcode = "SUP-$goodsItemId",
+    supplierGoodsName = "Supplier goods $goodsItemId",
+    lastUsedAtMillis = 1_710_000_000_000L,
+    createdAtMillis = 1_710_000_000_000L,
+    updatedAtMillis = 1_710_000_000_000L,
+    isActive = true
+)
+
+private fun aitaTestSupplierOrderWithLines(
+    id: String = "supplier-order-test",
+    storeId: String = AITA_FLOW_SOURCE_STORE_ID,
+    supplierId: String = "supplier-test",
+    goodsItemId: String = "goods-test",
+    requestedQuantity: Double = 6.0,
+    expectedSupplyPriceValue: String = "700",
+    status: SupplierOrderStatusDataModel = SupplierOrderStatusDataModel.Draft
+): SupplierOrderWithLinesDataModel {
+    val line = SupplierOrderLineDataModel(
+        id = "$id-line-1",
+        orderId = id,
+        goodsItemId = goodsItemId,
+        requestedQuantity = aitaTestQuantity(requestedQuantity),
+        expectedSupplyPrice = aitaTestPrice(expectedSupplyPriceValue, supplierId = supplierId),
+        desiredExpirationDateMillis = 1_800_000_000_000L,
+        additionalNotes = "Please deliver fresh stock",
+        additionalNotesLocalized = aitaTestLocalized("Please deliver fresh stock"),
+        isActive = true
+    )
+    val order = SupplierOrderDataModel(
+        id = id,
+        userId = AITA_FLOW_TEST_USER_ID,
+        storeId = storeId,
+        supplierId = supplierId,
+        amount = aitaTestPrice((requestedQuantity * expectedSupplyPriceValue.toDouble()).toString(), supplierId = supplierId),
+        orderedAtMillis = 1_710_000_000_000L,
+        desiredDeliveryTimeMillis = 1_710_086_400_000L,
+        additionalNotes = "Launch replenishment",
+        additionalNotesLocalized = aitaTestLocalized("Launch replenishment"),
+        status = status,
+        createdAtMillis = 1_710_000_000_000L,
+        updatedAtMillis = 1_710_000_000_000L,
+        isActive = true
+    )
+    return SupplierOrderWithLinesDataModel(order = order, lines = listOf(line))
+}
+
+private fun aitaTestNotification(
+    id: String = "notification-test",
+    message: String = "Aita test notification",
+    title: String = "Aita notification",
+    type: NotificationType = NotificationType.Neutral,
+    userId: String? = AITA_FLOW_TEST_USER_ID,
+    storeId: String? = AITA_FLOW_SOURCE_STORE_ID,
+    category: String = "general",
+    createdAtMillis: Long = getCurrentTimeMillis(),
+    readAtMillis: Long? = null,
+    isSavedOnServer: Boolean = true
+): NotificationDataModel = NotificationDataModel(
+    id = id,
+    userId = userId,
+    storeId = storeId,
+    title = title,
+    message = message,
+    type = type,
+    category = category,
+    source = "server",
+    metadata = mapOf("test" to "true"),
+    createdAtMillis = createdAtMillis,
+    shownAtMillis = createdAtMillis,
+    readAtMillis = readAtMillis,
+    isSavedOnServer = isSavedOnServer
+)
+
+private fun aitaTestOperationLog(
+    id: String = "operation-log-test",
+    rootStoreId: String = AITA_FLOW_SOURCE_STORE_ID,
+    storeId: String = AITA_FLOW_SOURCE_STORE_ID,
+    action: String = "test_action",
+    entityType: String = "test_entity",
+    entityId: String? = "test-entity-id",
+    title: String = "Test operation",
+    details: String = "Test operation details",
+    createdAtMillis: Long = 1_710_000_000_000L
+): OperationLogDataModel = OperationLogDataModel(
+    id = id,
+    rootStoreId = rootStoreId,
+    storeId = storeId,
+    storePublicId = if (storeId == AITA_FLOW_SOURCE_STORE_ID) "AITA-STORE" else "AITA-BRANCH",
+    storeName = aitaTestLocalized(if (storeId == AITA_FLOW_SOURCE_STORE_ID) "Aita test store" else "Aita test branch"),
+    actorUserId = AITA_FLOW_TEST_USER_ID,
+    actorPublicId = "AITA-TEST-USER",
+    actorDisplayName = "Aita Tester",
+    workshiftId = null,
+    action = action,
+    entityType = entityType,
+    entityId = entityId,
+    title = aitaTestLocalized(title),
+    details = aitaTestLocalized(details),
+    metadata = mapOf("entity_type" to entityType, "action" to action),
+    createdAtMillis = createdAtMillis
+)
+
+private fun AitaFlowTestEnvironment.recordAitaTestOperationLog(
+    action: String,
+    entityType: String,
+    entityId: String?,
+    storeId: String = AITA_FLOW_SOURCE_STORE_ID,
+    title: String,
+    details: String = ""
+) {
+    val rootStoreId = stores.findAitaTestStoreOrBranch(storeId)?.parentStoreId ?: storeId.ifBlank { AITA_FLOW_SOURCE_STORE_ID }
+    val log = aitaTestOperationLog(
+        id = "log-$action-${entityId.orEmpty()}-${operationLogs.size + 1}",
+        rootStoreId = rootStoreId,
+        storeId = storeId.ifBlank { AITA_FLOW_SOURCE_STORE_ID },
+        action = action,
+        entityType = entityType,
+        entityId = entityId,
+        title = title,
+        details = details.ifBlank { title },
+        createdAtMillis = getCurrentTimeMillis() + operationLogs.size
+    )
+    operationLogs = (listOf(log) + operationLogs).distinctBy { it.id }
+}
+
 private fun List<GoodsItemDataModel>.upsertAitaTestItem(item: GoodsItemDataModel): List<GoodsItemDataModel> =
     filterNot { it.id == item.id } + item
 
@@ -1607,6 +2576,19 @@ private fun List<TransactionDataModel>.upsertAitaTestTransaction(transaction: Tr
 private fun List<DebtorDataModel>.upsertAitaTestDebtor(debtor: DebtorDataModel): List<DebtorDataModel> =
     filterNot { it.id == debtor.id } + debtor
 
+
+
+private fun List<SupplierDataModel>.upsertAitaTestSupplier(supplier: SupplierDataModel): List<SupplierDataModel> =
+    filterNot { it.id == supplier.id } + supplier
+
+private fun List<SupplierGoodsPriceDataModel>.upsertAitaTestSupplierGoodsPrice(price: SupplierGoodsPriceDataModel): List<SupplierGoodsPriceDataModel> =
+    filterNot { it.id == price.id } + price
+
+private fun List<SupplierOrderWithLinesDataModel>.upsertAitaTestSupplierOrder(orderWithLines: SupplierOrderWithLinesDataModel): List<SupplierOrderWithLinesDataModel> =
+    filterNot { it.order.id == orderWithLines.order.id } + orderWithLines
+
+private fun List<NotificationDataModel>.upsertAitaTestNotification(notification: NotificationDataModel): List<NotificationDataModel> =
+    filterNot { it.id == notification.id } + notification
 
 private fun List<StoreDataModel>.findAitaTestStoreOrBranch(id: String?): StoreDataModel? {
     val cleanId = id?.takeIf { it.isNotBlank() } ?: return null

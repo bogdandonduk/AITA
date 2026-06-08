@@ -22204,19 +22204,19 @@
       "values": [
         {
           "language": "main",
-          "value": "Server connection available"
+          "value": "Server connected."
         },
         {
           "language": "en",
-          "value": "Server connection available"
+          "value": "Server connected."
         },
         {
           "language": "ru",
-          "value": "Сервер доступен"
+          "value": "Сервер подключён."
         },
         {
           "language": "kk",
-          "value": "Сервер қолжетімді"
+          "value": "Сервер қосылды."
         }
       ]
     },
@@ -22246,19 +22246,19 @@
       "values": [
         {
           "language": "main",
-          "value": "Server unavailable. Check local server address or Wi‑Fi."
+          "value": "Can’t reach AITA server. Check Wi‑Fi or server address."
         },
         {
           "language": "en",
-          "value": "Server unavailable. Check local server address or Wi‑Fi."
+          "value": "Can’t reach AITA server. Check Wi‑Fi or server address."
         },
         {
           "language": "ru",
-          "value": "Сервер недоступен. Проверьте адрес локального сервера или Wi‑Fi."
+          "value": "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера."
         },
         {
           "language": "kk",
-          "value": "Сервер қолжетімсіз. Жергілікті сервер мекенжайын немесе Wi‑Fi желісін тексеріңіз."
+          "value": "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
         }
       ]
     },
@@ -23519,6 +23519,342 @@
         {
           "language": "kk",
           "value": "Жойылды"
+        }
+      ]
+    },
+    {
+      "id": 1205,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open debts"
+        },
+        {
+          "language": "en",
+          "value": "Open debts"
+        },
+        {
+          "language": "ru",
+          "value": "Открытые долги"
+        },
+        {
+          "language": "kk",
+          "value": "Ашық қарыздар"
+        }
+      ]
+    },
+    {
+      "id": 1206,
+      "values": [
+        {
+          "language": "main",
+          "value": "All debts"
+        },
+        {
+          "language": "en",
+          "value": "All debts"
+        },
+        {
+          "language": "ru",
+          "value": "Все долги"
+        },
+        {
+          "language": "kk",
+          "value": "Барлық қарыздар"
+        }
+      ]
+    },
+    {
+      "id": 1207,
+      "values": [
+        {
+          "language": "main",
+          "value": "Time paid"
+        },
+        {
+          "language": "en",
+          "value": "Time paid"
+        },
+        {
+          "language": "ru",
+          "value": "Время оплаты"
+        },
+        {
+          "language": "kk",
+          "value": "Төленген уақыты"
+        }
+      ]
+    },
+    {
+      "id": 1208,
+      "values": [
+        {
+          "language": "main",
+          "value": "No sendable batches here"
+        },
+        {
+          "language": "en",
+          "value": "No sendable batches here"
+        },
+        {
+          "language": "ru",
+          "value": "Здесь нет партий для отправки"
+        },
+        {
+          "language": "kk",
+          "value": "Мұнда жіберетін партия жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1209,
+      "values": [
+        {
+          "language": "main",
+          "value": "Move this batch"
+        },
+        {
+          "language": "en",
+          "value": "Move this batch"
+        },
+        {
+          "language": "ru",
+          "value": "Переместить эту партию"
+        },
+        {
+          "language": "kk",
+          "value": "Осы партияны жылжыту"
+        }
+      ]
+    },
+    {
+      "id": 1210,
+      "values": [
+        {
+          "language": "main",
+          "value": "Send en route"
+        },
+        {
+          "language": "en",
+          "value": "Send en route"
+        },
+        {
+          "language": "ru",
+          "value": "Отправить в пути"
+        },
+        {
+          "language": "kk",
+          "value": "Жолға жіберу"
+        }
+      ]
+    },
+    {
+      "id": 1211,
+      "values": [
+        {
+          "language": "main",
+          "value": "The receiving branch will accept this batch before it becomes shelf stock."
+        },
+        {
+          "language": "en",
+          "value": "The receiving branch will accept this batch before it becomes shelf stock."
+        },
+        {
+          "language": "ru",
+          "value": "Принимающий филиал подтвердит партию перед тем, как она попадёт на полку."
+        },
+        {
+          "language": "kk",
+          "value": "Қабылдайтын филиал партия сөреге түспес бұрын оны растайды."
+        }
+      ]
+    },
+    {
+      "id": 1212,
+      "values": [
+        {
+          "language": "main",
+          "value": "Parent store"
+        },
+        {
+          "language": "en",
+          "value": "Parent store"
+        },
+        {
+          "language": "ru",
+          "value": "Родительский магазин"
+        },
+        {
+          "language": "kk",
+          "value": "Негізгі дүкен"
+        }
+      ]
+    },
+    {
+      "id": 1213,
+      "values": [
+        {
+          "language": "main",
+          "value": "Search parent stock"
+        },
+        {
+          "language": "en",
+          "value": "Search parent stock"
+        },
+        {
+          "language": "ru",
+          "value": "Поиск в родительском складе"
+        },
+        {
+          "language": "kk",
+          "value": "Негізгі қоймадан іздеу"
+        }
+      ]
+    },
+    {
+      "id": 1214,
+      "values": [
+        {
+          "language": "main",
+          "value": "Take a clean copy from the parent store stock, then adjust it for this branch."
+        },
+        {
+          "language": "en",
+          "value": "Take a clean copy from the parent store stock, then adjust it for this branch."
+        },
+        {
+          "language": "ru",
+          "value": "Возьмите чистую копию из родительского склада и настройте её для этого филиала."
+        },
+        {
+          "language": "kk",
+          "value": "Негізгі дүкен қоймасынан таза көшірме алып, оны осы филиалға бейімдеңіз."
+        }
+      ]
+    },
+    {
+      "id": 1215,
+      "values": [
+        {
+          "language": "main",
+          "value": "No parent store items match these filters"
+        },
+        {
+          "language": "en",
+          "value": "No parent store items match these filters"
+        },
+        {
+          "language": "ru",
+          "value": "В родительском складе нет товаров под эти фильтры"
+        },
+        {
+          "language": "kk",
+          "value": "Негізгі қоймада бұл сүзгілерге сай тауар жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1216,
+      "values": [
+        {
+          "language": "main",
+          "value": "Parent item applied"
+        },
+        {
+          "language": "en",
+          "value": "Parent item applied"
+        },
+        {
+          "language": "ru",
+          "value": "Товар из родительского магазина применён"
+        },
+        {
+          "language": "kk",
+          "value": "Негізгі дүкен тауары қолданылды"
+        }
+      ]
+    },
+    {
+      "id": 1217,
+      "values": [
+        {
+          "language": "main",
+          "value": "Parent stock"
+        },
+        {
+          "language": "en",
+          "value": "Parent stock"
+        },
+        {
+          "language": "ru",
+          "value": "Родительский склад"
+        },
+        {
+          "language": "kk",
+          "value": "Негізгі қойма"
+        }
+      ]
+    },
+    {
+      "id": 1218,
+      "values": [
+        {
+          "language": "main",
+          "value": "Use parent item"
+        },
+        {
+          "language": "en",
+          "value": "Use parent item"
+        },
+        {
+          "language": "ru",
+          "value": "Взять товар"
+        },
+        {
+          "language": "kk",
+          "value": "Тауарды алу"
+        }
+      ]
+    },
+    {
+      "id": 1219,
+      "values": [
+        {
+          "language": "main",
+          "value": "This active store has no parent store"
+        },
+        {
+          "language": "en",
+          "value": "This active store has no parent store"
+        },
+        {
+          "language": "ru",
+          "value": "У активного магазина нет родительского магазина"
+        },
+        {
+          "language": "kk",
+          "value": "Белсенді дүкеннің негізгі дүкені жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1220,
+      "values": [
+        {
+          "language": "main",
+          "value": "Minimum quantity"
+        },
+        {
+          "language": "en",
+          "value": "Minimum quantity"
+        },
+        {
+          "language": "ru",
+          "value": "Минимальное количество"
+        },
+        {
+          "language": "kk",
+          "value": "Ең аз сан"
         }
       ]
     }

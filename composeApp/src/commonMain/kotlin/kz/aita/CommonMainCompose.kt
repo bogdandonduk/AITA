@@ -15,6 +15,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -338,7 +339,20 @@ private fun platformAllowsAutomaticTextFieldFocus(): Boolean {
             platformName.contains("jvm", ignoreCase = true)
 }
 
+@Composable
+private fun AppConfiguration.stockBatchMovementIconPath(): String {
+    val normalizedThemeId = normalizeAppThemePreference(stateValues.appThemeId)
+    return stateValues.drawables.orEmpty().extractPath(59L, normalizedThemeId)
+        ?: "svg/59_${normalizedThemeId}.svg"
+}
+
+private fun AppConfiguration.stockBatchMovementIconFallback(): DrawableResource =
+    if (normalizeAppThemePreference(stateValues.appThemeId) == 1L) Res.drawable._59_1 else Res.drawable._59_0
+
 private fun StateHost?.autoFocusScopeKey(): String = this?.toString() ?: "global"
+
+private object SupplierPickerAutoFocusStateHost : StateHost()
+private object CartQuantityBottomSheetAutoFocusStateHost : StateHost()
 
 private fun List<NavigationScreenModel>.routesAutoFocusKey(): String =
     joinToString(">") { it.route }
@@ -523,9 +537,9 @@ private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallb
     put(1135L, mapOf("main" to "Session expired", "en" to "Session expired", "ru" to "Сеанс истёк", "kk" to "Сеанс мерзімі өтті"))
     put(1136L, mapOf("main" to "Security event", "en" to "Security event", "ru" to "Событие безопасности", "kk" to "Қауіпсіздік оқиғасы"))
     put(1137L, mapOf("main" to "Related data", "en" to "Related data", "ru" to "Связанные данные", "kk" to "Байланысты деректер"))
-    put(1138L, mapOf("main" to "Server connection available", "en" to "Server connection available", "ru" to "Сервер доступен", "kk" to "Сервер қолжетімді"))
+    put(1138L, mapOf("main" to "Server connected.", "en" to "Server connected.", "ru" to "Сервер подключён.", "kk" to "Сервер қосылды."))
     put(1139L, mapOf("main" to "Checking server connection…", "en" to "Checking server connection…", "ru" to "Проверяем соединение с сервером…", "kk" to "Сервермен байланыс тексерілуде…"))
-    put(1140L, mapOf("main" to "Server unavailable. Check local server address or Wi‑Fi.", "en" to "Server unavailable. Check local server address or Wi‑Fi.", "ru" to "Сервер недоступен. Проверьте адрес локального сервера или Wi‑Fi.", "kk" to "Сервер қолжетімсіз. Жергілікті сервер мекенжайын немесе Wi‑Fi желісін тексеріңіз."))
+    put(1140L, mapOf("main" to "Can’t reach AITA server. Check Wi‑Fi or server address.", "en" to "Can’t reach AITA server. Check Wi‑Fi or server address.", "ru" to "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.", "kk" to "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."))
     put(1141L, mapOf("main" to "Please wait…", "en" to "Please wait…", "ru" to "Пожалуйста, подождите…", "kk" to "Күте тұрыңыз…"))
     put(1142L, mapOf("main" to "Updating workshift password…", "en" to "Updating workshift password…", "ru" to "Обновляем пароль смены…", "kk" to "Ауысым құпия сөзі жаңартылуда…"))
     put(1143L, mapOf("main" to "Account password", "en" to "Account password", "ru" to "Пароль аккаунта", "kk" to "Аккаунт құпия сөзі"))
@@ -586,6 +600,22 @@ private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallb
     put(1202L, mapOf("main" to "Sold out", "en" to "Sold out", "ru" to "Распродано", "kk" to "Сатылып бітті"))
     put(1203L, mapOf("main" to "Written off", "en" to "Written off", "ru" to "Списано", "kk" to "Есептен шығарылды"))
     put(1204L, mapOf("main" to "Deleted", "en" to "Deleted", "ru" to "Удалено", "kk" to "Жойылды"))
+    put(1205L, mapOf("main" to "Open debts", "en" to "Open debts", "ru" to "Открытые долги", "kk" to "Ашық қарыздар"))
+    put(1206L, mapOf("main" to "All debts", "en" to "All debts", "ru" to "Все долги", "kk" to "Барлық қарыздар"))
+    put(1207L, mapOf("main" to "Time paid", "en" to "Time paid", "ru" to "Время оплаты", "kk" to "Төленген уақыты"))
+    put(1208L, mapOf("main" to "No sendable batches here", "en" to "No sendable batches here", "ru" to "Здесь нет партий для отправки", "kk" to "Мұнда жіберетін партия жоқ"))
+    put(1209L, mapOf("main" to "Move this batch", "en" to "Move this batch", "ru" to "Переместить эту партию", "kk" to "Осы партияны жылжыту"))
+    put(1210L, mapOf("main" to "Send en route", "en" to "Send en route", "ru" to "Отправить в пути", "kk" to "Жолға жіберу"))
+    put(1211L, mapOf("main" to "The receiving branch will accept this batch before it becomes shelf stock.", "en" to "The receiving branch will accept this batch before it becomes shelf stock.", "ru" to "Принимающий филиал подтвердит партию перед тем, как она попадёт на полку.", "kk" to "Қабылдайтын филиал партия сөреге түспес бұрын оны растайды."))
+    put(1212L, mapOf("main" to "Parent store", "en" to "Parent store", "ru" to "Родительский магазин", "kk" to "Негізгі дүкен"))
+    put(1213L, mapOf("main" to "Search parent stock", "en" to "Search parent stock", "ru" to "Поиск в родительском складе", "kk" to "Негізгі қоймадан іздеу"))
+    put(1214L, mapOf("main" to "Take a clean copy from the parent store stock, then adjust it for this branch.", "en" to "Take a clean copy from the parent store stock, then adjust it for this branch.", "ru" to "Возьмите чистую копию из родительского склада и настройте её для этого филиала.", "kk" to "Негізгі дүкен қоймасынан таза көшірме алып, оны осы филиалға бейімдеңіз."))
+    put(1215L, mapOf("main" to "No parent store items match these filters", "en" to "No parent store items match these filters", "ru" to "В родительском складе нет товаров под эти фильтры", "kk" to "Негізгі қоймада бұл сүзгілерге сай тауар жоқ"))
+    put(1216L, mapOf("main" to "Parent item applied", "en" to "Parent item applied", "ru" to "Товар из родительского магазина применён", "kk" to "Негізгі дүкен тауары қолданылды"))
+    put(1217L, mapOf("main" to "Parent stock", "en" to "Parent stock", "ru" to "Родительский склад", "kk" to "Негізгі қойма"))
+    put(1218L, mapOf("main" to "Use parent item", "en" to "Use parent item", "ru" to "Взять товар", "kk" to "Тауарды алу"))
+    put(1219L, mapOf("main" to "This active store has no parent store", "en" to "This active store has no parent store", "ru" to "У активного магазина нет родительского магазина", "kk" to "Белсенді дүкеннің негізгі дүкені жоқ"))
+    put(1220L, mapOf("main" to "Minimum quantity", "en" to "Minimum quantity", "ru" to "Минимальное количество", "kk" to "Ең аз сан"))
 }
 
 
@@ -4363,6 +4393,157 @@ private fun QuantityDataModel.quantityText(language: String): String {
     return "${total.quantityAmountText(roundTotal)} $unit".trim()
 }
 
+private fun QuantityDataModel.isPieceQuantityUnit(): Boolean {
+    if (id == "0") return true
+
+    return immutableUnitName.any { localized ->
+        val value = localized.value.trim().lowercase()
+        value == "pc" ||
+                value == "pcs" ||
+                value == "pc." ||
+                value == "pcs." ||
+                value == "piece" ||
+                value == "pieces" ||
+                value == "шт" ||
+                value == "шт." ||
+                value == "штука" ||
+                value == "штук" ||
+                value == "дана"
+    }
+}
+
+private fun QuantityDataModel.allowsFractionalStockQuantityInput(): Boolean =
+    !isPieceQuantityUnit() && (!roundTotal || isWeightQuantityUnit())
+
+private fun sanitizeStockQuantityInput(raw: String, allowFraction: Boolean): String {
+    val normalized = raw.replace(',', '.')
+
+    if (!allowFraction) {
+        return normalized.substringBefore('.').filter { it.isDigit() }
+    }
+
+    var dotUsed = false
+    return buildString {
+        normalized.forEach { char ->
+            when {
+                char.isDigit() -> append(char)
+                char == '.' && !dotUsed -> {
+                    append(char)
+                    dotUsed = true
+                }
+            }
+        }
+    }
+}
+
+private fun String.isStockQuantityInputText(allowFraction: Boolean): Boolean {
+    if (isEmpty()) return true
+    return if (allowFraction) {
+        isNumericalDoubleString()
+    } else {
+        isNumericalString()
+    }
+}
+
+private fun stockQuantityInputTextFromAmount(amount: Double, unit: QuantityDataModel): String {
+    if (!unit.allowsFractionalStockQuantityInput()) {
+        return amount.coerceAtLeast(0.0).toInt().toString()
+    }
+
+    val scaled = round(amount.coerceAtLeast(0.0) * 1000.0).toLong()
+    val whole = scaled / 1000L
+    val fraction = (scaled % 1000L)
+        .toString()
+        .padStart(3, '0')
+        .trimEnd('0')
+        .ifBlank { "0" }
+
+    return "$whole.$fraction"
+}
+
+private fun parseStockQuantityInputText(raw: String, unit: QuantityDataModel): Double? {
+    val allowFraction = unit.allowsFractionalStockQuantityInput()
+    val sanitized = sanitizeStockQuantityInput(raw, allowFraction)
+    val parsed = sanitized.toDoubleOrNull() ?: return null
+    return if (allowFraction) parsed else parsed.toInt().coerceAtLeast(0).toDouble()
+}
+
+private fun QuantityDataModel.withStockQuantityInputTotalValue(total: Double): QuantityDataModel {
+    return if (allowsFractionalStockQuantityInput()) {
+        copy(
+            total = round(total.coerceAtLeast(0.0) * 1000.0) / 1000.0,
+            roundTotal = false
+        )
+    } else {
+        copy(total = total.coerceAtLeast(0.0).toInt().toDouble())
+    }
+}
+
+private fun stockQuantityShortcutAmounts(unit: QuantityDataModel): List<Double> {
+    return if (unit.allowsFractionalStockQuantityInput()) {
+        listOf(5.0, 10.0, 25.0, 50.0, 100.0)
+    } else {
+        listOf(10.0, 30.0, 50.0, 100.0, 500.0, 1000.0)
+    }
+}
+
+@Composable
+private fun AppConfiguration.StockQuantityQuickFillButtons(
+    quantityUnit: QuantityDataModel,
+    currentText: String,
+    modifier: Modifier = Modifier,
+    onAmountSelected: (String) -> Unit
+) {
+    val currentAmount = parseStockQuantityInputText(currentText, quantityUnit)
+    val unitText = quantityUnit.immutableUnitName.extractLocalizedString(stateValues.appLanguage).orEmpty()
+    val amounts = stockQuantityShortcutAmounts(quantityUnit)
+        .filterNot { amount ->
+            currentAmount != null && abs(currentAmount - amount) < 0.000001
+        }
+
+    if (amounts.isEmpty()) return
+
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        items(amounts) { amount ->
+            Box(
+                modifier = Modifier
+                    .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .border(
+                        stateValues.unfocusedBorderWidth,
+                        stateValues.AccentColor,
+                        RoundedCornerShape(stateValues.cornerRadius)
+                    )
+                    .background(stateValues.BackgroundColor)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = ripple(color = stateValues.AccentColor)
+                    ) {
+                        onAmountSelected(stockQuantityInputTextFromAmount(amount, quantityUnit))
+                    }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = listOf(
+                        stockQuantityInputTextFromAmount(amount, quantityUnit),
+                        unitText
+                    ).filter { it.isNotBlank() }.joinToString(" "),
+                    color = stateValues.AccentColor,
+                    fontSize = stateValues.smallTextSize,
+                    fontWeight = FontWeight.Bold,
+                    style = TextStyle(shadow = accentTextShadow(stateValues.AccentColor, stateValues.AccentColor)),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
 
 @Composable
 fun AppConfiguration.TransactionReceiptPreviewScreen() {
@@ -5438,46 +5619,57 @@ private fun AppConfiguration.TransactionDecimalAmountField(
 }
 
 @Composable
-private fun AppConfiguration.WeightQuantityDialog(
+private fun AppConfiguration.CartQuantityBottomSheet(
     goodsItem: GoodsItemDataModel,
     quantity: QuantityDataModel,
     onDismiss: () -> Unit,
     onConfirm: (Double) -> Unit
 ) {
     val unitText = quantity.immutableUnitName.extractLocalizedString(stateValues.appLanguage).orEmpty()
-    val dialogTitle = localizedStringResource(206, "Weight")
-    var amountText by rememberSaveable(goodsItem.id, quantity.total) {
-        mutableStateOf(quantity.total.quantityAmountText(roundTotal = false))
+    val allowFraction = quantity.allowsFractionalStockQuantityInput()
+    val maxFractionDigits = if (allowFraction) 3 else 0
+    val minimumAmount = quantity.pricedAmount
+        .takeIf { it > 0.0 }
+        ?: if (quantity.roundTotal) 1.0 else 0.001
+    val autoFocusAmount = platformAllowsAutomaticTextFieldFocus()
+    val suppressSystemKeyboard = getPlatformName().contains("android", ignoreCase = true)
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    fun normalizeQuantityText(raw: String): String {
+        val sanitized = sanitizeStockQuantityInput(raw, allowFraction)
+        return if (allowFraction) {
+            if (sanitized == ".") "0." else decimalInputNormalize(sanitized, maxFractionDigits = maxFractionDigits)
+        } else {
+            sanitized
+        }
     }
 
-    val amount = amountText.replace(',', '.').toDoubleOrNull() ?: 0.0
-    val itemName = goodsItem.name.visibleLocalizedString(stateValues.appLanguage, dialogTitle)
+    fun appendQuantityToken(current: String, token: String): String {
+        if (token == "." && !allowFraction) return current
+        val appended = decimalInputAppend(current, token, maxFractionDigits = maxFractionDigits)
+        return normalizeQuantityText(appended)
+    }
 
-    Dialog(onDismissRequest = onDismiss) {
+    var amountText by rememberSaveable(goodsItem.id, quantity.total, quantity.roundTotal, quantity.id) {
+        mutableStateOf(stockQuantityInputTextFromAmount(quantity.total, quantity))
+    }
+
+    val amount = parseStockQuantityInputText(amountText, quantity) ?: 0.0
+    val amountValid = amount + 0.000001 >= minimumAmount
+    val itemName = goodsItem.name.visibleLocalizedString(stateValues.appLanguage, localizedStringResource(365, "Goods item"))
+    var amountFieldContent: GenericTextFieldContent? = null
+
+    AitaBottomSheet(
+        title = localizedStringResource(513, "Quantity"),
+        iconPath = stateValues.drawablePathIconStock,
+        onDismiss = onDismiss
+    ) {
         Column(
             modifier = Modifier
-                .widthIn(min = 300.dp, max = if (stateValues.isNarrowScreen) 420.dp else 520.dp)
-                .foregroundTactileShadow(stateValues.cornerRadius, elevated = true)
-                .clip(RoundedCornerShape(stateValues.cornerRadius))
-                .background(stateValues.BackgroundColor)
-                .border(
-                    stateValues.focusedBorderWidth,
-                    stateValues.AccentColor,
-                    RoundedCornerShape(stateValues.cornerRadius)
-                )
-                .padding(stateValues.marginTextFieldGroup),
+                .weight(1f)
+                .padding(stateValues.marginTextField),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = dialogTitle,
-                color = stateValues.TextColor,
-                fontSize = stateValues.titleTextSize,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
             Text(
                 text = itemName,
                 color = stateValues.TextColor,
@@ -5487,25 +5679,45 @@ private fun AppConfiguration.WeightQuantityDialog(
                 overflow = TextOverflow.Ellipsis
             )
 
-            Spacer(modifier = Modifier.height(stateValues.marginTextField))
+            Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
-            TransactionDecimalAmountField(
+            amountFieldContent = genericTextField(
                 modifier = Modifier.fillMaxWidth(),
-                title = localizedStringResource(207, "Enter weight"),
-                value = amountText,
-                placeholder = "0.000",
-                maxFractionDigits = 3,
-                selected = true,
+                titleText = stateValues.stringEnterQuantity,
+                valueInitial = amountText,
+                stateHost = CartQuantityBottomSheetAutoFocusStateHost,
+                stateKey = null,
+                isFocusedInitial = autoFocusAmount,
+                autoFocus = autoFocusAmount,
+                forceRefocus = false,
+                readOnly = suppressSystemKeyboard,
+                keyboardType = if (allowFraction) KeyboardType.Decimal else KeyboardType.Number,
+                imeWithAction = ImeWithAction(ImeAction.Done),
                 leadingIconPath = stateValues.drawablePathIconStock,
-                onSelected = {},
-                onValueChange = { amountText = decimalInputNormalize(it, maxFractionDigits = 3) }
+                showClearButton = true,
+                selectionBackgroundColor = stateValues.AccentColor,
+                selectionFocusTextColor = stateValues.AccentTextColor,
+                updateIsFocusedAction = { focusState ->
+                    if (focusState.isFocused && suppressSystemKeyboard) {
+                        keyboardController?.hide()
+                    }
+                },
+                onTransformValue = { normalizeQuantityText(it) },
+                onValueChange = { rawValue, applyChange ->
+                    val normalized = normalizeQuantityText(rawValue)
+                    val acceptable = normalized.isEmpty() || normalized.isStockQuantityInputText(allowFraction)
+                    if (acceptable) {
+                        amountText = normalized
+                        applyChange()
+                    }
+                }
             )
 
             Spacer(modifier = Modifier.height(6.dp))
 
             Text(
-                text = "$amountText $unitText".trim(),
-                color = stateValues.AccentColor,
+                text = "${amountText.ifBlank { "0" }} $unitText".trim(),
+                color = if (amountValid) stateValues.AccentColor else stateValues.ErrorColor,
                 fontSize = stateValues.accentTextSize,
                 fontWeight = FontWeight.Bold,
                 style = TextStyle(shadow = accentTextShadow(stateValues.AccentColor, stateValues.AccentColor)),
@@ -5513,15 +5725,26 @@ private fun AppConfiguration.WeightQuantityDialog(
                 overflow = TextOverflow.Ellipsis
             )
 
+            if (!amountValid) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "${localizedStringResource(1220, "Minimum quantity")} ${minimumAmount.quantityAmountText(quantity.roundTotal)} $unitText".trim(),
+                    color = stateValues.ErrorColor,
+                    fontSize = stateValues.smallTextSize,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            }
+
             Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
             TransactionNumpad(
                 modifier = Modifier.fillMaxWidth(),
+                allowDecimal = allowFraction,
                 onInput = { token ->
-                    amountText = decimalInputNormalize(
-                        decimalInputAppend(amountText, token, maxFractionDigits = 3),
-                        maxFractionDigits = 3
-                    )
+                    val nextText = appendQuantityToken(amountText, token)
+                    amountText = nextText
+                    amountFieldContent?.replaceText(nextText, applyTransform = false)
                 }
             )
 
@@ -5541,11 +5764,10 @@ private fun AppConfiguration.WeightQuantityDialog(
                 actionButton(
                     modifier = Modifier.weight(1f),
                     text = stateValues.stringConfirm,
-                    enabled = amount > 0.0,
+                    enabled = amountValid,
                     enabledColor = stateValues.OkayColor,
                     onClick = {
                         onConfirm(amount)
-                        onDismiss()
                     }
                 )
             }
@@ -5554,17 +5776,28 @@ private fun AppConfiguration.WeightQuantityDialog(
 }
 
 
+
 @Composable
 private fun AppConfiguration.TransactionNumpad(
     modifier: Modifier = Modifier,
+    allowDecimal: Boolean = true,
     onInput: (String) -> Unit
 ) {
-    val rows = listOf(
-        listOf("1", "2", "3"),
-        listOf("4", "5", "6"),
-        listOf("7", "8", "9"),
-        listOf(".", "0", "⌫")
-    )
+    val rows = if (allowDecimal) {
+        listOf(
+            listOf("1", "2", "3"),
+            listOf("4", "5", "6"),
+            listOf("7", "8", "9"),
+            listOf(".", "0", "⌫")
+        )
+    } else {
+        listOf(
+            listOf("1", "2", "3"),
+            listOf("4", "5", "6"),
+            listOf("7", "8", "9"),
+            listOf("0", "⌫")
+        )
+    }
 
     Column(
         modifier = modifier,
@@ -5576,6 +5809,7 @@ private fun AppConfiguration.TransactionNumpad(
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 row.forEach { token ->
+                    val tokenEnabled = allowDecimal || token != "."
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -5587,8 +5821,9 @@ private fun AppConfiguration.TransactionNumpad(
                                 stateValues.PlaceholderTextColor,
                                 RoundedCornerShape(stateValues.cornerRadius)
                             )
-                            .background(if (token == "⌫") stateValues.DisabledColor else stateValues.BackgroundColor)
+                            .background(if (token == "⌫" || !tokenEnabled) stateValues.DisabledColor else stateValues.BackgroundColor)
                             .clickable(
+                                enabled = tokenEnabled,
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = ripple(color = stateValues.TextColor)
                             ) {
@@ -5598,7 +5833,7 @@ private fun AppConfiguration.TransactionNumpad(
                     ) {
                         Text(
                             text = token,
-                            color = stateValues.TextColor,
+                            color = stateValues.TextColor.copy(alpha = if (tokenEnabled) 1f else 0.42f),
                             fontSize = stateValues.accentTextSize,
                             fontWeight = FontWeight.Bold
                         )
@@ -7077,9 +7312,11 @@ fun AppConfiguration.GoodsItemInCartWidget(
     decreaseQuantityAction: () -> Unit
 ) {
     val isWeightQuantity = goodsItem.isWeightMeasurementUnit(stateValues.globalAppConfiguration) || !goodsItemInCart.quantity.roundTotal
-    var showWeightQuantityDialog by rememberSaveable(goodsItemInCart.id, goodsItemInCart.quantity.total) {
+    var showQuantityBottomSheet by rememberSaveable(goodsItemInCart.id, goodsItemInCart.quantity.total) {
         mutableStateOf(false)
     }
+    val quantityStep = goodsItemInCart.quantity.pricedAmount.takeIf { it > 0.0 } ?: 1.0
+    val canDecreaseQuantity = goodsItemInCart.quantity.total - quantityStep >= quantityStep - 0.000001
 
     val localScope = rememberCoroutineScope()
     var quantityLimitError by rememberSaveable(goodsItemInCart.id) { mutableStateOf<String?>(null) }
@@ -7104,15 +7341,15 @@ fun AppConfiguration.GoodsItemInCartWidget(
         }
     }
 
-    if (showWeightQuantityDialog) {
-        WeightQuantityDialog(
+    if (showQuantityBottomSheet) {
+        CartQuantityBottomSheet(
             goodsItem = goodsItem,
             quantity = goodsItemInCart.quantity,
-            onDismiss = { showWeightQuantityDialog = false },
+            onDismiss = { showQuantityBottomSheet = false },
             onConfirm = { total ->
                 runIfSaleQuantityAvailable(total) {
                     setQuantityAction(total)
-                    showWeightQuantityDialog = false
+                    showQuantityBottomSheet = false
                 }
             }
         )
@@ -7473,7 +7710,7 @@ fun AppConfiguration.GoodsItemInCartWidget(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = ripple(color = stateValues.AccentColor)
                             ) {
-                                showWeightQuantityDialog = true
+                                showQuantityBottomSheet = true
                             },
                         contentAlignment = Alignment.Center
                     ) {
@@ -7496,10 +7733,13 @@ fun AppConfiguration.GoodsItemInCartWidget(
                     actionButton(
                         fillMaxHeight = true,
                         text = "",
+                        enabled = canDecreaseQuantity,
                         enabledColor = stateValues.ErrorColor,
                         iconPath = stateValues.drawablePathIconSubtract,
                         iconContentDescription = stateValues.stringSubtract,
-                        onClick = decreaseQuantityAction
+                        onClick = {
+                            if (canDecreaseQuantity) decreaseQuantityAction()
+                        }
                     )
 
                     Spacer(modifier = Modifier.width(2.dp))
@@ -7510,7 +7750,13 @@ fun AppConfiguration.GoodsItemInCartWidget(
                             .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
                             .clip(RoundedCornerShape(stateValues.cornerRadius))
                             .background(stateValues.BackgroundColor)
-                            .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor, RoundedCornerShape(stateValues.cornerRadius)),
+                            .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor, RoundedCornerShape(stateValues.cornerRadius))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = ripple(color = stateValues.AccentColor)
+                            ) {
+                                showQuantityBottomSheet = true
+                            },
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -7533,7 +7779,7 @@ fun AppConfiguration.GoodsItemInCartWidget(
                         iconPath = stateValues.drawablePathIconAdd,
                         iconContentDescription = stateValues.stringAdd,
                         onClick = {
-                            runIfSaleQuantityAvailable(goodsItemInCart.quantity.total + 1.0, increaseQuantityAction)
+                            runIfSaleQuantityAvailable(goodsItemInCart.quantity.total + quantityStep, increaseQuantityAction)
                         }
                     )
                 }
@@ -8797,7 +9043,7 @@ fun AppConfiguration.StockWarehouseScreenContent(
             if (state.payload.run { onFilter?.let { filter { onFilter(it) } } ?: this }.isEmpty()) {
                 MessageText(
                     modifier = modifier
-                        .fillMaxWidth(),
+                        .fillMaxSize(),
                     stateValues.stringListEmpty
                 )
             } else {
@@ -8806,14 +9052,25 @@ fun AppConfiguration.StockWarehouseScreenContent(
                 }
 
                 if (searchQuery == null) {
+                    val autoFocusSearch = platformAllowsAutomaticTextFieldFocus()
                     val searchTextFieldContent =
                         searchTextField(
                             modifier = Modifier
                                 .padding(start = 8.dp, top = 8.dp, end = 8.dp),
                             stateHost = NavigationScreenModel.Stock.Warehouse,
                             stateKey = NavigationScreenModel.KEY_STATE_SEARCH_QUERY,
+                            isFocusedInitial = autoFocusSearch,
+                            autoFocus = autoFocusSearch,
+                            forceRefocus = false,
                             barcodeCamScanner = true
                         )
+
+                    LaunchedEffect(autoFocusSearch) {
+                        if (autoFocusSearch) {
+                            delay(320)
+                            searchTextFieldContent.focusRequester.requestFocus()
+                        }
+                    }
 
                     LaunchedEffect(searchTextFieldContent.value) {
                         lSearchQuery = searchTextFieldContent.value.text
@@ -8909,7 +9166,7 @@ fun AppConfiguration.StockWarehouseScreenContent(
                 if (sortedItems.isEmpty()) {
                     MessageText(
                         modifier = modifier
-                            .fillMaxWidth(),
+                            .fillMaxSize(),
                         stateValues.stringNoMatches
                     )
                 } else {
@@ -8976,7 +9233,7 @@ fun AppConfiguration.StockWarehouseScreenContent(
         is DataState.Empty -> {
             MessageText(
                 modifier = modifier
-                    .fillMaxWidth(),
+                    .fillMaxSize(),
                 stateValues.stringListEmpty
             )
         }
@@ -9584,7 +9841,7 @@ fun GoodsItemDataModel.toStockAddEditDraft(): StockAddEditDraft {
         supplyPrices = supplyPrices,
         wholesalePrices = wholesalePrices,
         wholesaleMinQuantityText = wholesaleMinQuantity
-            ?.let { minQuantity -> minQuantity.total.quantityAmountText(minQuantity.roundTotal) }
+            ?.let { minQuantity -> stockQuantityInputTextFromAmount(minQuantity.total, minQuantity) }
             .orEmpty(),
         genericExpirationPeriod = genericExpirationPeriod,
         promotions = promotions,
@@ -9605,19 +9862,16 @@ fun StockAddEditDraft.toGoodsItem(
     val now = getCurrentTimeMillis()
     val selectedUnit = configuration.goodsItemsQuantityUnits.find { it.id == measurementUnitId }
         ?: configuration.goodsItemsQuantityUnits.firstOrNull()
-    val wholesaleMinimumQuantity = wholesaleMinQuantityText
-        .replace(',', '.')
-        .toDoubleOrNull()
+    val wholesaleMinimumUnit = selectedUnit ?: QuantityDataModel(
+        id = measurementUnitId,
+        immutableUnitName = emptyList(),
+        total = 1.0,
+        pricedAmount = 1.0,
+        roundTotal = measurementUnitId == "0"
+    )
+    val wholesaleMinimumQuantity = parseStockQuantityInputText(wholesaleMinQuantityText, wholesaleMinimumUnit)
         ?.takeIf { it > 0.0 }
-        ?.let { total ->
-            (selectedUnit ?: QuantityDataModel(
-                id = measurementUnitId,
-                immutableUnitName = emptyList(),
-                total = 1.0,
-                pricedAmount = 1.0,
-                roundTotal = measurementUnitId == "0"
-            )).copy(total = total)
-        }
+        ?.let { total -> wholesaleMinimumUnit.withStockQuantityInputTotalValue(total) }
     val cleanNoteLocalized = noteLocalized.filter { it.value.isNotBlank() }
     val legacyNote = cleanNoteLocalized.extractLocalizedString("main")
         ?: cleanNoteLocalized.firstOrNull()?.value
@@ -9666,7 +9920,7 @@ fun StockAddEditDraft.toGoodsItem(
     )
 }
 
-fun StockAddEditDraft.isValidStockDraft(): Boolean {
+fun StockAddEditDraft.isValidStockDraft(configuration: GlobalAppConfigurationDataModel): Boolean {
     val cleanBarcodes = barcodes.map { it.trim().toStoredGoodsItemBarcode() }.filter { it.isNotEmpty() }
 
     val hasName = name.any { it.value.isNotBlank() }
@@ -9675,7 +9929,16 @@ fun StockAddEditDraft.isValidStockDraft(): Boolean {
     val hasSalePrice = salePrices.any { it.price.toDoubleOrNull()?.let { price -> price >= 0.0 } == true }
     val hasSupplyPrice = supplyPrices.any { it.price.toDoubleOrNull()?.let { price -> price >= 0.0 } == true }
     val hasWholesalePrice = wholesalePrices.any { it.price.toDoubleOrNull()?.let { price -> price > 0.0 } == true }
-    val hasWholesaleMinimum = wholesaleMinQuantityText.replace(',', '.').toDoubleOrNull()?.let { it > 0.0 } == true
+    val wholesaleMinimumUnit = configuration.goodsItemsQuantityUnits.find { it.id == measurementUnitId }
+        ?: configuration.goodsItemsQuantityUnits.firstOrNull()
+        ?: QuantityDataModel(
+            id = measurementUnitId,
+            immutableUnitName = emptyList(),
+            total = 1.0,
+            pricedAmount = 1.0,
+            roundTotal = measurementUnitId == "0"
+        )
+    val hasWholesaleMinimum = parseStockQuantityInputText(wholesaleMinQuantityText, wholesaleMinimumUnit)?.let { it > 0.0 } == true
 
     return hasName && hasBarcode && hasUnit && hasSalePrice && hasSupplyPrice && (!hasWholesalePrice || hasWholesaleMinimum)
 }
@@ -9718,10 +9981,22 @@ private fun defaultStockPromotion(language: String): StockPromotionDataModel = S
 private fun AppConfiguration.StockPromotionListEditor(
     promotions: List<StockPromotionDataModel>,
     onPromotionsChanged: (List<StockPromotionDataModel>) -> Unit,
+    quantityUnit: QuantityDataModel? = null,
     allowApplyToSameSupplier: Boolean = false,
     applyToSameSupplier: Boolean = false,
     onApplyToSameSupplierChanged: ((Boolean) -> Unit)? = null
 ) {
+    val fallbackQuantityUnit = quantityUnit
+        ?: stateValues.globalAppConfiguration.goodsItemsQuantityUnits.firstOrNull()
+        ?: QuantityDataModel(
+            id = "0",
+            immutableUnitName = listOf(LocalizedStringDataModel("main", "pcs")),
+            total = 1.0,
+            pricedAmount = 1.0,
+            roundTotal = true
+        )
+    val promoQuantityAllowsFraction = fallbackQuantityUnit.allowsFractionalStockQuantityInput()
+
     fun replacePromotion(index: Int, promotion: StockPromotionDataModel) {
         onPromotionsChanged(
             promotions.toMutableList().also { list ->
@@ -9870,16 +10145,57 @@ private fun AppConfiguration.StockPromotionListEditor(
                     Spacer(modifier = Modifier.height(stateValues.marginTextField))
                 }
 
+                var promoMinQuantityText by rememberSaveable(promotion.id, fallbackQuantityUnit.id) {
+                    mutableStateOf(
+                        promotion.minQuantity
+                            ?.let { amount -> stockQuantityInputTextFromAmount(amount, fallbackQuantityUnit) }
+                            .orEmpty()
+                    )
+                }
+
+                LaunchedEffect(promotion.id, promotion.minQuantity, fallbackQuantityUnit.id) {
+                    val externalMinQuantity = promotion.minQuantity
+                    val nextText = externalMinQuantity
+                        ?.let { amount -> stockQuantityInputTextFromAmount(amount, fallbackQuantityUnit) }
+                        .orEmpty()
+                    val localAmount = parseStockQuantityInputText(promoMinQuantityText, fallbackQuantityUnit)
+
+                    if (externalMinQuantity == null && promoMinQuantityText.isBlank()) return@LaunchedEffect
+                    if (externalMinQuantity != null && localAmount != null && abs(localAmount - externalMinQuantity) < 0.000001) return@LaunchedEffect
+                    if (!promoMinQuantityText.endsWith(".")) {
+                        promoMinQuantityText = nextText
+                    }
+                }
+
                 SimpleTextInput(
                     modifier = Modifier.fillMaxWidth(),
-                    value = promotion.minQuantity?.toString().orEmpty(),
+                    value = promoMinQuantityText,
                     placeholder = localizedStringResource(931, "Minimum quantity"),
-                    keyboardType = KeyboardType.Decimal,
+                    keyboardType = if (promoQuantityAllowsFraction) KeyboardType.Decimal else KeyboardType.Number,
                     leadingIconPath = stateValues.drawablePathIconStock,
+                    onTransformValue = { raw -> sanitizeStockQuantityInput(raw, promoQuantityAllowsFraction) },
                     onValueChange = { value ->
-                        if (value.isEmpty() || value.replace(',', '.').isNumericalDoubleString()) {
-                            replacePromotion(index, promotion.copy(minQuantity = value.replace(',', '.').toDoubleOrNull()))
+                        if (value.isStockQuantityInputText(promoQuantityAllowsFraction)) {
+                            promoMinQuantityText = value
+                            replacePromotion(
+                                index,
+                                promotion.copy(minQuantity = parseStockQuantityInputText(value, fallbackQuantityUnit))
+                            )
                         }
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                StockQuantityQuickFillButtons(
+                    quantityUnit = fallbackQuantityUnit,
+                    currentText = promoMinQuantityText,
+                    onAmountSelected = { selectedAmount ->
+                        promoMinQuantityText = selectedAmount
+                        replacePromotion(
+                            index,
+                            promotion.copy(minQuantity = parseStockQuantityInputText(selectedAmount, fallbackQuantityUnit))
+                        )
                     }
                 )
 
@@ -10325,6 +10641,7 @@ private fun AppConfiguration.SupplierPickerBottomSheet(
     LaunchedEffect(Unit) { getSuppliers() }
 
     val suppliers = stateValues.suppliers.orEmpty().filter { it.isActive }
+    val autoFocusSearch = platformAllowsAutomaticTextFieldFocus()
     var search by rememberSaveable { mutableStateOf("") }
     var addMode by rememberSaveable { mutableStateOf(false) }
 
@@ -10351,15 +10668,27 @@ private fun AppConfiguration.SupplierPickerBottomSheet(
         ) {
             val searchContent = searchTextField(
                 valueInitial = search,
-                stateHost = null,
+                stateHost = SupplierPickerAutoFocusStateHost,
                 stateKey = null,
                 modifier = Modifier.fillMaxWidth(),
+                isFocusedInitial = autoFocusSearch,
+                autoFocus = autoFocusSearch,
+                forceRefocus = autoFocusSearch,
                 updateIsFocusedAction = null
             )
 
             LaunchedEffect(searchContent.value.text) {
                 search = searchContent.value.text
             }
+
+            Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+            actionButton(
+                text = localizedStringResource(635, "Add supplier here"),
+                iconPath = stateValues.drawablePathIconAdd,
+                confirmationRequired = false,
+                onClick = { addMode = true }
+            )
 
             Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
@@ -10380,17 +10709,14 @@ private fun AppConfiguration.SupplierPickerBottomSheet(
                     }
                     .sortedBy { it.name.visibleLocalizedString(stateValues.appLanguage, it.id) }
 
-                item {
-                    actionButton(
-                        text = localizedStringResource(635, "Add supplier here"),
-                        iconPath = stateValues.drawablePathIconAdd,
-                        confirmationRequired = false,
-                        onClick = { addMode = true }
-                    )
-                }
-
                 if (visibleSuppliers.isEmpty()) {
-                    item { MessageText(modifier = Modifier.fillMaxWidth(), text = localizedStringResource(626, "No suppliers yet")) }
+                    item {
+                        MessageText(
+                            modifier = Modifier.fillParentMaxSize().fillMaxWidth(),
+                            text = if (q.isBlank()) localizedStringResource(626, "No suppliers yet") else stateValues.stringNoMatches,
+                            textColor = stateValues.PlaceholderTextColor
+                        )
+                    }
                 } else {
                     items(visibleSuppliers, key = { it.id }) { supplier ->
                         SupplierCard(
@@ -10585,7 +10911,7 @@ private fun AppConfiguration.QuickStockAddBottomSheet(
                     .padding(horizontal = 8.dp, vertical = 8.dp),
                 text = localizedStringResource(637, "Save item and add to cart"),
                 iconPath = stateValues.drawablePathIconCheck,
-                enabled = draft.isValidStockDraft() && stateValues.activeStoreId != null && stateValues.latestNotification == null,
+                enabled = draft.isValidStockDraft(stateValues.globalAppConfiguration) && stateValues.activeStoreId != null && stateValues.latestNotification == null,
                 confirmationRequired = false,
                 onClick = {
                     val storeId = stateValues.activeStoreId ?: return@actionButton
@@ -10825,9 +11151,19 @@ private fun AppConfiguration.StockConditionListEditor(
         mutableStateOf(values.map { it.toStockConditionDataModel().normalizedStockCondition() }.filter { visibleStockConditionText(it).isNotBlank() || it.kind != STOCK_CONDITION_KIND_CUSTOM_TEXT })
     }
 
+    fun storedCustomConditionProjection(items: List<StockConditionDataModel>): List<String> {
+        return items
+            .map { it.normalizedStockCondition() }
+            .filter { condition ->
+                condition.kind != STOCK_CONDITION_KIND_CUSTOM_TEXT ||
+                        condition.text.any { localized -> localized.value.isNotBlank() }
+            }
+            .map { it.toStoredStockCondition() }
+    }
+
     LaunchedEffect(values) {
         val next = values.map { it.toStockConditionDataModel().normalizedStockCondition() }
-        if (next.map { it.toStoredStockCondition() } != conditions.map { it.toStoredStockCondition() }) {
+        if (storedCustomConditionProjection(next) != storedCustomConditionProjection(conditions)) {
             conditions = next
         }
     }
@@ -10871,7 +11207,7 @@ private fun AppConfiguration.StockConditionListEditor(
         )
 
         conditions.forEachIndexed { index, condition ->
-            key("stock_condition_${index}_${condition.toStoredStockCondition().hashCode()}") {
+            key("stock_condition_${index}_${condition.kind}_${condition.transactionTypeIndex}") {
                 StockConditionCard(
                     index = index,
                     condition = condition,
@@ -11482,7 +11818,7 @@ private fun GoodsBatchDataModel.toDraft(
         goodsItemId = goodsItemId,
         storeId = storeId,
         supplierId = supplierId,
-        quantityText = quantity.total.toString(),
+        quantityText = stockQuantityInputTextFromAmount(quantity.total, quantity),
         quantityUnitId = quantity.id.ifBlank { fallbackUnitId },
         supplyPrice = supplyPrice,
         salePriceOverride = salePriceOverride,
@@ -11613,20 +11949,13 @@ fun AppConfiguration.StockBatchCard(
         label = "batchVerticalPushedOffset"
     )
 
-    fun dragBounds(): ClosedFloatingPointRange<Float> {
-        if (allBatchesCount <= 0) return 0f..0f
-        val min = -currentIndex * itemStepPx
-        val max = ((allBatchesCount - 1) - currentIndex) * itemStepPx
-        return min..max
-    }
-
     fun currentTargetIndex(): Int {
         if (allBatchesCount <= 0) return currentIndex
         val deltaSlots = round(dragOffsetPx / itemStepPx).toInt()
         return (currentIndex + deltaSlots).coerceIn(0, allBatchesCount - 1)
     }
 
-    Column(
+    Row(
         modifier = Modifier
             .run {
                 if (compact) widthIn(min = 176.dp, max = 240.dp) else fillMaxWidth()
@@ -11675,162 +12004,167 @@ fun AppConfiguration.StockBatchCard(
                     }
                 )
             }
-            .padding(stateValues.marginTextFieldGroup)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 16.dp, end = 12.dp, top = 14.dp, bottom = 12.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = listOfNotNull(
+                            shelfIndex?.let { "#${it + 1}" },
+                            if (isActiveShelf) localizedStringResource(265, "Active batch") else localizedStringResource(128, "Shelf batch")
+                        ).joinToString(" • "),
+                        color = if (isActiveShelf || isDragging) stateValues.AccentColor else stateValues.TextColor,
+                        fontSize = stateValues.textSize,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    Text(
+                        text = supplierName,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
                 Text(
-                    text = listOfNotNull(
-                        shelfIndex?.let { "#${it + 1}" },
-                        if (isActiveShelf) "Active shelf" else "Batch"
-                    ).joinToString(" • "),
-                    color = if (isActiveShelf || isDragging) stateValues.AccentColor else stateValues.TextColor,
-                    fontSize = stateValues.textSize,
+                    text = batch.quantity.quantityText(stateValues.appLanguage),
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.accentTextSize,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+            }
 
-                Text(
-                    text = supplierName,
-                    color = stateValues.TextColor,
-                    fontSize = stateValues.smallTextSize,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+            Spacer(modifier = Modifier.height(8.dp))
+
+            val batchPriceLines = buildList {
+                goodsItem?.promotedPriceForTransaction(
+                    transactionTypeIndex = 0,
+                    saleMethodId = SALE_METHOD_RETAIL,
+                    quantityTotal = 1.0,
+                    batch = batch
+                )?.takeIf { batch.salePriceOverride != null || it.hasPriceChange }?.let { promotedSalePrice ->
+                    add(StockPromotedPriceDisplayLine(stateValues.stringSalePrice, promotedSalePrice))
+                }
+
+                goodsItem?.promotedPriceForTransaction(
+                    transactionTypeIndex = 1,
+                    saleMethodId = SALE_METHOD_RETAIL,
+                    quantityTotal = 1.0,
+                    batch = batch
+                )?.takeIf { batch.returnPriceOverride != null || it.hasPriceChange }?.let { promotedReturnPrice ->
+                    add(StockPromotedPriceDisplayLine(stateValues.stringReturnPrice, promotedReturnPrice))
+                }
+
+                add(
+                    StockPromotedPriceDisplayLine(
+                        title = stateValues.stringSupplyPrice,
+                        promotedPrice = goodsItem?.promotedPriceForTransaction(
+                            transactionTypeIndex = 2,
+                            saleMethodId = SALE_METHOD_RETAIL,
+                            quantityTotal = batch.quantity.total.takeIf { it > 0.0 } ?: 1.0,
+                            batch = batch
+                        ) ?: PromotedPriceDataModel(originalPrice = batch.supplyPrice, finalPrice = batch.supplyPrice)
+                    )
                 )
             }
 
-            Text(
-                text = "${batch.quantity.total} ${batch.quantity.immutableUnitName.extractLocalizedString(stateValues.appLanguage).orEmpty()}",
-                color = stateValues.TextColor,
-                fontSize = stateValues.accentTextSize,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
+            StockCompactPromotionPriceInfoLines(batchPriceLines, stateValues.TextColor)
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        val batchPriceLines = buildList {
-            goodsItem?.promotedPriceForTransaction(
-                transactionTypeIndex = 0,
-                saleMethodId = SALE_METHOD_RETAIL,
-                quantityTotal = 1.0,
-                batch = batch
-            )?.takeIf { batch.salePriceOverride != null || it.hasPriceChange }?.let { promotedSalePrice ->
-                add(StockPromotedPriceDisplayLine(stateValues.stringSalePrice, promotedSalePrice))
-            }
-
-            goodsItem?.promotedPriceForTransaction(
-                transactionTypeIndex = 1,
-                saleMethodId = SALE_METHOD_RETAIL,
-                quantityTotal = 1.0,
-                batch = batch
-            )?.takeIf { batch.returnPriceOverride != null || it.hasPriceChange }?.let { promotedReturnPrice ->
-                add(StockPromotedPriceDisplayLine(stateValues.stringReturnPrice, promotedReturnPrice))
-            }
-
-            add(
-                StockPromotedPriceDisplayLine(
-                    title = stateValues.stringSupplyPrice,
-                    promotedPrice = goodsItem?.promotedPriceForTransaction(
-                        transactionTypeIndex = 2,
-                        saleMethodId = SALE_METHOD_RETAIL,
-                        quantityTotal = batch.quantity.total.takeIf { it > 0.0 } ?: 1.0,
-                        batch = batch
-                    ) ?: PromotedPriceDataModel(originalPrice = batch.supplyPrice, finalPrice = batch.supplyPrice)
+            batch.expirationDateMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let {
+                StockCardInfoLine(
+                    title = localizedStringResource(202, "Expiration"),
+                    value = it,
+                    textColor = stateValues.TextColor
                 )
-            )
-        }
+            }
 
-        StockCompactPromotionPriceInfoLines(batchPriceLines, stateValues.TextColor)
+            batch.deliveredAtMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let {
+                StockCardInfoLine(
+                    title = localizedStringResource(342, "Delivered"),
+                    value = it,
+                    textColor = stateValues.TextColor
+                )
+            }
 
-        batch.expirationDateMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let {
+            batch.manufacturedAtMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let {
+                StockCardInfoLine(
+                    title = localizedStringResource(343, "Made"),
+                    value = it,
+                    textColor = stateValues.TextColor
+                )
+            }
+
             StockCardInfoLine(
-                title = localizedStringResource(202, "Expiration"),
-                value = it,
+                title = localizedStringResource(200, "Status"),
+                value = stockBatchStatusText(batch.status),
                 textColor = stateValues.TextColor
             )
-        }
 
-        batch.deliveredAtMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let {
+            batch.shelfPosition?.takeIf { it.isNotBlank() }?.let {
+                StockCardInfoLine(
+                    title = localizedStringResource(344, "Shelf position"),
+                    value = it,
+                    textColor = stateValues.TextColor
+                )
+            }
+
             StockCardInfoLine(
-                title = localizedStringResource(342, "Delivered"),
-                value = it,
+                title = localizedStringResource(345, "Priority"),
+                value = batch.shelfPriority.toString(),
                 textColor = stateValues.TextColor
             )
+
+            if (batch.discounts.isNotEmpty()) {
+                StockCardInfoLine(
+                    title = localizedStringResource(346, "Discounts"),
+                    value = batch.discounts.size.toString(),
+                    textColor = stateValues.TextColor
+                )
+            }
+
+            if (batch.promotions.isNotEmpty()) {
+                StockCardInfoLine(
+                    title = localizedStringResource(920, "Promos"),
+                    value = batch.promotions.count { it.isActiveAt() }.takeIf { it > 0 }?.toString() ?: batch.promotions.size.toString(),
+                    textColor = stateValues.TextColor
+                )
+            }
+
+            val visibleBatchNotes = batch.additionalNotesLocalized.extractLocalizedString(stateValues.appLanguage)
+                ?: batch.additionalNotesLocalized.extractLocalizedString("main")
+                ?: batch.additionalNotes
+
+            visibleBatchNotes?.takeIf { it.isNotBlank() }?.let {
+                StockCardInfoLine(
+                    title = localizedStringResource(201, "Notes"),
+                    value = it,
+                    textColor = stateValues.TextColor
+                )
+            }
         }
 
-        batch.manufacturedAtMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let {
-            StockCardInfoLine(
-                title = localizedStringResource(343, "Made"),
-                value = it,
-                textColor = stateValues.TextColor
-            )
-        }
-
-        StockCardInfoLine(
-            title = localizedStringResource(200, "Status"),
-            value = stockBatchStatusText(batch.status),
-            textColor = stateValues.TextColor
-        )
-
-        batch.shelfPosition?.takeIf { it.isNotBlank() }?.let {
-            StockCardInfoLine(
-                title = localizedStringResource(344, "Shelf position"),
-                value = it,
-                textColor = stateValues.TextColor
-            )
-        }
-
-        StockCardInfoLine(
-            title = localizedStringResource(345, "Priority"),
-            value = batch.shelfPriority.toString(),
-            textColor = stateValues.TextColor
-        )
-
-        if (batch.discounts.isNotEmpty()) {
-            StockCardInfoLine(
-                title = localizedStringResource(346, "Discounts"),
-                value = batch.discounts.size.toString(),
-                textColor = stateValues.TextColor
-            )
-        }
-
-        if (batch.promotions.isNotEmpty()) {
-            StockCardInfoLine(
-                title = localizedStringResource(920, "Promos"),
-                value = batch.promotions.count { it.isActiveAt() }.takeIf { it > 0 }?.toString() ?: batch.promotions.size.toString(),
-                textColor = stateValues.TextColor
-            )
-        }
-
-        val visibleBatchNotes = batch.additionalNotesLocalized.extractLocalizedString(stateValues.appLanguage)
-            ?: batch.additionalNotesLocalized.extractLocalizedString("main")
-            ?: batch.additionalNotes
-
-        visibleBatchNotes?.takeIf { it.isNotBlank() }?.let {
-            StockCardInfoLine(
-                title = localizedStringResource(201, "Notes"),
-                value = it,
-                textColor = stateValues.TextColor
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier
+                .padding(end = 12.dp, top = 14.dp, start = 4.dp, bottom = 12.dp),
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             actionButton(
-                modifier = Modifier.weight(1f),
                 text = "",
                 iconPath = stateValues.drawablePathIconEdit,
                 iconContentDescription = stateValues.drawablePathIconEdit,
@@ -11838,7 +12172,6 @@ fun AppConfiguration.StockBatchCard(
             )
 
             actionButton(
-                modifier = Modifier.weight(1f),
                 text = "",
                 iconPath = stateValues.drawablePathIconStock,
                 iconContentDescription = "Shelf",
@@ -11847,7 +12180,6 @@ fun AppConfiguration.StockBatchCard(
             )
 
             actionButton(
-                modifier = Modifier.weight(1f),
                 text = "",
                 enabledColor = stateValues.ErrorColor,
                 iconPath = stateValues.drawablePathIconDelete,
@@ -11992,6 +12324,11 @@ fun AppConfiguration.StockBatchEditor(
         ?.takeIf { it.isUsable }
         ?.let { addStockExpirationPeriod(currentStockLocalDate(), it).toStockDateInputText() }
 
+    val selectedQuantityUnit = stateValues.globalAppConfiguration.goodsItemsQuantityUnits
+        .find { it.id == draft.quantityUnitId }
+        ?: defaultUnit
+    val selectedQuantityAllowsFraction = selectedQuantityUnit.allowsFractionalStockQuantityInput()
+
     Column(
         modifier = modifier.fillMaxSize()
     ) {
@@ -12043,13 +12380,22 @@ fun AppConfiguration.StockBatchEditor(
                     modifier = Modifier.fillMaxWidth(),
                     value = draft.quantityText,
                     placeholder = localizedStringResource(271, "Quantity"),
-                    keyboardType = KeyboardType.Decimal,
+                    keyboardType = if (selectedQuantityAllowsFraction) KeyboardType.Decimal else KeyboardType.Number,
                     leadingIconPath = stateValues.drawablePathIconStock,
-                    onValueChange = {
-                        if (it.isEmpty() || it.isNumericalDoubleString()) {
-                            draft = draft.copy(quantityText = it)
+                    onTransformValue = { raw -> sanitizeStockQuantityInput(raw, selectedQuantityAllowsFraction) },
+                    onValueChange = { value ->
+                        if (value.isStockQuantityInputText(selectedQuantityAllowsFraction)) {
+                            draft = draft.copy(quantityText = value)
                         }
                     }
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                StockQuantityQuickFillButtons(
+                    quantityUnit = selectedQuantityUnit,
+                    currentText = draft.quantityText,
+                    onAmountSelected = { selectedAmount -> draft = draft.copy(quantityText = selectedAmount) }
                 )
 
                 Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
@@ -12065,8 +12411,17 @@ fun AppConfiguration.StockBatchEditor(
                         )
                     },
                     placeholder = localizedStringResource(188, "Select unit"),
-                    onSelected = {
-                        draft = draft.copy(quantityUnitId = it)
+                    onSelected = { selectedUnitId ->
+                        val nextUnit = stateValues.globalAppConfiguration.goodsItemsQuantityUnits
+                            .find { unit -> unit.id == selectedUnitId }
+                            ?: selectedQuantityUnit
+                        draft = draft.copy(
+                            quantityUnitId = selectedUnitId,
+                            quantityText = sanitizeStockQuantityInput(
+                                draft.quantityText,
+                                nextUnit.allowsFractionalStockQuantityInput()
+                            )
+                        )
                     }
                 )
 
@@ -12165,6 +12520,7 @@ fun AppConfiguration.StockBatchEditor(
                 StockPromotionListEditor(
                     promotions = draft.promotions,
                     onPromotionsChanged = { draft = draft.copy(promotions = it.sanitizedStockPromotions()) },
+                    quantityUnit = selectedQuantityUnit,
                     allowApplyToSameSupplier = draft.supplierId?.isNotBlank() == true,
                     applyToSameSupplier = applyPromotionsToSameSupplier,
                     onApplyToSameSupplierChanged = { applyPromotionsToSameSupplier = it }
@@ -12213,7 +12569,7 @@ fun AppConfiguration.StockBatchEditor(
                 modifier = Modifier.weight(1f),
                 text = stateValues.stringConfirm,
                 enabled = !isSavingBatch &&
-                        draft.quantityText.toDoubleOrNull()?.let { it > 0.0 } == true &&
+                        parseStockQuantityInputText(draft.quantityText, selectedQuantityUnit)?.let { it > 0.0 } == true &&
                         draft.supplyPrice.price.toDoubleOrNull()?.let { it >= 0.0 } == true,
                 onClick = {
                     if (!isSavingBatch) {
@@ -12231,8 +12587,8 @@ fun AppConfiguration.StockBatchEditor(
                         storeId = goodsItem.storeId,
                         supplierId = draft.supplierId?.takeIf { it.isNotBlank() },
                         supplierOrderId = existingBatch?.supplierOrderId,
-                        quantity = quantityUnit.copy(
-                            total = draft.quantityText.toDoubleOrNull() ?: 0.0
+                        quantity = quantityUnit.withStockQuantityInputTotalValue(
+                            parseStockQuantityInputText(draft.quantityText, quantityUnit) ?: 0.0
                         ),
                         supplyPrice = draft.supplyPrice.copy(supplierId = draft.supplierId.orEmpty()),
                         salePriceOverride = draft.salePriceOverride?.takeIf { it.price.isNotBlank() },
@@ -12472,6 +12828,7 @@ private fun AppConfiguration.StockLocationAvailabilityCard(
         ?: "0"
     val isCurrent = location.storeId == currentStoreId
     val typeText = if (location.isParentStore) localizedStringResource(568, "Parent warehouse") else localizedStringResource(569, "Branch warehouse")
+    val stockMoveIconPath = stockBatchMovementIconPath()
 
     Column(
         modifier = Modifier
@@ -12549,7 +12906,7 @@ private fun AppConfiguration.StockLocationAvailabilityCard(
 
         if (movableBatches.isEmpty()) {
             Text(
-                text = if (isCurrent) localizedStringResource(1176, "No sendable batches here") else localizedStringResource(571, "No movable batches here"),
+                text = if (isCurrent) localizedStringResource(1208, "No sendable batches here") else localizedStringResource(571, "No movable batches here"),
                 color = stateValues.PlaceholderTextColor,
                 fontSize = stateValues.smallTextSize
             )
@@ -12580,9 +12937,11 @@ private fun AppConfiguration.StockLocationAvailabilityCard(
                         )
                     }
                     actionButton(
-                        text = if (isCurrent) localizedStringResource(1177, "Send") else localizedStringResource(551, "Import"),
+                        text = "",
                         fillMaxWidthIfTextPresent = false,
-                        iconPath = if (isCurrent) stateValues.drawablePathIconSwitch else stateValues.drawablePathIconAdd,
+                        iconPath = stockMoveIconPath,
+                        iconRes = stockBatchMovementIconFallback(),
+                        iconContentDescription = localizedStringResource(1209, "Move this batch"),
                         confirmationRequired = false,
                         onClick = { onMoveBatch(batch, if (isCurrent) null else currentStoreId) }
                     )
@@ -12616,30 +12975,29 @@ private fun AppConfiguration.StockBatchMoveDialog(
             selectedDestinationLocation?.isParentStore == false &&
             activeLocation?.isParentStore != true
 
+    var quantityText by rememberSaveable(sourceBatch.id) {
+        mutableStateOf(sourceBatch.quantity.total.quantityAmountText(sourceBatch.quantity.roundTotal))
+    }
     var movementNoteLocalized by remember(sourceBatch.id, selectedDestinationId) {
         mutableStateOf(emptyLocalizedItemForCurrentLanguage())
     }
 
-    Dialog(onDismissRequest = onDismiss) {
+    val stockMoveIconPath = stockBatchMovementIconPath()
+    val moveQuantityAllowsFraction = sourceBatch.quantity.allowsFractionalStockQuantityInput()
+    val quantityValue = parseStockQuantityInputText(quantityText, sourceBatch.quantity) ?: 0.0
+    val canMove = selectedDestinationId.isNotBlank() && quantityValue > 0.0 && quantityValue <= sourceBatch.quantity.total
+
+    AitaBottomSheet(
+        title = localizedStringResource(550, "Move batch"),
+        iconPath = stockMoveIconPath,
+        onDismiss = onDismiss
+    ) {
         Column(
             modifier = Modifier
-                .widthIn(max = stateValues.boundWidgetWidth)
                 .fillMaxWidth()
-                .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
-                .clip(RoundedCornerShape(stateValues.cornerRadius))
-                .background(stateValues.BackgroundColor)
-                .border(stateValues.focusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
-                .padding(stateValues.marginTextFieldGroup)
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
         ) {
-            Text(
-                text = localizedStringResource(550, "Move batch"),
-                color = stateValues.TextColor,
-                fontSize = stateValues.titleTextSize,
-                fontWeight = FontWeight.Bold
-            )
-
-            Spacer(modifier = Modifier.height(stateValues.marginTextField))
-
             Text(
                 text = "${localizedStringResource(554, "Source")}: ${sourceLocation?.name?.visibleLocalizedString(stateValues.appLanguage, sourceBatch.storeId) ?: sourceBatch.storeId}",
                 color = stateValues.PlaceholderTextColor,
@@ -12655,16 +13013,22 @@ private fun AppConfiguration.StockBatchMoveDialog(
 
             Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
-            val quantityField = genericTextField(
+            genericTextField(
+                modifier = Modifier.fillMaxWidth(),
                 titleText = localizedStringResource(555, "Quantity to move"),
                 placeholderText = stateValues.stringEnterQuantity,
-                valueInitial = sourceBatch.quantity.total.quantityAmountText(sourceBatch.quantity.roundTotal),
-                keyboardType = KeyboardType.Number,
-                onFilterValue = { text -> text.isEmpty() || text.replace(',', '.').isNumericalDoubleString() },
+                valueInitial = quantityText,
+                keyboardType = if (moveQuantityAllowsFraction) KeyboardType.Decimal else KeyboardType.Number,
+                onFilterValue = { text -> text.isStockQuantityInputText(moveQuantityAllowsFraction) },
+                onTransformValue = { raw -> sanitizeStockQuantityInput(raw, moveQuantityAllowsFraction) },
                 onContentValidityCheck = { text ->
-                    text.replace(',', '.').toDoubleOrNull()?.let { it > 0.0 && it <= sourceBatch.quantity.total } == true
+                    parseStockQuantityInputText(text, sourceBatch.quantity)?.let { it > 0.0 && it <= sourceBatch.quantity.total } == true
                 },
-                contentInvalidText = stateValues.stringEnterQuantity
+                contentInvalidText = stateValues.stringEnterQuantity,
+                onValueChange = { value, applyChange ->
+                    quantityText = value
+                    applyChange()
+                }
             )
 
             Spacer(modifier = Modifier.height(stateValues.marginTextField))
@@ -12679,7 +13043,14 @@ private fun AppConfiguration.StockBatchMoveDialog(
             Spacer(modifier = Modifier.height(6.dp))
 
             if (destinationOptions.isEmpty()) {
-                MessageText(text = localizedStringResource(558, "No other locations"))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = stateValues.textFieldHeight * 2f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    MessageText(text = localizedStringResource(558, "No other locations"))
+                }
             } else {
                 destinationOptions.forEach { location ->
                     val selected = selectedDestinationId == location.storeId
@@ -12739,8 +13110,8 @@ private fun AppConfiguration.StockBatchMoveDialog(
                 Spacer(modifier = Modifier.height(6.dp))
                 MessageText(
                     text = localizedStringResource(
-                        1168,
-                        "This branch-to-branch transfer will be sent en route. The receiving branch will accept it before it becomes shelf stock."
+                        1211,
+                        "The receiving branch will accept this batch before it becomes shelf stock."
                     )
                 )
             }
@@ -12759,48 +13130,48 @@ private fun AppConfiguration.StockBatchMoveDialog(
             )
 
             Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+        }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                actionButton(
-                    modifier = Modifier.weight(1f),
-                    text = stateValues.stringCancel,
-                    enabledColor = stateValues.DisabledColor,
-                    confirmationRequired = false,
-                    onClick = onDismiss
-                )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            actionButton(
+                modifier = Modifier.weight(1f),
+                text = stateValues.stringCancel,
+                iconPath = stateValues.drawablePathIconCancel,
+                iconRes = stateValues.drawableResIconCancel.value,
+                enabledColor = stateValues.DisabledColor,
+                confirmationRequired = false,
+                onClick = onDismiss
+            )
 
-                val quantityValue = quantityField.value.text.replace(',', '.').toDoubleOrNull() ?: 0.0
-                val canMove = selectedDestinationId.isNotBlank() && quantityValue > 0.0 && quantityValue <= sourceBatch.quantity.total
-
-                actionButton(
-                    modifier = Modifier.weight(1f),
-                    text = if (willRequireReceivingAcceptance) localizedStringResource(1169, "Send en route") else localizedStringResource(549, "Move"),
-                    enabled = canMove,
-                    iconPath = stateValues.drawablePathIconSwitch,
-                    confirmationRequired = false,
-                    onClick = {
-                        moveStockBatchBetweenStores(
-                            StockBatchMoveRequestDataModel(
-                                sourceStoreId = sourceBatch.storeId,
-                                destinationStoreId = selectedDestinationId,
-                                sourceGoodsItemId = sourceBatch.goodsItemId,
-                                sourceBatchId = sourceBatch.id,
-                                quantity = sourceBatch.quantity.copy(total = quantityValue),
-                                note = movementNoteLocalized.toStoredLocalizedNoteOrNull(),
-                                actorStoreId = stateValues.activeStoreId
-                            )
-                        ) { state ->
-                            if (state is DataState.Success) {
-                                onMoved()
-                                onDismiss()
-                            }
+            actionButton(
+                modifier = Modifier.weight(1f),
+                text = if (willRequireReceivingAcceptance) localizedStringResource(1210, "Send en route") else localizedStringResource(549, "Move"),
+                enabled = canMove,
+                iconPath = stockMoveIconPath,
+                iconRes = stockBatchMovementIconFallback(),
+                confirmationRequired = false,
+                onClick = {
+                    moveStockBatchBetweenStores(
+                        StockBatchMoveRequestDataModel(
+                            sourceStoreId = sourceBatch.storeId,
+                            destinationStoreId = selectedDestinationId,
+                            sourceGoodsItemId = sourceBatch.goodsItemId,
+                            sourceBatchId = sourceBatch.id,
+                            quantity = sourceBatch.quantity.withStockQuantityInputTotalValue(quantityValue),
+                            note = movementNoteLocalized.toStoredLocalizedNoteOrNull(),
+                            actorStoreId = stateValues.activeStoreId
+                        )
+                    ) { state ->
+                        if (state is DataState.Success) {
+                            onMoved()
+                            onDismiss()
                         }
                     }
-                )
-            }
+                }
+            )
         }
     }
 }
@@ -12955,6 +13326,7 @@ private fun AppConfiguration.IncomingStockBatchTransferCard(
     val destinationName = destination?.name?.visibleLocalizedString(stateValues.appLanguage, movement?.destinationStoreId.orEmpty())
         ?: movement?.destinationStoreId.orEmpty()
     var deciding by remember(batch.id, movement?.id) { mutableStateOf(false) }
+    val stockMoveIconPath = stockBatchMovementIconPath()
 
     Column(
         modifier = Modifier
@@ -12979,8 +13351,8 @@ private fun AppConfiguration.IncomingStockBatchTransferCard(
             ) {
                 CpImage(
                     modifier = Modifier.size(24.dp),
-                    url = stateValues.drawablePathIconSwitch,
-                    fallbackRes = Res.drawable._24_0,
+                    url = stockMoveIconPath,
+                    fallbackRes = stockBatchMovementIconFallback(),
                     contentDescription = localizedStringResource(1190, "Incoming transfer"),
                     tintColor = stateValues.AccentTextColor
                 )
@@ -13421,7 +13793,17 @@ fun AppConfiguration.StockSupplierPricesPage(
             ?.firstOrNull()
             ?.code
         ?: "KZT"
-    val defaultUnit = stateValues.globalAppConfiguration.goodsItemsQuantityUnits.firstOrNull()
+    val defaultUnit = stateValues.globalAppConfiguration.goodsItemsQuantityUnits
+        .find { it.id == goodsItem.measurementUnitId }
+        ?: stateValues.globalAppConfiguration.goodsItemsQuantityUnits.firstOrNull()
+    val supplierQuantityUnit = defaultUnit ?: QuantityDataModel(
+        id = goodsItem.measurementUnitId,
+        immutableUnitName = emptyList(),
+        total = 1.0,
+        pricedAmount = 1.0,
+        roundTotal = goodsItem.measurementUnitId == "0"
+    )
+    val supplierQuantityAllowsFraction = supplierQuantityUnit.allowsFractionalStockQuantityInput()
 
     var searchText by rememberSaveable(goodsItem.id) { mutableStateOf("") }
     var selectedSupplierId by rememberSaveable(goodsItem.id) { mutableStateOf(suppliers.firstOrNull()?.id.orEmpty()) }
@@ -13454,8 +13836,12 @@ fun AppConfiguration.StockSupplierPricesPage(
             supplierGoodsName = it.supplierGoodsName.orEmpty()
             supplierBarcode = it.supplierBarcode.orEmpty()
             supplyPriceText = it.supplyPrice.price
-            minOrderText = it.minOrderQuantity?.total?.toString().orEmpty()
-            packageText = it.packageQuantity?.total?.toString().orEmpty()
+            minOrderText = it.minOrderQuantity
+                ?.let { quantity -> stockQuantityInputTextFromAmount(quantity.total, quantity) }
+                .orEmpty()
+            packageText = it.packageQuantity
+                ?.let { quantity -> stockQuantityInputTextFromAmount(quantity.total, quantity) }
+                .orEmpty()
         }
     }
 
@@ -13649,20 +14035,28 @@ fun AppConfiguration.StockSupplierPricesPage(
                                 modifier = Modifier.weight(1f),
                                 value = minOrderText,
                                 placeholder = localizedStringResource(337, "Min order"),
-                                keyboardType = KeyboardType.Decimal,
+                                keyboardType = if (supplierQuantityAllowsFraction) KeyboardType.Decimal else KeyboardType.Number,
                                 leadingIconPath = stateValues.drawablePathIconStock,
-                                onTransformValue = { raw -> raw.filter { it.isDigit() || it == '.' || it == ',' }.replace(',', '.') },
-                                onValueChange = { minOrderText = it }
+                                onTransformValue = { raw -> sanitizeStockQuantityInput(raw, supplierQuantityAllowsFraction) },
+                                onValueChange = { value ->
+                                    if (value.isStockQuantityInputText(supplierQuantityAllowsFraction)) {
+                                        minOrderText = value
+                                    }
+                                }
                             )
 
                             SimpleTextInput(
                                 modifier = Modifier.weight(1f),
                                 value = packageText,
                                 placeholder = localizedStringResource(338, "Package qty"),
-                                keyboardType = KeyboardType.Decimal,
+                                keyboardType = if (supplierQuantityAllowsFraction) KeyboardType.Decimal else KeyboardType.Number,
                                 leadingIconPath = stateValues.drawablePathIconStock,
-                                onTransformValue = { raw -> raw.filter { it.isDigit() || it == '.' || it == ',' }.replace(',', '.') },
-                                onValueChange = { packageText = it }
+                                onTransformValue = { raw -> sanitizeStockQuantityInput(raw, supplierQuantityAllowsFraction) },
+                                onValueChange = { value ->
+                                    if (value.isStockQuantityInputText(supplierQuantityAllowsFraction)) {
+                                        packageText = value
+                                    }
+                                }
                             )
                         }
 
@@ -13673,7 +14067,7 @@ fun AppConfiguration.StockSupplierPricesPage(
                             iconPath = stateValues.drawablePathIconCheck,
                             enabled = selectedSupplierId.isNotBlank() && supplyPriceText.toDoubleOrNull() != null,
                             onClick = {
-                                val unit = defaultUnit
+                                val unit = supplierQuantityUnit
                                 upsertSupplierGoodsPrice(
                                     SupplierGoodsPriceDataModel(
                                         storeId = storeId,
@@ -13684,28 +14078,12 @@ fun AppConfiguration.StockSupplierPricesPage(
                                             currency = defaultCurrency,
                                             supplierId = selectedSupplierId
                                         ),
-                                        minOrderQuantity = unit?.let { u ->
-                                            minOrderText.toDoubleOrNull()?.let { total ->
-                                                QuantityDataModel(
-                                                    id = u.id,
-                                                    immutableUnitName = u.immutableUnitName,
-                                                    total = total,
-                                                    pricedAmount = 1.0,
-                                                    roundTotal = u.roundTotal
-                                                )
-                                            }
-                                        },
-                                        packageQuantity = unit?.let { u ->
-                                            packageText.toDoubleOrNull()?.let { total ->
-                                                QuantityDataModel(
-                                                    id = u.id,
-                                                    immutableUnitName = u.immutableUnitName,
-                                                    total = total,
-                                                    pricedAmount = 1.0,
-                                                    roundTotal = u.roundTotal
-                                                )
-                                            }
-                                        },
+                                        minOrderQuantity = parseStockQuantityInputText(minOrderText, unit)
+                                            ?.takeIf { it > 0.0 }
+                                            ?.let { total -> unit.withStockQuantityInputTotalValue(total) },
+                                        packageQuantity = parseStockQuantityInputText(packageText, unit)
+                                            ?.takeIf { it > 0.0 }
+                                            ?.let { total -> unit.withStockQuantityInputTotalValue(total) },
                                         supplierBarcode = supplierBarcode.takeIf { it.isNotBlank() },
                                         supplierGoodsName = supplierGoodsName.takeIf { it.isNotBlank() }
                                     )
@@ -13764,8 +14142,12 @@ fun AppConfiguration.StockSupplierPricesPage(
                                 supplierGoodsName = supplierPrice.supplierGoodsName.orEmpty()
                                 supplierBarcode = supplierPrice.supplierBarcode.orEmpty()
                                 supplyPriceText = supplierPrice.supplyPrice.price
-                                minOrderText = supplierPrice.minOrderQuantity?.total?.toString().orEmpty()
-                                packageText = supplierPrice.packageQuantity?.total?.toString().orEmpty()
+                                minOrderText = supplierPrice.minOrderQuantity
+                                    ?.let { quantity -> stockQuantityInputTextFromAmount(quantity.total, quantity) }
+                                    .orEmpty()
+                                packageText = supplierPrice.packageQuantity
+                                    ?.let { quantity -> stockQuantityInputTextFromAmount(quantity.total, quantity) }
+                                    .orEmpty()
                             }
                             .padding(stateValues.marginTextFieldGroup)
                     ) {
@@ -13810,18 +14192,18 @@ fun AppConfiguration.StockSupplierPricesPage(
                             StockCardInfoLine(stateValues.stringBarcode, it, stateValues.TextColor)
                         }
 
-                        supplierPrice.minOrderQuantity?.let {
+                        supplierPrice.minOrderQuantity?.let { quantity ->
                             StockCardInfoLine(
                                 localizedStringResource(337, "Min order"),
-                                "${it.total} ${it.immutableUnitName.visibleLocalizedString(stateValues.appLanguage, it.id)}",
+                                quantity.quantityText(stateValues.appLanguage),
                                 stateValues.TextColor
                             )
                         }
 
-                        supplierPrice.packageQuantity?.let {
+                        supplierPrice.packageQuantity?.let { quantity ->
                             StockCardInfoLine(
                                 localizedStringResource(338, "Package qty"),
-                                "${it.total} ${it.immutableUnitName.visibleLocalizedString(stateValues.appLanguage, it.id)}",
+                                quantity.quantityText(stateValues.appLanguage),
                                 stateValues.TextColor
                             )
                         }
@@ -14099,7 +14481,7 @@ private fun AppConfiguration.stockLanguageDomains(): List<SelectableDomain> {
         iconRes = null
     )
 
-    return listOf(defaultDomain) + stateValues.globalAppConfiguration.languages.map { language ->
+    return (listOf(defaultDomain) + stateValues.globalAppConfiguration.languages.map { language ->
         SelectableDomain(
             id = language.language,
             displayId = language.language.uppercase().toLocalizedSingleMain(),
@@ -14107,7 +14489,7 @@ private fun AppConfiguration.stockLanguageDomains(): List<SelectableDomain> {
             iconPath = null,
             iconRes = language.mapIconRes()
         )
-    }
+    }).distinctBy { it.id.lowercase() }
 }
 
 private fun AppConfiguration.stockCurrencyDomains(): List<SelectableDomain> {
@@ -14254,27 +14636,53 @@ private fun AppConfiguration.StockLocalizedStringGroupEditor(
     val languageDomains = stockLanguageDomains()
     val textOnlyDomain = stockTextOnlyDomain()
 
+    fun languageKey(id: String): String = id.trim().lowercase()
+
+    fun sanitizeEditorItems(items: List<DomainSelectionTextFieldGroupItemContent>): List<DomainSelectionTextFieldGroupItemContent> {
+        val used = mutableSetOf<String>()
+        return items.mapNotNull { rawItem ->
+            val requestedId = rawItem.selectedSecondaryDomainId.takeIf { it.isNotBlank() } ?: fallbackLanguageId
+            val requestedKey = languageKey(requestedId)
+            val resolvedId = if (requestedKey !in used) {
+                requestedId
+            } else {
+                languageDomains.firstOrNull { languageKey(it.id) !in used }?.id ?: return@mapNotNull null
+            }
+            used += languageKey(resolvedId)
+            rawItem.copy(selectedSecondaryDomainId = resolvedId)
+        }.ifEmpty {
+            listOf(
+                DomainSelectionTextFieldGroupItemContent(
+                    value = TextFieldValue(""),
+                    selectedDomainId = "text",
+                    selectedSecondaryDomainId = fallbackLanguageId,
+                    isContentValid = true
+                )
+            )
+        }
+    }
+
     var focusTargetIndex by rememberSaveable {
         mutableStateOf(-1)
     }
 
     var data by rememberSaveable {
-        mutableStateOf(values.toDomainSelectionItems(fallbackLanguageId))
+        mutableStateOf(sanitizeEditorItems(values.toDomainSelectionItems(fallbackLanguageId)))
     }
 
     val persistentEditorKey = localizedGroupEditorPersistentKey(persistentKey)
 
-    LaunchedEffect(persistentEditorKey, fallbackLanguageId) {
+    LaunchedEffect(persistentEditorKey, fallbackLanguageId, languageDomains.map { it.id }) {
         val key = persistentEditorKey ?: return@LaunchedEffect
         val restored = getPersistentUiDraftValue?.invoke(key)
             ?.toLocalizedGroupEditorItemsOrNull(fallbackLanguageId)
         if (!restored.isNullOrEmpty()) {
-            data = restored
+            data = sanitizeEditorItems(restored)
         }
     }
 
-    LaunchedEffect(values, fallbackLanguageId) {
-        val next = values.toDomainSelectionItems(fallbackLanguageId)
+    LaunchedEffect(values, fallbackLanguageId, languageDomains.map { it.id }) {
+        val next = sanitizeEditorItems(values.toDomainSelectionItems(fallbackLanguageId))
         val current = values
             .map { it.copy(value = it.value.trim()) }
             .filter { it.language.isNotBlank() && it.value.isNotBlank() }
@@ -14286,36 +14694,41 @@ private fun AppConfiguration.StockLocalizedStringGroupEditor(
         }
     }
 
-    val usedLanguageIds = data.map { it.selectedSecondaryDomainId }.filter { it.isNotBlank() }.toSet()
-    val availableLanguageDomains = languageDomains.filter { it.id !in usedLanguageIds }
+    val sanitizedData = sanitizeEditorItems(data)
+    LaunchedEffect(sanitizedData) {
+        if (sanitizedData != data) data = sanitizedData
+    }
+
+    val usedLanguageIds = sanitizedData.map { languageKey(it.selectedSecondaryDomainId) }.filter { it.isNotBlank() }.toSet()
+    val availableLanguageDomains = languageDomains.filter { languageKey(it.id) !in usedLanguageIds }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        data.forEachIndexed { index, item ->
+        sanitizedData.forEachIndexed { index, item ->
+            val usedByOtherRows = sanitizedData.mapIndexedNotNull { otherIndex, otherItem ->
+                if (otherIndex == index) null else languageKey(otherItem.selectedSecondaryDomainId)
+            }.toSet()
+            val currentLanguageId = item.selectedSecondaryDomainId.takeIf { it.isNotBlank() } ?: fallbackLanguageId
+            val safeSelectedLanguageId = currentLanguageId
+                .takeIf { languageKey(it) !in usedByOtherRows }
+                ?: languageDomains.firstOrNull { languageKey(it.id) !in usedByOtherRows }?.id
+                ?: fallbackLanguageId
+
             val rowLanguageDomains = (
-                    listOfNotNull(languageDomains.find { it.id == item.selectedSecondaryDomainId }) +
-                            languageDomains.filter { it.id !in usedLanguageIds || it.id == item.selectedSecondaryDomainId }
+                    listOfNotNull(languageDomains.find { languageKey(it.id) == languageKey(safeSelectedLanguageId) }) +
+                            languageDomains.filter { languageKey(it.id) !in usedByOtherRows }
                     )
-                .distinctBy { it.id }
+                .distinctBy { languageKey(it.id) }
 
             val instance = domainSelectionTextField(
                 titleText = if (index == 0) title else "$title ${index + 1}",
                 placeholderText = placeholder,
                 valueInitial = item.value.text,
-                titleIconButtonPath = if (data.size == 1) null else stateValues.drawablePathIconDelete,
-                onTitleIconButtonClick = if (data.size == 1) null else {
+                titleIconButtonPath = if (sanitizedData.size == 1) null else stateValues.drawablePathIconDelete,
+                onTitleIconButtonClick = if (sanitizedData.size == 1) null else {
                     {
-                        data = data.toMutableList().also { list ->
+                        data = sanitizeEditorItems(sanitizedData.toMutableList().also { list ->
                             if (index in list.indices) list.removeAt(index)
-                        }.ifEmpty {
-                            listOf(
-                                DomainSelectionTextFieldGroupItemContent(
-                                    value = TextFieldValue(""),
-                                    selectedDomainId = "text",
-                                    selectedSecondaryDomainId = fallbackLanguageId,
-                                    isContentValid = true
-                                )
-                            )
-                        }
+                        })
                         focusTargetIndex = (index - 1).coerceAtLeast(0)
                     }
                 },
@@ -14324,7 +14737,7 @@ private fun AppConfiguration.StockLocalizedStringGroupEditor(
                 selectionEnabled = false,
                 displayFullDomain = false,
                 secondaryDomains = rowLanguageDomains,
-                selectedSecondaryInitial = item.selectedSecondaryDomainId.takeIf { it.isNotBlank() }
+                selectedSecondaryInitial = safeSelectedLanguageId.takeIf { it.isNotBlank() }
                     ?: rowLanguageDomains.firstOrNull()?.id
                     ?: fallbackLanguageId,
                 secondaryDomainsShowId = true,
@@ -14341,8 +14754,14 @@ private fun AppConfiguration.StockLocalizedStringGroupEditor(
 
             Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
-            LaunchedEffect(instance.value.text, instance.selectedSecondaryId) {
-                val selectedLanguageId = instance.selectedSecondaryId ?: item.selectedSecondaryDomainId
+            LaunchedEffect(instance.value.text, instance.selectedSecondaryId, usedByOtherRows) {
+                val requestedLanguageId = instance.selectedSecondaryId ?: safeSelectedLanguageId
+                val selectedLanguageId = if (languageKey(requestedLanguageId) in usedByOtherRows) {
+                    rowLanguageDomains.firstOrNull { languageKey(it.id) !in usedByOtherRows }?.id
+                        ?: safeSelectedLanguageId
+                } else {
+                    requestedLanguageId
+                }
                 val nextItem = item.copy(
                     value = instance.value,
                     selectedDomainId = "text",
@@ -14351,19 +14770,19 @@ private fun AppConfiguration.StockLocalizedStringGroupEditor(
                 )
 
                 if (data.getOrNull(index) != nextItem) {
-                    data = data.toMutableList().also { list ->
+                    data = sanitizeEditorItems(sanitizedData.toMutableList().also { list ->
                         if (index in list.indices) list[index] = nextItem
-                    }
+                    })
                 }
             }
         }
 
-        LaunchedEffect(data, persistentEditorKey) {
+        LaunchedEffect(sanitizedData, persistentEditorKey) {
             persistentEditorKey?.let { key ->
-                setPersistentUiDraftValue?.invoke(key, data.toLocalizedGroupEditorStateString())
+                setPersistentUiDraftValue?.invoke(key, sanitizedData.toLocalizedGroupEditorStateString())
             }
 
-            val next = data.toLocalizedStringsFromLanguageSelection()
+            val next = sanitizedData.toLocalizedStringsFromLanguageSelection()
             val current = values
                 .map { it.copy(value = it.value.trim()) }
                 .filter { it.language.isNotBlank() && it.value.isNotBlank() }
@@ -14381,13 +14800,13 @@ private fun AppConfiguration.StockLocalizedStringGroupEditor(
                 iconPath = stateValues.drawablePathIconAdd
             ) {
                 val nextLanguageId = availableLanguageDomains.first().id
-                focusTargetIndex = data.size
-                data = data + DomainSelectionTextFieldGroupItemContent(
+                focusTargetIndex = sanitizedData.size
+                data = sanitizeEditorItems(sanitizedData + DomainSelectionTextFieldGroupItemContent(
                     value = TextFieldValue(""),
                     selectedDomainId = "text",
                     selectedSecondaryDomainId = nextLanguageId,
                     isContentValid = true
-                )
+                ))
             }
         }
     }
@@ -14676,6 +15095,13 @@ private fun AppConfiguration.undoTemplateIconPath(): String =
 
 private fun AppConfiguration.undoTemplateIconFallback(): DrawableResource =
     if (stateValues.appThemeId == 1L) Res.drawable._58_1 else Res.drawable._58_0
+
+private fun AppConfiguration.parentStoreStockIconPath(): String =
+    if (stateValues.appThemeId == 1L) "svg/60_1.svg" else "svg/60_0.svg"
+
+private fun AppConfiguration.parentStoreStockIconFallback(): DrawableResource =
+    if (stateValues.appThemeId == 1L) Res.drawable._60_1 else Res.drawable._60_0
+
 
 private fun AppConfiguration.stockBatchStatusText(status: StockBatchStatusDataModel): String = when (status) {
     StockBatchStatusDataModel.Ordered -> localizedStringResource(1198, "Ordered")
@@ -15128,6 +15554,362 @@ private fun AppConfiguration.GlobalGoodsPickerItemCard(
     }
 }
 
+
+private fun GoodsItemDataModel.visibleParentStoreStockName(language: String): String =
+    name.visibleLocalizedString(language, id.ifBlank { allBarcodeValues().firstOrNull().orEmpty() })
+
+private fun GoodsItemDataModel.parentStoreStockBarcodeText(): String =
+    allBarcodeValues().filter { it.isNotBlank() }.distinct().take(3).joinToString(" • ")
+
+private fun GoodsItemDataModel.matchesParentStoreStockPickerFilter(rawQuery: String): Boolean {
+    val queryTokens = rawQuery
+        .trim()
+        .lowercase()
+        .split(Regex("\\s+"))
+        .filter { it.isNotBlank() }
+
+    if (queryTokens.isEmpty()) return true
+
+    val searchableText = buildList {
+        add(id)
+        add(storeId)
+        addAll(allBarcodeValues())
+        addAll(allBarcodeValues().map { it.toStoredGoodsItemBarcode() })
+        addAll(name.map { it.value })
+        addAll(description.map { it.value })
+        add(measurementUnitId)
+        addAll(categoryIds)
+        addAll(salePrices.flatMap { listOf(it.price, it.currency, it.supplierId) })
+        addAll(supplyPrices.flatMap { listOf(it.price, it.currency, it.supplierId) })
+        addAll(returnPrices.flatMap { listOf(it.price, it.currency, it.supplierId) })
+        addAll(wholesalePrices.flatMap { listOf(it.price, it.currency, it.supplierId) })
+        note?.let { add(it) }
+        addAll(noteLocalized.map { it.value })
+        addAll(conditions)
+    }.joinToString(" ").lowercase()
+
+    return queryTokens.all { token -> searchableText.contains(token) }
+}
+
+private fun GoodsItemDataModel.toParentStoreStockTemplateDraft(
+    currentDraft: StockAddEditDraft,
+    existing: GoodsItemDataModel?
+): StockAddEditDraft {
+    val parentDraft = toStockAddEditDraft()
+    val preservedId = existing?.id ?: currentDraft.id.takeIf { it.isNotBlank() && it != id }.orEmpty()
+    return parentDraft.copy(id = preservedId)
+}
+
+@Composable
+private fun AppConfiguration.ParentStoreStockPickerItemCard(
+    item: GoodsItemDataModel,
+    barcodeMatched: Boolean,
+    onApply: () -> Unit
+) {
+    val name = item.visibleParentStoreStockName(stateValues.appLanguage)
+    val barcodeText = item.parentStoreStockBarcodeText()
+    val categoryText = item.categoryIds
+        .mapNotNull { globalGoodsCategoryName(it) }
+        .distinct()
+        .take(4)
+        .joinToString(" • ")
+    val unitText = stateValues.globalAppConfiguration.goodsItemsQuantityUnits
+        .find { it.id == item.measurementUnitId }
+        ?.immutableUnitName
+        ?.extractLocalizedString(stateValues.appLanguage)
+        ?: item.measurementUnitId.takeIf { it.isNotBlank() }
+        ?: ""
+    val salePriceText = item.salePrices.firstOrNull()?.let { price ->
+        listOf(price.price, price.currency).filter { it.isNotBlank() }.joinToString(" ")
+    }.orEmpty()
+    val supplyPriceText = item.supplyPrices.firstOrNull()?.let { price ->
+        listOf(price.price, price.currency).filter { it.isNotBlank() }.joinToString(" ")
+    }.orEmpty()
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .border(
+                stateValues.unfocusedBorderWidth,
+                if (barcodeMatched) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+                RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple(color = stateValues.AccentColor),
+                onClick = onApply
+            )
+            .padding(10.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            CpImage(
+                modifier = Modifier.size(30.dp),
+                url = parentStoreStockIconPath(),
+                fallbackRes = parentStoreStockIconFallback(),
+                contentDescription = localizedStringResource(1212, "Parent store"),
+                tintColor = if (barcodeMatched) stateValues.AccentColor else stateValues.TextColor
+            )
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = name,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.textSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = listOfNotNull(
+                        localizedStringResource(1217, "Parent stock"),
+                        item.id.take(8).takeIf { it.isNotBlank() }
+                    ).joinToString(" • "),
+                    color = if (barcodeMatched) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize,
+                    fontWeight = if (barcodeMatched) FontWeight.Bold else FontWeight.Normal,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            actionButton(
+                text = localizedStringResource(1218, "Use parent item"),
+                iconPath = parentStoreStockIconPath(),
+                fillMaxWidthIfTextPresent = false,
+                confirmationRequired = false,
+                onClick = onApply
+            )
+        }
+
+        val detailLines = listOfNotNull(
+            barcodeText.takeIf { it.isNotBlank() }?.let { "${stateValues.stringBarcode}: $it" },
+            categoryText.takeIf { it.isNotBlank() }?.let { "${stateValues.stringCategory}: $it" },
+            unitText.takeIf { it.isNotBlank() }?.let { "${stateValues.stringMeasurementUnit}: $it" },
+            salePriceText.takeIf { it.isNotBlank() }?.let { "${stateValues.stringSalePrice}: $it" },
+            supplyPriceText.takeIf { it.isNotBlank() }?.let { "${stateValues.stringSupplyPrice}: $it" }
+        )
+
+        detailLines.forEachIndexed { index, line ->
+            Spacer(modifier = Modifier.height(if (index == 0) 8.dp else 4.dp))
+            Text(
+                text = line,
+                color = stateValues.PlaceholderTextColor,
+                fontSize = stateValues.smallTextSize,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun AppConfiguration.ParentStoreStockSelectionBottomSheet(
+    activeStoreId: String,
+    draft: StockAddEditDraft,
+    existing: GoodsItemDataModel?,
+    onDismiss: () -> Unit,
+    onApply: (GoodsItemDataModel) -> Unit
+) {
+    val pickerPageSize = if (stateValues.isNarrowScreen) 18 else 32
+    val cachedParentStoreStock by parentStoreStockState.payload.collectAsState()
+    val autoFocusSearch = platformAllowsAutomaticTextFieldFocus()
+    var pickerPage by rememberSaveable(activeStoreId) { mutableStateOf(0) }
+    var serverLoadedItems by remember(activeStoreId) { mutableStateOf<List<GoodsItemDataModel>>(emptyList()) }
+    var serverEndReached by rememberSaveable(activeStoreId) { mutableStateOf(false) }
+    var loading by remember(activeStoreId) { mutableStateOf(false) }
+
+    val activeStore = stateValues.stores.findStoreOrBranchForUi(activeStoreId)
+    val parentStoreId = activeStore?.parentStoreId?.takeIf { it.isNotBlank() }
+    val parentStore = stateValues.stores.findStoreOrBranchForUi(parentStoreId)
+    val parentStoreName = parentStore
+        ?.name
+        ?.visibleLocalizedString(stateValues.appLanguage, parentStore.publicId.ifBlank { parentStore.id })
+        .orEmpty()
+
+    AitaBottomSheet(
+        title = localizedStringResource(1212, "Parent store"),
+        iconPath = parentStoreStockIconPath(),
+        onDismiss = onDismiss
+    ) {
+        Text(
+            text = listOfNotNull(
+                parentStoreName.takeIf { it.isNotBlank() },
+                localizedStringResource(1214, "Take a clean copy from the parent store stock, then adjust it for this branch.")
+            ).joinToString(" • "),
+            color = stateValues.PlaceholderTextColor,
+            fontSize = stateValues.smallTextSize,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+        Text(
+            text = localizedStringResource(1213, "Search parent stock"),
+            color = stateValues.TextColor,
+            fontSize = stateValues.accentTextSize,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 4.dp)
+        )
+
+        val searchTextFieldContent = searchTextField(
+            modifier = Modifier.fillMaxWidth(),
+            stateHost = NavigationScreenModel.Stock.AddEditGoodsItem,
+            stateKey = "stock_parent_store_sheet_search",
+            isFocusedInitial = autoFocusSearch,
+            autoFocus = autoFocusSearch,
+            barcodeCamScanner = false
+        )
+        val cleanQuery = searchTextFieldContent.value.text.trim()
+
+        LaunchedEffect(activeStoreId, cleanQuery) {
+            pickerPage = 0
+            serverLoadedItems = emptyList()
+            serverEndReached = false
+            loading = true
+            try {
+                delay(220)
+                getParentStoreStock(
+                    storeId = activeStoreId,
+                    query = cleanQuery.takeIf { it.length >= 2 },
+                    limit = pickerPageSize,
+                    offset = 0,
+                    updateSharedState = true,
+                    appendToSharedState = false
+                ).collect { state ->
+                    val payload = (state as? DataState.Success)?.payload.orEmpty()
+                    serverLoadedItems = payload
+                    serverEndReached = state is DataState.Empty || payload.size < pickerPageSize
+                }
+            } finally {
+                loading = false
+            }
+        }
+
+        LaunchedEffect(pickerPage, activeStoreId, cleanQuery, serverLoadedItems.size, serverEndReached) {
+            val desiredOffset = pickerPage * pickerPageSize
+            if (desiredOffset <= 0 || desiredOffset < serverLoadedItems.size || serverEndReached || loading) return@LaunchedEffect
+            loading = true
+            try {
+                getParentStoreStock(
+                    storeId = activeStoreId,
+                    query = cleanQuery.takeIf { it.length >= 2 },
+                    limit = pickerPageSize,
+                    offset = desiredOffset,
+                    updateSharedState = true,
+                    appendToSharedState = true
+                ).collect { state ->
+                    val payload = (state as? DataState.Success)?.payload.orEmpty()
+                    serverLoadedItems = (serverLoadedItems + payload).distinctBy { it.id }
+                    serverEndReached = state is DataState.Empty || payload.size < pickerPageSize
+                }
+            } finally {
+                loading = false
+            }
+        }
+
+        val cachedFilteredItems = cachedParentStoreStock
+            .orEmpty()
+            .filter { parentStoreId == null || it.storeId == parentStoreId }
+            .filter { it.matchesParentStoreStockPickerFilter(cleanQuery) }
+        val lookupBarcode = draft.standardBarcodeForGenericLookup()
+        val filteredItems = (serverLoadedItems + cachedFilteredItems)
+            .distinctBy { it.id }
+            .sortedWith(
+                compareByDescending<GoodsItemDataModel> { item ->
+                    lookupBarcode?.let { lookup ->
+                        item.allBarcodeValues().flatMap { it.toStoredGoodsItemBarcodeCandidates() }.any { it == lookup }
+                    } == true
+                }.thenBy { it.visibleParentStoreStockName(stateValues.appLanguage).lowercase() }
+                    .thenBy { it.id }
+            )
+        val displayItems = filteredItems.clientPaged(pickerPage, pickerPageSize)
+        val pageWaitingForServer = !serverEndReached && pickerPage * pickerPageSize >= serverLoadedItems.size
+        val totalItemsForPaging = if (serverEndReached) {
+            filteredItems.size
+        } else {
+            ((pickerPage + 2) * pickerPageSize).coerceAtLeast(filteredItems.size)
+        }
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(bottom = stateValues.screenHeight / 8)
+        ) {
+            when {
+                parentStoreId == null -> item {
+                    MessageText(
+                        modifier = Modifier.fillParentMaxSize().fillMaxWidth(),
+                        text = localizedStringResource(1219, "This active store has no parent store"),
+                        textSize = stateValues.textSize,
+                        textColor = stateValues.PlaceholderTextColor
+                    )
+                }
+
+                displayItems.isEmpty() && (loading || pageWaitingForServer) -> item {
+                    MessageText(
+                        modifier = Modifier.fillParentMaxSize().fillMaxWidth(),
+                        text = localizedStringResource(1141, "Please wait…"),
+                        textSize = stateValues.textSize,
+                        textColor = stateValues.PlaceholderTextColor
+                    )
+                }
+
+                displayItems.isEmpty() -> item {
+                    MessageText(
+                        modifier = Modifier.fillParentMaxSize().fillMaxWidth(),
+                        text = localizedStringResource(1215, "No parent store items match these filters"),
+                        textSize = stateValues.textSize,
+                        textColor = stateValues.PlaceholderTextColor
+                    )
+                }
+
+                else -> {
+                    items(displayItems, key = { it.id }) { item ->
+                        val barcodeMatched = lookupBarcode?.let { lookup ->
+                            item.allBarcodeValues().flatMap { it.toStoredGoodsItemBarcodeCandidates() }.any { it == lookup }
+                        } == true
+                        ParentStoreStockPickerItemCard(
+                            item = item,
+                            barcodeMatched = barcodeMatched,
+                            onApply = { onApply(item) }
+                        )
+                    }
+
+                    if (loading) {
+                        item {
+                            MessageText(
+                                modifier = Modifier.fillMaxWidth().height(48.dp),
+                                text = localizedStringResource(1188, "Loading more goods…"),
+                                textSize = stateValues.smallTextSize,
+                                textColor = stateValues.PlaceholderTextColor
+                            )
+                        }
+                    }
+
+                    item {
+                        PagingControls(
+                            page = pickerPage,
+                            totalItems = totalItemsForPaging,
+                            pageSize = pickerPageSize,
+                            onPageChange = { pickerPage = it.coerceAtLeast(0) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun AppConfiguration.GlobalGoodsSelectionBottomSheet(
     draft: StockAddEditDraft,
@@ -15307,7 +16089,7 @@ private fun AppConfiguration.GlobalGoodsSelectionBottomSheet(
             when {
                 displayItems.isEmpty() && (loading || pageWaitingForServer) -> item {
                     MessageText(
-                        modifier = Modifier.fillMaxWidth().height(64.dp),
+                        modifier = Modifier.fillParentMaxSize().fillMaxWidth(),
                         text = localizedStringResource(1141, "Please wait…"),
                         textSize = stateValues.textSize,
                         textColor = stateValues.PlaceholderTextColor
@@ -15316,7 +16098,7 @@ private fun AppConfiguration.GlobalGoodsSelectionBottomSheet(
 
                 displayItems.isEmpty() -> item {
                     MessageText(
-                        modifier = Modifier.fillMaxWidth().height(64.dp),
+                        modifier = Modifier.fillParentMaxSize().fillMaxWidth(),
                         text = localizedStringResource(1189, "No global goods match these filters"),
                         textSize = stateValues.textSize,
                         textColor = stateValues.PlaceholderTextColor
@@ -15674,6 +16456,18 @@ private fun AppConfiguration.StockAddEditPricesTab(
     contentFillFraction: Float = if (stateValues.isNarrowScreen) 1f else 0.92f,
     onDraftChanged: (StockAddEditDraft) -> Unit
 ) {
+    val wholesaleQuantityUnit = stateValues.globalAppConfiguration.goodsItemsQuantityUnits
+        .find { it.id == draft.measurementUnitId }
+        ?: stateValues.globalAppConfiguration.goodsItemsQuantityUnits.firstOrNull()
+        ?: QuantityDataModel(
+            id = draft.measurementUnitId,
+            immutableUnitName = emptyList(),
+            total = 1.0,
+            pricedAmount = 1.0,
+            roundTotal = draft.measurementUnitId == "0"
+        )
+    val wholesaleAllowsFraction = wholesaleQuantityUnit.allowsFractionalStockQuantityInput()
+
     LazyColumn(
         modifier = modifier
             .fillMaxWidth(contentFillFraction)
@@ -15750,16 +16544,27 @@ private fun AppConfiguration.StockAddEditPricesTab(
                 titleText = localizedStringResource(248, "Wholesale minimum quantity"),
                 valueInitial = draft.wholesaleMinQuantityText,
                 placeholderText = localizedStringResource(249, "Enter wholesale minimum quantity"),
-                keyboardType = KeyboardType.Decimal,
+                keyboardType = if (wholesaleAllowsFraction) KeyboardType.Decimal else KeyboardType.Number,
                 leadingIconPath = stateValues.drawablePathIconStock,
                 showClearButton = true,
                 contentInvalidText = localizedStringResource(251, "Not enough for wholesale"),
-                onFilterValue = { value -> value.isEmpty() || value.isNumericalDoubleString() },
+                onFilterValue = { value -> value.isStockQuantityInputText(wholesaleAllowsFraction) },
+                onTransformValue = { raw -> sanitizeStockQuantityInput(raw, wholesaleAllowsFraction) },
                 onValueChange = { value, applyChange ->
-                    if (value.isEmpty() || value.isNumericalDoubleString()) {
+                    if (value.isStockQuantityInputText(wholesaleAllowsFraction)) {
                         applyChange()
                         onDraftChanged(draft.copy(wholesaleMinQuantityText = value))
                     }
+                }
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            StockQuantityQuickFillButtons(
+                quantityUnit = wholesaleQuantityUnit,
+                currentText = draft.wholesaleMinQuantityText,
+                onAmountSelected = { selectedAmount ->
+                    onDraftChanged(draft.copy(wholesaleMinQuantityText = selectedAmount))
                 }
             )
 
@@ -15941,6 +16746,7 @@ private fun AppConfiguration.SupplierOrdersForGoodsItemContent(
         .find { it.id == goodsItem?.measurementUnitId }
         ?: stateValues.globalAppConfiguration.goodsItemsQuantityUnits.firstOrNull()
         ?: QuantityDataModel("0", "unit".toLocalizedSingleMain(), total = 1.0, pricedAmount = 1.0, roundTotal = false)
+    val supplierOrderQuantityAllowsFraction = defaultUnit.allowsFractionalStockQuantityInput()
 
     LaunchedEffect(activeStoreId) {
         activeStoreId?.let {
@@ -16040,11 +16846,12 @@ private fun AppConfiguration.SupplierOrdersForGoodsItemContent(
                         modifier = Modifier.weight(1f),
                         value = quantityText,
                         placeholder = localizedStringResource(271, "Quantity"),
-                        keyboardType = KeyboardType.Decimal,
+                        keyboardType = if (supplierOrderQuantityAllowsFraction) KeyboardType.Decimal else KeyboardType.Number,
                         leadingIconPath = stateValues.drawablePathIconStock,
+                        onTransformValue = { raw -> sanitizeStockQuantityInput(raw, supplierOrderQuantityAllowsFraction) },
                         onValueChange = { value ->
-                            if (value.isEmpty() || value.replace(',', '.').isNumericalDoubleString()) {
-                                quantityText = value.replace(',', '.')
+                            if (value.isStockQuantityInputText(supplierOrderQuantityAllowsFraction)) {
+                                quantityText = value
                             }
                         }
                     )
@@ -16093,10 +16900,10 @@ private fun AppConfiguration.SupplierOrdersForGoodsItemContent(
                 actionButton(
                     text = localizedStringResource(955, "Send to supplier"),
                     iconPath = stateValues.drawablePathIconTransactionSupply,
-                    enabled = selectedSupplierId.isNotBlank() && quantityText.toDoubleOrNull()?.let { it > 0.0 } == true
+                    enabled = selectedSupplierId.isNotBlank() && parseStockQuantityInputText(quantityText, defaultUnit)?.let { it > 0.0 } == true
                 ) {
                     val now = getCurrentTimeMillis()
-                    val quantity = defaultUnit.copy(total = quantityText.toDoubleOrNull() ?: 1.0)
+                    val quantity = defaultUnit.withStockQuantityInputTotalValue(parseStockQuantityInputText(quantityText, defaultUnit) ?: 1.0)
                     val note = notesLocalized.extractLocalizedString("main")
                         ?: notesLocalized.firstOrNull { it.value.isNotBlank() }?.value
                     val order = SupplierOrderDataModel(
@@ -16294,6 +17101,9 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
     var showGlobalGoodsSheet by rememberSaveable(existing?.id ?: "new_stock_item") {
         mutableStateOf(false)
     }
+    var showParentStoreStockSheet by rememberSaveable(existing?.id ?: "new_stock_item", stateValues.activeStoreId ?: "no_store") {
+        mutableStateOf(false)
+    }
     var stockAddEditUndoDraft by remember(existing?.id) {
         mutableStateOf<StockAddEditDraft?>(null)
     }
@@ -16392,6 +17202,8 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
     }
 
     val canPopStockScreen = !Navigation.Stock.isVeryFirstScreen(stateValues.isNarrowScreen)
+    val activeStoreForParentStock = stateValues.stores.findStoreOrBranchForUi(stateValues.activeStoreId)
+    val canPullFromParentStoreStock = !stateValues.activeStoreId.isNullOrBlank() && !activeStoreForParentStock?.parentStoreId.isNullOrBlank()
     val stockAddEditTrailingIcons = buildList<Triple<String, DrawableResource, () -> Unit>> {
         stockAddEditUndoDraft?.let { previousDraft ->
             add(
@@ -16406,6 +17218,19 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
                         NotificationType.Neutral,
                         transient = true
                     )
+                }
+            )
+        }
+        if (canPullFromParentStoreStock) {
+            add(
+                Triple(
+                    parentStoreStockIconPath(),
+                    parentStoreStockIconFallback()
+                ) {
+                    stateValues.activeStoreId?.let { activeStoreId ->
+                        showParentStoreStockSheet = true
+                        refreshParentStoreStock(activeStoreId, limit = 32, appendToSharedState = false)
+                    }
                 }
             )
         }
@@ -16457,6 +17282,25 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
             iconPath = stateValues.drawablePathIconTransactionSupply
         )
     )
+
+    if (showParentStoreStockSheet && stateValues.activeStoreId != null) {
+        ParentStoreStockSelectionBottomSheet(
+            activeStoreId = stateValues.activeStoreId!!,
+            draft = draft,
+            existing = existing,
+            onDismiss = { showParentStoreStockSheet = false },
+            onApply = { parentItem ->
+                stockAddEditUndoDraft = draft
+                draft = parentItem.toParentStoreStockTemplateDraft(draft, existing)
+                showParentStoreStockSheet = false
+                postInAppNotification(
+                    "${localizedStringResource(1216, "Parent item applied")}: ${parentItem.visibleParentStoreStockName(stateValues.appLanguage)}",
+                    NotificationType.Positive,
+                    transient = true
+                )
+            }
+        )
+    }
 
     if (showGlobalGoodsSheet) {
         GlobalGoodsSelectionBottomSheet(
@@ -16543,7 +17387,9 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
                     item {
                         StockPromotionListEditor(
                             promotions = draft.promotions,
-                            onPromotionsChanged = { draft = draft.copy(promotions = it.sanitizedStockPromotions()) }
+                            onPromotionsChanged = { draft = draft.copy(promotions = it.sanitizedStockPromotions()) },
+                            quantityUnit = stateValues.globalAppConfiguration.goodsItemsQuantityUnits
+                                .find { unit -> unit.id == draft.measurementUnitId }
                         )
 
                         Spacer(modifier = Modifier.height(stateValues.screenHeight / 5))
@@ -16596,7 +17442,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
                     .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.92f)
                     .padding(8.dp),
                 text = stateValues.stringConfirm,
-                enabled = draft.isValidStockDraft() &&
+                enabled = draft.isValidStockDraft(stateValues.globalAppConfiguration) &&
                         stateValues.activeStoreId != null &&
                         stateValues.latestNotification == null,
                 onClick = {
@@ -22306,28 +23152,29 @@ fun AppConfiguration.MessageText(
     subTextColor: Color = textColor,
     subTextSize: TextUnit = stateValues.textSize
 ) {
+    val cleanSubText = subText?.takeIf { it.isNotBlank() }
+
     Column(
-        modifier = modifier,
+        modifier = modifier
+            .defaultMinSize(minHeight = if (cleanSubText == null) 56.dp else 88.dp)
+            .padding(horizontal = 16.dp, vertical = if (cleanSubText == null) 8.dp else 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
             text = text,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 16.dp, top = 24.dp, end = 16.dp, bottom = if (subText == null) 24.dp else 0.dp),
+            modifier = Modifier.fillMaxWidth(),
             color = textColor,
             fontSize = textSize,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
         )
 
-        subText?.run {
+        cleanSubText?.run {
+            Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = this,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 24.dp, top = 8.dp, bottom = 24.dp, end = 24.dp),
+                modifier = Modifier.fillMaxWidth(),
                 color = subTextColor,
                 fontSize = subTextSize,
                 textAlign = TextAlign.Center
@@ -24297,6 +25144,17 @@ private fun AppConfiguration.TransactionHistoryCalendarDialog(
         mutableStateOf(LocalDate(selectedDate.year, selectedDate.monthNumber, 1).toStockDateInputText())
     }
     val visibleMonthDate = stockDateInputTextToLocalDate(visibleMonth) ?: currentStockLocalDate()
+    var showMonthYearPicker by rememberSaveable(selectedDateText) { mutableStateOf(false) }
+    var yearPickerStart by rememberSaveable(selectedDateText) {
+        mutableStateOf((visibleMonthDate.year - 5).coerceIn(1970, 2489))
+    }
+
+    LaunchedEffect(visibleMonthDate.year) {
+        if (visibleMonthDate.year !in yearPickerStart..(yearPickerStart + 11)) {
+            yearPickerStart = (visibleMonthDate.year - 5).coerceIn(1970, 2489)
+        }
+    }
+
     val daysInMonth = stockDaysInMonth(visibleMonthDate.year, visibleMonthDate.monthNumber)
     val leadingEmptyDays = transactionHistoryIsoWeekday(visibleMonthDate.year, visibleMonthDate.monthNumber, 1) - 1
     val monthTitle = "${visibleMonthDate.monthNumber.toString().padStart(2, '0')}.${visibleMonthDate.year}"
@@ -24331,7 +25189,7 @@ private fun AppConfiguration.TransactionHistoryCalendarDialog(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 actionButton(
                     fillMaxWidthIfTextPresent = false,
@@ -24343,12 +25201,35 @@ private fun AppConfiguration.TransactionHistoryCalendarDialog(
                     }
                 )
 
-                Text(
-                    text = monthTitle,
-                    color = stateValues.TextColor,
-                    fontSize = stateValues.accentTextSize,
-                    fontWeight = FontWeight.Bold
-                )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(stateValues.textFieldHeight)
+                        .foregroundTactileShadow(stateValues.cornerRadius, elevated = showMonthYearPicker)
+                        .clip(RoundedCornerShape(stateValues.cornerRadius))
+                        .background(if (showMonthYearPicker) stateValues.AccentColor else stateValues.BackgroundColor)
+                        .border(
+                            if (showMonthYearPicker) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
+                            if (showMonthYearPicker) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+                            RoundedCornerShape(stateValues.cornerRadius)
+                        )
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = ripple(color = if (showMonthYearPicker) stateValues.AccentTextColor else stateValues.AccentColor),
+                            onClick = { showMonthYearPicker = !showMonthYearPicker }
+                        )
+                        .padding(horizontal = stateValues.marginTextFieldGroup),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = monthTitle,
+                        color = if (showMonthYearPicker) stateValues.AccentTextColor else stateValues.TextColor,
+                        fontSize = stateValues.accentTextSize,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
 
                 actionButton(
                     fillMaxWidthIfTextPresent = false,
@@ -24359,6 +25240,85 @@ private fun AppConfiguration.TransactionHistoryCalendarDialog(
                         visibleMonth = transactionHistoryShiftMonth(visibleMonthDate, 1).let { LocalDate(it.year, it.monthNumber, 1) }.toStockDateInputText()
                     }
                 )
+            }
+
+            AnimatedVisibility(visible = showMonthYearPicker) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+                    Text(
+                        text = localizedStringResource(369, "Month"),
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items((1..12).toList()) { month ->
+                            TransactionHistoryFilterChip(
+                                text = month.toString().padStart(2, '0'),
+                                selected = month == visibleMonthDate.monthNumber,
+                                onClick = {
+                                    visibleMonth = LocalDate(visibleMonthDate.year, month, 1).toStockDateInputText()
+                                }
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            modifier = Modifier.weight(1f),
+                            text = localizedStringResource(370, "Year"),
+                            color = stateValues.TextColor,
+                            fontSize = stateValues.smallTextSize,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        actionButton(
+                            fillMaxWidthIfTextPresent = false,
+                            text = "‹",
+                            iconPath = null,
+                            confirmationRequired = false,
+                            onClick = { yearPickerStart = (yearPickerStart - 12).coerceAtLeast(1970) }
+                        )
+
+                        actionButton(
+                            fillMaxWidthIfTextPresent = false,
+                            text = "›",
+                            iconPath = null,
+                            confirmationRequired = false,
+                            onClick = { yearPickerStart = (yearPickerStart + 12).coerceAtMost(2489) }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items((yearPickerStart..(yearPickerStart + 11).coerceAtMost(2500)).toList()) { year ->
+                            TransactionHistoryFilterChip(
+                                text = year.toString(),
+                                selected = year == visibleMonthDate.year,
+                                onClick = {
+                                    visibleMonth = LocalDate(year, visibleMonthDate.monthNumber, 1).toStockDateInputText()
+                                }
+                            )
+                        }
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(stateValues.marginTextField))
@@ -24396,37 +25356,43 @@ private fun AppConfiguration.TransactionHistoryCalendarDialog(
                         val dateText = date?.toStockDateInputText().orEmpty()
                         val selected = dateText == selectedDateText
 
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(stateValues.textFieldHeight)
-                                .foregroundSubtleShadow(stateValues.cornerRadius)
-                                .clip(RoundedCornerShape(stateValues.cornerRadius))
-                                .background(if (selected) stateValues.AccentColor else stateValues.BackgroundColor)
-                                .border(
-                                    stateValues.unfocusedBorderWidth,
-                                    if (selected) stateValues.AccentColor else stateValues.PlaceholderTextColor.copy(alpha = if (enabled) 1f else 0.15f),
-                                    RoundedCornerShape(stateValues.cornerRadius)
-                                )
-                                .alpha(if (enabled) 1f else 0.25f)
-                                .clickable(
-                                    enabled = enabled,
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = ripple(color = if (selected) stateValues.AccentTextColor else stateValues.AccentColor),
-                                    onClick = {
-                                        onDateSelected(dateText)
-                                        onDismiss()
-                                    }
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = if (enabled) day.toString() else "",
-                                color = if (selected) stateValues.AccentTextColor else stateValues.TextColor,
-                                fontSize = stateValues.textSize,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                textAlign = TextAlign.Center
+                        if (!enabled) {
+                            Spacer(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(stateValues.textFieldHeight)
                             )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(stateValues.textFieldHeight)
+                                    .foregroundSubtleShadow(stateValues.cornerRadius)
+                                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                                    .background(if (selected) stateValues.AccentColor else stateValues.BackgroundColor)
+                                    .border(
+                                        stateValues.unfocusedBorderWidth,
+                                        if (selected) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+                                        RoundedCornerShape(stateValues.cornerRadius)
+                                    )
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = ripple(color = if (selected) stateValues.AccentTextColor else stateValues.AccentColor),
+                                        onClick = {
+                                            onDateSelected(dateText)
+                                            onDismiss()
+                                        }
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = day.toString(),
+                                    color = if (selected) stateValues.AccentTextColor else stateValues.TextColor,
+                                    fontSize = stateValues.textSize,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     }
                 }
@@ -25466,6 +26432,10 @@ fun AppConfiguration.MenuSuppliersScreen() {
     val suppliers by suppliersState.payload.collectAsState()
     val currentUserId = stateValues.userAccount?.id
     var selectedTab by rememberSaveable { mutableStateOf("mine") }
+    var search by rememberSaveable { mutableStateOf("") }
+    var sortMenuExpanded by rememberSaveable { mutableStateOf(false) }
+    var sortId by rememberSaveable { mutableStateOf("name") }
+    var sortAscending by rememberSaveable { mutableStateOf(true) }
 
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -25475,6 +26445,9 @@ fun AppConfiguration.MenuSuppliersScreen() {
             title = stateValues.stringSuppliers,
             iconPath = stateValues.drawablePathIconSuppliers,
             trailingIcons = listOf(
+                Triple(stateValues.drawablePathIconSwitch, stateValues.drawableResIconSwitch.value) {
+                    sortMenuExpanded = !sortMenuExpanded
+                },
                 Triple(stateValues.drawablePathIconAdd, stateValues.drawableResIconAdd.value) {
                     coroutineScope.launch {
                         NavigationScreenModel.Menu.AddEditSupplier.setState("edited_supplier_id" to "")
@@ -25489,36 +26462,94 @@ fun AppConfiguration.MenuSuppliersScreen() {
             }
         )
 
-        Row(
+        AnimatedVisibility(visible = sortMenuExpanded) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(stateValues.BackgroundColor)
+                    .padding(horizontal = stateValues.marginTextField, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = localizedStringResource(512, "Sort by"),
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.smallTextSize,
+                    fontWeight = FontWeight.Bold
+                )
+
+                listOf(
+                    "name" to stateValues.stringName,
+                    "added" to localizedStringResource(514, "Time added")
+                ).forEach { option ->
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = option.second,
+                        enabledColor = if (sortId == option.first) stateValues.AccentColor else stateValues.BackgroundColor,
+                        textColor = if (sortId == option.first) stateValues.AccentTextColor else stateValues.TextColor,
+                        confirmationRequired = false,
+                        onClick = { sortId = option.first }
+                    )
+                }
+
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = if (sortAscending) localizedStringResource(515, "Ascending") else localizedStringResource(516, "Descending"),
+                    iconPath = if (sortAscending) stateValues.drawablePathIconExpandLess else stateValues.drawablePathIconExpandMore,
+                    confirmationRequired = false,
+                    onClick = { sortAscending = !sortAscending }
+                )
+            }
+        }
+
+        Column(
             modifier = Modifier
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
-                .padding(horizontal = stateValues.marginTextField, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField),
+            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
         ) {
-            actionButton(
-                modifier = Modifier.weight(1f),
-                text = localizedStringResource(629, "My suppliers"),
-                enabledColor = if (selectedTab == "mine") stateValues.AccentColor else stateValues.BackgroundColor,
-                textColor = if (selectedTab == "mine") stateValues.AccentTextColor else stateValues.TextColor,
-                confirmationRequired = false,
-                onClick = { selectedTab = "mine" }
+            TransactionPlainTextField(
+                title = "",
+                value = search,
+                placeholder = stateValues.stringSearchByAnyData,
+                leadingIconPath = stateValues.drawablePathIconSearch,
+                stateHost = NavigationScreenModel.Menu.Suppliers,
+                stateKey = "menu_suppliers_search",
+                onValueChange = { search = it }
             )
-            actionButton(
-                modifier = Modifier.weight(1f),
-                text = localizedStringResource(628, "Generic suppliers"),
-                enabledColor = if (selectedTab == "generic") stateValues.AccentColor else stateValues.BackgroundColor,
-                textColor = if (selectedTab == "generic") stateValues.AccentTextColor else stateValues.TextColor,
-                confirmationRequired = false,
-                onClick = { selectedTab = "generic" }
+
+            tabRowWidget(
+                modifier = Modifier.fillMaxWidth(),
+                tabs = listOf(
+                    TabContent("mine", localizedStringResource(629, "My suppliers")) { selectedTab = it },
+                    TabContent("generic", localizedStringResource(628, "Generic suppliers")) { selectedTab = it }
+                ),
+                selectedIndexInitial = selectedTab
             )
         }
 
         val mineSuppliers = suppliers.orEmpty().filter { it.isMineForUser(currentUserId) && it.isActive }
         val genericSuppliers = suppliers.orEmpty().filter { it.isGenericSupplier() && it.isActive }
-        val shownSuppliers = if (selectedTab == "mine") mineSuppliers else genericSuppliers
+        val q = search.trim()
+        val shownSuppliers = (if (selectedTab == "mine") mineSuppliers else genericSuppliers)
+            .filter { supplier ->
+                q.isBlank() || listOf(
+                    supplier.id,
+                    supplier.visibleSupplierName(stateValues.appLanguage),
+                    supplier.phoneNumbers.orEmpty().asDisplayPhoneNumbers().joinToString(" "),
+                    supplier.emails.orEmpty().joinToString(" ")
+                ).any { it.contains(q, ignoreCase = true) }
+            }
+            .let { list ->
+                val sorted = when (sortId) {
+                    "added" -> list.sortedBy { it.addedAt }
+                    else -> list.sortedBy { it.visibleSupplierName(stateValues.appLanguage).lowercase() }
+                }
+                if (sortAscending) sorted else sorted.reversed()
+            }
 
         LazyColumn(
-            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Suppliers, selectedTab),
+            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Suppliers, listOf(selectedTab, sortId, if (sortAscending) "asc" else "desc").joinToString("_")),
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
@@ -25526,27 +26557,12 @@ fun AppConfiguration.MenuSuppliersScreen() {
             verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
             contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
         ) {
-            if (selectedTab == "mine") {
-                item {
-                    actionButton(
-                        text = localizedStringResource(627, "Add my supplier"),
-                        iconPath = stateValues.drawablePathIconAdd,
-                        confirmationRequired = false,
-                        onClick = {
-                            coroutineScope.launch {
-                                NavigationScreenModel.Menu.AddEditSupplier.setState("edited_supplier_id" to "")
-                                Navigation.Menu.go(NavigationScreenModel.Menu.AddEditSupplier, stateValues.isNarrowScreen)
-                            }
-                        }
-                    )
-                }
-            }
-
             if (shownSuppliers.isEmpty()) {
                 item {
                     MessageText(
-                        modifier = Modifier.fillMaxWidth(),
-                        text = localizedStringResource(626, "No suppliers yet")
+                        modifier = Modifier.fillParentMaxSize().fillMaxWidth(),
+                        text = if (q.isBlank()) localizedStringResource(626, "No suppliers yet") else stateValues.stringNoMatches,
+                        textColor = stateValues.PlaceholderTextColor
                     )
                 }
             } else {
@@ -25567,7 +26583,6 @@ fun AppConfiguration.MenuSuppliersScreen() {
         }
     }
 }
-
 
 private fun AppConfiguration.subscriptionStatusText(status: String): String {
     return when (status) {
@@ -27693,6 +28708,8 @@ fun AppConfiguration.MenuSupportScreen() {
 
 @Composable
 fun AppConfiguration.MenuDebtorsScreen() {
+    var sortMenuExpanded by rememberSaveable { mutableStateOf(false) }
+
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -27700,6 +28717,11 @@ fun AppConfiguration.MenuDebtorsScreen() {
         ScreenAppBarWidget(
             title = stateValues.stringDebtors,
             iconPath = stateValues.drawablePathIconDebtors,
+            trailingIcons = listOf(
+                Triple(stateValues.drawablePathIconSwitch, stateValues.drawableResIconSwitch.value) {
+                    sortMenuExpanded = !sortMenuExpanded
+                }
+            ),
             onBack = {
                 coroutineScope.launch {
                     Navigation.Menu.pop(stateValues.isNarrowScreen)
@@ -27716,28 +28738,60 @@ fun AppConfiguration.MenuDebtorsScreen() {
 
         var search by rememberSaveable { mutableStateOf("") }
         var pendingDeleteId by rememberSaveable { mutableStateOf<String?>(null) }
-        var showClosed by rememberSaveable { mutableStateOf(false) }
+        var selectedTab by rememberSaveable { mutableStateOf("open") }
+        var sortId by rememberSaveable { mutableStateOf("amount") }
+        var sortAscending by rememberSaveable { mutableStateOf(false) }
 
-        val shownDebtors = debtors.orEmpty()
-            .filter { showClosed || it.debtAmount > 0.0 }
-            .filter { debtor ->
-                val q = search.trim()
-                q.isBlank() || listOf(
-                    debtorDisplayName(debtor), debtor.firstName, debtor.lastName, debtor.companyName,
-                    debtor.phoneNumber.asDisplayPhoneNumber(), debtor.email, debtor.idNumber, debtor.companyIdNumber,
-                    debtor.currency, debtor.debtorType, debtor.transactionIds.joinToString(" ")
-                ).any { it.contains(q, true) }
+        AnimatedVisibility(visible = sortMenuExpanded) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(stateValues.BackgroundColor)
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = stateValues.marginTextField, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = localizedStringResource(512, "Sort by"),
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.smallTextSize,
+                    fontWeight = FontWeight.Bold
+                )
+
+                listOf(
+                    "name" to stateValues.stringName,
+                    "created" to localizedStringResource(514, "Time added"),
+                    "paid" to localizedStringResource(1207, "Time paid"),
+                    "amount" to localizedStringResource(581, "Amount")
+                ).forEach { option ->
+                    actionButton(
+                        modifier = Modifier.widthIn(min = 104.dp),
+                        text = option.second,
+                        enabledColor = if (sortId == option.first) stateValues.AccentColor else stateValues.BackgroundColor,
+                        textColor = if (sortId == option.first) stateValues.AccentTextColor else stateValues.TextColor,
+                        fillMaxWidthIfTextPresent = false,
+                        confirmationRequired = false,
+                        onClick = { sortId = option.first }
+                    )
+                }
+
+                actionButton(
+                    modifier = Modifier.widthIn(min = 132.dp),
+                    text = if (sortAscending) localizedStringResource(515, "Ascending") else localizedStringResource(516, "Descending"),
+                    iconPath = if (sortAscending) stateValues.drawablePathIconExpandLess else stateValues.drawablePathIconExpandMore,
+                    fillMaxWidthIfTextPresent = false,
+                    confirmationRequired = false,
+                    onClick = { sortAscending = !sortAscending }
+                )
             }
-            .sortedWith(
-                compareByDescending<DebtorDataModel> { it.debtDueAtMillis?.let { due -> due < getCurrentTimeMillis() } == true }
-                    .thenBy { it.debtDueAtMillis ?: Long.MAX_VALUE }
-                    .thenByDescending { it.debtAmount }
-            )
+        }
 
         Column(
             modifier = Modifier
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
-                .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField)
+                .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField),
+            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
         ) {
             TransactionPlainTextField(
                 title = "",
@@ -27748,26 +28802,56 @@ fun AppConfiguration.MenuDebtorsScreen() {
                 stateKey = "menu_debtors_search",
                 onValueChange = { search = it }
             )
-            Spacer(modifier = Modifier.height(6.dp))
-            actionButton(
-                text = if (showClosed) localizedStringResource(722, "Hide paid debts") else localizedStringResource(723, "Show paid debts"),
-                iconPath = stateValues.drawablePathIconSwitch,
-                enabledColor = if (showClosed) stateValues.AccentColor else stateValues.DisabledColor,
-                onClick = { showClosed = !showClosed }
+
+            tabRowWidget(
+                modifier = Modifier.fillMaxWidth(),
+                tabs = listOf(
+                    TabContent("open", localizedStringResource(1205, "Open debts")) { selectedTab = it },
+                    TabContent("all", localizedStringResource(1206, "All debts")) { selectedTab = it }
+                ),
+                selectedIndexInitial = selectedTab
             )
         }
 
+        fun DebtorDataModel.lastPaidAtMillis(): Long? = paymentHistory.maxOfOrNull { it.timeMillis }?.takeIf { it > 0L }
+
+        val q = search.trim()
+        val shownDebtors = debtors.orEmpty()
+            .filter { debtor -> selectedTab == "all" || debtor.debtAmount > 0.0 }
+            .filter { debtor ->
+                q.isBlank() || listOf(
+                    debtorDisplayName(debtor), debtor.firstName, debtor.lastName, debtor.companyName,
+                    debtor.phoneNumber.asDisplayPhoneNumber(), debtor.email, debtor.idNumber, debtor.companyIdNumber,
+                    debtor.currency, debtor.debtorType, debtor.transactionIds.joinToString(" ")
+                ).any { it.contains(q, true) }
+            }
+            .let { list ->
+                val sorted = when (sortId) {
+                    "name" -> list.sortedBy { debtorDisplayName(it).lowercase() }
+                    "created" -> list.sortedBy { it.debtCreatedAtMillis }
+                    "paid" -> list.sortedBy { it.lastPaidAtMillis() ?: Long.MAX_VALUE }
+                    else -> list.sortedBy { debtWithInterest(it) }
+                }
+                if (sortAscending) sorted else sorted.reversed()
+            }
+
         LazyColumn(
-            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Debtors),
+            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Debtors, listOf(selectedTab, sortId, if (sortAscending) "asc" else "desc").joinToString("_")),
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
                 .padding(stateValues.marginTextField)
         ) {
             if (storeId == null) {
-                item { MessageText(modifier = Modifier.fillParentMaxSize(), text = stateValues.stringNoActiveStore) }
+                item { MessageText(modifier = Modifier.fillParentMaxSize().fillMaxWidth(), text = stateValues.stringNoActiveStore, textColor = stateValues.PlaceholderTextColor) }
             } else if (shownDebtors.isEmpty()) {
-                item { MessageText(modifier = Modifier.fillParentMaxSize(), text = stateValues.stringListEmpty) }
+                item {
+                    MessageText(
+                        modifier = Modifier.fillParentMaxSize().fillMaxWidth(),
+                        text = if (q.isBlank()) stateValues.stringListEmpty else stateValues.stringNoMatches,
+                        textColor = stateValues.PlaceholderTextColor
+                    )
+                }
             } else {
                 items(shownDebtors, key = { it.id }) { debtor ->
                     DebtorPaymentCard(
@@ -30852,16 +31936,16 @@ private fun AppConfiguration.CloudConnectionStatusBanner() {
     val authRefreshRequired = transportStatus == CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED
     val transportUnavailable = transportStatus == CLOUD_TRANSPORT_STATUS_UNAVAILABLE
     val localNetwork = stateValues.localNetworkState
-    val connected = !authRefreshRequired && (connectedToRealtime || transportReachable)
+    val connected = !authRefreshRequired && !transportUnavailable && (connectedToRealtime || transportReachable)
     val localMode = userAccount != null && localNetwork.enabled && !connected && !authRefreshRequired
 
     val rawStatusKey = when {
         authRefreshRequired -> "auth_refresh"
         manualRefreshInProgress -> "checking"
+        transportUnavailable -> "unavailable"
         connectedToRealtime -> "realtime"
         localMode -> "local"
         transportReachable -> "reachable"
-        transportUnavailable -> "unavailable"
         else -> "checking"
     }
     var displayedStatusKey by rememberSaveable { mutableStateOf(rawStatusKey) }
@@ -30882,8 +31966,8 @@ private fun AppConfiguration.CloudConnectionStatusBanner() {
         "checking" -> localizedStringResource(1139, "Checking server connection…")
         "realtime" -> localizedStringResource(573, "Live updates connected")
         "local" -> localizedStringResource(914, "Server is not connected. Branch local network mode is active.")
-        "reachable" -> localizedStringResource(1138, "Server connection available")
-        "unavailable" -> localizedStringResource(1140, "Server unavailable. Check local server address or Wi‑Fi.")
+        "reachable" -> localizedStringResource(1138, "Server connected.")
+        "unavailable" -> localizedStringResource(1140, "Can’t reach AITA server. Check Wi‑Fi or server address.")
         else -> localizedStringResource(1139, "Checking server connection…")
     }
 
@@ -30962,42 +32046,147 @@ private fun String.normalizedNotificationPopupKey(): String =
         .lowercase()
         .replace(Regex("\\s+"), " ")
 
-private fun NotificationDataModel.popupDeduplicationKey(): String =
-    listOf(
+private fun String.isSessionRefreshPopupText(): Boolean {
+    val normalized = normalizedNotificationPopupKey()
+    if (normalized.isBlank()) return false
+    return listOf(
+        "cloud session needs refresh",
+        "session needs refresh",
+        "you remain signed in locally",
+        "server could not refresh session",
+        "облачный сеанс",
+        "сеанс нужно обновить",
+        "остаётесь в аккаунте локально",
+        "бұлттық сеанс",
+        "сеансты жаңарту",
+        "жергілікті түрде аккаунтта"
+    ).any { marker -> normalized.contains(marker) }
+}
+
+private fun String.isServerUnavailablePopupText(): Boolean {
+    val normalized = normalizedNotificationPopupKey()
+    if (normalized.isBlank()) return false
+    return listOf(
+        "can't reach aita server",
+        "can’t reach aita server",
+        "cannot reach server",
+        "cannot connect to server",
+        "server unavailable",
+        "server is unavailable",
+        "server is offline",
+        "server is not connected",
+        "live updates disconnected",
+        "connection unavailable",
+        "using cached data",
+        "while reconnecting",
+        "reconnecting",
+        "keeping you signed in offline",
+        "security sessions will refresh",
+        "server address opened another page",
+        "server address did not answer as aita",
+        "not the aita server",
+        "does not look like aita",
+        "tried http://",
+        "tried https://",
+        "client error:",
+        "connect timeout",
+        "connection timeout",
+        "connect_timeout",
+        "connecttimeoutexception",
+        "sockettimeoutexception",
+        "timeout has expired",
+        "connection refused",
+        "failed to connect",
+        "network unreachable",
+        "host unreachable",
+        "unknownhostexception",
+        "unresolvedaddress",
+        "socketexception",
+        "url=http://",
+        "url=https://",
+        "[url=",
+        "io.ktor.client.network.sockets",
+        "сервер aita недоступ",
+        "сервер недоступ",
+        "сервер офлайн",
+        "сервер не подключ",
+        "нет соединения",
+        "нет ответа от сервера",
+        "адрес сервера открыл другую страницу",
+        "адрес сервера ответил не как aita",
+        "пробовали http://",
+        "пробовали https://",
+        "таймаут подключения",
+        "ошибка подключения",
+        "остаётесь в аккаунте офлайн",
+        "сеансы безопасности обновятся",
+        "aita сервері қолжетімсіз",
+        "сервер қолжетімсіз",
+        "сервер офлайн",
+        "сервер қосылмаған",
+        "қосылу уақыты",
+        "қосылым қатесі"
+    ).any { marker -> normalized.contains(marker) }
+}
+
+private fun String.isServerRecoveryPopupText(): Boolean {
+    val normalized = normalizedNotificationPopupKey()
+    if (normalized.isBlank()) return false
+    return listOf(
+        "server is back online",
+        "server back online",
+        "live updates connected",
+        "cloud connection restored",
+        "server connection restored",
+        "server connection available",
+        "server connected",
+        "онлайн-обновления подключены",
+        "соединение восстановлено",
+        "связь с сервером восстановлена",
+        "сервер доступен",
+        "сервер подключ",
+        "сервер снова онлайн",
+        "нақты уақыттағы жаңартулар қосылды",
+        "сервермен байланыс қалпына",
+        "сервер қайта онлайн",
+        "сервер қосылды",
+        "сервер қолжетімді"
+    ).any { marker -> normalized.contains(marker) }
+}
+
+private fun String.notificationPopupSemanticKey(): String {
+    val normalized = normalizedNotificationPopupKey()
+    if (normalized.isBlank()) return ""
+    return when {
+        normalized.isServerUnavailablePopupText() -> "server-unavailable"
+        normalized.isServerRecoveryPopupText() -> "server-recovered"
+        normalized.isSessionRefreshPopupText() -> "session-refresh"
+        else -> normalized
+    }
+}
+
+private fun NotificationDataModel.popupDeduplicationKey(): String {
+    val combined = listOf(title, message, category, source).joinToString(" ")
+    if (combined.isServerUnavailablePopupText() || combined.isServerRecoveryPopupText()) {
+        return "connection|${combined.notificationPopupSemanticKey()}"
+    }
+    if (combined.isSessionRefreshPopupText()) {
+        return "session|${combined.notificationPopupSemanticKey()}"
+    }
+    return listOf(
         type.toString(),
-        title.normalizedNotificationPopupKey(),
-        message.normalizedNotificationPopupKey(),
-        category.normalizedNotificationPopupKey(),
+        title.notificationPopupSemanticKey(),
+        message.notificationPopupSemanticKey(),
+        category.notificationPopupSemanticKey(),
         source.normalizedNotificationPopupKey()
     ).joinToString("|")
+}
 
 private fun NotificationDataModel.isConnectionStatusPopupNoise(): Boolean {
     val combined = listOf(title, message, category, source)
         .joinToString(" ")
         .normalizedNotificationPopupKey()
-    return listOf(
-        "server unavailable",
-        "server is unavailable",
-        "server is not connected",
-        "live updates disconnected",
-        "connection unavailable",
-        "cannot reach server",
-        "keeping you signed in offline",
-        "security sessions will refresh",
-        "using cached data",
-        "while reconnecting",
-        "reconnecting",
-        "cloud session needs refresh",
-        "остаётесь в аккаунте офлайн",
-        "сеансы безопасности обновятся",
-        "используются сохранённые данные",
-        "идёт переподключение",
-        "сервер недоступ",
-        "сервер не подключ",
-        "нет соединения",
-        "қолжетімсіз",
-        "сервер қосылмаған"
-    ).any { marker -> combined.contains(marker) }
+    return combined.isServerUnavailablePopupText() || combined.isSessionRefreshPopupText()
 }
 
 private fun List<NotificationDataModel>.compactForPopupDisplay(): List<NotificationDataModel> {
@@ -31587,9 +32776,10 @@ fun AppConfiguration.NotificationsScreen(
                 item {
                     MessageText(
                         modifier = Modifier
-                            .fillMaxWidth()
+                            .fillParentMaxSize()
                             .padding(vertical = stateValues.marginTextFieldGroup),
-                        text = if (search.isBlank()) stateValues.stringListEmpty else localizedStringResource(193, "No notifications match this search")
+                        text = if (search.isBlank()) stateValues.stringListEmpty else localizedStringResource(193, "No notifications match this search"),
+                        textColor = stateValues.PlaceholderTextColor
                     )
                 }
             } else {
@@ -31634,6 +32824,17 @@ private fun AppConfiguration.localizedNotificationMessage(message: String): Stri
         group.values.any { it.value.trim() == normalized }
     }?.let { matchedGroup ->
         return localizedStringResource(matchedGroup.id, normalized)
+    }
+
+    val notificationKey = normalized.normalizedNotificationPopupKey()
+    if (notificationKey.isServerUnavailablePopupText()) {
+        return localizedStringResource(1140, "Can’t reach AITA server. Check Wi‑Fi or server address.")
+    }
+    if (notificationKey.isServerRecoveryPopupText()) {
+        return localizedStringResource(1138, "Server connected.")
+    }
+    if (notificationKey.isSessionRefreshPopupText()) {
+        return localizedStringResource(91, "Cloud session needs refresh. You remain signed in locally.")
     }
 
     return when (normalized) {
@@ -32008,6 +33209,8 @@ private fun localDrawableResourceForPath(
         "57_1" -> Res.drawable._57_1
         "58_0" -> Res.drawable._58_0
         "58_1" -> Res.drawable._58_1
+        "59_0" -> Res.drawable._59_0
+        "59_1" -> Res.drawable._59_1
         else -> fallbackRes
     }
 }
@@ -32235,7 +33438,7 @@ private fun AppConfiguration.StockBatchShelfPreviewCard(
                 scaleX = if (isDragging) 1.035f else 1f
                 scaleY = if (isDragging) 1.035f else 1f
                 alpha = if (isDragging) 0.97f else 1f
-                shadowElevation = with(density) { (if (isDragging) 12.dp else 4.dp).toPx() }
+                shadowElevation = if (isDragging) with(density) { 6.dp.toPx() } else 0f
                 shape = cardShape
                 clip = true
             }

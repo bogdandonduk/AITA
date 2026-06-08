@@ -1806,12 +1806,19 @@ fun changeCartQuantity(
     current: QuantityDataModel,
     deltaSteps: Int
 ) {
+    val step = current.pricedAmount.takeIf { it > 0.0 } ?: 1.0
+    val nextTotal = current.total + step * deltaSteps
+
+    if (deltaSteps < 0 && nextTotal < step - 0.000001) {
+        return
+    }
+
     setCartQuantity(
         id = id,
         transactionTypeIndex = transactionTypeIndex,
         clientId = clientId,
         current = current,
-        total = current.total + current.pricedAmount * deltaSteps
+        total = nextTotal
     )
 }
 
@@ -1824,9 +1831,11 @@ fun setCartQuantity(
 ) {
     val nextTotal = current.withTotalValue(total).total
 
-    if (nextTotal <= 0.0) {
-        deleteCartById(id, transactionTypeIndex, clientId)
-        removeCartSaleMethodId(transactionTypeIndex, clientId, id)
+    val minimumTotal = current.pricedAmount
+        .takeIf { it > 0.0 }
+        ?: if (current.roundTotal) 1.0 else 0.001
+
+    if (nextTotal + 0.000001 < minimumTotal) {
         return
     }
 
@@ -3516,6 +3525,7 @@ const val AITA_DEVICE_OS_HEADER = "X-AITA-Device-Os"
 const val AITA_DEVICE_APP_NAME_HEADER = "X-AITA-App-Name"
 const val AITA_DEVICE_APP_VERSION_HEADER = "X-AITA-App-Version"
 const val AITA_DEVICE_LOCALE_HEADER = "X-AITA-Device-Locale"
+const val AITA_CONNECTION_PROBE_HEADER = "X-AITA-Connection-Probe"
 
 const val CLOUD_TRANSPORT_STATUS_UNKNOWN = 0
 const val CLOUD_TRANSPORT_STATUS_REACHABLE = 1
@@ -3556,6 +3566,7 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
         updateStoresPath = Pair("stores/update", "11"),
         deleteStoresPath = Pair("stores/delete", "12"),
         getStockPath = Pair("stock/get", "13"),
+        getParentStoreStockPath = Pair("stock/parent/get", "1212"),
         addGoodsItemPath = Pair("stock/add", "14"),
         updateGoodsItemPath = Pair("stock/update", "15"),
         deleteGoodsItemPath = Pair("stock/delete", "16"),
@@ -4193,6 +4204,10 @@ val cacheMaxAgeSec = 30 * 24 * 3600
 val tokenRefreshMutex = Mutex()
 private val manualCloudConnectionRefreshMutex = Mutex()
 private const val AUTH_REFRESH_NON_AUTH_FAILURE_GRACE_MILLIS = 5_000L
+private const val CLOUD_CONNECTION_HEALTH_CHECK_REACHABLE_INTERVAL_MILLIS = 5_000L
+private const val CLOUD_CONNECTION_HEALTH_CHECK_UNKNOWN_INTERVAL_MILLIS = 4_000L
+private const val CLOUD_CONNECTION_HEALTH_CHECK_UNAVAILABLE_INTERVAL_MILLIS = 3_000L
+private const val CLOUD_CONNECTION_HEALTH_CHECK_TIMEOUT_MILLIS = 6_000L
 @Volatile
 private var lastAuthRefreshNonAuthFailureAtMillis: Long = 0L
 @Volatile
@@ -4373,12 +4388,14 @@ private val observedCartHydrationKeys = mutableSetOf<String>()
 private val observedCartHydrationMutex = Mutex()
 
 val stockState = MutableDataStateFlow<List<GoodsItemDataModel>>(GlobalScope)
+val parentStoreStockState = MutableDataStateFlow<List<GoodsItemDataModel>>(GlobalScope)
 
 val stockBatchesState = MutableDataStateFlow<List<GoodsBatchDataModel>>(GlobalScope)
 val stockItemBranchAvailabilityState = MutableDataStateFlow<StockItemBranchAvailabilityDataModel>(GlobalScope)
 val stockBatchMoveResultState = MutableDataStateFlow<StockBatchMoveResultDataModel>(GlobalScope)
 
 val getStockMutex = Mutex()
+val getParentStoreStockMutex = Mutex()
 val getStockBatchesMutex = Mutex()
 val addGoodsItemMutex = Mutex()
 val updateGoodsItemMutex = Mutex()
@@ -4727,6 +4744,7 @@ fun init() {
         startAppCacheCollectors()
         loadTransactionCartUiState()
         initializeLocalBranchNetwork()
+        startCloudConnectionHealthMonitor()
         syncPendingSessionCleanupsToServer()
         if (getStoredUserAuthTokens?.invoke() != null) startRealtimeUpdates()
     }
@@ -6564,24 +6582,22 @@ internal fun nonAitaHttpResponseMessage(
     rawBody: String,
     serverUrl: String
 ): List<LocalizedStringDataModel> {
-    val cleanServerUrl = serverUrl.trim().takeIf { it.isNotBlank() }.orEmpty()
-    val target = cleanServerUrl.takeIf { it.isNotBlank() }?.let { " at $it" }.orEmpty()
-    val detail = when {
-        status.value in 300..399 -> "HTTP ${status.value} ${status.description}. The address$target answered with a redirect instead of AITA, usually a hotspot login page, router page, proxy, or stale server address."
-        rawBody.trimStart().startsWith("<") -> "HTTP ${status.value} ${status.description}. The address$target answered with an HTML page instead of AITA."
-        rawBody.isBlank() -> "HTTP ${status.value} ${status.description}: empty response body$target."
-        else -> "HTTP ${status.value} ${status.description}. The response$target does not look like AITA."
+    val looksLikeAnotherPage = status.value in 300..399 || rawBody.trimStart().startsWith("<")
+    return if (looksLikeAnotherPage) {
+        listOf(
+            LocalizedStringDataModel("main", "Can’t reach AITA server. Check Wi‑Fi or server address."),
+            LocalizedStringDataModel("en", "Can’t reach AITA server. Check Wi‑Fi or server address."),
+            LocalizedStringDataModel("ru", "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера."),
+            LocalizedStringDataModel("kk", "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз.")
+        )
+    } else {
+        localizedStringResourceMessage(
+            id = 1140,
+            main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
+            ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
+            kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
+        )
     }
-    val main = "Server unavailable. Check local server address or Wi‑Fi. $detail"
-    val ru = "Сервер недоступен. Проверьте адрес локального сервера или Wi‑Fi. $detail"
-    val kk = "Сервер қолжетімсіз. Жергілікті сервер мекенжайын немесе Wi‑Fi желісін тексеріңіз. $detail"
-
-    return listOf(
-        LocalizedStringDataModel("main", main),
-        LocalizedStringDataModel("en", main),
-        LocalizedStringDataModel("ru", ru),
-        LocalizedStringDataModel("kk", kk)
-    )
 }
 
 @PublishedApi
@@ -6613,19 +6629,12 @@ internal fun networkTransportFailureMessage(
     serverUrl: String,
     endpointUrl: String,
     throwable: Throwable? = null
-): List<LocalizedStringDataModel> {
-    val target = networkTargetUrl(serverUrl, endpointUrl)
-    val detail = networkFailureSummary(throwable).takeIf { it.isNotBlank() }?.let { " Client error: $it" }.orEmpty()
-    val main = "Server unavailable. Tried $target.$detail"
-    val ru = "Сервер недоступен. Пробовали $target.$detail"
-    val kk = "Сервер қолжетімсіз. Тексерілген мекенжай: $target.$detail"
-    return listOf(
-        LocalizedStringDataModel("main", main),
-        LocalizedStringDataModel("en", main),
-        LocalizedStringDataModel("ru", ru),
-        LocalizedStringDataModel("kk", kk)
-    )
-}
+): List<LocalizedStringDataModel> = localizedStringResourceMessage(
+    id = 1140,
+    main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
+    ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
+    kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
+)
 
 private const val AITA_NETWORK_VERBOSE_LOGS = false
 
@@ -8215,9 +8224,11 @@ private fun realtimeRefreshingMessage(): List<LocalizedStringDataModel> = locali
 )
 
 private var appCacheCollectorsStarted = false
+private var cloudConnectionHealthMonitorJob: Job? = null
 private var realtimeUpdatesJob: Job? = null
 private var realtimeRefreshJob: Job? = null
 private val realtimeRefreshMutex = Mutex()
+private val cloudConnectionHealthProbeMutex = Mutex()
 private var realtimeOfflineNoticePosted = false
 val realtimeUpdatesConnectedState = MutableStateFlow(false)
 
@@ -8633,18 +8644,87 @@ private suspend fun probeCloudServerReachableForRealtimeFallback(): Boolean {
     val response = networkRequest<Unit, Unit>(
         method = HttpMethod.Get,
         endpointUrl = globalAppConfigurationState.payloadValue.connectionCheckPath.first,
+        query = mapOf("silent" to "true"),
+        headers = mapOf(AITA_CONNECTION_PROBE_HEADER to "1"),
         contentType = null
     )
 
-    if (!response.negative) {
-        markCloudTransportReachableForNotifications(
-            authenticated = false,
-            authRefreshRequired = null
-        )
-        return true
-    }
+    return !response.negative
+}
 
-    return false
+private fun cancelRealtimeUpdatesSocketAfterReachabilityFailure() {
+    realtimeUpdatesJob?.cancel()
+    realtimeUpdatesJob = null
+    realtimeUpdatesConnectedState.value = false
+}
+
+fun startCloudConnectionHealthMonitor() {
+    if (cloudConnectionHealthMonitorJob?.isActive == true) return
+
+    cloudConnectionHealthMonitorJob = GlobalScope.launch(Dispatchers.ourIo) {
+        delay(1_500L)
+
+        while (isActive) {
+            val configuredServerUrl = globalAppConfigurationState.payloadValue.serverUrl.first
+            val hasConfiguredServerUrl = normalizedHttpServerUrlOrNull(configuredServerUrl) != null
+
+            if (!hasConfiguredServerUrl) {
+                delay(CLOUD_CONNECTION_HEALTH_CHECK_UNKNOWN_INTERVAL_MILLIS)
+                continue
+            }
+
+            val wasRealtimeConnected = realtimeUpdatesConnectedState.value
+            val wasTransportMarkedReachable = cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_REACHABLE
+            val hasLocalAccount = getStoredUserAuthTokens?.invoke() != null
+            val response = cloudConnectionHealthProbeMutex.withLock {
+                withTimeoutOrNull(CLOUD_CONNECTION_HEALTH_CHECK_TIMEOUT_MILLIS) {
+                    networkRequest<Unit, Unit>(
+                        method = HttpMethod.Get,
+                        endpointUrl = globalAppConfigurationState.payloadValue.connectionCheckPath.first,
+                        query = mapOf("silent" to "true"),
+                        headers = mapOf(AITA_CONNECTION_PROBE_HEADER to "1"),
+                        contentType = null
+                    )
+                }
+            }
+
+            val serverAvailable = response != null && !response.negative
+
+            if (serverAvailable) {
+                realtimeOfflineNoticePosted = false
+
+                if (getStoredUserAuthTokens?.invoke() != null && realtimeUpdatesJob?.isActive != true) {
+                    startRealtimeUpdates()
+                }
+            } else {
+                cancelRealtimeUpdatesSocketAfterReachabilityFailure()
+                markCloudTransportUnavailableForNotifications()
+
+                val shouldPostOfflinePopup = hasLocalAccount && (
+                        wasRealtimeConnected ||
+                        wasTransportMarkedReachable ||
+                        !realtimeOfflineNoticePosted
+                )
+
+                if (shouldPostOfflinePopup) {
+                    realtimeOfflineNoticePosted = true
+                    postInAppNotificationNow(
+                        response?.message ?: realtimeDisconnectedMessage(),
+                        NotificationType.Neutral,
+                        transient = true
+                    )
+                }
+            }
+
+            val delayMillis = when (cloudTransportStatusState.value) {
+                CLOUD_TRANSPORT_STATUS_REACHABLE -> CLOUD_CONNECTION_HEALTH_CHECK_REACHABLE_INTERVAL_MILLIS
+                CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED -> CLOUD_CONNECTION_HEALTH_CHECK_UNAVAILABLE_INTERVAL_MILLIS
+                CLOUD_TRANSPORT_STATUS_UNAVAILABLE -> CLOUD_CONNECTION_HEALTH_CHECK_UNAVAILABLE_INTERVAL_MILLIS
+                else -> CLOUD_CONNECTION_HEALTH_CHECK_UNKNOWN_INTERVAL_MILLIS
+            }
+            delay(delayMillis)
+        }
+    }
 }
 
 fun stopRealtimeUpdates() {
@@ -8672,6 +8752,8 @@ private suspend fun currentRealtimeAccessTokenOrNull(): String? {
 }
 
 fun startRealtimeUpdates() {
+    startCloudConnectionHealthMonitor()
+
     if (realtimeUpdatesJob?.isActive == true) return
 
     realtimeUpdatesJob = GlobalScope.launch(Dispatchers.ourIo) {
@@ -8842,17 +8924,17 @@ fun refreshCloudConnectionManually() {
                 )
 
                 if (response.negative) {
-                    if (response.transportFailure) {
-                        markCloudTransportUnavailableForNotifications()
-                    }
+                    cancelRealtimeUpdatesSocketAfterReachabilityFailure()
+                    markCloudTransportUnavailableForNotifications()
                     postInAppNotification(
                         response.message ?: localizedStringResourceMessage(
                             id = 1140,
-                            main = "Server unavailable. Check local server address or Wi‑Fi.",
-                            ru = "Сервер недоступен. Проверьте адрес локального сервера или Wi‑Fi.",
-                            kk = "Сервер қолжетімсіз. Жергілікті сервер мекенжайын немесе Wi‑Fi желісін тексеріңіз."
+                            main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
+                            ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
+                            kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
                         ),
-                        NotificationType.Negative
+                        NotificationType.Negative,
+                        transient = true
                     )
                     return@withLock
                 }
@@ -9017,88 +9099,237 @@ private suspend fun emitObservedCartPreservingUntilStockLoaded(
 private const val IN_APP_NOTIFICATION_DEDUPE_WINDOW_MILLIS = 10_000L
 private const val IN_APP_NOTIFICATION_HISTORY_DEDUPE_WINDOW_MILLIS = 60_000L
 private const val IN_APP_NOTIFICATION_ID_BUCKET_MILLIS = 10_000L
+private const val IN_APP_NOTIFICATION_DISMISS_SUPPRESSION_MILLIS = 120_000L
 private const val ACTIVE_IN_APP_NOTIFICATION_LIMIT = 5
 private const val LOCAL_NOTIFICATION_HISTORY_LIMIT = 200
+private const val NOTIFICATION_CONNECTION_CATEGORY = "connection"
+private const val NOTIFICATION_SESSION_CATEGORY = "session"
 
 private val notificationPopupRemovalTokens = mutableMapOf<String, String>()
 private val notificationPopupTransientById = mutableMapOf<String, Boolean>()
+private val dismissedNotificationPopupKeysUntil = mutableMapOf<String, Long>()
 
+@Volatile
 private var cloudTransportReachableForNotifications = true
+@Volatile
 private var cloudTransportFailureNotificationPending = false
 @Volatile
-private var cloudSessionRefreshRequiredForNotifications = false
-
-private const val CLOUD_SESSION_REFRESH_NOTIFICATION_COOLDOWN_MILLIS = 90_000L
+private var cloudTransportFailureNoticePostedForCurrentOutage = false
 @Volatile
-private var lastCloudSessionRefreshNotificationMillis: Long = 0L
+private var cloudTransportRecoveryNotificationPending = false
+@Volatile
+private var cloudSessionRefreshRequiredForNotifications = false
+@Volatile
+private var cloudSessionRefreshNotificationPostedForCurrentRequirement = false
+
+private fun String.normalizedNotificationText(): String =
+    trim()
+        .lowercase()
+        .replace(Regex("\\s+"), " ")
 
 private fun String.isCloudSessionRefreshNotificationText(): Boolean {
-    val normalized = trim().lowercase().replace(Regex("\\s+"), " ")
+    val normalized = normalizedNotificationText()
     if (normalized.isBlank()) return false
 
     return listOf(
         "cloud session needs refresh",
+        "session needs refresh",
         "you remain signed in locally",
+        "server could not refresh session",
+        "local login active",
         "облачный сеанс",
+        "сеанс нужно обновить",
         "остаётесь в аккаунте локально",
+        "локальный вход сохран",
         "бұлттық сеанс",
-        "жергілікті түрде аккаунтта"
+        "сеансты жаңарту",
+        "жергілікті түрде аккаунтта",
+        "жергілікті кіру сақтал"
     ).any { marker -> normalized.contains(marker) }
 }
 
 private fun shouldPostCloudSessionRefreshNotificationNow(): Boolean {
-    val now = getCurrentTimeMillis()
-    if (now - lastCloudSessionRefreshNotificationMillis < CLOUD_SESSION_REFRESH_NOTIFICATION_COOLDOWN_MILLIS) {
-        return false
-    }
-    lastCloudSessionRefreshNotificationMillis = now
+    if (cloudSessionRefreshNotificationPostedForCurrentRequirement) return false
+    cloudSessionRefreshNotificationPostedForCurrentRequirement = true
     return true
 }
 
 private fun String.isCloudTransportFailureNotificationText(): Boolean {
-    val normalized = trim().lowercase().replace(Regex("\\s+"), " ")
+    val normalized = normalizedNotificationText()
     if (normalized.isBlank()) return false
 
     return listOf(
+        "can't reach aita server",
+        "can’t reach aita server",
         "cannot reach server",
         "cannot connect to server",
         "server unavailable",
         "server is unavailable",
+        "server is offline",
         "server is not connected",
         "live updates disconnected",
+        "connection unavailable",
         "using cached data while reconnecting",
         "keeping you signed in offline",
-        "cloud session needs refresh",
-        "you remain signed in locally",
         "security sessions will refresh",
+        "server address opened another page",
+        "server address did not answer as aita",
+        "not the aita server",
+        "does not look like aita",
+        "tried http://",
+        "tried https://",
+        "client error:",
+        "connect timeout",
+        "connection timeout",
+        "connect_timeout",
+        "connecttimeoutexception",
+        "sockettimeoutexception",
+        "timeout has expired",
+        "connection refused",
+        "network unreachable",
+        "host unreachable",
+        "failed to connect",
+        "no route to host",
+        "unknownhostexception",
+        "unresolvedaddress",
+        "socketexception",
+        "url=http://",
+        "url=https://",
+        "[url=",
+        "io.ktor.client.network.sockets",
+        "сервер aita недоступ",
         "сервер недоступ",
+        "сервер офлайн",
         "сервер не подключ",
         "нет соединения",
+        "нет ответа от сервера",
+        "адрес сервера открыл другую страницу",
+        "адрес сервера ответил не как aita",
+        "пробовали http://",
+        "пробовали https://",
+        "таймаут подключения",
+        "ошибка подключения",
         "остаётесь в аккаунте офлайн",
-        "облачный сеанс",
-        "остаётесь в аккаунте локально",
         "сеансы безопасности обновятся",
-        "қолжетімсіз",
-        "бұлттық сеанс",
-        "жергілікті түрде аккаунтта",
-        "сервер қосылмаған"
+        "aita сервері қолжетімсіз",
+        "сервер қолжетімсіз",
+        "сервер офлайн",
+        "сервер қосылмаған",
+        "қосылу уақыты",
+        "қосылым қатесі"
     ).any { marker -> normalized.contains(marker) }
 }
 
 private fun String.isCloudTransportRecoveryNotificationText(): Boolean {
-    val normalized = trim().lowercase().replace(Regex("\\s+"), " ")
+    val normalized = normalizedNotificationText()
     if (normalized.isBlank()) return false
 
     return listOf(
+        "server is back online",
+        "server back online",
         "live updates connected",
         "cloud connection restored",
+        "server connection restored",
         "server connection available",
         "server connected",
         "онлайн-обновления подключены",
         "соединение восстановлено",
+        "связь с сервером восстановлена",
+        "сервер доступен",
         "сервер подключ",
-        "нақты уақыттағы жаңартулар қосылды"
+        "сервер снова онлайн",
+        "нақты уақыттағы жаңартулар қосылды",
+        "сервермен байланыс қалпына",
+        "сервер қайта онлайн",
+        "сервер қосылды",
+        "сервер қолжетімді"
     ).any { marker -> normalized.contains(marker) }
+}
+
+private fun localizedCloudTransportFailureNotificationText(): String = localizedStringResourceText(
+    id = 1140,
+    main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
+    ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
+    kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
+)
+
+private fun localizedCloudTransportRecoveryNotificationText(): String = localizedStringResourceText(
+    id = 1138,
+    main = "Server connected.",
+    ru = "Сервер подключён.",
+    kk = "Сервер қосылды."
+)
+
+private fun localizedCloudSessionRefreshNotificationText(): String = localizedStringResourceText(
+    id = 91,
+    main = "Cloud session needs refresh. You remain signed in locally.",
+    ru = "Облачный сеанс нужно обновить. Вы остаётесь в аккаунте локально.",
+    kk = "Бұлттық сеансты жаңарту қажет. Сіз жергілікті түрде аккаунтта қаласыз."
+)
+
+private fun String.humanFriendlyNotificationMessage(): String {
+    val clean = trim().replace(Regex("\\s+"), " ")
+    if (clean.isBlank()) return clean
+
+    return when {
+        clean.isCloudTransportFailureNotificationText() -> localizedCloudTransportFailureNotificationText()
+        clean.isCloudTransportRecoveryNotificationText() -> localizedCloudTransportRecoveryNotificationText()
+        clean.isCloudSessionRefreshNotificationText() -> localizedCloudSessionRefreshNotificationText()
+        else -> clean
+    }
+}
+
+private fun String.notificationCanonicalText(): String {
+    val normalized = normalizedNotificationText()
+    if (normalized.isBlank()) return ""
+
+    return when {
+        isCloudTransportFailureNotificationText() -> "cloud-transport-unavailable"
+        isCloudTransportRecoveryNotificationText() -> "cloud-transport-recovered"
+        isCloudSessionRefreshNotificationText() -> "cloud-session-refresh-required"
+        else -> normalized
+    }
+}
+
+private fun NotificationDataModel.notificationStatusCombinedText(): String =
+    listOf(title, message, category, source).joinToString(" ")
+
+private fun NotificationDataModel.isConnectionStatusNotification(): Boolean {
+    val normalizedCategory = category.normalizedNotificationText()
+    val combined = notificationStatusCombinedText()
+    return normalizedCategory == NOTIFICATION_CONNECTION_CATEGORY ||
+            combined.isCloudTransportFailureNotificationText() ||
+            combined.isCloudTransportRecoveryNotificationText()
+}
+
+private fun NotificationDataModel.isSessionStatusNotification(): Boolean {
+    val normalizedCategory = category.normalizedNotificationText()
+    val combined = notificationStatusCombinedText()
+    return normalizedCategory == NOTIFICATION_SESSION_CATEGORY || combined.isCloudSessionRefreshNotificationText()
+}
+
+private fun NotificationDataModel.isLocalOnlyNotification(): Boolean = isConnectionStatusNotification()
+
+private fun NotificationDataModel.withHumanFriendlyNotificationText(): NotificationDataModel {
+    val combined = notificationStatusCombinedText()
+    val cleanMessage = message.humanFriendlyNotificationMessage()
+    val cleanTitle = if (
+        title.isCloudTransportFailureNotificationText() ||
+        title.isCloudTransportRecoveryNotificationText() ||
+        title.isCloudSessionRefreshNotificationText()
+    ) "" else title.trim()
+    val cleanCategory = when {
+        combined.isCloudTransportFailureNotificationText() -> NOTIFICATION_CONNECTION_CATEGORY
+        combined.isCloudTransportRecoveryNotificationText() -> NOTIFICATION_CONNECTION_CATEGORY
+        combined.isCloudSessionRefreshNotificationText() -> NOTIFICATION_SESSION_CATEGORY
+        else -> category
+    }
+
+    return if (cleanMessage == message && cleanTitle == title && cleanCategory == category) this else copy(
+        title = cleanTitle,
+        message = cleanMessage,
+        category = cleanCategory
+    )
 }
 
 private fun cloudSessionRefreshIsActiveForNotifications(): Boolean {
@@ -9107,15 +9338,20 @@ private fun cloudSessionRefreshIsActiveForNotifications(): Boolean {
 
 @PublishedApi
 internal fun markCloudTransportUnavailableForNotifications() {
-    cloudTransportStatusState.value = if (cloudSessionRefreshIsActiveForNotifications()) {
+    val nextStatus = if (cloudSessionRefreshIsActiveForNotifications()) {
         CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED
     } else {
         CLOUD_TRANSPORT_STATUS_UNAVAILABLE
     }
-    if (cloudTransportReachableForNotifications) {
-        cloudTransportReachableForNotifications = false
+
+    if (cloudTransportReachableForNotifications || cloudTransportStatusState.value != nextStatus) {
         cloudTransportFailureNotificationPending = true
+        cloudTransportFailureNoticePostedForCurrentOutage = false
     }
+
+    cloudTransportStatusState.value = nextStatus
+    cloudTransportReachableForNotifications = false
+    cloudTransportRecoveryNotificationPending = false
 }
 
 @PublishedApi
@@ -9123,6 +9359,9 @@ internal fun markCloudTransportReachableForNotifications(
     authenticated: Boolean = false,
     authRefreshRequired: Boolean? = null
 ) {
+    val wasUnavailable = !cloudTransportReachableForNotifications ||
+            cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_UNAVAILABLE
+    val hadVisibleOutage = cloudTransportFailureNoticePostedForCurrentOutage
     val hasStoredTokens = getStoredUserAuthTokens?.invoke() != null
     when {
         !hasStoredTokens -> cloudSessionRefreshRequiredForNotifications = false
@@ -9131,64 +9370,59 @@ internal fun markCloudTransportReachableForNotifications(
         authRefreshRequired == false && !cloudSessionRefreshRequiredForNotifications -> cloudSessionRefreshRequiredForNotifications = false
     }
 
-    cloudTransportStatusState.value = if (cloudSessionRefreshRequiredForNotifications && hasStoredTokens) {
+    val nextStatus = if (cloudSessionRefreshRequiredForNotifications && hasStoredTokens) {
         CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED
     } else {
         CLOUD_TRANSPORT_STATUS_REACHABLE
     }
+
+    cloudTransportStatusState.value = nextStatus
     cloudTransportReachableForNotifications = true
     cloudTransportFailureNotificationPending = false
+    cloudTransportFailureNoticePostedForCurrentOutage = false
+    cloudTransportRecoveryNotificationPending = wasUnavailable && hadVisibleOutage && nextStatus == CLOUD_TRANSPORT_STATUS_REACHABLE
 }
 
 @PublishedApi
 internal fun markCloudSessionNeedsRefreshForNotifications() {
     cloudSessionRefreshRequiredForNotifications = true
+    cloudTransportRecoveryNotificationPending = false
     cloudTransportStatusState.value = CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED
 }
 
 @PublishedApi
 internal fun clearCloudSessionRefreshRequirementForNotifications(statusAfterClear: Int = CLOUD_TRANSPORT_STATUS_UNKNOWN) {
     cloudSessionRefreshRequiredForNotifications = false
-    lastCloudSessionRefreshNotificationMillis = 0L
+    cloudSessionRefreshNotificationPostedForCurrentRequirement = false
     if (cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED) {
         cloudTransportStatusState.value = statusAfterClear
     }
 }
 
 private fun shouldPostNotificationConsideringCloudTransport(
-    notification: NotificationDataModel,
-    transient: Boolean
+    notification: NotificationDataModel
 ): Boolean {
-    val text = listOf(notification.title, notification.message, notification.category)
-        .joinToString(" ")
-        .trim()
+    val text = notification.notificationStatusCombinedText()
 
     if (text.isCloudSessionRefreshNotificationText()) {
         markCloudSessionNeedsRefreshForNotifications()
-        // Loading/noisy auth-refresh messages are rate-limited, but real operation results must be readable.
-        return !transient || shouldPostCloudSessionRefreshNotificationNow()
+        return shouldPostCloudSessionRefreshNotificationNow()
     }
 
     if (text.isCloudTransportRecoveryNotificationText()) {
+        val shouldPost = cloudTransportRecoveryNotificationPending
+        cloudTransportRecoveryNotificationPending = false
         markCloudTransportReachableForNotifications(authRefreshRequired = null)
-        return true
+        return shouldPost
     }
 
     if (!text.isCloudTransportFailureNotificationText()) return true
 
-    // A direct result of a user action (login, start shift, complete transaction, manual reconnect) must
-    // always replace the loading notification with a visible success/failure. Only passive transient
-    // connection-noise is collapsed by the transport banner.
-    if (!transient) return true
-
-    if (cloudTransportReachableForNotifications) {
-        cloudTransportReachableForNotifications = false
+    markCloudTransportUnavailableForNotifications()
+    if (cloudTransportFailureNotificationPending && !cloudTransportFailureNoticePostedForCurrentOutage) {
         cloudTransportFailureNotificationPending = false
-        return true
-    }
-
-    if (cloudTransportFailureNotificationPending) {
-        cloudTransportFailureNotificationPending = false
+        cloudTransportFailureNoticePostedForCurrentOutage = true
+        cloudTransportRecoveryNotificationPending = false
         return true
     }
 
@@ -9205,25 +9439,39 @@ private fun createNotificationDataModel(
         NotificationType.Neutral -> "neutral"
     }
 ): NotificationDataModel {
+    val combined = listOf(title, message, category).joinToString(" ")
+    val cleanMessage = message.humanFriendlyNotificationMessage()
+    val cleanTitle = if (
+        title.isCloudTransportFailureNotificationText() ||
+        title.isCloudTransportRecoveryNotificationText() ||
+        title.isCloudSessionRefreshNotificationText()
+    ) "" else title.trim()
+    val cleanCategory = when {
+        combined.isCloudTransportFailureNotificationText() -> NOTIFICATION_CONNECTION_CATEGORY
+        combined.isCloudTransportRecoveryNotificationText() -> NOTIFICATION_CONNECTION_CATEGORY
+        combined.isCloudSessionRefreshNotificationText() -> NOTIFICATION_SESSION_CATEGORY
+        else -> category
+    }
     val now = getCurrentTimeMillis()
     val storeId = activeStoreIdState.value
     val bucket = now / IN_APP_NOTIFICATION_ID_BUCKET_MILLIS
+    val dedupeStoreId = if (cleanCategory == NOTIFICATION_CONNECTION_CATEGORY) "" else storeId.orEmpty()
     val stableKey = listOf(
         userAccountState.payloadValue?.id.orEmpty(),
-        storeId.orEmpty(),
-        type.name,
-        category,
-        message
+        dedupeStoreId,
+        cleanCategory,
+        cleanTitle.notificationCanonicalText(),
+        cleanMessage.notificationCanonicalText()
     ).joinToString("|")
 
     return NotificationDataModel(
         id = "${bucket}_${stableKey.hashCode()}_${now}_${kotlin.random.Random.nextInt(0, Int.MAX_VALUE)}_${type.name}",
         userId = userAccountState.payloadValue?.id,
         storeId = storeId,
-        title = title,
-        message = message,
+        title = cleanTitle,
+        message = cleanMessage,
         type = type,
-        category = category,
+        category = cleanCategory,
         source = "app",
         metadata = emptyMap(),
         createdAtMillis = now,
@@ -9233,15 +9481,26 @@ private fun createNotificationDataModel(
     )
 }
 
-private fun NotificationDataModel.dedupeKey(): String = listOf(
-    userId.orEmpty(),
-    storeId.orEmpty(),
-    type.name,
-    category,
-    source,
-    title,
-    message
-).joinToString("|")
+private fun NotificationDataModel.dedupeKey(): String = when {
+    isConnectionStatusNotification() -> listOf(
+        NOTIFICATION_CONNECTION_CATEGORY,
+        notificationStatusCombinedText().notificationCanonicalText()
+    ).joinToString("|")
+    isSessionStatusNotification() -> listOf(
+        userId.orEmpty(),
+        NOTIFICATION_SESSION_CATEGORY,
+        notificationStatusCombinedText().notificationCanonicalText()
+    ).joinToString("|")
+    else -> listOf(
+        userId.orEmpty(),
+        storeId.orEmpty(),
+        type.name,
+        category.notificationCanonicalText(),
+        source.normalizedNotificationText(),
+        title.notificationCanonicalText(),
+        message.notificationCanonicalText()
+    ).joinToString("|")
+}
 
 private fun NotificationDataModel.isHistoryDuplicateOf(other: NotificationDataModel): Boolean =
     dedupeKey() == other.dedupeKey() &&
@@ -9258,10 +9517,11 @@ private fun List<NotificationDataModel>.dedupeRecentNotificationHistory(): List<
 }
 
 private suspend fun appendNotificationLocally(notification: NotificationDataModel) {
+    if (notification.isLocalOnlyNotification()) return
     val old = notificationsState.payloadValue.orEmpty()
     notificationsState.emit(
         DataState.Success(
-            (listOf(notification) + old)
+            (listOf(notification) + old.filterNot { it.isLocalOnlyNotification() })
                 .distinctBy { it.id }
                 .dedupeRecentNotificationHistory()
                 .take(LOCAL_NOTIFICATION_HISTORY_LIMIT)
@@ -9312,63 +9572,86 @@ private fun scheduleNotificationPopupRemoval(notificationId: String, delayMillis
     }
 }
 
+private fun pruneDismissedNotificationPopupKeys(now: Long) {
+    val expiredKeys = dismissedNotificationPopupKeysUntil
+        .filterValues { suppressUntil -> suppressUntil <= now }
+        .keys
+        .toList()
+    expiredKeys.forEach { key -> dismissedNotificationPopupKeysUntil.remove(key) }
+}
+
+private fun rememberDismissedNotificationPopupLocked(notification: NotificationDataModel, now: Long = getCurrentTimeMillis()) {
+    dismissedNotificationPopupKeysUntil[notification.dedupeKey()] = now + IN_APP_NOTIFICATION_DISMISS_SUPPRESSION_MILLIS
+}
+
 private suspend fun pushInAppNotificationNow(notification: NotificationDataModel, transient: Boolean) {
     val now = getCurrentTimeMillis()
-    val key = notification.dedupeKey()
-
-    if (!shouldPostNotificationConsideringCloudTransport(notification, transient)) return
-
+    val preparedNotification = notification.withHumanFriendlyNotificationText().copy(shownAtMillis = now)
+    val key = preparedNotification.dedupeKey()
     var shouldPersist = false
 
     notificationPopupMutex.withLock {
+        pruneDismissedNotificationPopupKeys(now)
+        if (!shouldPostNotificationConsideringCloudTransport(preparedNotification)) return@withLock
+        if ((dismissedNotificationPopupKeysUntil[key] ?: 0L) > now) return@withLock
+
         val duplicateActive = activeInAppNotificationsState.value.firstOrNull { existing ->
-            existing.dedupeKey() == key && now - existing.shownAtMillis <= IN_APP_NOTIFICATION_DEDUPE_WINDOW_MILLIS
+            existing.dedupeKey() == key &&
+                    (preparedNotification.isConnectionStatusNotification() || now - existing.shownAtMillis <= IN_APP_NOTIFICATION_DEDUPE_WINDOW_MILLIS)
         }
         val duplicateRecent = notificationsState.payloadValue.orEmpty().firstOrNull { existing ->
-            existing.dedupeKey() == key && now - existing.createdAtMillis <= IN_APP_NOTIFICATION_DEDUPE_WINDOW_MILLIS
+            existing.dedupeKey() == key &&
+                    (preparedNotification.isConnectionStatusNotification() || now - existing.createdAtMillis <= IN_APP_NOTIFICATION_DEDUPE_WINDOW_MILLIS)
         }
 
         if (duplicateActive != null) {
             latestInAppNotificationState.emit(duplicateActive)
             scheduleNotificationPopupRemoval(
                 duplicateActive.id,
-                notificationPopupDelayMillis(duplicateActive, transient && notificationPopupTransientById[duplicateActive.id] == true)
+                notificationPopupDelayMillis(duplicateActive, notificationPopupTransientById[duplicateActive.id] == true)
             )
             return@withLock
         }
 
-        if (duplicateRecent != null && transient) {
-            return@withLock
-        }
+        if (duplicateRecent != null) return@withLock
 
-        val activeBeforeInsert = if (notification.type != NotificationType.Neutral) {
-            activeInAppNotificationsState.value.filterNot { existing ->
-                val shouldRemoveLoading = notificationPopupTransientById[existing.id] == true && existing.type == NotificationType.Neutral
-                if (shouldRemoveLoading) {
-                    notificationPopupJobs.remove(existing.id)?.cancel()
-                    notificationPopupRemovalTokens.remove(existing.id)
-                    notificationPopupTransientById.remove(existing.id)
-                }
-                shouldRemoveLoading
+        val replacingConnectionStatus = preparedNotification.isConnectionStatusNotification()
+        val activeBeforeInsert = activeInAppNotificationsState.value.filterNot { existing ->
+            val shouldRemoveConnectionPeer = replacingConnectionStatus && existing.isConnectionStatusNotification()
+            val shouldRemoveLoading = preparedNotification.type != NotificationType.Neutral &&
+                    notificationPopupTransientById[existing.id] == true &&
+                    existing.type == NotificationType.Neutral
+            val shouldRemove = shouldRemoveConnectionPeer || shouldRemoveLoading
+            if (shouldRemove) {
+                notificationPopupJobs.remove(existing.id)?.cancel()
+                notificationPopupRemovalTokens.remove(existing.id)
+                notificationPopupTransientById.remove(existing.id)
             }
-        } else {
-            activeInAppNotificationsState.value
+            shouldRemove
         }
 
-        latestInAppNotificationState.emit(notification)
-        notificationPopupTransientById[notification.id] = transient
-        activeInAppNotificationsState.emit(
-            (listOf(notification) + activeBeforeInsert)
-                .distinctBy { it.id }
-                .take(ACTIVE_IN_APP_NOTIFICATION_LIMIT)
-        )
-        scheduleNotificationPopupRemoval(notification.id, notificationPopupDelayMillis(notification, transient))
-        shouldPersist = !transient
+        latestInAppNotificationState.emit(preparedNotification)
+        notificationPopupTransientById[preparedNotification.id] = transient
+        val nextActive = (listOf(preparedNotification) + activeBeforeInsert)
+            .distinctBy { it.dedupeKey() }
+            .take(ACTIVE_IN_APP_NOTIFICATION_LIMIT)
+        val nextActiveIds = nextActive.map { it.id }.toSet()
+        activeInAppNotificationsState.value
+            .map { it.id }
+            .filter { it !in nextActiveIds }
+            .forEach { droppedId ->
+                notificationPopupJobs.remove(droppedId)?.cancel()
+                notificationPopupRemovalTokens.remove(droppedId)
+                notificationPopupTransientById.remove(droppedId)
+            }
+        activeInAppNotificationsState.emit(nextActive)
+        scheduleNotificationPopupRemoval(preparedNotification.id, notificationPopupDelayMillis(preparedNotification, transient))
+        shouldPersist = !transient && !preparedNotification.isLocalOnlyNotification()
     }
 
     if (shouldPersist) {
-        appendNotificationLocally(notification)
-        saveNotificationToServer(notification)
+        appendNotificationLocally(preparedNotification)
+        saveNotificationToServer(preparedNotification)
     }
 }
 
@@ -9433,34 +9716,61 @@ private suspend fun clearTransientOrNeutralInAppNotifications() {
 
 fun clearInAppNotification() {
     GlobalScope.launch(Dispatchers.ourIo) {
-        notificationPopupJobs.values.forEach { it.cancel() }
-        notificationPopupJobs.clear()
-        notificationPopupRemovalTokens.clear()
-        notificationPopupTransientById.clear()
-        latestInAppNotificationState.emit(null)
-        activeInAppNotificationsState.emit(emptyList())
+        notificationPopupMutex.withLock {
+            val now = getCurrentTimeMillis()
+            activeInAppNotificationsState.value.forEach { notification ->
+                rememberDismissedNotificationPopupLocked(notification, now)
+            }
+            notificationPopupJobs.values.toList().forEach { it.cancel() }
+            notificationPopupJobs.clear()
+            notificationPopupRemovalTokens.clear()
+            notificationPopupTransientById.clear()
+            latestInAppNotificationState.emit(null)
+            activeInAppNotificationsState.emit(emptyList())
+        }
     }
 }
 
 fun dismissInAppNotification(notificationId: String, markAsRead: Boolean = true) {
     GlobalScope.launch(Dispatchers.ourIo) {
-        notificationPopupJobs.remove(notificationId)?.cancel()
-        notificationPopupRemovalTokens.remove(notificationId)
-        notificationPopupTransientById.remove(notificationId)
-        val remaining = activeInAppNotificationsState.value.filter { it.id != notificationId }
-        activeInAppNotificationsState.emit(remaining)
-        if (latestInAppNotificationState.value?.id == notificationId) {
-            latestInAppNotificationState.emit(remaining.firstOrNull())
-        }
-    }
+        var savedNotificationIdToMark: String? = null
 
-    if (markAsRead) {
-        markNotificationRead(notificationId)
+        notificationPopupMutex.withLock {
+            val target = activeInAppNotificationsState.value.firstOrNull { it.id == notificationId }
+            val targetKey = target?.dedupeKey()
+            val idsToRemove = activeInAppNotificationsState.value
+                .filter { existing -> existing.id == notificationId || (targetKey != null && existing.dedupeKey() == targetKey) }
+                .map { it.id }
+                .toSet()
+
+            if (target != null) rememberDismissedNotificationPopupLocked(target)
+
+            idsToRemove.forEach { id ->
+                notificationPopupJobs.remove(id)?.cancel()
+                notificationPopupRemovalTokens.remove(id)
+                notificationPopupTransientById.remove(id)
+            }
+
+            val remaining = activeInAppNotificationsState.value.filterNot { it.id in idsToRemove }
+            activeInAppNotificationsState.emit(remaining)
+            if (latestInAppNotificationState.value?.id?.let { it in idsToRemove } == true) {
+                latestInAppNotificationState.emit(remaining.firstOrNull())
+            }
+
+            savedNotificationIdToMark = notificationId.takeIf {
+                markAsRead && notificationsState.payloadValue.orEmpty().any { notification ->
+                    notification.id == notificationId && notification.isSavedOnServer
+                }
+            }
+        }
+
+        savedNotificationIdToMark?.let { markNotificationRead(it) }
     }
 }
 
 private suspend fun saveNotificationToServerNow(notification: NotificationDataModel) {
     if (notification.message.isBlank()) return
+    if (notification.isLocalOnlyNotification()) return
     if (getStoredUserAuthTokens?.invoke() == null) return
     if (userAccountState.payloadValue == null) return
 
@@ -9476,7 +9786,7 @@ private suspend fun saveNotificationToServerNow(notification: NotificationDataMo
             val old = notificationsState.payloadValue.orEmpty()
             notificationsState.emit(
                 DataState.Success(
-                    (listOf(saved) + old.filter { it.id != notification.id && it.id != saved.id })
+                    (listOf(saved) + old.filter { it.id != notification.id && it.id != saved.id && !it.isLocalOnlyNotification() })
                         .distinctBy { it.id }
                         .dedupeRecentNotificationHistory()
                         .take(LOCAL_NOTIFICATION_HISTORY_LIMIT)
@@ -9495,7 +9805,7 @@ suspend fun syncPendingNotificationsToServerNow(): Int {
 
     return syncPendingNotificationsMutex.withLock {
         val pending = notificationsState.payloadValue.orEmpty()
-            .filter { !it.isSavedOnServer && it.message.isNotBlank() }
+            .filter { !it.isSavedOnServer && it.message.isNotBlank() && !it.isLocalOnlyNotification() }
             .distinctBy { notification -> notification.id.ifBlank { notification.dedupeKey() } }
             .sortedBy { it.createdAtMillis }
 
@@ -9524,7 +9834,8 @@ fun getNotifications() {
             getNotificationsMutex.withLock {
                 if (getStoredUserAuthTokens?.invoke() == null) return@withLock
 
-                val localPending = notificationsState.payloadValue.orEmpty().filter { !it.isSavedOnServer }
+                val localPending = notificationsState.payloadValue.orEmpty()
+                    .filter { !it.isSavedOnServer && !it.isLocalOnlyNotification() }
 
                 val response = networkRequest<List<NotificationDataModel>, Unit>(
                     method = HttpMethod.Get,
@@ -9532,8 +9843,8 @@ fun getNotifications() {
                 )
 
                 if (!response.negative) {
-                    val serverNotifications = response.payload.orEmpty()
-                    val currentNotifications = notificationsState.payloadValue.orEmpty()
+                    val serverNotifications = response.payload.orEmpty().filterNot { it.isLocalOnlyNotification() }
+                    val currentNotifications = notificationsState.payloadValue.orEmpty().filterNot { it.isLocalOnlyNotification() }
                     val previousIds = currentNotifications.map { it.id }.toSet()
                     val now = getCurrentTimeMillis()
                     val recentPreviousByKey = currentNotifications
@@ -9572,7 +9883,12 @@ fun getNotifications() {
                     syncPendingNotificationsToServer()
                 } else if (response.transportFailure) {
                     // Keep local notification history available offline.
-                    notificationsState.emit(DataState.Success(notificationsState.payloadValue.orEmpty(), response.message))
+                    notificationsState.emit(
+                        DataState.Success(
+                            notificationsState.payloadValue.orEmpty().filterNot { it.isLocalOnlyNotification() },
+                            response.message
+                        )
+                    )
                 }
             }
         }
@@ -9580,6 +9896,7 @@ fun getNotifications() {
 
 fun saveNotificationToServer(notification: NotificationDataModel) {
     if (notification.message.isBlank()) return
+    if (notification.isLocalOnlyNotification()) return
     if (getStoredUserAuthTokens?.invoke() == null) return
     if (userAccountState.payloadValue == null) return
 
@@ -9593,10 +9910,16 @@ fun markNotificationRead(notificationId: String) {
         GlobalScope.launch(Dispatchers.ourIo) {
             markNotificationReadMutex.withLock {
                 val local = notificationsState.payloadValue.orEmpty()
+                val target = local.firstOrNull { it.id == notificationId }
+                removeActiveInAppNotification(notificationId)
+                if (target == null) return@withLock
+
                 val now = getCurrentTimeMillis()
                 notificationsState.emit(
                     DataState.Success(local.map { if (it.id == notificationId) it.copy(readAtMillis = now) else it })
                 )
+
+                if (!target.isSavedOnServer) return@withLock
 
                 val response = networkRequest<List<NotificationDataModel>, List<String>>(
                     method = HttpMethod.Put,
@@ -9605,7 +9928,7 @@ fun markNotificationRead(notificationId: String) {
                 )
 
                 if (!response.negative && response.payload != null) {
-                    notificationsState.emit(DataState.Success(response.payload))
+                    notificationsState.emit(DataState.Success(response.payload.filterNot { it.isLocalOnlyNotification() }))
                 }
             }
         }
@@ -9613,11 +9936,15 @@ fun markNotificationRead(notificationId: String) {
 
 fun markAllNotificationsRead() {
     GlobalScope.launch(Dispatchers.ourIo) {
-        val ids = notificationsState.payloadValue.orEmpty()
+        val unreadNotifications = notificationsState.payloadValue.orEmpty()
             .filter { it.readAtMillis == null }
-            .map { it.id }
 
-        if (ids.isEmpty()) return@launch
+        if (unreadNotifications.isEmpty()) return@launch
+
+        val ids = unreadNotifications.map { it.id }
+        val savedIds = unreadNotifications
+            .filter { it.isSavedOnServer }
+            .map { it.id }
 
         val now = getCurrentTimeMillis()
         notificationsState.emit(
@@ -9626,14 +9953,16 @@ fun markAllNotificationsRead() {
             )
         )
 
+        if (savedIds.isEmpty()) return@launch
+
         val response = networkRequest<List<NotificationDataModel>, List<String>>(
             method = HttpMethod.Put,
             endpointUrl = "notifications/read",
-            body = ids
+            body = savedIds
         )
 
         if (!response.negative && response.payload != null) {
-            notificationsState.emit(DataState.Success(response.payload))
+            notificationsState.emit(DataState.Success(response.payload.filterNot { it.isLocalOnlyNotification() }))
         }
     }
 }
@@ -9984,9 +10313,9 @@ fun logInUser(userAuthLogIn: UserAuthLogInDataModel, serverUrlOverride: String? 
                         val fallbackMessage = if (response.transportFailure) {
                             localizedStringResourceMessage(
                                 id = 1140,
-                                main = "Server unavailable. Check local server address or Wi‑Fi.",
-                                ru = "Сервер недоступен. Проверьте адрес локального сервера или Wi‑Fi.",
-                                kk = "Сервер қолжетімсіз. Жергілікті сервер мекенжайын немесе Wi‑Fi желісін тексеріңіз."
+                                main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
+                                ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
+                                kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
                             )
                         } else {
                             localizedStringResourceMessage(
@@ -10722,9 +11051,9 @@ suspend inline fun <reified Response, reified Body> networkRequest(
         lastServerErrorResponse ?: ResponseDataModel<Response>(
             message = lastTransportFailureMessage ?: localizedStringResourceMessage(
                 id = 1140,
-                main = "Server unavailable. Check local server address or Wi-Fi.",
-                ru = "Сервер недоступен. Проверьте адрес локального сервера или Wi-Fi.",
-                kk = "Сервер қолжетімсіз. Жергілікті сервер мекенжайын немесе Wi-Fi желісін тексеріңіз."
+                main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
+                ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
+                kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
             ),
             payload = null,
             negative = true,
@@ -10809,22 +11138,12 @@ internal fun <Response> nonAitaServerResponseDataModel(
     status: HttpStatusCode,
     rawBody: String
 ): ResponseDataModel<Response> {
-    val looksLikeCaptivePortal = status.value in 300..399 || rawBody.trimStart().startsWith("<")
-    val message = if (looksLikeCaptivePortal) {
-        localizedStringResourceMessage(
-            id = 223,
-            main = "The configured address answered, but it is not the AITA server. Check the local server address, Wi‑Fi, or hotspot/captive portal.",
-            ru = "Настроенный адрес ответил, но это не сервер AITA. Проверьте локальный адрес сервера, Wi‑Fi или страницу входа сети.",
-            kk = "Бапталған мекенжай жауап берді, бірақ бұл AITA сервері емес. Жергілікті сервер мекенжайын, Wi‑Fi немесе желіге кіру бетін тексеріңіз."
-        )
-    } else {
-        localizedStringResourceMessage(
-            id = 223,
-            main = "The server response does not look like AITA. Check the local server address and make sure the backend is running.",
-            ru = "Ответ сервера не похож на AITA. Проверьте локальный адрес сервера и убедитесь, что backend запущен.",
-            kk = "Сервер жауабы AITA-ға ұқсамайды. Жергілікті сервер мекенжайын тексеріп, backend іске қосылғанына көз жеткізіңіз."
-        )
-    }
+    val message = localizedStringResourceMessage(
+        id = 1140,
+        main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
+        ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
+        kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
+    )
 
     return ResponseDataModel(
         message = message,
@@ -10840,30 +11159,12 @@ internal fun <Response> unreadableNetworkResponseDataModel(
     status: HttpStatusCode,
     rawBody: String
 ): ResponseDataModel<Response> {
-    val rawPreview = rawBody
-        .replace("\n", " ")
-        .replace("\r", " ")
-        .take(1200)
-        .ifBlank { "<empty response body>" }
-
     return ResponseDataModel<Response>(
-        message = listOf(
-            LocalizedStringDataModel(
-                language = "main",
-                value = "Server returned an unreadable response: HTTP ${status.value} ${status.description}: $rawPreview"
-            ),
-            LocalizedStringDataModel(
-                language = "en",
-                value = "Server returned an unreadable response: HTTP ${status.value} ${status.description}: $rawPreview"
-            ),
-            LocalizedStringDataModel(
-                language = "ru",
-                value = "Сервер вернул нечитаемый ответ: HTTP ${status.value} ${status.description}: $rawPreview"
-            ),
-            LocalizedStringDataModel(
-                language = "kk",
-                value = "Сервер оқылмайтын жауап қайтарды: HTTP ${status.value} ${status.description}: $rawPreview"
-            )
+        message = localizedStringResourceMessage(
+            id = 225,
+            main = "Server response could not be read",
+            ru = "Не удалось прочитать ответ сервера",
+            kk = "Сервер жауабын оқу мүмкін болмады"
         ),
         payload = null,
         negative = true,
@@ -10933,6 +11234,7 @@ fun addStore(store: StoreDataModel, onCompleted: ((DataState<StoreDataModel>) ->
                     )
 
                     getStores()
+
                     onCompleted?.invoke(DataState.Success(response.payload!!))
                 }
             }
@@ -11289,6 +11591,81 @@ fun getStock(storeId: String) {
         }
 }
 
+fun getParentStoreStock(
+    storeId: String,
+    query: String? = null,
+    limit: Int = 80,
+    offset: Int = 0,
+    updateSharedState: Boolean = true,
+    appendToSharedState: Boolean = false
+): Flow<DataState<List<GoodsItemDataModel>>> {
+    return flow {
+        getParentStoreStockMutex.withLock {
+            val cleanStoreId = storeId.trim()
+            if (cleanStoreId.isBlank()) {
+                emit(DataState.Empty())
+                return@withLock
+            }
+
+            val cleanQuery = query
+                ?.trim()
+                ?.takeIf { it.isNotBlank() }
+            val cleanLimit = limit.coerceIn(1, globalAppConfigurationState.payloadValue.pagingMaxPageSize)
+            val cleanOffset = offset.coerceAtLeast(0)
+
+            val response = networkRequest<List<GoodsItemDataModel>, Unit>(
+                method = HttpMethod.Get,
+                endpointUrl = globalAppConfigurationState.payloadValue.getParentStoreStockPath.first,
+                headers = mapOf("store_id" to cleanStoreId),
+                query = buildMap {
+                    cleanQuery?.let { put("q", it) }
+                    put("limit", cleanLimit)
+                    put("offset", cleanOffset)
+                }
+            )
+
+            val state: DataState<List<GoodsItemDataModel>> = if (!response.negative) {
+                DataState.Success(response.payload.orEmpty(), response.message)
+            } else {
+                DataState.Empty(response.message)
+            }
+
+            if (updateSharedState && state is DataState.Success) {
+                val mergedPayload = if (appendToSharedState || cleanOffset > 0 || cleanQuery != null) {
+                    val freshIds = state.payload.map { it.id }.toSet()
+                    (parentStoreStockState.payloadValue.orEmpty().filterNot { it.id in freshIds } + state.payload).distinctBy { it.id }
+                } else {
+                    state.payload
+                }
+                parentStoreStockState.emit(DataState.Success(mergedPayload, state.message))
+            }
+
+            emit(state)
+        }
+    }
+}
+
+fun refreshParentStoreStock(
+    storeId: String,
+    query: String? = null,
+    limit: Int = 80,
+    offset: Int = 0,
+    appendToSharedState: Boolean = false
+) {
+    if (!getParentStoreStockMutex.isLocked) {
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getParentStoreStock(
+                storeId = storeId,
+                query = query,
+                limit = limit,
+                offset = offset,
+                updateSharedState = true,
+                appendToSharedState = appendToSharedState
+            ).collect()
+        }
+    }
+}
+
 fun updateGoodsItem(
     goodsItem: GoodsItemDataModel,
     onCompleted: ((DataState<GoodsItemDataModel>) -> Unit)?
@@ -11326,6 +11703,11 @@ fun updateGoodsItem(
                         )
                     )
 
+                    goodsItem.storeId.takeIf { it.isNotBlank() }?.let { storeId ->
+                        getStock(storeId)
+                        refreshParentStoreStock(storeId, limit = 32, appendToSharedState = false)
+                    }
+
                     onCompleted?.invoke(DataState.Success(response.payload!!))
                 }
             }
@@ -11360,6 +11742,11 @@ fun addGoodsItem(goodsItem: GoodsItemDataModel, onCompleted: ((DataState<GoodsIt
                             }
                         )
                     )
+
+                    goodsItem.storeId.takeIf { it.isNotBlank() }?.let { storeId ->
+                        getStock(storeId)
+                        refreshParentStoreStock(storeId, limit = 32, appendToSharedState = false)
+                    }
 
                     onCompleted?.invoke(DataState.Success(response.payload!!))
                 }
@@ -12424,6 +12811,7 @@ data class GlobalAppConfigurationDataModel(
     val updateStoresPath: Pair<String, String>,
     val deleteStoresPath: Pair<String, String>,
     val getStockPath: Pair<String, String>,
+    val getParentStoreStockPath: Pair<String, String> = Pair("stock/parent/get", "1212"),
     val addGoodsItemPath: Pair<String, String>,
     val updateGoodsItemPath: Pair<String, String>,
     val deleteGoodsItemPath: Pair<String, String>,

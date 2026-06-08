@@ -13,6 +13,7 @@ application {
 
     applicationDefaultJvmArgs = listOf(
         "-Dio.ktor.development=false",
+        "-Dktor.development=false",
         "-Dfile.encoding=UTF-8",
         "-Duser.timezone=UTC",
         "-XX:+ExitOnOutOfMemoryError",
@@ -76,4 +77,20 @@ dependencies {
     testImplementation(libs.kotlin.testJunit)
 
 
+}
+ktor {
+    fatJar {
+        archiveFileName.set("aita-server-all.jar")
+    }
+}
+
+tasks.withType<JavaExec>().configureEach {
+    systemProperty("io.ktor.development", "false")
+    systemProperty("ktor.development", "false")
+    jvmArgs("-Dio.ktor.development=false", "-Dktor.development=false")
+}
+
+tasks.withType<Test>().configureEach {
+    systemProperty("io.ktor.development", "false")
+    systemProperty("ktor.development", "false")
 }
