@@ -25012,6 +25012,594 @@
           "value": "Жасалды"
         }
       ]
+    },
+    {
+      "id": 1276,
+      "values": [
+        {
+          "language": "main",
+          "value": "Sticky label printer"
+        },
+        {
+          "language": "en",
+          "value": "Sticky label printer"
+        },
+        {
+          "language": "ru",
+          "value": "Принтер наклеек"
+        },
+        {
+          "language": "kk",
+          "value": "Жапсырма принтері"
+        }
+      ]
+    },
+    {
+      "id": 1277,
+      "values": [
+        {
+          "language": "main",
+          "value": "Sticky item tags use TSPL, ZPL or CPCL label printers. They print barcode, item name and price onto small adhesive labels."
+        },
+        {
+          "language": "en",
+          "value": "Sticky item tags use TSPL, ZPL or CPCL label printers. They print barcode, item name and price onto small adhesive labels."
+        },
+        {
+          "language": "ru",
+          "value": "Наклейки товаров печатаются на принтерах TSPL, ZPL или CPCL: штрихкод, название и цена на маленькой клейкой этикетке."
+        },
+        {
+          "language": "kk",
+          "value": "Тауар жапсырмалары TSPL, ZPL немесе CPCL принтерлерінде басылады: штрихкод, атау және баға."
+        }
+      ]
+    },
+    {
+      "id": 1278,
+      "values": [
+        {
+          "language": "main",
+          "value": "Detected label printers"
+        },
+        {
+          "language": "en",
+          "value": "Detected label printers"
+        },
+        {
+          "language": "ru",
+          "value": "Найденные принтеры наклеек"
+        },
+        {
+          "language": "kk",
+          "value": "Табылған жапсырма принтерлері"
+        }
+      ]
+    },
+    {
+      "id": 1279,
+      "values": [
+        {
+          "language": "main",
+          "value": "No paired sticky label printers found"
+        },
+        {
+          "language": "en",
+          "value": "No paired sticky label printers found"
+        },
+        {
+          "language": "ru",
+          "value": "Подключённые принтеры наклеек не найдены"
+        },
+        {
+          "language": "kk",
+          "value": "Жұпталған жапсырма принтері табылмады"
+        }
+      ]
+    },
+    {
+      "id": 1280,
+      "values": [
+        {
+          "language": "main",
+          "value": "Label printer selected"
+        },
+        {
+          "language": "en",
+          "value": "Label printer selected"
+        },
+        {
+          "language": "ru",
+          "value": "Принтер наклеек выбран"
+        },
+        {
+          "language": "kk",
+          "value": "Жапсырма принтері таңдалды"
+        }
+      ]
+    },
+    {
+      "id": 1281,
+      "values": [
+        {
+          "language": "main",
+          "value": "Label printer cleared"
+        },
+        {
+          "language": "en",
+          "value": "Label printer cleared"
+        },
+        {
+          "language": "ru",
+          "value": "Принтер наклеек сброшен"
+        },
+        {
+          "language": "kk",
+          "value": "Жапсырма принтері тазартылды"
+        }
+      ]
+    },
+    {
+      "id": 1282,
+      "values": [
+        {
+          "language": "main",
+          "value": "Send test label"
+        },
+        {
+          "language": "en",
+          "value": "Send test label"
+        },
+        {
+          "language": "ru",
+          "value": "Отправить тестовую наклейку"
+        },
+        {
+          "language": "kk",
+          "value": "Сынақ жапсырмасын жіберу"
+        }
+      ]
+    },
+    {
+      "id": 1283,
+      "values": [
+        {
+          "language": "main",
+          "value": "Test label sent"
+        },
+        {
+          "language": "en",
+          "value": "Test label sent"
+        },
+        {
+          "language": "ru",
+          "value": "Тестовая наклейка отправлена"
+        },
+        {
+          "language": "kk",
+          "value": "Сынақ жапсырмасы жіберілді"
+        }
+      ]
+    },
+    {
+      "id": 1284,
+      "values": [
+        {
+          "language": "main",
+          "value": "Label printer is not configured"
+        },
+        {
+          "language": "en",
+          "value": "Label printer is not configured"
+        },
+        {
+          "language": "ru",
+          "value": "Принтер наклеек не настроен"
+        },
+        {
+          "language": "kk",
+          "value": "Жапсырма принтері бапталмаған"
+        }
+      ]
+    },
+    {
+      "id": 1285,
+      "values": [
+        {
+          "language": "main",
+          "value": "Label sent to printer"
+        },
+        {
+          "language": "en",
+          "value": "Label sent to printer"
+        },
+        {
+          "language": "ru",
+          "value": "Наклейка отправлена на принтер"
+        },
+        {
+          "language": "kk",
+          "value": "Жапсырма принтерге жіберілді"
+        }
+      ]
+    },
+    {
+      "id": 1286,
+      "values": [
+        {
+          "language": "main",
+          "value": "Clear label printer"
+        },
+        {
+          "language": "en",
+          "value": "Clear label printer"
+        },
+        {
+          "language": "ru",
+          "value": "Сбросить принтер наклеек"
+        },
+        {
+          "language": "kk",
+          "value": "Жапсырма принтерін тазарту"
+        }
+      ]
+    },
+    {
+      "id": 1287,
+      "values": [
+        {
+          "language": "main",
+          "value": "Label printer protocol"
+        },
+        {
+          "language": "en",
+          "value": "Label printer protocol"
+        },
+        {
+          "language": "ru",
+          "value": "Протокол принтера наклеек"
+        },
+        {
+          "language": "kk",
+          "value": "Жапсырма принтері протоколы"
+        }
+      ]
+    },
+    {
+      "id": 1288,
+      "values": [
+        {
+          "language": "main",
+          "value": "Print item label"
+        },
+        {
+          "language": "en",
+          "value": "Print item label"
+        },
+        {
+          "language": "ru",
+          "value": "Печать наклейки товара"
+        },
+        {
+          "language": "kk",
+          "value": "Тауар жапсырмасын басу"
+        }
+      ]
+    },
+    {
+      "id": 1289,
+      "values": [
+        {
+          "language": "main",
+          "value": "Sticky shelf tag"
+        },
+        {
+          "language": "en",
+          "value": "Sticky shelf tag"
+        },
+        {
+          "language": "ru",
+          "value": "Полочная наклейка"
+        },
+        {
+          "language": "kk",
+          "value": "Сөре жапсырмасы"
+        }
+      ]
+    },
+    {
+      "id": 1290,
+      "values": [
+        {
+          "language": "main",
+          "value": "Print barcode, name and price on an adhesive item label."
+        },
+        {
+          "language": "en",
+          "value": "Print barcode, name and price on an adhesive item label."
+        },
+        {
+          "language": "ru",
+          "value": "Печатает штрихкод, название и цену на клейкой этикетке товара."
+        },
+        {
+          "language": "kk",
+          "value": "Тауар жапсырмасына штрихкод, атау және бағаны басады."
+        }
+      ]
+    },
+    {
+      "id": 1291,
+      "values": [
+        {
+          "language": "main",
+          "value": "Label copies"
+        },
+        {
+          "language": "en",
+          "value": "Label copies"
+        },
+        {
+          "language": "ru",
+          "value": "Количество наклеек"
+        },
+        {
+          "language": "kk",
+          "value": "Жапсырма саны"
+        }
+      ]
+    },
+    {
+      "id": 1292,
+      "values": [
+        {
+          "language": "main",
+          "value": "Label preview"
+        },
+        {
+          "language": "en",
+          "value": "Label preview"
+        },
+        {
+          "language": "ru",
+          "value": "Предпросмотр наклейки"
+        },
+        {
+          "language": "kk",
+          "value": "Жапсырманы алдын ала көру"
+        }
+      ]
+    },
+    {
+      "id": 1293,
+      "values": [
+        {
+          "language": "main",
+          "value": "Barcode for label"
+        },
+        {
+          "language": "en",
+          "value": "Barcode for label"
+        },
+        {
+          "language": "ru",
+          "value": "Штрихкод для наклейки"
+        },
+        {
+          "language": "kk",
+          "value": "Жапсырма штрихкоды"
+        }
+      ]
+    },
+    {
+      "id": 1294,
+      "values": [
+        {
+          "language": "main",
+          "value": "Auto protocol"
+        },
+        {
+          "language": "en",
+          "value": "Auto protocol"
+        },
+        {
+          "language": "ru",
+          "value": "Авто протокол"
+        },
+        {
+          "language": "kk",
+          "value": "Авто протокол"
+        }
+      ]
+    },
+    {
+      "id": 1295,
+      "values": [
+        {
+          "language": "main",
+          "value": "TSPL"
+        },
+        {
+          "language": "en",
+          "value": "TSPL"
+        },
+        {
+          "language": "ru",
+          "value": "TSPL"
+        },
+        {
+          "language": "kk",
+          "value": "TSPL"
+        }
+      ]
+    },
+    {
+      "id": 1296,
+      "values": [
+        {
+          "language": "main",
+          "value": "ZPL"
+        },
+        {
+          "language": "en",
+          "value": "ZPL"
+        },
+        {
+          "language": "ru",
+          "value": "ZPL"
+        },
+        {
+          "language": "kk",
+          "value": "ZPL"
+        }
+      ]
+    },
+    {
+      "id": 1297,
+      "values": [
+        {
+          "language": "main",
+          "value": "CPCL"
+        },
+        {
+          "language": "en",
+          "value": "CPCL"
+        },
+        {
+          "language": "ru",
+          "value": "CPCL"
+        },
+        {
+          "language": "kk",
+          "value": "CPCL"
+        }
+      ]
+    },
+    {
+      "id": 1298,
+      "values": [
+        {
+          "language": "main",
+          "value": "Label protocol selected"
+        },
+        {
+          "language": "en",
+          "value": "Label protocol selected"
+        },
+        {
+          "language": "ru",
+          "value": "Протокол наклеек выбран"
+        },
+        {
+          "language": "kk",
+          "value": "Жапсырма протоколы таңдалды"
+        }
+      ]
+    },
+    {
+      "id": 1299,
+      "values": [
+        {
+          "language": "main",
+          "value": "This item has no barcode yet; add a barcode before printing a shelf label."
+        },
+        {
+          "language": "en",
+          "value": "This item has no barcode yet; add a barcode before printing a shelf label."
+        },
+        {
+          "language": "ru",
+          "value": "У товара пока нет штрихкода. Добавьте штрихкод перед печатью полочной наклейки."
+        },
+        {
+          "language": "kk",
+          "value": "Бұл тауарда әлі штрихкод жоқ. Сөре жапсырмасын баспас бұрын штрихкод қосыңыз."
+        }
+      ]
+    },
+    {
+      "id": 1300,
+      "values": [
+        {
+          "language": "main",
+          "value": "Price text"
+        },
+        {
+          "language": "en",
+          "value": "Price text"
+        },
+        {
+          "language": "ru",
+          "value": "Текст цены"
+        },
+        {
+          "language": "kk",
+          "value": "Баға мәтіні"
+        }
+      ]
+    },
+    {
+      "id": 1301,
+      "values": [
+        {
+          "language": "main",
+          "value": "Store name"
+        },
+        {
+          "language": "en",
+          "value": "Store name"
+        },
+        {
+          "language": "ru",
+          "value": "Название магазина"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен атауы"
+        }
+      ]
+    },
+    {
+      "id": 1302,
+      "values": [
+        {
+          "language": "main",
+          "value": "Label printers refreshed"
+        },
+        {
+          "language": "en",
+          "value": "Label printers refreshed"
+        },
+        {
+          "language": "ru",
+          "value": "Принтеры наклеек обновлены"
+        },
+        {
+          "language": "kk",
+          "value": "Жапсырма принтерлері жаңартылды"
+        }
+      ]
+    },
+    {
+      "id": 1303,
+      "values": [
+        {
+          "language": "main",
+          "value": "Use this label printer"
+        },
+        {
+          "language": "en",
+          "value": "Use this label printer"
+        },
+        {
+          "language": "ru",
+          "value": "Использовать этот принтер наклеек"
+        },
+        {
+          "language": "kk",
+          "value": "Осы жапсырма принтерін қолдану"
+        }
+      ]
     }
   ]
 }

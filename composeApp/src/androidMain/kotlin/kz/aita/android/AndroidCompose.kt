@@ -761,10 +761,58 @@ object ReceiptPlatformAndroidBridge {
     }
 }
 
+
+object LabelPrinterAndroidBridge {
+    /** Optional direct TSPL/ZPL/CPCL label writer. */
+    var writeLabelBytes: (suspend (ByteArray) -> Boolean)? = null
+    var bluetoothLabelPrinterMacAddress: String? = null
+    var labelPrinterProtocol: String = LABEL_PRINTER_PROTOCOL_AUTO
+
+    private val bluetoothSerialPortProfileUuid: UUID =
+        UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+
+    fun configureBluetoothLabelPrinter(macAddress: String?) {
+        bluetoothLabelPrinterMacAddress = macAddress
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+    }
+
+    fun configureProtocol(protocol: String) {
+        labelPrinterProtocol = normalizeLabelPrinterProtocol(protocol)
+    }
+
+    @SuppressLint("MissingPermission")
+    private suspend fun writeLabelBytesToConfiguredBluetoothPrinter(labelBytes: ByteArray): Boolean =
+        withContext(Dispatchers.IO) {
+            val address = bluetoothLabelPrinterMacAddress?.trim()?.takeIf { it.isNotBlank() } ?: return@withContext false
+            val adapter = BluetoothAdapter.getDefaultAdapter() ?: return@withContext false
+            val device = runCatching { adapter.getRemoteDevice(address) }.getOrNull() ?: return@withContext false
+            runCatching { adapter.cancelDiscovery() }
+            val socket = device.createRfcommSocketToServiceRecord(bluetoothSerialPortProfileUuid)
+            try {
+                socket.connect()
+                socket.outputStream.write(labelBytes)
+                socket.outputStream.flush()
+                true
+            } finally {
+                runCatching { socket.close() }
+            }
+        }
+
+    suspend fun writeLabelBytesToConfiguredPrinter(labelBytes: ByteArray): Boolean {
+        writeLabelBytes?.let { customWriter -> return customWriter(labelBytes) }
+        return writeLabelBytesToConfiguredBluetoothPrinter(labelBytes)
+    }
+}
+
 fun installReceiptPlatformAndroid(context: Context) {
     val appContext = context.applicationContext
     val receiptPrinterPreferences = appContext.getSharedPreferences("aita_receipt_printer", Context.MODE_PRIVATE)
+    val labelPrinterPreferences = appContext.getSharedPreferences("aita_label_printer", Context.MODE_PRIVATE)
     ReceiptPlatformAndroidBridge.configureBluetoothPrinter(receiptPrinterPreferences.getString("bluetooth_printer_mac_address", null))
+    LabelPrinterAndroidBridge.configureBluetoothLabelPrinter(labelPrinterPreferences.getString("bluetooth_label_printer_mac_address", null))
+    LabelPrinterAndroidBridge.configureProtocol(labelPrinterPreferences.getString("label_printer_protocol", LABEL_PRINTER_PROTOCOL_AUTO))
+    configuredLabelPrinterProtocolState.value = LabelPrinterAndroidBridge.labelPrinterProtocol
 
 
     fun createCachedPdfUri(fileName: String, pdfBytes: ByteArray): Uri {
@@ -913,6 +961,60 @@ fun installReceiptPlatformAndroid(context: Context) {
             )
     }
 
+
+    fun likelyLabelPrinterName(name: String): Boolean {
+        val clean = name.lowercase()
+        return listOf("label", "sticker", "tspl", "tsc", "zebra", "zpl", "cpcl", "godex", "gainscha", "xprinter", "xp-", "bixolon", "printer")
+            .any { clean.contains(it) }
+    }
+
+    @SuppressLint("MissingPermission")
+    fun listBluetoothLabelPrinterDevices(): List<PlatformLabelPrinterDataModel> {
+        val configuredAddress = LabelPrinterAndroidBridge.bluetoothLabelPrinterMacAddress?.trim().orEmpty()
+        val discovered = runCatching {
+            val adapter = BluetoothAdapter.getDefaultAdapter() ?: return@runCatching emptyList()
+            adapter.bondedDevices
+                .orEmpty()
+                .mapNotNull { device ->
+                    val address = runCatching { device.address }.getOrNull()?.trim().orEmpty()
+                    val name = runCatching { device.name }.getOrNull()?.trim().orEmpty()
+                    val id = address.ifBlank { name }
+                    if (id.isBlank()) return@mapNotNull null
+                    val probable = likelyLabelPrinterName(name)
+                    PlatformLabelPrinterDataModel(
+                        id = id,
+                        name = name.ifBlank { address.ifBlank { "Bluetooth label printer" } },
+                        subtitle = listOfNotNull(
+                            address.takeIf { it.isNotBlank() },
+                            if (probable) "Likely TSPL/ZPL/CPCL sticky label printer" else "Paired Bluetooth device"
+                        ).joinToString(" • "),
+                        configured = address.equals(configuredAddress, ignoreCase = true) || id.equals(configuredAddress, ignoreCase = true),
+                        available = true
+                    )
+                }
+        }.getOrElse { emptyList() }
+
+        val withSavedConfiguredPrinter = if (configuredAddress.isNotBlank() && discovered.none { it.configured || it.id.equals(configuredAddress, ignoreCase = true) }) {
+            discovered + PlatformLabelPrinterDataModel(
+                id = configuredAddress,
+                name = "Saved label printer",
+                subtitle = "Saved Bluetooth label printer; connect or pair it in system settings if unavailable",
+                configured = true,
+                available = false
+            )
+        } else {
+            discovered
+        }
+
+        return withSavedConfiguredPrinter
+            .distinctBy { it.id.lowercase() }
+            .sortedWith(
+                compareByDescending<PlatformLabelPrinterDataModel> { it.configured }
+                    .thenByDescending { likelyLabelPrinterName(it.name) }
+                    .thenBy { it.name.lowercase() }
+            )
+    }
+
     saveReceiptPdfFile = { fileName, pdfBytes ->
         withContext(Dispatchers.IO) {
             savePdfToDownloadsOrPrivateDocuments(fileName, pdfBytes)
@@ -987,6 +1089,48 @@ fun installReceiptPlatformAndroid(context: Context) {
             true,
             if (deviceId.isNullOrBlank()) "Receipt printer cleared" else "Receipt printer selected"
         )
+    }
+
+
+    listPlatformLabelPrinterDevicesAction = {
+        withContext(Dispatchers.IO) {
+            listBluetoothLabelPrinterDevices()
+        }
+    }
+
+    configurePlatformLabelPrinterDeviceAction = { deviceId ->
+        LabelPrinterAndroidBridge.configureBluetoothLabelPrinter(deviceId)
+        if (deviceId.isNullOrBlank()) {
+            labelPrinterPreferences.edit().remove("bluetooth_label_printer_mac_address").apply()
+        } else {
+            labelPrinterPreferences.edit().putString("bluetooth_label_printer_mac_address", deviceId.trim()).apply()
+        }
+        ReceiptPlatformActionResult(
+            true,
+            if (deviceId.isNullOrBlank()) "Label printer cleared" else "Label printer selected"
+        )
+    }
+
+    configurePlatformLabelPrinterProtocolAction = { protocol ->
+        val normalized = normalizeLabelPrinterProtocol(protocol)
+        LabelPrinterAndroidBridge.configureProtocol(normalized)
+        labelPrinterPreferences.edit().putString("label_printer_protocol", normalized).apply()
+        configuredLabelPrinterProtocolState.value = normalized
+        ReceiptPlatformActionResult(true, "Label printer protocol selected")
+    }
+
+    printLabelPrinterBytes = { labelBytes ->
+        withContext(Dispatchers.IO) {
+            runCatching {
+                if (LabelPrinterAndroidBridge.writeLabelBytesToConfiguredPrinter(labelBytes)) {
+                    ReceiptPlatformActionResult(true, "Label sent to printer")
+                } else {
+                    ReceiptPlatformActionResult(false, "Android Bluetooth sticky label printer is not configured")
+                }
+            }.getOrElse { throwable ->
+                ReceiptPlatformActionResult(false, throwable.message ?: "Could not print sticky label")
+            }
+        }
     }
 
     printReceiptPlatformAction = { _, _, printerBytes ->

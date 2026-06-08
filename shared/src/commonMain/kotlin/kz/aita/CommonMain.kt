@@ -665,6 +665,7 @@ data class TransactionCartScrollStateDataModel(
     val updatedAtMillis: Long = 0L
 )
 
+@kotlinx.serialization.Serializable
 data class TransactionReceiptSnapshotDataModel(
     val transaction: TransactionDataModel,
     val store: StoreDataModel?,
@@ -677,6 +678,7 @@ data class TransactionReceiptSnapshotDataModel(
     val cashierEmail: String = ""
 )
 
+@kotlinx.serialization.Serializable
 data class TransactionReceiptLineDataModel(
     val index: Int,
     val goodsItemId: String,
@@ -699,6 +701,7 @@ data class ReceiptPlatformActionResult(
     val message: String = ""
 )
 
+@kotlinx.serialization.Serializable
 data class PlatformReceiptPrinterDataModel(
     val id: String,
     val name: String,
@@ -707,18 +710,55 @@ data class PlatformReceiptPrinterDataModel(
     val available: Boolean = true
 )
 
+const val LABEL_PRINTER_PROTOCOL_AUTO = "auto"
+const val LABEL_PRINTER_PROTOCOL_TSPL = "tspl"
+const val LABEL_PRINTER_PROTOCOL_ZPL = "zpl"
+const val LABEL_PRINTER_PROTOCOL_CPCL = "cpcl"
+
+@kotlinx.serialization.Serializable
+data class PlatformLabelPrinterDataModel(
+    val id: String,
+    val name: String,
+    val subtitle: String = "",
+    val configured: Boolean = false,
+    val available: Boolean = true,
+    val supportedProtocols: List<String> = listOf(
+        LABEL_PRINTER_PROTOCOL_AUTO,
+        LABEL_PRINTER_PROTOCOL_TSPL,
+        LABEL_PRINTER_PROTOCOL_ZPL,
+        LABEL_PRINTER_PROTOCOL_CPCL
+    )
+)
+
+@kotlinx.serialization.Serializable
+data class StockItemLabelDataModel(
+    val itemName: String = "",
+    val barcode: String = "",
+    val priceText: String = "",
+    val storeName: String = "",
+    val unitText: String = "",
+    val note: String = "",
+    val copies: Int = 1,
+    val labelWidthMm: Int = 58,
+    val labelHeightMm: Int = 40,
+    val protocol: String = LABEL_PRINTER_PROTOCOL_AUTO
+)
+
+@kotlinx.serialization.Serializable
 data class AnalyticsReportRowDataModel(
     val title: String,
     val value: String,
     val note: String = ""
 )
 
+@kotlinx.serialization.Serializable
 data class AnalyticsReportSectionDataModel(
     val title: String,
     val rows: List<AnalyticsReportRowDataModel> = emptyList(),
     val notes: List<String> = emptyList()
 )
 
+@kotlinx.serialization.Serializable
 data class AnalyticsReportSnapshotDataModel(
     val title: String,
     val storeName: String,
@@ -728,6 +768,7 @@ data class AnalyticsReportSnapshotDataModel(
     val sections: List<AnalyticsReportSectionDataModel>
 )
 
+@kotlinx.serialization.Serializable
 data class ReceiptTextLabelsDataModel(
     val store: String = "Store",
     val goodsReceiptTitle: String = "Goods receipt",
@@ -768,9 +809,16 @@ var printReceiptPlatformAction: (suspend (fileName: String, pdfBytes: ByteArray,
 var printPdfDocumentPlatformAction: (suspend (fileName: String, pdfBytes: ByteArray) -> ReceiptPlatformActionResult)? = null
 var listPlatformReceiptPrinterDevicesAction: (suspend () -> List<PlatformReceiptPrinterDataModel>)? = null
 var configurePlatformReceiptPrinterDeviceAction: (suspend (deviceId: String?) -> ReceiptPlatformActionResult)? = null
+var printLabelPrinterBytes: (suspend (labelBytes: ByteArray) -> ReceiptPlatformActionResult)? = null
+var listPlatformLabelPrinterDevicesAction: (suspend () -> List<PlatformLabelPrinterDataModel>)? = null
+var configurePlatformLabelPrinterDeviceAction: (suspend (deviceId: String?) -> ReceiptPlatformActionResult)? = null
+var configurePlatformLabelPrinterProtocolAction: (suspend (protocol: String) -> ReceiptPlatformActionResult)? = null
 
 val receiptPrinterDevicesState = MutableStateFlow<List<PlatformReceiptPrinterDataModel>>(emptyList())
 val configuredReceiptPrinterDeviceIdState = MutableStateFlow<String?>(null)
+val labelPrinterDevicesState = MutableStateFlow<List<PlatformLabelPrinterDataModel>>(emptyList())
+val configuredLabelPrinterDeviceIdState = MutableStateFlow<String?>(null)
+val configuredLabelPrinterProtocolState = MutableStateFlow(LABEL_PRINTER_PROTOCOL_AUTO)
 
 suspend fun saveReceiptPdf(fileName: String, pdfBytes: ByteArray, labels: ReceiptTextLabelsDataModel = ReceiptTextLabelsDataModel()): ReceiptPlatformActionResult {
     return saveReceiptPdfFile?.invoke(fileName, pdfBytes)
@@ -844,6 +892,199 @@ fun configureReceiptPrinterDevice(deviceId: String?, onCompleted: ((ReceiptPlatf
 
         onCompleted?.invoke(result)
     }
+}
+
+
+fun normalizeLabelPrinterProtocol(protocol: String?): String = when (protocol?.trim()?.lowercase()) {
+    LABEL_PRINTER_PROTOCOL_TSPL -> LABEL_PRINTER_PROTOCOL_TSPL
+    LABEL_PRINTER_PROTOCOL_ZPL -> LABEL_PRINTER_PROTOCOL_ZPL
+    LABEL_PRINTER_PROTOCOL_CPCL -> LABEL_PRINTER_PROTOCOL_CPCL
+    else -> LABEL_PRINTER_PROTOCOL_AUTO
+}
+
+fun effectiveLabelPrinterProtocol(protocol: String?): String = when (normalizeLabelPrinterProtocol(protocol)) {
+    LABEL_PRINTER_PROTOCOL_ZPL -> LABEL_PRINTER_PROTOCOL_ZPL
+    LABEL_PRINTER_PROTOCOL_CPCL -> LABEL_PRINTER_PROTOCOL_CPCL
+    else -> LABEL_PRINTER_PROTOCOL_TSPL
+}
+
+suspend fun printStockItemLabel(
+    label: StockItemLabelDataModel,
+    protocol: String = label.protocol,
+    notConfiguredMessage: String = "Sticky label printer is not configured for this platform"
+): ReceiptPlatformActionResult {
+    val normalizedProtocol = normalizeLabelPrinterProtocol(protocol)
+    return printLabelPrinterBytes?.invoke(
+        buildStockItemLabelPrinterBytes(label.copy(protocol = normalizedProtocol))
+    ) ?: ReceiptPlatformActionResult(false, notConfiguredMessage)
+}
+
+fun refreshLabelPrinterDevices(onCompleted: ((ReceiptPlatformActionResult) -> Unit)? = null) {
+    GlobalScope.launch(Dispatchers.ourIo) {
+        val result = runCatching {
+            val devices = listPlatformLabelPrinterDevicesAction?.invoke().orEmpty()
+            labelPrinterDevicesState.emit(devices)
+            configuredLabelPrinterDeviceIdState.emit(devices.firstOrNull { it.configured }?.id)
+            ReceiptPlatformActionResult(true, "Label printers refreshed")
+        }.getOrElse { throwable ->
+            ReceiptPlatformActionResult(false, throwable.message ?: "Could not refresh label printers")
+        }
+        onCompleted?.invoke(result)
+    }
+}
+
+fun configureLabelPrinterDevice(deviceId: String?, onCompleted: ((ReceiptPlatformActionResult) -> Unit)? = null) {
+    GlobalScope.launch(Dispatchers.ourIo) {
+        val result = runCatching {
+            configurePlatformLabelPrinterDeviceAction?.invoke(deviceId)
+                ?: ReceiptPlatformActionResult(false, "Sticky label printer configuration is not available on this platform")
+        }.getOrElse { throwable ->
+            ReceiptPlatformActionResult(false, throwable.message ?: "Could not configure sticky label printer")
+        }
+
+        if (result.success) {
+            configuredLabelPrinterDeviceIdState.emit(deviceId)
+            val devices = listPlatformLabelPrinterDevicesAction?.invoke().orEmpty()
+            labelPrinterDevicesState.emit(devices)
+        }
+
+        onCompleted?.invoke(result)
+    }
+}
+
+fun configureLabelPrinterProtocol(protocol: String, onCompleted: ((ReceiptPlatformActionResult) -> Unit)? = null) {
+    GlobalScope.launch(Dispatchers.ourIo) {
+        val normalized = normalizeLabelPrinterProtocol(protocol)
+        val result = runCatching {
+            configurePlatformLabelPrinterProtocolAction?.invoke(normalized)
+                ?: ReceiptPlatformActionResult(false, "Sticky label printer protocol configuration is not available on this platform")
+        }.getOrElse { throwable ->
+            ReceiptPlatformActionResult(false, throwable.message ?: "Could not configure sticky label printer protocol")
+        }
+
+        if (result.success) {
+            configuredLabelPrinterProtocolState.emit(normalized)
+        }
+
+        onCompleted?.invoke(result)
+    }
+}
+
+fun buildLabelPrinterTestBytes(protocol: String = LABEL_PRINTER_PROTOCOL_AUTO): ByteArray =
+    buildStockItemLabelPrinterBytes(
+        StockItemLabelDataModel(
+            itemName = "AITA test item",
+            barcode = "123456789012",
+            priceText = "100 KZT",
+            storeName = "AITA",
+            unitText = "1 pc",
+            note = "Sticker label printer is ready",
+            copies = 1,
+            protocol = protocol
+        )
+    )
+
+fun buildStockItemLabelPrinterBytes(label: StockItemLabelDataModel): ByteArray {
+    val cleanLabel = label.copy(
+        itemName = labelPrinterSafeText(label.itemName, 42).ifBlank { "AITA item" },
+        barcode = label.barcode.filter { it.isLetterOrDigit() }.take(48),
+        priceText = labelPrinterSafeText(label.priceText, 28),
+        storeName = labelPrinterSafeText(label.storeName, 32),
+        unitText = labelPrinterSafeText(label.unitText, 20),
+        note = labelPrinterSafeText(label.note, 38),
+        copies = label.copies.coerceIn(1, 99),
+        labelWidthMm = label.labelWidthMm.coerceIn(30, 110),
+        labelHeightMm = label.labelHeightMm.coerceIn(20, 80),
+        protocol = normalizeLabelPrinterProtocol(label.protocol)
+    )
+
+    return when (effectiveLabelPrinterProtocol(cleanLabel.protocol)) {
+        LABEL_PRINTER_PROTOCOL_ZPL -> buildStockItemLabelZplBytes(cleanLabel)
+        LABEL_PRINTER_PROTOCOL_CPCL -> buildStockItemLabelCpclBytes(cleanLabel)
+        else -> buildStockItemLabelTsplBytes(cleanLabel)
+    }
+}
+
+private fun labelDots(mm: Int, dpi: Int = 203): Int =
+    kotlin.math.round(mm.toDouble() * dpi.toDouble() / 25.4).toInt().coerceAtLeast(1)
+
+private fun labelPrinterSafeText(value: String, maxLength: Int): String = value
+    .replace('\r', ' ')
+    .replace('\n', ' ')
+    .replace('\t', ' ')
+    .replace(Regex("\\s+"), " ")
+    .trim()
+    .take(maxLength.coerceAtLeast(1))
+
+private fun String.tsplQuoted(): String = labelPrinterSafeText(this, 80).replace("\"", "'")
+private fun String.zplText(): String = labelPrinterSafeText(this, 80)
+    .replace("^", " ")
+    .replace("~", " ")
+    .replace("\\", " ")
+private fun String.cpclText(): String = labelPrinterSafeText(this, 80)
+
+private fun buildStockItemLabelTsplBytes(label: StockItemLabelDataModel): ByteArray {
+    val barcode = label.barcode.ifBlank { "000000000000" }
+    val unitLine = label.unitText.takeIf { it.isNotBlank() }
+    val noteLine = label.note.takeIf { it.isNotBlank() }
+    val priceLine = label.priceText.ifBlank { " " }
+    val height = label.labelHeightMm.coerceAtLeast(24)
+    val commands = buildString {
+        append("SIZE ${label.labelWidthMm} mm, ${height} mm\r\n")
+        append("GAP 2 mm, 0 mm\r\n")
+        append("DIRECTION 1\r\n")
+        append("CODEPAGE UTF-8\r\n")
+        append("CLS\r\n")
+        label.storeName.takeIf { it.isNotBlank() }?.let { append("TEXT 24,12,\"0\",0,1,1,\"${it.tsplQuoted()}\"\r\n") }
+        append("TEXT 24,44,\"0\",0,2,2,\"${label.itemName.tsplQuoted()}\"\r\n")
+        append("TEXT 24,88,\"0\",0,2,2,\"${priceLine.tsplQuoted()}\"\r\n")
+        unitLine?.let { append("TEXT 24,126,\"0\",0,1,1,\"${it.tsplQuoted()}\"\r\n") }
+        append("BARCODE 24,154,\"128\",78,1,0,2,2,\"${barcode.tsplQuoted()}\"\r\n")
+        noteLine?.let { append("TEXT 24,244,\"0\",0,1,1,\"${it.tsplQuoted()}\"\r\n") }
+        append("PRINT ${label.copies.coerceIn(1,99)},1\r\n")
+    }
+    return commands.encodeToByteArray()
+}
+
+private fun buildStockItemLabelZplBytes(label: StockItemLabelDataModel): ByteArray {
+    val width = labelDots(label.labelWidthMm)
+    val height = labelDots(label.labelHeightMm)
+    val barcode = label.barcode.ifBlank { "000000000000" }
+    val commands = buildString {
+        append("^XA\n")
+        append("^CI28\n")
+        append("^PW$width\n")
+        append("^LL$height\n")
+        append("^LH0,0\n")
+        label.storeName.takeIf { it.isNotBlank() }?.let { append("^FO24,12^A0N,22,22^FD${it.zplText()}^FS\n") }
+        append("^FO24,46^A0N,36,34^FB${(width - 48).coerceAtLeast(180)},2,4,L^FD${label.itemName.zplText()}^FS\n")
+        label.priceText.takeIf { it.isNotBlank() }?.let { append("^FO24,116^A0N,34,34^FD${it.zplText()}^FS\n") }
+        label.unitText.takeIf { it.isNotBlank() }?.let { append("^FO24,154^A0N,22,22^FD${it.zplText()}^FS\n") }
+        append("^FO24,184^BY2,2,70^BCN,70,Y,N,N^FD${barcode.zplText()}^FS\n")
+        label.note.takeIf { it.isNotBlank() }?.let { append("^FO24,278^A0N,20,20^FD${it.zplText()}^FS\n") }
+        append("^PQ${label.copies.coerceIn(1,99)},0,1,Y\n")
+        append("^XZ\n")
+    }
+    return commands.encodeToByteArray()
+}
+
+private fun buildStockItemLabelCpclBytes(label: StockItemLabelDataModel): ByteArray {
+    val height = labelDots(label.labelHeightMm)
+    val barcode = label.barcode.ifBlank { "000000000000" }
+    val commands = buildString {
+        append("! 0 200 200 $height ${label.copies.coerceIn(1,99)}\r\n")
+        append("PAGE-WIDTH ${labelDots(label.labelWidthMm)}\r\n")
+        label.storeName.takeIf { it.isNotBlank() }?.let { append("TEXT 0 1 24 12 ${it.cpclText()}\r\n") }
+        append("TEXT 4 1 24 44 ${label.itemName.cpclText()}\r\n")
+        label.priceText.takeIf { it.isNotBlank() }?.let { append("TEXT 4 1 24 92 ${it.cpclText()}\r\n") }
+        label.unitText.takeIf { it.isNotBlank() }?.let { append("TEXT 0 1 24 132 ${it.cpclText()}\r\n") }
+        append("BARCODE 128 2 1 78 24 162 ${barcode.cpclText()}\r\n")
+        append("TEXT 0 1 24 244 ${barcode.cpclText()}\r\n")
+        label.note.takeIf { it.isNotBlank() }?.let { append("TEXT 0 1 24 272 ${it.cpclText()}\r\n") }
+        append("FORM\r\n")
+        append("PRINT\r\n")
+    }
+    return commands.encodeToByteArray()
 }
 
 fun buildReceiptPrinterTestEscPosBytes(title: String = "AITA printer test", dateText: String = ""): ByteArray {
@@ -3886,7 +4127,7 @@ const val CLOUD_TRANSPORT_STATUS_UNAVAILABLE = -1
 @PublishedApi
 internal const val REALTIME_ACCESS_TOKEN_REFRESH_SKEW_MILLIS = 60_000L
 
-private const val DEFAULT_AITA_SERVER_URL = "http://192.168.1.51:8080"
+private const val DEFAULT_AITA_SERVER_URL = "http://172.20.10.2:8080"
 private val DEFAULT_AITA_SERVER_URL_PAIR = Pair(DEFAULT_AITA_SERVER_URL, "1")
 @Volatile
 private var currentNetworkRequestCandidateServerUrlsMemory: List<String> = emptyList()
@@ -4271,6 +4512,7 @@ val appLanguageState = MutableStateFlow(DEFAULT_APP_LANGUAGE)
 val appThemeIdState = MutableStateFlow(DEFAULT_APP_THEME_ID)
 val appSizeModeIdState = MutableStateFlow(DEFAULT_APP_SIZE_MODE_ID)
 
+@kotlinx.serialization.Serializable
 data class AuthScreenPreferenceOverrideDataModel(
     val appLanguage: String? = null,
     val appThemeId: Long? = null,
@@ -4507,6 +4749,7 @@ val drawablePathIconLogState = MutableStateFlow("svg/49_0.svg")
 val drawablePathIconPromosState = MutableStateFlow("svg/50_0.svg")
 val drawablePathIconAnalyticsState = MutableStateFlow("svg/21_0.svg")
 val drawablePathIconAnalyticsReportState = MutableStateFlow("svg/62_0.svg")
+val drawablePathIconLabelPrinterState = MutableStateFlow("svg/63_0.svg")
 val drawablePathIconWorkersState = MutableStateFlow("svg/22_0.svg")
 val drawablePathIconSuppliersState = MutableStateFlow("svg/23_0.svg")
 val drawablePathIconDebtorsState = MutableStateFlow("svg/24_0.svg")
@@ -6513,6 +6756,9 @@ fun updateDrawables(
         )
         drawablePathIconAnalyticsReportState.emit(
             drawablePath(62L)
+        )
+        drawablePathIconLabelPrinterState.emit(
+            drawablePath(63L)
         )
         drawablePathIconWorkersState.emit(
             drawablePath(22L)
@@ -10018,14 +10264,16 @@ private fun cloudSessionRefreshIsActiveForNotifications(): Boolean {
     return cloudSessionRefreshRequiredForNotifications && getStoredUserAuthTokens?.invoke() != null
 }
 
-private fun cloudTransportStatusName(status: Int): String = when (status) {
+@PublishedApi
+internal fun cloudTransportStatusName(status: Int): String = when (status) {
     CLOUD_TRANSPORT_STATUS_REACHABLE -> "reachable"
     CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED -> "auth_refresh_required"
     CLOUD_TRANSPORT_STATUS_UNAVAILABLE -> "unavailable"
     else -> "unknown"
 }
 
-private fun logCloudConnectionDiagnostic(message: String) {
+@PublishedApi
+internal fun logCloudConnectionDiagnostic(message: String) {
     println("AITA connection: $message")
 }
 

@@ -451,6 +451,52 @@ suspend fun RoutingCall.safeGenericResponseNoPayload(
     }
 }
 
+suspend fun ApplicationCall.safeGenericResponseNoPayload(
+    status: HttpStatusCode,
+    message: List<LocalizedStringDataModel>? = null,
+    logMessage: String? = null,
+    throwable: Throwable? = null
+) {
+    if (logMessage != null && throwable != null) {
+        application.environment.log.error(logMessage, throwable)
+    } else if (logMessage != null) {
+        application.environment.log.error(logMessage)
+    }
+
+    runCatching {
+        stabilizeServerRuntimeClassLoader("response-no-payload:${request.httpMethod.value}:${request.path()}")
+        val response = GenericResponseDataModel(
+            message = message?.let { jsonBase.encodeToString(it) },
+            payload = null,
+            negative = !status.isSuccess()
+        )
+        respondText(
+            text = jsonBase.encodeToString(response),
+            contentType = ContentType.Application.Json,
+            status = status
+        )
+    }.getOrElse { responseThrowable ->
+        application.environment.log.error("Failed to send JSON error response", responseThrowable)
+        val safeMessage = message ?: simpleMessage(
+            main = "Internal server error",
+            ru = "Внутренняя ошибка сервера",
+            kk = "Сервердің ішкі қатесі"
+        )
+        val response = GenericResponseDataModel(
+            message = jsonBase.encodeToString(safeMessage),
+            payload = null,
+            negative = true
+        )
+        runCatching {
+            respondText(
+                text = jsonBase.encodeToString(response),
+                contentType = ContentType.Application.Json,
+                status = status
+            )
+        }
+    }
+}
+
 suspend inline fun <reified T> RoutingCall.genericResponse(
     status: HttpStatusCode,
     payload: T?,
@@ -2987,7 +3033,8 @@ private fun classLoaderDebugName(loader: ClassLoader?): String =
 @Volatile
 private var sharedRuntimeSerializersPrewarmed = false
 
-private fun stabilizeServerRuntimeClassLoader(reason: String = "runtime") {
+@PublishedApi
+internal fun stabilizeServerRuntimeClassLoader(reason: String = "runtime") {
     val serverClassLoader = aitaServerRuntimeClassLoader
     val before = Thread.currentThread().contextClassLoader
     if (before !== serverClassLoader) {
@@ -3019,7 +3066,10 @@ private class AitaServerClassLoaderContextElement(
     }
 
     override fun restoreThreadContext(context: CoroutineContext, oldState: ClassLoader?) {
-        Thread.currentThread().contextClassLoader = oldState
+        val thread = Thread.currentThread()
+        if (thread.contextClassLoader !== loader) {
+            thread.contextClassLoader = loader
+        }
     }
 }
 
@@ -3117,6 +3167,8 @@ private fun prewarmSharedRuntimeSerializers() {
     touch("TransactionReceiptSnapshotDataModel") { TransactionReceiptSnapshotDataModel.serializer() }
     touch("TransactionReceiptLineDataModel") { TransactionReceiptLineDataModel.serializer() }
     touch("PlatformReceiptPrinterDataModel") { PlatformReceiptPrinterDataModel.serializer() }
+    touch("PlatformLabelPrinterDataModel") { PlatformLabelPrinterDataModel.serializer() }
+    touch("StockItemLabelDataModel") { StockItemLabelDataModel.serializer() }
     touch("AnalyticsReportRowDataModel") { AnalyticsReportRowDataModel.serializer() }
     touch("AnalyticsReportSectionDataModel") { AnalyticsReportSectionDataModel.serializer() }
     touch("AnalyticsReportSnapshotDataModel") { AnalyticsReportSnapshotDataModel.serializer() }
@@ -3213,6 +3265,16 @@ private fun prewarmSharedRuntimeSerializers() {
         "kz.aita.UserFinanceDashboardDataModel",
         "kz.aita.TransactionPaymentDraftDataModel",
         "kz.aita.TransactionCartScrollStateDataModel",
+        "kz.aita.TransactionReceiptSnapshotDataModel",
+        "kz.aita.TransactionReceiptLineDataModel",
+        "kz.aita.PlatformReceiptPrinterDataModel",
+        "kz.aita.PlatformLabelPrinterDataModel",
+        "kz.aita.StockItemLabelDataModel",
+        "kz.aita.AnalyticsReportRowDataModel",
+        "kz.aita.AnalyticsReportSectionDataModel",
+        "kz.aita.AnalyticsReportSnapshotDataModel",
+        "kz.aita.ReceiptTextLabelsDataModel",
+        "kz.aita.AuthScreenPreferenceOverrideDataModel",
         "kz.aita.EmbeddedWeightBarcodeDataModel",
         "kz.aita.GoodsItemBarcodeDataModel",
         "kz.aita.ReceiveSupplierOrderRequestDataModel",
@@ -3946,7 +4008,7 @@ private fun RoutingCall.matchesAnyInventoryContextStoreIdInsideTransaction(userI
     return activeStoreId == null || storeIds.any { storesShareInventoryRootInsideTransaction(activeStoreId, it) }
 }
 
-private suspend inline fun <reified T> RoutingCall.receiveAita(): T {
+private suspend inline fun <reified T : Any> RoutingCall.receiveAita(): T {
     stabilizeServerRuntimeClassLoader("receive:${request.httpMethod.value}:${request.path()}:${T::class.qualifiedName}")
     return receive<T>()
 }
@@ -3956,7 +4018,7 @@ private suspend fun RoutingCall.receiveTextAita(): String {
     return receiveText()
 }
 
-private suspend inline fun <reified T> RoutingCall.receiveOneOrList(): List<T> {
+private suspend inline fun <reified T : Any> RoutingCall.receiveOneOrList(): List<T> {
     stabilizeServerRuntimeClassLoader("receive-one-or-list:${request.httpMethod.value}:${request.path()}:${T::class.qualifiedName}")
     val raw = receiveTextAita().trim()
 

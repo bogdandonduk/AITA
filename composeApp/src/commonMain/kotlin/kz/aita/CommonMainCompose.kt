@@ -681,6 +681,34 @@ private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallb
     put(1273L, mapOf("main" to "Selected analytics tab", "en" to "Selected analytics tab", "ru" to "Выбранная вкладка аналитики", "kk" to "Таңдалған аналитика қойындысы"))
     put(1274L, mapOf("main" to "Filters", "en" to "Filters", "ru" to "Фильтры", "kk" to "Сүзгілер"))
     put(1275L, mapOf("main" to "Generated", "en" to "Generated", "ru" to "Сформировано", "kk" to "Жасалды"))
+    put(1276L, mapOf("main" to "Sticky label printer", "en" to "Sticky label printer", "ru" to "Принтер наклеек", "kk" to "Жапсырма принтері"))
+    put(1277L, mapOf("main" to "Sticky item tags use TSPL, ZPL or CPCL label printers. They print barcode, item name and price onto small adhesive labels.", "en" to "Sticky item tags use TSPL, ZPL or CPCL label printers. They print barcode, item name and price onto small adhesive labels.", "ru" to "Наклейки товаров печатаются на принтерах TSPL, ZPL или CPCL: штрихкод, название и цена на маленькой клейкой этикетке.", "kk" to "Тауар жапсырмалары TSPL, ZPL немесе CPCL принтерлерінде басылады: штрихкод, атау және баға."))
+    put(1278L, mapOf("main" to "Detected label printers", "en" to "Detected label printers", "ru" to "Найденные принтеры наклеек", "kk" to "Табылған жапсырма принтерлері"))
+    put(1279L, mapOf("main" to "No paired sticky label printers found", "en" to "No paired sticky label printers found", "ru" to "Подключённые принтеры наклеек не найдены", "kk" to "Жұпталған жапсырма принтері табылмады"))
+    put(1280L, mapOf("main" to "Label printer selected", "en" to "Label printer selected", "ru" to "Принтер наклеек выбран", "kk" to "Жапсырма принтері таңдалды"))
+    put(1281L, mapOf("main" to "Label printer cleared", "en" to "Label printer cleared", "ru" to "Принтер наклеек сброшен", "kk" to "Жапсырма принтері тазартылды"))
+    put(1282L, mapOf("main" to "Send test label", "en" to "Send test label", "ru" to "Отправить тестовую наклейку", "kk" to "Сынақ жапсырмасын жіберу"))
+    put(1283L, mapOf("main" to "Test label sent", "en" to "Test label sent", "ru" to "Тестовая наклейка отправлена", "kk" to "Сынақ жапсырмасы жіберілді"))
+    put(1284L, mapOf("main" to "Label printer is not configured", "en" to "Label printer is not configured", "ru" to "Принтер наклеек не настроен", "kk" to "Жапсырма принтері бапталмаған"))
+    put(1285L, mapOf("main" to "Label sent to printer", "en" to "Label sent to printer", "ru" to "Наклейка отправлена на принтер", "kk" to "Жапсырма принтерге жіберілді"))
+    put(1286L, mapOf("main" to "Clear label printer", "en" to "Clear label printer", "ru" to "Сбросить принтер наклеек", "kk" to "Жапсырма принтерін тазарту"))
+    put(1287L, mapOf("main" to "Label printer protocol", "en" to "Label printer protocol", "ru" to "Протокол принтера наклеек", "kk" to "Жапсырма принтері протоколы"))
+    put(1288L, mapOf("main" to "Print item label", "en" to "Print item label", "ru" to "Печать наклейки товара", "kk" to "Тауар жапсырмасын басу"))
+    put(1289L, mapOf("main" to "Sticky shelf tag", "en" to "Sticky shelf tag", "ru" to "Полочная наклейка", "kk" to "Сөре жапсырмасы"))
+    put(1290L, mapOf("main" to "Print barcode, name and price on an adhesive item label.", "en" to "Print barcode, name and price on an adhesive item label.", "ru" to "Печатает штрихкод, название и цену на клейкой этикетке товара.", "kk" to "Тауар жапсырмасына штрихкод, атау және бағаны басады."))
+    put(1291L, mapOf("main" to "Label copies", "en" to "Label copies", "ru" to "Количество наклеек", "kk" to "Жапсырма саны"))
+    put(1292L, mapOf("main" to "Label preview", "en" to "Label preview", "ru" to "Предпросмотр наклейки", "kk" to "Жапсырманы алдын ала көру"))
+    put(1293L, mapOf("main" to "Barcode for label", "en" to "Barcode for label", "ru" to "Штрихкод для наклейки", "kk" to "Жапсырма штрихкоды"))
+    put(1294L, mapOf("main" to "Auto protocol", "en" to "Auto protocol", "ru" to "Авто протокол", "kk" to "Авто протокол"))
+    put(1295L, mapOf("main" to "TSPL", "en" to "TSPL", "ru" to "TSPL", "kk" to "TSPL"))
+    put(1296L, mapOf("main" to "ZPL", "en" to "ZPL", "ru" to "ZPL", "kk" to "ZPL"))
+    put(1297L, mapOf("main" to "CPCL", "en" to "CPCL", "ru" to "CPCL", "kk" to "CPCL"))
+    put(1298L, mapOf("main" to "Label protocol selected", "en" to "Label protocol selected", "ru" to "Протокол наклеек выбран", "kk" to "Жапсырма протоколы таңдалды"))
+    put(1299L, mapOf("main" to "This item has no barcode yet; add a barcode before printing a shelf label.", "en" to "This item has no barcode yet; add a barcode before printing a shelf label.", "ru" to "У товара пока нет штрихкода. Добавьте штрихкод перед печатью полочной наклейки.", "kk" to "Бұл тауарда әлі штрихкод жоқ. Сөре жапсырмасын баспас бұрын штрихкод қосыңыз."))
+    put(1300L, mapOf("main" to "Price text", "en" to "Price text", "ru" to "Текст цены", "kk" to "Баға мәтіні"))
+    put(1301L, mapOf("main" to "Store name", "en" to "Store name", "ru" to "Название магазина", "kk" to "Дүкен атауы"))
+    put(1302L, mapOf("main" to "Label printers refreshed", "en" to "Label printers refreshed", "ru" to "Принтеры наклеек обновлены", "kk" to "Жапсырма принтерлері жаңартылды"))
+    put(1303L, mapOf("main" to "Use this label printer", "en" to "Use this label printer", "ru" to "Использовать этот принтер наклеек", "kk" to "Осы жапсырма принтерін қолдану"))
 }
 
 
@@ -8955,6 +8983,16 @@ fun AppConfiguration.StockWarehouseScreen() {
     var sortMenuExpanded by rememberSaveable { mutableStateOf(false) }
     var sortMode by rememberSaveable { mutableStateOf("name") }
     var sortAscending by rememberSaveable { mutableStateOf(true) }
+    var labelPrintItemId by rememberSaveable { mutableStateOf<String?>(null) }
+    val labelPrintItem = stateValues.stock.orEmpty().find { it.id == labelPrintItemId }
+
+    labelPrintItem?.let { item ->
+        StockItemLabelPrintBottomSheet(
+            goodsItem = item,
+            batches = stateValues.stockBatches.orEmpty().filter { it.goodsItemId == item.id && it.isActive },
+            onDismiss = { labelPrintItemId = null }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -9060,6 +9098,7 @@ fun AppConfiguration.StockWarehouseScreen() {
             onClick = openEdit,
             onEdit = openEdit,
             onAddBatch = openAddBatch,
+            onPrintLabel = { item -> labelPrintItemId = item.id },
             sortMode = sortMode,
             sortAscending = sortAscending
         )
@@ -9092,6 +9131,7 @@ fun AppConfiguration.StockWarehouseScreenContent(
     onDelete: ((GoodsItemDataModel) -> Unit)? = null,
     onEdit: ((GoodsItemDataModel) -> Unit)? = null,
     onAddBatch: ((GoodsItemDataModel) -> Unit)? = null,
+    onPrintLabel: ((GoodsItemDataModel) -> Unit)? = null,
     sortMode: String? = null,
     sortAscending: Boolean = true,
     preferredOrderIds: List<String> = emptyList(),
@@ -9273,7 +9313,8 @@ fun AppConfiguration.StockWarehouseScreenContent(
                                 onDelete = onDelete?.takeIf { canOperateThisStoreInventory },
                                 onClick = if (trulyOutOfStock || !canOperateThisStoreInventory) null else onClick,
                                 onEdit = onEdit?.takeIf { canOperateThisStoreInventory },
-                                onAddBatch = onAddBatch?.takeIf { canOperateThisStoreInventory }
+                                onAddBatch = onAddBatch?.takeIf { canOperateThisStoreInventory },
+                                onPrintLabel = onPrintLabel?.takeIf { canOperateThisStoreInventory }
                             )
                         }
 
@@ -10584,6 +10625,308 @@ private fun AppConfiguration.AitaBottomSheet(
                 ) {
                     content()
                 }
+            }
+        }
+    }
+}
+
+
+@Composable
+private fun AppConfiguration.StockItemLabelPrintBottomSheet(
+    goodsItem: GoodsItemDataModel,
+    batches: List<GoodsBatchDataModel>,
+    onDismiss: () -> Unit
+) {
+    val itemName = goodsItem.name.visibleLocalizedString(stateValues.appLanguage, localizedStringResource(113, "Unnamed item"))
+    val sortedBatches = batches.sortedForShelf(goodsItem)
+    val activeBatch = sortedBatches.firstOrNull { it.id == goodsItem.activeShelfBatchId }
+        ?: sortedBatches.bestBatchForSale(goodsItem)
+    val activeStore = stateValues.stores.findStoreOrBranchForUi(stateValues.activeStoreId ?: goodsItem.storeId)
+    val defaultStoreName = activeStore
+        ?.name
+        ?.visibleLocalizedString(stateValues.appLanguage, activeStore.publicId.ifBlank { activeStore.id })
+        .orEmpty()
+    val price = goodsItem.promotedPriceForTransaction(
+        transactionTypeIndex = 0,
+        saleMethodId = SALE_METHOD_RETAIL,
+        quantityTotal = 1.0,
+        batch = activeBatch
+    ).finalPrice
+    val defaultPriceText = listOf(price.price.trim(), price.currency.trim())
+        .filter { it.isNotBlank() && it != "0" }
+        .joinToString(" ")
+    val defaultUnitText = activeBatch
+        ?.quantity
+        ?.immutableUnitName
+        ?.visibleLocalizedString(stateValues.appLanguage, goodsItem.measurementUnitId)
+        ?: goodsItem.measurementUnitId
+    val barcodeOptions = goodsItem.allBarcodeValues()
+        .map { it.trim() }
+        .filter { it.isNotBlank() }
+        .distinct()
+
+    var selectedBarcode by rememberSaveable(goodsItem.id, barcodeOptions.joinToString("|")) {
+        mutableStateOf(barcodeOptions.firstOrNull().orEmpty())
+    }
+    var copies by rememberSaveable(goodsItem.id) { mutableStateOf(1) }
+    var priceText by rememberSaveable(goodsItem.id, defaultPriceText) { mutableStateOf(defaultPriceText) }
+    var storeName by rememberSaveable(goodsItem.id, defaultStoreName) { mutableStateOf(defaultStoreName) }
+    var selectedProtocol by rememberSaveable { mutableStateOf(configuredLabelPrinterProtocolState.value) }
+    val configuredLabelPrinterId by configuredLabelPrinterDeviceIdState.collectAsState()
+    val configuredProtocol by configuredLabelPrinterProtocolState.collectAsState()
+    val coroutineScope = rememberCoroutineScope()
+
+    LaunchedEffect(configuredProtocol) {
+        if (selectedProtocol.isBlank() || selectedProtocol == LABEL_PRINTER_PROTOCOL_AUTO) {
+            selectedProtocol = configuredProtocol
+        }
+    }
+
+    AitaBottomSheet(
+        title = localizedStringResource(1288, "Print item label"),
+        iconPath = stateValues.drawablePathIconLabelPrinter,
+        iconRes = stateValues.drawableResIconLabelPrinter.value,
+        onDismiss = onDismiss
+    ) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextFieldGroup),
+            contentPadding = PaddingValues(bottom = stateValues.screenHeight / 7)
+        ) {
+            item {
+                MessageText(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1289, "Sticky shelf tag"),
+                    subText = localizedStringResource(1290, "Print barcode, name and price on an adhesive item label."),
+                    textSize = stateValues.accentTextSize,
+                    subTextSize = stateValues.smallTextSize
+                )
+            }
+
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(stateValues.cornerRadius))
+                        .background(stateValues.BackgroundColor)
+                        .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor, RoundedCornerShape(stateValues.cornerRadius))
+                        .padding(stateValues.marginTextFieldGroup),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = localizedStringResource(1292, "Label preview"),
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = storeName.ifBlank { defaultStoreName.ifBlank { "AITA" } },
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = itemName,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.titleTextSize,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    priceText.takeIf { it.isNotBlank() }?.let {
+                        Text(
+                            text = it,
+                            color = stateValues.AccentColor,
+                            fontSize = stateValues.titleTextSize,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Text(
+                        text = listOfNotNull(
+                            selectedBarcode.takeIf { it.isNotBlank() }?.let { "||||  $it" },
+                            defaultUnitText.takeIf { it.isNotBlank() }
+                        ).joinToString(" • "),
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.textSize,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            item {
+                if (barcodeOptions.isEmpty()) {
+                    MessageText(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(1299, "This item has no barcode yet; add a barcode before printing a shelf label."),
+                        textSize = stateValues.textSize
+                    )
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = localizedStringResource(1293, "Barcode for label"),
+                            color = stateValues.TextColor,
+                            fontSize = stateValues.accentTextSize,
+                            fontWeight = FontWeight.Bold
+                        )
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(horizontal = 2.dp)
+                        ) {
+                            items(barcodeOptions, key = { it }) { barcode ->
+                                actionButton(
+                                    text = barcode.take(24),
+                                    enabledColor = if (barcode == selectedBarcode) stateValues.AccentColor else stateValues.BackgroundColor,
+                                    textColor = if (barcode == selectedBarcode) stateValues.AccentTextColor else stateValues.TextColor,
+                                    iconPath = if (barcode == selectedBarcode) stateValues.drawablePathIconCheck else stateValues.drawablePathIconBarcodeType,
+                                    iconRes = if (barcode == selectedBarcode) stateValues.drawableResIconCheck.value else stateValues.drawableResIconBarcodeType.value,
+                                    iconTintColor = if (barcode == selectedBarcode) stateValues.AccentTextColor else stateValues.TextColor,
+                                    fillMaxWidthIfTextPresent = false,
+                                    confirmationRequired = false,
+                                    onClick = { selectedBarcode = barcode }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            item {
+                val allowFocus = platformAllowsAutomaticTextFieldFocus()
+                Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+                    genericTextField(
+                        modifier = Modifier.fillMaxWidth(),
+                        titleText = localizedStringResource(1300, "Price text"),
+                        valueInitial = priceText,
+                        isFocusedInitial = allowFocus,
+                        autoFocus = allowFocus,
+                        showClearButton = true,
+                        onValueChange = { value, _ -> priceText = value.take(40) }
+                    )
+                    genericTextField(
+                        modifier = Modifier.fillMaxWidth(),
+                        titleText = localizedStringResource(1301, "Store name"),
+                        valueInitial = storeName,
+                        isFocusedInitial = false,
+                        autoFocus = false,
+                        showClearButton = true,
+                        onValueChange = { value, _ -> storeName = value.take(40) }
+                    )
+                }
+            }
+
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = localizedStringResource(1287, "Label printer protocol"),
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.accentTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                    tabRowWidget(
+                        modifier = Modifier.fillMaxWidth(),
+                        tabs = listOf(
+                            TabContent(LABEL_PRINTER_PROTOCOL_AUTO, localizedStringResource(1294, "Auto protocol")) {
+                                selectedProtocol = it
+                                configureLabelPrinterProtocol(it) { result -> coroutineScope.launch { receiptActionNotification(result, localizedStringResource(1298, "Label protocol selected")) } }
+                            },
+                            TabContent(LABEL_PRINTER_PROTOCOL_TSPL, localizedStringResource(1295, "TSPL")) {
+                                selectedProtocol = it
+                                configureLabelPrinterProtocol(it) { result -> coroutineScope.launch { receiptActionNotification(result, localizedStringResource(1298, "Label protocol selected")) } }
+                            },
+                            TabContent(LABEL_PRINTER_PROTOCOL_ZPL, localizedStringResource(1296, "ZPL")) {
+                                selectedProtocol = it
+                                configureLabelPrinterProtocol(it) { result -> coroutineScope.launch { receiptActionNotification(result, localizedStringResource(1298, "Label protocol selected")) } }
+                            },
+                            TabContent(LABEL_PRINTER_PROTOCOL_CPCL, localizedStringResource(1297, "CPCL")) {
+                                selectedProtocol = it
+                                configureLabelPrinterProtocol(it) { result -> coroutineScope.launch { receiptActionNotification(result, localizedStringResource(1298, "Label protocol selected")) } }
+                            }
+                        ),
+                        selectedIndexInitial = normalizeLabelPrinterProtocol(selectedProtocol),
+                        textSize = stateValues.smallTextSize
+                    )
+                }
+            }
+
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                ) {
+                    Text(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(1291, "Label copies"),
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.accentTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                    actionButton(
+                        text = "−",
+                        enabled = copies > 1,
+                        fillMaxWidthIfTextPresent = false,
+                        confirmationRequired = false,
+                        onClick = { copies = (copies - 1).coerceAtLeast(1) }
+                    )
+                    Text(
+                        text = copies.toString(),
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.titleTextSize,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.widthIn(min = 36.dp)
+                    )
+                    actionButton(
+                        text = "+",
+                        enabled = copies < 99,
+                        fillMaxWidthIfTextPresent = false,
+                        confirmationRequired = false,
+                        onClick = { copies = (copies + 1).coerceAtMost(99) }
+                    )
+                }
+            }
+
+            item {
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1288, "Print item label"),
+                    iconPath = stateValues.drawablePathIconLabelPrinter,
+                    iconRes = stateValues.drawableResIconLabelPrinter.value,
+                    enabled = selectedBarcode.isNotBlank() && !configuredLabelPrinterId.isNullOrBlank(),
+                    onDisabledClick = {
+                        postInAppNotification(
+                            if (selectedBarcode.isBlank()) localizedStringResource(1299, "This item has no barcode yet; add a barcode before printing a shelf label.") else localizedStringResource(1284, "Label printer is not configured"),
+                            NotificationType.Negative,
+                            transient = true
+                        )
+                    },
+                    confirmationRequired = false,
+                    onClick = {
+                        val label = StockItemLabelDataModel(
+                            itemName = itemName,
+                            barcode = selectedBarcode,
+                            priceText = priceText,
+                            storeName = storeName,
+                            unitText = defaultUnitText,
+                            copies = copies,
+                            protocol = selectedProtocol
+                        )
+                        coroutineScope.launch {
+                            receiptActionNotification(
+                                printStockItemLabel(
+                                    label = label,
+                                    protocol = selectedProtocol,
+                                    notConfiguredMessage = localizedStringResource(1284, "Label printer is not configured")
+                                ),
+                                localizedStringResource(1285, "Label sent to printer")
+                            )
+                        }
+                    }
+                )
             }
         }
     }
@@ -28472,7 +28815,11 @@ fun AppConfiguration.MenuSecurityScreen() {
 fun AppConfiguration.MenuDevicesScreen() {
     val receiptPrinters by receiptPrinterDevicesState.collectAsState()
     val configuredReceiptPrinterId by configuredReceiptPrinterDeviceIdState.collectAsState()
+    val labelPrinters by labelPrinterDevicesState.collectAsState()
+    val configuredLabelPrinterId by configuredLabelPrinterDeviceIdState.collectAsState()
+    val configuredLabelPrinterProtocol by configuredLabelPrinterProtocolState.collectAsState()
     var refreshingReceiptPrinters by rememberSaveable { mutableStateOf(false) }
+    var refreshingLabelPrinters by rememberSaveable { mutableStateOf(false) }
 
     val refreshButtonText = localizedStringResource(1259, "Refresh printers")
     val refreshSuccessText = localizedStringResource(1270, "Receipt printers refreshed")
@@ -28482,6 +28829,12 @@ fun AppConfiguration.MenuDevicesScreen() {
     val testReceiptButtonText = localizedStringResource(1262, "Send test receipt")
     val testReceiptSentText = localizedStringResource(1263, "Test receipt sent")
     val receiptPrinterNotConfiguredText = localizedStringResource(1038, "Receipt printer is not configured")
+    val labelPrinterSelectedText = localizedStringResource(1280, "Label printer selected")
+    val labelPrinterClearedText = localizedStringResource(1281, "Label printer cleared")
+    val labelPrinterProtocolSelectedText = localizedStringResource(1298, "Label protocol selected")
+    val testLabelSentText = localizedStringResource(1283, "Test label sent")
+    val labelPrinterNotConfiguredText = localizedStringResource(1284, "Label printer is not configured")
+    val labelPrintersRefreshedText = localizedStringResource(1302, "Label printers refreshed")
 
     fun refreshReceiptPrinters(showNotification: Boolean) {
         refreshingReceiptPrinters = true
@@ -28493,8 +28846,19 @@ fun AppConfiguration.MenuDevicesScreen() {
         }
     }
 
+    fun refreshLabelPrinters(showNotification: Boolean) {
+        refreshingLabelPrinters = true
+        refreshLabelPrinterDevices { result ->
+            coroutineScope.launch {
+                refreshingLabelPrinters = false
+                if (showNotification) receiptActionNotification(result, labelPrintersRefreshedText)
+            }
+        }
+    }
+
     LaunchedEffect(Unit) {
         refreshReceiptPrinters(showNotification = false)
+        refreshLabelPrinters(showNotification = false)
     }
 
     Column(
@@ -28701,6 +29065,195 @@ fun AppConfiguration.MenuDevicesScreen() {
                     }
                 }
             }
+
+            item {
+                DeviceSettingsCard(
+                    title = localizedStringResource(1276, "Sticky label printer"),
+                    subtitle = localizedStringResource(1277, "Sticky item tags use TSPL, ZPL or CPCL label printers. They print barcode, item name and price onto small adhesive labels."),
+                    iconPath = stateValues.drawablePathIconLabelPrinter,
+                    iconRes = stateValues.drawableResIconLabelPrinter.value
+                ) {
+                    if (stateValues.isNarrowScreen) {
+                        Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+                            actionButton(
+                                modifier = Modifier.fillMaxWidth(),
+                                text = refreshButtonText,
+                                iconPath = stateValues.drawablePathIconRefresh,
+                                iconRes = stateValues.drawableResIconRefresh.value,
+                                loading = refreshingLabelPrinters,
+                                confirmationRequired = false,
+                                onClick = { refreshLabelPrinters(showNotification = true) }
+                            )
+                            actionButton(
+                                modifier = Modifier.fillMaxWidth(),
+                                text = localizedStringResource(1282, "Send test label"),
+                                iconPath = stateValues.drawablePathIconLabelPrinter,
+                                iconRes = stateValues.drawableResIconLabelPrinter.value,
+                                enabled = !configuredLabelPrinterId.isNullOrBlank(),
+                                onDisabledClick = { postInAppNotification(labelPrinterNotConfiguredText, NotificationType.Negative, transient = true) },
+                                confirmationRequired = false,
+                                onClick = {
+                                    coroutineScope.launch {
+                                        receiptActionNotification(
+                                            printStockItemLabel(
+                                                StockItemLabelDataModel(
+                                                    itemName = localizedStringResource(1289, "Sticky shelf tag"),
+                                                    barcode = "123456789012",
+                                                    priceText = "100 KZT",
+                                                    storeName = "AITA",
+                                                    copies = 1,
+                                                    protocol = configuredLabelPrinterProtocol
+                                                ),
+                                                protocol = configuredLabelPrinterProtocol,
+                                                notConfiguredMessage = labelPrinterNotConfiguredText
+                                            ),
+                                            testLabelSentText
+                                        )
+                                    }
+                                }
+                            )
+                            actionButton(
+                                modifier = Modifier.fillMaxWidth(),
+                                text = localizedStringResource(1286, "Clear label printer"),
+                                iconPath = stateValues.drawablePathIconCancel,
+                                iconRes = stateValues.drawableResIconCancel.value,
+                                enabled = !configuredLabelPrinterId.isNullOrBlank(),
+                                confirmationRequired = false,
+                                onClick = {
+                                    configureLabelPrinterDevice(null) { result ->
+                                        coroutineScope.launch { receiptActionNotification(result, labelPrinterClearedText) }
+                                    }
+                                }
+                            )
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            actionButton(
+                                modifier = Modifier.weight(1f),
+                                text = refreshButtonText,
+                                iconPath = stateValues.drawablePathIconRefresh,
+                                iconRes = stateValues.drawableResIconRefresh.value,
+                                loading = refreshingLabelPrinters,
+                                confirmationRequired = false,
+                                onClick = { refreshLabelPrinters(showNotification = true) }
+                            )
+                            actionButton(
+                                modifier = Modifier.weight(1f),
+                                text = localizedStringResource(1282, "Send test label"),
+                                iconPath = stateValues.drawablePathIconLabelPrinter,
+                                iconRes = stateValues.drawableResIconLabelPrinter.value,
+                                enabled = !configuredLabelPrinterId.isNullOrBlank(),
+                                onDisabledClick = { postInAppNotification(labelPrinterNotConfiguredText, NotificationType.Negative, transient = true) },
+                                confirmationRequired = false,
+                                onClick = {
+                                    coroutineScope.launch {
+                                        receiptActionNotification(
+                                            printStockItemLabel(
+                                                StockItemLabelDataModel(
+                                                    itemName = localizedStringResource(1289, "Sticky shelf tag"),
+                                                    barcode = "123456789012",
+                                                    priceText = "100 KZT",
+                                                    storeName = "AITA",
+                                                    copies = 1,
+                                                    protocol = configuredLabelPrinterProtocol
+                                                ),
+                                                protocol = configuredLabelPrinterProtocol,
+                                                notConfiguredMessage = labelPrinterNotConfiguredText
+                                            ),
+                                            testLabelSentText
+                                        )
+                                    }
+                                }
+                            )
+                            actionButton(
+                                modifier = Modifier.weight(1f),
+                                text = localizedStringResource(1286, "Clear label printer"),
+                                iconPath = stateValues.drawablePathIconCancel,
+                                iconRes = stateValues.drawableResIconCancel.value,
+                                enabled = !configuredLabelPrinterId.isNullOrBlank(),
+                                confirmationRequired = false,
+                                onClick = {
+                                    configureLabelPrinterDevice(null) { result ->
+                                        coroutineScope.launch { receiptActionNotification(result, labelPrinterClearedText) }
+                                    }
+                                }
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+                    Text(
+                        text = localizedStringResource(1287, "Label printer protocol"),
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.accentTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+                    tabRowWidget(
+                        modifier = Modifier.fillMaxWidth(),
+                        tabs = listOf(
+                            TabContent(LABEL_PRINTER_PROTOCOL_AUTO, localizedStringResource(1294, "Auto protocol")) {
+                                configureLabelPrinterProtocol(it) { result -> coroutineScope.launch { receiptActionNotification(result, labelPrinterProtocolSelectedText) } }
+                            },
+                            TabContent(LABEL_PRINTER_PROTOCOL_TSPL, localizedStringResource(1295, "TSPL")) {
+                                configureLabelPrinterProtocol(it) { result -> coroutineScope.launch { receiptActionNotification(result, labelPrinterProtocolSelectedText) } }
+                            },
+                            TabContent(LABEL_PRINTER_PROTOCOL_ZPL, localizedStringResource(1296, "ZPL")) {
+                                configureLabelPrinterProtocol(it) { result -> coroutineScope.launch { receiptActionNotification(result, labelPrinterProtocolSelectedText) } }
+                            },
+                            TabContent(LABEL_PRINTER_PROTOCOL_CPCL, localizedStringResource(1297, "CPCL")) {
+                                configureLabelPrinterProtocol(it) { result -> coroutineScope.launch { receiptActionNotification(result, labelPrinterProtocolSelectedText) } }
+                            }
+                        ),
+                        selectedIndexInitial = normalizeLabelPrinterProtocol(configuredLabelPrinterProtocol),
+                        textSize = stateValues.smallTextSize
+                    )
+
+                    Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+                    Text(
+                        text = localizedStringResource(1278, "Detected label printers"),
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.accentTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+                    if (labelPrinters.isEmpty()) {
+                        MessageText(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = stateValues.marginTextFieldGroup),
+                            text = localizedStringResource(1279, "No paired sticky label printers found"),
+                            subText = localizedStringResource(1266, "Pair or connect the printer in system settings, then refresh this list."),
+                            textSize = stateValues.textSize,
+                            subTextSize = stateValues.smallTextSize
+                        )
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+                            labelPrinters.forEach { printer ->
+                                StickyLabelPrinterCard(
+                                    printer = printer,
+                                    selected = printer.id == configuredLabelPrinterId || printer.configured,
+                                    onSelect = {
+                                        configureLabelPrinterDevice(printer.id) { result ->
+                                            coroutineScope.launch { receiptActionNotification(result, labelPrinterSelectedText) }
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -28816,6 +29369,68 @@ private fun AppConfiguration.ThermalReceiptPrinterCard(
         )
     }
 }
+
+
+@Composable
+private fun AppConfiguration.StickyLabelPrinterCard(
+    printer: PlatformLabelPrinterDataModel,
+    selected: Boolean,
+    onSelect: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(if (selected) stateValues.AccentColor.copy(alpha = 0.08f) else stateValues.BackgroundColor)
+            .border(
+                stateValues.unfocusedBorderWidth,
+                if (selected) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+                RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .padding(stateValues.marginTextField),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+    ) {
+        CpImage(
+            modifier = Modifier.size(24.dp),
+            url = stateValues.drawablePathIconLabelPrinter,
+            fallbackRes = stateValues.drawableResIconLabelPrinter.value,
+            contentDescription = printer.name.ifBlank { printer.id },
+            tintColor = if (selected) stateValues.AccentColor else stateValues.TextColor
+        )
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = printer.name.ifBlank { printer.id },
+                color = stateValues.TextColor,
+                fontSize = stateValues.textSize,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            printer.subtitle.takeIf { it.isNotBlank() }?.let {
+                Text(
+                    text = it,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.smallTextSize,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        actionButton(
+            text = if (selected) localizedStringResource(1258, "Selected printer") else localizedStringResource(1303, "Use this label printer"),
+            iconPath = if (selected) stateValues.drawablePathIconCheck else stateValues.drawablePathIconLabelPrinter,
+            iconRes = if (selected) stateValues.drawableResIconCheck.value else stateValues.drawableResIconLabelPrinter.value,
+            enabled = !selected,
+            confirmationRequired = false,
+            fillMaxWidthIfTextPresent = false,
+            onClick = onSelect
+        )
+    }
+}
+
 
 
 private data class SupportFaqEntry(
@@ -34136,6 +34751,8 @@ private fun localDrawableResourceForPath(
         "61_1" -> Res.drawable._61_1
         "62_0" -> Res.drawable._62_0
         "62_1" -> Res.drawable._62_1
+        "63_0" -> Res.drawable._63_0
+        "63_1" -> Res.drawable._63_1
         else -> fallbackRes
     }
 }
@@ -34567,7 +35184,8 @@ fun AppConfiguration.GoodsItemInStockWidget(
     onClick: ((GoodsItemDataModel) -> Unit)? = null,
     onDelete: ((GoodsItemDataModel) -> Unit)? = null,
     onEdit: ((GoodsItemDataModel) -> Unit)? = null,
-    onAddBatch: ((GoodsItemDataModel) -> Unit)? = null
+    onAddBatch: ((GoodsItemDataModel) -> Unit)? = null,
+    onPrintLabel: ((GoodsItemDataModel) -> Unit)? = null
 ) {
     val itemName = goodsItem.name.visibleLocalizedString(stateValues.appLanguage, "Unnamed item")
 
@@ -34873,6 +35491,18 @@ fun AppConfiguration.GoodsItemInStockWidget(
                 }
             }
 
+            onPrintLabel?.let {
+                actionButton(
+                    text = "",
+                    iconPath = stateValues.drawablePathIconLabelPrinter,
+                    iconRes = stateValues.drawableResIconLabelPrinter.value,
+                    iconContentDescription = localizedStringResource(1288, "Print item label"),
+                    confirmationRequired = false,
+                ) {
+                    onPrintLabel(goodsItem)
+                }
+            }
+
             onEdit?.let {
                 actionButton(
                     text = "",
@@ -34979,7 +35609,15 @@ fun AppConfiguration.StockGoodsItemDetailsScreen() {
             return@StockScreenScaffold
         }
 
+        var showLabelPrintSheet by rememberSaveable(goodsItem.id) { mutableStateOf(false) }
         val batches = stateValues.stockBatches.orEmpty().filter { it.goodsItemId == goodsItem.id && it.isActive }
+        if (showLabelPrintSheet) {
+            StockItemLabelPrintBottomSheet(
+                goodsItem = goodsItem,
+                batches = batches,
+                onDismiss = { showLabelPrintSheet = false }
+            )
+        }
         val activeBatch = batches.sortedForShelf(goodsItem).firstOrNull { it.id == goodsItem.activeShelfBatchId }
             ?: batches.sortedForShelf(goodsItem).firstOrNull()
         val itemName = goodsItem.name.extractLocalizedString(stateValues.appLanguage)
@@ -35083,6 +35721,15 @@ fun AppConfiguration.StockGoodsItemDetailsScreen() {
                     Navigation.Stock.go(NavigationScreenModel.Stock.GoodsItemSupplierPrices, remove = true, forceSecond = true)
                 }
             }
+
+            actionButton(
+                modifier = Modifier.weight(1f),
+                text = localizedStringResource(1288, "Print item label"),
+                iconPath = stateValues.drawablePathIconLabelPrinter,
+                iconRes = stateValues.drawableResIconLabelPrinter.value,
+                confirmationRequired = false,
+                onClick = { showLabelPrintSheet = true }
+            )
         }
     }
 }
@@ -37490,6 +38137,9 @@ object AppConfiguration {
         val drawablePathIconAnalyticsReport: String
         val drawableResIconAnalyticsReport: StateFlow<DrawableResource>
 
+        val drawablePathIconLabelPrinter: String
+        val drawableResIconLabelPrinter: StateFlow<DrawableResource>
+
         val drawablePathIconWorkers: String
         val drawableResIconWorkers: StateFlow<DrawableResource>
 
@@ -38059,6 +38709,10 @@ object AppConfiguration {
             private val _drawableResIconAnalyticsReport = MutableStateFlow(Res.drawable._62_0)
             override val drawableResIconAnalyticsReport: StateFlow<DrawableResource> = _drawableResIconAnalyticsReport.asStateFlow()
 
+            override val drawablePathIconLabelPrinter: String by drawablePathIconLabelPrinterState.collectAsState()
+            private val _drawableResIconLabelPrinter = MutableStateFlow(Res.drawable._63_0)
+            override val drawableResIconLabelPrinter: StateFlow<DrawableResource> = _drawableResIconLabelPrinter.asStateFlow()
+
             override val drawablePathIconWorkers: String by drawablePathIconWorkersState.collectAsState()
             private val _drawableResIconWorkers = MutableStateFlow(Res.drawable._22_0)
             override val drawableResIconWorkers: StateFlow<DrawableResource> = _drawableResIconWorkers.asStateFlow()
@@ -38247,6 +38901,7 @@ object AppConfiguration {
 
                 _drawableResIconAnalytics.emit(if (stateValues.appThemeId == 1L) Res.drawable._21_1 else Res.drawable._21_0)
                 _drawableResIconAnalyticsReport.emit(if (stateValues.appThemeId == 1L) Res.drawable._62_1 else Res.drawable._62_0)
+                _drawableResIconLabelPrinter.emit(if (stateValues.appThemeId == 1L) Res.drawable._63_1 else Res.drawable._63_0)
 
                 _drawableResIconWorkers.emit(if (stateValues.appThemeId == 1L) Res.drawable._22_1 else Res.drawable._22_0)
 

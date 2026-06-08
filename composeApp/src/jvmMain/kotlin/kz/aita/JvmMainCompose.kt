@@ -23,6 +23,9 @@ import java.util.concurrent.ConcurrentHashMap
 import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
+import javax.print.DocFlavor
+import javax.print.PrintServiceLookup
+import javax.print.SimpleDoc
 
 private val keyringService = "aita_keyring"
 private val keyring: Keyring by lazy { Keyring.create() }
@@ -153,6 +156,156 @@ object ReceiptPlatformJvmBridge {
     }
 }
 
+
+object LabelPrinterPlatformJvmBridge {
+    /** Optional desktop label-printer writer for USB serial, network bridge, tests, etc. */
+    var writeLabelBytes: (suspend (ByteArray) -> Boolean)? = null
+
+    var labelPrinterDevicePath: String? = System.getenv("AITA_LABEL_PRINTER_DEVICE")
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+
+    var labelPrinterServiceName: String? = System.getenv("AITA_LABEL_PRINTER_SERVICE")
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+
+    var labelPrinterProtocol: String = normalizeLabelPrinterProtocol(System.getenv("AITA_LABEL_PRINTER_PROTOCOL"))
+
+    fun configureLabelPrinterDeviceId(deviceId: String?) {
+        val clean = deviceId?.trim()?.takeIf { it.isNotBlank() }
+        when {
+            clean == null -> {
+                labelPrinterDevicePath = null
+                labelPrinterServiceName = null
+            }
+            clean.startsWith("service:") -> {
+                labelPrinterServiceName = clean.removePrefix("service:").trim().takeIf { it.isNotBlank() }
+                labelPrinterDevicePath = null
+            }
+            clean.startsWith("path:") -> {
+                labelPrinterDevicePath = clean.removePrefix("path:").trim().takeIf { it.isNotBlank() }
+                labelPrinterServiceName = null
+            }
+            clean.startsWith("file:") -> {
+                labelPrinterDevicePath = clean.removePrefix("file:").trim().takeIf { it.isNotBlank() }
+                labelPrinterServiceName = null
+            }
+            else -> {
+                labelPrinterDevicePath = clean
+                labelPrinterServiceName = null
+            }
+        }
+    }
+
+    fun configureProtocol(protocol: String) {
+        labelPrinterProtocol = normalizeLabelPrinterProtocol(protocol)
+    }
+
+    private fun normalizedDevicePath(rawPath: String): String {
+        val clean = rawPath.trim()
+        val osName = System.getProperty("os.name").orEmpty().lowercase(Locale.ROOT)
+        return if (osName.contains("win") && clean.matches(Regex("(?i)^COM\\d+$"))) {
+            "\\\\.\\$clean"
+        } else {
+            clean
+        }
+    }
+
+    private fun systemPrintServiceNames(): List<String> =
+        PrintServiceLookup.lookupPrintServices(null, null)
+            .orEmpty()
+            .mapNotNull { it.name?.trim()?.takeIf { name -> name.isNotBlank() } }
+            .distinct()
+
+    fun listLabelPrinterDevices(): List<PlatformLabelPrinterDataModel> {
+        val configuredPath = labelPrinterDevicePath?.trim().orEmpty()
+        val configuredService = labelPrinterServiceName?.trim().orEmpty()
+        val pathCandidates = listOf(
+            configuredPath,
+            System.getenv("AITA_LABEL_PRINTER_DEVICE").orEmpty(),
+            "/dev/usb/lp0",
+            "/dev/ttyUSB0",
+            "/dev/ttyACM0"
+        )
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .filter { path -> configuredPath.equals(path, true) || File(path).exists() || path.matches(Regex("(?i)^COM\\d+$")) }
+            .map { path ->
+                PlatformLabelPrinterDataModel(
+                    id = "path:$path",
+                    name = path.substringAfterLast('/').ifBlank { path },
+                    subtitle = "Direct device path • TSPL/ZPL/CPCL raw label bytes",
+                    configured = configuredPath.equals(path, ignoreCase = true),
+                    available = File(path).exists() || path.matches(Regex("(?i)^COM\\d+$"))
+                )
+            }
+
+        val printServices = systemPrintServiceNames().map { name ->
+            PlatformLabelPrinterDataModel(
+                id = "service:$name",
+                name = name,
+                subtitle = "System raw print service • use only for label printers that accept TSPL/ZPL/CPCL bytes",
+                configured = configuredService.equals(name, ignoreCase = true),
+                available = true
+            )
+        }
+
+        val savedUnavailable = when {
+            configuredPath.isNotBlank() && pathCandidates.none { it.configured } -> listOf(
+                PlatformLabelPrinterDataModel(
+                    id = "path:$configuredPath",
+                    name = configuredPath.substringAfterLast('/').ifBlank { configuredPath },
+                    subtitle = "Saved label printer path; reconnect it if unavailable",
+                    configured = true,
+                    available = false
+                )
+            )
+            configuredService.isNotBlank() && printServices.none { it.configured } -> listOf(
+                PlatformLabelPrinterDataModel(
+                    id = "service:$configuredService",
+                    name = configuredService,
+                    subtitle = "Saved system print service; reconnect or reinstall it if unavailable",
+                    configured = true,
+                    available = false
+                )
+            )
+            else -> emptyList()
+        }
+
+        return (savedUnavailable + pathCandidates + printServices)
+            .distinctBy { it.id.lowercase(Locale.ROOT) }
+            .sortedWith(compareByDescending<PlatformLabelPrinterDataModel> { it.configured }.thenBy { it.name.lowercase(Locale.ROOT) })
+    }
+
+    suspend fun writeLabelBytesToConfiguredPrinter(labelBytes: ByteArray): Boolean {
+        writeLabelBytes?.let { customWriter -> return customWriter(labelBytes) }
+
+        val path = labelPrinterDevicePath?.trim()?.takeIf { it.isNotBlank() }
+        if (path != null) {
+            return withContext(Dispatchers.IO) {
+                val file = File(normalizedDevicePath(path))
+                file.outputStream().use { output ->
+                    output.write(labelBytes)
+                    output.flush()
+                }
+                true
+            }
+        }
+
+        val serviceName = labelPrinterServiceName?.trim()?.takeIf { it.isNotBlank() } ?: return false
+        return withContext(Dispatchers.IO) {
+            val service = PrintServiceLookup.lookupPrintServices(null, null)
+                .orEmpty()
+                .firstOrNull { it.name.equals(serviceName, ignoreCase = true) }
+                ?: return@withContext false
+            val doc = SimpleDoc(labelBytes, DocFlavor.BYTE_ARRAY.AUTOSENSE, null)
+            service.createPrintJob().print(doc, null)
+            true
+        }
+    }
+}
+
 object DesktopVoiceInputJvmBridge {
     /**
      * Optional desktop speech recognizer hook.
@@ -256,6 +409,8 @@ fun installDesktopVoiceInputJvm() {
 }
 
 fun installReceiptPlatformJvm() {
+    configuredLabelPrinterProtocolState.value = LabelPrinterPlatformJvmBridge.labelPrinterProtocol
+
     fun writePdfToDownloads(fileName: String, pdfBytes: ByteArray): File {
         val downloads = File(System.getProperty("user.home"), "Downloads").takeIf { it.exists() && it.isDirectory }
             ?: File(System.getProperty("user.home"))
@@ -336,6 +491,39 @@ fun installReceiptPlatformJvm() {
                 }
             }.getOrElse {
                 ReceiptPlatformActionResult(false, it.message ?: "Could not print receipt")
+            }
+        }
+    }
+
+    listPlatformLabelPrinterDevicesAction = {
+        withContext(Dispatchers.IO) {
+            LabelPrinterPlatformJvmBridge.listLabelPrinterDevices()
+        }
+    }
+
+    configurePlatformLabelPrinterDeviceAction = { deviceId ->
+        LabelPrinterPlatformJvmBridge.configureLabelPrinterDeviceId(deviceId)
+        ReceiptPlatformActionResult(
+            true,
+            if (deviceId.isNullOrBlank()) "Label printer cleared" else "Label printer selected"
+        )
+    }
+
+    configurePlatformLabelPrinterProtocolAction = { protocol ->
+        LabelPrinterPlatformJvmBridge.configureProtocol(protocol)
+        ReceiptPlatformActionResult(true, "Label printer protocol selected")
+    }
+
+    printLabelPrinterBytes = { labelBytes ->
+        withContext(Dispatchers.IO) {
+            runCatching {
+                if (LabelPrinterPlatformJvmBridge.writeLabelBytesToConfiguredPrinter(labelBytes)) {
+                    ReceiptPlatformActionResult(true, "Label sent to printer")
+                } else {
+                    ReceiptPlatformActionResult(false, "Desktop sticky label printer is not configured")
+                }
+            }.getOrElse { throwable ->
+                ReceiptPlatformActionResult(false, throwable.message ?: "Could not print sticky label")
             }
         }
     }
