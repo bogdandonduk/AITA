@@ -31934,7 +31934,6 @@ fun AppConfiguration.MenuAnalyticsScreen() {
     }
 }
 
-@Composable
 private fun AppConfiguration.analyticsReturnReasonsSubtitle(item: AnalyticsRankedItemDataModel, currencyCode: String): String {
     val reasons = item.returnReasons
         .takeIf { it.isNotEmpty() }
