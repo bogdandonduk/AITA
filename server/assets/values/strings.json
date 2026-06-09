@@ -25852,6 +25852,279 @@
           "value": "Қайтару сомасы"
         }
       ]
+    },
+    {
+      "id": 1316,
+      "values": [
+        {
+          "language": "main",
+          "value": "Generate barcode"
+        },
+        {
+          "language": "en",
+          "value": "Generate barcode"
+        },
+        {
+          "language": "ru",
+          "value": "Сгенерировать штрихкод"
+        },
+        {
+          "language": "kk",
+          "value": "Штрих-код жасау"
+        }
+      ]
+    },
+    {
+      "id": 1317,
+      "values": [
+        {
+          "language": "main",
+          "value": "Generated internal EAN-13 barcode"
+        },
+        {
+          "language": "en",
+          "value": "Generated internal EAN-13 barcode"
+        },
+        {
+          "language": "ru",
+          "value": "Создан внутренний штрихкод EAN-13"
+        },
+        {
+          "language": "kk",
+          "value": "Ішкі EAN-13 штрих-коды жасалды"
+        }
+      ]
+    },
+    {
+      "id": 1318,
+      "values": [
+        {
+          "language": "main",
+          "value": "Total items"
+        },
+        {
+          "language": "en",
+          "value": "Total items"
+        },
+        {
+          "language": "ru",
+          "value": "Всего товаров"
+        },
+        {
+          "language": "kk",
+          "value": "Барлық тауар"
+        }
+      ]
+    },
+    {
+      "id": 1319,
+      "values": [
+        {
+          "language": "main",
+          "value": "In stock"
+        },
+        {
+          "language": "en",
+          "value": "In stock"
+        },
+        {
+          "language": "ru",
+          "value": "В наличии"
+        },
+        {
+          "language": "kk",
+          "value": "Қоймада бар"
+        }
+      ]
+    },
+    {
+      "id": 1320,
+      "values": [
+        {
+          "language": "main",
+          "value": "Out"
+        },
+        {
+          "language": "en",
+          "value": "Out"
+        },
+        {
+          "language": "ru",
+          "value": "Нет"
+        },
+        {
+          "language": "kk",
+          "value": "Жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1321,
+      "values": [
+        {
+          "language": "main",
+          "value": "Low"
+        },
+        {
+          "language": "en",
+          "value": "Low"
+        },
+        {
+          "language": "ru",
+          "value": "Мало"
+        },
+        {
+          "language": "kk",
+          "value": "Аз"
+        }
+      ]
+    },
+    {
+      "id": 1322,
+      "values": [
+        {
+          "language": "main",
+          "value": "No barcode"
+        },
+        {
+          "language": "en",
+          "value": "No barcode"
+        },
+        {
+          "language": "ru",
+          "value": "Без штрихкода"
+        },
+        {
+          "language": "kk",
+          "value": "Штрих-код жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1323,
+      "values": [
+        {
+          "language": "main",
+          "value": "Selected"
+        },
+        {
+          "language": "en",
+          "value": "Selected"
+        },
+        {
+          "language": "ru",
+          "value": "Выбрано"
+        },
+        {
+          "language": "kk",
+          "value": "Таңдалды"
+        }
+      ]
+    },
+    {
+      "id": 1324,
+      "values": [
+        {
+          "language": "main",
+          "value": "Select all"
+        },
+        {
+          "language": "en",
+          "value": "Select all"
+        },
+        {
+          "language": "ru",
+          "value": "Выбрать всё"
+        },
+        {
+          "language": "kk",
+          "value": "Барлығын таңдау"
+        }
+      ]
+    },
+    {
+      "id": 1325,
+      "values": [
+        {
+          "language": "main",
+          "value": "Label opened for printing"
+        },
+        {
+          "language": "en",
+          "value": "Label opened for printing"
+        },
+        {
+          "language": "ru",
+          "value": "Этикетка открыта для печати"
+        },
+        {
+          "language": "kk",
+          "value": "Жапсырма басып шығаруға ашылды"
+        }
+      ]
+    },
+    {
+      "id": 1326,
+      "values": [
+        {
+          "language": "main",
+          "value": "System print dialog"
+        },
+        {
+          "language": "en",
+          "value": "System print dialog"
+        },
+        {
+          "language": "ru",
+          "value": "Системная печать"
+        },
+        {
+          "language": "kk",
+          "value": "Жүйелік басып шығару"
+        }
+      ]
+    },
+    {
+      "id": 1327,
+      "values": [
+        {
+          "language": "main",
+          "value": "Batches"
+        },
+        {
+          "language": "en",
+          "value": "Batches"
+        },
+        {
+          "language": "ru",
+          "value": "Партии"
+        },
+        {
+          "language": "kk",
+          "value": "Партиялар"
+        }
+      ]
+    },
+    {
+      "id": 1328,
+      "values": [
+        {
+          "language": "main",
+          "value": "Clear selection"
+        },
+        {
+          "language": "en",
+          "value": "Clear selection"
+        },
+        {
+          "language": "ru",
+          "value": "Снять выбор"
+        },
+        {
+          "language": "kk",
+          "value": "Таңдауды тазалау"
+        }
+      ]
     }
   ]
 }

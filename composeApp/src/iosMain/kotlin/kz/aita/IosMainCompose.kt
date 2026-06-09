@@ -93,6 +93,7 @@ import platform.UIKit.UIApplication
 import platform.UIKit.UIApplicationOpenSettingsURLString
 import platform.UIKit.UIDevice
 import platform.UIKit.UIPrintInteractionController
+import platform.UIKit.UIMarkupTextPrintFormatter
 import platform.UIKit.UIPasteboard
 import platform.UIKit.UIView
 import platform.UIKit.UIViewController
@@ -438,9 +439,23 @@ private fun installIosComposePlatformBridges() {
         }
     }
 
-    printReceiptPlatformAction = { fileName, pdfBytes, _ ->
+    printReceiptPlatformAction = { _, pdfBytes, _ ->
         val printController = UIPrintInteractionController.sharedPrintController()
         printController.printingItem = pdfBytes.toNSData()
+        printController.presentAnimated(true, completionHandler = null)
+        ReceiptPlatformActionResult(true, "Opening print dialog")
+    }
+
+    printPdfDocumentPlatformAction = { _, pdfBytes ->
+        val printController = UIPrintInteractionController.sharedPrintController()
+        printController.printingItem = pdfBytes.toNSData()
+        printController.presentAnimated(true, completionHandler = null)
+        ReceiptPlatformActionResult(true, "Opening print dialog")
+    }
+
+    printHtmlDocumentPlatformAction = { _, html ->
+        val printController = UIPrintInteractionController.sharedPrintController()
+        printController.printFormatter = UIMarkupTextPrintFormatter(markupText = html)
         printController.presentAnimated(true, completionHandler = null)
         ReceiptPlatformActionResult(true, "Opening print dialog")
     }

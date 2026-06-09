@@ -1,5 +1,5 @@
 // THIS IS CommonMainCompose.kt - in commonMain shared module of kmp compose app
-@file:OptIn(ExperimentalTime::class)
+@file:OptIn(ExperimentalTime::class, ExperimentalFoundationApi::class)
 package kz.aita
 
 import aita.composeapp.generated.resources.*
@@ -8,10 +8,12 @@ import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -721,6 +723,19 @@ private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallb
     put(1313L, mapOf("main" to "No reason provided", "en" to "No reason provided", "ru" to "Причина не указана", "kk" to "Себебі көрсетілмеген"))
     put(1314L, mapOf("main" to "Returned quantity", "en" to "Returned quantity", "ru" to "Возвращено", "kk" to "Қайтарылған саны"))
     put(1315L, mapOf("main" to "Returned amount", "en" to "Returned amount", "ru" to "Сумма возвратов", "kk" to "Қайтару сомасы"))
+    put(1316L, mapOf("main" to "Generate barcode", "en" to "Generate barcode", "ru" to "Сгенерировать штрихкод", "kk" to "Штрих-код жасау"))
+    put(1317L, mapOf("main" to "Generated internal EAN-13 barcode", "en" to "Generated internal EAN-13 barcode", "ru" to "Создан внутренний штрихкод EAN-13", "kk" to "Ішкі EAN-13 штрих-коды жасалды"))
+    put(1318L, mapOf("main" to "Total items", "en" to "Total items", "ru" to "Всего товаров", "kk" to "Барлық тауар"))
+    put(1319L, mapOf("main" to "In stock", "en" to "In stock", "ru" to "В наличии", "kk" to "Қоймада бар"))
+    put(1320L, mapOf("main" to "Out", "en" to "Out", "ru" to "Нет", "kk" to "Жоқ"))
+    put(1321L, mapOf("main" to "Low", "en" to "Low", "ru" to "Мало", "kk" to "Аз"))
+    put(1322L, mapOf("main" to "No barcode", "en" to "No barcode", "ru" to "Без штрихкода", "kk" to "Штрих-код жоқ"))
+    put(1323L, mapOf("main" to "Selected", "en" to "Selected", "ru" to "Выбрано", "kk" to "Таңдалды"))
+    put(1324L, mapOf("main" to "Select all", "en" to "Select all", "ru" to "Выбрать всё", "kk" to "Барлығын таңдау"))
+    put(1325L, mapOf("main" to "Label opened for printing", "en" to "Label opened for printing", "ru" to "Этикетка открыта для печати", "kk" to "Жапсырма басып шығаруға ашылды"))
+    put(1326L, mapOf("main" to "System print dialog", "en" to "System print dialog", "ru" to "Системная печать", "kk" to "Жүйелік басып шығару"))
+    put(1327L, mapOf("main" to "Batches", "en" to "Batches", "ru" to "Партии", "kk" to "Партиялар"))
+    put(1328L, mapOf("main" to "Clear selection", "en" to "Clear selection", "ru" to "Снять выбор", "kk" to "Таңдауды тазалау"))
 }
 
 
@@ -9432,6 +9447,189 @@ fun AppConfiguration.StockWarehouseScreen() {
 }
 
 
+
+private data class StockWarehouseMetricsData(
+    val totalItems: Int,
+    val inStockItems: Int,
+    val outOfStockItems: Int,
+    val lowStockItems: Int,
+    val expiringSoonItems: Int,
+    val noBarcodeItems: Int,
+    val activeBatchCount: Int
+)
+
+private fun stockWarehouseMetricsForUi(
+    items: List<GoodsItemDataModel>,
+    batches: List<GoodsBatchDataModel>
+): StockWarehouseMetricsData {
+    val activeBatches = batches.filter { batch ->
+        batch.isActive &&
+                batch.status != StockBatchStatusDataModel.Deleted &&
+                batch.status != StockBatchStatusDataModel.WrittenOff
+    }
+    val batchesByItem = activeBatches.groupBy { it.goodsItemId }
+    val now = getCurrentTimeMillis()
+    val sevenDaysMillis = 7L * 24L * 60L * 60L * 1000L
+
+    fun quantityFor(item: GoodsItemDataModel): Double = batchesByItem[item.id].orEmpty().sumOf { it.quantity.total }
+
+    return StockWarehouseMetricsData(
+        totalItems = items.size,
+        inStockItems = items.count { quantityFor(it) > 0.0 },
+        outOfStockItems = items.count { quantityFor(it) <= 0.0 },
+        lowStockItems = items.count { item ->
+            val quantity = quantityFor(item)
+            quantity > 0.0 && quantity <= 5.0
+        },
+        expiringSoonItems = items.count { item ->
+            batchesByItem[item.id].orEmpty().any { batch ->
+                val expiresAt = batch.expirationDateMillis ?: return@any false
+                expiresAt in now..(now + sevenDaysMillis)
+            }
+        },
+        noBarcodeItems = items.count { item -> item.allBarcodeValues().none { it.isNotBlank() } },
+        activeBatchCount = activeBatches.size
+    )
+}
+
+@Composable
+private fun AppConfiguration.StockWarehouseMetricPill(
+    title: String,
+    value: String,
+    accent: Boolean = false,
+    warning: Boolean = false
+) {
+    val shape = RoundedCornerShape(999.dp)
+    val borderColor = when {
+        warning -> stateValues.ErrorColor
+        accent -> stateValues.AccentColor
+        else -> stateValues.PlaceholderTextColor
+    }
+    Column(
+        modifier = Modifier
+            .clip(shape)
+            .background(if (accent) stateValues.AccentColor.copy(alpha = 0.10f) else stateValues.BackgroundColor)
+            .border(stateValues.unfocusedBorderWidth, borderColor.copy(alpha = if (accent || warning) 0.9f else 0.45f), shape)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = value,
+            color = if (warning) stateValues.ErrorColor else if (accent) stateValues.AccentColor else stateValues.TextColor,
+            fontSize = stateValues.accentTextSize,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1
+        )
+        Text(
+            text = title,
+            color = stateValues.PlaceholderTextColor,
+            fontSize = stateValues.smallTextSize,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun AppConfiguration.StockWarehouseInfoTile(
+    modifier: Modifier = Modifier,
+    metrics: StockWarehouseMetricsData,
+    selectionMode: Boolean,
+    selectedCount: Int,
+    totalSelectableCount: Int,
+    onSelectAll: () -> Unit,
+    onClearSelection: () -> Unit,
+    onRefresh: () -> Unit
+) {
+    val shape = RoundedCornerShape(stateValues.cornerRadius)
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = selectionMode)
+            .clip(shape)
+            .background(if (selectionMode) stateValues.AccentColor.copy(alpha = 0.12f) else stateValues.BackgroundColor)
+            .border(
+                stateValues.unfocusedBorderWidth,
+                if (selectionMode) stateValues.AccentColor else stateValues.PlaceholderTextColor.copy(alpha = 0.55f),
+                shape
+            )
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            if (selectionMode) {
+                Text(
+                    text = "${localizedStringResource(1323, "Selected")}: $selectedCount / $totalSelectableCount",
+                    color = stateValues.AccentColor,
+                    fontSize = stateValues.accentTextSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = localizedStringResource(1328, "Clear selection"),
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    StockWarehouseMetricPill(localizedStringResource(1318, "Total items"), metrics.totalItems.toString(), accent = true)
+                    StockWarehouseMetricPill(localizedStringResource(1319, "In stock"), metrics.inStockItems.toString())
+                    StockWarehouseMetricPill(localizedStringResource(1320, "Out"), metrics.outOfStockItems.toString(), warning = metrics.outOfStockItems > 0)
+                    StockWarehouseMetricPill(localizedStringResource(1321, "Low"), metrics.lowStockItems.toString(), warning = metrics.lowStockItems > 0)
+                    StockWarehouseMetricPill(localizedStringResource(1309, "Expires very soon"), metrics.expiringSoonItems.toString(), warning = metrics.expiringSoonItems > 0)
+                    StockWarehouseMetricPill(localizedStringResource(1322, "No barcode"), metrics.noBarcodeItems.toString(), warning = metrics.noBarcodeItems > 0)
+                    StockWarehouseMetricPill(localizedStringResource(1327, "Batches"), metrics.activeBatchCount.toString())
+                }
+            }
+        }
+
+        if (selectionMode) {
+            actionButton(
+                text = "",
+                iconPath = stateValues.drawablePathIconCheck,
+                iconRes = stateValues.drawableResIconCheck.value,
+                iconContentDescription = localizedStringResource(1324, "Select all"),
+                enabled = selectedCount < totalSelectableCount,
+                fillMaxWidthIfTextPresent = false,
+                confirmationRequired = false,
+                onClick = onSelectAll
+            )
+            actionButton(
+                text = "",
+                iconPath = stateValues.drawablePathIconCancel,
+                iconRes = stateValues.drawableResIconCancel.value,
+                iconContentDescription = localizedStringResource(1328, "Clear selection"),
+                fillMaxWidthIfTextPresent = false,
+                confirmationRequired = false,
+                onClick = onClearSelection
+            )
+        } else {
+            actionButton(
+                text = "",
+                iconPath = stateValues.drawablePathIconRefresh,
+                iconRes = stateValues.drawableResIconRefresh.value,
+                iconContentDescription = localizedStringResource(237, "Refresh"),
+                fillMaxWidthIfTextPresent = false,
+                confirmationRequired = false,
+                onClick = onRefresh
+            )
+        }
+    }
+}
+
 @Composable
 fun AppConfiguration.StockWarehouseScreenContent(
     modifier: Modifier = Modifier,
@@ -9465,6 +9663,9 @@ fun AppConfiguration.StockWarehouseScreenContent(
             } else {
                 var lSearchQuery: String by rememberSaveable {
                     mutableStateOf("")
+                }
+                var selectedStockItemIds by rememberSaveable {
+                    mutableStateOf(emptyList<String>())
                 }
 
                 if (searchQuery == null) {
@@ -9573,73 +9774,140 @@ fun AppConfiguration.StockWarehouseScreenContent(
                     if (preferredOrder.isEmpty() && !sortAscending) sorted.reversed() else sorted
                 }
 
+                val selectableItemIds = sortedItems.map { it.id }.filter { it.isNotBlank() }.distinct()
+                LaunchedEffect(selectableItemIds.joinToString("|")) {
+                    val cleaned = selectedStockItemIds.filter { it in selectableItemIds }.distinct()
+                    if (cleaned != selectedStockItemIds) selectedStockItemIds = cleaned
+                }
+
+                val selectionAvailable = searchQuery == null && transactionTypeIndex == null && selectableItemIds.isNotEmpty()
+                val selectionMode = selectionAvailable && selectedStockItemIds.isNotEmpty()
+
+                fun toggleSelection(item: GoodsItemDataModel) {
+                    if (!selectionAvailable || item.id.isBlank()) return
+                    selectedStockItemIds = if (item.id in selectedStockItemIds) {
+                        selectedStockItemIds.filterNot { it == item.id }
+                    } else {
+                        (selectedStockItemIds + item.id).distinct()
+                    }
+                }
+
+                fun enterSelection(item: GoodsItemDataModel) {
+                    if (!selectionAvailable || item.id.isBlank()) return
+                    if (item.id !in selectedStockItemIds) selectedStockItemIds = (selectedStockItemIds + item.id).distinct()
+                }
+
+                fun clearSelection() {
+                    selectedStockItemIds = emptyList()
+                }
+
+                fun selectAllVisibleStock() {
+                    selectedStockItemIds = selectableItemIds
+                }
+
                 var page by rememberSaveable(lSearchQuery, sortMode, sortAscending, sortedItems.size) {
                     mutableStateOf(0)
                 }
                 val pageSize = stateValues.globalAppConfiguration.pagingDefaultPageSize.coerceIn(20, 100)
                 val visibleItems = sortedItems.clientPaged(page, pageSize)
+                val overviewMetrics = stockWarehouseMetricsForUi(sortedItems, stateValues.stockBatches.orEmpty())
+                val showWarehouseInfoTile = searchQuery == null && transactionTypeIndex == null
+                val refreshAction = {
+                    stateValues.activeStoreId?.let { storeId ->
+                        getStock(storeId)
+                        getStockBatches(storeId)
+                    }
+                }
 
-                if (sortedItems.isEmpty()) {
-                    MessageText(
-                        modifier = modifier
-                            .fillMaxSize(),
-                        stateValues.stringNoMatches
-                    )
-                } else {
-                    val warehouseListState = rememberPersistentLazyListState(
-                        stateHost = scrollStateHost,
-                        stateKey = scrollStateKey
-                    )
+                Column(
+                    modifier = modifier
+                        .fillMaxWidth()
+                ) {
+                    if (showWarehouseInfoTile) {
+                        StockWarehouseInfoTile(
+                            modifier = Modifier.padding(horizontal = 8.dp, top = 8.dp),
+                            metrics = overviewMetrics,
+                            selectionMode = selectionMode,
+                            selectedCount = selectedStockItemIds.size,
+                            totalSelectableCount = selectableItemIds.size,
+                            onSelectAll = { selectAllVisibleStock() },
+                            onClearSelection = { clearSelection() },
+                            onRefresh = refreshAction
+                        )
+                    }
 
-                    LazyColumn(
-                        state = warehouseListState,
-                        modifier = modifier
-                            .fillMaxWidth()
-                            .padding(8.dp)
-                    ) {
-                        items(visibleItems, key = { it.id }) { item ->
-                            val activeStoreId = stateValues.activeStoreId
-                            val itemBatches = stateValues.stockBatches.orEmpty().filter { batch ->
-                                batch.goodsItemId == item.id &&
-                                        batch.isActive &&
-                                        (transactionTypeIndex == null || (batchBelongsToInventoryStoreForUi(batch.storeId, activeStoreId) && batch.isSelectableActiveStockBatch()))
-                            }
-                            val availableQuantity = itemBatches
-                                .filter { batch ->
-                                    if (transactionTypeIndex == null) {
-                                        batch.status != StockBatchStatusDataModel.Deleted && batch.status != StockBatchStatusDataModel.WrittenOff
-                                    } else {
-                                        batch.isSelectableActiveStockBatch()
-                                    }
+                    if (sortedItems.isEmpty()) {
+                        MessageText(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            stateValues.stringNoMatches
+                        )
+                    } else {
+                        val warehouseListState = rememberPersistentLazyListState(
+                            stateHost = scrollStateHost,
+                            stateKey = scrollStateKey
+                        )
+
+                        LazyColumn(
+                            state = warehouseListState,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .padding(8.dp)
+                        ) {
+                            items(visibleItems, key = { it.id }) { item ->
+                                val activeStoreId = stateValues.activeStoreId
+                                val itemBatches = stateValues.stockBatches.orEmpty().filter { batch ->
+                                    batch.goodsItemId == item.id &&
+                                            batch.isActive &&
+                                            (transactionTypeIndex == null || (batchBelongsToInventoryStoreForUi(batch.storeId, activeStoreId) && batch.isSelectableActiveStockBatch()))
                                 }
-                                .sumOf { it.quantity.total }
-                            val trulyOutOfStock = disableIfOutOfStock && availableQuantity <= 0.0
+                                val availableQuantity = itemBatches
+                                    .filter { batch ->
+                                        if (transactionTypeIndex == null) {
+                                            batch.status != StockBatchStatusDataModel.Deleted && batch.status != StockBatchStatusDataModel.WrittenOff
+                                        } else {
+                                            batch.isSelectableActiveStockBatch()
+                                        }
+                                    }
+                                    .sumOf { it.quantity.total }
+                                val trulyOutOfStock = disableIfOutOfStock && availableQuantity <= 0.0
 
-                            val canOperateThisStoreInventory = activeStoreId.isNullOrBlank() || sameInventoryStoreGroupForUi(activeStoreId, item.storeId) || itemHasSellableBatchInStoreForUi(item.id, activeStoreId)
+                                val canOperateThisStoreInventory = activeStoreId.isNullOrBlank() || sameInventoryStoreGroupForUi(activeStoreId, item.storeId) || itemHasSellableBatchInStoreForUi(item.id, activeStoreId)
 
-                            GoodsItemInStockWidget(
-                                modifier = Modifier
-                                    .alpha(if (trulyOutOfStock) 0.5f else 1f),
-                                goodsItem = item,
-                                batches = itemBatches,
-                                showBatches = showBatches && canOperateThisStoreInventory,
-                                transactionTypeIndex = transactionTypeIndex,
-                                onDelete = onDelete?.takeIf { canOperateThisStoreInventory },
-                                onClick = if (trulyOutOfStock || !canOperateThisStoreInventory) null else onClick,
-                                onEdit = onEdit?.takeIf { canOperateThisStoreInventory },
-                                onAddBatch = onAddBatch?.takeIf { canOperateThisStoreInventory },
-                                onPrintLabel = onPrintLabel?.takeIf { canOperateThisStoreInventory }
-                            )
-                        }
-
-                        if (sortedItems.size > pageSize) {
-                            item {
-                                PagingControls(
-                                    page = page,
-                                    totalItems = sortedItems.size,
-                                    pageSize = pageSize,
-                                    onPageChange = { page = it }
+                                GoodsItemInStockWidget(
+                                    modifier = Modifier
+                                        .alpha(if (trulyOutOfStock) 0.5f else 1f),
+                                    goodsItem = item,
+                                    batches = itemBatches,
+                                    showBatches = showBatches && canOperateThisStoreInventory,
+                                    transactionTypeIndex = transactionTypeIndex,
+                                    selectionMode = selectionMode,
+                                    selected = item.id in selectedStockItemIds,
+                                    onSelectionToggle = if (selectionAvailable) ({ selectedItem: GoodsItemDataModel -> toggleSelection(selectedItem) }) else null,
+                                    onLongPress = if (selectionAvailable) ({ selectedItem: GoodsItemDataModel -> enterSelection(selectedItem) }) else null,
+                                    onDelete = onDelete?.takeIf { !selectionMode && canOperateThisStoreInventory },
+                                    onClick = when {
+                                        selectionMode -> { selectedItem: GoodsItemDataModel -> toggleSelection(selectedItem) }
+                                        trulyOutOfStock || !canOperateThisStoreInventory -> null
+                                        else -> onClick
+                                    },
+                                    onEdit = onEdit?.takeIf { !selectionMode && canOperateThisStoreInventory },
+                                    onAddBatch = onAddBatch?.takeIf { !selectionMode && canOperateThisStoreInventory },
+                                    onPrintLabel = onPrintLabel?.takeIf { !selectionMode && canOperateThisStoreInventory }
                                 )
+                            }
+
+                            if (sortedItems.size > pageSize) {
+                                item {
+                                    PagingControls(
+                                        page = page,
+                                        totalItems = sortedItems.size,
+                                        pageSize = pageSize,
+                                        onPageChange = { page = it }
+                                    )
+                                }
                             }
                         }
                     }
@@ -10985,21 +11253,12 @@ private fun AppConfiguration.StockItemLabelPrintBottomSheet(
     var copies by rememberSaveable(goodsItem.id) { mutableStateOf(1) }
     var priceText by rememberSaveable(goodsItem.id, defaultPriceText) { mutableStateOf(defaultPriceText) }
     var storeName by rememberSaveable(goodsItem.id, defaultStoreName) { mutableStateOf(defaultStoreName) }
-    var selectedProtocol by rememberSaveable { mutableStateOf(configuredLabelPrinterProtocolState.value) }
-    val configuredLabelPrinterId by configuredLabelPrinterDeviceIdState.collectAsState()
-    val configuredProtocol by configuredLabelPrinterProtocolState.collectAsState()
     val coroutineScope = rememberCoroutineScope()
-
-    LaunchedEffect(configuredProtocol) {
-        if (selectedProtocol.isBlank() || selectedProtocol == LABEL_PRINTER_PROTOCOL_AUTO) {
-            selectedProtocol = configuredProtocol
-        }
-    }
 
     AitaBottomSheet(
         title = localizedStringResource(1288, "Print item label"),
-        iconPath = stateValues.drawablePathIconLabelPrinter,
-        iconRes = stateValues.drawableResIconLabelPrinter.value,
+        iconPath = stateValues.drawablePathIconPrintTag,
+        iconRes = stateValues.drawableResIconPrintTag.value,
         onDismiss = onDismiss
     ) {
         LazyColumn(
@@ -11118,7 +11377,11 @@ private fun AppConfiguration.StockItemLabelPrintBottomSheet(
                         isFocusedInitial = allowFocus,
                         autoFocus = allowFocus,
                         showClearButton = true,
-                        onValueChange = { value, _ -> priceText = value.take(40) }
+                        onTransformValue = { it.take(40) },
+                        onValueChange = { value, applyChange ->
+                            priceText = value.take(40)
+                            applyChange()
+                        }
                     )
                     genericTextField(
                         modifier = Modifier.fillMaxWidth(),
@@ -11127,41 +11390,11 @@ private fun AppConfiguration.StockItemLabelPrintBottomSheet(
                         isFocusedInitial = false,
                         autoFocus = false,
                         showClearButton = true,
-                        onValueChange = { value, _ -> storeName = value.take(40) }
-                    )
-                }
-            }
-
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = localizedStringResource(1287, "Label printer protocol"),
-                        color = stateValues.TextColor,
-                        fontSize = stateValues.accentTextSize,
-                        fontWeight = FontWeight.Bold
-                    )
-                    tabRowWidget(
-                        modifier = Modifier.fillMaxWidth(),
-                        tabs = listOf(
-                            TabContent(LABEL_PRINTER_PROTOCOL_AUTO, localizedStringResource(1294, "Auto protocol")) {
-                                selectedProtocol = it
-                                configureLabelPrinterProtocol(it) { result -> coroutineScope.launch { receiptActionNotification(result, localizedStringResource(1298, "Label protocol selected")) } }
-                            },
-                            TabContent(LABEL_PRINTER_PROTOCOL_TSPL, localizedStringResource(1295, "TSPL")) {
-                                selectedProtocol = it
-                                configureLabelPrinterProtocol(it) { result -> coroutineScope.launch { receiptActionNotification(result, localizedStringResource(1298, "Label protocol selected")) } }
-                            },
-                            TabContent(LABEL_PRINTER_PROTOCOL_ZPL, localizedStringResource(1296, "ZPL")) {
-                                selectedProtocol = it
-                                configureLabelPrinterProtocol(it) { result -> coroutineScope.launch { receiptActionNotification(result, localizedStringResource(1298, "Label protocol selected")) } }
-                            },
-                            TabContent(LABEL_PRINTER_PROTOCOL_CPCL, localizedStringResource(1297, "CPCL")) {
-                                selectedProtocol = it
-                                configureLabelPrinterProtocol(it) { result -> coroutineScope.launch { receiptActionNotification(result, localizedStringResource(1298, "Label protocol selected")) } }
-                            }
-                        ),
-                        selectedIndexInitial = normalizeLabelPrinterProtocol(selectedProtocol),
-                        textSize = stateValues.smallTextSize
+                        onTransformValue = { it.take(40) },
+                        onValueChange = { value, applyChange ->
+                            storeName = value.take(40)
+                            applyChange()
+                        }
                     )
                 }
             }
@@ -11208,12 +11441,12 @@ private fun AppConfiguration.StockItemLabelPrintBottomSheet(
                 actionButton(
                     modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(1288, "Print item label"),
-                    iconPath = stateValues.drawablePathIconLabelPrinter,
-                    iconRes = stateValues.drawableResIconLabelPrinter.value,
-                    enabled = selectedBarcode.isNotBlank() && !configuredLabelPrinterId.isNullOrBlank(),
+                    iconPath = stateValues.drawablePathIconPrintTag,
+                    iconRes = stateValues.drawableResIconPrintTag.value,
+                    enabled = selectedBarcode.isNotBlank(),
                     onDisabledClick = {
                         postInAppNotification(
-                            if (selectedBarcode.isBlank()) localizedStringResource(1299, "This item has no barcode yet; add a barcode before printing a shelf label.") else localizedStringResource(1284, "Label printer is not configured"),
+                            localizedStringResource(1299, "This item has no barcode yet; add a barcode before printing a shelf label."),
                             NotificationType.Negative,
                             transient = true
                         )
@@ -11227,16 +11460,15 @@ private fun AppConfiguration.StockItemLabelPrintBottomSheet(
                             storeName = storeName,
                             unitText = defaultUnitText,
                             copies = copies,
-                            protocol = selectedProtocol
+                            protocol = LABEL_PRINTER_PROTOCOL_AUTO
                         )
                         coroutineScope.launch {
                             receiptActionNotification(
-                                printStockItemLabel(
+                                printStockItemLabelDocument(
                                     label = label,
-                                    protocol = selectedProtocol,
-                                    notConfiguredMessage = localizedStringResource(1284, "Label printer is not configured")
+                                    notConfiguredMessage = localizedStringResource(1269, "Paper document printing is not configured for this platform")
                                 ),
-                                localizedStringResource(1285, "Label sent to printer")
+                                localizedStringResource(1325, "Label opened for printing")
                             )
                         }
                     }
@@ -14712,12 +14944,48 @@ fun AppConfiguration.StockSupplierPricesPage(
 
                         Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
-                        BarcodeTextInput(
+                        val supplierBarcodeTextFieldContent = BarcodeTextInput(
                             modifier = Modifier.fillMaxWidth(),
                             value = supplierBarcode,
                             placeholderText = stateValues.stringBarcode,
                             onValueChange = { supplierBarcode = it }
                         )
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            actionButton(
+                                text = "",
+                                iconPath = stateValues.drawablePathIconBarcodeGenerate,
+                                iconRes = stateValues.drawableResIconBarcodeGenerate.value,
+                                iconContentDescription = localizedStringResource(1316, "Generate barcode"),
+                                fillMaxWidthIfTextPresent = false,
+                                confirmationRequired = false,
+                                onClick = {
+                                    val generatedBarcode = generateInternalEan13Barcode(
+                                        stateValues.stock.orEmpty().flatMap { it.allBarcodeValues() } + supplierBarcode
+                                    )
+                                    supplierBarcode = generatedBarcode
+                                    supplierBarcodeTextFieldContent.replaceText(generatedBarcode, applyTransform = false)
+                                    postInAppNotification(
+                                        localizedStringResource(1317, "Generated internal EAN-13 barcode"),
+                                        NotificationType.Positive,
+                                        transient = true
+                                    )
+                                }
+                            )
+                            Text(
+                                text = localizedStringResource(1316, "Generate barcode"),
+                                color = stateValues.PlaceholderTextColor,
+                                fontSize = stateValues.smallTextSize,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
 
                         Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
@@ -18913,6 +19181,9 @@ fun AppConfiguration.BarcodeTextInput(
     forceRefocus: Boolean = false,
     scannerVisible: Boolean? = null,
     onScannerVisibleChange: ((Boolean) -> Unit)? = null,
+    showGenerateBarcodeButton: Boolean = true,
+    existingBarcodeValues: List<String> = emptyList(),
+    onGeneratedBarcode: ((String) -> Unit)? = null,
     onValueChange: (String) -> Unit
 ): GenericTextFieldContent {
     var localScannerVisible by rememberSaveable { mutableStateOf(false) }
@@ -19028,6 +19299,46 @@ fun AppConfiguration.BarcodeTextInput(
         }
     )
 
+    if (showGenerateBarcodeButton) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            actionButton(
+                text = localizedStringResource(1316, "Generate barcode"),
+                iconPath = stateValues.drawablePathIconBarcodeGenerate,
+                iconRes = stateValues.drawableResIconBarcodeGenerate.value,
+                iconContentDescription = localizedStringResource(1316, "Generate barcode"),
+                fillMaxWidthIfTextPresent = false,
+                confirmationRequired = false,
+                onClick = {
+                    val generatedBarcode = generateInternalEan13Barcode(
+                        buildList {
+                            addAll(stateValues.stock.orEmpty().flatMap { it.allBarcodeValues() })
+                            addAll(existingBarcodeValues)
+                            add(value)
+                        }.filter { it.isNotBlank() }
+                    )
+                    barcodeFillHighlightPulseKey += 1
+                    content.replaceText(generatedBarcode, applyTransform = false)
+                    if (onGeneratedBarcode != null) {
+                        onGeneratedBarcode(generatedBarcode)
+                    } else {
+                        onValueChange(generatedBarcode)
+                    }
+                    postInAppNotification(
+                        localizedStringResource(1317, "Generated internal EAN-13 barcode"),
+                        NotificationType.Positive,
+                        transient = true
+                    )
+                }
+            )
+        }
+    }
+
     val onCameraBarcodeDetected: (String) -> Unit = { raw ->
         val candidate = (raw.transactionBarcodeCandidate() ?: raw.trim()).toStoredGoodsItemBarcode()
         if (candidate.isNotBlank()) {
@@ -19103,9 +19414,22 @@ fun AppConfiguration.BarcodeListEditor(
                 isFocusedInitial = index == focusTargetIndex,
                 forceRefocus = index == focusTargetIndex,
                 scannerVisible = cameraScannerIndex == index,
+                existingBarcodeValues = currentBarcodes,
                 onScannerVisibleChange = { visible ->
                     cameraScannerIndex = if (visible) index else null
                     if (visible) focusTargetIndex = index
+                },
+                onGeneratedBarcode = { generatedBarcode ->
+                    val nextBarcodes = currentBarcodes.toMutableList().also {
+                        while (it.size <= index) it.add("")
+                        it[index] = generatedBarcode
+                    }
+                    val nextTypes = currentBarcodeTypes.toMutableList().also {
+                        while (it.size <= index) it.add(GOODS_ITEM_BARCODE_TYPE_STANDARD)
+                        it[index] = GOODS_ITEM_BARCODE_TYPE_INTERNAL
+                    }
+                    focusTargetIndex = index
+                    emitBarcodeEditorState(nextBarcodes, nextTypes)
                 },
                 onValueChange = { storedValue ->
                     val previousBarcode = currentBarcodes.getOrNull(index).orEmpty()
@@ -20233,8 +20557,12 @@ sealed class NavigationScreenModel(
         }
 
         data object Warehouse: Stock("StockWarehouseNavigationScreenModelRoute") {
+            override val iconPath: String
+                get() = AppConfiguration.stateValues.drawablePathIconStock
+            override val name: String
+                get() = AppConfiguration.stateValues.stringStock
             override val iconRes: DrawableResource
-                get() = TODO("Not yet implemented")
+                get() = AppConfiguration.stateValues.drawableResIconStock.value
         }
 
         data object AddEditGoodsItem: Stock("StockAddGoodsItemNavigationScreenModelRoute") {
@@ -20248,31 +20576,31 @@ sealed class NavigationScreenModel(
 
             const val KEY_STATE_QUANTITY_DATA: String = "keyState_quantityData"
             override val iconRes: DrawableResource
-                get() = TODO("Not yet implemented")
+                get() = AppConfiguration.stateValues.drawableResIconAdd.value
         }
 
         data object GoodsItemDetails: Stock("StockGoodsItemDetailsNavigationScreenModelRoute") {
             const val KEY_STATE_GOODS_ITEM_ID: String = "keyState_goodsItemId"
             override val iconRes: DrawableResource
-                get() = TODO("Not yet implemented")
+                get() = AppConfiguration.stateValues.drawableResIconStock.value
         }
 
         data object GoodsItemBatches: Stock("StockGoodsItemBatchesNavigationScreenModelRoute") {
             const val KEY_STATE_GOODS_ITEM_ID: String = "keyState_goodsItemId"
             override val iconRes: DrawableResource
-                get() = TODO("Not yet implemented")
+                get() = AppConfiguration.stateValues.drawableResIconStock.value
         }
 
         data object GoodsItemSupplierPrices: Stock("StockGoodsItemSupplierPricesNavigationScreenModelRoute") {
             const val KEY_STATE_GOODS_ITEM_ID: String = "keyState_goodsItemId"
             override val iconRes: DrawableResource
-                get() = TODO("Not yet implemented")
+                get() = AppConfiguration.stateValues.drawableResIconSuppliers.value
         }
 
         data object GoodsItemOrders: Stock("StockGoodsItemOrdersNavigationScreenModelRoute") {
             const val KEY_STATE_GOODS_ITEM_ID: String = "keyState_goodsItemId"
             override val iconRes: DrawableResource
-                get() = TODO("Not yet implemented")
+                get() = AppConfiguration.stateValues.drawableResIconClipboard.value
         }
     }
 
@@ -20289,7 +20617,7 @@ sealed class NavigationScreenModel(
 
         data object List: Menu("MenuListNavigationScreenModelRoute") {
             override val iconRes: DrawableResource
-                get() = TODO("Not yet implemented")
+                get() = AppConfiguration.stateValues.drawableResIconMenu.value
         }
 
         data object UserAccount: Menu("MenuUserAccountNavigationScreenModelRoute") {
@@ -20381,7 +20709,7 @@ sealed class NavigationScreenModel(
             const val KEY_STATE_LEGAL_ID: String = "keyState_legalId"
 
             override val iconRes: DrawableResource
-                get() = TODO("Not yet implemented")
+                get() = AppConfiguration.stateValues.drawableResIconStores.value
         }
 
         data object Analytics: Menu("MenuAnalyticsNavigationScreenModelRoute") {
@@ -20431,7 +20759,7 @@ sealed class NavigationScreenModel(
         }
         data object CloseDebt: Menu("MenuCloseDebtNavigationScreenModelRoute") {
             override val iconRes: DrawableResource
-                get() = TODO("Not yet implemented")
+                get() = AppConfiguration.stateValues.drawableResIconDebtors.value
         }
 
         data object Suppliers: Menu("MenuSuppliersNavigationScreenModelRoute") {
@@ -20444,7 +20772,7 @@ sealed class NavigationScreenModel(
         }
         data object AddEditSupplier: Menu("MenuAddEditSupplierNavigationScreenModelRoute") {
             override val iconRes: DrawableResource
-                get() = TODO("Not yet implemented")
+                get() = AppConfiguration.stateValues.drawableResIconSuppliers.value
         }
 
         data object GoodsCategories: Menu("MenuGoodsCategoriesNavigationScreenModelRoute") {
@@ -20518,23 +20846,25 @@ sealed class NavigationScreenModel(
 
         data object Main: UserAuth("UserAuthNavigationScreenModelRoute") {
             override val iconRes: DrawableResource
-                get() = TODO("Not yet implemented")
+                get() = AppConfiguration.stateValues.drawableResIconPassword.value
         }
 
         data object LogIn: UserAuth("UserAuthLogInNavigationScreenModelRoute") {
             override val iconRes: DrawableResource
-                get() = TODO("Not yet implemented")
+                get() = AppConfiguration.stateValues.drawableResIconPerson.value
         }
 
         data object SignUp: UserAuth("UserAuthSignUpNavigationScreenModelRoute") {
             override val iconRes: DrawableResource
-                get() = TODO("Not yet implemented")
+                get() = AppConfiguration.stateValues.drawableResIconAdd.value
         }
     }
 
     object Splash: NavigationScreenModel("SplashNavigationScreenModelRoute") {
+        override val iconPath: String
+            get() = AppConfiguration.stateValues.drawablePathAITALogo
         override val iconRes: DrawableResource
-            get() = TODO("Not yet implemented")
+            get() = AppConfiguration.stateValues.drawableResAITALogo.value
     }
 }
 
@@ -35213,6 +35543,10 @@ private fun localDrawableResourceForPath(
         "62_1" -> Res.drawable._62_1
         "63_0" -> Res.drawable._63_0
         "63_1" -> Res.drawable._63_1
+        "64_0" -> Res.drawable._64_0
+        "64_1" -> Res.drawable._64_1
+        "65_0" -> Res.drawable._65_0
+        "65_1" -> Res.drawable._65_1
         else -> fallbackRes
     }
 }
@@ -35641,6 +35975,10 @@ fun AppConfiguration.GoodsItemInStockWidget(
     returnedForPeriod: QuantityDataModel? = null,
     showBatches: Boolean = true,
     transactionTypeIndex: Int? = null,
+    selectionMode: Boolean = false,
+    selected: Boolean = false,
+    onSelectionToggle: ((GoodsItemDataModel) -> Unit)? = null,
+    onLongPress: ((GoodsItemDataModel) -> Unit)? = null,
     onClick: ((GoodsItemDataModel) -> Unit)? = null,
     onDelete: ((GoodsItemDataModel) -> Unit)? = null,
     onEdit: ((GoodsItemDataModel) -> Unit)? = null,
@@ -35687,24 +36025,34 @@ fun AppConfiguration.GoodsItemInStockWidget(
         "${localizedStringResource(234, "Expires")}: $it"
     }
 
+    val cardShape = RoundedCornerShape(stateValues.cornerRadius)
+    val cardBorderColor = if (selected) stateValues.AccentColor else stateValues.PlaceholderTextColor
+
     Row(
         modifier
             .padding(bottom = 4.dp)
             .fillMaxWidth()
             .heightIn(min = stateValues.textFieldHeight * 1.25f)
-            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
-            .clip(RoundedCornerShape(stateValues.cornerRadius))
-            .background(stateValues.BackgroundColor)
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = selected)
+            .clip(cardShape)
+            .background(if (selected) stateValues.AccentColor.copy(alpha = 0.10f) else stateValues.BackgroundColor)
             .border(
-                stateValues.unfocusedBorderWidth,
-                stateValues.PlaceholderTextColor,
-                RoundedCornerShape(stateValues.cornerRadius)
+                if (selected) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
+                cardBorderColor,
+                cardShape
             )
-            .clickable(
-                enabled = onClick != null,
+            .combinedClickable(
+                enabled = onClick != null || onLongPress != null || onSelectionToggle != null,
                 interactionSource = remember { MutableInteractionSource() },
-                indication = ripple(color = textColor),
-                onClick = { onClick?.invoke(goodsItem) }
+                indication = ripple(color = if (selected || selectionMode) stateValues.AccentColor else textColor),
+                onLongClick = { onLongPress?.invoke(goodsItem) },
+                onClick = {
+                    if (selectionMode && onSelectionToggle != null) {
+                        onSelectionToggle(goodsItem)
+                    } else {
+                        onClick?.invoke(goodsItem)
+                    }
+                }
             )
     ) {
         Column(
@@ -35716,6 +36064,16 @@ fun AppConfiguration.GoodsItemInStockWidget(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                if (selectionMode) {
+                    AitaRoundCheckbox(
+                        checked = selected,
+                        onCheckedChange = { onSelectionToggle?.invoke(goodsItem) },
+                        containerSize = 34.dp,
+                        circleSize = 22.dp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+
                 Text(
                     modifier = Modifier.weight(1f),
                     text = index?.run { "${index + 1}.  $itemName" } ?: itemName,
@@ -35949,46 +36307,48 @@ fun AppConfiguration.GoodsItemInStockWidget(
             horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            onAddBatch?.let {
-                actionButton(
-                    text = "",
-                    iconPath = stateValues.drawablePathIconAdd,
-                    iconContentDescription = localizedStringResource(194, "Add batch"),
-                ) {
-                    onAddBatch(goodsItem)
+            if (!selectionMode) {
+                onAddBatch?.let {
+                    actionButton(
+                        text = "",
+                        iconPath = stateValues.drawablePathIconAdd,
+                        iconContentDescription = localizedStringResource(194, "Add batch"),
+                    ) {
+                        onAddBatch(goodsItem)
+                    }
                 }
-            }
 
-            onPrintLabel?.let {
-                actionButton(
-                    text = "",
-                    iconPath = stateValues.drawablePathIconLabelPrinter,
-                    iconRes = stateValues.drawableResIconLabelPrinter.value,
-                    iconContentDescription = localizedStringResource(1288, "Print item label"),
-                    confirmationRequired = false,
-                ) {
-                    onPrintLabel(goodsItem)
+                onPrintLabel?.let {
+                    actionButton(
+                        text = "",
+                        iconPath = stateValues.drawablePathIconPrintTag,
+                        iconRes = stateValues.drawableResIconPrintTag.value,
+                        iconContentDescription = localizedStringResource(1288, "Print item label"),
+                        confirmationRequired = false,
+                    ) {
+                        onPrintLabel(goodsItem)
+                    }
                 }
-            }
 
-            onEdit?.let {
-                actionButton(
-                    text = "",
-                    iconPath = stateValues.drawablePathIconEdit,
-                    iconContentDescription = stateValues.drawablePathIconEdit,
-                ) {
-                    onEdit(goodsItem)
+                onEdit?.let {
+                    actionButton(
+                        text = "",
+                        iconPath = stateValues.drawablePathIconEdit,
+                        iconContentDescription = stateValues.drawablePathIconEdit,
+                    ) {
+                        onEdit(goodsItem)
+                    }
                 }
-            }
 
-            onDelete?.let {
-                actionButton(
-                    text = "",
-                    enabledColor = stateValues.ErrorColor,
-                    iconPath = stateValues.drawablePathIconDelete,
-                    iconContentDescription = stateValues.drawablePathIconDelete,
-                ) {
-                    onDelete(goodsItem)
+                onDelete?.let {
+                    actionButton(
+                        text = "",
+                        enabledColor = stateValues.ErrorColor,
+                        iconPath = stateValues.drawablePathIconDelete,
+                        iconContentDescription = stateValues.drawablePathIconDelete,
+                    ) {
+                        onDelete(goodsItem)
+                    }
                 }
             }
         }
@@ -38633,6 +38993,12 @@ object AppConfiguration {
         val drawablePathIconLabelPrinter: String
         val drawableResIconLabelPrinter: StateFlow<DrawableResource>
 
+        val drawablePathIconBarcodeGenerate: String
+        val drawableResIconBarcodeGenerate: StateFlow<DrawableResource>
+
+        val drawablePathIconPrintTag: String
+        val drawableResIconPrintTag: StateFlow<DrawableResource>
+
         val drawablePathIconWorkers: String
         val drawableResIconWorkers: StateFlow<DrawableResource>
 
@@ -39206,6 +39572,14 @@ object AppConfiguration {
             private val _drawableResIconLabelPrinter = MutableStateFlow(Res.drawable._63_0)
             override val drawableResIconLabelPrinter: StateFlow<DrawableResource> = _drawableResIconLabelPrinter.asStateFlow()
 
+            override val drawablePathIconBarcodeGenerate: String by drawablePathIconBarcodeGenerateState.collectAsState()
+            private val _drawableResIconBarcodeGenerate = MutableStateFlow(Res.drawable._64_0)
+            override val drawableResIconBarcodeGenerate: StateFlow<DrawableResource> = _drawableResIconBarcodeGenerate.asStateFlow()
+
+            override val drawablePathIconPrintTag: String by drawablePathIconPrintTagState.collectAsState()
+            private val _drawableResIconPrintTag = MutableStateFlow(Res.drawable._65_0)
+            override val drawableResIconPrintTag: StateFlow<DrawableResource> = _drawableResIconPrintTag.asStateFlow()
+
             override val drawablePathIconWorkers: String by drawablePathIconWorkersState.collectAsState()
             private val _drawableResIconWorkers = MutableStateFlow(Res.drawable._22_0)
             override val drawableResIconWorkers: StateFlow<DrawableResource> = _drawableResIconWorkers.asStateFlow()
@@ -39395,6 +39769,8 @@ object AppConfiguration {
                 _drawableResIconAnalytics.emit(if (stateValues.appThemeId == 1L) Res.drawable._21_1 else Res.drawable._21_0)
                 _drawableResIconAnalyticsReport.emit(if (stateValues.appThemeId == 1L) Res.drawable._62_1 else Res.drawable._62_0)
                 _drawableResIconLabelPrinter.emit(if (stateValues.appThemeId == 1L) Res.drawable._63_1 else Res.drawable._63_0)
+                _drawableResIconBarcodeGenerate.emit(if (stateValues.appThemeId == 1L) Res.drawable._64_1 else Res.drawable._64_0)
+                _drawableResIconPrintTag.emit(if (stateValues.appThemeId == 1L) Res.drawable._65_1 else Res.drawable._65_0)
 
                 _drawableResIconWorkers.emit(if (stateValues.appThemeId == 1L) Res.drawable._22_1 else Res.drawable._22_0)
 

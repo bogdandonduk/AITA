@@ -27,8 +27,11 @@ import android.print.PrintAttributes
 import android.print.PrintDocumentAdapter
 import android.print.PrintDocumentInfo
 import android.print.PrintManager
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import java.io.FileOutputStream
 import java.io.File
+import java.util.Locale
 import java.util.UUID
 
 actual fun getCurrentTimeMillis(): Long = System.currentTimeMillis()
@@ -177,6 +180,8 @@ fun installReceiptPlatformAndroid(context: Context) {
     val receiptPrinterPreferences = appContext.getSharedPreferences("aita_receipt_printer", Context.MODE_PRIVATE)
     ReceiptPlatformAndroidBridge.configureBluetoothPrinter(receiptPrinterPreferences.getString("bluetooth_printer_mac_address", null))
 
+    val activePrintWebViews = mutableListOf<WebView>()
+
 
     fun createCachedPdfUri(fileName: String, pdfBytes: ByteArray): Uri {
         val safeFileName = fileName.ifBlank { "receipt.pdf" }
@@ -250,21 +255,59 @@ fun installReceiptPlatformAndroid(context: Context) {
 
 
 
+    fun printAttributesForDocument(fileName: String): PrintAttributes {
+        val safeName = fileName.lowercase(Locale.ROOT)
+        val mediaSize = if (safeName.contains("label") || safeName.contains("tag")) {
+            PrintAttributes.MediaSize("AITA_LABEL_58_40", "AITA label 58 x 40 mm", 2283, 1575)
+        } else {
+            PrintAttributes.MediaSize.ISO_A4
+        }
+        return PrintAttributes.Builder()
+            .setMediaSize(mediaSize)
+            .setColorMode(PrintAttributes.COLOR_MODE_COLOR)
+            .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
+            .build()
+    }
+
     fun printPdfWithSystemPaperPrinter(fileName: String, pdfBytes: ByteArray): ReceiptPlatformActionResult {
         return runCatching {
             val printManager = context.getSystemService(Context.PRINT_SERVICE) as? PrintManager
                 ?: error("Android print service is not available")
             val safeFileName = fileName.ifBlank { "aita-document.pdf" }
-            val attributes = PrintAttributes.Builder()
-                .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
-                .setColorMode(PrintAttributes.COLOR_MODE_COLOR)
-                .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
-                .build()
             printManager.print(
                 "AITA ${safeFileName.removeSuffix(".pdf")}",
                 ReceiptPdfPrintDocumentAdapter(safeFileName, pdfBytes),
-                attributes
+                printAttributesForDocument(safeFileName)
             )
+            ReceiptPlatformActionResult(true, "Opening system print dialog")
+        }.getOrElse { throwable ->
+            ReceiptPlatformActionResult(false, throwable.message ?: "Could not open system print dialog")
+        }
+    }
+
+    fun printHtmlWithSystemPrinter(fileName: String, html: String): ReceiptPlatformActionResult {
+        return runCatching {
+            val printManager = context.getSystemService(Context.PRINT_SERVICE) as? PrintManager
+                ?: error("Android print service is not available")
+            val safeFileName = fileName.ifBlank { "aita-document.html" }
+            val printTitle = "AITA ${safeFileName.removeSuffix(".html")}"
+            val webView = WebView(context)
+            activePrintWebViews += webView
+            while (activePrintWebViews.size > 6) {
+                val oldView = activePrintWebViews.removeAt(0)
+                runCatching { oldView.destroy() }
+            }
+            webView.webViewClient = object : WebViewClient() {
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    val adapter = webView.createPrintDocumentAdapter(printTitle)
+                    printManager.print(printTitle, adapter, printAttributesForDocument(safeFileName))
+                    webView.postDelayed({
+                        activePrintWebViews.remove(webView)
+                        runCatching { webView.destroy() }
+                    }, 30_000L)
+                }
+            }
+            webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
             ReceiptPlatformActionResult(true, "Opening system print dialog")
         }.getOrElse { throwable ->
             ReceiptPlatformActionResult(false, throwable.message ?: "Could not open system print dialog")
@@ -378,6 +421,12 @@ fun installReceiptPlatformAndroid(context: Context) {
     printPdfDocumentPlatformAction = { fileName, pdfBytes ->
         withContext(Dispatchers.Main) {
             printPdfWithSystemPaperPrinter(fileName, pdfBytes)
+        }
+    }
+
+    printHtmlDocumentPlatformAction = { fileName, html ->
+        withContext(Dispatchers.Main) {
+            printHtmlWithSystemPrinter(fileName, html)
         }
     }
 

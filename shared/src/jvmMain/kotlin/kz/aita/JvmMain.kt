@@ -305,6 +305,15 @@ fun installReceiptPlatformJvm() {
         return file
     }
 
+    fun writeHtmlToTemp(fileName: String, html: String): File {
+        val safeName = fileName.ifBlank { "aita-document.html" }.let { name ->
+            if (name.endsWith(".html", ignoreCase = true) || name.endsWith(".htm", ignoreCase = true)) name else "$name.html"
+        }
+        val file = File(System.getProperty("java.io.tmpdir"), safeName)
+        file.writeText(html, Charsets.UTF_8)
+        return file
+    }
+
     fun desktop(): Desktop? = if (Desktop.isDesktopSupported()) Desktop.getDesktop() else null
 
     saveReceiptPdfFile = { fileName, pdfBytes ->
@@ -367,6 +376,28 @@ fun installReceiptPlatformJvm() {
                 }
             }.getOrElse { throwable ->
                 ReceiptPlatformActionResult(false, throwable.message ?: "Could not print PDF document")
+            }
+        }
+    }
+
+    printHtmlDocumentPlatformAction = { fileName, html ->
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val file = writeHtmlToTemp(fileName.ifBlank { "aita-document.html" }, html)
+                val desktop = desktop()
+                when {
+                    desktop != null && desktop.isSupported(Desktop.Action.BROWSE) -> {
+                        desktop.browse(file.toURI())
+                        ReceiptPlatformActionResult(true, "Opened label for printing")
+                    }
+                    desktop != null && desktop.isSupported(Desktop.Action.OPEN) -> {
+                        desktop.open(file)
+                        ReceiptPlatformActionResult(true, "Opened label; print from the viewer")
+                    }
+                    else -> ReceiptPlatformActionResult(true, "HTML label created at ${file.absolutePath}")
+                }
+            }.getOrElse { throwable ->
+                ReceiptPlatformActionResult(false, throwable.message ?: "Could not print HTML document")
             }
         }
     }

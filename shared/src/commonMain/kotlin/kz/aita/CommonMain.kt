@@ -34,6 +34,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.Json
 import kotlin.concurrent.Volatile
+import kotlin.random.Random
 
 @kotlinx.serialization.Serializable
 data class MoneyDataModel(
@@ -809,6 +810,7 @@ var shareReceiptPdfFile: (suspend (fileName: String, pdfBytes: ByteArray, whatsa
 var printReceiptEscPosBytes: (suspend (printerBytes: ByteArray) -> ReceiptPlatformActionResult)? = null
 var printReceiptPlatformAction: (suspend (fileName: String, pdfBytes: ByteArray, printerBytes: ByteArray) -> ReceiptPlatformActionResult)? = null
 var printPdfDocumentPlatformAction: (suspend (fileName: String, pdfBytes: ByteArray) -> ReceiptPlatformActionResult)? = null
+var printHtmlDocumentPlatformAction: (suspend (fileName: String, html: String) -> ReceiptPlatformActionResult)? = null
 var listPlatformReceiptPrinterDevicesAction: (suspend () -> List<PlatformReceiptPrinterDataModel>)? = null
 var configurePlatformReceiptPrinterDeviceAction: (suspend (deviceId: String?) -> ReceiptPlatformActionResult)? = null
 var printLabelPrinterBytes: (suspend (labelBytes: ByteArray) -> ReceiptPlatformActionResult)? = null
@@ -860,6 +862,11 @@ suspend fun printReceipt(
 
 suspend fun printPdfDocument(fileName: String, pdfBytes: ByteArray, notConfiguredMessage: String = "Document printing is not configured for this platform"): ReceiptPlatformActionResult {
     return printPdfDocumentPlatformAction?.invoke(fileName, pdfBytes)
+        ?: ReceiptPlatformActionResult(false, notConfiguredMessage)
+}
+
+suspend fun printHtmlDocument(fileName: String, html: String, notConfiguredMessage: String = "Document printing is not configured for this platform"): ReceiptPlatformActionResult {
+    return printHtmlDocumentPlatformAction?.invoke(fileName, html)
         ?: ReceiptPlatformActionResult(false, notConfiguredMessage)
 }
 
@@ -919,6 +926,30 @@ suspend fun printStockItemLabel(
     return printLabelPrinterBytes?.invoke(
         buildStockItemLabelPrinterBytes(label.copy(protocol = normalizedProtocol))
     ) ?: ReceiptPlatformActionResult(false, notConfiguredMessage)
+}
+
+suspend fun printStockItemLabelDocument(
+    label: StockItemLabelDataModel,
+    notConfiguredMessage: String = "Document printing is not configured for this platform"
+): ReceiptPlatformActionResult {
+    val cleanLabel = label.copy(
+        barcode = label.barcode.trim(),
+        copies = label.copies.coerceIn(1, 99),
+        labelWidthMm = label.labelWidthMm.coerceIn(30, 110),
+        labelHeightMm = label.labelHeightMm.coerceIn(20, 80)
+    )
+    val htmlResult = printHtmlDocument(
+        fileName = cleanLabel.stockItemLabelDocumentFileName().removeSuffix(".pdf") + ".html",
+        html = cleanLabel.buildStockItemLabelHtml(),
+        notConfiguredMessage = notConfiguredMessage
+    )
+    if (htmlResult.success) return htmlResult
+
+    return printPdfDocument(
+        fileName = cleanLabel.stockItemLabelDocumentFileName(),
+        pdfBytes = cleanLabel.buildStockItemLabelPdfBytes(),
+        notConfiguredMessage = notConfiguredMessage
+    )
 }
 
 fun refreshLabelPrinterDevices(onCompleted: ((ReceiptPlatformActionResult) -> Unit)? = null) {
@@ -1088,6 +1119,175 @@ private fun buildStockItemLabelCpclBytes(label: StockItemLabelDataModel): ByteAr
     }
     return commands.encodeToByteArray()
 }
+
+private fun String.labelDocumentSafeText(maxLength: Int = 80): String =
+    replace('\r', ' ')
+        .replace('\n', ' ')
+        .replace('\t', ' ')
+        .replace(Regex("\\s+"), " ")
+        .trim()
+        .take(maxLength.coerceAtLeast(1))
+
+private fun htmlEscape(value: String): String = value
+    .replace("&", "&amp;")
+    .replace("<", "&lt;")
+    .replace(">", "&gt;")
+    .replace("\"", "&quot;")
+    .replace("'", "&#39;")
+
+fun StockItemLabelDataModel.stockItemLabelDocumentFileName(): String {
+    val token = barcode.normalizedBarcodeToken().ifBlank { itemName.normalizedBarcodeToken() }.ifBlank { "label" }
+    return "aita_item_label_${token.take(32)}.pdf"
+}
+
+private fun StockItemLabelDataModel.cleanedForDocument(): StockItemLabelDataModel = copy(
+    itemName = itemName.labelDocumentSafeText(64).ifBlank { "AITA item" },
+    barcode = barcode.labelDocumentSafeText(64),
+    priceText = priceText.labelDocumentSafeText(32),
+    storeName = storeName.labelDocumentSafeText(42).ifBlank { "AITA" },
+    unitText = unitText.labelDocumentSafeText(24),
+    note = note.labelDocumentSafeText(50),
+    copies = copies.coerceIn(1, 99),
+    labelWidthMm = labelWidthMm.coerceIn(30, 110),
+    labelHeightMm = labelHeightMm.coerceIn(20, 80)
+)
+
+fun StockItemLabelDataModel.buildStockItemLabelHtml(): String {
+    val label = cleanedForDocument()
+    val barcodeRender = buildBarcodeLineRenderData(label.barcode)
+    val bars = barcodeRender.modules.joinToString(separator = "") { black ->
+        if (black) "<span class=\"m b\"></span>" else "<span class=\"m\"></span>"
+    }
+    val labels = (1..label.copies).joinToString("\n") { copyIndex ->
+        """
+        <section class="label">
+          <div class="store">${htmlEscape(label.storeName)}</div>
+          <div class="name">${htmlEscape(label.itemName)}</div>
+          <div class="bottom">
+            <div class="barcodeBox">
+              <div class="barcode">$bars</div>
+              <div class="digits">${htmlEscape(barcodeRender.humanText)}</div>
+            </div>
+            <div class="priceBox">
+              <div class="priceTitle">ЦЕНА</div>
+              <div class="price">${htmlEscape(label.priceText.ifBlank { "—" })}</div>
+            </div>
+          </div>
+          ${label.unitText.takeIf { it.isNotBlank() }?.let { "<div class=\"unit\">${htmlEscape(it)}</div>" }.orEmpty()}
+          ${label.note.takeIf { it.isNotBlank() }?.let { "<div class=\"note\">${htmlEscape(it)}</div>" }.orEmpty()}
+        </section>
+        """ + if (copyIndex == label.copies) "" else "<div class=\"pageBreak\"></div>"
+    }
+    return """
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>${htmlEscape(label.itemName)} ${htmlEscape(label.barcode)}</title>
+<style>
+  @page { size: ${label.labelWidthMm}mm ${label.labelHeightMm}mm; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #ffffff; }
+  body { font-family: Arial, Helvetica, system-ui, sans-serif; color: #050505; }
+  .label { width: ${label.labelWidthMm}mm; height: ${label.labelHeightMm}mm; padding: 2.2mm 2.0mm 1.4mm 2.0mm; overflow: hidden; border: 0.35mm solid #111; background: #fff; }
+  .store { text-align: center; font-style: italic; font-weight: 800; text-decoration: underline; font-size: 4.2mm; line-height: 4.8mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .name { margin-top: 1.6mm; font-size: 4.0mm; line-height: 4.7mm; font-weight: 600; height: 9.4mm; overflow: hidden; }
+  .bottom { margin-top: 1.8mm; display: flex; align-items: flex-end; gap: 2.0mm; }
+  .barcodeBox { flex: 1 1 auto; min-width: 0; }
+  .barcode { height: 14.5mm; display: flex; align-items: stretch; background: #fff; overflow: hidden; }
+  .m { flex: 1 1 0; min-width: 0; }
+  .b { background: #000; }
+  .digits { font-family: "Courier New", monospace; font-size: 2.6mm; line-height: 3.0mm; letter-spacing: 0.05mm; white-space: nowrap; overflow: hidden; text-overflow: clip; }
+  .priceBox { flex: 0 0 27mm; border: 0.35mm solid #111; min-height: 13mm; padding: 1mm 1.3mm 0.6mm; text-align: center; }
+  .priceTitle { font-size: 2.7mm; line-height: 3.0mm; font-weight: 800; }
+  .price { font-size: 7.0mm; line-height: 7.7mm; font-weight: 900; letter-spacing: 0.15mm; white-space: nowrap; overflow: hidden; text-overflow: clip; }
+  .unit, .note { margin-top: 0.5mm; font-size: 2.2mm; line-height: 2.5mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pageBreak { break-after: page; page-break-after: always; }
+</style>
+</head>
+<body>
+$labels
+<script>window.onload = function(){ setTimeout(function(){ window.print(); }, 120); };</script>
+</body>
+</html>
+""".trimIndent()
+}
+
+private fun Double.pdfNumber(): String {
+    val scaled = kotlin.math.round(this * 100.0).toLong()
+    val whole = scaled / 100L
+    val fraction = kotlin.math.abs((scaled % 100L).toInt())
+    return if (fraction == 0) whole.toString() else whole.toString() + "." + fraction.toString().padStart(2, '0').trimEnd('0')
+}
+
+private fun buildStockItemLabelPdfContent(label: StockItemLabelDataModel, pageWidth: Double, pageHeight: Double): String {
+    val barcodeRender = buildBarcodeLineRenderData(label.barcode)
+    val barcodeX = 8.0
+    val barcodeY = 9.0
+    val barcodeW = pageWidth * 0.48
+    val barcodeH = pageHeight * 0.36
+    val priceX = pageWidth * 0.56
+    val priceY = 11.0
+    val priceW = pageWidth - priceX - 6.0
+    val priceH = pageHeight * 0.27
+    val moduleW = (barcodeW / barcodeRender.modules.size.coerceAtLeast(1)).coerceAtLeast(0.18)
+    return buildString {
+        append("0 g 0 G\n")
+        append("0.8 w 1 1 ${(pageWidth - 2).pdfNumber()} ${(pageHeight - 2).pdfNumber()} re S\n")
+        append("BT /F3 14 Tf 1 0 0 1 12 ${(pageHeight - 18).pdfNumber()} Tm (${pdfEscape(label.storeName)}) Tj ET\n")
+        append("BT /F2 13 Tf 1 0 0 1 8 ${(pageHeight - 38).pdfNumber()} Tm (${pdfEscape(label.itemName)}) Tj ET\n")
+        append("0 g\n")
+        barcodeRender.modules.forEachIndexed { index, black ->
+            if (black) {
+                val x = barcodeX + index * moduleW
+                append("${x.pdfNumber()} ${barcodeY.pdfNumber()} ${(moduleW + 0.02).pdfNumber()} ${barcodeH.pdfNumber()} re f\n")
+            }
+        }
+        append("BT /F1 8 Tf 1 0 0 1 ${barcodeX.pdfNumber()} ${(barcodeY - 8).pdfNumber()} Tm (${pdfEscape(barcodeRender.humanText)}) Tj ET\n")
+        append("1.0 w ${priceX.pdfNumber()} ${priceY.pdfNumber()} ${priceW.pdfNumber()} ${priceH.pdfNumber()} re S\n")
+        append("BT /F2 8 Tf 1 0 0 1 ${(priceX + 20).pdfNumber()} ${(priceY + priceH - 9).pdfNumber()} Tm (PRICE) Tj ET\n")
+        append("BT /F2 22 Tf 1 0 0 1 ${(priceX + 6).pdfNumber()} ${(priceY + 7).pdfNumber()} Tm (${pdfEscape(label.priceText.ifBlank { "-" })}) Tj ET\n")
+        if (label.unitText.isNotBlank()) append("BT /F1 7 Tf 1 0 0 1 8 3 Tm (${pdfEscape(label.unitText)}) Tj ET\n")
+    }
+}
+
+fun StockItemLabelDataModel.buildStockItemLabelPdfBytes(): ByteArray {
+    val label = cleanedForDocument()
+    val pageWidth = label.labelWidthMm.toDouble() * 72.0 / 25.4
+    val pageHeight = label.labelHeightMm.toDouble() * 72.0 / 25.4
+    val pageContents = (1..label.copies).map { buildStockItemLabelPdfContent(label, pageWidth, pageHeight) }
+    val fontRegularObj = 3 + pageContents.size * 2
+    val fontBoldObj = fontRegularObj + 1
+    val fontObliqueObj = fontRegularObj + 2
+    val objects = mutableListOf<String>()
+    objects += "<< /Type /Catalog /Pages 2 0 R >>"
+    val kids = pageContents.indices.joinToString(" ") { index -> "${3 + index * 2} 0 R" }
+    objects += "<< /Type /Pages /Kids [$kids] /Count ${pageContents.size} >>"
+    pageContents.forEachIndexed { index, content ->
+        val pageObj = 3 + index * 2
+        val contentObj = pageObj + 1
+        objects += "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth.pdfNumber()} ${pageHeight.pdfNumber()}] /Resources << /Font << /F1 $fontRegularObj 0 R /F2 $fontBoldObj 0 R /F3 $fontObliqueObj 0 R >> >> /Contents $contentObj 0 R >>"
+        objects += "<< /Length ${content.encodeToByteArray().size} >>\nstream\n$content\nendstream"
+    }
+    objects += "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"
+    objects += "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>"
+    objects += "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-BoldOblique >>"
+    val out = StringBuilder()
+    val offsets = mutableListOf<Int>()
+    out.append("%PDF-1.4\n")
+    objects.forEachIndexed { index, obj ->
+        offsets += out.toString().encodeToByteArray().size
+        out.append("${index + 1} 0 obj\n$obj\nendobj\n")
+    }
+    val xrefOffset = out.toString().encodeToByteArray().size
+    out.append("xref\n0 ${objects.size + 1}\n")
+    out.append("0000000000 65535 f \n")
+    offsets.forEach { offset -> out.append(offset.toString().padStart(10, '0')).append(" 00000 n \n") }
+    out.append("trailer\n<< /Size ${objects.size + 1} /Root 1 0 R >>\n")
+    out.append("startxref\n$xrefOffset\n%%EOF")
+    return out.toString().encodeToByteArray()
+}
+
 
 fun buildReceiptPrinterTestEscPosBytes(title: String = "AITA printer test", dateText: String = ""): ByteArray {
     val bytes = mutableListOf<Byte>()
@@ -1945,6 +2145,115 @@ fun String.hasValidRetailBarcodeChecksum(): Boolean {
     }
 
     return ((10 - (sum % 10)) % 10) == check
+}
+
+fun calculateGtinModulo10CheckDigit(body: String): Int {
+    val digits = body.barcodeDigitsOnly()
+    if (digits.isBlank()) return 0
+
+    var sum = 0
+    var weight = 3
+    for (index in digits.length - 1 downTo 0) {
+        sum += digits[index].digitToInt() * weight
+        weight = if (weight == 3) 1 else 3
+    }
+    return (10 - (sum % 10)) % 10
+}
+
+fun String.isValidEan13Barcode(): Boolean {
+    val digits = barcodeDigitsOnly()
+    return digits.length == 13 && digits.hasValidRetailBarcodeChecksum()
+}
+
+fun generateInternalEan13Barcode(
+    existingBarcodes: Iterable<String> = emptyList(),
+    prefix: String = "04"
+): String {
+    val existing = existingBarcodes.map { it.barcodeDigitsOnly() }.toSet()
+    val safePrefix = prefix.barcodeDigitsOnly().take(11).ifBlank { "04" }
+
+    repeat(512) {
+        val body = buildString {
+            append(safePrefix.take(12))
+            while (length < 12) append(Random.nextInt(0, 10))
+        }.take(12)
+        val barcode = body + calculateGtinModulo10CheckDigit(body)
+        if (barcode !in existing && !barcode.isVariableMeasureRetailBarcode()) return barcode
+    }
+
+    val fallbackPrefix = "04"
+    val body = buildString {
+        append(fallbackPrefix)
+        while (length < 12) append(Random.nextInt(0, 10))
+    }
+    return body + calculateGtinModulo10CheckDigit(body)
+}
+
+private data class BarcodeLineRenderDataModel(
+    val modules: List<Boolean>,
+    val humanText: String,
+    val kind: String,
+    val scannable: Boolean
+)
+
+private val ean13LeftOddPatterns = arrayOf("0001101", "0011001", "0010011", "0111101", "0100011", "0110001", "0101111", "0111011", "0110111", "0001011")
+private val ean13LeftEvenPatterns = arrayOf("0100111", "0110011", "0011011", "0100001", "0011101", "0111001", "0000101", "0010001", "0001001", "0010111")
+private val ean13RightPatterns = arrayOf("1110010", "1100110", "1101100", "1000010", "1011100", "1001110", "1010000", "1000100", "1001000", "1110100")
+private val ean13ParityPatterns = arrayOf("LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG", "LGGGLL", "LGLGLG", "LGLGGL", "LGGLGL")
+
+private fun buildEan13BarcodeModules(ean13: String): List<Boolean> {
+    val digits = ean13.barcodeDigitsOnly()
+    if (digits.length != 13) return emptyList()
+    val modules = mutableListOf<Boolean>()
+    fun appendPattern(pattern: String) { pattern.forEach { modules += it == '1' } }
+    val first = digits.first().digitToInt()
+    val parity = ean13ParityPatterns.getOrElse(first) { ean13ParityPatterns[0] }
+    appendPattern("101")
+    digits.substring(1, 7).forEachIndexed { index, ch ->
+        val digit = ch.digitToInt()
+        appendPattern(if (parity[index] == 'G') ean13LeftEvenPatterns[digit] else ean13LeftOddPatterns[digit])
+    }
+    appendPattern("01010")
+    digits.substring(7, 13).forEach { ch -> appendPattern(ean13RightPatterns[ch.digitToInt()]) }
+    appendPattern("101")
+    return modules
+}
+
+private fun buildPseudoBarcodeModules(token: String): List<Boolean> {
+    val clean = token.normalizedBarcodeToken().ifBlank { "AITA" }
+    val modules = mutableListOf<Boolean>()
+    modules += listOf(true, false, true, false)
+    clean.encodeToByteArray().forEach { byte ->
+        for (shift in 7 downTo 0) modules += ((byte.toInt() ushr shift) and 1) == 1
+        modules += false
+    }
+    modules += listOf(false, true, false, true)
+    return modules.take(128).ifEmpty { listOf(true, false, true, false, true, false) }
+}
+
+private fun buildBarcodeLineRenderData(rawBarcode: String): BarcodeLineRenderDataModel {
+    val digits = rawBarcode.barcodeDigitsOnly()
+    val ean13 = when {
+        digits.length == 13 && digits.hasValidRetailBarcodeChecksum() -> digits
+        digits.length == 12 && digits.hasValidRetailBarcodeChecksum() -> "0$digits"
+        else -> null
+    }
+    if (ean13 != null) {
+        return BarcodeLineRenderDataModel(
+            modules = buildEan13BarcodeModules(ean13),
+            humanText = ean13,
+            kind = "EAN-13",
+            scannable = true
+        )
+    }
+
+    val token = rawBarcode.normalizedBarcodeToken().ifBlank { digits.ifBlank { "000000000000" } }
+    return BarcodeLineRenderDataModel(
+        modules = buildPseudoBarcodeModules(token),
+        humanText = rawBarcode.takeIf { it.isNotBlank() } ?: token,
+        kind = "Text",
+        scannable = false
+    )
 }
 
 fun String.isVariableMeasureRetailBarcode(): Boolean {
@@ -4200,7 +4509,7 @@ const val CLOUD_TRANSPORT_STATUS_UNAVAILABLE = -1
 @PublishedApi
 internal const val REALTIME_ACCESS_TOKEN_REFRESH_SKEW_MILLIS = 60_000L
 
-private const val DEFAULT_AITA_SERVER_URL = "http://192.168.1.51:8080"
+private const val DEFAULT_AITA_SERVER_URL = "http://10.202.10.147:8080"
 private val DEFAULT_AITA_SERVER_URL_PAIR = Pair(DEFAULT_AITA_SERVER_URL, "1")
 @Volatile
 private var currentNetworkRequestCandidateServerUrlsMemory: List<String> = emptyList()
@@ -4823,6 +5132,8 @@ val drawablePathIconPromosState = MutableStateFlow("svg/50_0.svg")
 val drawablePathIconAnalyticsState = MutableStateFlow("svg/21_0.svg")
 val drawablePathIconAnalyticsReportState = MutableStateFlow("svg/62_0.svg")
 val drawablePathIconLabelPrinterState = MutableStateFlow("svg/63_0.svg")
+val drawablePathIconBarcodeGenerateState = MutableStateFlow("svg/64_0.svg")
+val drawablePathIconPrintTagState = MutableStateFlow("svg/65_0.svg")
 val drawablePathIconWorkersState = MutableStateFlow("svg/22_0.svg")
 val drawablePathIconSuppliersState = MutableStateFlow("svg/23_0.svg")
 val drawablePathIconDebtorsState = MutableStateFlow("svg/24_0.svg")
@@ -6832,6 +7143,12 @@ fun updateDrawables(
         )
         drawablePathIconLabelPrinterState.emit(
             drawablePath(63L)
+        )
+        drawablePathIconBarcodeGenerateState.emit(
+            drawablePath(64L)
+        )
+        drawablePathIconPrintTagState.emit(
+            drawablePath(65L)
         )
         drawablePathIconWorkersState.emit(
             drawablePath(22L)
