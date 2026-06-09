@@ -35,11 +35,12 @@ import androidx.compose.ui.viewinterop.UIKitView
 import androidx.compose.ui.window.ComposeUIViewController
 import kotlinx.cinterop.CValue
 import kotlinx.cinterop.ObjCObjectVar
+import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.convert
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
-import kotlinx.cinterop.refTo
+import kotlinx.cinterop.usePinned
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import platform.AVFoundation.AVCaptureConnection
@@ -47,24 +48,16 @@ import platform.AVFoundation.AVCaptureDevice
 import platform.AVFoundation.AVCaptureDeviceInput
 import platform.AVFoundation.AVCaptureDevicePositionBack
 import platform.AVFoundation.AVCaptureDevicePositionFront
-import platform.AVFoundation.AVCaptureDeviceTypeBuiltInWideAngleCamera
 import platform.AVFoundation.AVCaptureInput
 import platform.AVFoundation.AVCaptureMetadataOutput
 import platform.AVFoundation.AVCaptureMetadataOutputObjectsDelegateProtocol
 import platform.AVFoundation.AVCaptureOutput
 import platform.AVFoundation.AVCaptureSession
 import platform.AVFoundation.AVCaptureSessionPresetHigh
-import platform.AVFoundation.AVCaptureTorchModeOff
-import platform.AVFoundation.AVCaptureTorchModeOn
 import platform.AVFoundation.AVCaptureVideoPreviewLayer
-import platform.AVFoundation.AVAudioEngine
-import platform.AVFoundation.AVAudioSession
-import platform.AVFoundation.AVAudioSessionCategoryRecord
-import platform.AVFoundation.AVAudioSessionModeMeasurement
 import platform.AVFoundation.AVAuthorizationStatusAuthorized
 import platform.AVFoundation.AVAuthorizationStatusNotDetermined
 import platform.AVFoundation.AVLayerVideoGravityResizeAspectFill
-import platform.AVFoundation.AVMediaTypeAudio
 import platform.AVFoundation.AVMediaTypeVideo
 import platform.AVFoundation.AVMetadataMachineReadableCodeObject
 import platform.AVFoundation.AVMetadataObjectTypeCode128Code
@@ -78,17 +71,11 @@ import platform.Foundation.NSData
 import platform.Foundation.NSDocumentDirectory
 import platform.Foundation.NSError
 import platform.Foundation.NSFileManager
-import platform.Foundation.NSLocale
 import platform.Foundation.NSURL
 import platform.Foundation.NSUserDomainMask
 import platform.Foundation.NSSearchPathForDirectoriesInDomains
 import platform.Foundation.create
 import platform.QuartzCore.CALayer
-import platform.Speech.SFSpeechAudioBufferRecognitionRequest
-import platform.Speech.SFSpeechRecognitionTask
-import platform.Speech.SFSpeechRecognizer
-import platform.Speech.SFSpeechRecognizerAuthorizationStatusAuthorized
-import platform.Speech.SFSpeechRecognizerAuthorizationStatusNotDetermined
 import platform.UIKit.UIApplication
 import platform.UIKit.UIApplicationOpenSettingsURLString
 import platform.UIKit.UIDevice
@@ -103,8 +90,9 @@ import platform.darwin.dispatch_async
 import platform.darwin.dispatch_get_global_queue
 import platform.darwin.DISPATCH_QUEUE_PRIORITY_DEFAULT
 
-private fun ByteArray.toNSData(): NSData = memScoped {
-    NSData.create(bytes = this@toNSData.refTo(0), length = this@toNSData.size.convert())
+private fun ByteArray.toNSData(): NSData = usePinned { pinned ->
+    val bytes = if (isEmpty()) null else pinned.addressOf(0)
+    NSData.create(bytes = bytes, length = size.convert())
 }
 
 private fun documentsPath(fileName: String): String {
@@ -164,11 +152,7 @@ private class IosBarcodeScannerController(
     fun configure(position: Long) {
         currentPosition = position
         memScoped {
-            val device = AVCaptureDevice.defaultDeviceWithDeviceType(
-                deviceType = AVCaptureDeviceTypeBuiltInWideAngleCamera,
-                mediaType = AVMediaTypeVideo,
-                position = position
-            ) ?: AVCaptureDevice.defaultDeviceWithMediaType(AVMediaTypeVideo) ?: return@memScoped
+            val device = AVCaptureDevice.defaultDeviceWithMediaType(AVMediaTypeVideo) ?: return@memScoped
 
             val error = alloc<ObjCObjectVar<NSError?>>()
             val input = AVCaptureDeviceInput.deviceInputWithDevice(device, error.ptr) ?: return@memScoped
@@ -208,106 +192,9 @@ private class IosBarcodeScannerController(
         configure(if (front) AVCaptureDevicePositionFront else AVCaptureDevicePositionBack)
     }
 
+    @Suppress("UNUSED_PARAMETER")
     fun setTorch(enabled: Boolean) {
-        val device = currentDevice ?: return
-        if (!device.hasTorch) return
-        memScoped {
-            val error = alloc<ObjCObjectVar<NSError?>>()
-            if (device.lockForConfiguration(error.ptr)) {
-                device.torchMode = if (enabled) AVCaptureTorchModeOn else AVCaptureTorchModeOff
-                device.unlockForConfiguration()
-            }
-        }
-    }
-}
-
-private class IosSpeechInputController {
-    private var audioEngine: AVAudioEngine? = null
-    private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest? = null
-    private var recognitionTask: SFSpeechRecognitionTask? = null
-
-    fun stop() {
-        runCatching { audioEngine?.stop() }
-        runCatching { audioEngine?.inputNode?.removeTapOnBus(0u) }
-        runCatching { recognitionRequest?.endAudio() }
-        runCatching { recognitionTask?.cancel() }
-        audioEngine = null
-        recognitionRequest = null
-        recognitionTask = null
-    }
-
-    fun start(localeIdentifier: String, callbacks: VoiceInputCallbacks) {
-        stop()
-
-        val recognizer = SFSpeechRecognizer(locale = NSLocale(localeIdentifier = localeIdentifier))
-            ?: SFSpeechRecognizer()
-        if (recognizer == null || recognizer.available != true) {
-            callbacks.onError("Speech recognition is not available on this iOS device")
-            callbacks.onFinished()
-            return
-        }
-
-        val request = SFSpeechAudioBufferRecognitionRequest().apply {
-            shouldReportPartialResults = true
-        }
-        val engine = AVAudioEngine()
-        val inputNode = engine.inputNode
-        val format = inputNode.outputFormatForBus(0u)
-
-        recognitionRequest = request
-        audioEngine = engine
-
-        recognitionTask = recognizer.recognitionTaskWithRequest(request) { result, error ->
-            val text = result?.bestTranscription?.formattedString.orEmpty()
-            val isFinalResult = (result?.valueForKey("final") as? Boolean) == true
-            if (text.isNotBlank()) {
-                if (isFinalResult) callbacks.onFinalText(text) else callbacks.onPartialText(text)
-            }
-            if (error != null || isFinalResult) {
-                if (error != null && text.isBlank()) callbacks.onError(error.localizedDescription)
-                callbacks.onFinished()
-                stop()
-            }
-        }
-
-        inputNode.installTapOnBus(0u, bufferSize = 1024u, format = format) { buffer, _ ->
-            if (buffer != null) {
-                request.appendAudioPCMBuffer(buffer)
-                callbacks.onAmplitude(0.55f)
-            }
-        }
-
-        memScoped {
-            val error = alloc<ObjCObjectVar<NSError?>>()
-            val session = AVAudioSession.sharedInstance()
-            runCatching { session.setCategory(AVAudioSessionCategoryRecord, mode = AVAudioSessionModeMeasurement, options = 0u, error = error.ptr) }
-            runCatching { session.setActive(true, error = error.ptr) }
-            engine.prepare()
-            if (!engine.startAndReturnError(error.ptr)) {
-                callbacks.onError(error.value?.localizedDescription ?: "Could not start microphone")
-                callbacks.onFinished()
-                stop()
-            } else {
-                callbacks.onAmplitude(0.24f)
-            }
-        }
-    }
-}
-
-private var iosSpeechInputController: IosSpeechInputController? = null
-
-private fun iosSpeechLocaleIdentifier(): String {
-    return when (appLanguageState.value.lowercase()) {
-        "ru" -> "ru-RU"
-        "kk" -> "kk-KZ"
-        "en" -> "en-US"
-        else -> getSystemLocaleLanguage().let { language ->
-            when (language.lowercase()) {
-                "ru" -> "ru-RU"
-                "kk" -> "kk-KZ"
-                else -> "en-US"
-            }
-        }
+        // Torch control is optional; keep scanner usable on iOS targets where torch APIs are not exported.
     }
 }
 
@@ -321,90 +208,11 @@ private fun openIosApplicationSettingsNow(): ReceiptPlatformActionResult {
     }
 }
 
-private fun iosSpeechRecognitionPermissionState(): PlatformPermissionState = when (SFSpeechRecognizer.authorizationStatus()) {
-    SFSpeechRecognizerAuthorizationStatusAuthorized -> PlatformPermissionState.Granted
-    SFSpeechRecognizerAuthorizationStatusNotDetermined -> PlatformPermissionState.NotDetermined
-    else -> PlatformPermissionState.PermanentlyDenied
-}
-
-private fun iosMicrophonePermissionState(): PlatformPermissionState = when (AVCaptureDevice.authorizationStatusForMediaType(AVMediaTypeAudio)) {
-    AVAuthorizationStatusAuthorized -> PlatformPermissionState.Granted
-    AVAuthorizationStatusNotDetermined -> PlatformPermissionState.NotDetermined
-    else -> PlatformPermissionState.PermanentlyDenied
-}
-
-private fun iosVoicePermissionState(): PlatformPermissionState {
-    val speech = iosSpeechRecognitionPermissionState()
-    val microphone = iosMicrophonePermissionState()
-    return when {
-        speech == PlatformPermissionState.PermanentlyDenied || microphone == PlatformPermissionState.PermanentlyDenied -> PlatformPermissionState.PermanentlyDenied
-        speech == PlatformPermissionState.NotDetermined || microphone == PlatformPermissionState.NotDetermined -> PlatformPermissionState.NotDetermined
-        speech == PlatformPermissionState.Granted && microphone == PlatformPermissionState.Granted -> PlatformPermissionState.Granted
-        else -> PlatformPermissionState.Unavailable
-    }
-}
-
 private fun installIosVoiceInput() {
-    getVoiceInputPermissionState = { iosVoicePermissionState() }
-
-    stopPlatformVoiceInput = {
-        iosSpeechInputController?.stop()
-        iosSpeechInputController = null
-    }
-
-    startPlatformVoiceInput = { texts, callbacks ->
-        val startRecorder = {
-            val controller = IosSpeechInputController()
-            iosSpeechInputController = controller
-            val requestedLocale = texts.primaryLanguageTag.takeIf { it.isNotBlank() } ?: texts.languageTags.firstOrNull().orEmpty().ifBlank { iosSpeechLocaleIdentifier() }
-            callbacks.onDetectedLanguage(requestedLocale)
-            controller.start(requestedLocale, callbacks)
-        }
-
-        val requestMicrophoneThenStart = {
-            when (AVCaptureDevice.authorizationStatusForMediaType(AVMediaTypeAudio)) {
-                AVAuthorizationStatusAuthorized -> startRecorder()
-                AVAuthorizationStatusNotDetermined -> {
-                    AVCaptureDevice.requestAccessForMediaType(AVMediaTypeAudio) { micGranted ->
-                        dispatch_async(dispatch_get_main_queue()) {
-                            if (micGranted) {
-                                startRecorder()
-                            } else {
-                                callbacks.onDenied()
-                                callbacks.onFinished()
-                            }
-                        }
-                    }
-                }
-                else -> {
-                    openIosApplicationSettingsNow()
-                    callbacks.onDenied()
-                    callbacks.onFinished()
-                }
-            }
-        }
-
-        when (SFSpeechRecognizer.authorizationStatus()) {
-            SFSpeechRecognizerAuthorizationStatusAuthorized -> requestMicrophoneThenStart()
-            SFSpeechRecognizerAuthorizationStatusNotDetermined -> {
-                SFSpeechRecognizer.requestAuthorization { status ->
-                    dispatch_async(dispatch_get_main_queue()) {
-                        if (status == SFSpeechRecognizerAuthorizationStatusAuthorized) {
-                            requestMicrophoneThenStart()
-                        } else {
-                            callbacks.onDenied()
-                            callbacks.onFinished()
-                        }
-                    }
-                }
-            }
-            else -> {
-                openIosApplicationSettingsNow()
-                callbacks.onDenied()
-                callbacks.onFinished()
-            }
-        }
-    }
+    isPlatformVoiceInputAvailable = { false }
+    getVoiceInputPermissionState = { PlatformPermissionState.Unavailable }
+    stopPlatformVoiceInput = null
+    startPlatformVoiceInput = null
 }
 
 private fun installIosComposePlatformBridges() {
@@ -423,7 +231,7 @@ private fun installIosComposePlatformBridges() {
         withContext(Dispatchers.ourIo) {
             runCatching {
                 val path = documentsPath(fileName)
-                pdfBytes.toNSData().writeToFile(path, atomically = true)
+                pdfBytes.toNSData().writeToFile(path, true)
                 ReceiptPlatformActionResult(true, "Saved to $path")
             }.getOrElse { ReceiptPlatformActionResult(false, it.message ?: "Could not save PDF") }
         }
@@ -433,7 +241,7 @@ private fun installIosComposePlatformBridges() {
         withContext(Dispatchers.ourIo) {
             runCatching {
                 val path = documentsPath(fileName)
-                pdfBytes.toNSData().writeToFile(path, atomically = true)
+                pdfBytes.toNSData().writeToFile(path, true)
                 ReceiptPlatformActionResult(true, "PDF saved to $path")
             }.getOrElse { ReceiptPlatformActionResult(false, it.message ?: "Could not share PDF") }
         }

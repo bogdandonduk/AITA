@@ -6,21 +6,21 @@ import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.native.NativeSqliteDriver
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.engine.darwin.Darwin
-import kotlinx.cinterop.CFTypeRefVar
+import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.convert
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
-import kotlinx.cinterop.refTo
 import kotlinx.cinterop.readBytes
+import kotlinx.cinterop.usePinned
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.datetime.Clock
 import platform.CoreFoundation.CFDictionaryRef
 import platform.CoreFoundation.CFTypeRef
+import platform.CoreFoundation.CFTypeRefVar
 import platform.CoreFoundation.kCFBooleanTrue
 import platform.Foundation.NSBundle
-import platform.Foundation.NSCacheDirectory
+import platform.Foundation.NSCachesDirectory
 import platform.Foundation.NSData
 import platform.Foundation.NSDate
 import platform.Foundation.NSFileManager
@@ -44,12 +44,13 @@ import platform.Security.kSecReturnData
 import platform.Security.kSecValueData
 import platform.UIKit.UIDevice
 
-actual fun getCurrentTimeMillis(): Long = Clock.System.now().toEpochMilliseconds()
+actual fun getCurrentTimeMillis(): Long = kotlin.time.Clock.System.now().toEpochMilliseconds()
 
 private const val keychainService = "kz.aita.secure"
 
-private fun ByteArray.toNSData(): NSData = memScoped {
-    NSData.create(bytes = this@toNSData.refTo(0), length = this@toNSData.size.convert())
+private fun ByteArray.toNSData(): NSData = usePinned { pinned ->
+    val bytes = if (isEmpty()) null else pinned.addressOf(0)
+    NSData.create(bytes = bytes, length = size.convert())
 }
 
 private fun NSData.toByteArray(): ByteArray = bytes?.readBytes(length.toInt()) ?: ByteArray(0)
@@ -86,7 +87,7 @@ private fun keychainSetString(account: String, value: String?) {
 }
 
 private fun iosCacheDirectoryPath(): String {
-    val paths = NSSearchPathForDirectoriesInDomains(NSCacheDirectory, NSUserDomainMask, true)
+    val paths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, true)
     val cachePath = paths.firstOrNull() as? String
     val aitaPath = (cachePath ?: platform.Foundation.NSTemporaryDirectory()).trimEnd('/') + "/AITA"
     NSFileManager.defaultManager.createDirectoryAtPath(
@@ -174,7 +175,7 @@ actual object LocalAitaLanTransport {
 fun installIosCommonPlatformBridges() {
     getClientDeviceInfo = {
         val info = NSBundle.mainBundle.infoDictionary
-        val version = (info?.objectForKey("CFBundleShortVersionString") as? String).orEmpty()
+        val version = (info?.get("CFBundleShortVersionString") as? String).orEmpty()
         val device = UIDevice.currentDevice
         ClientDeviceInfoDataModel(
             installationId = keychainInstallationId(),

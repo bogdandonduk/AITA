@@ -952,6 +952,27 @@ suspend fun printStockItemLabelDocument(
     )
 }
 
+suspend fun printStockItemLabelsDocument(
+    labels: List<StockItemLabelDataModel>,
+    notConfiguredMessage: String = "Document printing is not configured for this platform"
+): ReceiptPlatformActionResult {
+    val cleanLabels = labels.expandedCleanedStockItemLabelsForDocument()
+    if (cleanLabels.isEmpty()) return ReceiptPlatformActionResult(false, "No printable labels")
+
+    val htmlResult = printHtmlDocument(
+        fileName = cleanLabels.stockItemLabelsSheetDocumentFileName().removeSuffix(".pdf") + ".html",
+        html = cleanLabels.buildStockItemLabelsSheetHtml(),
+        notConfiguredMessage = notConfiguredMessage
+    )
+    if (htmlResult.success) return htmlResult
+
+    return printPdfDocument(
+        fileName = cleanLabels.stockItemLabelsSheetDocumentFileName(),
+        pdfBytes = cleanLabels.buildStockItemLabelsSheetPdfBytes(),
+        notConfiguredMessage = notConfiguredMessage
+    )
+}
+
 fun refreshLabelPrinterDevices(onCompleted: ((ReceiptPlatformActionResult) -> Unit)? = null) {
     GlobalScope.launch(Dispatchers.ourIo) {
         val result = runCatching {
@@ -1213,6 +1234,93 @@ $labels
 """.trimIndent()
 }
 
+private fun List<StockItemLabelDataModel>.expandedCleanedStockItemLabelsForDocument(): List<StockItemLabelDataModel> =
+    flatMap { rawLabel ->
+        val cleanLabel = rawLabel.cleanedForDocument().copy(copies = 1)
+        if (cleanLabel.barcode.isBlank()) {
+            emptyList()
+        } else {
+            List(rawLabel.copies.coerceIn(1, 99)) { cleanLabel }
+        }
+    }
+
+private fun List<StockItemLabelDataModel>.stockItemLabelsSheetDocumentFileName(): String {
+    val token = joinToString("_") { label ->
+        label.barcode.normalizedBarcodeToken()
+            .ifBlank { label.itemName.normalizedBarcodeToken() }
+            .ifBlank { "label" }
+            .take(10)
+    }.ifBlank { "sheet" }.take(48)
+    return "aita_item_label_sheet_$token.pdf"
+}
+
+private fun StockItemLabelDataModel.buildStockItemLabelSheetSectionHtml(): String {
+    val label = cleanedForDocument().copy(copies = 1)
+    val barcodeRender = buildBarcodeLineRenderData(label.barcode)
+    val bars = barcodeRender.modules.joinToString(separator = "") { black ->
+        if (black) "<span class=\"m b\"></span>" else "<span class=\"m\"></span>"
+    }
+    return """
+    <section class="label">
+      <div class="store">${htmlEscape(label.storeName)}</div>
+      <div class="name">${htmlEscape(label.itemName)}</div>
+      <div class="bottom">
+        <div class="barcodeBox">
+          <div class="barcode">$bars</div>
+          <div class="digits">${htmlEscape(barcodeRender.humanText)}</div>
+        </div>
+        <div class="priceBox">
+          <div class="priceTitle">ЦЕНА</div>
+          <div class="price">${htmlEscape(label.priceText.ifBlank { "—" })}</div>
+        </div>
+      </div>
+      ${label.unitText.takeIf { it.isNotBlank() }?.let { "<div class=\"unit\">${htmlEscape(it)}</div>" }.orEmpty()}
+      ${label.note.takeIf { it.isNotBlank() }?.let { "<div class=\"note\">${htmlEscape(it)}</div>" }.orEmpty()}
+    </section>
+    """.trimIndent()
+}
+
+fun List<StockItemLabelDataModel>.buildStockItemLabelsSheetHtml(): String {
+    val labels = expandedCleanedStockItemLabelsForDocument()
+    val content = labels.joinToString("\n") { it.buildStockItemLabelSheetSectionHtml() }
+    val title = labels.firstOrNull()?.let { htmlEscape(it.storeName.ifBlank { "AITA" }) } ?: "AITA"
+    return """
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>$title labels</title>
+<style>
+  @page { size: A4; margin: 8mm; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #ffffff; }
+  body { font-family: Arial, Helvetica, system-ui, sans-serif; color: #050505; }
+  .sheet { display: grid; grid-template-columns: repeat(3, 58mm); gap: 4mm; align-content: start; }
+  .label { width: 58mm; height: 40mm; padding: 2.2mm 2.0mm 1.4mm 2.0mm; overflow: hidden; border: 0.35mm solid #111; background: #fff; break-inside: avoid; page-break-inside: avoid; }
+  .store { text-align: center; font-style: italic; font-weight: 800; text-decoration: underline; font-size: 4.2mm; line-height: 4.8mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .name { margin-top: 1.6mm; font-size: 4.0mm; line-height: 4.7mm; font-weight: 600; height: 9.4mm; overflow: hidden; }
+  .bottom { margin-top: 1.8mm; display: flex; align-items: flex-end; gap: 2.0mm; }
+  .barcodeBox { flex: 1 1 auto; min-width: 0; }
+  .barcode { height: 14.5mm; display: flex; align-items: stretch; background: #fff; overflow: hidden; }
+  .m { flex: 1 1 0; min-width: 0; }
+  .b { background: #000; }
+  .digits { font-family: "Courier New", monospace; font-size: 2.6mm; line-height: 3.0mm; letter-spacing: 0.05mm; white-space: nowrap; overflow: hidden; text-overflow: clip; }
+  .priceBox { flex: 0 0 27mm; border: 0.35mm solid #111; min-height: 13mm; padding: 1mm 1.3mm 0.6mm; text-align: center; }
+  .priceTitle { font-size: 2.7mm; line-height: 3.0mm; font-weight: 800; }
+  .price { font-size: 7.0mm; line-height: 7.7mm; font-weight: 900; letter-spacing: 0.15mm; white-space: nowrap; overflow: hidden; text-overflow: clip; }
+  .unit, .note { margin-top: 0.5mm; font-size: 2.2mm; line-height: 2.5mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+</style>
+</head>
+<body>
+<main class="sheet">
+$content
+</main>
+<script>window.onload = function(){ setTimeout(function(){ window.print(); }, 120); };</script>
+</body>
+</html>
+""".trimIndent()
+}
+
 private fun Double.pdfNumber(): String {
     val scaled = kotlin.math.round(this * 100.0).toLong()
     val whole = scaled / 100L
@@ -1251,19 +1359,20 @@ private fun buildStockItemLabelPdfContent(label: StockItemLabelDataModel, pageWi
     }
 }
 
-fun StockItemLabelDataModel.buildStockItemLabelPdfBytes(): ByteArray {
-    val label = cleanedForDocument()
-    val pageWidth = label.labelWidthMm.toDouble() * 72.0 / 25.4
-    val pageHeight = label.labelHeightMm.toDouble() * 72.0 / 25.4
-    val pageContents = (1..label.copies).map { buildStockItemLabelPdfContent(label, pageWidth, pageHeight) }
-    val fontRegularObj = 3 + pageContents.size * 2
+private fun buildSimplePdfDocumentBytes(
+    pageContents: List<String>,
+    pageWidth: Double,
+    pageHeight: Double
+): ByteArray {
+    val safePageContents = pageContents.ifEmpty { listOf("") }
+    val fontRegularObj = 3 + safePageContents.size * 2
     val fontBoldObj = fontRegularObj + 1
     val fontObliqueObj = fontRegularObj + 2
     val objects = mutableListOf<String>()
     objects += "<< /Type /Catalog /Pages 2 0 R >>"
-    val kids = pageContents.indices.joinToString(" ") { index -> "${3 + index * 2} 0 R" }
-    objects += "<< /Type /Pages /Kids [$kids] /Count ${pageContents.size} >>"
-    pageContents.forEachIndexed { index, content ->
+    val kids = safePageContents.indices.joinToString(" ") { index -> "${3 + index * 2} 0 R" }
+    objects += "<< /Type /Pages /Kids [$kids] /Count ${safePageContents.size} >>"
+    safePageContents.forEachIndexed { index, content ->
         val pageObj = 3 + index * 2
         val contentObj = pageObj + 1
         objects += "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth.pdfNumber()} ${pageHeight.pdfNumber()}] /Resources << /Font << /F1 $fontRegularObj 0 R /F2 $fontBoldObj 0 R /F3 $fontObliqueObj 0 R >> >> /Contents $contentObj 0 R >>"
@@ -1286,6 +1395,41 @@ fun StockItemLabelDataModel.buildStockItemLabelPdfBytes(): ByteArray {
     out.append("trailer\n<< /Size ${objects.size + 1} /Root 1 0 R >>\n")
     out.append("startxref\n$xrefOffset\n%%EOF")
     return out.toString().encodeToByteArray()
+}
+
+fun StockItemLabelDataModel.buildStockItemLabelPdfBytes(): ByteArray {
+    val label = cleanedForDocument()
+    val pageWidth = label.labelWidthMm.toDouble() * 72.0 / 25.4
+    val pageHeight = label.labelHeightMm.toDouble() * 72.0 / 25.4
+    val pageContents = (1..label.copies).map { buildStockItemLabelPdfContent(label, pageWidth, pageHeight) }
+    return buildSimplePdfDocumentBytes(pageContents, pageWidth, pageHeight)
+}
+
+fun List<StockItemLabelDataModel>.buildStockItemLabelsSheetPdfBytes(): ByteArray {
+    val labels = expandedCleanedStockItemLabelsForDocument()
+    val pageWidth = 595.28
+    val pageHeight = 841.89
+    val margin = 22.68
+    val gap = 11.34
+    val labelWidth = 58.0 * 72.0 / 25.4
+    val labelHeight = 40.0 * 72.0 / 25.4
+    val columns = kotlin.math.floor((pageWidth - margin * 2 + gap) / (labelWidth + gap)).toInt().coerceAtLeast(1)
+    val rows = kotlin.math.floor((pageHeight - margin * 2 + gap) / (labelHeight + gap)).toInt().coerceAtLeast(1)
+    val labelsPerPage = (columns * rows).coerceAtLeast(1)
+    val pageContents = labels.chunked(labelsPerPage).map { pageLabels ->
+        buildString {
+            pageLabels.forEachIndexed { index, label ->
+                val column = index % columns
+                val row = index / columns
+                val x = margin + column * (labelWidth + gap)
+                val y = pageHeight - margin - labelHeight - row * (labelHeight + gap)
+                append("q\n1 0 0 1 ${x.pdfNumber()} ${y.pdfNumber()} cm\n")
+                append(buildStockItemLabelPdfContent(label, labelWidth, labelHeight))
+                append("Q\n")
+            }
+        }
+    }
+    return buildSimplePdfDocumentBytes(pageContents, pageWidth, pageHeight)
 }
 
 
@@ -4509,7 +4653,7 @@ const val CLOUD_TRANSPORT_STATUS_UNAVAILABLE = -1
 @PublishedApi
 internal const val REALTIME_ACCESS_TOKEN_REFRESH_SKEW_MILLIS = 60_000L
 
-private const val DEFAULT_AITA_SERVER_URL = "http://10.202.10.147:8080"
+private const val DEFAULT_AITA_SERVER_URL = "http://192.168.1.51:8080"
 private val DEFAULT_AITA_SERVER_URL_PAIR = Pair(DEFAULT_AITA_SERVER_URL, "1")
 @Volatile
 private var currentNetworkRequestCandidateServerUrlsMemory: List<String> = emptyList()

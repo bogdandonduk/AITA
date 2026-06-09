@@ -892,10 +892,10 @@ fun installReceiptPlatformAndroid(context: Context) {
 
     fun printAttributesForDocument(fileName: String): PrintAttributes {
         val safeName = fileName.lowercase(Locale.ROOT)
-        val mediaSize = if (safeName.contains("label") || safeName.contains("tag")) {
-            PrintAttributes.MediaSize("AITA_LABEL_58_40", "AITA label 58 x 40 mm", 2283, 1575)
-        } else {
-            PrintAttributes.MediaSize.ISO_A4
+        val mediaSize = when {
+            safeName.contains("sheet") || safeName.contains("a4") -> PrintAttributes.MediaSize.ISO_A4
+            safeName.contains("label") || safeName.contains("tag") -> PrintAttributes.MediaSize("AITA_LABEL_58_40", "AITA label 58 x 40 mm", 2283, 1575)
+            else -> PrintAttributes.MediaSize.ISO_A4
         }
         return PrintAttributes.Builder()
             .setMediaSize(mediaSize)

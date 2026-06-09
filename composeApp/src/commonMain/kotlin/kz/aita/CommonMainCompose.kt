@@ -9492,6 +9492,58 @@ private fun stockWarehouseMetricsForUi(
     )
 }
 
+private fun AppConfiguration.stockItemLabelDataForUi(
+    goodsItem: GoodsItemDataModel,
+    batches: List<GoodsBatchDataModel>,
+    copies: Int = 1,
+    barcodeOverride: String? = null,
+    priceTextOverride: String? = null,
+    storeNameOverride: String? = null
+): StockItemLabelDataModel? {
+    val itemName = goodsItem.name.visibleLocalizedString(stateValues.appLanguage, localizedStringResource(113, "Unnamed item"))
+    val sortedBatches = batches.sortedForShelf(goodsItem)
+    val activeBatch = sortedBatches.firstOrNull { it.id == goodsItem.activeShelfBatchId }
+        ?: sortedBatches.bestBatchForSale(goodsItem)
+    val activeStore = stateValues.stores.findStoreOrBranchForUi(stateValues.activeStoreId ?: goodsItem.storeId)
+    val defaultStoreName = activeStore
+        ?.name
+        ?.visibleLocalizedString(stateValues.appLanguage, activeStore.publicId.ifBlank { activeStore.id })
+        .orEmpty()
+    val promotedPrice = goodsItem.promotedPriceForTransaction(
+        transactionTypeIndex = 0,
+        saleMethodId = SALE_METHOD_RETAIL,
+        quantityTotal = 1.0,
+        batch = activeBatch
+    ).finalPrice
+    val defaultPriceText = listOf(promotedPrice.price.trim(), promotedPrice.currency.trim())
+        .filter { it.isNotBlank() && it != "0" }
+        .joinToString(" ")
+    val defaultUnitText = activeBatch
+        ?.quantity
+        ?.immutableUnitName
+        ?.visibleLocalizedString(stateValues.appLanguage, goodsItem.measurementUnitId)
+        ?: goodsItem.measurementUnitId
+    val barcode = barcodeOverride
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+        ?: goodsItem.allBarcodeValues()
+            .map { it.trim() }
+            .firstOrNull { it.isNotBlank() }
+            .orEmpty()
+
+    if (barcode.isBlank()) return null
+
+    return StockItemLabelDataModel(
+        itemName = itemName,
+        barcode = barcode,
+        priceText = priceTextOverride?.takeIf { it.isNotBlank() } ?: defaultPriceText,
+        storeName = storeNameOverride?.takeIf { it.isNotBlank() } ?: defaultStoreName.ifBlank { "AITA" },
+        unitText = defaultUnitText,
+        copies = copies.coerceIn(1, 99),
+        protocol = LABEL_PRINTER_PROTOCOL_AUTO
+    )
+}
+
 @Composable
 private fun AppConfiguration.StockWarehouseMetricPill(
     title: String,
@@ -9539,6 +9591,7 @@ private fun AppConfiguration.StockWarehouseInfoTile(
     totalSelectableCount: Int,
     onSelectAll: () -> Unit,
     onClearSelection: () -> Unit,
+    onPrintSelected: (() -> Unit)? = null,
     onRefresh: () -> Unit
 ) {
     val shape = RoundedCornerShape(stateValues.cornerRadius)
@@ -9607,6 +9660,18 @@ private fun AppConfiguration.StockWarehouseInfoTile(
                 confirmationRequired = false,
                 onClick = onSelectAll
             )
+            onPrintSelected?.let { printSelected ->
+                actionButton(
+                    text = "",
+                    iconPath = stateValues.drawablePathIconPrintTag,
+                    iconRes = stateValues.drawableResIconPrintTag.value,
+                    iconContentDescription = localizedStringResource(1288, "Print item label"),
+                    enabled = selectedCount > 0,
+                    fillMaxWidthIfTextPresent = false,
+                    confirmationRequired = false,
+                    onClick = printSelected
+                )
+            }
             actionButton(
                 text = "",
                 iconPath = stateValues.drawablePathIconCancel,
@@ -9805,6 +9870,49 @@ fun AppConfiguration.StockWarehouseScreenContent(
                     selectedStockItemIds = selectableItemIds
                 }
 
+                fun setSelectionForItemId(itemId: String, shouldSelect: Boolean) {
+                    if (!selectionAvailable || itemId.isBlank() || itemId !in selectableItemIds) return
+                    selectedStockItemIds = if (shouldSelect) {
+                        (selectedStockItemIds + itemId).distinct()
+                    } else {
+                        selectedStockItemIds.filterNot { it == itemId }
+                    }
+                }
+
+                fun selectedStockItemsInScreenOrder(): List<GoodsItemDataModel> {
+                    val selectedIds = selectedStockItemIds.toSet()
+                    return sortedItems.filter { it.id in selectedIds }
+                }
+
+                fun printSelectedStockLabels() {
+                    val selectedLabels = selectedStockItemsInScreenOrder().mapNotNull { item ->
+                        stockItemLabelDataForUi(
+                            goodsItem = item,
+                            batches = stateValues.stockBatches.orEmpty().filter { batch -> batch.goodsItemId == item.id && batch.isActive },
+                            copies = 1
+                        )
+                    }
+
+                    if (selectedLabels.isEmpty()) {
+                        postInAppNotification(
+                            localizedStringResource(1299, "This item has no barcode yet; add a barcode before printing a shelf label."),
+                            NotificationType.Negative,
+                            transient = true
+                        )
+                        return
+                    }
+
+                    coroutineScope.launch {
+                        receiptActionNotification(
+                            printStockItemLabelsDocument(
+                                labels = selectedLabels,
+                                notConfiguredMessage = localizedStringResource(1269, "Paper document printing is not configured for this platform")
+                            ),
+                            localizedStringResource(1325, "Label opened for printing")
+                        )
+                    }
+                }
+
                 var page by rememberSaveable(lSearchQuery, sortMode, sortAscending, sortedItems.size) {
                     mutableStateOf(0)
                 }
@@ -9812,11 +9920,12 @@ fun AppConfiguration.StockWarehouseScreenContent(
                 val visibleItems = sortedItems.clientPaged(page, pageSize)
                 val overviewMetrics = stockWarehouseMetricsForUi(sortedItems, stateValues.stockBatches.orEmpty())
                 val showWarehouseInfoTile = searchQuery == null && transactionTypeIndex == null
-                val refreshAction = {
+                val refreshAction: () -> Unit = {
                     stateValues.activeStoreId?.let { storeId ->
                         getStock(storeId)
                         getStockBatches(storeId)
                     }
+                    Unit
                 }
 
                 Column(
@@ -9825,13 +9934,14 @@ fun AppConfiguration.StockWarehouseScreenContent(
                 ) {
                     if (showWarehouseInfoTile) {
                         StockWarehouseInfoTile(
-                            modifier = Modifier.padding(horizontal = 8.dp, top = 8.dp),
+                            modifier = Modifier.padding(start = 8.dp, end = 8.dp, top = 8.dp),
                             metrics = overviewMetrics,
                             selectionMode = selectionMode,
                             selectedCount = selectedStockItemIds.size,
                             totalSelectableCount = selectableItemIds.size,
                             onSelectAll = { selectAllVisibleStock() },
                             onClearSelection = { clearSelection() },
+                            onPrintSelected = { printSelectedStockLabels() },
                             onRefresh = refreshAction
                         )
                     }
@@ -9849,12 +9959,55 @@ fun AppConfiguration.StockWarehouseScreenContent(
                             stateKey = scrollStateKey
                         )
 
+                        var selectionDragShouldSelect by remember(selectionMode) { mutableStateOf<Boolean?>(null) }
+                        var selectionDragTouchedIds by remember(selectionMode) { mutableStateOf(emptySet<String>()) }
+                        val latestSelectedStockItemIds by rememberUpdatedState(selectedStockItemIds)
+
+                        fun stockItemIdAtListY(y: Float): String? {
+                            val yInt = y.toInt()
+                            return warehouseListState.layoutInfo.visibleItemsInfo
+                                .firstOrNull { info -> yInt >= info.offset && yInt <= info.offset + info.size }
+                                ?.key
+                                ?.let { it as? String }
+                                ?.takeIf { it in selectableItemIds }
+                        }
+
+                        fun applyDragSelectionAt(y: Float, shouldSelectOverride: Boolean? = null) {
+                            val itemId = stockItemIdAtListY(y) ?: return
+                            val shouldSelect = shouldSelectOverride ?: selectionDragShouldSelect ?: return
+                            if (itemId in selectionDragTouchedIds) return
+                            selectionDragTouchedIds = selectionDragTouchedIds + itemId
+                            setSelectionForItemId(itemId, shouldSelect)
+                        }
+
                         LazyColumn(
                             state = warehouseListState,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f)
                                 .padding(8.dp)
+                                .pointerInput(selectionMode, selectableItemIds.joinToString("|")) {
+                                    if (!selectionMode) return@pointerInput
+                                    detectDragGestures(
+                                        onDragStart = { offset ->
+                                            val itemId = stockItemIdAtListY(offset.y)
+                                            val shouldSelect = itemId?.let { it !in latestSelectedStockItemIds } ?: true
+                                            selectionDragShouldSelect = shouldSelect
+                                            selectionDragTouchedIds = emptySet()
+                                            applyDragSelectionAt(offset.y, shouldSelect)
+                                        },
+                                        onDragEnd = {
+                                            selectionDragShouldSelect = null
+                                            selectionDragTouchedIds = emptySet()
+                                        },
+                                        onDragCancel = {
+                                            selectionDragShouldSelect = null
+                                            selectionDragTouchedIds = emptySet()
+                                        }
+                                    ) { change, _ ->
+                                        applyDragSelectionAt(change.position.y)
+                                    }
+                                }
                         ) {
                             items(visibleItems, key = { it.id }) { item ->
                                 val activeStoreId = stateValues.activeStoreId
