@@ -2,17 +2,14 @@
 package kz.aita
 
 import app.cash.sqldelight.db.SqlDriver
-import app.cash.sqldelight.driver.worker.WebWorkerDriver
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.engine.js.Js
 import kotlinx.browser.localStorage
 import kotlinx.browser.window
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.datetime.Clock
-import org.w3c.dom.Worker
 
-actual fun getCurrentTimeMillis(): Long = Clock.System.now().toEpochMilliseconds()
+actual fun getCurrentTimeMillis(): Long = kotlin.time.Clock.System.now().toEpochMilliseconds()
 
 private const val browserStoragePrefix = "aita."
 
@@ -67,14 +64,12 @@ actual var getSystemLocaleLanguage: () -> String = {
 
 actual var getPlatformName: () -> String = { "wasmJs" }
 
-private val webWorkerDriver: SqlDriver by lazy {
-    WebWorkerDriver(
-        Worker(js("new URL('@cashapp/sqldelight-sqljs-worker/sqljs.worker.js', import.meta.url).toString()").unsafeCast<String>())
-    )
-}
-
 actual var getSqlDelightDriver: (() -> SqlDriver?)? = {
-    webWorkerDriver
+    // The browser cache bridge still works through localStorage.
+    // SQLDelight's worker driver is intentionally not installed here because
+    // the generated JS/Wasm worker entry is bundler-specific and caused IDE/compiler
+    // errors on the current project setup. Returning null keeps Wasm startup safe.
+    null
 }
 
 actual object LocalAitaLanTransport {

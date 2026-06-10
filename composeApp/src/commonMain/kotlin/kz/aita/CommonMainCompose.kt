@@ -3457,26 +3457,31 @@ fun AppConfiguration.TransactionSelectionScreen(
         val transactionSelectionTabs = remember(
             context.transactionTypeIndex,
             transactionSmartSets,
+            stateValues.stock,
+            stateValues.stockBatches,
             stateValues.appLanguage
         ) {
             buildList {
-                add(TabContent("all", stateValues.stringAll))
-                add(TabContent("quick", stateValues.stringQuick))
-                add(TabContent("in_stock", localizedStringResource(1180, "In stock")))
+                add(TabContent("all", tabLabelWithCount(stateValues.stringAll, stateValues.stock.orEmpty().size)))
+                add(TabContent("quick", tabLabelWithCount(stateValues.stringQuick, stateValues.stock.orEmpty().count { it.isQuickItem })))
+                add(TabContent("in_stock", tabLabelWithCount(localizedStringResource(1180, "In stock"), stateValues.stock.orEmpty().count { item -> itemBatchesForActiveInventoryStore(item).any { it.isSelectableActiveStockBatch() } })))
                 if (transactionSmartSets.freshIds.isNotEmpty()) {
-                    add(TabContent("fresh", localizedStringResource(1310, "Fresh")))
+                    add(TabContent("fresh", tabLabelWithCount(localizedStringResource(1310, "Fresh"), transactionSmartSets.freshIds.size)))
                 }
 
                 if (transactionSmartSets.popularIds.isNotEmpty()) {
-                    add(TabContent("popular", localizedStringResource(713, "Most popular")))
+                    add(TabContent("popular", tabLabelWithCount(localizedStringResource(713, "Most popular"), transactionSmartSets.popularIds.size)))
                 }
 
                 if (transactionSmartSets.recentIds.isNotEmpty()) {
                     add(
                         TabContent(
                             "recent",
-                            if (context.transactionTypeIndex == 1) localizedStringResource(721, "Recently sold")
-                            else localizedStringResource(714, "Recently used")
+                            tabLabelWithCount(
+                                if (context.transactionTypeIndex == 1) localizedStringResource(721, "Recently sold")
+                                else localizedStringResource(714, "Recently used"),
+                                transactionSmartSets.recentIds.size
+                            )
                         )
                     )
                 }
@@ -3484,24 +3489,24 @@ fun AppConfiguration.TransactionSelectionScreen(
                 when (context.transactionTypeIndex) {
                     2 -> {
                         if (transactionSmartSets.restockIds.isNotEmpty()) {
-                            add(TabContent("restock", localizedStringResource(715, "Restock")))
+                            add(TabContent("restock", tabLabelWithCount(localizedStringResource(715, "Restock"), transactionSmartSets.restockIds.size)))
                         }
                         if (transactionSmartSets.lowStockIds.isNotEmpty()) {
-                            add(TabContent("low_stock", localizedStringResource(716, "Low stock")))
+                            add(TabContent("low_stock", tabLabelWithCount(localizedStringResource(716, "Low stock"), transactionSmartSets.lowStockIds.size)))
                         }
                         if (transactionSmartSets.expiringIds.isNotEmpty()) {
-                            add(TabContent("expiring", localizedStringResource(717, "Expiring")))
+                            add(TabContent("expiring", tabLabelWithCount(localizedStringResource(717, "Expiring"), transactionSmartSets.expiringIds.size)))
                         }
                         if (transactionSmartSets.slowMovingIds.isNotEmpty()) {
-                            add(TabContent("slow", localizedStringResource(718, "Slow movers")))
+                            add(TabContent("slow", tabLabelWithCount(localizedStringResource(718, "Slow movers"), transactionSmartSets.slowMovingIds.size)))
                         }
                     }
                     0 -> {
                         if (transactionSmartSets.expiringIds.isNotEmpty()) {
-                            add(TabContent("expiring", localizedStringResource(717, "Expiring")))
+                            add(TabContent("expiring", tabLabelWithCount(localizedStringResource(717, "Expiring"), transactionSmartSets.expiringIds.size)))
                         }
                         if (transactionSmartSets.slowMovingIds.isNotEmpty()) {
-                            add(TabContent("slow", localizedStringResource(718, "Slow movers")))
+                            add(TabContent("slow", tabLabelWithCount(localizedStringResource(718, "Slow movers"), transactionSmartSets.slowMovingIds.size)))
                         }
                     }
                 }
@@ -4037,6 +4042,7 @@ fun AppConfiguration.TransactionScreen() {
             ) {
                 repeat(5) { index ->
                     val cart by getCartState(transactionTypeIndex, index).collectAsState()
+                    val cartDistinctItemCount = cart.distinctBy { it.id }.size
 
                     Row(
                         modifier = Modifier
@@ -4077,15 +4083,14 @@ fun AppConfiguration.TransactionScreen() {
                                     }
                                 }
                             )
-                            .padding(horizontal = 6.dp, vertical = 4.dp),
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
 
                         CpImage(
                             modifier = Modifier
-                                .padding(vertical = stateValues.textFieldIconPadding)
-                                .aspectRatio(1f, matchHeightConstraintsFirst = true),
+                                .size(22.dp),
                             url = if (cart.isEmpty()) stateValues.drawablePathIconAddCart else stateValues.drawablePathIconCart,
                             fallbackRes = Res.drawable._0_0,
                             contentDescription = (index + 1).toString(),
@@ -4105,7 +4110,7 @@ fun AppConfiguration.TransactionScreen() {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Spacer(modifier = Modifier.width(5.dp))
                                 Text(
-                                    text = "(${cart.size})",
+                                    text = "($cartDistinctItemCount)",
                                     color = if (clientId == index) stateValues.AccentTextColor else stateValues.TextColor,
                                     fontSize = stateValues.smallTextSize,
                                     fontWeight = FontWeight.Bold,
@@ -12226,7 +12231,8 @@ private fun AppConfiguration.QuickStockAddBottomSheet(
         StockAddEditTabContent(
             id = "conditions",
             title = localizedStringResource(609, "Conditions"),
-            iconPath = stateValues.drawablePathIconCheck
+            iconPath = stateValues.drawablePathIconCheck,
+            count = draft.conditions.size
         ),
         StockAddEditTabContent(
             id = "prices",
@@ -14170,6 +14176,7 @@ fun AppConfiguration.StockAddEditIdentityPage(
                     placeholder = stateValues.stringSelectCategory,
                     onSelected = { rootId ->
                         onDraftChanged(draft.copy(categoryIds = listOf(rootId)))
+                        rememberLatestStockAddEditCategorySelection(rootId, rootId)
                     }
                 )
 
@@ -14183,6 +14190,7 @@ fun AppConfiguration.StockAddEditIdentityPage(
                         placeholder = localizedStringResource(185, "Select subcategory"),
                         onSelected = { subcategoryId ->
                             onDraftChanged(draft.copy(categoryIds = listOf(subcategoryId)))
+                            rememberLatestStockAddEditCategorySelection(selectedRootId, subcategoryId)
                         }
                     )
                 }
@@ -16368,7 +16376,8 @@ private data class StockAddEditTabContent(
     val id: String,
     val title: String,
     val iconPath: String? = null,
-    val enabled: Boolean = true
+    val enabled: Boolean = true,
+    val count: Int? = null
 )
 
 @Composable
@@ -16386,6 +16395,7 @@ private fun AppConfiguration.StockAddEditTabs(
     ) {
         items(tabs) { tab ->
             val selected = selectedId == tab.id
+            val visibleTitle = tab.count?.let { tabLabelWithCount(tab.title, it) } ?: tab.title
 
             val shape = RoundedCornerShape(stateValues.cornerRadius)
 
@@ -16422,7 +16432,7 @@ private fun AppConfiguration.StockAddEditTabs(
                             .size(18.dp),
                         url = it,
                         fallbackRes = Res.drawable._0_0,
-                        contentDescription = tab.title,
+                        contentDescription = visibleTitle,
                         tintColor = if (selected) stateValues.AccentTextColor else stateValues.TextColor
                     )
 
@@ -16430,7 +16440,7 @@ private fun AppConfiguration.StockAddEditTabs(
                 }
 
                 Text(
-                    text = tab.title,
+                    text = visibleTitle,
                     color = if (selected) stateValues.AccentTextColor else stateValues.TextColor,
                     fontSize = stateValues.textSize,
                     fontWeight = FontWeight.Bold,
@@ -17681,15 +17691,14 @@ private fun AppConfiguration.StockAddEditInfoTab(
                     selectedInitial = selectedRootId ?: rootCategories.first().id,
                     showId = false,
                     showName = true,
-                    search = Triple(stateValues.stringSearchByAnyData, NavigationScreenModel.Stock.AddEditGoodsItem, "stock_category_search")
-                )
-
-                LaunchedEffect(rootCategoryDropdown.selectedId) {
-                    if (selectedRootId != rootCategoryDropdown.selectedId) {
-                        onDraftChanged(draft.copy(categoryIds = listOf(rootCategoryDropdown.selectedId)))
-                        rememberLatestStockAddEditCategorySelection(rootCategoryDropdown.selectedId, rootCategoryDropdown.selectedId)
+                    search = Triple(stateValues.stringSearchByAnyData, NavigationScreenModel.Stock.AddEditGoodsItem, "stock_category_search"),
+                    onSelected = { rootId ->
+                        if (draft.categoryIds.firstOrNull() != rootId) {
+                            onDraftChanged(draft.copy(categoryIds = listOf(rootId)))
+                        }
+                        rememberLatestStockAddEditCategorySelection(rootId, rootId)
                     }
-                }
+                )
 
                 val currentRootId = rootCategoryDropdown.selectedId
                 val visibleSubcategories = allCategories
@@ -17703,7 +17712,7 @@ private fun AppConfiguration.StockAddEditInfoTab(
                         visibleSubcategories.any { it.id == id }
                     }
 
-                    val subcategoryDropdown = dropdownListWidget(
+                    dropdownListWidget(
                         titleText = localizedStringResource(184, "Subcategory"),
                         domains = visibleSubcategories.map { category ->
                             val categoryName = category.name.visibleGoodsCategoryName(stateValues.appLanguage, category.id).toLocalizedSingleMain()
@@ -17722,15 +17731,14 @@ private fun AppConfiguration.StockAddEditInfoTab(
                         selectedInitial = selectedSubcategoryId ?: visibleSubcategories.first().id,
                         showId = false,
                         showName = true,
-                        search = Triple(stateValues.stringSearchByAnyData, NavigationScreenModel.Stock.AddEditGoodsItem, "stock_subcategory_search")
-                    )
-
-                    LaunchedEffect(currentRootId, subcategoryDropdown.selectedId) {
-                        if (draft.categoryIds.firstOrNull() != subcategoryDropdown.selectedId) {
-                            onDraftChanged(draft.copy(categoryIds = listOf(subcategoryDropdown.selectedId)))
-                            rememberLatestStockAddEditCategorySelection(currentRootId, subcategoryDropdown.selectedId)
+                        search = Triple(stateValues.stringSearchByAnyData, NavigationScreenModel.Stock.AddEditGoodsItem, "stock_subcategory_search"),
+                        onSelected = { subcategoryId ->
+                            if (draft.categoryIds.firstOrNull() != subcategoryId) {
+                                onDraftChanged(draft.copy(categoryIds = listOf(subcategoryId)))
+                            }
+                            rememberLatestStockAddEditCategorySelection(currentRootId, subcategoryId)
                         }
-                    }
+                    )
                 }
             }
 
@@ -18586,6 +18594,21 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
     val canPopStockScreen = !Navigation.Stock.isVeryFirstScreen(stateValues.isNarrowScreen)
     val activeStoreForParentStock = stateValues.stores.findStoreOrBranchForUi(stateValues.activeStoreId)
     val canPullFromParentStoreStock = !stateValues.activeStoreId.isNullOrBlank() && !activeStoreForParentStock?.parentStoreId.isNullOrBlank()
+    val stockAddEditGoodsItemIdForCounts = existing?.id.orEmpty()
+    val stockAddEditBatchesCount = stateValues.stockBatches.orEmpty()
+        .count { it.goodsItemId == stockAddEditGoodsItemIdForCounts && it.isActive }
+    val stockAddEditSupplierPricesPayload by supplierGoodsPricesState.payload.collectAsState()
+    val stockAddEditSupplierPricesCount = stockAddEditSupplierPricesPayload.orEmpty()
+        .count { it.goodsItemId == stockAddEditGoodsItemIdForCounts && it.isActive }
+    val stockAddEditSupplierOrdersPayload by supplierOrdersState.payload.collectAsState()
+    val stockAddEditSupplierOrderLinesPayload by supplierOrderLinesState.payload.collectAsState()
+    val stockAddEditSupplierOrdersCount = stockAddEditSupplierOrdersPayload.orEmpty()
+        .count { order ->
+            order.isActive && stockAddEditSupplierOrderLinesPayload.orEmpty().any { line ->
+                line.goodsItemId == stockAddEditGoodsItemIdForCounts && line.orderId == order.id && line.isActive
+            }
+        }
+
     val stockAddEditTrailingIcons = buildList<Triple<String, DrawableResource, () -> Unit>> {
         stockAddEditUndoDraft?.let { previousDraft ->
             add(
@@ -18636,7 +18659,8 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
         StockAddEditTabContent(
             id = "conditions",
             title = localizedStringResource(609, "Conditions"),
-            iconPath = stateValues.drawablePathIconCheck
+            iconPath = stateValues.drawablePathIconCheck,
+            count = draft.conditions.size
         ),
         StockAddEditTabContent(
             id = "prices",
@@ -18646,22 +18670,26 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
         StockAddEditTabContent(
             id = "promos",
             title = localizedStringResource(920, "Promos"),
-            iconPath = stateValues.drawablePathIconPromos
+            iconPath = stateValues.drawablePathIconPromos,
+            count = draft.promotions.size
         ),
         StockAddEditTabContent(
             id = "batches",
             title = localizedStringResource(138, "Batches"),
-            iconPath = stateValues.drawablePathIconStock
+            iconPath = stateValues.drawablePathIconStock,
+            count = stockAddEditBatchesCount
         ),
         StockAddEditTabContent(
             id = "supplier_prices",
             title = localizedStringResource(203, "Supplier prices"),
-            iconPath = stateValues.drawablePathIconSuppliers
+            iconPath = stateValues.drawablePathIconSuppliers,
+            count = existing?.let { stockAddEditSupplierPricesCount }
         ),
         StockAddEditTabContent(
             id = "orders",
             title = localizedStringResource(254, "Orders"),
-            iconPath = stateValues.drawablePathIconTransactionSupply
+            iconPath = stateValues.drawablePathIconTransactionSupply,
+            count = existing?.let { stockAddEditSupplierOrdersCount }
         )
     )
 
@@ -29750,8 +29778,8 @@ fun AppConfiguration.MenuSecurityScreen() {
                 modifier = Modifier.fillMaxWidth(),
                 selectedIndexInitial = selectedSecurityTab,
                 tabs = listOf(
-                    TabContent("sessions", localizedStringResource(1121, "Active sessions")),
-                    TabContent("history", localizedStringResource(1122, "Security history"))
+                    TabContent("sessions", tabLabelWithCount(localizedStringResource(1121, "Active sessions"), sessions.size)),
+                    TabContent("history", tabLabelWithCount(localizedStringResource(1122, "Security history"), history.size))
                 ),
                 unselectedContainerColor = stateValues.BackgroundColor
             )
@@ -30655,6 +30683,7 @@ fun AppConfiguration.MenuSupportScreen() {
     var draftMessage by rememberSaveable { mutableStateOf("") }
     var selectedCategory by rememberSaveable { mutableStateOf("general") }
     var composingNewTicket by rememberSaveable { mutableStateOf(false) }
+    val faqEntries = supportFaqEntries()
 
     val selectedTicket = if (composingNewTicket) null else (
             tickets.firstOrNull { it.id == activeTicketId }
@@ -30693,14 +30722,14 @@ fun AppConfiguration.MenuSupportScreen() {
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
                 .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2),
             tabs = listOf(
-                TabContent("faq", localizedStringResource(814, "FAQ")) { selectedTab = it },
-                TabContent("chat", localizedStringResource(815, "Support chat")) { selectedTab = it }
+                TabContent("faq", tabLabelWithCount(localizedStringResource(814, "FAQ"), faqEntries.size)) { selectedTab = it },
+                TabContent("chat", tabLabelWithCount(localizedStringResource(815, "Support chat"), tickets.size)) { selectedTab = it }
             ),
             selectedIndexInitial = selectedTab
         )
 
         if (selectedTab == "faq") {
-            val allEntries = supportFaqEntries()
+            val allEntries = faqEntries
             val query = faqSearch.trim()
             val filtered = allEntries.filter { entry ->
                 val question = localizedStringResource(entry.questionId, entry.questionFallback)
@@ -30854,16 +30883,14 @@ fun AppConfiguration.MenuSupportScreen() {
                     Spacer(modifier = Modifier.height(stateValues.marginTextField))
                     Text(localizedStringResource(818, "Choose topic"), color = stateValues.TextColor, fontSize = stateValues.smallTextSize, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(6.dp))
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        items(categories, key = { it.first }) { (id, title) ->
-                            actionButton(
-                                text = title,
-                                fillMaxWidthIfTextPresent = false,
-                                enabledColor = if (selectedCategory == id) stateValues.AccentColor else stateValues.DisabledColor,
-                                onClick = { selectedCategory = id }
-                            )
-                        }
-                    }
+                    tabRowWidget(
+                        modifier = Modifier.fillMaxWidth(),
+                        tabs = categories.map { (id, title) ->
+                            TabContent(id, title) { selectedCategory = it }
+                        },
+                        selectedIndexInitial = selectedCategory,
+                        textSize = stateValues.smallTextSize
+                    )
                 }
 
                 LazyColumn(
@@ -31241,8 +31268,8 @@ fun AppConfiguration.MenuCloseDebtScreen() {
                     tabs = listOf(
                         TabContent("pay", localizedStringResource(354, "Pay")) { selectedTab = it },
                         TabContent("edit", localizedStringResource(355, "Edit debt")) { selectedTab = it },
-                        TabContent("plan", localizedStringResource(356, "Payment plan")) { selectedTab = it },
-                        TabContent("history", localizedStringResource(257, "History")) { selectedTab = it }
+                        TabContent("plan", tabLabelWithCount(localizedStringResource(356, "Payment plan"), debtor.plannedPayments.count { !it.completed })) { selectedTab = it },
+                        TabContent("history", tabLabelWithCount(localizedStringResource(257, "History"), debtor.paymentHistory.size + transactions.orEmpty().count { it.id in debtor.transactionIds })) { selectedTab = it }
                     )
                 )
                 selectedTab = tab.id
@@ -38090,7 +38117,8 @@ fun AppConfiguration.dropdownListWidget(
     domains: List<SelectableDomain>,
     selectedInitial: String? = null,
     cornerRadius: Dp = stateValues.cornerRadius,
-    search: Triple<String?, StateHost?, String?>? = null
+    search: Triple<String?, StateHost?, String?>? = null,
+    onSelected: ((String) -> Unit)? = null
 ): DropdownListWidgetContent {
 
     val domainsKey = remember(domains) {
@@ -38258,6 +38286,7 @@ fun AppConfiguration.dropdownListWidget(
                                     showName = showName
                                 ) {
                                     selectedId = domain.id
+                                    onSelected?.invoke(domain.id)
 
                                     isDomainSelectionDropdownExpandedState.targetState =
                                         !isDomainSelectionDropdownExpandedState.targetState

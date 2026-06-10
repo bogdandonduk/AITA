@@ -797,11 +797,7 @@ fun main() {
             title = "AITA",
             icon = painterResource("drawable/app_icon.ico")
         ) {
-            AppConfiguration(
-                content = {
-                    MainScreen()
-                }
-            )
+            AppConfiguration({ MainScreen() })
         }
     }
 }

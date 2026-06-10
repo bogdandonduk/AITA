@@ -10203,22 +10203,25 @@ fun startCloudConnectionHealthMonitor() {
                     syncLocalNetworkOperationsToCloudNow()
                 }
             } else {
-                cancelRealtimeUpdatesSocketAfterReachabilityFailure()
-                markCloudTransportUnavailableForNotifications()
+                val confirmedUnavailable = markCloudTransportUnavailableForNotifications()
 
-                val shouldPostOfflinePopup = hasLocalAccount && (
-                        wasRealtimeConnected ||
-                        wasTransportMarkedReachable ||
-                        !realtimeOfflineNoticePosted
-                )
+                if (confirmedUnavailable) {
+                    cancelRealtimeUpdatesSocketAfterReachabilityFailure()
 
-                if (shouldPostOfflinePopup) {
-                    realtimeOfflineNoticePosted = true
-                    postInAppNotificationNow(
-                        response?.message ?: realtimeDisconnectedMessage(),
-                        NotificationType.Neutral,
-                        transient = true
+                    val shouldPostOfflinePopup = hasLocalAccount && (
+                            wasRealtimeConnected ||
+                            wasTransportMarkedReachable ||
+                            !realtimeOfflineNoticePosted
                     )
+
+                    if (shouldPostOfflinePopup) {
+                        realtimeOfflineNoticePosted = true
+                        postInAppNotificationNow(
+                            response?.message ?: realtimeDisconnectedMessage(),
+                            NotificationType.Neutral,
+                            transient = true
+                        )
+                    }
                 }
             }
 
@@ -10394,14 +10397,13 @@ fun startRealtimeUpdates() {
                 val serverReachable = probeCloudServerReachableForRealtimeFallback()
 
                 if (!serverReachable) {
-                    val shouldPostOfflineNotice = !realtimeOfflineNoticePosted || wasConnected || realtimeUpdatesConnectedState.value
+                    val confirmedUnavailable = markCloudTransportUnavailableForNotifications()
+                    val shouldPostOfflineNotice = confirmedUnavailable &&
+                            (!realtimeOfflineNoticePosted || wasConnected || realtimeUpdatesConnectedState.value)
                     if (shouldPostOfflineNotice) {
                         // The persistent top connection banner represents server outage. Do not create
                         // repeating notification history entries while the same outage continues.
                         realtimeOfflineNoticePosted = true
-                    }
-                    markCloudTransportUnavailableForNotifications()
-                    if (shouldPostOfflineNotice) {
                         postInAppNotification(realtimeDisconnectedMessage(), NotificationType.Neutral, transient = true)
                     }
                 } else {
@@ -10664,6 +10666,15 @@ private var cloudSessionRefreshRequiredForNotifications = false
 @Volatile
 private var cloudSessionRefreshNotificationPostedForCurrentRequirement = false
 
+private const val CLOUD_TRANSPORT_FAILURE_CONFIRMATION_MIN_SIGNALS = 2
+private const val CLOUD_TRANSPORT_FAILURE_CONFIRMATION_WINDOW_MILLIS = 7_000L
+private const val CLOUD_TRANSPORT_FAILURE_SIGNAL_RESET_MILLIS = 20_000L
+
+@Volatile
+private var cloudTransportFailureSignalCount = 0
+@Volatile
+private var cloudTransportFirstFailureSignalAtMillis = 0L
+
 private fun String.normalizedNotificationText(): String =
     trim()
         .lowercase()
@@ -10908,11 +10919,46 @@ private fun recentCloudTransportFailureIsDominant(now: Long = getCurrentTimeMill
             now - lastUnavailable <= CLOUD_CONNECTION_AUTH_REFRESH_SUPPRESSION_AFTER_TRANSPORT_FAILURE_MILLIS
 }
 
-@PublishedApi
-internal fun markCloudTransportUnavailableForNotifications() {
+private fun clearCloudTransportFailureSignalsForNotifications() {
+    cloudTransportFailureSignalCount = 0
+    cloudTransportFirstFailureSignalAtMillis = 0L
+}
+
+private fun recordCloudTransportFailureSignalForNotifications(reason: String = "transport_failure"): Boolean {
     val now = getCurrentTimeMillis()
-    val nextStatus = CLOUD_TRANSPORT_STATUS_UNAVAILABLE
+    val firstSignalAt = cloudTransportFirstFailureSignalAtMillis
+
+    if (firstSignalAt <= 0L || now - firstSignalAt > CLOUD_TRANSPORT_FAILURE_SIGNAL_RESET_MILLIS) {
+        cloudTransportFirstFailureSignalAtMillis = now
+        cloudTransportFailureSignalCount = 1
+    } else {
+        cloudTransportFailureSignalCount = (cloudTransportFailureSignalCount + 1).coerceAtMost(1000)
+    }
+
+    val elapsed = now - cloudTransportFirstFailureSignalAtMillis
+    val confirmed = cloudTransportFailureSignalCount >= CLOUD_TRANSPORT_FAILURE_CONFIRMATION_MIN_SIGNALS ||
+            elapsed >= CLOUD_TRANSPORT_FAILURE_CONFIRMATION_WINDOW_MILLIS
+
+    if (!confirmed) {
+        logCloudConnectionDiagnostic(
+            "transport failure signal held for confirmation reason=$reason " +
+                    "signals=$cloudTransportFailureSignalCount elapsed=${elapsed}ms"
+        )
+    }
+
+    return confirmed
+}
+
+@PublishedApi
+internal fun markCloudTransportUnavailableForNotifications(): Boolean {
+    val now = getCurrentTimeMillis()
     cloudTransportLastUnavailableAtMillis = now
+
+    if (!recordCloudTransportFailureSignalForNotifications()) {
+        return false
+    }
+
+    val nextStatus = CLOUD_TRANSPORT_STATUS_UNAVAILABLE
 
     // A real transport failure is stronger evidence than an old or speculative auth-refresh state.
     // When the device cannot reach the server, the user needs a connection banner, not a session banner.
@@ -10924,9 +10970,10 @@ internal fun markCloudTransportUnavailableForNotifications() {
         cloudTransportFailureNoticePostedForCurrentOutage = false
     }
 
-    setCloudTransportStatusForDiagnostics(nextStatus, "transport_failure")
+    setCloudTransportStatusForDiagnostics(nextStatus, "transport_failure_confirmed")
     cloudTransportReachableForNotifications = false
     cloudTransportRecoveryNotificationPending = false
+    return true
 }
 
 @PublishedApi
@@ -10934,6 +10981,7 @@ internal fun markCloudTransportReachableForNotifications(
     authenticated: Boolean = false,
     authRefreshRequired: Boolean? = null
 ) {
+    clearCloudTransportFailureSignalsForNotifications()
     cloudTransportLastReachableAtMillis = getCurrentTimeMillis()
     val wasUnavailable = !cloudTransportReachableForNotifications ||
             cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_UNAVAILABLE
@@ -11004,7 +11052,7 @@ private fun shouldPostNotificationConsideringCloudTransport(
 
     if (!text.isCloudTransportFailureNotificationText()) return true
 
-    markCloudTransportUnavailableForNotifications()
+    if (!markCloudTransportUnavailableForNotifications()) return false
     if (cloudTransportFailureNotificationPending && !cloudTransportFailureNoticePostedForCurrentOutage) {
         cloudTransportFailureNotificationPending = false
         cloudTransportFailureNoticePostedForCurrentOutage = true
