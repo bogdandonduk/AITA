@@ -1,6 +1,7 @@
 // THIS IS WasmMainCompose.kt - place in composeApp/src/wasmJsMain/kotlin/kz/aita/WasmMainCompose.kt
 package kz.aita
 
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.window.ComposeViewport
 import kotlinx.browser.document
 import kotlinx.browser.window
@@ -51,13 +52,17 @@ private fun installWasmComposePlatformBridges() {
     }
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 fun main() {
     installWasmCommonPlatformBridges()
     installWasmComposePlatformBridges()
 
     ComposeViewport(document.body!!) {
-        AppConfiguration {
-            MainScreen()
-        }
+        AppConfiguration(
+            content = {
+                MainScreen()
+
+            }
+        )
     }
 }
