@@ -387,10 +387,8 @@ fun MainViewController(): UIViewController {
     installIosVoiceInput()
 
     return ComposeUIViewController {
-        AppConfiguration(
-            content = {
-                MainScreen()
-            }
-        )
+        AppConfiguration {
+            MainScreen()
+        }
     }
 }

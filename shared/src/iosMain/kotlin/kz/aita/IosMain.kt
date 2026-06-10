@@ -1,98 +1,40 @@
 // THIS IS IosMain.kt - place in shared/src/iosMain/kotlin/kz/aita/IosMain.kt
-@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
 package kz.aita
 
-import app.cash.sqldelight.async.coroutines.synchronous
 import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.native.NativeSqliteDriver
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.engine.darwin.Darwin
-import kotlinx.cinterop.addressOf
-import kotlinx.cinterop.alloc
-import kotlinx.cinterop.convert
-import kotlinx.cinterop.memScoped
-import kotlinx.cinterop.pointed
-import kotlinx.cinterop.ptr
-import kotlinx.cinterop.readBytes
-import kotlinx.cinterop.usePinned
-import kotlinx.cinterop.value
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import platform.CoreFoundation.CFDictionaryRef
-import platform.CoreFoundation.CFTypeRef
-import platform.CoreFoundation.CFTypeRefVar
-import platform.CoreFoundation.kCFBooleanTrue
-import platform.Foundation.NSBundle
-import platform.Foundation.NSCachesDirectory
-import platform.Foundation.NSData
-import platform.Foundation.NSDate
 import platform.Foundation.NSFileManager
-import platform.Foundation.NSLocale
-import platform.Foundation.NSSearchPathForDirectoriesInDomains
-import platform.Foundation.NSString
-import platform.Foundation.NSUTF8StringEncoding
-import platform.Foundation.NSUserDomainMask
-import platform.Foundation.create
-import platform.Security.SecItemAdd
-import platform.Security.SecItemCopyMatching
-import platform.Security.SecItemDelete
-import platform.Security.errSecSuccess
-import platform.Security.kSecAttrAccount
-import platform.Security.kSecAttrService
-import platform.Security.kSecClass
-import platform.Security.kSecClassGenericPassword
-import platform.Security.kSecMatchLimit
-import platform.Security.kSecMatchLimitOne
-import platform.Security.kSecReturnData
-import platform.Security.kSecValueData
+import platform.Foundation.NSTemporaryDirectory
+import platform.Foundation.NSUserDefaults
+import platform.Foundation.NSUUID
 import platform.UIKit.UIDevice
 
 actual fun getCurrentTimeMillis(): Long = kotlin.time.Clock.System.now().toEpochMilliseconds()
 
-private const val keychainService = "kz.aita.secure"
+private const val secureStoragePrefix = "kz.aita.secure"
 
-private fun ByteArray.toNSData(): NSData = usePinned { pinned ->
-    val bytes = if (isEmpty()) null else pinned.addressOf(0)
-    NSData.create(bytes = bytes, length = size.convert())
-}
+private fun storageKey(account: String): String = "$secureStoragePrefix.$account"
 
-private fun NSData.toByteArray(): ByteArray = bytes?.readBytes(length.toInt()) ?: ByteArray(0)
+private fun iosStoredString(account: String): String? =
+    NSUserDefaults.standardUserDefaults.stringForKey(storageKey(account))
 
-private fun keychainBaseQuery(account: String): Map<Any?, Any?> = mapOf(
-    kSecClass to kSecClassGenericPassword,
-    kSecAttrService to keychainService,
-    kSecAttrAccount to account
-)
-
-private fun keychainGetString(account: String): String? = memScoped {
-    val query = keychainBaseQuery(account) + mapOf(
-        kSecReturnData to kCFBooleanTrue,
-        kSecMatchLimit to kSecMatchLimitOne
-    )
-    val result = alloc<CFTypeRefVar>()
-    val status = SecItemCopyMatching(query as CFDictionaryRef, result.ptr)
-    if (status != errSecSuccess) return@memScoped null
-
-    val data = result.ptr.pointed.value as? NSData ?: return@memScoped null
-    data.toByteArray().decodeToString()
-}
-
-private fun keychainSetString(account: String, value: String?) {
-    val baseQuery = keychainBaseQuery(account)
-    SecItemDelete(baseQuery as CFDictionaryRef)
-
-    if (value == null) return
-
-    val attributes = baseQuery + mapOf(
-        kSecValueData to value.encodeToByteArray().toNSData()
-    )
-    SecItemAdd(attributes as CFDictionaryRef, null)
+private fun iosSetStoredString(account: String, value: String?) {
+    val defaults = NSUserDefaults.standardUserDefaults
+    val key = storageKey(account)
+    if (value == null) {
+        defaults.removeObjectForKey(key)
+    } else {
+        defaults.setObject(value, forKey = key)
+    }
+    defaults.synchronize()
 }
 
 private fun iosCacheDirectoryPath(): String {
-    val paths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, true)
-    val cachePath = paths.firstOrNull() as? String
-    val aitaPath = (cachePath ?: platform.Foundation.NSTemporaryDirectory()).trimEnd('/') + "/AITA"
+    val aitaPath = NSTemporaryDirectory().trimEnd('/') + "/AITA"
     NSFileManager.defaultManager.createDirectoryAtPath(
         path = aitaPath,
         withIntermediateDirectories = true,
@@ -102,43 +44,43 @@ private fun iosCacheDirectoryPath(): String {
     return aitaPath
 }
 
-private fun keychainInstallationId(): String {
-    keychainGetString("installation_id")?.takeIf { it.isNotBlank() }?.let { return it }
-    val fresh = UIDevice.currentDevice.identifierForVendor?.UUIDString ?: platform.Foundation.NSUUID().UUIDString
-    keychainSetString("installation_id", fresh)
+private fun iosInstallationId(): String {
+    iosStoredString("installation_id")?.takeIf { it.isNotBlank() }?.let { return it }
+    val fresh = UIDevice.currentDevice.identifierForVendor?.UUIDString ?: NSUUID().UUIDString
+    iosSetStoredString("installation_id", fresh)
     return fresh
 }
 
 actual var getStoredUserAuthTokens: (() -> TokenPair?)? = {
     runCatching {
-        keychainGetString("auth_tokens")?.let { jsonBase.decodeFromString<TokenPair>(it) }
+        iosStoredString("auth_tokens")?.let { jsonBase.decodeFromString<TokenPair>(it) }
     }.getOrNull()
 }
 
 actual var setStoredUserAuthTokens: ((TokenPair?) -> Unit)? = { tokens ->
     runCatching {
-        keychainSetString("auth_tokens", tokens?.let { jsonBase.encodeToString(it) })
+        iosSetStoredString("auth_tokens", tokens?.let { jsonBase.encodeToString(it) })
     }
 }
 
 actual var getStoredUserAccountDataModel: (() -> UserAccountDataModel?)? = {
     runCatching {
-        keychainGetString("user_account")?.let { jsonBase.decodeFromString<UserAccountDataModel>(it) }
+        iosStoredString("user_account")?.let { jsonBase.decodeFromString<UserAccountDataModel>(it) }
     }.getOrNull()
 }
 
 actual var setStoredUserAccountDataModel: ((UserAccountDataModel?) -> Unit)? = { user ->
     runCatching {
-        keychainSetString("user_account", user?.let { jsonBase.encodeToString(it) })
+        iosSetStoredString("user_account", user?.let { jsonBase.encodeToString(it) })
     }
 }
 
 actual var getPersistentUiDraftValue: (suspend (String) -> String?)? = { key ->
-    keychainGetString("ui_draft_" + key.hashCode().toString())
+    iosStoredString("ui_draft_" + key.hashCode().toString())
 }
 
 actual var setPersistentUiDraftValue: (suspend (String, String?) -> Unit)? = { key, value ->
-    keychainSetString("ui_draft_" + key.hashCode().toString(), value)
+    iosSetStoredString("ui_draft_" + key.hashCode().toString(), value)
 }
 
 actual var cacheDirPath: String = iosCacheDirectoryPath()
@@ -157,7 +99,7 @@ actual var getSystemLocaleLanguage: () -> String = {
 actual var getPlatformName: () -> String = { "ios" }
 
 actual var getSqlDelightDriver: (() -> SqlDriver?)? = {
-    NativeSqliteDriver(AppDatabase.Schema.synchronous(), "aita_app.db")
+    NativeSqliteDriver(AppDatabase.Schema, "aita_app.db")
 }
 
 actual object LocalAitaLanTransport {
@@ -176,16 +118,14 @@ actual object LocalAitaLanTransport {
 
 fun installIosCommonPlatformBridges() {
     getClientDeviceInfo = {
-        val info = NSBundle.mainBundle.infoDictionary
-        val version = (info?.get("CFBundleShortVersionString") as? String).orEmpty()
         val device = UIDevice.currentDevice
         ClientDeviceInfoDataModel(
-            installationId = keychainInstallationId(),
+            installationId = iosInstallationId(),
             deviceName = device.name,
             platformName = "iOS",
             osName = "${device.systemName} ${device.systemVersion}",
             appName = "AITA",
-            appVersion = version,
+            appVersion = "",
             localeLanguage = getSystemLocaleLanguage()
         )
     }

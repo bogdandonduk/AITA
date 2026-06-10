@@ -26125,6 +26125,27 @@
           "value": "Таңдауды тазалау"
         }
       ]
+    },
+    {
+      "id": 1329,
+      "values": [
+        {
+          "language": "main",
+          "value": "PRICE"
+        },
+        {
+          "language": "en",
+          "value": "PRICE"
+        },
+        {
+          "language": "ru",
+          "value": "ЦЕНА"
+        },
+        {
+          "language": "kk",
+          "value": "БАҒА"
+        }
+      ]
     }
   ]
 }

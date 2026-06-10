@@ -54,6 +54,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.compose.ui.text.*
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.*
 import androidx.compose.ui.text.style.TextAlign
@@ -736,6 +737,7 @@ private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallb
     put(1326L, mapOf("main" to "System print dialog", "en" to "System print dialog", "ru" to "Системная печать", "kk" to "Жүйелік басып шығару"))
     put(1327L, mapOf("main" to "Batches", "en" to "Batches", "ru" to "Партии", "kk" to "Партиялар"))
     put(1328L, mapOf("main" to "Clear selection", "en" to "Clear selection", "ru" to "Снять выбор", "kk" to "Таңдауды тазалау"))
+    put(1329L, mapOf("main" to "PRICE", "en" to "PRICE", "ru" to "ЦЕНА", "kk" to "БАҒА"))
 }
 
 
@@ -4030,7 +4032,7 @@ fun AppConfiguration.TransactionScreen() {
 
             Row(
                 modifier = Modifier
-                    .padding(8.dp)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
                     .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.6f)
             ) {
                 repeat(5) { index ->
@@ -4040,7 +4042,7 @@ fun AppConfiguration.TransactionScreen() {
                         modifier = Modifier
                             .weight(1f)
                             .height(38.dp)
-                            .padding(2.dp)
+                            .padding(1.dp)
                             .foregroundTactileShadow(stateValues.cornerRadius, elevated = clientId == index)
                             .clip(RoundedCornerShape(stateValues.cornerRadius))
                             .border(
@@ -9345,8 +9347,8 @@ fun AppConfiguration.StockWarehouseScreen() {
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(stateValues.BackgroundColor)
-                    .padding(horizontal = stateValues.marginTextField, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(horizontal = stateValues.marginTextField, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
                     text = localizedStringResource(512, "Sort by"),
@@ -9578,6 +9580,7 @@ private fun AppConfiguration.stockItemLabelDataForUi(
         itemName = itemName,
         barcode = barcode,
         priceText = priceTextOverride?.takeIf { it.isNotBlank() } ?: defaultPriceText,
+        priceLabel = localizedStringResource(1329, "PRICE"),
         storeName = storeNameOverride?.takeIf { it.isNotBlank() } ?: defaultStoreName.ifBlank { "AITA" },
         unitText = defaultUnitText,
         copies = copies.coerceIn(1, 99),
@@ -9595,7 +9598,7 @@ private fun AppConfiguration.StockWarehouseMetricPill(
     enabled: Boolean = true,
     onFilterSelected: (String) -> Unit = {}
 ) {
-    val shape = RoundedCornerShape(10.dp)
+    val shape = RoundedCornerShape(8.dp)
     val borderColor = when {
         selected -> stateValues.AccentColor
         warning -> stateValues.ErrorColor
@@ -9624,7 +9627,7 @@ private fun AppConfiguration.StockWarehouseMetricPill(
                     Modifier
                 }
             )
-            .padding(horizontal = 14.dp, vertical = 7.dp),
+            .padding(horizontal = 18.dp, vertical = 7.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
@@ -9655,8 +9658,7 @@ private fun AppConfiguration.StockWarehouseInfoTile(
     onFilterSelected: (String) -> Unit,
     onSelectAll: () -> Unit,
     onClearSelection: () -> Unit,
-    onPrintSelected: (() -> Unit)? = null,
-    onRefresh: () -> Unit
+    onPrintSelected: (() -> Unit)? = null
 ) {
     val shape = RoundedCornerShape(stateValues.cornerRadius)
     Row(
@@ -9794,16 +9796,6 @@ private fun AppConfiguration.StockWarehouseInfoTile(
                 fillMaxWidthIfTextPresent = false,
                 confirmationRequired = false,
                 onClick = onClearSelection
-            )
-        } else {
-            actionButton(
-                text = "",
-                iconPath = stateValues.drawablePathIconRefresh,
-                iconRes = stateValues.drawableResIconRefresh.value,
-                iconContentDescription = localizedStringResource(237, "Refresh"),
-                fillMaxWidthIfTextPresent = false,
-                confirmationRequired = false,
-                onClick = onRefresh
             )
         }
     }
@@ -10046,13 +10038,6 @@ fun AppConfiguration.StockWarehouseScreenContent(
                 val pageSize = stateValues.globalAppConfiguration.pagingDefaultPageSize.coerceIn(20, 100)
                 val visibleItems = sortedItems.clientPaged(page, pageSize)
                 val overviewMetrics = stockWarehouseMetricsForUi(unfilteredSortedItems, stateValues.stockBatches.orEmpty())
-                val refreshAction: () -> Unit = {
-                    stateValues.activeStoreId?.let { storeId ->
-                        getStock(storeId)
-                        getStockBatches(storeId)
-                    }
-                    Unit
-                }
 
                 Column(
                     modifier = modifier
@@ -10069,8 +10054,7 @@ fun AppConfiguration.StockWarehouseScreenContent(
                             onFilterSelected = { selectedWarehouseFilterId = it },
                             onSelectAll = { selectAllVisibleStock() },
                             onClearSelection = { clearSelection() },
-                            onPrintSelected = { printSelectedStockLabels() },
-                            onRefresh = refreshAction
+                            onPrintSelected = { printSelectedStockLabels() }
                         )
                     }
 
@@ -11495,6 +11479,142 @@ private fun AppConfiguration.AitaBottomSheet(
 
 
 @Composable
+private fun StockItemBarcodeBars(
+    modifier: Modifier = Modifier,
+    barcode: String
+) {
+    val previewData = remember(barcode) { stockItemLabelBarcodePreviewData(barcode) }
+    val modules = previewData.modules.ifEmpty { listOf(false) }
+
+    Row(
+        modifier = modifier
+            .clipToBounds()
+            .background(Color.White),
+        horizontalArrangement = Arrangement.spacedBy(0.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        modules.forEach { black ->
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .background(if (black) Color.Black else Color.White)
+            )
+        }
+    }
+}
+
+@Composable
+private fun AppConfiguration.StockItemLabelPreviewCard(
+    label: StockItemLabelDataModel,
+    modifier: Modifier = Modifier
+) {
+    val barcodePreview = remember(label.barcode) { stockItemLabelBarcodePreviewData(label.barcode) }
+    val priceText = remember(label.priceText) { stockItemLabelPriceDisplayText(label.priceText) }
+    val shape = RoundedCornerShape(2.dp)
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .aspectRatio(58f / 40f)
+            .clip(shape)
+            .background(Color.White)
+            .border(1.dp, Color.Black, shape)
+    ) {
+        Text(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(start = 8.dp, end = 8.dp, top = 5.dp),
+            text = label.storeName.ifBlank { "AITA" },
+            color = Color.Black,
+            fontSize = 25.sp,
+            lineHeight = 27.sp,
+            fontWeight = FontWeight.Black,
+            fontStyle = FontStyle.Italic,
+            textDecoration = TextDecoration.Underline,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center
+        )
+
+        Text(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.TopStart)
+                .padding(start = 8.dp, end = 8.dp, top = 42.dp),
+            text = label.itemName.ifBlank { localizedStringResource(113, "Unnamed item") },
+            color = Color.Black,
+            fontSize = 26.sp,
+            lineHeight = 28.sp,
+            fontWeight = FontWeight.Normal,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 16.dp, bottom = 8.dp)
+                .width(190.dp)
+                .height(82.dp),
+            verticalArrangement = Arrangement.Bottom
+        ) {
+            StockItemBarcodeBars(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(58.dp),
+                barcode = label.barcode
+            )
+            Text(
+                modifier = Modifier.fillMaxWidth(),
+                text = barcodePreview.humanText,
+                color = Color.Black,
+                fontSize = 15.sp,
+                lineHeight = 16.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Clip
+            )
+        }
+
+        Text(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 54.dp, bottom = 75.dp),
+            text = label.priceLabel.ifBlank { localizedStringResource(1329, "PRICE") },
+            color = Color.Black,
+            fontSize = 15.sp,
+            lineHeight = 16.sp,
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center
+        )
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 6.dp, bottom = 11.dp)
+                .width(182.dp)
+                .height(52.dp)
+                .border(1.dp, Color.Black),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                modifier = Modifier.padding(horizontal = 4.dp),
+                text = priceText,
+                color = Color.Black,
+                fontSize = 33.sp,
+                lineHeight = 35.sp,
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+                overflow = TextOverflow.Clip,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
 private fun AppConfiguration.StockItemLabelPrintBottomSheet(
     goodsItem: GoodsItemDataModel,
     batches: List<GoodsBatchDataModel>,
@@ -11502,27 +11622,38 @@ private fun AppConfiguration.StockItemLabelPrintBottomSheet(
 ) {
     val itemName = goodsItem.name.visibleLocalizedString(stateValues.appLanguage, localizedStringResource(113, "Unnamed item"))
     val sortedBatches = batches.sortedForShelf(goodsItem)
-    val activeBatch = sortedBatches.firstOrNull { it.id == goodsItem.activeShelfBatchId }
+    val defaultBatch = sortedBatches.firstOrNull { it.id == goodsItem.activeShelfBatchId }
         ?: sortedBatches.bestBatchForSale(goodsItem)
+    var selectedBatchId by rememberSaveable(goodsItem.id, sortedBatches.joinToString("|") { it.id }) {
+        mutableStateOf(defaultBatch?.id.orEmpty())
+    }
+    LaunchedEffect(defaultBatch?.id, sortedBatches.joinToString("|") { it.id }) {
+        if (selectedBatchId.isBlank() || sortedBatches.none { it.id == selectedBatchId }) {
+            selectedBatchId = defaultBatch?.id.orEmpty()
+        }
+    }
+    val selectedBatch = sortedBatches.firstOrNull { it.id == selectedBatchId } ?: defaultBatch
     val activeStore = stateValues.stores.findStoreOrBranchForUi(stateValues.activeStoreId ?: goodsItem.storeId)
-    val defaultStoreName = activeStore
+    val officialStoreName = activeStore
         ?.name
         ?.visibleLocalizedString(stateValues.appLanguage, activeStore.publicId.ifBlank { activeStore.id })
         .orEmpty()
+        .ifBlank { "AITA" }
     val price = goodsItem.promotedPriceForTransaction(
         transactionTypeIndex = 0,
         saleMethodId = SALE_METHOD_RETAIL,
         quantityTotal = 1.0,
-        batch = activeBatch
+        batch = selectedBatch
     ).finalPrice
-    val defaultPriceText = listOf(price.price.trim(), price.currency.trim())
+    val officialPriceText = listOf(price.price.trim(), price.currency.trim())
         .filter { it.isNotBlank() && it != "0" }
         .joinToString(" ")
-    val defaultUnitText = activeBatch
+    val defaultUnitText = selectedBatch
         ?.quantity
         ?.immutableUnitName
         ?.visibleLocalizedString(stateValues.appLanguage, goodsItem.measurementUnitId)
         ?: goodsItem.measurementUnitId
+    val priceLabel = localizedStringResource(1329, "PRICE")
     val barcodeOptions = goodsItem.allBarcodeValues()
         .map { it.trim() }
         .filter { it.isNotBlank() }
@@ -11532,9 +11663,17 @@ private fun AppConfiguration.StockItemLabelPrintBottomSheet(
         mutableStateOf(barcodeOptions.firstOrNull().orEmpty())
     }
     var copies by rememberSaveable(goodsItem.id) { mutableStateOf(1) }
-    var priceText by rememberSaveable(goodsItem.id, defaultPriceText) { mutableStateOf(defaultPriceText) }
-    var storeName by rememberSaveable(goodsItem.id, defaultStoreName) { mutableStateOf(defaultStoreName) }
     val coroutineScope = rememberCoroutineScope()
+    val previewLabel = StockItemLabelDataModel(
+        itemName = itemName,
+        barcode = selectedBarcode,
+        priceText = officialPriceText,
+        priceLabel = priceLabel,
+        storeName = officialStoreName,
+        unitText = defaultUnitText,
+        copies = copies,
+        protocol = LABEL_PRINTER_PROTOCOL_AUTO
+    )
 
     AitaBottomSheet(
         title = localizedStringResource(1288, "Print item label"),
@@ -11561,13 +11700,8 @@ private fun AppConfiguration.StockItemLabelPrintBottomSheet(
 
             item {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(stateValues.cornerRadius))
-                        .background(stateValues.BackgroundColor)
-                        .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor, RoundedCornerShape(stateValues.cornerRadius))
-                        .padding(stateValues.marginTextFieldGroup),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
                         text = localizedStringResource(1292, "Label preview"),
@@ -11575,38 +11709,9 @@ private fun AppConfiguration.StockItemLabelPrintBottomSheet(
                         fontSize = stateValues.smallTextSize,
                         fontWeight = FontWeight.Bold
                     )
-                    Text(
-                        text = storeName.ifBlank { defaultStoreName.ifBlank { "AITA" } },
-                        color = stateValues.TextColor,
-                        fontSize = stateValues.smallTextSize,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = itemName,
-                        color = stateValues.TextColor,
-                        fontSize = stateValues.titleTextSize,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    priceText.takeIf { it.isNotBlank() }?.let {
-                        Text(
-                            text = it,
-                            color = stateValues.AccentColor,
-                            fontSize = stateValues.titleTextSize,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    Text(
-                        text = listOfNotNull(
-                            selectedBarcode.takeIf { it.isNotBlank() }?.let { "||||  $it" },
-                            defaultUnitText.takeIf { it.isNotBlank() }
-                        ).joinToString(" • "),
-                        color = stateValues.TextColor,
-                        fontSize = stateValues.textSize,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                    StockItemLabelPreviewCard(
+                        label = previewLabel,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             }
@@ -11648,35 +11753,42 @@ private fun AppConfiguration.StockItemLabelPrintBottomSheet(
                 }
             }
 
-            item {
-                val allowFocus = platformAllowsAutomaticTextFieldFocus()
-                Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
-                    genericTextField(
-                        modifier = Modifier.fillMaxWidth(),
-                        titleText = localizedStringResource(1300, "Price text"),
-                        valueInitial = priceText,
-                        isFocusedInitial = allowFocus,
-                        autoFocus = allowFocus,
-                        showClearButton = true,
-                        onTransformValue = { it.take(40) },
-                        onValueChange = { value, applyChange ->
-                            priceText = value.take(40)
-                            applyChange()
+            if (sortedBatches.size > 1) {
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = localizedStringResource(341, "Batch data"),
+                            color = stateValues.TextColor,
+                            fontSize = stateValues.accentTextSize,
+                            fontWeight = FontWeight.Bold
+                        )
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(horizontal = 2.dp)
+                        ) {
+                            items(sortedBatches, key = { it.id }) { batch ->
+                                val isSelected = batch.id == selectedBatchId
+                                val batchInfo = buildList {
+                                    add(batch.quantity.quantityText(stateValues.appLanguage))
+                                    batch.expirationDateMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let {
+                                        add("${localizedStringResource(234, "Expires")}: $it")
+                                    }
+                                    batch.shelfPosition?.takeIf { it.isNotBlank() }?.let { add(it) }
+                                }.joinToString(" • ")
+                                actionButton(
+                                    text = batchInfo.take(40).ifBlank { batch.id.take(10) },
+                                    enabledColor = if (isSelected) stateValues.AccentColor else stateValues.BackgroundColor,
+                                    textColor = if (isSelected) stateValues.AccentTextColor else stateValues.TextColor,
+                                    iconPath = if (isSelected) stateValues.drawablePathIconCheck else stateValues.drawablePathIconStock,
+                                    iconRes = if (isSelected) stateValues.drawableResIconCheck.value else stateValues.drawableResIconStock.value,
+                                    iconTintColor = if (isSelected) stateValues.AccentTextColor else stateValues.TextColor,
+                                    fillMaxWidthIfTextPresent = false,
+                                    confirmationRequired = false,
+                                    onClick = { selectedBatchId = batch.id }
+                                )
+                            }
                         }
-                    )
-                    genericTextField(
-                        modifier = Modifier.fillMaxWidth(),
-                        titleText = localizedStringResource(1301, "Store name"),
-                        valueInitial = storeName,
-                        isFocusedInitial = false,
-                        autoFocus = false,
-                        showClearButton = true,
-                        onTransformValue = { it.take(40) },
-                        onValueChange = { value, applyChange ->
-                            storeName = value.take(40)
-                            applyChange()
-                        }
-                    )
+                    }
                 }
             }
 
@@ -11734,19 +11846,10 @@ private fun AppConfiguration.StockItemLabelPrintBottomSheet(
                     },
                     confirmationRequired = false,
                     onClick = {
-                        val label = StockItemLabelDataModel(
-                            itemName = itemName,
-                            barcode = selectedBarcode,
-                            priceText = priceText,
-                            storeName = storeName,
-                            unitText = defaultUnitText,
-                            copies = copies,
-                            protocol = LABEL_PRINTER_PROTOCOL_AUTO
-                        )
                         coroutineScope.launch {
                             receiptActionNotification(
                                 printStockItemLabelDocument(
-                                    label = label,
+                                    label = previewLabel.copy(copies = copies.coerceIn(1, 99)),
                                     notConfiguredMessage = localizedStringResource(1269, "Paper document printing is not configured for this platform")
                                 ),
                                 localizedStringResource(1325, "Label opened for printing")
@@ -11758,6 +11861,7 @@ private fun AppConfiguration.StockItemLabelPrintBottomSheet(
         }
     }
 }
+
 
 @Composable
 private fun AppConfiguration.QuickSupplierAddBottomSheet(
@@ -11980,7 +12084,7 @@ private fun AppConfiguration.TransactionSupplySupplierBanner(
     Row(
         modifier = Modifier
             .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
-            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .padding(horizontal = 8.dp, vertical = 2.dp)
             .foregroundTactileShadow(stateValues.cornerRadius, elevated = selectedSupplierId != null)
             .clip(RoundedCornerShape(stateValues.cornerRadius))
             .background(stateValues.BackgroundColor)
@@ -11994,9 +12098,9 @@ private fun AppConfiguration.TransactionSupplySupplierBanner(
                 indication = ripple(color = stateValues.AccentColor),
                 onClick = onSelectSupplier
             )
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 6.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         CpImage(
             modifier = Modifier.size(22.dp),
@@ -25438,6 +25542,7 @@ fun AppConfiguration.MenuWorkersScreen() {
     val myRequestsPayload by myWorkerRequestsState.payload.collectAsState()
     val incomingRequestsPayload by incomingWorkerRequestsState.payload.collectAsState()
     val storeWorkersPayload by storeWorkerMembershipsState.payload.collectAsState()
+    var myWorkSectionTab by rememberSaveable { mutableStateOf("managed") }
 
     LaunchedEffect(activeStoreId) {
         getMyWorkerMemberships()
@@ -25527,90 +25632,90 @@ fun AppConfiguration.MenuWorkersScreen() {
                         }
                     }
 
-                    item {
-                        Text(
-                            text = localizedStringResource(478, "Managed stores"),
-                            color = stateValues.TextColor,
-                            fontSize = stateValues.accentTextSize,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
                     val memberships = myMembershipsPayload.orEmpty()
-                    if (memberships.isEmpty()) {
-                        item { MessageText(modifier = Modifier.fillMaxWidth(), text = localizedStringResource(479, "You are not employed in other stores yet")) }
-                    } else {
-                        items(memberships, key = { it.id }) { worker ->
-                            WorkerMembershipCard(worker = worker, editable = false, showSelfPasswordEditor = true)
+                    val requests = myRequestsPayload.orEmpty()
+                        .filter { it.direction == WORKER_REQUEST_DIRECTION_USER_TO_STORE && it.status == WORKER_REQUEST_STATUS_PENDING }
+
+                    item {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+                                .clip(RoundedCornerShape(stateValues.cornerRadius))
+                                .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor, RoundedCornerShape(stateValues.cornerRadius))
+                                .background(stateValues.BackgroundColor)
+                                .padding(stateValues.marginTextFieldGroup),
+                            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                        ) {
+                            Text(
+                                text = localizedStringResource(472, "My work"),
+                                color = stateValues.TextColor,
+                                fontSize = stateValues.accentTextSize,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            tabRowWidget(
+                                modifier = Modifier.fillMaxWidth(),
+                                tabs = listOf(
+                                    TabContent(
+                                        "managed",
+                                        "${localizedStringResource(478, "Managed stores")} (${memberships.size})"
+                                    ) { myWorkSectionTab = it },
+                                    TabContent(
+                                        "requests",
+                                        "${localizedStringResource(480, "My employment requests")} (${requests.size})"
+                                    ) { myWorkSectionTab = it }
+                                ),
+                                selectedIndexInitial = myWorkSectionTab,
+                                textSize = stateValues.smallTextSize
+                            )
                         }
                     }
 
-
-                    item {
-                        Text(
-                            text = localizedStringResource(480, "My employment requests"),
-                            color = stateValues.TextColor,
-                            fontSize = stateValues.accentTextSize,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(top = stateValues.marginTextFieldGroup)
-                        )
-                    }
-
-                    val requests = myRequestsPayload.orEmpty().filter { it.direction == WORKER_REQUEST_DIRECTION_USER_TO_STORE && it.status == WORKER_REQUEST_STATUS_PENDING }
-                    if (requests.isEmpty()) {
-                        item { MessageText(modifier = Modifier.fillMaxWidth(), text = localizedStringResource(1117, "No pending employment requests")) }
-                    } else {
-                        items(requests, key = { it.id }) { request ->
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
-                                    .clip(RoundedCornerShape(stateValues.cornerRadius))
-                                    .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor, RoundedCornerShape(stateValues.cornerRadius))
-                                    .background(stateValues.BackgroundColor)
-                                    .padding(stateValues.marginTextFieldGroup)
-                            ) {
-                                Text(
-                                    text = request.storeName.extractLocalizedString(stateValues.appLanguage).orEmpty().ifBlank { request.storeId },
-                                    color = stateValues.TextColor,
-                                    fontSize = stateValues.accentTextSize,
-                                    fontWeight = FontWeight.Bold
-                                )
-
-                                Text(
-                                    text = "${localizedStringResource(482, "Status")}: ${workerRequestStatusLabel(request)}",
-                                    color = stateValues.TextColor,
-                                    fontSize = stateValues.textSize
-                                )
-
-                                Text(
-                                    text = receiptUiDateTime(request.requestedAtMillis),
-                                    color = stateValues.PlaceholderTextColor,
-                                    fontSize = stateValues.smallTextSize
-                                )
-
-                                if (request.direction == WORKER_REQUEST_DIRECTION_STORE_TO_USER && request.status == WORKER_REQUEST_STATUS_INVITED) {
-                                    Spacer(modifier = Modifier.height(stateValues.marginTextField))
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                    when (myWorkSectionTab) {
+                        "requests" -> {
+                            if (requests.isEmpty()) {
+                                item { MessageText(modifier = Modifier.fillMaxWidth(), text = localizedStringResource(1117, "No pending employment requests")) }
+                            } else {
+                                items(requests, key = { it.id }) { request ->
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+                                            .clip(RoundedCornerShape(stateValues.cornerRadius))
+                                            .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor, RoundedCornerShape(stateValues.cornerRadius))
+                                            .background(stateValues.BackgroundColor)
+                                            .padding(stateValues.marginTextFieldGroup)
                                     ) {
-                                        actionButton(
-                                            modifier = Modifier.weight(1f),
-                                            text = localizedStringResource(510, "Accept invite"),
-                                            iconPath = stateValues.drawablePathIconCheck,
-                                            confirmationRequired = false,
-                                            onClick = { acceptMyStoreWorkerInvitation(request.id) }
+                                        Text(
+                                            text = request.storeName.extractLocalizedString(stateValues.appLanguage).orEmpty().ifBlank { request.storeId },
+                                            color = stateValues.TextColor,
+                                            fontSize = stateValues.accentTextSize,
+                                            fontWeight = FontWeight.Bold
                                         )
-                                        actionButton(
-                                            modifier = Modifier.weight(1f),
-                                            text = localizedStringResource(511, "Decline invite"),
-                                            enabledColor = stateValues.ErrorColor,
-                                            iconPath = stateValues.drawablePathIconCancel,
-                                            confirmationRequired = true,
-                                            onClick = { declineMyStoreWorkerInvitation(request.id) }
+
+                                        Text(
+                                            text = "${localizedStringResource(482, "Status")}: ${workerRequestStatusLabel(request)}",
+                                            color = stateValues.TextColor,
+                                            fontSize = stateValues.textSize
+                                        )
+
+                                        Text(
+                                            text = receiptUiDateTime(request.requestedAtMillis),
+                                            color = stateValues.PlaceholderTextColor,
+                                            fontSize = stateValues.smallTextSize
                                         )
                                     }
+                                }
+                            }
+                        }
+
+                        else -> {
+                            if (memberships.isEmpty()) {
+                                item { MessageText(modifier = Modifier.fillMaxWidth(), text = localizedStringResource(479, "You are not employed in other stores yet")) }
+                            } else {
+                                items(memberships, key = { it.id }) { worker ->
+                                    WorkerMembershipCard(worker = worker, editable = false, showSelfPasswordEditor = true)
                                 }
                             }
                         }
@@ -28022,8 +28127,8 @@ fun AppConfiguration.MenuSuppliersScreen() {
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(stateValues.BackgroundColor)
-                    .padding(horizontal = stateValues.marginTextField, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(horizontal = stateValues.marginTextField, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
                     text = localizedStringResource(512, "Sort by"),
@@ -30853,8 +30958,8 @@ fun AppConfiguration.MenuDebtorsScreen() {
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(stateValues.BackgroundColor)
-                    .padding(horizontal = stateValues.marginTextField, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(horizontal = stateValues.marginTextField, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
                     text = localizedStringResource(512, "Sort by"),
@@ -36272,7 +36377,7 @@ fun AppConfiguration.GoodsItemInStockWidget(
             .fillMaxWidth()
             .heightIn(min = stateValues.textFieldHeight * 1.25f)
             .then(
-                if (selectionMode) Modifier else Modifier.foregroundTactileShadow(stateValues.cornerRadius, elevated = selected)
+                if (selectionMode || selected) Modifier else Modifier.foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
             )
             .clip(cardShape)
             .background(cardBackgroundColor)
