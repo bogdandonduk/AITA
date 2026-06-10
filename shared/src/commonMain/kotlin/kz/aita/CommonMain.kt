@@ -1189,11 +1189,16 @@ private fun String.stickyShelfTagPriceText(): String {
         .filter { char -> char.isDigit() || char == '.' || char == ',' }
         .replace('.', ',')
         .trim(',')
-    return if (numeric.isNotBlank()) {
-        if (numeric.contains(',')) numeric else "$numeric,"
-    } else {
-        clean.ifBlank { "—" }
-    }
+
+    if (numeric.isBlank()) return clean.ifBlank { "—" }
+
+    val pieces = numeric.split(',', limit = 2)
+    val whole = pieces.getOrNull(0).orEmpty().trimStart('0').ifBlank { "0" }
+    val fractionRaw = pieces.getOrNull(1).orEmpty().filter { it.isDigit() }
+    if (fractionRaw.isBlank() || fractionRaw.all { it == '0' }) return whole
+
+    val fraction = fractionRaw.padEnd(2, '0').take(2)
+    return "$whole,$fraction"
 }
 
 fun StockItemLabelDataModel.stockItemLabelDocumentFileName(): String {
@@ -4699,7 +4704,7 @@ const val CLOUD_TRANSPORT_STATUS_UNAVAILABLE = -1
 @PublishedApi
 internal const val REALTIME_ACCESS_TOKEN_REFRESH_SKEW_MILLIS = 60_000L
 
-private const val DEFAULT_AITA_SERVER_URL = "http://192.168.1.51:8080"
+private const val DEFAULT_AITA_SERVER_URL = "http://10.202.10.147:8080"
 private val DEFAULT_AITA_SERVER_URL_PAIR = Pair(DEFAULT_AITA_SERVER_URL, "1")
 @Volatile
 private var currentNetworkRequestCandidateServerUrlsMemory: List<String> = emptyList()

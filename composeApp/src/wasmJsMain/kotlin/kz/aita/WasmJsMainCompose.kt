@@ -61,7 +61,6 @@ fun main() {
         AppConfiguration(
             content = {
                 MainScreen()
-
             }
         )
     }

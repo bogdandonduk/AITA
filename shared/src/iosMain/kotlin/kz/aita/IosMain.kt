@@ -1,8 +1,8 @@
 // THIS IS IosMain.kt - place in shared/src/iosMain/kotlin/kz/aita/IosMain.kt
+@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
 package kz.aita
 
 import app.cash.sqldelight.db.SqlDriver
-import app.cash.sqldelight.driver.native.NativeSqliteDriver
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.engine.darwin.Darwin
 import kotlinx.coroutines.CoroutineDispatcher
@@ -99,7 +99,7 @@ actual var getSystemLocaleLanguage: () -> String = {
 actual var getPlatformName: () -> String = { "ios" }
 
 actual var getSqlDelightDriver: (() -> SqlDriver?)? = {
-    NativeSqliteDriver(AppDatabase.Schema, "aita_app.db")
+    null
 }
 
 actual object LocalAitaLanTransport {
