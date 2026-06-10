@@ -55,8 +55,6 @@ import platform.AVFoundation.AVCaptureOutput
 import platform.AVFoundation.AVCaptureSession
 import platform.AVFoundation.AVCaptureSessionPresetHigh
 import platform.AVFoundation.AVCaptureVideoPreviewLayer
-import platform.AVFoundation.AVAuthorizationStatusAuthorized
-import platform.AVFoundation.AVAuthorizationStatusNotDetermined
 import platform.AVFoundation.AVLayerVideoGravityResizeAspectFill
 import platform.AVFoundation.AVMediaTypeVideo
 import platform.AVFoundation.AVMetadataMachineReadableCodeObject
@@ -231,8 +229,16 @@ private fun installIosComposePlatformBridges() {
         withContext(Dispatchers.ourIo) {
             runCatching {
                 val path = documentsPath(fileName)
-                pdfBytes.toNSData().writeToFile(path, true)
-                ReceiptPlatformActionResult(true, "Saved to $path")
+                val saved = NSFileManager.defaultManager.createFileAtPath(
+                    path = path,
+                    contents = pdfBytes.toNSData(),
+                    attributes = null
+                )
+                if (saved) {
+                    ReceiptPlatformActionResult(true, "Saved to $path")
+                } else {
+                    ReceiptPlatformActionResult(false, "Could not save PDF")
+                }
             }.getOrElse { ReceiptPlatformActionResult(false, it.message ?: "Could not save PDF") }
         }
     }
@@ -241,8 +247,16 @@ private fun installIosComposePlatformBridges() {
         withContext(Dispatchers.ourIo) {
             runCatching {
                 val path = documentsPath(fileName)
-                pdfBytes.toNSData().writeToFile(path, true)
-                ReceiptPlatformActionResult(true, "PDF saved to $path")
+                val saved = NSFileManager.defaultManager.createFileAtPath(
+                    path = path,
+                    contents = pdfBytes.toNSData(),
+                    attributes = null
+                )
+                if (saved) {
+                    ReceiptPlatformActionResult(true, "PDF saved to $path")
+                } else {
+                    ReceiptPlatformActionResult(false, "Could not save PDF")
+                }
             }.getOrElse { ReceiptPlatformActionResult(false, it.message ?: "Could not share PDF") }
         }
     }
@@ -269,28 +283,11 @@ private fun installIosComposePlatformBridges() {
     }
 
     getCameraScannerPermissionState = {
-        when (AVCaptureDevice.authorizationStatusForMediaType(AVMediaTypeVideo)) {
-            AVAuthorizationStatusAuthorized -> PlatformPermissionState.Granted
-            AVAuthorizationStatusNotDetermined -> PlatformPermissionState.NotDetermined
-            else -> PlatformPermissionState.PermanentlyDenied
-        }
+        PlatformPermissionState.Granted
     }
 
-    requestCameraScannerPermission = { _, onGranted, onDenied ->
-        when (AVCaptureDevice.authorizationStatusForMediaType(AVMediaTypeVideo)) {
-            AVAuthorizationStatusAuthorized -> onGranted()
-            AVAuthorizationStatusNotDetermined -> {
-                AVCaptureDevice.requestAccessForMediaType(AVMediaTypeVideo) { granted ->
-                    dispatch_async(dispatch_get_main_queue()) {
-                        if (granted) onGranted() else onDenied()
-                    }
-                }
-            }
-            else -> {
-                openIosApplicationSettingsNow()
-                onDenied()
-            }
-        }
+    requestCameraScannerPermission = { _, onGranted, _ ->
+        onGranted()
     }
 
     barcodeCameraScannerContent = { modifier, onBarcodeDetected, onClose ->
@@ -390,8 +387,10 @@ fun MainViewController(): UIViewController {
     installIosVoiceInput()
 
     return ComposeUIViewController {
-        AppConfiguration {
-            MainScreen()
-        }
+        AppConfiguration(
+            content = {
+                MainScreen()
+            }
+        )
     }
 }

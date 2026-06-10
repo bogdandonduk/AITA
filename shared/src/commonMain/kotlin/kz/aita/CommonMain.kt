@@ -1156,6 +1156,27 @@ private fun htmlEscape(value: String): String = value
     .replace("\"", "&quot;")
     .replace("'", "&#39;")
 
+private fun BarcodeLineRenderDataModel.stickyTagHumanText(): String =
+    if (kind == "EAN-13" && humanText.length == 13 && humanText.all { it.isDigit() }) {
+        "${humanText[0]} ${humanText.substring(1, 7)} ${humanText.substring(7, 13)}"
+    } else {
+        humanText
+    }
+
+private fun String.stickyShelfTagPriceText(): String {
+    val clean = labelDocumentSafeText(32)
+    val numeric = clean
+        .takeWhile { char -> char.isDigit() || char == '.' || char == ',' || char.isWhitespace() }
+        .filter { char -> char.isDigit() || char == '.' || char == ',' }
+        .replace('.', ',')
+        .trim(',')
+    return if (numeric.isNotBlank()) {
+        if (numeric.contains(',')) numeric else "$numeric,"
+    } else {
+        clean.ifBlank { "—" }
+    }
+}
+
 fun StockItemLabelDataModel.stockItemLabelDocumentFileName(): String {
     val token = barcode.normalizedBarcodeToken().ifBlank { itemName.normalizedBarcodeToken() }.ifBlank { "label" }
     return "aita_item_label_${token.take(32)}.pdf"
@@ -1176,6 +1197,8 @@ private fun StockItemLabelDataModel.cleanedForDocument(): StockItemLabelDataMode
 fun StockItemLabelDataModel.buildStockItemLabelHtml(): String {
     val label = cleanedForDocument()
     val barcodeRender = buildBarcodeLineRenderData(label.barcode)
+    val barcodeDigits = barcodeRender.stickyTagHumanText()
+    val priceForTag = label.priceText.stickyShelfTagPriceText()
     val bars = barcodeRender.modules.joinToString(separator = "") { black ->
         if (black) "<span class=\"m b\"></span>" else "<span class=\"m\"></span>"
     }
@@ -1184,18 +1207,12 @@ fun StockItemLabelDataModel.buildStockItemLabelHtml(): String {
         <section class="label">
           <div class="store">${htmlEscape(label.storeName)}</div>
           <div class="name">${htmlEscape(label.itemName)}</div>
-          <div class="bottom">
-            <div class="barcodeBox">
-              <div class="barcode">$bars</div>
-              <div class="digits">${htmlEscape(barcodeRender.humanText)}</div>
-            </div>
-            <div class="priceBox">
-              <div class="priceTitle">ЦЕНА</div>
-              <div class="price">${htmlEscape(label.priceText.ifBlank { "—" })}</div>
-            </div>
+          <div class="barcodeBox">
+            <div class="barcode">$bars</div>
+            <div class="digits">${htmlEscape(barcodeDigits)}</div>
           </div>
-          ${label.unitText.takeIf { it.isNotBlank() }?.let { "<div class=\"unit\">${htmlEscape(it)}</div>" }.orEmpty()}
-          ${label.note.takeIf { it.isNotBlank() }?.let { "<div class=\"note\">${htmlEscape(it)}</div>" }.orEmpty()}
+          <div class="priceTitle">ЦЕНА</div>
+          <div class="priceBox"><div class="price">${htmlEscape(priceForTag)}</div></div>
         </section>
         """ + if (copyIndex == label.copies) "" else "<div class=\"pageBreak\"></div>"
     }
@@ -1210,19 +1227,17 @@ fun StockItemLabelDataModel.buildStockItemLabelHtml(): String {
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: #ffffff; }
   body { font-family: Arial, Helvetica, system-ui, sans-serif; color: #050505; }
-  .label { width: ${label.labelWidthMm}mm; height: ${label.labelHeightMm}mm; padding: 2.2mm 2.0mm 1.4mm 2.0mm; overflow: hidden; border: 0.35mm solid #111; background: #fff; }
-  .store { text-align: center; font-style: italic; font-weight: 800; text-decoration: underline; font-size: 4.2mm; line-height: 4.8mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .name { margin-top: 1.6mm; font-size: 4.0mm; line-height: 4.7mm; font-weight: 600; height: 9.4mm; overflow: hidden; }
-  .bottom { margin-top: 1.8mm; display: flex; align-items: flex-end; gap: 2.0mm; }
-  .barcodeBox { flex: 1 1 auto; min-width: 0; }
-  .barcode { height: 14.5mm; display: flex; align-items: stretch; background: #fff; overflow: hidden; }
+  .label { position: relative; width: ${label.labelWidthMm}mm; height: ${label.labelHeightMm}mm; padding: 0; overflow: hidden; background: #fff; }
+  .store { position: absolute; top: 1.1mm; left: 2.0mm; right: 2.0mm; text-align: center; font-style: italic; font-weight: 900; text-decoration-line: underline; text-decoration-thickness: 0.35mm; text-underline-offset: 0.55mm; font-size: 5.8mm; line-height: 6.4mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .name { position: absolute; top: 9.6mm; left: 1.2mm; right: 1.0mm; height: 13.0mm; font-size: 5.25mm; line-height: 5.9mm; font-weight: 400; overflow: hidden; }
+  .barcodeBox { position: absolute; left: 3.0mm; bottom: 2.1mm; width: 25.8mm; height: 14.2mm; }
+  .barcode { position: absolute; top: 0; left: 0; right: 0; height: 11.9mm; display: flex; align-items: stretch; background: #fff; overflow: hidden; }
   .m { flex: 1 1 0; min-width: 0; }
   .b { background: #000; }
-  .digits { font-family: "Courier New", monospace; font-size: 2.6mm; line-height: 3.0mm; letter-spacing: 0.05mm; white-space: nowrap; overflow: hidden; text-overflow: clip; }
-  .priceBox { flex: 0 0 27mm; border: 0.35mm solid #111; min-height: 13mm; padding: 1mm 1.3mm 0.6mm; text-align: center; }
-  .priceTitle { font-size: 2.7mm; line-height: 3.0mm; font-weight: 800; }
-  .price { font-size: 7.0mm; line-height: 7.7mm; font-weight: 900; letter-spacing: 0.15mm; white-space: nowrap; overflow: hidden; text-overflow: clip; }
-  .unit, .note { margin-top: 0.5mm; font-size: 2.2mm; line-height: 2.5mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .digits { position: absolute; left: -1.7mm; right: -1.2mm; bottom: -0.1mm; font-family: Arial, Helvetica, sans-serif; font-size: 2.8mm; line-height: 3.0mm; letter-spacing: -0.15mm; white-space: pre; overflow: hidden; color: #000; }
+  .priceTitle { position: absolute; left: 31.3mm; right: 0.8mm; bottom: 15.2mm; text-align: center; font-size: 2.9mm; line-height: 3.2mm; font-weight: 900; }
+  .priceBox { position: absolute; left: 29.7mm; right: 0.7mm; bottom: 3.6mm; height: 9.6mm; border: 0.35mm solid #111; display: flex; align-items: center; justify-content: center; padding: 0 1.0mm; }
+  .price { font-size: 7.9mm; line-height: 8.6mm; font-weight: 900; letter-spacing: 0.12mm; white-space: nowrap; overflow: hidden; text-overflow: clip; }
   .pageBreak { break-after: page; page-break-after: always; }
 </style>
 </head>
@@ -1257,6 +1272,8 @@ private fun List<StockItemLabelDataModel>.stockItemLabelsSheetDocumentFileName()
 private fun StockItemLabelDataModel.buildStockItemLabelSheetSectionHtml(): String {
     val label = cleanedForDocument().copy(copies = 1)
     val barcodeRender = buildBarcodeLineRenderData(label.barcode)
+    val barcodeDigits = barcodeRender.stickyTagHumanText()
+    val priceForTag = label.priceText.stickyShelfTagPriceText()
     val bars = barcodeRender.modules.joinToString(separator = "") { black ->
         if (black) "<span class=\"m b\"></span>" else "<span class=\"m\"></span>"
     }
@@ -1264,18 +1281,12 @@ private fun StockItemLabelDataModel.buildStockItemLabelSheetSectionHtml(): Strin
     <section class="label">
       <div class="store">${htmlEscape(label.storeName)}</div>
       <div class="name">${htmlEscape(label.itemName)}</div>
-      <div class="bottom">
-        <div class="barcodeBox">
-          <div class="barcode">$bars</div>
-          <div class="digits">${htmlEscape(barcodeRender.humanText)}</div>
-        </div>
-        <div class="priceBox">
-          <div class="priceTitle">ЦЕНА</div>
-          <div class="price">${htmlEscape(label.priceText.ifBlank { "—" })}</div>
-        </div>
+      <div class="barcodeBox">
+        <div class="barcode">$bars</div>
+        <div class="digits">${htmlEscape(barcodeDigits)}</div>
       </div>
-      ${label.unitText.takeIf { it.isNotBlank() }?.let { "<div class=\"unit\">${htmlEscape(it)}</div>" }.orEmpty()}
-      ${label.note.takeIf { it.isNotBlank() }?.let { "<div class=\"note\">${htmlEscape(it)}</div>" }.orEmpty()}
+      <div class="priceTitle">ЦЕНА</div>
+      <div class="priceBox"><div class="price">${htmlEscape(priceForTag)}</div></div>
     </section>
     """.trimIndent()
 }
@@ -1296,19 +1307,17 @@ fun List<StockItemLabelDataModel>.buildStockItemLabelsSheetHtml(): String {
   html, body { margin: 0; padding: 0; background: #ffffff; }
   body { font-family: Arial, Helvetica, system-ui, sans-serif; color: #050505; }
   .sheet { display: grid; grid-template-columns: repeat(3, 58mm); gap: 4mm; align-content: start; }
-  .label { width: 58mm; height: 40mm; padding: 2.2mm 2.0mm 1.4mm 2.0mm; overflow: hidden; border: 0.35mm solid #111; background: #fff; break-inside: avoid; page-break-inside: avoid; }
-  .store { text-align: center; font-style: italic; font-weight: 800; text-decoration: underline; font-size: 4.2mm; line-height: 4.8mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .name { margin-top: 1.6mm; font-size: 4.0mm; line-height: 4.7mm; font-weight: 600; height: 9.4mm; overflow: hidden; }
-  .bottom { margin-top: 1.8mm; display: flex; align-items: flex-end; gap: 2.0mm; }
-  .barcodeBox { flex: 1 1 auto; min-width: 0; }
-  .barcode { height: 14.5mm; display: flex; align-items: stretch; background: #fff; overflow: hidden; }
+  .label { position: relative; width: 58mm; height: 40mm; padding: 0; overflow: hidden; background: #fff; break-inside: avoid; page-break-inside: avoid; }
+  .store { position: absolute; top: 1.1mm; left: 2.0mm; right: 2.0mm; text-align: center; font-style: italic; font-weight: 900; text-decoration-line: underline; text-decoration-thickness: 0.35mm; text-underline-offset: 0.55mm; font-size: 5.8mm; line-height: 6.4mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .name { position: absolute; top: 9.6mm; left: 1.2mm; right: 1.0mm; height: 13.0mm; font-size: 5.25mm; line-height: 5.9mm; font-weight: 400; overflow: hidden; }
+  .barcodeBox { position: absolute; left: 3.0mm; bottom: 2.1mm; width: 25.8mm; height: 14.2mm; }
+  .barcode { position: absolute; top: 0; left: 0; right: 0; height: 11.9mm; display: flex; align-items: stretch; background: #fff; overflow: hidden; }
   .m { flex: 1 1 0; min-width: 0; }
   .b { background: #000; }
-  .digits { font-family: "Courier New", monospace; font-size: 2.6mm; line-height: 3.0mm; letter-spacing: 0.05mm; white-space: nowrap; overflow: hidden; text-overflow: clip; }
-  .priceBox { flex: 0 0 27mm; border: 0.35mm solid #111; min-height: 13mm; padding: 1mm 1.3mm 0.6mm; text-align: center; }
-  .priceTitle { font-size: 2.7mm; line-height: 3.0mm; font-weight: 800; }
-  .price { font-size: 7.0mm; line-height: 7.7mm; font-weight: 900; letter-spacing: 0.15mm; white-space: nowrap; overflow: hidden; text-overflow: clip; }
-  .unit, .note { margin-top: 0.5mm; font-size: 2.2mm; line-height: 2.5mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .digits { position: absolute; left: -1.7mm; right: -1.2mm; bottom: -0.1mm; font-family: Arial, Helvetica, sans-serif; font-size: 2.8mm; line-height: 3.0mm; letter-spacing: -0.15mm; white-space: pre; overflow: hidden; color: #000; }
+  .priceTitle { position: absolute; left: 31.3mm; right: 0.8mm; bottom: 15.2mm; text-align: center; font-size: 2.9mm; line-height: 3.2mm; font-weight: 900; }
+  .priceBox { position: absolute; left: 29.7mm; right: 0.7mm; bottom: 3.6mm; height: 9.6mm; border: 0.35mm solid #111; display: flex; align-items: center; justify-content: center; padding: 0 1.0mm; }
+  .price { font-size: 7.9mm; line-height: 8.6mm; font-weight: 900; letter-spacing: 0.12mm; white-space: nowrap; overflow: hidden; text-overflow: clip; }
 </style>
 </head>
 <body>
@@ -1330,32 +1339,33 @@ private fun Double.pdfNumber(): String {
 
 private fun buildStockItemLabelPdfContent(label: StockItemLabelDataModel, pageWidth: Double, pageHeight: Double): String {
     val barcodeRender = buildBarcodeLineRenderData(label.barcode)
-    val barcodeX = 8.0
-    val barcodeY = 9.0
-    val barcodeW = pageWidth * 0.48
-    val barcodeH = pageHeight * 0.36
-    val priceX = pageWidth * 0.56
-    val priceY = 11.0
-    val priceW = pageWidth - priceX - 6.0
-    val priceH = pageHeight * 0.27
+    val humanDigits = barcodeRender.stickyTagHumanText()
+    val priceForTag = label.priceText.stickyShelfTagPriceText()
+    val barcodeX = pageWidth * 0.052
+    val barcodeY = pageHeight * 0.052
+    val barcodeW = pageWidth * 0.445
+    val barcodeH = pageHeight * 0.298
+    val priceX = pageWidth * 0.512
+    val priceY = pageHeight * 0.09
+    val priceW = pageWidth - priceX - pageWidth * 0.012
+    val priceH = pageHeight * 0.24
     val moduleW = (barcodeW / barcodeRender.modules.size.coerceAtLeast(1)).coerceAtLeast(0.18)
     return buildString {
         append("0 g 0 G\n")
-        append("0.8 w 1 1 ${(pageWidth - 2).pdfNumber()} ${(pageHeight - 2).pdfNumber()} re S\n")
-        append("BT /F3 14 Tf 1 0 0 1 12 ${(pageHeight - 18).pdfNumber()} Tm (${pdfEscape(label.storeName)}) Tj ET\n")
-        append("BT /F2 13 Tf 1 0 0 1 8 ${(pageHeight - 38).pdfNumber()} Tm (${pdfEscape(label.itemName)}) Tj ET\n")
+        append("BT /F3 24 Tf 1 0 0 1 ${(pageWidth * 0.22).pdfNumber()} ${(pageHeight - 25).pdfNumber()} Tm (${pdfEscape(label.storeName)}) Tj ET\n")
+        append("0.7 w ${(pageWidth * 0.21).pdfNumber()} ${(pageHeight - 29).pdfNumber()} ${(pageWidth * 0.58).pdfNumber()} 0 l S\n")
+        append("BT /F1 23 Tf 1 0 0 1 ${(pageWidth * 0.02).pdfNumber()} ${(pageHeight - 62).pdfNumber()} Tm (${pdfEscape(label.itemName)}) Tj ET\n")
         append("0 g\n")
         barcodeRender.modules.forEachIndexed { index, black ->
             if (black) {
                 val x = barcodeX + index * moduleW
-                append("${x.pdfNumber()} ${barcodeY.pdfNumber()} ${(moduleW + 0.02).pdfNumber()} ${barcodeH.pdfNumber()} re f\n")
+                append("${x.pdfNumber()} ${(barcodeY + 8.0).pdfNumber()} ${(moduleW + 0.03).pdfNumber()} ${barcodeH.pdfNumber()} re f\n")
             }
         }
-        append("BT /F1 8 Tf 1 0 0 1 ${barcodeX.pdfNumber()} ${(barcodeY - 8).pdfNumber()} Tm (${pdfEscape(barcodeRender.humanText)}) Tj ET\n")
+        append("BT /F1 8 Tf 1 0 0 1 ${(barcodeX - 5.0).pdfNumber()} ${barcodeY.pdfNumber()} Tm (${pdfEscape(humanDigits)}) Tj ET\n")
+        append("BT /F2 10 Tf 1 0 0 1 ${(priceX + priceW * 0.33).pdfNumber()} ${(priceY + priceH + 9.0).pdfNumber()} Tm (${pdfEscape("ЦЕНА")}) Tj ET\n")
         append("1.0 w ${priceX.pdfNumber()} ${priceY.pdfNumber()} ${priceW.pdfNumber()} ${priceH.pdfNumber()} re S\n")
-        append("BT /F2 8 Tf 1 0 0 1 ${(priceX + 20).pdfNumber()} ${(priceY + priceH - 9).pdfNumber()} Tm (PRICE) Tj ET\n")
-        append("BT /F2 22 Tf 1 0 0 1 ${(priceX + 6).pdfNumber()} ${(priceY + 7).pdfNumber()} Tm (${pdfEscape(label.priceText.ifBlank { "-" })}) Tj ET\n")
-        if (label.unitText.isNotBlank()) append("BT /F1 7 Tf 1 0 0 1 8 3 Tm (${pdfEscape(label.unitText)}) Tj ET\n")
+        append("BT /F2 30 Tf 1 0 0 1 ${(priceX + 9.0).pdfNumber()} ${(priceY + 7.0).pdfNumber()} Tm (${pdfEscape(priceForTag)}) Tj ET\n")
     }
 }
 

@@ -9458,36 +9458,77 @@ private data class StockWarehouseMetricsData(
     val activeBatchCount: Int
 )
 
-private fun stockWarehouseMetricsForUi(
-    items: List<GoodsItemDataModel>,
-    batches: List<GoodsBatchDataModel>
-): StockWarehouseMetricsData {
-    val activeBatches = batches.filter { batch ->
+private const val STOCK_WAREHOUSE_FILTER_TOTAL = "total"
+private const val STOCK_WAREHOUSE_FILTER_IN_STOCK = "in_stock"
+private const val STOCK_WAREHOUSE_FILTER_OUT = "out"
+private const val STOCK_WAREHOUSE_FILTER_LOW = "low"
+private const val STOCK_WAREHOUSE_FILTER_EXPIRING = "expiring"
+private const val STOCK_WAREHOUSE_FILTER_NO_BARCODE = "no_barcode"
+
+private fun stockWarehouseActiveBatchesForUi(batches: List<GoodsBatchDataModel>): List<GoodsBatchDataModel> =
+    batches.filter { batch ->
         batch.isActive &&
                 batch.status != StockBatchStatusDataModel.Deleted &&
                 batch.status != StockBatchStatusDataModel.WrittenOff
     }
-    val batchesByItem = activeBatches.groupBy { it.goodsItemId }
-    val now = getCurrentTimeMillis()
-    val sevenDaysMillis = 7L * 24L * 60L * 60L * 1000L
 
-    fun quantityFor(item: GoodsItemDataModel): Double = batchesByItem[item.id].orEmpty().sumOf { it.quantity.total }
+private fun stockWarehouseBatchesByItemForUi(batches: List<GoodsBatchDataModel>): Map<String, List<GoodsBatchDataModel>> =
+    stockWarehouseActiveBatchesForUi(batches).groupBy { it.goodsItemId }
+
+private fun GoodsItemDataModel.stockWarehouseQuantityForUi(
+    batchesByItem: Map<String, List<GoodsBatchDataModel>>
+): Double = batchesByItem[id].orEmpty().sumOf { it.quantity.total }
+
+private fun GoodsItemDataModel.stockWarehouseExpiringSoonForUi(
+    batchesByItem: Map<String, List<GoodsBatchDataModel>>,
+    now: Long = getCurrentTimeMillis(),
+    horizonMillis: Long = 7L * 24L * 60L * 60L * 1000L
+): Boolean = batchesByItem[id].orEmpty().any { batch ->
+    val expiresAt = batch.expirationDateMillis ?: return@any false
+    expiresAt in now..(now + horizonMillis)
+}
+
+private fun GoodsItemDataModel.stockWarehouseHasNoBarcodeForUi(): Boolean =
+    allBarcodeValues().none { it.isNotBlank() }
+
+private fun stockWarehouseItemsForFilter(
+    filterId: String,
+    items: List<GoodsItemDataModel>,
+    batches: List<GoodsBatchDataModel>
+): List<GoodsItemDataModel> {
+    if (filterId == STOCK_WAREHOUSE_FILTER_TOTAL) return items
+
+    val batchesByItem = stockWarehouseBatchesByItemForUi(batches)
+    return items.filter { item ->
+        val quantity = item.stockWarehouseQuantityForUi(batchesByItem)
+        when (filterId) {
+            STOCK_WAREHOUSE_FILTER_IN_STOCK -> quantity > 0.0
+            STOCK_WAREHOUSE_FILTER_OUT -> quantity <= 0.0
+            STOCK_WAREHOUSE_FILTER_LOW -> quantity > 0.0 && quantity <= 5.0
+            STOCK_WAREHOUSE_FILTER_EXPIRING -> item.stockWarehouseExpiringSoonForUi(batchesByItem)
+            STOCK_WAREHOUSE_FILTER_NO_BARCODE -> item.stockWarehouseHasNoBarcodeForUi()
+            else -> true
+        }
+    }
+}
+
+private fun stockWarehouseMetricsForUi(
+    items: List<GoodsItemDataModel>,
+    batches: List<GoodsBatchDataModel>
+): StockWarehouseMetricsData {
+    val activeBatches = stockWarehouseActiveBatchesForUi(batches)
+    val batchesByItem = activeBatches.groupBy { it.goodsItemId }
 
     return StockWarehouseMetricsData(
         totalItems = items.size,
-        inStockItems = items.count { quantityFor(it) > 0.0 },
-        outOfStockItems = items.count { quantityFor(it) <= 0.0 },
+        inStockItems = items.count { it.stockWarehouseQuantityForUi(batchesByItem) > 0.0 },
+        outOfStockItems = items.count { it.stockWarehouseQuantityForUi(batchesByItem) <= 0.0 },
         lowStockItems = items.count { item ->
-            val quantity = quantityFor(item)
+            val quantity = item.stockWarehouseQuantityForUi(batchesByItem)
             quantity > 0.0 && quantity <= 5.0
         },
-        expiringSoonItems = items.count { item ->
-            batchesByItem[item.id].orEmpty().any { batch ->
-                val expiresAt = batch.expirationDateMillis ?: return@any false
-                expiresAt in now..(now + sevenDaysMillis)
-            }
-        },
-        noBarcodeItems = items.count { item -> item.allBarcodeValues().none { it.isNotBlank() } },
+        expiringSoonItems = items.count { it.stockWarehouseExpiringSoonForUi(batchesByItem) },
+        noBarcodeItems = items.count { item -> item.stockWarehouseHasNoBarcodeForUi() },
         activeBatchCount = activeBatches.size
     )
 }
@@ -9546,35 +9587,56 @@ private fun AppConfiguration.stockItemLabelDataForUi(
 
 @Composable
 private fun AppConfiguration.StockWarehouseMetricPill(
+    filterId: String? = null,
     title: String,
     value: String,
-    accent: Boolean = false,
-    warning: Boolean = false
+    selected: Boolean = false,
+    warning: Boolean = false,
+    enabled: Boolean = true,
+    onFilterSelected: (String) -> Unit = {}
 ) {
-    val shape = RoundedCornerShape(999.dp)
+    val shape = RoundedCornerShape(10.dp)
     val borderColor = when {
+        selected -> stateValues.AccentColor
         warning -> stateValues.ErrorColor
-        accent -> stateValues.AccentColor
         else -> stateValues.PlaceholderTextColor
     }
+    val valueColor = when {
+        selected -> stateValues.AccentColor
+        warning -> stateValues.ErrorColor
+        enabled -> stateValues.TextColor
+        else -> stateValues.PlaceholderTextColor
+    }
+
     Column(
         modifier = Modifier
             .clip(shape)
-            .background(if (accent) stateValues.AccentColor.copy(alpha = 0.10f) else stateValues.BackgroundColor)
-            .border(stateValues.unfocusedBorderWidth, borderColor.copy(alpha = if (accent || warning) 0.9f else 0.45f), shape)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+            .background(if (selected) stateValues.AccentColor.copy(alpha = 0.14f) else stateValues.BackgroundColor)
+            .border(stateValues.unfocusedBorderWidth, borderColor.copy(alpha = if (selected || warning) 0.9f else 0.45f), shape)
+            .then(
+                if (enabled && filterId != null) {
+                    Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = ripple(color = stateValues.AccentColor),
+                        onClick = { onFilterSelected(filterId) }
+                    )
+                } else {
+                    Modifier
+                }
+            )
+            .padding(horizontal = 14.dp, vertical = 7.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = value,
-            color = if (warning) stateValues.ErrorColor else if (accent) stateValues.AccentColor else stateValues.TextColor,
+            color = valueColor,
             fontSize = stateValues.accentTextSize,
             fontWeight = FontWeight.Bold,
             maxLines = 1
         )
         Text(
             text = title,
-            color = stateValues.PlaceholderTextColor,
+            color = if (selected) stateValues.AccentColor else stateValues.PlaceholderTextColor,
             fontSize = stateValues.smallTextSize,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -9586,9 +9648,11 @@ private fun AppConfiguration.StockWarehouseMetricPill(
 private fun AppConfiguration.StockWarehouseInfoTile(
     modifier: Modifier = Modifier,
     metrics: StockWarehouseMetricsData,
+    selectedFilterId: String,
     selectionMode: Boolean,
     selectedCount: Int,
     totalSelectableCount: Int,
+    onFilterSelected: (String) -> Unit,
     onSelectAll: () -> Unit,
     onClearSelection: () -> Unit,
     onPrintSelected: (() -> Unit)? = null,
@@ -9598,7 +9662,6 @@ private fun AppConfiguration.StockWarehouseInfoTile(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .foregroundTactileShadow(stateValues.cornerRadius, elevated = selectionMode)
             .clip(shape)
             .background(if (selectionMode) stateValues.AccentColor.copy(alpha = 0.12f) else stateValues.BackgroundColor)
             .border(
@@ -9635,16 +9698,67 @@ private fun AppConfiguration.StockWarehouseInfoTile(
                     modifier = Modifier
                         .fillMaxWidth()
                         .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(7.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    StockWarehouseMetricPill(localizedStringResource(1318, "Total items"), metrics.totalItems.toString(), accent = true)
-                    StockWarehouseMetricPill(localizedStringResource(1319, "In stock"), metrics.inStockItems.toString())
-                    StockWarehouseMetricPill(localizedStringResource(1320, "Out"), metrics.outOfStockItems.toString(), warning = metrics.outOfStockItems > 0)
-                    StockWarehouseMetricPill(localizedStringResource(1321, "Low"), metrics.lowStockItems.toString(), warning = metrics.lowStockItems > 0)
-                    StockWarehouseMetricPill(localizedStringResource(1309, "Expires very soon"), metrics.expiringSoonItems.toString(), warning = metrics.expiringSoonItems > 0)
-                    StockWarehouseMetricPill(localizedStringResource(1322, "No barcode"), metrics.noBarcodeItems.toString(), warning = metrics.noBarcodeItems > 0)
-                    StockWarehouseMetricPill(localizedStringResource(1327, "Batches"), metrics.activeBatchCount.toString())
+                    StockWarehouseMetricPill(
+                        filterId = STOCK_WAREHOUSE_FILTER_TOTAL,
+                        title = localizedStringResource(1318, "Total items"),
+                        value = metrics.totalItems.toString(),
+                        selected = selectedFilterId == STOCK_WAREHOUSE_FILTER_TOTAL,
+                        onFilterSelected = onFilterSelected
+                    )
+                    StockWarehouseMetricPill(
+                        filterId = STOCK_WAREHOUSE_FILTER_IN_STOCK,
+                        title = localizedStringResource(1319, "In stock"),
+                        value = metrics.inStockItems.toString(),
+                        selected = selectedFilterId == STOCK_WAREHOUSE_FILTER_IN_STOCK,
+                        onFilterSelected = onFilterSelected
+                    )
+                    StockWarehouseMetricPill(
+                        filterId = STOCK_WAREHOUSE_FILTER_OUT,
+                        title = localizedStringResource(1320, "Out"),
+                        value = metrics.outOfStockItems.toString(),
+                        selected = selectedFilterId == STOCK_WAREHOUSE_FILTER_OUT,
+                        warning = metrics.outOfStockItems > 0,
+                        onFilterSelected = onFilterSelected
+                    )
+                    StockWarehouseMetricPill(
+                        filterId = STOCK_WAREHOUSE_FILTER_LOW,
+                        title = localizedStringResource(1321, "Low"),
+                        value = metrics.lowStockItems.toString(),
+                        selected = selectedFilterId == STOCK_WAREHOUSE_FILTER_LOW,
+                        warning = metrics.lowStockItems > 0,
+                        onFilterSelected = onFilterSelected
+                    )
+                    StockWarehouseMetricPill(
+                        filterId = STOCK_WAREHOUSE_FILTER_EXPIRING,
+                        title = localizedStringResource(1309, "Expires very soon"),
+                        value = metrics.expiringSoonItems.toString(),
+                        selected = selectedFilterId == STOCK_WAREHOUSE_FILTER_EXPIRING,
+                        warning = metrics.expiringSoonItems > 0,
+                        onFilterSelected = onFilterSelected
+                    )
+                    StockWarehouseMetricPill(
+                        filterId = STOCK_WAREHOUSE_FILTER_NO_BARCODE,
+                        title = localizedStringResource(1322, "No barcode"),
+                        value = metrics.noBarcodeItems.toString(),
+                        selected = selectedFilterId == STOCK_WAREHOUSE_FILTER_NO_BARCODE,
+                        warning = metrics.noBarcodeItems > 0,
+                        onFilterSelected = onFilterSelected
+                    )
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 2.dp)
+                            .width(stateValues.unfocusedBorderWidth)
+                            .height(34.dp)
+                            .background(stateValues.PlaceholderTextColor.copy(alpha = 0.30f))
+                    )
+                    StockWarehouseMetricPill(
+                        title = localizedStringResource(1327, "Batches"),
+                        value = metrics.activeBatchCount.toString(),
+                        enabled = false
+                    )
                 }
             }
         }
@@ -9732,6 +9846,9 @@ fun AppConfiguration.StockWarehouseScreenContent(
                 var selectedStockItemIds by rememberSaveable {
                     mutableStateOf(emptyList<String>())
                 }
+                var selectedWarehouseFilterId by remember(searchQuery, transactionTypeIndex) {
+                    mutableStateOf(STOCK_WAREHOUSE_FILTER_TOTAL)
+                }
 
                 if (searchQuery == null) {
                     val autoFocusSearch = platformAllowsAutomaticTextFieldFocus()
@@ -9817,7 +9934,7 @@ fun AppConfiguration.StockWarehouseScreenContent(
                         }
                     } ?: baseItems
 
-                val sortedItems = items.let { original ->
+                val unfilteredSortedItems = items.let { original ->
                     val preferredOrder = preferredOrderIds
                         .filter { it.isNotBlank() }
                         .withIndex()
@@ -9837,6 +9954,16 @@ fun AppConfiguration.StockWarehouseScreenContent(
                         else -> original.sortedBy { it.name.extractLocalizedString(stateValues.appLanguage).orEmpty().lowercase() }
                     }
                     if (preferredOrder.isEmpty() && !sortAscending) sorted.reversed() else sorted
+                }
+                val showWarehouseInfoTile = searchQuery == null && transactionTypeIndex == null
+                val sortedItems = if (showWarehouseInfoTile) {
+                    stockWarehouseItemsForFilter(
+                        filterId = selectedWarehouseFilterId,
+                        items = unfilteredSortedItems,
+                        batches = stateValues.stockBatches.orEmpty()
+                    )
+                } else {
+                    unfilteredSortedItems
                 }
 
                 val selectableItemIds = sortedItems.map { it.id }.filter { it.isNotBlank() }.distinct()
@@ -9913,13 +10040,12 @@ fun AppConfiguration.StockWarehouseScreenContent(
                     }
                 }
 
-                var page by rememberSaveable(lSearchQuery, sortMode, sortAscending, sortedItems.size) {
+                var page by rememberSaveable(lSearchQuery, sortMode, sortAscending, selectedWarehouseFilterId, sortedItems.size) {
                     mutableStateOf(0)
                 }
                 val pageSize = stateValues.globalAppConfiguration.pagingDefaultPageSize.coerceIn(20, 100)
                 val visibleItems = sortedItems.clientPaged(page, pageSize)
-                val overviewMetrics = stockWarehouseMetricsForUi(sortedItems, stateValues.stockBatches.orEmpty())
-                val showWarehouseInfoTile = searchQuery == null && transactionTypeIndex == null
+                val overviewMetrics = stockWarehouseMetricsForUi(unfilteredSortedItems, stateValues.stockBatches.orEmpty())
                 val refreshAction: () -> Unit = {
                     stateValues.activeStoreId?.let { storeId ->
                         getStock(storeId)
@@ -9936,9 +10062,11 @@ fun AppConfiguration.StockWarehouseScreenContent(
                         StockWarehouseInfoTile(
                             modifier = Modifier.padding(start = 8.dp, end = 8.dp, top = 8.dp),
                             metrics = overviewMetrics,
+                            selectedFilterId = selectedWarehouseFilterId,
                             selectionMode = selectionMode,
                             selectedCount = selectedStockItemIds.size,
                             totalSelectableCount = selectableItemIds.size,
+                            onFilterSelected = { selectedWarehouseFilterId = it },
                             onSelectAll = { selectAllVisibleStock() },
                             onClearSelection = { clearSelection() },
                             onPrintSelected = { printSelectedStockLabels() },
@@ -15097,48 +15225,12 @@ fun AppConfiguration.StockSupplierPricesPage(
 
                         Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
-                        val supplierBarcodeTextFieldContent = BarcodeTextInput(
+                        BarcodeTextInput(
                             modifier = Modifier.fillMaxWidth(),
                             value = supplierBarcode,
                             placeholderText = stateValues.stringBarcode,
                             onValueChange = { supplierBarcode = it }
                         )
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            actionButton(
-                                text = "",
-                                iconPath = stateValues.drawablePathIconBarcodeGenerate,
-                                iconRes = stateValues.drawableResIconBarcodeGenerate.value,
-                                iconContentDescription = localizedStringResource(1316, "Generate barcode"),
-                                fillMaxWidthIfTextPresent = false,
-                                confirmationRequired = false,
-                                onClick = {
-                                    val generatedBarcode = generateInternalEan13Barcode(
-                                        stateValues.stock.orEmpty().flatMap { it.allBarcodeValues() } + supplierBarcode
-                                    )
-                                    supplierBarcode = generatedBarcode
-                                    supplierBarcodeTextFieldContent.replaceText(generatedBarcode, applyTransform = false)
-                                    postInAppNotification(
-                                        localizedStringResource(1317, "Generated internal EAN-13 barcode"),
-                                        NotificationType.Positive,
-                                        transient = true
-                                    )
-                                }
-                            )
-                            Text(
-                                text = localizedStringResource(1316, "Generate barcode"),
-                                color = stateValues.PlaceholderTextColor,
-                                fontSize = stateValues.smallTextSize,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
 
                         Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
@@ -19417,6 +19509,31 @@ fun AppConfiguration.BarcodeTextInput(
         placeholderText = placeholderText,
         leadingIconPath = stateValues.drawablePathIconBarcodeScanner,
         leadingIconContentDescription = localizedStringResource(1001, "Handheld barcode scanner"),
+        trailingIconExtraLeadingPath = if (showGenerateBarcodeButton) stateValues.drawablePathIconBarcodeGenerate else null,
+        trailingIconExtraLeadingContentDescription = localizedStringResource(1316, "Generate barcode"),
+        trailingIconExtraLeadingOnClick = if (showGenerateBarcodeButton) {
+            { currentText, replaceText ->
+                val generatedBarcode = generateInternalEan13Barcode(
+                    buildList {
+                        addAll(stateValues.stock.orEmpty().flatMap { it.allBarcodeValues() })
+                        addAll(existingBarcodeValues)
+                        add(currentText.ifBlank { value })
+                    }.filter { it.isNotBlank() }
+                )
+                barcodeFillHighlightPulseKey += 1
+                replaceText(generatedBarcode, false)
+                if (onGeneratedBarcode != null) {
+                    onGeneratedBarcode(generatedBarcode)
+                } else {
+                    onValueChange(generatedBarcode)
+                }
+                postInAppNotification(
+                    localizedStringResource(1317, "Generated internal EAN-13 barcode"),
+                    NotificationType.Positive,
+                    transient = true
+                )
+            }
+        } else null,
         trailingIconExtraPath = if (cameraAvailable) stateValues.drawablePathIconBarcodeCamScanner else null,
         trailingIconExtraContentDescription = localizedStringResource(982, "Camera barcode scanner"),
         trailingIconExtraOnClick = if (cameraAvailable) {
@@ -19451,46 +19568,6 @@ fun AppConfiguration.BarcodeTextInput(
             }
         }
     )
-
-    if (showGenerateBarcodeButton) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 4.dp),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            actionButton(
-                text = localizedStringResource(1316, "Generate barcode"),
-                iconPath = stateValues.drawablePathIconBarcodeGenerate,
-                iconRes = stateValues.drawableResIconBarcodeGenerate.value,
-                iconContentDescription = localizedStringResource(1316, "Generate barcode"),
-                fillMaxWidthIfTextPresent = false,
-                confirmationRequired = false,
-                onClick = {
-                    val generatedBarcode = generateInternalEan13Barcode(
-                        buildList {
-                            addAll(stateValues.stock.orEmpty().flatMap { it.allBarcodeValues() })
-                            addAll(existingBarcodeValues)
-                            add(value)
-                        }.filter { it.isNotBlank() }
-                    )
-                    barcodeFillHighlightPulseKey += 1
-                    content.replaceText(generatedBarcode, applyTransform = false)
-                    if (onGeneratedBarcode != null) {
-                        onGeneratedBarcode(generatedBarcode)
-                    } else {
-                        onValueChange(generatedBarcode)
-                    }
-                    postInAppNotification(
-                        localizedStringResource(1317, "Generated internal EAN-13 barcode"),
-                        NotificationType.Positive,
-                        transient = true
-                    )
-                }
-            )
-        }
-    }
 
     val onCameraBarcodeDetected: (String) -> Unit = { raw ->
         val candidate = (raw.transactionBarcodeCandidate() ?: raw.trim()).toStoredGoodsItemBarcode()
@@ -36179,16 +36256,26 @@ fun AppConfiguration.GoodsItemInStockWidget(
     }
 
     val cardShape = RoundedCornerShape(stateValues.cornerRadius)
-    val cardBorderColor = if (selected) stateValues.AccentColor else stateValues.PlaceholderTextColor
+    val cardBorderColor = when {
+        selected -> stateValues.AccentColor
+        selectionMode -> stateValues.PlaceholderTextColor.copy(alpha = 0.55f)
+        else -> stateValues.PlaceholderTextColor
+    }
+    val cardBackgroundColor = when {
+        selected -> stateValues.AccentColor.copy(alpha = 0.14f)
+        else -> stateValues.BackgroundColor
+    }
 
     Row(
         modifier
             .padding(bottom = 4.dp)
             .fillMaxWidth()
             .heightIn(min = stateValues.textFieldHeight * 1.25f)
-            .foregroundTactileShadow(stateValues.cornerRadius, elevated = selected)
+            .then(
+                if (selectionMode) Modifier else Modifier.foregroundTactileShadow(stateValues.cornerRadius, elevated = selected)
+            )
             .clip(cardShape)
-            .background(if (selected) stateValues.AccentColor.copy(alpha = 0.10f) else stateValues.BackgroundColor)
+            .background(cardBackgroundColor)
             .border(
                 if (selected) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
                 cardBorderColor,
@@ -36817,6 +36904,9 @@ fun AppConfiguration.genericTextField(
     leadingIcon: @Composable (() -> Unit)? = null,
     leadingIconContentDescription: String = placeholderText,
     trailingIcon: @Composable (() -> Unit)? = null,
+    trailingIconExtraLeadingPath: String? = null,
+    trailingIconExtraLeadingContentDescription: String = placeholderText,
+    trailingIconExtraLeadingOnClick: ((String, (String, Boolean) -> Unit) -> Unit)? = null,
     trailingIconExtraPath: String? = null,
     trailingIconExtraContentDescription: String = placeholderText,
     trailingIconExtraOnClick: (() -> Unit)? = null,
@@ -37469,32 +37559,59 @@ fun AppConfiguration.genericTextField(
                                         }
                                     }
 
-                                    trailingIcon?.invoke() ?: trailingIconExtraPath?.run {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxHeight()
-                                                .width(stateValues.textFieldHeight)
-                                                .clickable(
-                                                    interactionSource = remember {
-                                                        MutableInteractionSource()
-                                                    },
-                                                    indication = ripple(color = textColor, radius = cornerRadius),
-                                                    onClick = {
-                                                        focusRequester.requestFocus()
-                                                        isFocused = true
-                                                        trailingIconExtraOnClick?.invoke()
-                                                    }
-                                                ),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            CpImage(
+                                    if (trailingIcon != null) {
+                                        trailingIcon.invoke()
+                                    } else {
+                                        trailingIconExtraLeadingPath?.run {
+                                            Box(
                                                 modifier = Modifier
-                                                    .size(stateValues.iconSize),
-                                                url = trailingIconExtraPath,
-                                                fallbackRes = Res.drawable._9_0,
-                                                contentDescription = trailingIconExtraContentDescription,
-                                                tintColor = textColor
-                                            )
+                                                    .fillMaxHeight()
+                                                    .width(stateValues.textFieldHeight)
+                                                    .clickable(
+                                                        interactionSource = remember { MutableInteractionSource() },
+                                                        indication = ripple(color = textColor, radius = cornerRadius),
+                                                        onClick = {
+                                                            focusRequester.requestFocus()
+                                                            isFocused = true
+                                                            trailingIconExtraLeadingOnClick?.invoke(textFieldValue.text, ::applyExternalTextReplacement)
+                                                        }
+                                                    ),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                CpImage(
+                                                    modifier = Modifier.size(stateValues.iconSize),
+                                                    url = this@run,
+                                                    fallbackRes = Res.drawable._64_0,
+                                                    contentDescription = trailingIconExtraLeadingContentDescription,
+                                                    tintColor = textColor
+                                                )
+                                            }
+                                        }
+
+                                        trailingIconExtraPath?.run {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxHeight()
+                                                    .width(stateValues.textFieldHeight)
+                                                    .clickable(
+                                                        interactionSource = remember { MutableInteractionSource() },
+                                                        indication = ripple(color = textColor, radius = cornerRadius),
+                                                        onClick = {
+                                                            focusRequester.requestFocus()
+                                                            isFocused = true
+                                                            trailingIconExtraOnClick?.invoke()
+                                                        }
+                                                    ),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                CpImage(
+                                                    modifier = Modifier.size(stateValues.iconSize),
+                                                    url = this@run,
+                                                    fallbackRes = Res.drawable._9_0,
+                                                    contentDescription = trailingIconExtraContentDescription,
+                                                    tintColor = textColor
+                                                )
+                                            }
                                         }
                                     }
 

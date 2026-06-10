@@ -56,8 +56,10 @@ fun main() {
     installWasmComposePlatformBridges()
 
     ComposeViewport(document.body!!) {
-        AppConfiguration {
-            MainScreen()
-        }
+        AppConfiguration(
+            content = {
+                MainScreen()
+            }
+        )
     }
 }

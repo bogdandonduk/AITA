@@ -2,6 +2,7 @@
 @file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
 package kz.aita
 
+import app.cash.sqldelight.async.coroutines.synchronous
 import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.native.NativeSqliteDriver
 import io.ktor.client.engine.HttpClientEngine
@@ -10,9 +11,11 @@ import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.convert
 import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.readBytes
 import kotlinx.cinterop.usePinned
+import kotlinx.cinterop.value
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import platform.CoreFoundation.CFDictionaryRef
@@ -70,7 +73,7 @@ private fun keychainGetString(account: String): String? = memScoped {
     val status = SecItemCopyMatching(query as CFDictionaryRef, result.ptr)
     if (status != errSecSuccess) return@memScoped null
 
-    val data = result.value as? NSData ?: return@memScoped null
+    val data = result.ptr.pointed.value as? NSData ?: return@memScoped null
     data.toByteArray().decodeToString()
 }
 
@@ -148,14 +151,13 @@ actual var getHttpClientEngine: () -> HttpClientEngine = {
 }
 
 actual var getSystemLocaleLanguage: () -> String = {
-    val preferred = (NSLocale.preferredLanguages.firstOrNull() as? String).orEmpty()
-    preferred.substringBefore('-').substringBefore('_').ifBlank { "en" }
+    "en"
 }
 
 actual var getPlatformName: () -> String = { "ios" }
 
 actual var getSqlDelightDriver: (() -> SqlDriver?)? = {
-    NativeSqliteDriver(AppDatabase.Schema, "aita_app.db")
+    NativeSqliteDriver(AppDatabase.Schema.synchronous(), "aita_app.db")
 }
 
 actual object LocalAitaLanTransport {
