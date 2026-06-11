@@ -4941,13 +4941,26 @@ const val CLOUD_TRANSPORT_STATUS_UNAVAILABLE = -1
 @PublishedApi
 internal const val REALTIME_ACCESS_TOKEN_REFRESH_SKEW_MILLIS = 60_000L
 
-private const val DEFAULT_AITA_SERVER_URL = "http://10.202.5.39:8080"
+private const val DEFAULT_AITA_SERVER_URL = "http://10.202.10.147:8080"
 private val DEFAULT_AITA_SERVER_URL_PAIR = Pair(DEFAULT_AITA_SERVER_URL, "1")
 @Volatile
 private var currentNetworkRequestCandidateServerUrlsMemory: List<String> = emptyList()
 
 val GlobalScope = CoroutineScope(SupervisorJob())
-val appModeState = MutableStateFlow(0)
+
+const val APP_MODE_STORE = 0
+const val APP_MODE_BUYER = 1
+const val APP_MODE_SUPPLIER = 2
+const val APP_MODE_MANUFACTURER = 3
+
+private fun normalizeAppModePreference(modeId: Int?): Int = when (modeId) {
+    APP_MODE_BUYER -> APP_MODE_BUYER
+    APP_MODE_SUPPLIER -> APP_MODE_SUPPLIER
+    APP_MODE_MANUFACTURER -> APP_MODE_MANUFACTURER
+    else -> APP_MODE_STORE
+}
+
+val appModeState = MutableStateFlow(APP_MODE_STORE)
 val globalAppConfigurationState = MutableDataStateFlowNonNull(
     coroutineScope = GlobalScope,
     initial = GlobalAppConfigurationDataModel(
@@ -5572,6 +5585,10 @@ val drawablePathIconBarcodeGenerateState = MutableStateFlow("svg/64_0.svg")
 val drawablePathIconPrintTagState = MutableStateFlow("svg/65_0.svg")
 val drawablePathIconWorkerRoleTemplatesState = MutableStateFlow("svg/66_0.svg")
 val drawablePathIconStockHistoryState = MutableStateFlow("svg/67_0.svg")
+val drawablePathIconAppModeStoreState = MutableStateFlow("svg/68_0.svg")
+val drawablePathIconAppModeBuyerState = MutableStateFlow("svg/69_0.svg")
+val drawablePathIconAppModeSupplierState = MutableStateFlow("svg/70_0.svg")
+val drawablePathIconAppModeManufacturerState = MutableStateFlow("svg/71_0.svg")
 val drawablePathIconWorkersState = MutableStateFlow("svg/22_0.svg")
 val drawablePathIconSuppliersState = MutableStateFlow("svg/23_0.svg")
 val drawablePathIconDebtorsState = MutableStateFlow("svg/24_0.svg")
@@ -6233,9 +6250,11 @@ fun init() {
 
     GlobalScope.launch {
         observeLocalKv(KEY_APP_MODE)
-            .collect {
-                it?.let {
-                    appModeState.emit(it.toInt())
+            .collect { stored ->
+                stored?.let { raw ->
+                    val normalized = normalizeAppModePreference(raw.toIntOrNull())
+                    appModeState.emit(normalized)
+                    if (raw != normalized.toString()) putLocalKv(KEY_APP_MODE, normalized.toString())
                 }
             }
     }
@@ -6541,8 +6560,10 @@ fun setAppSizeMode(sizeModeId: Long, syncServer: Boolean = true) {
 }
 
 fun setAppMode(modeId: Int) {
-    GlobalScope.launch {
-        putLocalKv(KEY_APP_MODE, modeId.toString())
+    val safeModeId = normalizeAppModePreference(modeId)
+    GlobalScope.launch(Dispatchers.ourIo) {
+        appModeState.emit(safeModeId)
+        putLocalKv(KEY_APP_MODE, safeModeId.toString())
     }
 }
 
@@ -7599,6 +7620,18 @@ fun updateDrawables(
         )
         drawablePathIconStockHistoryState.emit(
             drawablePath(67L)
+        )
+        drawablePathIconAppModeStoreState.emit(
+            drawablePath(68L)
+        )
+        drawablePathIconAppModeBuyerState.emit(
+            drawablePath(69L)
+        )
+        drawablePathIconAppModeSupplierState.emit(
+            drawablePath(70L)
+        )
+        drawablePathIconAppModeManufacturerState.emit(
+            drawablePath(71L)
         )
         drawablePathIconWorkersState.emit(
             drawablePath(22L)
@@ -14969,6 +15002,10 @@ data class SupplierOrderLineDataModel(
     val supplierOfferedSupplyPrice: PriceDataModel? = null,
     val substituteGoodsItemId: String? = null,
 
+    val goodsItemNameSnapshot: List<LocalizedStringDataModel> = emptyList(),
+    val goodsItemBarcodeSnapshots: List<String> = emptyList(),
+    val goodsItemMeasurementUnitIdSnapshot: String? = null,
+
     val deliveredBatchIds: List<String> = emptyList(),
 
     val isActive: Boolean = true
@@ -14989,6 +15026,9 @@ data class SupplierOrderDataModel(
     val deliveredAtMillis: Long? = null,
 
     val storeAddress: LocationDataModel? = null,
+    val storeNameSnapshot: List<LocalizedStringDataModel> = emptyList(),
+    val storePublicIdSnapshot: String = "",
+    val storeAddressTextSnapshot: String = "",
 
     val additionalNotes: String? = null,
     val additionalNotesLocalized: List<LocalizedStringDataModel> = emptyList(),

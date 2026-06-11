@@ -6062,6 +6062,74 @@ private fun supplierOrderWithLinesInsideTransaction(orderId: UUID): SupplierOrde
     return SupplierOrderWithLinesDataModel(order, lines)
 }
 
+private fun supplierOrderStatusAllowedFromSupplier(
+    requested: SupplierOrderStatusDataModel,
+    current: SupplierOrderStatusDataModel
+): SupplierOrderStatusDataModel {
+    return when (requested) {
+        SupplierOrderStatusDataModel.SeenBySupplier,
+        SupplierOrderStatusDataModel.Confirmed,
+        SupplierOrderStatusDataModel.Packed,
+        SupplierOrderStatusDataModel.InDelivery,
+        SupplierOrderStatusDataModel.IssueReported,
+        SupplierOrderStatusDataModel.Cancelled -> requested
+        SupplierOrderStatusDataModel.PartiallyDelivered,
+        SupplierOrderStatusDataModel.Delivered -> current
+        SupplierOrderStatusDataModel.Draft,
+        SupplierOrderStatusDataModel.Sent -> if (current == SupplierOrderStatusDataModel.Draft || current == SupplierOrderStatusDataModel.Sent) requested else current
+    }
+}
+
+private fun List<SupplierOrderWithLinesDataModel>.withSupplierDeskSnapshotsInsideTransaction(): List<SupplierOrderWithLinesDataModel> {
+    if (isEmpty()) return this
+
+    val storeIds = mapNotNull { orderWithLines ->
+        runCatching { UUID.fromString(orderWithLines.order.storeId) }.getOrNull()
+    }.distinct()
+
+    val goodsItemIds = flatMap { orderWithLines -> orderWithLines.lines }
+        .mapNotNull { line -> runCatching { UUID.fromString(line.goodsItemId) }.getOrNull() }
+        .distinct()
+
+    val storeRowsById = if (storeIds.isEmpty()) {
+        emptyMap<String, ResultRow>()
+    } else {
+        Stores
+            .selectAll()
+            .where { Stores.id inList storeIds }
+            .associateBy { it[Stores.id].toString() }
+    }
+
+    val goodsRowsById = if (goodsItemIds.isEmpty()) {
+        emptyMap<String, ResultRow>()
+    } else {
+        StockItems
+            .selectAll()
+            .where { StockItems.id inList goodsItemIds }
+            .associateBy { it[StockItems.id].toString() }
+    }
+
+    return map { orderWithLines ->
+        val storeRow = storeRowsById[orderWithLines.order.storeId]
+        val orderWithSnapshots = orderWithLines.order.copy(
+            storeNameSnapshot = storeRow?.get(Stores.name).orEmpty(),
+            storePublicIdSnapshot = storeRow?.get(Stores.publicId).orEmpty(),
+            storeAddressTextSnapshot = storeRow?.get(Stores.address).orEmpty()
+        )
+
+        val lineSnapshots = orderWithLines.lines.map { line ->
+            val goodsRow = goodsRowsById[line.goodsItemId]
+            line.copy(
+                goodsItemNameSnapshot = goodsRow?.get(StockItems.name).orEmpty(),
+                goodsItemBarcodeSnapshots = goodsRow?.stockBarcodeValues().orEmpty(),
+                goodsItemMeasurementUnitIdSnapshot = goodsRow?.get(StockItems.measurementUnitId)
+            )
+        }
+
+        SupplierOrderWithLinesDataModel(orderWithSnapshots, lineSnapshots)
+    }
+}
+
 private fun InsertStatement<Number>.setSupplierOrderColumns(
     orderId: UUID,
     clean: SupplierOrderDataModel,
@@ -11038,7 +11106,7 @@ fun Application.module() {
                                 order = order,
                                 lines = lines.filter { it.orderId == order.id }
                             )
-                        }
+                        }.withSupplierDeskSnapshotsInsideTransaction()
                     }
 
                     result?.let {
@@ -11096,6 +11164,7 @@ fun Application.module() {
                             }
 
                         supplierOrderWithLinesInsideTransaction(orderId)
+                            ?.let { listOf(it).withSupplierDeskSnapshotsInsideTransaction().firstOrNull() }
                     }
 
                     result?.let {
@@ -11134,6 +11203,58 @@ fun Application.module() {
                         if (!canEditFromStore && !canEditFromSupplier) return@newSuspendedTransaction null
 
                         val now = System.currentTimeMillis()
+
+                        if (canEditFromSupplier && !canEditFromStore) {
+                            val existingOrder = existing.toSupplierOrderDataModel()
+                            val requestedOrder = body.order
+                            val supplierStatus = supplierOrderStatusAllowedFromSupplier(requestedOrder.status, existingOrder.status)
+                            val supplierPatch = existingOrder.copy(
+                                confirmedDeliveryTimeMillis = requestedOrder.confirmedDeliveryTimeMillis,
+                                supplierComment = requestedOrder.supplierComment,
+                                supplierCommentLocalized = requestedOrder.supplierCommentLocalized,
+                                paymentTerms = requestedOrder.paymentTerms,
+                                externalReference = requestedOrder.externalReference,
+                                status = supplierStatus,
+                                updatedAtMillis = now,
+                                isActive = existing[SupplierOrders.isActive]
+                            ).cleanForStorage(existing[SupplierOrders.userId], storeId, supplierId, now)
+
+                            SupplierOrders.update({ SupplierOrders.id eq orderId }) {
+                                it[SupplierOrders.confirmedDeliveryTimeMillis] = supplierPatch.confirmedDeliveryTimeMillis
+                                it[SupplierOrders.supplierComment] = supplierPatch.supplierComment
+                                it[SupplierOrders.supplierCommentLocalized] = supplierPatch.supplierCommentLocalized
+                                it[SupplierOrders.paymentTerms] = supplierPatch.paymentTerms
+                                it[SupplierOrders.externalReference] = supplierPatch.externalReference
+                                it[SupplierOrders.status] = supplierPatch.status.name
+                                it[SupplierOrders.updatedAtMillis] = supplierPatch.updatedAtMillis
+                                it[SupplierOrders.isActive] = existing[SupplierOrders.isActive]
+                            }
+
+                            val existingLineIds = SupplierOrderLines
+                                .select(SupplierOrderLines.id)
+                                .where { SupplierOrderLines.orderId eq orderId }
+                                .map { it[SupplierOrderLines.id] }
+                                .toSet()
+
+                            body.lines.forEach { requestedLine ->
+                                val lineId = runCatching { UUID.fromString(requestedLine.id) }.getOrNull() ?: return@forEach
+                                if (lineId !in existingLineIds) return@forEach
+
+                                val cleanLine = requestedLine.cleanForStorage(orderId)
+                                SupplierOrderLines.update({ (SupplierOrderLines.id eq lineId) and (SupplierOrderLines.orderId eq orderId) }) {
+                                    it[SupplierOrderLines.supplierComment] = cleanLine.supplierComment
+                                    it[SupplierOrderLines.supplierCommentLocalized] = cleanLine.supplierCommentLocalized
+                                    it[SupplierOrderLines.supplierAcceptedQuantity] = cleanLine.supplierAcceptedQuantity
+                                    it[SupplierOrderLines.supplierOfferedSupplyPrice] = cleanLine.supplierOfferedSupplyPrice
+                                    it[SupplierOrderLines.substituteGoodsItemId] = cleanLine.substituteGoodsItemId
+                                        ?.let { raw -> runCatching { UUID.fromString(raw) }.getOrNull() }
+                                }
+                            }
+
+                            return@newSuspendedTransaction supplierOrderWithLinesInsideTransaction(orderId)
+                                ?.let { listOf(it).withSupplierDeskSnapshotsInsideTransaction().firstOrNull() }
+                        }
+
                         val cleanOrder = body.order.cleanForStorage(existing[SupplierOrders.userId], storeId, supplierId, now)
                         SupplierOrders.update({ SupplierOrders.id eq orderId }) {
                             it.setSupplierOrderUpdateColumns(cleanOrder)
@@ -11177,6 +11298,7 @@ fun Application.module() {
                             }
 
                         supplierOrderWithLinesInsideTransaction(orderId)
+                            ?.let { listOf(it).withSupplierDeskSnapshotsInsideTransaction().firstOrNull() }
                     }
 
                     result?.let {

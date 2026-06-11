@@ -18190,6 +18190,834 @@ private fun AppConfiguration.SupplierOrderCard(
     }
 }
 
+private data class SupplierFeaturePlanUiModel(
+    val title: String,
+    val subtitle: String,
+    val iconPath: String,
+    val iconRes: DrawableResource?,
+    val implemented: Boolean = false
+)
+
+private fun AppConfiguration.supplierMarketWinningFeatures(): List<SupplierFeaturePlanUiModel> = listOf(
+    SupplierFeaturePlanUiModel(
+        title = localizedStringResource(1341, "Smart order inbox"),
+        subtitle = localizedStringResource(1342, "See every store request, answer quickly, and keep fulfillment moving from sent to delivery."),
+        iconPath = stateValues.drawablePathIconAppModeSupplier,
+        iconRes = stateValues.drawableResIconAppModeSupplier.value,
+        implemented = true
+    ),
+    SupplierFeaturePlanUiModel(
+        title = localizedStringResource(1343, "Live B2B catalog"),
+        subtitle = localizedStringResource(1344, "Turn store stock items into supplier-side offers with MOQ, pack sizes, expiry rules and per-store prices."),
+        iconPath = stateValues.drawablePathIconStock,
+        iconRes = stateValues.drawableResIconStock.value
+    ),
+    SupplierFeaturePlanUiModel(
+        title = localizedStringResource(1345, "Substitutions that save sales"),
+        subtitle = localizedStringResource(1346, "Suggest replacements when a SKU is out of stock, with clear approval before the store receives it."),
+        iconPath = stateValues.drawablePathIconResponse,
+        iconRes = stateValues.drawableResIconResponse.value
+    ),
+    SupplierFeaturePlanUiModel(
+        title = localizedStringResource(1347, "Route batch planner"),
+        subtitle = localizedStringResource(1348, "Group nearby KZ, KG, TJ and UZ store deliveries into efficient runs and clear driver packs."),
+        iconPath = stateValues.drawablePathIconStores,
+        iconRes = stateValues.drawableResIconStores.value
+    ),
+    SupplierFeaturePlanUiModel(
+        title = localizedStringResource(1349, "Price ladder and payment terms"),
+        subtitle = localizedStringResource(1350, "Manage wholesale tiers, local currencies, deferred payments and trusted-store limits."),
+        iconPath = stateValues.drawablePathIconFinances,
+        iconRes = stateValues.drawableResIconFinances.value
+    ),
+    SupplierFeaturePlanUiModel(
+        title = localizedStringResource(1351, "Store reliability scorecards"),
+        subtitle = localizedStringResource(1352, "Know which stores pay on time, order predictably and need extra confirmation before dispatch."),
+        iconPath = stateValues.drawablePathIconAnalytics,
+        iconRes = stateValues.drawableResIconAnalytics.value
+    ),
+    SupplierFeaturePlanUiModel(
+        title = localizedStringResource(1353, "Demand radar"),
+        subtitle = localizedStringResource(1354, "Read reorder rhythm from store orders and prepare stock before the call comes."),
+        iconPath = stateValues.drawablePathIconAnalyticsReport,
+        iconRes = stateValues.drawableResIconAnalyticsReport.value
+    ),
+    SupplierFeaturePlanUiModel(
+        title = localizedStringResource(1355, "Manufacturer backorder bridge"),
+        subtitle = localizedStringResource(1356, "Push confirmed demand upstream to producers and keep stores updated on replenishment."),
+        iconPath = stateValues.drawablePathIconAppModeManufacturer,
+        iconRes = stateValues.drawableResIconAppModeManufacturer.value
+    )
+)
+
+private fun AppConfiguration.supplierDeskAllowedStatuses(): List<SupplierOrderStatusDataModel> = listOf(
+    SupplierOrderStatusDataModel.SeenBySupplier,
+    SupplierOrderStatusDataModel.Confirmed,
+    SupplierOrderStatusDataModel.Packed,
+    SupplierOrderStatusDataModel.InDelivery,
+    SupplierOrderStatusDataModel.IssueReported,
+    SupplierOrderStatusDataModel.Cancelled
+)
+
+private fun AppConfiguration.supplierDeskStoreTitle(order: SupplierOrderDataModel): String {
+    return order.storeNameSnapshot.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { order.storePublicIdSnapshot }
+        .ifBlank { order.storeAddressTextSnapshot }
+        .ifBlank { order.storeId.take(8) }
+}
+
+private fun AppConfiguration.supplierDeskLineTitle(line: SupplierOrderLineDataModel): String {
+    return line.goodsItemNameSnapshot.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { line.goodsItemBarcodeSnapshots.firstOrNull().orEmpty() }
+        .ifBlank { line.goodsItemId.take(8) }
+}
+
+private fun PriceDataModel?.supplierDeskMoneyText(): String = this?.let { price ->
+    listOf(price.price, price.currency).filter { it.isNotBlank() }.joinToString(" ")
+}.orEmpty()
+
+private fun SupplierOrderDataModel.supplierDeskSortTime(): Long =
+    updatedAtMillis.takeIf { it > 0L } ?: orderedAtMillis.takeIf { it > 0L } ?: createdAtMillis
+
+private fun AppConfiguration.supplierDeskOrderSearchText(
+    order: SupplierOrderDataModel,
+    lines: List<SupplierOrderLineDataModel>
+): String = buildString {
+    append(order.id).append(' ')
+    append(order.storeId).append(' ')
+    append(order.supplierId).append(' ')
+    append(supplierDeskStoreTitle(order)).append(' ')
+    append(order.storePublicIdSnapshot).append(' ')
+    append(order.storeAddressTextSnapshot).append(' ')
+    append(order.status.name).append(' ')
+    append(supplierOrderStatusTitle(order.status)).append(' ')
+    append(order.additionalNotes.orEmpty()).append(' ')
+    append(order.supplierComment.orEmpty()).append(' ')
+    lines.forEach { line ->
+        append(line.goodsItemId).append(' ')
+        append(supplierDeskLineTitle(line)).append(' ')
+        append(line.goodsItemBarcodeSnapshots.joinToString(" ")).append(' ')
+        append(line.additionalNotes.orEmpty()).append(' ')
+        append(line.supplierComment.orEmpty()).append(' ')
+    }
+}.lowercase()
+
+@Composable
+private fun AppConfiguration.SupplierDeskSummaryCard(
+    modifier: Modifier = Modifier,
+    title: String,
+    value: String,
+    subtitle: String,
+    iconPath: String,
+    iconRes: DrawableResource?
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor, RoundedCornerShape(stateValues.cornerRadius))
+            .padding(stateValues.marginTextFieldGroup),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .clip(RoundedCornerShape(stateValues.cornerRadius))
+                .background(stateValues.AccentColor.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center
+        ) {
+            CpImage(
+                modifier = Modifier.size(26.dp),
+                url = iconPath,
+                fallbackRes = iconRes,
+                contentDescription = title,
+                tintColor = stateValues.AccentColor
+            )
+        }
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = value,
+                color = stateValues.AccentColor,
+                fontSize = stateValues.titleTextSize,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = title,
+                color = stateValues.TextColor,
+                fontSize = stateValues.textSize,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = subtitle,
+                color = stateValues.PlaceholderTextColor,
+                fontSize = stateValues.smallTextSize,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun AppConfiguration.SupplierFeaturePlanCard(
+    feature: SupplierFeaturePlanUiModel,
+    compact: Boolean = false
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(if (feature.implemented) stateValues.AccentColor.copy(alpha = 0.10f) else stateValues.BackgroundColor)
+            .border(
+                if (feature.implemented) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
+                if (feature.implemented) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+                RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .padding(if (compact) stateValues.marginTextField else stateValues.marginTextFieldGroup),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+    ) {
+        CpImage(
+            modifier = Modifier.size(if (compact) 24.dp else 34.dp),
+            url = feature.iconPath,
+            fallbackRes = feature.iconRes,
+            contentDescription = feature.title,
+            tintColor = if (feature.implemented) stateValues.AccentColor else stateValues.IconTintColor
+        )
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = feature.title,
+                color = if (feature.implemented) stateValues.AccentColor else stateValues.TextColor,
+                fontSize = if (compact) stateValues.textSize else stateValues.accentTextSize,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = feature.subtitle,
+                color = stateValues.PlaceholderTextColor,
+                fontSize = stateValues.smallTextSize,
+                maxLines = if (compact) 2 else 3,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        if (feature.implemented) {
+            Text(
+                text = localizedStringResource(1357, "LIVE"),
+                color = stateValues.AccentTextColor,
+                fontSize = stateValues.smallTextSize,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            )
+        }
+    }
+}
+
+private fun AppConfiguration.patchSupplierDeskOrder(
+    order: SupplierOrderDataModel,
+    lines: List<SupplierOrderLineDataModel>,
+    status: SupplierOrderStatusDataModel,
+    comment: String
+) {
+    val cleanComment = comment.trim().takeIf { it.isNotBlank() }
+    updateSupplierOrder(
+        SupplierOrderWithLinesDataModel(
+            order = order.copy(
+                status = status,
+                supplierComment = cleanComment,
+                supplierCommentLocalized = cleanComment?.let { listOf(LocalizedStringDataModel(stateValues.appLanguage, it)) }.orEmpty(),
+                updatedAtMillis = getCurrentTimeMillis()
+            ),
+            lines = lines
+        )
+    ) { result ->
+        if (result is DataState.Success) {
+            getMySupplierSideOrders()
+        }
+    }
+}
+
+@Composable
+private fun AppConfiguration.SupplierOrderDeskCard(
+    order: SupplierOrderDataModel,
+    lines: List<SupplierOrderLineDataModel>
+) {
+    val allowedStatuses = supplierDeskAllowedStatuses()
+    var selectedStatusId by rememberSaveable(order.id, order.status.name) { mutableStateOf(order.status.name) }
+    var commentText by rememberSaveable(order.id, order.supplierComment.orEmpty()) {
+        mutableStateOf(
+            order.supplierCommentLocalized.extractLocalizedString(stateValues.appLanguage)
+                ?: order.supplierCommentLocalized.extractLocalizedString("main")
+                ?: order.supplierComment.orEmpty()
+        )
+    }
+    val selectedStatus = runCatching { SupplierOrderStatusDataModel.valueOf(selectedStatusId) }.getOrDefault(order.status)
+    val storeTitle = supplierDeskStoreTitle(order)
+    val totalQuantityText = lines
+        .filter { it.isActive }
+        .joinToString(" • ") { line -> line.requestedQuantity.quantityText(stateValues.appLanguage) }
+        .takeIf { it.isNotBlank() }
+        ?: lines.size.toString()
+    val amountText = order.amount.supplierDeskMoneyText()
+    val isClosed = order.status.isSupplierOrderClosed()
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .border(
+                if (isClosed) stateValues.unfocusedBorderWidth else stateValues.focusedBorderWidth,
+                if (isClosed) stateValues.PlaceholderTextColor else stateValues.AccentColor,
+                RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .padding(stateValues.marginTextFieldGroup),
+        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CpImage(
+                    modifier = Modifier.size(28.dp),
+                    url = stateValues.drawablePathIconStores,
+                    fallbackRes = stateValues.drawableResIconStores.value,
+                    contentDescription = storeTitle,
+                    tintColor = stateValues.AccentColor
+                )
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = storeTitle,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.accentTextSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "${supplierOrderStatusTitle(order.status)} • ${receiptUiDateTime(order.supplierDeskSortTime())}",
+                    color = if (isClosed) stateValues.PlaceholderTextColor else stateValues.AccentColor,
+                    fontSize = stateValues.smallTextSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                order.storeAddressTextSnapshot.takeIf { it.isNotBlank() }?.let { address ->
+                    Text(
+                        text = address,
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            Text(
+                text = amountText.ifBlank { totalQuantityText },
+                color = stateValues.AccentColor,
+                fontSize = stateValues.accentTextSize,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.End,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        StockCardInfoLine(localizedStringResource(960, "Ordered quantity"), totalQuantityText, stateValues.TextColor)
+        order.desiredDeliveryTimeMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let {
+            StockCardInfoLine(localizedStringResource(956, "Desired delivery"), it, stateValues.TextColor)
+        }
+        val orderNotesText = order.additionalNotesLocalized.extractLocalizedString(stateValues.appLanguage)
+            ?: order.additionalNotesLocalized.extractLocalizedString("main")
+            ?: order.additionalNotes
+        orderNotesText?.let { notes ->
+            StockCardInfoLine(localizedStringResource(201, "Notes"), notes, stateValues.TextColor)
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(stateValues.cornerRadius))
+                .background(stateValues.DisabledColor.copy(alpha = 0.20f))
+                .padding(stateValues.marginTextField),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = localizedStringResource(1358, "Requested goods"),
+                color = stateValues.TextColor,
+                fontSize = stateValues.textSize,
+                fontWeight = FontWeight.Bold
+            )
+            lines.filter { it.isActive }.forEach { line ->
+                val goodsTitle = supplierDeskLineTitle(line)
+                val linePrice = line.expectedSupplyPrice.supplierDeskMoneyText()
+                val barcode = line.goodsItemBarcodeSnapshots.firstOrNull().orEmpty()
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(stateValues.cornerRadius))
+                        .background(stateValues.BackgroundColor)
+                        .padding(stateValues.marginTextField),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = goodsTitle,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.textSize,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = listOf(
+                            line.requestedQuantity.quantityText(stateValues.appLanguage),
+                            linePrice,
+                            barcode.takeIf { it.isNotBlank() }?.let { "#${it}" }.orEmpty()
+                        ).filter { it.isNotBlank() }.joinToString(" • "),
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    val lineNotesText = line.additionalNotesLocalized.extractLocalizedString(stateValues.appLanguage)
+                        ?: line.additionalNotesLocalized.extractLocalizedString("main")
+                        ?: line.additionalNotes
+                    lineNotesText?.let { notes ->
+                        Text(
+                            text = notes,
+                            color = stateValues.PlaceholderTextColor,
+                            fontSize = stateValues.smallTextSize,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
+
+        if (!isClosed) {
+            SimpleDropdownField(
+                title = localizedStringResource(1359, "Supplier action"),
+                selectedId = selectedStatusId,
+                options = allowedStatuses.map { status ->
+                    DropdownOption(
+                        id = status.name,
+                        title = supplierOrderStatusTitle(status)
+                    )
+                },
+                placeholder = supplierOrderStatusTitle(order.status),
+                onSelected = { selectedStatusId = it }
+            )
+
+            SimpleTextInput(
+                modifier = Modifier.fillMaxWidth(),
+                value = commentText,
+                placeholder = localizedStringResource(1360, "Comment for the store"),
+                singleLine = false,
+                leadingIconPath = stateValues.drawablePathIconResponse,
+                onValueChange = { commentText = it }
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1361, "Save response"),
+                    iconPath = stateValues.drawablePathIconCheck,
+                    confirmationRequired = false,
+                    onClick = { patchSupplierDeskOrder(order, lines, selectedStatus, commentText) }
+                )
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1362, "Confirm"),
+                    iconPath = stateValues.drawablePathIconTransactionSupply,
+                    confirmationRequired = false,
+                    onClick = { patchSupplierDeskOrder(order, lines, SupplierOrderStatusDataModel.Confirmed, commentText) }
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1363, "Packed"),
+                    iconPath = stateValues.drawablePathIconStock,
+                    confirmationRequired = false,
+                    onClick = { patchSupplierDeskOrder(order, lines, SupplierOrderStatusDataModel.Packed, commentText) }
+                )
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1364, "In delivery"),
+                    iconPath = stateValues.drawablePathIconStores,
+                    confirmationRequired = false,
+                    onClick = { patchSupplierDeskOrder(order, lines, SupplierOrderStatusDataModel.InDelivery, commentText) }
+                )
+            }
+        } else {
+            Text(
+                text = localizedStringResource(1365, "Closed orders stay here as a clean supplier-side fulfillment record."),
+                color = stateValues.PlaceholderTextColor,
+                fontSize = stateValues.smallTextSize
+            )
+        }
+    }
+}
+
+@Composable
+private fun AppConfiguration.SupplierOrdersInboxScreen() {
+    val orders by supplierOrdersState.payload.collectAsState()
+    val lines by supplierOrderLinesState.payload.collectAsState()
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var statusFilter by rememberSaveable { mutableStateOf("open") }
+
+    LaunchedEffect(stateValues.userAccount?.id) {
+        if (stateValues.userAccount != null) {
+            getMySupplierSideOrders()
+        }
+    }
+
+    val activeOrders = remember(orders) {
+        orders.orEmpty()
+            .filter { it.isActive }
+            .sortedByDescending { it.supplierDeskSortTime() }
+    }
+    val linesByOrder = remember(lines) { lines.orEmpty().filter { it.isActive }.groupBy { it.orderId } }
+    val filteredOrders = remember(activeOrders, linesByOrder, searchQuery, statusFilter, stateValues.appLanguage) {
+        val normalizedSearch = searchQuery.trim().lowercase()
+        activeOrders.filter { order ->
+            val statusMatches = when (statusFilter) {
+                "all" -> true
+                "open" -> !order.status.isSupplierOrderClosed()
+                else -> order.status.name == statusFilter
+            }
+            val queryMatches = normalizedSearch.isBlank() || supplierDeskOrderSearchText(order, linesByOrder[order.id].orEmpty()).contains(normalizedSearch)
+            statusMatches && queryMatches
+        }
+    }
+    val openCount = activeOrders.count { !it.status.isSupplierOrderClosed() }
+    val todayAttentionCount = activeOrders.count { order ->
+        !order.status.isSupplierOrderClosed() && (order.status == SupplierOrderStatusDataModel.Sent || order.status == SupplierOrderStatusDataModel.SeenBySupplier)
+    }
+    val linesCount = activeOrders.sumOf { order -> linesByOrder[order.id].orEmpty().size }
+    val featurePlan = supplierMarketWinningFeatures()
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        ScreenAppBarWidget(
+            title = localizedStringResource(1366, "Supplier desk"),
+            iconPath = stateValues.drawablePathIconAppModeSupplier,
+            iconRes = stateValues.drawableResIconAppModeSupplier.value
+        )
+
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.74f)
+                .align(Alignment.CenterHorizontally)
+                .padding(stateValues.marginTextField),
+            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
+            contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
+        ) {
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+                        .clip(RoundedCornerShape(stateValues.cornerRadius))
+                        .background(stateValues.AccentColor.copy(alpha = 0.10f))
+                        .border(stateValues.focusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
+                        .padding(stateValues.marginTextFieldGroup),
+                    verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                    ) {
+                        CpImage(
+                            modifier = Modifier.size(42.dp),
+                            url = stateValues.drawablePathIconAppModeSupplier,
+                            fallbackRes = stateValues.drawableResIconAppModeSupplier.value,
+                            contentDescription = localizedStringResource(1366, "Supplier desk"),
+                            tintColor = stateValues.AccentColor
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = localizedStringResource(1367, "Fulfillment command center"),
+                                color = stateValues.TextColor,
+                                fontSize = stateValues.titleTextSize,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = localizedStringResource(1368, "The first supplier foundation: a market-ready inbox for store orders, delivery status, comments and reliable B2B rhythm."),
+                                color = stateValues.PlaceholderTextColor,
+                                fontSize = stateValues.smallTextSize
+                            )
+                        }
+                    }
+
+                    if (stateValues.isNarrowScreen) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                        ) {
+                            SupplierDeskSummaryCard(
+                                title = localizedStringResource(1369, "Open orders"),
+                                value = openCount.toString(),
+                                subtitle = localizedStringResource(1370, "Waiting for supplier action"),
+                                iconPath = stateValues.drawablePathIconAppModeSupplier,
+                                iconRes = stateValues.drawableResIconAppModeSupplier.value
+                            )
+                            SupplierDeskSummaryCard(
+                                title = localizedStringResource(1371, "Needs attention"),
+                                value = todayAttentionCount.toString(),
+                                subtitle = localizedStringResource(1372, "New or recently seen requests"),
+                                iconPath = stateValues.drawablePathIconResponse,
+                                iconRes = stateValues.drawableResIconResponse.value
+                            )
+                            SupplierDeskSummaryCard(
+                                title = localizedStringResource(1373, "Requested lines"),
+                                value = linesCount.toString(),
+                                subtitle = localizedStringResource(1374, "Goods positions from stores"),
+                                iconPath = stateValues.drawablePathIconStock,
+                                iconRes = stateValues.drawableResIconStock.value
+                            )
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                        ) {
+                            SupplierDeskSummaryCard(
+                                modifier = Modifier.weight(1f),
+                                title = localizedStringResource(1369, "Open orders"),
+                                value = openCount.toString(),
+                                subtitle = localizedStringResource(1370, "Waiting for supplier action"),
+                                iconPath = stateValues.drawablePathIconAppModeSupplier,
+                                iconRes = stateValues.drawableResIconAppModeSupplier.value
+                            )
+                            SupplierDeskSummaryCard(
+                                modifier = Modifier.weight(1f),
+                                title = localizedStringResource(1371, "Needs attention"),
+                                value = todayAttentionCount.toString(),
+                                subtitle = localizedStringResource(1372, "New or recently seen requests"),
+                                iconPath = stateValues.drawablePathIconResponse,
+                                iconRes = stateValues.drawableResIconResponse.value
+                            )
+                            SupplierDeskSummaryCard(
+                                modifier = Modifier.weight(1f),
+                                title = localizedStringResource(1373, "Requested lines"),
+                                value = linesCount.toString(),
+                                subtitle = localizedStringResource(1374, "Goods positions from stores"),
+                                iconPath = stateValues.drawablePathIconStock,
+                                iconRes = stateValues.drawableResIconStock.value
+                            )
+                        }
+                    }
+                }
+            }
+
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+                        .clip(RoundedCornerShape(stateValues.cornerRadius))
+                        .background(stateValues.BackgroundColor)
+                        .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor, RoundedCornerShape(stateValues.cornerRadius))
+                        .padding(stateValues.marginTextFieldGroup),
+                    verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                ) {
+                    Text(
+                        text = localizedStringResource(1375, "Find the right request fast"),
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.titleTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    SimpleTextInput(
+                        modifier = Modifier.fillMaxWidth(),
+                        value = searchQuery,
+                        placeholder = localizedStringResource(216, "Search"),
+                        leadingIconPath = stateValues.drawablePathIconSearch,
+                        onValueChange = { searchQuery = it }
+                    )
+
+                    SimpleDropdownField(
+                        title = localizedStringResource(1376, "Status filter"),
+                        selectedId = statusFilter,
+                        options = listOf(
+                            DropdownOption("open", localizedStringResource(1377, "Open")),
+                            DropdownOption("all", localizedStringResource(1378, "All"))
+                        ) + SupplierOrderStatusDataModel.entries.map { status ->
+                            DropdownOption(status.name, supplierOrderStatusTitle(status))
+                        },
+                        placeholder = localizedStringResource(1377, "Open"),
+                        onSelected = { statusFilter = it }
+                    )
+                }
+            }
+
+            if (activeOrders.isEmpty()) {
+                item {
+                    MessageText(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(1379, "No store orders have reached this supplier profile yet. When stores send supply requests, they will appear here.")
+                    )
+                }
+            } else if (filteredOrders.isEmpty()) {
+                item {
+                    MessageText(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(1380, "No orders match this filter")
+                    )
+                }
+            } else {
+                items(filteredOrders, key = { it.id }) { order ->
+                    SupplierOrderDeskCard(
+                        order = order,
+                        lines = linesByOrder[order.id].orEmpty()
+                    )
+                }
+            }
+
+            item {
+                Text(
+                    text = localizedStringResource(1381, "Supplier feature roadmap"),
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.titleTextSize,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            items(featurePlan) { feature ->
+                SupplierFeaturePlanCard(feature = feature, compact = true)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppConfiguration.SupplierPlaceholderScreen(
+    title: String,
+    subtitle: String,
+    iconPath: String,
+    iconRes: DrawableResource?
+) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        ScreenAppBarWidget(
+            title = title,
+            iconPath = iconPath,
+            iconRes = iconRes
+        )
+
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.68f)
+                .align(Alignment.CenterHorizontally)
+                .padding(stateValues.marginTextField),
+            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
+            contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
+        ) {
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+                        .clip(RoundedCornerShape(stateValues.cornerRadius))
+                        .background(stateValues.BackgroundColor)
+                        .border(stateValues.focusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
+                        .padding(stateValues.marginTextFieldGroup),
+                    verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(54.dp),
+                        url = iconPath,
+                        fallbackRes = iconRes,
+                        contentDescription = title,
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = title,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.titleTextSize,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = subtitle,
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.textSize,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+
+            items(supplierMarketWinningFeatures().filterNot { it.implemented }) { feature ->
+                SupplierFeaturePlanCard(feature = feature, compact = false)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppConfiguration.SupplierScreen() {
+    when (stateValues.navigationScreensMain.last()) {
+        is NavigationScreenModel.Supplier.Orders -> SupplierOrdersInboxScreen()
+        is NavigationScreenModel.Supplier.Catalog -> SupplierPlaceholderScreen(
+            title = localizedStringResource(1338, "Catalog"),
+            subtitle = localizedStringResource(1382, "Next foundation: reusable B2B catalog offers connected to the store-side supplier order bridge."),
+            iconPath = stateValues.drawablePathIconStock,
+            iconRes = stateValues.drawableResIconStock.value
+        )
+        is NavigationScreenModel.Supplier.Customers -> SupplierPlaceholderScreen(
+            title = localizedStringResource(1339, "Customers"),
+            subtitle = localizedStringResource(1383, "Upcoming: store relationship cards, reliability, route clusters and private terms."),
+            iconPath = stateValues.drawablePathIconStores,
+            iconRes = stateValues.drawableResIconStores.value
+        )
+        is NavigationScreenModel.Supplier.Analytics -> SupplierPlaceholderScreen(
+            title = localizedStringResource(1340, "Insights"),
+            subtitle = localizedStringResource(1384, "Upcoming: demand radar, margin lens, delivery performance and cross-market growth signals."),
+            iconPath = stateValues.drawablePathIconAnalytics,
+            iconRes = stateValues.drawableResIconAnalytics.value
+        )
+        else -> SupplierOrdersInboxScreen()
+    }
+}
+
 @Composable
 private fun AppConfiguration.SupplierOrdersForGoodsItemContent(
     modifier: Modifier = Modifier,
@@ -21149,6 +21977,53 @@ sealed class NavigationScreenModel(
         }
     }
 
+    sealed class Supplier(route: String): NavigationScreenModel(route) {
+
+        sealed class Orders(route: String): Supplier(route) {
+            data object Main: Orders("SupplierOrdersMainNavigationScreenModelRoute") {
+                override val name: String
+                    get() = with(AppConfiguration) { localizedStringResource(1337, "Orders") }
+                override val iconPath: String
+                    get() = AppConfiguration.stateValues.drawablePathIconAppModeSupplier
+                override val iconRes: DrawableResource
+                    get() = AppConfiguration.stateValues.drawableResIconAppModeSupplier.value
+            }
+        }
+
+        sealed class Catalog(route: String): Supplier(route) {
+            data object Main: Catalog("SupplierCatalogMainNavigationScreenModelRoute") {
+                override val name: String
+                    get() = with(AppConfiguration) { localizedStringResource(1338, "Catalog") }
+                override val iconPath: String
+                    get() = AppConfiguration.stateValues.drawablePathIconStock
+                override val iconRes: DrawableResource
+                    get() = AppConfiguration.stateValues.drawableResIconStock.value
+            }
+        }
+
+        sealed class Customers(route: String): Supplier(route) {
+            data object Main: Customers("SupplierCustomersMainNavigationScreenModelRoute") {
+                override val name: String
+                    get() = with(AppConfiguration) { localizedStringResource(1339, "Customers") }
+                override val iconPath: String
+                    get() = AppConfiguration.stateValues.drawablePathIconStores
+                override val iconRes: DrawableResource
+                    get() = AppConfiguration.stateValues.drawableResIconStores.value
+            }
+        }
+
+        sealed class Analytics(route: String): Supplier(route) {
+            data object Main: Analytics("SupplierAnalyticsMainNavigationScreenModelRoute") {
+                override val name: String
+                    get() = with(AppConfiguration) { localizedStringResource(1340, "Insights") }
+                override val iconPath: String
+                    get() = AppConfiguration.stateValues.drawablePathIconAnalytics
+                override val iconRes: DrawableResource
+                    get() = AppConfiguration.stateValues.drawableResIconAnalytics.value
+            }
+        }
+    }
+
 
     data object Notifications: NavigationScreenModel("NotificationsNavigationScreenModelRoute") {
         override val iconPath: String
@@ -21637,7 +22512,11 @@ private fun persistentAppNavigationScreens(): List<NavigationScreenModel> = list
     NavigationScreenModel.Buyer.Main.Home,
     NavigationScreenModel.Buyer.Main.Search,
     NavigationScreenModel.Buyer.Cart.Main,
-    NavigationScreenModel.Buyer.Orders.Main
+    NavigationScreenModel.Buyer.Orders.Main,
+    NavigationScreenModel.Supplier.Orders.Main,
+    NavigationScreenModel.Supplier.Catalog.Main,
+    NavigationScreenModel.Supplier.Customers.Main,
+    NavigationScreenModel.Supplier.Analytics.Main
 )
 
 private fun persistentAppRouteToScreen(route: String): NavigationScreenModel? =
@@ -21668,12 +22547,31 @@ private suspend fun restorePersistentAppStateHosts(stateHosts: Map<String, Map<S
 private fun List<NavigationScreenModel>.toPersistentAppRoutes(): List<String> =
     map { it.toPersistentAppRoute() }
 
+private fun defaultMainScreenForAppMode(modeId: Int): NavigationScreenModel = when (modeId) {
+    APP_MODE_SUPPLIER -> NavigationScreenModel.Supplier.Orders.Main
+    APP_MODE_BUYER -> NavigationScreenModel.Buyer.Main.Home
+    APP_MODE_MANUFACTURER -> NavigationScreenModel.Supplier.Catalog.Main
+    else -> NavigationScreenModel.Transaction.MainSale
+}
+
+private fun NavigationScreenModel.isMainScreenCompatibleWithAppMode(modeId: Int): Boolean = when {
+    this is NavigationScreenModel.Splash -> true
+    this is NavigationScreenModel.UserAuth -> true
+    this is NavigationScreenModel.Menu -> true
+    this is NavigationScreenModel.Notifications -> true
+    this is NavigationScreenModel.Supplier -> modeId == APP_MODE_SUPPLIER || modeId == APP_MODE_MANUFACTURER
+    this is NavigationScreenModel.Buyer -> modeId == APP_MODE_BUYER
+    this is NavigationScreenModel.Transaction -> modeId == APP_MODE_STORE
+    this is NavigationScreenModel.Stock -> modeId == APP_MODE_STORE
+    else -> true
+}
+
 private fun List<String>?.toPersistentMainStack(): List<NavigationScreenModel> {
     val restoredCurrent = orEmpty()
         .mapNotNull { persistentAppRouteToScreen(it) }
         .filterNot { it.route == NavigationScreenModel.Splash.route }
         .lastOrNull()
-        ?: NavigationScreenModel.Transaction.MainSale
+        ?: defaultMainScreenForAppMode(appModeState.value)
 
     return listOf(restoredCurrent)
 }
@@ -21743,7 +22641,7 @@ private fun List<NavigationScreenModel>.toCompactPersistentMainRoutes(): List<St
     lastOrNull()
         ?.takeIf { it.route != NavigationScreenModel.Splash.route }
         ?.let { listOf(it.route) }
-        ?: listOf(NavigationScreenModel.Transaction.MainSale.route)
+        ?: listOf(defaultMainScreenForAppMode(appModeState.value).route)
 
 private fun List<String>?.toPersistentTransactionStack(
     defaultFirst: NavigationScreenModel.Transaction
@@ -21776,6 +22674,14 @@ object Navigation {
         NavigationScreenModel.Buyer.Main.Home,
         NavigationScreenModel.Buyer.Cart.Main,
         NavigationScreenModel.Buyer.Orders.Main,
+        NavigationScreenModel.Menu.Main
+    )
+
+    val bottomNavBarScreensSupplier = listOf(
+        NavigationScreenModel.Supplier.Orders.Main,
+        NavigationScreenModel.Supplier.Catalog.Main,
+        NavigationScreenModel.Supplier.Customers.Main,
+        NavigationScreenModel.Supplier.Analytics.Main,
         NavigationScreenModel.Menu.Main
     )
 
@@ -21840,7 +22746,7 @@ object Navigation {
     }
 
     suspend fun goMain(model: NavigationScreenModel) {
-        if (model::class != _Main.value.last()::class)
+        if (model.route != _Main.value.last().route)
             _Main.emit(listOf(model))
     }
 
@@ -24495,6 +25401,7 @@ object Navigation {
         val listScreens = listOf(
             NavigationScreenModel.Menu.UserAccount,
             NavigationScreenModel.Menu.Notifications,
+            NavigationScreenModel.Menu.AppMode,
             NavigationScreenModel.Menu.Finances,
             NavigationScreenModel.Menu.StoreSubscription,
             NavigationScreenModel.Menu.Stores,
@@ -29664,8 +30571,34 @@ private fun AppConfiguration.canOpenMenuDestination(model: NavigationScreenModel
     }
 }
 
+private fun AppConfiguration.menuDestinationsForCurrentMode(): List<NavigationScreenModel.Menu> = when (stateValues.appModeId) {
+    APP_MODE_SUPPLIER, APP_MODE_MANUFACTURER -> listOf(
+        NavigationScreenModel.Menu.UserAccount,
+        NavigationScreenModel.Menu.Notifications,
+        NavigationScreenModel.Menu.AppMode,
+        NavigationScreenModel.Menu.Finances,
+        NavigationScreenModel.Menu.Security,
+        NavigationScreenModel.Menu.Support,
+        NavigationScreenModel.Menu.AppLanguage,
+        NavigationScreenModel.Menu.AppTheme,
+        NavigationScreenModel.Menu.AppScale
+    )
+    APP_MODE_BUYER -> listOf(
+        NavigationScreenModel.Menu.UserAccount,
+        NavigationScreenModel.Menu.Notifications,
+        NavigationScreenModel.Menu.AppMode,
+        NavigationScreenModel.Menu.Finances,
+        NavigationScreenModel.Menu.Security,
+        NavigationScreenModel.Menu.Support,
+        NavigationScreenModel.Menu.AppLanguage,
+        NavigationScreenModel.Menu.AppTheme,
+        NavigationScreenModel.Menu.AppScale
+    )
+    else -> Navigation.Menu.listScreens
+}
+
 private fun AppConfiguration.filteredMenuDestinations(): List<NavigationScreenModel.Menu> {
-    return Navigation.Menu.listScreens.filter { canOpenMenuDestination(it) }
+    return menuDestinationsForCurrentMode().filter { canOpenMenuDestination(it) }
 }
 
 private fun AppConfiguration.filteredMainBottomDestinations(): List<NavigationScreenModel> {
@@ -29833,6 +30766,109 @@ private fun AppConfiguration.ActiveWorkshiftMenuTile(workshift: WorkshiftDataMod
     }
 }
 
+
+@Composable
+private fun AppConfiguration.SupplierWorkspaceMenuTile() {
+    val destinations = Navigation.bottomNavBarScreensSupplier.filterNot { it is NavigationScreenModel.Menu }
+    val currentRoute = stateValues.navigationScreensMain.last().route
+    val manufacturerMode = stateValues.appModeId == APP_MODE_MANUFACTURER
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2)
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.AccentColor.copy(alpha = 0.10f))
+            .border(stateValues.focusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
+            .padding(stateValues.marginTextFieldGroup),
+        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            CpImage(
+                modifier = Modifier.size(38.dp),
+                url = if (manufacturerMode) stateValues.drawablePathIconAppModeManufacturer else stateValues.drawablePathIconAppModeSupplier,
+                fallbackRes = if (manufacturerMode) stateValues.drawableResIconAppModeManufacturer.value else stateValues.drawableResIconAppModeSupplier.value,
+                contentDescription = localizedStringResource(1400, "Workspace"),
+                tintColor = null
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (manufacturerMode) localizedStringResource(1401, "Producer workspace") else localizedStringResource(1402, "Supplier workspace"),
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.titleTextSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = if (manufacturerMode) {
+                        localizedStringResource(1403, "Producer mode starts with catalog and demand bridge screens while the production layer grows.")
+                    } else {
+                        localizedStringResource(1404, "Jump between order inbox, catalog, customers and insights without returning to the bottom bar.")
+                    },
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        destinations.chunked(if (stateValues.isNarrowScreen) 1 else 2).forEach { rowDestinations ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                rowDestinations.forEach { destination ->
+                    val active = destination.route == currentRoute
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(stateValues.cornerRadius))
+                            .background(if (active) stateValues.AccentColor.copy(alpha = 0.16f) else stateValues.BackgroundColor)
+                            .border(
+                                if (active) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
+                                if (active) stateValues.AccentColor else stateValues.PlaceholderTextColor.copy(alpha = 0.55f),
+                                RoundedCornerShape(stateValues.cornerRadius)
+                            )
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = ripple(color = stateValues.AccentColor)
+                            ) {
+                                coroutineScope.launch { Navigation.goMain(destination) }
+                            }
+                            .padding(horizontal = stateValues.marginTextField, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        CpImage(
+                            modifier = Modifier.size(22.dp),
+                            url = destination.iconPath,
+                            fallbackRes = destination.iconRes,
+                            contentDescription = destination.name,
+                            tintColor = if (active) stateValues.AccentColor else stateValues.IconTintColor
+                        )
+                        Text(
+                            text = destination.name,
+                            color = if (active) stateValues.AccentColor else stateValues.TextColor,
+                            fontSize = stateValues.smallTextSize,
+                            fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+                if (!stateValues.isNarrowScreen && rowDestinations.size == 1) Spacer(modifier = Modifier.weight(1f))
+            }
+        }
+    }
+}
+
 @Composable
 fun AppConfiguration.MenuListScreen() {
     Column(
@@ -29844,12 +30880,14 @@ fun AppConfiguration.MenuListScreen() {
             iconPath = stateValues.drawablePathIconMenu
         )
 
-        stateValues.activeWorkshift?.takeIf { it.isActive && it.endedAtMillis == null && it.storeId == stateValues.activeStoreId }?.let { workshift ->
-            ActiveWorkshiftMenuTile(workshift = workshift)
-        }
+        if (stateValues.appModeId == APP_MODE_STORE) {
+            stateValues.activeWorkshift?.takeIf { it.isActive && it.endedAtMillis == null && it.storeId == stateValues.activeStoreId }?.let { workshift ->
+                ActiveWorkshiftMenuTile(workshift = workshift)
+            }
 
-        if (shouldBlockAppForWorkshift()) {
-            NoActiveWorkshiftMenuTile()
+            if (shouldBlockAppForWorkshift()) {
+                NoActiveWorkshiftMenuTile()
+            }
         }
 
         LazyColumn(
@@ -29857,6 +30895,12 @@ fun AppConfiguration.MenuListScreen() {
             modifier = Modifier
                 .weight(1f)
         ) {
+            if (stateValues.appModeId == APP_MODE_SUPPLIER || stateValues.appModeId == APP_MODE_MANUFACTURER) {
+                item {
+                    SupplierWorkspaceMenuTile()
+                }
+            }
+
             items(filteredMenuDestinations()) { model ->
                 Row(
                     modifier = Modifier
@@ -32289,16 +33333,221 @@ fun AppConfiguration.MenuAppScaleScreen() {
     }
 }
 
+
+private data class AppModeOptionUiModel(
+    val modeId: Int,
+    val title: String,
+    val subtitle: String,
+    val promise: String,
+    val iconPath: String,
+    val iconRes: DrawableResource?,
+    val features: List<String>
+)
+
+private fun AppConfiguration.appModeOptions(): List<AppModeOptionUiModel> = listOf(
+    AppModeOptionUiModel(
+        modeId = APP_MODE_STORE,
+        title = localizedStringResource(724, "Store mode"),
+        subtitle = localizedStringResource(1385, "Point of sale, stock, shifts, workers and store operations."),
+        promise = localizedStringResource(1386, "Best for a shop team serving customers right now."),
+        iconPath = stateValues.drawablePathIconAppModeStore,
+        iconRes = stateValues.drawableResIconAppModeStore.value,
+        features = listOf(
+            localizedStringResource(86, "Sale"),
+            localizedStringResource(87, "Return"),
+            localizedStringResource(88, "Supply"),
+            localizedStringResource(756, "Stock")
+        )
+    ),
+    AppModeOptionUiModel(
+        modeId = APP_MODE_BUYER,
+        title = localizedStringResource(725, "Buyer mode"),
+        subtitle = localizedStringResource(1387, "Personal buying, carts, order history and marketplace discovery."),
+        promise = localizedStringResource(1388, "Best for the end user choosing and tracking goods."),
+        iconPath = stateValues.drawablePathIconAppModeBuyer,
+        iconRes = stateValues.drawableResIconAppModeBuyer.value,
+        features = listOf(
+            localizedStringResource(216, "Search"),
+            stateValues.stringCart,
+            localizedStringResource(254, "Orders"),
+            localizedStringResource(177, "Notifications")
+        )
+    ),
+    AppModeOptionUiModel(
+        modeId = APP_MODE_SUPPLIER,
+        title = localizedStringResource(726, "Supplier mode"),
+        subtitle = localizedStringResource(1389, "Store demand inbox, fulfillment statuses, B2B replies and delivery rhythm."),
+        promise = localizedStringResource(1390, "Best for wholesalers and distributors serving many stores."),
+        iconPath = stateValues.drawablePathIconAppModeSupplier,
+        iconRes = stateValues.drawableResIconAppModeSupplier.value,
+        features = listOf(
+            localizedStringResource(1341, "Smart order inbox"),
+            localizedStringResource(1338, "Catalog"),
+            localizedStringResource(1339, "Customers"),
+            localizedStringResource(1340, "Insights")
+        )
+    ),
+    AppModeOptionUiModel(
+        modeId = APP_MODE_MANUFACTURER,
+        title = localizedStringResource(727, "Producer mode"),
+        subtitle = localizedStringResource(1391, "Production batches, upstream planning, quality and distributor bridge."),
+        promise = localizedStringResource(1392, "Best for factories and makers feeding suppliers and stores."),
+        iconPath = stateValues.drawablePathIconAppModeManufacturer,
+        iconRes = stateValues.drawableResIconAppModeManufacturer.value,
+        features = listOf(
+            localizedStringResource(1393, "Production"),
+            localizedStringResource(1394, "Batches"),
+            localizedStringResource(1395, "Quality"),
+            localizedStringResource(1355, "Manufacturer bridge")
+        )
+    )
+)
+
+@Composable
+private fun AppConfiguration.AppModeFeatureChip(
+    text: String,
+    selected: Boolean
+) {
+    Text(
+        text = text,
+        color = if (selected) stateValues.AccentTextColor else stateValues.TextColor,
+        fontSize = stateValues.smallTextSize,
+        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(if (selected) stateValues.AccentColor else stateValues.DisabledColor.copy(alpha = 0.20f))
+            .border(
+                stateValues.unfocusedBorderWidth,
+                if (selected) stateValues.AccentColor else stateValues.PlaceholderTextColor.copy(alpha = 0.55f),
+                RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .padding(horizontal = 9.dp, vertical = 5.dp)
+    )
+}
+
+@Composable
+private fun AppConfiguration.AppModeSelectionCard(
+    option: AppModeOptionUiModel,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = modifier
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = selected)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(if (selected) stateValues.AccentColor.copy(alpha = 0.10f) else stateValues.BackgroundColor)
+            .border(
+                if (selected) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
+                if (selected) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+                RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple(color = if (selected) stateValues.AccentColor else stateValues.TextColor)
+            ) { onClick() }
+            .padding(stateValues.marginTextFieldGroup),
+        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(58.dp)
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(if (selected) stateValues.AccentColor.copy(alpha = 0.16f) else stateValues.DisabledColor.copy(alpha = 0.18f))
+                    .border(
+                        stateValues.unfocusedBorderWidth,
+                        if (selected) stateValues.AccentColor else stateValues.PlaceholderTextColor.copy(alpha = 0.55f),
+                        RoundedCornerShape(stateValues.cornerRadius)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                CpImage(
+                    modifier = Modifier.size(40.dp),
+                    url = option.iconPath,
+                    fallbackRes = option.iconRes,
+                    contentDescription = option.title,
+                    tintColor = null
+                )
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = option.title,
+                    color = if (selected) stateValues.AccentColor else stateValues.TextColor,
+                    fontSize = stateValues.accentTextSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = option.subtitle,
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            if (selected) {
+                CpImage(
+                    modifier = Modifier.size(22.dp),
+                    url = stateValues.drawablePathIconCheck,
+                    fallbackRes = stateValues.drawableResIconCheck.value,
+                    contentDescription = localizedStringResource(1396, "Selected"),
+                    tintColor = stateValues.AccentColor
+                )
+            }
+        }
+
+        Text(
+            text = option.promise,
+            color = stateValues.TextColor,
+            fontSize = stateValues.textSize,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            option.features.take(2).forEach { chip ->
+                AppModeFeatureChip(text = chip, selected = selected)
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            option.features.drop(2).take(2).forEach { chip ->
+                AppModeFeatureChip(text = chip, selected = selected)
+            }
+        }
+    }
+}
+
 @Composable
 fun AppConfiguration.MenuAppModeScreen() {
+    val options = appModeOptions()
+
     Column(
-        modifier = Modifier
-            .fillMaxSize(),
+        modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally
-    ){
+    ) {
         ScreenAppBarWidget(
             title = stateValues.stringAppMode,
             iconPath = stateValues.drawablePathIconSwitch,
+            iconRes = stateValues.drawableResIconSwitch.value,
             onBack = {
                 coroutineScope.launch {
                     Navigation.Menu.pop(stateValues.isNarrowScreen)
@@ -32306,116 +33555,108 @@ fun AppConfiguration.MenuAppModeScreen() {
             }
         )
 
-        @Composable
-        fun Card(
-            text: String,
-            onClick: (String) -> Unit
+        LazyColumn(
+            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.AppMode),
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.78f),
+            contentPadding = PaddingValues(
+                start = stateValues.marginTextField,
+                end = stateValues.marginTextField,
+                top = stateValues.marginTextField,
+                bottom = stateValues.screenHeight / 6
+            ),
+            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
         ) {
-            Column(
-                modifier = Modifier
-                    .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
-                    .clip(RoundedCornerShape(stateValues.cornerRadius))
-                    .border(stateValues.unfocusedBorderWidth, color = stateValues.TextColor, RoundedCornerShape(stateValues.cornerRadius))
-                    .clickable(
-                        interactionSource = remember {
-                            MutableInteractionSource()
-                        },
-                        indication = ripple(color = stateValues.TextColor)
-                    ) {
-                        onClick(text)
-                    }
-            ) {
-                Text(
+            item {
+                Column(
                     modifier = Modifier
-                        .padding(16.dp),
-                    text = text,
-                    color = stateValues.TextColor,
-                    fontWeight = FontWeight.Bold
+                        .fillMaxWidth()
+                        .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+                        .clip(RoundedCornerShape(stateValues.cornerRadius))
+                        .background(stateValues.AccentColor.copy(alpha = 0.10f))
+                        .border(stateValues.focusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
+                        .padding(stateValues.marginTextFieldGroup),
+                    verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(58.dp),
+                        url = options.firstOrNull { it.modeId == stateValues.appModeId }?.iconPath ?: stateValues.drawablePathIconSwitch,
+                        fallbackRes = options.firstOrNull { it.modeId == stateValues.appModeId }?.iconRes ?: stateValues.drawableResIconSwitch.value,
+                        contentDescription = stateValues.stringAppMode,
+                        tintColor = null
+                    )
+                    Text(
+                        text = localizedStringResource(1397, "Choose how AITA behaves today"),
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.titleTextSize,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = localizedStringResource(1398, "Each mode keeps the same account, but reshapes navigation, shortcuts and the first screen around the role: store, buyer, supplier or producer."),
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.textSize,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+
+            item {
+                if (stateValues.isNarrowScreen) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                    ) {
+                        options.forEach { option ->
+                            AppModeSelectionCard(
+                                option = option,
+                                selected = stateValues.appModeId == option.modeId,
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = {
+                                    setAppMode(option.modeId)
+                                    coroutineScope.launch { Navigation.goMain(defaultMainScreenForAppMode(option.modeId)) }
+                                }
+                            )
+                        }
+                    }
+                } else {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                    ) {
+                        options.chunked(2).forEach { rowOptions ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                            ) {
+                                rowOptions.forEach { option ->
+                                    AppModeSelectionCard(
+                                        option = option,
+                                        selected = stateValues.appModeId == option.modeId,
+                                        modifier = Modifier.weight(1f),
+                                        onClick = {
+                                            setAppMode(option.modeId)
+                                            coroutineScope.launch { Navigation.goMain(defaultMainScreenForAppMode(option.modeId)) }
+                                        }
+                                    )
+                                }
+                                if (rowOptions.size == 1) Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+            }
+
+            item {
+                Text(
+                    text = localizedStringResource(1399, "Supplier mode starts with the Smart order inbox: the foundation that connects store-side supplier orders to a supplier-side fulfillment desk."),
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
                 )
-            }
-        }
-
-        if (AppConfiguration.stateValues.isNarrowScreen) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.6f),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Column {
-                    Card(
-                        localizedStringResource(724, "Store mode")
-                    ) {
-                        setAppMode(0)
-                    }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Card(
-                        localizedStringResource(725, "Buyer mode")
-                    ) {
-                        setAppMode(1)
-                    }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Card(
-                        localizedStringResource(726, "Supplier mode")
-                    ) {
-                        setAppMode(2)
-                    }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Card(
-                        localizedStringResource(727, "Producer mode")
-                    ) {
-                        setAppMode(3)
-                    }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-                }
-            }
-        } else {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth(0.6f)
-                    .fillMaxHeight(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Card(
-                    localizedStringResource(724, "Store mode")
-                ) {
-                    setAppMode(0)
-                }
-
-                Spacer(modifier = Modifier.width(4.dp))
-
-                Card(
-                    localizedStringResource(725, "Buyer mode")
-                ) {
-                    setAppMode(1)
-                }
-
-                Spacer(modifier = Modifier.width(4.dp))
-
-                Card(
-                    localizedStringResource(726, "Supplier mode")
-                ) {
-                    setAppMode(2)
-                }
-
-                Spacer(modifier = Modifier.width(4.dp))
-
-                Card(
-                    localizedStringResource(727, "Producer mode")
-                ) {
-                    setAppMode(3)
-                }
-
-                Spacer(modifier = Modifier.width(4.dp))
             }
         }
     }
@@ -35651,12 +36892,20 @@ fun AppConfiguration.MainScreen() {
                     }
                 } else if ((it is DataState.Success) && Navigation.Main.value.last()
                         .run { this is NavigationScreenModel.UserAuth || this is NavigationScreenModel.Splash }
-                ) Navigation.goMain(NavigationScreenModel.Transaction.MainSale)
+                ) Navigation.goMain(defaultMainScreenForAppMode(stateValues.appModeId))
             }
         }
 
         CloudConnectionStatusBanner()
         LocalAppPreferencesPriorityEffect()
+
+        LaunchedEffect(stateValues.appModeId, stateValues.navigationScreensMain.last().route) {
+            Navigation.awaitAppNavigationRestore()
+            val current = stateValues.navigationScreensMain.last()
+            if (!current.isMainScreenCompatibleWithAppMode(stateValues.appModeId)) {
+                Navigation.goMain(defaultMainScreenForAppMode(stateValues.appModeId))
+            }
+        }
 
         if (stateValues.isNarrowScreen && visibleNotifications.isNotEmpty()) {
             AnimatedVisibility(
@@ -35705,6 +36954,7 @@ fun AppConfiguration.MainScreen() {
                     is NavigationScreenModel.Notifications -> NotificationsScreen()
                     is NavigationScreenModel.Transaction.MainSale, NavigationScreenModel.Transaction.MainReturn, NavigationScreenModel.Transaction.MainSupply -> TransactionScreen()
                     is NavigationScreenModel.Stock -> StockScreen()
+                    is NavigationScreenModel.Supplier -> SupplierScreen()
                     is NavigationScreenModel.Menu -> MenuScreen()
                     else -> {}
                 }
@@ -35799,7 +37049,8 @@ fun AppConfiguration.MainScreen() {
                     else width((stateValues.boundWidgetWidth * 2.2f))
                 }) {
                 val items = when (stateValues.appModeId) {
-                    0 -> filteredMainBottomDestinations()
+                    APP_MODE_STORE -> filteredMainBottomDestinations()
+                    APP_MODE_SUPPLIER, APP_MODE_MANUFACTURER -> Navigation.bottomNavBarScreensSupplier
                     else -> Navigation.bottomNavBarScreensBuyer
                 }
 
@@ -35814,7 +37065,7 @@ fun AppConfiguration.MainScreen() {
                     Column(
                         modifier = Modifier.weight(1f).clickable(
                             onClick = {
-                                if (model in filteredMainBottomDestinations() || stateValues.appModeId != 0) {
+                                if (stateValues.appModeId != APP_MODE_STORE || model in filteredMainBottomDestinations()) {
                                     coroutineScope.launch { Navigation.goMain(model) }
                                 } else {
                                     postInAppNotification(currentUserPermissionDeniedMessage(), NotificationType.Negative)
@@ -36644,6 +37895,18 @@ private fun localDrawableResourceForPath(
         "64_1" -> Res.drawable._64_1
         "65_0" -> Res.drawable._65_0
         "65_1" -> Res.drawable._65_1
+        "66_0" -> Res.drawable._66_0
+        "66_1" -> Res.drawable._66_1
+        "67_0" -> Res.drawable._67_0
+        "67_1" -> Res.drawable._67_1
+        "68_0" -> Res.drawable._68_0
+        "68_1" -> Res.drawable._68_1
+        "69_0" -> Res.drawable._69_0
+        "69_1" -> Res.drawable._69_1
+        "70_0" -> Res.drawable._70_0
+        "70_1" -> Res.drawable._70_1
+        "71_0" -> Res.drawable._71_0
+        "71_1" -> Res.drawable._71_1
         else -> fallbackRes
     }
 }
@@ -40144,6 +41407,18 @@ object AppConfiguration {
         val drawablePathIconStockHistory: String
         val drawableResIconStockHistory: StateFlow<DrawableResource>
 
+        val drawablePathIconAppModeStore: String
+        val drawableResIconAppModeStore: StateFlow<DrawableResource>
+
+        val drawablePathIconAppModeBuyer: String
+        val drawableResIconAppModeBuyer: StateFlow<DrawableResource>
+
+        val drawablePathIconAppModeSupplier: String
+        val drawableResIconAppModeSupplier: StateFlow<DrawableResource>
+
+        val drawablePathIconAppModeManufacturer: String
+        val drawableResIconAppModeManufacturer: StateFlow<DrawableResource>
+
         val drawablePathIconWorkers: String
         val drawableResIconWorkers: StateFlow<DrawableResource>
 
@@ -40733,6 +42008,22 @@ object AppConfiguration {
             private val _drawableResIconStockHistory = MutableStateFlow(Res.drawable._67_0)
             override val drawableResIconStockHistory: StateFlow<DrawableResource> = _drawableResIconStockHistory.asStateFlow()
 
+            override val drawablePathIconAppModeStore: String by drawablePathIconAppModeStoreState.collectAsState()
+            private val _drawableResIconAppModeStore = MutableStateFlow(Res.drawable._68_0)
+            override val drawableResIconAppModeStore: StateFlow<DrawableResource> = _drawableResIconAppModeStore.asStateFlow()
+
+            override val drawablePathIconAppModeBuyer: String by drawablePathIconAppModeBuyerState.collectAsState()
+            private val _drawableResIconAppModeBuyer = MutableStateFlow(Res.drawable._69_0)
+            override val drawableResIconAppModeBuyer: StateFlow<DrawableResource> = _drawableResIconAppModeBuyer.asStateFlow()
+
+            override val drawablePathIconAppModeSupplier: String by drawablePathIconAppModeSupplierState.collectAsState()
+            private val _drawableResIconAppModeSupplier = MutableStateFlow(Res.drawable._70_0)
+            override val drawableResIconAppModeSupplier: StateFlow<DrawableResource> = _drawableResIconAppModeSupplier.asStateFlow()
+
+            override val drawablePathIconAppModeManufacturer: String by drawablePathIconAppModeManufacturerState.collectAsState()
+            private val _drawableResIconAppModeManufacturer = MutableStateFlow(Res.drawable._71_0)
+            override val drawableResIconAppModeManufacturer: StateFlow<DrawableResource> = _drawableResIconAppModeManufacturer.asStateFlow()
+
             override val drawablePathIconWorkers: String by drawablePathIconWorkersState.collectAsState()
             private val _drawableResIconWorkers = MutableStateFlow(Res.drawable._22_0)
             override val drawableResIconWorkers: StateFlow<DrawableResource> = _drawableResIconWorkers.asStateFlow()
@@ -40926,6 +42217,10 @@ object AppConfiguration {
                 _drawableResIconPrintTag.emit(if (stateValues.appThemeId == 1L) Res.drawable._65_1 else Res.drawable._65_0)
                 _drawableResIconWorkerRoleTemplates.emit(if (stateValues.appThemeId == 1L) Res.drawable._66_1 else Res.drawable._66_0)
                 _drawableResIconStockHistory.emit(if (stateValues.appThemeId == 1L) Res.drawable._67_1 else Res.drawable._67_0)
+                _drawableResIconAppModeStore.emit(if (stateValues.appThemeId == 1L) Res.drawable._68_1 else Res.drawable._68_0)
+                _drawableResIconAppModeBuyer.emit(if (stateValues.appThemeId == 1L) Res.drawable._69_1 else Res.drawable._69_0)
+                _drawableResIconAppModeSupplier.emit(if (stateValues.appThemeId == 1L) Res.drawable._70_1 else Res.drawable._70_0)
+                _drawableResIconAppModeManufacturer.emit(if (stateValues.appThemeId == 1L) Res.drawable._71_1 else Res.drawable._71_0)
 
                 _drawableResIconWorkers.emit(if (stateValues.appThemeId == 1L) Res.drawable._22_1 else Res.drawable._22_0)
 
