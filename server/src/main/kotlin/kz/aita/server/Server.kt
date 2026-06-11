@@ -4639,17 +4639,38 @@ private fun stockBatchOperationLogTextInsideTransaction(
     val wholesaleText = batch.wholesalePriceOverride.operationLogPriceText()
     val statusText = batch.status.name
 
-    val isUpdate = action == OPERATION_LOG_ACTION_UPDATED
-
-    val title = if (isUpdate) {
-        simpleMessage(
+    val title = when (action) {
+        OPERATION_LOG_ACTION_UPDATED -> simpleMessage(
             main = "Batch updated: $goodsName",
             en = "Batch updated: $goodsName",
             ru = "Партия обновлена: $goodsName",
             kk = "Партия жаңартылды: $goodsName"
         )
-    } else {
-        simpleMessage(
+        OPERATION_LOG_ACTION_DELETED -> simpleMessage(
+            main = "Batch removed: $goodsName",
+            en = "Batch removed: $goodsName",
+            ru = "Партия удалена: $goodsName",
+            kk = "Партия жойылды: $goodsName"
+        )
+        OPERATION_LOG_ACTION_MOVED -> simpleMessage(
+            main = "Batch moved: $goodsName",
+            en = "Batch moved: $goodsName",
+            ru = "Партия перемещена: $goodsName",
+            kk = "Партия жылжытылды: $goodsName"
+        )
+        OPERATION_LOG_ACTION_ACCEPTED -> simpleMessage(
+            main = "Batch move accepted: $goodsName",
+            en = "Batch move accepted: $goodsName",
+            ru = "Перемещение партии принято: $goodsName",
+            kk = "Партия ауыстыруы қабылданды: $goodsName"
+        )
+        OPERATION_LOG_ACTION_DECLINED -> simpleMessage(
+            main = "Batch move declined: $goodsName",
+            en = "Batch move declined: $goodsName",
+            ru = "Перемещение партии отклонено: $goodsName",
+            kk = "Партия ауыстыруы қабылданбады: $goodsName"
+        )
+        else -> simpleMessage(
             main = "Batch added: $goodsName",
             en = "Batch added: $goodsName",
             ru = "Партия добавлена: $goodsName",
@@ -4708,6 +4729,100 @@ private fun stockBatchOperationLogTextInsideTransaction(
         details = details,
         metadata = metadata
     )
+}
+
+private fun ResultRow.stockItemOperationLogName(fallback: String = ""): String {
+    val idFallback = fallback.ifBlank { this[StockItems.id].toString() }
+    return this[StockItems.name].operationLogVisibleText(idFallback).ifBlank { idFallback }
+}
+
+private fun ResultRow.stockItemOperationLogBarcodeText(): String {
+    return stockBarcodeValues().joinToString(",")
+}
+
+private fun stockItemChangeDetails(changedFields: List<String>): List<LocalizedStringDataModel> {
+    val value = changedFields.joinToString(", ").ifBlank { "Stock item data" }
+    return simpleMessage(
+        main = "Changed: $value",
+        en = "Changed: $value",
+        ru = "Изменено: $value",
+        kk = "Өзгерді: $value"
+    )
+}
+
+private fun stockItemChangedFieldsInsideTransaction(
+    previousRow: ResultRow,
+    cleanBarcodes: List<String>,
+    cleanBarcodeModels: List<GoodsItemBarcodeDataModel>,
+    requestedActiveShelfBatchId: String?,
+    requestedWholesaleMinQuantity: QuantityDataModel?,
+    requestedGenericExpirationPeriod: ExpirationPeriodDataModel?,
+    requestedConditions: List<String>,
+    sanitizedPromotions: List<StockPromotionDataModel>,
+    body: GoodsItemDataModel
+): List<String> {
+    val existingActiveShelfBatchId = previousRow[StockItems.activeShelfBatchId]?.toString()
+    return buildList {
+        if (cleanBarcodes.toSet() != previousRow.stockBarcodeValues().toSet()) add("barcodes")
+        if (cleanBarcodeModels != previousRow.stockBarcodeModels()) add("barcode types")
+        if (body.name != previousRow[StockItems.name]) add("name")
+        if (body.description != previousRow[StockItems.description]) add("description")
+        if (body.measurementUnitId != previousRow[StockItems.measurementUnitId]) add("unit")
+        if (body.categoryIds != previousRow[StockItems.categoryIds]) add("categories")
+        if (body.salePrices != previousRow[StockItems.salePrices]) add("sale prices")
+        if (body.returnPrices != previousRow[StockItems.returnPrices]) add("return prices")
+        if (body.supplyPrices != previousRow[StockItems.supplyPrices]) add("supply prices")
+        if (body.wholesalePrices != previousRow[StockItems.wholesalePrices]) add("wholesale prices")
+        if (requestedWholesaleMinQuantity != previousRow[StockItems.wholesaleMinQuantity]) add("wholesale minimum quantity")
+        if (requestedGenericExpirationPeriod != previousRow[StockItems.genericExpirationPeriod]) add("expiration period")
+        if (body.isQuickItem != previousRow[StockItems.isQuickItem]) add("quick item flag")
+        if (body.imagePaths != previousRow[StockItems.imagePaths]) add("images")
+        if (requestedActiveShelfBatchId != existingActiveShelfBatchId) add("active shelf batch")
+        if (sanitizedPromotions != previousRow[StockItems.promotions]) add("promotions")
+        if (body.note != previousRow[StockItems.note]) add("note")
+        if (body.noteLocalized != previousRow[StockItems.noteLocalized]) add("localized note")
+        if (requestedConditions != previousRow[StockItems.conditions].map { it.trim() }.filter { it.isNotBlank() }.distinct()) add("conditions")
+        if (body.isActive != previousRow[StockItems.isActive]) add("activity")
+    }
+}
+
+private fun batchChangedFieldsInsideTransaction(
+    previousRow: ResultRow,
+    goodsItemId: UUID,
+    nextSupplierId: UUID?,
+    nextSupplierOrderId: UUID?,
+    sanitizedPromotions: List<StockPromotionDataModel>,
+    body: GoodsBatchDataModel
+): List<String> = buildList {
+    if (previousRow[StockBatchesV2.goodsItemId] != goodsItemId) add("item")
+    if (previousRow[StockBatchesV2.supplierId] != nextSupplierId) add("supplier")
+    if (previousRow[StockBatchesV2.supplierOrderId] != nextSupplierOrderId) add("supplier order")
+    if (previousRow[StockBatchesV2.quantity] != body.quantity) add("quantity")
+    if (previousRow[StockBatchesV2.supplyPrice] != body.supplyPrice) add("supply price")
+    if (previousRow[StockBatchesV2.salePriceOverride] != body.salePriceOverride) add("sale price override")
+    if (previousRow[StockBatchesV2.returnPriceOverride] != body.returnPriceOverride) add("return price override")
+    if (previousRow[StockBatchesV2.wholesalePriceOverride] != body.wholesalePriceOverride) add("wholesale price override")
+    if (previousRow[StockBatchesV2.deliveredAtMillis] != body.deliveredAtMillis) add("delivery date")
+    if (previousRow[StockBatchesV2.manufacturedAtMillis] != body.manufacturedAtMillis) add("manufacture date")
+    if (previousRow[StockBatchesV2.expirationDateMillis] != body.expirationDateMillis) add("expiration date")
+    if (previousRow[StockBatchesV2.discounts] != body.discounts) add("discounts")
+    if (previousRow[StockBatchesV2.promotions] != sanitizedPromotions) add("promotions")
+    if (previousRow[StockBatchesV2.shelfPosition] != body.shelfPosition) add("shelf position")
+    if (previousRow[StockBatchesV2.shelfPriority] != body.shelfPriority) add("shelf priority")
+    if (previousRow[StockBatchesV2.status] != body.status.name) add("status")
+    if (previousRow[StockBatchesV2.additionalNotes] != body.additionalNotes) add("notes")
+    if (previousRow[StockBatchesV2.additionalNotesLocalized] != body.additionalNotesLocalized) add("localized notes")
+    if (previousRow[StockBatchesV2.isActive] != body.isActive) add("activity")
+}
+
+private fun OperationLogDataModel.matchesStockItemHistory(goodsItemId: String, batchIds: Set<String>): Boolean {
+    if (entityType == OPERATION_LOG_ENTITY_STOCK_ITEM && entityId == goodsItemId) return true
+    if (entityType == OPERATION_LOG_ENTITY_STOCK_BATCH && entityId != null && entityId in batchIds) return true
+    val itemKeys = listOf("goods_item_id", "stock_item_id", "item_id", "source_goods_item_id", "destination_goods_item_id")
+    val batchKeys = listOf("batch_id", "source_batch_id", "destination_batch_id")
+    if (itemKeys.any { metadata[it] == goodsItemId }) return true
+    if (batchKeys.any { key -> metadata[key]?.let { it in batchIds } == true }) return true
+    return false
 }
 
 private fun insertOperationLogInsideTransaction(
@@ -7562,9 +7677,15 @@ fun Application.module() {
             val routeWritesSpecificOperationLog = normalizedEntityPath.startsWith("notifications") ||
                     normalizedEntityPath.startsWith("operationlogs") ||
                     normalizedEntityPath.startsWith("logs/") ||
+                    normalizedEntityPath.startsWith("stock/history") ||
                     normalizedEntityPath.startsWith("stock/add") ||
+                    normalizedEntityPath.startsWith("stock/update") ||
+                    normalizedEntityPath.startsWith("stock/delete") ||
                     normalizedEntityPath.startsWith("stockbatches/add") ||
                     normalizedEntityPath.startsWith("stockbatches/update") ||
+                    normalizedEntityPath.startsWith("stockbatches/delete") ||
+                    normalizedEntityPath.startsWith("stockbatches/move") ||
+                    normalizedEntityPath.startsWith("stockbatches/decidemove") ||
                     normalizedEntityPath.startsWith("stockbatches/setactiveshelfbatch") ||
                     normalizedEntityPath.startsWith("transactions/complete") ||
                     normalizedEntityPath.startsWith("workshifts/start") ||
@@ -8727,6 +8848,71 @@ fun Application.module() {
                     } ?: call.respond(UnauthorizedResponse())
                 }
 
+                get("/history/get") {
+                    val userId = call.checkPrincipal() ?: return@get
+                    val storeId = call.headerUuid("store_id")
+                        ?: return@get call.respond(UnauthorizedResponse())
+                    val goodsItemId = call.headerUuid("goods_item_id")
+                        ?: return@get call.genericResponseNoPayload(HttpStatusCode.BadRequest, message = getResponse("13").message)
+
+                    val limit = call.request.queryParameters["limit"]
+                        ?.toIntOrNull()
+                        ?.coerceIn(1, 500)
+                        ?: 250
+                    val offset = call.request.queryParameters["offset"]
+                        ?.toIntOrNull()
+                        ?.coerceAtLeast(0)
+                        ?: 0
+
+                    val result = newSuspendedTransaction(aitaServerIoContext) {
+                        val canViewHistory = userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_HISTORY_VIEW, requireWorkshift = false) ||
+                                userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_LOGS_VIEW, requireWorkshift = false)
+                        if (!canViewHistory)
+                            return@newSuspendedTransaction null
+
+                        val visibleStoreIds = stockVisibleStoreIdsInsideTransaction(storeId)
+                        val itemVisible = StockItems
+                            .select(StockItems.id)
+                            .where {
+                                (StockItems.id eq goodsItemId) and
+                                        (StockItems.storeId inList visibleStoreIds)
+                            }
+                            .empty()
+                            .not()
+
+                        if (!itemVisible)
+                            return@newSuspendedTransaction null
+
+                        val batchIds = StockBatchesV2
+                            .select(StockBatchesV2.id)
+                            .where {
+                                (StockBatchesV2.goodsItemId eq goodsItemId) and
+                                        (StockBatchesV2.storeId inList visibleStoreIds)
+                            }
+                            .map { it[StockBatchesV2.id].toString() }
+                            .toSet()
+
+                        OperationLogs
+                            .selectAll()
+                            .where {
+                                (OperationLogs.storeId inList visibleStoreIds) and
+                                        (OperationLogs.entityType inList listOf(OPERATION_LOG_ENTITY_STOCK_ITEM, OPERATION_LOG_ENTITY_STOCK_BATCH))
+                            }
+                            .orderBy(OperationLogs.createdAtMillis, SortOrder.DESC)
+                            .map { it.toOperationLogDataModel() }
+                            .filter { log -> log.matchesStockItemHistory(goodsItemId.toString(), batchIds) }
+                            .drop(offset)
+                            .take(limit)
+                    }
+
+                    result?.let {
+                        call.genericListResponse(
+                            status = HttpStatusCode.OK,
+                            payload = it
+                        )
+                    } ?: call.respond(UnauthorizedResponse())
+                }
+
 
                 post("/add") {
                     val userId = call.checkPrincipal() ?: return@post
@@ -8751,6 +8937,7 @@ fun Application.module() {
                         if (barcodeClashesInsideTransaction(storeId, null, cleanBarcodeModels))
                             return@newSuspendedTransaction null
 
+                        val sanitizedPromotions = body.promotions.sanitizedStockPromotions()
                         val now = System.currentTimeMillis()
                         val id = UUID.randomUUID()
 
@@ -8782,7 +8969,7 @@ fun Application.module() {
                                 ?.takeIf { value -> value.isNotBlank() }
                                 ?.let { value -> runCatching { UUID.fromString(value) }.getOrNull() }
 
-                            it[StockItems.promotions] = body.promotions.sanitizedStockPromotions()
+                            it[StockItems.promotions] = sanitizedPromotions
 
                             it[StockItems.note] = body.note
                             it[StockItems.noteLocalized] = body.noteLocalized
@@ -8814,15 +9001,26 @@ fun Application.module() {
                             now = now
                         )
 
+                        val insertedItemName = insertedRow.stockItemOperationLogName(cleanBarcodes.firstOrNull().orEmpty())
                         insertOperationLogInsideTransaction(
                             actorUserId = userId,
                             storeId = storeId,
                             action = OPERATION_LOG_ACTION_CREATED,
                             entityType = OPERATION_LOG_ENTITY_STOCK_ITEM,
                             entityId = id.toString(),
-                            title = simpleMessage("Stock item added", ru = "Товар добавлен", kk = "Тауар қосылды"),
-                            details = body.name.takeIf { it.isNotEmpty() } ?: simpleMessage(cleanBarcodes.firstOrNull().orEmpty()),
-                            metadata = mapOf("barcode" to cleanBarcodes.joinToString(",")),
+                            title = simpleMessage(
+                                main = "Stock item added: $insertedItemName",
+                                en = "Stock item added: $insertedItemName",
+                                ru = "Товар добавлен: $insertedItemName",
+                                kk = "Тауар қосылды: $insertedItemName"
+                            ),
+                            details = stockItemChangeDetails(listOf("created", "name", "barcodes", "prices", "promotions", "conditions")),
+                            metadata = mapOf(
+                                "goods_item_id" to id.toString(),
+                                "goods_name" to insertedItemName,
+                                "barcode" to cleanBarcodes.joinToString(","),
+                                "changed_fields" to "created|name|barcodes|prices|promotions|conditions"
+                            ).filterValues { it.isNotBlank() },
                             now = now
                         )
 
@@ -8896,6 +9094,18 @@ fun Application.module() {
                             .distinct()
                         val requestedWholesaleMinQuantity = body.wholesaleMinQuantity?.takeIf { quantity -> quantity.total > 0.0 }
                         val requestedGenericExpirationPeriod = body.genericExpirationPeriod?.takeIf { period -> period.isUsable }
+                        val sanitizedPromotions = body.promotions.sanitizedStockPromotions()
+                        val changedFields = stockItemChangedFieldsInsideTransaction(
+                            previousRow = goodsItemRow,
+                            cleanBarcodes = cleanBarcodes,
+                            cleanBarcodeModels = cleanBarcodeModels,
+                            requestedActiveShelfBatchId = requestedActiveShelfBatchId,
+                            requestedWholesaleMinQuantity = requestedWholesaleMinQuantity,
+                            requestedGenericExpirationPeriod = requestedGenericExpirationPeriod,
+                            requestedConditions = requestedConditions,
+                            sanitizedPromotions = sanitizedPromotions,
+                            body = body
+                        )
                         val requestedCoreMatchesExisting = cleanBarcodes.toSet() == goodsItemRow.stockBarcodeValues().toSet() &&
                                 cleanBarcodeModels == goodsItemRow.stockBarcodeModels() &&
                                 body.name == goodsItemRow[StockItems.name] &&
@@ -8954,7 +9164,7 @@ fun Application.module() {
                                 ?.takeIf { value -> value.isNotBlank() }
                                 ?.let { value -> runCatching { UUID.fromString(value) }.getOrNull() }
 
-                            it[StockItems.promotions] = body.promotions.sanitizedStockPromotions()
+                            it[StockItems.promotions] = sanitizedPromotions
 
                             it[StockItems.note] = body.note
                             it[StockItems.noteLocalized] = body.noteLocalized
@@ -8973,6 +9183,31 @@ fun Application.module() {
                             userId = userId,
                             now = now
                         )
+
+                        if (changedFields.isNotEmpty()) {
+                            val updatedItemName = updatedRow.stockItemOperationLogName(goodsItemRow.stockItemOperationLogName(id.toString()))
+                            insertOperationLogInsideTransaction(
+                                actorUserId = userId,
+                                storeId = storeId,
+                                action = OPERATION_LOG_ACTION_UPDATED,
+                                entityType = OPERATION_LOG_ENTITY_STOCK_ITEM,
+                                entityId = id.toString(),
+                                title = simpleMessage(
+                                    main = "Stock item updated: $updatedItemName",
+                                    en = "Stock item updated: $updatedItemName",
+                                    ru = "Товар обновлён: $updatedItemName",
+                                    kk = "Тауар жаңартылды: $updatedItemName"
+                                ),
+                                details = stockItemChangeDetails(changedFields),
+                                metadata = mapOf(
+                                    "goods_item_id" to id.toString(),
+                                    "goods_name" to updatedItemName,
+                                    "barcode" to updatedRow.stockItemOperationLogBarcodeText(),
+                                    "changed_fields" to changedFields.joinToString("|")
+                                ).filterValues { it.isNotBlank() },
+                                now = now
+                            )
+                        }
 
                         updatedRow.toGoodsItemDataModel() to parentMirrorRow?.get(StockItems.storeId)?.toString()
                     }
@@ -9024,6 +9259,33 @@ fun Application.module() {
                             ?: return@newSuspendedTransaction null
 
                         preserveGoodsItemNameInTransactionsInsideTransaction(storeId, goodsItemRow)
+
+                        val deletedItemName = goodsItemRow.stockItemOperationLogName(id.toString())
+                        insertOperationLogInsideTransaction(
+                            actorUserId = userId,
+                            storeId = storeId,
+                            action = OPERATION_LOG_ACTION_DELETED,
+                            entityType = OPERATION_LOG_ENTITY_STOCK_ITEM,
+                            entityId = id.toString(),
+                            title = simpleMessage(
+                                main = "Stock item deleted: $deletedItemName",
+                                en = "Stock item deleted: $deletedItemName",
+                                ru = "Товар удалён: $deletedItemName",
+                                kk = "Тауар жойылды: $deletedItemName"
+                            ),
+                            details = simpleMessage(
+                                main = "Removed stock item and its batch links from the active catalog.",
+                                en = "Removed stock item and its batch links from the active catalog.",
+                                ru = "Товар и его связи с партиями удалены из активного каталога.",
+                                kk = "Тауар және оның партиялармен байланыстары белсенді каталогтан жойылды."
+                            ),
+                            metadata = mapOf(
+                                "goods_item_id" to id.toString(),
+                                "goods_name" to deletedItemName,
+                                "barcode" to goodsItemRow.stockItemOperationLogBarcodeText(),
+                                "changed_fields" to "deleted"
+                            ).filterValues { it.isNotBlank() }
+                        )
 
                         val affected = StockItems.deleteWhere {
                             (StockItems.id eq id) and
@@ -9274,6 +9536,69 @@ fun Application.module() {
                             it[StockBatchMovements.decisionNote] = null
                         }
 
+                        val sourceItemName = sourceItemRow.stockItemOperationLogName(sourceGoodsItemId.toString())
+                        val destinationItemName = destinationItemRow.stockItemOperationLogName(destinationGoodsItemId.toString())
+                        val moveQuantityText = moveQuantity.operationLogQuantityText(sourceItemRow[StockItems.measurementUnitId])
+                        val moveMetadata = mapOf(
+                            "movement_id" to movementId.toString(),
+                            "source_goods_item_id" to sourceGoodsItemId.toString(),
+                            "destination_goods_item_id" to destinationGoodsItemId.toString(),
+                            "source_batch_id" to sourceBatchId.toString(),
+                            "destination_batch_id" to destinationBatchId.toString(),
+                            "goods_item_id" to sourceGoodsItemId.toString(),
+                            "batch_id" to sourceBatchId.toString(),
+                            "quantity" to moveQuantity.total.toString(),
+                            "quantity_unit" to moveQuantity.id.ifBlank { sourceItemRow[StockItems.measurementUnitId] },
+                            "status" to if (requiresAcceptance) StockBatchMovementStatusDataModel.PendingAcceptance.name else StockBatchMovementStatusDataModel.Accepted.name,
+                            "changed_fields" to "quantity|movement"
+                        ).filterValues { it.isNotBlank() }
+                        insertOperationLogInsideTransaction(
+                            actorUserId = userId,
+                            storeId = sourceStoreId,
+                            action = OPERATION_LOG_ACTION_MOVED,
+                            entityType = OPERATION_LOG_ENTITY_STOCK_BATCH,
+                            entityId = sourceBatchId.toString(),
+                            title = simpleMessage(
+                                main = "Batch moved out: $sourceItemName",
+                                en = "Batch moved out: $sourceItemName",
+                                ru = "Партия отправлена: $sourceItemName",
+                                kk = "Партия жіберілді: $sourceItemName"
+                            ),
+                            details = simpleMessage(
+                                main = "Quantity: $moveQuantityText",
+                                en = "Quantity: $moveQuantityText",
+                                ru = "Количество: $moveQuantityText",
+                                kk = "Саны: $moveQuantityText"
+                            ),
+                            metadata = moveMetadata,
+                            now = now
+                        )
+                        insertOperationLogInsideTransaction(
+                            actorUserId = userId,
+                            storeId = destinationStoreId,
+                            action = OPERATION_LOG_ACTION_MOVED,
+                            entityType = OPERATION_LOG_ENTITY_STOCK_BATCH,
+                            entityId = destinationBatchId.toString(),
+                            title = simpleMessage(
+                                main = if (requiresAcceptance) "Batch sent en route: $destinationItemName" else "Batch moved in: $destinationItemName",
+                                en = if (requiresAcceptance) "Batch sent en route: $destinationItemName" else "Batch moved in: $destinationItemName",
+                                ru = if (requiresAcceptance) "Партия в пути: $destinationItemName" else "Партия принята перемещением: $destinationItemName",
+                                kk = if (requiresAcceptance) "Партия жолда: $destinationItemName" else "Партия ауыстырумен қабылданды: $destinationItemName"
+                            ),
+                            details = simpleMessage(
+                                main = "Quantity: $moveQuantityText",
+                                en = "Quantity: $moveQuantityText",
+                                ru = "Количество: $moveQuantityText",
+                                kk = "Саны: $moveQuantityText"
+                            ),
+                            metadata = moveMetadata + mapOf(
+                                "goods_item_id" to destinationGoodsItemId.toString(),
+                                "batch_id" to destinationBatchId.toString(),
+                                "goods_name" to destinationItemName
+                            ),
+                            now = now
+                        )
+
                         val sourceBatch = StockBatchesV2.selectAll().where { StockBatchesV2.id eq sourceBatchId }.single().toGoodsBatchDataModel()
                         val destinationBatch = StockBatchesV2.selectAll().where { StockBatchesV2.id eq destinationBatchId }.single().toGoodsBatchDataModel()
                         val sourceItem = StockItems.selectAll().where { StockItems.id eq sourceGoodsItemId }.single().toGoodsItemDataModel()
@@ -9426,6 +9751,84 @@ fun Application.module() {
                                 it[StockBatchMovements.acceptedAtMillis] = now
                                 it[StockBatchMovements.decisionNote] = decisionNote
                             }
+                        }
+
+                        val decisionAction = if (request.accept) OPERATION_LOG_ACTION_ACCEPTED else OPERATION_LOG_ACTION_DECLINED
+                        val destinationItemNameForDecision = StockItems
+                            .selectAll()
+                            .where { StockItems.id eq destinationGoodsItemId }
+                            .singleOrNull()
+                            ?.stockItemOperationLogName(destinationGoodsItemId.toString())
+                            ?: destinationGoodsItemId.toString()
+                        val sourceItemNameForDecision = StockItems
+                            .selectAll()
+                            .where { StockItems.id eq sourceGoodsItemId }
+                            .singleOrNull()
+                            ?.stockItemOperationLogName(sourceGoodsItemId.toString())
+                            ?: sourceGoodsItemId.toString()
+                        val decisionQuantity = movementRow[StockBatchMovements.quantity]
+                        val decisionQuantityText = decisionQuantity.operationLogQuantityText()
+                        val decisionMetadata = mapOf(
+                            "movement_id" to movementId.toString(),
+                            "source_goods_item_id" to sourceGoodsItemId.toString(),
+                            "destination_goods_item_id" to destinationGoodsItemId.toString(),
+                            "source_batch_id" to sourceBatchId.toString(),
+                            "destination_batch_id" to destinationBatchId.toString(),
+                            "goods_item_id" to destinationGoodsItemId.toString(),
+                            "batch_id" to destinationBatchId.toString(),
+                            "goods_name" to destinationItemNameForDecision,
+                            "quantity" to decisionQuantity.total.toString(),
+                            "quantity_unit" to decisionQuantity.id,
+                            "status" to if (request.accept) StockBatchMovementStatusDataModel.Accepted.name else StockBatchMovementStatusDataModel.Declined.name,
+                            "changed_fields" to "movement_status|status"
+                        ).filterValues { it.isNotBlank() }
+                        insertOperationLogInsideTransaction(
+                            actorUserId = userId,
+                            storeId = destinationStoreId,
+                            action = decisionAction,
+                            entityType = OPERATION_LOG_ENTITY_STOCK_BATCH,
+                            entityId = destinationBatchId.toString(),
+                            title = simpleMessage(
+                                main = if (request.accept) "Incoming batch accepted: $destinationItemNameForDecision" else "Incoming batch declined: $destinationItemNameForDecision",
+                                en = if (request.accept) "Incoming batch accepted: $destinationItemNameForDecision" else "Incoming batch declined: $destinationItemNameForDecision",
+                                ru = if (request.accept) "Входящая партия принята: $destinationItemNameForDecision" else "Входящая партия отклонена: $destinationItemNameForDecision",
+                                kk = if (request.accept) "Кіріс партия қабылданды: $destinationItemNameForDecision" else "Кіріс партия қабылданбады: $destinationItemNameForDecision"
+                            ),
+                            details = simpleMessage(
+                                main = "Quantity: $decisionQuantityText" + (decisionNote?.let { " · Note: $it" } ?: ""),
+                                en = "Quantity: $decisionQuantityText" + (decisionNote?.let { " · Note: $it" } ?: ""),
+                                ru = "Количество: $decisionQuantityText" + (decisionNote?.let { " · Заметка: $it" } ?: ""),
+                                kk = "Саны: $decisionQuantityText" + (decisionNote?.let { " · Ескертпе: $it" } ?: "")
+                            ),
+                            metadata = decisionMetadata,
+                            now = now
+                        )
+                        if (!request.accept) {
+                            insertOperationLogInsideTransaction(
+                                actorUserId = userId,
+                                storeId = sourceStoreId,
+                                action = OPERATION_LOG_ACTION_DECLINED,
+                                entityType = OPERATION_LOG_ENTITY_STOCK_BATCH,
+                                entityId = sourceBatchId.toString(),
+                                title = simpleMessage(
+                                    main = "Batch move declined and returned: $sourceItemNameForDecision",
+                                    en = "Batch move declined and returned: $sourceItemNameForDecision",
+                                    ru = "Перемещение партии отклонено, остаток возвращён: $sourceItemNameForDecision",
+                                    kk = "Партия ауыстыруы қабылданбады, қалдық қайтарылды: $sourceItemNameForDecision"
+                                ),
+                                details = simpleMessage(
+                                    main = "Quantity: $decisionQuantityText" + (decisionNote?.let { " · Note: $it" } ?: ""),
+                                    en = "Quantity: $decisionQuantityText" + (decisionNote?.let { " · Note: $it" } ?: ""),
+                                    ru = "Количество: $decisionQuantityText" + (decisionNote?.let { " · Заметка: $it" } ?: ""),
+                                    kk = "Саны: $decisionQuantityText" + (decisionNote?.let { " · Ескертпе: $it" } ?: "")
+                                ),
+                                metadata = decisionMetadata + mapOf(
+                                    "goods_item_id" to sourceGoodsItemId.toString(),
+                                    "batch_id" to sourceBatchId.toString(),
+                                    "goods_name" to sourceItemNameForDecision
+                                ),
+                                now = now
+                            )
                         }
 
                         updateGoodsItemActiveShelfBatchInsideTransaction(sourceGoodsItemId, sourceStoreId, now)
@@ -9686,24 +10089,15 @@ fun Application.module() {
                                 .singleOrNull()
                                 ?: return@newSuspendedTransaction null
 
-                            val meaningfulBatchContentChanged =
-                                previousBatchRow[StockBatchesV2.goodsItemId] != goodsItemId ||
-                                        previousBatchRow[StockBatchesV2.supplierId] != nextSupplierId ||
-                                        previousBatchRow[StockBatchesV2.supplierOrderId] != nextSupplierOrderId ||
-                                        previousBatchRow[StockBatchesV2.quantity] != body.quantity ||
-                                        previousBatchRow[StockBatchesV2.supplyPrice] != body.supplyPrice ||
-                                        previousBatchRow[StockBatchesV2.salePriceOverride] != body.salePriceOverride ||
-                                        previousBatchRow[StockBatchesV2.returnPriceOverride] != body.returnPriceOverride ||
-                                        previousBatchRow[StockBatchesV2.wholesalePriceOverride] != body.wholesalePriceOverride ||
-                                        previousBatchRow[StockBatchesV2.deliveredAtMillis] != body.deliveredAtMillis ||
-                                        previousBatchRow[StockBatchesV2.manufacturedAtMillis] != body.manufacturedAtMillis ||
-                                        previousBatchRow[StockBatchesV2.expirationDateMillis] != body.expirationDateMillis ||
-                                        previousBatchRow[StockBatchesV2.discounts] != body.discounts ||
-                                        previousBatchRow[StockBatchesV2.promotions] != sanitizedPromotions ||
-                                        previousBatchRow[StockBatchesV2.status] != body.status.name ||
-                                        previousBatchRow[StockBatchesV2.additionalNotes] != body.additionalNotes ||
-                                        previousBatchRow[StockBatchesV2.additionalNotesLocalized] != body.additionalNotesLocalized ||
-                                        previousBatchRow[StockBatchesV2.isActive] != body.isActive
+                            val changedBatchFields = batchChangedFieldsInsideTransaction(
+                                previousRow = previousBatchRow,
+                                goodsItemId = goodsItemId,
+                                nextSupplierId = nextSupplierId,
+                                nextSupplierOrderId = nextSupplierOrderId,
+                                sanitizedPromotions = sanitizedPromotions,
+                                body = body
+                            )
+                            val meaningfulBatchContentChanged = changedBatchFields.isNotEmpty()
 
                             StockBatchesV2.update({
                                 (StockBatchesV2.id eq id) and
@@ -9770,7 +10164,7 @@ fun Application.module() {
                                     entityId = id.toString(),
                                     title = logText.title,
                                     details = logText.details,
-                                    metadata = logText.metadata,
+                                    metadata = logText.metadata + ("changed_fields" to changedBatchFields.joinToString("|")),
                                     now = now
                                 )
                             }
@@ -9816,16 +10210,44 @@ fun Application.module() {
                             val id = runCatching { UUID.fromString(rawId) }.getOrNull()
                                 ?: continue
 
+                            val previousBatchRow = StockBatchesV2
+                                .selectAll()
+                                .where {
+                                    (StockBatchesV2.id eq id) and
+                                            (StockBatchesV2.storeId eq storeId)
+                                }
+                                .singleOrNull()
+                                ?: continue
+
                             val affected = StockBatchesV2.update({
                                 (StockBatchesV2.id eq id) and
                                         (StockBatchesV2.storeId eq storeId)
                             }) {
                                 it[StockBatchesV2.isActive] = false
+                                it[StockBatchesV2.status] = StockBatchStatusDataModel.Deleted.name
                                 it[StockBatchesV2.updatedAtMillis] = now
                             }
 
-                            if (affected > 0)
+                            if (affected > 0) {
+                                val logText = stockBatchOperationLogTextInsideTransaction(
+                                    action = OPERATION_LOG_ACTION_DELETED,
+                                    batchId = id,
+                                    goodsItemId = previousBatchRow[StockBatchesV2.goodsItemId],
+                                    batch = previousBatchRow.toGoodsBatchDataModel()
+                                )
+                                insertOperationLogInsideTransaction(
+                                    actorUserId = userId,
+                                    storeId = storeId,
+                                    action = OPERATION_LOG_ACTION_DELETED,
+                                    entityType = OPERATION_LOG_ENTITY_STOCK_BATCH,
+                                    entityId = id.toString(),
+                                    title = logText.title,
+                                    details = logText.details,
+                                    metadata = logText.metadata + ("changed_fields" to "deleted"),
+                                    now = now
+                                )
                                 result += rawId
+                            }
                         }
 
                         result
@@ -9880,22 +10302,45 @@ fun Application.module() {
                             .selectAll()
                             .where {
                                 (StockItems.id eq goodsItemId) and
-                                        (StockItems.storeId eq storeId) and
-                                        (StockItems.userId eq userId)
+                                        (StockItems.storeId eq storeId)
                             }
                             .singleOrNull() ?: return@newSuspendedTransaction null
 
-                        changed = existingItemRow[StockItems.activeShelfBatchId] != batchId
+                        val previousShelfBatchId = existingItemRow[StockItems.activeShelfBatchId]
+                        changed = previousShelfBatchId != batchId
 
                         if (changed) {
+                            val now = System.currentTimeMillis()
                             StockItems.update({
                                 (StockItems.id eq goodsItemId) and
-                                        (StockItems.storeId eq storeId) and
-                                        (StockItems.userId eq userId)
+                                        (StockItems.storeId eq storeId)
                             }) {
                                 it[StockItems.activeShelfBatchId] = batchId
-                                it[StockItems.updatedAtMillis] = System.currentTimeMillis()
+                                it[StockItems.updatedAtMillis] = now
                             }
+                            val itemName = existingItemRow.stockItemOperationLogName(goodsItemId.toString())
+                            insertOperationLogInsideTransaction(
+                                actorUserId = userId,
+                                storeId = storeId,
+                                action = OPERATION_LOG_ACTION_UPDATED,
+                                entityType = OPERATION_LOG_ENTITY_STOCK_ITEM,
+                                entityId = goodsItemId.toString(),
+                                title = simpleMessage(
+                                    main = "Active shelf batch changed: $itemName",
+                                    en = "Active shelf batch changed: $itemName",
+                                    ru = "Активная партия на полке изменена: $itemName",
+                                    kk = "Сөредегі белсенді партия өзгерді: $itemName"
+                                ),
+                                details = stockItemChangeDetails(listOf("active shelf batch")),
+                                metadata = mapOf(
+                                    "goods_item_id" to goodsItemId.toString(),
+                                    "goods_name" to itemName,
+                                    "batch_id" to batchId.toString(),
+                                    "previous_batch_id" to previousShelfBatchId?.toString().orEmpty(),
+                                    "changed_fields" to "active_shelf_batch"
+                                ).filterValues { it.isNotBlank() },
+                                now = now
+                            )
                         }
 
                         StockItems

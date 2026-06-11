@@ -3960,6 +3960,43 @@ fun getOperationLogs(
         }
 }
 
+fun getStockItemHistory(
+    storeId: String,
+    goodsItemId: String,
+    onCompleted: ((DataState<List<OperationLogDataModel>>) -> Unit)? = null
+) {
+    if (!getStockItemHistoryMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getStockItemHistoryMutex.withLock {
+                val cleanStoreId = storeId.trim()
+                val cleanGoodsItemId = goodsItemId.trim()
+                if (cleanStoreId.isBlank() || cleanGoodsItemId.isBlank()) {
+                    stockItemHistoryState.emit(DataState.Empty())
+                    onCompleted?.invoke(DataState.Empty())
+                    return@withLock
+                }
+
+                val response = networkRequest<List<OperationLogDataModel>, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getStockItemHistoryPath.first,
+                    headers = mapOf(
+                        "store_id" to cleanStoreId,
+                        "goods_item_id" to cleanGoodsItemId
+                    )
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    stockItemHistoryState.emit(DataState.Empty(response.message))
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    stockItemHistoryState.emit(DataState.Success(response.payload, response.message))
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
 fun getStoreAnalytics(
     storeId: String,
     startMillis: Long = 0L,
@@ -4238,6 +4275,12 @@ fun currentUserCanViewCashRegister(storeId: String?): Boolean {
 
 fun currentUserCanViewStock(storeId: String?): Boolean {
     return currentUserOwnsStore(storeId) || currentUserHasStorePermission(storeId, STORE_PERMISSION_STOCK_READ)
+}
+
+fun currentUserCanViewStockHistory(storeId: String?): Boolean {
+    return currentUserOwnsStore(storeId) ||
+            currentUserHasStorePermission(storeId, STORE_PERMISSION_STOCK_HISTORY_VIEW) ||
+            currentUserHasStorePermission(storeId, STORE_PERMISSION_LOGS_VIEW)
 }
 
 fun currentUserCanEditStock(storeId: String?): Boolean {
@@ -4898,7 +4941,7 @@ const val CLOUD_TRANSPORT_STATUS_UNAVAILABLE = -1
 @PublishedApi
 internal const val REALTIME_ACCESS_TOKEN_REFRESH_SKEW_MILLIS = 60_000L
 
-private const val DEFAULT_AITA_SERVER_URL = "http://192.168.1.51:8080"
+private const val DEFAULT_AITA_SERVER_URL = "http://10.202.5.39:8080"
 private val DEFAULT_AITA_SERVER_URL_PAIR = Pair(DEFAULT_AITA_SERVER_URL, "1")
 @Volatile
 private var currentNetworkRequestCandidateServerUrlsMemory: List<String> = emptyList()
@@ -4929,6 +4972,7 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
         updateStoresPath = Pair("stores/update", "11"),
         deleteStoresPath = Pair("stores/delete", "12"),
         getStockPath = Pair("stock/get", "13"),
+        getStockItemHistoryPath = Pair("stock/history/get", "1330"),
         getParentStoreStockPath = Pair("stock/parent/get", "1212"),
         addGoodsItemPath = Pair("stock/add", "14"),
         updateGoodsItemPath = Pair("stock/update", "15"),
@@ -5526,6 +5570,8 @@ val drawablePathIconAnalyticsReportState = MutableStateFlow("svg/62_0.svg")
 val drawablePathIconLabelPrinterState = MutableStateFlow("svg/63_0.svg")
 val drawablePathIconBarcodeGenerateState = MutableStateFlow("svg/64_0.svg")
 val drawablePathIconPrintTagState = MutableStateFlow("svg/65_0.svg")
+val drawablePathIconWorkerRoleTemplatesState = MutableStateFlow("svg/66_0.svg")
+val drawablePathIconStockHistoryState = MutableStateFlow("svg/67_0.svg")
 val drawablePathIconWorkersState = MutableStateFlow("svg/22_0.svg")
 val drawablePathIconSuppliersState = MutableStateFlow("svg/23_0.svg")
 val drawablePathIconDebtorsState = MutableStateFlow("svg/24_0.svg")
@@ -5841,6 +5887,7 @@ val storeWorkerRoleTemplatesState = MutableDataStateFlow<List<StoreWorkerRoleTem
 val activeWorkshiftState = MutableDataStateFlow<WorkshiftDataModel>(GlobalScope)
 val workshiftLoginInProgressState = MutableStateFlow(false)
 val operationLogsState = MutableDataStateFlow<List<OperationLogDataModel>>(GlobalScope)
+val stockItemHistoryState = MutableDataStateFlow<List<OperationLogDataModel>>(GlobalScope)
 val localNetworkState = MutableStateFlow(LocalNetworkStateDataModel())
 val localNetworkDevicesState = MutableStateFlow<List<LocalNetworkDeviceDataModel>>(emptyList())
 val localNetworkQueuedOperationsState = MutableStateFlow<List<LocalNetworkQueuedOperationDataModel>>(emptyList())
@@ -5867,6 +5914,7 @@ private val getCurrentWorkshiftMutex = Mutex()
 private val startWorkshiftMutex = Mutex()
 private val endWorkshiftMutex = Mutex()
 private val getOperationLogsMutex = Mutex()
+private val getStockItemHistoryMutex = Mutex()
 private val getStoreAnalyticsMutex = Mutex()
 
 
@@ -7545,6 +7593,12 @@ fun updateDrawables(
         )
         drawablePathIconPrintTagState.emit(
             drawablePath(65L)
+        )
+        drawablePathIconWorkerRoleTemplatesState.emit(
+            drawablePath(66L)
+        )
+        drawablePathIconStockHistoryState.emit(
+            drawablePath(67L)
         )
         drawablePathIconWorkersState.emit(
             drawablePath(22L)
@@ -12600,6 +12654,7 @@ fun forceLogOutUser(
         storeWorkerMembershipsState.emit(DataState.Empty())
         activeWorkshiftState.emit(DataState.Empty())
         operationLogsState.emit(DataState.Empty())
+        stockItemHistoryState.emit(DataState.Empty())
         storeAnalyticsDashboardState.emit(DataState.Empty())
         cashRegisterState.emit(DataState.Empty())
         cashRegisterEventsState.emit(DataState.Empty())
@@ -14048,6 +14103,7 @@ const val STORE_PERMISSION_CASH_REGISTER_VIEW = "cash_register_view"
 const val STORE_PERMISSION_CASH_REGISTER_EXTRACT = "cash_register_extract"
 
 const val STORE_PERMISSION_STOCK_READ = "stock_read"
+const val STORE_PERMISSION_STOCK_HISTORY_VIEW = "stock_history_view"
 const val STORE_PERMISSION_STOCK_WRITE = "stock_write"
 const val STORE_PERMISSION_STOCK_ITEM_CREATE = "stock_item_create"
 const val STORE_PERMISSION_STOCK_ITEM_EDIT = "stock_item_edit"
@@ -14117,6 +14173,7 @@ val ALL_STORE_PERMISSION_IDS = listOf(
     STORE_PERMISSION_CASH_REGISTER_VIEW,
     STORE_PERMISSION_CASH_REGISTER_EXTRACT,
     STORE_PERMISSION_STOCK_READ,
+    STORE_PERMISSION_STOCK_HISTORY_VIEW,
     STORE_PERMISSION_STOCK_ITEM_CREATE,
     STORE_PERMISSION_STOCK_ITEM_EDIT,
     STORE_PERMISSION_STOCK_ITEM_DELETE,
@@ -14157,6 +14214,7 @@ val LEGACY_STORE_PERMISSION_IDS = listOf(
 val STORE_PERMISSION_LEGACY_EXPANSIONS = mapOf(
     STORE_PERMISSION_STOCK_WRITE to listOf(
         STORE_PERMISSION_STOCK_READ,
+        STORE_PERMISSION_STOCK_HISTORY_VIEW,
         STORE_PERMISSION_STOCK_ITEM_CREATE,
         STORE_PERMISSION_STOCK_ITEM_EDIT,
         STORE_PERMISSION_STOCK_ITEM_DELETE,
@@ -14201,6 +14259,7 @@ val STANDARD_STORE_PERMISSION_IDS = listOf(
     STORE_PERMISSION_TRANSACTION_HISTORY_VIEW,
     STORE_PERMISSION_CASH_REGISTER_VIEW,
     STORE_PERMISSION_STOCK_READ,
+    STORE_PERMISSION_STOCK_HISTORY_VIEW,
     STORE_PERMISSION_DEBTORS_VIEW,
     STORE_PERMISSION_DEBTOR_PAYMENTS_MANAGE
 )
@@ -14800,6 +14859,7 @@ data class GlobalAppConfigurationDataModel(
     val updateStoresPath: Pair<String, String>,
     val deleteStoresPath: Pair<String, String>,
     val getStockPath: Pair<String, String>,
+    val getStockItemHistoryPath: Pair<String, String> = Pair("stock/history/get", "1330"),
     val getParentStoreStockPath: Pair<String, String> = Pair("stock/parent/get", "1212"),
     val addGoodsItemPath: Pair<String, String>,
     val updateGoodsItemPath: Pair<String, String>,

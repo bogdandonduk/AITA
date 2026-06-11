@@ -8,7 +8,7 @@
       "second": "0"
     },
     "serverUrl": {
-      "first": "http://192.168.1.51:8080",
+      "first": "http://10.202.5.39:8080",
       "second": "1"
     },
     "globalAppConfigurationPath": {
@@ -74,6 +74,10 @@
     "getStockPath": {
       "first": "stock/get",
       "second": "13"
+    },
+    "getStockItemHistoryPath": {
+      "first": "stock/history/get",
+      "second": "1330"
     },
     "getParentStoreStockPath": {
       "first": "stock/parent/get",

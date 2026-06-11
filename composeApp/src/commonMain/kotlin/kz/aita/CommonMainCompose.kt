@@ -16446,6 +16446,7 @@ private data class StockAddEditTabContent(
     val id: String,
     val title: String,
     val iconPath: String? = null,
+    val iconRes: DrawableResource? = null,
     val enabled: Boolean = true,
     val count: Int? = null
 )
@@ -16501,7 +16502,7 @@ private fun AppConfiguration.StockAddEditTabs(
                         modifier = Modifier
                             .size(18.dp),
                         url = it,
-                        fallbackRes = Res.drawable._0_0,
+                        fallbackRes = tab.iconRes ?: Res.drawable._0_0,
                         contentDescription = visibleTitle,
                         tintColor = if (selected) stateValues.AccentTextColor else stateValues.TextColor
                     )
@@ -18460,6 +18461,107 @@ private fun AppConfiguration.SupplierOrdersForGoodsItemContent(
 }
 
 @Composable
+private fun AppConfiguration.StockAddEditHistoryTab(
+    modifier: Modifier = Modifier,
+    goodsItem: GoodsItemDataModel?
+) {
+    val logs = stockItemHistoryState.payload.collectAsState().value.orEmpty()
+    val activeStoreId = goodsItem?.storeId?.takeIf { it.isNotBlank() } ?: stateValues.activeStoreId
+    val canViewHistory = currentUserCanViewStockHistory(activeStoreId)
+
+    LaunchedEffect(activeStoreId, goodsItem?.id, canViewHistory) {
+        val storeId = activeStoreId?.takeIf { it.isNotBlank() }
+        val itemId = goodsItem?.id?.takeIf { it.isNotBlank() }
+        if (storeId != null && itemId != null && canViewHistory) {
+            getStockItemHistory(storeId, itemId)
+        }
+    }
+
+    LazyColumn(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(stateValues.marginTextField),
+        contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5),
+        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+    ) {
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.55f), RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.BackgroundColor)
+                    .padding(stateValues.marginTextFieldGroup),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(30.dp),
+                        url = stateValues.drawablePathIconStockHistory,
+                        fallbackRes = stateValues.drawableResIconStockHistory.value,
+                        contentDescription = localizedStringResource(1331, "Stock item history"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = localizedStringResource(1331, "Stock item history"),
+                            color = stateValues.TextColor,
+                            fontSize = stateValues.accentTextSize,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = localizedStringResource(1333, "Every saved change to item data, prices, promotions, conditions and batches is collected here."),
+                            color = stateValues.PlaceholderTextColor,
+                            fontSize = stateValues.smallTextSize
+                        )
+                    }
+                }
+            }
+        }
+
+        when {
+            goodsItem == null -> item {
+                MessageText(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1334, "Save the item first to unlock its history."),
+                    subText = localizedStringResource(1333, "Every saved change to item data, prices, promotions, conditions and batches is collected here."),
+                    subTextSize = stateValues.smallTextSize
+                )
+            }
+
+            !canViewHistory -> item {
+                MessageText(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(665, "You do not have permission for this action"),
+                    subText = localizedStringResource(1332, "View stock history"),
+                    textColor = stateValues.ErrorColor,
+                    subTextColor = stateValues.PlaceholderTextColor,
+                    subTextSize = stateValues.smallTextSize
+                )
+            }
+
+            logs.isEmpty() -> item {
+                MessageText(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1335, "No stock item history yet"),
+                    subText = localizedStringResource(1333, "Every saved change to item data, prices, promotions, conditions and batches is collected here."),
+                    subTextSize = stateValues.smallTextSize
+                )
+            }
+
+            else -> items(logs, key = { it.id }) { log ->
+                OperationLogCard(log)
+            }
+        }
+    }
+}
+
+@Composable
 private fun AppConfiguration.StockAddEditOrdersTab(
     modifier: Modifier = Modifier,
     goodsItem: GoodsItemDataModel?
@@ -18678,6 +18780,8 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
                 line.goodsItemId == stockAddEditGoodsItemIdForCounts && line.orderId == order.id && line.isActive
             }
         }
+    val stockItemHistoryPayload by stockItemHistoryState.payload.collectAsState()
+    val stockAddEditHistoryCount = stockItemHistoryPayload.orEmpty().size.takeIf { existing != null }
     val activeStoreIdForStockAddEditPermissions = existing?.storeId?.takeIf { it.isNotBlank() } ?: stateValues.activeStoreId
     val canCreateStockItemHere = currentUserHasStorePermission(activeStoreIdForStockAddEditPermissions, STORE_PERMISSION_STOCK_ITEM_CREATE)
     val canEditStockItemHere = currentUserHasStorePermission(activeStoreIdForStockAddEditPermissions, STORE_PERMISSION_STOCK_ITEM_EDIT)
@@ -18696,6 +18800,15 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
                     currentUserCanViewSuppliers(activeStoreIdForStockAddEditPermissions)
             )
     val canWorkWithSupplierOrders = existing != null && currentUserCanViewSupplierOrders(activeStoreIdForStockAddEditPermissions)
+    val canViewStockItemHistory = existing != null && currentUserCanViewStockHistory(activeStoreIdForStockAddEditPermissions)
+
+    LaunchedEffect(existing?.id, activeStoreIdForStockAddEditPermissions, canViewStockItemHistory) {
+        val storeId = activeStoreIdForStockAddEditPermissions?.takeIf { it.isNotBlank() }
+        val itemId = existing?.id?.takeIf { it.isNotBlank() }
+        if (storeId != null && itemId != null && canViewStockItemHistory) {
+            getStockItemHistory(storeId, itemId)
+        }
+    }
 
     val stockAddEditTrailingIcons = buildList<Triple<String, DrawableResource, () -> Unit>> {
         if (canEditCoreStockItem) stockAddEditUndoDraft?.let { previousDraft ->
@@ -18782,6 +18895,17 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
                     title = localizedStringResource(138, "Batches"),
                     iconPath = stateValues.drawablePathIconStock,
                     count = stockAddEditBatchesCount
+                )
+            )
+        }
+        if (canViewStockItemHistory) {
+            add(
+                StockAddEditTabContent(
+                    id = "history",
+                    title = localizedStringResource(1330, "History"),
+                    iconPath = stateValues.drawablePathIconStockHistory,
+                    iconRes = stateValues.drawableResIconStockHistory.value,
+                    count = stockAddEditHistoryCount
                 )
             )
         }
@@ -18948,6 +19072,13 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
                             NavigationScreenModel.Stock.AddEditGoodsItem.removeState("stock_add_edit_start_add_batch")
                         }
                     }
+                )
+            }
+
+            "history" -> {
+                StockAddEditHistoryTab(
+                    modifier = Modifier.weight(1f),
+                    goodsItem = existing
                 )
             }
 
@@ -24875,7 +25006,8 @@ private fun AppConfiguration.workerPermissionCategory(permissionId: String): Str
         STORE_PERMISSION_STOCK_BATCH_MOVE,
         STORE_PERMISSION_STOCK_BATCH_TRANSFER_DECIDE,
         STORE_PERMISSION_STOCK_BATCH_SET_ACTIVE_SHELF,
-        STORE_PERMISSION_STOCK_PROMOTIONS_MANAGE -> localizedStringResource(1250, "Stock")
+        STORE_PERMISSION_STOCK_PROMOTIONS_MANAGE,
+        STORE_PERMISSION_STOCK_HISTORY_VIEW -> localizedStringResource(1250, "Stock")
 
         STORE_PERMISSION_SUPPLIERS_VIEW,
         STORE_PERMISSION_SUPPLIERS_MANAGE,
@@ -24908,6 +25040,7 @@ private fun AppConfiguration.workerPermissionLabel(permissionId: String): String
         STORE_PERMISSION_CASH_REGISTER_VIEW -> localizedStringResource(458, "View cash register")
         STORE_PERMISSION_CASH_REGISTER_EXTRACT -> localizedStringResource(459, "Extract cash")
         STORE_PERMISSION_STOCK_READ -> localizedStringResource(454, "View stock")
+        STORE_PERMISSION_STOCK_HISTORY_VIEW -> localizedStringResource(1332, "View stock history")
         STORE_PERMISSION_STOCK_ITEM_CREATE -> localizedStringResource(1255, "Create goods")
         STORE_PERMISSION_STOCK_ITEM_EDIT -> localizedStringResource(1256, "Edit goods")
         STORE_PERMISSION_STOCK_ITEM_DELETE -> localizedStringResource(1257, "Delete goods")
@@ -25388,19 +25521,20 @@ private fun AppConfiguration.WorkerRoleTemplateManager(
         ) {
             CpImage(
                 modifier = Modifier.size(32.dp),
-                url = "svg/66_0.svg",
-                contentDescription = localizedStringResource(1283, "Worker role templates"),
+                url = stateValues.drawablePathIconWorkerRoleTemplates,
+                fallbackRes = stateValues.drawableResIconWorkerRoleTemplates.value,
+                contentDescription = localizedStringResource(1336, "Worker role templates"),
                 tintColor = stateValues.AccentColor,
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = localizedStringResource(1283, "Worker role templates"),
+                    text = localizedStringResource(1336, "Worker role templates"),
                     color = stateValues.TextColor,
                     fontSize = stateValues.accentTextSize,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = localizedStringResource(1284, "Save reusable permission sets for cashier, stockkeeper, branch lead, or any cute custom role."),
+                    text = localizedStringResource(1337, "Save reusable permission sets for cashier, stockkeeper, branch lead, or any cute custom role."),
                     color = stateValues.PlaceholderTextColor,
                     fontSize = stateValues.smallTextSize
                 )
@@ -25461,7 +25595,7 @@ private fun AppConfiguration.WorkerRoleTemplateManager(
             modifier = Modifier.fillMaxWidth(),
             value = nameText,
             placeholder = localizedStringResource(1288, "Role name, for example Stockkeeper"),
-            leadingIconPath = "svg/66_1.svg",
+            leadingIconPath = stateValues.drawablePathIconWorkerRoleTemplates,
             stateHost = NavigationScreenModel.Menu.Workers,
             stateKey = "worker_role_template_name_$storeId",
             onValueChange = { nameText = it.take(64) }
@@ -40004,6 +40138,12 @@ object AppConfiguration {
         val drawablePathIconPrintTag: String
         val drawableResIconPrintTag: StateFlow<DrawableResource>
 
+        val drawablePathIconWorkerRoleTemplates: String
+        val drawableResIconWorkerRoleTemplates: StateFlow<DrawableResource>
+
+        val drawablePathIconStockHistory: String
+        val drawableResIconStockHistory: StateFlow<DrawableResource>
+
         val drawablePathIconWorkers: String
         val drawableResIconWorkers: StateFlow<DrawableResource>
 
@@ -40585,6 +40725,14 @@ object AppConfiguration {
             private val _drawableResIconPrintTag = MutableStateFlow(Res.drawable._65_0)
             override val drawableResIconPrintTag: StateFlow<DrawableResource> = _drawableResIconPrintTag.asStateFlow()
 
+            override val drawablePathIconWorkerRoleTemplates: String by drawablePathIconWorkerRoleTemplatesState.collectAsState()
+            private val _drawableResIconWorkerRoleTemplates = MutableStateFlow(Res.drawable._66_0)
+            override val drawableResIconWorkerRoleTemplates: StateFlow<DrawableResource> = _drawableResIconWorkerRoleTemplates.asStateFlow()
+
+            override val drawablePathIconStockHistory: String by drawablePathIconStockHistoryState.collectAsState()
+            private val _drawableResIconStockHistory = MutableStateFlow(Res.drawable._67_0)
+            override val drawableResIconStockHistory: StateFlow<DrawableResource> = _drawableResIconStockHistory.asStateFlow()
+
             override val drawablePathIconWorkers: String by drawablePathIconWorkersState.collectAsState()
             private val _drawableResIconWorkers = MutableStateFlow(Res.drawable._22_0)
             override val drawableResIconWorkers: StateFlow<DrawableResource> = _drawableResIconWorkers.asStateFlow()
@@ -40776,6 +40924,8 @@ object AppConfiguration {
                 _drawableResIconLabelPrinter.emit(if (stateValues.appThemeId == 1L) Res.drawable._63_1 else Res.drawable._63_0)
                 _drawableResIconBarcodeGenerate.emit(if (stateValues.appThemeId == 1L) Res.drawable._64_1 else Res.drawable._64_0)
                 _drawableResIconPrintTag.emit(if (stateValues.appThemeId == 1L) Res.drawable._65_1 else Res.drawable._65_0)
+                _drawableResIconWorkerRoleTemplates.emit(if (stateValues.appThemeId == 1L) Res.drawable._66_1 else Res.drawable._66_0)
+                _drawableResIconStockHistory.emit(if (stateValues.appThemeId == 1L) Res.drawable._67_1 else Res.drawable._67_0)
 
                 _drawableResIconWorkers.emit(if (stateValues.appThemeId == 1L) Res.drawable._22_1 else Res.drawable._22_0)
 
