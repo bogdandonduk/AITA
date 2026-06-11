@@ -9448,23 +9448,31 @@ fun AppConfiguration.StockWarehouseScreen() {
             }
         }
 
+        val activeStoreIdForPermissions = stateValues.activeStoreId
+        val canCreateStockItem = currentUserHasStorePermission(activeStoreIdForPermissions, STORE_PERMISSION_STOCK_ITEM_CREATE)
+        val canEditStockItem = currentUserHasStorePermission(activeStoreIdForPermissions, STORE_PERMISSION_STOCK_ITEM_EDIT)
+        val canDeleteStockItem = currentUserHasStorePermission(activeStoreIdForPermissions, STORE_PERMISSION_STOCK_ITEM_DELETE)
+        val canCreateStockBatch = currentUserHasStorePermission(activeStoreIdForPermissions, STORE_PERMISSION_STOCK_BATCH_CREATE)
+
         StockWarehouseScreenContent(
             modifier = Modifier
                 .weight(1f),
-            onDelete = {
-                deleteGoodsItem(id = it.id, storeId = it.storeId.ifBlank { stateValues.activeStoreId.orEmpty() }) {
+            onDelete = if (canDeleteStockItem) {
+                { item ->
+                    deleteGoodsItem(id = item.id, storeId = item.storeId.ifBlank { stateValues.activeStoreId.orEmpty() }) {
 
+                    }
                 }
-            },
-            onClick = openEdit,
-            onEdit = openEdit,
-            onAddBatch = openAddBatch,
+            } else null,
+            onClick = if (canEditStockItem) openEdit else null,
+            onEdit = if (canEditStockItem) openEdit else null,
+            onAddBatch = if (canCreateStockBatch) openAddBatch else null,
             onPrintLabel = { item -> labelPrintItemId = item.id },
             sortMode = sortMode,
             sortAscending = sortAscending
         )
 
-        if (stateValues.isNarrowScreen) {
+        if (stateValues.isNarrowScreen && canCreateStockItem) {
             actionButton(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -13300,9 +13308,9 @@ fun AppConfiguration.StockBatchCard(
     draggedBatchIndex: Int? = null,
     dragTargetIndex: Int? = null,
     allBatchesCount: Int = 0,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit,
-    onSetActiveShelf: () -> Unit,
+    onEdit: (() -> Unit)? = null,
+    onDelete: (() -> Unit)? = null,
+    onSetActiveShelf: (() -> Unit)? = null,
     onDragStart: ((String) -> Unit)? = null,
     onDragTargetChanged: ((Int) -> Unit)? = null,
     onDragFinished: ((Int) -> Unit)? = null,
@@ -13552,28 +13560,34 @@ fun AppConfiguration.StockBatchCard(
             horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            actionButton(
-                text = "",
-                iconPath = stateValues.drawablePathIconEdit,
-                iconContentDescription = stateValues.drawablePathIconEdit,
-                onClick = onEdit
-            )
+            onEdit?.let { edit ->
+                actionButton(
+                    text = "",
+                    iconPath = stateValues.drawablePathIconEdit,
+                    iconContentDescription = stateValues.drawablePathIconEdit,
+                    onClick = edit
+                )
+            }
 
-            actionButton(
-                text = "",
-                iconPath = stateValues.drawablePathIconStock,
-                iconContentDescription = "Shelf",
-                enabled = !isActiveShelf,
-                onClick = onSetActiveShelf
-            )
+            onSetActiveShelf?.let { setActiveShelf ->
+                actionButton(
+                    text = "",
+                    iconPath = stateValues.drawablePathIconStock,
+                    iconContentDescription = "Shelf",
+                    enabled = !isActiveShelf,
+                    onClick = setActiveShelf
+                )
+            }
 
-            actionButton(
-                text = "",
-                enabledColor = stateValues.ErrorColor,
-                iconPath = stateValues.drawablePathIconDelete,
-                iconContentDescription = stateValues.drawablePathIconDelete,
-                onClick = onDelete
-            )
+            onDelete?.let { delete ->
+                actionButton(
+                    text = "",
+                    enabledColor = stateValues.ErrorColor,
+                    iconPath = stateValues.drawablePathIconDelete,
+                    iconContentDescription = stateValues.drawablePathIconDelete,
+                    onClick = delete
+                )
+            }
         }
     }
 }
@@ -14211,7 +14225,7 @@ fun AppConfiguration.StockAddEditIdentityPage(
 private fun AppConfiguration.StockLocationAvailabilityCard(
     location: StockBranchQuantityDataModel,
     currentStoreId: String,
-    onMoveBatch: (GoodsBatchDataModel, String?) -> Unit
+    onMoveBatch: ((GoodsBatchDataModel, String?) -> Unit)?
 ) {
     val name = location.name.visibleLocalizedString(stateValues.appLanguage, location.publicId.ifBlank { location.storeId })
     val quantityText = location.totalQuantity?.quantityText(stateValues.appLanguage)
@@ -14326,15 +14340,17 @@ private fun AppConfiguration.StockLocationAvailabilityCard(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
-                    actionButton(
-                        text = "",
-                        fillMaxWidthIfTextPresent = false,
-                        iconPath = stockMoveIconPath,
-                        iconRes = stockBatchMovementIconFallback(),
-                        iconContentDescription = localizedStringResource(1209, "Move this batch"),
-                        confirmationRequired = false,
-                        onClick = { onMoveBatch(batch, if (isCurrent) null else currentStoreId) }
-                    )
+                    onMoveBatch?.let { moveBatch ->
+                        actionButton(
+                            text = "",
+                            fillMaxWidthIfTextPresent = false,
+                            iconPath = stockMoveIconPath,
+                            iconRes = stockBatchMovementIconFallback(),
+                            iconContentDescription = localizedStringResource(1209, "Move this batch"),
+                            confirmationRequired = false,
+                            onClick = { moveBatch(batch, if (isCurrent) null else currentStoreId) }
+                        )
+                    }
                 }
             }
         }
@@ -14570,7 +14586,7 @@ private fun AppConfiguration.StockBatchMoveDialog(
 private fun AppConfiguration.StockBranchAvailabilitySection(
     goodsItem: GoodsItemDataModel,
     availability: StockItemBranchAvailabilityDataModel?,
-    onMoveBatch: (GoodsBatchDataModel, String?) -> Unit
+    onMoveBatch: ((GoodsBatchDataModel, String?) -> Unit)?
 ) {
     val currentStoreId = stateValues.activeStoreId ?: goodsItem.storeId
     val locations = availability?.locations.orEmpty()
@@ -14701,6 +14717,7 @@ private fun AppConfiguration.IncomingStockBatchTransferCard(
     batch: GoodsBatchDataModel,
     movement: StockBatchMovementDataModel?,
     availability: StockItemBranchAvailabilityDataModel?,
+    canDecide: Boolean,
     onDecided: () -> Unit
 ) {
     val source = movement?.sourceStoreId?.let { sourceId -> availability?.locations.orEmpty().find { it.storeId == sourceId } }
@@ -14812,6 +14829,8 @@ private fun AppConfiguration.IncomingStockBatchTransferCard(
 
         if (movement == null) {
             MessageText(text = localizedStringResource(1193, "Transfer metadata is still loading. Refresh branch stock."))
+        } else if (!canDecide) {
+            MessageText(text = localizedStringResource(665, "You do not have permission for this action"))
         } else {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -14887,6 +14906,13 @@ fun AppConfiguration.StockAddEditBatchesPage(
     val editIdKey = "stock_batches_edit_id_${goodsItem.id}"
     val currentMode = addEditState[modeKey] ?: "list"
     val currentEditId = addEditState[editIdKey]
+    val activeStoreIdForBatches = stateValues.activeStoreId ?: goodsItem.storeId
+    val canCreateBatch = currentUserHasStorePermission(activeStoreIdForBatches, STORE_PERMISSION_STOCK_BATCH_CREATE)
+    val canEditBatch = currentUserHasStorePermission(activeStoreIdForBatches, STORE_PERMISSION_STOCK_BATCH_EDIT)
+    val canDeleteBatch = currentUserHasStorePermission(activeStoreIdForBatches, STORE_PERMISSION_STOCK_BATCH_DELETE)
+    val canMoveBatch = currentUserHasStorePermission(activeStoreIdForBatches, STORE_PERMISSION_STOCK_BATCH_MOVE)
+    val canDecideBatchTransfers = currentUserHasStorePermission(activeStoreIdForBatches, STORE_PERMISSION_STOCK_BATCH_TRANSFER_DECIDE)
+    val canSetActiveShelfBatch = currentUserHasStorePermission(activeStoreIdForBatches, STORE_PERMISSION_STOCK_BATCH_SET_ACTIVE_SHELF)
 
     val batches = stateValues.stockBatches
         .orEmpty()
@@ -14910,12 +14936,32 @@ fun AppConfiguration.StockAddEditBatchesPage(
         }
     }
 
-    LaunchedEffect(startAddingBatch) {
+    LaunchedEffect(startAddingBatch, canCreateBatch) {
         if (startAddingBatch) {
-            NavigationScreenModel.Stock.AddEditGoodsItem.setState(modeKey to "add")
-            NavigationScreenModel.Stock.AddEditGoodsItem.removeState(editIdKey)
+            if (canCreateBatch) {
+                NavigationScreenModel.Stock.AddEditGoodsItem.setState(modeKey to "add")
+                NavigationScreenModel.Stock.AddEditGoodsItem.removeState(editIdKey)
+            } else {
+                postInAppNotification(currentUserPermissionDeniedMessage(), NotificationType.Negative, transient = true)
+            }
             onStartAddingBatchConsumed()
         }
+    }
+
+    if (addingBatch && !canCreateBatch) {
+        MessageText(
+            modifier = modifier.fillMaxSize(),
+            text = localizedStringResource(665, "You do not have permission for this action")
+        )
+        return
+    }
+
+    if (editing && !canEditBatch) {
+        MessageText(
+            modifier = modifier.fillMaxSize(),
+            text = localizedStringResource(665, "You do not have permission for this action")
+        )
+        return
     }
 
     if (addingBatch || editing) {
@@ -14937,7 +14983,6 @@ fun AppConfiguration.StockAddEditBatchesPage(
 
     var draggedBatchId by remember(goodsItem.id) { mutableStateOf<String?>(null) }
     var dragTargetIndex by remember(goodsItem.id) { mutableStateOf<Int?>(null) }
-    val activeStoreIdForBatches = stateValues.activeStoreId ?: goodsItem.storeId
     val incomingBatches = stateValues.stockBatches
         .orEmpty()
         .filter {
@@ -14985,10 +15030,12 @@ fun AppConfiguration.StockAddEditBatchesPage(
                 StockBranchAvailabilitySection(
                     goodsItem = goodsItem,
                     availability = branchAvailability,
-                    onMoveBatch = { batch, preferredDestination ->
-                        movingBatch = batch
-                        preferredDestinationStoreId = preferredDestination
-                    }
+                    onMoveBatch = if (canMoveBatch) {
+                        { batch, preferredDestination ->
+                            movingBatch = batch
+                            preferredDestinationStoreId = preferredDestination
+                        }
+                    } else null
                 )
 
                 Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
@@ -15014,6 +15061,7 @@ fun AppConfiguration.StockAddEditBatchesPage(
                             batch = incomingBatch,
                             movement = movement,
                             availability = branchAvailability,
+                            canDecide = canDecideBatchTransfers,
                             onDecided = {
                                 getStockItemBranchAvailability(activeStoreIdForBatches, goodsItem.id)
                             }
@@ -15063,57 +15111,69 @@ fun AppConfiguration.StockAddEditBatchesPage(
                         draggedBatchIndex = draggedBatchId?.let { id -> batches.indexOfFirst { it.id == id }.takeIf { it >= 0 } },
                         dragTargetIndex = dragTargetIndex,
                         allBatchesCount = batches.size,
-                        onEdit = {
-                            coroutineScope.launch {
-                                NavigationScreenModel.Stock.AddEditGoodsItem.setState(modeKey to "edit")
-                                NavigationScreenModel.Stock.AddEditGoodsItem.setState(editIdKey to batch.id)
+                        onEdit = if (canEditBatch) {
+                            {
+                                coroutineScope.launch {
+                                    NavigationScreenModel.Stock.AddEditGoodsItem.setState(modeKey to "edit")
+                                    NavigationScreenModel.Stock.AddEditGoodsItem.setState(editIdKey to batch.id)
+                                }
                             }
-                        },
-                        onDelete = {
-                            stateValues.activeStoreId?.let { storeId ->
-                                deleteGoodsBatches(
-                                    ids = listOf(batch.id),
-                                    storeId = storeId,
-                                    onCompleted = null
-                                )
+                        } else null,
+                        onDelete = if (canDeleteBatch) {
+                            {
+                                stateValues.activeStoreId?.let { storeId ->
+                                    deleteGoodsBatches(
+                                        ids = listOf(batch.id),
+                                        storeId = storeId,
+                                        onCompleted = null
+                                    )
+                                }
                             }
-                        },
-                        onSetActiveShelf = {
-                            stateValues.activeStoreId?.let { storeId ->
-                                setActiveShelfBatch(
-                        batch = batch,
-                        storeId = storeId,
-                        previousActiveShelfBatchId = goodsItem.activeShelfBatchId
-                    )
+                        } else null,
+                        onSetActiveShelf = if (canSetActiveShelfBatch) {
+                            {
+                                stateValues.activeStoreId?.let { storeId ->
+                                    setActiveShelfBatch(
+                                        batch = batch,
+                                        storeId = storeId,
+                                        previousActiveShelfBatchId = goodsItem.activeShelfBatchId
+                                    )
+                                }
                             }
-                        },
-                        onDragStart = { id ->
-                            draggedBatchId = id
-                            dragTargetIndex = index
-                        },
-                        onDragTargetChanged = { target ->
-                            dragTargetIndex = target
-                        },
-                        onDragFinished = { target ->
-                            val from = index
-                            draggedBatchId = null
-                            dragTargetIndex = null
-                            if (from != target) {
-                                reorderShelfBatches(
-                                    goodsItem = goodsItem,
-                                    batches = batches,
-                                    fromIndex = from,
-                                    toIndex = target
-                                )
+                        } else null,
+                        onDragStart = if (canSetActiveShelfBatch) {
+                            { id ->
+                                draggedBatchId = id
+                                dragTargetIndex = index
                             }
-                        },
+                        } else null,
+                        onDragTargetChanged = if (canSetActiveShelfBatch) {
+                            { target ->
+                                dragTargetIndex = target
+                            }
+                        } else null,
+                        onDragFinished = if (canSetActiveShelfBatch) {
+                            { target ->
+                                val from = index
+                                draggedBatchId = null
+                                dragTargetIndex = null
+                                if (from != target) {
+                                    reorderShelfBatches(
+                                        goodsItem = goodsItem,
+                                        batches = batches,
+                                        fromIndex = from,
+                                        toIndex = target
+                                    )
+                                }
+                            }
+                        } else null,
                         onDragCancelled = {
                             draggedBatchId = null
                             dragTargetIndex = null
                         }
                     )
 
-                    if (batch.quantity.total > 0.0 && branchAvailability?.locations.orEmpty().any { it.storeId != batch.storeId }) {
+                    if (canMoveBatch && batch.quantity.total > 0.0 && branchAvailability?.locations.orEmpty().any { it.storeId != batch.storeId }) {
                         Spacer(modifier = Modifier.height(6.dp))
                         actionButton(
                             modifier = Modifier.fillMaxWidth(),
@@ -15136,17 +15196,19 @@ fun AppConfiguration.StockAddEditBatchesPage(
             }
         }
 
-        actionButton(
-            modifier = Modifier.padding(8.dp),
-            text = localizedStringResource(194, "Add batch"),
-            iconPath = stateValues.drawablePathIconAdd,
-            onClick = {
-                coroutineScope.launch {
-                    NavigationScreenModel.Stock.AddEditGoodsItem.setState(modeKey to "add")
-                    NavigationScreenModel.Stock.AddEditGoodsItem.removeState(editIdKey)
+        if (canCreateBatch) {
+            actionButton(
+                modifier = Modifier.padding(8.dp),
+                text = localizedStringResource(194, "Add batch"),
+                iconPath = stateValues.drawablePathIconAdd,
+                onClick = {
+                    coroutineScope.launch {
+                        NavigationScreenModel.Stock.AddEditGoodsItem.setState(modeKey to "add")
+                        NavigationScreenModel.Stock.AddEditGoodsItem.removeState(editIdKey)
+                    }
                 }
-            }
-        )
+            )
+        }
     }
 }
 
@@ -15169,6 +15231,8 @@ fun AppConfiguration.StockSupplierPricesPage(
     }
 
     val storeId = stateValues.activeStoreId ?: goodsItem.storeId
+    val canManageSupplierPrices = currentUserHasStorePermission(storeId, STORE_PERMISSION_SUPPLIER_PRICES_MANAGE)
+    val canManageSuppliersHere = currentUserCanManageSuppliers(storeId)
     val suppliers = stateValues.suppliers.orEmpty()
     val supplierPricesPayload by supplierGoodsPricesState.payload.collectAsState()
     val allSupplierPrices = supplierPricesPayload.orEmpty()
@@ -15321,7 +15385,7 @@ fun AppConfiguration.StockSupplierPricesPage(
                 Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
             }
 
-            item {
+            if (canManageSupplierPrices) item {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -15360,14 +15424,16 @@ fun AppConfiguration.StockSupplierPricesPage(
 
                         Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
-                        actionButton(
-                            text = localizedStringResource(635, "Add supplier here"),
-                            iconPath = stateValues.drawablePathIconAdd,
-                            confirmationRequired = false,
-                            onClick = { showSupplierAddSheet = true }
-                        )
+                        if (canManageSuppliersHere) {
+                            actionButton(
+                                text = localizedStringResource(635, "Add supplier here"),
+                                iconPath = stateValues.drawablePathIconAdd,
+                                confirmationRequired = false,
+                                onClick = { showSupplierAddSheet = true }
+                            )
 
-                        Spacer(modifier = Modifier.height(stateValues.marginTextField))
+                            Spacer(modifier = Modifier.height(stateValues.marginTextField))
+                        }
 
                         SimpleTextInput(
                             modifier = Modifier.fillMaxWidth(),
@@ -15528,20 +15594,24 @@ fun AppConfiguration.StockSupplierPricesPage(
                                 stateValues.PlaceholderTextColor,
                                 RoundedCornerShape(stateValues.cornerRadius)
                             )
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = ripple(color = stateValues.AccentColor)
-                            ) {
-                                selectedSupplierId = supplierPrice.supplierId
-                                supplierGoodsName = supplierPrice.supplierGoodsName.orEmpty()
-                                supplierBarcode = supplierPrice.supplierBarcode.orEmpty()
-                                supplyPriceText = supplierPrice.supplyPrice.price
-                                minOrderText = supplierPrice.minOrderQuantity
-                                    ?.let { quantity -> stockQuantityInputTextFromAmount(quantity.total, quantity) }
-                                    .orEmpty()
-                                packageText = supplierPrice.packageQuantity
-                                    ?.let { quantity -> stockQuantityInputTextFromAmount(quantity.total, quantity) }
-                                    .orEmpty()
+                            .run {
+                                if (canManageSupplierPrices) {
+                                    clickable(
+                                        interactionSource = MutableInteractionSource(),
+                                        indication = ripple(color = stateValues.AccentColor)
+                                    ) {
+                                        selectedSupplierId = supplierPrice.supplierId
+                                        supplierGoodsName = supplierPrice.supplierGoodsName.orEmpty()
+                                        supplierBarcode = supplierPrice.supplierBarcode.orEmpty()
+                                        supplyPriceText = supplierPrice.supplyPrice.price
+                                        minOrderText = supplierPrice.minOrderQuantity
+                                            ?.let { quantity -> stockQuantityInputTextFromAmount(quantity.total, quantity) }
+                                            .orEmpty()
+                                        packageText = supplierPrice.packageQuantity
+                                            ?.let { quantity -> stockQuantityInputTextFromAmount(quantity.total, quantity) }
+                                            .orEmpty()
+                                    }
+                                } else this
                             }
                             .padding(stateValues.marginTextFieldGroup)
                     ) {
@@ -18608,9 +18678,27 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
                 line.goodsItemId == stockAddEditGoodsItemIdForCounts && line.orderId == order.id && line.isActive
             }
         }
+    val activeStoreIdForStockAddEditPermissions = existing?.storeId?.takeIf { it.isNotBlank() } ?: stateValues.activeStoreId
+    val canCreateStockItemHere = currentUserHasStorePermission(activeStoreIdForStockAddEditPermissions, STORE_PERMISSION_STOCK_ITEM_CREATE)
+    val canEditStockItemHere = currentUserHasStorePermission(activeStoreIdForStockAddEditPermissions, STORE_PERMISSION_STOCK_ITEM_EDIT)
+    val canEditCoreStockItem = if (existing == null) canCreateStockItemHere else canEditStockItemHere
+    val canManageStockPromotions = canEditCoreStockItem || currentUserHasStorePermission(activeStoreIdForStockAddEditPermissions, STORE_PERMISSION_STOCK_PROMOTIONS_MANAGE)
+    val canWorkWithStockBatches = existing != null && listOf(
+        STORE_PERMISSION_STOCK_BATCH_CREATE,
+        STORE_PERMISSION_STOCK_BATCH_EDIT,
+        STORE_PERMISSION_STOCK_BATCH_DELETE,
+        STORE_PERMISSION_STOCK_BATCH_MOVE,
+        STORE_PERMISSION_STOCK_BATCH_TRANSFER_DECIDE,
+        STORE_PERMISSION_STOCK_BATCH_SET_ACTIVE_SHELF
+    ).any { permission -> currentUserHasStorePermission(activeStoreIdForStockAddEditPermissions, permission) }
+    val canWorkWithSupplierPrices = existing != null && (
+            currentUserHasStorePermission(activeStoreIdForStockAddEditPermissions, STORE_PERMISSION_SUPPLIER_PRICES_MANAGE) ||
+                    currentUserCanViewSuppliers(activeStoreIdForStockAddEditPermissions)
+            )
+    val canWorkWithSupplierOrders = existing != null && currentUserCanViewSupplierOrders(activeStoreIdForStockAddEditPermissions)
 
     val stockAddEditTrailingIcons = buildList<Triple<String, DrawableResource, () -> Unit>> {
-        stockAddEditUndoDraft?.let { previousDraft ->
+        if (canEditCoreStockItem) stockAddEditUndoDraft?.let { previousDraft ->
             add(
                 Triple(
                     undoTemplateIconPath(),
@@ -18626,7 +18714,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
                 }
             )
         }
-        if (canPullFromParentStoreStock) {
+        if (canEditCoreStockItem && canPullFromParentStoreStock) {
             add(
                 Triple(
                     parentStoreStockIconPath(),
@@ -18639,59 +18727,102 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
                 }
             )
         }
-        add(
-            Triple(
-                globalGoodsIconPath(),
-                globalGoodsIconFallback()
-            ) {
-                showGlobalGoodsSheet = true
-                refreshGenericGoodsItems(limit = 32, appendToSharedState = true)
-            }
-        )
+        if (canEditCoreStockItem) {
+            add(
+                Triple(
+                    globalGoodsIconPath(),
+                    globalGoodsIconFallback()
+                ) {
+                    showGlobalGoodsSheet = true
+                    refreshGenericGoodsItems(limit = 32, appendToSharedState = true)
+                }
+            )
+        }
     }
 
-    val tabs = listOf(
-        StockAddEditTabContent(
-            id = "info",
-            title = localizedStringResource(252, "Info"),
-            iconPath = stateValues.drawablePathIconEdit
-        ),
-        StockAddEditTabContent(
-            id = "conditions",
-            title = localizedStringResource(609, "Conditions"),
-            iconPath = stateValues.drawablePathIconCheck,
-            count = draft.conditions.size
-        ),
-        StockAddEditTabContent(
-            id = "prices",
-            title = localizedStringResource(253, "Generic prices"),
-            iconPath = stateValues.drawablePathIconFinances
-        ),
-        StockAddEditTabContent(
-            id = "promos",
-            title = localizedStringResource(920, "Promos"),
-            iconPath = stateValues.drawablePathIconPromos,
-            count = draft.promotions.size
-        ),
-        StockAddEditTabContent(
-            id = "batches",
-            title = localizedStringResource(138, "Batches"),
-            iconPath = stateValues.drawablePathIconStock,
-            count = stockAddEditBatchesCount
-        ),
-        StockAddEditTabContent(
-            id = "supplier_prices",
-            title = localizedStringResource(203, "Supplier prices"),
-            iconPath = stateValues.drawablePathIconSuppliers,
-            count = existing?.let { stockAddEditSupplierPricesCount }
-        ),
-        StockAddEditTabContent(
-            id = "orders",
-            title = localizedStringResource(254, "Orders"),
-            iconPath = stateValues.drawablePathIconTransactionSupply,
-            count = existing?.let { stockAddEditSupplierOrdersCount }
-        )
-    )
+    val tabs = buildList {
+        if (canEditCoreStockItem) {
+            add(
+                StockAddEditTabContent(
+                    id = "info",
+                    title = localizedStringResource(252, "Info"),
+                    iconPath = stateValues.drawablePathIconEdit
+                )
+            )
+            add(
+                StockAddEditTabContent(
+                    id = "conditions",
+                    title = localizedStringResource(609, "Conditions"),
+                    iconPath = stateValues.drawablePathIconCheck,
+                    count = draft.conditions.size
+                )
+            )
+            add(
+                StockAddEditTabContent(
+                    id = "prices",
+                    title = localizedStringResource(253, "Generic prices"),
+                    iconPath = stateValues.drawablePathIconFinances
+                )
+            )
+        }
+        if (canManageStockPromotions) {
+            add(
+                StockAddEditTabContent(
+                    id = "promos",
+                    title = localizedStringResource(920, "Promos"),
+                    iconPath = stateValues.drawablePathIconPromos,
+                    count = draft.promotions.size
+                )
+            )
+        }
+        if (canWorkWithStockBatches) {
+            add(
+                StockAddEditTabContent(
+                    id = "batches",
+                    title = localizedStringResource(138, "Batches"),
+                    iconPath = stateValues.drawablePathIconStock,
+                    count = stockAddEditBatchesCount
+                )
+            )
+        }
+        if (canWorkWithSupplierPrices) {
+            add(
+                StockAddEditTabContent(
+                    id = "supplier_prices",
+                    title = localizedStringResource(203, "Supplier prices"),
+                    iconPath = stateValues.drawablePathIconSuppliers,
+                    count = stockAddEditSupplierPricesCount
+                )
+            )
+        }
+        if (canWorkWithSupplierOrders) {
+            add(
+                StockAddEditTabContent(
+                    id = "orders",
+                    title = localizedStringResource(254, "Orders"),
+                    iconPath = stateValues.drawablePathIconTransactionSupply,
+                    count = stockAddEditSupplierOrdersCount
+                )
+            )
+        }
+        if (isEmpty()) {
+            add(
+                StockAddEditTabContent(
+                    id = "restricted",
+                    title = localizedStringResource(665, "You do not have permission for this action"),
+                    iconPath = stateValues.drawablePathIconSecurity
+                )
+            )
+        }
+    }
+    val visibleSelectedTabId = selectedTabId.takeIf { selected -> tabs.any { it.id == selected } } ?: tabs.first().id
+
+    LaunchedEffect(visibleSelectedTabId) {
+        if (selectedTabId != visibleSelectedTabId) {
+            selectedTabId = visibleSelectedTabId
+            NavigationScreenModel.Stock.AddEditGoodsItem.setState("stock_add_edit_selected_tab" to visibleSelectedTabId)
+        }
+    }
 
     if (showParentStoreStockSheet && stateValues.activeStoreId != null) {
         ParentStoreStockSelectionBottomSheet(
@@ -18752,7 +18883,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
         StockAddEditTabs(
             modifier = Modifier
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.92f),
-            selectedId = selectedTabId,
+            selectedId = visibleSelectedTabId,
             tabs = tabs,
             onSelected = {
                 selectedTabId = it
@@ -18762,7 +18893,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
             }
         )
 
-        when (selectedTabId) {
+        when (visibleSelectedTabId) {
             "conditions" -> {
                 StockAddEditConditionsTab(
                     modifier = Modifier.weight(1f),
@@ -18834,6 +18965,13 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
                 )
             }
 
+            "restricted" -> {
+                MessageText(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(665, "You do not have permission for this action")
+                )
+            }
+
             else -> {
                 StockAddEditInfoTab(
                     modifier = Modifier.weight(1f),
@@ -18846,16 +18984,27 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
             }
         }
 
-        if (selectedTabId == "info" || selectedTabId == "conditions" || selectedTabId == "prices" || selectedTabId == "promos") {
+        val canSaveVisibleStockDraft = when (visibleSelectedTabId) {
+            "info", "conditions", "prices" -> canEditCoreStockItem
+            "promos" -> canManageStockPromotions
+            else -> false
+        }
+
+        if (visibleSelectedTabId == "info" || visibleSelectedTabId == "conditions" || visibleSelectedTabId == "prices" || visibleSelectedTabId == "promos") {
             actionButton(
                 modifier = Modifier
                     .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.92f)
                     .padding(8.dp),
                 text = stateValues.stringConfirm,
-                enabled = draft.isValidStockDraft(stateValues.globalAppConfiguration) &&
+                enabled = canSaveVisibleStockDraft &&
+                        draft.isValidStockDraft(stateValues.globalAppConfiguration) &&
                         stateValues.activeStoreId != null &&
                         stateValues.latestNotification == null,
                 onClick = {
+                    if (!canSaveVisibleStockDraft) {
+                        postInAppNotification(currentUserPermissionDeniedMessage(), NotificationType.Negative, transient = true)
+                        return@actionButton
+                    }
                     val storeId = stateValues.activeStoreId ?: return@actionButton
                     val goodsItem = draft.toGoodsItem(storeId, stateValues.globalAppConfiguration, existing)
 
@@ -24693,7 +24842,13 @@ fun AppConfiguration.MessageText(
     }
 }
 
-private fun AppConfiguration.workerRoleLabel(roleId: String): String {
+private fun AppConfiguration.workerRoleLabel(
+    roleId: String,
+    templates: List<StoreWorkerRoleTemplateDataModel> = storeWorkerRoleTemplatesState.payloadValue.orEmpty()
+): String {
+    templates.firstOrNull { it.id == roleId }?.let { template ->
+        return template.name.extractLocalizedString(stateValues.appLanguage).orEmpty().ifBlank { template.displayName }
+    }
     return when (roleId) {
         WORKER_ROLE_ADMIN -> localizedStringResource(448, "Admin")
         WORKER_ROLE_OWNER -> localizedStringResource(449, "Owner")
@@ -24701,22 +24856,116 @@ private fun AppConfiguration.workerRoleLabel(roleId: String): String {
     }
 }
 
+private fun AppConfiguration.workerPermissionCategory(permissionId: String): String {
+    return when (permissionId) {
+        STORE_PERMISSION_SALE_TRANSACTION,
+        STORE_PERMISSION_RETURN_TRANSACTION,
+        STORE_PERMISSION_SUPPLY_TRANSACTION,
+        STORE_PERMISSION_TRANSACTION_HISTORY_VIEW,
+        STORE_PERMISSION_CASH_REGISTER_VIEW,
+        STORE_PERMISSION_CASH_REGISTER_EXTRACT -> localizedStringResource(1249, "Checkout and cash")
+
+        STORE_PERMISSION_STOCK_READ,
+        STORE_PERMISSION_STOCK_ITEM_CREATE,
+        STORE_PERMISSION_STOCK_ITEM_EDIT,
+        STORE_PERMISSION_STOCK_ITEM_DELETE,
+        STORE_PERMISSION_STOCK_BATCH_CREATE,
+        STORE_PERMISSION_STOCK_BATCH_EDIT,
+        STORE_PERMISSION_STOCK_BATCH_DELETE,
+        STORE_PERMISSION_STOCK_BATCH_MOVE,
+        STORE_PERMISSION_STOCK_BATCH_TRANSFER_DECIDE,
+        STORE_PERMISSION_STOCK_BATCH_SET_ACTIVE_SHELF,
+        STORE_PERMISSION_STOCK_PROMOTIONS_MANAGE -> localizedStringResource(1250, "Stock")
+
+        STORE_PERMISSION_SUPPLIERS_VIEW,
+        STORE_PERMISSION_SUPPLIERS_MANAGE,
+        STORE_PERMISSION_SUPPLIER_PRICES_MANAGE,
+        STORE_PERMISSION_SUPPLIER_ORDERS_VIEW,
+        STORE_PERMISSION_SUPPLIER_ORDERS_MANAGE,
+        STORE_PERMISSION_SUPPLIER_ORDERS_RECEIVE -> localizedStringResource(1251, "Suppliers")
+
+        STORE_PERMISSION_DEBTORS_VIEW,
+        STORE_PERMISSION_DEBTORS_MANAGE,
+        STORE_PERMISSION_DEBTOR_PAYMENTS_MANAGE -> localizedStringResource(1252, "Debtors")
+
+        STORE_PERMISSION_WORKERS_VIEW,
+        STORE_PERMISSION_WORKERS_INVITE,
+        STORE_PERMISSION_WORKERS_DECIDE_REQUESTS,
+        STORE_PERMISSION_WORKERS_EDIT_PERMISSIONS,
+        STORE_PERMISSION_WORKERS_REMOVE,
+        STORE_PERMISSION_WORKER_ROLE_TEMPLATES_MANAGE -> localizedStringResource(1253, "Workers")
+
+        else -> localizedStringResource(1254, "Administration")
+    }
+}
+
 private fun AppConfiguration.workerPermissionLabel(permissionId: String): String {
     return when (permissionId) {
-        STORE_PERMISSION_SALE_TRANSACTION -> localizedStringResource(451, "Sale transaction")
-        STORE_PERMISSION_RETURN_TRANSACTION -> localizedStringResource(452, "Return transaction")
-        STORE_PERMISSION_SUPPLY_TRANSACTION -> localizedStringResource(453, "Supply transaction")
-        STORE_PERMISSION_STOCK_READ -> localizedStringResource(454, "View stock")
-        STORE_PERMISSION_STOCK_WRITE -> localizedStringResource(455, "Edit stock")
+        STORE_PERMISSION_SALE_TRANSACTION -> localizedStringResource(451, "Complete sales")
+        STORE_PERMISSION_RETURN_TRANSACTION -> localizedStringResource(452, "Complete returns")
+        STORE_PERMISSION_SUPPLY_TRANSACTION -> localizedStringResource(453, "Complete supply transactions")
         STORE_PERMISSION_TRANSACTION_HISTORY_VIEW -> localizedStringResource(456, "View transaction history")
-        STORE_PERMISSION_ANALYTICS_VIEW -> localizedStringResource(457, "View analytics")
         STORE_PERMISSION_CASH_REGISTER_VIEW -> localizedStringResource(458, "View cash register")
         STORE_PERMISSION_CASH_REGISTER_EXTRACT -> localizedStringResource(459, "Extract cash")
-        STORE_PERMISSION_WORKERS_VIEW -> localizedStringResource(460, "View workers")
-        STORE_PERMISSION_WORKERS_MANAGE -> localizedStringResource(461, "Manage workers")
-        STORE_PERMISSION_STORE_MANAGE -> localizedStringResource(462, "Manage store")
+        STORE_PERMISSION_STOCK_READ -> localizedStringResource(454, "View stock")
+        STORE_PERMISSION_STOCK_ITEM_CREATE -> localizedStringResource(1255, "Create goods")
+        STORE_PERMISSION_STOCK_ITEM_EDIT -> localizedStringResource(1256, "Edit goods")
+        STORE_PERMISSION_STOCK_ITEM_DELETE -> localizedStringResource(1257, "Delete goods")
+        STORE_PERMISSION_STOCK_BATCH_CREATE -> localizedStringResource(1258, "Create stock batches")
+        STORE_PERMISSION_STOCK_BATCH_EDIT -> localizedStringResource(1259, "Edit stock batches")
+        STORE_PERMISSION_STOCK_BATCH_DELETE -> localizedStringResource(1260, "Delete stock batches")
+        STORE_PERMISSION_STOCK_BATCH_MOVE -> localizedStringResource(1261, "Move stock between branches")
+        STORE_PERMISSION_STOCK_BATCH_TRANSFER_DECIDE -> localizedStringResource(1262, "Accept or decline stock moves")
+        STORE_PERMISSION_STOCK_BATCH_SET_ACTIVE_SHELF -> localizedStringResource(1263, "Set active shelf batch")
+        STORE_PERMISSION_STOCK_PROMOTIONS_MANAGE -> localizedStringResource(1264, "Manage stock promotions")
+        STORE_PERMISSION_SUPPLIERS_VIEW -> localizedStringResource(1265, "View suppliers")
+        STORE_PERMISSION_SUPPLIERS_MANAGE -> localizedStringResource(1266, "Create and edit suppliers")
+        STORE_PERMISSION_SUPPLIER_PRICES_MANAGE -> localizedStringResource(1267, "Manage supplier prices")
+        STORE_PERMISSION_SUPPLIER_ORDERS_VIEW -> localizedStringResource(1268, "View supplier orders")
+        STORE_PERMISSION_SUPPLIER_ORDERS_MANAGE -> localizedStringResource(1269, "Create and edit supplier orders")
+        STORE_PERMISSION_SUPPLIER_ORDERS_RECEIVE -> localizedStringResource(1270, "Receive supplier orders")
+        STORE_PERMISSION_DEBTORS_VIEW -> localizedStringResource(1271, "View debtors")
+        STORE_PERMISSION_DEBTORS_MANAGE -> localizedStringResource(1272, "Create and edit debtors")
+        STORE_PERMISSION_DEBTOR_PAYMENTS_MANAGE -> localizedStringResource(1273, "Record debtor payments")
+        STORE_PERMISSION_ANALYTICS_VIEW -> localizedStringResource(457, "View analytics")
         STORE_PERMISSION_LOGS_VIEW -> localizedStringResource(1075, "View operation logs")
+        STORE_PERMISSION_WORKERS_VIEW -> localizedStringResource(460, "View workers")
+        STORE_PERMISSION_WORKERS_INVITE -> localizedStringResource(1274, "Invite workers")
+        STORE_PERMISSION_WORKERS_DECIDE_REQUESTS -> localizedStringResource(1275, "Accept employment requests")
+        STORE_PERMISSION_WORKERS_EDIT_PERMISSIONS -> localizedStringResource(1276, "Edit worker permissions")
+        STORE_PERMISSION_WORKERS_REMOVE -> localizedStringResource(1277, "Request worker removal")
+        STORE_PERMISSION_WORKER_ROLE_TEMPLATES_MANAGE -> localizedStringResource(1278, "Manage role templates")
+        STORE_PERMISSION_STORE_MANAGE -> localizedStringResource(462, "Manage store settings")
+        STORE_PERMISSION_BRANCHES_MANAGE -> localizedStringResource(1279, "Manage branches")
+        STORE_PERMISSION_SUBSCRIPTION_MANAGE -> localizedStringResource(1280, "Manage subscription")
+        STORE_PERMISSION_STOCK_WRITE -> localizedStringResource(455, "Edit stock")
+        STORE_PERMISSION_WORKERS_MANAGE -> localizedStringResource(461, "Manage workers")
         else -> permissionId
+    }
+}
+
+private fun AppConfiguration.workerRoleOptions(templates: List<StoreWorkerRoleTemplateDataModel>): List<DropdownOption> {
+    return listOf(
+        DropdownOption(WORKER_ROLE_STANDARD, workerRoleLabel(WORKER_ROLE_STANDARD), localizedStringResource(463, "Cashier/basic worker")),
+        DropdownOption(WORKER_ROLE_ADMIN, workerRoleLabel(WORKER_ROLE_ADMIN), localizedStringResource(464, "Can manage most store operations"))
+    ) + templates.filter { it.isActive }.map { template ->
+        DropdownOption(
+            template.id,
+            workerRoleLabel(template.id, templates),
+            template.description.extractLocalizedString(stateValues.appLanguage).orEmpty().ifBlank { localizedStringResource(1281, "Custom permission template") }
+        )
+    }
+}
+
+private fun AppConfiguration.defaultAssignablePermissionsForWorkerRole(
+    roleId: String,
+    assignablePermissions: Set<String>,
+    templates: List<StoreWorkerRoleTemplateDataModel> = storeWorkerRoleTemplatesState.payloadValue.orEmpty()
+): List<String> {
+    val templatePermissions = templates.firstOrNull { it.id == roleId }?.permissions
+    val defaultPermissions = (templatePermissions ?: defaultStorePermissionsForRole(roleId)).filter { it in assignablePermissions }
+    return defaultPermissions.ifEmpty {
+        if (roleId == WORKER_ROLE_ADMIN) ALL_STORE_PERMISSION_IDS.filter { it in assignablePermissions } else emptyList()
     }
 }
 
@@ -24992,59 +25241,306 @@ private fun AppConfiguration.WorkerPermissionEditor(
     onChanged: (List<String>) -> Unit
 ) {
     val visiblePermissionIds = ALL_STORE_PERMISSION_IDS.filter { it in availablePermissions }
+    val selectedPermissionSet = permissions.toSet()
+    val groups = visiblePermissionIds.groupBy { workerPermissionCategory(it) }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
     ) {
-        visiblePermissionIds.chunked(if (stateValues.isNarrowScreen) 1 else 2).forEach { row ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
-                verticalAlignment = Alignment.CenterVertically
+        groups.forEach { (category, permissionIds) ->
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor.copy(alpha = 0.35f), RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.BackgroundColor)
+                    .padding(stateValues.marginTextField),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                row.forEach { permissionId ->
-                    val checked = permissionId in permissions
+                Text(
+                    text = category,
+                    color = stateValues.AccentColor,
+                    fontSize = stateValues.smallTextSize,
+                    fontWeight = FontWeight.Bold
+                )
+
+                permissionIds.chunked(if (stateValues.isNarrowScreen) 1 else 2).forEach { row ->
                     Row(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(stateValues.cornerRadius))
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = ripple(color = stateValues.AccentColor),
-                                onClick = {
-                                    onChanged(
-                                        if (checked) permissions - permissionId else permissions + permissionId
-                                    )
-                                }
-                            )
-                            .padding(vertical = 2.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        AitaRoundCheckbox(
-                            checked = checked,
-                            onCheckedChange = { isChecked ->
-                                onChanged(if (isChecked) permissions + permissionId else permissions - permissionId)
+                        row.forEach { permissionId ->
+                            val checked = permissionId in selectedPermissionSet
+                            Row(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = ripple(color = stateValues.AccentColor),
+                                        onClick = {
+                                            onChanged(
+                                                normalizeStorePermissionIds(if (checked) permissions - permissionId else permissions + permissionId)
+                                            )
+                                        }
+                                    )
+                                    .padding(vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                AitaRoundCheckbox(
+                                    checked = checked,
+                                    onCheckedChange = { isChecked ->
+                                        onChanged(normalizeStorePermissionIds(if (isChecked) permissions + permissionId else permissions - permissionId))
+                                    }
+                                )
+
+                                Text(
+                                    text = workerPermissionLabel(permissionId),
+                                    color = stateValues.TextColor,
+                                    fontSize = stateValues.smallTextSize,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                             }
-                        )
+                        }
 
-                        Text(
-                            text = workerPermissionLabel(permissionId),
-                            color = stateValues.TextColor,
-                            fontSize = stateValues.smallTextSize,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        repeat((if (stateValues.isNarrowScreen) 1 else 2) - row.size) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
                     }
-                }
-
-                repeat((if (stateValues.isNarrowScreen) 1 else 2) - row.size) {
-                    Spacer(modifier = Modifier.weight(1f))
                 }
             }
         }
     }
 }
+
+@Composable
+private fun AppConfiguration.ResetPermissionsText(
+    roleId: String,
+    assignablePermissions: Set<String>,
+    templates: List<StoreWorkerRoleTemplateDataModel>,
+    onReset: (List<String>) -> Unit
+) {
+    Text(
+        text = localizedStringResource(1282, "Reset checkboxes to this role default"),
+        color = stateValues.AccentColor,
+        fontSize = stateValues.smallTextSize,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple(color = stateValues.AccentColor),
+                onClick = { onReset(defaultAssignablePermissionsForWorkerRole(roleId, assignablePermissions, templates)) }
+            )
+            .padding(vertical = 4.dp),
+        textAlign = TextAlign.End
+    )
+}
+
+@Composable
+private fun AppConfiguration.WorkerRoleTemplateManager(
+    storeId: String,
+    templates: List<StoreWorkerRoleTemplateDataModel>,
+    assignablePermissions: Set<String>
+) {
+    var editingTemplateId by rememberSaveable(storeId) { mutableStateOf("") }
+    var nameText by rememberSaveable(storeId) { mutableStateOf("") }
+    var descriptionText by rememberSaveable(storeId) { mutableStateOf("") }
+    var permissionsText by rememberSaveable(storeId, assignablePermissions.sorted().joinToString("|")) {
+        mutableStateOf(defaultAssignablePermissionsForWorkerRole(WORKER_ROLE_STANDARD, assignablePermissions, templates).joinToString("|"))
+    }
+    val permissions = permissionsFromSerialized(permissionsText)
+        .filter { it in assignablePermissions }
+        .ifEmpty { defaultAssignablePermissionsForWorkerRole(WORKER_ROLE_STANDARD, assignablePermissions, templates) }
+
+    fun startEdit(template: StoreWorkerRoleTemplateDataModel) {
+        editingTemplateId = template.id
+        nameText = template.name.extractLocalizedString(stateValues.appLanguage).orEmpty().ifBlank { template.displayName }
+        descriptionText = template.description.extractLocalizedString(stateValues.appLanguage).orEmpty()
+        permissionsText = template.permissions.filter { it in assignablePermissions }.joinToString("|")
+    }
+
+    fun resetEditor() {
+        editingTemplateId = ""
+        nameText = ""
+        descriptionText = ""
+        permissionsText = defaultAssignablePermissionsForWorkerRole(WORKER_ROLE_STANDARD, assignablePermissions, templates).joinToString("|")
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.55f), RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .padding(stateValues.marginTextFieldGroup),
+        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            CpImage(
+                modifier = Modifier.size(32.dp),
+                url = "svg/66_0.svg",
+                contentDescription = localizedStringResource(1283, "Worker role templates"),
+                tintColor = stateValues.AccentColor,
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = localizedStringResource(1283, "Worker role templates"),
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.accentTextSize,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = localizedStringResource(1284, "Save reusable permission sets for cashier, stockkeeper, branch lead, or any cute custom role."),
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize
+                )
+            }
+        }
+
+        if (templates.isNotEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                templates.forEach { template ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(stateValues.cornerRadius))
+                            .background(stateValues.BackgroundColor)
+                            .padding(stateValues.marginTextField),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = workerRoleLabel(template.id, templates),
+                                color = stateValues.TextColor,
+                                fontSize = stateValues.textSize,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = localizedStringResource(1285, "{count} permissions").replace("{count}", template.permissions.size.toString()),
+                                color = stateValues.PlaceholderTextColor,
+                                fontSize = stateValues.smallTextSize
+                            )
+                        }
+                        actionButton(
+                            text = localizedStringResource(1086, "Edit"),
+                            iconPath = stateValues.drawablePathIconEdit,
+                            confirmationRequired = false,
+                            onClick = { startEdit(template) }
+                        )
+                        actionButton(
+                            text = localizedStringResource(1277, "Delete"),
+                            enabledColor = stateValues.ErrorColor,
+                            iconPath = stateValues.drawablePathIconDelete,
+                            confirmationRequired = true,
+                            onClick = { deleteStoreWorkerRoleTemplate(storeId, template.id) }
+                        )
+                    }
+                }
+            }
+        }
+
+        Text(
+            text = if (editingTemplateId.isBlank()) localizedStringResource(1286, "Create role template") else localizedStringResource(1287, "Edit role template"),
+            color = stateValues.AccentColor,
+            fontSize = stateValues.textSize,
+            fontWeight = FontWeight.Bold
+        )
+
+        SimpleTextInput(
+            modifier = Modifier.fillMaxWidth(),
+            value = nameText,
+            placeholder = localizedStringResource(1288, "Role name, for example Stockkeeper"),
+            leadingIconPath = "svg/66_1.svg",
+            stateHost = NavigationScreenModel.Menu.Workers,
+            stateKey = "worker_role_template_name_$storeId",
+            onValueChange = { nameText = it.take(64) }
+        )
+
+        SimpleTextInput(
+            modifier = Modifier.fillMaxWidth(),
+            value = descriptionText,
+            placeholder = localizedStringResource(1289, "Optional short description"),
+            leadingIconPath = stateValues.drawablePathIconResponse,
+            singleLine = false,
+            stateHost = NavigationScreenModel.Menu.Workers,
+            stateKey = "worker_role_template_description_$storeId",
+            onValueChange = { descriptionText = it.take(180) }
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            actionButton(
+                modifier = Modifier.weight(1f),
+                text = workerRoleLabel(WORKER_ROLE_STANDARD),
+                iconPath = stateValues.drawablePathIconPerson,
+                confirmationRequired = false,
+                onClick = { permissionsText = defaultAssignablePermissionsForWorkerRole(WORKER_ROLE_STANDARD, assignablePermissions, templates).joinToString("|") }
+            )
+            actionButton(
+                modifier = Modifier.weight(1f),
+                text = workerRoleLabel(WORKER_ROLE_ADMIN),
+                iconPath = stateValues.drawablePathIconSecurity,
+                confirmationRequired = false,
+                onClick = { permissionsText = defaultAssignablePermissionsForWorkerRole(WORKER_ROLE_ADMIN, assignablePermissions, templates).joinToString("|") }
+            )
+        }
+
+        WorkerPermissionEditor(
+            permissions = permissions,
+            availablePermissions = assignablePermissions,
+            onChanged = { permissionsText = it.distinct().joinToString("|") }
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            actionButton(
+                modifier = Modifier.weight(1f),
+                text = stateValues.stringCancel,
+                iconPath = stateValues.drawablePathIconCancel,
+                enabledColor = stateValues.DisabledColor,
+                confirmationRequired = false,
+                onClick = { resetEditor() }
+            )
+            actionButton(
+                modifier = Modifier.weight(1f),
+                text = localizedStringResource(471, "Save"),
+                enabled = nameText.isNotBlank() && permissions.isNotEmpty(),
+                iconPath = stateValues.drawablePathIconCheck,
+                confirmationRequired = false,
+                onClick = {
+                    upsertStoreWorkerRoleTemplate(
+                        storeId = storeId,
+                        templateId = editingTemplateId,
+                        name = listOf(
+                            LocalizedStringDataModel("main", nameText.trim()),
+                            LocalizedStringDataModel(stateValues.appLanguage.ifBlank { DEFAULT_APP_LANGUAGE }, nameText.trim())
+                        ).distinctBy { it.language },
+                        description = descriptionText.trim().takeIf { it.isNotBlank() }?.let { listOf(LocalizedStringDataModel("main", it)) }.orEmpty(),
+                        permissions = permissions
+                    ) { result ->
+                        if (result is DataState.Success) resetEditor()
+                    }
+                }
+            )
+        }
+    }
+}
+
 
 @Composable
 private fun AppConfiguration.WorkerRequestCard(
@@ -25053,12 +25549,9 @@ private fun AppConfiguration.WorkerRequestCard(
 ) {
     val requestStoreId = request.storeId.ifBlank { storeId }
     val assignablePermissions = currentUserAssignableStorePermissions(requestStoreId)
-    fun defaultAssignablePermissionsForRole(selectedRoleId: String): List<String> {
-        val defaultPermissions = defaultStorePermissionsForRole(selectedRoleId).filter { it in assignablePermissions }
-        return defaultPermissions.ifEmpty {
-            if (selectedRoleId == WORKER_ROLE_ADMIN) ALL_STORE_PERMISSION_IDS.filter { it in assignablePermissions } else emptyList()
-        }
-    }
+    val roleTemplates = storeWorkerRoleTemplatesState.payloadValue.orEmpty()
+    fun defaultAssignablePermissionsForRole(selectedRoleId: String): List<String> =
+        defaultAssignablePermissionsForWorkerRole(selectedRoleId, assignablePermissions, roleTemplates)
 
     var roleId by rememberSaveable(request.id) { mutableStateOf(request.roleId.ifBlank { WORKER_ROLE_STANDARD }) }
     var permissionsText by rememberSaveable(request.id, assignablePermissions.sorted().joinToString("|")) {
@@ -25072,10 +25565,7 @@ private fun AppConfiguration.WorkerRequestCard(
     val permissions = permissionsFromSerialized(permissionsText)
         .filter { it in assignablePermissions }
         .ifEmpty { defaultAssignablePermissionsForRole(roleId) }
-    val roleOptions = listOf(
-        DropdownOption(WORKER_ROLE_STANDARD, workerRoleLabel(WORKER_ROLE_STANDARD), localizedStringResource(463, "Cashier/basic worker")),
-        DropdownOption(WORKER_ROLE_ADMIN, workerRoleLabel(WORKER_ROLE_ADMIN), localizedStringResource(464, "Can manage most store operations"))
-    )
+    val roleOptions = workerRoleOptions(roleTemplates)
     var decisionDialog by rememberSaveable(request.id) { mutableStateOf<String?>(null) }
 
     decisionDialog?.let { action ->
@@ -25148,6 +25638,13 @@ private fun AppConfiguration.WorkerRequestCard(
                 roleId = selectedRole
                 permissionsText = defaultAssignablePermissionsForRole(selectedRole).joinToString("|")
             }
+        )
+
+        ResetPermissionsText(
+            roleId = roleId,
+            assignablePermissions = assignablePermissions,
+            templates = roleTemplates,
+            onReset = { permissionsText = it.joinToString("|") }
         )
 
         Spacer(modifier = Modifier.height(stateValues.marginTextField))
@@ -25321,32 +25818,29 @@ private fun AppConfiguration.WorkerMembershipCard(
     editable: Boolean,
     storeId: String? = null,
     showSelfPasswordEditor: Boolean = false,
-    pendingRemovalRequest: StoreWorkerRequestDataModel? = null
+    pendingRemovalRequest: StoreWorkerRequestDataModel? = null,
+    canRemove: Boolean = false
 ) {
     val workerStoreId = storeId ?: worker.storeId
     val assignablePermissions = currentUserAssignableStorePermissions(workerStoreId)
-    fun defaultAssignablePermissionsForRole(selectedRoleId: String): List<String> {
-        val defaultPermissions = defaultStorePermissionsForRole(selectedRoleId).filter { it in assignablePermissions }
-        return defaultPermissions.ifEmpty {
-            if (selectedRoleId == WORKER_ROLE_ADMIN) ALL_STORE_PERMISSION_IDS.filter { it in assignablePermissions } else emptyList()
-        }
-    }
+    val roleTemplates = storeWorkerRoleTemplatesState.payloadValue.orEmpty()
+    fun defaultAssignablePermissionsForRole(selectedRoleId: String): List<String> =
+        defaultAssignablePermissionsForWorkerRole(selectedRoleId, assignablePermissions, roleTemplates)
 
     var roleId by rememberSaveable(worker.id) { mutableStateOf(worker.roleId.ifBlank { WORKER_ROLE_STANDARD }) }
-    var permissionsText by rememberSaveable(worker.id) { mutableStateOf(worker.permissions.joinToString("|")) }
+    var permissionsText by rememberSaveable(worker.id) { mutableStateOf(normalizeStorePermissionIds(worker.permissions).joinToString("|")) }
     val permissions = permissionsFromSerialized(permissionsText).ifEmpty {
-        if (editable) defaultAssignablePermissionsForRole(roleId) else defaultStorePermissionsForRole(roleId)
+        if (editable) defaultAssignablePermissionsForRole(roleId) else normalizeStorePermissionIds(worker.permissions.ifEmpty { defaultStorePermissionsForRole(roleId) })
     }
     var selfWorkshiftPasswordSaving by rememberSaveable(worker.id) { mutableStateOf(false) }
-    val roleOptions = listOf(
-        DropdownOption(WORKER_ROLE_STANDARD, workerRoleLabel(WORKER_ROLE_STANDARD)),
-        DropdownOption(WORKER_ROLE_ADMIN, workerRoleLabel(WORKER_ROLE_ADMIN))
-    )
+    val roleOptions = workerRoleOptions(roleTemplates)
     val storeName = worker.storeName.extractLocalizedString(stateValues.appLanguage).orEmpty()
     val contactLine = listOf(worker.userPublicId, worker.phoneNumber.asDisplayPhoneNumber(), worker.email)
         .filter { it.isNotBlank() }
         .joinToString(" • ")
     val permissionLine = permissions.joinToString(" • ") { workerPermissionLabel(it) }
+    val currentUserId = stateValues.userAccount?.id.orEmpty()
+    val removalControlAllowed = canRemove && storeId != null && worker.userId.isNotBlank() && worker.userId != currentUserId
 
     Column(
         modifier = Modifier
@@ -25385,7 +25879,7 @@ private fun AppConfiguration.WorkerMembershipCard(
             }
 
             Text(
-                text = workerRoleLabel(worker.roleId),
+                text = workerRoleLabel(worker.roleId, roleTemplates),
                 color = stateValues.AccentColor,
                 fontSize = stateValues.textSize,
                 fontWeight = FontWeight.Bold
@@ -25438,6 +25932,13 @@ private fun AppConfiguration.WorkerMembershipCard(
                 }
             )
 
+            ResetPermissionsText(
+                roleId = roleId,
+                assignablePermissions = assignablePermissions,
+                templates = roleTemplates,
+                onReset = { permissionsText = it.joinToString("|") }
+            )
+
             Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
             WorkerPermissionEditor(
@@ -25470,8 +25971,7 @@ private fun AppConfiguration.WorkerMembershipCard(
                 }
             )
 
-            val currentUserId = stateValues.userAccount?.id.orEmpty()
-            if (worker.userId.isNotBlank() && worker.userId != currentUserId) {
+            if (removalControlAllowed) {
                 Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
                 if (pendingRemovalRequest != null) {
@@ -25521,6 +26021,42 @@ private fun AppConfiguration.WorkerMembershipCard(
                 color = stateValues.TextColor,
                 fontSize = stateValues.smallTextSize
             )
+
+            if (removalControlAllowed) {
+                Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+                if (pendingRemovalRequest != null) {
+                    Text(
+                        text = localizedStringResource(1231, "Removal request is waiting for worker confirmation"),
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Text(
+                        text = localizedStringResource(1235, "The worker stays active until they confirm this request."),
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    actionButton(
+                        text = localizedStringResource(1232, "Request removal"),
+                        enabledColor = stateValues.ErrorColor,
+                        iconPath = stateValues.drawablePathIconDelete,
+                        iconContentDescription = localizedStringResource(1232, "Request removal"),
+                        confirmationRequired = true,
+                        onClick = {
+                            removeStoreWorker(
+                                storeId = storeId,
+                                workerId = worker.id
+                            )
+                        }
+                    )
+                }
+            }
 
             if (showSelfPasswordEditor) {
                 Spacer(modifier = Modifier.height(stateValues.marginTextField))
@@ -25612,6 +26148,7 @@ fun AppConfiguration.MenuWorkersScreen() {
     val myRequestsPayload by myWorkerRequestsState.payload.collectAsState()
     val incomingRequestsPayload by incomingWorkerRequestsState.payload.collectAsState()
     val storeWorkersPayload by storeWorkerMembershipsState.payload.collectAsState()
+    val roleTemplatesPayload by storeWorkerRoleTemplatesState.payload.collectAsState()
     var myWorkSectionTab by rememberSaveable { mutableStateOf("managed") }
 
     val myMembershipsCount = myMembershipsPayload.orEmpty().size
@@ -25632,6 +26169,7 @@ fun AppConfiguration.MenuWorkersScreen() {
         activeStoreId?.let { storeId ->
             getStoreWorkers(storeId)
             getIncomingWorkerRequests(storeId)
+            getStoreWorkerRoleTemplates(storeId)
         }
     }
 
@@ -25954,8 +26492,8 @@ fun AppConfiguration.MenuWorkersScreen() {
 
                     if (activeStoreId == null) {
                         item { MessageText(modifier = Modifier.fillMaxWidth(), text = stateValues.stringNoActiveStore) }
-                    } else if (!currentUserCanManageWorkers(activeStoreId)) {
-                        item { MessageText(modifier = Modifier.fillMaxWidth(), text = localizedStringResource(486, "Only store owners and worker managers can accept employment requests")) }
+                    } else if (!currentUserCanDecideWorkerRequests(activeStoreId)) {
+                        item { MessageText(modifier = Modifier.fillMaxWidth(), text = localizedStringResource(486, "Only store owners and permitted worker managers can accept employment requests")) }
                     } else {
                         val storeResponses = incomingRequestsPayload.orEmpty()
                             .filter { it.isEmploymentResponse() || it.isWorkerRemovalResponse() }
@@ -25991,15 +26529,23 @@ fun AppConfiguration.MenuWorkersScreen() {
                     } else if (!currentUserCanViewWorkers(activeStoreId)) {
                         item { MessageText(modifier = Modifier.fillMaxWidth(), text = localizedStringResource(483, "You do not have permission to view workers in this store")) }
                     } else {
-                        if (currentUserCanManageWorkers(activeStoreId)) {
+                        val roleTemplates = roleTemplatesPayload.orEmpty()
+
+                        if (currentUserCanManageWorkerRoleTemplates(activeStoreId)) {
+                            item {
+                                WorkerRoleTemplateManager(
+                                    storeId = activeStoreId,
+                                    templates = roleTemplates,
+                                    assignablePermissions = currentUserAssignableStorePermissions(activeStoreId)
+                                )
+                            }
+                        }
+
+                        if (currentUserCanInviteWorkers(activeStoreId)) {
                             item {
                                 val assignablePermissions = currentUserAssignableStorePermissions(activeStoreId)
-                                fun defaultAssignablePermissionsForRole(selectedRoleId: String): List<String> {
-                                    val defaultPermissions = defaultStorePermissionsForRole(selectedRoleId).filter { it in assignablePermissions }
-                                    return defaultPermissions.ifEmpty {
-                                        if (selectedRoleId == WORKER_ROLE_ADMIN) ALL_STORE_PERMISSION_IDS.filter { it in assignablePermissions } else emptyList()
-                                    }
-                                }
+                                fun defaultAssignablePermissionsForRole(selectedRoleId: String): List<String> =
+                                    defaultAssignablePermissionsForWorkerRole(selectedRoleId, assignablePermissions, roleTemplates)
 
                                 var invitedUserId by rememberSaveable { mutableStateOf("") }
                                 var roleId by rememberSaveable { mutableStateOf(WORKER_ROLE_STANDARD) }
@@ -26044,15 +26590,19 @@ fun AppConfiguration.MenuWorkersScreen() {
                                         modifier = Modifier.fillMaxWidth(),
                                         title = localizedStringResource(466, "Role"),
                                         selectedId = roleId,
-                                        options = listOf(
-                                            DropdownOption(WORKER_ROLE_STANDARD, workerRoleLabel(WORKER_ROLE_STANDARD)),
-                                            DropdownOption(WORKER_ROLE_ADMIN, workerRoleLabel(WORKER_ROLE_ADMIN))
-                                        ),
+                                        options = workerRoleOptions(roleTemplates),
                                         placeholder = workerRoleLabel(WORKER_ROLE_STANDARD),
                                         onSelected = { selectedRole ->
                                             roleId = selectedRole
                                             permissionsText = defaultAssignablePermissionsForRole(selectedRole).joinToString("|")
                                         }
+                                    )
+
+                                    ResetPermissionsText(
+                                        roleId = roleId,
+                                        assignablePermissions = assignablePermissions,
+                                        templates = roleTemplates,
+                                        onReset = { permissionsText = it.joinToString("|") }
                                     )
 
                                     Spacer(modifier = Modifier.height(stateValues.marginTextField))
@@ -26097,7 +26647,8 @@ fun AppConfiguration.MenuWorkersScreen() {
                         if (workers.isEmpty()) {
                             item { MessageText(modifier = Modifier.fillMaxWidth(), text = localizedStringResource(484, "No workers in this store yet")) }
                         } else {
-                            val editable = currentUserHasStorePermission(activeStoreId, STORE_PERMISSION_WORKERS_MANAGE)
+                            val editable = currentUserCanEditWorkerPermissions(activeStoreId)
+                            val removable = currentUserCanRemoveWorkers(activeStoreId)
                             val assignablePermissions = currentUserAssignableStorePermissions(activeStoreId)
                             val pendingRemovalRequests = incomingRequestsPayload.orEmpty()
                                 .filter { it.isPendingWorkerRemovalRequest() }
@@ -26111,7 +26662,8 @@ fun AppConfiguration.MenuWorkersScreen() {
                                     worker = worker,
                                     editable = canEditWorker,
                                     storeId = worker.storeId.ifBlank { activeStoreId },
-                                    pendingRemovalRequest = pendingRemovalRequest
+                                    pendingRemovalRequest = pendingRemovalRequest,
+                                    canRemove = removable
                                 )
                             }
                         }
@@ -26130,8 +26682,8 @@ fun AppConfiguration.MenuWorkersScreen() {
 
                     if (activeStoreId == null) {
                         item { MessageText(modifier = Modifier.fillMaxWidth(), text = stateValues.stringNoActiveStore) }
-                    } else if (!currentUserCanManageWorkers(activeStoreId)) {
-                        item { MessageText(modifier = Modifier.fillMaxWidth(), text = localizedStringResource(486, "Only store owners and worker managers can accept employment requests")) }
+                    } else if (!currentUserCanDecideWorkerRequests(activeStoreId)) {
+                        item { MessageText(modifier = Modifier.fillMaxWidth(), text = localizedStringResource(486, "Only store owners and permitted worker managers can accept employment requests")) }
                     } else {
                         val pendingRequests = incomingRequestsPayload.orEmpty().filter { it.direction == WORKER_REQUEST_DIRECTION_USER_TO_STORE && it.status == WORKER_REQUEST_STATUS_PENDING }
                         if (pendingRequests.isEmpty()) {
@@ -28531,6 +29083,7 @@ fun AppConfiguration.MenuStoresScreen() {
                             items(filteredTopLevelStores, key = { it.id }) { store ->
                                 val isOwner = currentUserId in store.userIds
                                 val canManageStore = isOwner || currentUserHasStorePermission(store.id, STORE_PERMISSION_STORE_MANAGE)
+                                val canManageBranches = canManageStore || currentUserHasStorePermission(store.id, STORE_PERMISSION_BRANCHES_MANAGE)
                                 val isActive = store.id == stateValues.activeStoreId
                                 val canBeActive = store.canBeSelectedAsActiveStore()
                                 val hasBranches = store.branches.isNotEmpty()
@@ -28582,7 +29135,7 @@ fun AppConfiguration.MenuStoresScreen() {
                                                 modifier = Modifier.padding(start = stateValues.marginTextField),
                                                 store = branch,
                                                 onDelete = if (isOwner) { { branchToDelete -> deleteStore(branchToDelete) } } else null,
-                                                onEdit = if (canManageStore) {
+                                                onEdit = if (canManageBranches) {
                                                     {
                                                         coroutineScope.launch {
                                                             NavigationScreenModel.Menu.AddEditStore.setState(NavigationScreenModel.Menu.AddEditStore.KEY_STATE_EDITED_STORE_ID to branch.id)
@@ -28601,7 +29154,7 @@ fun AppConfiguration.MenuStoresScreen() {
                                         }
                                     }
 
-                                    if (canManageStore) {
+                                    if (canManageBranches) {
                                         actionButton(
                                             modifier = Modifier
                                                 .fillMaxWidth()
@@ -28968,11 +29521,11 @@ private fun AppConfiguration.canOpenMenuDestination(model: NavigationScreenModel
         NavigationScreenModel.Menu.Analytics -> activeOwnerFallback || currentUserCanViewAnalytics(activeStoreId)
         NavigationScreenModel.Menu.Workers -> activeOwnerFallback || currentUserCanViewWorkers(activeStoreId)
         NavigationScreenModel.Menu.Stores -> true
-        NavigationScreenModel.Menu.Suppliers -> activeOwnerFallback || currentUserCanViewStock(activeStoreId) || currentUserOwnsStore(activeStoreId)
-        NavigationScreenModel.Menu.Debtors -> activeOwnerFallback || currentUserCanViewTransactionHistory(activeStoreId) || currentUserOwnsStore(activeStoreId)
+        NavigationScreenModel.Menu.Suppliers -> activeOwnerFallback || currentUserCanViewSuppliers(activeStoreId) || currentUserCanViewSupplierOrders(activeStoreId) || currentUserCanManageSupplierOrders(activeStoreId) || currentUserCanReceiveSupplierOrders(activeStoreId)
+        NavigationScreenModel.Menu.Debtors -> activeOwnerFallback || currentUserCanViewDebtors(activeStoreId) || currentUserCanManageDebtorPayments(activeStoreId)
         NavigationScreenModel.Menu.GoodsCategories -> activeOwnerFallback || currentUserCanViewStock(activeStoreId) || currentUserOwnsStore(activeStoreId)
         NavigationScreenModel.Menu.StoreSubscription,
-        NavigationScreenModel.Menu.StoreSubscriptionPlans -> activeOwnerFallback || currentUserOwnsStore(activeStoreId)
+        NavigationScreenModel.Menu.StoreSubscriptionPlans -> activeOwnerFallback || currentUserOwnsStore(activeStoreId) || currentUserHasStorePermission(activeStoreId, STORE_PERMISSION_SUBSCRIPTION_MANAGE)
         else -> true
     }
 }

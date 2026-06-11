@@ -681,6 +681,18 @@
       "first": "workers/requests/my",
       "second": "54"
     },
+    "getStoreWorkerRoleTemplatesPath": {
+      "first": "workers/roleTemplates/get",
+      "second": "1248"
+    },
+    "upsertStoreWorkerRoleTemplatePath": {
+      "first": "workers/roleTemplates/upsert",
+      "second": "1249"
+    },
+    "deleteStoreWorkerRoleTemplatePath": {
+      "first": "workers/roleTemplates/delete",
+      "second": "1250"
+    },
     "requestStoreEmploymentPath": {
       "first": "workers/request",
       "second": "55"

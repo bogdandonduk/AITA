@@ -3280,6 +3280,124 @@ fun getMyWorkerRequests(
         }
 }
 
+fun getStoreWorkerRoleTemplates(
+    storeId: String,
+    onCompleted: ((DataState<List<StoreWorkerRoleTemplateDataModel>>) -> Unit)? = null
+) {
+    val cleanStoreId = storeId.trim()
+    if (cleanStoreId.isBlank()) {
+        onCompleted?.invoke(DataState.Empty())
+        return
+    }
+
+    if (!getStoreWorkerRoleTemplatesMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getStoreWorkerRoleTemplatesMutex.withLock {
+                val response = networkRequest<List<StoreWorkerRoleTemplateDataModel>, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getStoreWorkerRoleTemplatesPath.first,
+                    headers = mapOf("store_id" to cleanStoreId)
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    storeWorkerRoleTemplatesState.emit(DataState.Success(response.payload, response.message))
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun upsertStoreWorkerRoleTemplate(
+    storeId: String,
+    templateId: String = "",
+    name: List<LocalizedStringDataModel>,
+    description: List<LocalizedStringDataModel> = emptyList(),
+    permissions: List<String>,
+    onCompleted: ((DataState<StoreWorkerRoleTemplateDataModel>) -> Unit)? = null
+) {
+    val cleanStoreId = storeId.trim()
+    if (cleanStoreId.isBlank()) {
+        onCompleted?.invoke(DataState.Empty())
+        return
+    }
+
+    if (!upsertStoreWorkerRoleTemplateMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            upsertStoreWorkerRoleTemplateMutex.withLock {
+                val response = networkRequest<StoreWorkerRoleTemplateDataModel, StoreWorkerRoleTemplateUpsertRequestDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.upsertStoreWorkerRoleTemplatePath.first,
+                    body = StoreWorkerRoleTemplateUpsertRequestDataModel(
+                        id = templateId.trim(),
+                        storeId = cleanStoreId,
+                        name = name,
+                        description = description,
+                        permissions = permissions
+                    ),
+                    headers = mapOf("store_id" to cleanStoreId)
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    storeWorkerRoleTemplatesState.emit(
+                        DataState.Success(
+                            storeWorkerRoleTemplatesState.payloadValue.orEmpty().filterNot { it.id == response.payload.id } + response.payload,
+                            response.message
+                        )
+                    )
+                    getStoreWorkerRoleTemplates(cleanStoreId)
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun deleteStoreWorkerRoleTemplate(
+    storeId: String,
+    templateId: String,
+    onCompleted: ((DataState<StoreWorkerRoleTemplateDataModel>) -> Unit)? = null
+) {
+    val cleanStoreId = storeId.trim()
+    val cleanTemplateId = templateId.trim()
+    if (cleanStoreId.isBlank() || cleanTemplateId.isBlank()) {
+        onCompleted?.invoke(DataState.Empty())
+        return
+    }
+
+    if (!deleteStoreWorkerRoleTemplateMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            deleteStoreWorkerRoleTemplateMutex.withLock {
+                val response = networkRequest<StoreWorkerRoleTemplateDataModel, StoreWorkerRoleTemplateDeleteRequestDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.deleteStoreWorkerRoleTemplatePath.first,
+                    body = StoreWorkerRoleTemplateDeleteRequestDataModel(templateId = cleanTemplateId),
+                    headers = mapOf("store_id" to cleanStoreId)
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    storeWorkerRoleTemplatesState.emit(
+                        DataState.Success(
+                            storeWorkerRoleTemplatesState.payloadValue.orEmpty().filterNot { it.id == response.payload.id },
+                            response.message
+                        )
+                    )
+                    getStoreWorkerRoleTemplates(cleanStoreId)
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
 fun requestStoreEmployment(
     storeId: String,
     note: String? = null,
@@ -4046,19 +4164,32 @@ fun currentUserStorePermissions(storeId: String?): Set<String> {
 
     if (currentUserOwnsStore(cleanStoreId)) return ALL_STORE_PERMISSION_IDS.toSet()
 
-    return myWorkerMembershipsState.payloadValue.orEmpty()
-        .filter { it.userId == currentUserId && it.isActive && (it.storeId == cleanStoreId || it.storeId == cleanRootStoreId) }
-        .flatMap { it.permissions }
-        .toSet()
+    return normalizeStorePermissionIds(
+        myWorkerMembershipsState.payloadValue.orEmpty()
+            .filter { it.userId == currentUserId && it.isActive && (it.storeId == cleanStoreId || it.storeId == cleanRootStoreId) }
+            .flatMap { it.permissions }
+    ).toSet()
 }
 
 fun currentUserAssignableStorePermissions(storeId: String?): Set<String> {
     val permissions = currentUserStorePermissions(storeId)
-    return permissions.takeIf { STORE_PERMISSION_WORKERS_MANAGE in it }.orEmpty()
+    return permissions.takeIf {
+        STORE_PERMISSION_WORKERS_INVITE in it ||
+                STORE_PERMISSION_WORKERS_DECIDE_REQUESTS in it ||
+                STORE_PERMISSION_WORKERS_EDIT_PERMISSIONS in it ||
+                STORE_PERMISSION_WORKER_ROLE_TEMPLATES_MANAGE in it
+    }.orEmpty()
 }
 
 fun currentUserHasStorePermission(storeId: String?, permission: String): Boolean {
-    return permission in currentUserStorePermissions(storeId)
+    val permissions = currentUserStorePermissions(storeId)
+    if (permission in permissions) return true
+    val legacyExpansion = when (permission) {
+        STORE_PERMISSION_STOCK_WRITE -> STORE_PERMISSION_LEGACY_EXPANSIONS[permission].orEmpty().filterNot { it == STORE_PERMISSION_STOCK_READ }
+        STORE_PERMISSION_WORKERS_MANAGE -> STORE_PERMISSION_LEGACY_EXPANSIONS[permission].orEmpty().filterNot { it == STORE_PERMISSION_WORKERS_VIEW }
+        else -> emptyList()
+    }
+    return legacyExpansion.any { it in permissions }
 }
 
 fun currentUserCanExtractCashRegister(storeId: String?): Boolean {
@@ -4070,11 +4201,31 @@ fun currentUserCanViewLogs(storeId: String?): Boolean {
 }
 
 fun currentUserCanViewWorkers(storeId: String?): Boolean {
-    return currentUserOwnsStore(storeId) || currentUserHasStorePermission(storeId, STORE_PERMISSION_WORKERS_VIEW) || currentUserHasStorePermission(storeId, STORE_PERMISSION_WORKERS_MANAGE)
+    return currentUserOwnsStore(storeId) || currentUserHasStorePermission(storeId, STORE_PERMISSION_WORKERS_VIEW)
+}
+
+fun currentUserCanInviteWorkers(storeId: String?): Boolean {
+    return currentUserOwnsStore(storeId) || currentUserHasStorePermission(storeId, STORE_PERMISSION_WORKERS_INVITE)
+}
+
+fun currentUserCanDecideWorkerRequests(storeId: String?): Boolean {
+    return currentUserOwnsStore(storeId) || currentUserHasStorePermission(storeId, STORE_PERMISSION_WORKERS_DECIDE_REQUESTS)
+}
+
+fun currentUserCanEditWorkerPermissions(storeId: String?): Boolean {
+    return currentUserOwnsStore(storeId) || currentUserHasStorePermission(storeId, STORE_PERMISSION_WORKERS_EDIT_PERMISSIONS)
+}
+
+fun currentUserCanRemoveWorkers(storeId: String?): Boolean {
+    return currentUserOwnsStore(storeId) || currentUserHasStorePermission(storeId, STORE_PERMISSION_WORKERS_REMOVE)
+}
+
+fun currentUserCanManageWorkerRoleTemplates(storeId: String?): Boolean {
+    return currentUserOwnsStore(storeId) || currentUserHasStorePermission(storeId, STORE_PERMISSION_WORKER_ROLE_TEMPLATES_MANAGE)
 }
 
 fun currentUserCanManageWorkers(storeId: String?): Boolean {
-    return currentUserOwnsStore(storeId) || currentUserHasStorePermission(storeId, STORE_PERMISSION_WORKERS_MANAGE)
+    return currentUserCanInviteWorkers(storeId) || currentUserCanDecideWorkerRequests(storeId) || currentUserCanEditWorkerPermissions(storeId) || currentUserCanRemoveWorkers(storeId) || currentUserCanManageWorkerRoleTemplates(storeId)
 }
 
 fun currentUserCanViewAnalytics(storeId: String?): Boolean {
@@ -4086,11 +4237,54 @@ fun currentUserCanViewCashRegister(storeId: String?): Boolean {
 }
 
 fun currentUserCanViewStock(storeId: String?): Boolean {
-    return currentUserOwnsStore(storeId) || currentUserHasStorePermission(storeId, STORE_PERMISSION_STOCK_READ) || currentUserHasStorePermission(storeId, STORE_PERMISSION_STOCK_WRITE)
+    return currentUserOwnsStore(storeId) || currentUserHasStorePermission(storeId, STORE_PERMISSION_STOCK_READ)
 }
 
 fun currentUserCanEditStock(storeId: String?): Boolean {
-    return currentUserOwnsStore(storeId) || currentUserHasStorePermission(storeId, STORE_PERMISSION_STOCK_WRITE)
+    return currentUserOwnsStore(storeId) || listOf(
+        STORE_PERMISSION_STOCK_ITEM_CREATE,
+        STORE_PERMISSION_STOCK_ITEM_EDIT,
+        STORE_PERMISSION_STOCK_ITEM_DELETE,
+        STORE_PERMISSION_STOCK_BATCH_CREATE,
+        STORE_PERMISSION_STOCK_BATCH_EDIT,
+        STORE_PERMISSION_STOCK_BATCH_DELETE,
+        STORE_PERMISSION_STOCK_BATCH_MOVE,
+        STORE_PERMISSION_STOCK_BATCH_TRANSFER_DECIDE,
+        STORE_PERMISSION_STOCK_BATCH_SET_ACTIVE_SHELF,
+        STORE_PERMISSION_STOCK_PROMOTIONS_MANAGE
+    ).any { currentUserHasStorePermission(storeId, it) }
+}
+
+fun currentUserCanViewSuppliers(storeId: String?): Boolean {
+    return currentUserOwnsStore(storeId) || currentUserHasStorePermission(storeId, STORE_PERMISSION_SUPPLIERS_VIEW)
+}
+
+fun currentUserCanManageSuppliers(storeId: String?): Boolean {
+    return currentUserOwnsStore(storeId) || currentUserHasStorePermission(storeId, STORE_PERMISSION_SUPPLIERS_MANAGE)
+}
+
+fun currentUserCanViewSupplierOrders(storeId: String?): Boolean {
+    return currentUserOwnsStore(storeId) || currentUserHasStorePermission(storeId, STORE_PERMISSION_SUPPLIER_ORDERS_VIEW)
+}
+
+fun currentUserCanManageSupplierOrders(storeId: String?): Boolean {
+    return currentUserOwnsStore(storeId) || currentUserHasStorePermission(storeId, STORE_PERMISSION_SUPPLIER_ORDERS_MANAGE)
+}
+
+fun currentUserCanReceiveSupplierOrders(storeId: String?): Boolean {
+    return currentUserOwnsStore(storeId) || currentUserHasStorePermission(storeId, STORE_PERMISSION_SUPPLIER_ORDERS_RECEIVE)
+}
+
+fun currentUserCanViewDebtors(storeId: String?): Boolean {
+    return currentUserOwnsStore(storeId) || currentUserHasStorePermission(storeId, STORE_PERMISSION_DEBTORS_VIEW)
+}
+
+fun currentUserCanManageDebtors(storeId: String?): Boolean {
+    return currentUserOwnsStore(storeId) || currentUserHasStorePermission(storeId, STORE_PERMISSION_DEBTORS_MANAGE)
+}
+
+fun currentUserCanManageDebtorPayments(storeId: String?): Boolean {
+    return currentUserOwnsStore(storeId) || currentUserHasStorePermission(storeId, STORE_PERMISSION_DEBTOR_PAYMENTS_MANAGE)
 }
 
 fun currentUserCanViewTransactionHistory(storeId: String?): Boolean {
@@ -4777,6 +4971,9 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
         getMyWorkerMembershipsPath = Pair("workers/my/get", "52"),
         getIncomingWorkerRequestsPath = Pair("workers/requests/incoming", "53"),
         getMyWorkerRequestsPath = Pair("workers/requests/my", "54"),
+        getStoreWorkerRoleTemplatesPath = Pair("workers/roleTemplates/get", "1248"),
+        upsertStoreWorkerRoleTemplatePath = Pair("workers/roleTemplates/upsert", "1249"),
+        deleteStoreWorkerRoleTemplatePath = Pair("workers/roleTemplates/delete", "1250"),
         requestStoreEmploymentPath = Pair("workers/request", "55"),
         acceptStoreEmploymentPath = Pair("workers/accept", "56"),
         declineStoreEmploymentPath = Pair("workers/decline", "57"),
@@ -5640,6 +5837,7 @@ val storeWorkerMembershipsState = MutableDataStateFlow<List<StoreWorkerDataModel
 val myWorkerMembershipsState = MutableDataStateFlow<List<StoreWorkerDataModel>>(GlobalScope)
 val incomingWorkerRequestsState = MutableDataStateFlow<List<StoreWorkerRequestDataModel>>(GlobalScope)
 val myWorkerRequestsState = MutableDataStateFlow<List<StoreWorkerRequestDataModel>>(GlobalScope)
+val storeWorkerRoleTemplatesState = MutableDataStateFlow<List<StoreWorkerRoleTemplateDataModel>>(GlobalScope)
 val activeWorkshiftState = MutableDataStateFlow<WorkshiftDataModel>(GlobalScope)
 val workshiftLoginInProgressState = MutableStateFlow(false)
 val operationLogsState = MutableDataStateFlow<List<OperationLogDataModel>>(GlobalScope)
@@ -5655,6 +5853,9 @@ private val getStoreWorkersMutex = Mutex()
 private val getMyWorkerMembershipsMutex = Mutex()
 private val getIncomingWorkerRequestsMutex = Mutex()
 private val getMyWorkerRequestsMutex = Mutex()
+private val getStoreWorkerRoleTemplatesMutex = Mutex()
+private val upsertStoreWorkerRoleTemplateMutex = Mutex()
+private val deleteStoreWorkerRoleTemplateMutex = Mutex()
 private val requestStoreEmploymentMutex = Mutex()
 private val inviteStoreWorkerMutex = Mutex()
 private val decideStoreEmploymentMutex = Mutex()
@@ -13842,16 +14043,46 @@ const val WORKER_ROLE_STANDARD = "standard"
 const val STORE_PERMISSION_SALE_TRANSACTION = "sale_transaction"
 const val STORE_PERMISSION_RETURN_TRANSACTION = "return_transaction"
 const val STORE_PERMISSION_SUPPLY_TRANSACTION = "supply_transaction"
-const val STORE_PERMISSION_STOCK_READ = "stock_read"
-const val STORE_PERMISSION_STOCK_WRITE = "stock_write"
 const val STORE_PERMISSION_TRANSACTION_HISTORY_VIEW = "transaction_history_view"
-const val STORE_PERMISSION_ANALYTICS_VIEW = "analytics_view"
 const val STORE_PERMISSION_CASH_REGISTER_VIEW = "cash_register_view"
 const val STORE_PERMISSION_CASH_REGISTER_EXTRACT = "cash_register_extract"
+
+const val STORE_PERMISSION_STOCK_READ = "stock_read"
+const val STORE_PERMISSION_STOCK_WRITE = "stock_write"
+const val STORE_PERMISSION_STOCK_ITEM_CREATE = "stock_item_create"
+const val STORE_PERMISSION_STOCK_ITEM_EDIT = "stock_item_edit"
+const val STORE_PERMISSION_STOCK_ITEM_DELETE = "stock_item_delete"
+const val STORE_PERMISSION_STOCK_BATCH_CREATE = "stock_batch_create"
+const val STORE_PERMISSION_STOCK_BATCH_EDIT = "stock_batch_edit"
+const val STORE_PERMISSION_STOCK_BATCH_DELETE = "stock_batch_delete"
+const val STORE_PERMISSION_STOCK_BATCH_MOVE = "stock_batch_move"
+const val STORE_PERMISSION_STOCK_BATCH_TRANSFER_DECIDE = "stock_batch_transfer_decide"
+const val STORE_PERMISSION_STOCK_BATCH_SET_ACTIVE_SHELF = "stock_batch_set_active_shelf"
+const val STORE_PERMISSION_STOCK_PROMOTIONS_MANAGE = "stock_promotions_manage"
+
+const val STORE_PERMISSION_SUPPLIERS_VIEW = "suppliers_view"
+const val STORE_PERMISSION_SUPPLIERS_MANAGE = "suppliers_manage"
+const val STORE_PERMISSION_SUPPLIER_PRICES_MANAGE = "supplier_prices_manage"
+const val STORE_PERMISSION_SUPPLIER_ORDERS_VIEW = "supplier_orders_view"
+const val STORE_PERMISSION_SUPPLIER_ORDERS_MANAGE = "supplier_orders_manage"
+const val STORE_PERMISSION_SUPPLIER_ORDERS_RECEIVE = "supplier_orders_receive"
+
+const val STORE_PERMISSION_DEBTORS_VIEW = "debtors_view"
+const val STORE_PERMISSION_DEBTORS_MANAGE = "debtors_manage"
+const val STORE_PERMISSION_DEBTOR_PAYMENTS_MANAGE = "debtor_payments_manage"
+
+const val STORE_PERMISSION_ANALYTICS_VIEW = "analytics_view"
+const val STORE_PERMISSION_LOGS_VIEW = "logs_view"
 const val STORE_PERMISSION_WORKERS_VIEW = "workers_view"
 const val STORE_PERMISSION_WORKERS_MANAGE = "workers_manage"
+const val STORE_PERMISSION_WORKERS_INVITE = "workers_invite"
+const val STORE_PERMISSION_WORKERS_DECIDE_REQUESTS = "workers_decide_requests"
+const val STORE_PERMISSION_WORKERS_EDIT_PERMISSIONS = "workers_edit_permissions"
+const val STORE_PERMISSION_WORKERS_REMOVE = "workers_remove"
+const val STORE_PERMISSION_WORKER_ROLE_TEMPLATES_MANAGE = "worker_role_templates_manage"
 const val STORE_PERMISSION_STORE_MANAGE = "store_manage"
-const val STORE_PERMISSION_LOGS_VIEW = "logs_view"
+const val STORE_PERMISSION_BRANCHES_MANAGE = "branches_manage"
+const val STORE_PERMISSION_SUBSCRIPTION_MANAGE = "subscription_manage"
 
 const val OPERATION_LOG_SCOPE_CURRENT = "current"
 const val OPERATION_LOG_SCOPE_ROOT = "root"
@@ -13882,25 +14113,96 @@ val ALL_STORE_PERMISSION_IDS = listOf(
     STORE_PERMISSION_SALE_TRANSACTION,
     STORE_PERMISSION_RETURN_TRANSACTION,
     STORE_PERMISSION_SUPPLY_TRANSACTION,
-    STORE_PERMISSION_STOCK_READ,
-    STORE_PERMISSION_STOCK_WRITE,
     STORE_PERMISSION_TRANSACTION_HISTORY_VIEW,
-    STORE_PERMISSION_ANALYTICS_VIEW,
     STORE_PERMISSION_CASH_REGISTER_VIEW,
     STORE_PERMISSION_CASH_REGISTER_EXTRACT,
+    STORE_PERMISSION_STOCK_READ,
+    STORE_PERMISSION_STOCK_ITEM_CREATE,
+    STORE_PERMISSION_STOCK_ITEM_EDIT,
+    STORE_PERMISSION_STOCK_ITEM_DELETE,
+    STORE_PERMISSION_STOCK_BATCH_CREATE,
+    STORE_PERMISSION_STOCK_BATCH_EDIT,
+    STORE_PERMISSION_STOCK_BATCH_DELETE,
+    STORE_PERMISSION_STOCK_BATCH_MOVE,
+    STORE_PERMISSION_STOCK_BATCH_TRANSFER_DECIDE,
+    STORE_PERMISSION_STOCK_BATCH_SET_ACTIVE_SHELF,
+    STORE_PERMISSION_STOCK_PROMOTIONS_MANAGE,
+    STORE_PERMISSION_SUPPLIERS_VIEW,
+    STORE_PERMISSION_SUPPLIERS_MANAGE,
+    STORE_PERMISSION_SUPPLIER_PRICES_MANAGE,
+    STORE_PERMISSION_SUPPLIER_ORDERS_VIEW,
+    STORE_PERMISSION_SUPPLIER_ORDERS_MANAGE,
+    STORE_PERMISSION_SUPPLIER_ORDERS_RECEIVE,
+    STORE_PERMISSION_DEBTORS_VIEW,
+    STORE_PERMISSION_DEBTORS_MANAGE,
+    STORE_PERMISSION_DEBTOR_PAYMENTS_MANAGE,
+    STORE_PERMISSION_ANALYTICS_VIEW,
+    STORE_PERMISSION_LOGS_VIEW,
     STORE_PERMISSION_WORKERS_VIEW,
-    STORE_PERMISSION_WORKERS_MANAGE,
+    STORE_PERMISSION_WORKERS_INVITE,
+    STORE_PERMISSION_WORKERS_DECIDE_REQUESTS,
+    STORE_PERMISSION_WORKERS_EDIT_PERMISSIONS,
+    STORE_PERMISSION_WORKERS_REMOVE,
+    STORE_PERMISSION_WORKER_ROLE_TEMPLATES_MANAGE,
     STORE_PERMISSION_STORE_MANAGE,
-    STORE_PERMISSION_LOGS_VIEW
+    STORE_PERMISSION_BRANCHES_MANAGE,
+    STORE_PERMISSION_SUBSCRIPTION_MANAGE
 )
+
+val LEGACY_STORE_PERMISSION_IDS = listOf(
+    STORE_PERMISSION_STOCK_WRITE,
+    STORE_PERMISSION_WORKERS_MANAGE
+)
+
+val STORE_PERMISSION_LEGACY_EXPANSIONS = mapOf(
+    STORE_PERMISSION_STOCK_WRITE to listOf(
+        STORE_PERMISSION_STOCK_READ,
+        STORE_PERMISSION_STOCK_ITEM_CREATE,
+        STORE_PERMISSION_STOCK_ITEM_EDIT,
+        STORE_PERMISSION_STOCK_ITEM_DELETE,
+        STORE_PERMISSION_STOCK_BATCH_CREATE,
+        STORE_PERMISSION_STOCK_BATCH_EDIT,
+        STORE_PERMISSION_STOCK_BATCH_DELETE,
+        STORE_PERMISSION_STOCK_BATCH_MOVE,
+        STORE_PERMISSION_STOCK_BATCH_TRANSFER_DECIDE,
+        STORE_PERMISSION_STOCK_BATCH_SET_ACTIVE_SHELF,
+        STORE_PERMISSION_STOCK_PROMOTIONS_MANAGE,
+        STORE_PERMISSION_SUPPLIERS_VIEW,
+        STORE_PERMISSION_SUPPLIER_PRICES_MANAGE,
+        STORE_PERMISSION_SUPPLIER_ORDERS_VIEW,
+        STORE_PERMISSION_SUPPLIER_ORDERS_MANAGE,
+        STORE_PERMISSION_SUPPLIER_ORDERS_RECEIVE
+    ),
+    STORE_PERMISSION_WORKERS_MANAGE to listOf(
+        STORE_PERMISSION_WORKERS_VIEW,
+        STORE_PERMISSION_WORKERS_INVITE,
+        STORE_PERMISSION_WORKERS_DECIDE_REQUESTS,
+        STORE_PERMISSION_WORKERS_EDIT_PERMISSIONS,
+        STORE_PERMISSION_WORKERS_REMOVE,
+        STORE_PERMISSION_WORKER_ROLE_TEMPLATES_MANAGE
+    )
+)
+
+val STORE_PERMISSION_IDS_ACCEPTED_BY_API = (ALL_STORE_PERMISSION_IDS + LEGACY_STORE_PERMISSION_IDS).distinct()
+
+fun normalizeStorePermissionIds(input: Iterable<String>): List<String> {
+    val result = linkedSetOf<String>()
+    input.forEach { rawPermissionId ->
+        val permissionId = rawPermissionId.trim()
+        if (permissionId in ALL_STORE_PERMISSION_IDS) result += permissionId
+        STORE_PERMISSION_LEGACY_EXPANSIONS[permissionId].orEmpty().forEach { result += it }
+    }
+    return ALL_STORE_PERMISSION_IDS.filter { it in result }
+}
 
 val STANDARD_STORE_PERMISSION_IDS = listOf(
     STORE_PERMISSION_SALE_TRANSACTION,
     STORE_PERMISSION_RETURN_TRANSACTION,
-    STORE_PERMISSION_SUPPLY_TRANSACTION,
-    STORE_PERMISSION_STOCK_READ,
     STORE_PERMISSION_TRANSACTION_HISTORY_VIEW,
-    STORE_PERMISSION_CASH_REGISTER_VIEW
+    STORE_PERMISSION_CASH_REGISTER_VIEW,
+    STORE_PERMISSION_STOCK_READ,
+    STORE_PERMISSION_DEBTORS_VIEW,
+    STORE_PERMISSION_DEBTOR_PAYMENTS_MANAGE
 )
 
 fun defaultStorePermissionsForRole(roleId: String): List<String> {
@@ -14543,6 +14845,9 @@ data class GlobalAppConfigurationDataModel(
     val getMyWorkerMembershipsPath: Pair<String, String> = Pair("workers/my/get", "52"),
     val getIncomingWorkerRequestsPath: Pair<String, String> = Pair("workers/requests/incoming", "53"),
     val getMyWorkerRequestsPath: Pair<String, String> = Pair("workers/requests/my", "54"),
+    val getStoreWorkerRoleTemplatesPath: Pair<String, String> = Pair("workers/roleTemplates/get", "1248"),
+    val upsertStoreWorkerRoleTemplatePath: Pair<String, String> = Pair("workers/roleTemplates/upsert", "1249"),
+    val deleteStoreWorkerRoleTemplatePath: Pair<String, String> = Pair("workers/roleTemplates/delete", "1250"),
     val requestStoreEmploymentPath: Pair<String, String> = Pair("workers/request", "55"),
     val acceptStoreEmploymentPath: Pair<String, String> = Pair("workers/accept", "56"),
     val declineStoreEmploymentPath: Pair<String, String> = Pair("workers/decline", "57"),
@@ -16483,6 +16788,35 @@ data class StoreWorkerRequestDataModel(
     val displayName: String
         get() = "${firstName.trim()} ${lastName.trim()}".trim().ifBlank { phoneNumber.asDisplayPhoneNumber().ifBlank { email.ifBlank { requesterPublicId.ifBlank { requesterUserId } } } }
 }
+
+@kotlinx.serialization.Serializable
+data class StoreWorkerRoleTemplateDataModel(
+    val id: String = "",
+    val storeId: String = "",
+    val name: List<LocalizedStringDataModel> = emptyList(),
+    val description: List<LocalizedStringDataModel> = emptyList(),
+    val permissions: List<String> = STANDARD_STORE_PERMISSION_IDS,
+    val createdAtMillis: Long = 0L,
+    val updatedAtMillis: Long = 0L,
+    val isActive: Boolean = true
+) {
+    val displayName: String
+        get() = name.firstOrNull { it.value.isNotBlank() }?.value.orEmpty().ifBlank { id }
+}
+
+@kotlinx.serialization.Serializable
+data class StoreWorkerRoleTemplateUpsertRequestDataModel(
+    val id: String = "",
+    val storeId: String = "",
+    val name: List<LocalizedStringDataModel> = emptyList(),
+    val description: List<LocalizedStringDataModel> = emptyList(),
+    val permissions: List<String> = STANDARD_STORE_PERMISSION_IDS
+)
+
+@kotlinx.serialization.Serializable
+data class StoreWorkerRoleTemplateDeleteRequestDataModel(
+    val templateId: String
+)
 
 @kotlinx.serialization.Serializable
 data class WorkerEmploymentRequestCreateDataModel(
