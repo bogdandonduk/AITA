@@ -424,6 +424,7 @@ private fun buildBundledLocalizedStringFallbacks(): Map<Long, Map<String, String
         putBundledLocalizedStringFallbacksPart45()
         putBundledLocalizedStringFallbacksPart46()
         putBundledLocalizedStringFallbacksPart47()
+        putBundledLocalizedStringFallbacksPart48()
     }
 
 private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallbacksPart47() {
@@ -738,8 +739,113 @@ private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallb
     put(1327L, mapOf("main" to "Batches", "en" to "Batches", "ru" to "Партии", "kk" to "Партиялар"))
     put(1328L, mapOf("main" to "Clear selection", "en" to "Clear selection", "ru" to "Снять выбор", "kk" to "Таңдауды тазалау"))
     put(1329L, mapOf("main" to "PRICE", "en" to "PRICE", "ru" to "ЦЕНА", "kk" to "БАҒА"))
+
 }
 
+private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallbacksPart48() {
+    put(1330L, mapOf("main" to "History", "en" to "History", "ru" to "История", "kk" to "Тарих"))
+    put(1331L, mapOf("main" to "Stock item history", "en" to "Stock item history", "ru" to "История товара", "kk" to "Тауар тарихы"))
+    put(1332L, mapOf("main" to "View stock history", "en" to "View stock history", "ru" to "Просмотр истории товара", "kk" to "Тауар тарихын көру"))
+    put(1333L, mapOf("main" to "Every saved change to item data, prices, promotions, conditions and batches is collected here.", "en" to "Every saved change to item data, prices, promotions, conditions and batches is collected here.", "ru" to "Здесь собираются все сохранённые изменения данных товара, цен, промо, условий и партий.", "kk" to "Мұнда тауар деректері, бағалар, акциялар, шарттар және партиялар бойынша сақталған барлық өзгеріс жиналады."))
+    put(1334L, mapOf("main" to "Save the item first to unlock its history.", "en" to "Save the item first to unlock its history.", "ru" to "Сначала сохраните товар, чтобы открыть его историю.", "kk" to "Тарихын ашу үшін алдымен тауарды сақтаңыз."))
+    put(1335L, mapOf("main" to "No stock item history yet", "en" to "No stock item history yet", "ru" to "Истории товара пока нет", "kk" to "Тауар тарихы әзірге жоқ"))
+    put(1336L, mapOf("main" to "Worker role templates", "en" to "Worker role templates", "ru" to "Шаблоны ролей сотрудников", "kk" to "Қызметкер рөлдерінің үлгілері"))
+    put(1337L, mapOf("main" to "Orders", "en" to "Orders", "ru" to "Заказы", "kk" to "Тапсырыстар"))
+    put(1338L, mapOf("main" to "Catalog", "en" to "Catalog", "ru" to "Каталог", "kk" to "Каталог"))
+    put(1339L, mapOf("main" to "Customers", "en" to "Customers", "ru" to "Клиенты", "kk" to "Клиенттер"))
+    put(1340L, mapOf("main" to "Insights", "en" to "Insights", "ru" to "Инсайты", "kk" to "Инсайттар"))
+    put(1341L, mapOf("main" to "Smart order inbox", "en" to "Smart order inbox", "ru" to "Умная входящая заявок", "kk" to "Ақылды тапсырыс жәшігі"))
+    put(1342L, mapOf("main" to "See every store request, answer quickly, and keep fulfillment moving from sent to delivery.", "en" to "See every store request, answer quickly, and keep fulfillment moving from sent to delivery.", "ru" to "Видьте каждую заявку магазина, быстро отвечайте и ведите исполнение от отправки до доставки.", "kk" to "Дүкеннің әр сұранысын көріп, тез жауап беріңіз және орындауды жіберуден жеткізуге дейін жүргізіңіз."))
+    put(1343L, mapOf("main" to "Live B2B catalog", "en" to "Live B2B catalog", "ru" to "Живой B2B-каталог", "kk" to "Тірі B2B каталог"))
+    put(1344L, mapOf("main" to "Turn store stock items into supplier-side offers with MOQ, pack sizes, expiry rules and per-store prices.", "en" to "Turn store stock items into supplier-side offers with MOQ, pack sizes, expiry rules and per-store prices.", "ru" to "Превращайте товары магазинов в предложения поставщика с MOQ, фасовками, сроками годности и ценами по магазинам.", "kk" to "Дүкен тауарларын MOQ, қаптама саны, жарамдылық ережелері және әр дүкен бағалары бар жеткізуші ұсыныстарына айналдырыңыз."))
+    put(1345L, mapOf("main" to "Substitutions that save sales", "en" to "Substitutions that save sales", "ru" to "Замены, которые спасают продажи", "kk" to "Сатуды сақтайтын ауыстырулар"))
+    put(1346L, mapOf("main" to "Suggest replacements when a SKU is out of stock, with clear approval before the store receives it.", "en" to "Suggest replacements when a SKU is out of stock, with clear approval before the store receives it.", "ru" to "Предлагайте замену, когда товара нет, с понятным подтверждением до приёмки магазином.", "kk" to "Тауар жоқ кезде дүкен қабылдамай тұрып нақты растауы бар ауыстыру ұсыныңыз."))
+    put(1347L, mapOf("main" to "Route batch planner", "en" to "Route batch planner", "ru" to "Планировщик маршрутов", "kk" to "Маршрут партияларын жоспарлау"))
+    put(1348L, mapOf("main" to "Group nearby KZ, KG, TJ and UZ store deliveries into efficient runs and clear driver packs.", "en" to "Group nearby KZ, KG, TJ and UZ store deliveries into efficient runs and clear driver packs.", "ru" to "Группируйте близкие доставки по KZ, KG, TJ и UZ в удобные рейсы и понятные наборы для водителя.", "kk" to "KZ, KG, TJ және UZ бойынша жақын жеткізілімдерді тиімді рейстерге және жүргізушіге түсінікті жинақтарға біріктіріңіз."))
+    put(1349L, mapOf("main" to "Price ladder and payment terms", "en" to "Price ladder and payment terms", "ru" to "Ценовые ступени и условия оплаты", "kk" to "Баға сатылары және төлем шарттары"))
+    put(1350L, mapOf("main" to "Manage wholesale tiers, local currencies, deferred payments and trusted-store limits.", "en" to "Manage wholesale tiers, local currencies, deferred payments and trusted-store limits.", "ru" to "Управляйте оптовыми уровнями, локальными валютами, отсрочкой оплаты и лимитами доверия магазинам.", "kk" to "Көтерме деңгейлерді, жергілікті валюталарды, кейінге төлемді және сенімді дүкен лимиттерін басқарыңыз."))
+    put(1351L, mapOf("main" to "Store reliability scorecards", "en" to "Store reliability scorecards", "ru" to "Карточки надёжности магазинов", "kk" to "Дүкен сенімділігі карталары"))
+    put(1352L, mapOf("main" to "Know which stores pay on time, order predictably and need extra confirmation before dispatch.", "en" to "Know which stores pay on time, order predictably and need extra confirmation before dispatch.", "ru" to "Знайте, какие магазины платят вовремя, заказывают предсказуемо и требуют доподтверждения перед отгрузкой.", "kk" to "Қай дүкен уақытында төлейтінін, тұрақты тапсырыс беретінін және жөнелтуден бұрын қосымша растау керек екенін біліңіз."))
+    put(1353L, mapOf("main" to "Demand radar", "en" to "Demand radar", "ru" to "Радар спроса", "kk" to "Сұраныс радары"))
+    put(1354L, mapOf("main" to "Read reorder rhythm from store orders and prepare stock before the call comes.", "en" to "Read reorder rhythm from store orders and prepare stock before the call comes.", "ru" to "Считывайте ритм повторных заказов по заявкам магазинов и готовьте товар до звонка.", "kk" to "Дүкен тапсырыстарынан қайта сұраныс ырғағын оқып, қоңырауға дейін қор дайындаңыз."))
+    put(1355L, mapOf("main" to "Manufacturer backorder bridge", "en" to "Manufacturer backorder bridge", "ru" to "Мост предзаказов к производителю", "kk" to "Өндірушіге алдын ала тапсырыс көпірі"))
+    put(1356L, mapOf("main" to "Push confirmed demand upstream to producers and keep stores updated on replenishment.", "en" to "Push confirmed demand upstream to producers and keep stores updated on replenishment.", "ru" to "Передавайте подтверждённый спрос производителям и держите магазины в курсе пополнения.", "kk" to "Расталған сұранысты өндірушілерге жіберіп, дүкендерді толықтыру жайынан хабардар ұстаңыз."))
+    put(1357L, mapOf("main" to "LIVE", "en" to "LIVE", "ru" to "РАБОТАЕТ", "kk" to "ҚОСУЛЫ"))
+    put(1358L, mapOf("main" to "Requested goods", "en" to "Requested goods", "ru" to "Запрошенные товары", "kk" to "Сұралған тауарлар"))
+    put(1359L, mapOf("main" to "Supplier action", "en" to "Supplier action", "ru" to "Действие поставщика", "kk" to "Жеткізуші әрекеті"))
+    put(1360L, mapOf("main" to "Comment for the store", "en" to "Comment for the store", "ru" to "Комментарий для магазина", "kk" to "Дүкенге түсініктеме"))
+    put(1361L, mapOf("main" to "Save response", "en" to "Save response", "ru" to "Сохранить ответ", "kk" to "Жауапты сақтау"))
+    put(1362L, mapOf("main" to "Confirm", "en" to "Confirm", "ru" to "Подтвердить", "kk" to "Растау"))
+    put(1363L, mapOf("main" to "Packed", "en" to "Packed", "ru" to "Собран", "kk" to "Жиналды"))
+    put(1364L, mapOf("main" to "In delivery", "en" to "In delivery", "ru" to "В доставке", "kk" to "Жеткізілуде"))
+    put(1365L, mapOf("main" to "Closed orders stay here as a clean supplier-side fulfillment record.", "en" to "Closed orders stay here as a clean supplier-side fulfillment record.", "ru" to "Закрытые заказы остаются здесь как чистая история исполнения со стороны поставщика.", "kk" to "Жабылған тапсырыстар мұнда жеткізуші жағындағы таза орындау жазбасы болып қалады."))
+    put(1366L, mapOf("main" to "Supplier desk", "en" to "Supplier desk", "ru" to "Пульт поставщика", "kk" to "Жеткізуші пульті"))
+    put(1367L, mapOf("main" to "Fulfillment command center", "en" to "Fulfillment command center", "ru" to "Командный центр исполнения", "kk" to "Орындау командалық орталығы"))
+    put(1368L, mapOf("main" to "The first supplier foundation: a market-ready inbox for store orders, delivery status, comments and reliable B2B rhythm.", "en" to "The first supplier foundation: a market-ready inbox for store orders, delivery status, comments and reliable B2B rhythm.", "ru" to "Первая основа режима поставщика: рыночная входящая для заказов магазинов, статусов доставки, комментариев и надёжного B2B-ритма.", "kk" to "Жеткізуші режимінің алғашқы негізі: дүкен тапсырыстары, жеткізу күйлері, пікірлер және сенімді B2B ырғағы үшін дайын кіріс жәшігі."))
+    put(1369L, mapOf("main" to "Open orders", "en" to "Open orders", "ru" to "Открытые заказы", "kk" to "Ашық тапсырыстар"))
+    put(1370L, mapOf("main" to "Waiting for supplier action", "en" to "Waiting for supplier action", "ru" to "Ждут действия поставщика", "kk" to "Жеткізуші әрекетін күтеді"))
+    put(1371L, mapOf("main" to "Needs attention", "en" to "Needs attention", "ru" to "Требует внимания", "kk" to "Назар керек"))
+    put(1372L, mapOf("main" to "New or recently seen requests", "en" to "New or recently seen requests", "ru" to "Новые или недавно просмотренные заявки", "kk" to "Жаңа немесе жақында көрілген сұраныстар"))
+    put(1373L, mapOf("main" to "Requested lines", "en" to "Requested lines", "ru" to "Строки заявок", "kk" to "Сұраныс жолдары"))
+    put(1374L, mapOf("main" to "Goods positions from stores", "en" to "Goods positions from stores", "ru" to "Товарные позиции от магазинов", "kk" to "Дүкендерден тауар позициялары"))
+    put(1375L, mapOf("main" to "Find the right request fast", "en" to "Find the right request fast", "ru" to "Быстро найти нужную заявку", "kk" to "Керек сұранысты тез табу"))
+    put(1376L, mapOf("main" to "Status filter", "en" to "Status filter", "ru" to "Фильтр статуса", "kk" to "Күй сүзгісі"))
+    put(1377L, mapOf("main" to "Open", "en" to "Open", "ru" to "Открытые", "kk" to "Ашық"))
+    put(1378L, mapOf("main" to "All", "en" to "All", "ru" to "Все", "kk" to "Барлығы"))
+    put(1379L, mapOf("main" to "No store orders have reached this supplier profile yet. When stores send supply requests, they will appear here.", "en" to "No store orders have reached this supplier profile yet. When stores send supply requests, they will appear here.", "ru" to "До этого профиля поставщика ещё не дошли заказы магазинов. Когда магазины отправят заявки на поставку, они появятся здесь.", "kk" to "Бұл жеткізуші профиліне дүкен тапсырыстары әлі келген жоқ. Дүкендер жеткізу сұраныстарын жібергенде, олар осында көрінеді."))
+    put(1380L, mapOf("main" to "No orders match this filter", "en" to "No orders match this filter", "ru" to "Под этот фильтр заказы не подходят", "kk" to "Бұл сүзгіге сәйкес тапсырыс жоқ"))
+    put(1381L, mapOf("main" to "Supplier feature roadmap", "en" to "Supplier feature roadmap", "ru" to "Карта развития поставщика", "kk" to "Жеткізуші мүмкіндіктерінің жол картасы"))
+    put(1382L, mapOf("main" to "Next foundation: reusable B2B catalog offers connected to the store-side supplier order bridge.", "en" to "Next foundation: reusable B2B catalog offers connected to the store-side supplier order bridge.", "ru" to "Следующая основа: переиспользуемые B2B-предложения каталога, связанные с мостом заказов магазина поставщику.", "kk" to "Келесі негіз: дүкеннің жеткізуші тапсырыстары көпірімен байланысқан қайта қолданылатын B2B каталог ұсыныстары."))
+    put(1383L, mapOf("main" to "Upcoming: store relationship cards, reliability, route clusters and private terms.", "en" to "Upcoming: store relationship cards, reliability, route clusters and private terms.", "ru" to "Скоро: карточки отношений с магазинами, надёжность, маршрутные кластеры и индивидуальные условия.", "kk" to "Алда: дүкен қатынас карталары, сенімділік, маршрут кластерлері және жеке шарттар."))
+    put(1384L, mapOf("main" to "Upcoming: demand radar, margin lens, delivery performance and cross-market growth signals.", "en" to "Upcoming: demand radar, margin lens, delivery performance and cross-market growth signals.", "ru" to "Скоро: радар спроса, взгляд на маржу, качество доставки и сигналы роста по рынкам.", "kk" to "Алда: сұраныс радары, маржа көрінісі, жеткізу тиімділігі және нарықаралық өсу белгілері."))
+    put(1385L, mapOf("main" to "Point of sale, stock, shifts, workers and store operations.", "en" to "Point of sale, stock, shifts, workers and store operations.", "ru" to "Касса, склад, смены, сотрудники и операции магазина.", "kk" to "Сату орны, қойма, ауысымдар, қызметкерлер және дүкен операциялары."))
+    put(1386L, mapOf("main" to "Best for a shop team serving customers right now.", "en" to "Best for a shop team serving customers right now.", "ru" to "Лучше всего для команды магазина, которая обслуживает покупателей прямо сейчас.", "kk" to "Қазір клиенттерге қызмет көрсетіп жатқан дүкен командасына ең қолайлы."))
+    put(1387L, mapOf("main" to "Personal buying, carts, order history and marketplace discovery.", "en" to "Personal buying, carts, order history and marketplace discovery.", "ru" to "Личные покупки, корзины, история заказов и поиск по маркетплейсу.", "kk" to "Жеке сатып алу, себеттер, тапсырыс тарихы және маркетплейс іздеу."))
+    put(1388L, mapOf("main" to "Best for the end user choosing and tracking goods.", "en" to "Best for the end user choosing and tracking goods.", "ru" to "Лучше всего для конечного покупателя, который выбирает и отслеживает товары.", "kk" to "Тауар таңдап, қадағалайтын соңғы пайдаланушыға ең қолайлы."))
+    put(1389L, mapOf("main" to "Store demand inbox, fulfillment statuses, B2B replies and delivery rhythm.", "en" to "Store demand inbox, fulfillment statuses, B2B replies and delivery rhythm.", "ru" to "Входящие заявки магазинов, статусы исполнения, B2B-ответы и ритм доставки.", "kk" to "Дүкен сұраныстары, орындау күйлері, B2B жауаптары және жеткізу ырғағы."))
+    put(1390L, mapOf("main" to "Best for wholesalers and distributors serving many stores.", "en" to "Best for wholesalers and distributors serving many stores.", "ru" to "Лучше всего для оптовиков и дистрибьюторов, обслуживающих много магазинов.", "kk" to "Көп дүкенге қызмет көрсететін көтерме сатушылар мен дистрибьюторларға ең қолайлы."))
+    put(1391L, mapOf("main" to "Production batches, upstream planning, quality and distributor bridge.", "en" to "Production batches, upstream planning, quality and distributor bridge.", "ru" to "Производственные партии, планирование вверх по цепочке, качество и мост к дистрибьюторам.", "kk" to "Өндіріс партиялары, жоғары тізбек жоспарлауы, сапа және дистрибьютор көпірі."))
+    put(1392L, mapOf("main" to "Best for factories and makers feeding suppliers and stores.", "en" to "Best for factories and makers feeding suppliers and stores.", "ru" to "Лучше всего для фабрик и производителей, снабжающих поставщиков и магазины.", "kk" to "Жеткізушілер мен дүкендерді қамтамасыз ететін фабрикалар мен өндірушілерге ең қолайлы."))
+    put(1393L, mapOf("main" to "Production", "en" to "Production", "ru" to "Производство", "kk" to "Өндіріс"))
+    put(1394L, mapOf("main" to "Batches", "en" to "Batches", "ru" to "Партии", "kk" to "Партиялар"))
+    put(1395L, mapOf("main" to "Quality", "en" to "Quality", "ru" to "Качество", "kk" to "Сапа"))
+    put(1396L, mapOf("main" to "Selected", "en" to "Selected", "ru" to "Выбран", "kk" to "Таңдалды"))
+    put(1397L, mapOf("main" to "Choose how AITA behaves today", "en" to "Choose how AITA behaves today", "ru" to "Выберите, как AITA работает сегодня", "kk" to "Бүгін AITA қалай жұмыс істейтінін таңдаңыз"))
+    put(1398L, mapOf("main" to "Each mode keeps the same account, but reshapes navigation, shortcuts and the first screen around the role: store, buyer, supplier or producer.", "en" to "Each mode keeps the same account, but reshapes navigation, shortcuts and the first screen around the role: store, buyer, supplier or producer.", "ru" to "Каждый режим сохраняет тот же аккаунт, но перестраивает навигацию, быстрые действия и первый экран под роль: магазин, покупатель, поставщик или производитель.", "kk" to "Әр режим бір аккаунтты сақтайды, бірақ навигацияны, жылдам әрекеттерді және бірінші экранды рөлге қарай өзгертеді: дүкен, сатып алушы, жеткізуші немесе өндіруші."))
+    put(1399L, mapOf("main" to "Supplier mode starts with the Smart order inbox: the foundation that connects store-side supplier orders to a supplier-side fulfillment desk.", "en" to "Supplier mode starts with the Smart order inbox: the foundation that connects store-side supplier orders to a supplier-side fulfillment desk.", "ru" to "Режим поставщика начинается с умной входящей заявок: основы, которая связывает заказы магазина поставщику с пультом исполнения поставщика.", "kk" to "Жеткізуші режимі ақылды тапсырыс жәшігінен басталады: ол дүкеннің жеткізушіге тапсырыстарын жеткізуші орындау пультімен байланыстырады."))
+    put(1400L, mapOf("main" to "Workspace", "en" to "Workspace", "ru" to "Рабочая область", "kk" to "Жұмыс аймағы"))
+    put(1401L, mapOf("main" to "Producer workspace", "en" to "Producer workspace", "ru" to "Рабочая область производителя", "kk" to "Өндіруші жұмыс аймағы"))
+    put(1402L, mapOf("main" to "Supplier workspace", "en" to "Supplier workspace", "ru" to "Рабочая область поставщика", "kk" to "Жеткізуші жұмыс аймағы"))
+    put(1403L, mapOf("main" to "Producer mode starts with catalog and demand bridge screens while the production layer grows.", "en" to "Producer mode starts with catalog and demand bridge screens while the production layer grows.", "ru" to "Режим производителя начинается с каталога и моста спроса, пока слой производства растёт.", "kk" to "Өндіруші режимі өндіріс қабаты дамып жатқанда каталог пен сұраныс көпірінен басталады."))
+    put(1404L, mapOf("main" to "Jump between order inbox, catalog, customers and insights without returning to the bottom bar.", "en" to "Jump between order inbox, catalog, customers and insights without returning to the bottom bar.", "ru" to "Переходите между входящими заказами, каталогом, клиентами и инсайтами без возврата к нижней панели.", "kk" to "Төменгі панельге қайтпай-ақ тапсырыс жәшігі, каталог, клиенттер және инсайттар арасында ауысыңыз."))
+    put(1405L, mapOf("main" to "Save reusable permission sets for cashier, stockkeeper, branch lead, or any cute custom role.", "en" to "Save reusable permission sets for cashier, stockkeeper, branch lead, or any cute custom role.", "ru" to "Сохраняйте переиспользуемые наборы прав для кассира, кладовщика, руководителя филиала или любой своей роли.", "kk" to "Кассир, қоймашы, филиал жетекшісі немесе өзіңіз жасаған кез келген рөл үшін қайта қолданылатын рұқсаттар жинағын сақтаңыз."))
+    put(1406L, mapOf("main" to "Demand-built catalog", "en" to "Demand-built catalog", "ru" to "Каталог, построенный спросом", "kk" to "Сұраныспен құрылған каталог"))
+    put(1407L, mapOf("main" to "Every store request automatically becomes a supplier-side product card, so the catalog grows from real demand instead of manual retyping.", "en" to "Every store request automatically becomes a supplier-side product card, so the catalog grows from real demand instead of manual retyping.", "ru" to "Каждая заявка магазина автоматически становится карточкой товара поставщика, поэтому каталог растёт из реального спроса без ручного переписывания.", "kk" to "Дүкеннің әр сұранысы автоматты түрде жеткізуші жағындағы тауар картасына айналады, сондықтан каталог қолмен қайта термей, нақты сұраныстан өседі."))
+    put(1408L, mapOf("main" to "Catalog SKUs", "en" to "Catalog SKUs", "ru" to "SKU в каталоге", "kk" to "Каталог SKU-лары"))
+    put(1409L, mapOf("main" to "Unique goods requested by connected stores", "en" to "Unique goods requested by connected stores", "ru" to "Уникальные товары, запрошенные подключёнными магазинами", "kk" to "Қосылған дүкендер сұраған бірегей тауарлар"))
+    put(1410L, mapOf("main" to "Interested stores", "en" to "Interested stores", "ru" to "Заинтересованные магазины", "kk" to "Қызығушы дүкендер"))
+    put(1411L, mapOf("main" to "Stores that asked for these goods", "en" to "Stores that asked for these goods", "ru" to "Магазины, которые спрашивали эти товары", "kk" to "Осы тауарларды сұраған дүкендер"))
+    put(1412L, mapOf("main" to "Open demand", "en" to "Open demand", "ru" to "Открытый спрос", "kk" to "Ашық сұраныс"))
+    put(1413L, mapOf("main" to "Unfinished requests linked to catalog", "en" to "Unfinished requests linked to catalog", "ru" to "Незавершённые заявки, связанные с каталогом", "kk" to "Каталогқа байланысты аяқталмаған сұраныстар"))
+    put(1414L, mapOf("main" to "Catalog filter", "en" to "Catalog filter", "ru" to "Фильтр каталога", "kk" to "Каталог сүзгісі"))
+    put(1415L, mapOf("main" to "With open demand", "en" to "With open demand", "ru" to "С открытым спросом", "kk" to "Ашық сұранысы бар"))
+    put(1416L, mapOf("main" to "Needs supplier reply", "en" to "Needs supplier reply", "ru" to "Нужен ответ поставщика", "kk" to "Жеткізуші жауабы керек"))
+    put(1417L, mapOf("main" to "Delivered history", "en" to "Delivered history", "ru" to "История доставок", "kk" to "Жеткізу тарихы"))
+    put(1418L, mapOf("main" to "No catalog items yet", "en" to "No catalog items yet", "ru" to "В каталоге пока нет товаров", "kk" to "Каталогта әзірге тауар жоқ"))
+    put(1419L, mapOf("main" to "The catalog will grow automatically from incoming store orders. When a store requests a stock item, it becomes a reusable supplier offer card here.", "en" to "The catalog will grow automatically from incoming store orders. When a store requests a stock item, it becomes a reusable supplier offer card here.", "ru" to "Каталог будет автоматически расти из входящих заказов магазинов. Когда магазин запросит товар склада, здесь появится переиспользуемая карточка предложения поставщика.", "kk" to "Каталог дүкендердің кіріс тапсырыстарынан автоматты түрде өседі. Дүкен қойма тауарын сұрағанда, мұнда қайта қолданылатын жеткізуші ұсыныс картасы пайда болады."))
+    put(1420L, mapOf("main" to "No catalog items match this filter", "en" to "No catalog items match this filter", "ru" to "Под этот фильтр товары каталога не подходят", "kk" to "Бұл сүзгіге сәйкес каталог тауары жоқ"))
+    put(1421L, mapOf("main" to "Last request", "en" to "Last request", "ru" to "Последняя заявка", "kk" to "Соңғы сұраныс"))
+    put(1422L, mapOf("main" to "Stores asking", "en" to "Stores asking", "ru" to "Магазины спрашивают", "kk" to "Сұраған дүкендер"))
+    put(1423L, mapOf("main" to "Open requests", "en" to "Open requests", "ru" to "Открытые заявки", "kk" to "Ашық сұраныстар"))
+    put(1424L, mapOf("main" to "Total requested", "en" to "Total requested", "ru" to "Всего запрошено", "kk" to "Барлығы сұралды"))
+    put(1425L, mapOf("main" to "Expected price", "en" to "Expected price", "ru" to "Ожидаемая цена", "kk" to "Күтілетін баға"))
+    put(1426L, mapOf("main" to "Recent store signals", "en" to "Recent store signals", "ru" to "Свежие сигналы магазинов", "kk" to "Дүкендердің соңғы белгілері"))
+    put(1427L, mapOf("main" to "Open related orders", "en" to "Open related orders", "ru" to "Открыть связанные заказы", "kk" to "Байланысты тапсырыстарды ашу"))
+    put(1428L, mapOf("main" to "This is not a separate product database yet: it is a smart catalog lens over real store orders, safe to add before supplier-owned price books.", "en" to "This is not a separate product database yet: it is a smart catalog lens over real store orders, safe to add before supplier-owned price books.", "ru" to "Это ещё не отдельная товарная база: это умная витрина поверх реальных заказов магазинов, безопасная перед будущими прайс-листами поставщика.", "kk" to "Бұл әзірге бөлек тауар базасы емес: ол нақты дүкен тапсырыстарының үстіндегі ақылды каталог көрінісі, болашақ жеткізуші прайс-парақтарына дейін қауіпсіз қабат."))
+    put(1429L, mapOf("main" to "Copy offer note", "en" to "Copy offer note", "ru" to "Скопировать заметку предложения", "kk" to "Ұсыныс жазбасын көшіру"))
+    put(1430L, mapOf("main" to "Latest status", "en" to "Latest status", "ru" to "Последний статус", "kk" to "Соңғы күй"))
+    put(1431L, mapOf("main" to "Manufacturer bridge", "en" to "Manufacturer bridge", "ru" to "Мост к производителю", "kk" to "Өндіруші көпірі"))
+}
 
 
 
@@ -1607,6 +1713,7 @@ private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallb
     put(749L, mapOf("main" to "Enable local branch network", "en" to "Enable local branch network", "ru" to "Включить локальную сеть филиала", "kk" to "Филиалдың жергілікті желісін қосу"))
     put(750L, mapOf("main" to "Disable local branch network", "en" to "Disable local branch network", "ru" to "Выключить локальную сеть филиала", "kk" to "Филиалдың жергілікті желісін өшіру"))
     put(751L, mapOf("main" to "Select one physical branch first. Local branch network cannot run on a parent warehouse with several branches.", "en" to "Select one physical branch first. Local branch network cannot run on a parent warehouse with several branches.", "ru" to "Сначала выберите один физический филиал. Локальная сеть филиала не работает на головном складе с несколькими филиалами.", "kk" to "Алдымен бір нақты филиалды таңдаңыз. Филиалдың жергілікті желісі бірнеше филиалы бар негізгі қоймада жұмыс істемейді."))
+    put(756L, mapOf("main" to "Stock", "en" to "Stock", "ru" to "Склад", "kk" to "Қор"))
     put(800L, mapOf("main" to "Remembered price exists", "en" to "Remembered price exists", "ru" to "Сохранённая цена уже есть", "kk" to "Сақталған баға бар"))
     put(801L, mapOf("main" to "New supplier price", "en" to "New supplier price", "ru" to "Новая цена поставщика", "kk" to "Жеткізушінің жаңа бағасы"))
     put(802L, mapOf("main" to "Remember default supply prices for this goods item per supplier. These prices can prefill new batches later.", "en" to "Remember default supply prices for this goods item per supplier. These prices can prefill new batches later.", "ru" to "Сохраняйте стандартные закупочные цены этого товара по каждому поставщику. Потом они смогут автоматически заполнять новые партии.", "kk" to "Әр жеткізуші бойынша осы тауардың әдепкі сатып алу бағаларын сақтаңыз. Кейін олар жаңа партияларды автоматты толтыра алады."))
@@ -18209,8 +18316,9 @@ private fun AppConfiguration.supplierMarketWinningFeatures(): List<SupplierFeatu
     SupplierFeaturePlanUiModel(
         title = localizedStringResource(1343, "Live B2B catalog"),
         subtitle = localizedStringResource(1344, "Turn store stock items into supplier-side offers with MOQ, pack sizes, expiry rules and per-store prices."),
-        iconPath = stateValues.drawablePathIconStock,
-        iconRes = stateValues.drawableResIconStock.value
+        iconPath = stateValues.drawablePathIconSupplierCatalog,
+        iconRes = stateValues.drawableResIconSupplierCatalog.value,
+        implemented = true
     ),
     SupplierFeaturePlanUiModel(
         title = localizedStringResource(1345, "Substitutions that save sales"),
@@ -18302,6 +18410,555 @@ private fun AppConfiguration.supplierDeskOrderSearchText(
     }
 }.lowercase()
 
+
+private data class SupplierCatalogItemUiModel(
+    val goodsItemId: String,
+    val title: String,
+    val barcodeText: String,
+    val totalQuantityText: String,
+    val expectedPriceText: String,
+    val storeTitles: List<String>,
+    val openOrderCount: Int,
+    val orderCount: Int,
+    val lineCount: Int,
+    val lastActivityMillis: Long,
+    val latestStatus: SupplierOrderStatusDataModel,
+    val needsReply: Boolean,
+    val deliveredOnly: Boolean,
+    val searchKey: String,
+    val offerNote: String
+)
+
+private fun AppConfiguration.supplierCatalogQuantityText(lines: List<SupplierOrderLineDataModel>): String {
+    val activeLines = lines.filter { it.isActive }
+    if (activeLines.isEmpty()) return ""
+
+    val unitKeys = activeLines.map { line ->
+        val quantity = line.requestedQuantity
+        quantity.id.ifBlank { quantity.immutableUnitName.visibleLocalizedString(stateValues.appLanguage, "") }
+    }.distinct()
+
+    return if (unitKeys.size == 1) {
+        val firstQuantity = activeLines.first().requestedQuantity
+        firstQuantity
+            .copy(total = activeLines.sumOf { it.requestedQuantity.total })
+            .quantityText(stateValues.appLanguage)
+    } else {
+        buildString {
+            append(activeLines.take(3).joinToString(" • ") { it.requestedQuantity.quantityText(stateValues.appLanguage) })
+            if (activeLines.size > 3) append(" +").append(activeLines.size - 3)
+        }
+    }
+}
+
+private fun AppConfiguration.buildSupplierCatalogItems(
+    orders: List<SupplierOrderDataModel>,
+    lines: List<SupplierOrderLineDataModel>
+): List<SupplierCatalogItemUiModel> {
+    val activeOrders = orders.filter { it.isActive }
+    val ordersById = activeOrders.associateBy { it.id }
+    val activeLines = lines.filter { line -> line.isActive && ordersById[line.orderId] != null }
+    val replyStatuses = setOf(
+        SupplierOrderStatusDataModel.Sent,
+        SupplierOrderStatusDataModel.SeenBySupplier,
+        SupplierOrderStatusDataModel.IssueReported
+    )
+
+    return activeLines
+        .groupBy { line ->
+            line.goodsItemId
+                .ifBlank { line.goodsItemBarcodeSnapshots.firstOrNull().orEmpty() }
+                .ifBlank { supplierDeskLineTitle(line) }
+                .ifBlank { line.id }
+        }
+        .map { (goodsKey, itemLines) ->
+            val relatedOrders = itemLines
+                .mapNotNull { ordersById[it.orderId] }
+                .distinctBy { it.id }
+                .sortedByDescending { it.supplierDeskSortTime() }
+            val latestOrder = relatedOrders.firstOrNull()
+            val latestLine = itemLines.maxByOrNull { line -> ordersById[line.orderId]?.supplierDeskSortTime() ?: 0L } ?: itemLines.first()
+            val title = itemLines
+                .asSequence()
+                .map { supplierDeskLineTitle(it) }
+                .firstOrNull { it.isNotBlank() }
+                ?: goodsKey.take(12)
+            val barcodeText = itemLines
+                .asSequence()
+                .flatMap { it.goodsItemBarcodeSnapshots.asSequence() }
+                .firstOrNull { it.isNotBlank() }
+                .orEmpty()
+            val storeTitles = relatedOrders
+                .map { supplierDeskStoreTitle(it) }
+                .filter { it.isNotBlank() }
+                .distinct()
+            val totalQuantityText = supplierCatalogQuantityText(itemLines)
+            val expectedPriceText = (latestLine.supplierOfferedSupplyPrice ?: latestLine.expectedSupplyPrice ?: latestOrder?.amount).supplierDeskMoneyText()
+            val latestStatus = latestOrder?.status ?: SupplierOrderStatusDataModel.Draft
+            val openOrderCount = relatedOrders.count { !it.status.isSupplierOrderClosed() }
+            val lastActivityMillis = latestOrder?.supplierDeskSortTime() ?: 0L
+            val needsReply = relatedOrders.any { it.status in replyStatuses }
+            val deliveredOnly = relatedOrders.any { order ->
+                order.status == SupplierOrderStatusDataModel.Delivered || order.status == SupplierOrderStatusDataModel.PartiallyDelivered
+            }
+            val storeListText = storeTitles.take(4).joinToString(", ").ifBlank { localizedStringResource(1410, "Interested stores") }
+            val searchKey = buildString {
+                append(goodsKey).append(' ')
+                append(title).append(' ')
+                append(barcodeText).append(' ')
+                append(storeTitles.joinToString(" ")).append(' ')
+                append(relatedOrders.joinToString(" ") { it.id }).append(' ')
+                append(itemLines.joinToString(" ") { line ->
+                    listOf(
+                        line.goodsItemId,
+                        line.goodsItemBarcodeSnapshots.joinToString(" "),
+                        line.additionalNotes.orEmpty(),
+                        line.supplierComment.orEmpty()
+                    ).joinToString(" ")
+                })
+            }.lowercase()
+            val offerNote = buildString {
+                append(title)
+                if (barcodeText.isNotBlank()) append('\n').append(stateValues.stringBarcode).append(": ").append(barcodeText)
+                if (totalQuantityText.isNotBlank()) append('\n').append(localizedStringResource(1424, "Total requested")).append(": ").append(totalQuantityText)
+                if (expectedPriceText.isNotBlank()) append('\n').append(localizedStringResource(1425, "Expected price")).append(": ").append(expectedPriceText)
+                append('\n').append(localizedStringResource(1422, "Stores asking")).append(": ").append(storeListText)
+                append('\n').append(localizedStringResource(1430, "Latest status")).append(": ").append(supplierOrderStatusTitle(latestStatus))
+            }
+
+            SupplierCatalogItemUiModel(
+                goodsItemId = goodsKey,
+                title = title,
+                barcodeText = barcodeText,
+                totalQuantityText = totalQuantityText,
+                expectedPriceText = expectedPriceText,
+                storeTitles = storeTitles,
+                openOrderCount = openOrderCount,
+                orderCount = relatedOrders.size,
+                lineCount = itemLines.size,
+                lastActivityMillis = lastActivityMillis,
+                latestStatus = latestStatus,
+                needsReply = needsReply,
+                deliveredOnly = deliveredOnly,
+                searchKey = searchKey,
+                offerNote = offerNote
+            )
+        }
+        .sortedWith(compareByDescending<SupplierCatalogItemUiModel> { if (it.openOrderCount > 0) 1 else 0 }
+            .thenByDescending { if (it.needsReply) 1 else 0 }
+            .thenByDescending { it.lastActivityMillis })
+}
+
+@Composable
+private fun AppConfiguration.SupplierCatalogChip(text: String) {
+    Text(
+        text = text,
+        color = stateValues.AccentColor,
+        fontSize = stateValues.smallTextSize,
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.AccentColor.copy(alpha = 0.10f))
+            .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.55f), RoundedCornerShape(stateValues.cornerRadius))
+            .padding(horizontal = 8.dp, vertical = 5.dp)
+    )
+}
+
+@Composable
+private fun AppConfiguration.SupplierCatalogItemCard(item: SupplierCatalogItemUiModel) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .border(
+                if (item.openOrderCount > 0) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
+                if (item.openOrderCount > 0) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+                RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .padding(stateValues.marginTextFieldGroup),
+        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(46.dp)
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CpImage(
+                    modifier = Modifier.size(30.dp),
+                    url = stateValues.drawablePathIconSupplierCatalog,
+                    fallbackRes = stateValues.drawableResIconSupplierCatalog.value,
+                    contentDescription = item.title,
+                    tintColor = stateValues.AccentColor
+                )
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.title,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.accentTextSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "${supplierOrderStatusTitle(item.latestStatus)} • ${receiptUiDateTime(item.lastActivityMillis)}",
+                    color = if (item.openOrderCount > 0) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Text(
+                text = item.expectedPriceText.ifBlank { item.totalQuantityText },
+                color = stateValues.AccentColor,
+                fontSize = stateValues.accentTextSize,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.End,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        item.barcodeText.takeIf { it.isNotBlank() }?.let { barcode ->
+            StockCardInfoLine(stateValues.stringBarcode, barcode, stateValues.TextColor)
+        }
+        StockCardInfoLine(localizedStringResource(1424, "Total requested"), item.totalQuantityText.ifBlank { item.lineCount.toString() }, stateValues.TextColor)
+        item.expectedPriceText.takeIf { it.isNotBlank() }?.let { price ->
+            StockCardInfoLine(localizedStringResource(1425, "Expected price"), price, stateValues.TextColor)
+        }
+        StockCardInfoLine(localizedStringResource(1422, "Stores asking"), item.storeTitles.size.toString(), stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1423, "Open requests"), "${item.openOrderCount} / ${item.orderCount}", stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1430, "Latest status"), supplierOrderStatusTitle(item.latestStatus), stateValues.TextColor)
+
+        if (item.storeTitles.isNotEmpty()) {
+            Text(
+                text = localizedStringResource(1426, "Recent store signals"),
+                color = stateValues.TextColor,
+                fontSize = stateValues.textSize,
+                fontWeight = FontWeight.Bold
+            )
+            item.storeTitles.take(4).chunked(if (stateValues.isNarrowScreen) 1 else 2).forEach { rowStores ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    rowStores.forEach { storeTitle ->
+                        Box(modifier = Modifier.weight(1f)) {
+                            SupplierCatalogChip(text = storeTitle)
+                        }
+                    }
+                    if (!stateValues.isNarrowScreen && rowStores.size == 1) Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+
+        Text(
+            text = localizedStringResource(1428, "This is not a separate product database yet: it is a smart catalog lens over real store orders, safe to add before supplier-owned price books."),
+            color = stateValues.PlaceholderTextColor,
+            fontSize = stateValues.smallTextSize
+        )
+
+        if (stateValues.isNarrowScreen) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1427, "Open related orders"),
+                    iconPath = stateValues.drawablePathIconAppModeSupplier,
+                    iconRes = stateValues.drawableResIconAppModeSupplier.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.searchKey)
+                            Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
+                        }
+                    }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1429, "Copy offer note"),
+                    iconPath = stateValues.drawablePathIconClipboard,
+                    iconRes = stateValues.drawableResIconClipboard.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(item.offerNote) }
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1427, "Open related orders"),
+                    iconPath = stateValues.drawablePathIconAppModeSupplier,
+                    iconRes = stateValues.drawableResIconAppModeSupplier.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.searchKey)
+                            Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
+                        }
+                    }
+                )
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1429, "Copy offer note"),
+                    iconPath = stateValues.drawablePathIconClipboard,
+                    iconRes = stateValues.drawableResIconClipboard.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(item.offerNote) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppConfiguration.SupplierCatalogScreen() {
+    val orders by supplierOrdersState.payload.collectAsState()
+    val lines by supplierOrderLinesState.payload.collectAsState()
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var catalogFilter by rememberSaveable { mutableStateOf("all") }
+
+    LaunchedEffect(stateValues.userAccount?.id) {
+        if (stateValues.userAccount != null) {
+            getMySupplierSideOrders()
+        }
+    }
+
+    val activeOrders = remember(orders) { orders.orEmpty().filter { it.isActive } }
+    val activeLines = remember(lines) { lines.orEmpty().filter { it.isActive } }
+    val catalogItems = remember(activeOrders, activeLines, stateValues.appLanguage) {
+        buildSupplierCatalogItems(activeOrders, activeLines)
+    }
+    val normalizedSearch = searchQuery.trim().lowercase()
+    val filteredItems = remember(catalogItems, normalizedSearch, catalogFilter) {
+        catalogItems.filter { item ->
+            val filterMatches = when (catalogFilter) {
+                "open" -> item.openOrderCount > 0
+                "reply" -> item.needsReply
+                "delivered" -> item.deliveredOnly
+                else -> true
+            }
+            val queryMatches = normalizedSearch.isBlank() || item.searchKey.contains(normalizedSearch)
+            filterMatches && queryMatches
+        }
+    }
+    val interestedStoresCount = catalogItems.flatMap { it.storeTitles }.distinct().size
+    val openDemandCount = catalogItems.sumOf { it.openOrderCount }
+    val featurePlan = supplierMarketWinningFeatures()
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        ScreenAppBarWidget(
+            title = localizedStringResource(1338, "Catalog"),
+            iconPath = stateValues.drawablePathIconSupplierCatalog,
+            iconRes = stateValues.drawableResIconSupplierCatalog.value
+        )
+
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.74f)
+                .align(Alignment.CenterHorizontally)
+                .padding(stateValues.marginTextField),
+            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
+            contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
+        ) {
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(stateValues.cornerRadius))
+                        .background(stateValues.AccentColor.copy(alpha = 0.10f))
+                        .border(stateValues.focusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
+                        .padding(stateValues.marginTextFieldGroup),
+                    verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                    ) {
+                        CpImage(
+                            modifier = Modifier.size(42.dp),
+                            url = stateValues.drawablePathIconSupplierCatalog,
+                            fallbackRes = stateValues.drawableResIconSupplierCatalog.value,
+                            contentDescription = localizedStringResource(1406, "Demand-built catalog"),
+                            tintColor = stateValues.AccentColor
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = localizedStringResource(1406, "Demand-built catalog"),
+                                color = stateValues.TextColor,
+                                fontSize = stateValues.titleTextSize,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = localizedStringResource(1407, "Every requested stock item becomes a supplier-side product card, so the catalog grows from real demand instead of manual retyping."),
+                                color = stateValues.PlaceholderTextColor,
+                                fontSize = stateValues.smallTextSize
+                            )
+                        }
+                    }
+
+                    if (stateValues.isNarrowScreen) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                        ) {
+                            SupplierDeskSummaryCard(
+                                title = localizedStringResource(1408, "Catalog SKUs"),
+                                value = catalogItems.size.toString(),
+                                subtitle = localizedStringResource(1409, "Unique goods requested by connected stores"),
+                                iconPath = stateValues.drawablePathIconSupplierCatalog,
+                                iconRes = stateValues.drawableResIconSupplierCatalog.value
+                            )
+                            SupplierDeskSummaryCard(
+                                title = localizedStringResource(1410, "Interested stores"),
+                                value = interestedStoresCount.toString(),
+                                subtitle = localizedStringResource(1411, "Stores that asked for these goods"),
+                                iconPath = stateValues.drawablePathIconStores,
+                                iconRes = stateValues.drawableResIconStores.value
+                            )
+                            SupplierDeskSummaryCard(
+                                title = localizedStringResource(1412, "Open demand"),
+                                value = openDemandCount.toString(),
+                                subtitle = localizedStringResource(1413, "Unfinished requests linked to catalog"),
+                                iconPath = stateValues.drawablePathIconAppModeSupplier,
+                                iconRes = stateValues.drawableResIconAppModeSupplier.value
+                            )
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                        ) {
+                            SupplierDeskSummaryCard(
+                                modifier = Modifier.weight(1f),
+                                title = localizedStringResource(1408, "Catalog SKUs"),
+                                value = catalogItems.size.toString(),
+                                subtitle = localizedStringResource(1409, "Unique goods requested by connected stores"),
+                                iconPath = stateValues.drawablePathIconSupplierCatalog,
+                                iconRes = stateValues.drawableResIconSupplierCatalog.value
+                            )
+                            SupplierDeskSummaryCard(
+                                modifier = Modifier.weight(1f),
+                                title = localizedStringResource(1410, "Interested stores"),
+                                value = interestedStoresCount.toString(),
+                                subtitle = localizedStringResource(1411, "Stores that asked for these goods"),
+                                iconPath = stateValues.drawablePathIconStores,
+                                iconRes = stateValues.drawableResIconStores.value
+                            )
+                            SupplierDeskSummaryCard(
+                                modifier = Modifier.weight(1f),
+                                title = localizedStringResource(1412, "Open demand"),
+                                value = openDemandCount.toString(),
+                                subtitle = localizedStringResource(1413, "Unfinished requests linked to catalog"),
+                                iconPath = stateValues.drawablePathIconAppModeSupplier,
+                                iconRes = stateValues.drawableResIconAppModeSupplier.value
+                            )
+                        }
+                    }
+                }
+            }
+
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+                        .clip(RoundedCornerShape(stateValues.cornerRadius))
+                        .background(stateValues.BackgroundColor)
+                        .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor, RoundedCornerShape(stateValues.cornerRadius))
+                        .padding(stateValues.marginTextFieldGroup),
+                    verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                ) {
+                    Text(
+                        text = localizedStringResource(1414, "Catalog filter"),
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.titleTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    SimpleTextInput(
+                        modifier = Modifier.fillMaxWidth(),
+                        value = searchQuery,
+                        placeholder = localizedStringResource(216, "Search"),
+                        leadingIconPath = stateValues.drawablePathIconSearch,
+                        onValueChange = { searchQuery = it }
+                    )
+
+                    SimpleDropdownField(
+                        title = localizedStringResource(1414, "Catalog filter"),
+                        selectedId = catalogFilter,
+                        options = listOf(
+                            DropdownOption("all", localizedStringResource(1378, "All")),
+                            DropdownOption("open", localizedStringResource(1415, "With open demand")),
+                            DropdownOption("reply", localizedStringResource(1416, "Needs supplier reply")),
+                            DropdownOption("delivered", localizedStringResource(1417, "Delivered history"))
+                        ),
+                        placeholder = localizedStringResource(1378, "All"),
+                        onSelected = { catalogFilter = it }
+                    )
+                }
+            }
+
+            if (catalogItems.isEmpty()) {
+                item {
+                    MessageText(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(1418, "No catalog items yet"),
+                        subText = localizedStringResource(1419, "The catalog will grow automatically from incoming store orders. When a store requests a stock item, it becomes a reusable supplier offer card here."),
+                        subTextSize = stateValues.smallTextSize
+                    )
+                }
+            } else if (filteredItems.isEmpty()) {
+                item {
+                    MessageText(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(1420, "No catalog items match this filter")
+                    )
+                }
+            } else {
+                items(filteredItems, key = { it.goodsItemId }) { item ->
+                    SupplierCatalogItemCard(item = item)
+                }
+            }
+
+            item {
+                Text(
+                    text = localizedStringResource(1381, "Supplier feature roadmap"),
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.titleTextSize,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            items(featurePlan.filterNot { it.title == localizedStringResource(1343, "Live B2B catalog") }) { feature ->
+                SupplierFeaturePlanCard(feature = feature, compact = true)
+            }
+        }
+    }
+}
+
 @Composable
 private fun AppConfiguration.SupplierDeskSummaryCard(
     modifier: Modifier = Modifier,
@@ -18374,7 +19031,7 @@ private fun AppConfiguration.SupplierFeaturePlanCard(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .run { if (feature.implemented) this else foregroundTactileShadow(stateValues.cornerRadius, elevated = false) }
             .clip(RoundedCornerShape(stateValues.cornerRadius))
             .background(if (feature.implemented) stateValues.AccentColor.copy(alpha = 0.10f) else stateValues.BackgroundColor)
             .border(
@@ -18697,8 +19354,10 @@ private fun AppConfiguration.SupplierOrderDeskCard(
 private fun AppConfiguration.SupplierOrdersInboxScreen() {
     val orders by supplierOrdersState.payload.collectAsState()
     val lines by supplierOrderLinesState.payload.collectAsState()
-    var searchQuery by rememberSaveable { mutableStateOf("") }
-    var statusFilter by rememberSaveable { mutableStateOf("open") }
+    val supplierOrderNavigationState by NavigationScreenModel.Supplier.Orders.Main.state.collectAsState()
+    val supplierOrderSearchSeed = supplierOrderNavigationState[NavigationScreenModel.KEY_STATE_SEARCH_QUERY].orEmpty()
+    var searchQuery by rememberSaveable(supplierOrderSearchSeed) { mutableStateOf(supplierOrderSearchSeed) }
+    var statusFilter by rememberSaveable(supplierOrderSearchSeed) { mutableStateOf(if (supplierOrderSearchSeed.isBlank()) "open" else "all") }
 
     LaunchedEffect(stateValues.userAccount?.id) {
         if (stateValues.userAccount != null) {
@@ -18751,7 +19410,6 @@ private fun AppConfiguration.SupplierOrdersInboxScreen() {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
                         .clip(RoundedCornerShape(stateValues.cornerRadius))
                         .background(stateValues.AccentColor.copy(alpha = 0.10f))
                         .border(stateValues.focusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
@@ -18996,12 +19654,7 @@ private fun AppConfiguration.SupplierPlaceholderScreen(
 private fun AppConfiguration.SupplierScreen() {
     when (stateValues.navigationScreensMain.last()) {
         is NavigationScreenModel.Supplier.Orders -> SupplierOrdersInboxScreen()
-        is NavigationScreenModel.Supplier.Catalog -> SupplierPlaceholderScreen(
-            title = localizedStringResource(1338, "Catalog"),
-            subtitle = localizedStringResource(1382, "Next foundation: reusable B2B catalog offers connected to the store-side supplier order bridge."),
-            iconPath = stateValues.drawablePathIconStock,
-            iconRes = stateValues.drawableResIconStock.value
-        )
+        is NavigationScreenModel.Supplier.Catalog -> SupplierCatalogScreen()
         is NavigationScreenModel.Supplier.Customers -> SupplierPlaceholderScreen(
             title = localizedStringResource(1339, "Customers"),
             subtitle = localizedStringResource(1383, "Upcoming: store relationship cards, reliability, route clusters and private terms."),
@@ -21995,9 +22648,9 @@ sealed class NavigationScreenModel(
                 override val name: String
                     get() = with(AppConfiguration) { localizedStringResource(1338, "Catalog") }
                 override val iconPath: String
-                    get() = AppConfiguration.stateValues.drawablePathIconStock
+                    get() = AppConfiguration.stateValues.drawablePathIconSupplierCatalog
                 override val iconRes: DrawableResource
-                    get() = AppConfiguration.stateValues.drawableResIconStock.value
+                    get() = AppConfiguration.stateValues.drawableResIconSupplierCatalog.value
             }
         }
 
@@ -26441,7 +27094,7 @@ private fun AppConfiguration.WorkerRoleTemplateManager(
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = localizedStringResource(1337, "Save reusable permission sets for cashier, stockkeeper, branch lead, or any cute custom role."),
+                    text = localizedStringResource(1405, "Save reusable permission sets for cashier, stockkeeper, branch lead, or any cute custom role."),
                     color = stateValues.PlaceholderTextColor,
                     fontSize = stateValues.smallTextSize
                 )
@@ -30722,7 +31375,6 @@ private fun AppConfiguration.ActiveWorkshiftMenuTile(workshift: WorkshiftDataMod
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2)
-            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
             .clip(RoundedCornerShape(stateValues.cornerRadius))
             .background(stateValues.AccentColor.copy(alpha = 0.12f))
             .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
@@ -30777,7 +31429,6 @@ private fun AppConfiguration.SupplierWorkspaceMenuTile() {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2)
-            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
             .clip(RoundedCornerShape(stateValues.cornerRadius))
             .background(stateValues.AccentColor.copy(alpha = 0.10f))
             .border(stateValues.focusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
@@ -33398,7 +34049,7 @@ private fun AppConfiguration.appModeOptions(): List<AppModeOptionUiModel> = list
             localizedStringResource(1393, "Production"),
             localizedStringResource(1394, "Batches"),
             localizedStringResource(1395, "Quality"),
-            localizedStringResource(1355, "Manufacturer bridge")
+            localizedStringResource(1431, "Manufacturer bridge")
         )
     )
 )
@@ -33436,7 +34087,7 @@ private fun AppConfiguration.AppModeSelectionCard(
 ) {
     Column(
         modifier = modifier
-            .foregroundTactileShadow(stateValues.cornerRadius, elevated = selected)
+            .run { if (selected) this else foregroundTactileShadow(stateValues.cornerRadius, elevated = false) }
             .clip(RoundedCornerShape(stateValues.cornerRadius))
             .background(if (selected) stateValues.AccentColor.copy(alpha = 0.10f) else stateValues.BackgroundColor)
             .border(
@@ -33572,7 +34223,6 @@ fun AppConfiguration.MenuAppModeScreen() {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
                         .clip(RoundedCornerShape(stateValues.cornerRadius))
                         .background(stateValues.AccentColor.copy(alpha = 0.10f))
                         .border(stateValues.focusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
@@ -41419,6 +42069,9 @@ object AppConfiguration {
         val drawablePathIconAppModeManufacturer: String
         val drawableResIconAppModeManufacturer: StateFlow<DrawableResource>
 
+        val drawablePathIconSupplierCatalog: String
+        val drawableResIconSupplierCatalog: StateFlow<DrawableResource>
+
         val drawablePathIconWorkers: String
         val drawableResIconWorkers: StateFlow<DrawableResource>
 
@@ -42024,6 +42677,10 @@ object AppConfiguration {
             private val _drawableResIconAppModeManufacturer = MutableStateFlow(Res.drawable._71_0)
             override val drawableResIconAppModeManufacturer: StateFlow<DrawableResource> = _drawableResIconAppModeManufacturer.asStateFlow()
 
+            override val drawablePathIconSupplierCatalog: String by drawablePathIconSupplierCatalogState.collectAsState()
+            private val _drawableResIconSupplierCatalog = MutableStateFlow(Res.drawable._72_0)
+            override val drawableResIconSupplierCatalog: StateFlow<DrawableResource> = _drawableResIconSupplierCatalog.asStateFlow()
+
             override val drawablePathIconWorkers: String by drawablePathIconWorkersState.collectAsState()
             private val _drawableResIconWorkers = MutableStateFlow(Res.drawable._22_0)
             override val drawableResIconWorkers: StateFlow<DrawableResource> = _drawableResIconWorkers.asStateFlow()
@@ -42221,6 +42878,7 @@ object AppConfiguration {
                 _drawableResIconAppModeBuyer.emit(if (stateValues.appThemeId == 1L) Res.drawable._69_1 else Res.drawable._69_0)
                 _drawableResIconAppModeSupplier.emit(if (stateValues.appThemeId == 1L) Res.drawable._70_1 else Res.drawable._70_0)
                 _drawableResIconAppModeManufacturer.emit(if (stateValues.appThemeId == 1L) Res.drawable._71_1 else Res.drawable._71_0)
+                _drawableResIconSupplierCatalog.emit(if (stateValues.appThemeId == 1L) Res.drawable._72_1 else Res.drawable._72_0)
 
                 _drawableResIconWorkers.emit(if (stateValues.appThemeId == 1L) Res.drawable._22_1 else Res.drawable._22_0)
 

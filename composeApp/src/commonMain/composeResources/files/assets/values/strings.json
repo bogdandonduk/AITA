@@ -15795,6 +15795,27 @@
       ]
     },
     {
+      "id": 756,
+      "values": [
+        {
+          "language": "main",
+          "value": "Stock"
+        },
+        {
+          "language": "en",
+          "value": "Stock"
+        },
+        {
+          "language": "ru",
+          "value": "Склад"
+        },
+        {
+          "language": "kk",
+          "value": "Қор"
+        }
+      ]
+    },
+    {
       "id": 800,
       "values": [
         {
@@ -26144,6 +26165,2148 @@
         {
           "language": "kk",
           "value": "БАҒА"
+        }
+      ]
+    },
+    {
+      "id": 1330,
+      "values": [
+        {
+          "language": "main",
+          "value": "History"
+        },
+        {
+          "language": "en",
+          "value": "History"
+        },
+        {
+          "language": "ru",
+          "value": "История"
+        },
+        {
+          "language": "kk",
+          "value": "Тарих"
+        }
+      ]
+    },
+    {
+      "id": 1331,
+      "values": [
+        {
+          "language": "main",
+          "value": "Stock item history"
+        },
+        {
+          "language": "en",
+          "value": "Stock item history"
+        },
+        {
+          "language": "ru",
+          "value": "История товара"
+        },
+        {
+          "language": "kk",
+          "value": "Тауар тарихы"
+        }
+      ]
+    },
+    {
+      "id": 1332,
+      "values": [
+        {
+          "language": "main",
+          "value": "View stock history"
+        },
+        {
+          "language": "en",
+          "value": "View stock history"
+        },
+        {
+          "language": "ru",
+          "value": "Просмотр истории товара"
+        },
+        {
+          "language": "kk",
+          "value": "Тауар тарихын көру"
+        }
+      ]
+    },
+    {
+      "id": 1333,
+      "values": [
+        {
+          "language": "main",
+          "value": "Every saved change to item data, prices, promotions, conditions and batches is collected here."
+        },
+        {
+          "language": "en",
+          "value": "Every saved change to item data, prices, promotions, conditions and batches is collected here."
+        },
+        {
+          "language": "ru",
+          "value": "Здесь собираются все сохранённые изменения данных товара, цен, промо, условий и партий."
+        },
+        {
+          "language": "kk",
+          "value": "Мұнда тауар деректері, бағалар, акциялар, шарттар және партиялар бойынша сақталған барлық өзгеріс жиналады."
+        }
+      ]
+    },
+    {
+      "id": 1334,
+      "values": [
+        {
+          "language": "main",
+          "value": "Save the item first to unlock its history."
+        },
+        {
+          "language": "en",
+          "value": "Save the item first to unlock its history."
+        },
+        {
+          "language": "ru",
+          "value": "Сначала сохраните товар, чтобы открыть его историю."
+        },
+        {
+          "language": "kk",
+          "value": "Тарихын ашу үшін алдымен тауарды сақтаңыз."
+        }
+      ]
+    },
+    {
+      "id": 1335,
+      "values": [
+        {
+          "language": "main",
+          "value": "No stock item history yet"
+        },
+        {
+          "language": "en",
+          "value": "No stock item history yet"
+        },
+        {
+          "language": "ru",
+          "value": "Истории товара пока нет"
+        },
+        {
+          "language": "kk",
+          "value": "Тауар тарихы әзірге жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1336,
+      "values": [
+        {
+          "language": "main",
+          "value": "Worker role templates"
+        },
+        {
+          "language": "en",
+          "value": "Worker role templates"
+        },
+        {
+          "language": "ru",
+          "value": "Шаблоны ролей сотрудников"
+        },
+        {
+          "language": "kk",
+          "value": "Қызметкер рөлдерінің үлгілері"
+        }
+      ]
+    },
+    {
+      "id": 1337,
+      "values": [
+        {
+          "language": "main",
+          "value": "Orders"
+        },
+        {
+          "language": "en",
+          "value": "Orders"
+        },
+        {
+          "language": "ru",
+          "value": "Заказы"
+        },
+        {
+          "language": "kk",
+          "value": "Тапсырыстар"
+        }
+      ]
+    },
+    {
+      "id": 1338,
+      "values": [
+        {
+          "language": "main",
+          "value": "Catalog"
+        },
+        {
+          "language": "en",
+          "value": "Catalog"
+        },
+        {
+          "language": "ru",
+          "value": "Каталог"
+        },
+        {
+          "language": "kk",
+          "value": "Каталог"
+        }
+      ]
+    },
+    {
+      "id": 1339,
+      "values": [
+        {
+          "language": "main",
+          "value": "Customers"
+        },
+        {
+          "language": "en",
+          "value": "Customers"
+        },
+        {
+          "language": "ru",
+          "value": "Клиенты"
+        },
+        {
+          "language": "kk",
+          "value": "Клиенттер"
+        }
+      ]
+    },
+    {
+      "id": 1340,
+      "values": [
+        {
+          "language": "main",
+          "value": "Insights"
+        },
+        {
+          "language": "en",
+          "value": "Insights"
+        },
+        {
+          "language": "ru",
+          "value": "Инсайты"
+        },
+        {
+          "language": "kk",
+          "value": "Инсайттар"
+        }
+      ]
+    },
+    {
+      "id": 1341,
+      "values": [
+        {
+          "language": "main",
+          "value": "Smart order inbox"
+        },
+        {
+          "language": "en",
+          "value": "Smart order inbox"
+        },
+        {
+          "language": "ru",
+          "value": "Умная входящая заявок"
+        },
+        {
+          "language": "kk",
+          "value": "Ақылды тапсырыс жәшігі"
+        }
+      ]
+    },
+    {
+      "id": 1342,
+      "values": [
+        {
+          "language": "main",
+          "value": "See every store request, answer quickly, and keep fulfillment moving from sent to delivery."
+        },
+        {
+          "language": "en",
+          "value": "See every store request, answer quickly, and keep fulfillment moving from sent to delivery."
+        },
+        {
+          "language": "ru",
+          "value": "Видьте каждую заявку магазина, быстро отвечайте и ведите исполнение от отправки до доставки."
+        },
+        {
+          "language": "kk",
+          "value": "Дүкеннің әр сұранысын көріп, тез жауап беріңіз және орындауды жіберуден жеткізуге дейін жүргізіңіз."
+        }
+      ]
+    },
+    {
+      "id": 1343,
+      "values": [
+        {
+          "language": "main",
+          "value": "Live B2B catalog"
+        },
+        {
+          "language": "en",
+          "value": "Live B2B catalog"
+        },
+        {
+          "language": "ru",
+          "value": "Живой B2B-каталог"
+        },
+        {
+          "language": "kk",
+          "value": "Тірі B2B каталог"
+        }
+      ]
+    },
+    {
+      "id": 1344,
+      "values": [
+        {
+          "language": "main",
+          "value": "Turn store stock items into supplier-side offers with MOQ, pack sizes, expiry rules and per-store prices."
+        },
+        {
+          "language": "en",
+          "value": "Turn store stock items into supplier-side offers with MOQ, pack sizes, expiry rules and per-store prices."
+        },
+        {
+          "language": "ru",
+          "value": "Превращайте товары магазинов в предложения поставщика с MOQ, фасовками, сроками годности и ценами по магазинам."
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен тауарларын MOQ, қаптама саны, жарамдылық ережелері және әр дүкен бағалары бар жеткізуші ұсыныстарына айналдырыңыз."
+        }
+      ]
+    },
+    {
+      "id": 1345,
+      "values": [
+        {
+          "language": "main",
+          "value": "Substitutions that save sales"
+        },
+        {
+          "language": "en",
+          "value": "Substitutions that save sales"
+        },
+        {
+          "language": "ru",
+          "value": "Замены, которые спасают продажи"
+        },
+        {
+          "language": "kk",
+          "value": "Сатуды сақтайтын ауыстырулар"
+        }
+      ]
+    },
+    {
+      "id": 1346,
+      "values": [
+        {
+          "language": "main",
+          "value": "Suggest replacements when a SKU is out of stock, with clear approval before the store receives it."
+        },
+        {
+          "language": "en",
+          "value": "Suggest replacements when a SKU is out of stock, with clear approval before the store receives it."
+        },
+        {
+          "language": "ru",
+          "value": "Предлагайте замену, когда товара нет, с понятным подтверждением до приёмки магазином."
+        },
+        {
+          "language": "kk",
+          "value": "Тауар жоқ кезде дүкен қабылдамай тұрып нақты растауы бар ауыстыру ұсыныңыз."
+        }
+      ]
+    },
+    {
+      "id": 1347,
+      "values": [
+        {
+          "language": "main",
+          "value": "Route batch planner"
+        },
+        {
+          "language": "en",
+          "value": "Route batch planner"
+        },
+        {
+          "language": "ru",
+          "value": "Планировщик маршрутов"
+        },
+        {
+          "language": "kk",
+          "value": "Маршрут партияларын жоспарлау"
+        }
+      ]
+    },
+    {
+      "id": 1348,
+      "values": [
+        {
+          "language": "main",
+          "value": "Group nearby KZ, KG, TJ and UZ store deliveries into efficient runs and clear driver packs."
+        },
+        {
+          "language": "en",
+          "value": "Group nearby KZ, KG, TJ and UZ store deliveries into efficient runs and clear driver packs."
+        },
+        {
+          "language": "ru",
+          "value": "Группируйте близкие доставки по KZ, KG, TJ и UZ в удобные рейсы и понятные наборы для водителя."
+        },
+        {
+          "language": "kk",
+          "value": "KZ, KG, TJ және UZ бойынша жақын жеткізілімдерді тиімді рейстерге және жүргізушіге түсінікті жинақтарға біріктіріңіз."
+        }
+      ]
+    },
+    {
+      "id": 1349,
+      "values": [
+        {
+          "language": "main",
+          "value": "Price ladder and payment terms"
+        },
+        {
+          "language": "en",
+          "value": "Price ladder and payment terms"
+        },
+        {
+          "language": "ru",
+          "value": "Ценовые ступени и условия оплаты"
+        },
+        {
+          "language": "kk",
+          "value": "Баға сатылары және төлем шарттары"
+        }
+      ]
+    },
+    {
+      "id": 1350,
+      "values": [
+        {
+          "language": "main",
+          "value": "Manage wholesale tiers, local currencies, deferred payments and trusted-store limits."
+        },
+        {
+          "language": "en",
+          "value": "Manage wholesale tiers, local currencies, deferred payments and trusted-store limits."
+        },
+        {
+          "language": "ru",
+          "value": "Управляйте оптовыми уровнями, локальными валютами, отсрочкой оплаты и лимитами доверия магазинам."
+        },
+        {
+          "language": "kk",
+          "value": "Көтерме деңгейлерді, жергілікті валюталарды, кейінге төлемді және сенімді дүкен лимиттерін басқарыңыз."
+        }
+      ]
+    },
+    {
+      "id": 1351,
+      "values": [
+        {
+          "language": "main",
+          "value": "Store reliability scorecards"
+        },
+        {
+          "language": "en",
+          "value": "Store reliability scorecards"
+        },
+        {
+          "language": "ru",
+          "value": "Карточки надёжности магазинов"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен сенімділігі карталары"
+        }
+      ]
+    },
+    {
+      "id": 1352,
+      "values": [
+        {
+          "language": "main",
+          "value": "Know which stores pay on time, order predictably and need extra confirmation before dispatch."
+        },
+        {
+          "language": "en",
+          "value": "Know which stores pay on time, order predictably and need extra confirmation before dispatch."
+        },
+        {
+          "language": "ru",
+          "value": "Знайте, какие магазины платят вовремя, заказывают предсказуемо и требуют доподтверждения перед отгрузкой."
+        },
+        {
+          "language": "kk",
+          "value": "Қай дүкен уақытында төлейтінін, тұрақты тапсырыс беретінін және жөнелтуден бұрын қосымша растау керек екенін біліңіз."
+        }
+      ]
+    },
+    {
+      "id": 1353,
+      "values": [
+        {
+          "language": "main",
+          "value": "Demand radar"
+        },
+        {
+          "language": "en",
+          "value": "Demand radar"
+        },
+        {
+          "language": "ru",
+          "value": "Радар спроса"
+        },
+        {
+          "language": "kk",
+          "value": "Сұраныс радары"
+        }
+      ]
+    },
+    {
+      "id": 1354,
+      "values": [
+        {
+          "language": "main",
+          "value": "Read reorder rhythm from store orders and prepare stock before the call comes."
+        },
+        {
+          "language": "en",
+          "value": "Read reorder rhythm from store orders and prepare stock before the call comes."
+        },
+        {
+          "language": "ru",
+          "value": "Считывайте ритм повторных заказов по заявкам магазинов и готовьте товар до звонка."
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен тапсырыстарынан қайта сұраныс ырғағын оқып, қоңырауға дейін қор дайындаңыз."
+        }
+      ]
+    },
+    {
+      "id": 1355,
+      "values": [
+        {
+          "language": "main",
+          "value": "Manufacturer backorder bridge"
+        },
+        {
+          "language": "en",
+          "value": "Manufacturer backorder bridge"
+        },
+        {
+          "language": "ru",
+          "value": "Мост предзаказов к производителю"
+        },
+        {
+          "language": "kk",
+          "value": "Өндірушіге алдын ала тапсырыс көпірі"
+        }
+      ]
+    },
+    {
+      "id": 1356,
+      "values": [
+        {
+          "language": "main",
+          "value": "Push confirmed demand upstream to producers and keep stores updated on replenishment."
+        },
+        {
+          "language": "en",
+          "value": "Push confirmed demand upstream to producers and keep stores updated on replenishment."
+        },
+        {
+          "language": "ru",
+          "value": "Передавайте подтверждённый спрос производителям и держите магазины в курсе пополнения."
+        },
+        {
+          "language": "kk",
+          "value": "Расталған сұранысты өндірушілерге жіберіп, дүкендерді толықтыру жайынан хабардар ұстаңыз."
+        }
+      ]
+    },
+    {
+      "id": 1357,
+      "values": [
+        {
+          "language": "main",
+          "value": "LIVE"
+        },
+        {
+          "language": "en",
+          "value": "LIVE"
+        },
+        {
+          "language": "ru",
+          "value": "РАБОТАЕТ"
+        },
+        {
+          "language": "kk",
+          "value": "ҚОСУЛЫ"
+        }
+      ]
+    },
+    {
+      "id": 1358,
+      "values": [
+        {
+          "language": "main",
+          "value": "Requested goods"
+        },
+        {
+          "language": "en",
+          "value": "Requested goods"
+        },
+        {
+          "language": "ru",
+          "value": "Запрошенные товары"
+        },
+        {
+          "language": "kk",
+          "value": "Сұралған тауарлар"
+        }
+      ]
+    },
+    {
+      "id": 1359,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier action"
+        },
+        {
+          "language": "en",
+          "value": "Supplier action"
+        },
+        {
+          "language": "ru",
+          "value": "Действие поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші әрекеті"
+        }
+      ]
+    },
+    {
+      "id": 1360,
+      "values": [
+        {
+          "language": "main",
+          "value": "Comment for the store"
+        },
+        {
+          "language": "en",
+          "value": "Comment for the store"
+        },
+        {
+          "language": "ru",
+          "value": "Комментарий для магазина"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкенге түсініктеме"
+        }
+      ]
+    },
+    {
+      "id": 1361,
+      "values": [
+        {
+          "language": "main",
+          "value": "Save response"
+        },
+        {
+          "language": "en",
+          "value": "Save response"
+        },
+        {
+          "language": "ru",
+          "value": "Сохранить ответ"
+        },
+        {
+          "language": "kk",
+          "value": "Жауапты сақтау"
+        }
+      ]
+    },
+    {
+      "id": 1362,
+      "values": [
+        {
+          "language": "main",
+          "value": "Confirm"
+        },
+        {
+          "language": "en",
+          "value": "Confirm"
+        },
+        {
+          "language": "ru",
+          "value": "Подтвердить"
+        },
+        {
+          "language": "kk",
+          "value": "Растау"
+        }
+      ]
+    },
+    {
+      "id": 1363,
+      "values": [
+        {
+          "language": "main",
+          "value": "Packed"
+        },
+        {
+          "language": "en",
+          "value": "Packed"
+        },
+        {
+          "language": "ru",
+          "value": "Собран"
+        },
+        {
+          "language": "kk",
+          "value": "Жиналды"
+        }
+      ]
+    },
+    {
+      "id": 1364,
+      "values": [
+        {
+          "language": "main",
+          "value": "In delivery"
+        },
+        {
+          "language": "en",
+          "value": "In delivery"
+        },
+        {
+          "language": "ru",
+          "value": "В доставке"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізілуде"
+        }
+      ]
+    },
+    {
+      "id": 1365,
+      "values": [
+        {
+          "language": "main",
+          "value": "Closed orders stay here as a clean supplier-side fulfillment record."
+        },
+        {
+          "language": "en",
+          "value": "Closed orders stay here as a clean supplier-side fulfillment record."
+        },
+        {
+          "language": "ru",
+          "value": "Закрытые заказы остаются здесь как чистая история исполнения со стороны поставщика."
+        },
+        {
+          "language": "kk",
+          "value": "Жабылған тапсырыстар мұнда жеткізуші жағындағы таза орындау жазбасы болып қалады."
+        }
+      ]
+    },
+    {
+      "id": 1366,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier desk"
+        },
+        {
+          "language": "en",
+          "value": "Supplier desk"
+        },
+        {
+          "language": "ru",
+          "value": "Пульт поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші пульті"
+        }
+      ]
+    },
+    {
+      "id": 1367,
+      "values": [
+        {
+          "language": "main",
+          "value": "Fulfillment command center"
+        },
+        {
+          "language": "en",
+          "value": "Fulfillment command center"
+        },
+        {
+          "language": "ru",
+          "value": "Командный центр исполнения"
+        },
+        {
+          "language": "kk",
+          "value": "Орындау командалық орталығы"
+        }
+      ]
+    },
+    {
+      "id": 1368,
+      "values": [
+        {
+          "language": "main",
+          "value": "The first supplier foundation: a market-ready inbox for store orders, delivery status, comments and reliable B2B rhythm."
+        },
+        {
+          "language": "en",
+          "value": "The first supplier foundation: a market-ready inbox for store orders, delivery status, comments and reliable B2B rhythm."
+        },
+        {
+          "language": "ru",
+          "value": "Первая основа режима поставщика: рыночная входящая для заказов магазинов, статусов доставки, комментариев и надёжного B2B-ритма."
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші режимінің алғашқы негізі: дүкен тапсырыстары, жеткізу күйлері, пікірлер және сенімді B2B ырғағы үшін дайын кіріс жәшігі."
+        }
+      ]
+    },
+    {
+      "id": 1369,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open orders"
+        },
+        {
+          "language": "en",
+          "value": "Open orders"
+        },
+        {
+          "language": "ru",
+          "value": "Открытые заказы"
+        },
+        {
+          "language": "kk",
+          "value": "Ашық тапсырыстар"
+        }
+      ]
+    },
+    {
+      "id": 1370,
+      "values": [
+        {
+          "language": "main",
+          "value": "Waiting for supplier action"
+        },
+        {
+          "language": "en",
+          "value": "Waiting for supplier action"
+        },
+        {
+          "language": "ru",
+          "value": "Ждут действия поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші әрекетін күтеді"
+        }
+      ]
+    },
+    {
+      "id": 1371,
+      "values": [
+        {
+          "language": "main",
+          "value": "Needs attention"
+        },
+        {
+          "language": "en",
+          "value": "Needs attention"
+        },
+        {
+          "language": "ru",
+          "value": "Требует внимания"
+        },
+        {
+          "language": "kk",
+          "value": "Назар керек"
+        }
+      ]
+    },
+    {
+      "id": 1372,
+      "values": [
+        {
+          "language": "main",
+          "value": "New or recently seen requests"
+        },
+        {
+          "language": "en",
+          "value": "New or recently seen requests"
+        },
+        {
+          "language": "ru",
+          "value": "Новые или недавно просмотренные заявки"
+        },
+        {
+          "language": "kk",
+          "value": "Жаңа немесе жақында көрілген сұраныстар"
+        }
+      ]
+    },
+    {
+      "id": 1373,
+      "values": [
+        {
+          "language": "main",
+          "value": "Requested lines"
+        },
+        {
+          "language": "en",
+          "value": "Requested lines"
+        },
+        {
+          "language": "ru",
+          "value": "Строки заявок"
+        },
+        {
+          "language": "kk",
+          "value": "Сұраныс жолдары"
+        }
+      ]
+    },
+    {
+      "id": 1374,
+      "values": [
+        {
+          "language": "main",
+          "value": "Goods positions from stores"
+        },
+        {
+          "language": "en",
+          "value": "Goods positions from stores"
+        },
+        {
+          "language": "ru",
+          "value": "Товарные позиции от магазинов"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкендерден тауар позициялары"
+        }
+      ]
+    },
+    {
+      "id": 1375,
+      "values": [
+        {
+          "language": "main",
+          "value": "Find the right request fast"
+        },
+        {
+          "language": "en",
+          "value": "Find the right request fast"
+        },
+        {
+          "language": "ru",
+          "value": "Быстро найти нужную заявку"
+        },
+        {
+          "language": "kk",
+          "value": "Керек сұранысты тез табу"
+        }
+      ]
+    },
+    {
+      "id": 1376,
+      "values": [
+        {
+          "language": "main",
+          "value": "Status filter"
+        },
+        {
+          "language": "en",
+          "value": "Status filter"
+        },
+        {
+          "language": "ru",
+          "value": "Фильтр статуса"
+        },
+        {
+          "language": "kk",
+          "value": "Күй сүзгісі"
+        }
+      ]
+    },
+    {
+      "id": 1377,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open"
+        },
+        {
+          "language": "en",
+          "value": "Open"
+        },
+        {
+          "language": "ru",
+          "value": "Открытые"
+        },
+        {
+          "language": "kk",
+          "value": "Ашық"
+        }
+      ]
+    },
+    {
+      "id": 1378,
+      "values": [
+        {
+          "language": "main",
+          "value": "All"
+        },
+        {
+          "language": "en",
+          "value": "All"
+        },
+        {
+          "language": "ru",
+          "value": "Все"
+        },
+        {
+          "language": "kk",
+          "value": "Барлығы"
+        }
+      ]
+    },
+    {
+      "id": 1379,
+      "values": [
+        {
+          "language": "main",
+          "value": "No store orders have reached this supplier profile yet. When stores send supply requests, they will appear here."
+        },
+        {
+          "language": "en",
+          "value": "No store orders have reached this supplier profile yet. When stores send supply requests, they will appear here."
+        },
+        {
+          "language": "ru",
+          "value": "До этого профиля поставщика ещё не дошли заказы магазинов. Когда магазины отправят заявки на поставку, они появятся здесь."
+        },
+        {
+          "language": "kk",
+          "value": "Бұл жеткізуші профиліне дүкен тапсырыстары әлі келген жоқ. Дүкендер жеткізу сұраныстарын жібергенде, олар осында көрінеді."
+        }
+      ]
+    },
+    {
+      "id": 1380,
+      "values": [
+        {
+          "language": "main",
+          "value": "No orders match this filter"
+        },
+        {
+          "language": "en",
+          "value": "No orders match this filter"
+        },
+        {
+          "language": "ru",
+          "value": "Под этот фильтр заказы не подходят"
+        },
+        {
+          "language": "kk",
+          "value": "Бұл сүзгіге сәйкес тапсырыс жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1381,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier feature roadmap"
+        },
+        {
+          "language": "en",
+          "value": "Supplier feature roadmap"
+        },
+        {
+          "language": "ru",
+          "value": "Карта развития поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші мүмкіндіктерінің жол картасы"
+        }
+      ]
+    },
+    {
+      "id": 1382,
+      "values": [
+        {
+          "language": "main",
+          "value": "Next foundation: reusable B2B catalog offers connected to the store-side supplier order bridge."
+        },
+        {
+          "language": "en",
+          "value": "Next foundation: reusable B2B catalog offers connected to the store-side supplier order bridge."
+        },
+        {
+          "language": "ru",
+          "value": "Следующая основа: переиспользуемые B2B-предложения каталога, связанные с мостом заказов магазина поставщику."
+        },
+        {
+          "language": "kk",
+          "value": "Келесі негіз: дүкеннің жеткізуші тапсырыстары көпірімен байланысқан қайта қолданылатын B2B каталог ұсыныстары."
+        }
+      ]
+    },
+    {
+      "id": 1383,
+      "values": [
+        {
+          "language": "main",
+          "value": "Upcoming: store relationship cards, reliability, route clusters and private terms."
+        },
+        {
+          "language": "en",
+          "value": "Upcoming: store relationship cards, reliability, route clusters and private terms."
+        },
+        {
+          "language": "ru",
+          "value": "Скоро: карточки отношений с магазинами, надёжность, маршрутные кластеры и индивидуальные условия."
+        },
+        {
+          "language": "kk",
+          "value": "Алда: дүкен қатынас карталары, сенімділік, маршрут кластерлері және жеке шарттар."
+        }
+      ]
+    },
+    {
+      "id": 1384,
+      "values": [
+        {
+          "language": "main",
+          "value": "Upcoming: demand radar, margin lens, delivery performance and cross-market growth signals."
+        },
+        {
+          "language": "en",
+          "value": "Upcoming: demand radar, margin lens, delivery performance and cross-market growth signals."
+        },
+        {
+          "language": "ru",
+          "value": "Скоро: радар спроса, взгляд на маржу, качество доставки и сигналы роста по рынкам."
+        },
+        {
+          "language": "kk",
+          "value": "Алда: сұраныс радары, маржа көрінісі, жеткізу тиімділігі және нарықаралық өсу белгілері."
+        }
+      ]
+    },
+    {
+      "id": 1385,
+      "values": [
+        {
+          "language": "main",
+          "value": "Point of sale, stock, shifts, workers and store operations."
+        },
+        {
+          "language": "en",
+          "value": "Point of sale, stock, shifts, workers and store operations."
+        },
+        {
+          "language": "ru",
+          "value": "Касса, склад, смены, сотрудники и операции магазина."
+        },
+        {
+          "language": "kk",
+          "value": "Сату орны, қойма, ауысымдар, қызметкерлер және дүкен операциялары."
+        }
+      ]
+    },
+    {
+      "id": 1386,
+      "values": [
+        {
+          "language": "main",
+          "value": "Best for a shop team serving customers right now."
+        },
+        {
+          "language": "en",
+          "value": "Best for a shop team serving customers right now."
+        },
+        {
+          "language": "ru",
+          "value": "Лучше всего для команды магазина, которая обслуживает покупателей прямо сейчас."
+        },
+        {
+          "language": "kk",
+          "value": "Қазір клиенттерге қызмет көрсетіп жатқан дүкен командасына ең қолайлы."
+        }
+      ]
+    },
+    {
+      "id": 1387,
+      "values": [
+        {
+          "language": "main",
+          "value": "Personal buying, carts, order history and marketplace discovery."
+        },
+        {
+          "language": "en",
+          "value": "Personal buying, carts, order history and marketplace discovery."
+        },
+        {
+          "language": "ru",
+          "value": "Личные покупки, корзины, история заказов и поиск по маркетплейсу."
+        },
+        {
+          "language": "kk",
+          "value": "Жеке сатып алу, себеттер, тапсырыс тарихы және маркетплейс іздеу."
+        }
+      ]
+    },
+    {
+      "id": 1388,
+      "values": [
+        {
+          "language": "main",
+          "value": "Best for the end user choosing and tracking goods."
+        },
+        {
+          "language": "en",
+          "value": "Best for the end user choosing and tracking goods."
+        },
+        {
+          "language": "ru",
+          "value": "Лучше всего для конечного покупателя, который выбирает и отслеживает товары."
+        },
+        {
+          "language": "kk",
+          "value": "Тауар таңдап, қадағалайтын соңғы пайдаланушыға ең қолайлы."
+        }
+      ]
+    },
+    {
+      "id": 1389,
+      "values": [
+        {
+          "language": "main",
+          "value": "Store demand inbox, fulfillment statuses, B2B replies and delivery rhythm."
+        },
+        {
+          "language": "en",
+          "value": "Store demand inbox, fulfillment statuses, B2B replies and delivery rhythm."
+        },
+        {
+          "language": "ru",
+          "value": "Входящие заявки магазинов, статусы исполнения, B2B-ответы и ритм доставки."
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен сұраныстары, орындау күйлері, B2B жауаптары және жеткізу ырғағы."
+        }
+      ]
+    },
+    {
+      "id": 1390,
+      "values": [
+        {
+          "language": "main",
+          "value": "Best for wholesalers and distributors serving many stores."
+        },
+        {
+          "language": "en",
+          "value": "Best for wholesalers and distributors serving many stores."
+        },
+        {
+          "language": "ru",
+          "value": "Лучше всего для оптовиков и дистрибьюторов, обслуживающих много магазинов."
+        },
+        {
+          "language": "kk",
+          "value": "Көп дүкенге қызмет көрсететін көтерме сатушылар мен дистрибьюторларға ең қолайлы."
+        }
+      ]
+    },
+    {
+      "id": 1391,
+      "values": [
+        {
+          "language": "main",
+          "value": "Production batches, upstream planning, quality and distributor bridge."
+        },
+        {
+          "language": "en",
+          "value": "Production batches, upstream planning, quality and distributor bridge."
+        },
+        {
+          "language": "ru",
+          "value": "Производственные партии, планирование вверх по цепочке, качество и мост к дистрибьюторам."
+        },
+        {
+          "language": "kk",
+          "value": "Өндіріс партиялары, жоғары тізбек жоспарлауы, сапа және дистрибьютор көпірі."
+        }
+      ]
+    },
+    {
+      "id": 1392,
+      "values": [
+        {
+          "language": "main",
+          "value": "Best for factories and makers feeding suppliers and stores."
+        },
+        {
+          "language": "en",
+          "value": "Best for factories and makers feeding suppliers and stores."
+        },
+        {
+          "language": "ru",
+          "value": "Лучше всего для фабрик и производителей, снабжающих поставщиков и магазины."
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізушілер мен дүкендерді қамтамасыз ететін фабрикалар мен өндірушілерге ең қолайлы."
+        }
+      ]
+    },
+    {
+      "id": 1393,
+      "values": [
+        {
+          "language": "main",
+          "value": "Production"
+        },
+        {
+          "language": "en",
+          "value": "Production"
+        },
+        {
+          "language": "ru",
+          "value": "Производство"
+        },
+        {
+          "language": "kk",
+          "value": "Өндіріс"
+        }
+      ]
+    },
+    {
+      "id": 1394,
+      "values": [
+        {
+          "language": "main",
+          "value": "Batches"
+        },
+        {
+          "language": "en",
+          "value": "Batches"
+        },
+        {
+          "language": "ru",
+          "value": "Партии"
+        },
+        {
+          "language": "kk",
+          "value": "Партиялар"
+        }
+      ]
+    },
+    {
+      "id": 1395,
+      "values": [
+        {
+          "language": "main",
+          "value": "Quality"
+        },
+        {
+          "language": "en",
+          "value": "Quality"
+        },
+        {
+          "language": "ru",
+          "value": "Качество"
+        },
+        {
+          "language": "kk",
+          "value": "Сапа"
+        }
+      ]
+    },
+    {
+      "id": 1396,
+      "values": [
+        {
+          "language": "main",
+          "value": "Selected"
+        },
+        {
+          "language": "en",
+          "value": "Selected"
+        },
+        {
+          "language": "ru",
+          "value": "Выбран"
+        },
+        {
+          "language": "kk",
+          "value": "Таңдалды"
+        }
+      ]
+    },
+    {
+      "id": 1397,
+      "values": [
+        {
+          "language": "main",
+          "value": "Choose how AITA behaves today"
+        },
+        {
+          "language": "en",
+          "value": "Choose how AITA behaves today"
+        },
+        {
+          "language": "ru",
+          "value": "Выберите, как AITA работает сегодня"
+        },
+        {
+          "language": "kk",
+          "value": "Бүгін AITA қалай жұмыс істейтінін таңдаңыз"
+        }
+      ]
+    },
+    {
+      "id": 1398,
+      "values": [
+        {
+          "language": "main",
+          "value": "Each mode keeps the same account, but reshapes navigation, shortcuts and the first screen around the role: store, buyer, supplier or producer."
+        },
+        {
+          "language": "en",
+          "value": "Each mode keeps the same account, but reshapes navigation, shortcuts and the first screen around the role: store, buyer, supplier or producer."
+        },
+        {
+          "language": "ru",
+          "value": "Каждый режим сохраняет тот же аккаунт, но перестраивает навигацию, быстрые действия и первый экран под роль: магазин, покупатель, поставщик или производитель."
+        },
+        {
+          "language": "kk",
+          "value": "Әр режим бір аккаунтты сақтайды, бірақ навигацияны, жылдам әрекеттерді және бірінші экранды рөлге қарай өзгертеді: дүкен, сатып алушы, жеткізуші немесе өндіруші."
+        }
+      ]
+    },
+    {
+      "id": 1399,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier mode starts with the Smart order inbox: the foundation that connects store-side supplier orders to a supplier-side fulfillment desk."
+        },
+        {
+          "language": "en",
+          "value": "Supplier mode starts with the Smart order inbox: the foundation that connects store-side supplier orders to a supplier-side fulfillment desk."
+        },
+        {
+          "language": "ru",
+          "value": "Режим поставщика начинается с умной входящей заявок: основы, которая связывает заказы магазина поставщику с пультом исполнения поставщика."
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші режимі ақылды тапсырыс жәшігінен басталады: ол дүкеннің жеткізушіге тапсырыстарын жеткізуші орындау пультімен байланыстырады."
+        }
+      ]
+    },
+    {
+      "id": 1400,
+      "values": [
+        {
+          "language": "main",
+          "value": "Workspace"
+        },
+        {
+          "language": "en",
+          "value": "Workspace"
+        },
+        {
+          "language": "ru",
+          "value": "Рабочая область"
+        },
+        {
+          "language": "kk",
+          "value": "Жұмыс аймағы"
+        }
+      ]
+    },
+    {
+      "id": 1401,
+      "values": [
+        {
+          "language": "main",
+          "value": "Producer workspace"
+        },
+        {
+          "language": "en",
+          "value": "Producer workspace"
+        },
+        {
+          "language": "ru",
+          "value": "Рабочая область производителя"
+        },
+        {
+          "language": "kk",
+          "value": "Өндіруші жұмыс аймағы"
+        }
+      ]
+    },
+    {
+      "id": 1402,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier workspace"
+        },
+        {
+          "language": "en",
+          "value": "Supplier workspace"
+        },
+        {
+          "language": "ru",
+          "value": "Рабочая область поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші жұмыс аймағы"
+        }
+      ]
+    },
+    {
+      "id": 1403,
+      "values": [
+        {
+          "language": "main",
+          "value": "Producer mode starts with catalog and demand bridge screens while the production layer grows."
+        },
+        {
+          "language": "en",
+          "value": "Producer mode starts with catalog and demand bridge screens while the production layer grows."
+        },
+        {
+          "language": "ru",
+          "value": "Режим производителя начинается с каталога и моста спроса, пока слой производства растёт."
+        },
+        {
+          "language": "kk",
+          "value": "Өндіруші режимі өндіріс қабаты дамып жатқанда каталог пен сұраныс көпірінен басталады."
+        }
+      ]
+    },
+    {
+      "id": 1404,
+      "values": [
+        {
+          "language": "main",
+          "value": "Jump between order inbox, catalog, customers and insights without returning to the bottom bar."
+        },
+        {
+          "language": "en",
+          "value": "Jump between order inbox, catalog, customers and insights without returning to the bottom bar."
+        },
+        {
+          "language": "ru",
+          "value": "Переходите между входящими заказами, каталогом, клиентами и инсайтами без возврата к нижней панели."
+        },
+        {
+          "language": "kk",
+          "value": "Төменгі панельге қайтпай-ақ тапсырыс жәшігі, каталог, клиенттер және инсайттар арасында ауысыңыз."
+        }
+      ]
+    },
+    {
+      "id": 1405,
+      "values": [
+        {
+          "language": "main",
+          "value": "Save reusable permission sets for cashier, stockkeeper, branch lead, or any cute custom role."
+        },
+        {
+          "language": "en",
+          "value": "Save reusable permission sets for cashier, stockkeeper, branch lead, or any cute custom role."
+        },
+        {
+          "language": "ru",
+          "value": "Сохраняйте переиспользуемые наборы прав для кассира, кладовщика, руководителя филиала или любой своей роли."
+        },
+        {
+          "language": "kk",
+          "value": "Кассир, қоймашы, филиал жетекшісі немесе өзіңіз жасаған кез келген рөл үшін қайта қолданылатын рұқсаттар жинағын сақтаңыз."
+        }
+      ]
+    },
+    {
+      "id": 1406,
+      "values": [
+        {
+          "language": "main",
+          "value": "Demand-built catalog"
+        },
+        {
+          "language": "en",
+          "value": "Demand-built catalog"
+        },
+        {
+          "language": "ru",
+          "value": "Каталог, построенный спросом"
+        },
+        {
+          "language": "kk",
+          "value": "Сұраныспен құрылған каталог"
+        }
+      ]
+    },
+    {
+      "id": 1407,
+      "values": [
+        {
+          "language": "main",
+          "value": "Every store request automatically becomes a supplier-side product card, so the catalog grows from real demand instead of manual retyping."
+        },
+        {
+          "language": "en",
+          "value": "Every store request automatically becomes a supplier-side product card, so the catalog grows from real demand instead of manual retyping."
+        },
+        {
+          "language": "ru",
+          "value": "Каждая заявка магазина автоматически становится карточкой товара поставщика, поэтому каталог растёт из реального спроса без ручного переписывания."
+        },
+        {
+          "language": "kk",
+          "value": "Дүкеннің әр сұранысы автоматты түрде жеткізуші жағындағы тауар картасына айналады, сондықтан каталог қолмен қайта термей, нақты сұраныстан өседі."
+        }
+      ]
+    },
+    {
+      "id": 1408,
+      "values": [
+        {
+          "language": "main",
+          "value": "Catalog SKUs"
+        },
+        {
+          "language": "en",
+          "value": "Catalog SKUs"
+        },
+        {
+          "language": "ru",
+          "value": "SKU в каталоге"
+        },
+        {
+          "language": "kk",
+          "value": "Каталог SKU-лары"
+        }
+      ]
+    },
+    {
+      "id": 1409,
+      "values": [
+        {
+          "language": "main",
+          "value": "Unique goods requested by connected stores"
+        },
+        {
+          "language": "en",
+          "value": "Unique goods requested by connected stores"
+        },
+        {
+          "language": "ru",
+          "value": "Уникальные товары, запрошенные подключёнными магазинами"
+        },
+        {
+          "language": "kk",
+          "value": "Қосылған дүкендер сұраған бірегей тауарлар"
+        }
+      ]
+    },
+    {
+      "id": 1410,
+      "values": [
+        {
+          "language": "main",
+          "value": "Interested stores"
+        },
+        {
+          "language": "en",
+          "value": "Interested stores"
+        },
+        {
+          "language": "ru",
+          "value": "Заинтересованные магазины"
+        },
+        {
+          "language": "kk",
+          "value": "Қызығушы дүкендер"
+        }
+      ]
+    },
+    {
+      "id": 1411,
+      "values": [
+        {
+          "language": "main",
+          "value": "Stores that asked for these goods"
+        },
+        {
+          "language": "en",
+          "value": "Stores that asked for these goods"
+        },
+        {
+          "language": "ru",
+          "value": "Магазины, которые спрашивали эти товары"
+        },
+        {
+          "language": "kk",
+          "value": "Осы тауарларды сұраған дүкендер"
+        }
+      ]
+    },
+    {
+      "id": 1412,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open demand"
+        },
+        {
+          "language": "en",
+          "value": "Open demand"
+        },
+        {
+          "language": "ru",
+          "value": "Открытый спрос"
+        },
+        {
+          "language": "kk",
+          "value": "Ашық сұраныс"
+        }
+      ]
+    },
+    {
+      "id": 1413,
+      "values": [
+        {
+          "language": "main",
+          "value": "Unfinished requests linked to catalog"
+        },
+        {
+          "language": "en",
+          "value": "Unfinished requests linked to catalog"
+        },
+        {
+          "language": "ru",
+          "value": "Незавершённые заявки, связанные с каталогом"
+        },
+        {
+          "language": "kk",
+          "value": "Каталогқа байланысты аяқталмаған сұраныстар"
+        }
+      ]
+    },
+    {
+      "id": 1414,
+      "values": [
+        {
+          "language": "main",
+          "value": "Catalog filter"
+        },
+        {
+          "language": "en",
+          "value": "Catalog filter"
+        },
+        {
+          "language": "ru",
+          "value": "Фильтр каталога"
+        },
+        {
+          "language": "kk",
+          "value": "Каталог сүзгісі"
+        }
+      ]
+    },
+    {
+      "id": 1415,
+      "values": [
+        {
+          "language": "main",
+          "value": "With open demand"
+        },
+        {
+          "language": "en",
+          "value": "With open demand"
+        },
+        {
+          "language": "ru",
+          "value": "С открытым спросом"
+        },
+        {
+          "language": "kk",
+          "value": "Ашық сұранысы бар"
+        }
+      ]
+    },
+    {
+      "id": 1416,
+      "values": [
+        {
+          "language": "main",
+          "value": "Needs supplier reply"
+        },
+        {
+          "language": "en",
+          "value": "Needs supplier reply"
+        },
+        {
+          "language": "ru",
+          "value": "Нужен ответ поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші жауабы керек"
+        }
+      ]
+    },
+    {
+      "id": 1417,
+      "values": [
+        {
+          "language": "main",
+          "value": "Delivered history"
+        },
+        {
+          "language": "en",
+          "value": "Delivered history"
+        },
+        {
+          "language": "ru",
+          "value": "История доставок"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізу тарихы"
+        }
+      ]
+    },
+    {
+      "id": 1418,
+      "values": [
+        {
+          "language": "main",
+          "value": "No catalog items yet"
+        },
+        {
+          "language": "en",
+          "value": "No catalog items yet"
+        },
+        {
+          "language": "ru",
+          "value": "В каталоге пока нет товаров"
+        },
+        {
+          "language": "kk",
+          "value": "Каталогта әзірге тауар жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1419,
+      "values": [
+        {
+          "language": "main",
+          "value": "The catalog will grow automatically from incoming store orders. When a store requests a stock item, it becomes a reusable supplier offer card here."
+        },
+        {
+          "language": "en",
+          "value": "The catalog will grow automatically from incoming store orders. When a store requests a stock item, it becomes a reusable supplier offer card here."
+        },
+        {
+          "language": "ru",
+          "value": "Каталог будет автоматически расти из входящих заказов магазинов. Когда магазин запросит товар склада, здесь появится переиспользуемая карточка предложения поставщика."
+        },
+        {
+          "language": "kk",
+          "value": "Каталог дүкендердің кіріс тапсырыстарынан автоматты түрде өседі. Дүкен қойма тауарын сұрағанда, мұнда қайта қолданылатын жеткізуші ұсыныс картасы пайда болады."
+        }
+      ]
+    },
+    {
+      "id": 1420,
+      "values": [
+        {
+          "language": "main",
+          "value": "No catalog items match this filter"
+        },
+        {
+          "language": "en",
+          "value": "No catalog items match this filter"
+        },
+        {
+          "language": "ru",
+          "value": "Под этот фильтр товары каталога не подходят"
+        },
+        {
+          "language": "kk",
+          "value": "Бұл сүзгіге сәйкес каталог тауары жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1421,
+      "values": [
+        {
+          "language": "main",
+          "value": "Last request"
+        },
+        {
+          "language": "en",
+          "value": "Last request"
+        },
+        {
+          "language": "ru",
+          "value": "Последняя заявка"
+        },
+        {
+          "language": "kk",
+          "value": "Соңғы сұраныс"
+        }
+      ]
+    },
+    {
+      "id": 1422,
+      "values": [
+        {
+          "language": "main",
+          "value": "Stores asking"
+        },
+        {
+          "language": "en",
+          "value": "Stores asking"
+        },
+        {
+          "language": "ru",
+          "value": "Магазины спрашивают"
+        },
+        {
+          "language": "kk",
+          "value": "Сұраған дүкендер"
+        }
+      ]
+    },
+    {
+      "id": 1423,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open requests"
+        },
+        {
+          "language": "en",
+          "value": "Open requests"
+        },
+        {
+          "language": "ru",
+          "value": "Открытые заявки"
+        },
+        {
+          "language": "kk",
+          "value": "Ашық сұраныстар"
+        }
+      ]
+    },
+    {
+      "id": 1424,
+      "values": [
+        {
+          "language": "main",
+          "value": "Total requested"
+        },
+        {
+          "language": "en",
+          "value": "Total requested"
+        },
+        {
+          "language": "ru",
+          "value": "Всего запрошено"
+        },
+        {
+          "language": "kk",
+          "value": "Барлығы сұралды"
+        }
+      ]
+    },
+    {
+      "id": 1425,
+      "values": [
+        {
+          "language": "main",
+          "value": "Expected price"
+        },
+        {
+          "language": "en",
+          "value": "Expected price"
+        },
+        {
+          "language": "ru",
+          "value": "Ожидаемая цена"
+        },
+        {
+          "language": "kk",
+          "value": "Күтілетін баға"
+        }
+      ]
+    },
+    {
+      "id": 1426,
+      "values": [
+        {
+          "language": "main",
+          "value": "Recent store signals"
+        },
+        {
+          "language": "en",
+          "value": "Recent store signals"
+        },
+        {
+          "language": "ru",
+          "value": "Свежие сигналы магазинов"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкендердің соңғы белгілері"
+        }
+      ]
+    },
+    {
+      "id": 1427,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open related orders"
+        },
+        {
+          "language": "en",
+          "value": "Open related orders"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть связанные заказы"
+        },
+        {
+          "language": "kk",
+          "value": "Байланысты тапсырыстарды ашу"
+        }
+      ]
+    },
+    {
+      "id": 1428,
+      "values": [
+        {
+          "language": "main",
+          "value": "This is not a separate product database yet: it is a smart catalog lens over real store orders, safe to add before supplier-owned price books."
+        },
+        {
+          "language": "en",
+          "value": "This is not a separate product database yet: it is a smart catalog lens over real store orders, safe to add before supplier-owned price books."
+        },
+        {
+          "language": "ru",
+          "value": "Это ещё не отдельная товарная база: это умная витрина поверх реальных заказов магазинов, безопасная перед будущими прайс-листами поставщика."
+        },
+        {
+          "language": "kk",
+          "value": "Бұл әзірге бөлек тауар базасы емес: ол нақты дүкен тапсырыстарының үстіндегі ақылды каталог көрінісі, болашақ жеткізуші прайс-парақтарына дейін қауіпсіз қабат."
+        }
+      ]
+    },
+    {
+      "id": 1429,
+      "values": [
+        {
+          "language": "main",
+          "value": "Copy offer note"
+        },
+        {
+          "language": "en",
+          "value": "Copy offer note"
+        },
+        {
+          "language": "ru",
+          "value": "Скопировать заметку предложения"
+        },
+        {
+          "language": "kk",
+          "value": "Ұсыныс жазбасын көшіру"
+        }
+      ]
+    },
+    {
+      "id": 1430,
+      "values": [
+        {
+          "language": "main",
+          "value": "Latest status"
+        },
+        {
+          "language": "en",
+          "value": "Latest status"
+        },
+        {
+          "language": "ru",
+          "value": "Последний статус"
+        },
+        {
+          "language": "kk",
+          "value": "Соңғы күй"
+        }
+      ]
+    },
+    {
+      "id": 1431,
+      "values": [
+        {
+          "language": "main",
+          "value": "Manufacturer bridge"
+        },
+        {
+          "language": "en",
+          "value": "Manufacturer bridge"
+        },
+        {
+          "language": "ru",
+          "value": "Мост к производителю"
+        },
+        {
+          "language": "kk",
+          "value": "Өндіруші көпірі"
         }
       ]
     }

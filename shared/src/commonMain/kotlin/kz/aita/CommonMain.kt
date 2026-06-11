@@ -5589,6 +5589,7 @@ val drawablePathIconAppModeStoreState = MutableStateFlow("svg/68_0.svg")
 val drawablePathIconAppModeBuyerState = MutableStateFlow("svg/69_0.svg")
 val drawablePathIconAppModeSupplierState = MutableStateFlow("svg/70_0.svg")
 val drawablePathIconAppModeManufacturerState = MutableStateFlow("svg/71_0.svg")
+val drawablePathIconSupplierCatalogState = MutableStateFlow("svg/72_0.svg")
 val drawablePathIconWorkersState = MutableStateFlow("svg/22_0.svg")
 val drawablePathIconSuppliersState = MutableStateFlow("svg/23_0.svg")
 val drawablePathIconDebtorsState = MutableStateFlow("svg/24_0.svg")
@@ -7632,6 +7633,9 @@ fun updateDrawables(
         )
         drawablePathIconAppModeManufacturerState.emit(
             drawablePath(71L)
+        )
+        drawablePathIconSupplierCatalogState.emit(
+            drawablePath(72L)
         )
         drawablePathIconWorkersState.emit(
             drawablePath(22L)
