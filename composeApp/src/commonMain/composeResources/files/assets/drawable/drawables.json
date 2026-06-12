@@ -989,6 +989,19 @@
           "path": "svg/75_1.svg"
         }
       ]
+    },
+    {
+      "id": 76,
+      "values": [
+        {
+          "themeId": 0,
+          "path": "svg/76_0.svg"
+        },
+        {
+          "themeId": 1,
+          "path": "svg/76_1.svg"
+        }
+      ]
     }
   ]
 }

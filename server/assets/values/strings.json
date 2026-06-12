@@ -29296,6 +29296,1098 @@
           "value": "Дүкен сенімділігі карталары"
         }
       ]
+    },
+    {
+      "id": 1479,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier contracts"
+        },
+        {
+          "language": "en",
+          "value": "Supplier contracts"
+        },
+        {
+          "language": "ru",
+          "value": "Договоры с поставщиками"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші келісімшарттары"
+        }
+      ]
+    },
+    {
+      "id": 1480,
+      "values": [
+        {
+          "language": "main",
+          "value": "Contract proposal sent"
+        },
+        {
+          "language": "en",
+          "value": "Contract proposal sent"
+        },
+        {
+          "language": "ru",
+          "value": "Предложение договора отправлено"
+        },
+        {
+          "language": "kk",
+          "value": "Келісімшарт ұсынысы жіберілді"
+        }
+      ]
+    },
+    {
+      "id": 1481,
+      "values": [
+        {
+          "language": "main",
+          "value": "Contract accepted"
+        },
+        {
+          "language": "en",
+          "value": "Contract accepted"
+        },
+        {
+          "language": "ru",
+          "value": "Договор принят"
+        },
+        {
+          "language": "kk",
+          "value": "Келісімшарт қабылданды"
+        }
+      ]
+    },
+    {
+      "id": 1482,
+      "values": [
+        {
+          "language": "main",
+          "value": "Contract declined"
+        },
+        {
+          "language": "en",
+          "value": "Contract declined"
+        },
+        {
+          "language": "ru",
+          "value": "Договор отклонён"
+        },
+        {
+          "language": "kk",
+          "value": "Келісімшарт қабылданбады"
+        }
+      ]
+    },
+    {
+      "id": 1483,
+      "values": [
+        {
+          "language": "main",
+          "value": "Contract archived"
+        },
+        {
+          "language": "en",
+          "value": "Contract archived"
+        },
+        {
+          "language": "ru",
+          "value": "Договор помещён в архив"
+        },
+        {
+          "language": "kk",
+          "value": "Келісімшарт мұрағатталды"
+        }
+      ]
+    },
+    {
+      "id": 1484,
+      "values": [
+        {
+          "language": "main",
+          "value": "Contract board"
+        },
+        {
+          "language": "en",
+          "value": "Contract board"
+        },
+        {
+          "language": "ru",
+          "value": "Доска договоров"
+        },
+        {
+          "language": "kk",
+          "value": "Келісімшарт тақтасы"
+        }
+      ]
+    },
+    {
+      "id": 1485,
+      "values": [
+        {
+          "language": "main",
+          "value": "Negotiate price, age/time limits, margin caps, schedules, and written terms before goods start moving."
+        },
+        {
+          "language": "en",
+          "value": "Negotiate price, age/time limits, margin caps, schedules, and written terms before goods start moving."
+        },
+        {
+          "language": "ru",
+          "value": "Согласуйте цену, возрастные и временные ограничения, лимит наценки, графики и письменные условия до начала поставки."
+        },
+        {
+          "language": "kk",
+          "value": "Тауар қозғалғанға дейін баға, жас/уақыт шектеулері, үстеме шегі, кестелер және жазбаша шарттарды келісіңіз."
+        }
+      ]
+    },
+    {
+      "id": 1486,
+      "values": [
+        {
+          "language": "main",
+          "value": "Pending store"
+        },
+        {
+          "language": "en",
+          "value": "Pending store"
+        },
+        {
+          "language": "ru",
+          "value": "Ждёт магазин"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкенді күтуде"
+        }
+      ]
+    },
+    {
+      "id": 1487,
+      "values": [
+        {
+          "language": "main",
+          "value": "Pending supplier"
+        },
+        {
+          "language": "en",
+          "value": "Pending supplier"
+        },
+        {
+          "language": "ru",
+          "value": "Ждёт поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізушіні күтуде"
+        }
+      ]
+    },
+    {
+      "id": 1488,
+      "values": [
+        {
+          "language": "main",
+          "value": "Active contract"
+        },
+        {
+          "language": "en",
+          "value": "Active contract"
+        },
+        {
+          "language": "ru",
+          "value": "Активный договор"
+        },
+        {
+          "language": "kk",
+          "value": "Белсенді келісімшарт"
+        }
+      ]
+    },
+    {
+      "id": 1489,
+      "values": [
+        {
+          "language": "main",
+          "value": "Declined"
+        },
+        {
+          "language": "en",
+          "value": "Declined"
+        },
+        {
+          "language": "ru",
+          "value": "Отклонён"
+        },
+        {
+          "language": "kk",
+          "value": "Қабылданбады"
+        }
+      ]
+    },
+    {
+      "id": 1490,
+      "values": [
+        {
+          "language": "main",
+          "value": "Archived"
+        },
+        {
+          "language": "en",
+          "value": "Archived"
+        },
+        {
+          "language": "ru",
+          "value": "Архив"
+        },
+        {
+          "language": "kk",
+          "value": "Мұрағат"
+        }
+      ]
+    },
+    {
+      "id": 1491,
+      "values": [
+        {
+          "language": "main",
+          "value": "Partnership-wide"
+        },
+        {
+          "language": "en",
+          "value": "Partnership-wide"
+        },
+        {
+          "language": "ru",
+          "value": "На всё партнёрство"
+        },
+        {
+          "language": "kk",
+          "value": "Бүкіл серіктестікке"
+        }
+      ]
+    },
+    {
+      "id": 1492,
+      "values": [
+        {
+          "language": "main",
+          "value": "Goods item"
+        },
+        {
+          "language": "en",
+          "value": "Goods item"
+        },
+        {
+          "language": "ru",
+          "value": "Товар"
+        },
+        {
+          "language": "kk",
+          "value": "Тауар"
+        }
+      ]
+    },
+    {
+      "id": 1493,
+      "values": [
+        {
+          "language": "main",
+          "value": "Goods group"
+        },
+        {
+          "language": "en",
+          "value": "Goods group"
+        },
+        {
+          "language": "ru",
+          "value": "Группа товаров"
+        },
+        {
+          "language": "kk",
+          "value": "Тауарлар тобы"
+        }
+      ]
+    },
+    {
+      "id": 1494,
+      "values": [
+        {
+          "language": "main",
+          "value": "Create contract"
+        },
+        {
+          "language": "en",
+          "value": "Create contract"
+        },
+        {
+          "language": "ru",
+          "value": "Создать договор"
+        },
+        {
+          "language": "kk",
+          "value": "Келісімшарт жасау"
+        }
+      ]
+    },
+    {
+      "id": 1495,
+      "values": [
+        {
+          "language": "main",
+          "value": "Counter / edit proposal"
+        },
+        {
+          "language": "en",
+          "value": "Counter / edit proposal"
+        },
+        {
+          "language": "ru",
+          "value": "Встречное предложение / правка"
+        },
+        {
+          "language": "kk",
+          "value": "Қарсы ұсыныс / түзету"
+        }
+      ]
+    },
+    {
+      "id": 1496,
+      "values": [
+        {
+          "language": "main",
+          "value": "Accept contract"
+        },
+        {
+          "language": "en",
+          "value": "Accept contract"
+        },
+        {
+          "language": "ru",
+          "value": "Принять договор"
+        },
+        {
+          "language": "kk",
+          "value": "Келісімшартты қабылдау"
+        }
+      ]
+    },
+    {
+      "id": 1497,
+      "values": [
+        {
+          "language": "main",
+          "value": "Decline contract"
+        },
+        {
+          "language": "en",
+          "value": "Decline contract"
+        },
+        {
+          "language": "ru",
+          "value": "Отклонить договор"
+        },
+        {
+          "language": "kk",
+          "value": "Келісімшарттан бас тарту"
+        }
+      ]
+    },
+    {
+      "id": 1498,
+      "values": [
+        {
+          "language": "main",
+          "value": "Archive contract"
+        },
+        {
+          "language": "en",
+          "value": "Archive contract"
+        },
+        {
+          "language": "ru",
+          "value": "В архив"
+        },
+        {
+          "language": "kk",
+          "value": "Мұрағатқа"
+        }
+      ]
+    },
+    {
+      "id": 1499,
+      "values": [
+        {
+          "language": "main",
+          "value": "Margin limit"
+        },
+        {
+          "language": "en",
+          "value": "Margin limit"
+        },
+        {
+          "language": "ru",
+          "value": "Лимит наценки"
+        },
+        {
+          "language": "kk",
+          "value": "Үстеме шегі"
+        }
+      ]
+    },
+    {
+      "id": 1500,
+      "values": [
+        {
+          "language": "main",
+          "value": "Added margin limit"
+        },
+        {
+          "language": "en",
+          "value": "Added margin limit"
+        },
+        {
+          "language": "ru",
+          "value": "Добавлен лимит наценки"
+        },
+        {
+          "language": "kk",
+          "value": "Үстеме шегі қосылды"
+        }
+      ]
+    },
+    {
+      "id": 1501,
+      "values": [
+        {
+          "language": "main",
+          "value": "Maximum added margin, %"
+        },
+        {
+          "language": "en",
+          "value": "Maximum added margin, %"
+        },
+        {
+          "language": "ru",
+          "value": "Максимальная наценка, %"
+        },
+        {
+          "language": "kk",
+          "value": "Максималды үстеме, %"
+        }
+      ]
+    },
+    {
+      "id": 1502,
+      "values": [
+        {
+          "language": "main",
+          "value": "Store may add no more than"
+        },
+        {
+          "language": "en",
+          "value": "Store may add no more than"
+        },
+        {
+          "language": "ru",
+          "value": "Магазин может добавить не больше"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен артық қоса алмайды"
+        }
+      ]
+    },
+    {
+      "id": 1503,
+      "values": [
+        {
+          "language": "main",
+          "value": "Contract terms"
+        },
+        {
+          "language": "en",
+          "value": "Contract terms"
+        },
+        {
+          "language": "ru",
+          "value": "Условия договора"
+        },
+        {
+          "language": "kk",
+          "value": "Келісімшарт шарттары"
+        }
+      ]
+    },
+    {
+      "id": 1504,
+      "values": [
+        {
+          "language": "main",
+          "value": "Delivery schedule"
+        },
+        {
+          "language": "en",
+          "value": "Delivery schedule"
+        },
+        {
+          "language": "ru",
+          "value": "График поставок"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізу кестесі"
+        }
+      ]
+    },
+    {
+      "id": 1505,
+      "values": [
+        {
+          "language": "main",
+          "value": "Payment schedule"
+        },
+        {
+          "language": "en",
+          "value": "Payment schedule"
+        },
+        {
+          "language": "ru",
+          "value": "График оплаты"
+        },
+        {
+          "language": "kk",
+          "value": "Төлем кестесі"
+        }
+      ]
+    },
+    {
+      "id": 1506,
+      "values": [
+        {
+          "language": "main",
+          "value": "Price lines"
+        },
+        {
+          "language": "en",
+          "value": "Price lines"
+        },
+        {
+          "language": "ru",
+          "value": "Ценовые строки"
+        },
+        {
+          "language": "kk",
+          "value": "Баға жолдары"
+        }
+      ]
+    },
+    {
+      "id": 1507,
+      "values": [
+        {
+          "language": "main",
+          "value": "Contract scope"
+        },
+        {
+          "language": "en",
+          "value": "Contract scope"
+        },
+        {
+          "language": "ru",
+          "value": "Область договора"
+        },
+        {
+          "language": "kk",
+          "value": "Келісімшарт аясы"
+        }
+      ]
+    },
+    {
+      "id": 1508,
+      "values": [
+        {
+          "language": "main",
+          "value": "Select partner store"
+        },
+        {
+          "language": "en",
+          "value": "Select partner store"
+        },
+        {
+          "language": "ru",
+          "value": "Выберите магазин-партнёра"
+        },
+        {
+          "language": "kk",
+          "value": "Серіктес дүкенді таңдаңыз"
+        }
+      ]
+    },
+    {
+      "id": 1509,
+      "values": [
+        {
+          "language": "main",
+          "value": "Select supplier"
+        },
+        {
+          "language": "en",
+          "value": "Select supplier"
+        },
+        {
+          "language": "ru",
+          "value": "Выберите поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізушіні таңдаңыз"
+        }
+      ]
+    },
+    {
+      "id": 1510,
+      "values": [
+        {
+          "language": "main",
+          "value": "Select goods"
+        },
+        {
+          "language": "en",
+          "value": "Select goods"
+        },
+        {
+          "language": "ru",
+          "value": "Выберите товары"
+        },
+        {
+          "language": "kk",
+          "value": "Тауарларды таңдаңыз"
+        }
+      ]
+    },
+    {
+      "id": 1511,
+      "values": [
+        {
+          "language": "main",
+          "value": "No contracts yet"
+        },
+        {
+          "language": "en",
+          "value": "No contracts yet"
+        },
+        {
+          "language": "ru",
+          "value": "Договоров пока нет"
+        },
+        {
+          "language": "kk",
+          "value": "Әзірге келісімшарт жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1512,
+      "values": [
+        {
+          "language": "main",
+          "value": "Both sides must accept the same revision before supply is unlocked."
+        },
+        {
+          "language": "en",
+          "value": "Both sides must accept the same revision before supply is unlocked."
+        },
+        {
+          "language": "ru",
+          "value": "Обе стороны должны принять одну и ту же редакцию, прежде чем поставка будет разрешена."
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізу ашылуы үшін екі тарап бірдей нұсқаны қабылдауы керек."
+        }
+      ]
+    },
+    {
+      "id": 1513,
+      "values": [
+        {
+          "language": "main",
+          "value": "Pending contract not accepted yet"
+        },
+        {
+          "language": "en",
+          "value": "Pending contract not accepted yet"
+        },
+        {
+          "language": "ru",
+          "value": "Ожидающий договор ещё не принят"
+        },
+        {
+          "language": "kk",
+          "value": "Күтіп тұрған келісім әлі қабылданбады"
+        }
+      ]
+    },
+    {
+      "id": 1514,
+      "values": [
+        {
+          "language": "main",
+          "value": "Contracts protect age/time/margin rules before goods start moving."
+        },
+        {
+          "language": "en",
+          "value": "Contracts protect age/time/margin rules before goods start moving."
+        },
+        {
+          "language": "ru",
+          "value": "Договоры защищают правила возраста, времени и наценки до движения товара."
+        },
+        {
+          "language": "kk",
+          "value": "Келісімшарттар тауар қозғалысына дейін жас, уақыт және үстеме ережелерін қорғайды."
+        }
+      ]
+    },
+    {
+      "id": 1515,
+      "values": [
+        {
+          "language": "main",
+          "value": "Save and send proposal"
+        },
+        {
+          "language": "en",
+          "value": "Save and send proposal"
+        },
+        {
+          "language": "ru",
+          "value": "Сохранить и отправить предложение"
+        },
+        {
+          "language": "kk",
+          "value": "Сақтап, ұсынысты жіберу"
+        }
+      ]
+    },
+    {
+      "id": 1516,
+      "values": [
+        {
+          "language": "main",
+          "value": "Store requirements / supplier terms"
+        },
+        {
+          "language": "en",
+          "value": "Store requirements / supplier terms"
+        },
+        {
+          "language": "ru",
+          "value": "Требования магазина / условия поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен талаптары / жеткізуші шарттары"
+        }
+      ]
+    },
+    {
+      "id": 1517,
+      "values": [
+        {
+          "language": "main",
+          "value": "People talk on WhatsApp, but the final accepted terms should live here as a clean partnership document."
+        },
+        {
+          "language": "en",
+          "value": "People talk on WhatsApp, but the final accepted terms should live here as a clean partnership document."
+        },
+        {
+          "language": "ru",
+          "value": "Люди могут обсуждать в WhatsApp, но финальные принятые условия должны жить здесь как аккуратный документ партнёрства."
+        },
+        {
+          "language": "kk",
+          "value": "Адамдар WhatsApp-та сөйлесе алады, бірақ соңғы қабылданған шарттар мұнда таза серіктестік құжаты ретінде сақталуы керек."
+        }
+      ]
+    },
+    {
+      "id": 1518,
+      "values": [
+        {
+          "language": "main",
+          "value": "Contract guardrails"
+        },
+        {
+          "language": "en",
+          "value": "Contract guardrails"
+        },
+        {
+          "language": "ru",
+          "value": "Договорные ограждения"
+        },
+        {
+          "language": "kk",
+          "value": "Келісімшарт қоршаулары"
+        }
+      ]
+    },
+    {
+      "id": 1519,
+      "values": [
+        {
+          "language": "main",
+          "value": "Attach age/time/margin/price/schedule rules to one item, a goods group, or the whole partnership."
+        },
+        {
+          "language": "en",
+          "value": "Attach age/time/margin/price/schedule rules to one item, a goods group, or the whole partnership."
+        },
+        {
+          "language": "ru",
+          "value": "Привязывайте возраст, время, наценку, цену и график к одному товару, группе товаров или всему партнёрству."
+        },
+        {
+          "language": "kk",
+          "value": "Жас, уақыт, үстеме, баға және кесте ережелерін бір тауарға, топқа немесе бүкіл серіктестікке бекітіңіз."
+        }
+      ]
+    },
+    {
+      "id": 1520,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open supplier contracts"
+        },
+        {
+          "language": "en",
+          "value": "Open supplier contracts"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть договоры поставщиков"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші келісімшарттарын ашу"
+        }
+      ]
+    },
+    {
+      "id": 1521,
+      "values": [
+        {
+          "language": "main",
+          "value": "New proposal"
+        },
+        {
+          "language": "en",
+          "value": "New proposal"
+        },
+        {
+          "language": "ru",
+          "value": "Новое предложение"
+        },
+        {
+          "language": "kk",
+          "value": "Жаңа ұсыныс"
+        }
+      ]
+    },
+    {
+      "id": 1522,
+      "values": [
+        {
+          "language": "main",
+          "value": "Proposal title"
+        },
+        {
+          "language": "en",
+          "value": "Proposal title"
+        },
+        {
+          "language": "ru",
+          "value": "Название предложения"
+        },
+        {
+          "language": "kk",
+          "value": "Ұсыныс атауы"
+        }
+      ]
+    },
+    {
+      "id": 1523,
+      "values": [
+        {
+          "language": "main",
+          "value": "Short summary"
+        },
+        {
+          "language": "en",
+          "value": "Short summary"
+        },
+        {
+          "language": "ru",
+          "value": "Краткое описание"
+        },
+        {
+          "language": "kk",
+          "value": "Қысқаша сипаттама"
+        }
+      ]
+    },
+    {
+      "id": 1524,
+      "values": [
+        {
+          "language": "main",
+          "value": "Custom written terms"
+        },
+        {
+          "language": "en",
+          "value": "Custom written terms"
+        },
+        {
+          "language": "ru",
+          "value": "Произвольные письменные условия"
+        },
+        {
+          "language": "kk",
+          "value": "Еркін жазбаша шарттар"
+        }
+      ]
+    },
+    {
+      "id": 1525,
+      "values": [
+        {
+          "language": "main",
+          "value": "Terms accepted by both sides"
+        },
+        {
+          "language": "en",
+          "value": "Terms accepted by both sides"
+        },
+        {
+          "language": "ru",
+          "value": "Условия приняты обеими сторонами"
+        },
+        {
+          "language": "kk",
+          "value": "Шарттарды екі тарап қабылдады"
+        }
+      ]
+    },
+    {
+      "id": 1526,
+      "values": [
+        {
+          "language": "main",
+          "value": "Waiting for your acceptance"
+        },
+        {
+          "language": "en",
+          "value": "Waiting for your acceptance"
+        },
+        {
+          "language": "ru",
+          "value": "Ждёт вашего принятия"
+        },
+        {
+          "language": "kk",
+          "value": "Сіздің қабылдауыңызды күтуде"
+        }
+      ]
+    },
+    {
+      "id": 1527,
+      "values": [
+        {
+          "language": "main",
+          "value": "Waiting for the other side"
+        },
+        {
+          "language": "en",
+          "value": "Waiting for the other side"
+        },
+        {
+          "language": "ru",
+          "value": "Ждёт другую сторону"
+        },
+        {
+          "language": "kk",
+          "value": "Екінші тарапты күтуде"
+        }
+      ]
+    },
+    {
+      "id": 1528,
+      "values": [
+        {
+          "language": "main",
+          "value": "This contract blocks supply until accepted"
+        },
+        {
+          "language": "en",
+          "value": "This contract blocks supply until accepted"
+        },
+        {
+          "language": "ru",
+          "value": "Этот договор блокирует поставку до принятия"
+        },
+        {
+          "language": "kk",
+          "value": "Бұл келісімшарт қабылданғанша жеткізуді бұғаттайды"
+        }
+      ]
+    },
+    {
+      "id": 1529,
+      "values": [
+        {
+          "language": "main",
+          "value": "Selected goods receive copied price/schedule terms from real order demand."
+        },
+        {
+          "language": "en",
+          "value": "Selected goods receive copied price/schedule terms from real order demand."
+        },
+        {
+          "language": "ru",
+          "value": "Для выбранных товаров создаются ценовые и графиковые строки из реального спроса заказов."
+        },
+        {
+          "language": "kk",
+          "value": "Таңдалған тауарларға нақты тапсырыс сұранысынан баға мен кесте жолдары көшіріледі."
+        }
+      ]
+    },
+    {
+      "id": 1530,
+      "values": [
+        {
+          "language": "main",
+          "value": "No partner store yet. Supplier orders will create partner signals automatically."
+        },
+        {
+          "language": "en",
+          "value": "No partner store yet. Supplier orders will create partner signals automatically."
+        },
+        {
+          "language": "ru",
+          "value": "Партнёрского магазина пока нет. Заказы поставщику автоматически создадут сигналы партнёров."
+        },
+        {
+          "language": "kk",
+          "value": "Әзірге серіктес дүкен жоқ. Жеткізуші тапсырыстары серіктес белгілерін автоматты жасайды."
+        }
+      ]
     }
   ]
 }

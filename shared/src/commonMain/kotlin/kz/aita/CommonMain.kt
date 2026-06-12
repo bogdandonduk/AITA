@@ -33,6 +33,10 @@ import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.concurrent.Volatile
 import kotlin.random.Random
 
@@ -445,6 +449,17 @@ enum class SupplierOrderStatusDataModel {
     IssueReported,
     Cancelled
 }
+
+const val SUPPLIER_CONTRACT_SIDE_STORE = "store"
+const val SUPPLIER_CONTRACT_SIDE_SUPPLIER = "supplier"
+const val SUPPLIER_CONTRACT_SCOPE_PARTNERSHIP = "partnership"
+const val SUPPLIER_CONTRACT_SCOPE_GOODS_ITEM = "goods_item"
+const val SUPPLIER_CONTRACT_SCOPE_GOODS_GROUP = "goods_group"
+const val SUPPLIER_CONTRACT_STATUS_PENDING_STORE = "pending_store"
+const val SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER = "pending_supplier"
+const val SUPPLIER_CONTRACT_STATUS_ACTIVE = "active"
+const val SUPPLIER_CONTRACT_STATUS_DECLINED = "declined"
+const val SUPPLIER_CONTRACT_STATUS_ARCHIVED = "archived"
 
 expect fun getCurrentTimeMillis(): Long
 
@@ -4600,6 +4615,9 @@ val supplierOrdersState =
 val supplierOrderLinesState =
     MutableDataStateFlow<List<SupplierOrderLineDataModel>>(GlobalScope)
 
+val supplierPartnershipContractsState =
+    MutableDataStateFlow<List<SupplierPartnershipContractDataModel>>(GlobalScope)
+
 private val getSupplierGoodsPricesMutex = Mutex()
 private val upsertSupplierGoodsPriceMutex = Mutex()
 
@@ -4608,6 +4626,11 @@ private val addSupplierOrderMutex = Mutex()
 private val updateSupplierOrderMutex = Mutex()
 private val deleteSupplierOrderMutex = Mutex()
 private val receiveSupplierOrderMutex = Mutex()
+private val getSupplierContractsMutex = Mutex()
+private val upsertSupplierContractMutex = Mutex()
+private val acceptSupplierContractMutex = Mutex()
+private val declineSupplierContractMutex = Mutex()
+private val archiveSupplierContractMutex = Mutex()
 
 val securitySessionsState = MutableDataStateFlow<List<SecuritySessionDataModel>>(GlobalScope)
 val securitySessionHistoryState = MutableDataStateFlow<List<SecuritySessionHistoryDataModel>>(GlobalScope)
@@ -4669,6 +4692,59 @@ fun upsertSupplierGoodsPrice(
                 }
             }
         }
+}
+
+@kotlinx.serialization.Serializable
+data class SupplierContractPriceTermDataModel(
+    val id: String = "",
+    val goodsItemId: String = "",
+    val goodsItemNameSnapshot: List<LocalizedStringDataModel> = emptyList(),
+    val supplyPrice: PriceDataModel? = null,
+    val suggestedSalePrice: PriceDataModel? = null,
+    val minOrderQuantity: QuantityDataModel? = null,
+    val packageQuantity: QuantityDataModel? = null,
+    val scheduleText: List<LocalizedStringDataModel> = emptyList(),
+    val note: List<LocalizedStringDataModel> = emptyList(),
+    val isActive: Boolean = true
+)
+
+@kotlinx.serialization.Serializable
+data class SupplierPartnershipContractDataModel(
+    val id: String = "",
+    val storeId: String = "",
+    val supplierId: String = "",
+    val authorUserId: String = "",
+    val lastEditorUserId: String = "",
+    val authorSide: String = SUPPLIER_CONTRACT_SIDE_SUPPLIER,
+    val scopeType: String = SUPPLIER_CONTRACT_SCOPE_PARTNERSHIP,
+    val goodsItemIds: List<String> = emptyList(),
+    val title: List<LocalizedStringDataModel> = emptyList(),
+    val summary: List<LocalizedStringDataModel> = emptyList(),
+    val conditions: List<String> = emptyList(),
+    val customTerms: List<LocalizedStringDataModel> = emptyList(),
+    val deliverySchedule: List<LocalizedStringDataModel> = emptyList(),
+    val paymentSchedule: List<LocalizedStringDataModel> = emptyList(),
+    val priceTerms: List<SupplierContractPriceTermDataModel> = emptyList(),
+    val status: String = SUPPLIER_CONTRACT_STATUS_PENDING_STORE,
+    val revision: Int = 1,
+    val supplierAcceptedAtMillis: Long? = null,
+    val storeAcceptedAtMillis: Long? = null,
+    val supplierAcceptedByUserId: String? = null,
+    val storeAcceptedByUserId: String? = null,
+    val declinedAtMillis: Long? = null,
+    val declinedByUserId: String? = null,
+    val storeNameSnapshot: List<LocalizedStringDataModel> = emptyList(),
+    val storePublicIdSnapshot: String = "",
+    val supplierNameSnapshot: List<LocalizedStringDataModel> = emptyList(),
+    val createdAtMillis: Long = 0L,
+    val updatedAtMillis: Long = 0L,
+    val isActive: Boolean = true
+) {
+    val isFullyAccepted: Boolean
+        get() = status == SUPPLIER_CONTRACT_STATUS_ACTIVE || (supplierAcceptedAtMillis != null && storeAcceptedAtMillis != null)
+
+    fun requiresStoreAcceptance(): Boolean = status == SUPPLIER_CONTRACT_STATUS_PENDING_STORE
+    fun requiresSupplierAcceptance(): Boolean = status == SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER
 }
 
 @kotlinx.serialization.Serializable
@@ -4913,6 +4989,156 @@ fun receiveSupplierOrder(
         }
 }
 
+
+fun getSupplierContracts(
+    storeId: String? = null,
+    supplierId: String? = null,
+    onCompleted: ((DataState<List<SupplierPartnershipContractDataModel>>) -> Unit)? = null
+) {
+    if (!getSupplierContractsMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getSupplierContractsMutex.withLock {
+                val headers = buildMap {
+                    storeId?.takeIf { it.isNotBlank() }?.let { put("store_id", it) }
+                    supplierId?.takeIf { it.isNotBlank() }?.let { put("supplier_id", it) }
+                }
+                val response = networkRequest<List<SupplierPartnershipContractDataModel>, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getSupplierContractsPath.first,
+                    headers = headers
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    supplierPartnershipContractsState.emit(DataState.Success(response.payload, response.message))
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun upsertSupplierContract(
+    contract: SupplierPartnershipContractDataModel,
+    onCompleted: ((DataState<SupplierPartnershipContractDataModel>) -> Unit)? = null
+) {
+    if (!upsertSupplierContractMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            upsertSupplierContractMutex.withLock {
+                val response = networkRequest<SupplierPartnershipContractDataModel, SupplierPartnershipContractDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.upsertSupplierContractPath.first,
+                    body = contract
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    supplierPartnershipContractsState.emit(
+                        DataState.Success(
+                            supplierPartnershipContractsState.payloadValue.orEmpty().upsertById(response.payload),
+                            response.message
+                        )
+                    )
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun acceptSupplierContract(
+    contractId: String,
+    onCompleted: ((DataState<SupplierPartnershipContractDataModel>) -> Unit)? = null
+) {
+    if (!acceptSupplierContractMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            acceptSupplierContractMutex.withLock {
+                val response = networkRequest<SupplierPartnershipContractDataModel, String>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.acceptSupplierContractPath.first,
+                    body = contractId
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    supplierPartnershipContractsState.emit(
+                        DataState.Success(
+                            supplierPartnershipContractsState.payloadValue.orEmpty().upsertById(response.payload),
+                            response.message
+                        )
+                    )
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun declineSupplierContract(
+    contractId: String,
+    onCompleted: ((DataState<SupplierPartnershipContractDataModel>) -> Unit)? = null
+) {
+    if (!declineSupplierContractMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            declineSupplierContractMutex.withLock {
+                val response = networkRequest<SupplierPartnershipContractDataModel, String>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.declineSupplierContractPath.first,
+                    body = contractId
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    supplierPartnershipContractsState.emit(
+                        DataState.Success(
+                            supplierPartnershipContractsState.payloadValue.orEmpty().upsertById(response.payload),
+                            response.message
+                        )
+                    )
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun archiveSupplierContract(
+    contractId: String,
+    onCompleted: ((DataState<String>) -> Unit)? = null
+) {
+    if (!archiveSupplierContractMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            archiveSupplierContractMutex.withLock {
+                val response = networkRequest<String, String>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.archiveSupplierContractPath.first,
+                    body = contractId
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    supplierPartnershipContractsState.emit(
+                        DataState.Success(
+                            supplierPartnershipContractsState.payloadValue.orEmpty().filterNot { it.id == response.payload },
+                            response.message
+                        )
+                    )
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
 private fun <T> List<T>.upsertById(
     item: T,
     idOf: (T) -> String = {
@@ -4920,6 +5146,7 @@ private fun <T> List<T>.upsertById(
             is SupplierGoodsPriceDataModel -> it.id
             is SupplierOrderDataModel -> it.id
             is SupplierOrderLineDataModel -> it.id
+            is SupplierPartnershipContractDataModel -> it.id
             is GoodsBatchDataModel -> it.id
             is GoodsItemDataModel -> it.id
             is TopUpPaymentIntentDataModel -> it.id
@@ -4967,7 +5194,7 @@ const val CLOUD_TRANSPORT_STATUS_UNAVAILABLE = -1
 @PublishedApi
 internal const val REALTIME_ACCESS_TOKEN_REFRESH_SKEW_MILLIS = 60_000L
 
-private const val DEFAULT_AITA_SERVER_URL = "http://192.168.1.51:8080"
+private const val DEFAULT_AITA_SERVER_URL = "http://10.202.10.147:8080"
 private val DEFAULT_AITA_SERVER_URL_PAIR = Pair(DEFAULT_AITA_SERVER_URL, "1")
 @Volatile
 private var currentNetworkRequestCandidateServerUrlsMemory: List<String> = emptyList()
@@ -5048,6 +5275,11 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
         updateSupplierOrderPath = Pair("supplierOrders/update", "36"),
         deleteSupplierOrdersPath = Pair("supplierOrders/delete", "37"),
         receiveSupplierOrderPath = Pair("supplierOrders/receive", "38"),
+        getSupplierContractsPath = Pair("supplierContracts/get", "1479"),
+        upsertSupplierContractPath = Pair("supplierContracts/upsert", "1480"),
+        acceptSupplierContractPath = Pair("supplierContracts/accept", "1481"),
+        declineSupplierContractPath = Pair("supplierContracts/decline", "1482"),
+        archiveSupplierContractPath = Pair("supplierContracts/archive", "1483"),
         getCashRegisterPath = Pair("cashRegister/get", "49"),
         extractCashRegisterPath = Pair("cashRegister/extract", "50"),
         getStoreWorkersPath = Pair("workers/store/get", "51"),
@@ -5616,9 +5848,10 @@ val drawablePathIconAppModeBuyerState = MutableStateFlow("svg/69_0.svg")
 val drawablePathIconAppModeSupplierState = MutableStateFlow("svg/70_0.svg")
 val drawablePathIconAppModeManufacturerState = MutableStateFlow("svg/71_0.svg")
 val drawablePathIconSupplierCatalogState = MutableStateFlow("svg/72_0.svg")
+val drawablePathIconSupplierContractsState = MutableStateFlow("svg/76_0.svg")
+val drawablePathIconSupplierPartnersState = MutableStateFlow("svg/75_0.svg")
 val drawablePathIconBuyerAgeRestrictionState = MutableStateFlow("svg/73_0.svg")
 val drawablePathIconTransactionTimeRestrictionState = MutableStateFlow("svg/74_0.svg")
-val drawablePathIconSupplierPartnersState = MutableStateFlow("svg/75_0.svg")
 val drawablePathIconWorkersState = MutableStateFlow("svg/22_0.svg")
 val drawablePathIconSuppliersState = MutableStateFlow("svg/23_0.svg")
 val drawablePathIconDebtorsState = MutableStateFlow("svg/24_0.svg")
@@ -7676,14 +7909,17 @@ fun updateDrawables(
         drawablePathIconSupplierCatalogState.emit(
             drawablePath(72L)
         )
+        drawablePathIconSupplierContractsState.emit(
+            drawablePath(76L)
+        )
+        drawablePathIconSupplierPartnersState.emit(
+            drawablePath(75L)
+        )
         drawablePathIconBuyerAgeRestrictionState.emit(
             drawablePath(73L)
         )
         drawablePathIconTransactionTimeRestrictionState.emit(
             drawablePath(74L)
-        )
-        drawablePathIconSupplierPartnersState.emit(
-            drawablePath(75L)
         )
         drawablePathIconWorkersState.emit(
             drawablePath(22L)
@@ -8115,8 +8351,7 @@ internal fun rawBodyLooksLikeAitaServerResponse(rawBody: String): Boolean {
 
     if (trimmed.startsWith("{") &&
         trimmed.contains("\"message\"") &&
-        trimmed.contains("\"negative\"") &&
-        trimmed.contains("\"payload\"")
+        trimmed.contains("\"negative\"")
     ) return true
 
     if (trimmed.startsWith("{") &&
@@ -8196,7 +8431,7 @@ internal fun networkTransportFailureMessage(
 )
 
 @PublishedApi
-internal fun HttpStatusCode.isAitaServerUnhealthyForClientBanner(): Boolean = value >= 500
+internal fun HttpStatusCode.isAitaServerUnhealthyForClientBanner(): Boolean = value in 502..504
 
 @PublishedApi
 internal fun <Response> ResponseDataModel<Response>.withAitaTransportFailureFromStatus(status: HttpStatusCode): ResponseDataModel<Response> =
@@ -11007,7 +11242,9 @@ private var cloudSessionRefreshRequiredForNotifications = false
 private var cloudSessionRefreshNotificationPostedForCurrentRequirement = false
 
 private const val CLOUD_TRANSPORT_FAILURE_CONFIRMATION_MIN_SIGNALS = 2
+private const val CLOUD_TRANSPORT_FAILURE_CONFIRMATION_MIN_SIGNALS_WHILE_REALTIME_CONNECTED = 4
 private const val CLOUD_TRANSPORT_FAILURE_CONFIRMATION_WINDOW_MILLIS = 7_000L
+private const val CLOUD_TRANSPORT_FAILURE_CONFIRMATION_WINDOW_WHILE_REALTIME_CONNECTED_MILLIS = 14_000L
 private const val CLOUD_TRANSPORT_FAILURE_SIGNAL_RESET_MILLIS = 20_000L
 
 @Volatile
@@ -11275,14 +11512,25 @@ private fun recordCloudTransportFailureSignalForNotifications(reason: String = "
         cloudTransportFailureSignalCount = (cloudTransportFailureSignalCount + 1).coerceAtMost(1000)
     }
 
+    val realtimeLooksHealthy = realtimeUpdatesConnectedState.value || cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_REACHABLE
+    val requiredSignals = if (realtimeLooksHealthy) {
+        CLOUD_TRANSPORT_FAILURE_CONFIRMATION_MIN_SIGNALS_WHILE_REALTIME_CONNECTED
+    } else {
+        CLOUD_TRANSPORT_FAILURE_CONFIRMATION_MIN_SIGNALS
+    }
+    val requiredWindow = if (realtimeLooksHealthy) {
+        CLOUD_TRANSPORT_FAILURE_CONFIRMATION_WINDOW_WHILE_REALTIME_CONNECTED_MILLIS
+    } else {
+        CLOUD_TRANSPORT_FAILURE_CONFIRMATION_WINDOW_MILLIS
+    }
     val elapsed = now - cloudTransportFirstFailureSignalAtMillis
-    val confirmed = cloudTransportFailureSignalCount >= CLOUD_TRANSPORT_FAILURE_CONFIRMATION_MIN_SIGNALS ||
-            elapsed >= CLOUD_TRANSPORT_FAILURE_CONFIRMATION_WINDOW_MILLIS
+    val confirmed = cloudTransportFailureSignalCount >= requiredSignals || elapsed >= requiredWindow
 
     if (!confirmed) {
         logCloudConnectionDiagnostic(
             "transport failure signal held for confirmation reason=$reason " +
-                    "signals=$cloudTransportFailureSignalCount elapsed=${elapsed}ms"
+                    "signals=$cloudTransportFailureSignalCount/$requiredSignals elapsed=${elapsed}ms/${requiredWindow}ms " +
+                    "realtime=${realtimeUpdatesConnectedState.value} status=${cloudTransportStatusName(cloudTransportStatusState.value)}"
         )
     }
 
@@ -11646,6 +11894,7 @@ private suspend fun postInAppNotificationNow(
 }
 
 private suspend fun postInAppNotificationNow(message: String, type: NotificationType, transient: Boolean = false) {
+    if (message.trim().isBlank()) return
     pushInAppNotificationNow(createNotificationDataModel(message, type), transient)
 }
 
@@ -11660,6 +11909,7 @@ fun postInAppNotification(
 }
 
 fun postInAppNotification(message: String, type: NotificationType, transient: Boolean = false) {
+    if (message.trim().isBlank()) return
     pushInAppNotification(createNotificationDataModel(message, type), transient)
 }
 
@@ -13069,18 +13319,63 @@ internal inline fun <reified Response> decodeNetworkResponseDataModel(
     rawBody: String,
     status: HttpStatusCode
 ): ResponseDataModel<Response> {
-    if (!status.isSuccess() && (rawBody.isBlank() || status.value >= 500 || !rawBodyLooksLikeJson(rawBody))) {
+    if (!status.isSuccess() && (rawBody.isBlank() || (!rawBodyLooksLikeAitaServerResponse(rawBody) && (status.value >= 500 || !rawBodyLooksLikeJson(rawBody))))) {
         return genericHttpErrorNetworkResponseDataModel(status)
     }
 
-    val genericEnvelope: ResponseDataModel<Response>? = runCatching<ResponseDataModel<Response>> {
-        jsonBase.decodeFromString<GenericResponseDataModel>(rawBody).toResponseDataModel<Response>()
+    val lenientEnvelopeObject = runCatching { jsonBase.decodeFromString<kotlinx.serialization.json.JsonElement>(rawBody).jsonObject }.getOrNull()
+    if (lenientEnvelopeObject != null &&
+        lenientEnvelopeObject.containsKey("message") &&
+        lenientEnvelopeObject.containsKey("negative")
+    ) {
+        val messageText = lenientEnvelopeObject["message"]?.let { element ->
+            runCatching { element.jsonPrimitive.contentOrNull }.getOrNull()
+                ?: element.toString().takeIf { it != "null" }
+        }
+        val message = messageText?.takeIf { it.isNotBlank() }?.let { text ->
+            runCatching { jsonBase.decodeFromString<List<LocalizedStringDataModel>>(text) }.getOrNull()
+        }
+        val payloadText = lenientEnvelopeObject["payload"]?.let { element ->
+            runCatching { element.jsonPrimitive.contentOrNull }.getOrNull()
+                ?: element.toString().takeIf { it != "null" }
+        }
+        val payload = payloadText?.let { text ->
+            runCatching { jsonBase.decodeFromString<Response>(text) }.getOrNull()
+        }
+        val payloadUnreadable = payloadText != null && payload == null
+        val negative = lenientEnvelopeObject["negative"]
+            ?.let { runCatching { it.jsonPrimitive.booleanOrNull }.getOrNull() }
+            ?: !status.isSuccess()
+        val envelopeTransportFailure = lenientEnvelopeObject["transportFailure"]
+            ?.let { runCatching { it.jsonPrimitive.booleanOrNull }.getOrNull() }
+            ?: false
+
+        return ResponseDataModel(
+            message = if (payloadUnreadable && message == null) unreadableNetworkResponseDataModel<Response>(status, rawBody).message else message,
+            payload = payload,
+            negative = negative || payloadUnreadable || !status.isSuccess(),
+            httpStatusCode = status.value,
+            transportFailure = envelopeTransportFailure || status.isAitaServerUnhealthyForClientBanner()
+        )
+    }
+
+    val genericResponse = runCatching {
+        jsonBase.decodeFromString<GenericResponseDataModel>(rawBody)
     }.getOrNull()
 
-    if (genericEnvelope != null) {
-        return genericEnvelope.copy(
+    if (genericResponse != null) {
+        val message = runCatching { genericResponse.getMessage() }.getOrNull()
+        val payload = genericResponse.payload?.let { payloadText ->
+            runCatching { jsonBase.decodeFromString<Response>(payloadText) }.getOrNull()
+        }
+        val payloadUnreadable = genericResponse.payload != null && payload == null
+
+        return ResponseDataModel(
+            message = if (payloadUnreadable && message == null) unreadableNetworkResponseDataModel<Response>(status, rawBody).message else message,
+            payload = payload,
+            negative = genericResponse.negative || payloadUnreadable || !status.isSuccess(),
             httpStatusCode = status.value,
-            transportFailure = genericEnvelope.transportFailure || status.isAitaServerUnhealthyForClientBanner()
+            transportFailure = status.isAitaServerUnhealthyForClientBanner()
         )
     }
 
@@ -13117,9 +13412,9 @@ internal fun <Response> genericHttpErrorNetworkResponseDataModel(status: HttpSta
     val message = when (status.value) {
         in 500..599 -> localizedStringResourceMessage(
             id = 223,
-            main = "Server is unavailable or returned an internal error. Please try again after the server is restarted.",
-            ru = "Сервер недоступен или вернул внутреннюю ошибку. Попробуйте снова после перезапуска сервера.",
-            kk = "Сервер қолжетімсіз немесе ішкі қате қайтарды. Сервер қайта іске қосылғаннан кейін қайталап көріңіз."
+            main = "Server returned an internal request error. The server is reachable; try again after the failed action is fixed.",
+            ru = "Сервер вернул внутреннюю ошибку запроса. Сервер доступен; попробуйте снова после исправления действия.",
+            kk = "Сервер сұраудың ішкі қатесін қайтарды. Сервер қолжетімді; әрекет түзетілген соң қайталап көріңіз."
         )
         else -> localizedStringResourceMessage(
             id = 223,
@@ -13134,7 +13429,7 @@ internal fun <Response> genericHttpErrorNetworkResponseDataModel(status: HttpSta
         payload = null,
         negative = true,
         httpStatusCode = status.value,
-        transportFailure = status.value >= 500
+        transportFailure = status.isAitaServerUnhealthyForClientBanner()
     )
 }
 
@@ -13174,7 +13469,7 @@ internal fun <Response> unreadableNetworkResponseDataModel(
         payload = null,
         negative = true,
         httpStatusCode = status.value,
-        transportFailure = status.value >= 500
+        transportFailure = status.isAitaServerUnhealthyForClientBanner()
     )
 }
 
@@ -13806,8 +14101,11 @@ fun getStockBatches(storeId: String) {
                     headers = mapOf("store_id" to storeId)
                 )
 
-                if (!response.negative)
-                    stockBatchesState.emit(DataState.Success(response.payload!!, response.message))
+                if (!response.negative) {
+                    response.payload?.let { batches ->
+                        stockBatchesState.emit(DataState.Success(batches, response.message))
+                    }
+                }
             }
         }
 }
@@ -14898,9 +15196,9 @@ data class GenericGoodsItemDataModel(
 
 @kotlinx.serialization.Serializable
 data class GenericResponseDataModel(
-    val message: String?,
-    val payload: String?,
-    val negative: Boolean
+    val message: String? = null,
+    val payload: String? = null,
+    val negative: Boolean = true
 ) {
 
     fun getMessage(): List<LocalizedStringDataModel>? {
@@ -14984,6 +15282,11 @@ data class GlobalAppConfigurationDataModel(
     val updateSupplierOrderPath: Pair<String, String> = Pair("supplierOrders/update", "36"),
     val deleteSupplierOrdersPath: Pair<String, String> = Pair("supplierOrders/delete", "37"),
     val receiveSupplierOrderPath: Pair<String, String> = Pair("supplierOrders/receive", "38"),
+    val getSupplierContractsPath: Pair<String, String> = Pair("supplierContracts/get", "1479"),
+    val upsertSupplierContractPath: Pair<String, String> = Pair("supplierContracts/upsert", "1480"),
+    val acceptSupplierContractPath: Pair<String, String> = Pair("supplierContracts/accept", "1481"),
+    val declineSupplierContractPath: Pair<String, String> = Pair("supplierContracts/decline", "1482"),
+    val archiveSupplierContractPath: Pair<String, String> = Pair("supplierContracts/archive", "1483"),
     val getCashRegisterPath: Pair<String, String> = Pair("cashRegister/get", "49"),
     val extractCashRegisterPath: Pair<String, String> = Pair("cashRegister/extract", "50"),
     val getStoreWorkersPath: Pair<String, String> = Pair("workers/store/get", "51"),

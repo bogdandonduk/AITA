@@ -1,3 +1,4 @@
+// THIS IS CommonMainCompose.kt - in commonMain shared module of kmp compose app
 @file:OptIn(ExperimentalTime::class, ExperimentalFoundationApi::class)
 package kz.aita
 
@@ -894,6 +895,58 @@ private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallb
     put(1476L, mapOf("main" to "Regular partner", "en" to "Regular partner", "ru" to "Постоянный партнёр", "kk" to "Тұрақты серіктес"))
     put(1477L, mapOf("main" to "Returning partner", "en" to "Returning partner", "ru" to "Возвращающийся партнёр", "kk" to "Қайта келген серіктес"))
     put(1478L, mapOf("main" to "Store reliability scorecards", "en" to "Store reliability scorecards", "ru" to "Карточки надёжности магазинов", "kk" to "Дүкен сенімділігі карталары"))
+    put(1479L, mapOf("main" to "Supplier contracts", "en" to "Supplier contracts", "ru" to "Договоры с поставщиками", "kk" to "Жеткізуші келісімдері"))
+    put(1480L, mapOf("main" to "Contract proposal sent", "en" to "Contract proposal sent", "ru" to "Предложение договора отправлено", "kk" to "Келісім ұсынысы жіберілді"))
+    put(1481L, mapOf("main" to "Contract accepted", "en" to "Contract accepted", "ru" to "Договор принят", "kk" to "Келісім қабылданды"))
+    put(1482L, mapOf("main" to "Contract declined", "en" to "Contract declined", "ru" to "Договор отклонён", "kk" to "Келісім қабылданбады"))
+    put(1483L, mapOf("main" to "Contract archived", "en" to "Contract archived", "ru" to "Договор отправлен в архив", "kk" to "Келісім архивтелді"))
+    put(1484L, mapOf("main" to "Contract board", "en" to "Contract board", "ru" to "Панель договоров", "kk" to "Келісімдер панелі"))
+    put(1485L, mapOf("main" to "One negotiated document per supplier/store relationship. Supplier proposes terms, store can counter, and supply is unlocked only after both sides accept.", "en" to "One negotiated document per supplier/store relationship. Supplier proposes terms, store can counter, and supply is unlocked only after both sides accept.", "ru" to "Один согласованный документ на отношения поставщик–магазин. Поставщик предлагает условия, магазин может ответить встречными, а поставка открывается только после принятия обеими сторонами.", "kk" to "Жеткізуші мен дүкен қатынасына бір келісілген құжат. Жеткізуші шарт ұсынады, дүкен қарсы талап қоса алады, ал жеткізу екі жақ қабылдағанда ғана ашылады."))
+    put(1486L, mapOf("main" to "Pending store", "en" to "Pending store", "ru" to "Ждёт магазин", "kk" to "Дүкенді күтеді"))
+    put(1487L, mapOf("main" to "Pending supplier", "en" to "Pending supplier", "ru" to "Ждёт поставщика", "kk" to "Жеткізушіні күтеді"))
+    put(1488L, mapOf("main" to "Active contract", "en" to "Active contract", "ru" to "Активный договор", "kk" to "Белсенді келісім"))
+    put(1489L, mapOf("main" to "Declined", "en" to "Declined", "ru" to "Отклонён", "kk" to "Бас тартылды"))
+    put(1490L, mapOf("main" to "Archived", "en" to "Archived", "ru" to "Архив", "kk" to "Архив"))
+    put(1491L, mapOf("main" to "Partnership-wide", "en" to "Partnership-wide", "ru" to "На всё партнёрство", "kk" to "Бүкіл серіктестікке"))
+    put(1492L, mapOf("main" to "Goods item", "en" to "Goods item", "ru" to "Один товар", "kk" to "Бір тауар"))
+    put(1493L, mapOf("main" to "Goods group", "en" to "Goods group", "ru" to "Группа товаров", "kk" to "Тауарлар тобы"))
+    put(1494L, mapOf("main" to "Create contract", "en" to "Create contract", "ru" to "Создать договор", "kk" to "Келісім жасау"))
+    put(1495L, mapOf("main" to "Counter / edit proposal", "en" to "Counter / edit proposal", "ru" to "Изменить / встречное предложение", "kk" to "Өзгерту / қарсы ұсыныс"))
+    put(1496L, mapOf("main" to "Accept contract", "en" to "Accept contract", "ru" to "Принять договор", "kk" to "Келісімді қабылдау"))
+    put(1497L, mapOf("main" to "Decline contract", "en" to "Decline contract", "ru" to "Отклонить договор", "kk" to "Келісімнен бас тарту"))
+    put(1498L, mapOf("main" to "Archive contract", "en" to "Archive contract", "ru" to "Архивировать договор", "kk" to "Келісімді архивтеу"))
+    put(1499L, mapOf("main" to "Margin limit", "en" to "Margin limit", "ru" to "Лимит наценки", "kk" to "Үстеме шегі"))
+    put(1500L, mapOf("main" to "Added margin limit", "en" to "Added margin limit", "ru" to "Ограничение добавленной наценки", "kk" to "Қосылған үстеме шегі"))
+    put(1501L, mapOf("main" to "Maximum added margin, %", "en" to "Maximum added margin, %", "ru" to "Максимальная добавленная наценка, %", "kk" to "Максималды қосылған үстеме, %"))
+    put(1502L, mapOf("main" to "Store may add no more than", "en" to "Store may add no more than", "ru" to "Магазин может добавить не больше", "kk" to "Дүкен қоса алатын ең көбі"))
+    put(1503L, mapOf("main" to "Contract terms", "en" to "Contract terms", "ru" to "Условия договора", "kk" to "Келісім шарттары"))
+    put(1504L, mapOf("main" to "Delivery schedule", "en" to "Delivery schedule", "ru" to "График поставки", "kk" to "Жеткізу кестесі"))
+    put(1505L, mapOf("main" to "Payment schedule", "en" to "Payment schedule", "ru" to "График оплаты", "kk" to "Төлем кестесі"))
+    put(1506L, mapOf("main" to "Price lines", "en" to "Price lines", "ru" to "Ценовые строки", "kk" to "Баға жолдары"))
+    put(1507L, mapOf("main" to "Contract scope", "en" to "Contract scope", "ru" to "Область договора", "kk" to "Келісім ауқымы"))
+    put(1508L, mapOf("main" to "Select partner store", "en" to "Select partner store", "ru" to "Выберите магазин-партнёр", "kk" to "Серіктес дүкенді таңдаңыз"))
+    put(1509L, mapOf("main" to "Select supplier", "en" to "Select supplier", "ru" to "Выберите поставщика", "kk" to "Жеткізушіні таңдаңыз"))
+    put(1510L, mapOf("main" to "Select goods", "en" to "Select goods", "ru" to "Выберите товары", "kk" to "Тауарларды таңдаңыз"))
+    put(1511L, mapOf("main" to "No contracts yet", "en" to "No contracts yet", "ru" to "Договоров пока нет", "kk" to "Әзірге келісім жоқ"))
+    put(1512L, mapOf("main" to "Both sides must accept the same revision before supply is unlocked.", "en" to "Both sides must accept the same revision before supply is unlocked.", "ru" to "Обе стороны должны принять одну и ту же редакцию, прежде чем поставка откроется.", "kk" to "Жеткізу ашылуы үшін екі жақ бір редакцияны қабылдауы керек."))
+    put(1513L, mapOf("main" to "Pending contract not accepted yet", "en" to "Pending contract not accepted yet", "ru" to "Ожидающий договор ещё не принят", "kk" to "Күтіп тұрған келісім әлі қабылданбады"))
+    put(1514L, mapOf("main" to "Contracts protect age/time/margin rules before goods start moving.", "en" to "Contracts protect age/time/margin rules before goods start moving.", "ru" to "Договоры защищают правила возраста, времени и наценки до движения товара.", "kk" to "Келісімдер тауар қозғалғанға дейін жас, уақыт және үстеме ережелерін қорғайды."))
+    put(1515L, mapOf("main" to "Save and send proposal", "en" to "Save and send proposal", "ru" to "Сохранить и отправить предложение", "kk" to "Сақтап, ұсыныс жіберу"))
+    put(1516L, mapOf("main" to "Store requirements / supplier terms", "en" to "Store requirements / supplier terms", "ru" to "Требования магазина / условия поставщика", "kk" to "Дүкен талаптары / жеткізуші шарттары"))
+    put(1517L, mapOf("main" to "People talk on WhatsApp, but AITA keeps the accepted version clean and machine-readable.", "en" to "People talk on WhatsApp, but AITA keeps the accepted version clean and machine-readable.", "ru" to "Люди обсуждают в WhatsApp, а AITA хранит принятую версию чисто и машиночитаемо.", "kk" to "Адамдар WhatsApp-та сөйлеседі, ал AITA қабылданған нұсқаны таза әрі машина оқитындай сақтайды."))
+    put(1518L, mapOf("main" to "Contract guardrails", "en" to "Contract guardrails", "ru" to "Договорные защитные правила", "kk" to "Келісім қорғаныс ережелері"))
+    put(1519L, mapOf("main" to "Attach age, time, margin, price and schedule rules to a partner, a goods group, or one item before supply starts.", "en" to "Attach age, time, margin, price and schedule rules to a partner, a goods group, or one item before supply starts.", "ru" to "Прикрепляйте правила возраста, времени, наценки, цен и графиков к партнёру, группе товаров или одному товару до начала поставок.", "kk" to "Жеткізу басталғанға дейін жас, уақыт, үстеме, баға және кесте ережелерін серіктеске, тауар тобына немесе бір тауарға бекітіңіз."))
+    put(1520L, mapOf("main" to "Open supplier contracts", "en" to "Open supplier contracts", "ru" to "Открыть договоры", "kk" to "Келісімдерді ашу"))
+    put(1521L, mapOf("main" to "New proposal", "en" to "New proposal", "ru" to "Новое предложение", "kk" to "Жаңа ұсыныс"))
+    put(1522L, mapOf("main" to "Proposal title", "en" to "Proposal title", "ru" to "Название предложения", "kk" to "Ұсыныс атауы"))
+    put(1523L, mapOf("main" to "Short summary", "en" to "Short summary", "ru" to "Краткое описание", "kk" to "Қысқаша сипаттама"))
+    put(1524L, mapOf("main" to "Custom written terms", "en" to "Custom written terms", "ru" to "Свободные текстовые условия", "kk" to "Еркін жазылған шарттар"))
+    put(1525L, mapOf("main" to "Terms accepted by both sides", "en" to "Terms accepted by both sides", "ru" to "Условия приняты обеими сторонами", "kk" to "Шарттарды екі жақ қабылдады"))
+    put(1526L, mapOf("main" to "Waiting for your acceptance", "en" to "Waiting for your acceptance", "ru" to "Ждёт вашего принятия", "kk" to "Сіздің қабылдауыңызды күтеді"))
+    put(1527L, mapOf("main" to "Waiting for the other side", "en" to "Waiting for the other side", "ru" to "Ждёт другую сторону", "kk" to "Екінші тарапты күтеді"))
+    put(1528L, mapOf("main" to "This contract blocks supply until accepted", "en" to "This contract blocks supply until accepted", "ru" to "Этот договор блокирует поставку до принятия", "kk" to "Бұл келісім қабылданғанға дейін жеткізуді бөгейді"))
+    put(1529L, mapOf("main" to "Selected goods receive copied price/schedule terms from recent store demand.", "en" to "Selected goods receive copied price/schedule terms from recent store demand.", "ru" to "Выбранные товары получают ценовые и графиковые строки из свежего спроса магазинов.", "kk" to "Таңдалған тауарлар соңғы дүкен сұранысынан баға және кесте жолдарын алады."))
+    put(1530L, mapOf("main" to "No partner store yet. Supplier contracts appear after at least one store order or saved supplier link.", "en" to "No partner store yet. Supplier contracts appear after at least one store order or saved supplier link.", "ru" to "Магазина-партнёра пока нет. Договоры появятся после хотя бы одного заказа или сохранённой связи с поставщиком.", "kk" to "Әзірге серіктес дүкен жоқ. Келісімдер кемінде бір тапсырыс немесе сақталған жеткізуші байланысынан кейін пайда болады."))
 }
 
 
@@ -9647,7 +9700,7 @@ fun AppConfiguration.StockWarehouseScreen() {
             )
         )
 
-        AnimatedVisibility(visible = sortMenuExpanded) {
+        AnimatedVisibility(visible = sortMenuExpanded && selectedTab != "contracts") {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -10674,6 +10727,7 @@ private const val STOCK_CONDITION_STORAGE_PREFIX = "aita-stock-condition-v1:"
 private const val STOCK_CONDITION_KIND_CUSTOM_TEXT = "custom_text"
 private const val STOCK_CONDITION_KIND_BUYER_MINIMUM_AGE = "buyer_minimum_age"
 private const val STOCK_CONDITION_KIND_TRANSACTION_TIME_WINDOW = "transaction_time_window"
+private const val STOCK_CONDITION_KIND_MARGIN_LIMIT = "margin_limit"
 
 @kotlinx.serialization.Serializable
 data class StockConditionDataModel(
@@ -10682,7 +10736,8 @@ data class StockConditionDataModel(
     val text: List<LocalizedStringDataModel> = emptyList(),
     val minimumAge: Int = 18,
     val startsAtMinutes: Int = 6 * 60,
-    val endsAtMinutes: Int = 22 * 60
+    val endsAtMinutes: Int = 22 * 60,
+    val marginLimitPercent: String = "30"
 )
 
 private fun AppConfiguration.defaultCustomStockCondition(): StockConditionDataModel = StockConditionDataModel(
@@ -10707,10 +10762,37 @@ private fun defaultTransactionTimeWindowStockCondition(
     endsAtMinutes = endsAtMinutes.coerceIn(0, 23 * 60 + 59)
 )
 
+private fun defaultMarginLimitStockCondition(limitPercent: String = "30"): StockConditionDataModel = StockConditionDataModel(
+    kind = STOCK_CONDITION_KIND_MARGIN_LIMIT,
+    transactionTypeIndex = 0,
+    marginLimitPercent = limitPercent.cleanStockConditionPercent()
+)
+
+private fun String.cleanStockConditionPercent(): String {
+    val normalized = trim()
+        .replace(',', '.')
+        .filter { it.isDigit() || it == '.' }
+    val singleDot = buildString {
+        var seenDot = false
+        normalized.forEach { char ->
+            if (char == '.') {
+                if (!seenDot) {
+                    append(char)
+                    seenDot = true
+                }
+            } else {
+                append(char)
+            }
+        }
+    }.trim('.')
+    return singleDot.take(6).ifBlank { "30" }
+}
+
 private fun StockConditionDataModel.normalizedStockCondition(): StockConditionDataModel = copy(
     kind = when (kind) {
         STOCK_CONDITION_KIND_BUYER_MINIMUM_AGE -> STOCK_CONDITION_KIND_BUYER_MINIMUM_AGE
         STOCK_CONDITION_KIND_TRANSACTION_TIME_WINDOW -> STOCK_CONDITION_KIND_TRANSACTION_TIME_WINDOW
+        STOCK_CONDITION_KIND_MARGIN_LIMIT -> STOCK_CONDITION_KIND_MARGIN_LIMIT
         else -> STOCK_CONDITION_KIND_CUSTOM_TEXT
     },
     transactionTypeIndex = transactionTypeIndex.coerceIn(0, 2),
@@ -10720,7 +10802,8 @@ private fun StockConditionDataModel.normalizedStockCondition(): StockConditionDa
         .distinctBy { it.language },
     minimumAge = minimumAge.coerceIn(1, 130),
     startsAtMinutes = startsAtMinutes.coerceIn(0, 23 * 60 + 59),
-    endsAtMinutes = endsAtMinutes.coerceIn(0, 23 * 60 + 59)
+    endsAtMinutes = endsAtMinutes.coerceIn(0, 23 * 60 + 59),
+    marginLimitPercent = marginLimitPercent.cleanStockConditionPercent()
 )
 
 private fun escapeStockConditionJsonString(raw: String): String = buildString {
@@ -10821,7 +10904,8 @@ private fun StockConditionDataModel.toStoredStockCondition(): String {
         append("\"text\":").append(localizedTextJson).append(',')
         append("\"minimumAge\":").append(normalized.minimumAge).append(',')
         append("\"startsAtMinutes\":").append(normalized.startsAtMinutes).append(',')
-        append("\"endsAtMinutes\":").append(normalized.endsAtMinutes)
+        append("\"endsAtMinutes\":").append(normalized.endsAtMinutes).append(',')
+        append("\"marginLimitPercent\":\"").append(escapeStockConditionJsonString(normalized.marginLimitPercent)).append("\"")
         append('}')
     }
 }
@@ -10852,7 +10936,8 @@ private fun String.toStockConditionDataModel(): StockConditionDataModel {
             text = parsedText,
             minimumAge = extractStockConditionJsonInt(payload, "minimumAge") ?: 18,
             startsAtMinutes = extractStockConditionJsonInt(payload, "startsAtMinutes") ?: 6 * 60,
-            endsAtMinutes = extractStockConditionJsonInt(payload, "endsAtMinutes") ?: 22 * 60
+            endsAtMinutes = extractStockConditionJsonInt(payload, "endsAtMinutes") ?: 22 * 60,
+            marginLimitPercent = extractStockConditionJsonString(payload, "marginLimitPercent") ?: "30"
         ).normalizedStockCondition()
     }
 
@@ -10911,6 +10996,7 @@ private fun AppConfiguration.stockConditionTransactionTitle(transactionTypeIndex
 private fun AppConfiguration.stockConditionKindTitle(kind: String): String = when (kind) {
     STOCK_CONDITION_KIND_BUYER_MINIMUM_AGE -> localizedStringResource(1012, "Buyer age")
     STOCK_CONDITION_KIND_TRANSACTION_TIME_WINDOW -> localizedStringResource(1013, "Transaction time")
+    STOCK_CONDITION_KIND_MARGIN_LIMIT -> localizedStringResource(1499, "Margin limit")
     else -> localizedStringResource(1011, "Manual condition")
 }
 
@@ -10923,6 +11009,7 @@ private fun AppConfiguration.visibleStockConditionText(condition: StockCondition
             val end = formatStockConditionMinute(normalized.endsAtMinutes)
             "${stockConditionTransactionTitle(normalized.transactionTypeIndex)}: ${localizedStringResource(1021, "allowed only from")} $start ${localizedStringResource(1022, "to")} $end."
         }
+        STOCK_CONDITION_KIND_MARGIN_LIMIT -> "${localizedStringResource(1502, "Store may add no more than")} ${normalized.marginLimitPercent}% ${localizedStringResource(1499, "margin limit").lowercase()}."
         else -> normalized.text.visibleLocalizedString(stateValues.appLanguage, localizedStringResource(611, "Enter condition"))
     }
 }
@@ -12697,13 +12784,15 @@ private fun AppConfiguration.StockConditionCard(
             options = listOf(
                 DropdownOption(STOCK_CONDITION_KIND_CUSTOM_TEXT, localizedStringResource(1011, "Manual condition"), localizedStringResource(1026, "Cashier confirms this condition")),
                 DropdownOption(STOCK_CONDITION_KIND_BUYER_MINIMUM_AGE, localizedStringResource(1012, "Buyer age"), localizedStringResource(1027, "Cashier confirms buyer age")),
-                DropdownOption(STOCK_CONDITION_KIND_TRANSACTION_TIME_WINDOW, localizedStringResource(1013, "Transaction time"), localizedStringResource(1028, "Automatically checks current time"))
+                DropdownOption(STOCK_CONDITION_KIND_TRANSACTION_TIME_WINDOW, localizedStringResource(1013, "Transaction time"), localizedStringResource(1028, "Automatically checks current time")),
+                DropdownOption(STOCK_CONDITION_KIND_MARGIN_LIMIT, localizedStringResource(1499, "Margin limit"), localizedStringResource(1514, "Contracts protect age/time/margin rules before goods start moving."))
             ),
             placeholder = localizedStringResource(1025, "Condition type"),
             onSelected = { selectedKind ->
                 val next = when (selectedKind) {
                     STOCK_CONDITION_KIND_BUYER_MINIMUM_AGE -> normalized.copy(kind = STOCK_CONDITION_KIND_BUYER_MINIMUM_AGE, minimumAge = normalized.minimumAge.coerceAtLeast(18))
                     STOCK_CONDITION_KIND_TRANSACTION_TIME_WINDOW -> normalized.copy(kind = STOCK_CONDITION_KIND_TRANSACTION_TIME_WINDOW)
+                    STOCK_CONDITION_KIND_MARGIN_LIMIT -> normalized.copy(kind = STOCK_CONDITION_KIND_MARGIN_LIMIT, marginLimitPercent = normalized.marginLimitPercent.cleanStockConditionPercent())
                     else -> normalized.copy(
                         kind = STOCK_CONDITION_KIND_CUSTOM_TEXT,
                         text = normalized.text.ifEmpty { listOf(LocalizedStringDataModel("main", "")) }
@@ -12789,6 +12878,30 @@ private fun AppConfiguration.StockConditionCard(
                 }
             }
 
+            STOCK_CONDITION_KIND_MARGIN_LIMIT -> {
+                genericTextField(
+                    modifier = Modifier.fillMaxWidth(),
+                    titleText = localizedStringResource(1501, "Maximum added margin, %"),
+                    valueInitial = normalized.marginLimitPercent,
+                    placeholderText = "30",
+                    leadingIconPath = stateValues.drawablePathIconFinances,
+                    keyboardType = KeyboardType.Decimal,
+                    showClearButton = false,
+                    onTransformValue = { raw -> raw.cleanStockConditionPercent() },
+                    onValueChange = { value, applyChange ->
+                        onChanged(normalized.copy(marginLimitPercent = value.cleanStockConditionPercent()).normalizedStockCondition())
+                        applyChange()
+                    }
+                )
+
+                Text(
+                    modifier = Modifier.padding(top = 4.dp),
+                    text = localizedStringResource(1514, "Contracts protect age/time/margin rules before goods start moving."),
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize
+                )
+            }
+
             else -> {
                 StockLocalizedStringGroupEditor(
                     title = localizedStringResource(1030, "Condition text"),
@@ -12867,7 +12980,7 @@ private fun AppConfiguration.StockConditionListEditor(
         )
 
         Text(
-            text = localizedStringResource(1031, "Use ready rules for buyer age and transaction time, or add your own condition text."),
+            text = localizedStringResource(1031, "Use ready rules for buyer age and transaction time, or add your own condition text.") + " " + localizedStringResource(1514, "Contracts protect age/time/margin rules before goods start moving."),
             color = stateValues.PlaceholderTextColor,
             fontSize = stateValues.smallTextSize,
             modifier = Modifier.padding(bottom = stateValues.marginTextField)
@@ -12894,36 +13007,55 @@ private fun AppConfiguration.StockConditionListEditor(
             Spacer(modifier = Modifier.height(stateValues.marginTextField))
         }
 
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
         ) {
-            actionButton(
-                modifier = Modifier.weight(1f),
-                text = localizedStringResource(1018, "Manual"),
-                iconPath = stateValues.drawablePathIconAdd,
-                textSize = stateValues.smallTextSize,
-                confirmationRequired = false,
-                onClick = { emit(conditions + defaultCustomStockCondition()) }
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1018, "Manual"),
+                    iconPath = stateValues.drawablePathIconAdd,
+                    textSize = stateValues.smallTextSize,
+                    confirmationRequired = false,
+                    onClick = { emit(conditions + defaultCustomStockCondition()) }
+                )
 
-            actionButton(
-                modifier = Modifier.weight(1f),
-                text = localizedStringResource(1012, "Buyer age"),
-                iconPath = stateValues.drawablePathIconUserAccount,
-                textSize = stateValues.smallTextSize,
-                confirmationRequired = false,
-                onClick = { emit(conditions + defaultBuyerMinimumAgeStockCondition()) }
-            )
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1012, "Buyer age"),
+                    iconPath = stateValues.drawablePathIconUserAccount,
+                    textSize = stateValues.smallTextSize,
+                    confirmationRequired = false,
+                    onClick = { emit(conditions + defaultBuyerMinimumAgeStockCondition()) }
+                )
+            }
 
-            actionButton(
-                modifier = Modifier.weight(1f),
-                text = localizedStringResource(1013, "Time"),
-                iconPath = stateValues.drawablePathIconWorkers,
-                textSize = stateValues.smallTextSize,
-                confirmationRequired = false,
-                onClick = { emit(conditions + defaultTransactionTimeWindowStockCondition()) }
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1013, "Time"),
+                    iconPath = stateValues.drawablePathIconWorkers,
+                    textSize = stateValues.smallTextSize,
+                    confirmationRequired = false,
+                    onClick = { emit(conditions + defaultTransactionTimeWindowStockCondition()) }
+                )
+
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1499, "Margin"),
+                    iconPath = stateValues.drawablePathIconFinances,
+                    textSize = stateValues.smallTextSize,
+                    confirmationRequired = false,
+                    onClick = { emit(conditions + defaultMarginLimitStockCondition()) }
+                )
+            }
         }
     }
 }
@@ -18489,6 +18621,13 @@ private fun AppConfiguration.supplierMarketWinningFeatures(): List<SupplierFeatu
         implemented = true
     ),
     SupplierFeaturePlanUiModel(
+        title = localizedStringResource(1518, "Contract guardrails"),
+        subtitle = localizedStringResource(1519, "Attach age, time, margin, price and schedule rules to a partner, a goods group, or one item before supply starts."),
+        iconPath = stateValues.drawablePathIconSupplierContracts,
+        iconRes = stateValues.drawableResIconSupplierContracts.value,
+        implemented = true
+    ),
+    SupplierFeaturePlanUiModel(
         title = localizedStringResource(1345, "Substitutions that save sales"),
         subtitle = localizedStringResource(1346, "Suggest replacements when a SKU is out of stock, with clear approval before the store receives it."),
         iconPath = stateValues.drawablePathIconResponse,
@@ -20287,6 +20426,818 @@ private fun AppConfiguration.SupplierOrdersInboxScreen() {
     }
 }
 
+
+private data class SupplierContractPartnerUiModel(
+    val key: String,
+    val storeId: String,
+    val supplierId: String,
+    val title: String,
+    val subtitle: String
+)
+
+private data class SupplierContractGoodsUiModel(
+    val key: String,
+    val storeId: String,
+    val supplierId: String,
+    val goodsItemId: String,
+    val title: String,
+    val subtitle: String,
+    val priceText: String,
+    val quantityText: String,
+    val nameSnapshot: List<LocalizedStringDataModel>,
+    val latestSupplyPrice: PriceDataModel?,
+    val latestQuantity: QuantityDataModel?
+)
+
+private fun AppConfiguration.supplierContractStatusTitle(status: String): String = when (status) {
+    SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER -> localizedStringResource(1487, "Pending supplier")
+    SUPPLIER_CONTRACT_STATUS_ACTIVE -> localizedStringResource(1488, "Active contract")
+    SUPPLIER_CONTRACT_STATUS_DECLINED -> localizedStringResource(1489, "Declined")
+    SUPPLIER_CONTRACT_STATUS_ARCHIVED -> localizedStringResource(1490, "Archived")
+    else -> localizedStringResource(1486, "Pending store")
+}
+
+private fun AppConfiguration.supplierContractScopeTitle(scope: String): String = when (scope) {
+    SUPPLIER_CONTRACT_SCOPE_GOODS_ITEM -> localizedStringResource(1492, "Goods item")
+    SUPPLIER_CONTRACT_SCOPE_GOODS_GROUP -> localizedStringResource(1493, "Goods group")
+    else -> localizedStringResource(1491, "Partnership-wide")
+}
+
+private fun AppConfiguration.SupplierPartnershipContractDataModel.visibleContractTitle(): String =
+    title.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { summary.visibleLocalizedString(stateValues.appLanguage, "") }
+        .ifBlank { supplierContractScopeTitle(scopeType) }
+
+private fun AppConfiguration.SupplierPartnershipContractDataModel.visibleContractSummary(): String =
+    summary.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { customTerms.visibleLocalizedString(stateValues.appLanguage, "") }
+        .ifBlank { localizedStringResource(1512, "Both sides must accept the same revision before supply is unlocked.") }
+
+private fun AppConfiguration.supplierContractStatusColor(status: String): Color = when (status) {
+    SUPPLIER_CONTRACT_STATUS_ACTIVE -> stateValues.OkayColor
+    SUPPLIER_CONTRACT_STATUS_DECLINED, SUPPLIER_CONTRACT_STATUS_ARCHIVED -> stateValues.DisabledColor
+    SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER, SUPPLIER_CONTRACT_STATUS_PENDING_STORE -> stateValues.BorderlineBadColor
+    else -> stateValues.PlaceholderTextColor
+}
+
+private fun AppConfiguration.buildSupplierContractPartners(
+    actorSide: String,
+    fixedStoreId: String?,
+    orders: List<SupplierOrderDataModel>,
+    suppliers: List<SupplierDataModel>
+): List<SupplierContractPartnerUiModel> {
+    val orderPartners = orders
+        .filter { it.isActive && (fixedStoreId.isNullOrBlank() || it.storeId == fixedStoreId) }
+        .groupBy { it.storeId to it.supplierId }
+        .mapNotNull { (ids, partnerOrders) ->
+            val firstOrder = partnerOrders.maxByOrNull { it.supplierDeskSortTime() } ?: return@mapNotNull null
+            val supplier = suppliers.firstOrNull { it.id == ids.second }
+            val storeTitle = supplierDeskStoreTitle(firstOrder)
+            val supplierTitle = supplier?.visibleSupplierName(stateValues.appLanguage).orEmpty().ifBlank { firstOrder.supplierId.take(8) }
+            SupplierContractPartnerUiModel(
+                key = ids.first + "|" + ids.second,
+                storeId = ids.first,
+                supplierId = ids.second,
+                title = if (actorSide == SUPPLIER_CONTRACT_SIDE_STORE) supplierTitle else storeTitle,
+                subtitle = if (actorSide == SUPPLIER_CONTRACT_SIDE_STORE) storeTitle else supplierTitle
+            )
+        }
+
+    if (actorSide != SUPPLIER_CONTRACT_SIDE_STORE || fixedStoreId.isNullOrBlank()) {
+        return orderPartners.sortedBy { it.title.lowercase() }
+    }
+
+    val supplierPartners = suppliers
+        .filter { it.isActive }
+        .map { supplier ->
+            SupplierContractPartnerUiModel(
+                key = fixedStoreId + "|" + supplier.id,
+                storeId = fixedStoreId,
+                supplierId = supplier.id,
+                title = supplier.visibleSupplierName(stateValues.appLanguage),
+                subtitle = localizedStringResource(1479, "Supplier contracts")
+            )
+        }
+
+    return (orderPartners + supplierPartners)
+        .distinctBy { it.key }
+        .sortedBy { it.title.lowercase() }
+}
+
+private fun AppConfiguration.buildSupplierContractGoodsOptions(
+    orders: List<SupplierOrderDataModel>,
+    lines: List<SupplierOrderLineDataModel>
+): List<SupplierContractGoodsUiModel> {
+    val ordersById = orders.filter { it.isActive }.associateBy { it.id }
+    return lines
+        .filter { it.isActive && it.goodsItemId.isNotBlank() }
+        .groupBy { line ->
+            val order = ordersById[line.orderId]
+            listOf(order?.storeId.orEmpty(), order?.supplierId.orEmpty(), line.goodsItemId).joinToString("|")
+        }
+        .mapNotNull { (key, itemLines) ->
+            val sampleLine = itemLines.maxByOrNull { line -> ordersById[line.orderId]?.supplierDeskSortTime() ?: 0L } ?: return@mapNotNull null
+            val sampleOrder = ordersById[sampleLine.orderId] ?: return@mapNotNull null
+            val latestPrice = sampleLine.supplierOfferedSupplyPrice ?: sampleLine.expectedSupplyPrice
+            val latestQuantity = sampleLine.supplierAcceptedQuantity ?: sampleLine.requestedQuantity
+            val title = supplierDeskLineTitle(sampleLine)
+            SupplierContractGoodsUiModel(
+                key = key,
+                storeId = sampleOrder.storeId,
+                supplierId = sampleOrder.supplierId,
+                goodsItemId = sampleLine.goodsItemId,
+                title = title,
+                subtitle = sampleLine.goodsItemBarcodeSnapshots.joinToString(" • ").ifBlank { sampleLine.goodsItemId.take(8) },
+                priceText = latestPrice.supplierDeskMoneyText(),
+                quantityText = latestQuantity?.quantityText(stateValues.appLanguage).orEmpty(),
+                nameSnapshot = sampleLine.goodsItemNameSnapshot,
+                latestSupplyPrice = latestPrice,
+                latestQuantity = latestQuantity
+            )
+        }
+        .distinctBy { it.key }
+        .sortedBy { it.title.lowercase() }
+}
+
+private fun AppConfiguration.supplierContractActionHint(contract: SupplierPartnershipContractDataModel, actorSide: String): String = when {
+    contract.status == SUPPLIER_CONTRACT_STATUS_ACTIVE -> localizedStringResource(1525, "Terms accepted by both sides")
+    actorSide == SUPPLIER_CONTRACT_SIDE_STORE && contract.status == SUPPLIER_CONTRACT_STATUS_PENDING_STORE -> localizedStringResource(1526, "Waiting for your acceptance")
+    actorSide == SUPPLIER_CONTRACT_SIDE_SUPPLIER && contract.status == SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER -> localizedStringResource(1526, "Waiting for your acceptance")
+    contract.status == SUPPLIER_CONTRACT_STATUS_PENDING_STORE || contract.status == SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER -> localizedStringResource(1527, "Waiting for the other side")
+    else -> supplierContractStatusTitle(contract.status)
+}
+
+@Composable
+private fun AppConfiguration.SupplierContractEditorCard(
+    actorSide: String,
+    existingContract: SupplierPartnershipContractDataModel?,
+    partners: List<SupplierContractPartnerUiModel>,
+    goodsOptions: List<SupplierContractGoodsUiModel>,
+    onClose: () -> Unit
+) {
+    var selectedPartnerKey by remember(existingContract?.id, partners.map { it.key }) {
+        mutableStateOf(
+            existingContract?.let { it.storeId + "|" + it.supplierId }
+                ?: partners.firstOrNull()?.key.orEmpty()
+        )
+    }
+    var selectedScope by remember(existingContract?.id) {
+        mutableStateOf(existingContract?.scopeType ?: SUPPLIER_CONTRACT_SCOPE_PARTNERSHIP)
+    }
+    var selectedGoodsIds by remember(existingContract?.id) {
+        mutableStateOf(existingContract?.goodsItemIds.orEmpty().toSet())
+    }
+    var title by remember(existingContract?.id, stateValues.appLanguage) {
+        mutableStateOf(existingContract?.title?.takeIf { it.isNotEmpty() } ?: listOf(LocalizedStringDataModel("main", localizedStringResource(1479, "Supplier contracts"))))
+    }
+    var summary by remember(existingContract?.id, stateValues.appLanguage) {
+        mutableStateOf(existingContract?.summary?.takeIf { it.isNotEmpty() } ?: listOf(LocalizedStringDataModel("main", localizedStringResource(1516, "Store requirements / supplier terms"))))
+    }
+    var customTerms by remember(existingContract?.id, stateValues.appLanguage) {
+        mutableStateOf(existingContract?.customTerms?.takeIf { it.isNotEmpty() } ?: emptyLocalizedItemForCurrentLanguage())
+    }
+    var deliverySchedule by remember(existingContract?.id, stateValues.appLanguage) {
+        mutableStateOf(existingContract?.deliverySchedule?.takeIf { it.isNotEmpty() } ?: emptyLocalizedItemForCurrentLanguage())
+    }
+    var paymentSchedule by remember(existingContract?.id, stateValues.appLanguage) {
+        mutableStateOf(existingContract?.paymentSchedule?.takeIf { it.isNotEmpty() } ?: emptyLocalizedItemForCurrentLanguage())
+    }
+    var conditions by remember(existingContract?.id) {
+        mutableStateOf(existingContract?.conditions?.takeIf { it.isNotEmpty() } ?: listOf(defaultMarginLimitStockCondition("30").toStoredStockCondition()))
+    }
+
+    val selectedPartner = partners.firstOrNull { it.key == selectedPartnerKey }
+    val selectableGoods = goodsOptions
+        .filter { option -> selectedPartner?.let { option.storeId == it.storeId && option.supplierId == it.supplierId } ?: false }
+        .distinctBy { it.goodsItemId }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.AccentColor.copy(alpha = 0.08f))
+            .border(stateValues.focusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.70f), RoundedCornerShape(stateValues.cornerRadius))
+            .padding(stateValues.marginTextFieldGroup),
+        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            CpImage(
+                modifier = Modifier.size(34.dp),
+                url = stateValues.drawablePathIconSupplierContracts,
+                fallbackRes = stateValues.drawableResIconSupplierContracts.value,
+                contentDescription = localizedStringResource(1479, "Supplier contracts"),
+                tintColor = stateValues.AccentColor
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = existingContract?.let { localizedStringResource(1495, "Counter / edit proposal") }
+                        ?: localizedStringResource(1521, "New proposal"),
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.titleTextSize,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = localizedStringResource(1512, "Both sides must accept the same revision before supply is unlocked."),
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize
+                )
+            }
+        }
+
+        if (partners.isEmpty()) {
+            MessageText(
+                modifier = Modifier.fillMaxWidth(),
+                text = localizedStringResource(1530, "No partner store yet. Supplier contracts appear after at least one store order or saved supplier link.")
+            )
+        } else {
+            SimpleDropdownField(
+                title = if (actorSide == SUPPLIER_CONTRACT_SIDE_STORE) localizedStringResource(1509, "Select supplier") else localizedStringResource(1508, "Select partner store"),
+                selectedId = selectedPartnerKey,
+                options = partners.map { DropdownOption(it.key, it.title, it.subtitle) },
+                placeholder = localizedStringResource(216, "Search"),
+                onSelected = { key ->
+                    selectedPartnerKey = key
+                    selectedGoodsIds = emptySet()
+                }
+            )
+
+            SimpleDropdownField(
+                title = localizedStringResource(1507, "Contract scope"),
+                selectedId = selectedScope,
+                options = listOf(
+                    DropdownOption(SUPPLIER_CONTRACT_SCOPE_PARTNERSHIP, localizedStringResource(1491, "Partnership-wide"), localizedStringResource(1512, "Both sides must accept the same revision before supply is unlocked.")),
+                    DropdownOption(SUPPLIER_CONTRACT_SCOPE_GOODS_ITEM, localizedStringResource(1492, "Goods item"), localizedStringResource(1514, "Contracts protect age/time/margin rules before goods start moving.")),
+                    DropdownOption(SUPPLIER_CONTRACT_SCOPE_GOODS_GROUP, localizedStringResource(1493, "Goods group"), localizedStringResource(1529, "Selected goods receive copied price/schedule terms from recent store demand."))
+                ),
+                placeholder = localizedStringResource(1507, "Contract scope"),
+                onSelected = { scope ->
+                    selectedScope = scope
+                    if (scope == SUPPLIER_CONTRACT_SCOPE_PARTNERSHIP) selectedGoodsIds = emptySet()
+                }
+            )
+
+            if (selectedScope != SUPPLIER_CONTRACT_SCOPE_PARTNERSHIP) {
+                Text(
+                    text = localizedStringResource(1510, "Select goods"),
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.textSize,
+                    fontWeight = FontWeight.Bold
+                )
+                if (selectableGoods.isEmpty()) {
+                    MessageText(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(1529, "Selected goods receive copied price/schedule terms from recent store demand.")
+                    )
+                } else {
+                    selectableGoods.take(10).forEach { goods ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(stateValues.cornerRadius))
+                                .background(stateValues.BackgroundColor)
+                                .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor.copy(alpha = 0.45f), RoundedCornerShape(stateValues.cornerRadius))
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = ripple(color = stateValues.AccentColor)
+                                ) {
+                                    selectedGoodsIds = if (selectedGoodsIds.contains(goods.goodsItemId)) selectedGoodsIds - goods.goodsItemId else selectedGoodsIds + goods.goodsItemId
+                                    if (selectedScope == SUPPLIER_CONTRACT_SCOPE_GOODS_ITEM && selectedGoodsIds.size > 1) selectedGoodsIds = setOf(goods.goodsItemId)
+                                }
+                                .padding(stateValues.marginTextField),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                        ) {
+                            AitaRoundCheckbox(
+                                checked = selectedGoodsIds.contains(goods.goodsItemId),
+                                onCheckedChange = { checked ->
+                                    selectedGoodsIds = if (checked) {
+                                        if (selectedScope == SUPPLIER_CONTRACT_SCOPE_GOODS_ITEM) setOf(goods.goodsItemId) else selectedGoodsIds + goods.goodsItemId
+                                    } else selectedGoodsIds - goods.goodsItemId
+                                }
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = goods.title,
+                                    color = stateValues.TextColor,
+                                    fontSize = stateValues.textSize,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = listOf(goods.subtitle, goods.priceText, goods.quantityText).filter { it.isNotBlank() }.joinToString(" • "),
+                                    color = stateValues.PlaceholderTextColor,
+                                    fontSize = stateValues.smallTextSize,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            LocalizedStringListEditor(
+                title = localizedStringResource(1522, "Proposal title"),
+                values = title,
+                onChanged = { title = it }
+            )
+            LocalizedStringListEditor(
+                title = localizedStringResource(1523, "Short summary"),
+                values = summary,
+                onChanged = { summary = it }
+            )
+            StockConditionListEditor(
+                title = localizedStringResource(1503, "Contract terms"),
+                values = conditions,
+                onChanged = { conditions = it }
+            )
+            LocalizedStringListEditor(
+                title = localizedStringResource(1524, "Custom written terms"),
+                values = customTerms,
+                onChanged = { customTerms = it }
+            )
+            LocalizedStringListEditor(
+                title = localizedStringResource(1504, "Delivery schedule"),
+                values = deliverySchedule,
+                onChanged = { deliverySchedule = it }
+            )
+            LocalizedStringListEditor(
+                title = localizedStringResource(1505, "Payment schedule"),
+                values = paymentSchedule,
+                onChanged = { paymentSchedule = it }
+            )
+
+            val selectedPriceTerms = selectableGoods
+                .filter { it.goodsItemId in selectedGoodsIds }
+                .map { goods ->
+                    SupplierContractPriceTermDataModel(
+                        goodsItemId = goods.goodsItemId,
+                        goodsItemNameSnapshot = goods.nameSnapshot.ifEmpty { listOf(LocalizedStringDataModel("main", goods.title)) },
+                        supplyPrice = goods.latestSupplyPrice,
+                        minOrderQuantity = goods.latestQuantity,
+                        scheduleText = deliverySchedule,
+                        note = summary
+                    )
+                }
+
+            if (selectedPriceTerms.isNotEmpty()) {
+                Text(
+                    text = localizedStringResource(1506, "Price lines"),
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.textSize,
+                    fontWeight = FontWeight.Bold
+                )
+                selectedPriceTerms.take(6).forEach { term ->
+                    SupplierCatalogChip(
+                        text = listOf(
+                            term.goodsItemNameSnapshot.visibleLocalizedString(stateValues.appLanguage, term.goodsItemId.take(8)),
+                            term.supplyPrice.supplierDeskMoneyText(),
+                            term.minOrderQuantity?.quantityText(stateValues.appLanguage).orEmpty()
+                        ).filter { it.isNotBlank() }.joinToString(" • ")
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = stateValues.stringCancel,
+                    iconPath = stateValues.drawablePathIconCancel,
+                    enabledColor = stateValues.DisabledColor,
+                    confirmationRequired = false,
+                    onClick = onClose
+                )
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1515, "Save and send proposal"),
+                    iconPath = stateValues.drawablePathIconSupplierContracts,
+                    iconRes = stateValues.drawableResIconSupplierContracts.value,
+                    confirmationRequired = true,
+                    onClick = {
+                        val partner = selectedPartner ?: return@actionButton
+                        val scope = if (selectedScope == SUPPLIER_CONTRACT_SCOPE_GOODS_ITEM && selectedGoodsIds.size > 1) SUPPLIER_CONTRACT_SCOPE_GOODS_GROUP else selectedScope
+                        upsertSupplierContract(
+                            SupplierPartnershipContractDataModel(
+                                id = existingContract?.id.orEmpty(),
+                                storeId = partner.storeId,
+                                supplierId = partner.supplierId,
+                                authorSide = actorSide,
+                                scopeType = if (scope == SUPPLIER_CONTRACT_SCOPE_PARTNERSHIP) scope else if (selectedGoodsIds.size <= 1) SUPPLIER_CONTRACT_SCOPE_GOODS_ITEM else SUPPLIER_CONTRACT_SCOPE_GOODS_GROUP,
+                                goodsItemIds = if (scope == SUPPLIER_CONTRACT_SCOPE_PARTNERSHIP) emptyList() else selectedGoodsIds.toList(),
+                                title = title,
+                                summary = summary,
+                                conditions = conditions,
+                                customTerms = customTerms,
+                                deliverySchedule = deliverySchedule,
+                                paymentSchedule = paymentSchedule,
+                                priceTerms = selectedPriceTerms,
+                                authorUserId = stateValues.userAccount?.id.orEmpty(),
+                                lastEditorUserId = stateValues.userAccount?.id.orEmpty()
+                            )
+                        ) { state -> if (state !is DataState.Empty) onClose() }
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppConfiguration.SupplierContractCard(
+    contract: SupplierPartnershipContractDataModel,
+    actorSide: String,
+    onEdit: () -> Unit
+) {
+    val canAccept = (actorSide == SUPPLIER_CONTRACT_SIDE_STORE && contract.status == SUPPLIER_CONTRACT_STATUS_PENDING_STORE) ||
+            (actorSide == SUPPLIER_CONTRACT_SIDE_SUPPLIER && contract.status == SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER)
+    val statusColor = supplierContractStatusColor(contract.status)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .border(stateValues.unfocusedBorderWidth, statusColor.copy(alpha = 0.70f), RoundedCornerShape(stateValues.cornerRadius))
+            .padding(stateValues.marginTextFieldGroup),
+        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            CpImage(
+                modifier = Modifier.size(36.dp),
+                url = stateValues.drawablePathIconSupplierContracts,
+                fallbackRes = stateValues.drawableResIconSupplierContracts.value,
+                contentDescription = localizedStringResource(1479, "Supplier contracts"),
+                tintColor = statusColor
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = contract.visibleContractTitle(),
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.accentTextSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "${supplierContractScopeTitle(contract.scopeType)} • ${supplierContractStatusTitle(contract.status)} • rev.${contract.revision}",
+                    color = statusColor,
+                    fontSize = stateValues.smallTextSize,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        Text(
+            text = contract.visibleContractSummary(),
+            color = stateValues.PlaceholderTextColor,
+            fontSize = stateValues.textSize,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            SupplierCatalogChip(text = supplierContractActionHint(contract, actorSide))
+            if (contract.authorSide == SUPPLIER_CONTRACT_SIDE_SUPPLIER && contract.status == SUPPLIER_CONTRACT_STATUS_PENDING_STORE) {
+                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = localizedStringResource(1528, "This contract blocks supply until accepted")) }
+            }
+        }
+
+        if (contract.conditions.isNotEmpty()) {
+            contract.conditions.take(4).forEach { raw ->
+                Text(
+                    text = "• ${visibleStockConditionText(raw.toStockConditionDataModel())}",
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.smallTextSize
+                )
+            }
+        }
+
+        val delivery = contract.deliverySchedule.visibleLocalizedString(stateValues.appLanguage, "")
+        val payment = contract.paymentSchedule.visibleLocalizedString(stateValues.appLanguage, "")
+        listOf(
+            localizedStringResource(1504, "Delivery schedule") to delivery,
+            localizedStringResource(1505, "Payment schedule") to payment
+        ).filter { it.second.isNotBlank() }.forEach { (title, value) ->
+            Text(
+                text = "$title: $value",
+                color = stateValues.PlaceholderTextColor,
+                fontSize = stateValues.smallTextSize,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        if (contract.priceTerms.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                contract.priceTerms.take(2).forEach { term ->
+                    Box(modifier = Modifier.weight(1f)) {
+                        SupplierCatalogChip(
+                            text = listOf(
+                                term.goodsItemNameSnapshot.visibleLocalizedString(stateValues.appLanguage, term.goodsItemId.take(8)),
+                                term.supplyPrice.supplierDeskMoneyText()
+                            ).filter { it.isNotBlank() }.joinToString(" • ")
+                        )
+                    }
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            actionButton(
+                modifier = Modifier.weight(1f),
+                text = localizedStringResource(1495, "Counter / edit proposal"),
+                iconPath = stateValues.drawablePathIconEdit,
+                iconRes = stateValues.drawableResIconEdit.value,
+                textSize = stateValues.smallTextSize,
+                enabledColor = stateValues.BorderlineBadColor,
+                confirmationRequired = false,
+                onClick = onEdit
+            )
+            actionButton(
+                modifier = Modifier.weight(1f),
+                text = localizedStringResource(1496, "Accept contract"),
+                iconPath = stateValues.drawablePathIconCheck,
+                iconRes = stateValues.drawableResIconCheck.value,
+                textSize = stateValues.smallTextSize,
+                enabled = canAccept,
+                enabledColor = stateValues.OkayColor,
+                confirmationRequired = true,
+                onDisabledClick = {
+                    postInAppNotification(localizedStringResource(1527, "Waiting for the other side"), NotificationType.Neutral)
+                },
+                onClick = { acceptSupplierContract(contract.id) }
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            actionButton(
+                modifier = Modifier.weight(1f),
+                text = localizedStringResource(1497, "Decline contract"),
+                iconPath = stateValues.drawablePathIconCancel,
+                iconRes = stateValues.drawableResIconCancel.value,
+                textSize = stateValues.smallTextSize,
+                enabledColor = stateValues.ErrorColor,
+                confirmationRequired = true,
+                onClick = { declineSupplierContract(contract.id) }
+            )
+            actionButton(
+                modifier = Modifier.weight(1f),
+                text = localizedStringResource(1498, "Archive contract"),
+                iconPath = stateValues.drawablePathIconDelete,
+                iconRes = stateValues.drawableResIconDelete.value,
+                textSize = stateValues.smallTextSize,
+                enabledColor = stateValues.DisabledColor,
+                confirmationRequired = true,
+                onClick = { archiveSupplierContract(contract.id) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun AppConfiguration.SupplierContractsBoardContent(
+    modifier: Modifier = Modifier,
+    actorSide: String,
+    fixedStoreId: String? = null,
+    showAppBar: Boolean = true
+) {
+    LaunchedEffect(actorSide, fixedStoreId) {
+        if (actorSide == SUPPLIER_CONTRACT_SIDE_STORE) {
+            fixedStoreId?.let {
+                getSupplierOrders(it)
+                getSupplierContracts(storeId = it)
+                getSuppliers()
+            }
+        } else {
+            getMySupplierSideOrders()
+            getSupplierContracts()
+            getSuppliers()
+        }
+    }
+
+    val contracts by supplierPartnershipContractsState.payload.collectAsState()
+    val orders by supplierOrdersState.payload.collectAsState()
+    val lines by supplierOrderLinesState.payload.collectAsState()
+    val suppliers = stateValues.suppliers.orEmpty()
+    val activeOrders = orders.orEmpty().filter { fixedStoreId.isNullOrBlank() || it.storeId == fixedStoreId }
+    val partners = remember(actorSide, fixedStoreId, activeOrders, suppliers, stateValues.appLanguage) {
+        buildSupplierContractPartners(actorSide, fixedStoreId, activeOrders, suppliers)
+    }
+    val goodsOptions = remember(activeOrders, lines, stateValues.appLanguage) {
+        buildSupplierContractGoodsOptions(activeOrders, lines.orEmpty())
+    }
+    var showEditor by rememberSaveable { mutableStateOf(false) }
+    var editingContractId by rememberSaveable { mutableStateOf<String?>(null) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var statusFilter by rememberSaveable { mutableStateOf("open") }
+
+    val visibleContracts = remember(contracts, partners, searchQuery, statusFilter, actorSide, fixedStoreId, stateValues.appLanguage) {
+        val partnerKeys = partners.map { it.key }.toSet()
+        contracts.orEmpty()
+            .filter { it.isActive }
+            .filter { fixedStoreId.isNullOrBlank() || it.storeId == fixedStoreId }
+            .filter { partnerKeys.isEmpty() || (it.storeId + "|" + it.supplierId) in partnerKeys }
+            .filter { contract ->
+                statusFilter == "all" ||
+                        (statusFilter == "open" && contract.status != SUPPLIER_CONTRACT_STATUS_ACTIVE && contract.status != SUPPLIER_CONTRACT_STATUS_DECLINED && contract.status != SUPPLIER_CONTRACT_STATUS_ARCHIVED) ||
+                        contract.status == statusFilter
+            }
+            .filter { contract ->
+                val q = searchQuery.trim().lowercase()
+                q.isBlank() || buildString {
+                    append(contract.visibleContractTitle()).append(' ')
+                    append(contract.visibleContractSummary()).append(' ')
+                    append(contract.storeNameSnapshot.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+                    append(contract.supplierNameSnapshot.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+                    contract.conditions.forEach { append(it).append(' ') }
+                }.lowercase().contains(q)
+            }
+            .sortedWith(compareByDescending<SupplierPartnershipContractDataModel> { if (it.status == SUPPLIER_CONTRACT_STATUS_ACTIVE) 0 else 1 }
+                .thenByDescending { it.updatedAtMillis.takeIf { value -> value > 0L } ?: it.createdAtMillis })
+    }
+
+    val editingContract = editingContractId?.let { id -> contracts.orEmpty().firstOrNull { it.id == id } }
+    val activeCount = contracts.orEmpty().count { it.isActive && it.status == SUPPLIER_CONTRACT_STATUS_ACTIVE && (fixedStoreId.isNullOrBlank() || it.storeId == fixedStoreId) }
+    val waitingForMeCount = contracts.orEmpty().count {
+        it.isActive &&
+                ((actorSide == SUPPLIER_CONTRACT_SIDE_STORE && it.status == SUPPLIER_CONTRACT_STATUS_PENDING_STORE) ||
+                        (actorSide == SUPPLIER_CONTRACT_SIDE_SUPPLIER && it.status == SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER)) &&
+                (fixedStoreId.isNullOrBlank() || it.storeId == fixedStoreId)
+    }
+
+    Column(modifier = modifier.fillMaxSize()) {
+        if (showAppBar) {
+            ScreenAppBarWidget(
+                title = localizedStringResource(1479, "Supplier contracts"),
+                iconPath = stateValues.drawablePathIconSupplierContracts,
+                iconRes = stateValues.drawableResIconSupplierContracts.value
+            )
+        }
+
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
+                .align(Alignment.CenterHorizontally)
+                .padding(stateValues.marginTextField),
+            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
+            contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
+        ) {
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(stateValues.cornerRadius))
+                        .background(stateValues.AccentColor.copy(alpha = 0.10f))
+                        .border(stateValues.focusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
+                        .padding(stateValues.marginTextFieldGroup),
+                    verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                    ) {
+                        CpImage(
+                            modifier = Modifier.size(46.dp),
+                            url = stateValues.drawablePathIconSupplierContracts,
+                            fallbackRes = stateValues.drawableResIconSupplierContracts.value,
+                            contentDescription = localizedStringResource(1479, "Supplier contracts"),
+                            tintColor = stateValues.AccentColor
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = localizedStringResource(1484, "Contract board"),
+                                color = stateValues.TextColor,
+                                fontSize = stateValues.titleTextSize,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = localizedStringResource(1485, "One negotiated document per supplier/store relationship. Supplier proposes terms, store can counter, and supply is unlocked only after both sides accept."),
+                                color = stateValues.PlaceholderTextColor,
+                                fontSize = stateValues.smallTextSize
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1488, "Active contract")}: $activeCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1526, "Waiting for your acceptance")}: $waitingForMeCount") }
+                    }
+
+                    actionButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(1494, "Create contract"),
+                        iconPath = stateValues.drawablePathIconSupplierContracts,
+                        iconRes = stateValues.drawableResIconSupplierContracts.value,
+                        confirmationRequired = false,
+                        onClick = {
+                            editingContractId = null
+                            showEditor = true
+                        }
+                    )
+                }
+            }
+
+            if (showEditor) {
+                item {
+                    SupplierContractEditorCard(
+                        actorSide = actorSide,
+                        existingContract = editingContract,
+                        partners = partners,
+                        goodsOptions = goodsOptions,
+                        onClose = {
+                            showEditor = false
+                            editingContractId = null
+                        }
+                    )
+                }
+            }
+
+            item {
+                SimpleTextInput(
+                    modifier = Modifier.fillMaxWidth(),
+                    value = searchQuery,
+                    placeholder = localizedStringResource(216, "Search"),
+                    leadingIconPath = stateValues.drawablePathIconSearch,
+                    onValueChange = { searchQuery = it }
+                )
+            }
+
+            item {
+                SimpleDropdownField(
+                    title = localizedStringResource(1376, "Status filter"),
+                    selectedId = statusFilter,
+                    options = listOf(
+                        DropdownOption("open", localizedStringResource(1377, "Open")),
+                        DropdownOption("all", localizedStringResource(1378, "All")),
+                        DropdownOption(SUPPLIER_CONTRACT_STATUS_PENDING_STORE, localizedStringResource(1486, "Pending store")),
+                        DropdownOption(SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER, localizedStringResource(1487, "Pending supplier")),
+                        DropdownOption(SUPPLIER_CONTRACT_STATUS_ACTIVE, localizedStringResource(1488, "Active contract")),
+                        DropdownOption(SUPPLIER_CONTRACT_STATUS_DECLINED, localizedStringResource(1489, "Declined"))
+                    ),
+                    placeholder = localizedStringResource(1377, "Open"),
+                    onSelected = { statusFilter = it }
+                )
+            }
+
+            if (visibleContracts.isEmpty()) {
+                item {
+                    MessageText(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(1511, "No contracts yet") + "\n" + localizedStringResource(1517, "People talk on WhatsApp, but AITA keeps the accepted version clean and machine-readable.")
+                    )
+                }
+            } else {
+                items(visibleContracts, key = { it.id }) { contract ->
+                    SupplierContractCard(
+                        contract = contract,
+                        actorSide = actorSide,
+                        onEdit = {
+                            editingContractId = contract.id
+                            showEditor = true
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppConfiguration.SupplierContractsScreen() {
+    SupplierContractsBoardContent(
+        actorSide = SUPPLIER_CONTRACT_SIDE_SUPPLIER,
+        showAppBar = true
+    )
+}
+
 @Composable
 private fun AppConfiguration.SupplierPlaceholderScreen(
     title: String,
@@ -20357,6 +21308,7 @@ private fun AppConfiguration.SupplierScreen() {
     when (stateValues.navigationScreensMain.last()) {
         is NavigationScreenModel.Supplier.Orders -> SupplierOrdersInboxScreen()
         is NavigationScreenModel.Supplier.Catalog -> SupplierCatalogScreen()
+        is NavigationScreenModel.Supplier.Contracts -> SupplierContractsScreen()
         is NavigationScreenModel.Supplier.Customers -> SupplierCustomersScreen()
         is NavigationScreenModel.Supplier.Analytics -> SupplierPlaceholderScreen(
             title = localizedStringResource(1340, "Insights"),
@@ -23362,6 +24314,17 @@ sealed class NavigationScreenModel(
             }
         }
 
+        sealed class Contracts(route: String): Supplier(route) {
+            data object Main: Contracts("SupplierContractsMainNavigationScreenModelRoute") {
+                override val name: String
+                    get() = with(AppConfiguration) { localizedStringResource(1479, "Supplier contracts") }
+                override val iconPath: String
+                    get() = AppConfiguration.stateValues.drawablePathIconSupplierContracts
+                override val iconRes: DrawableResource
+                    get() = AppConfiguration.stateValues.drawableResIconSupplierContracts.value
+            }
+        }
+
         sealed class Analytics(route: String): Supplier(route) {
             data object Main: Analytics("SupplierAnalyticsMainNavigationScreenModelRoute") {
                 override val name: String
@@ -23865,6 +24828,7 @@ private fun persistentAppNavigationScreens(): List<NavigationScreenModel> = list
     NavigationScreenModel.Buyer.Orders.Main,
     NavigationScreenModel.Supplier.Orders.Main,
     NavigationScreenModel.Supplier.Catalog.Main,
+    NavigationScreenModel.Supplier.Contracts.Main,
     NavigationScreenModel.Supplier.Customers.Main,
     NavigationScreenModel.Supplier.Analytics.Main
 )
@@ -24030,8 +24994,8 @@ object Navigation {
     val bottomNavBarScreensSupplier = listOf(
         NavigationScreenModel.Supplier.Orders.Main,
         NavigationScreenModel.Supplier.Catalog.Main,
+        NavigationScreenModel.Supplier.Contracts.Main,
         NavigationScreenModel.Supplier.Customers.Main,
-        NavigationScreenModel.Supplier.Analytics.Main,
         NavigationScreenModel.Menu.Main
     )
 
@@ -31382,9 +32346,17 @@ fun AppConfiguration.MenuOperationLogsScreen() {
 
 @Composable
 fun AppConfiguration.MenuSuppliersScreen() {
-    LaunchedEffect(Unit) { getSuppliers() }
+    val activeStoreId = stateValues.activeStoreId
+    LaunchedEffect(activeStoreId) {
+        getSuppliers()
+        activeStoreId?.let {
+            getSupplierOrders(it)
+            getSupplierContracts(storeId = it)
+        }
+    }
 
     val suppliers by suppliersState.payload.collectAsState()
+    val supplierContracts by supplierPartnershipContractsState.payload.collectAsState()
     val currentUserId = stateValues.userAccount?.id
     var selectedTab by rememberSaveable { mutableStateOf("mine") }
     var search by rememberSaveable { mutableStateOf("") }
@@ -31399,7 +32371,7 @@ fun AppConfiguration.MenuSuppliersScreen() {
         ScreenAppBarWidget(
             title = stateValues.stringSuppliers,
             iconPath = stateValues.drawablePathIconSuppliers,
-            trailingIcons = listOf(
+            trailingIcons = if (selectedTab == "contracts") emptyList() else listOf(
                 Triple(sortActionIconPath(), sortActionIconFallback()) {
                     sortMenuExpanded = !sortMenuExpanded
                 },
@@ -31485,7 +32457,8 @@ fun AppConfiguration.MenuSuppliersScreen() {
                 modifier = Modifier.fillMaxWidth(),
                 tabs = listOf(
                     TabContent("mine", tabLabelWithCount(localizedStringResource(629, "My suppliers"), mineSuppliers.count { supplierMatchesSearch(it) })) { selectedTab = it },
-                    TabContent("generic", tabLabelWithCount(localizedStringResource(628, "Generic suppliers"), genericSuppliers.count { supplierMatchesSearch(it) })) { selectedTab = it }
+                    TabContent("generic", tabLabelWithCount(localizedStringResource(628, "Generic suppliers"), genericSuppliers.count { supplierMatchesSearch(it) })) { selectedTab = it },
+                    TabContent("contracts", tabLabelWithCount(localizedStringResource(1479, "Supplier contracts"), supplierContracts.orEmpty().count { it.isActive && (activeStoreId.isNullOrBlank() || it.storeId == activeStoreId) })) { selectedTab = it }
                 ),
                 selectedIndexInitial = selectedTab
             )
@@ -31501,35 +32474,44 @@ fun AppConfiguration.MenuSuppliersScreen() {
                 if (sortAscending) sorted else sorted.reversed()
             }
 
-        LazyColumn(
-            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Suppliers, listOf(selectedTab, sortId, if (sortAscending) "asc" else "desc").joinToString("_")),
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
-                .padding(horizontal = stateValues.marginTextField),
-            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
-            contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
-        ) {
-            if (shownSuppliers.isEmpty()) {
-                item {
-                    MessageText(
-                        modifier = Modifier.fillParentMaxSize().fillMaxWidth(),
-                        text = if (q.isBlank()) localizedStringResource(626, "No suppliers yet") else stateValues.stringNoMatches
-                    )
-                }
-            } else {
-                items(shownSuppliers, key = { it.id }) { supplier ->
-                    SupplierCard(
-                        supplier = supplier,
-                        editable = selectedTab == "mine",
-                        onEdit = {
-                            coroutineScope.launch {
-                                NavigationScreenModel.Menu.AddEditSupplier.setState("edited_supplier_id" to supplier.id)
-                                Navigation.Menu.go(NavigationScreenModel.Menu.AddEditSupplier, stateValues.isNarrowScreen)
-                            }
-                        },
-                        onDelete = { deleteSupplier(supplier.id) }
-                    )
+        if (selectedTab == "contracts") {
+            SupplierContractsBoardContent(
+                modifier = Modifier.weight(1f),
+                actorSide = SUPPLIER_CONTRACT_SIDE_STORE,
+                fixedStoreId = activeStoreId,
+                showAppBar = false
+            )
+        } else {
+            LazyColumn(
+                state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Suppliers, listOf(selectedTab, sortId, if (sortAscending) "asc" else "desc").joinToString("_")),
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
+                    .padding(horizontal = stateValues.marginTextField),
+                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
+                contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
+            ) {
+                if (shownSuppliers.isEmpty()) {
+                    item {
+                        MessageText(
+                            modifier = Modifier.fillParentMaxSize().fillMaxWidth(),
+                            text = if (q.isBlank()) localizedStringResource(626, "No suppliers yet") else stateValues.stringNoMatches
+                        )
+                    }
+                } else {
+                    items(shownSuppliers, key = { it.id }) { supplier ->
+                        SupplierCard(
+                            supplier = supplier,
+                            editable = selectedTab == "mine",
+                            onEdit = {
+                                coroutineScope.launch {
+                                    NavigationScreenModel.Menu.AddEditSupplier.setState("edited_supplier_id" to supplier.id)
+                                    Navigation.Menu.go(NavigationScreenModel.Menu.AddEditSupplier, stateValues.isNarrowScreen)
+                                }
+                            },
+                            onDelete = { deleteSupplier(supplier.id) }
+                        )
+                    }
                 }
             }
         }
@@ -43073,6 +44055,9 @@ object AppConfiguration {
         val drawablePathIconSupplierCatalog: String
         val drawableResIconSupplierCatalog: StateFlow<DrawableResource>
 
+        val drawablePathIconSupplierContracts: String
+        val drawableResIconSupplierContracts: StateFlow<DrawableResource>
+
         val drawablePathIconSupplierPartners: String
         val drawableResIconSupplierPartners: StateFlow<DrawableResource>
 
@@ -43691,6 +44676,10 @@ object AppConfiguration {
             private val _drawableResIconSupplierCatalog = MutableStateFlow(Res.drawable._72_0)
             override val drawableResIconSupplierCatalog: StateFlow<DrawableResource> = _drawableResIconSupplierCatalog.asStateFlow()
 
+            override val drawablePathIconSupplierContracts: String by drawablePathIconSupplierContractsState.collectAsState()
+            private val _drawableResIconSupplierContracts = MutableStateFlow(Res.drawable._76_0)
+            override val drawableResIconSupplierContracts: StateFlow<DrawableResource> = _drawableResIconSupplierContracts.asStateFlow()
+
             override val drawablePathIconSupplierPartners: String by drawablePathIconSupplierPartnersState.collectAsState()
             private val _drawableResIconSupplierPartners = MutableStateFlow(Res.drawable._75_0)
             override val drawableResIconSupplierPartners: StateFlow<DrawableResource> = _drawableResIconSupplierPartners.asStateFlow()
@@ -43901,6 +44890,7 @@ object AppConfiguration {
                 _drawableResIconAppModeSupplier.emit(if (stateValues.appThemeId == 1L) Res.drawable._70_1 else Res.drawable._70_0)
                 _drawableResIconAppModeManufacturer.emit(if (stateValues.appThemeId == 1L) Res.drawable._71_1 else Res.drawable._71_0)
                 _drawableResIconSupplierCatalog.emit(if (stateValues.appThemeId == 1L) Res.drawable._72_1 else Res.drawable._72_0)
+                _drawableResIconSupplierContracts.emit(if (stateValues.appThemeId == 1L) Res.drawable._76_1 else Res.drawable._76_0)
                 _drawableResIconSupplierPartners.emit(if (stateValues.appThemeId == 1L) Res.drawable._75_1 else Res.drawable._75_0)
                 _drawableResIconBuyerAgeRestriction.emit(if (stateValues.appThemeId == 1L) Res.drawable._73_1 else Res.drawable._73_0)
                 _drawableResIconTransactionTimeRestriction.emit(if (stateValues.appThemeId == 1L) Res.drawable._74_1 else Res.drawable._74_0)

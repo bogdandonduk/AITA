@@ -8,7 +8,7 @@
       "second": "0"
     },
     "serverUrl": {
-      "first": "http://192.168.1.51:8080",
+      "first": "http://10.202.10.147:8080",
       "second": "1"
     },
     "globalAppConfigurationPath": {
@@ -178,6 +178,26 @@
     "receiveSupplierOrderPath": {
       "first": "supplierOrders/receive",
       "second": "38"
+    },
+    "getSupplierContractsPath": {
+      "first": "supplierContracts/get",
+      "second": "1479"
+    },
+    "upsertSupplierContractPath": {
+      "first": "supplierContracts/upsert",
+      "second": "1480"
+    },
+    "acceptSupplierContractPath": {
+      "first": "supplierContracts/accept",
+      "second": "1481"
+    },
+    "declineSupplierContractPath": {
+      "first": "supplierContracts/decline",
+      "second": "1482"
+    },
+    "archiveSupplierContractPath": {
+      "first": "supplierContracts/archive",
+      "second": "1483"
     },
     "companyForms": [
       {
