@@ -1424,6 +1424,12 @@ object StoreWorkerRequests: Table("store_worker_requests") {
     val decidedByUserId = uuid("decided_by_user_id").nullable()
     val roleId = text("role_id").default(WORKER_ROLE_STANDARD)
     val permissions = jsonb("permissions", Json, ListSerializer(String.serializer())).default(STANDARD_STORE_PERMISSION_IDS)
+    val jobTitle = text("job_title").default("")
+    val jobTitleLocalized = jsonb("job_title_localized", Json, ListSerializer(LocalizedStringDataModel.serializer())).default(emptyList())
+    val salary = text("salary").default("")
+    val salaryCurrencyCode = text("salary_currency_code").default("KZT")
+    val offerNote = text("offer_note").nullable()
+    val offerNoteLocalized = jsonb("offer_note_localized", Json, ListSerializer(LocalizedStringDataModel.serializer())).default(emptyList())
     val workshiftPasswordHash = text("workshift_password_hash").nullable()
     val note = text("note").nullable()
     val noteLocalized = jsonb("note_localized", Json, ListSerializer(LocalizedStringDataModel.serializer())).default(emptyList())
@@ -1442,6 +1448,10 @@ object StoreWorkerMemberships: Table("store_worker_memberships") {
     val requestId = uuid("request_id").nullable()
     val roleId = text("role_id").default(WORKER_ROLE_STANDARD)
     val permissions = jsonb("permissions", Json, ListSerializer(String.serializer())).default(STANDARD_STORE_PERMISSION_IDS)
+    val jobTitle = text("job_title").default("")
+    val jobTitleLocalized = jsonb("job_title_localized", Json, ListSerializer(LocalizedStringDataModel.serializer())).default(emptyList())
+    val salary = text("salary").default("")
+    val salaryCurrencyCode = text("salary_currency_code").default("KZT")
     val workshiftPasswordHash = text("workshift_password_hash").nullable()
     val requestedAtMillis = long("requested_at_millis").default(0L)
     val acceptedAtMillis = long("accepted_at_millis")
@@ -4278,6 +4288,44 @@ private fun cleanWorkerRoleId(input: String): String {
     return clean.ifBlank { WORKER_ROLE_STANDARD }
 }
 
+private fun cleanWorkerJobTitle(input: String?): String = input
+    ?.trim()
+    ?.replace(Regex("\\s+"), " ")
+    ?.take(120)
+    ?.takeIf { it.isNotBlank() }
+    .orEmpty()
+
+private fun cleanWorkerSalary(input: String?): String {
+    val clean = input
+        ?.trim()
+        ?.replace(',', '.')
+        ?.filter { it.isDigit() || it == '.' }
+        ?.let { raw ->
+            val firstDot = raw.indexOf('.')
+            if (firstDot < 0) raw else raw.take(firstDot + 1) + raw.drop(firstDot + 1).replace(".", "")
+        }
+        ?.trim('.')
+        ?.take(16)
+        .orEmpty()
+    if (clean.isBlank()) return ""
+    val number = clean.toDoubleOrNull() ?: return ""
+    if (number < 0.0) return ""
+    val parts = clean.split('.', limit = 2)
+    val whole = parts.getOrNull(0).orEmpty().trimStart('0').ifBlank { "0" }
+    val fractional = parts.getOrNull(1)?.take(2).orEmpty()
+    return if (fractional.isBlank()) whole else "$whole.$fractional"
+}
+
+private fun cleanWorkerSalaryCurrencyCode(input: String?): String {
+    val clean = input
+        ?.trim()
+        ?.uppercase()
+        ?.filter { it in 'A'..'Z' }
+        ?.take(4)
+        .orEmpty()
+    return clean.ifBlank { "KZT" }
+}
+
 private fun canAssignWorkerPermissionsInsideTransaction(userId: UUID, storeId: UUID): Boolean {
     return isStoreOwnerInsideTransaction(userId, storeId) ||
             userHasStorePermissionInsideTransaction(userId, storeId, STORE_PERMISSION_WORKERS_INVITE) ||
@@ -5581,6 +5629,10 @@ private fun ResultRow.toStoreWorkerDataModel(): StoreWorkerDataModel {
         lastName = this[Users.lastName],
         roleId = this[StoreWorkerMemberships.roleId],
         permissions = normalizeStorePermissionIds(this[StoreWorkerMemberships.permissions]),
+        jobTitle = this[StoreWorkerMemberships.jobTitle],
+        jobTitleLocalized = this[StoreWorkerMemberships.jobTitleLocalized],
+        salary = this[StoreWorkerMemberships.salary],
+        salaryCurrencyCode = this[StoreWorkerMemberships.salaryCurrencyCode],
         requestedAtMillis = this[StoreWorkerMemberships.requestedAtMillis],
         acceptedAtMillis = this[StoreWorkerMemberships.acceptedAtMillis],
         acceptedByUserId = this[StoreWorkerMemberships.acceptedByUserId].toString(),
@@ -5745,6 +5797,12 @@ private fun ResultRow.toStoreWorkerRequestDataModel(): StoreWorkerRequestDataMod
         decidedByUserId = this[StoreWorkerRequests.decidedByUserId]?.toString(),
         roleId = this[StoreWorkerRequests.roleId],
         permissions = normalizeStorePermissionIds(this[StoreWorkerRequests.permissions]),
+        jobTitle = this[StoreWorkerRequests.jobTitle],
+        jobTitleLocalized = this[StoreWorkerRequests.jobTitleLocalized],
+        salary = this[StoreWorkerRequests.salary],
+        salaryCurrencyCode = this[StoreWorkerRequests.salaryCurrencyCode],
+        offerNote = this[StoreWorkerRequests.offerNote],
+        offerNoteLocalized = this[StoreWorkerRequests.offerNoteLocalized],
         note = this[StoreWorkerRequests.note],
         noteLocalized = this[StoreWorkerRequests.noteLocalized],
         responseNote = this[StoreWorkerRequests.responseNote],
@@ -12609,6 +12667,12 @@ fun Application.module() {
                             it[StoreWorkerRequests.requestedAtMillis] = now
                             it[StoreWorkerRequests.roleId] = WORKER_ROLE_STANDARD
                             it[StoreWorkerRequests.permissions] = STANDARD_STORE_PERMISSION_IDS
+                            it[StoreWorkerRequests.jobTitle] = ""
+                            it[StoreWorkerRequests.jobTitleLocalized] = emptyList()
+                            it[StoreWorkerRequests.salary] = ""
+                            it[StoreWorkerRequests.salaryCurrencyCode] = "KZT"
+                            it[StoreWorkerRequests.offerNote] = null
+                            it[StoreWorkerRequests.offerNoteLocalized] = emptyList()
                             it[StoreWorkerRequests.workshiftPasswordHash] = null
                             it[StoreWorkerRequests.note] = requestNote
                             it[StoreWorkerRequests.noteLocalized] = requestNoteLocalized
@@ -12646,6 +12710,10 @@ fun Application.module() {
                     val now = System.currentTimeMillis()
                     val role = cleanWorkerRoleId(body.roleId)
                     val requestedPermissions = cleanPermissionIds(body.permissions).ifEmpty { defaultStorePermissionsForRole(role) }
+                    val jobTitle = cleanWorkerJobTitle(body.jobTitle)
+                    val jobTitleLocalized = localizedNoteForStorage(jobTitle.takeIf { it.isNotBlank() }, body.jobTitleLocalized)
+                    val salary = cleanWorkerSalary(body.salary)
+                    val salaryCurrencyCode = cleanWorkerSalaryCurrencyCode(body.salaryCurrencyCode)
                     val inviteNote = cleanOptionalText(body.note)
                     val inviteNoteLocalized = localizedNoteForStorage(inviteNote, body.noteLocalized)
                     var failureMessage: List<LocalizedStringDataModel>? = null
@@ -12717,6 +12785,12 @@ fun Application.module() {
                             it[StoreWorkerRequests.requestedAtMillis] = now
                             it[StoreWorkerRequests.roleId] = role
                             it[StoreWorkerRequests.permissions] = permissions
+                            it[StoreWorkerRequests.jobTitle] = jobTitle
+                            it[StoreWorkerRequests.jobTitleLocalized] = jobTitleLocalized
+                            it[StoreWorkerRequests.salary] = salary
+                            it[StoreWorkerRequests.salaryCurrencyCode] = salaryCurrencyCode
+                            it[StoreWorkerRequests.offerNote] = inviteNote
+                            it[StoreWorkerRequests.offerNoteLocalized] = inviteNoteLocalized
                             it[StoreWorkerRequests.workshiftPasswordHash] = null
                             it[StoreWorkerRequests.note] = inviteNote
                             it[StoreWorkerRequests.noteLocalized] = inviteNoteLocalized
@@ -12764,7 +12838,6 @@ fun Application.module() {
                             .where {
                                 (StoreWorkerRequests.id eq requestId) and
                                         (StoreWorkerRequests.requesterUserId eq userId) and
-                                        (StoreWorkerRequests.direction eq WORKER_REQUEST_DIRECTION_STORE_TO_USER) and
                                         (StoreWorkerRequests.status eq WORKER_REQUEST_STATUS_INVITED)
                             }
                             .singleOrNull()
@@ -12789,6 +12862,10 @@ fun Application.module() {
                                 it[StoreWorkerMemberships.requestId] = requestId
                                 it[StoreWorkerMemberships.roleId] = requestRow[StoreWorkerRequests.roleId]
                                 it[StoreWorkerMemberships.permissions] = requestRow[StoreWorkerRequests.permissions]
+                                it[StoreWorkerMemberships.jobTitle] = requestRow[StoreWorkerRequests.jobTitle]
+                                it[StoreWorkerMemberships.jobTitleLocalized] = requestRow[StoreWorkerRequests.jobTitleLocalized]
+                                it[StoreWorkerMemberships.salary] = requestRow[StoreWorkerRequests.salary]
+                                it[StoreWorkerMemberships.salaryCurrencyCode] = requestRow[StoreWorkerRequests.salaryCurrencyCode]
                                 it[StoreWorkerMemberships.workshiftPasswordHash] = null
                                 it[StoreWorkerMemberships.requestedAtMillis] = requestRow[StoreWorkerRequests.requestedAtMillis]
                                 it[StoreWorkerMemberships.acceptedAtMillis] = now
@@ -12799,6 +12876,10 @@ fun Application.module() {
                             StoreWorkerMemberships.update({ StoreWorkerMemberships.id eq membershipId }) {
                                 it[StoreWorkerMemberships.roleId] = requestRow[StoreWorkerRequests.roleId]
                                 it[StoreWorkerMemberships.permissions] = requestRow[StoreWorkerRequests.permissions]
+                                it[StoreWorkerMemberships.jobTitle] = requestRow[StoreWorkerRequests.jobTitle]
+                                it[StoreWorkerMemberships.jobTitleLocalized] = requestRow[StoreWorkerRequests.jobTitleLocalized]
+                                it[StoreWorkerMemberships.salary] = requestRow[StoreWorkerRequests.salary]
+                                it[StoreWorkerMemberships.salaryCurrencyCode] = requestRow[StoreWorkerRequests.salaryCurrencyCode]
                                 it[StoreWorkerMemberships.workshiftPasswordHash] = null
                                 it[StoreWorkerMemberships.acceptedAtMillis] = now
                                 it[StoreWorkerMemberships.acceptedByUserId] = accepterUserId
@@ -12827,7 +12908,7 @@ fun Application.module() {
                             workerUserId = userId,
                             actorUserId = userId,
                             accepted = true,
-                            direction = WORKER_REQUEST_DIRECTION_STORE_TO_USER,
+                            direction = requestRow[StoreWorkerRequests.direction],
                             nowMillis = now
                         )
 
@@ -12860,7 +12941,6 @@ fun Application.module() {
                         val updated = StoreWorkerRequests.update({
                             (StoreWorkerRequests.id eq requestId) and
                                     (StoreWorkerRequests.requesterUserId eq userId) and
-                                    (StoreWorkerRequests.direction eq WORKER_REQUEST_DIRECTION_STORE_TO_USER) and
                                     (StoreWorkerRequests.status eq WORKER_REQUEST_STATUS_INVITED)
                         }) {
                             it[StoreWorkerRequests.status] = WORKER_REQUEST_STATUS_DECLINED
@@ -12889,7 +12969,7 @@ fun Application.module() {
                             workerUserId = userId,
                             actorUserId = userId,
                             accepted = false,
-                            direction = WORKER_REQUEST_DIRECTION_STORE_TO_USER,
+                            direction = requestRow[StoreWorkerRequests.direction],
                             nowMillis = now
                         )
 
@@ -12911,12 +12991,16 @@ fun Application.module() {
                     val now = System.currentTimeMillis()
                     val role = cleanWorkerRoleId(body.roleId)
                     val requestedPermissions = cleanPermissionIds(body.permissions).ifEmpty { defaultStorePermissionsForRole(role) }
+                    val jobTitle = cleanWorkerJobTitle(body.jobTitle)
+                    val jobTitleLocalized = localizedNoteForStorage(jobTitle.takeIf { it.isNotBlank() }, body.jobTitleLocalized)
+                    val salary = cleanWorkerSalary(body.salary)
+                    val salaryCurrencyCode = cleanWorkerSalaryCurrencyCode(body.salaryCurrencyCode)
                     val responseNote = cleanOptionalText(body.responseNote ?: body.note)
                     val responseNoteLocalized = localizedNoteForStorage(responseNote, body.responseNoteLocalized)
                     var failureMessage: List<LocalizedStringDataModel>? = null
-                    var alreadyAccepted = false
+                    var alreadyOffered = false
 
-                    val worker = newSuspendedTransaction(aitaServerIoContext) {
+                    val request = newSuspendedTransaction(aitaServerIoContext) {
                         val requestRow = StoreWorkerRequests
                             .selectAll()
                             .where { StoreWorkerRequests.id eq requestId }
@@ -12953,90 +13037,79 @@ fun Application.module() {
                         }
 
                         val workerUserId = requestRow[StoreWorkerRequests.requesterUserId]
-                        val currentStatus = requestRow[StoreWorkerRequests.status]
-
-                        if (currentStatus == WORKER_REQUEST_STATUS_DECLINED) {
-                            failureMessage = simpleMessage(
-                                main = "This employment request has already been declined",
-                                ru = "Эта заявка на работу уже отклонена",
-                                kk = "Бұл жұмысқа өтінім бұрын қабылданбаған"
-                            )
+                        val activeMembership = StoreWorkerMemberships
+                            .selectAll()
+                            .where { (StoreWorkerMemberships.storeId eq requestStoreId) and (StoreWorkerMemberships.userId eq workerUserId) and (StoreWorkerMemberships.isActive eq true) }
+                            .empty()
+                            .not()
+                        if (activeMembership) {
+                            failureMessage = getResponse("62").message
                             return@newSuspendedTransaction null
                         }
 
-                        val existing = StoreWorkerMemberships
-                            .selectAll()
-                            .where { (StoreWorkerMemberships.storeId eq requestStoreId) and (StoreWorkerMemberships.userId eq workerUserId) and (StoreWorkerMemberships.isActive eq true) }
-                            .singleOrNull()
+                        val currentStatus = requestRow[StoreWorkerRequests.status]
 
-                        val membershipId = existing?.get(StoreWorkerMemberships.id) ?: UUID.randomUUID()
-
-                        if (currentStatus == WORKER_REQUEST_STATUS_ACCEPTED && existing != null) {
-                            alreadyAccepted = true
-                        } else if (existing == null) {
-                            StoreWorkerMemberships.insert {
-                                it[StoreWorkerMemberships.id] = membershipId
-                                it[StoreWorkerMemberships.storeId] = requestStoreId
-                                it[StoreWorkerMemberships.userId] = workerUserId
-                                it[StoreWorkerMemberships.requestId] = requestId
-                                it[StoreWorkerMemberships.roleId] = role
-                                it[StoreWorkerMemberships.permissions] = permissions
-                                it[StoreWorkerMemberships.workshiftPasswordHash] = null
-                                it[StoreWorkerMemberships.requestedAtMillis] = requestRow[StoreWorkerRequests.requestedAtMillis]
-                                it[StoreWorkerMemberships.acceptedAtMillis] = now
-                                it[StoreWorkerMemberships.acceptedByUserId] = userId
-                                it[StoreWorkerMemberships.isActive] = true
+                        when (currentStatus) {
+                            WORKER_REQUEST_STATUS_DECLINED -> {
+                                failureMessage = simpleMessage(
+                                    main = "This employment request has already been declined",
+                                    ru = "Эта заявка на работу уже отклонена",
+                                    kk = "Бұл жұмысқа өтінім бұрын қабылданбаған"
+                                )
+                                return@newSuspendedTransaction null
                             }
-                        } else {
-                            StoreWorkerMemberships.update({ StoreWorkerMemberships.id eq membershipId }) {
-                                it[StoreWorkerMemberships.roleId] = role
-                                it[StoreWorkerMemberships.permissions] = permissions
-                                it[StoreWorkerMemberships.acceptedAtMillis] = now
-                                it[StoreWorkerMemberships.acceptedByUserId] = userId
-                                it[StoreWorkerMemberships.isActive] = true
-                                it[StoreWorkerMemberships.updatedAt] = Instant.now()
+                            WORKER_REQUEST_STATUS_INVITED -> alreadyOffered = true
+                            WORKER_REQUEST_STATUS_ACCEPTED -> {
+                                failureMessage = simpleMessage(
+                                    main = "This employment request has already been accepted",
+                                    ru = "Эта заявка на работу уже принята",
+                                    kk = "Бұл жұмысқа өтінім бұрын қабылданған"
+                                )
+                                return@newSuspendedTransaction null
                             }
                         }
 
-                        StoreUsers.insertIgnore {
-                            it[StoreUsers.storeId] = requestStoreId
-                            it[StoreUsers.userId] = workerUserId
-                        }
                         StoreWorkerRequests.update({ StoreWorkerRequests.id eq requestId }) {
-                            it[StoreWorkerRequests.status] = WORKER_REQUEST_STATUS_ACCEPTED
-                            it[StoreWorkerRequests.decidedAtMillis] = requestRow[StoreWorkerRequests.decidedAtMillis] ?: now
-                            it[StoreWorkerRequests.decidedByUserId] = requestRow[StoreWorkerRequests.decidedByUserId] ?: userId
+                            it[StoreWorkerRequests.status] = WORKER_REQUEST_STATUS_INVITED
+                            it[StoreWorkerRequests.decidedAtMillis] = now
+                            it[StoreWorkerRequests.decidedByUserId] = userId
                             it[StoreWorkerRequests.roleId] = role
                             it[StoreWorkerRequests.permissions] = permissions
-                            it[StoreWorkerRequests.responseNote] = responseNote ?: requestRow[StoreWorkerRequests.responseNote]
-                            it[StoreWorkerRequests.responseNoteLocalized] = responseNoteLocalized.ifEmpty { requestRow[StoreWorkerRequests.responseNoteLocalized] }
+                            it[StoreWorkerRequests.jobTitle] = jobTitle
+                            it[StoreWorkerRequests.jobTitleLocalized] = jobTitleLocalized
+                            it[StoreWorkerRequests.salary] = salary
+                            it[StoreWorkerRequests.salaryCurrencyCode] = salaryCurrencyCode
+                            it[StoreWorkerRequests.offerNote] = responseNote
+                            it[StoreWorkerRequests.offerNoteLocalized] = responseNoteLocalized
                             it[StoreWorkerRequests.updatedAt] = Instant.now()
                         }
 
-                        if (!alreadyAccepted) {
-                            notifyEmploymentDecisionInsideTransaction(
-                                requestId = requestId,
+                        if (!alreadyOffered) {
+                            notifyEmploymentInviteCreatedInsideTransaction(
+                                invitedUserId = workerUserId,
+                                inviterUserId = userId,
                                 storeId = requestStoreId,
-                                workerUserId = workerUserId,
-                                actorUserId = userId,
-                                accepted = true,
-                                direction = WORKER_REQUEST_DIRECTION_USER_TO_STORE,
+                                requestId = requestId,
                                 nowMillis = now
                             )
                         }
 
-                        StoreWorkerMemberships
-                            .innerJoin(Stores, { StoreWorkerMemberships.storeId }, { Stores.id })
-                            .innerJoin(Users, { StoreWorkerMemberships.userId }, { Users.id })
+                        StoreWorkerRequests
+                            .innerJoin(Stores, { StoreWorkerRequests.storeId }, { Stores.id })
+                            .innerJoin(Users, { StoreWorkerRequests.requesterUserId }, { Users.id })
                             .selectAll()
-                            .where { StoreWorkerMemberships.id eq membershipId }
+                            .where { StoreWorkerRequests.id eq requestId }
                             .single()
-                            .toStoreWorkerDataModel()
+                            .toStoreWorkerRequestDataModel()
                     }
 
-                    worker?.let {
-                        publishWorkerRealtimeBundle(it.storeId, if (alreadyAccepted) "employment_request_already_accepted" else "employment_request_accepted")
-                        call.genericResponse(HttpStatusCode.OK, payload = it, message = getResponse("56").message)
+                    request?.let {
+                        publishWorkerRealtimeBundle(it.storeId, if (alreadyOffered) "employment_offer_already_waiting" else "employment_offer_sent")
+                        call.genericResponse(HttpStatusCode.OK, payload = it, message = simpleMessage(
+                            main = if (alreadyOffered) "Job offer is already waiting for worker" else "Job offer sent to worker",
+                            ru = if (alreadyOffered) "Предложение работы уже ожидает работника" else "Предложение работы отправлено работнику",
+                            kk = if (alreadyOffered) "Жұмыс ұсынысы қызметкерді күтіп тұр" else "Жұмыс ұсынысы қызметкерге жіберілді"
+                        ))
                     } ?: call.genericResponseNoPayload(HttpStatusCode.Conflict, failureMessage ?: getResponse("3").message)
                 }
 
@@ -13141,6 +13214,10 @@ fun Application.module() {
                         ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
                     val role = cleanWorkerRoleId(body.roleId)
                     val requestedPermissions = cleanPermissionIds(body.permissions)
+                    val jobTitle = cleanWorkerJobTitle(body.jobTitle)
+                    val jobTitleLocalized = localizedNoteForStorage(jobTitle.takeIf { it.isNotBlank() }, body.jobTitleLocalized)
+                    val salary = cleanWorkerSalary(body.salary)
+                    val salaryCurrencyCode = cleanWorkerSalaryCurrencyCode(body.salaryCurrencyCode)
                     val now = System.currentTimeMillis()
                     var failureMessage: List<LocalizedStringDataModel>? = null
 
@@ -13177,6 +13254,10 @@ fun Application.module() {
                         val updated = StoreWorkerMemberships.update({ (StoreWorkerMemberships.id eq workerId) and (StoreWorkerMemberships.isActive eq true) }) {
                             it[StoreWorkerMemberships.roleId] = role
                             it[StoreWorkerMemberships.permissions] = permissions
+                            it[StoreWorkerMemberships.jobTitle] = jobTitle
+                            it[StoreWorkerMemberships.jobTitleLocalized] = jobTitleLocalized
+                            it[StoreWorkerMemberships.salary] = salary
+                            it[StoreWorkerMemberships.salaryCurrencyCode] = salaryCurrencyCode
                             it[StoreWorkerMemberships.updatedAt] = Instant.now()
                         }
 
@@ -13283,6 +13364,12 @@ fun Application.module() {
                             it[StoreWorkerRequests.requestedAtMillis] = now
                             it[StoreWorkerRequests.roleId] = existingWorkerRow[StoreWorkerMemberships.roleId]
                             it[StoreWorkerRequests.permissions] = existingWorkerRow[StoreWorkerMemberships.permissions]
+                            it[StoreWorkerRequests.jobTitle] = existingWorkerRow[StoreWorkerMemberships.jobTitle]
+                            it[StoreWorkerRequests.jobTitleLocalized] = existingWorkerRow[StoreWorkerMemberships.jobTitleLocalized]
+                            it[StoreWorkerRequests.salary] = existingWorkerRow[StoreWorkerMemberships.salary]
+                            it[StoreWorkerRequests.salaryCurrencyCode] = existingWorkerRow[StoreWorkerMemberships.salaryCurrencyCode]
+                            it[StoreWorkerRequests.offerNote] = null
+                            it[StoreWorkerRequests.offerNoteLocalized] = emptyList()
                             it[StoreWorkerRequests.workshiftPasswordHash] = null
                             it[StoreWorkerRequests.note] = requestNote
                             it[StoreWorkerRequests.noteLocalized] = requestNoteLocalized

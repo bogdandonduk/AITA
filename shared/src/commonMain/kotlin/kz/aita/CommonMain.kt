@@ -3440,6 +3440,10 @@ fun inviteStoreWorker(
     userId: String,
     roleId: String,
     permissions: List<String>,
+    jobTitle: String = "",
+    jobTitleLocalized: List<LocalizedStringDataModel> = emptyList(),
+    salary: String = "",
+    salaryCurrencyCode: String = "KZT",
     note: String? = null,
     workerPassword: String? = null,
     onCompleted: ((DataState<StoreWorkerRequestDataModel>) -> Unit)? = null
@@ -3455,6 +3459,10 @@ fun inviteStoreWorker(
                         userId = userId.trim(),
                         roleId = roleId,
                         permissions = permissions,
+                        jobTitle = jobTitle.trim(),
+                        jobTitleLocalized = jobTitleLocalized,
+                        salary = salary.trim(),
+                        salaryCurrencyCode = salaryCurrencyCode.trim().uppercase(),
                         note = cleanNote,
                         workerPassword = workerPassword,
                         noteLocalized = cleanNote.toLocalizedUserNote()
@@ -3557,20 +3565,28 @@ fun acceptStoreEmploymentRequest(
     requestId: String,
     roleId: String,
     permissions: List<String>,
+    jobTitle: String = "",
+    jobTitleLocalized: List<LocalizedStringDataModel> = emptyList(),
+    salary: String = "",
+    salaryCurrencyCode: String = "KZT",
     note: String? = null,
     workerPassword: String? = null,
-    onCompleted: ((DataState<StoreWorkerDataModel>) -> Unit)? = null
+    onCompleted: ((DataState<StoreWorkerRequestDataModel>) -> Unit)? = null
 ) {
     if (!decideStoreEmploymentMutex.isLocked)
         GlobalScope.launch(Dispatchers.ourIo) {
             decideStoreEmploymentMutex.withLock {
-                val response = networkRequest<StoreWorkerDataModel, WorkerEmploymentDecisionRequestDataModel>(
+                val response = networkRequest<StoreWorkerRequestDataModel, WorkerEmploymentDecisionRequestDataModel>(
                     method = HttpMethod.Post,
                     endpointUrl = globalAppConfigurationState.payloadValue.acceptStoreEmploymentPath.first,
                     body = WorkerEmploymentDecisionRequestDataModel(
                         requestId = requestId,
                         roleId = roleId,
                         permissions = permissions,
+                        jobTitle = jobTitle.trim(),
+                        jobTitleLocalized = jobTitleLocalized,
+                        salary = salary.trim(),
+                        salaryCurrencyCode = salaryCurrencyCode.trim().uppercase(),
                         note = note?.trim()?.takeIf { it.isNotBlank() },
                         workerPassword = workerPassword,
                         responseNote = note?.trim()?.takeIf { it.isNotBlank() },
@@ -3583,23 +3599,20 @@ fun acceptStoreEmploymentRequest(
                     postInAppNotification(response.message, NotificationType.Negative)
                     onCompleted?.invoke(DataState.Empty(response.message))
                 } else {
-                    storeWorkerMembershipsState.emit(
+                    incomingWorkerRequestsState.emit(
                         DataState.Success(
-                            storeWorkerMembershipsState.payloadValue.orEmpty().filterNot { it.id == response.payload.id } + response.payload,
+                            incomingWorkerRequestsState.payloadValue.orEmpty().filterNot { it.id == response.payload.id } + response.payload,
                             response.message
                         )
                     )
                     val realStoreId = response.payload.storeId.ifBlank { storeId }
                     val visibleStoreId = activeStoreIdState.value?.takeIf { it.isNotBlank() } ?: realStoreId
                     getIncomingWorkerRequests(visibleStoreId)
-                    getStoreWorkers(visibleStoreId)
                     if (visibleStoreId != realStoreId) {
                         getIncomingWorkerRequests(realStoreId)
-                        getStoreWorkers(realStoreId)
                     }
                     getMyWorkerRequests()
                     getNotifications()
-                    getStores()
                     postInAppNotification(response.message, NotificationType.Positive)
                     onCompleted?.invoke(DataState.Success(response.payload, response.message))
                 }
@@ -3655,6 +3668,10 @@ fun updateStoreWorkerPermissions(
     workerId: String,
     roleId: String,
     permissions: List<String>,
+    jobTitle: String = "",
+    jobTitleLocalized: List<LocalizedStringDataModel> = emptyList(),
+    salary: String = "",
+    salaryCurrencyCode: String = "KZT",
     workerPassword: String? = null,
     onCompleted: ((DataState<StoreWorkerDataModel>) -> Unit)? = null
 ) {
@@ -3664,7 +3681,16 @@ fun updateStoreWorkerPermissions(
                 val response = networkRequest<StoreWorkerDataModel, WorkerPermissionsUpdateRequestDataModel>(
                     method = HttpMethod.Post,
                     endpointUrl = globalAppConfigurationState.payloadValue.updateStoreWorkerPermissionsPath.first,
-                    body = WorkerPermissionsUpdateRequestDataModel(workerId, roleId, permissions, workerPassword),
+                    body = WorkerPermissionsUpdateRequestDataModel(
+                        workerId = workerId,
+                        roleId = roleId,
+                        permissions = permissions,
+                        jobTitle = jobTitle.trim(),
+                        jobTitleLocalized = jobTitleLocalized,
+                        salary = salary.trim(),
+                        salaryCurrencyCode = salaryCurrencyCode.trim().uppercase(),
+                        workerPassword = workerPassword
+                    ),
                     headers = mapOf("store_id" to storeId)
                 )
 
@@ -5590,6 +5616,8 @@ val drawablePathIconAppModeBuyerState = MutableStateFlow("svg/69_0.svg")
 val drawablePathIconAppModeSupplierState = MutableStateFlow("svg/70_0.svg")
 val drawablePathIconAppModeManufacturerState = MutableStateFlow("svg/71_0.svg")
 val drawablePathIconSupplierCatalogState = MutableStateFlow("svg/72_0.svg")
+val drawablePathIconBuyerAgeRestrictionState = MutableStateFlow("svg/73_0.svg")
+val drawablePathIconTransactionTimeRestrictionState = MutableStateFlow("svg/74_0.svg")
 val drawablePathIconWorkersState = MutableStateFlow("svg/22_0.svg")
 val drawablePathIconSuppliersState = MutableStateFlow("svg/23_0.svg")
 val drawablePathIconDebtorsState = MutableStateFlow("svg/24_0.svg")
@@ -6179,6 +6207,16 @@ fun StoreWorkerRequestDataModel.isEmploymentResponse(): Boolean {
 fun StoreWorkerRequestDataModel.requestNoteVisible(language: String): String? {
     return noteLocalized.extractLocalizedString(language)?.trim()?.takeIf { it.isNotBlank() }
         ?: note?.trim()?.takeIf { it.isNotBlank() }
+}
+
+fun StoreWorkerRequestDataModel.offerNoteVisible(language: String): String? {
+    return offerNoteLocalized.extractLocalizedString(language)?.trim()?.takeIf { it.isNotBlank() }
+        ?: offerNote?.trim()?.takeIf { it.isNotBlank() }
+        ?: when {
+            direction == WORKER_REQUEST_DIRECTION_STORE_TO_USER -> requestNoteVisible(language)
+            direction == WORKER_REQUEST_DIRECTION_USER_TO_STORE && status == WORKER_REQUEST_STATUS_INVITED -> responseNoteVisible(language)
+            else -> null
+        }
 }
 
 fun StoreWorkerRequestDataModel.responseNoteVisible(language: String): String? {
@@ -7636,6 +7674,12 @@ fun updateDrawables(
         )
         drawablePathIconSupplierCatalogState.emit(
             drawablePath(72L)
+        )
+        drawablePathIconBuyerAgeRestrictionState.emit(
+            drawablePath(73L)
+        )
+        drawablePathIconTransactionTimeRestrictionState.emit(
+            drawablePath(74L)
         )
         drawablePathIconWorkersState.emit(
             drawablePath(22L)
@@ -16854,6 +16898,10 @@ data class StoreWorkerDataModel(
     val lastName: String = "",
     val roleId: String = WORKER_ROLE_STANDARD,
     val permissions: List<String> = STANDARD_STORE_PERMISSION_IDS,
+    val jobTitle: String = "",
+    val jobTitleLocalized: List<LocalizedStringDataModel> = emptyList(),
+    val salary: String = "",
+    val salaryCurrencyCode: String = "KZT",
     val requestedAtMillis: Long = 0L,
     val acceptedAtMillis: Long = 0L,
     val acceptedByUserId: String = "",
@@ -16884,6 +16932,12 @@ data class StoreWorkerRequestDataModel(
     val decidedByUserId: String? = null,
     val roleId: String = WORKER_ROLE_STANDARD,
     val permissions: List<String> = STANDARD_STORE_PERMISSION_IDS,
+    val jobTitle: String = "",
+    val jobTitleLocalized: List<LocalizedStringDataModel> = emptyList(),
+    val salary: String = "",
+    val salaryCurrencyCode: String = "KZT",
+    val offerNote: String? = null,
+    val offerNoteLocalized: List<LocalizedStringDataModel> = emptyList(),
     val note: String? = null,
     val noteLocalized: List<LocalizedStringDataModel> = emptyList(),
     val responseNote: String? = null,
@@ -16934,6 +16988,10 @@ data class WorkerEmploymentDecisionRequestDataModel(
     val requestId: String,
     val roleId: String = WORKER_ROLE_STANDARD,
     val permissions: List<String> = STANDARD_STORE_PERMISSION_IDS,
+    val jobTitle: String = "",
+    val jobTitleLocalized: List<LocalizedStringDataModel> = emptyList(),
+    val salary: String = "",
+    val salaryCurrencyCode: String = "KZT",
     val note: String? = null,
     val workerPassword: String? = null,
     val responseNote: String? = null,
@@ -16945,6 +17003,10 @@ data class WorkerStoreInviteCreateDataModel(
     val userId: String,
     val roleId: String = WORKER_ROLE_STANDARD,
     val permissions: List<String> = STANDARD_STORE_PERMISSION_IDS,
+    val jobTitle: String = "",
+    val jobTitleLocalized: List<LocalizedStringDataModel> = emptyList(),
+    val salary: String = "",
+    val salaryCurrencyCode: String = "KZT",
     val note: String? = null,
     val workerPassword: String? = null,
     val noteLocalized: List<LocalizedStringDataModel> = emptyList()
@@ -16963,6 +17025,10 @@ data class WorkerPermissionsUpdateRequestDataModel(
     val workerId: String,
     val roleId: String,
     val permissions: List<String>,
+    val jobTitle: String = "",
+    val jobTitleLocalized: List<LocalizedStringDataModel> = emptyList(),
+    val salary: String = "",
+    val salaryCurrencyCode: String = "KZT",
     val workerPassword: String? = null
 )
 

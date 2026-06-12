@@ -28309,6 +28309,384 @@
           "value": "Өндіруші көпірі"
         }
       ]
+    },
+    {
+      "id": 1432,
+      "values": [
+        {
+          "language": "main",
+          "value": "Job title"
+        },
+        {
+          "language": "en",
+          "value": "Job title"
+        },
+        {
+          "language": "ru",
+          "value": "Должность"
+        },
+        {
+          "language": "kk",
+          "value": "Лауазым"
+        }
+      ]
+    },
+    {
+      "id": 1433,
+      "values": [
+        {
+          "language": "main",
+          "value": "Salary"
+        },
+        {
+          "language": "en",
+          "value": "Salary"
+        },
+        {
+          "language": "ru",
+          "value": "Зарплата"
+        },
+        {
+          "language": "kk",
+          "value": "Жалақы"
+        }
+      ]
+    },
+    {
+      "id": 1434,
+      "values": [
+        {
+          "language": "main",
+          "value": "Send job offer"
+        },
+        {
+          "language": "en",
+          "value": "Send job offer"
+        },
+        {
+          "language": "ru",
+          "value": "Отправить предложение работы"
+        },
+        {
+          "language": "kk",
+          "value": "Жұмыс ұсынысын жіберу"
+        }
+      ]
+    },
+    {
+      "id": 1435,
+      "values": [
+        {
+          "language": "main",
+          "value": "The worker will review this job offer and accept or decline it."
+        },
+        {
+          "language": "en",
+          "value": "The worker will review this job offer and accept or decline it."
+        },
+        {
+          "language": "ru",
+          "value": "Сотрудник увидит это предложение работы и примет или отклонит его."
+        },
+        {
+          "language": "kk",
+          "value": "Қызметкер бұл жұмыс ұсынысын қарап, қабылдайды немесе бас тартады."
+        }
+      ]
+    },
+    {
+      "id": 1436,
+      "values": [
+        {
+          "language": "main",
+          "value": "Offer details"
+        },
+        {
+          "language": "en",
+          "value": "Offer details"
+        },
+        {
+          "language": "ru",
+          "value": "Детали предложения"
+        },
+        {
+          "language": "kk",
+          "value": "Ұсыныс мәліметтері"
+        }
+      ]
+    },
+    {
+      "id": 1437,
+      "values": [
+        {
+          "language": "main",
+          "value": "No salary specified"
+        },
+        {
+          "language": "en",
+          "value": "No salary specified"
+        },
+        {
+          "language": "ru",
+          "value": "Зарплата не указана"
+        },
+        {
+          "language": "kk",
+          "value": "Жалақы көрсетілмеген"
+        }
+      ]
+    },
+    {
+      "id": 1438,
+      "values": [
+        {
+          "language": "main",
+          "value": "No job title specified"
+        },
+        {
+          "language": "en",
+          "value": "No job title specified"
+        },
+        {
+          "language": "ru",
+          "value": "Должность не указана"
+        },
+        {
+          "language": "kk",
+          "value": "Лауазым көрсетілмеген"
+        }
+      ]
+    },
+    {
+      "id": 1439,
+      "values": [
+        {
+          "language": "main",
+          "value": "Permissions included"
+        },
+        {
+          "language": "en",
+          "value": "Permissions included"
+        },
+        {
+          "language": "ru",
+          "value": "Включённые права"
+        },
+        {
+          "language": "kk",
+          "value": "Қосылған рұқсаттар"
+        }
+      ]
+    },
+    {
+      "id": 1440,
+      "values": [
+        {
+          "language": "main",
+          "value": "Structured employment offer"
+        },
+        {
+          "language": "en",
+          "value": "Structured employment offer"
+        },
+        {
+          "language": "ru",
+          "value": "Структурированное предложение работы"
+        },
+        {
+          "language": "kk",
+          "value": "Құрылымды жұмыс ұсынысы"
+        }
+      ]
+    },
+    {
+      "id": 1441,
+      "values": [
+        {
+          "language": "main",
+          "value": "Accept job offer?"
+        },
+        {
+          "language": "en",
+          "value": "Accept job offer?"
+        },
+        {
+          "language": "ru",
+          "value": "Принять предложение работы?"
+        },
+        {
+          "language": "kk",
+          "value": "Жұмыс ұсынысын қабылдау керек пе?"
+        }
+      ]
+    },
+    {
+      "id": 1442,
+      "values": [
+        {
+          "language": "main",
+          "value": "Decline job offer?"
+        },
+        {
+          "language": "en",
+          "value": "Decline job offer?"
+        },
+        {
+          "language": "ru",
+          "value": "Отклонить предложение работы?"
+        },
+        {
+          "language": "kk",
+          "value": "Жұмыс ұсынысынан бас тарту керек пе?"
+        }
+      ]
+    },
+    {
+      "id": 1443,
+      "values": [
+        {
+          "language": "main",
+          "value": "Accept job offer"
+        },
+        {
+          "language": "en",
+          "value": "Accept job offer"
+        },
+        {
+          "language": "ru",
+          "value": "Принять предложение"
+        },
+        {
+          "language": "kk",
+          "value": "Ұсынысты қабылдау"
+        }
+      ]
+    },
+    {
+      "id": 1444,
+      "values": [
+        {
+          "language": "main",
+          "value": "Decline job offer"
+        },
+        {
+          "language": "en",
+          "value": "Decline job offer"
+        },
+        {
+          "language": "ru",
+          "value": "Отклонить предложение"
+        },
+        {
+          "language": "kk",
+          "value": "Ұсыныстан бас тарту"
+        }
+      ]
+    },
+    {
+      "id": 1445,
+      "values": [
+        {
+          "language": "main",
+          "value": "Waiting for store to prepare an offer"
+        },
+        {
+          "language": "en",
+          "value": "Waiting for store to prepare an offer"
+        },
+        {
+          "language": "ru",
+          "value": "Ждём, пока магазин подготовит предложение"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен ұсыныс дайындағанын күтеміз"
+        }
+      ]
+    },
+    {
+      "id": 1446,
+      "values": [
+        {
+          "language": "main",
+          "value": "Employment offer from store"
+        },
+        {
+          "language": "en",
+          "value": "Employment offer from store"
+        },
+        {
+          "language": "ru",
+          "value": "Предложение работы от магазина"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкеннен жұмыс ұсынысы"
+        }
+      ]
+    },
+    {
+      "id": 1447,
+      "values": [
+        {
+          "language": "main",
+          "value": "Job offer sent"
+        },
+        {
+          "language": "en",
+          "value": "Job offer sent"
+        },
+        {
+          "language": "ru",
+          "value": "Предложение работы отправлено"
+        },
+        {
+          "language": "kk",
+          "value": "Жұмыс ұсынысы жіберілді"
+        }
+      ]
+    },
+    {
+      "id": 1448,
+      "values": [
+        {
+          "language": "main",
+          "value": "Job offer is waiting for worker"
+        },
+        {
+          "language": "en",
+          "value": "Job offer is waiting for worker"
+        },
+        {
+          "language": "ru",
+          "value": "Предложение ждёт ответа сотрудника"
+        },
+        {
+          "language": "kk",
+          "value": "Жұмыс ұсынысы қызметкердің жауабын күтуде"
+        }
+      ]
+    },
+    {
+      "id": 1449,
+      "value": [
+        {
+          "language": "main",
+          "value": "Offer note"
+        },
+        {
+          "language": "en",
+          "value": "Offer note"
+        },
+        {
+          "language": "ru",
+          "value": "Заметка предложения"
+        },
+        {
+          "language": "kk",
+          "value": "Ұсыныс жазбасы"
+        }
+      ]
     }
   ]
 }

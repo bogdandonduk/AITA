@@ -55,7 +55,10 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.compose.ui.text.*
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.input.*
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -845,6 +848,24 @@ private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallb
     put(1429L, mapOf("main" to "Copy offer note", "en" to "Copy offer note", "ru" to "Скопировать заметку предложения", "kk" to "Ұсыныс жазбасын көшіру"))
     put(1430L, mapOf("main" to "Latest status", "en" to "Latest status", "ru" to "Последний статус", "kk" to "Соңғы күй"))
     put(1431L, mapOf("main" to "Manufacturer bridge", "en" to "Manufacturer bridge", "ru" to "Мост к производителю", "kk" to "Өндіруші көпірі"))
+    put(1432L, mapOf("main" to "Job title", "en" to "Job title", "ru" to "Должность", "kk" to "Лауазым"))
+    put(1433L, mapOf("main" to "Salary", "en" to "Salary", "ru" to "Зарплата", "kk" to "Жалақы"))
+    put(1434L, mapOf("main" to "Send job offer", "en" to "Send job offer", "ru" to "Отправить предложение работы", "kk" to "Жұмыс ұсынысын жіберу"))
+    put(1435L, mapOf("main" to "The worker will review this job offer and accept or decline it.", "en" to "The worker will review this job offer and accept or decline it.", "ru" to "Сотрудник увидит это предложение работы и примет или отклонит его.", "kk" to "Қызметкер бұл жұмыс ұсынысын қарап, қабылдайды немесе бас тартады."))
+    put(1436L, mapOf("main" to "Offer details", "en" to "Offer details", "ru" to "Детали предложения", "kk" to "Ұсыныс мәліметтері"))
+    put(1437L, mapOf("main" to "No salary specified", "en" to "No salary specified", "ru" to "Зарплата не указана", "kk" to "Жалақы көрсетілмеген"))
+    put(1438L, mapOf("main" to "No job title specified", "en" to "No job title specified", "ru" to "Должность не указана", "kk" to "Лауазым көрсетілмеген"))
+    put(1439L, mapOf("main" to "Permissions included", "en" to "Permissions included", "ru" to "Включённые права", "kk" to "Қосылған рұқсаттар"))
+    put(1440L, mapOf("main" to "Structured employment offer", "en" to "Structured employment offer", "ru" to "Структурированное предложение работы", "kk" to "Құрылымды жұмыс ұсынысы"))
+    put(1441L, mapOf("main" to "Accept job offer?", "en" to "Accept job offer?", "ru" to "Принять предложение работы?", "kk" to "Жұмыс ұсынысын қабылдау керек пе?"))
+    put(1442L, mapOf("main" to "Decline job offer?", "en" to "Decline job offer?", "ru" to "Отклонить предложение работы?", "kk" to "Жұмыс ұсынысынан бас тарту керек пе?"))
+    put(1443L, mapOf("main" to "Accept job offer", "en" to "Accept job offer", "ru" to "Принять предложение", "kk" to "Ұсынысты қабылдау"))
+    put(1444L, mapOf("main" to "Decline job offer", "en" to "Decline job offer", "ru" to "Отклонить предложение", "kk" to "Ұсыныстан бас тарту"))
+    put(1445L, mapOf("main" to "Waiting for store to prepare an offer", "en" to "Waiting for store to prepare an offer", "ru" to "Ждём, пока магазин подготовит предложение", "kk" to "Дүкен ұсыныс дайындағанын күтеміз"))
+    put(1446L, mapOf("main" to "Employment offer from store", "en" to "Employment offer from store", "ru" to "Предложение работы от магазина", "kk" to "Дүкеннен жұмыс ұсынысы"))
+    put(1447L, mapOf("main" to "Job offer sent", "en" to "Job offer sent", "ru" to "Предложение работы отправлено", "kk" to "Жұмыс ұсынысы жіберілді"))
+    put(1448L, mapOf("main" to "Job offer is waiting for worker", "en" to "Job offer is waiting for worker", "ru" to "Предложение ждёт ответа сотрудника", "kk" to "Жұмыс ұсынысы қызметкердің жауабын күтуде"))
+    put(1449L, mapOf("main" to "Offer note", "en" to "Offer note", "ru" to "Заметка предложения", "kk" to "Ұсыныс жазбасы"))
 }
 
 
@@ -7813,6 +7834,103 @@ data class CartConditionUiModel(
     val statusText: String? = null
 )
 
+private data class TransactionRestrictionBadgeUiModel(
+    val key: String,
+    val label: String,
+    val iconPath: String,
+    val fallbackRes: DrawableResource,
+    val contentDescription: String
+)
+
+private fun formatStockConditionMinuteBadge(minuteOfDay: Int): String {
+    val clean = minuteOfDay.coerceIn(0, 23 * 60 + 59)
+    val hours = clean / 60
+    val minutes = clean % 60
+    return "$hours.${minutes.toString().padStart(2, '0')}"
+}
+
+private fun AppConfiguration.transactionRestrictionBadgesFor(
+    goodsItem: GoodsItemDataModel,
+    transactionTypeIndex: Int
+): List<TransactionRestrictionBadgeUiModel> {
+    val conditions = goodsItem.conditions
+        .map { it.toStockConditionDataModel().normalizedStockCondition() }
+        .filter { it.transactionTypeIndex == transactionTypeIndex }
+
+    val ageBadge = conditions
+        .filter { it.kind == STOCK_CONDITION_KIND_BUYER_MINIMUM_AGE }
+        .maxOfOrNull { it.minimumAge.coerceAtLeast(0) }
+        ?.let { age ->
+            TransactionRestrictionBadgeUiModel(
+                key = "age_$age",
+                label = "$age+",
+                iconPath = stateValues.drawablePathIconBuyerAgeRestriction,
+                fallbackRes = stateValues.drawableResIconBuyerAgeRestriction.value,
+                contentDescription = localizedStringResource(1012, "Buyer age")
+            )
+        }
+
+    val timeBadges = conditions
+        .filter { it.kind == STOCK_CONDITION_KIND_TRANSACTION_TIME_WINDOW }
+        .distinctBy { it.startsAtMinutes to it.endsAtMinutes }
+        .map { condition ->
+            TransactionRestrictionBadgeUiModel(
+                key = "time_${condition.startsAtMinutes}_${condition.endsAtMinutes}",
+                label = "${formatStockConditionMinuteBadge(condition.startsAtMinutes)}–${formatStockConditionMinuteBadge(condition.endsAtMinutes)}",
+                iconPath = stateValues.drawablePathIconTransactionTimeRestriction,
+                fallbackRes = stateValues.drawableResIconTransactionTimeRestriction.value,
+                contentDescription = localizedStringResource(1013, "Transaction time")
+            )
+        }
+
+    return listOfNotNull(ageBadge) + timeBadges
+}
+
+@Composable
+private fun AppConfiguration.TransactionRestrictionBadges(
+    badges: List<TransactionRestrictionBadgeUiModel>,
+    textColor: Color = stateValues.TextColor
+) {
+    if (badges.isEmpty()) return
+
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        badges.take(3).forEach { badge ->
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(stateValues.AccentColor.copy(alpha = 0.12f))
+                    .border(
+                        width = stateValues.unfocusedBorderWidth,
+                        color = stateValues.AccentColor.copy(alpha = 0.50f),
+                        shape = RoundedCornerShape(999.dp)
+                    )
+                    .padding(horizontal = 6.dp, vertical = 3.dp),
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CpImage(
+                    modifier = Modifier.size(13.dp),
+                    url = badge.iconPath,
+                    fallbackRes = badge.fallbackRes,
+                    contentDescription = badge.contentDescription,
+                    tintColor = stateValues.AccentColor
+                )
+                Text(
+                    text = badge.label,
+                    color = textColor,
+                    fontSize = stateValues.smallTextSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
 @Composable
 fun AppConfiguration.GoodsItemInCartWidget(
     modifier: Modifier = Modifier,
@@ -7915,13 +8033,35 @@ fun AppConfiguration.GoodsItemInCartWidget(
                 .padding(16.dp),
         ) {
             val itemName = goodsItem.name.visibleLocalizedString(stateValues.appLanguage, "Unnamed item")
+            val restrictionBadges = transactionRestrictionBadgesFor(goodsItem, transactionTypeIndex)
 
-            Text(
-                text = index?.run { "${index + 1}.  $itemName" } ?: itemName,
-                fontSize = stateValues.titleTextSize,
-                fontWeight = FontWeight.Bold,
-                color = textColor
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                if (index != null) {
+                    Text(
+                        text = "${index + 1}.",
+                        fontSize = stateValues.titleTextSize,
+                        fontWeight = FontWeight.Bold,
+                        color = textColor,
+                        maxLines = 1
+                    )
+                }
+
+                TransactionRestrictionBadges(restrictionBadges, textColor)
+
+                Text(
+                    modifier = Modifier.weight(1f),
+                    text = itemName,
+                    fontSize = stateValues.titleTextSize,
+                    fontWeight = FontWeight.Bold,
+                    color = textColor,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
 
             if (transactionTypeIndex == 0 && goodsItem.hasWholesalePrice()) {
                 Spacer(modifier = Modifier.height(6.dp))
@@ -10695,14 +10835,14 @@ private fun formatStockConditionMinute(minuteOfDay: Int): String {
     val clean = minuteOfDay.coerceIn(0, 23 * 60 + 59)
     val hours = clean / 60
     val minutes = clean % 60
-    return "${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}"
+    return "${hours.toString().padStart(2, '0')}.${minutes.toString().padStart(2, '0')}"
 }
 
 private fun parseStockConditionMinute(raw: String): Int? {
     val clean = raw.trim()
     val compactDigits = clean.filter { it.isDigit() }
     val normalized = when {
-        clean.contains(':') -> clean
+        clean.contains(':') || clean.contains('.') -> clean.replace('.', ':')
         compactDigits.length in 3..4 -> compactDigits.dropLast(2) + ":" + compactDigits.takeLast(2)
         compactDigits.length in 1..2 -> compactDigits + ":00"
         else -> clean
@@ -26670,6 +26810,105 @@ private fun permissionsFromSerialized(value: String): List<String> {
         .distinct()
 }
 
+private fun normalizeWorkerSalaryInput(value: String): String {
+    val raw = value.trim().replace(',', '.')
+    val firstDot = raw.indexOf('.')
+    val compact = raw.filterIndexed { index, char ->
+        char.isDigit() || (char == '.' && index == firstDot)
+    }.take(14)
+    val parts = compact.split('.', limit = 2)
+    val whole = parts.getOrNull(0).orEmpty().trimStart('0').ifBlank { if (compact.startsWith('.')) "0" else "" }.take(9)
+    val fractional = parts.getOrNull(1)?.take(2).orEmpty()
+    return when {
+        compact.isBlank() -> ""
+        compact.endsWith('.') && fractional.isBlank() -> "$whole."
+        fractional.isNotBlank() -> "$whole.$fractional"
+        else -> whole
+    }
+}
+
+private fun workerSalaryLine(salary: String, currencyCode: String): String {
+    val clean = salary.trim()
+    return if (clean.isBlank()) "" else "$clean ${currencyCode.trim().uppercase().ifBlank { "KZT" }}"
+}
+
+private fun AppConfiguration.workerJobTitleText(jobTitle: String, jobTitleLocalized: List<LocalizedStringDataModel>): String =
+    jobTitleLocalized.extractLocalizedString(stateValues.appLanguage).orEmpty().ifBlank { jobTitle.trim() }
+
+@Composable
+private fun AppConfiguration.WorkerOfferDetailLine(
+    title: String,
+    value: String,
+    accent: Boolean = false
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            modifier = Modifier.weight(0.42f),
+            text = title,
+            color = stateValues.PlaceholderTextColor,
+            fontSize = stateValues.smallTextSize,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            modifier = Modifier.weight(0.58f),
+            text = value.ifBlank { "—" },
+            color = if (accent) stateValues.AccentColor else stateValues.TextColor,
+            fontSize = stateValues.smallTextSize,
+            fontWeight = if (accent) FontWeight.Bold else FontWeight.Normal,
+            textAlign = TextAlign.End,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun AppConfiguration.WorkerOfferDetails(
+    roleId: String,
+    permissions: List<String>,
+    jobTitle: String,
+    jobTitleLocalized: List<LocalizedStringDataModel> = emptyList(),
+    salary: String,
+    salaryCurrencyCode: String = "KZT",
+    showPermissionPreview: Boolean = true,
+    offerNote: String? = null
+) {
+    val jobTitleText = workerJobTitleText(jobTitle, jobTitleLocalized).ifBlank { localizedStringResource(1438, "No job title specified") }
+    val salaryText = workerSalaryLine(salary, salaryCurrencyCode).ifBlank { localizedStringResource(1437, "No salary specified") }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.AccentColor.copy(alpha = 0.08f))
+            .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.34f), RoundedCornerShape(stateValues.cornerRadius))
+            .padding(stateValues.marginTextField),
+        verticalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Text(
+            text = localizedStringResource(1436, "Offer details"),
+            color = stateValues.AccentColor,
+            fontSize = stateValues.smallTextSize,
+            fontWeight = FontWeight.Bold
+        )
+        WorkerOfferDetailLine(localizedStringResource(1432, "Job title"), jobTitleText, accent = jobTitle.isNotBlank())
+        WorkerOfferDetailLine(localizedStringResource(466, "Role"), workerRoleLabel(roleId.ifBlank { WORKER_ROLE_STANDARD }), accent = true)
+        WorkerOfferDetailLine(localizedStringResource(1433, "Salary"), salaryText, accent = salary.isNotBlank())
+        offerNote?.trim()?.takeIf { it.isNotBlank() }?.let { note ->
+            WorkerOfferDetailLine(localizedStringResource(1449, "Offer note"), note, accent = true)
+        }
+        if (showPermissionPreview) {
+            WorkerOfferDetailLine(
+                localizedStringResource(1439, "Permissions included"),
+                permissions.take(4).joinToString(" • ") { workerPermissionLabel(it) } + if (permissions.size > 4) " +${permissions.size - 4}" else ""
+            )
+        }
+    }
+}
+
 
 private fun AppConfiguration.workerRequestDirectionLabel(request: StoreWorkerRequestDataModel): String {
     return when (request.direction) {
@@ -26903,7 +27142,12 @@ private fun AppConfiguration.WorkerResponseCard(
         Spacer(modifier = Modifier.height(2.dp))
 
         WorkerResponseInfoRow(localizedStringResource(1116, "Request direction"), workerRequestDirectionLabel(request))
+        WorkerResponseInfoRow(localizedStringResource(1432, "Job title"), workerJobTitleText(request.jobTitle, request.jobTitleLocalized))
         WorkerResponseInfoRow(localizedStringResource(466, "Role"), workerRoleLabel(request.roleId.ifBlank { WORKER_ROLE_STANDARD }))
+        WorkerResponseInfoRow(localizedStringResource(1433, "Salary"), workerSalaryLine(request.salary, request.salaryCurrencyCode))
+        request.offerNoteVisible(stateValues.appLanguage).orEmpty().trim().takeIf { it.isNotBlank() }?.let { offerNote ->
+            WorkerResponseInfoRow(localizedStringResource(1449, "Offer note"), offerNote)
+        }
         WorkerResponseInfoRow(localizedStringResource(467, "Allowed actions"), permissionLine)
         WorkerResponseInfoRow(localizedStringResource(1096, "Request time"), receiptUiDateTime(request.requestedAtMillis))
         WorkerResponseInfoRow(localizedStringResource(1095, "Response time"), request.decidedAtMillis?.let { receiptUiDateTime(it) }.orEmpty(), accent = true)
@@ -27248,6 +27492,9 @@ private fun AppConfiguration.WorkerRequestCard(
         defaultAssignablePermissionsForWorkerRole(selectedRoleId, assignablePermissions, roleTemplates)
 
     var roleId by rememberSaveable(request.id) { mutableStateOf(request.roleId.ifBlank { WORKER_ROLE_STANDARD }) }
+    var jobTitle by rememberSaveable(request.id) { mutableStateOf(workerJobTitleText(request.jobTitle, request.jobTitleLocalized)) }
+    var salary by rememberSaveable(request.id) { mutableStateOf(request.salary) }
+    val salaryCurrencyCode = request.salaryCurrencyCode.ifBlank { "KZT" }
     var permissionsText by rememberSaveable(request.id, assignablePermissions.sorted().joinToString("|")) {
         mutableStateOf(
             request.permissions
@@ -27265,9 +27512,9 @@ private fun AppConfiguration.WorkerRequestCard(
     decisionDialog?.let { action ->
         val accepting = action == "accept"
         WorkerDecisionNoteDialog(
-            title = if (accepting) localizedStringResource(1109, "Accept employment request?") else localizedStringResource(1110, "Decline employment request?"),
-            subtitle = listOf(request.displayName, workerRequestDirectionLabel(request)).filter { it.isNotBlank() }.joinToString(" • "),
-            positiveButtonText = if (accepting) localizedStringResource(468, "Accept") else localizedStringResource(469, "Decline"),
+            title = if (accepting) localizedStringResource(1434, "Send job offer?") else localizedStringResource(1110, "Decline employment request?"),
+            subtitle = if (accepting) localizedStringResource(1435, "The worker will review this job offer and accept or decline it.") else listOf(request.displayName, workerRequestDirectionLabel(request)).filter { it.isNotBlank() }.joinToString(" • "),
+            positiveButtonText = if (accepting) localizedStringResource(1434, "Send job offer") else localizedStringResource(469, "Decline"),
             positiveColor = if (accepting) stateValues.AccentColor else stateValues.ErrorColor,
             positiveIconPath = if (accepting) stateValues.drawablePathIconCheck else stateValues.drawablePathIconCancel,
             onDismiss = { decisionDialog = null },
@@ -27279,6 +27526,9 @@ private fun AppConfiguration.WorkerRequestCard(
                         requestId = request.id,
                         roleId = roleId,
                         permissions = permissions,
+                        jobTitle = jobTitle,
+                        salary = salary,
+                        salaryCurrencyCode = salaryCurrencyCode,
                         note = responseNote
                     )
                 } else {
@@ -27322,6 +27572,43 @@ private fun AppConfiguration.WorkerRequestCard(
 
         Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
+        SimpleTextInput(
+            modifier = Modifier.fillMaxWidth(),
+            value = jobTitle,
+            placeholder = localizedStringResource(1432, "Job title"),
+            leadingIconPath = stateValues.drawablePathIconPerson,
+            stateHost = NavigationScreenModel.Menu.Workers,
+            stateKey = "menu_workers_offer_job_title_${request.id}",
+            onValueChange = { jobTitle = it.take(120) }
+        )
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+        SimpleTextInput(
+            modifier = Modifier.fillMaxWidth(),
+            value = salary,
+            placeholder = localizedStringResource(1433, "Salary"),
+            keyboardType = KeyboardType.Decimal,
+            leadingIconPath = stateValues.drawablePathIconFinances,
+            stateHost = NavigationScreenModel.Menu.Workers,
+            stateKey = "menu_workers_offer_salary_${request.id}",
+            onTransformValue = ::normalizeWorkerSalaryInput,
+            onValueChange = { salary = normalizeWorkerSalaryInput(it) }
+        )
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+        WorkerOfferDetails(
+            roleId = roleId,
+            permissions = permissions,
+            jobTitle = jobTitle,
+            salary = salary,
+            salaryCurrencyCode = salaryCurrencyCode,
+            showPermissionPreview = false
+        )
+
+        Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
         SimpleDropdownField(
             modifier = Modifier.fillMaxWidth(),
             title = localizedStringResource(466, "Role"),
@@ -27361,14 +27648,14 @@ private fun AppConfiguration.WorkerRequestCard(
         Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
         Text(
-            text = localizedStringResource(1076, "The worker sets their own workshift password after approval."),
+            text = localizedStringResource(1435, "The worker will review this job offer and accept or decline it."),
             color = stateValues.AccentColor,
             fontSize = stateValues.smallTextSize,
             fontWeight = FontWeight.Bold
         )
 
         Text(
-            text = localizedStringResource(1077, "Approve the role and permissions only. Store owners and managers never need to know the worker’s shift password."),
+            text = localizedStringResource(1440, "Structured employment offer"),
             color = stateValues.PlaceholderTextColor,
             fontSize = stateValues.smallTextSize
         )
@@ -27381,7 +27668,7 @@ private fun AppConfiguration.WorkerRequestCard(
         ) {
             actionButton(
                 modifier = Modifier.weight(1f),
-                text = localizedStringResource(468, "Accept"),
+                text = localizedStringResource(1434, "Send job offer"),
                 iconPath = stateValues.drawablePathIconCheck,
                 confirmationRequired = false,
                 onClick = { decisionDialog = "accept" }
@@ -27522,6 +27809,9 @@ private fun AppConfiguration.WorkerMembershipCard(
         defaultAssignablePermissionsForWorkerRole(selectedRoleId, assignablePermissions, roleTemplates)
 
     var roleId by rememberSaveable(worker.id) { mutableStateOf(worker.roleId.ifBlank { WORKER_ROLE_STANDARD }) }
+    var jobTitle by rememberSaveable(worker.id) { mutableStateOf(workerJobTitleText(worker.jobTitle, worker.jobTitleLocalized)) }
+    var salary by rememberSaveable(worker.id) { mutableStateOf(worker.salary) }
+    val salaryCurrencyCode = worker.salaryCurrencyCode.ifBlank { "KZT" }
     var permissionsText by rememberSaveable(worker.id) { mutableStateOf(normalizeStorePermissionIds(worker.permissions).joinToString("|")) }
     val permissions = permissionsFromSerialized(permissionsText).ifEmpty {
         if (editable) defaultAssignablePermissionsForRole(roleId) else normalizeStorePermissionIds(worker.permissions.ifEmpty { defaultStorePermissionsForRole(roleId) })
@@ -27604,6 +27894,19 @@ private fun AppConfiguration.WorkerMembershipCard(
             fontSize = stateValues.smallTextSize
         )
 
+        Spacer(modifier = Modifier.height(6.dp))
+
+        WorkerOfferDetails(
+            roleId = worker.roleId,
+            permissions = normalizeStorePermissionIds(worker.permissions),
+            jobTitle = worker.jobTitle,
+            jobTitleLocalized = worker.jobTitleLocalized,
+            salary = worker.salary,
+            salaryCurrencyCode = salaryCurrencyCode
+        )
+
+        Spacer(modifier = Modifier.height(6.dp))
+
         Text(
             text = "${localizedStringResource(1085, "Shift password status")}: ${if (worker.hasWorkshiftPassword) localizedStringResource(1080, "Password is set") else localizedStringResource(1081, "Password is not set yet")}",
             color = if (worker.hasWorkshiftPassword) stateValues.OkayColor else stateValues.ErrorColor,
@@ -27614,6 +27917,32 @@ private fun AppConfiguration.WorkerMembershipCard(
         Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
         if (editable && storeId != null) {
+            SimpleTextInput(
+                modifier = Modifier.fillMaxWidth(),
+                value = jobTitle,
+                placeholder = localizedStringResource(1432, "Job title"),
+                leadingIconPath = stateValues.drawablePathIconPerson,
+                stateHost = NavigationScreenModel.Menu.Workers,
+                stateKey = "menu_workers_membership_job_title_${worker.id}",
+                onValueChange = { jobTitle = it.take(120) }
+            )
+
+            Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+            SimpleTextInput(
+                modifier = Modifier.fillMaxWidth(),
+                value = salary,
+                placeholder = localizedStringResource(1433, "Salary"),
+                keyboardType = KeyboardType.Decimal,
+                leadingIconPath = stateValues.drawablePathIconFinances,
+                stateHost = NavigationScreenModel.Menu.Workers,
+                stateKey = "menu_workers_membership_salary_${worker.id}",
+                onTransformValue = ::normalizeWorkerSalaryInput,
+                onValueChange = { salary = normalizeWorkerSalaryInput(it) }
+            )
+
+            Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
             SimpleDropdownField(
                 modifier = Modifier.fillMaxWidth(),
                 title = localizedStringResource(466, "Role"),
@@ -27660,7 +27989,10 @@ private fun AppConfiguration.WorkerMembershipCard(
                         storeId = storeId,
                         workerId = worker.id,
                         roleId = roleId,
-                        permissions = permissions
+                        permissions = permissions,
+                        jobTitle = jobTitle,
+                        salary = salary,
+                        salaryCurrencyCode = salaryCurrencyCode
                     )
                 }
             )
@@ -27849,7 +28181,7 @@ fun AppConfiguration.MenuWorkersScreen() {
     val myPendingEmploymentRequestsCount = myRequestsPayload.orEmpty()
         .count { it.direction == WORKER_REQUEST_DIRECTION_USER_TO_STORE && it.status == WORKER_REQUEST_STATUS_PENDING }
     val myInvitesCount = myRequestsPayload.orEmpty()
-        .count { it.direction == WORKER_REQUEST_DIRECTION_STORE_TO_USER && it.status == WORKER_REQUEST_STATUS_INVITED } +
+        .count { !it.isWorkerRemovalRequest() && it.status == WORKER_REQUEST_STATUS_INVITED } +
             myRequestsPayload.orEmpty().count { it.isPendingWorkerRemovalRequest() }
     val myResponsesCount = myRequestsPayload.orEmpty().count { it.isEmploymentResponse() || it.isWorkerRemovalResponse() } +
             incomingRequestsPayload.orEmpty().count { it.isEmploymentResponse() || it.isWorkerRemovalResponse() }
@@ -28001,6 +28333,13 @@ fun AppConfiguration.MenuWorkersScreen() {
                                             color = stateValues.PlaceholderTextColor,
                                             fontSize = stateValues.smallTextSize
                                         )
+
+                                        Text(
+                                            text = localizedStringResource(1445, "Waiting for store to prepare an offer"),
+                                            color = stateValues.AccentColor,
+                                            fontSize = stateValues.smallTextSize,
+                                            fontWeight = FontWeight.Bold
+                                        )
                                     }
                                 }
                             }
@@ -28021,7 +28360,7 @@ fun AppConfiguration.MenuWorkersScreen() {
 
                 "invites" -> {
                     val invitations = myRequestsPayload.orEmpty()
-                        .filter { it.direction == WORKER_REQUEST_DIRECTION_STORE_TO_USER && it.status == WORKER_REQUEST_STATUS_INVITED }
+                        .filter { !it.isWorkerRemovalRequest() && it.status == WORKER_REQUEST_STATUS_INVITED }
                         .distinctBy { it.id }
                     val removalRequests = myRequestsPayload.orEmpty()
                         .filter { it.isPendingWorkerRemovalRequest() }
@@ -28046,9 +28385,9 @@ fun AppConfiguration.MenuWorkersScreen() {
                                 decisionDialog?.let { action ->
                                     val accepting = action == "accept"
                                     WorkerDecisionNoteDialog(
-                                        title = if (accepting) localizedStringResource(1111, "Accept invitation?") else localizedStringResource(1112, "Decline invitation?"),
-                                        subtitle = listOf(workerRequestStoreTitle(request), workerRequestDirectionLabel(request)).filter { it.isNotBlank() }.joinToString(" • "),
-                                        positiveButtonText = if (accepting) localizedStringResource(510, "Accept invite") else localizedStringResource(511, "Decline invite"),
+                                        title = if (accepting) localizedStringResource(1441, "Accept job offer?") else localizedStringResource(1442, "Decline job offer?"),
+                                        subtitle = listOf(localizedStringResource(1446, "Employment offer from store"), workerRequestStoreTitle(request), workerRequestDirectionLabel(request)).filter { it.isNotBlank() }.joinToString(" • "),
+                                        positiveButtonText = if (accepting) localizedStringResource(1443, "Accept job offer") else localizedStringResource(1444, "Decline job offer"),
                                         positiveColor = if (accepting) stateValues.AccentColor else stateValues.ErrorColor,
                                         positiveIconPath = if (accepting) stateValues.drawablePathIconCheck else stateValues.drawablePathIconCancel,
                                         onDismiss = { decisionDialog = null },
@@ -28096,20 +28435,32 @@ fun AppConfiguration.MenuWorkersScreen() {
 
                                     Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
+                                    WorkerOfferDetails(
+                                        roleId = request.roleId.ifBlank { WORKER_ROLE_STANDARD },
+                                        permissions = normalizeStorePermissionIds(request.permissions),
+                                        jobTitle = request.jobTitle,
+                                        jobTitleLocalized = request.jobTitleLocalized,
+                                        salary = request.salary,
+                                        salaryCurrencyCode = request.salaryCurrencyCode.ifBlank { "KZT" },
+                                        offerNote = request.offerNoteVisible(stateValues.appLanguage)
+                                    )
+
+                                    Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
                                     ) {
                                         actionButton(
                                             modifier = Modifier.weight(1f),
-                                            text = localizedStringResource(510, "Accept invite"),
+                                            text = localizedStringResource(1443, "Accept job offer"),
                                             iconPath = stateValues.drawablePathIconCheck,
                                             confirmationRequired = false,
                                             onClick = { decisionDialog = "accept" }
                                         )
                                         actionButton(
                                             modifier = Modifier.weight(1f),
-                                            text = localizedStringResource(511, "Decline invite"),
+                                            text = localizedStringResource(1444, "Decline job offer"),
                                             enabledColor = stateValues.ErrorColor,
                                             iconPath = stateValues.drawablePathIconCancel,
                                             confirmationRequired = false,
@@ -28243,6 +28594,10 @@ fun AppConfiguration.MenuWorkersScreen() {
 
                                 var invitedUserId by rememberSaveable { mutableStateOf("") }
                                 var roleId by rememberSaveable { mutableStateOf(WORKER_ROLE_STANDARD) }
+                                var jobTitle by rememberSaveable { mutableStateOf("") }
+                                var salary by rememberSaveable { mutableStateOf("") }
+                                var offerNote by rememberSaveable { mutableStateOf("") }
+                                val salaryCurrencyCode = "KZT"
                                 var permissionsText by rememberSaveable(assignablePermissions.sorted().joinToString("|")) {
                                     mutableStateOf(defaultAssignablePermissionsForRole(WORKER_ROLE_STANDARD).joinToString("|"))
                                 }
@@ -28276,6 +28631,57 @@ fun AppConfiguration.MenuWorkersScreen() {
                                         stateHost = NavigationScreenModel.Menu.Workers,
                                         stateKey = "menu_workers_invited_user_id",
                                         onValueChange = { invitedUserId = it.trim().uppercase() }
+                                    )
+
+                                    Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+                                    SimpleTextInput(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        value = jobTitle,
+                                        placeholder = localizedStringResource(1432, "Job title"),
+                                        leadingIconPath = stateValues.drawablePathIconPerson,
+                                        stateHost = NavigationScreenModel.Menu.Workers,
+                                        stateKey = "menu_workers_invite_job_title",
+                                        onValueChange = { jobTitle = it.take(120) }
+                                    )
+
+                                    Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+                                    SimpleTextInput(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        value = salary,
+                                        placeholder = localizedStringResource(1433, "Salary"),
+                                        keyboardType = KeyboardType.Decimal,
+                                        leadingIconPath = stateValues.drawablePathIconFinances,
+                                        stateHost = NavigationScreenModel.Menu.Workers,
+                                        stateKey = "menu_workers_invite_salary",
+                                        onTransformValue = ::normalizeWorkerSalaryInput,
+                                        onValueChange = { salary = normalizeWorkerSalaryInput(it) }
+                                    )
+
+                                    Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+                                    SimpleTextInput(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        value = offerNote,
+                                        placeholder = localizedStringResource(1449, "Offer note"),
+                                        singleLine = false,
+                                        leadingIconPath = stateValues.drawablePathIconResponse,
+                                        stateHost = NavigationScreenModel.Menu.Workers,
+                                        stateKey = "menu_workers_invite_offer_note",
+                                        onValueChange = { offerNote = it.take(240) }
+                                    )
+
+                                    Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+                                    WorkerOfferDetails(
+                                        roleId = roleId,
+                                        permissions = permissions,
+                                        jobTitle = jobTitle,
+                                        salary = salary,
+                                        salaryCurrencyCode = salaryCurrencyCode,
+                                        showPermissionPreview = false,
+                                        offerNote = offerNote
                                     )
 
                                     Spacer(modifier = Modifier.height(stateValues.marginTextField))
@@ -28327,9 +28733,18 @@ fun AppConfiguration.MenuWorkersScreen() {
                                                 storeId = activeStoreId,
                                                 userId = invitedUserId,
                                                 roleId = roleId,
-                                                permissions = permissions
+                                                permissions = permissions,
+                                                jobTitle = jobTitle,
+                                                salary = salary,
+                                                salaryCurrencyCode = salaryCurrencyCode,
+                                                note = offerNote
                                             ) { result ->
-                                                if (result is DataState.Success) invitedUserId = ""
+                                                if (result is DataState.Success) {
+                                                    invitedUserId = ""
+                                                    jobTitle = ""
+                                                    salary = ""
+                                                    offerNote = ""
+                                                }
                                             }
                                         }
                                     )
@@ -30270,8 +30685,14 @@ private fun AppConfiguration.OperationLogCard(log: OperationLogDataModel) {
                 fontSize = stateValues.smallTextSize
             )
         }
+        val actorName = log.actorDisplayName.ifBlank { log.actorPublicId.ifBlank { log.actorUserId } }
         Text(
-            text = "${localizedStringResource(668, "By")}: ${log.actorDisplayName.ifBlank { log.actorPublicId.ifBlank { log.actorUserId } }}",
+            text = buildAnnotatedString {
+                append("${localizedStringResource(668, "By")}: ")
+                withStyle(SpanStyle(color = stateValues.TextColor, fontWeight = FontWeight.Bold)) {
+                    append(actorName)
+                }
+            },
             color = stateValues.PlaceholderTextColor,
             fontSize = stateValues.smallTextSize
         )
@@ -38557,6 +38978,12 @@ private fun localDrawableResourceForPath(
         "70_1" -> Res.drawable._70_1
         "71_0" -> Res.drawable._71_0
         "71_1" -> Res.drawable._71_1
+        "72_0" -> Res.drawable._72_0
+        "72_1" -> Res.drawable._72_1
+        "73_0" -> Res.drawable._73_0
+        "73_1" -> Res.drawable._73_1
+        "74_0" -> Res.drawable._74_0
+        "74_1" -> Res.drawable._74_1
         else -> fallbackRes
     }
 }
@@ -38996,6 +39423,7 @@ fun AppConfiguration.GoodsItemInStockWidget(
     onPrintLabel: ((GoodsItemDataModel) -> Unit)? = null
 ) {
     val itemName = goodsItem.name.visibleLocalizedString(stateValues.appLanguage, "Unnamed item")
+    val restrictionBadges = transactionTypeIndex?.let { transactionRestrictionBadgesFor(goodsItem, it) }.orEmpty()
 
     val standardBarcodesText = goodsItem.standardBarcodeValues()
         .filter { it.isNotBlank() }
@@ -39094,9 +39522,25 @@ fun AppConfiguration.GoodsItemInStockWidget(
                     Spacer(modifier = Modifier.width(8.dp))
                 }
 
+                if (index != null) {
+                    Text(
+                        text = "${index + 1}.",
+                        fontSize = stateValues.titleTextSize,
+                        fontWeight = FontWeight.Bold,
+                        color = textColor,
+                        maxLines = 1
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                }
+
+                TransactionRestrictionBadges(restrictionBadges, textColor)
+                if (restrictionBadges.isNotEmpty()) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                }
+
                 Text(
                     modifier = Modifier.weight(1f),
-                    text = index?.run { "${index + 1}.  $itemName" } ?: itemName,
+                    text = itemName,
                     fontSize = stateValues.titleTextSize,
                     fontWeight = FontWeight.Bold,
                     color = textColor,
@@ -42072,6 +42516,12 @@ object AppConfiguration {
         val drawablePathIconSupplierCatalog: String
         val drawableResIconSupplierCatalog: StateFlow<DrawableResource>
 
+        val drawablePathIconBuyerAgeRestriction: String
+        val drawableResIconBuyerAgeRestriction: StateFlow<DrawableResource>
+
+        val drawablePathIconTransactionTimeRestriction: String
+        val drawableResIconTransactionTimeRestriction: StateFlow<DrawableResource>
+
         val drawablePathIconWorkers: String
         val drawableResIconWorkers: StateFlow<DrawableResource>
 
@@ -42681,6 +43131,14 @@ object AppConfiguration {
             private val _drawableResIconSupplierCatalog = MutableStateFlow(Res.drawable._72_0)
             override val drawableResIconSupplierCatalog: StateFlow<DrawableResource> = _drawableResIconSupplierCatalog.asStateFlow()
 
+            override val drawablePathIconBuyerAgeRestriction: String by drawablePathIconBuyerAgeRestrictionState.collectAsState()
+            private val _drawableResIconBuyerAgeRestriction = MutableStateFlow(Res.drawable._73_0)
+            override val drawableResIconBuyerAgeRestriction: StateFlow<DrawableResource> = _drawableResIconBuyerAgeRestriction.asStateFlow()
+
+            override val drawablePathIconTransactionTimeRestriction: String by drawablePathIconTransactionTimeRestrictionState.collectAsState()
+            private val _drawableResIconTransactionTimeRestriction = MutableStateFlow(Res.drawable._74_0)
+            override val drawableResIconTransactionTimeRestriction: StateFlow<DrawableResource> = _drawableResIconTransactionTimeRestriction.asStateFlow()
+
             override val drawablePathIconWorkers: String by drawablePathIconWorkersState.collectAsState()
             private val _drawableResIconWorkers = MutableStateFlow(Res.drawable._22_0)
             override val drawableResIconWorkers: StateFlow<DrawableResource> = _drawableResIconWorkers.asStateFlow()
@@ -42879,6 +43337,8 @@ object AppConfiguration {
                 _drawableResIconAppModeSupplier.emit(if (stateValues.appThemeId == 1L) Res.drawable._70_1 else Res.drawable._70_0)
                 _drawableResIconAppModeManufacturer.emit(if (stateValues.appThemeId == 1L) Res.drawable._71_1 else Res.drawable._71_0)
                 _drawableResIconSupplierCatalog.emit(if (stateValues.appThemeId == 1L) Res.drawable._72_1 else Res.drawable._72_0)
+                _drawableResIconBuyerAgeRestriction.emit(if (stateValues.appThemeId == 1L) Res.drawable._73_1 else Res.drawable._73_0)
+                _drawableResIconTransactionTimeRestriction.emit(if (stateValues.appThemeId == 1L) Res.drawable._74_1 else Res.drawable._74_0)
 
                 _drawableResIconWorkers.emit(if (stateValues.appThemeId == 1L) Res.drawable._22_1 else Res.drawable._22_0)
 

@@ -937,6 +937,45 @@
           "path": "svg/71_1.svg"
         }
       ]
+    },
+    {
+      "id": 72,
+      "values": [
+        {
+          "themeId": 0,
+          "path": "svg/72_0.svg"
+        },
+        {
+          "themeId": 1,
+          "path": "svg/72_1.svg"
+        }
+      ]
+    },
+    {
+      "id": 73,
+      "values": [
+        {
+          "themeId": 0,
+          "path": "svg/73_0.svg"
+        },
+        {
+          "themeId": 1,
+          "path": "svg/73_1.svg"
+        }
+      ]
+    },
+    {
+      "id": 74,
+      "values": [
+        {
+          "themeId": 0,
+          "path": "svg/74_0.svg"
+        },
+        {
+          "themeId": 1,
+          "path": "svg/74_1.svg"
+        }
+      ]
     }
   ]
 }
