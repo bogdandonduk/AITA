@@ -947,7 +947,33 @@ private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallb
     put(1528L, mapOf("main" to "This contract blocks supply until accepted", "en" to "This contract blocks supply until accepted", "ru" to "Этот договор блокирует поставку до принятия", "kk" to "Бұл келісім қабылданғанға дейін жеткізуді бөгейді"))
     put(1529L, mapOf("main" to "Selected goods receive copied price/schedule terms from recent store demand.", "en" to "Selected goods receive copied price/schedule terms from recent store demand.", "ru" to "Выбранные товары получают ценовые и графиковые строки из свежего спроса магазинов.", "kk" to "Таңдалған тауарлар соңғы дүкен сұранысынан баға және кесте жолдарын алады."))
     put(1530L, mapOf("main" to "No partner store yet. Supplier contracts appear after at least one store order or saved supplier link.", "en" to "No partner store yet. Supplier contracts appear after at least one store order or saved supplier link.", "ru" to "Магазина-партнёра пока нет. Договоры появятся после хотя бы одного заказа или сохранённой связи с поставщиком.", "kk" to "Әзірге серіктес дүкен жоқ. Келісімдер кемінде бір тапсырыс немесе сақталған жеткізуші байланысынан кейін пайда болады."))
+    put(1531L, mapOf("main" to "Demand radar live", "en" to "Demand radar live", "ru" to "Радар спроса работает", "kk" to "Сұраныс радары қосулы"))
+    put(1532L, mapOf("main" to "Store demand turns into an early-warning board: which items to prepare, which stores need confirmation, and which contracts may block supply.", "en" to "Store demand turns into an early-warning board: which items to prepare, which stores need confirmation, and which contracts may block supply.", "ru" to "Спрос магазинов превращается в раннюю панель предупреждений: какие товары готовить, каким магазинам нужно подтверждение и какие договоры могут блокировать поставку.", "kk" to "Дүкен сұранысы ерте ескерту панеліне айналады: қандай тауар дайындау, қай дүкенге растау керек және қандай келісім жеткізуді бөгей алады."))
+    put(1533L, mapOf("main" to "Open pipeline", "en" to "Open pipeline", "ru" to "Открытый поток", "kk" to "Ашық ағын"))
+    put(1534L, mapOf("main" to "Orders not closed yet", "en" to "Orders not closed yet", "ru" to "Заказы ещё не закрыты", "kk" to "Әлі жабылмаған тапсырыстар"))
+    put(1535L, mapOf("main" to "Issue watch", "en" to "Issue watch", "ru" to "Контроль проблем", "kk" to "Мәселе бақылауы"))
+    put(1536L, mapOf("main" to "Orders needing supplier attention", "en" to "Orders needing supplier attention", "ru" to "Заказы, требующие внимания поставщика", "kk" to "Жеткізуші назарын қажет ететін тапсырыстар"))
+    put(1537L, mapOf("main" to "Contract blockers", "en" to "Contract blockers", "ru" to "Блокирующие договоры", "kk" to "Бөгейтін келісімдер"))
+    put(1538L, mapOf("main" to "Pending negotiated terms", "en" to "Pending negotiated terms", "ru" to "Условия на согласовании", "kk" to "Келісілетін шарттар"))
+    put(1539L, mapOf("main" to "Top demand signals", "en" to "Top demand signals", "ru" to "Главные сигналы спроса", "kk" to "Негізгі сұраныс белгілері"))
+    put(1540L, mapOf("main" to "No demand signal yet", "en" to "No demand signal yet", "ru" to "Сигнала спроса пока нет", "kk" to "Әзірге сұраныс белгісі жоқ"))
+    put(1541L, mapOf("main" to "Demand will appear after stores send supplier orders.", "en" to "Demand will appear after stores send supplier orders.", "ru" to "Спрос появится после того, как магазины отправят заказы поставщику.", "kk" to "Дүкендер жеткізушіге тапсырыс жібергеннен кейін сұраныс пайда болады."))
+    put(1542L, mapOf("main" to "Prepare stock", "en" to "Prepare stock", "ru" to "Подготовить запас", "kk" to "Қор дайындау"))
+    put(1543L, mapOf("main" to "stores", "en" to "stores", "ru" to "магазинов", "kk" to "дүкен"))
+    put(1544L, mapOf("main" to "open orders", "en" to "open orders", "ru" to "открытых заказов", "kk" to "ашық тапсырыс"))
+    put(1545L, mapOf("main" to "Latest activity", "en" to "Latest activity", "ru" to "Последняя активность", "kk" to "Соңғы белсенділік"))
+    put(1546L, mapOf("main" to "Open matching orders", "en" to "Open matching orders", "ru" to "Открыть подходящие заказы", "kk" to "Сәйкес тапсырыстарды ашу"))
+    put(1547L, mapOf("main" to "Review contracts", "en" to "Review contracts", "ru" to "Проверить договоры", "kk" to "Келісімдерді қарау"))
+    put(1548L, mapOf("main" to "Supplier next moves", "en" to "Supplier next moves", "ru" to "Следующие шаги поставщика", "kk" to "Жеткізушінің келесі қадамдары"))
+    put(1549L, mapOf("main" to "Confirm waiting orders", "en" to "Confirm waiting orders", "ru" to "Подтвердить ожидающие заказы", "kk" to "Күтіп тұрған тапсырыстарды растау"))
+    put(1550L, mapOf("main" to "Open partner CRM", "en" to "Open partner CRM", "ru" to "Открыть CRM партнёров", "kk" to "Серіктестер CRM-ін ашу"))
+    put(1551L, mapOf("main" to "Watch these SKUs first", "en" to "Watch these SKUs first", "ru" to "Сначала следите за этими товарами", "kk" to "Алдымен осы тауарларды бақылаңыз"))
+    put(1552L, mapOf("main" to "Demand score", "en" to "Demand score", "ru" to "Оценка спроса", "kk" to "Сұраныс бағасы"))
+    put(1553L, mapOf("main" to "This is the bridge from store-side ordering to supplier-side planning: orders feed catalog, contracts guard supply, partners show reliability, and insights decide what to prepare next.", "en" to "This is the bridge from store-side ordering to supplier-side planning: orders feed catalog, contracts guard supply, partners show reliability, and insights decide what to prepare next.", "ru" to "Это мост от заказов магазина к планированию поставщика: заказы наполняют каталог, договоры защищают поставку, партнёры показывают надёжность, а инсайты решают, что готовить дальше.", "kk" to "Бұл дүкен тапсырысынан жеткізуші жоспарына көпір: тапсырыстар каталогты толтырады, келісімдер жеткізуді қорғайды, серіктестер сенімділікті көрсетеді, ал инсайттар әрі қарай не дайындауды шешеді."))
+    put(1554L, mapOf("main" to "Top item demand", "en" to "Top item demand", "ru" to "Главный спрос по товарам", "kk" to "Тауар бойынша негізгі сұраныс"))
+    put(1555L, mapOf("main" to "Active contracts", "en" to "Active contracts", "ru" to "Активные договоры", "kk" to "Белсенді келісімдер"))
 }
+
 
 
 
@@ -9700,7 +9726,7 @@ fun AppConfiguration.StockWarehouseScreen() {
             )
         )
 
-        AnimatedVisibility(visible = sortMenuExpanded && selectedTab != "contracts") {
+        AnimatedVisibility(visible = sortMenuExpanded) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -18655,8 +18681,9 @@ private fun AppConfiguration.supplierMarketWinningFeatures(): List<SupplierFeatu
     SupplierFeaturePlanUiModel(
         title = localizedStringResource(1353, "Demand radar"),
         subtitle = localizedStringResource(1354, "Read reorder rhythm from store orders and prepare stock before the call comes."),
-        iconPath = stateValues.drawablePathIconAnalyticsReport,
-        iconRes = stateValues.drawableResIconAnalyticsReport.value
+        iconPath = stateValues.drawablePathIconSupplierDemandRadar,
+        iconRes = stateValues.drawableResIconSupplierDemandRadar.value,
+        implemented = true
     ),
     SupplierFeaturePlanUiModel(
         title = localizedStringResource(1355, "Manufacturer backorder bridge"),
@@ -20463,14 +20490,14 @@ private fun AppConfiguration.supplierContractScopeTitle(scope: String): String =
     else -> localizedStringResource(1491, "Partnership-wide")
 }
 
-private fun AppConfiguration.SupplierPartnershipContractDataModel.visibleContractTitle(): String =
-    title.visibleLocalizedString(stateValues.appLanguage, "")
-        .ifBlank { summary.visibleLocalizedString(stateValues.appLanguage, "") }
-        .ifBlank { supplierContractScopeTitle(scopeType) }
+private fun AppConfiguration.supplierVisibleContractTitle(contract: SupplierPartnershipContractDataModel): String =
+    contract.title.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { contract.summary.visibleLocalizedString(stateValues.appLanguage, "") }
+        .ifBlank { supplierContractScopeTitle(contract.scopeType) }
 
-private fun AppConfiguration.SupplierPartnershipContractDataModel.visibleContractSummary(): String =
-    summary.visibleLocalizedString(stateValues.appLanguage, "")
-        .ifBlank { customTerms.visibleLocalizedString(stateValues.appLanguage, "") }
+private fun AppConfiguration.supplierVisibleContractSummary(contract: SupplierPartnershipContractDataModel): String =
+    contract.summary.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { contract.customTerms.visibleLocalizedString(stateValues.appLanguage, "") }
         .ifBlank { localizedStringResource(1512, "Both sides must accept the same revision before supply is unlocked.") }
 
 private fun AppConfiguration.supplierContractStatusColor(status: String): Color = when (status) {
@@ -20882,7 +20909,7 @@ private fun AppConfiguration.SupplierContractCard(
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = contract.visibleContractTitle(),
+                    text = supplierVisibleContractTitle(contract),
                     color = stateValues.TextColor,
                     fontSize = stateValues.accentTextSize,
                     fontWeight = FontWeight.Bold,
@@ -20899,7 +20926,7 @@ private fun AppConfiguration.SupplierContractCard(
         }
 
         Text(
-            text = contract.visibleContractSummary(),
+            text = supplierVisibleContractSummary(contract),
             color = stateValues.PlaceholderTextColor,
             fontSize = stateValues.textSize,
             maxLines = 3,
@@ -21068,8 +21095,8 @@ private fun AppConfiguration.SupplierContractsBoardContent(
             .filter { contract ->
                 val q = searchQuery.trim().lowercase()
                 q.isBlank() || buildString {
-                    append(contract.visibleContractTitle()).append(' ')
-                    append(contract.visibleContractSummary()).append(' ')
+                    append(supplierVisibleContractTitle(contract)).append(' ')
+                    append(supplierVisibleContractSummary(contract)).append(' ')
                     append(contract.storeNameSnapshot.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
                     append(contract.supplierNameSnapshot.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
                     contract.conditions.forEach { append(it).append(' ') }
@@ -21303,6 +21330,466 @@ private fun AppConfiguration.SupplierPlaceholderScreen(
     }
 }
 
+
+private data class SupplierDemandRadarUiModel(
+    val goodsItemId: String,
+    val title: String,
+    val subtitle: String,
+    val totalQuantityText: String,
+    val storesCount: Int,
+    val openOrderCount: Int,
+    val issueCount: Int,
+    val latestStatus: SupplierOrderStatusDataModel,
+    val lastActivityMillis: Long,
+    val latestPriceText: String,
+    val demandScore: Int,
+    val searchKey: String
+)
+
+private fun AppConfiguration.buildSupplierDemandRadarItems(
+    orders: List<SupplierOrderDataModel>,
+    lines: List<SupplierOrderLineDataModel>
+): List<SupplierDemandRadarUiModel> {
+    val activeOrders = orders.filter { it.isActive }
+    val ordersById = activeOrders.associateBy { it.id }
+    return lines
+        .filter { it.isActive && it.goodsItemId.isNotBlank() }
+        .groupBy { it.goodsItemId }
+        .mapNotNull { (goodsItemId, itemLines) ->
+            val relatedOrders = itemLines
+                .mapNotNull { ordersById[it.orderId] }
+                .distinctBy { it.id }
+            if (relatedOrders.isEmpty()) return@mapNotNull null
+
+            val latestOrder = relatedOrders.maxByOrNull { it.supplierDeskSortTime() } ?: return@mapNotNull null
+            val sampleLine = itemLines.maxByOrNull { line -> ordersById[line.orderId]?.supplierDeskSortTime() ?: 0L } ?: return@mapNotNull null
+            val openOrders = relatedOrders.count { !it.status.isSupplierOrderClosed() }
+            val issueCount = relatedOrders.count { it.status == SupplierOrderStatusDataModel.IssueReported || it.status == SupplierOrderStatusDataModel.Cancelled }
+            val totalQuantity = itemLines.sumOf { it.requestedQuantity.total.coerceAtLeast(0.0) }
+            val baseQuantity = sampleLine.requestedQuantity
+            val totalQuantityText = if (totalQuantity > 0.0) {
+                baseQuantity.copy(total = totalQuantity).quantityText(stateValues.appLanguage)
+            } else {
+                itemLines.size.toString()
+            }
+            val stores = relatedOrders.map { supplierDeskStoreTitle(it) }.filter { it.isNotBlank() }.distinct()
+            val latestPrice = itemLines.asSequence()
+                .mapNotNull { it.supplierOfferedSupplyPrice ?: it.expectedSupplyPrice }
+                .firstOrNull()
+                .supplierDeskMoneyText()
+            val title = supplierDeskLineTitle(sampleLine)
+            val demandScore = openOrders * 3 + issueCount * 2 + stores.size + itemLines.size
+
+            SupplierDemandRadarUiModel(
+                goodsItemId = goodsItemId,
+                title = title,
+                subtitle = stores.take(3).joinToString(" • ").ifBlank { goodsItemId.take(8) },
+                totalQuantityText = totalQuantityText,
+                storesCount = stores.size,
+                openOrderCount = openOrders,
+                issueCount = issueCount,
+                latestStatus = latestOrder.status,
+                lastActivityMillis = latestOrder.supplierDeskSortTime(),
+                latestPriceText = latestPrice,
+                demandScore = demandScore,
+                searchKey = buildString {
+                    append(goodsItemId).append(' ')
+                    append(title).append(' ')
+                    append(stores.joinToString(" ")).append(' ')
+                    append(sampleLine.goodsItemBarcodeSnapshots.joinToString(" ")).append(' ')
+                    append(latestOrder.status.name).append(' ')
+                    append(supplierOrderStatusTitle(latestOrder.status))
+                }.lowercase()
+            )
+        }
+        .sortedWith(compareByDescending<SupplierDemandRadarUiModel> { it.demandScore }
+            .thenByDescending { it.lastActivityMillis })
+}
+
+@Composable
+private fun AppConfiguration.SupplierDemandRadarCard(item: SupplierDemandRadarUiModel) {
+    val coroutineScope = rememberCoroutineScope()
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .border(
+                if (item.openOrderCount > 0) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
+                if (item.openOrderCount > 0) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+                RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .padding(stateValues.marginTextFieldGroup),
+        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(46.dp)
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CpImage(
+                    modifier = Modifier.size(30.dp),
+                    url = stateValues.drawablePathIconSupplierDemandRadar,
+                    fallbackRes = stateValues.drawableResIconSupplierDemandRadar.value,
+                    contentDescription = item.title,
+                    tintColor = stateValues.AccentColor
+                )
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.title,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.accentTextSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = item.subtitle,
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Text(
+                text = item.latestPriceText.ifBlank { item.totalQuantityText },
+                color = stateValues.AccentColor,
+                fontSize = stateValues.accentTextSize,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.End,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        StockCardInfoLine(localizedStringResource(1542, "Prepare stock"), item.totalQuantityText, stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1422, "Stores asking"), item.storesCount.toString(), stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1423, "Open requests"), item.openOrderCount.toString(), stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1545, "Latest activity"), receiptUiDateTime(item.lastActivityMillis), stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1552, "Demand score"), item.demandScore.toString(), stateValues.TextColor)
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(modifier = Modifier.weight(1f)) {
+                SupplierCatalogChip(text = supplierOrderStatusTitle(item.latestStatus))
+            }
+            if (item.issueCount > 0) {
+                Box(modifier = Modifier.weight(1f)) {
+                    SupplierCatalogChip(text = "${localizedStringResource(1473, "Issues")}: ${item.issueCount}")
+                }
+            } else {
+                Box(modifier = Modifier.weight(1f)) {
+                    SupplierCatalogChip(text = localizedStringResource(1469, "Healthy rhythm"))
+                }
+            }
+        }
+
+        actionButton(
+            modifier = Modifier.fillMaxWidth(),
+            text = localizedStringResource(1546, "Open matching orders"),
+            iconPath = stateValues.drawablePathIconAppModeSupplier,
+            iconRes = stateValues.drawableResIconAppModeSupplier.value,
+            confirmationRequired = false,
+            onClick = {
+                coroutineScope.launch {
+                    NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.goodsItemId)
+                    Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun AppConfiguration.SupplierInsightsScreen() {
+    val orders by supplierOrdersState.payload.collectAsState()
+    val lines by supplierOrderLinesState.payload.collectAsState()
+    val contracts by supplierPartnershipContractsState.payload.collectAsState()
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    val coroutineScope = rememberCoroutineScope()
+
+    LaunchedEffect(stateValues.userAccount?.id) {
+        if (stateValues.userAccount != null) {
+            getMySupplierSideOrders()
+            getSupplierContracts()
+        }
+    }
+
+    val activeOrders = remember(orders) { orders.orEmpty().filter { it.isActive } }
+    val activeLines = remember(lines) { lines.orEmpty().filter { it.isActive } }
+    val activeContracts = remember(contracts) { contracts.orEmpty().filter { it.isActive } }
+    val radarItems = remember(activeOrders, activeLines, stateValues.appLanguage) {
+        buildSupplierDemandRadarItems(activeOrders, activeLines)
+    }
+    val normalizedSearch = searchQuery.trim().lowercase()
+    val visibleRadarItems = remember(radarItems, normalizedSearch) {
+        radarItems.filter { normalizedSearch.isBlank() || it.searchKey.contains(normalizedSearch) }
+    }
+    val openOrdersCount = activeOrders.count { !it.status.isSupplierOrderClosed() }
+    val attentionCount = activeOrders.count { it.status == SupplierOrderStatusDataModel.Sent || it.status == SupplierOrderStatusDataModel.SeenBySupplier || it.status == SupplierOrderStatusDataModel.IssueReported }
+    val pendingContractCount = activeContracts.count { it.status == SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER || it.status == SUPPLIER_CONTRACT_STATUS_PENDING_STORE }
+    val activeContractCount = activeContracts.count { it.status == SUPPLIER_CONTRACT_STATUS_ACTIVE }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        ScreenAppBarWidget(
+            title = localizedStringResource(1353, "Demand radar"),
+            iconPath = stateValues.drawablePathIconSupplierDemandRadar,
+            iconRes = stateValues.drawableResIconSupplierDemandRadar.value
+        )
+
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.74f)
+                .align(Alignment.CenterHorizontally)
+                .padding(stateValues.marginTextField),
+            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
+            contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
+        ) {
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(stateValues.cornerRadius))
+                        .background(stateValues.AccentColor.copy(alpha = 0.10f))
+                        .border(stateValues.focusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
+                        .padding(stateValues.marginTextFieldGroup),
+                    verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                    ) {
+                        CpImage(
+                            modifier = Modifier.size(46.dp),
+                            url = stateValues.drawablePathIconSupplierDemandRadar,
+                            fallbackRes = stateValues.drawableResIconSupplierDemandRadar.value,
+                            contentDescription = localizedStringResource(1353, "Demand radar"),
+                            tintColor = stateValues.AccentColor
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = localizedStringResource(1531, "Demand radar live"),
+                                color = stateValues.TextColor,
+                                fontSize = stateValues.titleTextSize,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = localizedStringResource(1532, "Store demand turns into an early-warning board: which items to prepare, which stores need confirmation, and which contracts may block supply."),
+                                color = stateValues.PlaceholderTextColor,
+                                fontSize = stateValues.smallTextSize
+                            )
+                        }
+                    }
+
+                    if (stateValues.isNarrowScreen) {
+                        Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+                            SupplierDeskSummaryCard(
+                                title = localizedStringResource(1533, "Open pipeline"),
+                                value = openOrdersCount.toString(),
+                                subtitle = localizedStringResource(1534, "Orders not closed yet"),
+                                iconPath = stateValues.drawablePathIconAppModeSupplier,
+                                iconRes = stateValues.drawableResIconAppModeSupplier.value
+                            )
+                            SupplierDeskSummaryCard(
+                                title = localizedStringResource(1535, "Issue watch"),
+                                value = attentionCount.toString(),
+                                subtitle = localizedStringResource(1536, "Orders needing supplier attention"),
+                                iconPath = stateValues.drawablePathIconResponse,
+                                iconRes = stateValues.drawableResIconResponse.value
+                            )
+                            SupplierDeskSummaryCard(
+                                title = localizedStringResource(1537, "Contract blockers"),
+                                value = pendingContractCount.toString(),
+                                subtitle = localizedStringResource(1538, "Pending negotiated terms"),
+                                iconPath = stateValues.drawablePathIconSupplierContracts,
+                                iconRes = stateValues.drawableResIconSupplierContracts.value
+                            )
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                        ) {
+                            SupplierDeskSummaryCard(
+                                modifier = Modifier.weight(1f),
+                                title = localizedStringResource(1533, "Open pipeline"),
+                                value = openOrdersCount.toString(),
+                                subtitle = localizedStringResource(1534, "Orders not closed yet"),
+                                iconPath = stateValues.drawablePathIconAppModeSupplier,
+                                iconRes = stateValues.drawableResIconAppModeSupplier.value
+                            )
+                            SupplierDeskSummaryCard(
+                                modifier = Modifier.weight(1f),
+                                title = localizedStringResource(1535, "Issue watch"),
+                                value = attentionCount.toString(),
+                                subtitle = localizedStringResource(1536, "Orders needing supplier attention"),
+                                iconPath = stateValues.drawablePathIconResponse,
+                                iconRes = stateValues.drawableResIconResponse.value
+                            )
+                            SupplierDeskSummaryCard(
+                                modifier = Modifier.weight(1f),
+                                title = localizedStringResource(1537, "Contract blockers"),
+                                value = pendingContractCount.toString(),
+                                subtitle = localizedStringResource(1538, "Pending negotiated terms"),
+                                iconPath = stateValues.drawablePathIconSupplierContracts,
+                                iconRes = stateValues.drawableResIconSupplierContracts.value
+                            )
+                        }
+                    }
+
+                    StockCardInfoLine(localizedStringResource(1555, "Active contracts"), activeContractCount.toString(), stateValues.TextColor)
+                    Text(
+                        text = localizedStringResource(1553, "This is the bridge from store-side ordering to supplier-side planning: orders feed catalog, contracts guard supply, partners show reliability, and insights decide what to prepare next."),
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize
+                    )
+                }
+            }
+
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+                        .clip(RoundedCornerShape(stateValues.cornerRadius))
+                        .background(stateValues.BackgroundColor)
+                        .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor, RoundedCornerShape(stateValues.cornerRadius))
+                        .padding(stateValues.marginTextFieldGroup),
+                    verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                ) {
+                    Text(
+                        text = localizedStringResource(1548, "Supplier next moves"),
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.titleTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                    SimpleTextInput(
+                        modifier = Modifier.fillMaxWidth(),
+                        value = searchQuery,
+                        placeholder = localizedStringResource(216, "Search"),
+                        leadingIconPath = stateValues.drawablePathIconSearch,
+                        onValueChange = { searchQuery = it }
+                    )
+                    if (stateValues.isNarrowScreen) {
+                        Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+                            actionButton(
+                                modifier = Modifier.fillMaxWidth(),
+                                text = localizedStringResource(1549, "Confirm waiting orders"),
+                                iconPath = stateValues.drawablePathIconAppModeSupplier,
+                                iconRes = stateValues.drawableResIconAppModeSupplier.value,
+                                confirmationRequired = false,
+                                onClick = {
+                                    coroutineScope.launch {
+                                        NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to SupplierOrderStatusDataModel.Sent.name)
+                                        Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
+                                    }
+                                }
+                            )
+                            actionButton(
+                                modifier = Modifier.fillMaxWidth(),
+                                text = localizedStringResource(1547, "Review contracts"),
+                                iconPath = stateValues.drawablePathIconSupplierContracts,
+                                iconRes = stateValues.drawableResIconSupplierContracts.value,
+                                confirmationRequired = false,
+                                onClick = { coroutineScope.launch { Navigation.goMain(NavigationScreenModel.Supplier.Contracts.Main) } }
+                            )
+                            actionButton(
+                                modifier = Modifier.fillMaxWidth(),
+                                text = localizedStringResource(1550, "Open partner CRM"),
+                                iconPath = stateValues.drawablePathIconSupplierPartners,
+                                iconRes = stateValues.drawableResIconSupplierPartners.value,
+                                confirmationRequired = false,
+                                onClick = { coroutineScope.launch { Navigation.goMain(NavigationScreenModel.Supplier.Customers.Main) } }
+                            )
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                        ) {
+                            actionButton(
+                                modifier = Modifier.weight(1f),
+                                text = localizedStringResource(1549, "Confirm waiting orders"),
+                                iconPath = stateValues.drawablePathIconAppModeSupplier,
+                                iconRes = stateValues.drawableResIconAppModeSupplier.value,
+                                confirmationRequired = false,
+                                onClick = {
+                                    coroutineScope.launch {
+                                        NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to SupplierOrderStatusDataModel.Sent.name)
+                                        Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
+                                    }
+                                }
+                            )
+                            actionButton(
+                                modifier = Modifier.weight(1f),
+                                text = localizedStringResource(1547, "Review contracts"),
+                                iconPath = stateValues.drawablePathIconSupplierContracts,
+                                iconRes = stateValues.drawableResIconSupplierContracts.value,
+                                confirmationRequired = false,
+                                onClick = { coroutineScope.launch { Navigation.goMain(NavigationScreenModel.Supplier.Contracts.Main) } }
+                            )
+                            actionButton(
+                                modifier = Modifier.weight(1f),
+                                text = localizedStringResource(1550, "Open partner CRM"),
+                                iconPath = stateValues.drawablePathIconSupplierPartners,
+                                iconRes = stateValues.drawableResIconSupplierPartners.value,
+                                confirmationRequired = false,
+                                onClick = { coroutineScope.launch { Navigation.goMain(NavigationScreenModel.Supplier.Customers.Main) } }
+                            )
+                        }
+                    }
+                }
+            }
+
+            item {
+                Text(
+                    text = localizedStringResource(1551, "Watch these SKUs first"),
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.titleTextSize,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            if (radarItems.isEmpty()) {
+                item {
+                    MessageText(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(1541, "Demand will appear after stores send supplier orders.")
+                    )
+                }
+            } else if (visibleRadarItems.isEmpty()) {
+                item {
+                    MessageText(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(1380, "No orders match this filter")
+                    )
+                }
+            } else {
+                items(visibleRadarItems, key = { it.goodsItemId }) { item ->
+                    SupplierDemandRadarCard(item)
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun AppConfiguration.SupplierScreen() {
     when (stateValues.navigationScreensMain.last()) {
@@ -21310,12 +21797,7 @@ private fun AppConfiguration.SupplierScreen() {
         is NavigationScreenModel.Supplier.Catalog -> SupplierCatalogScreen()
         is NavigationScreenModel.Supplier.Contracts -> SupplierContractsScreen()
         is NavigationScreenModel.Supplier.Customers -> SupplierCustomersScreen()
-        is NavigationScreenModel.Supplier.Analytics -> SupplierPlaceholderScreen(
-            title = localizedStringResource(1340, "Insights"),
-            subtitle = localizedStringResource(1384, "Upcoming: demand radar, margin lens, delivery performance and cross-market growth signals."),
-            iconPath = stateValues.drawablePathIconAnalytics,
-            iconRes = stateValues.drawableResIconAnalytics.value
-        )
+        is NavigationScreenModel.Supplier.Analytics -> SupplierInsightsScreen()
         else -> SupplierOrdersInboxScreen()
     }
 }
@@ -24330,9 +24812,9 @@ sealed class NavigationScreenModel(
                 override val name: String
                     get() = with(AppConfiguration) { localizedStringResource(1340, "Insights") }
                 override val iconPath: String
-                    get() = AppConfiguration.stateValues.drawablePathIconAnalytics
+                    get() = AppConfiguration.stateValues.drawablePathIconSupplierDemandRadar
                 override val iconRes: DrawableResource
-                    get() = AppConfiguration.stateValues.drawableResIconAnalytics.value
+                    get() = AppConfiguration.stateValues.drawableResIconSupplierDemandRadar.value
             }
         }
     }
@@ -44061,6 +44543,9 @@ object AppConfiguration {
         val drawablePathIconSupplierPartners: String
         val drawableResIconSupplierPartners: StateFlow<DrawableResource>
 
+        val drawablePathIconSupplierDemandRadar: String
+        val drawableResIconSupplierDemandRadar: StateFlow<DrawableResource>
+
         val drawablePathIconBuyerAgeRestriction: String
         val drawableResIconBuyerAgeRestriction: StateFlow<DrawableResource>
 
@@ -44684,6 +45169,10 @@ object AppConfiguration {
             private val _drawableResIconSupplierPartners = MutableStateFlow(Res.drawable._75_0)
             override val drawableResIconSupplierPartners: StateFlow<DrawableResource> = _drawableResIconSupplierPartners.asStateFlow()
 
+            override val drawablePathIconSupplierDemandRadar: String by drawablePathIconSupplierDemandRadarState.collectAsState()
+            private val _drawableResIconSupplierDemandRadar = MutableStateFlow(Res.drawable._77_0)
+            override val drawableResIconSupplierDemandRadar: StateFlow<DrawableResource> = _drawableResIconSupplierDemandRadar.asStateFlow()
+
             override val drawablePathIconBuyerAgeRestriction: String by drawablePathIconBuyerAgeRestrictionState.collectAsState()
             private val _drawableResIconBuyerAgeRestriction = MutableStateFlow(Res.drawable._73_0)
             override val drawableResIconBuyerAgeRestriction: StateFlow<DrawableResource> = _drawableResIconBuyerAgeRestriction.asStateFlow()
@@ -44892,6 +45381,7 @@ object AppConfiguration {
                 _drawableResIconSupplierCatalog.emit(if (stateValues.appThemeId == 1L) Res.drawable._72_1 else Res.drawable._72_0)
                 _drawableResIconSupplierContracts.emit(if (stateValues.appThemeId == 1L) Res.drawable._76_1 else Res.drawable._76_0)
                 _drawableResIconSupplierPartners.emit(if (stateValues.appThemeId == 1L) Res.drawable._75_1 else Res.drawable._75_0)
+                _drawableResIconSupplierDemandRadar.emit(if (stateValues.appThemeId == 1L) Res.drawable._77_1 else Res.drawable._77_0)
                 _drawableResIconBuyerAgeRestriction.emit(if (stateValues.appThemeId == 1L) Res.drawable._73_1 else Res.drawable._73_0)
                 _drawableResIconTransactionTimeRestriction.emit(if (stateValues.appThemeId == 1L) Res.drawable._74_1 else Res.drawable._74_0)
 

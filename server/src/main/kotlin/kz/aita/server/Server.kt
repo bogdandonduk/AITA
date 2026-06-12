@@ -10584,10 +10584,10 @@ fun Application.module() {
                         )
                     } ?: call.genericResponseNoPayload(
                         HttpStatusCode.BadRequest,
-                        failureMessage ?: simpleMessage(
-                            main = "Cannot update supplier order",
-                            ru = "Не удалось обновить заказ поставщику",
-                            kk = "Жеткізуші тапсырысын жаңарту мүмкін болмады"
+                        simpleMessage(
+                            main = "Cannot update stock batch",
+                            ru = "Не удалось обновить партию товара",
+                            kk = "Тауар партиясын жаңарту мүмкін болмады"
                         )
                     )
                 }

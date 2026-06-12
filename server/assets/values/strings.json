@@ -30388,6 +30388,531 @@
           "value": "Әзірге серіктес дүкен жоқ. Жеткізуші тапсырыстары серіктес белгілерін автоматты жасайды."
         }
       ]
+    },
+    {
+      "id": 1531,
+      "values": [
+        {
+          "language": "main",
+          "value": "Demand radar live"
+        },
+        {
+          "language": "en",
+          "value": "Demand radar live"
+        },
+        {
+          "language": "ru",
+          "value": "Радар спроса активен"
+        },
+        {
+          "language": "kk",
+          "value": "Сұраныс радары қосулы"
+        }
+      ]
+    },
+    {
+      "id": 1532,
+      "values": [
+        {
+          "language": "main",
+          "value": "Store demand turns into an early-warning board: which items to prepare, which stores need confirmation, and which contracts may block supply."
+        },
+        {
+          "language": "en",
+          "value": "Store demand turns into an early-warning board: which items to prepare, which stores need confirmation, and which contracts may block supply."
+        },
+        {
+          "language": "ru",
+          "value": "Спрос магазинов превращается в панель раннего сигнала: какие товары готовить, каким магазинам нужно подтверждение и какие договоры могут блокировать поставку."
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен сұранысы ерте ескерту тақтасына айналады: қай тауарды дайындау, қай дүкенді растау және қандай келісімдер жеткізуді тоқтатуы мүмкін."
+        }
+      ]
+    },
+    {
+      "id": 1533,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open pipeline"
+        },
+        {
+          "language": "en",
+          "value": "Open pipeline"
+        },
+        {
+          "language": "ru",
+          "value": "Открытая воронка"
+        },
+        {
+          "language": "kk",
+          "value": "Ашық ағым"
+        }
+      ]
+    },
+    {
+      "id": 1534,
+      "values": [
+        {
+          "language": "main",
+          "value": "Orders not closed yet"
+        },
+        {
+          "language": "en",
+          "value": "Orders not closed yet"
+        },
+        {
+          "language": "ru",
+          "value": "Заказы ещё не закрыты"
+        },
+        {
+          "language": "kk",
+          "value": "Тапсырыстар әлі жабылмады"
+        }
+      ]
+    },
+    {
+      "id": 1535,
+      "values": [
+        {
+          "language": "main",
+          "value": "Issue watch"
+        },
+        {
+          "language": "en",
+          "value": "Issue watch"
+        },
+        {
+          "language": "ru",
+          "value": "Контроль проблем"
+        },
+        {
+          "language": "kk",
+          "value": "Мәселелер бақылауы"
+        }
+      ]
+    },
+    {
+      "id": 1536,
+      "values": [
+        {
+          "language": "main",
+          "value": "Orders needing supplier attention"
+        },
+        {
+          "language": "en",
+          "value": "Orders needing supplier attention"
+        },
+        {
+          "language": "ru",
+          "value": "Заказы, требующие внимания поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші назарын қажет ететін тапсырыстар"
+        }
+      ]
+    },
+    {
+      "id": 1537,
+      "values": [
+        {
+          "language": "main",
+          "value": "Contract blockers"
+        },
+        {
+          "language": "en",
+          "value": "Contract blockers"
+        },
+        {
+          "language": "ru",
+          "value": "Блокирующие договоры"
+        },
+        {
+          "language": "kk",
+          "value": "Бұғаттайтын келісімдер"
+        }
+      ]
+    },
+    {
+      "id": 1538,
+      "values": [
+        {
+          "language": "main",
+          "value": "Pending negotiated terms"
+        },
+        {
+          "language": "en",
+          "value": "Pending negotiated terms"
+        },
+        {
+          "language": "ru",
+          "value": "Условия ещё согласуются"
+        },
+        {
+          "language": "kk",
+          "value": "Шарттар келісілуде"
+        }
+      ]
+    },
+    {
+      "id": 1539,
+      "values": [
+        {
+          "language": "main",
+          "value": "Top demand signals"
+        },
+        {
+          "language": "en",
+          "value": "Top demand signals"
+        },
+        {
+          "language": "ru",
+          "value": "Главные сигналы спроса"
+        },
+        {
+          "language": "kk",
+          "value": "Басты сұраныс белгілері"
+        }
+      ]
+    },
+    {
+      "id": 1540,
+      "values": [
+        {
+          "language": "main",
+          "value": "No demand signal yet"
+        },
+        {
+          "language": "en",
+          "value": "No demand signal yet"
+        },
+        {
+          "language": "ru",
+          "value": "Сигналов спроса пока нет"
+        },
+        {
+          "language": "kk",
+          "value": "Әзірге сұраныс белгісі жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1541,
+      "values": [
+        {
+          "language": "main",
+          "value": "Demand will appear after stores send supplier orders."
+        },
+        {
+          "language": "en",
+          "value": "Demand will appear after stores send supplier orders."
+        },
+        {
+          "language": "ru",
+          "value": "Спрос появится после того, как магазины отправят заказы поставщику."
+        },
+        {
+          "language": "kk",
+          "value": "Дүкендер жеткізушіге тапсырыс жібергеннен кейін сұраныс пайда болады."
+        }
+      ]
+    },
+    {
+      "id": 1542,
+      "values": [
+        {
+          "language": "main",
+          "value": "Prepare stock"
+        },
+        {
+          "language": "en",
+          "value": "Prepare stock"
+        },
+        {
+          "language": "ru",
+          "value": "Подготовить запас"
+        },
+        {
+          "language": "kk",
+          "value": "Қорды дайындау"
+        }
+      ]
+    },
+    {
+      "id": 1543,
+      "values": [
+        {
+          "language": "main",
+          "value": "stores"
+        },
+        {
+          "language": "en",
+          "value": "stores"
+        },
+        {
+          "language": "ru",
+          "value": "магазины"
+        },
+        {
+          "language": "kk",
+          "value": "дүкендер"
+        }
+      ]
+    },
+    {
+      "id": 1544,
+      "values": [
+        {
+          "language": "main",
+          "value": "open orders"
+        },
+        {
+          "language": "en",
+          "value": "open orders"
+        },
+        {
+          "language": "ru",
+          "value": "открытые заказы"
+        },
+        {
+          "language": "kk",
+          "value": "ашық тапсырыстар"
+        }
+      ]
+    },
+    {
+      "id": 1545,
+      "values": [
+        {
+          "language": "main",
+          "value": "Latest activity"
+        },
+        {
+          "language": "en",
+          "value": "Latest activity"
+        },
+        {
+          "language": "ru",
+          "value": "Последняя активность"
+        },
+        {
+          "language": "kk",
+          "value": "Соңғы белсенділік"
+        }
+      ]
+    },
+    {
+      "id": 1546,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open matching orders"
+        },
+        {
+          "language": "en",
+          "value": "Open matching orders"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть связанные заказы"
+        },
+        {
+          "language": "kk",
+          "value": "Сәйкес тапсырыстарды ашу"
+        }
+      ]
+    },
+    {
+      "id": 1547,
+      "values": [
+        {
+          "language": "main",
+          "value": "Review contracts"
+        },
+        {
+          "language": "en",
+          "value": "Review contracts"
+        },
+        {
+          "language": "ru",
+          "value": "Проверить договоры"
+        },
+        {
+          "language": "kk",
+          "value": "Келісімдерді қарау"
+        }
+      ]
+    },
+    {
+      "id": 1548,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier next moves"
+        },
+        {
+          "language": "en",
+          "value": "Supplier next moves"
+        },
+        {
+          "language": "ru",
+          "value": "Следующие шаги поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізушінің келесі қадамдары"
+        }
+      ]
+    },
+    {
+      "id": 1549,
+      "values": [
+        {
+          "language": "main",
+          "value": "Confirm waiting orders"
+        },
+        {
+          "language": "en",
+          "value": "Confirm waiting orders"
+        },
+        {
+          "language": "ru",
+          "value": "Подтвердить ожидающие заказы"
+        },
+        {
+          "language": "kk",
+          "value": "Күтіп тұрған тапсырыстарды растау"
+        }
+      ]
+    },
+    {
+      "id": 1550,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open partner CRM"
+        },
+        {
+          "language": "en",
+          "value": "Open partner CRM"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть CRM партнёров"
+        },
+        {
+          "language": "kk",
+          "value": "Серіктес CRM ашу"
+        }
+      ]
+    },
+    {
+      "id": 1551,
+      "values": [
+        {
+          "language": "main",
+          "value": "Watch these SKUs first"
+        },
+        {
+          "language": "en",
+          "value": "Watch these SKUs first"
+        },
+        {
+          "language": "ru",
+          "value": "Сначала следите за этими SKU"
+        },
+        {
+          "language": "kk",
+          "value": "Алдымен осы SKU-ларды бақылаңыз"
+        }
+      ]
+    },
+    {
+      "id": 1552,
+      "values": [
+        {
+          "language": "main",
+          "value": "Demand score"
+        },
+        {
+          "language": "en",
+          "value": "Demand score"
+        },
+        {
+          "language": "ru",
+          "value": "Оценка спроса"
+        },
+        {
+          "language": "kk",
+          "value": "Сұраныс бағасы"
+        }
+      ]
+    },
+    {
+      "id": 1553,
+      "values": [
+        {
+          "language": "main",
+          "value": "This is the bridge from store-side ordering to supplier-side planning: orders feed catalog, contracts guard supply, partners show reliability, and insights decide what to prepare next."
+        },
+        {
+          "language": "en",
+          "value": "This is the bridge from store-side ordering to supplier-side planning: orders feed catalog, contracts guard supply, partners show reliability, and insights decide what to prepare next."
+        },
+        {
+          "language": "ru",
+          "value": "Это мост от заказов магазина к планированию поставщика: заказы наполняют каталог, договоры охраняют поставку, партнёры показывают надёжность, а аналитика подсказывает, что готовить дальше."
+        },
+        {
+          "language": "kk",
+          "value": "Бұл дүкен тапсырыстары мен жеткізуші жоспары арасындағы көпір: тапсырыстар каталогты толықтырады, келісімдер жеткізуді қорғайды, серіктестер сенімділікті көрсетеді, ал талдау келесі дайындықты айтады."
+        }
+      ]
+    },
+    {
+      "id": 1554,
+      "values": [
+        {
+          "language": "main",
+          "value": "Top item demand"
+        },
+        {
+          "language": "en",
+          "value": "Top item demand"
+        },
+        {
+          "language": "ru",
+          "value": "Спрос по товарам"
+        },
+        {
+          "language": "kk",
+          "value": "Тауар сұранысы"
+        }
+      ]
+    },
+    {
+      "id": 1555,
+      "values": [
+        {
+          "language": "main",
+          "value": "Active contracts"
+        },
+        {
+          "language": "en",
+          "value": "Active contracts"
+        },
+        {
+          "language": "ru",
+          "value": "Активные договоры"
+        },
+        {
+          "language": "kk",
+          "value": "Белсенді келісімдер"
+        }
+      ]
     }
   ]
 }

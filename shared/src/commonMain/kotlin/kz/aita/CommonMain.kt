@@ -5194,7 +5194,7 @@ const val CLOUD_TRANSPORT_STATUS_UNAVAILABLE = -1
 @PublishedApi
 internal const val REALTIME_ACCESS_TOKEN_REFRESH_SKEW_MILLIS = 60_000L
 
-private const val DEFAULT_AITA_SERVER_URL = "http://10.202.10.147:8080"
+private const val DEFAULT_AITA_SERVER_URL = "http://10.202.5.36:8080"
 private val DEFAULT_AITA_SERVER_URL_PAIR = Pair(DEFAULT_AITA_SERVER_URL, "1")
 @Volatile
 private var currentNetworkRequestCandidateServerUrlsMemory: List<String> = emptyList()
@@ -5850,6 +5850,7 @@ val drawablePathIconAppModeManufacturerState = MutableStateFlow("svg/71_0.svg")
 val drawablePathIconSupplierCatalogState = MutableStateFlow("svg/72_0.svg")
 val drawablePathIconSupplierContractsState = MutableStateFlow("svg/76_0.svg")
 val drawablePathIconSupplierPartnersState = MutableStateFlow("svg/75_0.svg")
+val drawablePathIconSupplierDemandRadarState = MutableStateFlow("svg/77_0.svg")
 val drawablePathIconBuyerAgeRestrictionState = MutableStateFlow("svg/73_0.svg")
 val drawablePathIconTransactionTimeRestrictionState = MutableStateFlow("svg/74_0.svg")
 val drawablePathIconWorkersState = MutableStateFlow("svg/22_0.svg")
@@ -7914,6 +7915,9 @@ fun updateDrawables(
         )
         drawablePathIconSupplierPartnersState.emit(
             drawablePath(75L)
+        )
+        drawablePathIconSupplierDemandRadarState.emit(
+            drawablePath(77L)
         )
         drawablePathIconBuyerAgeRestrictionState.emit(
             drawablePath(73L)
