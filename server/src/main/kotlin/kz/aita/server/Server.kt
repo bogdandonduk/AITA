@@ -522,6 +522,28 @@ suspend fun ApplicationCall.safeGenericResponseNoPayload(
     }
 }
 
+suspend fun ApplicationCall.respondAitaUnauthorized(
+    message: List<LocalizedStringDataModel> = simpleMessage(
+        main = "Authentication or permission is required",
+        en = "Authentication or permission is required",
+        ru = "Требуется вход или разрешение",
+        kk = "Кіру немесе рұқсат қажет"
+    )
+) {
+    stabilizeServerRuntimeClassLoader("unauthorized:${request.httpMethod.value}:${request.path()}")
+    val response = GenericResponseDataModel(
+        message = jsonBase.encodeToString(message),
+        payload = null,
+        negative = true
+    )
+
+    respondText(
+        text = jsonBase.encodeToString(response),
+        contentType = ContentType.Application.Json,
+        status = HttpStatusCode.Unauthorized
+    )
+}
+
 suspend inline fun <reified T> RoutingCall.genericResponse(
     status: HttpStatusCode,
     payload: T?,
@@ -658,14 +680,14 @@ suspend fun RoutingCall.checkPrincipal(): UUID? {
     val principal = principal<JWTPrincipal>()
 
     if (principal == null) {
-        respond(UnauthorizedResponse())
+        respondAitaUnauthorized()
         return null
     }
 
     val userId = runCatching { UUID.fromString(principal.subject) }.getOrNull()
 
     if (userId == null) {
-        respond(UnauthorizedResponse())
+        respondAitaUnauthorized()
         return null
     }
 
@@ -9056,7 +9078,7 @@ fun Application.module() {
                             }
 
                         when {
-                            genericGoodsCategories.first == 1 -> call.respond(UnauthorizedResponse())
+                            genericGoodsCategories.first == 1 -> call.respondAitaUnauthorized()
                             else -> {
                                 call.genericResponse(
                                     HttpStatusCode.OK,
@@ -9125,7 +9147,7 @@ fun Application.module() {
                             }
 
                         when {
-                            genericGoodsItems.first == 1 -> call.respond(UnauthorizedResponse())
+                            genericGoodsItems.first == 1 -> call.respondAitaUnauthorized()
                             else -> {
                                 call.genericResponse(
                                     HttpStatusCode.OK,
@@ -9169,7 +9191,7 @@ fun Application.module() {
                 get("/get") {
                     val userId = call.checkPrincipal() ?: return@get
                     val storeId = call.headerUuid("store_id")
-                        ?: return@get call.respond(UnauthorizedResponse())
+                        ?: return@get call.respondAitaUnauthorized()
 
                     val result = newSuspendedTransaction(aitaServerIoContext) {
                         if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_READ, requireWorkshift = false))
@@ -9192,13 +9214,13 @@ fun Application.module() {
                             status = HttpStatusCode.OK,
                             payload = it
                         )
-                    } ?: call.respond(UnauthorizedResponse())
+                    } ?: call.respondAitaUnauthorized()
                 }
 
                 get("/parent/get") {
                     val userId = call.checkPrincipal() ?: return@get
                     val storeId = call.headerUuid("store_id")
-                        ?: return@get call.respond(UnauthorizedResponse())
+                        ?: return@get call.respondAitaUnauthorized()
                     val cleanQuery = call.request.queryParameters["q"]
                         ?.trim()
                         ?.takeIf { it.isNotBlank() }
@@ -9240,13 +9262,13 @@ fun Application.module() {
                             status = HttpStatusCode.OK,
                             payload = it
                         )
-                    } ?: call.respond(UnauthorizedResponse())
+                    } ?: call.respondAitaUnauthorized()
                 }
 
                 get("/history/get") {
                     val userId = call.checkPrincipal() ?: return@get
                     val storeId = call.headerUuid("store_id")
-                        ?: return@get call.respond(UnauthorizedResponse())
+                        ?: return@get call.respondAitaUnauthorized()
                     val goodsItemId = call.headerUuid("goods_item_id")
                         ?: return@get call.genericResponseNoPayload(HttpStatusCode.BadRequest, message = getResponse("13").message)
 
@@ -9305,7 +9327,7 @@ fun Application.module() {
                             status = HttpStatusCode.OK,
                             payload = it
                         )
-                    } ?: call.respond(UnauthorizedResponse())
+                    } ?: call.respondAitaUnauthorized()
                 }
 
 
@@ -9632,7 +9654,7 @@ fun Application.module() {
                     val userId = call.checkPrincipal() ?: return@delete
                     val rawId = call.receiveAita<String>()
                     val storeId = call.headerUuid("store_id")
-                        ?: return@delete call.respond(UnauthorizedResponse())
+                        ?: return@delete call.respondAitaUnauthorized()
 
                     val deletedId = newSuspendedTransaction(aitaServerIoContext) {
                         if (!call.matchesInventoryContextStoreIdInsideTransaction(userId, storeId))
@@ -9700,7 +9722,7 @@ fun Application.module() {
                             payload = it,
                             message = getResponse("16").message
                         )
-                    } ?: call.respond(UnauthorizedResponse())
+                    } ?: call.respondAitaUnauthorized()
                 }
             }
         }
@@ -9710,7 +9732,7 @@ fun Application.module() {
                 get("/get") {
                     val userId = call.checkPrincipal() ?: return@get
                     val storeId = call.headerUuid("store_id")
-                        ?: return@get call.respond(UnauthorizedResponse())
+                        ?: return@get call.respondAitaUnauthorized()
 
                     val result = newSuspendedTransaction(aitaServerIoContext) {
                         if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_READ, requireWorkshift = false))
@@ -9738,7 +9760,7 @@ fun Application.module() {
                 get("/branchAvailability") {
                     val userId = call.checkPrincipal() ?: return@get
                     val storeId = call.headerUuid("store_id")
-                        ?: return@get call.respond(UnauthorizedResponse())
+                        ?: return@get call.respondAitaUnauthorized()
                     val goodsItemId = call.headerUuid("goods_item_id")
                         ?: return@get call.genericResponseNoPayload(HttpStatusCode.BadRequest, message = getResponse("13").message)
 
@@ -9755,7 +9777,7 @@ fun Application.module() {
                             payload = it,
                             message = getResponse("73").message
                         )
-                    } ?: call.respond(UnauthorizedResponse())
+                    } ?: call.respondAitaUnauthorized()
                 }
 
                 post("/move") {
@@ -10438,7 +10460,7 @@ fun Application.module() {
                             payload = it,
                             message = getResponse("17").message
                         )
-                    } ?: call.respond(UnauthorizedResponse())
+                    } ?: call.respondAitaUnauthorized()
                 }
 
                 put("/update") {
@@ -10596,7 +10618,7 @@ fun Application.module() {
                     val userId = call.checkPrincipal() ?: return@delete
                     val ids = call.receiveOneOrList<String>()
                     val storeId = call.headerUuid("store_id")
-                        ?: return@delete call.respond(UnauthorizedResponse())
+                        ?: return@delete call.respondAitaUnauthorized()
 
                     val deletedIds = newSuspendedTransaction(aitaServerIoContext) {
                         if (!call.matchesInventoryContextStoreIdInsideTransaction(userId, storeId))
@@ -10662,7 +10684,7 @@ fun Application.module() {
                             payload = it,
                             message = getResponse("19").message
                         )
-                    } ?: call.respond(UnauthorizedResponse())
+                    } ?: call.respondAitaUnauthorized()
                 }
 
                 post("/setActiveShelfBatch") {
@@ -10763,7 +10785,7 @@ fun Application.module() {
                                 kk = "Сөредегі партия таңдалды"
                             ) else null
                         )
-                    } ?: call.respond(UnauthorizedResponse())
+                    } ?: call.respondAitaUnauthorized()
                 }
             }
         }
@@ -10773,7 +10795,7 @@ fun Application.module() {
                 get("/get") {
                     val userId = call.checkPrincipal() ?: return@get
                     val storeId = call.headerUuid("store_id")
-                        ?: return@get call.respond(UnauthorizedResponse())
+                        ?: return@get call.respondAitaUnauthorized()
 
                     val result = newSuspendedTransaction(aitaServerIoContext) {
                         if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_SUPPLIERS_VIEW, requireWorkshift = false))
@@ -10793,7 +10815,7 @@ fun Application.module() {
                             status = HttpStatusCode.OK,
                             payload = it
                         )
-                    } ?: call.respond(UnauthorizedResponse())
+                    } ?: call.respondAitaUnauthorized()
                 }
 
                 post("/upsert") {
@@ -10849,14 +10871,14 @@ fun Application.module() {
                                 kk = "Жеткізуші бағасы сақталды"
                             )
                         )
-                    } ?: call.respond(UnauthorizedResponse())
+                    } ?: call.respondAitaUnauthorized()
                 }
 
                 delete("/delete") {
                     val userId = call.checkPrincipal() ?: return@delete
                     val ids = call.receiveOneOrList<String>()
                     val storeId = call.headerUuid("store_id")
-                        ?: return@delete call.respond(UnauthorizedResponse())
+                        ?: return@delete call.respondAitaUnauthorized()
 
                     val deleted = newSuspendedTransaction(aitaServerIoContext) {
                         if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_SUPPLIER_PRICES_MANAGE, requireWorkshift = true))
@@ -10895,7 +10917,7 @@ fun Application.module() {
                                 kk = "Жеткізуші бағалары өшірілді"
                             )
                         )
-                    } ?: call.respond(UnauthorizedResponse())
+                    } ?: call.respondAitaUnauthorized()
                 }
             }
         }
@@ -10912,7 +10934,7 @@ fun Application.module() {
                             .empty()
 
                         if (noUser)
-                            call.respond(UnauthorizedResponse())
+                            call.respondAitaUnauthorized()
 
                         val directStoreIds = StoreUsers
                             .select(StoreUsers.storeId)
@@ -10983,7 +11005,7 @@ fun Application.module() {
                             )
                         )
 
-                        else -> call.respond(UnauthorizedResponse())
+                        else -> call.respondAitaUnauthorized()
                     }
                 }
 
@@ -10999,7 +11021,7 @@ fun Application.module() {
                             .empty()
                     }
 
-                    if (noUser) return@post call.respond(UnauthorizedResponse())
+                    if (noUser) return@post call.respondAitaUnauthorized()
 
                     val body = call.receiveAita<StoreDataModel>()
 
@@ -11030,7 +11052,7 @@ fun Application.module() {
                         ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
 
                     if (body.parentStoreId != null && parentStoreIdForBranch == null) {
-                        return@post call.respond(UnauthorizedResponse())
+                        return@post call.respondAitaUnauthorized()
                     }
 
                     val parentAccessOk = newSuspendedTransaction(aitaServerIoContext) {
@@ -11043,7 +11065,7 @@ fun Application.module() {
                         } ?: true
                     }
 
-                    if (!parentAccessOk) return@post call.respond(UnauthorizedResponse())
+                    if (!parentAccessOk) return@post call.respondAitaUnauthorized()
 
                     var state23505Reached: Boolean
 
@@ -11204,7 +11226,7 @@ fun Application.module() {
                             getResponse("11").message
                         )
 
-                        1, 2 -> call.respond(UnauthorizedResponse())
+                        1, 2 -> call.respondAitaUnauthorized()
                         else -> call.genericResponseNoPayload(
                             status = HttpStatusCode.InternalServerError,
                             message = getResponse("3").message
@@ -11252,7 +11274,7 @@ fun Application.module() {
                             message = getResponse("12").message
                         )
 
-                        1, 2 -> call.respond(UnauthorizedResponse())
+                        1, 2 -> call.respondAitaUnauthorized()
                         else -> call.genericResponseNoPayload(
                             status = HttpStatusCode.InternalServerError,
                             message = getResponse("3").message
@@ -11289,7 +11311,7 @@ fun Application.module() {
                         }
 
                     when {
-                        suppliers.first == 1 -> call.respond(UnauthorizedResponse())
+                        suppliers.first == 1 -> call.respondAitaUnauthorized()
                         suppliers.second != null ->
                             call.genericResponse(
                                 HttpStatusCode.OK,
@@ -11327,7 +11349,7 @@ fun Application.module() {
 
                     inserted?.let {
                         call.genericResponse(HttpStatusCode.Created, payload = it, message = getResponse("83").message)
-                    } ?: call.respond(UnauthorizedResponse())
+                    } ?: call.respondAitaUnauthorized()
                 }
 
                 put("/update") {
@@ -11359,7 +11381,7 @@ fun Application.module() {
 
                     updated?.let {
                         call.genericResponse(HttpStatusCode.OK, payload = it, message = getResponse("84").message)
-                    } ?: call.respond(UnauthorizedResponse())
+                    } ?: call.respondAitaUnauthorized()
                 }
 
                 delete("/delete") {
@@ -11383,7 +11405,7 @@ fun Application.module() {
                     if (deleted) {
                         call.genericResponse(HttpStatusCode.OK, payload = supplierId, message = getResponse("85").message)
                     } else {
-                        call.respond(UnauthorizedResponse())
+                        call.respondAitaUnauthorized()
                     }
                 }
             }
@@ -11437,7 +11459,7 @@ fun Application.module() {
                                 kk = "Жеткізуші келісімдері жүктелді"
                             )
                         )
-                    } ?: call.respond(UnauthorizedResponse())
+                    } ?: call.respondAitaUnauthorized()
                 }
 
                 post("/upsert") {
@@ -11513,7 +11535,7 @@ fun Application.module() {
                 post("/accept") {
                     val userId = call.checkPrincipal() ?: return@post
                     val contractId = runCatching { UUID.fromString(call.receiveAita<String>().trim()) }.getOrNull()
-                        ?: return@post call.respond(UnauthorizedResponse())
+                        ?: return@post call.respondAitaUnauthorized()
 
                     val result = newSuspendedTransaction(aitaServerIoContext) {
                         val existing = SupplierPartnershipContracts.selectAll().where { SupplierPartnershipContracts.id eq contractId }.singleOrNull()
@@ -11561,13 +11583,13 @@ fun Application.module() {
                                 kk = if (it.status == SUPPLIER_CONTRACT_STATUS_ACTIVE) "Келісім белсенді" else "Келісім қабылданды"
                             )
                         )
-                    } ?: call.respond(UnauthorizedResponse())
+                    } ?: call.respondAitaUnauthorized()
                 }
 
                 post("/decline") {
                     val userId = call.checkPrincipal() ?: return@post
                     val contractId = runCatching { UUID.fromString(call.receiveAita<String>().trim()) }.getOrNull()
-                        ?: return@post call.respond(UnauthorizedResponse())
+                        ?: return@post call.respondAitaUnauthorized()
 
                     val result = newSuspendedTransaction(aitaServerIoContext) {
                         val existing = SupplierPartnershipContracts.selectAll().where { SupplierPartnershipContracts.id eq contractId }.singleOrNull()
@@ -11602,13 +11624,13 @@ fun Application.module() {
                                 kk = "Келісім қабылданбады"
                             )
                         )
-                    } ?: call.respond(UnauthorizedResponse())
+                    } ?: call.respondAitaUnauthorized()
                 }
 
                 post("/archive") {
                     val userId = call.checkPrincipal() ?: return@post
                     val contractId = runCatching { UUID.fromString(call.receiveAita<String>().trim()) }.getOrNull()
-                        ?: return@post call.respond(UnauthorizedResponse())
+                        ?: return@post call.respondAitaUnauthorized()
 
                     val archived = newSuspendedTransaction(aitaServerIoContext) {
                         val existing = SupplierPartnershipContracts.selectAll().where { SupplierPartnershipContracts.id eq contractId }.singleOrNull()
@@ -11636,7 +11658,7 @@ fun Application.module() {
                             )
                         )
                     } else {
-                        call.respond(UnauthorizedResponse())
+                        call.respondAitaUnauthorized()
                     }
                 }
             }
@@ -11706,7 +11728,7 @@ fun Application.module() {
                                 kk = "Жеткізуші тапсырыстары жүктелді"
                             )
                         )
-                    } ?: call.respond(UnauthorizedResponse())
+                    } ?: call.respondAitaUnauthorized()
                 }
 
                 post("/add") {
@@ -11924,7 +11946,7 @@ fun Application.module() {
                 delete("/delete") {
                     val userId = call.checkPrincipal() ?: return@delete
                     val orderId = runCatching { UUID.fromString(call.receiveAita<String>().trim()) }.getOrNull()
-                        ?: return@delete call.respond(UnauthorizedResponse())
+                        ?: return@delete call.respondAitaUnauthorized()
 
                     val deleted = newSuspendedTransaction(aitaServerIoContext) {
                         val existing = SupplierOrders.selectAll().where { SupplierOrders.id eq orderId }.singleOrNull()
@@ -11948,7 +11970,7 @@ fun Application.module() {
                             )
                         )
                     } else {
-                        call.respond(UnauthorizedResponse())
+                        call.respondAitaUnauthorized()
                     }
                 }
 
@@ -12085,7 +12107,7 @@ fun Application.module() {
                                 kk = "Қаржы жүктелді"
                             )
                         )
-                    } ?: call.respond(UnauthorizedResponse())
+                    } ?: call.respondAitaUnauthorized()
                 }
 
                 post("/topup/create") {
@@ -12224,7 +12246,7 @@ fun Application.module() {
 
                 get("/store/get") {
                     val userId = call.checkPrincipal() ?: return@get
-                    val storeId = call.headerUuid("store_id") ?: return@get call.respond(UnauthorizedResponse())
+                    val storeId = call.headerUuid("store_id") ?: return@get call.respondAitaUnauthorized()
                     val dashboard = newSuspendedTransaction(aitaServerIoContext) {
                         if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STORE_MANAGE, requireWorkshift = false) && !userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_SUBSCRIPTION_MANAGE, requireWorkshift = false)) return@newSuspendedTransaction null
                         subscriptionDashboardInsideTransaction(storeId)
@@ -12239,14 +12261,14 @@ fun Application.module() {
                                 kk = "Дүкен жазылымы жүктелді"
                             )
                         )
-                    } ?: call.respond(UnauthorizedResponse())
+                    } ?: call.respondAitaUnauthorized()
                 }
 
                 post("/store/update") {
                     val userId = call.checkPrincipal() ?: return@post
                     val body = call.receiveAita<StoreSubscriptionUpdateRequestDataModel>()
                     val storeId = runCatching { UUID.fromString(body.storeId) }.getOrNull()
-                        ?: return@post call.respond(UnauthorizedResponse())
+                        ?: return@post call.respondAitaUnauthorized()
 
                     val dashboard = newSuspendedTransaction(aitaServerIoContext) {
                         val rootStoreId = rootStoreIdForAccessInsideTransaction(storeId)
@@ -12334,7 +12356,7 @@ fun Application.module() {
                             .empty()
 
                         if (noUser)
-                            call.respond(UnauthorizedResponse())
+                            call.respondAitaUnauthorized()
 
                         UserBalances
                             .selectAll()
@@ -12398,7 +12420,7 @@ fun Application.module() {
 //              getResponse("11").message
 //            )
 //
-//            1, 2 -> call.respond(UnauthorizedResponse())
+//            1, 2 -> call.respondAitaUnauthorized()
 //            else -> call.genericResponseNoPayload(
 //              status = HttpStatusCode.InternalServerError,
 //              message = getResponse("3").message
@@ -12422,7 +12444,7 @@ fun Application.module() {
                             .limit(1)
                             .singleOrNull()
                             ?.toUserAccountDataModel()
-                    } ?: return@get call.respond(UnauthorizedResponse())
+                    } ?: return@get call.respondAitaUnauthorized()
 
                     call.genericResponse(
                         HttpStatusCode.OK,
@@ -12457,7 +12479,7 @@ fun Application.module() {
                             .limit(1)
                             .singleOrNull()
                             ?.toUserAccountDataModel()
-                    } ?: return@put call.respond(UnauthorizedResponse())
+                    } ?: return@put call.respondAitaUnauthorized()
 
                     call.genericResponse(
                         HttpStatusCode.OK,
@@ -12587,7 +12609,7 @@ fun Application.module() {
                             )
                         }
 
-                        "unauthorized", "password_mismatch" -> call.respond(UnauthorizedResponse())
+                        "unauthorized", "password_mismatch" -> call.respondAitaUnauthorized()
 
                         "phone_number_and_email_clash" -> call.genericResponseNoPayload(
                             HttpStatusCode.Conflict,
@@ -12618,7 +12640,7 @@ fun Application.module() {
             authenticate("auth-jwt") {
                 get("/get") {
                     val userId = call.checkPrincipal() ?: return@get
-                    val storeId = call.headerUuid("store_id") ?: return@get call.respond(UnauthorizedResponse())
+                    val storeId = call.headerUuid("store_id") ?: return@get call.respondAitaUnauthorized()
 
                     val debtors = newSuspendedTransaction(aitaServerIoContext) {
                         if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_DEBTORS_VIEW, requireWorkshift = false))
@@ -12636,12 +12658,12 @@ fun Application.module() {
 
                     debtors?.let {
                         call.genericResponse(HttpStatusCode.OK, it)
-                    } ?: call.respond(UnauthorizedResponse())
+                    } ?: call.respondAitaUnauthorized()
                 }
 
                 post("/add") {
                     val userId = call.checkPrincipal() ?: return@post
-                    val storeId = call.headerUuid("store_id") ?: return@post call.respond(UnauthorizedResponse())
+                    val storeId = call.headerUuid("store_id") ?: return@post call.respondAitaUnauthorized()
                     val body = call.receiveAita<DebtorDataModel>()
 
                     val debtor = newSuspendedTransaction(aitaServerIoContext) {
@@ -12661,15 +12683,15 @@ fun Application.module() {
                             it,
                             simpleMessage("Debtor saved", ru = "Должник сохранён", kk = "Борышкер сақталды")
                         )
-                    } ?: call.respond(UnauthorizedResponse())
+                    } ?: call.respondAitaUnauthorized()
                 }
 
                 put("/update") {
                     val userId = call.checkPrincipal() ?: return@put
-                    val storeId = call.headerUuid("store_id") ?: return@put call.respond(UnauthorizedResponse())
+                    val storeId = call.headerUuid("store_id") ?: return@put call.respondAitaUnauthorized()
                     val body = call.receiveAita<DebtorDataModel>()
                     val debtorId = runCatching { UUID.fromString(body.id) }.getOrNull()
-                        ?: return@put call.respond(UnauthorizedResponse())
+                        ?: return@put call.respondAitaUnauthorized()
 
                     val debtor = newSuspendedTransaction(aitaServerIoContext) {
                         if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_DEBTORS_MANAGE, requireWorkshift = true))
@@ -12715,15 +12737,15 @@ fun Application.module() {
                             it,
                             simpleMessage("Debtor updated", ru = "Должник обновлён", kk = "Борышкер жаңартылды")
                         )
-                    } ?: call.respond(UnauthorizedResponse())
+                    } ?: call.respondAitaUnauthorized()
                 }
 
                 delete("/delete") {
                     val userId = call.checkPrincipal() ?: return@delete
-                    val storeId = call.headerUuid("store_id") ?: return@delete call.respond(UnauthorizedResponse())
+                    val storeId = call.headerUuid("store_id") ?: return@delete call.respondAitaUnauthorized()
                     val body = call.receiveAita<String>()
                     val debtorId = runCatching { UUID.fromString(body) }.getOrNull()
-                        ?: return@delete call.respond(UnauthorizedResponse())
+                        ?: return@delete call.respondAitaUnauthorized()
 
                     val deleted = newSuspendedTransaction(aitaServerIoContext) {
                         if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_DEBTORS_MANAGE, requireWorkshift = true))
@@ -12747,16 +12769,16 @@ fun Application.module() {
                             it,
                             simpleMessage("Debtor deleted", ru = "Должник удалён", kk = "Борышкер өшірілді")
                         )
-                    } ?: call.respond(UnauthorizedResponse())
+                    } ?: call.respondAitaUnauthorized()
                 }
 
                 post("/pay") {
                     val userId = call.checkPrincipal() ?: return@post
                     val body = call.receiveAita<DebtPaymentRequestDataModel>()
                     val storeId = runCatching { UUID.fromString(body.storeId) }.getOrNull()
-                        ?: return@post call.respond(UnauthorizedResponse())
+                        ?: return@post call.respondAitaUnauthorized()
                     val debtorId = runCatching { UUID.fromString(body.debtorId) }.getOrNull()
-                        ?: return@post call.respond(UnauthorizedResponse())
+                        ?: return@post call.respondAitaUnauthorized()
 
                     val debtor = newSuspendedTransaction(aitaServerIoContext) {
                         if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_DEBTOR_PAYMENTS_MANAGE, requireWorkshift = true))
@@ -12812,7 +12834,7 @@ fun Application.module() {
                             it,
                             simpleMessage("Debt payment saved", ru = "Оплата долга сохранена", kk = "Қарыз төлемі сақталды")
                         )
-                    } ?: call.respond(UnauthorizedResponse())
+                    } ?: call.respondAitaUnauthorized()
                 }
             }
         }
@@ -12822,7 +12844,7 @@ fun Application.module() {
             authenticate("auth-jwt") {
                 get("/get") {
                     val userId = call.checkPrincipal() ?: return@get
-                    val storeId = call.headerUuid("store_id") ?: return@get call.respond(UnauthorizedResponse())
+                    val storeId = call.headerUuid("store_id") ?: return@get call.respondAitaUnauthorized()
 
                     val state = newSuspendedTransaction(aitaServerIoContext) {
                         if (!userHasStoreAccessInsideTransaction(userId, storeId))
@@ -12836,7 +12858,7 @@ fun Application.module() {
 
                     state?.let {
                         call.genericResponse(HttpStatusCode.OK, payload = it, message = getResponse("49").message)
-                    } ?: call.respond(UnauthorizedResponse())
+                    } ?: call.respondAitaUnauthorized()
                 }
 
                 post("/extract") {
@@ -12844,7 +12866,7 @@ fun Application.module() {
                     val body = call.receiveAita<CashRegisterExtractionRequestDataModel>()
                     val storeId = runCatching { UUID.fromString(body.storeId) }.getOrNull()
                         ?: call.headerUuid("store_id")
-                        ?: return@post call.respond(UnauthorizedResponse())
+                        ?: return@post call.respondAitaUnauthorized()
                     val now = body.timeMillis.takeIf { it > 0L } ?: System.currentTimeMillis()
                     val amount = kotlin.math.floor(body.amount.coerceAtLeast(0.0) * 100.0) / 100.0
 
@@ -12925,7 +12947,7 @@ fun Application.module() {
 
                 get("/store/get") {
                     val userId = call.checkPrincipal() ?: return@get
-                    val storeId = call.headerUuid("store_id") ?: return@get call.respond(UnauthorizedResponse())
+                    val storeId = call.headerUuid("store_id") ?: return@get call.respondAitaUnauthorized()
 
                     val result = newSuspendedTransaction(aitaServerIoContext) {
                         val visibleStoreIds = storeGroupIdsInsideTransaction(rootStoreIdForAccessInsideTransaction(storeId))
@@ -12947,12 +12969,12 @@ fun Application.module() {
                     }
 
                     result?.let { call.genericResponse(HttpStatusCode.OK, payload = it, message = getResponse("51").message) }
-                        ?: call.respond(UnauthorizedResponse())
+                        ?: call.respondAitaUnauthorized()
                 }
 
                 get("/roleTemplates/get") {
                     val userId = call.checkPrincipal() ?: return@get
-                    val storeId = call.headerUuid("store_id") ?: return@get call.respond(UnauthorizedResponse())
+                    val storeId = call.headerUuid("store_id") ?: return@get call.respondAitaUnauthorized()
 
                     val result = newSuspendedTransaction(aitaServerIoContext) {
                         val rootStoreId = rootStoreIdForAccessInsideTransaction(storeId)
@@ -12981,12 +13003,12 @@ fun Application.module() {
                                 kk = "Қызметкер рөлінің үлгілері жүктелді"
                             )
                         )
-                    } ?: call.respond(UnauthorizedResponse())
+                    } ?: call.respondAitaUnauthorized()
                 }
 
                 post("/roleTemplates/upsert") {
                     val userId = call.checkPrincipal() ?: return@post
-                    val headerStoreId = call.headerUuid("store_id") ?: return@post call.respond(UnauthorizedResponse())
+                    val headerStoreId = call.headerUuid("store_id") ?: return@post call.respondAitaUnauthorized()
                     val body = call.receiveAita<StoreWorkerRoleTemplateUpsertRequestDataModel>()
                     val now = System.currentTimeMillis()
                     var failureMessage: List<LocalizedStringDataModel>? = null
@@ -13075,7 +13097,7 @@ fun Application.module() {
 
                 post("/roleTemplates/delete") {
                     val userId = call.checkPrincipal() ?: return@post
-                    val headerStoreId = call.headerUuid("store_id") ?: return@post call.respond(UnauthorizedResponse())
+                    val headerStoreId = call.headerUuid("store_id") ?: return@post call.respondAitaUnauthorized()
                     val body = call.receiveAita<StoreWorkerRoleTemplateDeleteRequestDataModel>()
                     val templateId = runCatching { UUID.fromString(body.templateId) }.getOrNull()
                         ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
@@ -13137,7 +13159,7 @@ fun Application.module() {
 
                 get("/requests/incoming") {
                     val userId = call.checkPrincipal() ?: return@get
-                    val storeId = call.headerUuid("store_id") ?: return@get call.respond(UnauthorizedResponse())
+                    val storeId = call.headerUuid("store_id") ?: return@get call.respondAitaUnauthorized()
 
                     val result = newSuspendedTransaction(aitaServerIoContext) {
                         val requestStoreIds = storeGroupIdsInsideTransaction(rootStoreIdForAccessInsideTransaction(storeId))
@@ -13159,7 +13181,7 @@ fun Application.module() {
                     }
 
                     result?.let { call.genericResponse(HttpStatusCode.OK, payload = it, message = getResponse("53").message) }
-                        ?: call.respond(UnauthorizedResponse())
+                        ?: call.respondAitaUnauthorized()
                 }
 
                 post("/request") {
@@ -13260,7 +13282,7 @@ fun Application.module() {
 
                 post("/invite") {
                     val userId = call.checkPrincipal() ?: return@post
-                    val storeId = call.headerUuid("store_id") ?: return@post call.respond(UnauthorizedResponse())
+                    val storeId = call.headerUuid("store_id") ?: return@post call.respondAitaUnauthorized()
                     val body = call.receiveAita<WorkerStoreInviteCreateDataModel>()
                     val now = System.currentTimeMillis()
                     val role = cleanWorkerRoleId(body.roleId)
@@ -13539,7 +13561,7 @@ fun Application.module() {
 
                 post("/accept") {
                     val userId = call.checkPrincipal() ?: return@post
-                    val headerStoreId = call.headerUuid("store_id") ?: return@post call.respond(UnauthorizedResponse())
+                    val headerStoreId = call.headerUuid("store_id") ?: return@post call.respondAitaUnauthorized()
                     val body = call.receiveAita<WorkerEmploymentDecisionRequestDataModel>()
                     val requestId = runCatching { UUID.fromString(body.requestId) }.getOrNull()
                         ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
@@ -13670,7 +13692,7 @@ fun Application.module() {
 
                 post("/decline") {
                     val userId = call.checkPrincipal() ?: return@post
-                    val headerStoreId = call.headerUuid("store_id") ?: return@post call.respond(UnauthorizedResponse())
+                    val headerStoreId = call.headerUuid("store_id") ?: return@post call.respondAitaUnauthorized()
                     val body = call.receiveAita<WorkerEmploymentDecisionRequestDataModel>()
                     val requestId = runCatching { UUID.fromString(body.requestId) }.getOrNull()
                         ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
@@ -13763,7 +13785,7 @@ fun Application.module() {
 
                 post("/updatePermissions") {
                     val userId = call.checkPrincipal() ?: return@post
-                    val storeId = call.headerUuid("store_id") ?: return@post call.respond(UnauthorizedResponse())
+                    val storeId = call.headerUuid("store_id") ?: return@post call.respondAitaUnauthorized()
                     val body = call.receiveAita<WorkerPermissionsUpdateRequestDataModel>()
                     val workerId = runCatching { UUID.fromString(body.workerId) }.getOrNull()
                         ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
@@ -13846,7 +13868,7 @@ fun Application.module() {
 
                 post("/remove") {
                     val userId = call.checkPrincipal() ?: return@post
-                    val storeId = call.headerUuid("store_id") ?: return@post call.respond(UnauthorizedResponse())
+                    val storeId = call.headerUuid("store_id") ?: return@post call.respondAitaUnauthorized()
                     val body = call.receiveAita<WorkerRemovalRequestDataModel>()
                     val workerId = runCatching { UUID.fromString(body.workerId) }.getOrNull()
                         ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
@@ -14218,7 +14240,7 @@ fun Application.module() {
             authenticate("auth-jwt") {
                 get("/current") {
                     val userId = call.checkPrincipal() ?: return@get
-                    val storeId = call.headerUuid("store_id") ?: return@get call.respond(UnauthorizedResponse())
+                    val storeId = call.headerUuid("store_id") ?: return@get call.respondAitaUnauthorized()
 
                     val workshift = newSuspendedTransaction(aitaServerIoContext) {
                         Workshifts
@@ -14243,7 +14265,7 @@ fun Application.module() {
 
                 post("/start") {
                     val userId = call.checkPrincipal() ?: return@post
-                    val storeId = call.headerUuid("store_id") ?: return@post call.respond(UnauthorizedResponse())
+                    val storeId = call.headerUuid("store_id") ?: return@post call.respondAitaUnauthorized()
                     val body = call.receiveAita<WorkshiftStartRequestDataModel>()
                     val now = System.currentTimeMillis()
                     var failureMessage: List<LocalizedStringDataModel>? = null
@@ -14348,7 +14370,7 @@ fun Application.module() {
 
                 post("/end") {
                     val userId = call.checkPrincipal() ?: return@post
-                    val storeId = call.headerUuid("store_id") ?: return@post call.respond(UnauthorizedResponse())
+                    val storeId = call.headerUuid("store_id") ?: return@post call.respondAitaUnauthorized()
                     val rawBody = runCatching { call.receiveTextAita().trim() }.getOrNull().orEmpty()
                     val body = rawBody
                         .takeIf { it.isNotBlank() }
@@ -14379,7 +14401,7 @@ fun Application.module() {
                 get("/get") {
                     val userId = call.checkPrincipal() ?: return@get
                     val storeId = call.headerUuid("store_id")
-                        ?: return@get call.respond(UnauthorizedResponse())
+                        ?: return@get call.respondAitaUnauthorized()
                     val scope = call.request.queryParameters["scope"].orEmpty().ifBlank { OPERATION_LOG_SCOPE_CURRENT }
 
                     val logs = newSuspendedTransaction(aitaServerIoContext) {
@@ -14402,7 +14424,7 @@ fun Application.module() {
                             payload = it,
                             message = getResponse("92").message
                         )
-                    } ?: call.respond(UnauthorizedResponse())
+                    } ?: call.respondAitaUnauthorized()
                 }
             }
         }
@@ -14412,7 +14434,7 @@ fun Application.module() {
                 get("/store/get") {
                     val userId = call.checkPrincipal() ?: return@get
                     val storeId = runCatching { UUID.fromString(call.request.header("store_id")) }.getOrNull()
-                        ?: return@get call.respond(UnauthorizedResponse())
+                        ?: return@get call.respondAitaUnauthorized()
                     val startMillis = call.request.queryParameters["startMillis"]?.toLongOrNull() ?: 0L
                     val endMillisExclusive = call.request.queryParameters["endMillisExclusive"]?.toLongOrNull()
                         ?: Long.MAX_VALUE
@@ -14470,7 +14492,7 @@ fun Application.module() {
                             payload = it,
                             message = getResponse("94").message
                         )
-                    } ?: call.respond(UnauthorizedResponse())
+                    } ?: call.respondAitaUnauthorized()
                 }
             }
         }
@@ -14481,7 +14503,7 @@ fun Application.module() {
                     val userId = call.checkPrincipal() ?: return@get
                     val storeId = runCatching {
                         UUID.fromString(call.request.header("store_id"))
-                    }.getOrNull() ?: return@get call.respond(UnauthorizedResponse())
+                    }.getOrNull() ?: return@get call.respondAitaUnauthorized()
 
                     val transactions = newSuspendedTransaction(aitaServerIoContext) {
                         if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_TRANSACTION_HISTORY_VIEW, requireWorkshift = false))
@@ -14503,7 +14525,7 @@ fun Application.module() {
                             status = HttpStatusCode.OK,
                             payload = it
                         )
-                    } ?: call.respond(UnauthorizedResponse())
+                    } ?: call.respondAitaUnauthorized()
                 }
 
                 post("/complete") {
@@ -14514,7 +14536,7 @@ fun Application.module() {
 
                     val storeId = runCatching {
                         UUID.fromString(body.storeId)
-                    }.getOrNull() ?: return@post call.respond(UnauthorizedResponse())
+                    }.getOrNull() ?: return@post call.respondAitaUnauthorized()
 
                     var transactionFailureMessage: List<LocalizedStringDataModel>? = null
 
@@ -14726,7 +14748,7 @@ fun Application.module() {
                                 status = HttpStatusCode.Conflict,
                                 message = message
                             )
-                        } ?: call.respond(UnauthorizedResponse())
+                        } ?: call.respondAitaUnauthorized()
                     }
                 
                     } catch (throwable: Throwable) {

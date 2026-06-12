@@ -22452,6 +22452,27 @@
       ]
     },
     {
+      "id": 1150,
+      "values": [
+        {
+          "language": "main",
+          "value": "Workshift ended locally; server sync is queued"
+        },
+        {
+          "language": "en",
+          "value": "Workshift ended locally; server sync is queued"
+        },
+        {
+          "language": "ru",
+          "value": "Смена завершена локально; синхронизация с сервером поставлена в очередь"
+        },
+        {
+          "language": "kk",
+          "value": "Ауысым жергілікті аяқталды; сервермен синхрондау кезекке қойылды"
+        }
+      ]
+    },
+    {
       "id": 1153,
       "values": [
         {
@@ -30911,6 +30932,573 @@
         {
           "language": "kk",
           "value": "Белсенді келісімдер"
+        }
+      ]
+    },
+    {
+      "id": 1556,
+      "values": [
+        {
+          "language": "main",
+          "value": "Dispatch"
+        },
+        {
+          "language": "en",
+          "value": "Dispatch"
+        },
+        {
+          "language": "ru",
+          "value": "Доставка"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізу"
+        }
+      ]
+    },
+    {
+      "id": 1557,
+      "values": [
+        {
+          "language": "main",
+          "value": "Delivery runs"
+        },
+        {
+          "language": "en",
+          "value": "Delivery runs"
+        },
+        {
+          "language": "ru",
+          "value": "Маршруты доставки"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізу бағыттары"
+        }
+      ]
+    },
+    {
+      "id": 1558,
+      "values": [
+        {
+          "language": "main",
+          "value": "Group open store orders into practical packing and driver lanes, with contract blockers visible before goods leave the supplier."
+        },
+        {
+          "language": "en",
+          "value": "Group open store orders into practical packing and driver lanes, with contract blockers visible before goods leave the supplier."
+        },
+        {
+          "language": "ru",
+          "value": "Группируйте открытые заказы магазинов в удобные линии сборки и доставки, видя договорные блокировки до выхода товара от поставщика."
+        },
+        {
+          "language": "kk",
+          "value": "Ашық дүкен тапсырыстарын жинау және жүргізуші бағыттарына біріктіріңіз, тауар жеткізушіден шықпай тұрып келісім бөгеттерін көріңіз."
+        }
+      ]
+    },
+    {
+      "id": 1559,
+      "values": [
+        {
+          "language": "main",
+          "value": "Ready lanes"
+        },
+        {
+          "language": "en",
+          "value": "Ready lanes"
+        },
+        {
+          "language": "ru",
+          "value": "Готовые маршруты"
+        },
+        {
+          "language": "kk",
+          "value": "Дайын бағыттар"
+        }
+      ]
+    },
+    {
+      "id": 1560,
+      "values": [
+        {
+          "language": "main",
+          "value": "In delivery"
+        },
+        {
+          "language": "en",
+          "value": "In delivery"
+        },
+        {
+          "language": "ru",
+          "value": "В доставке"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізілуде"
+        }
+      ]
+    },
+    {
+      "id": 1561,
+      "values": [
+        {
+          "language": "main",
+          "value": "Needs confirmation"
+        },
+        {
+          "language": "en",
+          "value": "Needs confirmation"
+        },
+        {
+          "language": "ru",
+          "value": "Нужно подтверждение"
+        },
+        {
+          "language": "kk",
+          "value": "Растау қажет"
+        }
+      ]
+    },
+    {
+      "id": 1562,
+      "values": [
+        {
+          "language": "main",
+          "value": "Contract check"
+        },
+        {
+          "language": "en",
+          "value": "Contract check"
+        },
+        {
+          "language": "ru",
+          "value": "Проверка договора"
+        },
+        {
+          "language": "kk",
+          "value": "Келісімді тексеру"
+        }
+      ]
+    },
+    {
+      "id": 1563,
+      "values": [
+        {
+          "language": "main",
+          "value": "Orders in lane"
+        },
+        {
+          "language": "en",
+          "value": "Orders in lane"
+        },
+        {
+          "language": "ru",
+          "value": "Заказов в маршруте"
+        },
+        {
+          "language": "kk",
+          "value": "Бағыттағы тапсырыстар"
+        }
+      ]
+    },
+    {
+      "id": 1564,
+      "values": [
+        {
+          "language": "main",
+          "value": "Goods lines"
+        },
+        {
+          "language": "en",
+          "value": "Goods lines"
+        },
+        {
+          "language": "ru",
+          "value": "Строк товаров"
+        },
+        {
+          "language": "kk",
+          "value": "Тауар жолдары"
+        }
+      ]
+    },
+    {
+      "id": 1565,
+      "values": [
+        {
+          "language": "main",
+          "value": "Next delivery"
+        },
+        {
+          "language": "en",
+          "value": "Next delivery"
+        },
+        {
+          "language": "ru",
+          "value": "Ближайшая доставка"
+        },
+        {
+          "language": "kk",
+          "value": "Келесі жеткізу"
+        }
+      ]
+    },
+    {
+      "id": 1566,
+      "values": [
+        {
+          "language": "main",
+          "value": "No dispatch lanes yet"
+        },
+        {
+          "language": "en",
+          "value": "No dispatch lanes yet"
+        },
+        {
+          "language": "ru",
+          "value": "Маршрутов доставки пока нет"
+        },
+        {
+          "language": "kk",
+          "value": "Әзірге жеткізу бағыты жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1567,
+      "values": [
+        {
+          "language": "main",
+          "value": "Confirm or pack supplier orders and they will appear here as store delivery lanes."
+        },
+        {
+          "language": "en",
+          "value": "Confirm or pack supplier orders and they will appear here as store delivery lanes."
+        },
+        {
+          "language": "ru",
+          "value": "Подтвердите или упакуйте заказы поставщика, и они появятся здесь как маршруты доставки по магазинам."
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші тапсырыстарын растаңыз немесе жинаңыз, сонда олар мұнда дүкен жеткізу бағыттары болып пайда болады."
+        }
+      ]
+    },
+    {
+      "id": 1568,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open run orders"
+        },
+        {
+          "language": "en",
+          "value": "Open run orders"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть заказы маршрута"
+        },
+        {
+          "language": "kk",
+          "value": "Бағыт тапсырыстарын ашу"
+        }
+      ]
+    },
+    {
+      "id": 1569,
+      "values": [
+        {
+          "language": "main",
+          "value": "Copy driver manifest"
+        },
+        {
+          "language": "en",
+          "value": "Copy driver manifest"
+        },
+        {
+          "language": "ru",
+          "value": "Скопировать манифест водителя"
+        },
+        {
+          "language": "kk",
+          "value": "Жүргізуші манифесін көшіру"
+        }
+      ]
+    },
+    {
+      "id": 1570,
+      "values": [
+        {
+          "language": "main",
+          "value": "Mark packed"
+        },
+        {
+          "language": "en",
+          "value": "Mark packed"
+        },
+        {
+          "language": "ru",
+          "value": "Отметить упаковано"
+        },
+        {
+          "language": "kk",
+          "value": "Жиналды деп белгілеу"
+        }
+      ]
+    },
+    {
+      "id": 1571,
+      "values": [
+        {
+          "language": "main",
+          "value": "Start delivery"
+        },
+        {
+          "language": "en",
+          "value": "Start delivery"
+        },
+        {
+          "language": "ru",
+          "value": "Начать доставку"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуді бастау"
+        }
+      ]
+    },
+    {
+      "id": 1572,
+      "values": [
+        {
+          "language": "main",
+          "value": "Driver manifest"
+        },
+        {
+          "language": "en",
+          "value": "Driver manifest"
+        },
+        {
+          "language": "ru",
+          "value": "Манифест водителя"
+        },
+        {
+          "language": "kk",
+          "value": "Жүргізуші манифесі"
+        }
+      ]
+    },
+    {
+      "id": 1573,
+      "values": [
+        {
+          "language": "main",
+          "value": "Driver manifest copied"
+        },
+        {
+          "language": "en",
+          "value": "Driver manifest copied"
+        },
+        {
+          "language": "ru",
+          "value": "Манифест водителя скопирован"
+        },
+        {
+          "language": "kk",
+          "value": "Жүргізуші манифесі көшірілді"
+        }
+      ]
+    },
+    {
+      "id": 1574,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier dispatch lane updated"
+        },
+        {
+          "language": "en",
+          "value": "Supplier dispatch lane updated"
+        },
+        {
+          "language": "ru",
+          "value": "Маршрут поставщика обновлён"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші жеткізу бағыты жаңартылды"
+        }
+      ]
+    },
+    {
+      "id": 1575,
+      "values": [
+        {
+          "language": "main",
+          "value": "Could not update supplier dispatch lane"
+        },
+        {
+          "language": "en",
+          "value": "Could not update supplier dispatch lane"
+        },
+        {
+          "language": "ru",
+          "value": "Не удалось обновить маршрут поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші жеткізу бағытын жаңарту мүмкін болмады"
+        }
+      ]
+    },
+    {
+      "id": 1576,
+      "values": [
+        {
+          "language": "main",
+          "value": "No packable orders in this lane"
+        },
+        {
+          "language": "en",
+          "value": "No packable orders in this lane"
+        },
+        {
+          "language": "ru",
+          "value": "В этом маршруте нет заказов для упаковки"
+        },
+        {
+          "language": "kk",
+          "value": "Бұл бағытта жинауға болатын тапсырыс жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1577,
+      "values": [
+        {
+          "language": "main",
+          "value": "Pack orders before starting delivery"
+        },
+        {
+          "language": "en",
+          "value": "Pack orders before starting delivery"
+        },
+        {
+          "language": "ru",
+          "value": "Перед началом доставки сначала упакуйте заказы"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуді бастамас бұрын тапсырыстарды жинаңыз"
+        }
+      ]
+    },
+    {
+      "id": 1578,
+      "values": [
+        {
+          "language": "main",
+          "value": "Dispatch rhythm planner"
+        },
+        {
+          "language": "en",
+          "value": "Dispatch rhythm planner"
+        },
+        {
+          "language": "ru",
+          "value": "Планировщик ритма доставки"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізу ырғағын жоспарлау"
+        }
+      ]
+    },
+    {
+      "id": 1579,
+      "values": [
+        {
+          "language": "main",
+          "value": "Stores with packed goods"
+        },
+        {
+          "language": "en",
+          "value": "Stores with packed goods"
+        },
+        {
+          "language": "ru",
+          "value": "Магазины с упакованным товаром"
+        },
+        {
+          "language": "kk",
+          "value": "Тауары жиналған дүкендер"
+        }
+      ]
+    },
+    {
+      "id": 1580,
+      "values": [
+        {
+          "language": "main",
+          "value": "Runs already on the road"
+        },
+        {
+          "language": "en",
+          "value": "Runs already on the road"
+        },
+        {
+          "language": "ru",
+          "value": "Маршруты уже в пути"
+        },
+        {
+          "language": "kk",
+          "value": "Жолдағы бағыттар"
+        }
+      ]
+    },
+    {
+      "id": 1581,
+      "values": [
+        {
+          "language": "main",
+          "value": "Confirmations, issues or contracts to clear"
+        },
+        {
+          "language": "en",
+          "value": "Confirmations, issues or contracts to clear"
+        },
+        {
+          "language": "ru",
+          "value": "Подтверждения, проблемы или договоры для очистки"
+        },
+        {
+          "language": "kk",
+          "value": "Растау, мәселе немесе шешілетін келісімдер"
+        }
+      ]
+    },
+    {
+      "id": 1582,
+      "values": [
+        {
+          "language": "main",
+          "value": "Dispatch filter"
+        },
+        {
+          "language": "en",
+          "value": "Dispatch filter"
+        },
+        {
+          "language": "ru",
+          "value": "Фильтр доставки"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізу сүзгісі"
         }
       ]
     }

@@ -93,6 +93,12 @@ import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kz.aita.*
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
@@ -247,15 +253,46 @@ fun getPasswordTransformedTextWithSelectionFocusTextColor(
 }
 
 private inline fun <reified T> decodeBundledResourcePayload(raw: String): T {
-    return runCatching {
-        jsonBase.decodeFromString<ResponseDataModel<T>>(raw).payload
-    }.getOrNull() ?: jsonBase.decodeFromString<T>(raw)
+    val trimmed = raw.trim()
+
+    val payloadFromAitaEnvelope = runCatching<T?> {
+        val root = jsonBase.decodeFromString<kotlinx.serialization.json.JsonElement>(trimmed)
+        val envelope = root.jsonObject
+        val payloadElement = envelope["payload"]
+
+        when {
+            (payloadElement == null || payloadElement is JsonNull) && envelope.containsKey("negative") && T::class == List::class -> emptyList<Any>() as T
+            payloadElement == null || payloadElement is JsonNull -> null
+            payloadElement is JsonPrimitive -> {
+                val content = payloadElement.contentOrNull
+                if (!content.isNullOrBlank() && content.trim().let { candidate ->
+                        candidate.startsWith("{") || candidate.startsWith("[") || candidate.startsWith("\"")
+                    }
+                ) {
+                    jsonBase.decodeFromString<T>(content)
+                } else {
+                    jsonBase.decodeFromJsonElement<T>(payloadElement)
+                }
+            }
+            else -> jsonBase.decodeFromJsonElement<T>(payloadElement)
+        }
+    }.getOrNull()
+
+    if (payloadFromAitaEnvelope != null) return payloadFromAitaEnvelope
+
+    runCatching {
+        jsonBase.decodeFromString<ResponseDataModel<T>>(trimmed).payload
+    }.getOrNull()?.let { return it }
+
+    return jsonBase.decodeFromString<T>(trimmed)
 }
 
 suspend fun loadResourceStrings(): List<LocalizedStringGroupDataModel> {
-    return decodeBundledResourcePayload(
-        Res.readBytes("files/assets/values/strings.json").decodeToString()
-    )
+    return runCatching {
+        decodeBundledResourcePayload<List<LocalizedStringGroupDataModel>>(
+            Res.readBytes("files/assets/values/strings.json").decodeToString()
+        )
+    }.getOrDefault(emptyList())
 }
 
 private val autoFocusedTextFieldKeysByScope = mutableMapOf<String, String>()
@@ -565,6 +602,7 @@ private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallb
     put(1146L, mapOf("main" to "Confirm with your account password so nobody can change the shift password on an unlocked device.", "en" to "Confirm with your account password so nobody can change the shift password on an unlocked device.", "ru" to "Подтвердите паролем аккаунта, чтобы никто не смог сменить пароль смены на разблокированном устройстве.", "kk" to "Құрылғы құлыптан ашық тұрғанда ешкім ауысым құпия сөзін өзгерте алмауы үшін аккаунт құпия сөзімен растаңыз."))
     put(1148L, mapOf("main" to "Logged out locally; server session cleanup is queued", "en" to "Logged out locally; server session cleanup is queued", "ru" to "Выход выполнен локально; завершение серверного сеанса поставлено в очередь", "kk" to "Жергілікті түрде шығу орындалды; сервердегі сеансты аяқтау кезекке қойылды"))
     put(1149L, mapOf("main" to "Server could not refresh session. Keeping local login active.", "en" to "Server could not refresh session. Keeping local login active.", "ru" to "Сервер не смог обновить сеанс. Локальный вход сохранён.", "kk" to "Сервер сеансты жаңарта алмады. Жергілікті кіру сақталды."))
+    put(1150L, mapOf("main" to "Workshift ended locally; server sync is queued", "en" to "Workshift ended locally; server sync is queued", "ru" to "Смена завершена локально; синхронизация с сервером поставлена в очередь", "kk" to "Ауысым жергілікті аяқталды; сервермен синхрондау кезекке қойылды"))
     put(1153L, mapOf("main" to "Standard", "en" to "Standard", "ru" to "Стандартный", "kk" to "Стандартты"))
     put(1154L, mapOf("main" to "Internal", "en" to "Internal", "ru" to "Внутренний", "kk" to "Ішкі"))
     put(1155L, mapOf("main" to "Internal store barcode", "en" to "Internal store barcode", "ru" to "Внутренний штрих-код магазина", "kk" to "Дүкеннің ішкі штрих-коды"))
@@ -972,6 +1010,33 @@ private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallb
     put(1553L, mapOf("main" to "This is the bridge from store-side ordering to supplier-side planning: orders feed catalog, contracts guard supply, partners show reliability, and insights decide what to prepare next.", "en" to "This is the bridge from store-side ordering to supplier-side planning: orders feed catalog, contracts guard supply, partners show reliability, and insights decide what to prepare next.", "ru" to "Это мост от заказов магазина к планированию поставщика: заказы наполняют каталог, договоры защищают поставку, партнёры показывают надёжность, а инсайты решают, что готовить дальше.", "kk" to "Бұл дүкен тапсырысынан жеткізуші жоспарына көпір: тапсырыстар каталогты толтырады, келісімдер жеткізуді қорғайды, серіктестер сенімділікті көрсетеді, ал инсайттар әрі қарай не дайындауды шешеді."))
     put(1554L, mapOf("main" to "Top item demand", "en" to "Top item demand", "ru" to "Главный спрос по товарам", "kk" to "Тауар бойынша негізгі сұраныс"))
     put(1555L, mapOf("main" to "Active contracts", "en" to "Active contracts", "ru" to "Активные договоры", "kk" to "Белсенді келісімдер"))
+    put(1556L, mapOf("main" to "Dispatch", "en" to "Dispatch", "ru" to "Доставка", "kk" to "Жеткізу"))
+    put(1557L, mapOf("main" to "Delivery runs", "en" to "Delivery runs", "ru" to "Маршруты доставки", "kk" to "Жеткізу бағыттары"))
+    put(1558L, mapOf("main" to "Group open store orders into practical packing and driver lanes, with contract blockers visible before goods leave the supplier.", "en" to "Group open store orders into practical packing and driver lanes, with contract blockers visible before goods leave the supplier.", "ru" to "Группируйте открытые заказы магазинов в удобные линии сборки и доставки, видя договорные блокировки до выхода товара от поставщика.", "kk" to "Ашық дүкен тапсырыстарын жинау және жүргізуші бағыттарына біріктіріңіз, тауар жеткізушіден шықпай тұрып келісім бөгеттерін көріңіз."))
+    put(1559L, mapOf("main" to "Ready lanes", "en" to "Ready lanes", "ru" to "Готовые маршруты", "kk" to "Дайын бағыттар"))
+    put(1560L, mapOf("main" to "In delivery", "en" to "In delivery", "ru" to "В доставке", "kk" to "Жеткізілуде"))
+    put(1561L, mapOf("main" to "Needs confirmation", "en" to "Needs confirmation", "ru" to "Нужно подтверждение", "kk" to "Растау қажет"))
+    put(1562L, mapOf("main" to "Contract check", "en" to "Contract check", "ru" to "Проверка договора", "kk" to "Келісімді тексеру"))
+    put(1563L, mapOf("main" to "Orders in lane", "en" to "Orders in lane", "ru" to "Заказов в маршруте", "kk" to "Бағыттағы тапсырыстар"))
+    put(1564L, mapOf("main" to "Goods lines", "en" to "Goods lines", "ru" to "Строк товаров", "kk" to "Тауар жолдары"))
+    put(1565L, mapOf("main" to "Next delivery", "en" to "Next delivery", "ru" to "Ближайшая доставка", "kk" to "Келесі жеткізу"))
+    put(1566L, mapOf("main" to "No dispatch lanes yet", "en" to "No dispatch lanes yet", "ru" to "Маршрутов доставки пока нет", "kk" to "Әзірге жеткізу бағыты жоқ"))
+    put(1567L, mapOf("main" to "Confirm or pack supplier orders and they will appear here as store delivery lanes.", "en" to "Confirm or pack supplier orders and they will appear here as store delivery lanes.", "ru" to "Подтвердите или упакуйте заказы поставщика, и они появятся здесь как маршруты доставки по магазинам.", "kk" to "Жеткізуші тапсырыстарын растаңыз немесе жинаңыз, сонда олар мұнда дүкен жеткізу бағыттары болып пайда болады."))
+    put(1568L, mapOf("main" to "Open run orders", "en" to "Open run orders", "ru" to "Открыть заказы маршрута", "kk" to "Бағыт тапсырыстарын ашу"))
+    put(1569L, mapOf("main" to "Copy driver manifest", "en" to "Copy driver manifest", "ru" to "Скопировать манифест водителя", "kk" to "Жүргізуші манифесін көшіру"))
+    put(1570L, mapOf("main" to "Mark packed", "en" to "Mark packed", "ru" to "Отметить упаковано", "kk" to "Жиналды деп белгілеу"))
+    put(1571L, mapOf("main" to "Start delivery", "en" to "Start delivery", "ru" to "Начать доставку", "kk" to "Жеткізуді бастау"))
+    put(1572L, mapOf("main" to "Driver manifest", "en" to "Driver manifest", "ru" to "Манифест водителя", "kk" to "Жүргізуші манифесі"))
+    put(1573L, mapOf("main" to "Driver manifest copied", "en" to "Driver manifest copied", "ru" to "Манифест водителя скопирован", "kk" to "Жүргізуші манифесі көшірілді"))
+    put(1574L, mapOf("main" to "Supplier dispatch lane updated", "en" to "Supplier dispatch lane updated", "ru" to "Маршрут поставщика обновлён", "kk" to "Жеткізуші жеткізу бағыты жаңартылды"))
+    put(1575L, mapOf("main" to "Could not update supplier dispatch lane", "en" to "Could not update supplier dispatch lane", "ru" to "Не удалось обновить маршрут поставщика", "kk" to "Жеткізуші жеткізу бағытын жаңарту мүмкін болмады"))
+    put(1576L, mapOf("main" to "No packable orders in this lane", "en" to "No packable orders in this lane", "ru" to "В этом маршруте нет заказов для упаковки", "kk" to "Бұл бағытта жинауға болатын тапсырыс жоқ"))
+    put(1577L, mapOf("main" to "Pack orders before starting delivery", "en" to "Pack orders before starting delivery", "ru" to "Перед началом доставки сначала упакуйте заказы", "kk" to "Жеткізуді бастамас бұрын тапсырыстарды жинаңыз"))
+    put(1578L, mapOf("main" to "Dispatch rhythm planner", "en" to "Dispatch rhythm planner", "ru" to "Планировщик ритма доставки", "kk" to "Жеткізу ырғағын жоспарлау"))
+    put(1579L, mapOf("main" to "Stores with packed goods", "en" to "Stores with packed goods", "ru" to "Магазины с упакованным товаром", "kk" to "Тауары жиналған дүкендер"))
+    put(1580L, mapOf("main" to "Runs already on the road", "en" to "Runs already on the road", "ru" to "Маршруты уже в пути", "kk" to "Жолдағы бағыттар"))
+    put(1581L, mapOf("main" to "Confirmations, issues or contracts to clear", "en" to "Confirmations, issues or contracts to clear", "ru" to "Подтверждения, проблемы или договоры для очистки", "kk" to "Растау, мәселе немесе шешілетін келісімдер"))
+    put(1582L, mapOf("main" to "Dispatch filter", "en" to "Dispatch filter", "ru" to "Фильтр доставки", "kk" to "Жеткізу сүзгісі"))
 }
 
 
@@ -2069,22 +2134,28 @@ fun AppConfiguration.localizedStringResource(
 }
 
 suspend fun loadResourceDimensions(): List<StylizedDimensionGroupDataModel> {
-    return decodeBundledResourcePayload(
-        Res.readBytes("files/assets/values/dimensions.json").decodeToString()
-    )
+    return runCatching {
+        decodeBundledResourcePayload<List<StylizedDimensionGroupDataModel>>(
+            Res.readBytes("files/assets/values/dimensions.json").decodeToString()
+        )
+    }.getOrDefault(emptyList())
 }
 
 suspend fun loadResourceColors(): List<StylizedColorGroupDataModel> {
-    return decodeBundledResourcePayload(
-        Res.readBytes("files/assets/values/colors.json").decodeToString()
-    )
+    return runCatching {
+        decodeBundledResourcePayload<List<StylizedColorGroupDataModel>>(
+            Res.readBytes("files/assets/values/colors.json").decodeToString()
+        )
+    }.getOrDefault(emptyList())
 }
 
 
 suspend fun loadResourceDrawablePaths(): List<StylizedDrawablePathsGroupDataModel> {
-    return decodeBundledResourcePayload(
-        Res.readBytes("files/assets/drawable/drawables.json").decodeToString()
-    )
+    return runCatching {
+        decodeBundledResourcePayload<List<StylizedDrawablePathsGroupDataModel>>(
+            Res.readBytes("files/assets/drawable/drawables.json").decodeToString()
+        )
+    }.getOrDefault(emptyList())
 }
 
 private fun Color.softAppBackgroundColor(): Color {
@@ -18662,8 +18733,9 @@ private fun AppConfiguration.supplierMarketWinningFeatures(): List<SupplierFeatu
     SupplierFeaturePlanUiModel(
         title = localizedStringResource(1347, "Route batch planner"),
         subtitle = localizedStringResource(1348, "Group nearby KZ, KG, TJ and UZ store deliveries into efficient runs and clear driver packs."),
-        iconPath = stateValues.drawablePathIconStores,
-        iconRes = stateValues.drawableResIconStores.value
+        iconPath = stateValues.drawablePathIconSupplierDispatch,
+        iconRes = stateValues.drawableResIconSupplierDispatch.value,
+        implemented = true
     ),
     SupplierFeaturePlanUiModel(
         title = localizedStringResource(1349, "Price ladder and payment terms"),
@@ -21265,6 +21337,589 @@ private fun AppConfiguration.SupplierContractsScreen() {
     )
 }
 
+
+private data class SupplierDispatchLaneUiModel(
+    val storeKey: String,
+    val storeTitle: String,
+    val publicId: String,
+    val address: String,
+    val bundles: List<SupplierOrderWithLinesDataModel>,
+    val orderCount: Int,
+    val lineCount: Int,
+    val needsConfirmationCount: Int,
+    val packedCount: Int,
+    val inDeliveryCount: Int,
+    val issueCount: Int,
+    val activeContractCount: Int,
+    val pendingContractCount: Int,
+    val nextDeliveryMillis: Long?,
+    val lastActivityMillis: Long,
+    val goodsPreview: String,
+    val manifest: String,
+    val searchKey: String
+)
+
+private fun AppConfiguration.buildSupplierDispatchLanes(
+    orders: List<SupplierOrderDataModel>,
+    lines: List<SupplierOrderLineDataModel>,
+    contracts: List<SupplierPartnershipContractDataModel>
+): List<SupplierDispatchLaneUiModel> {
+    val activeLinesByOrder = lines
+        .filter { it.isActive }
+        .groupBy { it.orderId }
+    val movableOrders = orders
+        .filter { order ->
+            order.isActive &&
+                    order.status != SupplierOrderStatusDataModel.Draft &&
+                    !order.status.isSupplierOrderClosed()
+        }
+
+    return movableOrders
+        .groupBy { order ->
+            order.storeId
+                .ifBlank { order.storePublicIdSnapshot }
+                .ifBlank { supplierDeskStoreTitle(order) }
+                .ifBlank { order.id }
+        }
+        .map { (storeKey, storeOrdersRaw) ->
+            val storeOrders = storeOrdersRaw.sortedWith(
+                compareBy<SupplierOrderDataModel> { it.desiredDeliveryTimeMillis ?: Long.MAX_VALUE }
+                    .thenByDescending { it.supplierDeskSortTime() }
+            )
+            val bundles = storeOrders.map { order ->
+                SupplierOrderWithLinesDataModel(order = order, lines = activeLinesByOrder[order.id].orEmpty())
+            }
+            val newestOrder = storeOrders.maxByOrNull { it.supplierDeskSortTime() } ?: storeOrders.first()
+            val storeLines = bundles.flatMap { it.lines }
+            val storeTitle = storeOrders
+                .asSequence()
+                .map { supplierDeskStoreTitle(it) }
+                .firstOrNull { it.isNotBlank() }
+                ?: storeKey.take(12)
+            val publicId = storeOrders
+                .asSequence()
+                .map { it.storePublicIdSnapshot }
+                .firstOrNull { it.isNotBlank() }
+                .orEmpty()
+            val address = storeOrders
+                .asSequence()
+                .map { it.storeAddressTextSnapshot }
+                .firstOrNull { it.isNotBlank() }
+                .orEmpty()
+            val relatedContracts = contracts.filter { contract ->
+                contract.isActive &&
+                        contract.storeId == newestOrder.storeId &&
+                        contract.supplierId == newestOrder.supplierId
+            }
+            val goodsPreview = storeLines
+                .groupBy { line ->
+                    line.goodsItemId
+                        .ifBlank { line.goodsItemBarcodeSnapshots.firstOrNull().orEmpty() }
+                        .ifBlank { supplierDeskLineTitle(line) }
+                }
+                .values
+                .take(4)
+                .joinToString(" • ") { itemLines ->
+                    val first = itemLines.first()
+                    val total = itemLines.sumOf { it.requestedQuantity.total.coerceAtLeast(0.0) }
+                    val quantityText = if (total > 0.0) first.requestedQuantity.copy(total = total).quantityText(stateValues.appLanguage) else itemLines.size.toString()
+                    supplierDeskLineTitle(first) + " × " + quantityText
+                }
+                .ifBlank { localizedStringResource(1566, "No goods lines yet") }
+            val manifest = buildString {
+                append(localizedStringResource(1572, "Driver manifest")).append(" — ").append(storeTitle).append('\n')
+                if (publicId.isNotBlank()) append("ID: ").append(publicId).append('\n')
+                if (address.isNotBlank()) append(localizedStringResource(147, "Address")).append(": ").append(address).append('\n')
+                append(localizedStringResource(1563, "Orders in lane")).append(": ").append(storeOrders.size).append('\n')
+                append(localizedStringResource(1564, "Goods lines")).append(": ").append(storeLines.size).append('\n')
+                storeOrders.forEach { order ->
+                    append("\n#").append(order.id.take(8)).append(" — ").append(supplierOrderStatusTitle(order.status))
+                    order.desiredDeliveryTimeMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let { dateText ->
+                        append(" — ").append(dateText)
+                    }
+                    activeLinesByOrder[order.id].orEmpty().take(8).forEach { line ->
+                        append('\n').append("  • ").append(supplierDeskLineTitle(line)).append(" × ").append(line.requestedQuantity.quantityText(stateValues.appLanguage))
+                    }
+                }
+            }
+            val searchKey = buildString {
+                append(storeKey).append(' ')
+                append(storeTitle).append(' ')
+                append(publicId).append(' ')
+                append(address).append(' ')
+                append(goodsPreview).append(' ')
+                storeOrders.forEach { order ->
+                    append(order.id).append(' ')
+                    append(order.status.name).append(' ')
+                    append(supplierOrderStatusTitle(order.status)).append(' ')
+                    append(order.additionalNotes.orEmpty()).append(' ')
+                    append(order.supplierComment.orEmpty()).append(' ')
+                }
+                storeLines.forEach { line ->
+                    append(line.goodsItemId).append(' ')
+                    append(supplierDeskLineTitle(line)).append(' ')
+                    append(line.goodsItemBarcodeSnapshots.joinToString(" ")).append(' ')
+                }
+            }.lowercase()
+
+            SupplierDispatchLaneUiModel(
+                storeKey = storeKey,
+                storeTitle = storeTitle,
+                publicId = publicId,
+                address = address,
+                bundles = bundles,
+                orderCount = storeOrders.size,
+                lineCount = storeLines.size,
+                needsConfirmationCount = storeOrders.count { it.status == SupplierOrderStatusDataModel.Sent || it.status == SupplierOrderStatusDataModel.SeenBySupplier },
+                packedCount = storeOrders.count { it.status == SupplierOrderStatusDataModel.Packed },
+                inDeliveryCount = storeOrders.count { it.status == SupplierOrderStatusDataModel.InDelivery },
+                issueCount = storeOrders.count { it.status == SupplierOrderStatusDataModel.IssueReported },
+                activeContractCount = relatedContracts.count { it.status == SUPPLIER_CONTRACT_STATUS_ACTIVE },
+                pendingContractCount = relatedContracts.count { it.status == SUPPLIER_CONTRACT_STATUS_PENDING_STORE || it.status == SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER },
+                nextDeliveryMillis = storeOrders.mapNotNull { it.desiredDeliveryTimeMillis }.minOrNull(),
+                lastActivityMillis = newestOrder.supplierDeskSortTime(),
+                goodsPreview = goodsPreview,
+                manifest = manifest,
+                searchKey = searchKey
+            )
+        }
+        .sortedWith(
+            compareByDescending<SupplierDispatchLaneUiModel> { it.issueCount }
+                .thenByDescending { it.needsConfirmationCount }
+                .thenBy { it.nextDeliveryMillis ?: Long.MAX_VALUE }
+                .thenByDescending { it.lastActivityMillis }
+        )
+}
+
+@Composable
+private fun AppConfiguration.SupplierDispatchLaneCard(lane: SupplierDispatchLaneUiModel) {
+    val coroutineScope = rememberCoroutineScope()
+    val packableBundles = remember(lane.bundles) {
+        lane.bundles.filter { bundle ->
+            bundle.order.status == SupplierOrderStatusDataModel.Sent ||
+                    bundle.order.status == SupplierOrderStatusDataModel.SeenBySupplier ||
+                    bundle.order.status == SupplierOrderStatusDataModel.Confirmed ||
+                    bundle.order.status == SupplierOrderStatusDataModel.IssueReported
+        }
+    }
+    val deliverableBundles = remember(lane.bundles) {
+        lane.bundles.filter { it.order.status == SupplierOrderStatusDataModel.Packed }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .border(
+                if (lane.issueCount > 0 || lane.needsConfirmationCount > 0) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
+                if (lane.issueCount > 0) stateValues.ErrorColor else if (lane.needsConfirmationCount > 0) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+                RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .padding(stateValues.marginTextFieldGroup),
+        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(46.dp)
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CpImage(
+                    modifier = Modifier.size(28.dp),
+                    url = stateValues.drawablePathIconSupplierDispatch,
+                    fallbackRes = stateValues.drawableResIconSupplierDispatch.value,
+                    contentDescription = localizedStringResource(1556, "Dispatch"),
+                    tintColor = stateValues.AccentColor
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = lane.storeTitle,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.titleTextSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = listOf(lane.publicId, lane.address).filter { it.isNotBlank() }.joinToString(" • ").ifBlank { localizedStringResource(1557, "Delivery run") },
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Text(
+                text = supplierOrderStatusTitle(lane.bundles.maxByOrNull { it.order.supplierDeskSortTime() }?.order?.status ?: SupplierOrderStatusDataModel.Sent),
+                color = if (lane.issueCount > 0) stateValues.ErrorColor else stateValues.AccentColor,
+                fontSize = stateValues.smallTextSize,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.End
+            )
+        }
+
+        Text(
+            text = lane.goodsPreview,
+            color = stateValues.TextColor,
+            fontSize = stateValues.textSize,
+            fontWeight = FontWeight.Bold,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            StockCardInfoLine(localizedStringResource(1563, "Orders in lane"), lane.orderCount.toString(), stateValues.TextColor)
+            StockCardInfoLine(localizedStringResource(1564, "Goods lines"), lane.lineCount.toString(), stateValues.TextColor)
+            lane.nextDeliveryMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let { dateText ->
+                StockCardInfoLine(localizedStringResource(1565, "Next delivery"), dateText, stateValues.TextColor)
+            }
+            StockCardInfoLine(localizedStringResource(1561, "Needs confirmation"), lane.needsConfirmationCount.toString(), if (lane.needsConfirmationCount > 0) stateValues.AccentColor else stateValues.PlaceholderTextColor)
+            StockCardInfoLine(localizedStringResource(1562, "Contract check"), "${lane.activeContractCount} / ${lane.pendingContractCount}", if (lane.pendingContractCount > 0) stateValues.ErrorColor else stateValues.TextColor)
+            StockCardInfoLine(localizedStringResource(1463, "Last activity"), receiptUiDateTime(lane.lastActivityMillis), stateValues.PlaceholderTextColor)
+        }
+
+        if (stateValues.isNarrowScreen) {
+            Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1568, "Open run orders"),
+                    iconPath = stateValues.drawablePathIconAppModeSupplier,
+                    iconRes = stateValues.drawableResIconAppModeSupplier.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to lane.storeKey.ifBlank { lane.storeTitle })
+                            Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
+                        }
+                    }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1569, "Copy driver manifest"),
+                    iconPath = stateValues.drawablePathIconClipboard,
+                    iconRes = stateValues.drawableResIconClipboard.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        copyTextToClipboard(lane.manifest)
+                        postInAppNotification(localizedStringResource(1573, "Driver manifest copied"), NotificationType.Positive, transient = true)
+                    }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1570, "Mark packed"),
+                    enabled = packableBundles.isNotEmpty(),
+                    iconPath = stateValues.drawablePathIconSupplierDispatch,
+                    iconRes = stateValues.drawableResIconSupplierDispatch.value,
+                    confirmationRequired = true,
+                    onDisabledClick = { postInAppNotification(localizedStringResource(1576, "No packable orders in this lane"), NotificationType.Neutral, transient = true) },
+                    onClick = { updateSupplierOrdersSupplierStatus(packableBundles, SupplierOrderStatusDataModel.Packed) }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1571, "Start delivery"),
+                    enabled = deliverableBundles.isNotEmpty(),
+                    iconPath = stateValues.drawablePathIconSupplierDispatch,
+                    iconRes = stateValues.drawableResIconSupplierDispatch.value,
+                    confirmationRequired = true,
+                    onDisabledClick = { postInAppNotification(localizedStringResource(1577, "Pack orders before starting delivery"), NotificationType.Neutral, transient = true) },
+                    onClick = { updateSupplierOrdersSupplierStatus(deliverableBundles, SupplierOrderStatusDataModel.InDelivery) }
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1568, "Open run orders"),
+                    iconPath = stateValues.drawablePathIconAppModeSupplier,
+                    iconRes = stateValues.drawableResIconAppModeSupplier.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to lane.storeKey.ifBlank { lane.storeTitle })
+                            Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
+                        }
+                    }
+                )
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1569, "Copy driver manifest"),
+                    iconPath = stateValues.drawablePathIconClipboard,
+                    iconRes = stateValues.drawableResIconClipboard.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        copyTextToClipboard(lane.manifest)
+                        postInAppNotification(localizedStringResource(1573, "Driver manifest copied"), NotificationType.Positive, transient = true)
+                    }
+                )
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1570, "Mark packed"),
+                    enabled = packableBundles.isNotEmpty(),
+                    iconPath = stateValues.drawablePathIconSupplierDispatch,
+                    iconRes = stateValues.drawableResIconSupplierDispatch.value,
+                    confirmationRequired = true,
+                    onDisabledClick = { postInAppNotification(localizedStringResource(1576, "No packable orders in this lane"), NotificationType.Neutral, transient = true) },
+                    onClick = { updateSupplierOrdersSupplierStatus(packableBundles, SupplierOrderStatusDataModel.Packed) }
+                )
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1571, "Start delivery"),
+                    enabled = deliverableBundles.isNotEmpty(),
+                    iconPath = stateValues.drawablePathIconSupplierDispatch,
+                    iconRes = stateValues.drawableResIconSupplierDispatch.value,
+                    confirmationRequired = true,
+                    onDisabledClick = { postInAppNotification(localizedStringResource(1577, "Pack orders before starting delivery"), NotificationType.Neutral, transient = true) },
+                    onClick = { updateSupplierOrdersSupplierStatus(deliverableBundles, SupplierOrderStatusDataModel.InDelivery) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppConfiguration.SupplierDispatchScreen() {
+    val orders by supplierOrdersState.payload.collectAsState()
+    val lines by supplierOrderLinesState.payload.collectAsState()
+    val contracts by supplierPartnershipContractsState.payload.collectAsState()
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var laneFilter by rememberSaveable { mutableStateOf("all") }
+
+    LaunchedEffect(stateValues.userAccount?.id) {
+        if (stateValues.userAccount != null) {
+            getMySupplierSideOrders()
+            getSupplierContracts()
+        }
+    }
+
+    val lanes = remember(orders, lines, contracts, stateValues.appLanguage) {
+        buildSupplierDispatchLanes(
+            orders = orders.orEmpty(),
+            lines = lines.orEmpty(),
+            contracts = contracts.orEmpty()
+        )
+    }
+    val normalizedSearch = searchQuery.trim().lowercase()
+    val visibleLanes = remember(lanes, normalizedSearch, laneFilter) {
+        lanes.filter { lane ->
+            val filterMatches = when (laneFilter) {
+                "confirm" -> lane.needsConfirmationCount > 0
+                "packed" -> lane.packedCount > 0
+                "delivery" -> lane.inDeliveryCount > 0
+                "issue" -> lane.issueCount > 0
+                "contracts" -> lane.pendingContractCount > 0
+                else -> true
+            }
+            val queryMatches = normalizedSearch.isBlank() || lane.searchKey.contains(normalizedSearch)
+            filterMatches && queryMatches
+        }
+    }
+    val readyCount = lanes.count { it.packedCount > 0 }
+    val inDeliveryCount = lanes.count { it.inDeliveryCount > 0 }
+    val attentionCount = lanes.count { it.needsConfirmationCount > 0 || it.issueCount > 0 || it.pendingContractCount > 0 }
+    val featurePlan = supplierMarketWinningFeatures()
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        ScreenAppBarWidget(
+            title = localizedStringResource(1557, "Delivery runs"),
+            iconPath = stateValues.drawablePathIconSupplierDispatch,
+            iconRes = stateValues.drawableResIconSupplierDispatch.value
+        )
+
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
+                .align(Alignment.CenterHorizontally)
+                .padding(stateValues.marginTextField),
+            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
+            contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
+        ) {
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(stateValues.cornerRadius))
+                        .background(stateValues.AccentColor.copy(alpha = 0.11f))
+                        .border(stateValues.focusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
+                        .padding(stateValues.marginTextFieldGroup),
+                    verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                    ) {
+                        CpImage(
+                            modifier = Modifier.size(42.dp),
+                            url = stateValues.drawablePathIconSupplierDispatch,
+                            fallbackRes = stateValues.drawableResIconSupplierDispatch.value,
+                            contentDescription = localizedStringResource(1557, "Delivery runs"),
+                            tintColor = stateValues.AccentColor
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = localizedStringResource(1578, "Dispatch rhythm planner"),
+                                color = stateValues.TextColor,
+                                fontSize = stateValues.titleTextSize,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = localizedStringResource(1558, "Group open store orders into practical packing and driver lanes, with contract blockers visible before goods leave the supplier."),
+                                color = stateValues.PlaceholderTextColor,
+                                fontSize = stateValues.textSize
+                            )
+                        }
+                    }
+
+                    if (stateValues.isNarrowScreen) {
+                        Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+                            SupplierDeskSummaryCard(
+                                title = localizedStringResource(1559, "Ready lanes"),
+                                value = readyCount.toString(),
+                                subtitle = localizedStringResource(1579, "Stores with packed goods"),
+                                iconPath = stateValues.drawablePathIconSupplierDispatch,
+                                iconRes = stateValues.drawableResIconSupplierDispatch.value
+                            )
+                            SupplierDeskSummaryCard(
+                                title = localizedStringResource(1560, "In delivery"),
+                                value = inDeliveryCount.toString(),
+                                subtitle = localizedStringResource(1580, "Runs already on the road"),
+                                iconPath = stateValues.drawablePathIconSupplierDispatch,
+                                iconRes = stateValues.drawableResIconSupplierDispatch.value
+                            )
+                            SupplierDeskSummaryCard(
+                                title = localizedStringResource(1535, "Issue watch"),
+                                value = attentionCount.toString(),
+                                subtitle = localizedStringResource(1581, "Confirmations, issues or contracts to clear"),
+                                iconPath = stateValues.drawablePathIconSupplierContracts,
+                                iconRes = stateValues.drawableResIconSupplierContracts.value
+                            )
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                        ) {
+                            SupplierDeskSummaryCard(
+                                modifier = Modifier.weight(1f),
+                                title = localizedStringResource(1559, "Ready lanes"),
+                                value = readyCount.toString(),
+                                subtitle = localizedStringResource(1579, "Stores with packed goods"),
+                                iconPath = stateValues.drawablePathIconSupplierDispatch,
+                                iconRes = stateValues.drawableResIconSupplierDispatch.value
+                            )
+                            SupplierDeskSummaryCard(
+                                modifier = Modifier.weight(1f),
+                                title = localizedStringResource(1560, "In delivery"),
+                                value = inDeliveryCount.toString(),
+                                subtitle = localizedStringResource(1580, "Runs already on the road"),
+                                iconPath = stateValues.drawablePathIconSupplierDispatch,
+                                iconRes = stateValues.drawableResIconSupplierDispatch.value
+                            )
+                            SupplierDeskSummaryCard(
+                                modifier = Modifier.weight(1f),
+                                title = localizedStringResource(1535, "Issue watch"),
+                                value = attentionCount.toString(),
+                                subtitle = localizedStringResource(1581, "Confirmations, issues or contracts to clear"),
+                                iconPath = stateValues.drawablePathIconSupplierContracts,
+                                iconRes = stateValues.drawableResIconSupplierContracts.value
+                            )
+                        }
+                    }
+                }
+            }
+
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+                        .clip(RoundedCornerShape(stateValues.cornerRadius))
+                        .background(stateValues.BackgroundColor)
+                        .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor, RoundedCornerShape(stateValues.cornerRadius))
+                        .padding(stateValues.marginTextFieldGroup),
+                    verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                ) {
+                    Text(
+                        text = localizedStringResource(1582, "Dispatch filter"),
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.titleTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                    SimpleTextInput(
+                        modifier = Modifier.fillMaxWidth(),
+                        value = searchQuery,
+                        placeholder = localizedStringResource(216, "Search"),
+                        leadingIconPath = stateValues.drawablePathIconSearch,
+                        onValueChange = { searchQuery = it }
+                    )
+                    SimpleDropdownField(
+                        title = localizedStringResource(1582, "Dispatch filter"),
+                        selectedId = laneFilter,
+                        options = listOf(
+                            DropdownOption("all", localizedStringResource(1378, "All")),
+                            DropdownOption("confirm", localizedStringResource(1561, "Needs confirmation")),
+                            DropdownOption("packed", localizedStringResource(1559, "Ready lanes")),
+                            DropdownOption("delivery", localizedStringResource(1560, "In delivery")),
+                            DropdownOption("issue", localizedStringResource(1535, "Issue watch")),
+                            DropdownOption("contracts", localizedStringResource(1537, "Contract blockers"))
+                        ),
+                        placeholder = localizedStringResource(1378, "All"),
+                        onSelected = { laneFilter = it }
+                    )
+                }
+            }
+
+            if (lanes.isEmpty()) {
+                item {
+                    MessageText(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(1566, "No dispatch lanes yet"),
+                        subText = localizedStringResource(1567, "Confirm or pack supplier orders and they will appear here as store delivery lanes."),
+                        subTextSize = stateValues.smallTextSize
+                    )
+                }
+            } else if (visibleLanes.isEmpty()) {
+                item {
+                    MessageText(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(1380, "No orders match this filter")
+                    )
+                }
+            } else {
+                items(visibleLanes, key = { it.storeKey }) { lane ->
+                    SupplierDispatchLaneCard(lane)
+                }
+            }
+
+            item {
+                Text(
+                    text = localizedStringResource(1381, "Supplier feature roadmap"),
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.titleTextSize,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            items(featurePlan.filterNot { it.title == localizedStringResource(1347, "Route batch planner") }) { feature ->
+                SupplierFeaturePlanCard(feature = feature, compact = true)
+            }
+        }
+    }
+}
+
 @Composable
 private fun AppConfiguration.SupplierPlaceholderScreen(
     title: String,
@@ -21796,6 +22451,7 @@ private fun AppConfiguration.SupplierScreen() {
         is NavigationScreenModel.Supplier.Orders -> SupplierOrdersInboxScreen()
         is NavigationScreenModel.Supplier.Catalog -> SupplierCatalogScreen()
         is NavigationScreenModel.Supplier.Contracts -> SupplierContractsScreen()
+        is NavigationScreenModel.Supplier.Dispatch -> SupplierDispatchScreen()
         is NavigationScreenModel.Supplier.Customers -> SupplierCustomersScreen()
         is NavigationScreenModel.Supplier.Analytics -> SupplierInsightsScreen()
         else -> SupplierOrdersInboxScreen()
@@ -24785,6 +25441,17 @@ sealed class NavigationScreenModel(
             }
         }
 
+        sealed class Dispatch(route: String): Supplier(route) {
+            data object Main: Dispatch("SupplierDispatchMainNavigationScreenModelRoute") {
+                override val name: String
+                    get() = with(AppConfiguration) { localizedStringResource(1556, "Dispatch") }
+                override val iconPath: String
+                    get() = AppConfiguration.stateValues.drawablePathIconSupplierDispatch
+                override val iconRes: DrawableResource
+                    get() = AppConfiguration.stateValues.drawableResIconSupplierDispatch.value
+            }
+        }
+
         sealed class Customers(route: String): Supplier(route) {
             data object Main: Customers("SupplierCustomersMainNavigationScreenModelRoute") {
                 override val name: String
@@ -25311,6 +25978,7 @@ private fun persistentAppNavigationScreens(): List<NavigationScreenModel> = list
     NavigationScreenModel.Supplier.Orders.Main,
     NavigationScreenModel.Supplier.Catalog.Main,
     NavigationScreenModel.Supplier.Contracts.Main,
+    NavigationScreenModel.Supplier.Dispatch.Main,
     NavigationScreenModel.Supplier.Customers.Main,
     NavigationScreenModel.Supplier.Analytics.Main
 )
@@ -25477,6 +26145,7 @@ object Navigation {
         NavigationScreenModel.Supplier.Orders.Main,
         NavigationScreenModel.Supplier.Catalog.Main,
         NavigationScreenModel.Supplier.Contracts.Main,
+        NavigationScreenModel.Supplier.Dispatch.Main,
         NavigationScreenModel.Supplier.Customers.Main,
         NavigationScreenModel.Menu.Main
     )
@@ -44546,6 +45215,9 @@ object AppConfiguration {
         val drawablePathIconSupplierDemandRadar: String
         val drawableResIconSupplierDemandRadar: StateFlow<DrawableResource>
 
+        val drawablePathIconSupplierDispatch: String
+        val drawableResIconSupplierDispatch: StateFlow<DrawableResource>
+
         val drawablePathIconBuyerAgeRestriction: String
         val drawableResIconBuyerAgeRestriction: StateFlow<DrawableResource>
 
@@ -45173,6 +45845,10 @@ object AppConfiguration {
             private val _drawableResIconSupplierDemandRadar = MutableStateFlow(Res.drawable._77_0)
             override val drawableResIconSupplierDemandRadar: StateFlow<DrawableResource> = _drawableResIconSupplierDemandRadar.asStateFlow()
 
+            override val drawablePathIconSupplierDispatch: String by drawablePathIconSupplierDispatchState.collectAsState()
+            private val _drawableResIconSupplierDispatch = MutableStateFlow(Res.drawable._78_0)
+            override val drawableResIconSupplierDispatch: StateFlow<DrawableResource> = _drawableResIconSupplierDispatch.asStateFlow()
+
             override val drawablePathIconBuyerAgeRestriction: String by drawablePathIconBuyerAgeRestrictionState.collectAsState()
             private val _drawableResIconBuyerAgeRestriction = MutableStateFlow(Res.drawable._73_0)
             override val drawableResIconBuyerAgeRestriction: StateFlow<DrawableResource> = _drawableResIconBuyerAgeRestriction.asStateFlow()
@@ -45382,6 +46058,7 @@ object AppConfiguration {
                 _drawableResIconSupplierContracts.emit(if (stateValues.appThemeId == 1L) Res.drawable._76_1 else Res.drawable._76_0)
                 _drawableResIconSupplierPartners.emit(if (stateValues.appThemeId == 1L) Res.drawable._75_1 else Res.drawable._75_0)
                 _drawableResIconSupplierDemandRadar.emit(if (stateValues.appThemeId == 1L) Res.drawable._77_1 else Res.drawable._77_0)
+                _drawableResIconSupplierDispatch.emit(if (stateValues.appThemeId == 1L) Res.drawable._78_1 else Res.drawable._78_0)
                 _drawableResIconBuyerAgeRestriction.emit(if (stateValues.appThemeId == 1L) Res.drawable._73_1 else Res.drawable._73_0)
                 _drawableResIconTransactionTimeRestriction.emit(if (stateValues.appThemeId == 1L) Res.drawable._74_1 else Res.drawable._74_0)
 

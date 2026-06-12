@@ -4915,6 +4915,95 @@ fun updateSupplierOrder(
         }
 }
 
+fun updateSupplierOrdersSupplierStatus(
+    orderBundles: List<SupplierOrderWithLinesDataModel>,
+    status: SupplierOrderStatusDataModel,
+    comment: String? = null,
+    onCompleted: ((Int) -> Unit)? = null
+) {
+    val cleanBundles = orderBundles
+        .filter { it.order.id.isNotBlank() }
+        .distinctBy { it.order.id }
+
+    if (cleanBundles.isEmpty()) {
+        onCompleted?.invoke(0)
+        return
+    }
+
+    if (!updateSupplierOrderMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            updateSupplierOrderMutex.withLock {
+                val cleanComment = comment?.trim()?.takeIf { it.isNotBlank() }
+                val now = getCurrentTimeMillis()
+                var successCount = 0
+                var lastFailureMessage: List<LocalizedStringDataModel>? = null
+
+                for (bundle in cleanBundles) {
+                    val patched = bundle.copy(
+                        order = bundle.order.copy(
+                            status = status,
+                            supplierComment = cleanComment ?: bundle.order.supplierComment,
+                            supplierCommentLocalized = cleanComment?.let { listOf(LocalizedStringDataModel(appLanguageState.value, it)) }
+                                ?: bundle.order.supplierCommentLocalized,
+                            updatedAtMillis = now
+                        )
+                    )
+
+                    val response = networkRequest<SupplierOrderWithLinesDataModel, SupplierOrderWithLinesDataModel>(
+                        method = HttpMethod.Put,
+                        endpointUrl = globalAppConfigurationState.payloadValue.updateSupplierOrderPath.first,
+                        body = patched
+                    )
+
+                    if (response.negative || response.payload == null) {
+                        lastFailureMessage = response.message
+                    } else {
+                        successCount += 1
+                        supplierOrdersState.emit(
+                            DataState.Success(
+                                supplierOrdersState.payloadValue.orEmpty().upsertById(response.payload.order),
+                                response.message
+                            )
+                        )
+                        supplierOrderLinesState.emit(
+                            DataState.Success(
+                                supplierOrderLinesState.payloadValue.orEmpty()
+                                    .filterNot { line -> line.orderId == response.payload.order.id } + response.payload.lines,
+                                response.message
+                            )
+                        )
+                    }
+                }
+
+                if (successCount > 0) {
+                    postInAppNotification(
+                        localizedStringResourceMessage(
+                            id = 1574,
+                            main = "Supplier dispatch lane updated",
+                            ru = "Маршрут поставщика обновлён",
+                            kk = "Жеткізуші жеткізу бағыты жаңартылды"
+                        ),
+                        NotificationType.Positive,
+                        transient = true
+                    )
+                    getMySupplierSideOrders()
+                } else {
+                    postInAppNotification(
+                        lastFailureMessage ?: localizedStringResourceMessage(
+                            id = 1575,
+                            main = "Could not update supplier dispatch lane",
+                            ru = "Не удалось обновить маршрут поставщика",
+                            kk = "Жеткізуші жеткізу бағытын жаңарту мүмкін болмады"
+                        ),
+                        NotificationType.Negative
+                    )
+                }
+
+                onCompleted?.invoke(successCount)
+            }
+        }
+}
+
 fun deleteSupplierOrder(
     orderId: String,
     onCompleted: ((DataState<String>) -> Unit)? = null
@@ -5851,6 +5940,7 @@ val drawablePathIconSupplierCatalogState = MutableStateFlow("svg/72_0.svg")
 val drawablePathIconSupplierContractsState = MutableStateFlow("svg/76_0.svg")
 val drawablePathIconSupplierPartnersState = MutableStateFlow("svg/75_0.svg")
 val drawablePathIconSupplierDemandRadarState = MutableStateFlow("svg/77_0.svg")
+val drawablePathIconSupplierDispatchState = MutableStateFlow("svg/78_0.svg")
 val drawablePathIconBuyerAgeRestrictionState = MutableStateFlow("svg/73_0.svg")
 val drawablePathIconTransactionTimeRestrictionState = MutableStateFlow("svg/74_0.svg")
 val drawablePathIconWorkersState = MutableStateFlow("svg/22_0.svg")
@@ -7918,6 +8008,9 @@ fun updateDrawables(
         )
         drawablePathIconSupplierDemandRadarState.emit(
             drawablePath(77L)
+        )
+        drawablePathIconSupplierDispatchState.emit(
+            drawablePath(78L)
         )
         drawablePathIconBuyerAgeRestrictionState.emit(
             drawablePath(73L)
