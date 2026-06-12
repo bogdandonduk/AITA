@@ -31501,6 +31501,237 @@
           "value": "Жеткізу сүзгісі"
         }
       ]
+    },
+    {
+      "id": 1583,
+      "values": [
+        {
+          "language": "main",
+          "value": "Offer studio"
+        },
+        {
+          "language": "en",
+          "value": "Offer studio"
+        },
+        {
+          "language": "ru",
+          "value": "Студия предложения"
+        },
+        {
+          "language": "kk",
+          "value": "Ұсыныс студиясы"
+        }
+      ]
+    },
+    {
+      "id": 1584,
+      "values": [
+        {
+          "language": "main",
+          "value": "A quote draft built from real store demand: price signal, MOQ hint and contract-ready wording without retyping."
+        },
+        {
+          "language": "en",
+          "value": "A quote draft built from real store demand: price signal, MOQ hint and contract-ready wording without retyping."
+        },
+        {
+          "language": "ru",
+          "value": "Черновик предложения на основе реального спроса магазинов: ценовой сигнал, подсказка MOQ и текст для договора без повторного набора."
+        },
+        {
+          "language": "kk",
+          "value": "Нақты дүкен сұранысынан жасалған баға ұсынысы: баға сигналы, MOQ кеңесі және келісімге дайын мәтін қайта терусіз."
+        }
+      ]
+    },
+    {
+      "id": 1585,
+      "values": [
+        {
+          "language": "main",
+          "value": "Price signal"
+        },
+        {
+          "language": "en",
+          "value": "Price signal"
+        },
+        {
+          "language": "ru",
+          "value": "Ценовой сигнал"
+        },
+        {
+          "language": "kk",
+          "value": "Баға сигналы"
+        }
+      ]
+    },
+    {
+      "id": 1586,
+      "values": [
+        {
+          "language": "main",
+          "value": "Suggested quote"
+        },
+        {
+          "language": "en",
+          "value": "Suggested quote"
+        },
+        {
+          "language": "ru",
+          "value": "Рекомендуемое предложение"
+        },
+        {
+          "language": "kk",
+          "value": "Ұсынылатын баға"
+        }
+      ]
+    },
+    {
+      "id": 1587,
+      "values": [
+        {
+          "language": "main",
+          "value": "Copy quote"
+        },
+        {
+          "language": "en",
+          "value": "Copy quote"
+        },
+        {
+          "language": "ru",
+          "value": "Скопировать предложение"
+        },
+        {
+          "language": "kk",
+          "value": "Ұсынысты көшіру"
+        }
+      ]
+    },
+    {
+      "id": 1588,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open contract board"
+        },
+        {
+          "language": "en",
+          "value": "Open contract board"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть договорную доску"
+        },
+        {
+          "language": "kk",
+          "value": "Келісім тақтасын ашу"
+        }
+      ]
+    },
+    {
+      "id": 1589,
+      "values": [
+        {
+          "language": "main",
+          "value": "No expected prices yet"
+        },
+        {
+          "language": "en",
+          "value": "No expected prices yet"
+        },
+        {
+          "language": "ru",
+          "value": "Ожидаемых цен пока нет"
+        },
+        {
+          "language": "kk",
+          "value": "Күтілетін бағалар әзірге жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1590,
+      "values": [
+        {
+          "language": "main",
+          "value": "Use latest requested price as starting point"
+        },
+        {
+          "language": "en",
+          "value": "Use latest requested price as starting point"
+        },
+        {
+          "language": "ru",
+          "value": "Используйте последнюю запрошенную цену как старт"
+        },
+        {
+          "language": "kk",
+          "value": "Соңғы сұралған бағаны бастапқы нүкте етіңіз"
+        }
+      ]
+    },
+    {
+      "id": 1591,
+      "values": [
+        {
+          "language": "main",
+          "value": "MOQ hint"
+        },
+        {
+          "language": "en",
+          "value": "MOQ hint"
+        },
+        {
+          "language": "ru",
+          "value": "Подсказка MOQ"
+        },
+        {
+          "language": "kk",
+          "value": "MOQ кеңесі"
+        }
+      ]
+    },
+    {
+      "id": 1592,
+      "values": [
+        {
+          "language": "main",
+          "value": "Demand signal"
+        },
+        {
+          "language": "en",
+          "value": "Demand signal"
+        },
+        {
+          "language": "ru",
+          "value": "Сигнал спроса"
+        },
+        {
+          "language": "kk",
+          "value": "Сұраныс сигналы"
+        }
+      ]
+    },
+    {
+      "id": 1593,
+      "values": [
+        {
+          "language": "main",
+          "value": "Contract-ready quote copied"
+        },
+        {
+          "language": "en",
+          "value": "Contract-ready quote copied"
+        },
+        {
+          "language": "ru",
+          "value": "Предложение для договора скопировано"
+        },
+        {
+          "language": "kk",
+          "value": "Келісімге дайын ұсыныс көшірілді"
+        }
+      ]
     }
   ]
 }

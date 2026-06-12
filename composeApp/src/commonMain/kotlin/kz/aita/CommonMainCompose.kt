@@ -1037,6 +1037,17 @@ private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallb
     put(1580L, mapOf("main" to "Runs already on the road", "en" to "Runs already on the road", "ru" to "Маршруты уже в пути", "kk" to "Жолдағы бағыттар"))
     put(1581L, mapOf("main" to "Confirmations, issues or contracts to clear", "en" to "Confirmations, issues or contracts to clear", "ru" to "Подтверждения, проблемы или договоры для очистки", "kk" to "Растау, мәселе немесе шешілетін келісімдер"))
     put(1582L, mapOf("main" to "Dispatch filter", "en" to "Dispatch filter", "ru" to "Фильтр доставки", "kk" to "Жеткізу сүзгісі"))
+    put(1583L, mapOf("main" to "Offer studio", "en" to "Offer studio", "ru" to "Студия предложения", "kk" to "Ұсыныс студиясы"))
+    put(1584L, mapOf("main" to "A quote draft built from real store demand: price signal, MOQ hint and contract-ready wording without retyping.", "en" to "A quote draft built from real store demand: price signal, MOQ hint and contract-ready wording without retyping.", "ru" to "Черновик предложения из реального спроса магазинов: ценовой сигнал, подсказка MOQ и текст для договора без перепечатывания.", "kk" to "Дүкен сұранысынан жасалған ұсыныс жобасы: баға сигналы, MOQ кеңесі және қайта терусіз келісім мәтіні."))
+    put(1585L, mapOf("main" to "Price signal", "en" to "Price signal", "ru" to "Ценовой сигнал", "kk" to "Баға сигналы"))
+    put(1586L, mapOf("main" to "Suggested quote", "en" to "Suggested quote", "ru" to "Рекомендуемое предложение", "kk" to "Ұсынылған баға"))
+    put(1587L, mapOf("main" to "Copy quote", "en" to "Copy quote", "ru" to "Скопировать предложение", "kk" to "Ұсынысты көшіру"))
+    put(1588L, mapOf("main" to "Open contract board", "en" to "Open contract board", "ru" to "Открыть доску договоров", "kk" to "Келісімдер тақтасын ашу"))
+    put(1589L, mapOf("main" to "No expected prices yet", "en" to "No expected prices yet", "ru" to "Ожидаемых цен пока нет", "kk" to "Әзірге күтілетін баға жоқ"))
+    put(1590L, mapOf("main" to "Use latest requested price as starting point", "en" to "Use latest requested price as starting point", "ru" to "Используйте последнюю запрошенную цену как отправную точку", "kk" to "Соңғы сұралған бағаны бастапқы нүкте ретінде қолданыңыз"))
+    put(1591L, mapOf("main" to "MOQ hint", "en" to "MOQ hint", "ru" to "Подсказка MOQ", "kk" to "MOQ кеңесі"))
+    put(1592L, mapOf("main" to "Demand signal", "en" to "Demand signal", "ru" to "Сигнал спроса", "kk" to "Сұраныс сигналы"))
+    put(1593L, mapOf("main" to "Contract-ready quote copied", "en" to "Contract-ready quote copied", "ru" to "Предложение для договора скопировано", "kk" to "Келісімге дайын ұсыныс көшірілді"))
 }
 
 
@@ -18740,8 +18751,9 @@ private fun AppConfiguration.supplierMarketWinningFeatures(): List<SupplierFeatu
     SupplierFeaturePlanUiModel(
         title = localizedStringResource(1349, "Price ladder and payment terms"),
         subtitle = localizedStringResource(1350, "Manage wholesale tiers, local currencies, deferred payments and trusted-store limits."),
-        iconPath = stateValues.drawablePathIconFinances,
-        iconRes = stateValues.drawableResIconFinances.value
+        iconPath = stateValues.drawablePathIconSupplierOfferStudio,
+        iconRes = stateValues.drawableResIconSupplierOfferStudio.value,
+        implemented = true
     ),
     SupplierFeaturePlanUiModel(
         title = localizedStringResource(1351, "Store reliability scorecards"),
@@ -18791,6 +18803,61 @@ private fun PriceDataModel?.supplierDeskMoneyText(): String = this?.let { price 
     listOf(price.price, price.currency).filter { it.isNotBlank() }.joinToString(" ")
 }.orEmpty()
 
+private fun String.supplierOfferPriceNumberOrNull(): Double? =
+    trim()
+        .replace(" ", "")
+        .replace("\u00A0", "")
+        .replace(',', '.')
+        .toDoubleOrNull()
+
+private fun Double.supplierOfferCompactNumberText(): String {
+    val rounded2 = round(this * 100.0) / 100.0
+    val whole = round(rounded2)
+    return if (abs(rounded2 - whole) < 0.005) {
+        whole.toLong().toString()
+    } else {
+        rounded2.toString().trimEnd('0').trimEnd('.')
+    }
+}
+
+private fun AppConfiguration.supplierOfferPriceSignalText(prices: List<PriceDataModel?>): String {
+    val pairs = prices.mapNotNull { price ->
+        val value = price?.price?.supplierOfferPriceNumberOrNull() ?: return@mapNotNull null
+        value to price.currency.trim().ifBlank { "KZT" }
+    }
+    if (pairs.isEmpty()) return localizedStringResource(1589, "No expected prices yet")
+
+    val currency = pairs.groupingBy { it.second }.eachCount().maxByOrNull { it.value }?.key ?: pairs.last().second
+    val values = pairs.filter { it.second == currency }.map { it.first }.ifEmpty { pairs.map { it.first } }
+    val min = values.minOrNull() ?: return localizedStringResource(1589, "No expected prices yet")
+    val max = values.maxOrNull() ?: min
+    return if (abs(max - min) < 0.005) {
+        "${min.supplierOfferCompactNumberText()} $currency"
+    } else {
+        "${min.supplierOfferCompactNumberText()}–${max.supplierOfferCompactNumberText()} $currency"
+    }
+}
+
+private fun AppConfiguration.supplierSuggestedQuoteText(
+    prices: List<PriceDataModel?>,
+    totalQuantityText: String
+): String {
+    val pairs = prices.mapNotNull { price ->
+        val value = price?.price?.supplierOfferPriceNumberOrNull() ?: return@mapNotNull null
+        value to price.currency.trim().ifBlank { "KZT" }
+    }
+    if (pairs.isEmpty()) return localizedStringResource(1590, "Use latest requested price as starting point")
+
+    val currency = pairs.groupingBy { it.second }.eachCount().maxByOrNull { it.value }?.key ?: pairs.last().second
+    val values = pairs.filter { it.second == currency }.map { it.first }.ifEmpty { pairs.map { it.first } }
+    val suggested = values.average()
+    val priceText = "${suggested.supplierOfferCompactNumberText()} $currency"
+    return listOf(
+        priceText,
+        totalQuantityText.takeIf { it.isNotBlank() }?.let { "${localizedStringResource(1591, "MOQ hint")}: $it" }.orEmpty()
+    ).filter { it.isNotBlank() }.joinToString(" • ")
+}
+
 private fun SupplierOrderDataModel.supplierDeskSortTime(): Long =
     updatedAtMillis.takeIf { it > 0L } ?: orderedAtMillis.takeIf { it > 0L } ?: createdAtMillis
 
@@ -18832,6 +18899,9 @@ private data class SupplierCatalogItemUiModel(
     val latestStatus: SupplierOrderStatusDataModel,
     val needsReply: Boolean,
     val deliveredOnly: Boolean,
+    val priceSignalText: String,
+    val suggestedQuoteText: String,
+    val quoteNote: String,
     val searchKey: String,
     val offerNote: String
 )
@@ -18909,6 +18979,20 @@ private fun AppConfiguration.buildSupplierCatalogItems(
                 order.status == SupplierOrderStatusDataModel.Delivered || order.status == SupplierOrderStatusDataModel.PartiallyDelivered
             }
             val storeListText = storeTitles.take(4).joinToString(", ").ifBlank { localizedStringResource(1410, "Interested stores") }
+            val priceSignalPrices = itemLines.map { line ->
+                line.supplierOfferedSupplyPrice ?: line.expectedSupplyPrice ?: ordersById[line.orderId]?.amount
+            }
+            val priceSignalText = supplierOfferPriceSignalText(priceSignalPrices)
+            val suggestedQuoteText = supplierSuggestedQuoteText(priceSignalPrices, totalQuantityText)
+            val quoteNote = buildString {
+                append(localizedStringResource(1583, "Offer studio")).append(": ").append(title)
+                if (barcodeText.isNotBlank()) append('\n').append(stateValues.stringBarcode).append(": ").append(barcodeText)
+                append('\n').append(localizedStringResource(1592, "Demand signal")).append(": ").append(totalQuantityText.ifBlank { itemLines.size.toString() })
+                append('\n').append(localizedStringResource(1585, "Price signal")).append(": ").append(priceSignalText)
+                append('\n').append(localizedStringResource(1586, "Suggested quote")).append(": ").append(suggestedQuoteText)
+                append('\n').append(localizedStringResource(1422, "Stores asking")).append(": ").append(storeListText)
+                append('\n').append(localizedStringResource(1430, "Latest status")).append(": ").append(supplierOrderStatusTitle(latestStatus))
+            }
             val searchKey = buildString {
                 append(goodsKey).append(' ')
                 append(title).append(' ')
@@ -18947,6 +19031,9 @@ private fun AppConfiguration.buildSupplierCatalogItems(
                 latestStatus = latestStatus,
                 needsReply = needsReply,
                 deliveredOnly = deliveredOnly,
+                priceSignalText = priceSignalText,
+                suggestedQuoteText = suggestedQuoteText,
+                quoteNote = quoteNote,
                 searchKey = searchKey,
                 offerNote = offerNote
             )
@@ -19075,6 +19162,45 @@ private fun AppConfiguration.SupplierCatalogItemCard(item: SupplierCatalogItemUi
             }
         }
 
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(stateValues.cornerRadius))
+                .background(stateValues.AccentColor.copy(alpha = 0.07f))
+                .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.50f), RoundedCornerShape(stateValues.cornerRadius))
+                .padding(stateValues.marginTextField),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                CpImage(
+                    modifier = Modifier.size(28.dp),
+                    url = stateValues.drawablePathIconSupplierOfferStudio,
+                    fallbackRes = stateValues.drawableResIconSupplierOfferStudio.value,
+                    contentDescription = localizedStringResource(1583, "Offer studio"),
+                    tintColor = stateValues.AccentColor
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = localizedStringResource(1583, "Offer studio"),
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.textSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = localizedStringResource(1584, "A quote draft built from real store demand: price signal, MOQ hint and contract-ready wording without retyping."),
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize
+                    )
+                }
+            }
+            StockCardInfoLine(localizedStringResource(1585, "Price signal"), item.priceSignalText, stateValues.TextColor)
+            StockCardInfoLine(localizedStringResource(1586, "Suggested quote"), item.suggestedQuoteText, stateValues.TextColor)
+        }
+
         Text(
             text = localizedStringResource(1428, "This is not a separate product database yet: it is a smart catalog lens over real store orders, safe to add before supplier-owned price books."),
             color = stateValues.PlaceholderTextColor,
@@ -19107,6 +19233,30 @@ private fun AppConfiguration.SupplierCatalogItemCard(item: SupplierCatalogItemUi
                     confirmationRequired = false,
                     onClick = { copyTextToClipboard(item.offerNote) }
                 )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1587, "Copy quote"),
+                    iconPath = stateValues.drawablePathIconSupplierOfferStudio,
+                    iconRes = stateValues.drawableResIconSupplierOfferStudio.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        copyTextToClipboard(item.quoteNote)
+                        postInAppNotification(localizedStringResource(1593, "Contract-ready quote copied"), NotificationType.Positive, transient = true)
+                    }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1588, "Open contract board"),
+                    iconPath = stateValues.drawablePathIconSupplierContracts,
+                    iconRes = stateValues.drawableResIconSupplierContracts.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            NavigationScreenModel.Supplier.Contracts.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.title)
+                            Navigation.goMain(NavigationScreenModel.Supplier.Contracts.Main)
+                        }
+                    }
+                )
             }
         } else {
             Row(
@@ -19133,6 +19283,35 @@ private fun AppConfiguration.SupplierCatalogItemCard(item: SupplierCatalogItemUi
                     iconRes = stateValues.drawableResIconClipboard.value,
                     confirmationRequired = false,
                     onClick = { copyTextToClipboard(item.offerNote) }
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1587, "Copy quote"),
+                    iconPath = stateValues.drawablePathIconSupplierOfferStudio,
+                    iconRes = stateValues.drawableResIconSupplierOfferStudio.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        copyTextToClipboard(item.quoteNote)
+                        postInAppNotification(localizedStringResource(1593, "Contract-ready quote copied"), NotificationType.Positive, transient = true)
+                    }
+                )
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1588, "Open contract board"),
+                    iconPath = stateValues.drawablePathIconSupplierContracts,
+                    iconRes = stateValues.drawableResIconSupplierContracts.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            NavigationScreenModel.Supplier.Contracts.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.title)
+                            Navigation.goMain(NavigationScreenModel.Supplier.Contracts.Main)
+                        }
+                    }
                 )
             }
         }
@@ -21148,10 +21327,12 @@ private fun AppConfiguration.SupplierContractsBoardContent(
     val goodsOptions = remember(activeOrders, lines, stateValues.appLanguage) {
         buildSupplierContractGoodsOptions(activeOrders, lines.orEmpty())
     }
+    val contractNavigationState by NavigationScreenModel.Supplier.Contracts.Main.state.collectAsState()
+    val contractSearchSeed = contractNavigationState[NavigationScreenModel.KEY_STATE_SEARCH_QUERY].orEmpty()
     var showEditor by rememberSaveable { mutableStateOf(false) }
     var editingContractId by rememberSaveable { mutableStateOf<String?>(null) }
-    var searchQuery by rememberSaveable { mutableStateOf("") }
-    var statusFilter by rememberSaveable { mutableStateOf("open") }
+    var searchQuery by rememberSaveable(contractSearchSeed) { mutableStateOf(contractSearchSeed) }
+    var statusFilter by rememberSaveable(contractSearchSeed) { mutableStateOf(if (contractSearchSeed.isBlank()) "open" else "all") }
 
     val visibleContracts = remember(contracts, partners, searchQuery, statusFilter, actorSide, fixedStoreId, stateValues.appLanguage) {
         val partnerKeys = partners.map { it.key }.toSet()
@@ -45218,6 +45399,9 @@ object AppConfiguration {
         val drawablePathIconSupplierDispatch: String
         val drawableResIconSupplierDispatch: StateFlow<DrawableResource>
 
+        val drawablePathIconSupplierOfferStudio: String
+        val drawableResIconSupplierOfferStudio: StateFlow<DrawableResource>
+
         val drawablePathIconBuyerAgeRestriction: String
         val drawableResIconBuyerAgeRestriction: StateFlow<DrawableResource>
 
@@ -45849,6 +46033,10 @@ object AppConfiguration {
             private val _drawableResIconSupplierDispatch = MutableStateFlow(Res.drawable._78_0)
             override val drawableResIconSupplierDispatch: StateFlow<DrawableResource> = _drawableResIconSupplierDispatch.asStateFlow()
 
+            override val drawablePathIconSupplierOfferStudio: String by drawablePathIconSupplierOfferStudioState.collectAsState()
+            private val _drawableResIconSupplierOfferStudio = MutableStateFlow(Res.drawable._79_0)
+            override val drawableResIconSupplierOfferStudio: StateFlow<DrawableResource> = _drawableResIconSupplierOfferStudio.asStateFlow()
+
             override val drawablePathIconBuyerAgeRestriction: String by drawablePathIconBuyerAgeRestrictionState.collectAsState()
             private val _drawableResIconBuyerAgeRestriction = MutableStateFlow(Res.drawable._73_0)
             override val drawableResIconBuyerAgeRestriction: StateFlow<DrawableResource> = _drawableResIconBuyerAgeRestriction.asStateFlow()
@@ -46059,6 +46247,7 @@ object AppConfiguration {
                 _drawableResIconSupplierPartners.emit(if (stateValues.appThemeId == 1L) Res.drawable._75_1 else Res.drawable._75_0)
                 _drawableResIconSupplierDemandRadar.emit(if (stateValues.appThemeId == 1L) Res.drawable._77_1 else Res.drawable._77_0)
                 _drawableResIconSupplierDispatch.emit(if (stateValues.appThemeId == 1L) Res.drawable._78_1 else Res.drawable._78_0)
+                _drawableResIconSupplierOfferStudio.emit(if (stateValues.appThemeId == 1L) Res.drawable._79_1 else Res.drawable._79_0)
                 _drawableResIconBuyerAgeRestriction.emit(if (stateValues.appThemeId == 1L) Res.drawable._73_1 else Res.drawable._73_0)
                 _drawableResIconTransactionTimeRestriction.emit(if (stateValues.appThemeId == 1L) Res.drawable._74_1 else Res.drawable._74_0)
 
