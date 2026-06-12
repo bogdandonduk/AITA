@@ -28687,6 +28687,615 @@
           "value": "Ұсыныс жазбасы"
         }
       ]
+    },
+    {
+      "id": 1450,
+      "values": [
+        {
+          "language": "main",
+          "value": "Store partner CRM"
+        },
+        {
+          "language": "en",
+          "value": "Store partner CRM"
+        },
+        {
+          "language": "ru",
+          "value": "CRM партнёров-магазинов"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен серіктестер CRM-і"
+        }
+      ]
+    },
+    {
+      "id": 1451,
+      "values": [
+        {
+          "language": "main",
+          "value": "Relationship control tower"
+        },
+        {
+          "language": "en",
+          "value": "Relationship control tower"
+        },
+        {
+          "language": "ru",
+          "value": "Пульт отношений"
+        },
+        {
+          "language": "kk",
+          "value": "Қатынас басқару мұнарасы"
+        }
+      ]
+    },
+    {
+      "id": 1452,
+      "values": [
+        {
+          "language": "main",
+          "value": "Every store that sends supplier orders becomes a partner card with open work, reliability and recent demand signals."
+        },
+        {
+          "language": "en",
+          "value": "Every store that sends supplier orders becomes a partner card with open work, reliability and recent demand signals."
+        },
+        {
+          "language": "ru",
+          "value": "Каждый магазин, отправляющий заказы поставщику, становится карточкой партнёра с открытыми задачами, надёжностью и свежими сигналами спроса."
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізушіге тапсырыс жіберген әр дүкен ашық жұмыс, сенімділік және соңғы сұраныс белгілері бар серіктес картасына айналады."
+        }
+      ]
+    },
+    {
+      "id": 1453,
+      "values": [
+        {
+          "language": "main",
+          "value": "Partner stores"
+        },
+        {
+          "language": "en",
+          "value": "Partner stores"
+        },
+        {
+          "language": "ru",
+          "value": "Магазины-партнёры"
+        },
+        {
+          "language": "kk",
+          "value": "Серіктес дүкендер"
+        }
+      ]
+    },
+    {
+      "id": 1454,
+      "values": [
+        {
+          "language": "main",
+          "value": "Stores with at least one supplier order"
+        },
+        {
+          "language": "en",
+          "value": "Stores with at least one supplier order"
+        },
+        {
+          "language": "ru",
+          "value": "Магазины хотя бы с одним заказом поставщику"
+        },
+        {
+          "language": "kk",
+          "value": "Кемінде бір жеткізуші тапсырысы бар дүкендер"
+        }
+      ]
+    },
+    {
+      "id": 1455,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open work"
+        },
+        {
+          "language": "en",
+          "value": "Open work"
+        },
+        {
+          "language": "ru",
+          "value": "Открытая работа"
+        },
+        {
+          "language": "kk",
+          "value": "Ашық жұмыс"
+        }
+      ]
+    },
+    {
+      "id": 1456,
+      "values": [
+        {
+          "language": "main",
+          "value": "Orders still moving"
+        },
+        {
+          "language": "en",
+          "value": "Orders still moving"
+        },
+        {
+          "language": "ru",
+          "value": "Заказы ещё в движении"
+        },
+        {
+          "language": "kk",
+          "value": "Әлі қозғалып тұрған тапсырыстар"
+        }
+      ]
+    },
+    {
+      "id": 1457,
+      "values": [
+        {
+          "language": "main",
+          "value": "Reliable rhythm"
+        },
+        {
+          "language": "en",
+          "value": "Reliable rhythm"
+        },
+        {
+          "language": "ru",
+          "value": "Надёжный ритм"
+        },
+        {
+          "language": "kk",
+          "value": "Сенімді ырғақ"
+        }
+      ]
+    },
+    {
+      "id": 1458,
+      "values": [
+        {
+          "language": "main",
+          "value": "Partners with clean delivery flow"
+        },
+        {
+          "language": "en",
+          "value": "Partners with clean delivery flow"
+        },
+        {
+          "language": "ru",
+          "value": "Партнёры с чистым потоком поставок"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізу ағымы таза серіктестер"
+        }
+      ]
+    },
+    {
+      "id": 1459,
+      "values": [
+        {
+          "language": "main",
+          "value": "Find a store partner fast"
+        },
+        {
+          "language": "en",
+          "value": "Find a store partner fast"
+        },
+        {
+          "language": "ru",
+          "value": "Быстро найти магазин-партнёр"
+        },
+        {
+          "language": "kk",
+          "value": "Серіктес дүкенді тез табу"
+        }
+      ]
+    },
+    {
+      "id": 1460,
+      "values": [
+        {
+          "language": "main",
+          "value": "No store partners yet"
+        },
+        {
+          "language": "en",
+          "value": "No store partners yet"
+        },
+        {
+          "language": "ru",
+          "value": "Партнёров-магазинов пока нет"
+        },
+        {
+          "language": "kk",
+          "value": "Әзірге серіктес дүкен жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1461,
+      "values": [
+        {
+          "language": "main",
+          "value": "Store partners will appear here after stores send supplier orders."
+        },
+        {
+          "language": "en",
+          "value": "Store partners will appear here after stores send supplier orders."
+        },
+        {
+          "language": "ru",
+          "value": "Партнёры-магазины появятся здесь после того, как магазины отправят заказы поставщику."
+        },
+        {
+          "language": "kk",
+          "value": "Дүкендер жеткізушіге тапсырыс жібергеннен кейін серіктес дүкендер осы жерде пайда болады."
+        }
+      ]
+    },
+    {
+      "id": 1462,
+      "values": [
+        {
+          "language": "main",
+          "value": "No partners match this filter"
+        },
+        {
+          "language": "en",
+          "value": "No partners match this filter"
+        },
+        {
+          "language": "ru",
+          "value": "Под этот фильтр партнёры не подходят"
+        },
+        {
+          "language": "kk",
+          "value": "Бұл сүзгіге сәйкес серіктес жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1463,
+      "values": [
+        {
+          "language": "main",
+          "value": "Last activity"
+        },
+        {
+          "language": "en",
+          "value": "Last activity"
+        },
+        {
+          "language": "ru",
+          "value": "Последняя активность"
+        },
+        {
+          "language": "kk",
+          "value": "Соңғы белсенділік"
+        }
+      ]
+    },
+    {
+      "id": 1464,
+      "values": [
+        {
+          "language": "main",
+          "value": "Reliability score"
+        },
+        {
+          "language": "en",
+          "value": "Reliability score"
+        },
+        {
+          "language": "ru",
+          "value": "Оценка надёжности"
+        },
+        {
+          "language": "kk",
+          "value": "Сенімділік бағасы"
+        }
+      ]
+    },
+    {
+      "id": 1465,
+      "values": [
+        {
+          "language": "main",
+          "value": "View partner orders"
+        },
+        {
+          "language": "en",
+          "value": "View partner orders"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть заказы партнёра"
+        },
+        {
+          "language": "kk",
+          "value": "Серіктес тапсырыстарын ашу"
+        }
+      ]
+    },
+    {
+      "id": 1466,
+      "values": [
+        {
+          "language": "main",
+          "value": "Copy partner brief"
+        },
+        {
+          "language": "en",
+          "value": "Copy partner brief"
+        },
+        {
+          "language": "ru",
+          "value": "Скопировать сводку партнёра"
+        },
+        {
+          "language": "kk",
+          "value": "Серіктес қысқаша мәліметін көшіру"
+        }
+      ]
+    },
+    {
+      "id": 1467,
+      "values": [
+        {
+          "language": "main",
+          "value": "Needs confirmation"
+        },
+        {
+          "language": "en",
+          "value": "Needs confirmation"
+        },
+        {
+          "language": "ru",
+          "value": "Нужно подтверждение"
+        },
+        {
+          "language": "kk",
+          "value": "Растау керек"
+        }
+      ]
+    },
+    {
+      "id": 1468,
+      "values": [
+        {
+          "language": "main",
+          "value": "New relationship"
+        },
+        {
+          "language": "en",
+          "value": "New relationship"
+        },
+        {
+          "language": "ru",
+          "value": "Новые отношения"
+        },
+        {
+          "language": "kk",
+          "value": "Жаңа қатынас"
+        }
+      ]
+    },
+    {
+      "id": 1469,
+      "values": [
+        {
+          "language": "main",
+          "value": "Healthy rhythm"
+        },
+        {
+          "language": "en",
+          "value": "Healthy rhythm"
+        },
+        {
+          "language": "ru",
+          "value": "Здоровый ритм"
+        },
+        {
+          "language": "kk",
+          "value": "Жақсы ырғақ"
+        }
+      ]
+    },
+    {
+      "id": 1470,
+      "values": [
+        {
+          "language": "main",
+          "value": "Watch issues"
+        },
+        {
+          "language": "en",
+          "value": "Watch issues"
+        },
+        {
+          "language": "ru",
+          "value": "Следить за проблемами"
+        },
+        {
+          "language": "kk",
+          "value": "Мәселелерді бақылау"
+        }
+      ]
+    },
+    {
+      "id": 1471,
+      "values": [
+        {
+          "language": "main",
+          "value": "Total orders"
+        },
+        {
+          "language": "en",
+          "value": "Total orders"
+        },
+        {
+          "language": "ru",
+          "value": "Всего заказов"
+        },
+        {
+          "language": "kk",
+          "value": "Барлық тапсырыстар"
+        }
+      ]
+    },
+    {
+      "id": 1472,
+      "values": [
+        {
+          "language": "main",
+          "value": "Delivered"
+        },
+        {
+          "language": "en",
+          "value": "Delivered"
+        },
+        {
+          "language": "ru",
+          "value": "Доставлено"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізілді"
+        }
+      ]
+    },
+    {
+      "id": 1473,
+      "values": [
+        {
+          "language": "main",
+          "value": "Issues"
+        },
+        {
+          "language": "en",
+          "value": "Issues"
+        },
+        {
+          "language": "ru",
+          "value": "Проблемы"
+        },
+        {
+          "language": "kk",
+          "value": "Мәселелер"
+        }
+      ]
+    },
+    {
+      "id": 1474,
+      "values": [
+        {
+          "language": "main",
+          "value": "This connects store-side supplier order history to supplier-side CRM, so wholesalers can see who needs attention before opening chat or delivery planning."
+        },
+        {
+          "language": "en",
+          "value": "This connects store-side supplier order history to supplier-side CRM, so wholesalers can see who needs attention before opening chat or delivery planning."
+        },
+        {
+          "language": "ru",
+          "value": "Это связывает историю заказов магазина поставщику с CRM поставщика, чтобы оптовик видел, кому нужно внимание, ещё до чата или планирования доставки."
+        },
+        {
+          "language": "kk",
+          "value": "Бұл дүкеннің жеткізушіге тапсырыс тарихын жеткізуші CRM-імен байланыстырады, сондықтан көтерме сатушы чат немесе жеткізу жоспарына дейін кімге назар керек екенін көреді."
+        }
+      ]
+    },
+    {
+      "id": 1475,
+      "values": [
+        {
+          "language": "main",
+          "value": "Partner brief copied"
+        },
+        {
+          "language": "en",
+          "value": "Partner brief copied"
+        },
+        {
+          "language": "ru",
+          "value": "Сводка партнёра скопирована"
+        },
+        {
+          "language": "kk",
+          "value": "Серіктес қысқаша мәліметі көшірілді"
+        }
+      ]
+    },
+    {
+      "id": 1476,
+      "values": [
+        {
+          "language": "main",
+          "value": "Regular partner"
+        },
+        {
+          "language": "en",
+          "value": "Regular partner"
+        },
+        {
+          "language": "ru",
+          "value": "Постоянный партнёр"
+        },
+        {
+          "language": "kk",
+          "value": "Тұрақты серіктес"
+        }
+      ]
+    },
+    {
+      "id": 1477,
+      "values": [
+        {
+          "language": "main",
+          "value": "Returning partner"
+        },
+        {
+          "language": "en",
+          "value": "Returning partner"
+        },
+        {
+          "language": "ru",
+          "value": "Возвращающийся партнёр"
+        },
+        {
+          "language": "kk",
+          "value": "Қайта келген серіктес"
+        }
+      ]
+    },
+    {
+      "id": 1478,
+      "values": [
+        {
+          "language": "main",
+          "value": "Store reliability scorecards"
+        },
+        {
+          "language": "en",
+          "value": "Store reliability scorecards"
+        },
+        {
+          "language": "ru",
+          "value": "Карточки надёжности магазинов"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен сенімділігі карталары"
+        }
+      ]
     }
   ]
 }

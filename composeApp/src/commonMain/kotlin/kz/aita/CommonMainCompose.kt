@@ -1,4 +1,3 @@
-// THIS IS CommonMainCompose.kt - in commonMain shared module of kmp compose app
 @file:OptIn(ExperimentalTime::class, ExperimentalFoundationApi::class)
 package kz.aita
 
@@ -866,6 +865,35 @@ private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallb
     put(1447L, mapOf("main" to "Job offer sent", "en" to "Job offer sent", "ru" to "Предложение работы отправлено", "kk" to "Жұмыс ұсынысы жіберілді"))
     put(1448L, mapOf("main" to "Job offer is waiting for worker", "en" to "Job offer is waiting for worker", "ru" to "Предложение ждёт ответа сотрудника", "kk" to "Жұмыс ұсынысы қызметкердің жауабын күтуде"))
     put(1449L, mapOf("main" to "Offer note", "en" to "Offer note", "ru" to "Заметка предложения", "kk" to "Ұсыныс жазбасы"))
+    put(1450L, mapOf("main" to "Store partner CRM", "en" to "Store partner CRM", "ru" to "CRM партнёров-магазинов", "kk" to "Дүкен серіктестер CRM-і"))
+    put(1451L, mapOf("main" to "Relationship control tower", "en" to "Relationship control tower", "ru" to "Пульт отношений", "kk" to "Қатынас басқару мұнарасы"))
+    put(1452L, mapOf("main" to "Every store that sends supplier orders becomes a partner card with open work, reliability and recent demand signals.", "en" to "Every store that sends supplier orders becomes a partner card with open work, reliability and recent demand signals.", "ru" to "Каждый магазин, отправляющий заказы поставщику, становится карточкой партнёра с открытыми задачами, надёжностью и свежими сигналами спроса.", "kk" to "Жеткізушіге тапсырыс жіберген әр дүкен ашық жұмыс, сенімділік және соңғы сұраныс белгілері бар серіктес картасына айналады."))
+    put(1453L, mapOf("main" to "Partner stores", "en" to "Partner stores", "ru" to "Магазины-партнёры", "kk" to "Серіктес дүкендер"))
+    put(1454L, mapOf("main" to "Stores with at least one supplier order", "en" to "Stores with at least one supplier order", "ru" to "Магазины хотя бы с одним заказом поставщику", "kk" to "Кемінде бір жеткізуші тапсырысы бар дүкендер"))
+    put(1455L, mapOf("main" to "Open work", "en" to "Open work", "ru" to "Открытая работа", "kk" to "Ашық жұмыс"))
+    put(1456L, mapOf("main" to "Orders still moving", "en" to "Orders still moving", "ru" to "Заказы ещё в движении", "kk" to "Әлі қозғалып тұрған тапсырыстар"))
+    put(1457L, mapOf("main" to "Reliable rhythm", "en" to "Reliable rhythm", "ru" to "Надёжный ритм", "kk" to "Сенімді ырғақ"))
+    put(1458L, mapOf("main" to "Partners with clean delivery flow", "en" to "Partners with clean delivery flow", "ru" to "Партнёры с чистым потоком поставок", "kk" to "Жеткізу ағымы таза серіктестер"))
+    put(1459L, mapOf("main" to "Find a store partner fast", "en" to "Find a store partner fast", "ru" to "Быстро найти магазин-партнёр", "kk" to "Серіктес дүкенді тез табу"))
+    put(1460L, mapOf("main" to "No store partners yet", "en" to "No store partners yet", "ru" to "Партнёров-магазинов пока нет", "kk" to "Әзірге серіктес дүкен жоқ"))
+    put(1461L, mapOf("main" to "Store partners will appear here after stores send supplier orders.", "en" to "Store partners will appear here after stores send supplier orders.", "ru" to "Партнёры-магазины появятся здесь после того, как магазины отправят заказы поставщику.", "kk" to "Дүкендер жеткізушіге тапсырыс жібергеннен кейін серіктес дүкендер осы жерде пайда болады."))
+    put(1462L, mapOf("main" to "No partners match this filter", "en" to "No partners match this filter", "ru" to "Под этот фильтр партнёры не подходят", "kk" to "Бұл сүзгіге сәйкес серіктес жоқ"))
+    put(1463L, mapOf("main" to "Last activity", "en" to "Last activity", "ru" to "Последняя активность", "kk" to "Соңғы белсенділік"))
+    put(1464L, mapOf("main" to "Reliability score", "en" to "Reliability score", "ru" to "Оценка надёжности", "kk" to "Сенімділік бағасы"))
+    put(1465L, mapOf("main" to "View partner orders", "en" to "View partner orders", "ru" to "Открыть заказы партнёра", "kk" to "Серіктес тапсырыстарын ашу"))
+    put(1466L, mapOf("main" to "Copy partner brief", "en" to "Copy partner brief", "ru" to "Скопировать сводку партнёра", "kk" to "Серіктес қысқаша мәліметін көшіру"))
+    put(1467L, mapOf("main" to "Needs confirmation", "en" to "Needs confirmation", "ru" to "Нужно подтверждение", "kk" to "Растау керек"))
+    put(1468L, mapOf("main" to "New relationship", "en" to "New relationship", "ru" to "Новые отношения", "kk" to "Жаңа қатынас"))
+    put(1469L, mapOf("main" to "Healthy rhythm", "en" to "Healthy rhythm", "ru" to "Здоровый ритм", "kk" to "Жақсы ырғақ"))
+    put(1470L, mapOf("main" to "Watch issues", "en" to "Watch issues", "ru" to "Следить за проблемами", "kk" to "Мәселелерді бақылау"))
+    put(1471L, mapOf("main" to "Total orders", "en" to "Total orders", "ru" to "Всего заказов", "kk" to "Барлық тапсырыстар"))
+    put(1472L, mapOf("main" to "Delivered", "en" to "Delivered", "ru" to "Доставлено", "kk" to "Жеткізілді"))
+    put(1473L, mapOf("main" to "Issues", "en" to "Issues", "ru" to "Проблемы", "kk" to "Мәселелер"))
+    put(1474L, mapOf("main" to "This connects store-side supplier order history to supplier-side CRM, so wholesalers can see who needs attention before opening chat or delivery planning.", "en" to "This connects store-side supplier order history to supplier-side CRM, so wholesalers can see who needs attention before opening chat or delivery planning.", "ru" to "Это связывает историю заказов магазина поставщику с CRM поставщика, чтобы оптовик видел, кому нужно внимание, ещё до чата или планирования доставки.", "kk" to "Бұл дүкеннің жеткізушіге тапсырыс тарихын жеткізуші CRM-імен байланыстырады, сондықтан көтерме сатушы чат немесе жеткізу жоспарына дейін кімге назар керек екенін көреді."))
+    put(1475L, mapOf("main" to "Partner brief copied", "en" to "Partner brief copied", "ru" to "Сводка партнёра скопирована", "kk" to "Серіктес қысқаша мәліметі көшірілді"))
+    put(1476L, mapOf("main" to "Regular partner", "en" to "Regular partner", "ru" to "Постоянный партнёр", "kk" to "Тұрақты серіктес"))
+    put(1477L, mapOf("main" to "Returning partner", "en" to "Returning partner", "ru" to "Возвращающийся партнёр", "kk" to "Қайта келген серіктес"))
+    put(1478L, mapOf("main" to "Store reliability scorecards", "en" to "Store reliability scorecards", "ru" to "Карточки надёжности магазинов", "kk" to "Дүкен сенімділігі карталары"))
 }
 
 
@@ -18481,8 +18509,9 @@ private fun AppConfiguration.supplierMarketWinningFeatures(): List<SupplierFeatu
     SupplierFeaturePlanUiModel(
         title = localizedStringResource(1351, "Store reliability scorecards"),
         subtitle = localizedStringResource(1352, "Know which stores pay on time, order predictably and need extra confirmation before dispatch."),
-        iconPath = stateValues.drawablePathIconAnalytics,
-        iconRes = stateValues.drawableResIconAnalytics.value
+        iconPath = stateValues.drawablePathIconSupplierPartners,
+        iconRes = stateValues.drawableResIconSupplierPartners.value,
+        implemented = true
     ),
     SupplierFeaturePlanUiModel(
         title = localizedStringResource(1353, "Demand radar"),
@@ -18708,6 +18737,8 @@ private fun AppConfiguration.SupplierCatalogChip(text: String) {
 
 @Composable
 private fun AppConfiguration.SupplierCatalogItemCard(item: SupplierCatalogItemUiModel) {
+    val coroutineScope = rememberCoroutineScope()
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -18825,7 +18856,7 @@ private fun AppConfiguration.SupplierCatalogItemCard(item: SupplierCatalogItemUi
                     confirmationRequired = false,
                     onClick = {
                         coroutineScope.launch {
-                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.searchKey)
+                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.goodsItemId.ifBlank { item.title })
                             Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
                         }
                     }
@@ -18852,7 +18883,7 @@ private fun AppConfiguration.SupplierCatalogItemCard(item: SupplierCatalogItemUi
                     confirmationRequired = false,
                     onClick = {
                         coroutineScope.launch {
-                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.searchKey)
+                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.goodsItemId.ifBlank { item.title })
                             Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
                         }
                     }
@@ -19093,6 +19124,537 @@ private fun AppConfiguration.SupplierCatalogScreen() {
             }
 
             items(featurePlan.filterNot { it.title == localizedStringResource(1343, "Live B2B catalog") }) { feature ->
+                SupplierFeaturePlanCard(feature = feature, compact = true)
+            }
+        }
+    }
+}
+
+
+private data class SupplierPartnerUiModel(
+    val storeKey: String,
+    val title: String,
+    val publicId: String,
+    val address: String,
+    val orderCount: Int,
+    val openOrderCount: Int,
+    val deliveredOrderCount: Int,
+    val issueOrderCount: Int,
+    val cancelledOrderCount: Int,
+    val requestedLineCount: Int,
+    val lastActivityMillis: Long,
+    val latestStatus: SupplierOrderStatusDataModel,
+    val reliabilityScore: Int,
+    val rhythmTitle: String,
+    val actionTitle: String,
+    val searchKey: String,
+    val brief: String
+)
+
+private fun AppConfiguration.buildSupplierPartnerItems(
+    orders: List<SupplierOrderDataModel>,
+    lines: List<SupplierOrderLineDataModel>
+): List<SupplierPartnerUiModel> {
+    val activeOrders = orders.filter { it.isActive }
+    val activeLinesByOrder = lines
+        .filter { it.isActive }
+        .groupBy { it.orderId }
+
+    return activeOrders
+        .groupBy { order ->
+            order.storeId
+                .ifBlank { order.storePublicIdSnapshot }
+                .ifBlank { supplierDeskStoreTitle(order) }
+                .ifBlank { order.id }
+        }
+        .map { (storeKey, storeOrdersRaw) ->
+            val storeOrders = storeOrdersRaw.sortedByDescending { it.supplierDeskSortTime() }
+            val latestOrder = storeOrders.first()
+            val storeLines = storeOrders.flatMap { activeLinesByOrder[it.id].orEmpty() }
+            val title = storeOrders
+                .asSequence()
+                .map { supplierDeskStoreTitle(it) }
+                .firstOrNull { it.isNotBlank() }
+                ?: storeKey.take(12)
+            val publicId = storeOrders
+                .asSequence()
+                .map { it.storePublicIdSnapshot }
+                .firstOrNull { it.isNotBlank() }
+                .orEmpty()
+            val address = storeOrders
+                .asSequence()
+                .map { it.storeAddressTextSnapshot }
+                .firstOrNull { it.isNotBlank() }
+                .orEmpty()
+            val openOrderCount = storeOrders.count { !it.status.isSupplierOrderClosed() }
+            val deliveredOrderCount = storeOrders.count {
+                it.status == SupplierOrderStatusDataModel.Delivered || it.status == SupplierOrderStatusDataModel.PartiallyDelivered
+            }
+            val issueOrderCount = storeOrders.count { it.status == SupplierOrderStatusDataModel.IssueReported }
+            val cancelledOrderCount = storeOrders.count { it.status == SupplierOrderStatusDataModel.Cancelled }
+            val activeMovingOrderCount = storeOrders.count {
+                it.status == SupplierOrderStatusDataModel.Confirmed ||
+                        it.status == SupplierOrderStatusDataModel.Packed ||
+                        it.status == SupplierOrderStatusDataModel.InDelivery
+            }
+            val reliabilityScore = (62 + deliveredOrderCount * 9 + activeMovingOrderCount * 4 + storeOrders.size.coerceAtMost(8) * 2 - issueOrderCount * 16 - cancelledOrderCount * 12 - openOrderCount.coerceAtMost(8))
+                .coerceIn(5, 99)
+            val rhythmTitle = when {
+                storeOrders.size <= 1 -> localizedStringResource(1468, "New relationship")
+                reliabilityScore >= 78 && issueOrderCount == 0 -> localizedStringResource(1469, "Healthy rhythm")
+                deliveredOrderCount > 0 -> localizedStringResource(1477, "Returning partner")
+                storeOrders.size >= 4 -> localizedStringResource(1476, "Regular partner")
+                else -> localizedStringResource(1468, "New relationship")
+            }
+            val actionTitle = when {
+                issueOrderCount > 0 -> localizedStringResource(1470, "Watch issues")
+                openOrderCount > 0 -> localizedStringResource(1467, "Needs confirmation")
+                reliabilityScore >= 78 -> localizedStringResource(1469, "Healthy rhythm")
+                else -> localizedStringResource(1468, "New relationship")
+            }
+            val latestStatus = latestOrder.status
+            val lastActivityMillis = latestOrder.supplierDeskSortTime()
+            val searchKey = buildString {
+                append(storeKey).append(' ')
+                append(title).append(' ')
+                append(publicId).append(' ')
+                append(address).append(' ')
+                append(storeOrders.joinToString(" ") { order ->
+                    listOf(
+                        order.id,
+                        order.status.name,
+                        supplierOrderStatusTitle(order.status),
+                        order.additionalNotes.orEmpty(),
+                        order.supplierComment.orEmpty()
+                    ).joinToString(" ")
+                }).append(' ')
+                append(storeLines.joinToString(" ") { line ->
+                    listOf(
+                        line.goodsItemId,
+                        supplierDeskLineTitle(line),
+                        line.goodsItemBarcodeSnapshots.joinToString(" "),
+                        line.additionalNotes.orEmpty(),
+                        line.supplierComment.orEmpty()
+                    ).joinToString(" ")
+                })
+            }.lowercase()
+            val brief = buildString {
+                append(title)
+                if (publicId.isNotBlank()) append('\n').append("ID: ").append(publicId)
+                if (address.isNotBlank()) append('\n').append(localizedStringResource(147, "Address")).append(": ").append(address)
+                append('\n').append(localizedStringResource(1471, "Total orders")).append(": ").append(storeOrders.size)
+                append('\n').append(localizedStringResource(1455, "Open work")).append(": ").append(openOrderCount)
+                append('\n').append(localizedStringResource(1472, "Delivered")).append(": ").append(deliveredOrderCount)
+                append('\n').append(localizedStringResource(1473, "Issues")).append(": ").append(issueOrderCount + cancelledOrderCount)
+                append('\n').append(localizedStringResource(1464, "Reliability score")).append(": ").append(reliabilityScore).append("%")
+                append('\n').append(localizedStringResource(1430, "Latest status")).append(": ").append(supplierOrderStatusTitle(latestStatus))
+            }
+
+            SupplierPartnerUiModel(
+                storeKey = storeKey,
+                title = title,
+                publicId = publicId,
+                address = address,
+                orderCount = storeOrders.size,
+                openOrderCount = openOrderCount,
+                deliveredOrderCount = deliveredOrderCount,
+                issueOrderCount = issueOrderCount,
+                cancelledOrderCount = cancelledOrderCount,
+                requestedLineCount = storeLines.size,
+                lastActivityMillis = lastActivityMillis,
+                latestStatus = latestStatus,
+                reliabilityScore = reliabilityScore,
+                rhythmTitle = rhythmTitle,
+                actionTitle = actionTitle,
+                searchKey = searchKey,
+                brief = brief
+            )
+        }
+        .sortedWith(
+            compareByDescending<SupplierPartnerUiModel> { it.openOrderCount }
+                .thenByDescending { it.issueOrderCount }
+                .thenByDescending { it.lastActivityMillis }
+                .thenBy { it.title.lowercase() }
+        )
+}
+
+@Composable
+private fun AppConfiguration.SupplierPartnerCard(partner: SupplierPartnerUiModel) {
+    val coroutineScope = rememberCoroutineScope()
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .border(
+                if (partner.openOrderCount > 0 || partner.issueOrderCount > 0) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
+                if (partner.openOrderCount > 0 || partner.issueOrderCount > 0) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+                RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .padding(stateValues.marginTextFieldGroup),
+        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CpImage(
+                    modifier = Modifier.size(31.dp),
+                    url = stateValues.drawablePathIconSupplierPartners,
+                    fallbackRes = stateValues.drawableResIconSupplierPartners.value,
+                    contentDescription = partner.title,
+                    tintColor = stateValues.AccentColor
+                )
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = partner.title,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.accentTextSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = listOfNotNull(
+                        partner.publicId.takeIf { it.isNotBlank() },
+                        partner.address.takeIf { it.isNotBlank() }
+                    ).joinToString(" • ").ifBlank { localizedStringResource(1453, "Partner stores") },
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Text(
+                text = "${partner.reliabilityScore}%",
+                color = stateValues.AccentColor,
+                fontSize = stateValues.titleTextSize,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.End
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = partner.actionTitle) }
+            Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = partner.rhythmTitle) }
+        }
+
+        StockCardInfoLine(localizedStringResource(1471, "Total orders"), partner.orderCount.toString(), stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1455, "Open work"), partner.openOrderCount.toString(), stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1472, "Delivered"), partner.deliveredOrderCount.toString(), stateValues.TextColor)
+        if (partner.issueOrderCount > 0 || partner.cancelledOrderCount > 0) {
+            StockCardInfoLine(localizedStringResource(1473, "Issues"), "${partner.issueOrderCount + partner.cancelledOrderCount}", stateValues.ErrorColor)
+        }
+        StockCardInfoLine(localizedStringResource(1424, "Total requested"), partner.requestedLineCount.toString(), stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1430, "Latest status"), supplierOrderStatusTitle(partner.latestStatus), stateValues.TextColor)
+        if (partner.lastActivityMillis > 0L) {
+            StockCardInfoLine(localizedStringResource(1463, "Last activity"), receiptUiDateTime(partner.lastActivityMillis), stateValues.TextColor)
+        }
+
+        Text(
+            text = localizedStringResource(1474, "This connects store-side supplier order history to supplier-side CRM, so real demand creates the partner profile before a heavier B2B account system exists."),
+            color = stateValues.PlaceholderTextColor,
+            fontSize = stateValues.smallTextSize
+        )
+
+        if (stateValues.isNarrowScreen) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1465, "View partner orders"),
+                    iconPath = stateValues.drawablePathIconAppModeSupplier,
+                    iconRes = stateValues.drawableResIconAppModeSupplier.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to partner.storeKey.ifBlank { partner.title })
+                            Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
+                        }
+                    }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1466, "Copy partner brief"),
+                    iconPath = stateValues.drawablePathIconClipboard,
+                    iconRes = stateValues.drawableResIconClipboard.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        copyTextToClipboard(partner.brief)
+                        postInAppNotification(localizedStringResource(1475, "Partner brief copied"), NotificationType.Positive, transient = true)
+                    }
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1465, "View partner orders"),
+                    iconPath = stateValues.drawablePathIconAppModeSupplier,
+                    iconRes = stateValues.drawableResIconAppModeSupplier.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to partner.storeKey.ifBlank { partner.title })
+                            Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
+                        }
+                    }
+                )
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1466, "Copy partner brief"),
+                    iconPath = stateValues.drawablePathIconClipboard,
+                    iconRes = stateValues.drawableResIconClipboard.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        copyTextToClipboard(partner.brief)
+                        postInAppNotification(localizedStringResource(1475, "Partner brief copied"), NotificationType.Positive, transient = true)
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppConfiguration.SupplierCustomersScreen() {
+    val orders by supplierOrdersState.payload.collectAsState()
+    val lines by supplierOrderLinesState.payload.collectAsState()
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var partnerFilter by rememberSaveable { mutableStateOf("all") }
+
+    LaunchedEffect(stateValues.userAccount?.id) {
+        if (stateValues.userAccount != null) {
+            getMySupplierSideOrders()
+        }
+    }
+
+    val activeOrders = remember(orders) { orders.orEmpty().filter { it.isActive } }
+    val activeLines = remember(lines) { lines.orEmpty().filter { it.isActive } }
+    val partnerItems = remember(activeOrders, activeLines, stateValues.appLanguage) {
+        buildSupplierPartnerItems(activeOrders, activeLines)
+    }
+    val normalizedSearch = searchQuery.trim().lowercase()
+    val filteredPartners = remember(partnerItems, normalizedSearch, partnerFilter) {
+        partnerItems.filter { partner ->
+            val filterMatches = when (partnerFilter) {
+                "open" -> partner.openOrderCount > 0
+                "attention" -> partner.issueOrderCount > 0 || partner.openOrderCount > 0
+                "reliable" -> partner.reliabilityScore >= 78 && partner.issueOrderCount == 0
+                else -> true
+            }
+            val queryMatches = normalizedSearch.isBlank() || partner.searchKey.contains(normalizedSearch)
+            filterMatches && queryMatches
+        }
+    }
+    val openWorkCount = partnerItems.sumOf { it.openOrderCount }
+    val reliableCount = partnerItems.count { it.reliabilityScore >= 78 && it.issueOrderCount == 0 }
+    val featurePlan = supplierMarketWinningFeatures()
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        ScreenAppBarWidget(
+            title = localizedStringResource(1450, "Store partner CRM"),
+            iconPath = stateValues.drawablePathIconSupplierPartners,
+            iconRes = stateValues.drawableResIconSupplierPartners.value
+        )
+
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
+                .align(Alignment.CenterHorizontally)
+                .padding(stateValues.marginTextField),
+            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
+            contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
+        ) {
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(stateValues.cornerRadius))
+                        .background(stateValues.AccentColor.copy(alpha = 0.11f))
+                        .border(stateValues.focusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
+                        .padding(stateValues.marginTextFieldGroup),
+                    verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                    ) {
+                        CpImage(
+                            modifier = Modifier.size(42.dp),
+                            url = stateValues.drawablePathIconSupplierPartners,
+                            fallbackRes = stateValues.drawableResIconSupplierPartners.value,
+                            contentDescription = localizedStringResource(1450, "Store partner CRM"),
+                            tintColor = stateValues.AccentColor
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = localizedStringResource(1451, "Relationship control tower"),
+                                color = stateValues.TextColor,
+                                fontSize = stateValues.titleTextSize,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = localizedStringResource(1452, "Every store that sends supplier orders becomes a partner card with open work, reliability and recent demand signals."),
+                                color = stateValues.PlaceholderTextColor,
+                                fontSize = stateValues.textSize
+                            )
+                        }
+                    }
+
+                    if (stateValues.isNarrowScreen) {
+                        Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+                            SupplierDeskSummaryCard(
+                                title = localizedStringResource(1453, "Partner stores"),
+                                value = partnerItems.size.toString(),
+                                subtitle = localizedStringResource(1454, "Stores with at least one supplier order"),
+                                iconPath = stateValues.drawablePathIconStores,
+                                iconRes = stateValues.drawableResIconStores.value
+                            )
+                            SupplierDeskSummaryCard(
+                                title = localizedStringResource(1455, "Open work"),
+                                value = openWorkCount.toString(),
+                                subtitle = localizedStringResource(1456, "Orders still moving"),
+                                iconPath = stateValues.drawablePathIconAppModeSupplier,
+                                iconRes = stateValues.drawableResIconAppModeSupplier.value
+                            )
+                            SupplierDeskSummaryCard(
+                                title = localizedStringResource(1457, "Reliable rhythm"),
+                                value = reliableCount.toString(),
+                                subtitle = localizedStringResource(1458, "Partners with clean delivery flow"),
+                                iconPath = stateValues.drawablePathIconSupplierPartners,
+                                iconRes = stateValues.drawableResIconSupplierPartners.value
+                            )
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                        ) {
+                            SupplierDeskSummaryCard(
+                                modifier = Modifier.weight(1f),
+                                title = localizedStringResource(1453, "Partner stores"),
+                                value = partnerItems.size.toString(),
+                                subtitle = localizedStringResource(1454, "Stores with at least one supplier order"),
+                                iconPath = stateValues.drawablePathIconStores,
+                                iconRes = stateValues.drawableResIconStores.value
+                            )
+                            SupplierDeskSummaryCard(
+                                modifier = Modifier.weight(1f),
+                                title = localizedStringResource(1455, "Open work"),
+                                value = openWorkCount.toString(),
+                                subtitle = localizedStringResource(1456, "Orders still moving"),
+                                iconPath = stateValues.drawablePathIconAppModeSupplier,
+                                iconRes = stateValues.drawableResIconAppModeSupplier.value
+                            )
+                            SupplierDeskSummaryCard(
+                                modifier = Modifier.weight(1f),
+                                title = localizedStringResource(1457, "Reliable rhythm"),
+                                value = reliableCount.toString(),
+                                subtitle = localizedStringResource(1458, "Partners with clean delivery flow"),
+                                iconPath = stateValues.drawablePathIconSupplierPartners,
+                                iconRes = stateValues.drawableResIconSupplierPartners.value
+                            )
+                        }
+                    }
+                }
+            }
+
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+                        .clip(RoundedCornerShape(stateValues.cornerRadius))
+                        .background(stateValues.BackgroundColor)
+                        .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor, RoundedCornerShape(stateValues.cornerRadius))
+                        .padding(stateValues.marginTextFieldGroup),
+                    verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                ) {
+                    Text(
+                        text = localizedStringResource(1459, "Find a store partner fast"),
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.titleTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    SimpleTextInput(
+                        modifier = Modifier.fillMaxWidth(),
+                        value = searchQuery,
+                        placeholder = localizedStringResource(216, "Search"),
+                        leadingIconPath = stateValues.drawablePathIconSearch,
+                        onValueChange = { searchQuery = it }
+                    )
+
+                    SimpleDropdownField(
+                        title = localizedStringResource(1376, "Status filter"),
+                        selectedId = partnerFilter,
+                        options = listOf(
+                            DropdownOption("all", localizedStringResource(1378, "All")),
+                            DropdownOption("open", localizedStringResource(1455, "Open work")),
+                            DropdownOption("attention", localizedStringResource(1467, "Needs confirmation")),
+                            DropdownOption("reliable", localizedStringResource(1457, "Reliable rhythm"))
+                        ),
+                        placeholder = localizedStringResource(1378, "All"),
+                        onSelected = { partnerFilter = it }
+                    )
+                }
+            }
+
+            if (partnerItems.isEmpty()) {
+                item {
+                    MessageText(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(1461, "Store partners will appear here after stores send supplier orders.")
+                    )
+                }
+            } else if (filteredPartners.isEmpty()) {
+                item {
+                    MessageText(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(1462, "No partners match this filter")
+                    )
+                }
+            } else {
+                items(filteredPartners, key = { it.storeKey }) { partner ->
+                    SupplierPartnerCard(partner = partner)
+                }
+            }
+
+            item {
+                Text(
+                    text = localizedStringResource(1381, "Supplier feature roadmap"),
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.titleTextSize,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            items(featurePlan.filterNot { it.title == localizedStringResource(1351, "Store reliability scorecards") }) { feature ->
                 SupplierFeaturePlanCard(feature = feature, compact = true)
             }
         }
@@ -19795,12 +20357,7 @@ private fun AppConfiguration.SupplierScreen() {
     when (stateValues.navigationScreensMain.last()) {
         is NavigationScreenModel.Supplier.Orders -> SupplierOrdersInboxScreen()
         is NavigationScreenModel.Supplier.Catalog -> SupplierCatalogScreen()
-        is NavigationScreenModel.Supplier.Customers -> SupplierPlaceholderScreen(
-            title = localizedStringResource(1339, "Customers"),
-            subtitle = localizedStringResource(1383, "Upcoming: store relationship cards, reliability, route clusters and private terms."),
-            iconPath = stateValues.drawablePathIconStores,
-            iconRes = stateValues.drawableResIconStores.value
-        )
+        is NavigationScreenModel.Supplier.Customers -> SupplierCustomersScreen()
         is NavigationScreenModel.Supplier.Analytics -> SupplierPlaceholderScreen(
             title = localizedStringResource(1340, "Insights"),
             subtitle = localizedStringResource(1384, "Upcoming: demand radar, margin lens, delivery performance and cross-market growth signals."),
@@ -22799,9 +23356,9 @@ sealed class NavigationScreenModel(
                 override val name: String
                     get() = with(AppConfiguration) { localizedStringResource(1339, "Customers") }
                 override val iconPath: String
-                    get() = AppConfiguration.stateValues.drawablePathIconStores
+                    get() = AppConfiguration.stateValues.drawablePathIconSupplierPartners
                 override val iconRes: DrawableResource
-                    get() = AppConfiguration.stateValues.drawableResIconStores.value
+                    get() = AppConfiguration.stateValues.drawableResIconSupplierPartners.value
             }
         }
 
@@ -42516,6 +43073,9 @@ object AppConfiguration {
         val drawablePathIconSupplierCatalog: String
         val drawableResIconSupplierCatalog: StateFlow<DrawableResource>
 
+        val drawablePathIconSupplierPartners: String
+        val drawableResIconSupplierPartners: StateFlow<DrawableResource>
+
         val drawablePathIconBuyerAgeRestriction: String
         val drawableResIconBuyerAgeRestriction: StateFlow<DrawableResource>
 
@@ -43131,6 +43691,10 @@ object AppConfiguration {
             private val _drawableResIconSupplierCatalog = MutableStateFlow(Res.drawable._72_0)
             override val drawableResIconSupplierCatalog: StateFlow<DrawableResource> = _drawableResIconSupplierCatalog.asStateFlow()
 
+            override val drawablePathIconSupplierPartners: String by drawablePathIconSupplierPartnersState.collectAsState()
+            private val _drawableResIconSupplierPartners = MutableStateFlow(Res.drawable._75_0)
+            override val drawableResIconSupplierPartners: StateFlow<DrawableResource> = _drawableResIconSupplierPartners.asStateFlow()
+
             override val drawablePathIconBuyerAgeRestriction: String by drawablePathIconBuyerAgeRestrictionState.collectAsState()
             private val _drawableResIconBuyerAgeRestriction = MutableStateFlow(Res.drawable._73_0)
             override val drawableResIconBuyerAgeRestriction: StateFlow<DrawableResource> = _drawableResIconBuyerAgeRestriction.asStateFlow()
@@ -43337,6 +43901,7 @@ object AppConfiguration {
                 _drawableResIconAppModeSupplier.emit(if (stateValues.appThemeId == 1L) Res.drawable._70_1 else Res.drawable._70_0)
                 _drawableResIconAppModeManufacturer.emit(if (stateValues.appThemeId == 1L) Res.drawable._71_1 else Res.drawable._71_0)
                 _drawableResIconSupplierCatalog.emit(if (stateValues.appThemeId == 1L) Res.drawable._72_1 else Res.drawable._72_0)
+                _drawableResIconSupplierPartners.emit(if (stateValues.appThemeId == 1L) Res.drawable._75_1 else Res.drawable._75_0)
                 _drawableResIconBuyerAgeRestriction.emit(if (stateValues.appThemeId == 1L) Res.drawable._73_1 else Res.drawable._73_0)
                 _drawableResIconTransactionTimeRestriction.emit(if (stateValues.appThemeId == 1L) Res.drawable._74_1 else Res.drawable._74_0)
 

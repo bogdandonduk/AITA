@@ -9463,7 +9463,7 @@ fun Application.module() {
                             status = HttpStatusCode.OK,
                             payload = it
                         )
-                    } ?: call.respond(UnauthorizedResponse())
+                    } ?: call.genericResponseNoPayload(HttpStatusCode.Forbidden, getResponse("665").message)
                 }
 
                 get("/branchAvailability") {
