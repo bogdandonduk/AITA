@@ -1054,6 +1054,19 @@
           "path": "svg/80_1.svg"
         }
       ]
+    },
+    {
+      "id": 81,
+      "values": [
+        {
+          "themeId": 0,
+          "path": "svg/81_0.svg"
+        },
+        {
+          "themeId": 1,
+          "path": "svg/81_1.svg"
+        }
+      ]
     }
   ]
 }

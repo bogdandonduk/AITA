@@ -1059,6 +1059,27 @@ private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallb
     put(1602L, mapOf("main" to "Save line offer", "en" to "Save line offer", "ru" to "Сохранить предложение строки", "kk" to "Жол ұсынысын сақтау"))
     put(1603L, mapOf("main" to "Line rescue saved", "en" to "Line rescue saved", "ru" to "Предложение по строке сохранено", "kk" to "Жол ұсынысы сақталды"))
     put(1604L, mapOf("main" to "Receive supplier offer", "en" to "Receive supplier offer", "ru" to "Принять предложение поставщика", "kk" to "Жеткізуші ұсынысын қабылдау"))
+    put(1605L, mapOf("main" to "Manufacturer backorder bridge", "en" to "Manufacturer backorder bridge", "ru" to "Мост заказов производителю", "kk" to "Өндірушіге тапсырыс көпірі"))
+    put(1606L, mapOf("main" to "Convert store demand into clean producer purchase briefs when supplier stock may not be enough.", "en" to "Convert store demand into clean producer purchase briefs when supplier stock may not be enough.", "ru" to "Превращайте спрос магазинов в аккуратные заявки производителю, если запаса поставщика может не хватить.", "kk" to "Жеткізуші қоры жетпеуі мүмкін кезде дүкен сұранысын өндірушіге арналған таза тапсырысқа айналдырыңыз."))
+    put(1607L, mapOf("main" to "Backorder quantity", "en" to "Backorder quantity", "ru" to "Количество для дозаказа", "kk" to "Қосымша тапсырыс саны"))
+    put(1608L, mapOf("main" to "Requested by stores", "en" to "Requested by stores", "ru" to "Запросили магазины", "kk" to "Дүкендер сұрады"))
+    put(1609L, mapOf("main" to "Open store orders", "en" to "Open store orders", "ru" to "Открытые заказы магазинов", "kk" to "Ашық дүкен тапсырыстары"))
+    put(1610L, mapOf("main" to "Latest price signal", "en" to "Latest price signal", "ru" to "Последний ценовой сигнал", "kk" to "Соңғы баға белгісі"))
+    put(1611L, mapOf("main" to "Copy producer brief", "en" to "Copy producer brief", "ru" to "Скопировать заявку производителю", "kk" to "Өндірушіге қысқаша тапсырысты көшіру"))
+    put(1612L, mapOf("main" to "Open store orders", "en" to "Open store orders", "ru" to "Открыть заказы магазинов", "kk" to "Дүкен тапсырыстарын ашу"))
+    put(1613L, mapOf("main" to "Needs producer", "en" to "Needs producer", "ru" to "Нужен производитель", "kk" to "Өндіруші керек"))
+    put(1614L, mapOf("main" to "Supply ready watch", "en" to "Supply ready watch", "ru" to "Контроль готовности поставки", "kk" to "Жеткізу дайындығын бақылау"))
+    put(1615L, mapOf("main" to "Forecast upstream demand", "en" to "Forecast upstream demand", "ru" to "Прогнозировать спрос выше по цепочке", "kk" to "Жоғарғы тізбектегі сұранысты болжау"))
+    put(1616L, mapOf("main" to "Accepted less than requested", "en" to "Accepted less than requested", "ru" to "Принято меньше запрошенного", "kk" to "Сұралғаннан аз қабылданды"))
+    put(1617L, mapOf("main" to "Supplier has shortages/issues", "en" to "Supplier has shortages/issues", "ru" to "У поставщика нехватка или проблема", "kk" to "Жеткізушіде жетіспеушілік не мәселе бар"))
+    put(1618L, mapOf("main" to "Producer brief", "en" to "Producer brief", "ru" to "Заявка производителю", "kk" to "Өндірушіге қысқаша тапсырыс"))
+    put(1619L, mapOf("main" to "Item", "en" to "Item", "ru" to "Товар", "kk" to "Тауар"))
+    put(1620L, mapOf("main" to "Suggested procurement", "en" to "Suggested procurement", "ru" to "Рекомендуемый закуп", "kk" to "Ұсынылған сатып алу"))
+    put(1621L, mapOf("main" to "Store demand", "en" to "Store demand", "ru" to "Спрос магазинов", "kk" to "Дүкен сұранысы"))
+    put(1622L, mapOf("main" to "Supplier note", "en" to "Supplier note", "ru" to "Заметка поставщика", "kk" to "Жеткізуші ескертпесі"))
+    put(1623L, mapOf("main" to "Top bridge items", "en" to "Top bridge items", "ru" to "Главные позиции моста", "kk" to "Негізгі көпір тауарлары"))
+    put(1624L, mapOf("main" to "Items needing upstream procurement will appear after stores send orders or suppliers report shortages.", "en" to "Items needing upstream procurement will appear after stores send orders or suppliers report shortages.", "ru" to "Позиции для закупа у производителя появятся после заказов магазинов или сообщений поставщика о нехватке.", "kk" to "Өндірушіден алу керек тауарлар дүкен тапсырыстарынан немесе жеткізуші жетіспеушілік хабарлағаннан кейін көрінеді."))
+    put(1625L, mapOf("main" to "Upstream bridge items", "en" to "Upstream bridge items", "ru" to "Позиции для производителя", "kk" to "Өндірушіге баратын позициялар"))
 }
 
 
@@ -18794,8 +18815,9 @@ private fun AppConfiguration.supplierMarketWinningFeatures(): List<SupplierFeatu
     SupplierFeaturePlanUiModel(
         title = localizedStringResource(1355, "Manufacturer backorder bridge"),
         subtitle = localizedStringResource(1356, "Push confirmed demand upstream to producers and keep stores updated on replenishment."),
-        iconPath = stateValues.drawablePathIconAppModeManufacturer,
-        iconRes = stateValues.drawableResIconAppModeManufacturer.value
+        iconPath = stateValues.drawablePathIconSupplierManufacturerBridge,
+        iconRes = stateValues.drawableResIconSupplierManufacturerBridge.value,
+        implemented = true
     )
 )
 
@@ -22685,6 +22707,250 @@ private fun AppConfiguration.SupplierDemandRadarCard(item: SupplierDemandRadarUi
     }
 }
 
+
+private data class SupplierManufacturerBridgeUiModel(
+    val goodsItemId: String,
+    val title: String,
+    val subtitle: String,
+    val shortageQuantityText: String,
+    val requestedQuantityText: String,
+    val storesCount: Int,
+    val openOrderCount: Int,
+    val issueCount: Int,
+    val latestPriceText: String,
+    val lastActivityMillis: Long,
+    val statusHint: String,
+    val producerBrief: String,
+    val searchKey: String,
+    val priorityScore: Int
+)
+
+private fun AppConfiguration.buildSupplierManufacturerBridgeItems(
+    orders: List<SupplierOrderDataModel>,
+    lines: List<SupplierOrderLineDataModel>
+): List<SupplierManufacturerBridgeUiModel> {
+    val activeOrders = orders.filter { it.isActive }
+    val ordersById = activeOrders.associateBy { it.id }
+
+    return lines
+        .filter { it.isActive && it.goodsItemId.isNotBlank() }
+        .groupBy { it.goodsItemId }
+        .mapNotNull { (goodsItemId, itemLines) ->
+            val openPairs = itemLines
+                .mapNotNull { line ->
+                    val order = ordersById[line.orderId]?.takeUnless { it.status.isSupplierOrderClosed() }
+                    order?.let { it to line }
+                }
+            if (openPairs.isEmpty()) return@mapNotNull null
+
+            val samplePair = openPairs.maxByOrNull { (order, _) -> order.supplierDeskSortTime() } ?: return@mapNotNull null
+            val sampleLine = samplePair.second
+            val relatedOrders = openPairs.map { it.first }.distinctBy { it.id }
+            val requestedTotal = openPairs.sumOf { (_, line) -> line.requestedQuantity.total.coerceAtLeast(0.0) }
+            val acceptedTotal = openPairs.sumOf { (_, line) -> line.supplierAcceptedQuantity?.total?.coerceAtLeast(0.0) ?: 0.0 }
+            val explicitShortage = openPairs.any { (_, line) ->
+                val accepted = line.supplierAcceptedQuantity?.total ?: return@any false
+                accepted < line.requestedQuantity.total
+            }
+            val issueCount = relatedOrders.count { it.status == SupplierOrderStatusDataModel.IssueReported || it.status == SupplierOrderStatusDataModel.Cancelled }
+            val unresolvedTotal = if (acceptedTotal > 0.0) (requestedTotal - acceptedTotal).coerceAtLeast(0.0) else requestedTotal
+            if (unresolvedTotal <= 0.0 && issueCount == 0 && !explicitShortage) return@mapNotNull null
+
+            val stores = relatedOrders.map { supplierDeskStoreTitle(it) }.filter { it.isNotBlank() }.distinct()
+            val title = supplierDeskLineTitle(sampleLine)
+            val latestPrice = openPairs.asSequence()
+                .mapNotNull { (_, line) -> line.supplierOfferedSupplyPrice ?: line.expectedSupplyPrice }
+                .firstOrNull()
+                .supplierDeskMoneyText()
+            val shortageQuantityText = sampleLine.requestedQuantity.copy(total = unresolvedTotal).quantityText(stateValues.appLanguage)
+            val requestedQuantityText = sampleLine.requestedQuantity.copy(total = requestedTotal).quantityText(stateValues.appLanguage)
+            val latestOrder = relatedOrders.maxByOrNull { it.supplierDeskSortTime() } ?: samplePair.first
+            val statusHint = when {
+                issueCount > 0 -> localizedStringResource(1617, "Supplier has shortages/issues")
+                explicitShortage -> localizedStringResource(1616, "Accepted less than requested")
+                else -> localizedStringResource(1615, "Forecast upstream demand")
+            }
+            val producerBrief = buildString {
+                append(localizedStringResource(1618, "Producer brief")).append('\n')
+                append(localizedStringResource(1619, "Item")).append(": ").append(title).append('\n')
+                append(localizedStringResource(1620, "Suggested procurement")).append(": ").append(shortageQuantityText).append('\n')
+                append(localizedStringResource(1621, "Store demand")).append(": ").append(requestedQuantityText)
+                if (stores.isNotEmpty()) append(" • ").append(stores.take(5).joinToString(", "))
+                if (latestPrice.isNotBlank()) append('\n').append(localizedStringResource(1610, "Latest price signal")).append(": ").append(latestPrice)
+                append('\n').append(localizedStringResource(1430, "Latest status")).append(": ").append(supplierOrderStatusTitle(latestOrder.status))
+                append('\n').append(localizedStringResource(1622, "Supplier note")).append(": ").append(statusHint)
+            }
+            val priorityScore = (unresolvedTotal.coerceAtMost(999.0)).toInt() + relatedOrders.size * 3 + issueCount * 6 + stores.size
+
+            SupplierManufacturerBridgeUiModel(
+                goodsItemId = goodsItemId,
+                title = title,
+                subtitle = stores.take(3).joinToString(" • ").ifBlank { goodsItemId.take(8) },
+                shortageQuantityText = shortageQuantityText,
+                requestedQuantityText = requestedQuantityText,
+                storesCount = stores.size,
+                openOrderCount = relatedOrders.size,
+                issueCount = issueCount,
+                latestPriceText = latestPrice,
+                lastActivityMillis = latestOrder.supplierDeskSortTime(),
+                statusHint = statusHint,
+                producerBrief = producerBrief,
+                searchKey = buildString {
+                    append(goodsItemId).append(' ')
+                    append(title).append(' ')
+                    append(stores.joinToString(" ")).append(' ')
+                    append(statusHint).append(' ')
+                    append(sampleLine.goodsItemBarcodeSnapshots.joinToString(" "))
+                }.lowercase(),
+                priorityScore = priorityScore
+            )
+        }
+        .sortedWith(compareByDescending<SupplierManufacturerBridgeUiModel> { it.priorityScore }
+            .thenByDescending { it.lastActivityMillis })
+}
+
+@Composable
+private fun AppConfiguration.SupplierManufacturerBridgeCard(item: SupplierManufacturerBridgeUiModel) {
+    val coroutineScope = rememberCoroutineScope()
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .border(
+                if (item.issueCount > 0) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
+                if (item.issueCount > 0) stateValues.ErrorColor else stateValues.AccentColor,
+                RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .padding(stateValues.marginTextFieldGroup),
+        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CpImage(
+                    modifier = Modifier.size(32.dp),
+                    url = stateValues.drawablePathIconSupplierManufacturerBridge,
+                    fallbackRes = stateValues.drawableResIconSupplierManufacturerBridge.value,
+                    contentDescription = localizedStringResource(1605, "Manufacturer backorder bridge"),
+                    tintColor = stateValues.AccentColor
+                )
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.title,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.accentTextSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = item.subtitle,
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Text(
+                text = item.shortageQuantityText,
+                color = stateValues.AccentColor,
+                fontSize = stateValues.accentTextSize,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.End,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        StockCardInfoLine(localizedStringResource(1607, "Backorder quantity"), item.shortageQuantityText, stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1621, "Store demand"), item.requestedQuantityText, stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1608, "Requested by stores"), item.storesCount.toString(), stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1609, "Open store orders"), item.openOrderCount.toString(), stateValues.TextColor)
+        item.latestPriceText.takeIf { it.isNotBlank() }?.let { StockCardInfoLine(localizedStringResource(1610, "Latest price signal"), it, stateValues.TextColor) }
+        StockCardInfoLine(localizedStringResource(1545, "Latest activity"), receiptUiDateTime(item.lastActivityMillis), stateValues.TextColor)
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(modifier = Modifier.weight(1f)) {
+                SupplierCatalogChip(text = item.statusHint)
+            }
+            Box(modifier = Modifier.weight(1f)) {
+                SupplierCatalogChip(text = if (item.issueCount > 0) "${localizedStringResource(1473, "Issues")}: ${item.issueCount}" else localizedStringResource(1613, "Needs producer"))
+            }
+        }
+
+        if (stateValues.isNarrowScreen) {
+            Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1611, "Copy producer brief"),
+                    iconPath = stateValues.drawablePathIconClipboard,
+                    iconRes = stateValues.drawableResIconClipboard.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(item.producerBrief) }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1612, "Open store orders"),
+                    iconPath = stateValues.drawablePathIconAppModeSupplier,
+                    iconRes = stateValues.drawableResIconAppModeSupplier.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.goodsItemId)
+                            Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
+                        }
+                    }
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1611, "Copy producer brief"),
+                    iconPath = stateValues.drawablePathIconClipboard,
+                    iconRes = stateValues.drawableResIconClipboard.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(item.producerBrief) }
+                )
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1612, "Open store orders"),
+                    iconPath = stateValues.drawablePathIconAppModeSupplier,
+                    iconRes = stateValues.drawableResIconAppModeSupplier.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.goodsItemId)
+                            Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
+                        }
+                    }
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun AppConfiguration.SupplierInsightsScreen() {
     val orders by supplierOrdersState.payload.collectAsState()
@@ -22706,9 +22972,15 @@ private fun AppConfiguration.SupplierInsightsScreen() {
     val radarItems = remember(activeOrders, activeLines, stateValues.appLanguage) {
         buildSupplierDemandRadarItems(activeOrders, activeLines)
     }
+    val manufacturerBridgeItems = remember(activeOrders, activeLines, stateValues.appLanguage) {
+        buildSupplierManufacturerBridgeItems(activeOrders, activeLines)
+    }
     val normalizedSearch = searchQuery.trim().lowercase()
     val visibleRadarItems = remember(radarItems, normalizedSearch) {
         radarItems.filter { normalizedSearch.isBlank() || it.searchKey.contains(normalizedSearch) }
+    }
+    val visibleManufacturerBridgeItems = remember(manufacturerBridgeItems, normalizedSearch) {
+        manufacturerBridgeItems.filter { normalizedSearch.isBlank() || it.searchKey.contains(normalizedSearch) }
     }
     val openOrdersCount = activeOrders.count { !it.status.isSupplierOrderClosed() }
     val attentionCount = activeOrders.count { it.status == SupplierOrderStatusDataModel.Sent || it.status == SupplierOrderStatusDataModel.SeenBySupplier || it.status == SupplierOrderStatusDataModel.IssueReported }
@@ -22825,6 +23097,7 @@ private fun AppConfiguration.SupplierInsightsScreen() {
                     }
 
                     StockCardInfoLine(localizedStringResource(1555, "Active contracts"), activeContractCount.toString(), stateValues.TextColor)
+                    StockCardInfoLine(localizedStringResource(1625, "Upstream bridge items"), manufacturerBridgeItems.size.toString(), stateValues.TextColor)
                     Text(
                         text = localizedStringResource(1553, "This is the bridge from store-side ordering to supplier-side planning: orders feed catalog, contracts guard supply, partners show reliability, and insights decide what to prepare next."),
                         color = stateValues.PlaceholderTextColor,
@@ -22925,6 +23198,36 @@ private fun AppConfiguration.SupplierInsightsScreen() {
                             )
                         }
                     }
+                }
+            }
+
+            item {
+                Text(
+                    text = localizedStringResource(1605, "Manufacturer backorder bridge"),
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.titleTextSize,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            if (manufacturerBridgeItems.isEmpty()) {
+                item {
+                    MessageText(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(1624, "Items needing upstream procurement will appear after stores send orders or suppliers report shortages.")
+                    )
+                }
+            } else if (visibleManufacturerBridgeItems.isEmpty()) {
+                item {
+                    MessageText(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(1380, "No orders match this filter")
+                    )
+                }
+            } else {
+                items(visibleManufacturerBridgeItems.take(4), key = { "manufacturer_bridge_${it.goodsItemId}" }) { item ->
+                    SupplierManufacturerBridgeCard(item)
                 }
             }
 
@@ -35048,9 +35351,12 @@ private fun AppConfiguration.ActiveWorkshiftMenuTile(workshift: WorkshiftDataMod
 
 @Composable
 private fun AppConfiguration.SupplierWorkspaceMenuTile() {
-    val destinations = Navigation.bottomNavBarScreensSupplier.filterNot { it is NavigationScreenModel.Menu }
+    val destinations = (Navigation.bottomNavBarScreensSupplier.filterNot { it is NavigationScreenModel.Menu } +
+            NavigationScreenModel.Supplier.Analytics.Main)
+        .distinctBy { it.route }
     val currentRoute = stateValues.navigationScreensMain.last().route
     val manufacturerMode = stateValues.appModeId == APP_MODE_MANUFACTURER
+    val coroutineScope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -45740,6 +46046,9 @@ object AppConfiguration {
         val drawablePathIconSupplierSubstitutions: String
         val drawableResIconSupplierSubstitutions: StateFlow<DrawableResource>
 
+        val drawablePathIconSupplierManufacturerBridge: String
+        val drawableResIconSupplierManufacturerBridge: StateFlow<DrawableResource>
+
         val drawablePathIconBuyerAgeRestriction: String
         val drawableResIconBuyerAgeRestriction: StateFlow<DrawableResource>
 
@@ -46379,6 +46688,10 @@ object AppConfiguration {
             private val _drawableResIconSupplierSubstitutions = MutableStateFlow(Res.drawable._80_0)
             override val drawableResIconSupplierSubstitutions: StateFlow<DrawableResource> = _drawableResIconSupplierSubstitutions.asStateFlow()
 
+            override val drawablePathIconSupplierManufacturerBridge: String by drawablePathIconSupplierManufacturerBridgeState.collectAsState()
+            private val _drawableResIconSupplierManufacturerBridge = MutableStateFlow(Res.drawable._81_0)
+            override val drawableResIconSupplierManufacturerBridge: StateFlow<DrawableResource> = _drawableResIconSupplierManufacturerBridge.asStateFlow()
+
             override val drawablePathIconBuyerAgeRestriction: String by drawablePathIconBuyerAgeRestrictionState.collectAsState()
             private val _drawableResIconBuyerAgeRestriction = MutableStateFlow(Res.drawable._73_0)
             override val drawableResIconBuyerAgeRestriction: StateFlow<DrawableResource> = _drawableResIconBuyerAgeRestriction.asStateFlow()
@@ -46591,6 +46904,7 @@ object AppConfiguration {
                 _drawableResIconSupplierDispatch.emit(if (stateValues.appThemeId == 1L) Res.drawable._78_1 else Res.drawable._78_0)
                 _drawableResIconSupplierOfferStudio.emit(if (stateValues.appThemeId == 1L) Res.drawable._79_1 else Res.drawable._79_0)
                 _drawableResIconSupplierSubstitutions.emit(if (stateValues.appThemeId == 1L) Res.drawable._80_1 else Res.drawable._80_0)
+                _drawableResIconSupplierManufacturerBridge.emit(if (stateValues.appThemeId == 1L) Res.drawable._81_1 else Res.drawable._81_0)
                 _drawableResIconBuyerAgeRestriction.emit(if (stateValues.appThemeId == 1L) Res.drawable._73_1 else Res.drawable._73_0)
                 _drawableResIconTransactionTimeRestriction.emit(if (stateValues.appThemeId == 1L) Res.drawable._74_1 else Res.drawable._74_0)
 

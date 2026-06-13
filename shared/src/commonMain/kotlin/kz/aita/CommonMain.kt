@@ -5943,6 +5943,7 @@ val drawablePathIconSupplierDemandRadarState = MutableStateFlow("svg/77_0.svg")
 val drawablePathIconSupplierDispatchState = MutableStateFlow("svg/78_0.svg")
 val drawablePathIconSupplierOfferStudioState = MutableStateFlow("svg/79_0.svg")
 val drawablePathIconSupplierSubstitutionsState = MutableStateFlow("svg/80_0.svg")
+val drawablePathIconSupplierManufacturerBridgeState = MutableStateFlow("svg/81_0.svg")
 val drawablePathIconBuyerAgeRestrictionState = MutableStateFlow("svg/73_0.svg")
 val drawablePathIconTransactionTimeRestrictionState = MutableStateFlow("svg/74_0.svg")
 val drawablePathIconWorkersState = MutableStateFlow("svg/22_0.svg")
@@ -8020,6 +8021,9 @@ fun updateDrawables(
         )
         drawablePathIconSupplierSubstitutionsState.emit(
             drawablePath(80L)
+        )
+        drawablePathIconSupplierManufacturerBridgeState.emit(
+            drawablePath(81L)
         )
         drawablePathIconBuyerAgeRestrictionState.emit(
             drawablePath(73L)
@@ -13459,8 +13463,11 @@ suspend inline fun <reified Response, reified Body> networkRequest(
         logNetworkAttempt("FAILED ${method.value} ${endpointUrl.trim('/')} top-level ${networkFailureSummary(throwable)}")
         val serializationLikeFailure = throwable::class.simpleName?.contains("Serialization", ignoreCase = true) == true ||
                 throwable::class.simpleName?.contains("Json", ignoreCase = true) == true
+        val safeEmptyPayload = expectedEmptyCollectionPayload<Response>()
         ResponseDataModel<Response>(
-            message = if (serializationLikeFailure) {
+            message = if (serializationLikeFailure && safeEmptyPayload != null) {
+                null
+            } else if (serializationLikeFailure) {
                 localizedStringResourceMessage(
                     id = 225,
                     main = "Server response could not be read",
@@ -13475,7 +13482,7 @@ suspend inline fun <reified Response, reified Body> networkRequest(
                     kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
                 )
             },
-            payload = expectedEmptyCollectionPayload<Response>(),
+            payload = safeEmptyPayload,
             negative = true,
             transportFailure = !serializationLikeFailure
         )
@@ -13488,7 +13495,10 @@ suspend inline fun <reified Response, reified Body> networkRequest(
 @PublishedApi
 @Suppress("UNCHECKED_CAST")
 internal inline fun <reified Response> expectedEmptyCollectionPayload(): Response? {
-    return if (Response::class == List::class) {
+    return if (Response::class == List::class ||
+        Response::class == MutableList::class ||
+        Response::class == Collection::class
+    ) {
         emptyList<Any>() as Response
     } else {
         null
@@ -13607,12 +13617,25 @@ internal inline fun <reified Response> decodeNetworkResponseDataModel(
         )
     }
 
+    expectedEmptyCollectionPayload<Response>()?.let { safeEmptyPayload ->
+        return ResponseDataModel(
+            message = null,
+            payload = safeEmptyPayload,
+            negative = true,
+            httpStatusCode = status.value,
+            transportFailure = status.isAitaServerUnhealthyForClientBanner()
+        )
+    }
+
         return unreadableNetworkResponseDataModel<Response>(status, rawBody)
     } catch (throwable: Throwable) {
         if (throwable is CancellationException) throw throwable
         logNetworkAttempt("DECODE FAILED HTTP ${status.value} ${networkFailureSummary(throwable)} body=${rawBody.take(160).replace(Regex("\\s+"), " ")}")
-        return unreadableNetworkResponseDataModel<Response>(status, rawBody).copy(
-            payload = expectedEmptyCollectionPayload<Response>()
+        val safeEmptyPayload = expectedEmptyCollectionPayload<Response>()
+        val unreadableResponse = unreadableNetworkResponseDataModel<Response>(status, rawBody)
+        return unreadableResponse.copy(
+            message = if (safeEmptyPayload != null) null else unreadableResponse.message,
+            payload = safeEmptyPayload
         )
     }
 }

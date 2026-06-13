@@ -31963,6 +31963,447 @@
           "value": "Жеткізуші ұсынысын қабылдау"
         }
       ]
+    },
+    {
+      "id": 1605,
+      "values": [
+        {
+          "language": "main",
+          "value": "Manufacturer backorder bridge"
+        },
+        {
+          "language": "en",
+          "value": "Manufacturer backorder bridge"
+        },
+        {
+          "language": "ru",
+          "value": "Мост заказов производителю"
+        },
+        {
+          "language": "kk",
+          "value": "Өндірушіге тапсырыс көпірі"
+        }
+      ]
+    },
+    {
+      "id": 1606,
+      "values": [
+        {
+          "language": "main",
+          "value": "Convert store demand into clean producer purchase briefs when supplier stock may not be enough."
+        },
+        {
+          "language": "en",
+          "value": "Convert store demand into clean producer purchase briefs when supplier stock may not be enough."
+        },
+        {
+          "language": "ru",
+          "value": "Превращайте спрос магазинов в аккуратные заявки производителю, если запаса поставщика может не хватить."
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші қоры жетпеуі мүмкін кезде дүкен сұранысын өндірушіге арналған таза тапсырысқа айналдырыңыз."
+        }
+      ]
+    },
+    {
+      "id": 1607,
+      "values": [
+        {
+          "language": "main",
+          "value": "Backorder quantity"
+        },
+        {
+          "language": "en",
+          "value": "Backorder quantity"
+        },
+        {
+          "language": "ru",
+          "value": "Количество для дозаказа"
+        },
+        {
+          "language": "kk",
+          "value": "Қосымша тапсырыс саны"
+        }
+      ]
+    },
+    {
+      "id": 1608,
+      "values": [
+        {
+          "language": "main",
+          "value": "Requested by stores"
+        },
+        {
+          "language": "en",
+          "value": "Requested by stores"
+        },
+        {
+          "language": "ru",
+          "value": "Запросили магазины"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкендер сұрады"
+        }
+      ]
+    },
+    {
+      "id": 1609,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open store orders"
+        },
+        {
+          "language": "en",
+          "value": "Open store orders"
+        },
+        {
+          "language": "ru",
+          "value": "Открытые заказы магазинов"
+        },
+        {
+          "language": "kk",
+          "value": "Ашық дүкен тапсырыстары"
+        }
+      ]
+    },
+    {
+      "id": 1610,
+      "values": [
+        {
+          "language": "main",
+          "value": "Latest price signal"
+        },
+        {
+          "language": "en",
+          "value": "Latest price signal"
+        },
+        {
+          "language": "ru",
+          "value": "Последний ценовой сигнал"
+        },
+        {
+          "language": "kk",
+          "value": "Соңғы баға белгісі"
+        }
+      ]
+    },
+    {
+      "id": 1611,
+      "values": [
+        {
+          "language": "main",
+          "value": "Copy producer brief"
+        },
+        {
+          "language": "en",
+          "value": "Copy producer brief"
+        },
+        {
+          "language": "ru",
+          "value": "Скопировать заявку производителю"
+        },
+        {
+          "language": "kk",
+          "value": "Өндірушіге қысқаша тапсырысты көшіру"
+        }
+      ]
+    },
+    {
+      "id": 1612,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open store orders"
+        },
+        {
+          "language": "en",
+          "value": "Open store orders"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть заказы магазинов"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен тапсырыстарын ашу"
+        }
+      ]
+    },
+    {
+      "id": 1613,
+      "values": [
+        {
+          "language": "main",
+          "value": "Needs producer"
+        },
+        {
+          "language": "en",
+          "value": "Needs producer"
+        },
+        {
+          "language": "ru",
+          "value": "Нужен производитель"
+        },
+        {
+          "language": "kk",
+          "value": "Өндіруші керек"
+        }
+      ]
+    },
+    {
+      "id": 1614,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supply ready watch"
+        },
+        {
+          "language": "en",
+          "value": "Supply ready watch"
+        },
+        {
+          "language": "ru",
+          "value": "Контроль готовности поставки"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізу дайындығын бақылау"
+        }
+      ]
+    },
+    {
+      "id": 1615,
+      "values": [
+        {
+          "language": "main",
+          "value": "Forecast upstream demand"
+        },
+        {
+          "language": "en",
+          "value": "Forecast upstream demand"
+        },
+        {
+          "language": "ru",
+          "value": "Прогнозировать спрос выше по цепочке"
+        },
+        {
+          "language": "kk",
+          "value": "Жоғарғы тізбектегі сұранысты болжау"
+        }
+      ]
+    },
+    {
+      "id": 1616,
+      "values": [
+        {
+          "language": "main",
+          "value": "Accepted less than requested"
+        },
+        {
+          "language": "en",
+          "value": "Accepted less than requested"
+        },
+        {
+          "language": "ru",
+          "value": "Принято меньше запрошенного"
+        },
+        {
+          "language": "kk",
+          "value": "Сұралғаннан аз қабылданды"
+        }
+      ]
+    },
+    {
+      "id": 1617,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier has shortages/issues"
+        },
+        {
+          "language": "en",
+          "value": "Supplier has shortages/issues"
+        },
+        {
+          "language": "ru",
+          "value": "У поставщика нехватка или проблема"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізушіде жетіспеушілік не мәселе бар"
+        }
+      ]
+    },
+    {
+      "id": 1618,
+      "values": [
+        {
+          "language": "main",
+          "value": "Producer brief"
+        },
+        {
+          "language": "en",
+          "value": "Producer brief"
+        },
+        {
+          "language": "ru",
+          "value": "Заявка производителю"
+        },
+        {
+          "language": "kk",
+          "value": "Өндірушіге қысқаша тапсырыс"
+        }
+      ]
+    },
+    {
+      "id": 1619,
+      "values": [
+        {
+          "language": "main",
+          "value": "Item"
+        },
+        {
+          "language": "en",
+          "value": "Item"
+        },
+        {
+          "language": "ru",
+          "value": "Товар"
+        },
+        {
+          "language": "kk",
+          "value": "Тауар"
+        }
+      ]
+    },
+    {
+      "id": 1620,
+      "values": [
+        {
+          "language": "main",
+          "value": "Suggested procurement"
+        },
+        {
+          "language": "en",
+          "value": "Suggested procurement"
+        },
+        {
+          "language": "ru",
+          "value": "Рекомендуемый закуп"
+        },
+        {
+          "language": "kk",
+          "value": "Ұсынылған сатып алу"
+        }
+      ]
+    },
+    {
+      "id": 1621,
+      "values": [
+        {
+          "language": "main",
+          "value": "Store demand"
+        },
+        {
+          "language": "en",
+          "value": "Store demand"
+        },
+        {
+          "language": "ru",
+          "value": "Спрос магазинов"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен сұранысы"
+        }
+      ]
+    },
+    {
+      "id": 1622,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier note"
+        },
+        {
+          "language": "en",
+          "value": "Supplier note"
+        },
+        {
+          "language": "ru",
+          "value": "Заметка поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші ескертпесі"
+        }
+      ]
+    },
+    {
+      "id": 1623,
+      "values": [
+        {
+          "language": "main",
+          "value": "Top bridge items"
+        },
+        {
+          "language": "en",
+          "value": "Top bridge items"
+        },
+        {
+          "language": "ru",
+          "value": "Главные позиции моста"
+        },
+        {
+          "language": "kk",
+          "value": "Негізгі көпір тауарлары"
+        }
+      ]
+    },
+    {
+      "id": 1624,
+      "values": [
+        {
+          "language": "main",
+          "value": "Items needing upstream procurement will appear after stores send orders or suppliers report shortages."
+        },
+        {
+          "language": "en",
+          "value": "Items needing upstream procurement will appear after stores send orders or suppliers report shortages."
+        },
+        {
+          "language": "ru",
+          "value": "Позиции для закупа у производителя появятся после заказов магазинов или сообщений поставщика о нехватке."
+        },
+        {
+          "language": "kk",
+          "value": "Өндірушіден алу керек тауарлар дүкен тапсырыстарынан немесе жеткізуші жетіспеушілік хабарлағаннан кейін көрінеді."
+        }
+      ]
+    },
+    {
+      "id": 1625,
+      "values": [
+        {
+          "language": "main",
+          "value": "Upstream bridge items"
+        },
+        {
+          "language": "en",
+          "value": "Upstream bridge items"
+        },
+        {
+          "language": "ru",
+          "value": "Позиции для производителя"
+        },
+        {
+          "language": "kk",
+          "value": "Өндірушіге баратын позициялар"
+        }
+      ]
     }
   ]
 }
