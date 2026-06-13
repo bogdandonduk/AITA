@@ -28690,7 +28690,7 @@
     },
     {
       "id": 1449,
-      "value": [
+      "values": [
         {
           "language": "main",
           "value": "Offer note"
@@ -32402,6 +32402,720 @@
         {
           "language": "kk",
           "value": "Өндірушіге баратын позициялар"
+        }
+      ]
+    },
+    {
+      "id": 1626,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier price book"
+        },
+        {
+          "language": "en",
+          "value": "Supplier price book"
+        },
+        {
+          "language": "ru",
+          "value": "Прайс-лист поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші прайс-листі"
+        }
+      ]
+    },
+    {
+      "id": 1627,
+      "values": [
+        {
+          "language": "main",
+          "value": "Publish the suggested offer into each asking store's supplier price memory, so their next supply order starts with your terms."
+        },
+        {
+          "language": "en",
+          "value": "Publish the suggested offer into each asking store's supplier price memory, so their next supply order starts with your terms."
+        },
+        {
+          "language": "ru",
+          "value": "Опубликуйте предложенные условия в память цен каждого заинтересованного магазина, чтобы следующий заказ поставки начинался с ваших условий."
+        },
+        {
+          "language": "kk",
+          "value": "Ұсынылған шарттарды сұраған әр дүкеннің жеткізуші бағаларына жариялаңыз, сонда келесі жеткізу тапсырысы сіздің шарттарыңыздан басталады."
+        }
+      ]
+    },
+    {
+      "id": 1628,
+      "values": [
+        {
+          "language": "main",
+          "value": "Minimum order"
+        },
+        {
+          "language": "en",
+          "value": "Minimum order"
+        },
+        {
+          "language": "ru",
+          "value": "Минимальный заказ"
+        },
+        {
+          "language": "kk",
+          "value": "Ең аз тапсырыс"
+        }
+      ]
+    },
+    {
+      "id": 1629,
+      "values": [
+        {
+          "language": "main",
+          "value": "Pack step"
+        },
+        {
+          "language": "en",
+          "value": "Pack step"
+        },
+        {
+          "language": "ru",
+          "value": "Шаг упаковки"
+        },
+        {
+          "language": "kk",
+          "value": "Қаптама қадамы"
+        }
+      ]
+    },
+    {
+      "id": 1630,
+      "values": [
+        {
+          "language": "main",
+          "value": "Publish targets"
+        },
+        {
+          "language": "en",
+          "value": "Publish targets"
+        },
+        {
+          "language": "ru",
+          "value": "Куда публикуем"
+        },
+        {
+          "language": "kk",
+          "value": "Жариялау нысандары"
+        }
+      ]
+    },
+    {
+      "id": 1631,
+      "values": [
+        {
+          "language": "main",
+          "value": "Publish price book"
+        },
+        {
+          "language": "en",
+          "value": "Publish price book"
+        },
+        {
+          "language": "ru",
+          "value": "Опубликовать прайс"
+        },
+        {
+          "language": "kk",
+          "value": "Прайс жариялау"
+        }
+      ]
+    },
+    {
+      "id": 1632,
+      "values": [
+        {
+          "language": "main",
+          "value": "Need a price signal and at least one partner store first"
+        },
+        {
+          "language": "en",
+          "value": "Need a price signal and at least one partner store first"
+        },
+        {
+          "language": "ru",
+          "value": "Сначала нужен ценовой сигнал и хотя бы один магазин-партнёр"
+        },
+        {
+          "language": "kk",
+          "value": "Алдымен баға белгісі және кемінде бір серіктес дүкен керек"
+        }
+      ]
+    },
+    {
+      "id": 1633,
+      "values": [
+        {
+          "language": "main",
+          "value": "Price book targets"
+        },
+        {
+          "language": "en",
+          "value": "Price book targets"
+        },
+        {
+          "language": "ru",
+          "value": "Цели прайс-листа"
+        },
+        {
+          "language": "kk",
+          "value": "Прайс нысандары"
+        }
+      ]
+    },
+    {
+      "id": 1634,
+      "values": [
+        {
+          "language": "main",
+          "value": "Price book note"
+        },
+        {
+          "language": "en",
+          "value": "Price book note"
+        },
+        {
+          "language": "ru",
+          "value": "Заметка прайс-листа"
+        },
+        {
+          "language": "kk",
+          "value": "Прайс жазбасы"
+        }
+      ]
+    },
+    {
+      "id": 1635,
+      "values": [
+        {
+          "language": "main",
+          "value": "Published into store supplier prices"
+        },
+        {
+          "language": "en",
+          "value": "Published into store supplier prices"
+        },
+        {
+          "language": "ru",
+          "value": "Опубликовано в цены поставщиков магазина"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкеннің жеткізуші бағаларына жарияланды"
+        }
+      ]
+    },
+    {
+      "id": 1636,
+      "values": [
+        {
+          "language": "main",
+          "value": "No price book rows to publish"
+        },
+        {
+          "language": "en",
+          "value": "No price book rows to publish"
+        },
+        {
+          "language": "ru",
+          "value": "Нет строк прайс-листа для публикации"
+        },
+        {
+          "language": "kk",
+          "value": "Жариялайтын прайс жолдары жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1637,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier price book published"
+        },
+        {
+          "language": "en",
+          "value": "Supplier price book published"
+        },
+        {
+          "language": "ru",
+          "value": "Прайс-лист поставщика опубликован"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші прайс-листі жарияланды"
+        }
+      ]
+    },
+    {
+      "id": 1638,
+      "values": [
+        {
+          "language": "main",
+          "value": "Could not publish supplier price book"
+        },
+        {
+          "language": "en",
+          "value": "Could not publish supplier price book"
+        },
+        {
+          "language": "ru",
+          "value": "Не удалось опубликовать прайс-лист поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші прайс-листін жариялау мүмкін болмады"
+        }
+      ]
+    },
+    {
+      "id": 1639,
+      "values": [
+        {
+          "language": "main",
+          "value": "Reorder pulse"
+        },
+        {
+          "language": "en",
+          "value": "Reorder pulse"
+        },
+        {
+          "language": "ru",
+          "value": "Пульс повторного заказа"
+        },
+        {
+          "language": "kk",
+          "value": "Қайта тапсырыс пульсі"
+        }
+      ]
+    },
+    {
+      "id": 1640,
+      "values": [
+        {
+          "language": "main",
+          "value": "Partner reorder pulses"
+        },
+        {
+          "language": "en",
+          "value": "Partner reorder pulses"
+        },
+        {
+          "language": "ru",
+          "value": "Пульсы заказов партнёров"
+        },
+        {
+          "language": "kk",
+          "value": "Серіктес қайта тапсырыс пульстері"
+        }
+      ]
+    },
+    {
+      "id": 1641,
+      "values": [
+        {
+          "language": "main",
+          "value": "Predict which store will need this SKU next, using real supplier-order rhythm."
+        },
+        {
+          "language": "en",
+          "value": "Predict which store will need this SKU next, using real supplier-order rhythm."
+        },
+        {
+          "language": "ru",
+          "value": "Прогнозируйте, какому магазину скоро понадобится этот товар, по реальному ритму заказов."
+        },
+        {
+          "language": "kk",
+          "value": "Нақты жеткізу тапсырыстарының ырғағы бойынша қай дүкенге бұл тауар жақында керек болатынын болжаңыз."
+        }
+      ]
+    },
+    {
+      "id": 1642,
+      "values": [
+        {
+          "language": "main",
+          "value": "Likely due"
+        },
+        {
+          "language": "en",
+          "value": "Likely due"
+        },
+        {
+          "language": "ru",
+          "value": "Вероятно пора"
+        },
+        {
+          "language": "kk",
+          "value": "Уақыты келуі мүмкін"
+        }
+      ]
+    },
+    {
+      "id": 1643,
+      "values": [
+        {
+          "language": "main",
+          "value": "Early watch"
+        },
+        {
+          "language": "en",
+          "value": "Early watch"
+        },
+        {
+          "language": "ru",
+          "value": "Раннее наблюдение"
+        },
+        {
+          "language": "kk",
+          "value": "Ерте бақылау"
+        }
+      ]
+    },
+    {
+      "id": 1644,
+      "values": [
+        {
+          "language": "main",
+          "value": "Already open"
+        },
+        {
+          "language": "en",
+          "value": "Already open"
+        },
+        {
+          "language": "ru",
+          "value": "Уже открыт"
+        },
+        {
+          "language": "kk",
+          "value": "Қазір ашық"
+        }
+      ]
+    },
+    {
+      "id": 1645,
+      "values": [
+        {
+          "language": "main",
+          "value": "First rhythm signal"
+        },
+        {
+          "language": "en",
+          "value": "First rhythm signal"
+        },
+        {
+          "language": "ru",
+          "value": "Первый сигнал ритма"
+        },
+        {
+          "language": "kk",
+          "value": "Алғашқы ырғақ белгісі"
+        }
+      ]
+    },
+    {
+      "id": 1646,
+      "values": [
+        {
+          "language": "main",
+          "value": "Last order"
+        },
+        {
+          "language": "en",
+          "value": "Last order"
+        },
+        {
+          "language": "ru",
+          "value": "Последний заказ"
+        },
+        {
+          "language": "kk",
+          "value": "Соңғы тапсырыс"
+        }
+      ]
+    },
+    {
+      "id": 1647,
+      "values": [
+        {
+          "language": "main",
+          "value": "Average rhythm"
+        },
+        {
+          "language": "en",
+          "value": "Average rhythm"
+        },
+        {
+          "language": "ru",
+          "value": "Средний ритм"
+        },
+        {
+          "language": "kk",
+          "value": "Орташа ырғақ"
+        }
+      ]
+    },
+    {
+      "id": 1648,
+      "values": [
+        {
+          "language": "main",
+          "value": "Suggested reorder"
+        },
+        {
+          "language": "en",
+          "value": "Suggested reorder"
+        },
+        {
+          "language": "ru",
+          "value": "Предложение к заказу"
+        },
+        {
+          "language": "kk",
+          "value": "Ұсынылған қайта тапсырыс"
+        }
+      ]
+    },
+    {
+      "id": 1649,
+      "values": [
+        {
+          "language": "main",
+          "value": "Average order"
+        },
+        {
+          "language": "en",
+          "value": "Average order"
+        },
+        {
+          "language": "ru",
+          "value": "Средний заказ"
+        },
+        {
+          "language": "kk",
+          "value": "Орташа тапсырыс"
+        }
+      ]
+    },
+    {
+      "id": 1650,
+      "values": [
+        {
+          "language": "main",
+          "value": "Contract signal"
+        },
+        {
+          "language": "en",
+          "value": "Contract signal"
+        },
+        {
+          "language": "ru",
+          "value": "Сигнал договора"
+        },
+        {
+          "language": "kk",
+          "value": "Келісімшарт белгісі"
+        }
+      ]
+    },
+    {
+      "id": 1651,
+      "values": [
+        {
+          "language": "main",
+          "value": "Copy reorder nudge"
+        },
+        {
+          "language": "en",
+          "value": "Copy reorder nudge"
+        },
+        {
+          "language": "ru",
+          "value": "Скопировать напоминание"
+        },
+        {
+          "language": "kk",
+          "value": "Қайта тапсырыс еске салуын көшіру"
+        }
+      ]
+    },
+    {
+      "id": 1652,
+      "values": [
+        {
+          "language": "main",
+          "value": "Reorder nudge copied"
+        },
+        {
+          "language": "en",
+          "value": "Reorder nudge copied"
+        },
+        {
+          "language": "ru",
+          "value": "Напоминание о повторном заказе скопировано"
+        },
+        {
+          "language": "kk",
+          "value": "Қайта тапсырыс еске салуы көшірілді"
+        }
+      ]
+    },
+    {
+      "id": 1653,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open partner orders"
+        },
+        {
+          "language": "en",
+          "value": "Open partner orders"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть заказы партнёра"
+        },
+        {
+          "language": "kk",
+          "value": "Серіктес тапсырыстарын ашу"
+        }
+      ]
+    },
+    {
+      "id": 1654,
+      "values": [
+        {
+          "language": "main",
+          "value": "days"
+        },
+        {
+          "language": "en",
+          "value": "days"
+        },
+        {
+          "language": "ru",
+          "value": "дн."
+        },
+        {
+          "language": "kk",
+          "value": "күн"
+        }
+      ]
+    },
+    {
+      "id": 1655,
+      "values": [
+        {
+          "language": "main",
+          "value": "No reorder rhythm yet"
+        },
+        {
+          "language": "en",
+          "value": "No reorder rhythm yet"
+        },
+        {
+          "language": "ru",
+          "value": "Ритм повторных заказов пока не виден"
+        },
+        {
+          "language": "kk",
+          "value": "Қайта тапсырыс ырғағы әзірге көрінбейді"
+        }
+      ]
+    },
+    {
+      "id": 1656,
+      "values": [
+        {
+          "language": "main",
+          "value": "Pending contract before next delivery"
+        },
+        {
+          "language": "en",
+          "value": "Pending contract before next delivery"
+        },
+        {
+          "language": "ru",
+          "value": "Перед следующей поставкой ждёт договор"
+        },
+        {
+          "language": "kk",
+          "value": "Келесі жеткізу алдында келісімшарт күтілуде"
+        }
+      ]
+    },
+    {
+      "id": 1657,
+      "values": [
+        {
+          "language": "main",
+          "value": "Terms are active"
+        },
+        {
+          "language": "en",
+          "value": "Terms are active"
+        },
+        {
+          "language": "ru",
+          "value": "Условия активны"
+        },
+        {
+          "language": "kk",
+          "value": "Шарттар белсенді"
+        }
+      ]
+    },
+    {
+      "id": 1658,
+      "values": [
+        {
+          "language": "main",
+          "value": "Store demand now becomes a sales rep task: who to remind, what quantity to suggest, and whether contracts or price book terms are ready."
+        },
+        {
+          "language": "en",
+          "value": "Store demand now becomes a sales rep task: who to remind, what quantity to suggest, and whether contracts or price book terms are ready."
+        },
+        {
+          "language": "ru",
+          "value": "Спрос магазинов превращается в задачу торгового представителя: кому напомнить, какой объём предложить и готовы ли договоры/цены."
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен сұранысы сауда өкілі міндетіне айналады: кімге ескерту, қандай көлем ұсыну және шарт/баға дайын ба."
+        }
+      ]
+    },
+    {
+      "id": 1659,
+      "values": [
+        {
+          "language": "main",
+          "value": "No contract terms yet"
+        },
+        {
+          "language": "en",
+          "value": "No contract terms yet"
+        },
+        {
+          "language": "ru",
+          "value": "Условия договора ещё не заданы"
+        },
+        {
+          "language": "kk",
+          "value": "Келісімшарт шарттары әлі жоқ"
         }
       ]
     }

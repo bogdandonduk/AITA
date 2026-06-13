@@ -1067,6 +1067,32 @@
           "path": "svg/81_1.svg"
         }
       ]
+    },
+    {
+      "id": 82,
+      "values": [
+        {
+          "themeId": 0,
+          "path": "svg/82_0.svg"
+        },
+        {
+          "themeId": 1,
+          "path": "svg/82_1.svg"
+        }
+      ]
+    },
+    {
+      "id": 83,
+      "values": [
+        {
+          "themeId": 0,
+          "path": "svg/83_0.svg"
+        },
+        {
+          "themeId": 1,
+          "path": "svg/83_1.svg"
+        }
+      ]
     }
   ]
 }

@@ -4694,6 +4694,90 @@ fun upsertSupplierGoodsPrice(
         }
 }
 
+fun publishSupplierGoodsPrices(
+    prices: List<SupplierGoodsPriceDataModel>,
+    onCompleted: ((DataState<List<SupplierGoodsPriceDataModel>>) -> Unit)? = null
+) {
+    val cleanPrices = prices
+        .filter { price ->
+            price.storeId.isNotBlank() &&
+                    price.supplierId.isNotBlank() &&
+                    price.goodsItemId.isNotBlank() &&
+                    price.supplyPrice.price.toMoneyDouble() > 0.0
+        }
+        .distinctBy { price -> listOf(price.storeId, price.supplierId, price.goodsItemId).joinToString(":") }
+
+    if (cleanPrices.isEmpty()) {
+        val message = localizedStringResourceMessage(
+            id = 1636,
+            main = "No price book rows to publish",
+            ru = "Нет строк прайс-листа для публикации",
+            kk = "Жариялайтын прайс жолдары жоқ"
+        )
+        postInAppNotification(message, NotificationType.Negative, transient = true)
+        onCompleted?.invoke(DataState.Empty(message))
+        return
+    }
+
+    if (!upsertSupplierGoodsPriceMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            upsertSupplierGoodsPriceMutex.withLock {
+                val saved = mutableListOf<SupplierGoodsPriceDataModel>()
+                var lastFailureMessage: List<LocalizedStringDataModel>? = null
+
+                for (price in cleanPrices) {
+                    val response = networkRequest<SupplierGoodsPriceDataModel, SupplierGoodsPriceDataModel>(
+                        method = HttpMethod.Post,
+                        endpointUrl = globalAppConfigurationState.payloadValue.upsertSupplierGoodsPricePath.first,
+                        body = price
+                    )
+
+                    if (response.negative || response.payload == null) {
+                        lastFailureMessage = response.message ?: lastFailureMessage
+                    } else {
+                        saved += response.payload
+                    }
+                }
+
+                if (saved.isNotEmpty()) {
+                    val updatedPrices = supplierGoodsPricesState.payloadValue.orEmpty().toMutableList()
+                    saved.forEach { savedPrice ->
+                        val existingIndex = updatedPrices.indexOfFirst { it.id == savedPrice.id }
+                        if (existingIndex >= 0) {
+                            updatedPrices[existingIndex] = savedPrice
+                        } else {
+                            val sameBusinessIndex = updatedPrices.indexOfFirst {
+                                it.storeId == savedPrice.storeId &&
+                                        it.supplierId == savedPrice.supplierId &&
+                                        it.goodsItemId == savedPrice.goodsItemId
+                            }
+                            if (sameBusinessIndex >= 0) updatedPrices[sameBusinessIndex] = savedPrice else updatedPrices += savedPrice
+                        }
+                    }
+
+                    val message = localizedStringResourceMessage(
+                        id = 1637,
+                        main = "Supplier price book published",
+                        ru = "Прайс-лист поставщика опубликован",
+                        kk = "Жеткізуші прайс-листі жарияланды"
+                    )
+                    supplierGoodsPricesState.emit(DataState.Success(updatedPrices, message))
+                    postInAppNotification(message, NotificationType.Positive, transient = true)
+                    onCompleted?.invoke(DataState.Success(saved, message))
+                } else {
+                    val message = lastFailureMessage ?: localizedStringResourceMessage(
+                        id = 1638,
+                        main = "Could not publish supplier price book",
+                        ru = "Не удалось опубликовать прайс-лист поставщика",
+                        kk = "Жеткізуші прайс-листін жариялау мүмкін болмады"
+                    )
+                    postInAppNotification(message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(message))
+                }
+            }
+        }
+}
+
 @kotlinx.serialization.Serializable
 data class SupplierContractPriceTermDataModel(
     val id: String = "",
@@ -5944,6 +6028,8 @@ val drawablePathIconSupplierDispatchState = MutableStateFlow("svg/78_0.svg")
 val drawablePathIconSupplierOfferStudioState = MutableStateFlow("svg/79_0.svg")
 val drawablePathIconSupplierSubstitutionsState = MutableStateFlow("svg/80_0.svg")
 val drawablePathIconSupplierManufacturerBridgeState = MutableStateFlow("svg/81_0.svg")
+val drawablePathIconSupplierPriceBookState = MutableStateFlow("svg/82_0.svg")
+val drawablePathIconSupplierReorderPulseState = MutableStateFlow("svg/83_0.svg")
 val drawablePathIconBuyerAgeRestrictionState = MutableStateFlow("svg/73_0.svg")
 val drawablePathIconTransactionTimeRestrictionState = MutableStateFlow("svg/74_0.svg")
 val drawablePathIconWorkersState = MutableStateFlow("svg/22_0.svg")
@@ -8024,6 +8110,12 @@ fun updateDrawables(
         )
         drawablePathIconSupplierManufacturerBridgeState.emit(
             drawablePath(81L)
+        )
+        drawablePathIconSupplierPriceBookState.emit(
+            drawablePath(82L)
+        )
+        drawablePathIconSupplierReorderPulseState.emit(
+            drawablePath(83L)
         )
         drawablePathIconBuyerAgeRestrictionState.emit(
             drawablePath(73L)

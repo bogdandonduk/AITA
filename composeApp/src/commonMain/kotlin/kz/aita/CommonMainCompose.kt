@@ -1080,7 +1080,42 @@ private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallb
     put(1623L, mapOf("main" to "Top bridge items", "en" to "Top bridge items", "ru" to "Главные позиции моста", "kk" to "Негізгі көпір тауарлары"))
     put(1624L, mapOf("main" to "Items needing upstream procurement will appear after stores send orders or suppliers report shortages.", "en" to "Items needing upstream procurement will appear after stores send orders or suppliers report shortages.", "ru" to "Позиции для закупа у производителя появятся после заказов магазинов или сообщений поставщика о нехватке.", "kk" to "Өндірушіден алу керек тауарлар дүкен тапсырыстарынан немесе жеткізуші жетіспеушілік хабарлағаннан кейін көрінеді."))
     put(1625L, mapOf("main" to "Upstream bridge items", "en" to "Upstream bridge items", "ru" to "Позиции для производителя", "kk" to "Өндірушіге баратын позициялар"))
+    put(1626L, mapOf("main" to "Supplier price book", "en" to "Supplier price book", "ru" to "Прайс-лист поставщика", "kk" to "Жеткізуші прайс-листі"))
+    put(1627L, mapOf("main" to "Publish the suggested offer into each asking store's supplier price memory, so their next supply order starts with your terms.", "en" to "Publish the suggested offer into each asking store's supplier price memory, so their next supply order starts with your terms.", "ru" to "Опубликуйте предложенные условия в память цен каждого заинтересованного магазина, чтобы следующий заказ поставки начинался с ваших условий.", "kk" to "Ұсынылған шарттарды сұраған әр дүкеннің жеткізуші бағаларына жариялаңыз, сонда келесі жеткізу тапсырысы сіздің шарттарыңыздан басталады."))
+    put(1628L, mapOf("main" to "Minimum order", "en" to "Minimum order", "ru" to "Минимальный заказ", "kk" to "Ең аз тапсырыс"))
+    put(1629L, mapOf("main" to "Pack step", "en" to "Pack step", "ru" to "Шаг упаковки", "kk" to "Қаптама қадамы"))
+    put(1630L, mapOf("main" to "Publish targets", "en" to "Publish targets", "ru" to "Куда публикуем", "kk" to "Жариялау нысандары"))
+    put(1631L, mapOf("main" to "Publish price book", "en" to "Publish price book", "ru" to "Опубликовать прайс", "kk" to "Прайс жариялау"))
+    put(1632L, mapOf("main" to "Need a price signal and at least one partner store first", "en" to "Need a price signal and at least one partner store first", "ru" to "Сначала нужен ценовой сигнал и хотя бы один магазин-партнёр", "kk" to "Алдымен баға белгісі және кемінде бір серіктес дүкен керек"))
+    put(1633L, mapOf("main" to "Price book targets", "en" to "Price book targets", "ru" to "Цели прайс-листа", "kk" to "Прайс нысандары"))
+    put(1634L, mapOf("main" to "Price book note", "en" to "Price book note", "ru" to "Заметка прайс-листа", "kk" to "Прайс жазбасы"))
+    put(1635L, mapOf("main" to "Published into store supplier prices", "en" to "Published into store supplier prices", "ru" to "Опубликовано в цены поставщиков магазина", "kk" to "Дүкеннің жеткізуші бағаларына жарияланды"))
+    put(1636L, mapOf("main" to "No price book rows to publish", "en" to "No price book rows to publish", "ru" to "Нет строк прайс-листа для публикации", "kk" to "Жариялайтын прайс жолдары жоқ"))
+    put(1637L, mapOf("main" to "Supplier price book published", "en" to "Supplier price book published", "ru" to "Прайс-лист поставщика опубликован", "kk" to "Жеткізуші прайс-листі жарияланды"))
+    put(1638L, mapOf("main" to "Could not publish supplier price book", "en" to "Could not publish supplier price book", "ru" to "Не удалось опубликовать прайс-лист поставщика", "kk" to "Жеткізуші прайс-листін жариялау мүмкін болмады"))
+    put(1639L, mapOf("main" to "Reorder pulse", "en" to "Reorder pulse", "ru" to "Пульс повторного заказа", "kk" to "Қайта тапсырыс пульсі"))
+    put(1640L, mapOf("main" to "Partner reorder pulses", "en" to "Partner reorder pulses", "ru" to "Пульсы заказов партнёров", "kk" to "Серіктес қайта тапсырыс пульстері"))
+    put(1641L, mapOf("main" to "Predict which store will need this SKU next, using real supplier-order rhythm.", "en" to "Predict which store will need this SKU next, using real supplier-order rhythm.", "ru" to "Прогнозируйте, какому магазину скоро понадобится этот товар, по реальному ритму заказов.", "kk" to "Нақты жеткізу тапсырыстарының ырғағы бойынша қай дүкенге бұл тауар жақында керек болатынын болжаңыз."))
+    put(1642L, mapOf("main" to "Likely due", "en" to "Likely due", "ru" to "Вероятно пора", "kk" to "Уақыты келуі мүмкін"))
+    put(1643L, mapOf("main" to "Early watch", "en" to "Early watch", "ru" to "Раннее наблюдение", "kk" to "Ерте бақылау"))
+    put(1644L, mapOf("main" to "Already open", "en" to "Already open", "ru" to "Уже открыт", "kk" to "Қазір ашық"))
+    put(1645L, mapOf("main" to "First rhythm signal", "en" to "First rhythm signal", "ru" to "Первый сигнал ритма", "kk" to "Алғашқы ырғақ белгісі"))
+    put(1646L, mapOf("main" to "Last order", "en" to "Last order", "ru" to "Последний заказ", "kk" to "Соңғы тапсырыс"))
+    put(1647L, mapOf("main" to "Average rhythm", "en" to "Average rhythm", "ru" to "Средний ритм", "kk" to "Орташа ырғақ"))
+    put(1648L, mapOf("main" to "Suggested reorder", "en" to "Suggested reorder", "ru" to "Предложение к заказу", "kk" to "Ұсынылған қайта тапсырыс"))
+    put(1649L, mapOf("main" to "Average order", "en" to "Average order", "ru" to "Средний заказ", "kk" to "Орташа тапсырыс"))
+    put(1650L, mapOf("main" to "Contract signal", "en" to "Contract signal", "ru" to "Сигнал договора", "kk" to "Келісімшарт белгісі"))
+    put(1651L, mapOf("main" to "Copy reorder nudge", "en" to "Copy reorder nudge", "ru" to "Скопировать напоминание", "kk" to "Қайта тапсырыс еске салуын көшіру"))
+    put(1652L, mapOf("main" to "Reorder nudge copied", "en" to "Reorder nudge copied", "ru" to "Напоминание о повторном заказе скопировано", "kk" to "Қайта тапсырыс еске салуы көшірілді"))
+    put(1653L, mapOf("main" to "Open partner orders", "en" to "Open partner orders", "ru" to "Открыть заказы партнёра", "kk" to "Серіктес тапсырыстарын ашу"))
+    put(1654L, mapOf("main" to "days", "en" to "days", "ru" to "дн.", "kk" to "күн"))
+    put(1655L, mapOf("main" to "No reorder rhythm yet", "en" to "No reorder rhythm yet", "ru" to "Ритм повторных заказов пока не виден", "kk" to "Қайта тапсырыс ырғағы әзірге көрінбейді"))
+    put(1656L, mapOf("main" to "Pending contract before next delivery", "en" to "Pending contract before next delivery", "ru" to "Перед следующей поставкой ждёт договор", "kk" to "Келесі жеткізу алдында келісімшарт күтілуде"))
+    put(1657L, mapOf("main" to "Terms are active", "en" to "Terms are active", "ru" to "Условия активны", "kk" to "Шарттар белсенді"))
+    put(1658L, mapOf("main" to "Store demand now becomes a sales rep task: who to remind, what quantity to suggest, and whether contracts or price book terms are ready.", "en" to "Store demand now becomes a sales rep task: who to remind, what quantity to suggest, and whether contracts or price book terms are ready.", "ru" to "Спрос магазинов превращается в задачу торгового представителя: кому напомнить, какой объём предложить и готовы ли договоры/цены.", "kk" to "Дүкен сұранысы сауда өкілі міндетіне айналады: кімге ескерту, қандай көлем ұсыну және шарт/баға дайын ба."))
+    put(1659L, mapOf("main" to "No contract terms yet", "en" to "No contract terms yet", "ru" to "Условия договора ещё не заданы", "kk" to "Келісімшарт шарттары әлі жоқ"))
 }
+
 
 
 
@@ -18794,8 +18829,15 @@ private fun AppConfiguration.supplierMarketWinningFeatures(): List<SupplierFeatu
     SupplierFeaturePlanUiModel(
         title = localizedStringResource(1349, "Price ladder and payment terms"),
         subtitle = localizedStringResource(1350, "Manage wholesale tiers, local currencies, deferred payments and trusted-store limits."),
-        iconPath = stateValues.drawablePathIconSupplierOfferStudio,
-        iconRes = stateValues.drawableResIconSupplierOfferStudio.value,
+        iconPath = stateValues.drawablePathIconSupplierPriceBook,
+        iconRes = stateValues.drawableResIconSupplierPriceBook.value,
+        implemented = true
+    ),
+    SupplierFeaturePlanUiModel(
+        title = localizedStringResource(1639, "Reorder pulse"),
+        subtitle = localizedStringResource(1641, "Predict which store will need this SKU next, using real supplier-order rhythm."),
+        iconPath = stateValues.drawablePathIconSupplierReorderPulse,
+        iconRes = stateValues.drawableResIconSupplierReorderPulse.value,
         implemented = true
     ),
     SupplierFeaturePlanUiModel(
@@ -18902,6 +18944,47 @@ private fun AppConfiguration.supplierSuggestedQuoteText(
     ).filter { it.isNotBlank() }.joinToString(" • ")
 }
 
+private fun AppConfiguration.supplierSuggestedPriceBookPrice(
+    prices: List<PriceDataModel?>,
+    supplierId: String
+): PriceDataModel? {
+    val pairs = prices.mapNotNull { price ->
+        val value = price?.price?.supplierOfferPriceNumberOrNull() ?: return@mapNotNull null
+        Triple(value, price.currency.trim().ifBlank { "KZT" }, price.supplierId)
+    }
+    if (pairs.isEmpty()) return null
+
+    val currency = pairs.groupingBy { it.second }.eachCount().maxByOrNull { it.value }?.key ?: pairs.last().second
+    val values = pairs.filter { it.second == currency }.map { it.first }.ifEmpty { pairs.map { it.first } }
+    val sourceSupplierId = supplierId.ifBlank { pairs.lastOrNull { it.third.isNotBlank() }?.third.orEmpty() }
+    return PriceDataModel(
+        price = values.average().roundMoney().toStockMoneyText(),
+        currency = currency,
+        supplierId = sourceSupplierId
+    )
+}
+
+private fun supplierCatalogSameUnitQuantities(lines: List<SupplierOrderLineDataModel>): List<QuantityDataModel> {
+    val quantities = lines.map { it.requestedQuantity }.filter { it.total > 0.0 }
+    val first = quantities.firstOrNull() ?: return emptyList()
+    return quantities.takeIf { list -> list.all { it.id == first.id && it.roundTotal == first.roundTotal } }.orEmpty()
+}
+
+private fun supplierPriceBookMinOrderQuantity(lines: List<SupplierOrderLineDataModel>): QuantityDataModel? {
+    val quantities = supplierCatalogSameUnitQuantities(lines)
+    val first = quantities.firstOrNull() ?: return null
+    val packageStep = first.pricedAmount.takeIf { it > 0.0 } ?: if (first.roundTotal) 1.0 else 0.001
+    val smallestStoreRequest = quantities.minOfOrNull { it.total } ?: first.total
+    return first.copy(total = smallestStoreRequest.coerceAtLeast(packageStep))
+}
+
+private fun supplierPriceBookPackageQuantity(lines: List<SupplierOrderLineDataModel>): QuantityDataModel? {
+    val quantities = supplierCatalogSameUnitQuantities(lines)
+    val first = quantities.firstOrNull() ?: return null
+    val packageStep = first.pricedAmount.takeIf { it > 0.0 } ?: if (first.roundTotal) 1.0 else 0.001
+    return first.copy(total = packageStep.coerceAtLeast(if (first.roundTotal) 1.0 else 0.001))
+}
+
 private fun SupplierOrderDataModel.supplierDeskSortTime(): Long =
     updatedAtMillis.takeIf { it > 0L } ?: orderedAtMillis.takeIf { it > 0L } ?: createdAtMillis
 
@@ -18931,6 +19014,12 @@ private fun AppConfiguration.supplierDeskOrderSearchText(
 }.lowercase()
 
 
+private data class SupplierCatalogPriceBookTargetUiModel(
+    val storeId: String,
+    val supplierId: String,
+    val storeTitle: String
+)
+
 private data class SupplierCatalogItemUiModel(
     val goodsItemId: String,
     val title: String,
@@ -18949,7 +19038,12 @@ private data class SupplierCatalogItemUiModel(
     val suggestedQuoteText: String,
     val quoteNote: String,
     val searchKey: String,
-    val offerNote: String
+    val offerNote: String,
+    val priceBookTargets: List<SupplierCatalogPriceBookTargetUiModel>,
+    val suggestedSupplyPrice: PriceDataModel?,
+    val suggestedMinOrderQuantity: QuantityDataModel?,
+    val suggestedPackageQuantity: QuantityDataModel?,
+    val priceBookNote: String
 )
 
 private fun AppConfiguration.supplierCatalogQuantityText(lines: List<SupplierOrderLineDataModel>): String {
@@ -19028,8 +19122,29 @@ private fun AppConfiguration.buildSupplierCatalogItems(
             val priceSignalPrices = itemLines.map { line ->
                 line.supplierOfferedSupplyPrice ?: line.expectedSupplyPrice ?: ordersById[line.orderId]?.amount
             }
+            val priceBookTargets = relatedOrders
+                .mapNotNull { order ->
+                    val targetStoreId = order.storeId.trim()
+                    val targetSupplierId = order.supplierId.trim()
+                    if (targetStoreId.isBlank() || targetSupplierId.isBlank()) null else SupplierCatalogPriceBookTargetUiModel(
+                        storeId = targetStoreId,
+                        supplierId = targetSupplierId,
+                        storeTitle = supplierDeskStoreTitle(order)
+                    )
+                }
+                .distinctBy { target -> target.storeId + ":" + target.supplierId }
+            val suggestedSupplyPrice = supplierSuggestedPriceBookPrice(priceSignalPrices, latestOrder?.supplierId.orEmpty())
+            val suggestedMinOrderQuantity = supplierPriceBookMinOrderQuantity(itemLines)
+            val suggestedPackageQuantity = supplierPriceBookPackageQuantity(itemLines)
             val priceSignalText = supplierOfferPriceSignalText(priceSignalPrices)
             val suggestedQuoteText = supplierSuggestedQuoteText(priceSignalPrices, totalQuantityText)
+            val priceBookNote = buildString {
+                append(localizedStringResource(1626, "Supplier price book")).append(": ").append(title)
+                suggestedSupplyPrice?.let { append('\n').append(localizedStringResource(1599, "Offered price")).append(": ").append(it.supplierDeskMoneyText()) }
+                suggestedMinOrderQuantity?.let { append('\n').append(localizedStringResource(1628, "Minimum order")).append(": ").append(it.quantityText(stateValues.appLanguage)) }
+                suggestedPackageQuantity?.let { append('\n').append(localizedStringResource(1629, "Pack step")).append(": ").append(it.quantityText(stateValues.appLanguage)) }
+                append('\n').append(localizedStringResource(1422, "Stores asking")).append(": ").append(storeListText)
+            }
             val quoteNote = buildString {
                 append(localizedStringResource(1583, "Offer studio")).append(": ").append(title)
                 if (barcodeText.isNotBlank()) append('\n').append(stateValues.stringBarcode).append(": ").append(barcodeText)
@@ -19081,7 +19196,12 @@ private fun AppConfiguration.buildSupplierCatalogItems(
                 suggestedQuoteText = suggestedQuoteText,
                 quoteNote = quoteNote,
                 searchKey = searchKey,
-                offerNote = offerNote
+                offerNote = offerNote,
+                priceBookTargets = priceBookTargets,
+                suggestedSupplyPrice = suggestedSupplyPrice,
+                suggestedMinOrderQuantity = suggestedMinOrderQuantity,
+                suggestedPackageQuantity = suggestedPackageQuantity,
+                priceBookNote = priceBookNote
             )
         }
         .sortedWith(compareByDescending<SupplierCatalogItemUiModel> { if (it.openOrderCount > 0) 1 else 0 }
@@ -19109,6 +19229,35 @@ private fun AppConfiguration.SupplierCatalogChip(text: String) {
 @Composable
 private fun AppConfiguration.SupplierCatalogItemCard(item: SupplierCatalogItemUiModel) {
     val coroutineScope = rememberCoroutineScope()
+    val priceBookPublishEnabled = item.suggestedSupplyPrice != null &&
+            item.priceBookTargets.isNotEmpty() &&
+            item.goodsItemId.isNotBlank()
+
+    fun publishPriceBook() {
+        val suggestedPrice = item.suggestedSupplyPrice
+        if (suggestedPrice == null || item.priceBookTargets.isEmpty()) {
+            postInAppNotification(
+                localizedStringResource(1636, "No price book rows to publish"),
+                NotificationType.Negative,
+                transient = true
+            )
+            return
+        }
+
+        val entries = item.priceBookTargets.map { target ->
+            SupplierGoodsPriceDataModel(
+                storeId = target.storeId,
+                supplierId = target.supplierId,
+                goodsItemId = item.goodsItemId,
+                supplyPrice = suggestedPrice.copy(supplierId = target.supplierId),
+                minOrderQuantity = item.suggestedMinOrderQuantity,
+                packageQuantity = item.suggestedPackageQuantity,
+                supplierBarcode = item.barcodeText.takeIf { it.isNotBlank() },
+                supplierGoodsName = item.title.takeIf { it.isNotBlank() }
+            )
+        }
+        publishSupplierGoodsPrices(entries)
+    }
 
     Column(
         modifier = Modifier
@@ -19245,6 +19394,67 @@ private fun AppConfiguration.SupplierCatalogItemCard(item: SupplierCatalogItemUi
             }
             StockCardInfoLine(localizedStringResource(1585, "Price signal"), item.priceSignalText, stateValues.TextColor)
             StockCardInfoLine(localizedStringResource(1586, "Suggested quote"), item.suggestedQuoteText, stateValues.TextColor)
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(stateValues.cornerRadius))
+                .background(stateValues.AccentColor.copy(alpha = 0.08f))
+                .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.55f), RoundedCornerShape(stateValues.cornerRadius))
+                .padding(stateValues.marginTextField),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                CpImage(
+                    modifier = Modifier.size(28.dp),
+                    url = stateValues.drawablePathIconSupplierPriceBook,
+                    fallbackRes = stateValues.drawableResIconSupplierPriceBook.value,
+                    contentDescription = localizedStringResource(1626, "Supplier price book"),
+                    tintColor = stateValues.AccentColor
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = localizedStringResource(1626, "Supplier price book"),
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.textSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = localizedStringResource(1627, "Publish the suggested offer into each asking store's supplier price memory, so their next supply order starts with your terms."),
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize
+                    )
+                }
+            }
+            StockCardInfoLine(localizedStringResource(1599, "Offered price"), item.suggestedSupplyPrice.supplierDeskMoneyText().ifBlank { localizedStringResource(1589, "No expected prices yet") }, stateValues.TextColor)
+            item.suggestedMinOrderQuantity?.let { quantity ->
+                StockCardInfoLine(localizedStringResource(1628, "Minimum order"), quantity.quantityText(stateValues.appLanguage), stateValues.TextColor)
+            }
+            item.suggestedPackageQuantity?.let { quantity ->
+                StockCardInfoLine(localizedStringResource(1629, "Pack step"), quantity.quantityText(stateValues.appLanguage), stateValues.TextColor)
+            }
+            StockCardInfoLine(localizedStringResource(1630, "Publish targets"), item.priceBookTargets.size.toString(), stateValues.TextColor)
+            actionButton(
+                modifier = Modifier.fillMaxWidth(),
+                text = localizedStringResource(1631, "Publish price book"),
+                iconPath = stateValues.drawablePathIconSupplierPriceBook,
+                iconRes = stateValues.drawableResIconSupplierPriceBook.value,
+                enabled = priceBookPublishEnabled,
+                confirmationRequired = true,
+                onDisabledClick = {
+                    postInAppNotification(
+                        localizedStringResource(1632, "Need a price signal and at least one partner store first"),
+                        NotificationType.Negative,
+                        transient = true
+                    )
+                },
+                onClick = { publishPriceBook() }
+            )
         }
 
         Text(
@@ -22708,6 +22918,320 @@ private fun AppConfiguration.SupplierDemandRadarCard(item: SupplierDemandRadarUi
 }
 
 
+private data class SupplierReorderPulseUiModel(
+    val key: String,
+    val storeId: String,
+    val goodsItemId: String,
+    val title: String,
+    val storeTitle: String,
+    val subtitle: String,
+    val lastOrderMillis: Long,
+    val daysSinceLast: Int,
+    val rhythmText: String,
+    val suggestedQuantityText: String,
+    val averageQuantityText: String,
+    val latestPriceText: String,
+    val openOrderCount: Int,
+    val pendingContractCount: Int,
+    val activeContractCount: Int,
+    val statusHint: String,
+    val reorderNote: String,
+    val score: Int,
+    val searchKey: String
+)
+
+private fun AppConfiguration.supplierContractTouchesGoods(
+    contract: SupplierPartnershipContractDataModel,
+    goodsItemId: String
+): Boolean {
+    return contract.scopeType == SUPPLIER_CONTRACT_SCOPE_PARTNERSHIP ||
+            contract.goodsItemIds.isEmpty() ||
+            goodsItemId in contract.goodsItemIds
+}
+
+private fun AppConfiguration.buildSupplierReorderPulseItems(
+    orders: List<SupplierOrderDataModel>,
+    lines: List<SupplierOrderLineDataModel>,
+    contracts: List<SupplierPartnershipContractDataModel>
+): List<SupplierReorderPulseUiModel> {
+    val activeOrders = orders.filter { it.isActive }
+    val ordersById = activeOrders.associateBy { it.id }
+    val activeContracts = contracts.filter { it.isActive }
+    val now = getCurrentTimeMillis()
+    val dayMillis = 86_400_000L
+
+    return lines
+        .filter { it.isActive && it.goodsItemId.isNotBlank() }
+        .mapNotNull { line -> ordersById[line.orderId]?.let { order -> order to line } }
+        .groupBy { (order, line) -> "${order.storeId}:${order.supplierId}:${line.goodsItemId}" }
+        .mapNotNull { (key, pairs) ->
+            val latestPair = pairs.maxByOrNull { (order, _) -> order.supplierDeskSortTime() } ?: return@mapNotNull null
+            val latestOrder = latestPair.first
+            val sampleLine = latestPair.second
+            val relatedOrders = pairs.map { it.first }.distinctBy { it.id }
+            if (relatedOrders.isEmpty()) return@mapNotNull null
+
+            val storeTitle = supplierDeskStoreTitle(latestOrder)
+            val title = supplierDeskLineTitle(sampleLine)
+            val sortedTimes = relatedOrders
+                .map { it.supplierDeskSortTime() }
+                .filter { it > 0L }
+                .distinct()
+                .sorted()
+            val lastOrderMillis = sortedTimes.lastOrNull() ?: latestOrder.supplierDeskSortTime()
+            val daysSinceLast = ((now - lastOrderMillis).coerceAtLeast(0L) / dayMillis).toInt()
+            val rhythmDays = sortedTimes
+                .zipWithNext { earlier, later -> ((later - earlier).coerceAtLeast(0L) / dayMillis).toDouble() }
+                .filter { it > 0.0 }
+                .takeIf { it.isNotEmpty() }
+                ?.average()
+            val rhythmText = rhythmDays
+                ?.let { "${it.supplierOfferCompactNumberText()} ${localizedStringResource(1654, "days")}" }
+                ?: localizedStringResource(1645, "First rhythm signal")
+
+            val quantityNumbers = pairs.map { (_, line) ->
+                (line.supplierAcceptedQuantity ?: line.requestedQuantity).total.coerceAtLeast(0.0)
+            }.filter { it > 0.0 }
+            val averageQuantity = quantityNumbers.takeIf { it.isNotEmpty() }?.average() ?: sampleLine.requestedQuantity.total.coerceAtLeast(0.0)
+            val openOrderCount = relatedOrders.count { !it.status.isSupplierOrderClosed() }
+            val pendingContractCount = activeContracts.count { contract ->
+                contract.storeId == latestOrder.storeId &&
+                        contract.supplierId == latestOrder.supplierId &&
+                        (contract.status == SUPPLIER_CONTRACT_STATUS_PENDING_STORE || contract.status == SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER) &&
+                        supplierContractTouchesGoods(contract, sampleLine.goodsItemId)
+            }
+            val activeContractCount = activeContracts.count { contract ->
+                contract.storeId == latestOrder.storeId &&
+                        contract.supplierId == latestOrder.supplierId &&
+                        contract.status == SUPPLIER_CONTRACT_STATUS_ACTIVE &&
+                        supplierContractTouchesGoods(contract, sampleLine.goodsItemId)
+            }
+            val isDue = rhythmDays?.let { daysSinceLast + 1 >= it } ?: false
+            val suggestedMultiplier = when {
+                openOrderCount > 0 -> 1.0
+                isDue -> 1.15
+                else -> 1.0
+            }
+            val suggestedQuantity = sampleLine.requestedQuantity.copy(total = (averageQuantity * suggestedMultiplier).coerceAtLeast(0.0))
+            val averageQuantityModel = sampleLine.requestedQuantity.copy(total = averageQuantity.coerceAtLeast(0.0))
+            val latestPrice = pairs
+                .sortedByDescending { (order, _) -> order.supplierDeskSortTime() }
+                .asSequence()
+                .mapNotNull { (_, line) -> line.supplierOfferedSupplyPrice ?: line.expectedSupplyPrice }
+                .firstOrNull()
+                .supplierDeskMoneyText()
+            val statusHint = when {
+                openOrderCount > 0 -> localizedStringResource(1644, "Already open")
+                pendingContractCount > 0 -> localizedStringResource(1656, "Pending contract before next delivery")
+                isDue -> localizedStringResource(1642, "Likely due")
+                rhythmDays == null -> localizedStringResource(1645, "First rhythm signal")
+                else -> localizedStringResource(1643, "Early watch")
+            }
+            val contractSignal = when {
+                pendingContractCount > 0 -> localizedStringResource(1656, "Pending contract before next delivery")
+                activeContractCount > 0 -> localizedStringResource(1657, "Terms are active")
+                else -> localizedStringResource(1659, "No contract terms yet")
+            }
+            val reorderNote = buildString {
+                append(localizedStringResource(1639, "Reorder pulse")).append('\n')
+                append(localizedStringResource(1619, "Item")).append(": ").append(title).append('\n')
+                append(localizedStringResource(146, "Store")).append(": ").append(storeTitle).append('\n')
+                append(localizedStringResource(1648, "Suggested reorder")).append(": ").append(suggestedQuantity.quantityText(stateValues.appLanguage)).append('\n')
+                append(localizedStringResource(1647, "Average rhythm")).append(": ").append(rhythmText).append('\n')
+                append(localizedStringResource(1646, "Last order")).append(": ").append(receiptUiDateTime(lastOrderMillis))
+                if (latestPrice.isNotBlank()) append('\n').append(localizedStringResource(1610, "Latest price signal")).append(": ").append(latestPrice)
+                append('\n').append(localizedStringResource(1650, "Contract signal")).append(": ").append(contractSignal)
+            }
+            val score = when {
+                openOrderCount > 0 -> 100
+                isDue -> 80
+                pendingContractCount > 0 -> 70
+                else -> 35
+            } + relatedOrders.size * 4 + activeContractCount * 2 - daysSinceLast.coerceAtMost(14)
+
+            SupplierReorderPulseUiModel(
+                key = key,
+                storeId = latestOrder.storeId,
+                goodsItemId = sampleLine.goodsItemId,
+                title = title,
+                storeTitle = storeTitle,
+                subtitle = listOf(storeTitle, statusHint).filter { it.isNotBlank() }.joinToString(" • "),
+                lastOrderMillis = lastOrderMillis,
+                daysSinceLast = daysSinceLast,
+                rhythmText = rhythmText,
+                suggestedQuantityText = suggestedQuantity.quantityText(stateValues.appLanguage),
+                averageQuantityText = averageQuantityModel.quantityText(stateValues.appLanguage),
+                latestPriceText = latestPrice,
+                openOrderCount = openOrderCount,
+                pendingContractCount = pendingContractCount,
+                activeContractCount = activeContractCount,
+                statusHint = statusHint,
+                reorderNote = reorderNote,
+                score = score,
+                searchKey = buildString {
+                    append(sampleLine.goodsItemId).append(' ')
+                    append(title).append(' ')
+                    append(storeTitle).append(' ')
+                    append(statusHint).append(' ')
+                    append(latestOrder.storePublicIdSnapshot).append(' ')
+                    append(sampleLine.goodsItemBarcodeSnapshots.joinToString(" "))
+                }.lowercase()
+            )
+        }
+        .sortedWith(compareByDescending<SupplierReorderPulseUiModel> { it.score }
+            .thenByDescending { it.lastOrderMillis })
+}
+
+@Composable
+private fun AppConfiguration.SupplierReorderPulseCard(item: SupplierReorderPulseUiModel) {
+    val coroutineScope = rememberCoroutineScope()
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .border(
+                if (item.openOrderCount > 0 || item.pendingContractCount > 0) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
+                when {
+                    item.pendingContractCount > 0 -> stateValues.BorderlineBadColor
+                    item.openOrderCount > 0 -> stateValues.AccentColor
+                    else -> stateValues.PlaceholderTextColor
+                },
+                RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .padding(stateValues.marginTextFieldGroup),
+        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CpImage(
+                    modifier = Modifier.size(32.dp),
+                    url = stateValues.drawablePathIconSupplierReorderPulse,
+                    fallbackRes = stateValues.drawableResIconSupplierReorderPulse.value,
+                    contentDescription = localizedStringResource(1639, "Reorder pulse"),
+                    tintColor = stateValues.AccentColor
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.title,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.accentTextSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = item.subtitle,
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Text(
+                text = item.suggestedQuantityText,
+                color = stateValues.AccentColor,
+                fontSize = stateValues.accentTextSize,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.End,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        StockCardInfoLine(localizedStringResource(1648, "Suggested reorder"), item.suggestedQuantityText, stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1649, "Average order"), item.averageQuantityText, stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1647, "Average rhythm"), item.rhythmText, stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1646, "Last order"), "${receiptUiDateTime(item.lastOrderMillis)} • ${item.daysSinceLast} ${localizedStringResource(1654, "days")}", stateValues.TextColor)
+        item.latestPriceText.takeIf { it.isNotBlank() }?.let { price ->
+            StockCardInfoLine(localizedStringResource(1610, "Latest price signal"), price, stateValues.TextColor)
+        }
+        StockCardInfoLine(localizedStringResource(1650, "Contract signal"), item.statusHint, stateValues.TextColor)
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = item.statusHint) }
+            Box(modifier = Modifier.weight(1f)) {
+                SupplierCatalogChip(text = "${localizedStringResource(1423, "Open requests")}: ${item.openOrderCount}")
+            }
+        }
+
+        if (stateValues.isNarrowScreen) {
+            Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1651, "Copy reorder nudge"),
+                    iconPath = stateValues.drawablePathIconSupplierReorderPulse,
+                    iconRes = stateValues.drawableResIconSupplierReorderPulse.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        copyTextToClipboard(item.reorderNote)
+                        postInAppNotification(localizedStringResource(1652, "Reorder nudge copied"), NotificationType.Positive, transient = true)
+                    }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1653, "Open partner orders"),
+                    iconPath = stateValues.drawablePathIconAppModeSupplier,
+                    iconRes = stateValues.drawableResIconAppModeSupplier.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.storeId)
+                            Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
+                        }
+                    }
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1651, "Copy reorder nudge"),
+                    iconPath = stateValues.drawablePathIconSupplierReorderPulse,
+                    iconRes = stateValues.drawableResIconSupplierReorderPulse.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        copyTextToClipboard(item.reorderNote)
+                        postInAppNotification(localizedStringResource(1652, "Reorder nudge copied"), NotificationType.Positive, transient = true)
+                    }
+                )
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1653, "Open partner orders"),
+                    iconPath = stateValues.drawablePathIconAppModeSupplier,
+                    iconRes = stateValues.drawableResIconAppModeSupplier.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.storeId)
+                            Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
+                        }
+                    }
+                )
+            }
+        }
+    }
+}
+
+
 private data class SupplierManufacturerBridgeUiModel(
     val goodsItemId: String,
     val title: String,
@@ -22975,7 +23499,13 @@ private fun AppConfiguration.SupplierInsightsScreen() {
     val manufacturerBridgeItems = remember(activeOrders, activeLines, stateValues.appLanguage) {
         buildSupplierManufacturerBridgeItems(activeOrders, activeLines)
     }
+    val reorderPulseItems = remember(activeOrders, activeLines, activeContracts, stateValues.appLanguage) {
+        buildSupplierReorderPulseItems(activeOrders, activeLines, activeContracts)
+    }
     val normalizedSearch = searchQuery.trim().lowercase()
+    val visibleReorderPulseItems = remember(reorderPulseItems, normalizedSearch) {
+        reorderPulseItems.filter { normalizedSearch.isBlank() || it.searchKey.contains(normalizedSearch) }
+    }
     val visibleRadarItems = remember(radarItems, normalizedSearch) {
         radarItems.filter { normalizedSearch.isBlank() || it.searchKey.contains(normalizedSearch) }
     }
@@ -23097,6 +23627,7 @@ private fun AppConfiguration.SupplierInsightsScreen() {
                     }
 
                     StockCardInfoLine(localizedStringResource(1555, "Active contracts"), activeContractCount.toString(), stateValues.TextColor)
+                    StockCardInfoLine(localizedStringResource(1640, "Partner reorder pulses"), reorderPulseItems.size.toString(), stateValues.TextColor)
                     StockCardInfoLine(localizedStringResource(1625, "Upstream bridge items"), manufacturerBridgeItems.size.toString(), stateValues.TextColor)
                     Text(
                         text = localizedStringResource(1553, "This is the bridge from store-side ordering to supplier-side planning: orders feed catalog, contracts guard supply, partners show reliability, and insights decide what to prepare next."),
@@ -23198,6 +23729,46 @@ private fun AppConfiguration.SupplierInsightsScreen() {
                             )
                         }
                     }
+                }
+            }
+
+
+            item {
+                Text(
+                    text = localizedStringResource(1640, "Partner reorder pulses"),
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.titleTextSize,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            item {
+                Text(
+                    text = localizedStringResource(1658, "Store demand now becomes a sales rep task: who to remind, what quantity to suggest, and whether contracts or price book terms are ready."),
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            if (reorderPulseItems.isEmpty()) {
+                item {
+                    MessageText(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(1655, "No reorder rhythm yet")
+                    )
+                }
+            } else if (visibleReorderPulseItems.isEmpty()) {
+                item {
+                    MessageText(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(1380, "No orders match this filter")
+                    )
+                }
+            } else {
+                items(visibleReorderPulseItems.take(5), key = { "reorder_pulse_${it.key}" }) { item ->
+                    SupplierReorderPulseCard(item)
                 }
             }
 
@@ -46049,6 +46620,12 @@ object AppConfiguration {
         val drawablePathIconSupplierManufacturerBridge: String
         val drawableResIconSupplierManufacturerBridge: StateFlow<DrawableResource>
 
+        val drawablePathIconSupplierPriceBook: String
+        val drawableResIconSupplierPriceBook: StateFlow<DrawableResource>
+
+        val drawablePathIconSupplierReorderPulse: String
+        val drawableResIconSupplierReorderPulse: StateFlow<DrawableResource>
+
         val drawablePathIconBuyerAgeRestriction: String
         val drawableResIconBuyerAgeRestriction: StateFlow<DrawableResource>
 
@@ -46692,6 +47269,14 @@ object AppConfiguration {
             private val _drawableResIconSupplierManufacturerBridge = MutableStateFlow(Res.drawable._81_0)
             override val drawableResIconSupplierManufacturerBridge: StateFlow<DrawableResource> = _drawableResIconSupplierManufacturerBridge.asStateFlow()
 
+            override val drawablePathIconSupplierPriceBook: String by drawablePathIconSupplierPriceBookState.collectAsState()
+            private val _drawableResIconSupplierPriceBook = MutableStateFlow(Res.drawable._82_0)
+            override val drawableResIconSupplierPriceBook: StateFlow<DrawableResource> = _drawableResIconSupplierPriceBook.asStateFlow()
+
+            override val drawablePathIconSupplierReorderPulse: String by drawablePathIconSupplierReorderPulseState.collectAsState()
+            private val _drawableResIconSupplierReorderPulse = MutableStateFlow(Res.drawable._83_0)
+            override val drawableResIconSupplierReorderPulse: StateFlow<DrawableResource> = _drawableResIconSupplierReorderPulse.asStateFlow()
+
             override val drawablePathIconBuyerAgeRestriction: String by drawablePathIconBuyerAgeRestrictionState.collectAsState()
             private val _drawableResIconBuyerAgeRestriction = MutableStateFlow(Res.drawable._73_0)
             override val drawableResIconBuyerAgeRestriction: StateFlow<DrawableResource> = _drawableResIconBuyerAgeRestriction.asStateFlow()
@@ -46905,6 +47490,8 @@ object AppConfiguration {
                 _drawableResIconSupplierOfferStudio.emit(if (stateValues.appThemeId == 1L) Res.drawable._79_1 else Res.drawable._79_0)
                 _drawableResIconSupplierSubstitutions.emit(if (stateValues.appThemeId == 1L) Res.drawable._80_1 else Res.drawable._80_0)
                 _drawableResIconSupplierManufacturerBridge.emit(if (stateValues.appThemeId == 1L) Res.drawable._81_1 else Res.drawable._81_0)
+                _drawableResIconSupplierPriceBook.emit(if (stateValues.appThemeId == 1L) Res.drawable._82_1 else Res.drawable._82_0)
+                _drawableResIconSupplierReorderPulse.emit(if (stateValues.appThemeId == 1L) Res.drawable._83_1 else Res.drawable._83_0)
                 _drawableResIconBuyerAgeRestriction.emit(if (stateValues.appThemeId == 1L) Res.drawable._73_1 else Res.drawable._73_0)
                 _drawableResIconTransactionTimeRestriction.emit(if (stateValues.appThemeId == 1L) Res.drawable._74_1 else Res.drawable._74_0)
 

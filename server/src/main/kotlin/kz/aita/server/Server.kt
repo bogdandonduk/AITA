@@ -4294,6 +4294,39 @@ private fun userHasSupplierAccessInsideTransaction(
     return decodeSupplierStringList(supplier[Suppliers.userIds]).contains(userId.toString())
 }
 
+private fun supplierStoreRelationshipExistsInsideTransaction(
+    storeId: UUID,
+    supplierId: UUID
+): Boolean {
+    val supplierExists = Suppliers
+        .select(Suppliers.id)
+        .where { (Suppliers.id eq supplierId) and (Suppliers.isActive eq true) }
+        .empty()
+        .not()
+    if (!supplierExists) return false
+
+    val hasOrder = SupplierOrders
+        .select(SupplierOrders.id)
+        .where {
+            (SupplierOrders.storeId eq storeId) and
+                    (SupplierOrders.supplierId eq supplierId) and
+                    (SupplierOrders.isActive eq true)
+        }
+        .empty()
+        .not()
+    if (hasOrder) return true
+
+    return SupplierPartnershipContracts
+        .select(SupplierPartnershipContracts.id)
+        .where {
+            (SupplierPartnershipContracts.storeId eq storeId) and
+                    (SupplierPartnershipContracts.supplierId eq supplierId) and
+                    (SupplierPartnershipContracts.isActive eq true)
+        }
+        .empty()
+        .not()
+}
+
 
 private fun isStoreOwnerInsideTransaction(userId: UUID, storeId: UUID): Boolean {
     val rootStoreId = rootStoreIdForAccessInsideTransaction(storeId)
@@ -10861,7 +10894,17 @@ fun Application.module() {
                         val goodsItemId = runCatching { UUID.fromString(body.goodsItemId) }.getOrNull()
                             ?: return@newSuspendedTransaction null
 
-                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_SUPPLIER_PRICES_MANAGE, requireWorkshift = true))
+                        val itemBelongsToStore = StockItems
+                            .select(StockItems.id)
+                            .where { (StockItems.id eq goodsItemId) and (StockItems.storeId eq storeId) and (StockItems.isActive eq true) }
+                            .empty()
+                            .not()
+                        if (!itemBelongsToStore) return@newSuspendedTransaction null
+
+                        val canStoreManage = userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_SUPPLIER_PRICES_MANAGE, requireWorkshift = true)
+                        val canSupplierPublish = userHasSupplierAccessInsideTransaction(userId, supplierId) &&
+                                supplierStoreRelationshipExistsInsideTransaction(storeId, supplierId)
+                        if (!canStoreManage && !canSupplierPublish)
                             return@newSuspendedTransaction null
 
                         val now = System.currentTimeMillis()
@@ -10891,6 +10934,7 @@ fun Application.module() {
                     }
 
                     result?.let {
+                        publishStockRealtimeBundle(it.storeId, "supplier_goods_price_saved")
                         call.genericResponse(
                             status = HttpStatusCode.OK,
                             payload = it,
@@ -10910,8 +10954,7 @@ fun Application.module() {
                         ?: return@delete call.respondAitaUnauthorized()
 
                     val deleted = newSuspendedTransaction(aitaServerIoContext) {
-                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_SUPPLIER_PRICES_MANAGE, requireWorkshift = true))
-                            return@newSuspendedTransaction null
+                        val canStoreManage = userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_SUPPLIER_PRICES_MANAGE, requireWorkshift = true)
 
                         val now = System.currentTimeMillis()
                         val result = mutableListOf<String>()
@@ -10920,10 +10963,23 @@ fun Application.module() {
                             val id = runCatching { UUID.fromString(rawId) }.getOrNull()
                                 ?: continue
 
+                            val row = SupplierGoodsPrices
+                                .selectAll()
+                                .where {
+                                    (SupplierGoodsPrices.id eq id) and
+                                            (SupplierGoodsPrices.storeId eq storeId) and
+                                            (SupplierGoodsPrices.isActive eq true)
+                                }
+                                .singleOrNull()
+                                ?: continue
+
+                            val canSupplierDelete = row[SupplierGoodsPrices.userId] == userId ||
+                                    userHasSupplierAccessInsideTransaction(userId, row[SupplierGoodsPrices.supplierId])
+                            if (!canStoreManage && !canSupplierDelete) continue
+
                             val affected = SupplierGoodsPrices.update({
                                 (SupplierGoodsPrices.id eq id) and
-                                        (SupplierGoodsPrices.storeId eq storeId) and
-                                        (SupplierGoodsPrices.userId eq userId)
+                                        (SupplierGoodsPrices.storeId eq storeId)
                             }) {
                                 it[SupplierGoodsPrices.isActive] = false
                                 it[SupplierGoodsPrices.updatedAtMillis] = now
@@ -10937,6 +10993,7 @@ fun Application.module() {
                     }
 
                     deleted?.let {
+                        if (it.isNotEmpty()) publishStockRealtimeBundle(storeId.toString(), "supplier_goods_price_deleted")
                         call.genericResponse(
                             status = HttpStatusCode.OK,
                             payload = it,
