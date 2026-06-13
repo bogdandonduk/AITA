@@ -31732,6 +31732,237 @@
           "value": "Келісімге дайын ұсыныс көшірілді"
         }
       ]
+    },
+    {
+      "id": 1594,
+      "values": [
+        {
+          "language": "main",
+          "value": "Line offer"
+        },
+        {
+          "language": "en",
+          "value": "Line offer"
+        },
+        {
+          "language": "ru",
+          "value": "Предложение по строке"
+        },
+        {
+          "language": "kk",
+          "value": "Жол бойынша ұсыныс"
+        }
+      ]
+    },
+    {
+      "id": 1595,
+      "values": [
+        {
+          "language": "main",
+          "value": "Confirm exact quantity, adjust price, or propose a substitution/shortage note before store receives it."
+        },
+        {
+          "language": "en",
+          "value": "Confirm exact quantity, adjust price, or propose a substitution/shortage note before store receives it."
+        },
+        {
+          "language": "ru",
+          "value": "Подтвердите точное количество, измените цену или предложите замену/дефицит до приёмки магазином."
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен қабылдамай тұрып нақты санды растаңыз, бағаны өзгертіңіз немесе ауыстыру/жетіспеу ескертпесін ұсыныңыз."
+        }
+      ]
+    },
+    {
+      "id": 1596,
+      "values": [
+        {
+          "language": "main",
+          "value": "Requested"
+        },
+        {
+          "language": "en",
+          "value": "Requested"
+        },
+        {
+          "language": "ru",
+          "value": "Запрошено"
+        },
+        {
+          "language": "kk",
+          "value": "Сұралды"
+        }
+      ]
+    },
+    {
+      "id": 1597,
+      "values": [
+        {
+          "language": "main",
+          "value": "Accepted"
+        },
+        {
+          "language": "en",
+          "value": "Accepted"
+        },
+        {
+          "language": "ru",
+          "value": "Принято"
+        },
+        {
+          "language": "kk",
+          "value": "Қабылданды"
+        }
+      ]
+    },
+    {
+      "id": 1598,
+      "values": [
+        {
+          "language": "main",
+          "value": "Offered"
+        },
+        {
+          "language": "en",
+          "value": "Offered"
+        },
+        {
+          "language": "ru",
+          "value": "Предложено"
+        },
+        {
+          "language": "kk",
+          "value": "Ұсынылды"
+        }
+      ]
+    },
+    {
+      "id": 1599,
+      "values": [
+        {
+          "language": "main",
+          "value": "Offered price"
+        },
+        {
+          "language": "en",
+          "value": "Offered price"
+        },
+        {
+          "language": "ru",
+          "value": "Предложенная цена"
+        },
+        {
+          "language": "kk",
+          "value": "Ұсынылған баға"
+        }
+      ]
+    },
+    {
+      "id": 1600,
+      "values": [
+        {
+          "language": "main",
+          "value": "Substitution / shortage note for store"
+        },
+        {
+          "language": "en",
+          "value": "Substitution / shortage note for store"
+        },
+        {
+          "language": "ru",
+          "value": "Заметка о замене / дефиците для магазина"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкенге ауыстыру / жетіспеу ескертпесі"
+        }
+      ]
+    },
+    {
+      "id": 1601,
+      "values": [
+        {
+          "language": "main",
+          "value": "Can fulfill as requested"
+        },
+        {
+          "language": "en",
+          "value": "Can fulfill as requested"
+        },
+        {
+          "language": "ru",
+          "value": "Можно выполнить как запрошено"
+        },
+        {
+          "language": "kk",
+          "value": "Сұралғандай орындауға болады"
+        }
+      ]
+    },
+    {
+      "id": 1602,
+      "values": [
+        {
+          "language": "main",
+          "value": "Save line offer"
+        },
+        {
+          "language": "en",
+          "value": "Save line offer"
+        },
+        {
+          "language": "ru",
+          "value": "Сохранить предложение строки"
+        },
+        {
+          "language": "kk",
+          "value": "Жол ұсынысын сақтау"
+        }
+      ]
+    },
+    {
+      "id": 1603,
+      "values": [
+        {
+          "language": "main",
+          "value": "Line rescue saved"
+        },
+        {
+          "language": "en",
+          "value": "Line rescue saved"
+        },
+        {
+          "language": "ru",
+          "value": "Предложение по строке сохранено"
+        },
+        {
+          "language": "kk",
+          "value": "Жол ұсынысы сақталды"
+        }
+      ]
+    },
+    {
+      "id": 1604,
+      "values": [
+        {
+          "language": "main",
+          "value": "Receive supplier offer"
+        },
+        {
+          "language": "en",
+          "value": "Receive supplier offer"
+        },
+        {
+          "language": "ru",
+          "value": "Принять предложение поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші ұсынысын қабылдау"
+        }
+      ]
     }
   ]
 }

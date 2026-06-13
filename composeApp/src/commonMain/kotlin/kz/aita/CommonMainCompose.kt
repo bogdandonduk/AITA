@@ -1048,6 +1048,17 @@ private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallb
     put(1591L, mapOf("main" to "MOQ hint", "en" to "MOQ hint", "ru" to "Подсказка MOQ", "kk" to "MOQ кеңесі"))
     put(1592L, mapOf("main" to "Demand signal", "en" to "Demand signal", "ru" to "Сигнал спроса", "kk" to "Сұраныс сигналы"))
     put(1593L, mapOf("main" to "Contract-ready quote copied", "en" to "Contract-ready quote copied", "ru" to "Предложение для договора скопировано", "kk" to "Келісімге дайын ұсыныс көшірілді"))
+    put(1594L, mapOf("main" to "Line offer", "en" to "Line offer", "ru" to "Предложение по строке", "kk" to "Жол бойынша ұсыныс"))
+    put(1595L, mapOf("main" to "Confirm exact quantity, adjust price, or propose a substitution/shortage note before store receives it.", "en" to "Confirm exact quantity, adjust price, or propose a substitution/shortage note before store receives it.", "ru" to "Подтвердите точное количество, измените цену или предложите замену/дефицит до приёмки магазином.", "kk" to "Дүкен қабылдамай тұрып нақты санды растаңыз, бағаны өзгертіңіз немесе ауыстыру/жетіспеу ескертпесін ұсыныңыз."))
+    put(1596L, mapOf("main" to "Requested", "en" to "Requested", "ru" to "Запрошено", "kk" to "Сұралды"))
+    put(1597L, mapOf("main" to "Accepted", "en" to "Accepted", "ru" to "Принято", "kk" to "Қабылданды"))
+    put(1598L, mapOf("main" to "Offered", "en" to "Offered", "ru" to "Предложено", "kk" to "Ұсынылды"))
+    put(1599L, mapOf("main" to "Offered price", "en" to "Offered price", "ru" to "Предложенная цена", "kk" to "Ұсынылған баға"))
+    put(1600L, mapOf("main" to "Substitution / shortage note for store", "en" to "Substitution / shortage note for store", "ru" to "Заметка о замене / дефиците для магазина", "kk" to "Дүкенге ауыстыру / жетіспеу ескертпесі"))
+    put(1601L, mapOf("main" to "Can fulfill as requested", "en" to "Can fulfill as requested", "ru" to "Можно выполнить как запрошено", "kk" to "Сұралғандай орындауға болады"))
+    put(1602L, mapOf("main" to "Save line offer", "en" to "Save line offer", "ru" to "Сохранить предложение строки", "kk" to "Жол ұсынысын сақтау"))
+    put(1603L, mapOf("main" to "Line rescue saved", "en" to "Line rescue saved", "ru" to "Предложение по строке сохранено", "kk" to "Жол ұсынысы сақталды"))
+    put(1604L, mapOf("main" to "Receive supplier offer", "en" to "Receive supplier offer", "ru" to "Принять предложение поставщика", "kk" to "Жеткізуші ұсынысын қабылдау"))
 }
 
 
@@ -18592,7 +18603,9 @@ private fun AppConfiguration.SupplierOrderCard(
         ?: order.supplierId
     val primaryLine = lines.firstOrNull { it.goodsItemId == goodsItem.id }
     val quantityText = primaryLine?.requestedQuantity?.quantityText(stateValues.appLanguage).orEmpty()
+    val acceptedQuantityText = primaryLine?.supplierAcceptedQuantity?.quantityText(stateValues.appLanguage).orEmpty()
     val priceText = primaryLine?.expectedSupplyPrice?.let { "${it.price} ${it.currency}" }.orEmpty()
+    val supplierOfferedPriceText = primaryLine?.supplierOfferedSupplyPrice.supplierDeskMoneyText()
     val notesText = primaryLine?.additionalNotesLocalized?.extractLocalizedString(stateValues.appLanguage)
         ?: primaryLine?.additionalNotesLocalized?.extractLocalizedString("main")
         ?: primaryLine?.additionalNotes
@@ -18654,6 +18667,14 @@ private fun AppConfiguration.SupplierOrderCard(
             textColor = stateValues.TextColor
         )
 
+        acceptedQuantityText.takeIf { it.isNotBlank() }?.let {
+            StockCardInfoLine(localizedStringResource(1597, "Accepted"), it, stateValues.TextColor)
+        }
+
+        supplierOfferedPriceText.takeIf { it.isNotBlank() }?.let {
+            StockCardInfoLine(localizedStringResource(1599, "Offered price"), it, stateValues.TextColor)
+        }
+
         order.desiredDeliveryTimeMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let {
             StockCardInfoLine(localizedStringResource(956, "Desired delivery"), it, stateValues.TextColor)
         }
@@ -18686,7 +18707,7 @@ private fun AppConfiguration.SupplierOrderCard(
             ) {
                 actionButton(
                     modifier = Modifier.weight(1f),
-                    text = localizedStringResource(979, "Receive full quantity"),
+                    text = if (acceptedQuantityText.isNotBlank() || supplierOfferedPriceText.isNotBlank()) localizedStringResource(1604, "Receive supplier offer") else localizedStringResource(979, "Receive full quantity"),
                     iconPath = stateValues.drawablePathIconTransactionSupply,
                     confirmationRequired = true,
                     onClick = onReceive
@@ -18738,8 +18759,9 @@ private fun AppConfiguration.supplierMarketWinningFeatures(): List<SupplierFeatu
     SupplierFeaturePlanUiModel(
         title = localizedStringResource(1345, "Substitutions that save sales"),
         subtitle = localizedStringResource(1346, "Suggest replacements when a SKU is out of stock, with clear approval before the store receives it."),
-        iconPath = stateValues.drawablePathIconResponse,
-        iconRes = stateValues.drawableResIconResponse.value
+        iconPath = stateValues.drawablePathIconSupplierSubstitutions,
+        iconRes = stateValues.drawableResIconSupplierSubstitutions.value,
+        implemented = true
     ),
     SupplierFeaturePlanUiModel(
         title = localizedStringResource(1347, "Route batch planner"),
@@ -18881,6 +18903,8 @@ private fun AppConfiguration.supplierDeskOrderSearchText(
         append(line.goodsItemBarcodeSnapshots.joinToString(" ")).append(' ')
         append(line.additionalNotes.orEmpty()).append(' ')
         append(line.supplierComment.orEmpty()).append(' ')
+        append(line.supplierAcceptedQuantity?.quantityText(stateValues.appLanguage).orEmpty()).append(' ')
+        append(line.supplierOfferedSupplyPrice.supplierDeskMoneyText()).append(' ')
     }
 }.lowercase()
 
@@ -20227,6 +20251,310 @@ private fun AppConfiguration.patchSupplierDeskOrder(
     }
 }
 
+
+private fun AppConfiguration.patchSupplierDeskLineOffer(
+    order: SupplierOrderDataModel,
+    lines: List<SupplierOrderLineDataModel>,
+    targetLineId: String,
+    acceptedQuantityText: String,
+    offeredPriceText: String,
+    lineCommentText: String,
+    exactAsRequested: Boolean = false
+) {
+    val targetLine = lines.firstOrNull { it.id == targetLineId } ?: return
+    val quantityUnit = targetLine.requestedQuantity
+    val parsedQuantity = parseStockQuantityInputText(acceptedQuantityText, quantityUnit)
+    val acceptedQuantity = when {
+        exactAsRequested -> targetLine.requestedQuantity
+        parsedQuantity != null && parsedQuantity > 0.0 -> quantityUnit.withStockQuantityInputTotalValue(parsedQuantity)
+        else -> null
+    }
+    val currency = targetLine.expectedSupplyPrice?.currency?.takeIf { it.isNotBlank() }
+        ?: order.amount?.currency?.takeIf { it.isNotBlank() }
+        ?: stateValues.globalAppConfiguration.countries
+            .withTajikistanFallback()
+            .find { it.locale.equals(stateValues.userAccount?.countryLocale, true) }
+            ?.currencies
+            ?.firstOrNull()
+            ?.code
+        ?: "KZT"
+    val cleanPriceText = if (exactAsRequested) {
+        targetLine.expectedSupplyPrice?.price.orEmpty()
+    } else {
+        offeredPriceText.trim().replace(',', '.')
+    }
+    val offeredPrice = cleanPriceText
+        .takeIf { it.isNotBlank() && it.toMoneyDouble() > 0.0 }
+        ?.let { PriceDataModel(it, currency, order.supplierId) }
+    val cleanComment = if (exactAsRequested) null else lineCommentText.trim().takeIf { it.isNotBlank() }
+    val patchedLines = lines.map { line ->
+        if (line.id == targetLineId) {
+            line.copy(
+                supplierAcceptedQuantity = acceptedQuantity,
+                supplierOfferedSupplyPrice = offeredPrice,
+                supplierComment = cleanComment,
+                supplierCommentLocalized = cleanComment?.let { listOf(LocalizedStringDataModel(stateValues.appLanguage, it)) }.orEmpty()
+            )
+        } else {
+            line
+        }
+    }
+    val hasShortage = acceptedQuantity != null && acceptedQuantity.total + 0.0001 < targetLine.requestedQuantity.total
+    val hasSubstitutionSignal = cleanComment.orEmpty().isNotBlank()
+    val patchedStatus = when {
+        exactAsRequested -> SupplierOrderStatusDataModel.Confirmed
+        hasShortage || hasSubstitutionSignal -> SupplierOrderStatusDataModel.IssueReported
+        order.status == SupplierOrderStatusDataModel.Sent || order.status == SupplierOrderStatusDataModel.SeenBySupplier -> SupplierOrderStatusDataModel.Confirmed
+        else -> order.status
+    }
+
+    updateSupplierOrder(
+        SupplierOrderWithLinesDataModel(
+            order = order.copy(
+                status = patchedStatus,
+                updatedAtMillis = getCurrentTimeMillis()
+            ),
+            lines = patchedLines
+        )
+    ) { result ->
+        if (result is DataState.Success) {
+            getMySupplierSideOrders()
+        }
+    }
+}
+
+@Composable
+private fun AppConfiguration.SupplierLineOfferEditor(
+    order: SupplierOrderDataModel,
+    line: SupplierOrderLineDataModel,
+    allLines: List<SupplierOrderLineDataModel>,
+    isClosed: Boolean
+) {
+    var expanded by rememberSaveable(line.id) { mutableStateOf(false) }
+    var acceptedQuantityText by rememberSaveable(line.id, line.supplierAcceptedQuantity?.total) {
+        mutableStateOf(line.supplierAcceptedQuantity?.let { stockQuantityInputTextFromAmount(it.total, it) }.orEmpty())
+    }
+    var offeredPriceText by rememberSaveable(line.id, line.supplierOfferedSupplyPrice?.price) {
+        mutableStateOf(line.supplierOfferedSupplyPrice?.price.orEmpty())
+    }
+    var lineCommentText by rememberSaveable(line.id, line.supplierComment, line.supplierCommentLocalized.size) {
+        mutableStateOf(
+            line.supplierCommentLocalized.extractLocalizedString(stateValues.appLanguage)
+                ?: line.supplierCommentLocalized.extractLocalizedString("main")
+                ?: line.supplierComment.orEmpty()
+        )
+    }
+    val requestedQuantityText = line.requestedQuantity.quantityText(stateValues.appLanguage)
+    val acceptedQuantityPreview = line.supplierAcceptedQuantity?.quantityText(stateValues.appLanguage).orEmpty()
+    val offeredPricePreview = line.supplierOfferedSupplyPrice.supplierDeskMoneyText()
+    val hasSupplierLineOffer = acceptedQuantityPreview.isNotBlank() || offeredPricePreview.isNotBlank() || lineCommentText.isNotBlank()
+    val allowFraction = line.requestedQuantity.allowsFractionalStockQuantityInput()
+    val canSave = acceptedQuantityText.isBlank() || parseStockQuantityInputText(acceptedQuantityText, line.requestedQuantity) != null
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.AccentColor.copy(alpha = if (hasSupplierLineOffer) 0.10f else 0.05f))
+            .border(
+                stateValues.unfocusedBorderWidth,
+                if (hasSupplierLineOffer) stateValues.AccentColor.copy(alpha = 0.65f) else stateValues.PlaceholderTextColor.copy(alpha = 0.45f),
+                RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .padding(stateValues.marginTextField),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = !isClosed) { expanded = !expanded },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            CpImage(
+                modifier = Modifier.size(22.dp),
+                url = stateValues.drawablePathIconSupplierSubstitutions,
+                fallbackRes = stateValues.drawableResIconSupplierSubstitutions.value,
+                contentDescription = localizedStringResource(1594, "Line offer"),
+                tintColor = stateValues.AccentColor
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = localizedStringResource(1594, "Line offer"),
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.textSize,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = localizedStringResource(1595, "Confirm exact quantity, adjust price, or propose a substitution/shortage note before store receives it."),
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            if (!isClosed) {
+                CpImage(
+                    modifier = Modifier.size(20.dp),
+                    url = if (expanded) stateValues.drawablePathIconExpandLess else stateValues.drawablePathIconExpandMore,
+                    fallbackRes = if (expanded) stateValues.drawableResIconExpandLess.value else stateValues.drawableResIconExpandMore.value,
+                    contentDescription = localizedStringResource(133, "Open"),
+                    tintColor = stateValues.IconTintColor
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(modifier = Modifier.weight(1f)) {
+                SupplierCatalogChip(text = "${localizedStringResource(1596, "Requested")}: $requestedQuantityText")
+            }
+            if (acceptedQuantityPreview.isNotBlank()) {
+                Box(modifier = Modifier.weight(1f)) {
+                    SupplierCatalogChip(text = "${localizedStringResource(1597, "Accepted")}: $acceptedQuantityPreview")
+                }
+            }
+            if (offeredPricePreview.isNotBlank()) {
+                Box(modifier = Modifier.weight(1f)) {
+                    SupplierCatalogChip(text = "${localizedStringResource(1598, "Offered")}: $offeredPricePreview")
+                }
+            }
+        }
+
+        lineCommentText.takeIf { it.isNotBlank() && !expanded }?.let { note ->
+            Text(
+                text = note,
+                color = stateValues.PlaceholderTextColor,
+                fontSize = stateValues.smallTextSize,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        AnimatedVisibility(visible = expanded && !isClosed) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                ) {
+                    SimpleTextInput(
+                        modifier = Modifier.weight(1f),
+                        value = acceptedQuantityText,
+                        placeholder = localizedStringResource(1597, "Accepted"),
+                        keyboardType = if (allowFraction) KeyboardType.Decimal else KeyboardType.Number,
+                        leadingIconPath = stateValues.drawablePathIconStock,
+                        onTransformValue = { raw -> sanitizeStockQuantityInput(raw, allowFraction) },
+                        onValueChange = { value ->
+                            if (value.isStockQuantityInputText(allowFraction)) {
+                                acceptedQuantityText = value
+                            }
+                        }
+                    )
+
+                    SimpleTextInput(
+                        modifier = Modifier.weight(1f),
+                        value = offeredPriceText,
+                        placeholder = localizedStringResource(1599, "Offered price"),
+                        keyboardType = KeyboardType.Decimal,
+                        leadingIconPath = stateValues.drawablePathIconFinances,
+                        onValueChange = { value ->
+                            val normalized = value.replace(',', '.')
+                            if (normalized.isEmpty() || normalized.isNumericalDoubleString()) {
+                                offeredPriceText = normalized
+                            }
+                        }
+                    )
+                }
+
+                SimpleTextInput(
+                    modifier = Modifier.fillMaxWidth(),
+                    value = lineCommentText,
+                    placeholder = localizedStringResource(1600, "Substitution / shortage note for store"),
+                    singleLine = false,
+                    leadingIconPath = stateValues.drawablePathIconSupplierSubstitutions,
+                    onValueChange = { lineCommentText = it }
+                )
+
+                if (stateValues.isNarrowScreen) {
+                    Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+                        actionButton(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = localizedStringResource(1601, "Can fulfill as requested"),
+                            iconPath = stateValues.drawablePathIconCheck,
+                            confirmationRequired = false,
+                            onClick = {
+                                acceptedQuantityText = stockQuantityInputTextFromAmount(line.requestedQuantity.total, line.requestedQuantity)
+                                offeredPriceText = line.expectedSupplyPrice?.price.orEmpty()
+                                lineCommentText = ""
+                                patchSupplierDeskLineOffer(
+                                    order = order,
+                                    lines = allLines,
+                                    targetLineId = line.id,
+                                    acceptedQuantityText = acceptedQuantityText,
+                                    offeredPriceText = offeredPriceText,
+                                    lineCommentText = lineCommentText,
+                                    exactAsRequested = true
+                                )
+                            }
+                        )
+                        actionButton(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = localizedStringResource(1602, "Save line offer"),
+                            iconPath = stateValues.drawablePathIconSupplierSubstitutions,
+                            enabled = canSave,
+                            confirmationRequired = false,
+                            onClick = {
+                                patchSupplierDeskLineOffer(order, allLines, line.id, acceptedQuantityText, offeredPriceText, lineCommentText)
+                            }
+                        )
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                    ) {
+                        actionButton(
+                            modifier = Modifier.weight(1f),
+                            text = localizedStringResource(1601, "Can fulfill as requested"),
+                            iconPath = stateValues.drawablePathIconCheck,
+                            confirmationRequired = false,
+                            onClick = {
+                                acceptedQuantityText = stockQuantityInputTextFromAmount(line.requestedQuantity.total, line.requestedQuantity)
+                                offeredPriceText = line.expectedSupplyPrice?.price.orEmpty()
+                                lineCommentText = ""
+                                patchSupplierDeskLineOffer(
+                                    order = order,
+                                    lines = allLines,
+                                    targetLineId = line.id,
+                                    acceptedQuantityText = acceptedQuantityText,
+                                    offeredPriceText = offeredPriceText,
+                                    lineCommentText = lineCommentText,
+                                    exactAsRequested = true
+                                )
+                            }
+                        )
+                        actionButton(
+                            modifier = Modifier.weight(1f),
+                            text = localizedStringResource(1602, "Save line offer"),
+                            iconPath = stateValues.drawablePathIconSupplierSubstitutions,
+                            enabled = canSave,
+                            confirmationRequired = false,
+                            onClick = {
+                                patchSupplierDeskLineOffer(order, allLines, line.id, acceptedQuantityText, offeredPriceText, lineCommentText)
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun AppConfiguration.SupplierOrderDeskCard(
     order: SupplierOrderDataModel,
@@ -20393,6 +20721,13 @@ private fun AppConfiguration.SupplierOrderDeskCard(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
+
+                    SupplierLineOfferEditor(
+                        order = order,
+                        line = line,
+                        allLines = lines,
+                        isClosed = isClosed
+                    )
                 }
             }
         }
@@ -22888,8 +23223,8 @@ private fun AppConfiguration.SupplierOrdersForGoodsItemContent(
                                 ReceiveSupplierOrderLineDataModel(
                                     orderLineId = line.id,
                                     goodsItemId = line.goodsItemId,
-                                    receivedQuantity = line.requestedQuantity,
-                                    actualSupplyPrice = line.expectedSupplyPrice ?: PriceDataModel(expectedPriceText.ifBlank { "0" }, defaultCurrency, selectedSupplierId),
+                                    receivedQuantity = line.supplierAcceptedQuantity ?: line.requestedQuantity,
+                                    actualSupplyPrice = line.supplierOfferedSupplyPrice ?: line.expectedSupplyPrice ?: PriceDataModel(expectedPriceText.ifBlank { "0" }, defaultCurrency, selectedSupplierId),
                                     expirationDateMillis = line.desiredExpirationDateMillis,
                                     discounts = emptyList(),
                                     promotions = goodsItem.promotions,
@@ -45402,6 +45737,9 @@ object AppConfiguration {
         val drawablePathIconSupplierOfferStudio: String
         val drawableResIconSupplierOfferStudio: StateFlow<DrawableResource>
 
+        val drawablePathIconSupplierSubstitutions: String
+        val drawableResIconSupplierSubstitutions: StateFlow<DrawableResource>
+
         val drawablePathIconBuyerAgeRestriction: String
         val drawableResIconBuyerAgeRestriction: StateFlow<DrawableResource>
 
@@ -46037,6 +46375,10 @@ object AppConfiguration {
             private val _drawableResIconSupplierOfferStudio = MutableStateFlow(Res.drawable._79_0)
             override val drawableResIconSupplierOfferStudio: StateFlow<DrawableResource> = _drawableResIconSupplierOfferStudio.asStateFlow()
 
+            override val drawablePathIconSupplierSubstitutions: String by drawablePathIconSupplierSubstitutionsState.collectAsState()
+            private val _drawableResIconSupplierSubstitutions = MutableStateFlow(Res.drawable._80_0)
+            override val drawableResIconSupplierSubstitutions: StateFlow<DrawableResource> = _drawableResIconSupplierSubstitutions.asStateFlow()
+
             override val drawablePathIconBuyerAgeRestriction: String by drawablePathIconBuyerAgeRestrictionState.collectAsState()
             private val _drawableResIconBuyerAgeRestriction = MutableStateFlow(Res.drawable._73_0)
             override val drawableResIconBuyerAgeRestriction: StateFlow<DrawableResource> = _drawableResIconBuyerAgeRestriction.asStateFlow()
@@ -46248,6 +46590,7 @@ object AppConfiguration {
                 _drawableResIconSupplierDemandRadar.emit(if (stateValues.appThemeId == 1L) Res.drawable._77_1 else Res.drawable._77_0)
                 _drawableResIconSupplierDispatch.emit(if (stateValues.appThemeId == 1L) Res.drawable._78_1 else Res.drawable._78_0)
                 _drawableResIconSupplierOfferStudio.emit(if (stateValues.appThemeId == 1L) Res.drawable._79_1 else Res.drawable._79_0)
+                _drawableResIconSupplierSubstitutions.emit(if (stateValues.appThemeId == 1L) Res.drawable._80_1 else Res.drawable._80_0)
                 _drawableResIconBuyerAgeRestriction.emit(if (stateValues.appThemeId == 1L) Res.drawable._73_1 else Res.drawable._73_0)
                 _drawableResIconTransactionTimeRestriction.emit(if (stateValues.appThemeId == 1L) Res.drawable._74_1 else Res.drawable._74_0)
 

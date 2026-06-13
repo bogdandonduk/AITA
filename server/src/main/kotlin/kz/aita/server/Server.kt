@@ -6151,6 +6151,11 @@ private fun SupplierOrderDataModel.cleanForStorage(userId: UUID, storeId: UUID, 
 private fun SupplierOrderLineDataModel.cleanForStorage(orderId: UUID): SupplierOrderLineDataModel = copy(
     orderId = orderId.toString(),
     requestedQuantity = requestedQuantity.copy(total = requestedQuantity.total.coerceAtLeast(0.0)),
+    expectedSupplyPrice = expectedSupplyPrice?.copy(
+        price = expectedSupplyPrice.price.trim(),
+        currency = expectedSupplyPrice.currency.trim(),
+        supplierId = expectedSupplyPrice.supplierId.trim()
+    )?.takeIf { it.price.isNotBlank() },
     additionalNotes = additionalNotes?.trim()?.takeIf { it.isNotBlank() },
     additionalNotesLocalized = additionalNotesLocalized
         .map { it.copy(language = it.language.trim(), value = it.value.trim()) }
@@ -6160,7 +6165,15 @@ private fun SupplierOrderLineDataModel.cleanForStorage(orderId: UUID): SupplierO
     supplierCommentLocalized = supplierCommentLocalized
         .map { it.copy(language = it.language.trim(), value = it.value.trim()) }
         .filter { it.language.isNotBlank() && it.value.isNotBlank() }
-        .distinctBy { it.language }
+        .distinctBy { it.language },
+    supplierAcceptedQuantity = supplierAcceptedQuantity
+        ?.copy(total = supplierAcceptedQuantity.total.coerceAtLeast(0.0))
+        ?.takeIf { it.total > 0.0 },
+    supplierOfferedSupplyPrice = supplierOfferedSupplyPrice?.copy(
+        price = supplierOfferedSupplyPrice.price.trim(),
+        currency = supplierOfferedSupplyPrice.currency.trim(),
+        supplierId = supplierOfferedSupplyPrice.supplierId.trim()
+    )?.takeIf { it.price.isNotBlank() }
 )
 
 private fun supplierOrderWithLinesInsideTransaction(orderId: UUID): SupplierOrderWithLinesDataModel? {
