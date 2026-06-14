@@ -4609,6 +4609,9 @@ expect object LocalAitaLanTransport {
 val supplierGoodsPricesState =
     MutableDataStateFlow<List<SupplierGoodsPriceDataModel>>(GlobalScope)
 
+val supplierSideGoodsPricesState =
+    MutableDataStateFlow<List<SupplierGoodsPriceDataModel>>(GlobalScope)
+
 val supplierOrdersState =
     MutableDataStateFlow<List<SupplierOrderDataModel>>(GlobalScope)
 
@@ -4619,6 +4622,7 @@ val supplierPartnershipContractsState =
     MutableDataStateFlow<List<SupplierPartnershipContractDataModel>>(GlobalScope)
 
 private val getSupplierGoodsPricesMutex = Mutex()
+private val getSupplierSideGoodsPricesMutex = Mutex()
 private val upsertSupplierGoodsPriceMutex = Mutex()
 
 private val getSupplierOrdersMutex = Mutex()
@@ -4657,6 +4661,29 @@ fun getSupplierGoodsPrices(
                     onCompleted?.invoke(DataState.Empty(response.message))
                 } else {
                     supplierGoodsPricesState.emit(DataState.Success(response.payload, response.message))
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+
+fun getMySupplierSideGoodsPrices(
+    onCompleted: ((DataState<List<SupplierGoodsPriceDataModel>>) -> Unit)? = null
+) {
+    if (!getSupplierSideGoodsPricesMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getSupplierSideGoodsPricesMutex.withLock {
+                val response = networkRequest<List<SupplierGoodsPriceDataModel>, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getSupplierSideGoodsPricesPath.first
+                )
+
+                if (response.negative || response.payload == null) {
+                    supplierSideGoodsPricesState.emit(DataState.Empty(response.message))
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    supplierSideGoodsPricesState.emit(DataState.Success(response.payload, response.message))
                     onCompleted?.invoke(DataState.Success(response.payload, response.message))
                 }
             }
@@ -5367,7 +5394,7 @@ const val CLOUD_TRANSPORT_STATUS_UNAVAILABLE = -1
 @PublishedApi
 internal const val REALTIME_ACCESS_TOKEN_REFRESH_SKEW_MILLIS = 60_000L
 
-private const val DEFAULT_AITA_SERVER_URL = "http://192.168.1.51:8080"
+private const val DEFAULT_AITA_SERVER_URL = "http://192.168.1.168:8080"
 private val DEFAULT_AITA_SERVER_URL_PAIR = Pair(DEFAULT_AITA_SERVER_URL, "1")
 @Volatile
 private var currentNetworkRequestCandidateServerUrlsMemory: List<String> = emptyList()
@@ -5441,6 +5468,7 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
         deleteDebtorPath = Pair("debtors/delete", "42"),
         payDebtorDebtPath = Pair("debtors/pay", "43"),
         getSupplierGoodsPricesPath = Pair("supplierGoodsPrices/get", "31"),
+        getSupplierSideGoodsPricesPath = Pair("supplierGoodsPrices/supplier/get", "1682"),
         upsertSupplierGoodsPricePath = Pair("supplierGoodsPrices/upsert", "32"),
         deleteSupplierGoodsPricesPath = Pair("supplierGoodsPrices/delete", "33"),
         getSupplierOrdersPath = Pair("supplierOrders/get", "34"),
@@ -6030,6 +6058,8 @@ val drawablePathIconSupplierSubstitutionsState = MutableStateFlow("svg/80_0.svg"
 val drawablePathIconSupplierManufacturerBridgeState = MutableStateFlow("svg/81_0.svg")
 val drawablePathIconSupplierPriceBookState = MutableStateFlow("svg/82_0.svg")
 val drawablePathIconSupplierReorderPulseState = MutableStateFlow("svg/83_0.svg")
+val drawablePathIconSupplierSettlementState = MutableStateFlow("svg/84_0.svg")
+val drawablePathIconSupplierReadinessState = MutableStateFlow("svg/85_0.svg")
 val drawablePathIconBuyerAgeRestrictionState = MutableStateFlow("svg/73_0.svg")
 val drawablePathIconTransactionTimeRestrictionState = MutableStateFlow("svg/74_0.svg")
 val drawablePathIconWorkersState = MutableStateFlow("svg/22_0.svg")
@@ -8116,6 +8146,12 @@ fun updateDrawables(
         )
         drawablePathIconSupplierReorderPulseState.emit(
             drawablePath(83L)
+        )
+        drawablePathIconSupplierSettlementState.emit(
+            drawablePath(84L)
+        )
+        drawablePathIconSupplierReadinessState.emit(
+            drawablePath(85L)
         )
         drawablePathIconBuyerAgeRestrictionState.emit(
             drawablePath(73L)
@@ -15599,6 +15635,7 @@ data class GlobalAppConfigurationDataModel(
     val deleteDebtorPath: Pair<String, String> = Pair("debtors/delete", "42"),
     val payDebtorDebtPath: Pair<String, String> = Pair("debtors/pay", "43"),
     val getSupplierGoodsPricesPath: Pair<String, String> = Pair("supplierGoodsPrices/get", "31"),
+    val getSupplierSideGoodsPricesPath: Pair<String, String> = Pair("supplierGoodsPrices/supplier/get", "1682"),
     val upsertSupplierGoodsPricePath: Pair<String, String> = Pair("supplierGoodsPrices/upsert", "32"),
     val deleteSupplierGoodsPricesPath: Pair<String, String> = Pair("supplierGoodsPrices/delete", "33"),
 

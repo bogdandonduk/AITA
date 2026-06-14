@@ -14867,7 +14867,7 @@ fun Application.module() {
                             )
                         } ?: call.respondAitaUnauthorized()
                     }
-
+                
                     } catch (throwable: Throwable) {
                         call.safeGenericResponseNoPayload(
                             status = HttpStatusCode.Conflict,

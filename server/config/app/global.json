@@ -155,6 +155,10 @@
       "first": "supplierGoodsPrices/get",
       "second": "31"
     },
+    "getSupplierSideGoodsPricesPath": {
+      "first": "supplierGoodsPrices/supplier/get",
+      "second": "1682"
+    },
     "upsertSupplierGoodsPricePath": {
       "first": "supplierGoodsPrices/upsert",
       "second": "32"

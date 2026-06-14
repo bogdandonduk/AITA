@@ -33118,6 +33118,1623 @@
           "value": "Келісімшарт шарттары әлі жоқ"
         }
       ]
+    },
+    {
+      "id": 1660,
+      "values": [
+        {
+          "language": "main",
+          "value": "Settlement board"
+        },
+        {
+          "language": "en",
+          "value": "Settlement board"
+        },
+        {
+          "language": "ru",
+          "value": "Доска взаиморасчётов"
+        },
+        {
+          "language": "kk",
+          "value": "Есеп айырысу тақтасы"
+        }
+      ]
+    },
+    {
+      "id": 1661,
+      "values": [
+        {
+          "language": "main",
+          "value": "Turn fulfilled deliveries and open orders into payment follow-up, without leaving supplier mode."
+        },
+        {
+          "language": "en",
+          "value": "Turn fulfilled deliveries and open orders into payment follow-up, without leaving supplier mode."
+        },
+        {
+          "language": "ru",
+          "value": "Превращайте выполненные поставки и открытые заказы в контроль оплат, не выходя из режима поставщика."
+        },
+        {
+          "language": "kk",
+          "value": "Орындалған жеткізілімдер мен ашық тапсырыстарды жеткізуші режимінен шықпай төлем бақылауына айналдырыңыз."
+        }
+      ]
+    },
+    {
+      "id": 1662,
+      "values": [
+        {
+          "language": "main",
+          "value": "Delivered receivable"
+        },
+        {
+          "language": "en",
+          "value": "Delivered receivable"
+        },
+        {
+          "language": "ru",
+          "value": "К получению за поставленное"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізілгені үшін алынатын"
+        }
+      ]
+    },
+    {
+      "id": 1663,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open pipeline value"
+        },
+        {
+          "language": "en",
+          "value": "Open pipeline value"
+        },
+        {
+          "language": "ru",
+          "value": "Стоимость открытого потока"
+        },
+        {
+          "language": "kk",
+          "value": "Ашық ағын құны"
+        }
+      ]
+    },
+    {
+      "id": 1664,
+      "values": [
+        {
+          "language": "main",
+          "value": "Payment terms"
+        },
+        {
+          "language": "en",
+          "value": "Payment terms"
+        },
+        {
+          "language": "ru",
+          "value": "Условия оплаты"
+        },
+        {
+          "language": "kk",
+          "value": "Төлем шарттары"
+        }
+      ]
+    },
+    {
+      "id": 1665,
+      "values": [
+        {
+          "language": "main",
+          "value": "Payment follow-up"
+        },
+        {
+          "language": "en",
+          "value": "Payment follow-up"
+        },
+        {
+          "language": "ru",
+          "value": "Нужен контроль оплаты"
+        },
+        {
+          "language": "kk",
+          "value": "Төлемді бақылау керек"
+        }
+      ]
+    },
+    {
+      "id": 1666,
+      "values": [
+        {
+          "language": "main",
+          "value": "Ready to settle"
+        },
+        {
+          "language": "en",
+          "value": "Ready to settle"
+        },
+        {
+          "language": "ru",
+          "value": "Готово к расчёту"
+        },
+        {
+          "language": "kk",
+          "value": "Есеп айырысуға дайын"
+        }
+      ]
+    },
+    {
+      "id": 1667,
+      "values": [
+        {
+          "language": "main",
+          "value": "Future receivable"
+        },
+        {
+          "language": "en",
+          "value": "Future receivable"
+        },
+        {
+          "language": "ru",
+          "value": "Будущая дебиторка"
+        },
+        {
+          "language": "kk",
+          "value": "Болашақ түсім"
+        }
+      ]
+    },
+    {
+      "id": 1668,
+      "values": [
+        {
+          "language": "main",
+          "value": "Watch partner"
+        },
+        {
+          "language": "en",
+          "value": "Watch partner"
+        },
+        {
+          "language": "ru",
+          "value": "Наблюдать партнёра"
+        },
+        {
+          "language": "kk",
+          "value": "Серіктесті бақылау"
+        }
+      ]
+    },
+    {
+      "id": 1669,
+      "values": [
+        {
+          "language": "main",
+          "value": "Overdue orders"
+        },
+        {
+          "language": "en",
+          "value": "Overdue orders"
+        },
+        {
+          "language": "ru",
+          "value": "Просроченные заказы"
+        },
+        {
+          "language": "kk",
+          "value": "Мерзімі өткен тапсырыстар"
+        }
+      ]
+    },
+    {
+      "id": 1670,
+      "values": [
+        {
+          "language": "main",
+          "value": "Copy settlement brief"
+        },
+        {
+          "language": "en",
+          "value": "Copy settlement brief"
+        },
+        {
+          "language": "ru",
+          "value": "Скопировать сводку расчёта"
+        },
+        {
+          "language": "kk",
+          "value": "Есеп айырысу қысқашасын көшіру"
+        }
+      ]
+    },
+    {
+      "id": 1671,
+      "values": [
+        {
+          "language": "main",
+          "value": "Settlement brief copied"
+        },
+        {
+          "language": "en",
+          "value": "Settlement brief copied"
+        },
+        {
+          "language": "ru",
+          "value": "Сводка расчёта скопирована"
+        },
+        {
+          "language": "kk",
+          "value": "Есеп айырысу қысқашасы көшірілді"
+        }
+      ]
+    },
+    {
+      "id": 1672,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open money-related orders"
+        },
+        {
+          "language": "en",
+          "value": "Open money-related orders"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть связанные заказы"
+        },
+        {
+          "language": "kk",
+          "value": "Қатысты тапсырыстарды ашу"
+        }
+      ]
+    },
+    {
+      "id": 1673,
+      "values": [
+        {
+          "language": "main",
+          "value": "No settlement signals yet"
+        },
+        {
+          "language": "en",
+          "value": "No settlement signals yet"
+        },
+        {
+          "language": "ru",
+          "value": "Сигналов по расчётам пока нет"
+        },
+        {
+          "language": "kk",
+          "value": "Есеп айырысу белгілері әзірге жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1674,
+      "values": [
+        {
+          "language": "main",
+          "value": "Estimated due"
+        },
+        {
+          "language": "en",
+          "value": "Estimated due"
+        },
+        {
+          "language": "ru",
+          "value": "Ожидаемый срок оплаты"
+        },
+        {
+          "language": "kk",
+          "value": "Болжамды төлем мерзімі"
+        }
+      ]
+    },
+    {
+      "id": 1675,
+      "values": [
+        {
+          "language": "main",
+          "value": "No payment terms"
+        },
+        {
+          "language": "en",
+          "value": "No payment terms"
+        },
+        {
+          "language": "ru",
+          "value": "Условия оплаты не заданы"
+        },
+        {
+          "language": "kk",
+          "value": "Төлем шарттары жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1676,
+      "values": [
+        {
+          "language": "main",
+          "value": "Contract terms"
+        },
+        {
+          "language": "en",
+          "value": "Contract terms"
+        },
+        {
+          "language": "ru",
+          "value": "Договорные условия"
+        },
+        {
+          "language": "kk",
+          "value": "Келісімшарт шарттары"
+        }
+      ]
+    },
+    {
+      "id": 1677,
+      "values": [
+        {
+          "language": "main",
+          "value": "Payment already due"
+        },
+        {
+          "language": "en",
+          "value": "Payment already due"
+        },
+        {
+          "language": "ru",
+          "value": "Оплата уже должна быть внесена"
+        },
+        {
+          "language": "kk",
+          "value": "Төлем мерзімі келді"
+        }
+      ]
+    },
+    {
+      "id": 1678,
+      "values": [
+        {
+          "language": "main",
+          "value": "Settlement signal"
+        },
+        {
+          "language": "en",
+          "value": "Settlement signal"
+        },
+        {
+          "language": "ru",
+          "value": "Сигнал расчёта"
+        },
+        {
+          "language": "kk",
+          "value": "Есеп айырысу белгісі"
+        }
+      ]
+    },
+    {
+      "id": 1679,
+      "values": [
+        {
+          "language": "main",
+          "value": "Receivable partners"
+        },
+        {
+          "language": "en",
+          "value": "Receivable partners"
+        },
+        {
+          "language": "ru",
+          "value": "Партнёры с расчётами"
+        },
+        {
+          "language": "kk",
+          "value": "Есеп айырысатын серіктестер"
+        }
+      ]
+    },
+    {
+      "id": 1680,
+      "values": [
+        {
+          "language": "main",
+          "value": "This card is not accounting yet; it is an operational settlement radar from real orders and contracts."
+        },
+        {
+          "language": "en",
+          "value": "This card is not accounting yet; it is an operational settlement radar from real orders and contracts."
+        },
+        {
+          "language": "ru",
+          "value": "Это пока не бухгалтерия; это операционный радар расчётов по реальным заказам и договорам."
+        },
+        {
+          "language": "kk",
+          "value": "Бұл әлі бухгалтерия емес; бұл нақты тапсырыстар мен келісімдерден жасалған операциялық есеп айырысу радары."
+        }
+      ]
+    },
+    {
+      "id": 1681,
+      "values": [
+        {
+          "language": "main",
+          "value": "Terms missing"
+        },
+        {
+          "language": "en",
+          "value": "Terms missing"
+        },
+        {
+          "language": "ru",
+          "value": "Условия не заданы"
+        },
+        {
+          "language": "kk",
+          "value": "Шарттар жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1682,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier-side price book"
+        },
+        {
+          "language": "en",
+          "value": "Supplier-side price book"
+        },
+        {
+          "language": "ru",
+          "value": "Прайс-лист со стороны поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші жағындағы прайс-лист"
+        }
+      ]
+    },
+    {
+      "id": 1683,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supply readiness board"
+        },
+        {
+          "language": "en",
+          "value": "Supply readiness board"
+        },
+        {
+          "language": "ru",
+          "value": "Доска готовности поставки"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізу дайындығы тақтасы"
+        }
+      ]
+    },
+    {
+      "id": 1684,
+      "values": [
+        {
+          "language": "main",
+          "value": "Check contract, price-book, line-offer and dispatch readiness before promising a store shipment."
+        },
+        {
+          "language": "en",
+          "value": "Check contract, price-book, line-offer and dispatch readiness before promising a store shipment."
+        },
+        {
+          "language": "ru",
+          "value": "Проверяйте договор, прайс-лист, ответ по строкам и доставку до обещания поставки магазину."
+        },
+        {
+          "language": "kk",
+          "value": "Дүкенге жеткізуді уәде етпес бұрын келісім, прайс, жол ұсынысы және жеткізу дайындығын тексеріңіз."
+        }
+      ]
+    },
+    {
+      "id": 1685,
+      "values": [
+        {
+          "language": "main",
+          "value": "Ready to supply"
+        },
+        {
+          "language": "en",
+          "value": "Ready to supply"
+        },
+        {
+          "language": "ru",
+          "value": "Готово к поставке"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуге дайын"
+        }
+      ]
+    },
+    {
+      "id": 1686,
+      "values": [
+        {
+          "language": "main",
+          "value": "Contract needed"
+        },
+        {
+          "language": "en",
+          "value": "Contract needed"
+        },
+        {
+          "language": "ru",
+          "value": "Нужен договор"
+        },
+        {
+          "language": "kk",
+          "value": "Келісім керек"
+        }
+      ]
+    },
+    {
+      "id": 1687,
+      "values": [
+        {
+          "language": "main",
+          "value": "Price book missing"
+        },
+        {
+          "language": "en",
+          "value": "Price book missing"
+        },
+        {
+          "language": "ru",
+          "value": "Нет прайс-листа"
+        },
+        {
+          "language": "kk",
+          "value": "Прайс-лист жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1688,
+      "values": [
+        {
+          "language": "main",
+          "value": "Line offer missing"
+        },
+        {
+          "language": "en",
+          "value": "Line offer missing"
+        },
+        {
+          "language": "ru",
+          "value": "Нет ответа по строке"
+        },
+        {
+          "language": "kk",
+          "value": "Жол ұсынысы жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1689,
+      "values": [
+        {
+          "language": "main",
+          "value": "Delivery lane ready"
+        },
+        {
+          "language": "en",
+          "value": "Delivery lane ready"
+        },
+        {
+          "language": "ru",
+          "value": "Маршрут доставки готовится"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізу бағыты дайындалады"
+        }
+      ]
+    },
+    {
+      "id": 1690,
+      "values": [
+        {
+          "language": "main",
+          "value": "Store-item lanes"
+        },
+        {
+          "language": "en",
+          "value": "Store-item lanes"
+        },
+        {
+          "language": "ru",
+          "value": "Связки магазин-товар"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен-тауар бағыттары"
+        }
+      ]
+    },
+    {
+      "id": 1691,
+      "values": [
+        {
+          "language": "main",
+          "value": "Copy readiness brief"
+        },
+        {
+          "language": "en",
+          "value": "Copy readiness brief"
+        },
+        {
+          "language": "ru",
+          "value": "Скопировать сводку готовности"
+        },
+        {
+          "language": "kk",
+          "value": "Дайындық қысқашасын көшіру"
+        }
+      ]
+    },
+    {
+      "id": 1692,
+      "values": [
+        {
+          "language": "main",
+          "value": "Readiness brief copied"
+        },
+        {
+          "language": "en",
+          "value": "Readiness brief copied"
+        },
+        {
+          "language": "ru",
+          "value": "Сводка готовности скопирована"
+        },
+        {
+          "language": "kk",
+          "value": "Дайындық қысқашасы көшірілді"
+        }
+      ]
+    },
+    {
+      "id": 1693,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open readiness orders"
+        },
+        {
+          "language": "en",
+          "value": "Open readiness orders"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть заказы по готовности"
+        },
+        {
+          "language": "kk",
+          "value": "Дайындық тапсырыстарын ашу"
+        }
+      ]
+    },
+    {
+      "id": 1694,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open contract board"
+        },
+        {
+          "language": "en",
+          "value": "Open contract board"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть договоры"
+        },
+        {
+          "language": "kk",
+          "value": "Келісімдер тақтасын ашу"
+        }
+      ]
+    },
+    {
+      "id": 1695,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open price book/catalog"
+        },
+        {
+          "language": "en",
+          "value": "Open price book/catalog"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть каталог/прайс"
+        },
+        {
+          "language": "kk",
+          "value": "Каталог/прайсты ашу"
+        }
+      ]
+    },
+    {
+      "id": 1696,
+      "values": [
+        {
+          "language": "main",
+          "value": "No readiness lanes yet"
+        },
+        {
+          "language": "en",
+          "value": "No readiness lanes yet"
+        },
+        {
+          "language": "ru",
+          "value": "Связок готовности пока нет"
+        },
+        {
+          "language": "kk",
+          "value": "Дайындық бағыттары әзірге жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1697,
+      "values": [
+        {
+          "language": "main",
+          "value": "Contract active"
+        },
+        {
+          "language": "en",
+          "value": "Contract active"
+        },
+        {
+          "language": "ru",
+          "value": "Договор активен"
+        },
+        {
+          "language": "kk",
+          "value": "Келісім белсенді"
+        }
+      ]
+    },
+    {
+      "id": 1698,
+      "values": [
+        {
+          "language": "main",
+          "value": "Contract pending"
+        },
+        {
+          "language": "en",
+          "value": "Contract pending"
+        },
+        {
+          "language": "ru",
+          "value": "Договор ждёт принятия"
+        },
+        {
+          "language": "kk",
+          "value": "Келісім қабылдауды күтеді"
+        }
+      ]
+    },
+    {
+      "id": 1699,
+      "values": [
+        {
+          "language": "main",
+          "value": "Price book ready"
+        },
+        {
+          "language": "en",
+          "value": "Price book ready"
+        },
+        {
+          "language": "ru",
+          "value": "Прайс-лист готов"
+        },
+        {
+          "language": "kk",
+          "value": "Прайс-лист дайын"
+        }
+      ]
+    },
+    {
+      "id": 1700,
+      "values": [
+        {
+          "language": "main",
+          "value": "Price missing"
+        },
+        {
+          "language": "en",
+          "value": "Price missing"
+        },
+        {
+          "language": "ru",
+          "value": "Цена не задана"
+        },
+        {
+          "language": "kk",
+          "value": "Баға жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1701,
+      "values": [
+        {
+          "language": "main",
+          "value": "Offer complete"
+        },
+        {
+          "language": "en",
+          "value": "Offer complete"
+        },
+        {
+          "language": "ru",
+          "value": "Ответ готов"
+        },
+        {
+          "language": "kk",
+          "value": "Ұсыныс дайын"
+        }
+      ]
+    },
+    {
+      "id": 1702,
+      "values": [
+        {
+          "language": "main",
+          "value": "Needs supplier line offer"
+        },
+        {
+          "language": "en",
+          "value": "Needs supplier line offer"
+        },
+        {
+          "language": "ru",
+          "value": "Нужен ответ поставщика по строке"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізушінің жол бойынша ұсынысы керек"
+        }
+      ]
+    },
+    {
+      "id": 1703,
+      "values": [
+        {
+          "language": "main",
+          "value": "Delivery status"
+        },
+        {
+          "language": "en",
+          "value": "Delivery status"
+        },
+        {
+          "language": "ru",
+          "value": "Статус доставки"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізу күйі"
+        }
+      ]
+    },
+    {
+      "id": 1704,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supply can move"
+        },
+        {
+          "language": "en",
+          "value": "Supply can move"
+        },
+        {
+          "language": "ru",
+          "value": "Поставка может двигаться"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізу қозғала алады"
+        }
+      ]
+    },
+    {
+      "id": 1705,
+      "values": [
+        {
+          "language": "main",
+          "value": "Fix before promising"
+        },
+        {
+          "language": "en",
+          "value": "Fix before promising"
+        },
+        {
+          "language": "ru",
+          "value": "Исправить до обещания"
+        },
+        {
+          "language": "kk",
+          "value": "Уәде бермес бұрын түзету"
+        }
+      ]
+    },
+    {
+      "id": 1706,
+      "values": [
+        {
+          "language": "main",
+          "value": "This is a supplier preflight check: contract terms, price memory, line offer and delivery lane should be ready before promising fulfillment."
+        },
+        {
+          "language": "en",
+          "value": "This is a supplier preflight check: contract terms, price memory, line offer and delivery lane should be ready before promising fulfillment."
+        },
+        {
+          "language": "ru",
+          "value": "Это предполётная проверка поставщика: договор, ценовая память, ответ по строке и доставка должны быть готовы до обещания исполнения."
+        },
+        {
+          "language": "kk",
+          "value": "Бұл жеткізушінің ұшу алдындағы тексеруі: орындауды уәде етпес бұрын келісім, баға жады, жол ұсынысы және жеткізу дайын болуы керек."
+        }
+      ]
+    },
+    {
+      "id": 1707,
+      "values": [
+        {
+          "language": "main",
+          "value": "Line offer"
+        },
+        {
+          "language": "en",
+          "value": "Line offer"
+        },
+        {
+          "language": "ru",
+          "value": "Предложение по строке"
+        },
+        {
+          "language": "kk",
+          "value": "Жол ұсынысы"
+        }
+      ]
+    },
+    {
+      "id": 1708,
+      "values": [
+        {
+          "language": "main",
+          "value": "Readiness lanes needing work"
+        },
+        {
+          "language": "en",
+          "value": "Readiness lanes needing work"
+        },
+        {
+          "language": "ru",
+          "value": "Связки готовности с задачами"
+        },
+        {
+          "language": "kk",
+          "value": "Жұмыс керек дайындық бағыттары"
+        }
+      ]
+    },
+    {
+      "id": 1709,
+      "values": [
+        {
+          "language": "main",
+          "value": "Promise keeper"
+        },
+        {
+          "language": "en",
+          "value": "Promise keeper"
+        },
+        {
+          "language": "ru",
+          "value": "Хранитель обещаний"
+        },
+        {
+          "language": "kk",
+          "value": "Уәде бақылаушысы"
+        }
+      ]
+    },
+    {
+      "id": 1710,
+      "values": [
+        {
+          "language": "main",
+          "value": "Catch late or risky store promises before they become noisy support calls."
+        },
+        {
+          "language": "en",
+          "value": "Catch late or risky store promises before they become noisy support calls."
+        },
+        {
+          "language": "ru",
+          "value": "Ловите поздние и рискованные обещания магазинам до того, как они превратятся в шумные обращения."
+        },
+        {
+          "language": "kk",
+          "value": "Дүкендерге берілген кешігуі мүмкін уәделерді қолдау дауына айналмай тұрып ұстаңыз."
+        }
+      ]
+    },
+    {
+      "id": 1711,
+      "values": [
+        {
+          "language": "main",
+          "value": "Promise risks"
+        },
+        {
+          "language": "en",
+          "value": "Promise risks"
+        },
+        {
+          "language": "ru",
+          "value": "Риски обещаний"
+        },
+        {
+          "language": "kk",
+          "value": "Уәде тәуекелдері"
+        }
+      ]
+    },
+    {
+      "id": 1712,
+      "values": [
+        {
+          "language": "main",
+          "value": "Due soon"
+        },
+        {
+          "language": "en",
+          "value": "Due soon"
+        },
+        {
+          "language": "ru",
+          "value": "Скоро срок"
+        },
+        {
+          "language": "kk",
+          "value": "Мерзімі жақын"
+        }
+      ]
+    },
+    {
+      "id": 1713,
+      "values": [
+        {
+          "language": "main",
+          "value": "Overdue"
+        },
+        {
+          "language": "en",
+          "value": "Overdue"
+        },
+        {
+          "language": "ru",
+          "value": "Просрочено"
+        },
+        {
+          "language": "kk",
+          "value": "Мерзімі өтті"
+        }
+      ]
+    },
+    {
+      "id": 1714,
+      "values": [
+        {
+          "language": "main",
+          "value": "Waiting for supplier answer"
+        },
+        {
+          "language": "en",
+          "value": "Waiting for supplier answer"
+        },
+        {
+          "language": "ru",
+          "value": "Ждёт ответа поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші жауабын күтеді"
+        }
+      ]
+    },
+    {
+      "id": 1715,
+      "values": [
+        {
+          "language": "main",
+          "value": "Delivery promise"
+        },
+        {
+          "language": "en",
+          "value": "Delivery promise"
+        },
+        {
+          "language": "ru",
+          "value": "Обещание доставки"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізу уәдесі"
+        }
+      ]
+    },
+    {
+      "id": 1716,
+      "values": [
+        {
+          "language": "main",
+          "value": "Promise update copied"
+        },
+        {
+          "language": "en",
+          "value": "Promise update copied"
+        },
+        {
+          "language": "ru",
+          "value": "Обновление по обещанию скопировано"
+        },
+        {
+          "language": "kk",
+          "value": "Уәде жаңартуы көшірілді"
+        }
+      ]
+    },
+    {
+      "id": 1717,
+      "values": [
+        {
+          "language": "main",
+          "value": "Copy store update"
+        },
+        {
+          "language": "en",
+          "value": "Copy store update"
+        },
+        {
+          "language": "ru",
+          "value": "Скопировать обновление для магазина"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкенге жаңартуды көшіру"
+        }
+      ]
+    },
+    {
+      "id": 1718,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open promise order"
+        },
+        {
+          "language": "en",
+          "value": "Open promise order"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть заказ с обещанием"
+        },
+        {
+          "language": "kk",
+          "value": "Уәде тапсырысын ашу"
+        }
+      ]
+    },
+    {
+      "id": 1719,
+      "values": [
+        {
+          "language": "main",
+          "value": "Move one step"
+        },
+        {
+          "language": "en",
+          "value": "Move one step"
+        },
+        {
+          "language": "ru",
+          "value": "Сдвинуть на шаг"
+        },
+        {
+          "language": "kk",
+          "value": "Бір қадам жылжыту"
+        }
+      ]
+    },
+    {
+      "id": 1720,
+      "values": [
+        {
+          "language": "main",
+          "value": "Acknowledge request"
+        },
+        {
+          "language": "en",
+          "value": "Acknowledge request"
+        },
+        {
+          "language": "ru",
+          "value": "Подтвердить просмотр"
+        },
+        {
+          "language": "kk",
+          "value": "Сұранысты көрдім"
+        }
+      ]
+    },
+    {
+      "id": 1721,
+      "values": [
+        {
+          "language": "main",
+          "value": "Confirm promise"
+        },
+        {
+          "language": "en",
+          "value": "Confirm promise"
+        },
+        {
+          "language": "ru",
+          "value": "Подтвердить обещание"
+        },
+        {
+          "language": "kk",
+          "value": "Уәдені растау"
+        }
+      ]
+    },
+    {
+      "id": 1722,
+      "values": [
+        {
+          "language": "main",
+          "value": "Mark packed"
+        },
+        {
+          "language": "en",
+          "value": "Mark packed"
+        },
+        {
+          "language": "ru",
+          "value": "Отметить упаковано"
+        },
+        {
+          "language": "kk",
+          "value": "Қапталды деп белгілеу"
+        }
+      ]
+    },
+    {
+      "id": 1723,
+      "values": [
+        {
+          "language": "main",
+          "value": "Start delivery"
+        },
+        {
+          "language": "en",
+          "value": "Start delivery"
+        },
+        {
+          "language": "ru",
+          "value": "Начать доставку"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуді бастау"
+        }
+      ]
+    },
+    {
+      "id": 1724,
+      "values": [
+        {
+          "language": "main",
+          "value": "No promise risks yet"
+        },
+        {
+          "language": "en",
+          "value": "No promise risks yet"
+        },
+        {
+          "language": "ru",
+          "value": "Рисков по обещаниям пока нет"
+        },
+        {
+          "language": "kk",
+          "value": "Уәде тәуекелдері әзірге жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1725,
+      "values": [
+        {
+          "language": "main",
+          "value": "Delivery window"
+        },
+        {
+          "language": "en",
+          "value": "Delivery window"
+        },
+        {
+          "language": "ru",
+          "value": "Окно доставки"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізу терезесі"
+        }
+      ]
+    },
+    {
+      "id": 1726,
+      "values": [
+        {
+          "language": "main",
+          "value": "Risk reason"
+        },
+        {
+          "language": "en",
+          "value": "Risk reason"
+        },
+        {
+          "language": "ru",
+          "value": "Причина риска"
+        },
+        {
+          "language": "kk",
+          "value": "Тәуекел себебі"
+        }
+      ]
+    },
+    {
+      "id": 1727,
+      "values": [
+        {
+          "language": "main",
+          "value": "Suggested next step"
+        },
+        {
+          "language": "en",
+          "value": "Suggested next step"
+        },
+        {
+          "language": "ru",
+          "value": "Предлагаемый следующий шаг"
+        },
+        {
+          "language": "kk",
+          "value": "Ұсынылған келесі қадам"
+        }
+      ]
+    },
+    {
+      "id": 1728,
+      "values": [
+        {
+          "language": "main",
+          "value": "Promise is late"
+        },
+        {
+          "language": "en",
+          "value": "Promise is late"
+        },
+        {
+          "language": "ru",
+          "value": "Обещание просрочено"
+        },
+        {
+          "language": "kk",
+          "value": "Уәде кешікті"
+        }
+      ]
+    },
+    {
+      "id": 1729,
+      "values": [
+        {
+          "language": "main",
+          "value": "Promise due soon"
+        },
+        {
+          "language": "en",
+          "value": "Promise due soon"
+        },
+        {
+          "language": "ru",
+          "value": "Срок обещания скоро"
+        },
+        {
+          "language": "kk",
+          "value": "Уәде мерзімі жақын"
+        }
+      ]
+    },
+    {
+      "id": 1730,
+      "values": [
+        {
+          "language": "main",
+          "value": "Needs first supplier response"
+        },
+        {
+          "language": "en",
+          "value": "Needs first supplier response"
+        },
+        {
+          "language": "ru",
+          "value": "Нужен первый ответ поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізушінің алғашқы жауабы керек"
+        }
+      ]
+    },
+    {
+      "id": 1731,
+      "values": [
+        {
+          "language": "main",
+          "value": "In delivery, watch arrival"
+        },
+        {
+          "language": "en",
+          "value": "In delivery, watch arrival"
+        },
+        {
+          "language": "ru",
+          "value": "В доставке, следите за прибытием"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуде, келуін бақылаңыз"
+        }
+      ]
+    },
+    {
+      "id": 1732,
+      "values": [
+        {
+          "language": "main",
+          "value": "Contract may block promise"
+        },
+        {
+          "language": "en",
+          "value": "Contract may block promise"
+        },
+        {
+          "language": "ru",
+          "value": "Договор может блокировать обещание"
+        },
+        {
+          "language": "kk",
+          "value": "Келісім уәдені бұғаттауы мүмкін"
+        }
+      ]
+    },
+    {
+      "id": 1733,
+      "values": [
+        {
+          "language": "main",
+          "value": "Keep the store calm: send a proactive update, then move the order to the next honest status."
+        },
+        {
+          "language": "en",
+          "value": "Keep the store calm: send a proactive update, then move the order to the next honest status."
+        },
+        {
+          "language": "ru",
+          "value": "Держите магазин спокойно: отправьте проактивное обновление, затем переведите заказ в следующий честный статус."
+        },
+        {
+          "language": "kk",
+          "value": "Дүкенді сабырлы ұстаңыз: алдын ала жаңарту жіберіп, тапсырысты келесі шынайы күйге ауыстырыңыз."
+        }
+      ]
+    },
+    {
+      "id": 1734,
+      "values": [
+        {
+          "language": "main",
+          "value": "Promise brief"
+        },
+        {
+          "language": "en",
+          "value": "Promise brief"
+        },
+        {
+          "language": "ru",
+          "value": "Сводка обещания"
+        },
+        {
+          "language": "kk",
+          "value": "Уәде қысқашасы"
+        }
+      ]
+    },
+    {
+      "id": 1735,
+      "values": [
+        {
+          "language": "main",
+          "value": "Promise lanes needing attention"
+        },
+        {
+          "language": "en",
+          "value": "Promise lanes needing attention"
+        },
+        {
+          "language": "ru",
+          "value": "Обещания, требующие внимания"
+        },
+        {
+          "language": "kk",
+          "value": "Назар керек уәде бағыттары"
+        }
+      ]
+    },
+    {
+      "id": 1736,
+      "values": [
+        {
+          "language": "main",
+          "value": "No desired date"
+        },
+        {
+          "language": "en",
+          "value": "No desired date"
+        },
+        {
+          "language": "ru",
+          "value": "Желаемая дата не задана"
+        },
+        {
+          "language": "kk",
+          "value": "Қалаған күн жоқ"
+        }
+      ]
     }
   ]
 }

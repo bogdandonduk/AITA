@@ -1114,6 +1114,83 @@ private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallb
     put(1657L, mapOf("main" to "Terms are active", "en" to "Terms are active", "ru" to "Условия активны", "kk" to "Шарттар белсенді"))
     put(1658L, mapOf("main" to "Store demand now becomes a sales rep task: who to remind, what quantity to suggest, and whether contracts or price book terms are ready.", "en" to "Store demand now becomes a sales rep task: who to remind, what quantity to suggest, and whether contracts or price book terms are ready.", "ru" to "Спрос магазинов превращается в задачу торгового представителя: кому напомнить, какой объём предложить и готовы ли договоры/цены.", "kk" to "Дүкен сұранысы сауда өкілі міндетіне айналады: кімге ескерту, қандай көлем ұсыну және шарт/баға дайын ба."))
     put(1659L, mapOf("main" to "No contract terms yet", "en" to "No contract terms yet", "ru" to "Условия договора ещё не заданы", "kk" to "Келісімшарт шарттары әлі жоқ"))
+    put(1660L, mapOf("main" to "Settlement board", "en" to "Settlement board", "ru" to "Доска взаиморасчётов", "kk" to "Есеп айырысу тақтасы"))
+    put(1661L, mapOf("main" to "Turn fulfilled deliveries and open orders into payment follow-up, without leaving supplier mode.", "en" to "Turn fulfilled deliveries and open orders into payment follow-up, without leaving supplier mode.", "ru" to "Превращайте выполненные поставки и открытые заказы в контроль оплат, не выходя из режима поставщика.", "kk" to "Орындалған жеткізілімдер мен ашық тапсырыстарды жеткізуші режимінен шықпай төлем бақылауына айналдырыңыз."))
+    put(1662L, mapOf("main" to "Delivered receivable", "en" to "Delivered receivable", "ru" to "К получению за поставленное", "kk" to "Жеткізілгені үшін алынатын"))
+    put(1663L, mapOf("main" to "Open pipeline value", "en" to "Open pipeline value", "ru" to "Стоимость открытого потока", "kk" to "Ашық ағын құны"))
+    put(1664L, mapOf("main" to "Payment terms", "en" to "Payment terms", "ru" to "Условия оплаты", "kk" to "Төлем шарттары"))
+    put(1665L, mapOf("main" to "Payment follow-up", "en" to "Payment follow-up", "ru" to "Нужен контроль оплаты", "kk" to "Төлемді бақылау керек"))
+    put(1666L, mapOf("main" to "Ready to settle", "en" to "Ready to settle", "ru" to "Готово к расчёту", "kk" to "Есеп айырысуға дайын"))
+    put(1667L, mapOf("main" to "Future receivable", "en" to "Future receivable", "ru" to "Будущая дебиторка", "kk" to "Болашақ түсім"))
+    put(1668L, mapOf("main" to "Watch partner", "en" to "Watch partner", "ru" to "Наблюдать партнёра", "kk" to "Серіктесті бақылау"))
+    put(1669L, mapOf("main" to "Overdue orders", "en" to "Overdue orders", "ru" to "Просроченные заказы", "kk" to "Мерзімі өткен тапсырыстар"))
+    put(1670L, mapOf("main" to "Copy settlement brief", "en" to "Copy settlement brief", "ru" to "Скопировать сводку расчёта", "kk" to "Есеп айырысу қысқашасын көшіру"))
+    put(1671L, mapOf("main" to "Settlement brief copied", "en" to "Settlement brief copied", "ru" to "Сводка расчёта скопирована", "kk" to "Есеп айырысу қысқашасы көшірілді"))
+    put(1672L, mapOf("main" to "Open money-related orders", "en" to "Open money-related orders", "ru" to "Открыть связанные заказы", "kk" to "Қатысты тапсырыстарды ашу"))
+    put(1673L, mapOf("main" to "No settlement signals yet", "en" to "No settlement signals yet", "ru" to "Сигналов по расчётам пока нет", "kk" to "Есеп айырысу белгілері әзірге жоқ"))
+    put(1674L, mapOf("main" to "Estimated due", "en" to "Estimated due", "ru" to "Ожидаемый срок оплаты", "kk" to "Болжамды төлем мерзімі"))
+    put(1675L, mapOf("main" to "No payment terms", "en" to "No payment terms", "ru" to "Условия оплаты не заданы", "kk" to "Төлем шарттары жоқ"))
+    put(1676L, mapOf("main" to "Contract terms", "en" to "Contract terms", "ru" to "Договорные условия", "kk" to "Келісімшарт шарттары"))
+    put(1677L, mapOf("main" to "Payment already due", "en" to "Payment already due", "ru" to "Оплата уже должна быть внесена", "kk" to "Төлем мерзімі келді"))
+    put(1678L, mapOf("main" to "Settlement signal", "en" to "Settlement signal", "ru" to "Сигнал расчёта", "kk" to "Есеп айырысу белгісі"))
+    put(1679L, mapOf("main" to "Receivable partners", "en" to "Receivable partners", "ru" to "Партнёры с расчётами", "kk" to "Есеп айырысатын серіктестер"))
+    put(1680L, mapOf("main" to "This card is not accounting yet; it is an operational settlement radar from real orders and contracts.", "en" to "This card is not accounting yet; it is an operational settlement radar from real orders and contracts.", "ru" to "Это пока не бухгалтерия; это операционный радар расчётов по реальным заказам и договорам.", "kk" to "Бұл әлі бухгалтерия емес; бұл нақты тапсырыстар мен келісімдерден жасалған операциялық есеп айырысу радары."))
+    put(1681L, mapOf("main" to "Terms missing", "en" to "Terms missing", "ru" to "Условия не заданы", "kk" to "Шарттар жоқ"))
+    put(1682L, mapOf("main" to "Supplier-side price book", "en" to "Supplier-side price book", "ru" to "Прайс-лист со стороны поставщика", "kk" to "Жеткізуші жағындағы прайс-лист"))
+    put(1683L, mapOf("main" to "Supply readiness board", "en" to "Supply readiness board", "ru" to "Доска готовности поставки", "kk" to "Жеткізу дайындығы тақтасы"))
+    put(1684L, mapOf("main" to "Check contract, price-book, line-offer and dispatch readiness before promising a store shipment.", "en" to "Check contract, price-book, line-offer and dispatch readiness before promising a store shipment.", "ru" to "Проверяйте договор, прайс-лист, ответ по строкам и доставку до обещания поставки магазину.", "kk" to "Дүкенге жеткізуді уәде етпес бұрын келісім, прайс, жол ұсынысы және жеткізу дайындығын тексеріңіз."))
+    put(1685L, mapOf("main" to "Ready to supply", "en" to "Ready to supply", "ru" to "Готово к поставке", "kk" to "Жеткізуге дайын"))
+    put(1686L, mapOf("main" to "Contract needed", "en" to "Contract needed", "ru" to "Нужен договор", "kk" to "Келісім керек"))
+    put(1687L, mapOf("main" to "Price book missing", "en" to "Price book missing", "ru" to "Нет прайс-листа", "kk" to "Прайс-лист жоқ"))
+    put(1688L, mapOf("main" to "Line offer missing", "en" to "Line offer missing", "ru" to "Нет ответа по строке", "kk" to "Жол ұсынысы жоқ"))
+    put(1689L, mapOf("main" to "Delivery lane ready", "en" to "Delivery lane ready", "ru" to "Маршрут доставки готовится", "kk" to "Жеткізу бағыты дайындалады"))
+    put(1690L, mapOf("main" to "Store-item lanes", "en" to "Store-item lanes", "ru" to "Связки магазин-товар", "kk" to "Дүкен-тауар бағыттары"))
+    put(1691L, mapOf("main" to "Copy readiness brief", "en" to "Copy readiness brief", "ru" to "Скопировать сводку готовности", "kk" to "Дайындық қысқашасын көшіру"))
+    put(1692L, mapOf("main" to "Readiness brief copied", "en" to "Readiness brief copied", "ru" to "Сводка готовности скопирована", "kk" to "Дайындық қысқашасы көшірілді"))
+    put(1693L, mapOf("main" to "Open readiness orders", "en" to "Open readiness orders", "ru" to "Открыть заказы по готовности", "kk" to "Дайындық тапсырыстарын ашу"))
+    put(1694L, mapOf("main" to "Open contract board", "en" to "Open contract board", "ru" to "Открыть договоры", "kk" to "Келісімдер тақтасын ашу"))
+    put(1695L, mapOf("main" to "Open price book/catalog", "en" to "Open price book/catalog", "ru" to "Открыть каталог/прайс", "kk" to "Каталог/прайсты ашу"))
+    put(1696L, mapOf("main" to "No readiness lanes yet", "en" to "No readiness lanes yet", "ru" to "Связок готовности пока нет", "kk" to "Дайындық бағыттары әзірге жоқ"))
+    put(1697L, mapOf("main" to "Contract active", "en" to "Contract active", "ru" to "Договор активен", "kk" to "Келісім белсенді"))
+    put(1698L, mapOf("main" to "Contract pending", "en" to "Contract pending", "ru" to "Договор ждёт принятия", "kk" to "Келісім қабылдауды күтеді"))
+    put(1699L, mapOf("main" to "Price book ready", "en" to "Price book ready", "ru" to "Прайс-лист готов", "kk" to "Прайс-лист дайын"))
+    put(1700L, mapOf("main" to "Price missing", "en" to "Price missing", "ru" to "Цена не задана", "kk" to "Баға жоқ"))
+    put(1701L, mapOf("main" to "Offer complete", "en" to "Offer complete", "ru" to "Ответ готов", "kk" to "Ұсыныс дайын"))
+    put(1702L, mapOf("main" to "Needs supplier line offer", "en" to "Needs supplier line offer", "ru" to "Нужен ответ поставщика по строке", "kk" to "Жеткізушінің жол бойынша ұсынысы керек"))
+    put(1703L, mapOf("main" to "Delivery status", "en" to "Delivery status", "ru" to "Статус доставки", "kk" to "Жеткізу күйі"))
+    put(1704L, mapOf("main" to "Supply can move", "en" to "Supply can move", "ru" to "Поставка может двигаться", "kk" to "Жеткізу қозғала алады"))
+    put(1705L, mapOf("main" to "Fix before promising", "en" to "Fix before promising", "ru" to "Исправить до обещания", "kk" to "Уәде бермес бұрын түзету"))
+    put(1706L, mapOf("main" to "This is a supplier preflight check: contract terms, price memory, line offer and delivery lane should be ready before promising fulfillment.", "en" to "This is a supplier preflight check: contract terms, price memory, line offer and delivery lane should be ready before promising fulfillment.", "ru" to "Это предполётная проверка поставщика: договор, ценовая память, ответ по строке и доставка должны быть готовы до обещания исполнения.", "kk" to "Бұл жеткізушінің ұшу алдындағы тексеруі: орындауды уәде етпес бұрын келісім, баға жады, жол ұсынысы және жеткізу дайын болуы керек."))
+    put(1707L, mapOf("main" to "Line offer", "en" to "Line offer", "ru" to "Предложение по строке", "kk" to "Жол ұсынысы"))
+    put(1708L, mapOf("main" to "Readiness lanes needing work", "en" to "Readiness lanes needing work", "ru" to "Связки готовности с задачами", "kk" to "Жұмыс керек дайындық бағыттары"))
+    put(1709L, mapOf("main" to "Promise keeper", "en" to "Promise keeper", "ru" to "Хранитель обещаний", "kk" to "Уәде бақылаушысы"))
+    put(1710L, mapOf("main" to "Catch late or risky store promises before they become noisy support calls.", "en" to "Catch late or risky store promises before they become noisy support calls.", "ru" to "Ловите поздние и рискованные обещания магазинам до того, как они превратятся в шумные обращения.", "kk" to "Дүкендерге берілген кешігуі мүмкін уәделерді қолдау дауына айналмай тұрып ұстаңыз."))
+    put(1711L, mapOf("main" to "Promise risks", "en" to "Promise risks", "ru" to "Риски обещаний", "kk" to "Уәде тәуекелдері"))
+    put(1712L, mapOf("main" to "Due soon", "en" to "Due soon", "ru" to "Скоро срок", "kk" to "Мерзімі жақын"))
+    put(1713L, mapOf("main" to "Overdue", "en" to "Overdue", "ru" to "Просрочено", "kk" to "Мерзімі өтті"))
+    put(1714L, mapOf("main" to "Waiting for supplier answer", "en" to "Waiting for supplier answer", "ru" to "Ждёт ответа поставщика", "kk" to "Жеткізуші жауабын күтеді"))
+    put(1715L, mapOf("main" to "Delivery promise", "en" to "Delivery promise", "ru" to "Обещание доставки", "kk" to "Жеткізу уәдесі"))
+    put(1716L, mapOf("main" to "Promise update copied", "en" to "Promise update copied", "ru" to "Обновление по обещанию скопировано", "kk" to "Уәде жаңартуы көшірілді"))
+    put(1717L, mapOf("main" to "Copy store update", "en" to "Copy store update", "ru" to "Скопировать обновление для магазина", "kk" to "Дүкенге жаңартуды көшіру"))
+    put(1718L, mapOf("main" to "Open promise order", "en" to "Open promise order", "ru" to "Открыть заказ с обещанием", "kk" to "Уәде тапсырысын ашу"))
+    put(1719L, mapOf("main" to "Move one step", "en" to "Move one step", "ru" to "Сдвинуть на шаг", "kk" to "Бір қадам жылжыту"))
+    put(1720L, mapOf("main" to "Acknowledge request", "en" to "Acknowledge request", "ru" to "Подтвердить просмотр", "kk" to "Сұранысты көрдім"))
+    put(1721L, mapOf("main" to "Confirm promise", "en" to "Confirm promise", "ru" to "Подтвердить обещание", "kk" to "Уәдені растау"))
+    put(1722L, mapOf("main" to "Mark packed", "en" to "Mark packed", "ru" to "Отметить упаковано", "kk" to "Қапталды деп белгілеу"))
+    put(1723L, mapOf("main" to "Start delivery", "en" to "Start delivery", "ru" to "Начать доставку", "kk" to "Жеткізуді бастау"))
+    put(1724L, mapOf("main" to "No promise risks yet", "en" to "No promise risks yet", "ru" to "Рисков по обещаниям пока нет", "kk" to "Уәде тәуекелдері әзірге жоқ"))
+    put(1725L, mapOf("main" to "Delivery window", "en" to "Delivery window", "ru" to "Окно доставки", "kk" to "Жеткізу терезесі"))
+    put(1726L, mapOf("main" to "Risk reason", "en" to "Risk reason", "ru" to "Причина риска", "kk" to "Тәуекел себебі"))
+    put(1727L, mapOf("main" to "Suggested next step", "en" to "Suggested next step", "ru" to "Предлагаемый следующий шаг", "kk" to "Ұсынылған келесі қадам"))
+    put(1728L, mapOf("main" to "Promise is late", "en" to "Promise is late", "ru" to "Обещание просрочено", "kk" to "Уәде кешікті"))
+    put(1729L, mapOf("main" to "Promise due soon", "en" to "Promise due soon", "ru" to "Срок обещания скоро", "kk" to "Уәде мерзімі жақын"))
+    put(1730L, mapOf("main" to "Needs first supplier response", "en" to "Needs first supplier response", "ru" to "Нужен первый ответ поставщика", "kk" to "Жеткізушінің алғашқы жауабы керек"))
+    put(1731L, mapOf("main" to "In delivery, watch arrival", "en" to "In delivery, watch arrival", "ru" to "В доставке, следите за прибытием", "kk" to "Жеткізуде, келуін бақылаңыз"))
+    put(1732L, mapOf("main" to "Contract may block promise", "en" to "Contract may block promise", "ru" to "Договор может блокировать обещание", "kk" to "Келісім уәдені бұғаттауы мүмкін"))
+    put(1733L, mapOf("main" to "Keep the store calm: send a proactive update, then move the order to the next honest status.", "en" to "Keep the store calm: send a proactive update, then move the order to the next honest status.", "ru" to "Держите магазин спокойно: отправьте проактивное обновление, затем переведите заказ в следующий честный статус.", "kk" to "Дүкенді сабырлы ұстаңыз: алдын ала жаңарту жіберіп, тапсырысты келесі шынайы күйге ауыстырыңыз."))
+    put(1734L, mapOf("main" to "Promise brief", "en" to "Promise brief", "ru" to "Сводка обещания", "kk" to "Уәде қысқашасы"))
+    put(1735L, mapOf("main" to "Promise lanes needing attention", "en" to "Promise lanes needing attention", "ru" to "Обещания, требующие внимания", "kk" to "Назар керек уәде бағыттары"))
+    put(1736L, mapOf("main" to "No desired date", "en" to "No desired date", "ru" to "Желаемая дата не задана", "kk" to "Қалаған күн жоқ"))
 }
 
 
@@ -18834,6 +18911,27 @@ private fun AppConfiguration.supplierMarketWinningFeatures(): List<SupplierFeatu
         implemented = true
     ),
     SupplierFeaturePlanUiModel(
+        title = localizedStringResource(1660, "Settlement board"),
+        subtitle = localizedStringResource(1661, "Turn fulfilled deliveries and open orders into payment follow-up, without leaving supplier mode."),
+        iconPath = stateValues.drawablePathIconSupplierSettlement,
+        iconRes = stateValues.drawableResIconSupplierSettlement.value,
+        implemented = true
+    ),
+    SupplierFeaturePlanUiModel(
+        title = localizedStringResource(1683, "Supply readiness board"),
+        subtitle = localizedStringResource(1684, "Check contract, price-book, line-offer and dispatch readiness before promising a store shipment."),
+        iconPath = stateValues.drawablePathIconSupplierReadiness,
+        iconRes = stateValues.drawableResIconSupplierReadiness.value,
+        implemented = true
+    ),
+    SupplierFeaturePlanUiModel(
+        title = localizedStringResource(1709, "Promise keeper"),
+        subtitle = localizedStringResource(1710, "Catch late or risky store promises before they become noisy support calls."),
+        iconPath = stateValues.drawablePathIconSupplierPromiseKeeper,
+        iconRes = stateValues.drawableResIconSupplierPromiseKeeper.value,
+        implemented = true
+    ),
+    SupplierFeaturePlanUiModel(
         title = localizedStringResource(1639, "Reorder pulse"),
         subtitle = localizedStringResource(1641, "Predict which store will need this SKU next, using real supplier-order rhythm."),
         iconPath = stateValues.drawablePathIconSupplierReorderPulse,
@@ -22440,6 +22538,7 @@ private fun AppConfiguration.SupplierDispatchScreen() {
     val orders by supplierOrdersState.payload.collectAsState()
     val lines by supplierOrderLinesState.payload.collectAsState()
     val contracts by supplierPartnershipContractsState.payload.collectAsState()
+    val supplierSidePrices by supplierSideGoodsPricesState.payload.collectAsState()
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var laneFilter by rememberSaveable { mutableStateOf("all") }
 
@@ -22447,6 +22546,7 @@ private fun AppConfiguration.SupplierDispatchScreen() {
         if (stateValues.userAccount != null) {
             getMySupplierSideOrders()
             getSupplierContracts()
+            getMySupplierSideGoodsPrices()
         }
     }
 
@@ -22948,6 +23048,981 @@ private fun AppConfiguration.supplierContractTouchesGoods(
             contract.goodsItemIds.isEmpty() ||
             goodsItemId in contract.goodsItemIds
 }
+
+private data class SupplierSettlementUiModel(
+    val key: String,
+    val storeId: String,
+    val supplierId: String,
+    val storeTitle: String,
+    val deliveredValueText: String,
+    val openValueText: String,
+    val paymentTermsText: String,
+    val dueHint: String,
+    val deliveredOrdersCount: Int,
+    val openOrdersCount: Int,
+    val overdueOrdersCount: Int,
+    val pendingContractCount: Int,
+    val activeContractCount: Int,
+    val lastActivityMillis: Long,
+    val statusHint: String,
+    val brief: String,
+    val score: Int,
+    val searchKey: String
+)
+
+private fun supplierSettlementDominantCurrency(entries: List<Pair<Double, String>>): String =
+    entries
+        .map { it.second.trim().ifBlank { "KZT" } }
+        .groupingBy { it }
+        .eachCount()
+        .maxByOrNull { it.value }
+        ?.key
+        ?: "KZT"
+
+private fun supplierSettlementMoneyText(entries: List<Pair<Double, String>>, emptyValue: String = "0"): String {
+    if (entries.isEmpty()) return emptyValue
+    val grouped = entries
+        .groupBy { it.second.trim().ifBlank { "KZT" } }
+        .mapValues { (_, values) -> values.sumOf { it.first }.coerceAtLeast(0.0).roundMoney() }
+        .filterValues { it > 0.0 }
+    if (grouped.isEmpty()) return emptyValue
+
+    return grouped
+        .entries
+        .sortedByDescending { it.value }
+        .take(2)
+        .joinToString(" • ") { (currency, value) -> "${value.toStockMoneyText()} $currency" }
+}
+
+private fun SupplierOrderLineDataModel.supplierSettlementLineValue(): Pair<Double, String>? {
+    val linePrice = supplierOfferedSupplyPrice ?: expectedSupplyPrice ?: return null
+    val amount = linePrice.price.supplierOfferPriceNumberOrNull() ?: return null
+    val quantity = supplierAcceptedQuantity ?: requestedQuantity
+    val pricedAmount = quantity.pricedAmount.takeIf { it > 0.0 } ?: 1.0
+    val pricedUnits = (quantity.total.coerceAtLeast(0.0) / pricedAmount).coerceAtLeast(0.0)
+    if (amount <= 0.0 || pricedUnits <= 0.0) return null
+    return (amount * pricedUnits).roundMoney() to linePrice.currency.trim().ifBlank { "KZT" }
+}
+
+private fun supplierSettlementOrderValue(
+    order: SupplierOrderDataModel,
+    orderLines: List<SupplierOrderLineDataModel>
+): List<Pair<Double, String>> {
+    val lineValues = orderLines.mapNotNull { it.supplierSettlementLineValue() }
+    if (lineValues.isNotEmpty()) return lineValues
+
+    val orderAmount = order.amount ?: return emptyList()
+    val amount = orderAmount.price.supplierOfferPriceNumberOrNull() ?: return emptyList()
+    if (amount <= 0.0) return emptyList()
+    return listOf(amount.roundMoney() to orderAmount.currency.trim().ifBlank { "KZT" })
+}
+
+private fun AppConfiguration.supplierSettlementPaymentTermsText(
+    orders: List<SupplierOrderDataModel>,
+    contracts: List<SupplierPartnershipContractDataModel>
+): String {
+    orders
+        .asSequence()
+        .sortedByDescending { it.supplierDeskSortTime() }
+        .map { it.paymentTerms.orEmpty().trim() }
+        .firstOrNull { it.isNotBlank() }
+        ?.let { return it }
+
+    contracts
+        .asSequence()
+        .filter { it.status == SUPPLIER_CONTRACT_STATUS_ACTIVE }
+        .sortedByDescending { it.updatedAtMillis.takeIf { value -> value > 0L } ?: it.createdAtMillis }
+        .map { it.paymentSchedule.visibleLocalizedString(stateValues.appLanguage, "") }
+        .firstOrNull { it.isNotBlank() }
+        ?.let { return it }
+
+    return localizedStringResource(1675, "No payment terms")
+}
+
+private fun supplierSettlementPaymentDays(terms: String): Int? =
+    Regex("""\d+""")
+        .find(terms)
+        ?.value
+        ?.toIntOrNull()
+        ?.takeIf { it in 1..180 }
+
+private fun AppConfiguration.buildSupplierSettlementItems(
+    orders: List<SupplierOrderDataModel>,
+    lines: List<SupplierOrderLineDataModel>,
+    contracts: List<SupplierPartnershipContractDataModel>
+): List<SupplierSettlementUiModel> {
+    val activeOrders = orders.filter { it.isActive }
+    val activeLinesByOrderId = lines.filter { it.isActive }.groupBy { it.orderId }
+    val activeContracts = contracts.filter { it.isActive }
+    val now = getCurrentTimeMillis()
+    val dayMillis = 86_400_000L
+
+    return activeOrders
+        .filter { it.storeId.isNotBlank() && it.supplierId.isNotBlank() }
+        .groupBy { "${it.storeId}:${it.supplierId}" }
+        .mapNotNull { (key, storeOrders) ->
+            val latestOrder = storeOrders.maxByOrNull { it.supplierDeskSortTime() } ?: return@mapNotNull null
+            val storeTitle = supplierDeskStoreTitle(latestOrder)
+            val partnerContracts = activeContracts.filter { it.storeId == latestOrder.storeId && it.supplierId == latestOrder.supplierId }
+            val deliveredOrders = storeOrders.filter {
+                it.status == SupplierOrderStatusDataModel.Delivered || it.status == SupplierOrderStatusDataModel.PartiallyDelivered
+            }
+            val openOrders = storeOrders.filter { !it.status.isSupplierOrderClosed() }
+            val deliveredValues = deliveredOrders.flatMap { order ->
+                supplierSettlementOrderValue(order, activeLinesByOrderId[order.id].orEmpty())
+            }
+            val openValues = openOrders.flatMap { order ->
+                supplierSettlementOrderValue(order, activeLinesByOrderId[order.id].orEmpty())
+            }
+            val paymentTermsText = supplierSettlementPaymentTermsText(storeOrders, partnerContracts)
+            val paymentDays = supplierSettlementPaymentDays(paymentTermsText)
+            val overdueOrders = deliveredOrders.count { order ->
+                val deliveredAt = order.deliveredAtMillis ?: order.supplierDeskSortTime()
+                paymentDays != null && deliveredAt > 0L && now > deliveredAt + paymentDays.toLong() * dayMillis
+            }
+            val pendingContractCount = partnerContracts.count {
+                it.status == SUPPLIER_CONTRACT_STATUS_PENDING_STORE || it.status == SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER
+            }
+            val activeContractCount = partnerContracts.count { it.status == SUPPLIER_CONTRACT_STATUS_ACTIVE }
+            val latestDeliveredAt = deliveredOrders.maxOfOrNull { it.deliveredAtMillis ?: it.supplierDeskSortTime() } ?: 0L
+            val dueMillis = paymentDays?.let { days ->
+                latestDeliveredAt.takeIf { it > 0L }?.plus(days.toLong() * dayMillis)
+            }
+            val dueHint = when {
+                overdueOrders > 0 -> localizedStringResource(1677, "Payment already due")
+                dueMillis != null -> "${localizedStringResource(1674, "Estimated due")}: ${receiptUiDateTime(dueMillis)}"
+                paymentTermsText == localizedStringResource(1675, "No payment terms") -> localizedStringResource(1681, "Terms missing")
+                else -> paymentTermsText
+            }
+            val statusHint = when {
+                overdueOrders > 0 -> localizedStringResource(1665, "Payment follow-up")
+                deliveredOrders.isNotEmpty() -> localizedStringResource(1666, "Ready to settle")
+                openOrders.isNotEmpty() -> localizedStringResource(1667, "Future receivable")
+                else -> localizedStringResource(1668, "Watch partner")
+            }
+            val deliveredValueText = supplierSettlementMoneyText(deliveredValues, "0 ${supplierSettlementDominantCurrency(openValues)}")
+            val openValueText = supplierSettlementMoneyText(openValues, "0 ${supplierSettlementDominantCurrency(deliveredValues)}")
+            val lastActivityMillis = latestOrder.supplierDeskSortTime()
+            val contractSignal = when {
+                pendingContractCount > 0 -> localizedStringResource(1656, "Pending contract before next delivery")
+                activeContractCount > 0 -> localizedStringResource(1657, "Terms are active")
+                else -> localizedStringResource(1659, "No contract terms yet")
+            }
+            val brief = buildString {
+                append(localizedStringResource(1660, "Settlement board")).append(": ").append(storeTitle)
+                append('\n').append(localizedStringResource(1662, "Delivered receivable")).append(": ").append(deliveredValueText)
+                append('\n').append(localizedStringResource(1663, "Open pipeline value")).append(": ").append(openValueText)
+                append('\n').append(localizedStringResource(1664, "Payment terms")).append(": ").append(paymentTermsText)
+                append('\n').append(localizedStringResource(1674, "Estimated due")).append(": ").append(dueHint)
+                append('\n').append(localizedStringResource(1650, "Contract signal")).append(": ").append(contractSignal)
+                append('\n').append(localizedStringResource(1545, "Latest activity")).append(": ").append(receiptUiDateTime(lastActivityMillis))
+            }
+            val score = overdueOrders * 120 + deliveredOrders.size * 24 + openOrders.size * 12 + pendingContractCount * 18 + activeContractCount * 4
+            val searchKey = buildString {
+                append(latestOrder.storeId).append(' ')
+                append(latestOrder.supplierId).append(' ')
+                append(storeTitle).append(' ')
+                append(latestOrder.storePublicIdSnapshot).append(' ')
+                append(statusHint).append(' ')
+                append(paymentTermsText).append(' ')
+                append(contractSignal).append(' ')
+                storeOrders.forEach { append(it.id).append(' ').append(it.status.name).append(' ') }
+            }.lowercase()
+
+            SupplierSettlementUiModel(
+                key = key,
+                storeId = latestOrder.storeId,
+                supplierId = latestOrder.supplierId,
+                storeTitle = storeTitle,
+                deliveredValueText = deliveredValueText,
+                openValueText = openValueText,
+                paymentTermsText = paymentTermsText,
+                dueHint = dueHint,
+                deliveredOrdersCount = deliveredOrders.size,
+                openOrdersCount = openOrders.size,
+                overdueOrdersCount = overdueOrders,
+                pendingContractCount = pendingContractCount,
+                activeContractCount = activeContractCount,
+                lastActivityMillis = lastActivityMillis,
+                statusHint = statusHint,
+                brief = brief,
+                score = score,
+                searchKey = searchKey
+            )
+        }
+        .filter { it.deliveredOrdersCount > 0 || it.openOrdersCount > 0 || it.pendingContractCount > 0 }
+        .sortedWith(compareByDescending<SupplierSettlementUiModel> { it.score }
+            .thenByDescending { it.lastActivityMillis })
+}
+
+@Composable
+private fun AppConfiguration.SupplierSettlementCard(item: SupplierSettlementUiModel) {
+    val coroutineScope = rememberCoroutineScope()
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .border(
+                if (item.overdueOrdersCount > 0) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
+                if (item.overdueOrdersCount > 0) stateValues.ErrorColor else stateValues.PlaceholderTextColor,
+                RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .padding(stateValues.marginTextFieldGroup),
+        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(46.dp)
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CpImage(
+                    modifier = Modifier.size(30.dp),
+                    url = stateValues.drawablePathIconSupplierSettlement,
+                    fallbackRes = stateValues.drawableResIconSupplierSettlement.value,
+                    contentDescription = localizedStringResource(1660, "Settlement board"),
+                    tintColor = stateValues.AccentColor
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.storeTitle,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.accentTextSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = item.statusHint,
+                    color = if (item.overdueOrdersCount > 0) stateValues.ErrorColor else stateValues.AccentColor,
+                    fontSize = stateValues.smallTextSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Text(
+                text = item.deliveredValueText,
+                color = stateValues.AccentColor,
+                fontSize = stateValues.accentTextSize,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.End,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        StockCardInfoLine(localizedStringResource(1662, "Delivered receivable"), item.deliveredValueText, stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1663, "Open pipeline value"), item.openValueText, stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1664, "Payment terms"), item.paymentTermsText, stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1674, "Estimated due"), item.dueHint, stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1545, "Latest activity"), receiptUiDateTime(item.lastActivityMillis), stateValues.TextColor)
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1669, "Overdue orders")}: ${item.overdueOrdersCount}") }
+            Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1423, "Open requests")}: ${item.openOrdersCount}") }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1488, "Active contract")}: ${item.activeContractCount}") }
+            Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1537, "Contract blockers")}: ${item.pendingContractCount}") }
+        }
+
+        Text(
+            text = localizedStringResource(1680, "This card is not accounting yet; it is an operational settlement radar from real orders and contracts."),
+            color = stateValues.PlaceholderTextColor,
+            fontSize = stateValues.smallTextSize
+        )
+
+        if (stateValues.isNarrowScreen) {
+            Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1670, "Copy settlement brief"),
+                    iconPath = stateValues.drawablePathIconClipboard,
+                    iconRes = stateValues.drawableResIconClipboard.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        copyTextToClipboard(item.brief)
+                        postInAppNotification(localizedStringResource(1671, "Settlement brief copied"), NotificationType.Positive, transient = true)
+                    }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1672, "Open money-related orders"),
+                    iconPath = stateValues.drawablePathIconAppModeSupplier,
+                    iconRes = stateValues.drawableResIconAppModeSupplier.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.storeId)
+                            Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
+                        }
+                    }
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1670, "Copy settlement brief"),
+                    iconPath = stateValues.drawablePathIconClipboard,
+                    iconRes = stateValues.drawableResIconClipboard.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        copyTextToClipboard(item.brief)
+                        postInAppNotification(localizedStringResource(1671, "Settlement brief copied"), NotificationType.Positive, transient = true)
+                    }
+                )
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1672, "Open money-related orders"),
+                    iconPath = stateValues.drawablePathIconAppModeSupplier,
+                    iconRes = stateValues.drawableResIconAppModeSupplier.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.storeId)
+                            Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
+                        }
+                    }
+                )
+            }
+        }
+    }
+}
+
+private data class SupplierReadinessLaneUiModel(
+    val key: String,
+    val storeId: String,
+    val supplierId: String,
+    val goodsItemId: String,
+    val title: String,
+    val storeTitle: String,
+    val requestedQuantityText: String,
+    val openOrderCount: Int,
+    val lineCount: Int,
+    val pendingContractCount: Int,
+    val activeContractCount: Int,
+    val priceBookReady: Boolean,
+    val priceBookText: String,
+    val lineOfferReady: Boolean,
+    val deliveryStatusText: String,
+    val statusTitle: String,
+    val brief: String,
+    val score: Int,
+    val searchKey: String
+)
+
+private fun AppConfiguration.supplierReadinessPriceText(priceBook: SupplierGoodsPriceDataModel): String = buildString {
+    append(priceBook.supplyPrice.price)
+    priceBook.supplyPrice.currency.takeIf { it.isNotBlank() }?.let { append(' ').append(it) }
+    priceBook.minOrderQuantity?.quantityText(stateValues.appLanguage)?.takeIf { it.isNotBlank() }?.let { append(" • MOQ ").append(it) }
+    priceBook.packageQuantity?.quantityText(stateValues.appLanguage)?.takeIf { it.isNotBlank() }?.let { append(" • pack ").append(it) }
+}
+
+private fun SupplierOrderLineDataModel.hasSupplierLineOffer(): Boolean {
+    val hasComment = !supplierComment.isNullOrBlank() || supplierCommentLocalized.any { it.value.isNotBlank() }
+    return supplierAcceptedQuantity != null || supplierOfferedSupplyPrice != null || substituteGoodsItemId?.isNotBlank() == true || hasComment
+}
+
+private fun AppConfiguration.buildSupplierReadinessLanes(
+    orders: List<SupplierOrderDataModel>,
+    lines: List<SupplierOrderLineDataModel>,
+    contracts: List<SupplierPartnershipContractDataModel>,
+    supplierPrices: List<SupplierGoodsPriceDataModel>
+): List<SupplierReadinessLaneUiModel> {
+    val activeOrders = orders.filter { it.isActive }
+    val ordersById = activeOrders.associateBy { it.id }
+    val activeContracts = contracts.filter { it.isActive }
+    val activePricesByKey = supplierPrices
+        .filter { it.isActive && it.storeId.isNotBlank() && it.supplierId.isNotBlank() && it.goodsItemId.isNotBlank() }
+        .associateBy { "${it.storeId}:${it.supplierId}:${it.goodsItemId}" }
+
+    return lines
+        .filter { it.isActive && it.goodsItemId.isNotBlank() }
+        .mapNotNull { line -> ordersById[line.orderId]?.let { order -> order to line } }
+        .filter { (order, _) -> !order.status.isSupplierOrderClosed() && order.storeId.isNotBlank() && order.supplierId.isNotBlank() }
+        .groupBy { (order, line) -> "${order.storeId}:${order.supplierId}:${line.goodsItemId}" }
+        .mapNotNull { (key, pairs) ->
+            val latestPair = pairs.maxByOrNull { (order, _) -> order.supplierDeskSortTime() } ?: return@mapNotNull null
+            val latestOrder = latestPair.first
+            val sampleLine = latestPair.second
+            val relatedOrders = pairs.map { it.first }.distinctBy { it.id }
+            val relatedLines = pairs.map { it.second }
+            val itemContracts = activeContracts.filter { contract ->
+                contract.storeId == latestOrder.storeId &&
+                        contract.supplierId == latestOrder.supplierId &&
+                        supplierContractTouchesGoods(contract, sampleLine.goodsItemId)
+            }
+            val pendingContractCount = itemContracts.count {
+                it.status == SUPPLIER_CONTRACT_STATUS_PENDING_STORE || it.status == SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER
+            }
+            val activeContractCount = itemContracts.count { it.status == SUPPLIER_CONTRACT_STATUS_ACTIVE }
+            val priceBook = activePricesByKey[key]
+            val priceBookReady = priceBook != null
+            val lineOfferReady = relatedLines.all { it.hasSupplierLineOffer() || latestOrder.status == SupplierOrderStatusDataModel.Confirmed || latestOrder.status == SupplierOrderStatusDataModel.Packed || latestOrder.status == SupplierOrderStatusDataModel.InDelivery }
+            val requestedTotal = relatedLines.sumOf { it.requestedQuantity.total.coerceAtLeast(0.0) }
+            val requestedQuantity = sampleLine.requestedQuantity.copy(total = requestedTotal)
+            val statusTitle = when {
+                pendingContractCount > 0 -> localizedStringResource(1686, "Contract needed")
+                !priceBookReady -> localizedStringResource(1687, "Price book missing")
+                !lineOfferReady -> localizedStringResource(1688, "Line offer missing")
+                else -> localizedStringResource(1685, "Ready to supply")
+            }
+            val contractSignal = when {
+                pendingContractCount > 0 -> localizedStringResource(1698, "Contract pending")
+                activeContractCount > 0 -> localizedStringResource(1697, "Contract active")
+                else -> localizedStringResource(1659, "No contract terms yet")
+            }
+            val priceBookText = priceBook?.let { supplierReadinessPriceText(it) }?.takeIf { it.isNotBlank() }
+                ?: localizedStringResource(1700, "Price missing")
+            val lineSignal = if (lineOfferReady) localizedStringResource(1701, "Offer complete") else localizedStringResource(1702, "Needs supplier line offer")
+            val deliveryStatusText = when {
+                relatedOrders.any { it.status == SupplierOrderStatusDataModel.InDelivery } -> supplierOrderStatusTitle(SupplierOrderStatusDataModel.InDelivery)
+                relatedOrders.any { it.status == SupplierOrderStatusDataModel.Packed } -> supplierOrderStatusTitle(SupplierOrderStatusDataModel.Packed)
+                relatedOrders.any { it.status == SupplierOrderStatusDataModel.Confirmed } -> supplierOrderStatusTitle(SupplierOrderStatusDataModel.Confirmed)
+                else -> localizedStringResource(1689, "Delivery lane ready")
+            }
+            val storeTitle = supplierDeskStoreTitle(latestOrder)
+            val title = supplierDeskLineTitle(sampleLine)
+            val brief = buildString {
+                append(localizedStringResource(1683, "Supply readiness board")).append('\n')
+                append(localizedStringResource(1619, "Item")).append(": ").append(title).append('\n')
+                append(localizedStringResource(146, "Store")).append(": ").append(storeTitle).append('\n')
+                append(localizedStringResource(960, "Ordered quantity")).append(": ").append(requestedQuantity.quantityText(stateValues.appLanguage)).append('\n')
+                append(localizedStringResource(1650, "Contract signal")).append(": ").append(contractSignal).append('\n')
+                append(localizedStringResource(1349, "Price ladder and payment terms")).append(": ").append(priceBookText).append('\n')
+                append(localizedStringResource(1707, "Line offer")).append(": ").append(lineSignal).append('\n')
+                append(localizedStringResource(1703, "Delivery status")).append(": ").append(deliveryStatusText).append('\n')
+                append(localizedStringResource(1678, "Settlement signal")).append(": ").append(statusTitle)
+            }
+            val score = pendingContractCount * 100 +
+                    (if (!priceBookReady) 45 else 0) +
+                    (if (!lineOfferReady) 35 else 0) +
+                    relatedOrders.size * 6 +
+                    relatedLines.size * 2 -
+                    activeContractCount * 8
+
+            SupplierReadinessLaneUiModel(
+                key = key,
+                storeId = latestOrder.storeId,
+                supplierId = latestOrder.supplierId,
+                goodsItemId = sampleLine.goodsItemId,
+                title = title,
+                storeTitle = storeTitle,
+                requestedQuantityText = requestedQuantity.quantityText(stateValues.appLanguage),
+                openOrderCount = relatedOrders.count { !it.status.isSupplierOrderClosed() },
+                lineCount = relatedLines.size,
+                pendingContractCount = pendingContractCount,
+                activeContractCount = activeContractCount,
+                priceBookReady = priceBookReady,
+                priceBookText = priceBookText,
+                lineOfferReady = lineOfferReady,
+                deliveryStatusText = deliveryStatusText,
+                statusTitle = statusTitle,
+                brief = brief,
+                score = score,
+                searchKey = buildString {
+                    append(sampleLine.goodsItemId).append(' ')
+                    append(latestOrder.storeId).append(' ')
+                    append(title).append(' ')
+                    append(storeTitle).append(' ')
+                    append(statusTitle).append(' ')
+                    append(contractSignal).append(' ')
+                    append(priceBookText).append(' ')
+                    append(sampleLine.goodsItemBarcodeSnapshots.joinToString(" "))
+                }.lowercase()
+            )
+        }
+        .sortedWith(compareByDescending<SupplierReadinessLaneUiModel> { it.score }.thenByDescending { it.openOrderCount })
+}
+
+@Composable
+private fun AppConfiguration.SupplierReadinessLaneCard(item: SupplierReadinessLaneUiModel) {
+    val coroutineScope = rememberCoroutineScope()
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .border(
+                stateValues.unfocusedBorderWidth,
+                if (item.pendingContractCount > 0 || !item.priceBookReady || !item.lineOfferReady) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+                RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .padding(stateValues.marginTextFieldGroup),
+        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.10f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CpImage(
+                    modifier = Modifier.size(31.dp),
+                    url = stateValues.drawablePathIconSupplierReadiness,
+                    fallbackRes = stateValues.drawableResIconSupplierReadiness.value,
+                    contentDescription = localizedStringResource(1683, "Supply readiness board"),
+                    tintColor = stateValues.AccentColor
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.title,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.accentTextSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "${item.storeTitle} • ${item.statusTitle}",
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            Box(modifier = Modifier.weight(1f)) {
+                SupplierCatalogChip(text = if (item.pendingContractCount > 0) localizedStringResource(1698, "Contract pending") else if (item.activeContractCount > 0) localizedStringResource(1697, "Contract active") else localizedStringResource(1659, "No contract terms yet"))
+            }
+            Box(modifier = Modifier.weight(1f)) {
+                SupplierCatalogChip(text = if (item.priceBookReady) localizedStringResource(1699, "Price book ready") else localizedStringResource(1700, "Price missing"))
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            Box(modifier = Modifier.weight(1f)) {
+                SupplierCatalogChip(text = if (item.lineOfferReady) localizedStringResource(1701, "Offer complete") else localizedStringResource(1702, "Needs supplier line offer"))
+            }
+            Box(modifier = Modifier.weight(1f)) {
+                SupplierCatalogChip(text = item.deliveryStatusText)
+            }
+        }
+
+        StockCardInfoLine(localizedStringResource(960, "Ordered quantity"), item.requestedQuantityText, stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1423, "Open requests"), item.openOrderCount.toString(), stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1349, "Price ladder and payment terms"), item.priceBookText, stateValues.TextColor)
+        Text(
+            text = localizedStringResource(1706, "This is a supplier preflight check: contract terms, price memory, line offer and delivery lane should be ready before promising fulfillment."),
+            color = stateValues.PlaceholderTextColor,
+            fontSize = stateValues.smallTextSize
+        )
+
+        if (stateValues.isNarrowScreen) {
+            Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1691, "Copy readiness brief"),
+                    iconPath = stateValues.drawablePathIconClipboard,
+                    iconRes = stateValues.drawableResIconClipboard.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        copyTextToClipboard(item.brief)
+                        postInAppNotification(localizedStringResource(1692, "Readiness brief copied"), NotificationType.Positive, transient = true)
+                    }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1693, "Open readiness orders"),
+                    iconPath = stateValues.drawablePathIconAppModeSupplier,
+                    iconRes = stateValues.drawableResIconAppModeSupplier.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.goodsItemId)
+                            Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
+                        }
+                    }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = if (item.pendingContractCount > 0) localizedStringResource(1694, "Open contract board") else localizedStringResource(1695, "Open price book/catalog"),
+                    iconPath = if (item.pendingContractCount > 0) stateValues.drawablePathIconSupplierContracts else stateValues.drawablePathIconSupplierCatalog,
+                    iconRes = if (item.pendingContractCount > 0) stateValues.drawableResIconSupplierContracts.value else stateValues.drawableResIconSupplierCatalog.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            if (item.pendingContractCount > 0) {
+                                NavigationScreenModel.Supplier.Contracts.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.title)
+                                Navigation.goMain(NavigationScreenModel.Supplier.Contracts.Main)
+                            } else {
+                                NavigationScreenModel.Supplier.Catalog.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.title)
+                                Navigation.goMain(NavigationScreenModel.Supplier.Catalog.Main)
+                            }
+                        }
+                    }
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1691, "Copy readiness brief"),
+                    iconPath = stateValues.drawablePathIconClipboard,
+                    iconRes = stateValues.drawableResIconClipboard.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        copyTextToClipboard(item.brief)
+                        postInAppNotification(localizedStringResource(1692, "Readiness brief copied"), NotificationType.Positive, transient = true)
+                    }
+                )
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1693, "Open readiness orders"),
+                    iconPath = stateValues.drawablePathIconAppModeSupplier,
+                    iconRes = stateValues.drawableResIconAppModeSupplier.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.goodsItemId)
+                            Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
+                        }
+                    }
+                )
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = if (item.pendingContractCount > 0) localizedStringResource(1694, "Open contract board") else localizedStringResource(1695, "Open price book/catalog"),
+                    iconPath = if (item.pendingContractCount > 0) stateValues.drawablePathIconSupplierContracts else stateValues.drawablePathIconSupplierCatalog,
+                    iconRes = if (item.pendingContractCount > 0) stateValues.drawableResIconSupplierContracts.value else stateValues.drawableResIconSupplierCatalog.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            if (item.pendingContractCount > 0) {
+                                NavigationScreenModel.Supplier.Contracts.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.title)
+                                Navigation.goMain(NavigationScreenModel.Supplier.Contracts.Main)
+                            } else {
+                                NavigationScreenModel.Supplier.Catalog.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.title)
+                                Navigation.goMain(NavigationScreenModel.Supplier.Catalog.Main)
+                            }
+                        }
+                    }
+                )
+            }
+        }
+    }
+}
+
+private data class SupplierPromiseKeeperUiModel(
+    val order: SupplierOrderDataModel,
+    val lines: List<SupplierOrderLineDataModel>,
+    val storeTitle: String,
+    val goodsPreview: String,
+    val statusText: String,
+    val deliveryWindowText: String,
+    val riskTitle: String,
+    val riskReason: String,
+    val nextActionText: String,
+    val nextStatus: SupplierOrderStatusDataModel?,
+    val pendingContractCount: Int,
+    val promiseBrief: String,
+    val searchKey: String,
+    val score: Int,
+    val urgent: Boolean
+)
+
+private fun SupplierOrderDataModel.supplierPromiseDueMillis(): Long? =
+    confirmedDeliveryTimeMillis ?: desiredDeliveryTimeMillis
+
+private fun AppConfiguration.supplierPromiseNextStatus(order: SupplierOrderDataModel): SupplierOrderStatusDataModel? = when (order.status) {
+    SupplierOrderStatusDataModel.Sent -> SupplierOrderStatusDataModel.SeenBySupplier
+    SupplierOrderStatusDataModel.SeenBySupplier -> SupplierOrderStatusDataModel.Confirmed
+    SupplierOrderStatusDataModel.Confirmed -> SupplierOrderStatusDataModel.Packed
+    SupplierOrderStatusDataModel.Packed -> SupplierOrderStatusDataModel.InDelivery
+    else -> null
+}
+
+private fun AppConfiguration.supplierPromiseNextActionText(status: SupplierOrderStatusDataModel?): String = when (status) {
+    SupplierOrderStatusDataModel.SeenBySupplier -> localizedStringResource(1720, "Acknowledge request")
+    SupplierOrderStatusDataModel.Confirmed -> localizedStringResource(1721, "Confirm promise")
+    SupplierOrderStatusDataModel.Packed -> localizedStringResource(1722, "Mark packed")
+    SupplierOrderStatusDataModel.InDelivery -> localizedStringResource(1723, "Start delivery")
+    else -> localizedStringResource(1718, "Open promise order")
+}
+
+private fun AppConfiguration.buildSupplierPromiseKeeperItems(
+    orders: List<SupplierOrderDataModel>,
+    lines: List<SupplierOrderLineDataModel>,
+    contracts: List<SupplierPartnershipContractDataModel>
+): List<SupplierPromiseKeeperUiModel> {
+    val now = getCurrentTimeMillis()
+    val soonMillis = now + 24L * 60L * 60L * 1000L
+    val activeLinesByOrder = lines.filter { it.isActive }.groupBy { it.orderId }
+    val activeContracts = contracts.filter { it.isActive }
+
+    return orders
+        .filter { it.isActive && it.status != SupplierOrderStatusDataModel.Draft && !it.status.isSupplierOrderClosed() }
+        .mapNotNull { order ->
+            val orderLines = activeLinesByOrder[order.id].orEmpty()
+            val dueMillis = order.supplierPromiseDueMillis()
+            val overdue = dueMillis != null && dueMillis < now
+            val dueSoon = dueMillis != null && dueMillis >= now && dueMillis <= soonMillis
+            val waitingSupplierAnswer = order.status == SupplierOrderStatusDataModel.Sent || order.status == SupplierOrderStatusDataModel.SeenBySupplier
+            val issueReported = order.status == SupplierOrderStatusDataModel.IssueReported
+            val pendingContractCount = activeContracts.count { contract ->
+                contract.storeId == order.storeId &&
+                        contract.supplierId == order.supplierId &&
+                        (contract.status == SUPPLIER_CONTRACT_STATUS_PENDING_STORE || contract.status == SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER) &&
+                        (orderLines.isEmpty() || orderLines.any { line -> supplierContractTouchesGoods(contract, line.goodsItemId) })
+            }
+
+            if (!overdue && !dueSoon && !waitingSupplierAnswer && !issueReported && pendingContractCount == 0) return@mapNotNull null
+
+            val storeTitle = supplierDeskStoreTitle(order)
+            val goodsPreview = orderLines
+                .take(4)
+                .joinToString(" • ") { line ->
+                    val quantityText = line.supplierAcceptedQuantity ?: line.requestedQuantity
+                    supplierDeskLineTitle(line) + " × " + quantityText.quantityText(stateValues.appLanguage)
+                }
+                .ifBlank { localizedStringResource(1566, "No goods lines yet") }
+            val deliveryWindowText = dueMillis?.let { receiptUiDateTime(it) } ?: localizedStringResource(1736, "No desired date")
+            val riskTitle = when {
+                overdue -> localizedStringResource(1728, "Promise is late")
+                dueSoon -> localizedStringResource(1729, "Promise due soon")
+                waitingSupplierAnswer -> localizedStringResource(1730, "Needs first supplier response")
+                issueReported -> localizedStringResource(974, "Issue reported")
+                pendingContractCount > 0 -> localizedStringResource(1732, "Contract may block promise")
+                else -> localizedStringResource(1709, "Promise keeper")
+            }
+            val riskReason = when {
+                overdue -> localizedStringResource(1728, "Promise is late") + " • " + deliveryWindowText
+                dueSoon -> localizedStringResource(1729, "Promise due soon") + " • " + deliveryWindowText
+                waitingSupplierAnswer -> localizedStringResource(1730, "Needs first supplier response")
+                issueReported -> localizedStringResource(974, "Issue reported")
+                pendingContractCount > 0 -> localizedStringResource(1732, "Contract may block promise")
+                else -> localizedStringResource(1709, "Promise keeper")
+            }
+            val nextStatus = supplierPromiseNextStatus(order)
+            val nextActionText = supplierPromiseNextActionText(nextStatus)
+            val statusText = supplierOrderStatusTitle(order.status)
+            val promiseBrief = buildString {
+                append(localizedStringResource(1734, "Promise brief")).append(" — ").append(storeTitle).append('\n')
+                append(localizedStringResource(316, "Transaction")).append(": #").append(order.id.take(8)).append(" • ").append(statusText).append('\n')
+                append(localizedStringResource(1726, "Risk reason")).append(": ").append(riskReason).append('\n')
+                append(localizedStringResource(1725, "Delivery window")).append(": ").append(deliveryWindowText).append('\n')
+                append(localizedStringResource(392, "Items")).append(": ").append(goodsPreview).append('\n')
+                append(localizedStringResource(1727, "Suggested next step")).append(": ").append(nextActionText)
+                if (pendingContractCount > 0) append('\n').append(localizedStringResource(1537, "Contract blockers")).append(": ").append(pendingContractCount)
+            }
+            val searchKey = buildString {
+                append(order.id).append(' ')
+                append(order.storeId).append(' ')
+                append(order.storePublicIdSnapshot).append(' ')
+                append(storeTitle).append(' ')
+                append(statusText).append(' ')
+                append(riskTitle).append(' ')
+                append(goodsPreview).append(' ')
+                append(order.additionalNotes.orEmpty()).append(' ')
+                append(order.supplierComment.orEmpty()).append(' ')
+                orderLines.forEach { line ->
+                    append(line.goodsItemId).append(' ')
+                    append(supplierDeskLineTitle(line)).append(' ')
+                    append(line.goodsItemBarcodeSnapshots.joinToString(" ")).append(' ')
+                }
+            }.lowercase()
+            val score = when {
+                overdue -> 180
+                issueReported -> 150
+                dueSoon -> 120
+                waitingSupplierAnswer -> 90
+                pendingContractCount > 0 -> 70
+                else -> 20
+            } + pendingContractCount * 8 + orderLines.size
+
+            SupplierPromiseKeeperUiModel(
+                order = order,
+                lines = orderLines,
+                storeTitle = storeTitle,
+                goodsPreview = goodsPreview,
+                statusText = statusText,
+                deliveryWindowText = deliveryWindowText,
+                riskTitle = riskTitle,
+                riskReason = riskReason,
+                nextActionText = nextActionText,
+                nextStatus = nextStatus,
+                pendingContractCount = pendingContractCount,
+                promiseBrief = promiseBrief,
+                searchKey = searchKey,
+                score = score,
+                urgent = overdue || issueReported || dueSoon
+            )
+        }
+        .sortedWith(compareByDescending<SupplierPromiseKeeperUiModel> { it.score }
+            .thenBy { it.order.supplierPromiseDueMillis() ?: Long.MAX_VALUE }
+            .thenByDescending { it.order.supplierDeskSortTime() })
+}
+
+@Composable
+private fun AppConfiguration.SupplierPromiseKeeperCard(item: SupplierPromiseKeeperUiModel) {
+    val coroutineScope = rememberCoroutineScope()
+    val nextStatus = item.nextStatus
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .border(
+                if (item.urgent) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
+                if (item.urgent) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+                RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .padding(stateValues.marginTextFieldGroup),
+        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.10f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CpImage(
+                    modifier = Modifier.size(31.dp),
+                    url = stateValues.drawablePathIconSupplierPromiseKeeper,
+                    fallbackRes = stateValues.drawableResIconSupplierPromiseKeeper.value,
+                    contentDescription = localizedStringResource(1709, "Promise keeper"),
+                    tintColor = stateValues.AccentColor
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.storeTitle,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.accentTextSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "${item.riskTitle} • ${item.statusText}",
+                    color = if (item.urgent) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Text(
+                text = "#${item.order.id.take(8)}",
+                color = stateValues.PlaceholderTextColor,
+                fontSize = stateValues.smallTextSize,
+                textAlign = TextAlign.End
+            )
+        }
+
+        StockCardInfoLine(localizedStringResource(1725, "Delivery window"), item.deliveryWindowText, stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1726, "Risk reason"), item.riskReason, stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(392, "Items"), item.goodsPreview, stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1727, "Suggested next step"), item.nextActionText, stateValues.TextColor)
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = item.statusText) }
+            Box(modifier = Modifier.weight(1f)) {
+                SupplierCatalogChip(text = "${localizedStringResource(1537, "Contract blockers")}: ${item.pendingContractCount}")
+            }
+        }
+
+        Text(
+            text = localizedStringResource(1733, "Keep the store calm: send a proactive update, then move the order to the next honest status."),
+            color = stateValues.PlaceholderTextColor,
+            fontSize = stateValues.smallTextSize
+        )
+
+        Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+            actionButton(
+                modifier = Modifier.fillMaxWidth(),
+                text = localizedStringResource(1717, "Copy store update"),
+                iconPath = stateValues.drawablePathIconClipboard,
+                iconRes = stateValues.drawableResIconClipboard.value,
+                confirmationRequired = false,
+                onClick = {
+                    copyTextToClipboard(item.promiseBrief)
+                    postInAppNotification(localizedStringResource(1716, "Promise update copied"), NotificationType.Positive, transient = true)
+                }
+            )
+            actionButton(
+                modifier = Modifier.fillMaxWidth(),
+                text = localizedStringResource(1718, "Open promise order"),
+                iconPath = stateValues.drawablePathIconAppModeSupplier,
+                iconRes = stateValues.drawableResIconAppModeSupplier.value,
+                confirmationRequired = false,
+                onClick = {
+                    coroutineScope.launch {
+                        NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.order.id)
+                        Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
+                    }
+                }
+            )
+            if (nextStatus != null) {
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = item.nextActionText,
+                    iconPath = stateValues.drawablePathIconSupplierPromiseKeeper,
+                    iconRes = stateValues.drawableResIconSupplierPromiseKeeper.value,
+                    confirmationRequired = true,
+                    onClick = {
+                        updateSupplierOrdersSupplierStatus(
+                            orderBundles = listOf(SupplierOrderWithLinesDataModel(order = item.order, lines = item.lines)),
+                            status = nextStatus,
+                            comment = item.riskReason
+                        )
+                    }
+                )
+            }
+        }
+    }
+}
+
 
 private fun AppConfiguration.buildSupplierReorderPulseItems(
     orders: List<SupplierOrderDataModel>,
@@ -23480,6 +24555,7 @@ private fun AppConfiguration.SupplierInsightsScreen() {
     val orders by supplierOrdersState.payload.collectAsState()
     val lines by supplierOrderLinesState.payload.collectAsState()
     val contracts by supplierPartnershipContractsState.payload.collectAsState()
+    val supplierSidePrices by supplierSideGoodsPricesState.payload.collectAsState()
     var searchQuery by rememberSaveable { mutableStateOf("") }
     val coroutineScope = rememberCoroutineScope()
 
@@ -23487,6 +24563,7 @@ private fun AppConfiguration.SupplierInsightsScreen() {
         if (stateValues.userAccount != null) {
             getMySupplierSideOrders()
             getSupplierContracts()
+            getMySupplierSideGoodsPrices()
         }
     }
 
@@ -23502,9 +24579,27 @@ private fun AppConfiguration.SupplierInsightsScreen() {
     val reorderPulseItems = remember(activeOrders, activeLines, activeContracts, stateValues.appLanguage) {
         buildSupplierReorderPulseItems(activeOrders, activeLines, activeContracts)
     }
+    val settlementItems = remember(activeOrders, activeLines, activeContracts, stateValues.appLanguage) {
+        buildSupplierSettlementItems(activeOrders, activeLines, activeContracts)
+    }
+    val readinessItems = remember(activeOrders, activeLines, activeContracts, supplierSidePrices, stateValues.appLanguage) {
+        buildSupplierReadinessLanes(activeOrders, activeLines, activeContracts, supplierSidePrices.orEmpty())
+    }
+    val promiseKeeperItems = remember(activeOrders, activeLines, activeContracts, stateValues.appLanguage) {
+        buildSupplierPromiseKeeperItems(activeOrders, activeLines, activeContracts)
+    }
     val normalizedSearch = searchQuery.trim().lowercase()
     val visibleReorderPulseItems = remember(reorderPulseItems, normalizedSearch) {
         reorderPulseItems.filter { normalizedSearch.isBlank() || it.searchKey.contains(normalizedSearch) }
+    }
+    val visibleSettlementItems = remember(settlementItems, normalizedSearch) {
+        settlementItems.filter { normalizedSearch.isBlank() || it.searchKey.contains(normalizedSearch) }
+    }
+    val visibleReadinessItems = remember(readinessItems, normalizedSearch) {
+        readinessItems.filter { normalizedSearch.isBlank() || it.searchKey.contains(normalizedSearch) }
+    }
+    val visiblePromiseKeeperItems = remember(promiseKeeperItems, normalizedSearch) {
+        promiseKeeperItems.filter { normalizedSearch.isBlank() || it.searchKey.contains(normalizedSearch) }
     }
     val visibleRadarItems = remember(radarItems, normalizedSearch) {
         radarItems.filter { normalizedSearch.isBlank() || it.searchKey.contains(normalizedSearch) }
@@ -23627,6 +24722,10 @@ private fun AppConfiguration.SupplierInsightsScreen() {
                     }
 
                     StockCardInfoLine(localizedStringResource(1555, "Active contracts"), activeContractCount.toString(), stateValues.TextColor)
+                    StockCardInfoLine(localizedStringResource(1711, "Promise risks"), promiseKeeperItems.size.toString(), stateValues.TextColor)
+                    StockCardInfoLine(localizedStringResource(1690, "Store-item lanes"), readinessItems.size.toString(), stateValues.TextColor)
+                    StockCardInfoLine(localizedStringResource(1708, "Readiness lanes needing work"), readinessItems.count { it.pendingContractCount > 0 || !it.priceBookReady || !it.lineOfferReady }.toString(), stateValues.TextColor)
+                    StockCardInfoLine(localizedStringResource(1679, "Receivable partners"), settlementItems.size.toString(), stateValues.TextColor)
                     StockCardInfoLine(localizedStringResource(1640, "Partner reorder pulses"), reorderPulseItems.size.toString(), stateValues.TextColor)
                     StockCardInfoLine(localizedStringResource(1625, "Upstream bridge items"), manufacturerBridgeItems.size.toString(), stateValues.TextColor)
                     Text(
@@ -23732,6 +24831,123 @@ private fun AppConfiguration.SupplierInsightsScreen() {
                 }
             }
 
+
+            item {
+                Text(
+                    text = localizedStringResource(1709, "Promise keeper"),
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.titleTextSize,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            item {
+                Text(
+                    text = localizedStringResource(1710, "Catch late or risky store promises before they become noisy support calls."),
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            if (promiseKeeperItems.isEmpty()) {
+                item {
+                    MessageText(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(1724, "No promise risks yet")
+                    )
+                }
+            } else if (visiblePromiseKeeperItems.isEmpty()) {
+                item {
+                    MessageText(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(1380, "No orders match this filter")
+                    )
+                }
+            } else {
+                items(visiblePromiseKeeperItems.take(5), key = { "promise_keeper_${it.order.id}" }) { item ->
+                    SupplierPromiseKeeperCard(item)
+                }
+            }
+
+            item {
+                Text(
+                    text = localizedStringResource(1683, "Supply readiness board"),
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.titleTextSize,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            item {
+                Text(
+                    text = localizedStringResource(1684, "Check contract, price-book, line-offer and dispatch readiness before promising a store shipment."),
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            if (readinessItems.isEmpty()) {
+                item {
+                    MessageText(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(1696, "No readiness lanes yet")
+                    )
+                }
+            } else if (visibleReadinessItems.isEmpty()) {
+                item {
+                    MessageText(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(1380, "No orders match this filter")
+                    )
+                }
+            } else {
+                items(visibleReadinessItems.take(5), key = { "readiness_${it.key}" }) { item ->
+                    SupplierReadinessLaneCard(item)
+                }
+            }
+
+            item {
+                Text(
+                    text = localizedStringResource(1660, "Settlement board"),
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.titleTextSize,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            item {
+                Text(
+                    text = localizedStringResource(1661, "Turn fulfilled deliveries and open orders into payment follow-up, without leaving supplier mode."),
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            if (settlementItems.isEmpty()) {
+                item {
+                    MessageText(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(1673, "No settlement signals yet")
+                    )
+                }
+            } else if (visibleSettlementItems.isEmpty()) {
+                item {
+                    MessageText(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(1380, "No orders match this filter")
+                    )
+                }
+            } else {
+                items(visibleSettlementItems.take(4), key = { "settlement_${it.key}" }) { item ->
+                    SupplierSettlementCard(item)
+                }
+            }
 
             item {
                 Text(
@@ -46626,6 +47842,15 @@ object AppConfiguration {
         val drawablePathIconSupplierReorderPulse: String
         val drawableResIconSupplierReorderPulse: StateFlow<DrawableResource>
 
+        val drawablePathIconSupplierSettlement: String
+        val drawableResIconSupplierSettlement: StateFlow<DrawableResource>
+
+        val drawablePathIconSupplierReadiness: String
+        val drawableResIconSupplierReadiness: StateFlow<DrawableResource>
+
+        val drawablePathIconSupplierPromiseKeeper: String
+        val drawableResIconSupplierPromiseKeeper: StateFlow<DrawableResource>
+
         val drawablePathIconBuyerAgeRestriction: String
         val drawableResIconBuyerAgeRestriction: StateFlow<DrawableResource>
 
@@ -47277,6 +48502,18 @@ object AppConfiguration {
             private val _drawableResIconSupplierReorderPulse = MutableStateFlow(Res.drawable._83_0)
             override val drawableResIconSupplierReorderPulse: StateFlow<DrawableResource> = _drawableResIconSupplierReorderPulse.asStateFlow()
 
+            override val drawablePathIconSupplierSettlement: String by drawablePathIconSupplierSettlementState.collectAsState()
+            private val _drawableResIconSupplierSettlement = MutableStateFlow(Res.drawable._84_0)
+            override val drawableResIconSupplierSettlement: StateFlow<DrawableResource> = _drawableResIconSupplierSettlement.asStateFlow()
+
+            override val drawablePathIconSupplierReadiness: String by drawablePathIconSupplierReadinessState.collectAsState()
+            private val _drawableResIconSupplierReadiness = MutableStateFlow(Res.drawable._85_0)
+            override val drawableResIconSupplierReadiness: StateFlow<DrawableResource> = _drawableResIconSupplierReadiness.asStateFlow()
+
+            override val drawablePathIconSupplierPromiseKeeper: String by drawablePathIconSupplierPromiseKeeperState.collectAsState()
+            private val _drawableResIconSupplierPromiseKeeper = MutableStateFlow(Res.drawable._86_0)
+            override val drawableResIconSupplierPromiseKeeper: StateFlow<DrawableResource> = _drawableResIconSupplierPromiseKeeper.asStateFlow()
+
             override val drawablePathIconBuyerAgeRestriction: String by drawablePathIconBuyerAgeRestrictionState.collectAsState()
             private val _drawableResIconBuyerAgeRestriction = MutableStateFlow(Res.drawable._73_0)
             override val drawableResIconBuyerAgeRestriction: StateFlow<DrawableResource> = _drawableResIconBuyerAgeRestriction.asStateFlow()
@@ -47492,6 +48729,9 @@ object AppConfiguration {
                 _drawableResIconSupplierManufacturerBridge.emit(if (stateValues.appThemeId == 1L) Res.drawable._81_1 else Res.drawable._81_0)
                 _drawableResIconSupplierPriceBook.emit(if (stateValues.appThemeId == 1L) Res.drawable._82_1 else Res.drawable._82_0)
                 _drawableResIconSupplierReorderPulse.emit(if (stateValues.appThemeId == 1L) Res.drawable._83_1 else Res.drawable._83_0)
+                _drawableResIconSupplierSettlement.emit(if (stateValues.appThemeId == 1L) Res.drawable._84_1 else Res.drawable._84_0)
+                _drawableResIconSupplierReadiness.emit(if (stateValues.appThemeId == 1L) Res.drawable._85_1 else Res.drawable._85_0)
+                _drawableResIconSupplierPromiseKeeper.emit(if (stateValues.appThemeId == 1L) Res.drawable._86_1 else Res.drawable._86_0)
                 _drawableResIconBuyerAgeRestriction.emit(if (stateValues.appThemeId == 1L) Res.drawable._73_1 else Res.drawable._73_0)
                 _drawableResIconTransactionTimeRestriction.emit(if (stateValues.appThemeId == 1L) Res.drawable._74_1 else Res.drawable._74_0)
 
