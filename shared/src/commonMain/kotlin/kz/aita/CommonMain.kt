@@ -5394,7 +5394,7 @@ const val CLOUD_TRANSPORT_STATUS_UNAVAILABLE = -1
 @PublishedApi
 internal const val REALTIME_ACCESS_TOKEN_REFRESH_SKEW_MILLIS = 60_000L
 
-private const val DEFAULT_AITA_SERVER_URL = "http://192.168.1.168:8080"
+private const val DEFAULT_AITA_SERVER_URL = "http://10.202.10.147:8080"
 private val DEFAULT_AITA_SERVER_URL_PAIR = Pair(DEFAULT_AITA_SERVER_URL, "1")
 @Volatile
 private var currentNetworkRequestCandidateServerUrlsMemory: List<String> = emptyList()
@@ -6060,6 +6060,9 @@ val drawablePathIconSupplierPriceBookState = MutableStateFlow("svg/82_0.svg")
 val drawablePathIconSupplierReorderPulseState = MutableStateFlow("svg/83_0.svg")
 val drawablePathIconSupplierSettlementState = MutableStateFlow("svg/84_0.svg")
 val drawablePathIconSupplierReadinessState = MutableStateFlow("svg/85_0.svg")
+val drawablePathIconSupplierPromiseKeeperState = MutableStateFlow("svg/86_0.svg")
+val drawablePathIconSupplierOnboardingState = MutableStateFlow("svg/87_0.svg")
+val drawablePathIconSupplierBasketBuilderState = MutableStateFlow("svg/88_0.svg")
 val drawablePathIconBuyerAgeRestrictionState = MutableStateFlow("svg/73_0.svg")
 val drawablePathIconTransactionTimeRestrictionState = MutableStateFlow("svg/74_0.svg")
 val drawablePathIconWorkersState = MutableStateFlow("svg/22_0.svg")
@@ -8152,6 +8155,15 @@ fun updateDrawables(
         )
         drawablePathIconSupplierReadinessState.emit(
             drawablePath(85L)
+        )
+        drawablePathIconSupplierPromiseKeeperState.emit(
+            drawablePath(86L)
+        )
+        drawablePathIconSupplierOnboardingState.emit(
+            drawablePath(87L)
+        )
+        drawablePathIconSupplierBasketBuilderState.emit(
+            drawablePath(88L)
         )
         drawablePathIconBuyerAgeRestrictionState.emit(
             drawablePath(73L)
@@ -13230,8 +13242,14 @@ fun syncUserPreferencesToServer(
             )
 
             if (response.negative || response.payload == null) {
-                if (postFailure) {
+                val visibleMessage = response.message?.extractLocalizedString(appLanguageState.value).orEmpty()
+                val genericServerFailure = visibleMessage.contains("Internal server error", ignoreCase = true) ||
+                        visibleMessage.contains("Внутренняя ошибка", ignoreCase = true) ||
+                        visibleMessage.contains("Сервердің ішкі", ignoreCase = true)
+                if (postFailure && !genericServerFailure) {
                     postInAppNotification(response.message, NotificationType.Neutral, transient = true)
+                } else {
+                    logCloudConnectionDiagnostic("user preference sync skipped noisy notification; local preference remains applied")
                 }
             } else {
                 userAccountState.emit(DataState.Success(response.payload, response.message))

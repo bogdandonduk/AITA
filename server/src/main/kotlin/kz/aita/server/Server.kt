@@ -2329,7 +2329,7 @@ private fun String.withoutSeededGoodsCategoryPrefix(): String {
     return trim()
         .replace(
             Regex(
-                pattern = """^(Goods\s+(categor(?:y|ies)|section)|Product\s+category|Category|Категория\s+товаров|Раздел\s+товар(?:ов|а)?|Товарный\s+раздел|Категория|Тауар(?:лар)?\s+(санаты|бөлімі)|Товар(?:лар)?\s+(санаты|бөлімі)|Өнім(?:дер)?\s+(санаты|бөлімі)|Санат|Бөлім)\s*[:：\-—]?\s*""",
+                pattern = """^(Goods\s+subcategory|Goods\s+(categor(?:y|ies)|section)|Product\s+category|Subcategory|Category|Подкатегория\s+товаров|Категория\s+товаров|Раздел\s+товар(?:ов|а)?|Товарный\s+раздел|Категория|Тауар\s+ішкі\s+санаты|Тауар(?:лар)?\s+(санаты|бөлімі)|Товар(?:лар)?\s+(санаты|бөлімі)|Өнім(?:дер)?\s+(санаты|бөлімі)|Санат|Бөлім)\s*[:：\-—]?\s*""",
                 option = RegexOption.IGNORE_CASE
             ),
             ""
@@ -12585,9 +12585,12 @@ fun Application.module() {
                             .singleOrNull() ?: return@newSuspendedTransaction null
 
                         Users.update({ Users.id eq uuid }) {
-                            if (existing[Users.appLanguage] != language) it[Users.appLanguage] = language
-                            if (existing[Users.appThemeId] != themeId) it[Users.appThemeId] = themeId
-                            if (existing[Users.appSizeModeId] != sizeModeId) it[Users.appSizeModeId] = sizeModeId
+                            // Always assign all preference columns. Exposed may throw when an update block
+                            // produces no changed assignments, which made tapping an already-selected
+                            // language/theme/scale look like an internal server error to the app.
+                            it[Users.appLanguage] = language
+                            it[Users.appThemeId] = themeId
+                            it[Users.appSizeModeId] = sizeModeId
                         }
 
                         Users

@@ -34735,6 +34735,867 @@
           "value": "Қалаған күн жоқ"
         }
       ]
+    },
+    {
+      "id": 1737,
+      "values": [
+        {
+          "language": "main",
+          "value": "Partner onboarding checklist"
+        },
+        {
+          "language": "en",
+          "value": "Partner onboarding checklist"
+        },
+        {
+          "language": "ru",
+          "value": "Чеклист подключения партнёра"
+        },
+        {
+          "language": "kk",
+          "value": "Серіктесті қосу чекпарағы"
+        }
+      ]
+    },
+    {
+      "id": 1738,
+      "values": [
+        {
+          "language": "main",
+          "value": "Make each store ready to buy smoothly: active terms, price memory, address and line responses in one card."
+        },
+        {
+          "language": "en",
+          "value": "Make each store ready to buy smoothly: active terms, price memory, address and line responses in one card."
+        },
+        {
+          "language": "ru",
+          "value": "Подготовьте каждый магазин к спокойным закупкам: условия, ценовая память, адрес и ответы по строкам в одной карточке."
+        },
+        {
+          "language": "kk",
+          "value": "Әр дүкенді жеңіл сатып алуға дайындаңыз: шарттар, баға жады, мекенжай және жол жауаптары бір картада."
+        }
+      ]
+    },
+    {
+      "id": 1739,
+      "values": [
+        {
+          "language": "main",
+          "value": "Onboarding ready"
+        },
+        {
+          "language": "en",
+          "value": "Onboarding ready"
+        },
+        {
+          "language": "ru",
+          "value": "Подключение готово"
+        },
+        {
+          "language": "kk",
+          "value": "Қосу дайын"
+        }
+      ]
+    },
+    {
+      "id": 1740,
+      "values": [
+        {
+          "language": "main",
+          "value": "Needs setup"
+        },
+        {
+          "language": "en",
+          "value": "Needs setup"
+        },
+        {
+          "language": "ru",
+          "value": "Нужна настройка"
+        },
+        {
+          "language": "kk",
+          "value": "Баптау керек"
+        }
+      ]
+    },
+    {
+      "id": 1741,
+      "values": [
+        {
+          "language": "main",
+          "value": "Active contract"
+        },
+        {
+          "language": "en",
+          "value": "Active contract"
+        },
+        {
+          "language": "ru",
+          "value": "Активный договор"
+        },
+        {
+          "language": "kk",
+          "value": "Белсенді келісім"
+        }
+      ]
+    },
+    {
+      "id": 1742,
+      "values": [
+        {
+          "language": "main",
+          "value": "Pending terms"
+        },
+        {
+          "language": "en",
+          "value": "Pending terms"
+        },
+        {
+          "language": "ru",
+          "value": "Условия на согласовании"
+        },
+        {
+          "language": "kk",
+          "value": "Шарттар келісуде"
+        }
+      ]
+    },
+    {
+      "id": 1743,
+      "values": [
+        {
+          "language": "main",
+          "value": "Price book rows"
+        },
+        {
+          "language": "en",
+          "value": "Price book rows"
+        },
+        {
+          "language": "ru",
+          "value": "Строки ценовой памяти"
+        },
+        {
+          "language": "kk",
+          "value": "Баға жады жолдары"
+        }
+      ]
+    },
+    {
+      "id": 1744,
+      "values": [
+        {
+          "language": "main",
+          "value": "Delivery address"
+        },
+        {
+          "language": "en",
+          "value": "Delivery address"
+        },
+        {
+          "language": "ru",
+          "value": "Адрес доставки"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізу мекенжайы"
+        }
+      ]
+    },
+    {
+      "id": 1745,
+      "values": [
+        {
+          "language": "main",
+          "value": "Line offers"
+        },
+        {
+          "language": "en",
+          "value": "Line offers"
+        },
+        {
+          "language": "ru",
+          "value": "Ответы по строкам"
+        },
+        {
+          "language": "kk",
+          "value": "Жол ұсыныстары"
+        }
+      ]
+    },
+    {
+      "id": 1746,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open orders"
+        },
+        {
+          "language": "en",
+          "value": "Open orders"
+        },
+        {
+          "language": "ru",
+          "value": "Открытые заказы"
+        },
+        {
+          "language": "kk",
+          "value": "Ашық тапсырыстар"
+        }
+      ]
+    },
+    {
+      "id": 1747,
+      "values": [
+        {
+          "language": "main",
+          "value": "Copy onboarding brief"
+        },
+        {
+          "language": "en",
+          "value": "Copy onboarding brief"
+        },
+        {
+          "language": "ru",
+          "value": "Скопировать сводку подключения"
+        },
+        {
+          "language": "kk",
+          "value": "Қосу қысқашасын көшіру"
+        }
+      ]
+    },
+    {
+      "id": 1748,
+      "values": [
+        {
+          "language": "main",
+          "value": "Onboarding brief copied"
+        },
+        {
+          "language": "en",
+          "value": "Onboarding brief copied"
+        },
+        {
+          "language": "ru",
+          "value": "Сводка подключения скопирована"
+        },
+        {
+          "language": "kk",
+          "value": "Қосу қысқашасы көшірілді"
+        }
+      ]
+    },
+    {
+      "id": 1749,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open onboarding orders"
+        },
+        {
+          "language": "en",
+          "value": "Open onboarding orders"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть заказы подключения"
+        },
+        {
+          "language": "kk",
+          "value": "Қосу тапсырыстарын ашу"
+        }
+      ]
+    },
+    {
+      "id": 1750,
+      "values": [
+        {
+          "language": "main",
+          "value": "No onboarding checklist yet"
+        },
+        {
+          "language": "en",
+          "value": "No onboarding checklist yet"
+        },
+        {
+          "language": "ru",
+          "value": "Чеклист подключения пока пуст"
+        },
+        {
+          "language": "kk",
+          "value": "Қосу чекпарағы әзірге бос"
+        }
+      ]
+    },
+    {
+      "id": 1751,
+      "values": [
+        {
+          "language": "main",
+          "value": "Store can buy smoothly"
+        },
+        {
+          "language": "en",
+          "value": "Store can buy smoothly"
+        },
+        {
+          "language": "ru",
+          "value": "Магазин может закупать спокойно"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен жеңіл сатып ала алады"
+        }
+      ]
+    },
+    {
+      "id": 1752,
+      "values": [
+        {
+          "language": "main",
+          "value": "Contract missing"
+        },
+        {
+          "language": "en",
+          "value": "Contract missing"
+        },
+        {
+          "language": "ru",
+          "value": "Нет договора"
+        },
+        {
+          "language": "kk",
+          "value": "Келісім жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1753,
+      "values": [
+        {
+          "language": "main",
+          "value": "Price memory missing"
+        },
+        {
+          "language": "en",
+          "value": "Price memory missing"
+        },
+        {
+          "language": "ru",
+          "value": "Нет ценовой памяти"
+        },
+        {
+          "language": "kk",
+          "value": "Баға жады жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1754,
+      "values": [
+        {
+          "language": "main",
+          "value": "Address missing"
+        },
+        {
+          "language": "en",
+          "value": "Address missing"
+        },
+        {
+          "language": "ru",
+          "value": "Нет адреса"
+        },
+        {
+          "language": "kk",
+          "value": "Мекенжай жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1755,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier answer missing"
+        },
+        {
+          "language": "en",
+          "value": "Supplier answer missing"
+        },
+        {
+          "language": "ru",
+          "value": "Нет ответа поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші жауабы жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1756,
+      "values": [
+        {
+          "language": "main",
+          "value": "Steps ready"
+        },
+        {
+          "language": "en",
+          "value": "Steps ready"
+        },
+        {
+          "language": "ru",
+          "value": "Шагов готово"
+        },
+        {
+          "language": "kk",
+          "value": "Дайын қадамдар"
+        }
+      ]
+    },
+    {
+      "id": 1757,
+      "values": [
+        {
+          "language": "main",
+          "value": "Suggested next step"
+        },
+        {
+          "language": "en",
+          "value": "Suggested next step"
+        },
+        {
+          "language": "ru",
+          "value": "Следующий шаг"
+        },
+        {
+          "language": "kk",
+          "value": "Келесі қадам"
+        }
+      ]
+    },
+    {
+      "id": 1758,
+      "values": [
+        {
+          "language": "main",
+          "value": "Confirm partner terms"
+        },
+        {
+          "language": "en",
+          "value": "Confirm partner terms"
+        },
+        {
+          "language": "ru",
+          "value": "Согласуйте условия партнёра"
+        },
+        {
+          "language": "kk",
+          "value": "Серіктес шарттарын растаңыз"
+        }
+      ]
+    },
+    {
+      "id": 1759,
+      "values": [
+        {
+          "language": "main",
+          "value": "Store basket builder"
+        },
+        {
+          "language": "en",
+          "value": "Store basket builder"
+        },
+        {
+          "language": "ru",
+          "value": "Конструктор корзины магазина"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен себетін құрастырушы"
+        }
+      ]
+    },
+    {
+      "id": 1760,
+      "values": [
+        {
+          "language": "main",
+          "value": "Compose a suggested replenishment basket for each partner from open orders, price memory, line offers and contract gates."
+        },
+        {
+          "language": "en",
+          "value": "Compose a suggested replenishment basket for each partner from open orders, price memory, line offers and contract gates."
+        },
+        {
+          "language": "ru",
+          "value": "Соберите рекомендованную корзину пополнения для каждого партнёра из открытых заказов, ценовой памяти, предложений по строкам и договорных ограничений."
+        },
+        {
+          "language": "kk",
+          "value": "Әр серіктеске ашық тапсырыстар, баға жады, жол ұсыныстары және келісім қақпалары бойынша ұсынылатын толықтыру себетін құрастырыңыз."
+        }
+      ]
+    },
+    {
+      "id": 1761,
+      "values": [
+        {
+          "language": "main",
+          "value": "Basket value"
+        },
+        {
+          "language": "en",
+          "value": "Basket value"
+        },
+        {
+          "language": "ru",
+          "value": "Сумма корзины"
+        },
+        {
+          "language": "kk",
+          "value": "Себет құны"
+        }
+      ]
+    },
+    {
+      "id": 1762,
+      "values": [
+        {
+          "language": "main",
+          "value": "Suggested lines"
+        },
+        {
+          "language": "en",
+          "value": "Suggested lines"
+        },
+        {
+          "language": "ru",
+          "value": "Рекомендуемые строки"
+        },
+        {
+          "language": "kk",
+          "value": "Ұсынылған жолдар"
+        }
+      ]
+    },
+    {
+      "id": 1763,
+      "values": [
+        {
+          "language": "main",
+          "value": "Price memory"
+        },
+        {
+          "language": "en",
+          "value": "Price memory"
+        },
+        {
+          "language": "ru",
+          "value": "Ценовая память"
+        },
+        {
+          "language": "kk",
+          "value": "Баға жады"
+        }
+      ]
+    },
+    {
+      "id": 1764,
+      "values": [
+        {
+          "language": "main",
+          "value": "Contract blockers"
+        },
+        {
+          "language": "en",
+          "value": "Contract blockers"
+        },
+        {
+          "language": "ru",
+          "value": "Блокеры договора"
+        },
+        {
+          "language": "kk",
+          "value": "Келісім бөгеттері"
+        }
+      ]
+    },
+    {
+      "id": 1765,
+      "values": [
+        {
+          "language": "main",
+          "value": "Copy basket proposal"
+        },
+        {
+          "language": "en",
+          "value": "Copy basket proposal"
+        },
+        {
+          "language": "ru",
+          "value": "Скопировать предложение корзины"
+        },
+        {
+          "language": "kk",
+          "value": "Себет ұсынысын көшіру"
+        }
+      ]
+    },
+    {
+      "id": 1766,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open basket orders"
+        },
+        {
+          "language": "en",
+          "value": "Open basket orders"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть заказы корзины"
+        },
+        {
+          "language": "kk",
+          "value": "Себет тапсырыстарын ашу"
+        }
+      ]
+    },
+    {
+      "id": 1767,
+      "values": [
+        {
+          "language": "main",
+          "value": "No basket proposals yet"
+        },
+        {
+          "language": "en",
+          "value": "No basket proposals yet"
+        },
+        {
+          "language": "ru",
+          "value": "Предложений корзины пока нет"
+        },
+        {
+          "language": "kk",
+          "value": "Себет ұсыныстары әзірге жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1768,
+      "values": [
+        {
+          "language": "main",
+          "value": "Prepare basket"
+        },
+        {
+          "language": "en",
+          "value": "Prepare basket"
+        },
+        {
+          "language": "ru",
+          "value": "Подготовьте корзину"
+        },
+        {
+          "language": "kk",
+          "value": "Себетті дайындаңыз"
+        }
+      ]
+    },
+    {
+      "id": 1769,
+      "values": [
+        {
+          "language": "main",
+          "value": "Publish missing prices"
+        },
+        {
+          "language": "en",
+          "value": "Publish missing prices"
+        },
+        {
+          "language": "ru",
+          "value": "Опубликуйте недостающие цены"
+        },
+        {
+          "language": "kk",
+          "value": "Жетіспейтін бағаларды жариялаңыз"
+        }
+      ]
+    },
+    {
+      "id": 1770,
+      "values": [
+        {
+          "language": "main",
+          "value": "Send reorder nudge"
+        },
+        {
+          "language": "en",
+          "value": "Send reorder nudge"
+        },
+        {
+          "language": "ru",
+          "value": "Отправьте напоминание о повторном заказе"
+        },
+        {
+          "language": "kk",
+          "value": "Қайта тапсырыс ескертпесін жіберіңіз"
+        }
+      ]
+    },
+    {
+      "id": 1771,
+      "values": [
+        {
+          "language": "main",
+          "value": "Basket proposal copied"
+        },
+        {
+          "language": "en",
+          "value": "Basket proposal copied"
+        },
+        {
+          "language": "ru",
+          "value": "Предложение корзины скопировано"
+        },
+        {
+          "language": "kk",
+          "value": "Себет ұсынысы көшірілді"
+        }
+      ]
+    },
+    {
+      "id": 1772,
+      "values": [
+        {
+          "language": "main",
+          "value": "Suggested basket"
+        },
+        {
+          "language": "en",
+          "value": "Suggested basket"
+        },
+        {
+          "language": "ru",
+          "value": "Рекомендуемая корзина"
+        },
+        {
+          "language": "kk",
+          "value": "Ұсынылған себет"
+        }
+      ]
+    },
+    {
+      "id": 1773,
+      "values": [
+        {
+          "language": "main",
+          "value": "Missing price rows"
+        },
+        {
+          "language": "en",
+          "value": "Missing price rows"
+        },
+        {
+          "language": "ru",
+          "value": "Недостающие строки цен"
+        },
+        {
+          "language": "kk",
+          "value": "Жетіспейтін баға жолдары"
+        }
+      ]
+    },
+    {
+      "id": 1774,
+      "values": [
+        {
+          "language": "main",
+          "value": "Partner basket proposal"
+        },
+        {
+          "language": "en",
+          "value": "Partner basket proposal"
+        },
+        {
+          "language": "ru",
+          "value": "Предложение корзины партнёру"
+        },
+        {
+          "language": "kk",
+          "value": "Серіктес себеті ұсынысы"
+        }
+      ]
+    },
+    {
+      "id": 1775,
+      "values": [
+        {
+          "language": "main",
+          "value": "Recommended quantity"
+        },
+        {
+          "language": "en",
+          "value": "Recommended quantity"
+        },
+        {
+          "language": "ru",
+          "value": "Рекомендованное количество"
+        },
+        {
+          "language": "kk",
+          "value": "Ұсынылған мөлшер"
+        }
+      ]
+    },
+    {
+      "id": 1776,
+      "values": [
+        {
+          "language": "main",
+          "value": "Items in basket"
+        },
+        {
+          "language": "en",
+          "value": "Items in basket"
+        },
+        {
+          "language": "ru",
+          "value": "Позиций в корзине"
+        },
+        {
+          "language": "kk",
+          "value": "Себеттегі позициялар"
+        }
+      ]
+    },
+    {
+      "id": 1777,
+      "values": [
+        {
+          "language": "main",
+          "value": "Basket actions"
+        },
+        {
+          "language": "en",
+          "value": "Basket actions"
+        },
+        {
+          "language": "ru",
+          "value": "Действия по корзинам"
+        },
+        {
+          "language": "kk",
+          "value": "Себет әрекеттері"
+        }
+      ]
     }
   ]
 }
