@@ -2329,7 +2329,7 @@ private fun String.withoutSeededGoodsCategoryPrefix(): String {
     return trim()
         .replace(
             Regex(
-                pattern = """^(Goods\s+subcategory|Goods\s+(categor(?:y|ies)|section)|Product\s+category|Subcategory|Category|Подкатегория\s+товаров|Категория\s+товаров|Раздел\s+товар(?:ов|а)?|Товарный\s+раздел|Категория|Тауар\s+ішкі\s+санаты|Тауар(?:лар)?\s+(санаты|бөлімі)|Товар(?:лар)?\s+(санаты|бөлімі)|Өнім(?:дер)?\s+(санаты|бөлімі)|Санат|Бөлім)\s*[:：\-—]?\s*""",
+                pattern = """^(Goods\s+(categor(?:y|ies)|section)|Product\s+category|Category|Категория\s+товаров|Раздел\s+товар(?:ов|а)?|Товарный\s+раздел|Категория|Тауар(?:лар)?\s+(санаты|бөлімі)|Товар(?:лар)?\s+(санаты|бөлімі)|Өнім(?:дер)?\s+(санаты|бөлімі)|Санат|Бөлім)\s*[:：\-—]?\s*""",
                 option = RegexOption.IGNORE_CASE
             ),
             ""
@@ -4294,39 +4294,6 @@ private fun userHasSupplierAccessInsideTransaction(
     return decodeSupplierStringList(supplier[Suppliers.userIds]).contains(userId.toString())
 }
 
-private fun supplierStoreRelationshipExistsInsideTransaction(
-    storeId: UUID,
-    supplierId: UUID
-): Boolean {
-    val supplierExists = Suppliers
-        .select(Suppliers.id)
-        .where { (Suppliers.id eq supplierId) and (Suppliers.isActive eq true) }
-        .empty()
-        .not()
-    if (!supplierExists) return false
-
-    val hasOrder = SupplierOrders
-        .select(SupplierOrders.id)
-        .where {
-            (SupplierOrders.storeId eq storeId) and
-                    (SupplierOrders.supplierId eq supplierId) and
-                    (SupplierOrders.isActive eq true)
-        }
-        .empty()
-        .not()
-    if (hasOrder) return true
-
-    return SupplierPartnershipContracts
-        .select(SupplierPartnershipContracts.id)
-        .where {
-            (SupplierPartnershipContracts.storeId eq storeId) and
-                    (SupplierPartnershipContracts.supplierId eq supplierId) and
-                    (SupplierPartnershipContracts.isActive eq true)
-        }
-        .empty()
-        .not()
-}
-
 
 private fun isStoreOwnerInsideTransaction(userId: UUID, storeId: UUID): Boolean {
     val rootStoreId = rootStoreIdForAccessInsideTransaction(storeId)
@@ -6181,49 +6148,20 @@ private fun SupplierOrderDataModel.cleanForStorage(userId: UUID, storeId: UUID, 
     isActive = isActive
 )
 
-private fun SupplierOrderLineDataModel.cleanForStorage(orderId: UUID): SupplierOrderLineDataModel {
-    val cleanExpectedSupplyPrice = expectedSupplyPrice
-        ?.let { price ->
-            price.copy(
-                price = price.price.trim(),
-                currency = price.currency.trim(),
-                supplierId = price.supplierId.trim()
-            )
-        }
-        ?.takeIf { it.price.isNotBlank() }
-
-    val cleanSupplierAcceptedQuantity = supplierAcceptedQuantity
-        ?.let { quantity -> quantity.copy(total = quantity.total.coerceAtLeast(0.0)) }
-        ?.takeIf { it.total > 0.0 }
-
-    val cleanSupplierOfferedSupplyPrice = supplierOfferedSupplyPrice
-        ?.let { price ->
-            price.copy(
-                price = price.price.trim(),
-                currency = price.currency.trim(),
-                supplierId = price.supplierId.trim()
-            )
-        }
-        ?.takeIf { it.price.isNotBlank() }
-
-    return copy(
-        orderId = orderId.toString(),
-        requestedQuantity = requestedQuantity.copy(total = requestedQuantity.total.coerceAtLeast(0.0)),
-        expectedSupplyPrice = cleanExpectedSupplyPrice,
-        additionalNotes = additionalNotes?.trim()?.takeIf { it.isNotBlank() },
-        additionalNotesLocalized = additionalNotesLocalized
-            .map { it.copy(language = it.language.trim(), value = it.value.trim()) }
-            .filter { it.language.isNotBlank() && it.value.isNotBlank() }
-            .distinctBy { it.language },
-        supplierComment = supplierComment?.trim()?.takeIf { it.isNotBlank() },
-        supplierCommentLocalized = supplierCommentLocalized
-            .map { it.copy(language = it.language.trim(), value = it.value.trim()) }
-            .filter { it.language.isNotBlank() && it.value.isNotBlank() }
-            .distinctBy { it.language },
-        supplierAcceptedQuantity = cleanSupplierAcceptedQuantity,
-        supplierOfferedSupplyPrice = cleanSupplierOfferedSupplyPrice
-    )
-}
+private fun SupplierOrderLineDataModel.cleanForStorage(orderId: UUID): SupplierOrderLineDataModel = copy(
+    orderId = orderId.toString(),
+    requestedQuantity = requestedQuantity.copy(total = requestedQuantity.total.coerceAtLeast(0.0)),
+    additionalNotes = additionalNotes?.trim()?.takeIf { it.isNotBlank() },
+    additionalNotesLocalized = additionalNotesLocalized
+        .map { it.copy(language = it.language.trim(), value = it.value.trim()) }
+        .filter { it.language.isNotBlank() && it.value.isNotBlank() }
+        .distinctBy { it.language },
+    supplierComment = supplierComment?.trim()?.takeIf { it.isNotBlank() },
+    supplierCommentLocalized = supplierCommentLocalized
+        .map { it.copy(language = it.language.trim(), value = it.value.trim()) }
+        .filter { it.language.isNotBlank() && it.value.isNotBlank() }
+        .distinctBy { it.language }
+)
 
 private fun supplierOrderWithLinesInsideTransaction(orderId: UUID): SupplierOrderWithLinesDataModel? {
     val order = SupplierOrders
@@ -10880,37 +10818,6 @@ fun Application.module() {
                     } ?: call.respondAitaUnauthorized()
                 }
 
-                get("/supplier/get") {
-                    val userId = call.checkPrincipal() ?: return@get
-
-                    val result = newSuspendedTransaction(aitaServerIoContext) {
-                        val supplierIds = Suppliers
-                            .select(Suppliers.id, Suppliers.userIds)
-                            .where { Suppliers.isActive eq true }
-                            .mapNotNull { row ->
-                                val users = decodeSupplierStringList(row[Suppliers.userIds])
-                                row[Suppliers.id].takeIf { userId.toString() in users }
-                            }
-
-                        if (supplierIds.isEmpty()) {
-                            emptyList()
-                        } else {
-                            SupplierGoodsPrices
-                                .selectAll()
-                                .where {
-                                    (SupplierGoodsPrices.supplierId inList supplierIds) and
-                                            (SupplierGoodsPrices.isActive eq true)
-                                }
-                                .map { it.toSupplierGoodsPriceDataModel() }
-                        }
-                    }
-
-                    call.genericResponse(
-                        status = HttpStatusCode.OK,
-                        payload = result
-                    )
-                }
-
                 post("/upsert") {
                     val userId = call.checkPrincipal() ?: return@post
                     val body = call.receiveAita<SupplierGoodsPriceDataModel>()
@@ -10925,17 +10832,7 @@ fun Application.module() {
                         val goodsItemId = runCatching { UUID.fromString(body.goodsItemId) }.getOrNull()
                             ?: return@newSuspendedTransaction null
 
-                        val itemBelongsToStore = StockItems
-                            .select(StockItems.id)
-                            .where { (StockItems.id eq goodsItemId) and (StockItems.storeId eq storeId) and (StockItems.isActive eq true) }
-                            .empty()
-                            .not()
-                        if (!itemBelongsToStore) return@newSuspendedTransaction null
-
-                        val canStoreManage = userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_SUPPLIER_PRICES_MANAGE, requireWorkshift = true)
-                        val canSupplierPublish = userHasSupplierAccessInsideTransaction(userId, supplierId) &&
-                                supplierStoreRelationshipExistsInsideTransaction(storeId, supplierId)
-                        if (!canStoreManage && !canSupplierPublish)
+                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_SUPPLIER_PRICES_MANAGE, requireWorkshift = true))
                             return@newSuspendedTransaction null
 
                         val now = System.currentTimeMillis()
@@ -10965,7 +10862,6 @@ fun Application.module() {
                     }
 
                     result?.let {
-                        publishStockRealtimeBundle(it.storeId, "supplier_goods_price_saved")
                         call.genericResponse(
                             status = HttpStatusCode.OK,
                             payload = it,
@@ -10985,7 +10881,8 @@ fun Application.module() {
                         ?: return@delete call.respondAitaUnauthorized()
 
                     val deleted = newSuspendedTransaction(aitaServerIoContext) {
-                        val canStoreManage = userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_SUPPLIER_PRICES_MANAGE, requireWorkshift = true)
+                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_SUPPLIER_PRICES_MANAGE, requireWorkshift = true))
+                            return@newSuspendedTransaction null
 
                         val now = System.currentTimeMillis()
                         val result = mutableListOf<String>()
@@ -10994,23 +10891,10 @@ fun Application.module() {
                             val id = runCatching { UUID.fromString(rawId) }.getOrNull()
                                 ?: continue
 
-                            val row = SupplierGoodsPrices
-                                .selectAll()
-                                .where {
-                                    (SupplierGoodsPrices.id eq id) and
-                                            (SupplierGoodsPrices.storeId eq storeId) and
-                                            (SupplierGoodsPrices.isActive eq true)
-                                }
-                                .singleOrNull()
-                                ?: continue
-
-                            val canSupplierDelete = row[SupplierGoodsPrices.userId] == userId ||
-                                    userHasSupplierAccessInsideTransaction(userId, row[SupplierGoodsPrices.supplierId])
-                            if (!canStoreManage && !canSupplierDelete) continue
-
                             val affected = SupplierGoodsPrices.update({
                                 (SupplierGoodsPrices.id eq id) and
-                                        (SupplierGoodsPrices.storeId eq storeId)
+                                        (SupplierGoodsPrices.storeId eq storeId) and
+                                        (SupplierGoodsPrices.userId eq userId)
                             }) {
                                 it[SupplierGoodsPrices.isActive] = false
                                 it[SupplierGoodsPrices.updatedAtMillis] = now
@@ -11024,7 +10908,6 @@ fun Application.module() {
                     }
 
                     deleted?.let {
-                        if (it.isNotEmpty()) publishStockRealtimeBundle(storeId.toString(), "supplier_goods_price_deleted")
                         call.genericResponse(
                             status = HttpStatusCode.OK,
                             payload = it,
@@ -12585,12 +12468,9 @@ fun Application.module() {
                             .singleOrNull() ?: return@newSuspendedTransaction null
 
                         Users.update({ Users.id eq uuid }) {
-                            // Always assign all preference columns. Exposed may throw when an update block
-                            // produces no changed assignments, which made tapping an already-selected
-                            // language/theme/scale look like an internal server error to the app.
-                            it[Users.appLanguage] = language
-                            it[Users.appThemeId] = themeId
-                            it[Users.appSizeModeId] = sizeModeId
+                            if (existing[Users.appLanguage] != language) it[Users.appLanguage] = language
+                            if (existing[Users.appThemeId] != themeId) it[Users.appThemeId] = themeId
+                            if (existing[Users.appSizeModeId] != sizeModeId) it[Users.appSizeModeId] = sizeModeId
                         }
 
                         Users
@@ -14870,7 +14750,7 @@ fun Application.module() {
                             )
                         } ?: call.respondAitaUnauthorized()
                     }
-
+                
                     } catch (throwable: Throwable) {
                         call.safeGenericResponseNoPayload(
                             status = HttpStatusCode.Conflict,

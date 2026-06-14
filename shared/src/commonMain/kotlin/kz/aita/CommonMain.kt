@@ -4609,9 +4609,6 @@ expect object LocalAitaLanTransport {
 val supplierGoodsPricesState =
     MutableDataStateFlow<List<SupplierGoodsPriceDataModel>>(GlobalScope)
 
-val supplierSideGoodsPricesState =
-    MutableDataStateFlow<List<SupplierGoodsPriceDataModel>>(GlobalScope)
-
 val supplierOrdersState =
     MutableDataStateFlow<List<SupplierOrderDataModel>>(GlobalScope)
 
@@ -4622,7 +4619,6 @@ val supplierPartnershipContractsState =
     MutableDataStateFlow<List<SupplierPartnershipContractDataModel>>(GlobalScope)
 
 private val getSupplierGoodsPricesMutex = Mutex()
-private val getSupplierSideGoodsPricesMutex = Mutex()
 private val upsertSupplierGoodsPriceMutex = Mutex()
 
 private val getSupplierOrdersMutex = Mutex()
@@ -4667,29 +4663,6 @@ fun getSupplierGoodsPrices(
         }
 }
 
-
-fun getMySupplierSideGoodsPrices(
-    onCompleted: ((DataState<List<SupplierGoodsPriceDataModel>>) -> Unit)? = null
-) {
-    if (!getSupplierSideGoodsPricesMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
-            getSupplierSideGoodsPricesMutex.withLock {
-                val response = networkRequest<List<SupplierGoodsPriceDataModel>, Unit>(
-                    method = HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.getSupplierSideGoodsPricesPath.first
-                )
-
-                if (response.negative || response.payload == null) {
-                    supplierSideGoodsPricesState.emit(DataState.Empty(response.message))
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    supplierSideGoodsPricesState.emit(DataState.Success(response.payload, response.message))
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
-            }
-        }
-}
-
 fun upsertSupplierGoodsPrice(
     price: SupplierGoodsPriceDataModel,
     onCompleted: ((DataState<SupplierGoodsPriceDataModel>) -> Unit)? = null
@@ -4716,90 +4689,6 @@ fun upsertSupplierGoodsPrice(
                         )
                     )
                     onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
-            }
-        }
-}
-
-fun publishSupplierGoodsPrices(
-    prices: List<SupplierGoodsPriceDataModel>,
-    onCompleted: ((DataState<List<SupplierGoodsPriceDataModel>>) -> Unit)? = null
-) {
-    val cleanPrices = prices
-        .filter { price ->
-            price.storeId.isNotBlank() &&
-                    price.supplierId.isNotBlank() &&
-                    price.goodsItemId.isNotBlank() &&
-                    price.supplyPrice.price.toMoneyDouble() > 0.0
-        }
-        .distinctBy { price -> listOf(price.storeId, price.supplierId, price.goodsItemId).joinToString(":") }
-
-    if (cleanPrices.isEmpty()) {
-        val message = localizedStringResourceMessage(
-            id = 1636,
-            main = "No price book rows to publish",
-            ru = "Нет строк прайс-листа для публикации",
-            kk = "Жариялайтын прайс жолдары жоқ"
-        )
-        postInAppNotification(message, NotificationType.Negative, transient = true)
-        onCompleted?.invoke(DataState.Empty(message))
-        return
-    }
-
-    if (!upsertSupplierGoodsPriceMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
-            upsertSupplierGoodsPriceMutex.withLock {
-                val saved = mutableListOf<SupplierGoodsPriceDataModel>()
-                var lastFailureMessage: List<LocalizedStringDataModel>? = null
-
-                for (price in cleanPrices) {
-                    val response = networkRequest<SupplierGoodsPriceDataModel, SupplierGoodsPriceDataModel>(
-                        method = HttpMethod.Post,
-                        endpointUrl = globalAppConfigurationState.payloadValue.upsertSupplierGoodsPricePath.first,
-                        body = price
-                    )
-
-                    if (response.negative || response.payload == null) {
-                        lastFailureMessage = response.message ?: lastFailureMessage
-                    } else {
-                        saved += response.payload
-                    }
-                }
-
-                if (saved.isNotEmpty()) {
-                    val updatedPrices = supplierGoodsPricesState.payloadValue.orEmpty().toMutableList()
-                    saved.forEach { savedPrice ->
-                        val existingIndex = updatedPrices.indexOfFirst { it.id == savedPrice.id }
-                        if (existingIndex >= 0) {
-                            updatedPrices[existingIndex] = savedPrice
-                        } else {
-                            val sameBusinessIndex = updatedPrices.indexOfFirst {
-                                it.storeId == savedPrice.storeId &&
-                                        it.supplierId == savedPrice.supplierId &&
-                                        it.goodsItemId == savedPrice.goodsItemId
-                            }
-                            if (sameBusinessIndex >= 0) updatedPrices[sameBusinessIndex] = savedPrice else updatedPrices += savedPrice
-                        }
-                    }
-
-                    val message = localizedStringResourceMessage(
-                        id = 1637,
-                        main = "Supplier price book published",
-                        ru = "Прайс-лист поставщика опубликован",
-                        kk = "Жеткізуші прайс-листі жарияланды"
-                    )
-                    supplierGoodsPricesState.emit(DataState.Success(updatedPrices, message))
-                    postInAppNotification(message, NotificationType.Positive, transient = true)
-                    onCompleted?.invoke(DataState.Success(saved, message))
-                } else {
-                    val message = lastFailureMessage ?: localizedStringResourceMessage(
-                        id = 1638,
-                        main = "Could not publish supplier price book",
-                        ru = "Не удалось опубликовать прайс-лист поставщика",
-                        kk = "Жеткізуші прайс-листін жариялау мүмкін болмады"
-                    )
-                    postInAppNotification(message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(message))
                 }
             }
         }
@@ -5468,7 +5357,6 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
         deleteDebtorPath = Pair("debtors/delete", "42"),
         payDebtorDebtPath = Pair("debtors/pay", "43"),
         getSupplierGoodsPricesPath = Pair("supplierGoodsPrices/get", "31"),
-        getSupplierSideGoodsPricesPath = Pair("supplierGoodsPrices/supplier/get", "1682"),
         upsertSupplierGoodsPricePath = Pair("supplierGoodsPrices/upsert", "32"),
         deleteSupplierGoodsPricesPath = Pair("supplierGoodsPrices/delete", "33"),
         getSupplierOrdersPath = Pair("supplierOrders/get", "34"),
@@ -6053,16 +5941,6 @@ val drawablePathIconSupplierContractsState = MutableStateFlow("svg/76_0.svg")
 val drawablePathIconSupplierPartnersState = MutableStateFlow("svg/75_0.svg")
 val drawablePathIconSupplierDemandRadarState = MutableStateFlow("svg/77_0.svg")
 val drawablePathIconSupplierDispatchState = MutableStateFlow("svg/78_0.svg")
-val drawablePathIconSupplierOfferStudioState = MutableStateFlow("svg/79_0.svg")
-val drawablePathIconSupplierSubstitutionsState = MutableStateFlow("svg/80_0.svg")
-val drawablePathIconSupplierManufacturerBridgeState = MutableStateFlow("svg/81_0.svg")
-val drawablePathIconSupplierPriceBookState = MutableStateFlow("svg/82_0.svg")
-val drawablePathIconSupplierReorderPulseState = MutableStateFlow("svg/83_0.svg")
-val drawablePathIconSupplierSettlementState = MutableStateFlow("svg/84_0.svg")
-val drawablePathIconSupplierReadinessState = MutableStateFlow("svg/85_0.svg")
-val drawablePathIconSupplierPromiseKeeperState = MutableStateFlow("svg/86_0.svg")
-val drawablePathIconSupplierOnboardingState = MutableStateFlow("svg/87_0.svg")
-val drawablePathIconSupplierBasketBuilderState = MutableStateFlow("svg/88_0.svg")
 val drawablePathIconBuyerAgeRestrictionState = MutableStateFlow("svg/73_0.svg")
 val drawablePathIconTransactionTimeRestrictionState = MutableStateFlow("svg/74_0.svg")
 val drawablePathIconWorkersState = MutableStateFlow("svg/22_0.svg")
@@ -6122,7 +6000,6 @@ private const val CLOUD_CONNECTION_HEALTH_CHECK_UNKNOWN_INTERVAL_MILLIS = 4_000L
 private const val CLOUD_CONNECTION_HEALTH_CHECK_UNAVAILABLE_INTERVAL_MILLIS = 3_000L
 private const val CLOUD_CONNECTION_HEALTH_CHECK_TIMEOUT_MILLIS = 3_500L
 private const val CLOUD_CONNECTION_AUTH_REFRESH_SUPPRESSION_AFTER_TRANSPORT_FAILURE_MILLIS = 15_000L
-private const val CLOUD_CONNECTION_RECENT_REACHABLE_SUPPRESSION_MILLIS = 20_000L
 @Volatile
 private var cloudTransportLastUnavailableAtMillis: Long = 0L
 @Volatile
@@ -6933,7 +6810,7 @@ fun getStrings() {
                 if (!response.negative && response.payload != null) {
                     stringsState.emit(DataState.Success(response.payload, response.message))
                 } else {
-                    logCloudConnectionDiagnostic("string resources not refreshed; keeping bundled/cached strings")
+                    postInAppNotification(response.message, NotificationType.Negative)
                 }
             }
         }
@@ -6967,7 +6844,7 @@ fun getColors() {
                 if (!response.negative && response.payload != null) {
                     colorsState.emit(DataState.Success(response.payload, response.message))
                 } else {
-                    logCloudConnectionDiagnostic("color resources not refreshed; keeping bundled/cached colors")
+                    postInAppNotification(response.message, NotificationType.Negative)
                 }
             }
         }
@@ -8134,36 +8011,6 @@ fun updateDrawables(
         )
         drawablePathIconSupplierDispatchState.emit(
             drawablePath(78L)
-        )
-        drawablePathIconSupplierOfferStudioState.emit(
-            drawablePath(79L)
-        )
-        drawablePathIconSupplierSubstitutionsState.emit(
-            drawablePath(80L)
-        )
-        drawablePathIconSupplierManufacturerBridgeState.emit(
-            drawablePath(81L)
-        )
-        drawablePathIconSupplierPriceBookState.emit(
-            drawablePath(82L)
-        )
-        drawablePathIconSupplierReorderPulseState.emit(
-            drawablePath(83L)
-        )
-        drawablePathIconSupplierSettlementState.emit(
-            drawablePath(84L)
-        )
-        drawablePathIconSupplierReadinessState.emit(
-            drawablePath(85L)
-        )
-        drawablePathIconSupplierPromiseKeeperState.emit(
-            drawablePath(86L)
-        )
-        drawablePathIconSupplierOnboardingState.emit(
-            drawablePath(87L)
-        )
-        drawablePathIconSupplierBasketBuilderState.emit(
-            drawablePath(88L)
         )
         drawablePathIconBuyerAgeRestrictionState.emit(
             drawablePath(73L)
@@ -11746,11 +11593,6 @@ private fun recentCloudTransportFailureIsDominant(now: Long = getCurrentTimeMill
             now - lastUnavailable <= CLOUD_CONNECTION_AUTH_REFRESH_SUPPRESSION_AFTER_TRANSPORT_FAILURE_MILLIS
 }
 
-private fun recentCloudTransportReachableForNotifications(now: Long = getCurrentTimeMillis()): Boolean {
-    val lastReachable = cloudTransportLastReachableAtMillis
-    return lastReachable > 0L && now - lastReachable <= CLOUD_CONNECTION_RECENT_REACHABLE_SUPPRESSION_MILLIS
-}
-
 private fun clearCloudTransportFailureSignalsForNotifications() {
     cloudTransportFailureSignalCount = 0
     cloudTransportFirstFailureSignalAtMillis = 0L
@@ -11861,13 +11703,6 @@ internal fun markCloudSessionNeedsRefreshForNotifications() {
         return
     }
 
-    if (realtimeUpdatesConnectedState.value || cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_REACHABLE || recentCloudTransportReachableForNotifications()) {
-        // A healthy realtime socket or very recent successful health probe is stronger evidence than one speculative
-        // 401 during token rotation/startup. Do not repaint the app into a scary session state unless health degrades.
-        logCloudConnectionDiagnostic("session-refresh signal held because realtime/transport recently looked healthy")
-        return
-    }
-
     cloudSessionRefreshRequiredForNotifications = true
     cloudTransportRecoveryNotificationPending = false
     setCloudTransportStatusForDiagnostics(CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED, "auth_refresh_required")
@@ -11882,42 +11717,14 @@ internal fun clearCloudSessionRefreshRequirementForNotifications(statusAfterClea
     }
 }
 
-private fun String.isServerResponseReadNoiseNotificationText(): Boolean {
-    val normalized = normalizedNotificationText()
-    if (normalized.isBlank()) return false
-
-    return listOf(
-        "server response could not be read",
-        "could not read server response",
-        "не удалось прочитать ответ сервера",
-        "сервер жауабын оқу мүмкін болмады"
-    ).any { marker -> normalized.contains(marker) }
-}
-
-private fun cloudConnectionLooksHealthyForNotificationNoise(): Boolean =
-    realtimeUpdatesConnectedState.value ||
-            cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_REACHABLE ||
-            recentCloudTransportReachableForNotifications()
-
 private fun shouldPostNotificationConsideringCloudTransport(
     notification: NotificationDataModel
 ): Boolean {
     val text = notification.notificationStatusCombinedText()
 
-    if (text.isServerResponseReadNoiseNotificationText()) {
-        // This is an implementation/logging problem, not an action the shop/supplier user can fix.
-        // Keep real connection-cycle banners, but never spam the UI with raw JSON/read turbulence.
-        logCloudConnectionDiagnostic("suppressed server-read notification; keeping it in logs instead of popup noise")
-        return false
-    }
-
     if (text.isCloudSessionRefreshNotificationText()) {
         if (!cloudSessionRefreshIsActiveForNotifications()) return false
         if (cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_UNAVAILABLE) return false
-        if (cloudConnectionLooksHealthyForNotificationNoise()) {
-            logCloudConnectionDiagnostic("suppressed session-refresh popup while realtime/transport is healthy")
-            return false
-        }
         return shouldPostCloudSessionRefreshNotificationNow()
     }
 
@@ -13242,14 +13049,8 @@ fun syncUserPreferencesToServer(
             )
 
             if (response.negative || response.payload == null) {
-                val visibleMessage = response.message?.extractLocalizedString(appLanguageState.value).orEmpty()
-                val genericServerFailure = visibleMessage.contains("Internal server error", ignoreCase = true) ||
-                        visibleMessage.contains("Внутренняя ошибка", ignoreCase = true) ||
-                        visibleMessage.contains("Сервердің ішкі", ignoreCase = true)
-                if (postFailure && !genericServerFailure) {
+                if (postFailure) {
                     postInAppNotification(response.message, NotificationType.Neutral, transient = true)
-                } else {
-                    logCloudConnectionDiagnostic("user preference sync skipped noisy notification; local preference remains applied")
                 }
             } else {
                 userAccountState.emit(DataState.Success(response.payload, response.message))
@@ -13604,34 +13405,6 @@ suspend inline fun <reified Response, reified Body> networkRequest(
             negative = true,
             transportFailure = true
         )
-    } catch (throwable: Throwable) {
-        if (throwable is CancellationException) throw throwable
-        logNetworkAttempt("FAILED ${method.value} ${endpointUrl.trim('/')} top-level ${networkFailureSummary(throwable)}")
-        val serializationLikeFailure = throwable::class.simpleName?.contains("Serialization", ignoreCase = true) == true ||
-                throwable::class.simpleName?.contains("Json", ignoreCase = true) == true
-        val safeEmptyPayload = expectedEmptyCollectionPayload<Response>()
-        ResponseDataModel<Response>(
-            message = if (serializationLikeFailure && safeEmptyPayload != null) {
-                null
-            } else if (serializationLikeFailure) {
-                localizedStringResourceMessage(
-                    id = 225,
-                    main = "Server response could not be read",
-                    ru = "Не удалось прочитать ответ сервера",
-                    kk = "Сервер жауабын оқу мүмкін болмады"
-                )
-            } else {
-                localizedStringResourceMessage(
-                    id = 1140,
-                    main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
-                    ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
-                    kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
-                )
-            },
-            payload = safeEmptyPayload,
-            negative = true,
-            transportFailure = !serializationLikeFailure
-        )
     } finally {
         activeNetworkOperationsState.update { (it - 1).coerceAtLeast(0) }
     }
@@ -13639,54 +13412,13 @@ suspend inline fun <reified Response, reified Body> networkRequest(
 
 
 @PublishedApi
-@Suppress("UNCHECKED_CAST")
-internal inline fun <reified Response> expectedEmptyCollectionPayload(): Response? {
-    return if (Response::class == List::class ||
-        Response::class == MutableList::class ||
-        Response::class == Collection::class
-    ) {
-        emptyList<Any>() as Response
-    } else {
-        null
-    }
-}
-
-@PublishedApi
-internal inline fun <reified Response> decodePayloadTextForExpectedResponse(
-    payloadText: String?,
-    envelopeNegative: Boolean
-): Pair<Response?, Boolean> {
-    if (payloadText == null) {
-        return expectedEmptyCollectionPayload<Response>() to false
-    }
-
-    val trimmedPayload = payloadText.trim()
-    if (trimmedPayload.isBlank() || trimmedPayload == "null") {
-        return expectedEmptyCollectionPayload<Response>() to false
-    }
-
-    val decoded = runCatching { jsonBase.decodeFromString<Response>(trimmedPayload) }.getOrNull()
-    if (decoded != null) return decoded to false
-
-    val expectedList = expectedEmptyCollectionPayload<Response>()
-    if (expectedList != null && envelopeNegative) {
-        // A denied/expired/background list request may arrive as an AITA error envelope.
-        // For list loaders, the safe payload is an empty list; the negative flag/message still carries the failure.
-        return expectedList to false
-    }
-
-    return null to true
-}
-
-@PublishedApi
 internal inline fun <reified Response> decodeNetworkResponseDataModel(
     rawBody: String,
     status: HttpStatusCode
 ): ResponseDataModel<Response> {
-    try {
-        if (!status.isSuccess() && (rawBody.isBlank() || (!rawBodyLooksLikeAitaServerResponse(rawBody) && (status.value >= 500 || !rawBodyLooksLikeJson(rawBody))))) {
-            return genericHttpErrorNetworkResponseDataModel(status)
-        }
+    if (!status.isSuccess() && (rawBody.isBlank() || (!rawBodyLooksLikeAitaServerResponse(rawBody) && (status.value >= 500 || !rawBodyLooksLikeJson(rawBody))))) {
+        return genericHttpErrorNetworkResponseDataModel(status)
+    }
 
     val lenientEnvelopeObject = runCatching { jsonBase.decodeFromString<kotlinx.serialization.json.JsonElement>(rawBody).jsonObject }.getOrNull()
     if (lenientEnvelopeObject != null &&
@@ -13704,10 +13436,13 @@ internal inline fun <reified Response> decodeNetworkResponseDataModel(
             runCatching { element.jsonPrimitive.contentOrNull }.getOrNull()
                 ?: element.toString().takeIf { it != "null" }
         }
+        val payload = payloadText?.let { text ->
+            runCatching { jsonBase.decodeFromString<Response>(text) }.getOrNull()
+        }
+        val payloadUnreadable = payloadText != null && payload == null
         val negative = lenientEnvelopeObject["negative"]
             ?.let { runCatching { it.jsonPrimitive.booleanOrNull }.getOrNull() }
             ?: !status.isSuccess()
-        val (payload, payloadUnreadable) = decodePayloadTextForExpectedResponse<Response>(payloadText, negative)
         val envelopeTransportFailure = lenientEnvelopeObject["transportFailure"]
             ?.let { runCatching { it.jsonPrimitive.booleanOrNull }.getOrNull() }
             ?: false
@@ -13727,7 +13462,10 @@ internal inline fun <reified Response> decodeNetworkResponseDataModel(
 
     if (genericResponse != null) {
         val message = runCatching { genericResponse.getMessage() }.getOrNull()
-        val (payload, payloadUnreadable) = decodePayloadTextForExpectedResponse<Response>(genericResponse.payload, genericResponse.negative || !status.isSuccess())
+        val payload = genericResponse.payload?.let { payloadText ->
+            runCatching { jsonBase.decodeFromString<Response>(payloadText) }.getOrNull()
+        }
+        val payloadUnreadable = genericResponse.payload != null && payload == null
 
         return ResponseDataModel(
             message = if (payloadUnreadable && message == null) unreadableNetworkResponseDataModel<Response>(status, rawBody).message else message,
@@ -13763,27 +13501,7 @@ internal inline fun <reified Response> decodeNetworkResponseDataModel(
         )
     }
 
-    expectedEmptyCollectionPayload<Response>()?.let { safeEmptyPayload ->
-        return ResponseDataModel(
-            message = null,
-            payload = safeEmptyPayload,
-            negative = true,
-            httpStatusCode = status.value,
-            transportFailure = status.isAitaServerUnhealthyForClientBanner()
-        )
-    }
-
-        return unreadableNetworkResponseDataModel<Response>(status, rawBody)
-    } catch (throwable: Throwable) {
-        if (throwable is CancellationException) throw throwable
-        logNetworkAttempt("DECODE FAILED HTTP ${status.value} ${networkFailureSummary(throwable)} body=${rawBody.take(160).replace(Regex("\\s+"), " ")}")
-        val safeEmptyPayload = expectedEmptyCollectionPayload<Response>()
-        val unreadableResponse = unreadableNetworkResponseDataModel<Response>(status, rawBody)
-        return unreadableResponse.copy(
-            message = if (safeEmptyPayload != null) null else unreadableResponse.message,
-            payload = safeEmptyPayload
-        )
-    }
+    return unreadableNetworkResponseDataModel<Response>(status, rawBody)
 }
 
 @PublishedApi
@@ -15581,17 +15299,17 @@ data class GenericResponseDataModel(
 ) {
 
     fun getMessage(): List<LocalizedStringDataModel>? {
-        return message?.let { runCatching { jsonBase.decodeFromString<List<LocalizedStringDataModel>>(it) }.getOrNull() }
+        return message?.let { jsonBase.decodeFromString<List<LocalizedStringDataModel>>(it) }
     }
 
     inline fun <reified T> getPayload(): T? {
-        return payload?.let { runCatching { jsonBase.decodeFromString<T>(it) }.getOrNull() }
+        return payload?.let { jsonBase.decodeFromString<T>(it) }
     }
 
     inline fun <reified T> toResponseDataModel(): ResponseDataModel<T> {
         return ResponseDataModel<T>(
-            message = getMessage(),
-            payload = getPayload<T>(),
+            message = message?.let { jsonBase.decodeFromString<List<LocalizedStringDataModel>>(it) },
+            payload = payload?.let { jsonBase.decodeFromString<T>(it) },
             negative = negative
         )
     }
@@ -15653,7 +15371,6 @@ data class GlobalAppConfigurationDataModel(
     val deleteDebtorPath: Pair<String, String> = Pair("debtors/delete", "42"),
     val payDebtorDebtPath: Pair<String, String> = Pair("debtors/pay", "43"),
     val getSupplierGoodsPricesPath: Pair<String, String> = Pair("supplierGoodsPrices/get", "31"),
-    val getSupplierSideGoodsPricesPath: Pair<String, String> = Pair("supplierGoodsPrices/supplier/get", "1682"),
     val upsertSupplierGoodsPricePath: Pair<String, String> = Pair("supplierGoodsPrices/upsert", "32"),
     val deleteSupplierGoodsPricesPath: Pair<String, String> = Pair("supplierGoodsPrices/delete", "33"),
 
