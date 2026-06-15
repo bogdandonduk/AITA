@@ -42021,6 +42021,36 @@ private fun localDrawableResourceForPath(
         "73_1" -> Res.drawable._73_1
         "74_0" -> Res.drawable._74_0
         "74_1" -> Res.drawable._74_1
+        "75_0" -> Res.drawable._75_0
+        "75_1" -> Res.drawable._75_1
+        "76_0" -> Res.drawable._76_0
+        "76_1" -> Res.drawable._76_1
+        "77_0" -> Res.drawable._77_0
+        "77_1" -> Res.drawable._77_1
+        "78_0" -> Res.drawable._78_0
+        "78_1" -> Res.drawable._78_1
+        "79_0" -> Res.drawable._79_0
+        "79_1" -> Res.drawable._79_1
+        "80_0" -> Res.drawable._80_0
+        "80_1" -> Res.drawable._80_1
+        "81_0" -> Res.drawable._81_0
+        "81_1" -> Res.drawable._81_1
+        "82_0" -> Res.drawable._82_0
+        "82_1" -> Res.drawable._82_1
+        "83_0" -> Res.drawable._83_0
+        "83_1" -> Res.drawable._83_1
+        "84_0" -> Res.drawable._84_0
+        "84_1" -> Res.drawable._84_1
+        "85_0" -> Res.drawable._85_0
+        "85_1" -> Res.drawable._85_1
+        "86_0" -> Res.drawable._86_0
+        "86_1" -> Res.drawable._86_1
+        "87_0" -> Res.drawable._87_0
+        "87_1" -> Res.drawable._87_1
+        "88_0" -> Res.drawable._88_0
+        "88_1" -> Res.drawable._88_1
+        "89_0" -> Res.drawable._89_0
+        "89_1" -> Res.drawable._89_1
         else -> fallbackRes
     }
 }

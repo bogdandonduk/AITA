@@ -39,7 +39,7 @@ sqldelight = "2.1.0"
 sqlite = "2.6.1"
 securityCrypto = "1.1.0"
 hiltAndroid = "2.57.2"
-ksp = "2.2.20-2.0.3"
+ksp = "2.2.21-2.0.5"
 skiko-svg = "0.8.22"
 lifecycleViewmodelKtx = "2.10.0"
 
