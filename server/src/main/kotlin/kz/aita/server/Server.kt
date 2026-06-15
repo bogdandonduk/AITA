@@ -4084,6 +4084,11 @@ private fun RoutingCall.headerUuid(name: String): UUID? {
         ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
 }
 
+private fun String?.optionalUuidOrNull(): UUID? {
+    val clean = this?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    return runCatching { UUID.fromString(clean) }.getOrNull()
+}
+
 private fun RoutingCall.inventoryContextStoreId(): UUID? {
     return headerUuid("store_id")
         ?: headerUuid("store-id")
@@ -10354,14 +10359,20 @@ fun Application.module() {
 
                             val id = requestedBatchId ?: UUID.randomUUID()
 
+                            val nextSupplierId = body.supplierId.optionalUuidOrNull()
+                            val nextSupplierOrderId = body.supplierOrderId.optionalUuidOrNull()
+                            val sanitizedPromotions = body.promotions.sanitizedStockPromotions()
+                            val sanitizedAdditionalNotes = cleanOptionalText(body.additionalNotes)
+                            val sanitizedAdditionalNotesLocalized = cleanLocalizedValues(body.additionalNotesLocalized)
+
                             StockBatchesV2.insert {
                                 it[StockBatchesV2.id] = id
                                 it[StockBatchesV2.goodsItemId] = goodsItemId
                                 it[StockBatchesV2.userId] = userId
                                 it[StockBatchesV2.storeId] = storeId
 
-                                it[StockBatchesV2.supplierId] = body.supplierId?.let(UUID::fromString)
-                                it[StockBatchesV2.supplierOrderId] = body.supplierOrderId?.let(UUID::fromString)
+                                it[StockBatchesV2.supplierId] = nextSupplierId
+                                it[StockBatchesV2.supplierOrderId] = nextSupplierOrderId
 
                                 it[StockBatchesV2.quantity] = body.quantity
 
@@ -10375,14 +10386,14 @@ fun Application.module() {
                                 it[StockBatchesV2.expirationDateMillis] = body.expirationDateMillis
 
                                 it[StockBatchesV2.discounts] = body.discounts
-                                it[StockBatchesV2.promotions] = body.promotions.sanitizedStockPromotions()
+                                it[StockBatchesV2.promotions] = sanitizedPromotions
 
-                                it[StockBatchesV2.shelfPosition] = body.shelfPosition
+                                it[StockBatchesV2.shelfPosition] = cleanOptionalText(body.shelfPosition)
                                 it[StockBatchesV2.shelfPriority] = body.shelfPriority
 
                                 it[StockBatchesV2.status] = body.status.name
-                                it[StockBatchesV2.additionalNotes] = body.additionalNotes
-                                it[StockBatchesV2.additionalNotesLocalized] = body.additionalNotesLocalized
+                                it[StockBatchesV2.additionalNotes] = sanitizedAdditionalNotes
+                                it[StockBatchesV2.additionalNotesLocalized] = sanitizedAdditionalNotesLocalized
 
                                 it[StockBatchesV2.createdAtMillis] = now
                                 it[StockBatchesV2.updatedAtMillis] = now
@@ -10403,19 +10414,15 @@ fun Application.module() {
                                 }
                             }
 
-                            body.supplierId?.let { rawSupplierId ->
-                                val supplierId = runCatching { UUID.fromString(rawSupplierId) }.getOrNull()
-
-                                if (supplierId != null) {
-                                    upsertSupplierGoodsPriceInsideTransaction(
-                                        userId = userId,
-                                        storeId = storeId,
-                                        supplierId = supplierId,
-                                        goodsItemId = goodsItemId,
-                                        supplyPrice = body.supplyPrice,
-                                        now = now
-                                    )
-                                }
+                            nextSupplierId?.let { supplierId ->
+                                upsertSupplierGoodsPriceInsideTransaction(
+                                    userId = userId,
+                                    storeId = storeId,
+                                    supplierId = supplierId,
+                                    goodsItemId = goodsItemId,
+                                    supplyPrice = body.supplyPrice,
+                                    now = now
+                                )
                             }
 
                             val logText = stockBatchOperationLogTextInsideTransaction(
@@ -10441,8 +10448,13 @@ fun Application.module() {
                                 id = id.toString(),
                                 userId = userId.toString(),
                                 storeId = storeId.toString(),
+                                supplierId = nextSupplierId?.toString(),
+                                supplierOrderId = nextSupplierOrderId?.toString(),
                                 deliveredAtMillis = body.deliveredAtMillis ?: now,
-                                promotions = body.promotions.sanitizedStockPromotions(),
+                                promotions = sanitizedPromotions,
+                                shelfPosition = cleanOptionalText(body.shelfPosition),
+                                additionalNotes = sanitizedAdditionalNotes,
+                                additionalNotesLocalized = sanitizedAdditionalNotesLocalized,
                                 createdAtMillis = now,
                                 updatedAtMillis = now,
                                 createdByUserId = userId.toString(),

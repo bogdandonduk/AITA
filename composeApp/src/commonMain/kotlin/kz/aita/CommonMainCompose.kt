@@ -1037,6 +1037,28 @@ private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallb
     put(1580L, mapOf("main" to "Runs already on the road", "en" to "Runs already on the road", "ru" to "Маршруты уже в пути", "kk" to "Жолдағы бағыттар"))
     put(1581L, mapOf("main" to "Confirmations, issues or contracts to clear", "en" to "Confirmations, issues or contracts to clear", "ru" to "Подтверждения, проблемы или договоры для очистки", "kk" to "Растау, мәселе немесе шешілетін келісімдер"))
     put(1582L, mapOf("main" to "Dispatch filter", "en" to "Dispatch filter", "ru" to "Фильтр доставки", "kk" to "Жеткізу сүзгісі"))
+    put(1583L, mapOf("main" to "Supplier terms guard", "en" to "Supplier terms guard", "ru" to "Страж условий поставщика", "kk" to "Жеткізуші шарттарының күзеті"))
+    put(1584L, mapOf("main" to "Terms guard", "en" to "Terms guard", "ru" to "Страж условий", "kk" to "Шарттар күзеті"))
+    put(1585L, mapOf("main" to "Operational effect", "en" to "Operational effect", "ru" to "Операционный эффект", "kk" to "Операциялық әсер"))
+    put(1586L, mapOf("main" to "Affected open orders", "en" to "Affected open orders", "ru" to "Затронутые открытые заказы", "kk" to "Әсер ететін ашық тапсырыстар"))
+    put(1587L, mapOf("main" to "Covered goods", "en" to "Covered goods", "ru" to "Охваченные товары", "kk" to "Қамтылған тауарлар"))
+    put(1588L, mapOf("main" to "Blocking supply until accepted", "en" to "Blocking supply until accepted", "ru" to "Блокирует поставку до принятия", "kk" to "Қабылданғанша жеткізуді бұғаттайды"))
+    put(1589L, mapOf("main" to "Active terms protecting supply", "en" to "Active terms protecting supply", "ru" to "Активные условия защищают поставку", "kk" to "Белсенді шарттар жеткізуді қорғайды"))
+    put(1590L, mapOf("main" to "Waiting for supplier acceptance", "en" to "Waiting for supplier acceptance", "ru" to "Ожидает принятия поставщиком", "kk" to "Жеткізушінің қабылдауын күтеді"))
+    put(1591L, mapOf("main" to "Waiting for store acceptance", "en" to "Waiting for store acceptance", "ru" to "Ожидает принятия магазином", "kk" to "Дүкеннің қабылдауын күтеді"))
+    put(1592L, mapOf("main" to "No terms guard signals yet", "en" to "No terms guard signals yet", "ru" to "Пока нет сигналов стража условий", "kk" to "Әзірге шарттар күзеті сигналдары жоқ"))
+    put(1593L, mapOf("main" to "Create or accept supplier contracts and this board will show which real orders they unlock or block.", "en" to "Create or accept supplier contracts and this board will show which real orders they unlock or block.", "ru" to "Создайте или примите договоры поставщика, и эта доска покажет, какие реальные заказы они открывают или блокируют.", "kk" to "Жеткізуші келісімдерін жасаңыз немесе қабылдаңыз, сонда бұл тақта қай нақты тапсырыстарды ашатынын немесе бұғаттайтынын көрсетеді."))
+    put(1594L, mapOf("main" to "Open contract board", "en" to "Open contract board", "ru" to "Открыть доску договоров", "kk" to "Келісімдер тақтасын ашу"))
+    put(1595L, mapOf("main" to "Open affected orders", "en" to "Open affected orders", "ru" to "Открыть затронутые заказы", "kk" to "Әсер ететін тапсырыстарды ашу"))
+    put(1596L, mapOf("main" to "Copy terms brief", "en" to "Copy terms brief", "ru" to "Скопировать сводку условий", "kk" to "Шарттар қысқаша мәліметін көшіру"))
+    put(1597L, mapOf("main" to "Terms brief", "en" to "Terms brief", "ru" to "Сводка условий", "kk" to "Шарттар қысқашасы"))
+    put(1598L, mapOf("main" to "Price terms", "en" to "Price terms", "ru" to "Ценовые условия", "kk" to "Баға шарттары"))
+    put(1599L, mapOf("main" to "Custom terms", "en" to "Custom terms", "ru" to "Особые условия", "kk" to "Арнайы шарттар"))
+    put(1600L, mapOf("main" to "Delivery terms", "en" to "Delivery terms", "ru" to "Условия доставки", "kk" to "Жеткізу шарттары"))
+    put(1601L, mapOf("main" to "Payment terms", "en" to "Payment terms", "ru" to "Условия оплаты", "kk" to "Төлем шарттары"))
+    put(1602L, mapOf("main" to "Guarded orders", "en" to "Guarded orders", "ru" to "Заказы под защитой", "kk" to "Қорғалған тапсырыстар"))
+    put(1603L, mapOf("main" to "The terms guard connects contracts with live supplier orders, like a traffic light before goods move.", "en" to "The terms guard connects contracts with live supplier orders, like a traffic light before goods move.", "ru" to "Страж условий связывает договоры с живыми заказами поставщика, как светофор перед движением товара.", "kk" to "Шарттар күзеті келісімдерді нақты жеткізуші тапсырыстарымен байланыстырады, тауар қозғалар алдындағы бағдаршам сияқты."))
+    put(1604L, mapOf("main" to "Related order lines", "en" to "Related order lines", "ru" to "Связанные строки заказа", "kk" to "Байланысты тапсырыс жолдары"))
 }
 
 
@@ -22169,6 +22191,317 @@ private fun AppConfiguration.SupplierDemandRadarCard(item: SupplierDemandRadarUi
     }
 }
 
+
+private data class SupplierTermsGuardUiModel(
+    val contract: SupplierPartnershipContractDataModel,
+    val title: String,
+    val subtitle: String,
+    val statusText: String,
+    val effectText: String,
+    val affectedOpenOrders: Int,
+    val affectedLineCount: Int,
+    val coveredGoodsText: String,
+    val terms: List<String>,
+    val priceTermsText: String,
+    val searchKey: String,
+    val orderSearchQuery: String,
+    val brief: String,
+    val statusColor: Color
+)
+
+private fun AppConfiguration.supplierTermsGuardEffectText(contract: SupplierPartnershipContractDataModel): String = when (contract.status) {
+    SUPPLIER_CONTRACT_STATUS_ACTIVE -> localizedStringResource(1589, "Active terms protecting supply")
+    SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER -> localizedStringResource(1590, "Waiting for supplier acceptance")
+    SUPPLIER_CONTRACT_STATUS_PENDING_STORE -> localizedStringResource(1591, "Waiting for store acceptance")
+    else -> supplierContractStatusTitle(contract.status)
+}
+
+private fun AppConfiguration.buildSupplierTermsGuardItems(
+    orders: List<SupplierOrderDataModel>,
+    lines: List<SupplierOrderLineDataModel>,
+    contracts: List<SupplierPartnershipContractDataModel>
+): List<SupplierTermsGuardUiModel> {
+    val activeOrders = orders.filter { it.isActive }
+    val linesByOrder = lines.filter { it.isActive }.groupBy { it.orderId }
+    val guardStatuses = setOf(
+        SUPPLIER_CONTRACT_STATUS_ACTIVE,
+        SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER,
+        SUPPLIER_CONTRACT_STATUS_PENDING_STORE
+    )
+
+    return contracts
+        .filter { contract -> contract.isActive && contract.status in guardStatuses }
+        .map { contract ->
+            val contractGoodsIds = contract.goodsItemIds.toSet()
+            val relatedOrders = activeOrders.filter { order ->
+                order.storeId == contract.storeId && order.supplierId == contract.supplierId
+            }
+            val relatedLines = relatedOrders
+                .flatMap { order -> linesByOrder[order.id].orEmpty() }
+                .filter { line -> contract.scopeType == SUPPLIER_CONTRACT_SCOPE_PARTNERSHIP || line.goodsItemId in contractGoodsIds }
+            val affectedOrders = relatedOrders.filter { order ->
+                contract.scopeType == SUPPLIER_CONTRACT_SCOPE_PARTNERSHIP || linesByOrder[order.id].orEmpty().any { it.goodsItemId in contractGoodsIds }
+            }
+            val openAffectedOrders = affectedOrders.count { !it.status.isSupplierOrderClosed() }
+            val goodsTitles = relatedLines
+                .map { supplierDeskLineTitle(it) }
+                .filter { it.isNotBlank() }
+                .distinct()
+                .take(4)
+            val fallbackGoodsTitles = contract.priceTerms
+                .map { term -> term.goodsItemNameSnapshot.visibleLocalizedString(stateValues.appLanguage, term.goodsItemId.take(8)) }
+                .filter { it.isNotBlank() }
+                .distinct()
+                .take(4)
+            val coveredGoodsText = (goodsTitles.ifEmpty { fallbackGoodsTitles })
+                .joinToString(" • ")
+                .ifBlank { supplierContractScopeTitle(contract.scopeType) }
+            val conditionTerms = contract.conditions
+                .mapNotNull { raw -> runCatching { visibleStockConditionText(raw.toStockConditionDataModel()) }.getOrNull() }
+                .filter { it.isNotBlank() }
+            val deliveryText = contract.deliverySchedule.visibleLocalizedString(stateValues.appLanguage, "")
+                .takeIf { it.isNotBlank() }
+                ?.let { "${localizedStringResource(1600, "Delivery terms")}: $it" }
+            val paymentText = contract.paymentSchedule.visibleLocalizedString(stateValues.appLanguage, "")
+                .takeIf { it.isNotBlank() }
+                ?.let { "${localizedStringResource(1601, "Payment terms")}: $it" }
+            val customText = contract.customTerms.visibleLocalizedString(stateValues.appLanguage, "")
+                .takeIf { it.isNotBlank() }
+                ?.let { "${localizedStringResource(1599, "Custom terms")}: $it" }
+            val priceTermsText = contract.priceTerms
+                .filter { it.isActive }
+                .take(3)
+                .joinToString(" • ") { term ->
+                    listOfNotNull(
+                        term.goodsItemNameSnapshot.visibleLocalizedString(stateValues.appLanguage, term.goodsItemId.take(8)),
+                        term.supplyPrice.supplierDeskMoneyText(),
+                        term.minOrderQuantity?.quantityText(stateValues.appLanguage)
+                    ).filter { it.isNotBlank() }.joinToString(" ")
+                }
+            val terms = (conditionTerms + listOfNotNull(deliveryText, paymentText, customText))
+                .distinct()
+                .take(6)
+            val title = supplierVisibleContractTitle(contract)
+            val subtitle = listOf(
+                supplierContractScopeTitle(contract.scopeType),
+                supplierContractStatusTitle(contract.status),
+                "rev.${contract.revision}"
+            ).joinToString(" • ")
+            val effect = supplierTermsGuardEffectText(contract)
+            val orderSearchQuery = (listOf(contract.storeId, contract.supplierId) + contract.goodsItemIds).filter { it.isNotBlank() }.joinToString(" ")
+            val brief = buildString {
+                append(localizedStringResource(1597, "Terms brief")).append('\n')
+                append(title).append('\n')
+                append(subtitle).append('\n')
+                append(localizedStringResource(1585, "Operational effect")).append(": ").append(effect).append('\n')
+                append(localizedStringResource(1586, "Affected open orders")).append(": ").append(openAffectedOrders).append('\n')
+                if (coveredGoodsText.isNotBlank()) append(localizedStringResource(1587, "Covered goods")).append(": ").append(coveredGoodsText).append('\n')
+                if (priceTermsText.isNotBlank()) append(localizedStringResource(1598, "Price terms")).append(": ").append(priceTermsText).append('\n')
+                terms.forEach { append("• ").append(it).append('\n') }
+            }.trim()
+            SupplierTermsGuardUiModel(
+                contract = contract,
+                title = title,
+                subtitle = subtitle,
+                statusText = supplierContractStatusTitle(contract.status),
+                effectText = effect,
+                affectedOpenOrders = openAffectedOrders,
+                affectedLineCount = relatedLines.size,
+                coveredGoodsText = coveredGoodsText,
+                terms = terms,
+                priceTermsText = priceTermsText,
+                searchKey = buildString {
+                    append(contract.id).append(' ')
+                    append(title).append(' ')
+                    append(subtitle).append(' ')
+                    append(effect).append(' ')
+                    append(coveredGoodsText).append(' ')
+                    append(priceTermsText).append(' ')
+                    append(terms.joinToString(" ")).append(' ')
+                    append(orderSearchQuery)
+                }.lowercase(),
+                orderSearchQuery = orderSearchQuery,
+                brief = brief,
+                statusColor = supplierContractStatusColor(contract.status)
+            )
+        }
+        .sortedWith(compareByDescending<SupplierTermsGuardUiModel> { if (it.contract.status != SUPPLIER_CONTRACT_STATUS_ACTIVE) 1 else 0 }
+            .thenByDescending { it.affectedOpenOrders }
+            .thenByDescending { it.contract.updatedAtMillis })
+}
+
+@Composable
+private fun AppConfiguration.SupplierTermsGuardCard(item: SupplierTermsGuardUiModel) {
+    val coroutineScope = rememberCoroutineScope()
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .border(stateValues.unfocusedBorderWidth, item.statusColor.copy(alpha = 0.75f), RoundedCornerShape(stateValues.cornerRadius))
+            .padding(stateValues.marginTextFieldGroup),
+        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(46.dp)
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(item.statusColor.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CpImage(
+                    modifier = Modifier.size(30.dp),
+                    url = stateValues.drawablePathIconSupplierTermsGuard,
+                    fallbackRes = stateValues.drawableResIconSupplierTermsGuard.value,
+                    contentDescription = localizedStringResource(1583, "Supplier terms guard"),
+                    tintColor = item.statusColor
+                )
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.title,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.accentTextSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = item.subtitle,
+                    color = item.statusColor,
+                    fontSize = stateValues.smallTextSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        Text(
+            text = item.effectText,
+            color = stateValues.TextColor,
+            fontSize = stateValues.textSize,
+            fontWeight = FontWeight.Bold
+        )
+
+        StockCardInfoLine(localizedStringResource(1586, "Affected open orders"), item.affectedOpenOrders.toString(), stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1604, "Related order lines"), item.affectedLineCount.toString(), stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1587, "Covered goods"), item.coveredGoodsText, stateValues.TextColor)
+        item.priceTermsText.takeIf { it.isNotBlank() }?.let { text ->
+            StockCardInfoLine(localizedStringResource(1598, "Price terms"), text, stateValues.TextColor)
+        }
+
+        item.terms.take(4).forEach { term ->
+            Text(
+                text = "• $term",
+                color = stateValues.PlaceholderTextColor,
+                fontSize = stateValues.smallTextSize,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = item.statusText) }
+            Box(modifier = Modifier.weight(1f)) {
+                SupplierCatalogChip(
+                    text = if (item.contract.status == SUPPLIER_CONTRACT_STATUS_ACTIVE) {
+                        localizedStringResource(1602, "Guarded orders")
+                    } else {
+                        localizedStringResource(1588, "Blocking supply until accepted")
+                    }
+                )
+            }
+        }
+
+        if (stateValues.isNarrowScreen) {
+            Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1594, "Open contract board"),
+                    iconPath = stateValues.drawablePathIconSupplierContracts,
+                    iconRes = stateValues.drawableResIconSupplierContracts.value,
+                    textSize = stateValues.smallTextSize,
+                    confirmationRequired = false,
+                    onClick = { coroutineScope.launch { Navigation.goMain(NavigationScreenModel.Supplier.Contracts.Main) } }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1595, "Open affected orders"),
+                    iconPath = stateValues.drawablePathIconAppModeSupplier,
+                    iconRes = stateValues.drawableResIconAppModeSupplier.value,
+                    textSize = stateValues.smallTextSize,
+                    confirmationRequired = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.orderSearchQuery)
+                            Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
+                        }
+                    }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1596, "Copy terms brief"),
+                    iconPath = stateValues.drawablePathIconClipboard,
+                    iconRes = stateValues.drawableResIconClipboard.value,
+                    textSize = stateValues.smallTextSize,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(item.brief) }
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1594, "Open contract board"),
+                    iconPath = stateValues.drawablePathIconSupplierContracts,
+                    iconRes = stateValues.drawableResIconSupplierContracts.value,
+                    textSize = stateValues.smallTextSize,
+                    confirmationRequired = false,
+                    onClick = { coroutineScope.launch { Navigation.goMain(NavigationScreenModel.Supplier.Contracts.Main) } }
+                )
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1595, "Open affected orders"),
+                    iconPath = stateValues.drawablePathIconAppModeSupplier,
+                    iconRes = stateValues.drawableResIconAppModeSupplier.value,
+                    textSize = stateValues.smallTextSize,
+                    confirmationRequired = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.orderSearchQuery)
+                            Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
+                        }
+                    }
+                )
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1596, "Copy terms brief"),
+                    iconPath = stateValues.drawablePathIconClipboard,
+                    iconRes = stateValues.drawableResIconClipboard.value,
+                    textSize = stateValues.smallTextSize,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(item.brief) }
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun AppConfiguration.SupplierInsightsScreen() {
     val orders by supplierOrdersState.payload.collectAsState()
@@ -22194,10 +22527,17 @@ private fun AppConfiguration.SupplierInsightsScreen() {
     val visibleRadarItems = remember(radarItems, normalizedSearch) {
         radarItems.filter { normalizedSearch.isBlank() || it.searchKey.contains(normalizedSearch) }
     }
+    val termsGuardItems = remember(activeOrders, activeLines, activeContracts, stateValues.appLanguage) {
+        buildSupplierTermsGuardItems(activeOrders, activeLines, activeContracts)
+    }
+    val visibleTermsGuardItems = remember(termsGuardItems, normalizedSearch) {
+        termsGuardItems.filter { normalizedSearch.isBlank() || it.searchKey.contains(normalizedSearch) }
+    }
     val openOrdersCount = activeOrders.count { !it.status.isSupplierOrderClosed() }
     val attentionCount = activeOrders.count { it.status == SupplierOrderStatusDataModel.Sent || it.status == SupplierOrderStatusDataModel.SeenBySupplier || it.status == SupplierOrderStatusDataModel.IssueReported }
     val pendingContractCount = activeContracts.count { it.status == SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER || it.status == SUPPLIER_CONTRACT_STATUS_PENDING_STORE }
     val activeContractCount = activeContracts.count { it.status == SUPPLIER_CONTRACT_STATUS_ACTIVE }
+    val guardedOpenOrdersCount = termsGuardItems.sumOf { it.affectedOpenOrders }
 
     Column(modifier = Modifier.fillMaxSize()) {
         ScreenAppBarWidget(
@@ -22309,8 +22649,9 @@ private fun AppConfiguration.SupplierInsightsScreen() {
                     }
 
                     StockCardInfoLine(localizedStringResource(1555, "Active contracts"), activeContractCount.toString(), stateValues.TextColor)
+                    StockCardInfoLine(localizedStringResource(1602, "Guarded orders"), guardedOpenOrdersCount.toString(), stateValues.TextColor)
                     Text(
-                        text = localizedStringResource(1553, "This is the bridge from store-side ordering to supplier-side planning: orders feed catalog, contracts guard supply, partners show reliability, and insights decide what to prepare next."),
+                        text = localizedStringResource(1603, "The terms guard connects contracts with live supplier orders, like a traffic light before goods move."),
                         color = stateValues.PlaceholderTextColor,
                         fontSize = stateValues.smallTextSize
                     )
@@ -22409,6 +22750,37 @@ private fun AppConfiguration.SupplierInsightsScreen() {
                             )
                         }
                     }
+                }
+            }
+
+
+            item {
+                Text(
+                    text = localizedStringResource(1583, "Supplier terms guard"),
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.titleTextSize,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            if (termsGuardItems.isEmpty()) {
+                item {
+                    MessageText(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(1593, "Create or accept supplier contracts and this board will show which real orders they unlock or block.")
+                    )
+                }
+            } else if (visibleTermsGuardItems.isEmpty()) {
+                item {
+                    MessageText(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(1380, "No orders match this filter")
+                    )
+                }
+            } else {
+                items(visibleTermsGuardItems, key = { it.contract.id }) { item ->
+                    SupplierTermsGuardCard(item)
                 }
             }
 
@@ -45218,6 +45590,9 @@ object AppConfiguration {
         val drawablePathIconSupplierDispatch: String
         val drawableResIconSupplierDispatch: StateFlow<DrawableResource>
 
+        val drawablePathIconSupplierTermsGuard: String
+        val drawableResIconSupplierTermsGuard: StateFlow<DrawableResource>
+
         val drawablePathIconBuyerAgeRestriction: String
         val drawableResIconBuyerAgeRestriction: StateFlow<DrawableResource>
 
@@ -45849,6 +46224,10 @@ object AppConfiguration {
             private val _drawableResIconSupplierDispatch = MutableStateFlow(Res.drawable._78_0)
             override val drawableResIconSupplierDispatch: StateFlow<DrawableResource> = _drawableResIconSupplierDispatch.asStateFlow()
 
+            override val drawablePathIconSupplierTermsGuard: String by drawablePathIconSupplierTermsGuardState.collectAsState()
+            private val _drawableResIconSupplierTermsGuard = MutableStateFlow(Res.drawable._89_0)
+            override val drawableResIconSupplierTermsGuard: StateFlow<DrawableResource> = _drawableResIconSupplierTermsGuard.asStateFlow()
+
             override val drawablePathIconBuyerAgeRestriction: String by drawablePathIconBuyerAgeRestrictionState.collectAsState()
             private val _drawableResIconBuyerAgeRestriction = MutableStateFlow(Res.drawable._73_0)
             override val drawableResIconBuyerAgeRestriction: StateFlow<DrawableResource> = _drawableResIconBuyerAgeRestriction.asStateFlow()
@@ -46059,6 +46438,7 @@ object AppConfiguration {
                 _drawableResIconSupplierPartners.emit(if (stateValues.appThemeId == 1L) Res.drawable._75_1 else Res.drawable._75_0)
                 _drawableResIconSupplierDemandRadar.emit(if (stateValues.appThemeId == 1L) Res.drawable._77_1 else Res.drawable._77_0)
                 _drawableResIconSupplierDispatch.emit(if (stateValues.appThemeId == 1L) Res.drawable._78_1 else Res.drawable._78_0)
+                _drawableResIconSupplierTermsGuard.emit(if (stateValues.appThemeId == 1L) Res.drawable._89_1 else Res.drawable._89_0)
                 _drawableResIconBuyerAgeRestriction.emit(if (stateValues.appThemeId == 1L) Res.drawable._73_1 else Res.drawable._73_0)
                 _drawableResIconTransactionTimeRestriction.emit(if (stateValues.appThemeId == 1L) Res.drawable._74_1 else Res.drawable._74_0)
 

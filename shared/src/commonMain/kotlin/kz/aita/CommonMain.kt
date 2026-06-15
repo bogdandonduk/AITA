@@ -5941,6 +5941,7 @@ val drawablePathIconSupplierContractsState = MutableStateFlow("svg/76_0.svg")
 val drawablePathIconSupplierPartnersState = MutableStateFlow("svg/75_0.svg")
 val drawablePathIconSupplierDemandRadarState = MutableStateFlow("svg/77_0.svg")
 val drawablePathIconSupplierDispatchState = MutableStateFlow("svg/78_0.svg")
+val drawablePathIconSupplierTermsGuardState = MutableStateFlow("svg/89_0.svg")
 val drawablePathIconBuyerAgeRestrictionState = MutableStateFlow("svg/73_0.svg")
 val drawablePathIconTransactionTimeRestrictionState = MutableStateFlow("svg/74_0.svg")
 val drawablePathIconWorkersState = MutableStateFlow("svg/22_0.svg")
@@ -8011,6 +8012,9 @@ fun updateDrawables(
         )
         drawablePathIconSupplierDispatchState.emit(
             drawablePath(78L)
+        )
+        drawablePathIconSupplierTermsGuardState.emit(
+            drawablePath(89L)
         )
         drawablePathIconBuyerAgeRestrictionState.emit(
             drawablePath(73L)

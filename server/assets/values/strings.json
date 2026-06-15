@@ -31501,6 +31501,468 @@
           "value": "Жеткізу сүзгісі"
         }
       ]
+    },
+    {
+      "id": 1583,
+      "values": [
+        {
+          "locale": "main",
+          "value": "Supplier terms guard"
+        },
+        {
+          "locale": "en",
+          "value": "Supplier terms guard"
+        },
+        {
+          "locale": "ru",
+          "value": "Страж условий поставщика"
+        },
+        {
+          "locale": "kk",
+          "value": "Жеткізуші шарттарының күзеті"
+        }
+      ]
+    },
+    {
+      "id": 1584,
+      "values": [
+        {
+          "locale": "main",
+          "value": "Terms guard"
+        },
+        {
+          "locale": "en",
+          "value": "Terms guard"
+        },
+        {
+          "locale": "ru",
+          "value": "Страж условий"
+        },
+        {
+          "locale": "kk",
+          "value": "Шарттар күзеті"
+        }
+      ]
+    },
+    {
+      "id": 1585,
+      "values": [
+        {
+          "locale": "main",
+          "value": "Operational effect"
+        },
+        {
+          "locale": "en",
+          "value": "Operational effect"
+        },
+        {
+          "locale": "ru",
+          "value": "Операционный эффект"
+        },
+        {
+          "locale": "kk",
+          "value": "Операциялық әсер"
+        }
+      ]
+    },
+    {
+      "id": 1586,
+      "values": [
+        {
+          "locale": "main",
+          "value": "Affected open orders"
+        },
+        {
+          "locale": "en",
+          "value": "Affected open orders"
+        },
+        {
+          "locale": "ru",
+          "value": "Затронутые открытые заказы"
+        },
+        {
+          "locale": "kk",
+          "value": "Әсер ететін ашық тапсырыстар"
+        }
+      ]
+    },
+    {
+      "id": 1587,
+      "values": [
+        {
+          "locale": "main",
+          "value": "Covered goods"
+        },
+        {
+          "locale": "en",
+          "value": "Covered goods"
+        },
+        {
+          "locale": "ru",
+          "value": "Охваченные товары"
+        },
+        {
+          "locale": "kk",
+          "value": "Қамтылған тауарлар"
+        }
+      ]
+    },
+    {
+      "id": 1588,
+      "values": [
+        {
+          "locale": "main",
+          "value": "Blocking supply until accepted"
+        },
+        {
+          "locale": "en",
+          "value": "Blocking supply until accepted"
+        },
+        {
+          "locale": "ru",
+          "value": "Блокирует поставку до принятия"
+        },
+        {
+          "locale": "kk",
+          "value": "Қабылданғанша жеткізуді бұғаттайды"
+        }
+      ]
+    },
+    {
+      "id": 1589,
+      "values": [
+        {
+          "locale": "main",
+          "value": "Active terms protecting supply"
+        },
+        {
+          "locale": "en",
+          "value": "Active terms protecting supply"
+        },
+        {
+          "locale": "ru",
+          "value": "Активные условия защищают поставку"
+        },
+        {
+          "locale": "kk",
+          "value": "Белсенді шарттар жеткізуді қорғайды"
+        }
+      ]
+    },
+    {
+      "id": 1590,
+      "values": [
+        {
+          "locale": "main",
+          "value": "Waiting for supplier acceptance"
+        },
+        {
+          "locale": "en",
+          "value": "Waiting for supplier acceptance"
+        },
+        {
+          "locale": "ru",
+          "value": "Ожидает принятия поставщиком"
+        },
+        {
+          "locale": "kk",
+          "value": "Жеткізушінің қабылдауын күтеді"
+        }
+      ]
+    },
+    {
+      "id": 1591,
+      "values": [
+        {
+          "locale": "main",
+          "value": "Waiting for store acceptance"
+        },
+        {
+          "locale": "en",
+          "value": "Waiting for store acceptance"
+        },
+        {
+          "locale": "ru",
+          "value": "Ожидает принятия магазином"
+        },
+        {
+          "locale": "kk",
+          "value": "Дүкеннің қабылдауын күтеді"
+        }
+      ]
+    },
+    {
+      "id": 1592,
+      "values": [
+        {
+          "locale": "main",
+          "value": "No terms guard signals yet"
+        },
+        {
+          "locale": "en",
+          "value": "No terms guard signals yet"
+        },
+        {
+          "locale": "ru",
+          "value": "Пока нет сигналов стража условий"
+        },
+        {
+          "locale": "kk",
+          "value": "Әзірге шарттар күзеті сигналдары жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1593,
+      "values": [
+        {
+          "locale": "main",
+          "value": "Create or accept supplier contracts and this board will show which real orders they unlock or block."
+        },
+        {
+          "locale": "en",
+          "value": "Create or accept supplier contracts and this board will show which real orders they unlock or block."
+        },
+        {
+          "locale": "ru",
+          "value": "Создайте или примите договоры поставщика, и эта доска покажет, какие реальные заказы они открывают или блокируют."
+        },
+        {
+          "locale": "kk",
+          "value": "Жеткізуші келісімдерін жасаңыз немесе қабылдаңыз, сонда бұл тақта қай нақты тапсырыстарды ашатынын немесе бұғаттайтынын көрсетеді."
+        }
+      ]
+    },
+    {
+      "id": 1594,
+      "values": [
+        {
+          "locale": "main",
+          "value": "Open contract board"
+        },
+        {
+          "locale": "en",
+          "value": "Open contract board"
+        },
+        {
+          "locale": "ru",
+          "value": "Открыть доску договоров"
+        },
+        {
+          "locale": "kk",
+          "value": "Келісімдер тақтасын ашу"
+        }
+      ]
+    },
+    {
+      "id": 1595,
+      "values": [
+        {
+          "locale": "main",
+          "value": "Open affected orders"
+        },
+        {
+          "locale": "en",
+          "value": "Open affected orders"
+        },
+        {
+          "locale": "ru",
+          "value": "Открыть затронутые заказы"
+        },
+        {
+          "locale": "kk",
+          "value": "Әсер ететін тапсырыстарды ашу"
+        }
+      ]
+    },
+    {
+      "id": 1596,
+      "values": [
+        {
+          "locale": "main",
+          "value": "Copy terms brief"
+        },
+        {
+          "locale": "en",
+          "value": "Copy terms brief"
+        },
+        {
+          "locale": "ru",
+          "value": "Скопировать сводку условий"
+        },
+        {
+          "locale": "kk",
+          "value": "Шарттар қысқаша мәліметін көшіру"
+        }
+      ]
+    },
+    {
+      "id": 1597,
+      "values": [
+        {
+          "locale": "main",
+          "value": "Terms brief"
+        },
+        {
+          "locale": "en",
+          "value": "Terms brief"
+        },
+        {
+          "locale": "ru",
+          "value": "Сводка условий"
+        },
+        {
+          "locale": "kk",
+          "value": "Шарттар қысқашасы"
+        }
+      ]
+    },
+    {
+      "id": 1598,
+      "values": [
+        {
+          "locale": "main",
+          "value": "Price terms"
+        },
+        {
+          "locale": "en",
+          "value": "Price terms"
+        },
+        {
+          "locale": "ru",
+          "value": "Ценовые условия"
+        },
+        {
+          "locale": "kk",
+          "value": "Баға шарттары"
+        }
+      ]
+    },
+    {
+      "id": 1599,
+      "values": [
+        {
+          "locale": "main",
+          "value": "Custom terms"
+        },
+        {
+          "locale": "en",
+          "value": "Custom terms"
+        },
+        {
+          "locale": "ru",
+          "value": "Особые условия"
+        },
+        {
+          "locale": "kk",
+          "value": "Арнайы шарттар"
+        }
+      ]
+    },
+    {
+      "id": 1600,
+      "values": [
+        {
+          "locale": "main",
+          "value": "Delivery terms"
+        },
+        {
+          "locale": "en",
+          "value": "Delivery terms"
+        },
+        {
+          "locale": "ru",
+          "value": "Условия доставки"
+        },
+        {
+          "locale": "kk",
+          "value": "Жеткізу шарттары"
+        }
+      ]
+    },
+    {
+      "id": 1601,
+      "values": [
+        {
+          "locale": "main",
+          "value": "Payment terms"
+        },
+        {
+          "locale": "en",
+          "value": "Payment terms"
+        },
+        {
+          "locale": "ru",
+          "value": "Условия оплаты"
+        },
+        {
+          "locale": "kk",
+          "value": "Төлем шарттары"
+        }
+      ]
+    },
+    {
+      "id": 1602,
+      "values": [
+        {
+          "locale": "main",
+          "value": "Guarded orders"
+        },
+        {
+          "locale": "en",
+          "value": "Guarded orders"
+        },
+        {
+          "locale": "ru",
+          "value": "Заказы под защитой"
+        },
+        {
+          "locale": "kk",
+          "value": "Қорғалған тапсырыстар"
+        }
+      ]
+    },
+    {
+      "id": 1603,
+      "values": [
+        {
+          "locale": "main",
+          "value": "The terms guard connects contracts with live supplier orders, like a traffic light before goods move."
+        },
+        {
+          "locale": "en",
+          "value": "The terms guard connects contracts with live supplier orders, like a traffic light before goods move."
+        },
+        {
+          "locale": "ru",
+          "value": "Страж условий связывает договоры с живыми заказами поставщика, как светофор перед движением товара."
+        },
+        {
+          "locale": "kk",
+          "value": "Шарттар күзеті келісімдерді нақты жеткізуші тапсырыстарымен байланыстырады, тауар қозғалар алдындағы бағдаршам сияқты."
+        }
+      ]
+    },
+    {
+      "id": 1604,
+      "values": [
+        {
+          "locale": "main",
+          "value": "Related order lines"
+        },
+        {
+          "locale": "en",
+          "value": "Related order lines"
+        },
+        {
+          "locale": "ru",
+          "value": "Связанные строки заказа"
+        },
+        {
+          "locale": "kk",
+          "value": "Байланысты тапсырыс жолдары"
+        }
+      ]
     }
   ]
 }
