@@ -2,8 +2,8 @@
 package kz.aita
 
 import app.cash.sqldelight.db.SqlDriver
-import io.ktor.client.engine.HttpClientEngine
-import io.ktor.client.engine.js.Js
+import io.ktor.client.engine.*
+import io.ktor.client.engine.js.*
 import kotlinx.browser.localStorage
 import kotlinx.browser.window
 import kotlinx.coroutines.CoroutineDispatcher

@@ -14,8 +14,8 @@ import okhttp3.Cache
 import okhttp3.OkHttpClient
 import java.awt.Desktop
 import java.io.File
-import java.net.URLEncoder
 import java.net.URI
+import java.net.URLEncoder
 import java.nio.file.Files
 import java.util.*
 import javax.print.DocFlavor

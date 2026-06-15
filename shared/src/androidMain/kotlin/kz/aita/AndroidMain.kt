@@ -1,38 +1,29 @@
 package kz.aita
 
-import android.content.ContentValues
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
-import android.content.Context
 import android.content.ActivityNotFoundException
+import android.content.ContentValues
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
-import android.os.Bundle
-import android.os.Environment
+import android.os.*
+import android.print.*
 import android.provider.MediaStore
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.core.content.FileProvider
 import app.cash.sqldelight.db.SqlDriver
-import io.ktor.client.engine.HttpClientEngine
+import io.ktor.client.engine.*
 import io.ktor.client.engine.okhttp.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Cache
 import okhttp3.OkHttpClient
-import android.os.CancellationSignal
-import android.os.ParcelFileDescriptor
-import android.print.PageRange
-import android.print.PrintAttributes
-import android.print.PrintDocumentAdapter
-import android.print.PrintDocumentInfo
-import android.print.PrintManager
-import android.webkit.WebView
-import android.webkit.WebViewClient
-import java.io.FileOutputStream
 import java.io.File
-import java.util.Locale
-import java.util.UUID
+import java.io.FileOutputStream
+import java.util.*
 
 actual fun getCurrentTimeMillis(): Long = System.currentTimeMillis()
 
