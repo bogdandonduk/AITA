@@ -413,22 +413,66 @@ private fun ResultRow.toSupportMessageDataModel(): SupportMessageDataModel = Sup
     isActive = this[SupportMessages.isActive]
 )
 
+private fun aitaManualJsonString(value: String): String = buildString {
+    append('"')
+    value.forEach { char ->
+        when (char) {
+            '\\' -> append("\\\\")
+            '"' -> append("\\\"")
+            '\b' -> append("\\b")
+            '\u000C' -> append("\\f")
+            '\n' -> append("\\n")
+            '\r' -> append("\\r")
+            '\t' -> append("\\t")
+            else -> {
+                if (char.code < 0x20) {
+                    append("\\u")
+                    append(char.code.toString(16).padStart(4, '0'))
+                } else {
+                    append(char)
+                }
+            }
+        }
+    }
+    append('"')
+}
+
+private fun aitaManualLocalizedMessageArray(values: List<LocalizedStringDataModel>): String = values.joinToString(
+    prefix = "[",
+    postfix = "]"
+) { value ->
+    "{\"language\":${aitaManualJsonString(value.language)},\"value\":${aitaManualJsonString(value.value)}}"
+}
+
+@PublishedApi
+internal fun aitaGenericEnvelopeText(
+    message: List<LocalizedStringDataModel>?,
+    payloadText: String?,
+    negative: Boolean
+): String = buildString {
+    append('{')
+    append("\"message\":")
+    append(message?.let { aitaManualJsonString(aitaManualLocalizedMessageArray(it)) } ?: "null")
+    append(',')
+    append("\"payload\":")
+    append(payloadText?.let { aitaManualJsonString(it) } ?: "null")
+    append(',')
+    append("\"negative\":")
+    append(if (negative) "true" else "false")
+    append('}')
+}
+
 suspend fun RoutingCall.genericResponseNoPayload(
     status: HttpStatusCode,
     message: List<LocalizedStringDataModel>? = null
 ) {
-    stabilizeServerRuntimeClassLoader("response-no-payload:${request.httpMethod.value}:${request.path()}")
-    val response = GenericResponseDataModel(
-        message = message?.let { jsonBase.encodeToString(it) },
-        payload = null,
-        negative = !status.isSuccess()
-    )
-
-    respondText(
-        text = jsonBase.encodeToString(response),
-        contentType = ContentType.Application.Json,
-        status = status
-    )
+    withAitaServerRuntimeClassLoader("response-no-payload:${request.httpMethod.value}:${request.path()}") {
+        respondText(
+            text = aitaGenericEnvelopeText(message = message, payloadText = null, negative = !status.isSuccess()),
+            contentType = ContentType.Application.Json,
+            status = status
+        )
+    }
 }
 
 suspend fun RoutingCall.safeGenericResponseNoPayload(
@@ -452,17 +496,14 @@ suspend fun RoutingCall.safeGenericResponseNoPayload(
             ru = "Внутренняя ошибка сервера",
             kk = "Сервердің ішкі қатесі"
         )
-        val response = GenericResponseDataModel(
-            message = jsonBase.encodeToString(safeMessage),
-            payload = null,
-            negative = true
-        )
         runCatching {
-            respondText(
-                text = jsonBase.encodeToString(response),
-                contentType = ContentType.Application.Json,
-                status = status
-            )
+            withAitaServerRuntimeClassLoader("safe-response-no-payload-fallback:${request.httpMethod.value}:${request.path()}") {
+                respondText(
+                    text = aitaGenericEnvelopeText(message = safeMessage, payloadText = null, negative = true),
+                    contentType = ContentType.Application.Json,
+                    status = status
+                )
+            }
         }
     }
 }
@@ -480,17 +521,13 @@ suspend fun ApplicationCall.safeGenericResponseNoPayload(
     }
 
     runCatching {
-        stabilizeServerRuntimeClassLoader("response-no-payload:${request.httpMethod.value}:${request.path()}")
-        val response = GenericResponseDataModel(
-            message = message?.let { jsonBase.encodeToString(it) },
-            payload = null,
-            negative = !status.isSuccess()
-        )
-        respondText(
-            text = jsonBase.encodeToString(response),
-            contentType = ContentType.Application.Json,
-            status = status
-        )
+        withAitaServerRuntimeClassLoader("response-no-payload:${request.httpMethod.value}:${request.path()}") {
+            respondText(
+                text = aitaGenericEnvelopeText(message = message, payloadText = null, negative = !status.isSuccess()),
+                contentType = ContentType.Application.Json,
+                status = status
+            )
+        }
     }.getOrElse { responseThrowable ->
         application.environment.log.error("Failed to send JSON error response", responseThrowable)
         val safeMessage = message ?: simpleMessage(
@@ -498,17 +535,14 @@ suspend fun ApplicationCall.safeGenericResponseNoPayload(
             ru = "Внутренняя ошибка сервера",
             kk = "Сервердің ішкі қатесі"
         )
-        val response = GenericResponseDataModel(
-            message = jsonBase.encodeToString(safeMessage),
-            payload = null,
-            negative = true
-        )
         runCatching {
-            respondText(
-                text = jsonBase.encodeToString(response),
-                contentType = ContentType.Application.Json,
-                status = status
-            )
+            withAitaServerRuntimeClassLoader("safe-application-response-no-payload-fallback:${request.httpMethod.value}:${request.path()}") {
+                respondText(
+                    text = aitaGenericEnvelopeText(message = safeMessage, payloadText = null, negative = true),
+                    contentType = ContentType.Application.Json,
+                    status = status
+                )
+            }
         }
     }
 }
@@ -521,18 +555,13 @@ suspend fun ApplicationCall.respondAitaUnauthorized(
         kk = "Кіру немесе рұқсат қажет"
     )
 ) {
-    stabilizeServerRuntimeClassLoader("unauthorized:${request.httpMethod.value}:${request.path()}")
-    val response = GenericResponseDataModel(
-        message = jsonBase.encodeToString(message),
-        payload = null,
-        negative = true
-    )
-
-    respondText(
-        text = jsonBase.encodeToString(response),
-        contentType = ContentType.Application.Json,
-        status = HttpStatusCode.Unauthorized
-    )
+    withAitaServerRuntimeClassLoader("unauthorized:${request.httpMethod.value}:${request.path()}") {
+        respondText(
+            text = aitaGenericEnvelopeText(message = message, payloadText = null, negative = true),
+            contentType = ContentType.Application.Json,
+            status = HttpStatusCode.Unauthorized
+        )
+    }
 }
 
 suspend inline fun <reified T> RoutingCall.genericResponse(
@@ -540,40 +569,34 @@ suspend inline fun <reified T> RoutingCall.genericResponse(
     payload: T?,
     message: List<LocalizedStringDataModel>? = null
 ) {
-    stabilizeServerRuntimeClassLoader("response:${request.httpMethod.value}:${request.path()}:${T::class.qualifiedName}")
-    val payloadText = try {
-        payload?.let { jsonBase.encodeToString(it) }
-    } catch (throwable: Throwable) {
-        application.environment.log.error("Failed to encode generic response payload", throwable)
-        val safeMessage = listOf(
-            LocalizedStringDataModel("main", "Internal server error"),
-            LocalizedStringDataModel("en", "Internal server error"),
-            LocalizedStringDataModel("ru", "Внутренняя ошибка сервера"),
-            LocalizedStringDataModel("kk", "Сервердің ішкі қатесі")
-        )
-        val safeResponse = GenericResponseDataModel(
-            message = jsonBase.encodeToString(safeMessage),
-            payload = null,
-            negative = true
-        )
-        return respondText(
-            text = jsonBase.encodeToString(safeResponse),
+    withAitaServerRuntimeClassLoader("response:${request.httpMethod.value}:${request.path()}:${T::class.qualifiedName}") {
+        val payloadText = try {
+            payload?.let { jsonBase.encodeToString(it) }
+        } catch (throwable: Throwable) {
+            if (throwable.isClassLoadingFailure()) {
+                refreshSharedRuntimeSerializersAfterClassLoadingFailure("response:${T::class.qualifiedName}", throwable)
+            }
+            application.environment.log.error("Failed to encode generic response payload", throwable)
+            val safeMessage = listOf(
+                LocalizedStringDataModel("main", "Internal server error"),
+                LocalizedStringDataModel("en", "Internal server error"),
+                LocalizedStringDataModel("ru", "Внутренняя ошибка сервера"),
+                LocalizedStringDataModel("kk", "Сервердің ішкі қатесі")
+            )
+            respondText(
+                text = aitaGenericEnvelopeText(message = safeMessage, payloadText = null, negative = true),
+                contentType = ContentType.Application.Json,
+                status = HttpStatusCode.InternalServerError
+            )
+            return@withAitaServerRuntimeClassLoader
+        }
+
+        respondText(
+            text = aitaGenericEnvelopeText(message = message, payloadText = payloadText, negative = !status.isSuccess()),
             contentType = ContentType.Application.Json,
-            status = HttpStatusCode.InternalServerError
+            status = status
         )
     }
-
-    val response = GenericResponseDataModel(
-        message = message?.let { jsonBase.encodeToString(it) },
-        payload = payloadText,
-        negative = !status.isSuccess()
-    )
-
-    respondText(
-        text = jsonBase.encodeToString(response),
-        contentType = ContentType.Application.Json,
-        status = status
-    )
 }
 
 private fun String.jsonStringLiteral(): String = jsonBase.encodeToString(this)
@@ -599,18 +622,13 @@ suspend fun RoutingCall.genericTokenPairResponse(
     payload: TokenPair?,
     message: List<LocalizedStringDataModel>? = null
 ) {
-    stabilizeServerRuntimeClassLoader("response-token:${request.httpMethod.value}:${request.path()}")
-    val response = GenericResponseDataModel(
-        message = message?.let { jsonBase.encodeToString(it) },
-        payload = payload?.toManualPayloadJson(),
-        negative = !status.isSuccess()
-    )
-
-    respondText(
-        text = jsonBase.encodeToString(response),
-        contentType = ContentType.Application.Json,
-        status = status
-    )
+    withAitaServerRuntimeClassLoader("response-token:${request.httpMethod.value}:${request.path()}") {
+        respondText(
+            text = aitaGenericEnvelopeText(message = message, payloadText = payload?.toManualPayloadJson(), negative = !status.isSuccess()),
+            contentType = ContentType.Application.Json,
+            status = status
+        )
+    }
 }
 
 fun RoutingCall.pagingRequest(): PagingRequestDataModel {
@@ -3172,8 +3190,34 @@ private class AitaServerClassLoaderContextElement(
 private fun aitaServerClassLoaderContextElement(): CoroutineContext = AitaServerClassLoaderContextElement()
 private val aitaServerIoContext: CoroutineContext = Dispatchers.IO + AitaServerClassLoaderContextElement()
 
-private fun Throwable.isClassLoadingFailure(): Boolean =
+@PublishedApi
+internal suspend fun <T> withAitaServerRuntimeClassLoader(
+    reason: String,
+    block: suspend () -> T
+): T {
+    stabilizeServerRuntimeClassLoader(reason)
+    return withContext(aitaServerClassLoaderContextElement()) {
+        stabilizeServerRuntimeClassLoader("$reason-context")
+        block()
+    }
+}
+
+@PublishedApi
+internal fun Throwable.isClassLoadingFailure(): Boolean =
     this is ClassNotFoundException || this is NoClassDefFoundError || cause?.isClassLoadingFailure() == true
+
+@PublishedApi
+internal fun refreshSharedRuntimeSerializersAfterClassLoadingFailure(reason: String, throwable: Throwable? = null) {
+    sharedRuntimeSerializersPrewarmed = false
+    runCatching { prewarmSharedRuntimeSerializers() }
+        .onFailure { refreshThrowable ->
+            System.err.println(
+                "AITA server classloader: serializer refresh failed reason=$reason " +
+                        "original=${throwable?.let { it::class.qualifiedName + ": " + it.message }.orEmpty()} " +
+                        "refresh=${refreshThrowable::class.qualifiedName}: ${refreshThrowable.message}"
+            )
+        }
+}
 
 @Synchronized
 private fun prewarmSharedRuntimeSerializers() {
@@ -3225,6 +3269,15 @@ private fun prewarmSharedRuntimeSerializers() {
     touch("SupplierGoodsPriceDataModel") { SupplierGoodsPriceDataModel.serializer() }
     touch("SupplierContractPriceTermDataModel") { SupplierContractPriceTermDataModel.serializer() }
     touch("SupplierPartnershipContractDataModel") { SupplierPartnershipContractDataModel.serializer() }
+    touch("SupplierDashboardStatusBucketDataModel") { SupplierDashboardStatusBucketDataModel.serializer() }
+    touch("SupplierDashboardDemandDataModel") { SupplierDashboardDemandDataModel.serializer() }
+    touch("SupplierDashboardPartnerDataModel") { SupplierDashboardPartnerDataModel.serializer() }
+    touch("SupplierDashboardProfileDataModel") { SupplierDashboardProfileDataModel.serializer() }
+    touch("SupplierDashboardActionDataModel") { SupplierDashboardActionDataModel.serializer() }
+    touch("SupplierDashboardDeliveryBucketDataModel") { SupplierDashboardDeliveryBucketDataModel.serializer() }
+    touch("SupplierDashboardReadinessDataModel") { SupplierDashboardReadinessDataModel.serializer() }
+    touch("SupplierDashboardManufacturerBridgeDataModel") { SupplierDashboardManufacturerBridgeDataModel.serializer() }
+    touch("SupplierModeDashboardDataModel") { SupplierModeDashboardDataModel.serializer() }
     touch("SupplierOrderWithLinesDataModel") { SupplierOrderWithLinesDataModel.serializer() }
     touch("SupportMessageSendRequestDataModel") { SupportMessageSendRequestDataModel.serializer() }
     touch("SupportMessagesReadRequestDataModel") { SupportMessagesReadRequestDataModel.serializer() }
@@ -3260,6 +3313,9 @@ private fun prewarmSharedRuntimeSerializers() {
     touch("StoreSubscriptionChargeDataModel") { StoreSubscriptionChargeDataModel.serializer() }
     touch("SubscriptionDashboardDataModel") { SubscriptionDashboardDataModel.serializer() }
     touch("UserFinanceDashboardDataModel") { UserFinanceDashboardDataModel.serializer() }
+    touch("StockBatchStatusDataModel") { StockBatchStatusDataModel.serializer() }
+    touch("StockBatchMovementStatusDataModel") { StockBatchMovementStatusDataModel.serializer() }
+    touch("SupplierOrderStatusDataModel") { SupplierOrderStatusDataModel.serializer() }
     touch("TransactionPaymentDraftDataModel") { TransactionPaymentDraftDataModel.serializer() }
     touch("TransactionCartScrollStateDataModel") { TransactionCartScrollStateDataModel.serializer() }
     touch("TransactionReceiptSnapshotDataModel") { TransactionReceiptSnapshotDataModel.serializer() }
@@ -3270,6 +3326,7 @@ private fun prewarmSharedRuntimeSerializers() {
     touch("AnalyticsReportRowDataModel") { AnalyticsReportRowDataModel.serializer() }
     touch("AnalyticsReportSectionDataModel") { AnalyticsReportSectionDataModel.serializer() }
     touch("AnalyticsReportSnapshotDataModel") { AnalyticsReportSnapshotDataModel.serializer() }
+    touch("AnalyticsReturnReasonDataModel") { AnalyticsReturnReasonDataModel.serializer() }
     touch("ReceiptTextLabelsDataModel") { ReceiptTextLabelsDataModel.serializer() }
     touch("EmbeddedWeightBarcodeDataModel") { EmbeddedWeightBarcodeDataModel.serializer() }
     touch("ReceiveSupplierOrderLineDataModel") { ReceiveSupplierOrderLineDataModel.serializer() }
@@ -3335,6 +3392,7 @@ private fun prewarmSharedRuntimeSerializers() {
     touch("StoreWorkerRoleTemplateDataModel") { StoreWorkerRoleTemplateDataModel.serializer() }
     touch("StoreWorkerRoleTemplateUpsertRequestDataModel") { StoreWorkerRoleTemplateUpsertRequestDataModel.serializer() }
     touch("StoreWorkerRoleTemplateDeleteRequestDataModel") { StoreWorkerRoleTemplateDeleteRequestDataModel.serializer() }
+    touch("StoreJobDataModel") { StoreJobDataModel.serializer() }
     touch("WorkshiftEndRequestDataModel") { WorkshiftEndRequestDataModel.serializer() }
     touch("WorkshiftDataModel") { WorkshiftDataModel.serializer() }
     touch("OperationLogDataModel") { OperationLogDataModel.serializer() }
@@ -3346,6 +3404,9 @@ private fun prewarmSharedRuntimeSerializers() {
 
     listOf(
         "kz.aita.MoneyDataModel",
+        "kz.aita.StockBatchStatusDataModel",
+        "kz.aita.StockBatchMovementStatusDataModel",
+        "kz.aita.SupplierOrderStatusDataModel",
         "kz.aita.ExpirationPeriodDataModel",
         "kz.aita.BatchDiscountDataModel",
         "kz.aita.StockPromotionDataModel",
@@ -3374,6 +3435,7 @@ private fun prewarmSharedRuntimeSerializers() {
         "kz.aita.AnalyticsReportRowDataModel",
         "kz.aita.AnalyticsReportSectionDataModel",
         "kz.aita.AnalyticsReportSnapshotDataModel",
+        "kz.aita.AnalyticsReturnReasonDataModel",
         "kz.aita.ReceiptTextLabelsDataModel",
         "kz.aita.AuthScreenPreferenceOverrideDataModel",
         "kz.aita.EmbeddedWeightBarcodeDataModel",
@@ -3417,6 +3479,15 @@ private fun prewarmSharedRuntimeSerializers() {
         "kz.aita.SupplierGoodsPriceDataModel",
         "kz.aita.SupplierContractPriceTermDataModel",
         "kz.aita.SupplierPartnershipContractDataModel",
+        "kz.aita.SupplierDashboardStatusBucketDataModel",
+        "kz.aita.SupplierDashboardDemandDataModel",
+        "kz.aita.SupplierDashboardPartnerDataModel",
+        "kz.aita.SupplierDashboardProfileDataModel",
+        "kz.aita.SupplierDashboardActionDataModel",
+        "kz.aita.SupplierDashboardDeliveryBucketDataModel",
+        "kz.aita.SupplierDashboardReadinessDataModel",
+        "kz.aita.SupplierDashboardManufacturerBridgeDataModel",
+        "kz.aita.SupplierModeDashboardDataModel",
         "kz.aita.GoodsBatchDataModel",
         "kz.aita.GoodsBatchShelfQueueDataModel",
         "kz.aita.GoodsCategoryDataModel",
@@ -3481,6 +3552,10 @@ private fun prewarmSharedRuntimeSerializers() {
         "kz.aita.StoreWorkerRoleTemplateDataModel",
         "kz.aita.StoreWorkerRoleTemplateUpsertRequestDataModel",
         "kz.aita.StoreWorkerRoleTemplateDeleteRequestDataModel",
+        "kz.aita.StoreJobDataModel",
+        "kz.aita.StoreJobDataModel\$Cashier",
+        "kz.aita.StoreJobDataModel\$WarehouseManager",
+        "kz.aita.StoreJobDataModel\$Administrator",
         "kz.aita.WorkerEmploymentRequestCreateDataModel",
         "kz.aita.WorkerEmploymentDecisionRequestDataModel",
         "kz.aita.WorkerStoreInviteCreateDataModel",
@@ -3496,7 +3571,7 @@ private fun prewarmSharedRuntimeSerializers() {
         "kz.aita.WorkerDataModel",
         "kz.aita.WorkerPrivilegeModeDataModel",
     ).forEach { className ->
-        runCatching { Class.forName(className, false, aitaServerRuntimeClassLoader) }
+        runCatching { Class.forName(className, true, aitaServerRuntimeClassLoader) }
             .onFailure { throwable ->
                 println("AITA server classloader: FAILED to verify $className in $aitaServerRuntimeClassLoader: ${throwable::class.qualifiedName} ${throwable.message}")
                 throw throwable
@@ -4120,23 +4195,37 @@ private fun RoutingCall.matchesAnyInventoryContextStoreIdInsideTransaction(userI
 }
 
 private suspend inline fun <reified T : Any> RoutingCall.receiveAita(): T {
-    stabilizeServerRuntimeClassLoader("receive:${request.httpMethod.value}:${request.path()}:${T::class.qualifiedName}")
-    return receive<T>()
+    return withAitaServerRuntimeClassLoader("receive:${request.httpMethod.value}:${request.path()}:${T::class.qualifiedName}") {
+        runCatching { receive<T>() }.getOrElse { throwable ->
+            if (throwable.isClassLoadingFailure()) {
+                refreshSharedRuntimeSerializersAfterClassLoadingFailure("receive:${T::class.qualifiedName}", throwable)
+            }
+            throw throwable
+        }
+    }
 }
 
 private suspend fun RoutingCall.receiveTextAita(): String {
-    stabilizeServerRuntimeClassLoader("receive-text:${request.httpMethod.value}:${request.path()}")
-    return receiveText()
+    return withAitaServerRuntimeClassLoader("receive-text:${request.httpMethod.value}:${request.path()}") {
+        receiveText()
+    }
 }
 
 private suspend inline fun <reified T : Any> RoutingCall.receiveOneOrList(): List<T> {
-    stabilizeServerRuntimeClassLoader("receive-one-or-list:${request.httpMethod.value}:${request.path()}:${T::class.qualifiedName}")
-    val raw = receiveTextAita().trim()
-
-    return if (raw.startsWith("[")) {
-        jsonBase.decodeFromString<List<T>>(raw)
-    } else {
-        listOf(jsonBase.decodeFromString<T>(raw))
+    return withAitaServerRuntimeClassLoader("receive-one-or-list:${request.httpMethod.value}:${request.path()}:${T::class.qualifiedName}") {
+        val raw = receiveText().trim()
+        runCatching {
+            if (raw.startsWith("[")) {
+                jsonBase.decodeFromString<List<T>>(raw)
+            } else {
+                listOf(jsonBase.decodeFromString<T>(raw))
+            }
+        }.getOrElse { throwable ->
+            if (throwable.isClassLoadingFailure()) {
+                refreshSharedRuntimeSerializersAfterClassLoadingFailure("receive-one-or-list:${T::class.qualifiedName}", throwable)
+            }
+            throw throwable
+        }
     }
 }
 
@@ -6201,7 +6290,8 @@ private fun List<SupplierOrderWithLinesDataModel>.withSupplierDeskSnapshotsInsid
     }.distinct()
 
     val goodsItemIds = flatMap { orderWithLines -> orderWithLines.lines }
-        .mapNotNull { line -> runCatching { UUID.fromString(line.goodsItemId) }.getOrNull() }
+        .flatMap { line -> listOf(line.goodsItemId, line.substituteGoodsItemId.orEmpty()) }
+        .mapNotNull { rawGoodsItemId -> runCatching { UUID.fromString(rawGoodsItemId) }.getOrNull() }
         .distinct()
 
     val storeRowsById = if (storeIds.isEmpty()) {
@@ -6232,15 +6322,582 @@ private fun List<SupplierOrderWithLinesDataModel>.withSupplierDeskSnapshotsInsid
 
         val lineSnapshots = orderWithLines.lines.map { line ->
             val goodsRow = goodsRowsById[line.goodsItemId]
+            val substituteGoodsRow = line.substituteGoodsItemId?.let { goodsRowsById[it] }
             line.copy(
                 goodsItemNameSnapshot = goodsRow?.get(StockItems.name).orEmpty(),
                 goodsItemBarcodeSnapshots = goodsRow?.stockBarcodeValues().orEmpty(),
-                goodsItemMeasurementUnitIdSnapshot = goodsRow?.get(StockItems.measurementUnitId)
+                goodsItemMeasurementUnitIdSnapshot = goodsRow?.get(StockItems.measurementUnitId),
+                substituteGoodsItemNameSnapshot = substituteGoodsRow?.get(StockItems.name).orEmpty(),
+                substituteGoodsItemBarcodeSnapshots = substituteGoodsRow?.stockBarcodeValues().orEmpty(),
+                substituteGoodsItemMeasurementUnitIdSnapshot = substituteGoodsRow?.get(StockItems.measurementUnitId)
             )
         }
 
         SupplierOrderWithLinesDataModel(orderWithSnapshots, lineSnapshots)
     }
+}
+
+private fun accessibleSupplierProfilesForUserInsideTransaction(userId: UUID): List<SupplierDataModel> =
+    Suppliers
+        .selectAll()
+        .where { Suppliers.isActive eq true }
+        .map { it.toSupplierDataModel() }
+        .filter { supplier -> supplier.userIds.contains(userId.toString()) }
+        .distinctBy { it.id }
+
+private fun accessibleSupplierIdsForUserInsideTransaction(userId: UUID): List<UUID> =
+    accessibleSupplierProfilesForUserInsideTransaction(userId)
+        .mapNotNull { supplier -> runCatching { UUID.fromString(supplier.id) }.getOrNull() }
+        .distinct()
+
+private fun SupplierOrderStatusDataModel.isClosedForSupplierDashboard(): Boolean =
+    this == SupplierOrderStatusDataModel.Delivered || this == SupplierOrderStatusDataModel.Cancelled
+
+private const val AITA_SUPPLIER_DAY_MILLIS: Long = 24L * 60L * 60L * 1000L
+
+private fun supplierDashboardDayStartMillis(now: Long): Long = now - (now % AITA_SUPPLIER_DAY_MILLIS)
+
+private fun supplierDashboardDeliveryBucketId(now: Long, dueAtMillis: Long?): String {
+    val todayStart = supplierDashboardDayStartMillis(now)
+    val safeDue = dueAtMillis ?: return "unscheduled"
+    return when {
+        safeDue < todayStart -> "overdue"
+        safeDue < todayStart + AITA_SUPPLIER_DAY_MILLIS -> "today"
+        safeDue < todayStart + 2L * AITA_SUPPLIER_DAY_MILLIS -> "tomorrow"
+        safeDue < todayStart + 7L * AITA_SUPPLIER_DAY_MILLIS -> "week"
+        else -> "later"
+    }
+}
+
+private fun supplierDashboardDeliveryBucketRank(bucketId: String): Int = when (bucketId) {
+    "overdue" -> 0
+    "today" -> 1
+    "tomorrow" -> 2
+    "week" -> 3
+    "later" -> 4
+    else -> 5
+}
+
+private fun supplierDashboardDeliveryBucketTitle(bucketId: String): List<LocalizedStringDataModel> = when (bucketId) {
+    "overdue" -> simpleMessage(
+        main = "Overdue promises",
+        ru = "Просроченные обещания",
+        kk = "Кешіккен уәделер"
+    )
+    "today" -> simpleMessage(
+        main = "Due today",
+        ru = "На сегодня",
+        kk = "Бүгінге"
+    )
+    "tomorrow" -> simpleMessage(
+        main = "Due tomorrow",
+        ru = "На завтра",
+        kk = "Ертеңге"
+    )
+    "week" -> simpleMessage(
+        main = "This week",
+        ru = "На этой неделе",
+        kk = "Осы аптада"
+    )
+    "later" -> simpleMessage(
+        main = "Later",
+        ru = "Позже",
+        kk = "Кейін"
+    )
+    else -> simpleMessage(
+        main = "No promised date",
+        ru = "Без обещанной даты",
+        kk = "Уәде күні жоқ"
+    )
+}
+
+private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDashboardDataModel {
+    val now = System.currentTimeMillis()
+    val supplierProfiles = accessibleSupplierProfilesForUserInsideTransaction(userId)
+    val supplierIds = supplierProfiles
+        .mapNotNull { supplier -> runCatching { UUID.fromString(supplier.id) }.getOrNull() }
+        .distinct()
+    if (supplierIds.isEmpty()) {
+        return SupplierModeDashboardDataModel(generatedAtMillis = now)
+    }
+
+    val rawOrders = SupplierOrders
+        .selectAll()
+        .where { (SupplierOrders.supplierId inList supplierIds) and (SupplierOrders.isActive eq true) }
+        .map { it.toSupplierOrderDataModel() }
+        .sortedByDescending { it.updatedAtMillis.takeIf { value -> value > 0L } ?: it.orderedAtMillis }
+
+    val orderIds = rawOrders.mapNotNull { runCatching { UUID.fromString(it.id) }.getOrNull() }
+    val rawLines = if (orderIds.isEmpty()) {
+        emptyList()
+    } else {
+        SupplierOrderLines
+            .selectAll()
+            .where { (SupplierOrderLines.orderId inList orderIds) and (SupplierOrderLines.isActive eq true) }
+            .map { it.toSupplierOrderLineDataModel() }
+    }
+
+    val bundles = rawOrders.map { order ->
+        SupplierOrderWithLinesDataModel(order, rawLines.filter { it.orderId == order.id })
+    }.withSupplierDeskSnapshotsInsideTransaction()
+
+    val orders = bundles.map { it.order }
+    val lines = bundles.flatMap { it.lines }.filter { it.isActive }
+    val linesByOrder = lines.groupBy { it.orderId }
+    val ordersById = orders.associateBy { it.id }
+
+    val contracts = SupplierPartnershipContracts
+        .selectAll()
+        .where { (SupplierPartnershipContracts.supplierId inList supplierIds) and (SupplierPartnershipContracts.isActive eq true) }
+        .map { it.toSupplierPartnershipContractDataModel() }
+
+    val supplierPriceRows = SupplierGoodsPrices
+        .selectAll()
+        .where { (SupplierGoodsPrices.supplierId inList supplierIds) and (SupplierGoodsPrices.isActive eq true) }
+        .map { it.toSupplierGoodsPriceDataModel() }
+
+    val priceBookGoodsItemIds = supplierPriceRows
+        .map { it.goodsItemId }
+        .filter { it.isNotBlank() }
+        .distinct()
+
+    val statusBuckets = SupplierOrderStatusDataModel.entries.mapNotNull { status ->
+        val statusOrders = orders.filter { it.status == status }
+        val lineCount = statusOrders.sumOf { linesByOrder[it.id].orEmpty().size }
+        if (statusOrders.isEmpty() && lineCount == 0) null else SupplierDashboardStatusBucketDataModel(
+            status = status,
+            orderCount = statusOrders.size,
+            lineCount = lineCount
+        )
+    }
+
+    val demandHighlights = lines
+        .groupBy { it.goodsItemId }
+        .mapNotNull bridgeItem@{ (goodsItemId, itemLines) ->
+            val relatedOrders = itemLines.mapNotNull { ordersById[it.orderId] }.distinctBy { it.id }
+            val latestOrder = relatedOrders.maxByOrNull { it.updatedAtMillis.takeIf { value -> value > 0L } ?: it.orderedAtMillis }
+                ?: return@mapNotNull null
+            val sampleLine = itemLines.maxByOrNull { line -> ordersById[line.orderId]?.updatedAtMillis ?: 0L } ?: itemLines.firstOrNull()
+                ?: return@mapNotNull null
+            SupplierDashboardDemandDataModel(
+                goodsItemId = goodsItemId,
+                goodsItemNameSnapshot = sampleLine.goodsItemNameSnapshot,
+                barcodeSnapshots = sampleLine.goodsItemBarcodeSnapshots,
+                measurementUnitIdSnapshot = sampleLine.goodsItemMeasurementUnitIdSnapshot,
+                requestedQuantityTotal = itemLines.sumOf { it.requestedQuantity.total.coerceAtLeast(0.0) },
+                requestLineCount = itemLines.size,
+                openOrderCount = relatedOrders.count { !it.status.isClosedForSupplierDashboard() },
+                storeCount = relatedOrders.map { it.storeId }.filter { it.isNotBlank() }.distinct().size,
+                latestStatus = latestOrder.status,
+                latestActivityMillis = latestOrder.updatedAtMillis.takeIf { it > 0L } ?: latestOrder.orderedAtMillis,
+                latestExpectedSupplyPrice = itemLines.asSequence().mapNotNull { it.expectedSupplyPrice }.firstOrNull(),
+                latestOfferedSupplyPrice = itemLines.asSequence().mapNotNull { it.supplierOfferedSupplyPrice }.firstOrNull()
+            )
+        }
+        .sortedWith(
+            compareByDescending<SupplierDashboardDemandDataModel> { it.openOrderCount }
+                .thenByDescending { it.requestLineCount }
+                .thenByDescending { it.latestActivityMillis }
+        )
+        .take(8)
+
+    val contractsByStore = contracts.groupBy { it.storeId }
+    val partnerHighlights = orders
+        .groupBy { it.storeId.ifBlank { it.storePublicIdSnapshot }.ifBlank { it.id } }
+        .map { (storeKey, storeOrdersRaw) ->
+            val storeOrders = storeOrdersRaw.sortedByDescending { it.updatedAtMillis.takeIf { value -> value > 0L } ?: it.orderedAtMillis }
+            val latest = storeOrders.firstOrNull()
+            val storeContracts = latest?.storeId?.let { contractsByStore[it].orEmpty() }.orEmpty()
+            SupplierDashboardPartnerDataModel(
+                storeId = latest?.storeId ?: storeKey,
+                storeNameSnapshot = latest?.storeNameSnapshot.orEmpty(),
+                storePublicIdSnapshot = latest?.storePublicIdSnapshot.orEmpty(),
+                storeAddressTextSnapshot = latest?.storeAddressTextSnapshot.orEmpty(),
+                orderCount = storeOrders.size,
+                openOrderCount = storeOrders.count { !it.status.isClosedForSupplierDashboard() },
+                deliveredOrderCount = storeOrders.count { it.status == SupplierOrderStatusDataModel.Delivered || it.status == SupplierOrderStatusDataModel.PartiallyDelivered },
+                issueOrderCount = storeOrders.count { it.status == SupplierOrderStatusDataModel.IssueReported || it.status == SupplierOrderStatusDataModel.Cancelled },
+                latestStatus = latest?.status ?: SupplierOrderStatusDataModel.Draft,
+                latestActivityMillis = latest?.updatedAtMillis?.takeIf { it > 0L } ?: latest?.orderedAtMillis ?: 0L,
+                activeContractCount = storeContracts.count { it.status == SUPPLIER_CONTRACT_STATUS_ACTIVE },
+                pendingContractCount = storeContracts.count { it.status == SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER || it.status == SUPPLIER_CONTRACT_STATUS_PENDING_STORE }
+            )
+        }
+        .sortedWith(
+            compareByDescending<SupplierDashboardPartnerDataModel> { it.openOrderCount }
+                .thenByDescending { it.issueOrderCount }
+                .thenByDescending { it.latestActivityMillis }
+        )
+        .take(8)
+
+    val actionQueue = bundles
+        .asSequence()
+        .filter { bundle -> bundle.order.isActive && !bundle.order.status.isClosedForSupplierDashboard() }
+        .mapNotNull { bundle ->
+            val order = bundle.order
+            val bundleLines = bundle.lines.filter { it.isActive }
+            val dueAtMillis = order.confirmedDeliveryTimeMillis ?: order.desiredDeliveryTimeMillis
+            val missingAcceptedQuantityCount = bundleLines.count { it.supplierAcceptedQuantity == null }
+            val missingOfferedPriceCount = bundleLines.count { it.supplierOfferedSupplyPrice == null }
+            val missingHeaderDetails = order.status in listOf(
+                SupplierOrderStatusDataModel.Confirmed,
+                SupplierOrderStatusDataModel.Packed,
+                SupplierOrderStatusDataModel.InDelivery
+            ) && (order.confirmedDeliveryTimeMillis == null || order.paymentTerms.isNullOrBlank() || order.externalReference.isNullOrBlank())
+            val actionType = when {
+                order.status == SupplierOrderStatusDataModel.IssueReported -> "issue"
+                order.status == SupplierOrderStatusDataModel.Sent || order.status == SupplierOrderStatusDataModel.SeenBySupplier -> "answer"
+                order.status == SupplierOrderStatusDataModel.Confirmed && (missingAcceptedQuantityCount > 0 || missingOfferedPriceCount > 0) -> "complete_response"
+                missingHeaderDetails -> "terms"
+                order.status == SupplierOrderStatusDataModel.Confirmed -> "pack"
+                order.status == SupplierOrderStatusDataModel.Packed -> "dispatch"
+                order.status == SupplierOrderStatusDataModel.InDelivery || order.status == SupplierOrderStatusDataModel.PartiallyDelivered -> "delivery"
+                else -> null
+            } ?: return@mapNotNull null
+            val dueBoost = dueAtMillis?.let { due ->
+                when {
+                    due < now -> 20
+                    due < now + 24L * 60L * 60L * 1000L -> 12
+                    due < now + 3L * 24L * 60L * 60L * 1000L -> 6
+                    else -> 0
+                }
+            } ?: 0
+            val basePriority = when (actionType) {
+                "issue" -> 100
+                "answer" -> 90
+                "complete_response" -> 84
+                "pack" -> 72
+                "dispatch" -> 70
+                "terms" -> 58
+                "delivery" -> 48
+                else -> 10
+            }
+            val preview = bundleLines
+                .take(3)
+                .joinToString(" • ") { line ->
+                    val title = line.goodsItemNameSnapshot.firstOrNull { it.value.isNotBlank() }?.value
+                        ?: line.goodsItemBarcodeSnapshots.firstOrNull()
+                        ?: line.goodsItemId.take(8)
+                    val quantityText = line.requestedQuantity.total.takeIf { it > 0.0 }?.let { value ->
+                        val whole = value.toLong()
+                        if (value == whole.toDouble()) whole.toString() else value.toString()
+                    }.orEmpty()
+                    if (quantityText.isBlank()) title else "$title × $quantityText"
+                }
+            SupplierDashboardActionDataModel(
+                actionId = "${actionType}_${order.id}",
+                actionType = actionType,
+                priority = basePriority + dueBoost,
+                orderId = order.id,
+                storeId = order.storeId,
+                supplierId = order.supplierId,
+                storeNameSnapshot = order.storeNameSnapshot,
+                storePublicIdSnapshot = order.storePublicIdSnapshot,
+                status = order.status,
+                dueAtMillis = dueAtMillis,
+                latestActivityMillis = order.updatedAtMillis.takeIf { it > 0L } ?: order.orderedAtMillis,
+                lineCount = bundleLines.size,
+                missingAcceptedQuantityCount = missingAcceptedQuantityCount,
+                missingOfferedPriceCount = missingOfferedPriceCount,
+                amount = order.amount,
+                goodsPreview = preview.takeIf { it.isNotBlank() }?.let { listOf(LocalizedStringDataModel("main", it)) }.orEmpty()
+            )
+        }
+        .sortedWith(
+            compareByDescending<SupplierDashboardActionDataModel> { it.priority }
+                .thenBy { it.dueAtMillis ?: Long.MAX_VALUE }
+                .thenByDescending { it.latestActivityMillis }
+        )
+        .take(10)
+        .toList()
+
+    val deliveryBuckets = bundles
+        .asSequence()
+        .filter { bundle -> bundle.order.isActive && !bundle.order.status.isClosedForSupplierDashboard() }
+        .groupBy { bundle ->
+            supplierDashboardDeliveryBucketId(
+                now = now,
+                dueAtMillis = bundle.order.confirmedDeliveryTimeMillis ?: bundle.order.desiredDeliveryTimeMillis
+            )
+        }
+        .map { (bucketId, bucketBundles) ->
+            val bucketOrders = bucketBundles.map { it.order }.distinctBy { it.id }
+            val bucketLines = bucketBundles.flatMap { bundle -> bundle.lines.filter { it.isActive } }
+            val dueValues = bucketOrders.mapNotNull { order -> order.confirmedDeliveryTimeMillis ?: order.desiredDeliveryTimeMillis }
+            val preview = bucketLines
+                .distinctBy { it.goodsItemId.ifBlank { it.id } }
+                .take(4)
+                .joinToString(" • ") { line ->
+                    line.goodsItemNameSnapshot.firstOrNull { it.value.isNotBlank() }?.value
+                        ?: line.goodsItemBarcodeSnapshots.firstOrNull()
+                        ?: line.goodsItemId.take(8)
+                }
+
+            SupplierDashboardDeliveryBucketDataModel(
+                bucketId = bucketId,
+                title = supplierDashboardDeliveryBucketTitle(bucketId),
+                orderCount = bucketOrders.size,
+                lineCount = bucketLines.size,
+                storeCount = bucketOrders.map { it.storeId }.filter { it.isNotBlank() }.distinct().size,
+                actionRequiredOrderCount = bucketOrders.count { order ->
+                    order.status == SupplierOrderStatusDataModel.Sent ||
+                            order.status == SupplierOrderStatusDataModel.SeenBySupplier ||
+                            order.status == SupplierOrderStatusDataModel.IssueReported
+                },
+                packedOrderCount = bucketOrders.count { it.status == SupplierOrderStatusDataModel.Packed },
+                inDeliveryOrderCount = bucketOrders.count { it.status == SupplierOrderStatusDataModel.InDelivery },
+                issueOrderCount = bucketOrders.count { it.status == SupplierOrderStatusDataModel.IssueReported || it.status == SupplierOrderStatusDataModel.Cancelled },
+                earliestDueAtMillis = dueValues.minOrNull(),
+                latestDueAtMillis = dueValues.maxOrNull(),
+                goodsPreview = preview.takeIf { it.isNotBlank() }?.let { listOf(LocalizedStringDataModel("main", it)) }.orEmpty()
+            )
+        }
+        .sortedWith(
+            compareBy<SupplierDashboardDeliveryBucketDataModel> { supplierDashboardDeliveryBucketRank(it.bucketId) }
+                .thenByDescending { it.actionRequiredOrderCount }
+                .thenByDescending { it.orderCount }
+        )
+
+
+    val openBundles = bundles.filter { bundle ->
+        bundle.order.isActive && !bundle.order.status.isClosedForSupplierDashboard()
+    }
+    val openLines = openBundles.flatMap { bundle -> bundle.lines.filter { it.isActive } }
+    val supplierPriceBookKeys = supplierPriceRows
+        .map { price -> "${price.storeId}|${price.supplierId}|${price.goodsItemId}" }
+        .toSet()
+    fun supplierBridgeTargetGoodsItemId(line: SupplierOrderLineDataModel): String =
+        line.substituteGoodsItemId?.takeIf { it.isNotBlank() } ?: line.goodsItemId
+    fun supplierPriceBookKeyFor(order: SupplierOrderDataModel, line: SupplierOrderLineDataModel): String {
+        val targetGoodsItemId = supplierBridgeTargetGoodsItemId(line)
+        return "${order.storeId}|${order.supplierId}|$targetGoodsItemId"
+    }
+    val priceBookCoveredLineCount = openLines.count { line ->
+        val order = ordersById[line.orderId] ?: return@count false
+        supplierPriceBookKeyFor(order, line) in supplierPriceBookKeys
+    }
+    val missingAcceptedQuantityLineCount = openLines.count { it.supplierAcceptedQuantity == null }
+    val missingOfferedPriceLineCount = openLines.count { it.supplierOfferedSupplyPrice == null }
+    val responseReadyStatuses = setOf(
+        SupplierOrderStatusDataModel.Sent,
+        SupplierOrderStatusDataModel.SeenBySupplier,
+        SupplierOrderStatusDataModel.Confirmed
+    )
+    val responseReadyOrders = openBundles.filter { bundle ->
+        val bundleLines = bundle.lines.filter { it.isActive }
+        bundleLines.isNotEmpty() &&
+                bundle.order.status in responseReadyStatuses &&
+                bundleLines.all { it.supplierAcceptedQuantity != null && it.supplierOfferedSupplyPrice != null } &&
+                bundle.order.confirmedDeliveryTimeMillis != null
+    }
+    val readyToPackOrders = openBundles.filter { bundle ->
+        val bundleLines = bundle.lines.filter { it.isActive }
+        bundle.order.status == SupplierOrderStatusDataModel.Confirmed &&
+                bundleLines.isNotEmpty() &&
+                bundleLines.all { it.supplierAcceptedQuantity != null && it.supplierOfferedSupplyPrice != null } &&
+                bundle.order.confirmedDeliveryTimeMillis != null
+    }
+    val readyAmountLines = openLines.filter { line ->
+        line.supplierAcceptedQuantity != null && line.supplierOfferedSupplyPrice != null
+    }
+    val readyAmountValue = readyAmountLines.sumOf { line ->
+        (line.supplierAcceptedQuantity?.total ?: 0.0).coerceAtLeast(0.0) *
+                (line.supplierOfferedSupplyPrice?.price?.toMoneyDouble() ?: 0.0)
+    }.roundMoney()
+    val readyAmountCurrency = readyAmountLines.firstNotNullOfOrNull { line ->
+        line.supplierOfferedSupplyPrice?.currency?.takeIf { it.isNotBlank() }
+    } ?: supplierPriceRows.firstOrNull()?.supplyPrice?.currency?.takeIf { it.isNotBlank() } ?: "KZT"
+    val readiness = SupplierDashboardReadinessDataModel(
+        openOrderCount = openBundles.size,
+        answerNeededOrderCount = openBundles.count { bundle ->
+            bundle.order.status == SupplierOrderStatusDataModel.Sent ||
+                    bundle.order.status == SupplierOrderStatusDataModel.SeenBySupplier ||
+                    bundle.order.status == SupplierOrderStatusDataModel.IssueReported
+        },
+        responseReadyOrderCount = responseReadyOrders.size,
+        readyToPackOrderCount = readyToPackOrders.size,
+        packReadyLineCount = readyToPackOrders.sumOf { bundle -> bundle.lines.count { it.isActive } },
+        missingAcceptedQuantityLineCount = missingAcceptedQuantityLineCount,
+        missingOfferedPriceLineCount = missingOfferedPriceLineCount,
+        priceBookCoveredLineCount = priceBookCoveredLineCount,
+        priceBookMissingLineCount = (openLines.size - priceBookCoveredLineCount).coerceAtLeast(0),
+        priceBookCoveragePercent = if (openLines.isEmpty()) 0 else (((priceBookCoveredLineCount * 100.0) / openLines.size) + 0.5).toInt().coerceIn(0, 100),
+        estimatedReadyAmount = readyAmountValue.takeIf { it > 0.0 }?.let { amount ->
+            PriceDataModel(amount.toStockMoneyText(), readyAmountCurrency, supplierIds.firstOrNull()?.toString().orEmpty())
+        },
+        earliestDueAtMillis = openBundles.mapNotNull { bundle -> bundle.order.confirmedDeliveryTimeMillis ?: bundle.order.desiredDeliveryTimeMillis }.minOrNull(),
+        generatedAtMillis = now
+    )
+
+    val manufacturerBridge = openLines
+        .filter { line -> supplierBridgeTargetGoodsItemId(line).isNotBlank() }
+        .groupBy { line -> supplierBridgeTargetGoodsItemId(line) }
+        .mapNotNull bridgeItem@{ (goodsItemId, itemLines) ->
+            val relatedOrders = itemLines
+                .mapNotNull { line -> ordersById[line.orderId] }
+                .filter { order -> !order.status.isClosedForSupplierDashboard() }
+                .distinctBy { it.id }
+            if (relatedOrders.isEmpty()) return@bridgeItem null
+
+            val sampleLine = itemLines
+                .maxByOrNull { line -> ordersById[line.orderId]?.updatedAtMillis ?: 0L }
+                ?: itemLines.firstOrNull()
+                ?: return@bridgeItem null
+            val sampleUsesSubstitute = sampleLine.substituteGoodsItemId?.takeIf { it.isNotBlank() } == goodsItemId
+            val requestedQuantityTotal = itemLines.sumOf { line -> line.requestedQuantity.total.coerceAtLeast(0.0) }.roundMoney()
+            val acceptedQuantityTotal = itemLines.sumOf { line -> line.supplierAcceptedQuantity?.total?.coerceAtLeast(0.0) ?: 0.0 }.roundMoney()
+            val missingQuantityTotal = (requestedQuantityTotal - acceptedQuantityTotal).coerceAtLeast(0.0).roundMoney()
+            val openOrderCount = relatedOrders.count { order -> !order.status.isClosedForSupplierDashboard() }
+            val confirmedOrderCount = relatedOrders.count { order ->
+                order.status == SupplierOrderStatusDataModel.Confirmed ||
+                        order.status == SupplierOrderStatusDataModel.Packed ||
+                        order.status == SupplierOrderStatusDataModel.InDelivery
+            }
+            val priceBookRowsForItem = supplierPriceRows.filter { price -> price.goodsItemId == goodsItemId }
+            val responseCoveredLineCount = itemLines.count { line ->
+                line.supplierAcceptedQuantity != null &&
+                        (line.supplierOfferedSupplyPrice != null || run {
+                            val order = ordersById[line.orderId]
+                            order != null && supplierPriceBookKeyFor(order, line) in supplierPriceBookKeys
+                        })
+            }
+            val amountLines = itemLines.mapNotNull lineAmount@{ line ->
+                val order = ordersById[line.orderId] ?: return@lineAmount null
+                val quantity = line.supplierAcceptedQuantity?.total?.coerceAtLeast(0.0) ?: return@lineAmount null
+                val price = line.supplierOfferedSupplyPrice ?: supplierPriceRows
+                    .filter { price ->
+                        price.isActive &&
+                                price.storeId == order.storeId &&
+                                price.supplierId == order.supplierId &&
+                                price.goodsItemId == goodsItemId
+                    }
+                    .maxByOrNull { price -> price.lastUsedAtMillis ?: price.updatedAtMillis }
+                    ?.supplyPrice
+                    ?: return@lineAmount null
+                quantity to price
+            }
+            val amountValue = amountLines.sumOf { (quantity, price) -> quantity * price.price.toMoneyDouble() }.roundMoney()
+            val amountCurrency = amountLines.firstOrNull()?.second?.currency?.takeIf { it.isNotBlank() }
+                ?: priceBookRowsForItem.firstOrNull()?.supplyPrice?.currency?.takeIf { it.isNotBlank() }
+                ?: supplierPriceRows.firstOrNull()?.supplyPrice?.currency?.takeIf { it.isNotBlank() }
+                ?: "KZT"
+            val earliestDueAtMillis = relatedOrders
+                .mapNotNull { order -> order.confirmedDeliveryTimeMillis ?: order.desiredDeliveryTimeMillis }
+                .minOrNull()
+            val latestActivityMillis = relatedOrders
+                .map { order -> order.updatedAtMillis.takeIf { value -> value > 0L } ?: order.orderedAtMillis }
+                .maxOrNull()
+                ?: 0L
+            val missingResponseLineCount = itemLines.count { line -> line.supplierAcceptedQuantity == null || line.supplierOfferedSupplyPrice == null }
+            val duePressure = earliestDueAtMillis?.let { due ->
+                when {
+                    due < now -> 24
+                    due < now + AITA_SUPPLIER_DAY_MILLIS -> 18
+                    due < now + 3L * AITA_SUPPLIER_DAY_MILLIS -> 12
+                    else -> 4
+                }
+            } ?: 2
+            val suggestedAction = when {
+                relatedOrders.any { order -> order.status == SupplierOrderStatusDataModel.Packed || order.status == SupplierOrderStatusDataModel.InDelivery } -> "ship"
+                confirmedOrderCount > 0 && acceptedQuantityTotal > 0.0 -> "produce"
+                missingResponseLineCount > 0 -> "quote"
+                priceBookRowsForItem.isEmpty() -> "price_book"
+                missingQuantityTotal > 0.0 -> "backorder"
+                else -> "watch"
+            }
+            val priorityScore = (openOrderCount * 10 + confirmedOrderCount * 7 + missingResponseLineCount * 5 + duePressure + missingQuantityTotal.coerceAtMost(999.0).toInt())
+                .coerceAtLeast(0)
+
+            SupplierDashboardManufacturerBridgeDataModel(
+                bridgeId = "${goodsItemId}:${relatedOrders.joinToString("-") { it.id.take(8) }}",
+                goodsItemId = goodsItemId,
+                goodsItemNameSnapshot = if (sampleUsesSubstitute) sampleLine.substituteGoodsItemNameSnapshot else sampleLine.goodsItemNameSnapshot,
+                barcodeSnapshots = if (sampleUsesSubstitute) sampleLine.substituteGoodsItemBarcodeSnapshots else sampleLine.goodsItemBarcodeSnapshots,
+                measurementUnitIdSnapshot = if (sampleUsesSubstitute) sampleLine.substituteGoodsItemMeasurementUnitIdSnapshot else sampleLine.goodsItemMeasurementUnitIdSnapshot,
+                requestedQuantityTotal = requestedQuantityTotal,
+                acceptedQuantityTotal = acceptedQuantityTotal,
+                missingQuantityTotal = missingQuantityTotal,
+                openOrderCount = openOrderCount,
+                confirmedOrderCount = confirmedOrderCount,
+                storeCount = relatedOrders.map { it.storeId }.filter { it.isNotBlank() }.distinct().size,
+                priceBookRowCount = priceBookRowsForItem.size,
+                responseCoveragePercent = if (itemLines.isEmpty()) 0 else (((responseCoveredLineCount * 100.0) / itemLines.size) + 0.5).toInt().coerceIn(0, 100),
+                estimatedAcceptedAmount = amountValue.takeIf { it > 0.0 }?.let { amount ->
+                    PriceDataModel(amount.toStockMoneyText(), amountCurrency, supplierIds.firstOrNull()?.toString().orEmpty())
+                },
+                earliestDueAtMillis = earliestDueAtMillis,
+                latestActivityMillis = latestActivityMillis,
+                priorityScore = priorityScore,
+                suggestedAction = suggestedAction
+            )
+        }
+        .sortedWith(
+            compareByDescending<SupplierDashboardManufacturerBridgeDataModel> { it.priorityScore }
+                .thenBy { it.earliestDueAtMillis ?: Long.MAX_VALUE }
+                .thenByDescending { it.latestActivityMillis }
+        )
+        .take(10)
+
+    val dashboardProfiles = supplierProfiles.map { supplier ->
+        val profileOrders = orders.filter { it.supplierId == supplier.id }
+        val profileOrderIds = profileOrders.map { it.id }.toSet()
+        val profileLines = lines.filter { it.orderId in profileOrderIds }
+        val profilePriceBookGoodsItemIds = supplierPriceRows
+            .filter { it.supplierId == supplier.id }
+            .map { it.goodsItemId }
+            .filter { it.isNotBlank() }
+        SupplierDashboardProfileDataModel(
+            supplierId = supplier.id,
+            name = supplier.name,
+            phoneNumbers = supplier.phoneNumbers.orEmpty(),
+            emails = supplier.emails.orEmpty(),
+            orderCount = profileOrders.size,
+            openOrderCount = profileOrders.count { !it.status.isClosedForSupplierDashboard() },
+            actionRequiredOrderCount = profileOrders.count {
+                it.status == SupplierOrderStatusDataModel.Sent ||
+                        it.status == SupplierOrderStatusDataModel.SeenBySupplier ||
+                        it.status == SupplierOrderStatusDataModel.IssueReported
+            },
+            catalogSkuCount = (profileLines.map { it.goodsItemId } + profilePriceBookGoodsItemIds).filter { it.isNotBlank() }.distinct().size,
+            partnerCount = (profileOrders.map { it.storeId } + supplierPriceRows.filter { it.supplierId == supplier.id }.map { it.storeId }).filter { it.isNotBlank() }.distinct().size,
+            latestActivityMillis = profileOrders
+                .map { it.updatedAtMillis.takeIf { value -> value > 0L } ?: it.orderedAtMillis }
+                .maxOrNull() ?: supplier.addedAt
+        )
+    }.sortedWith(
+        compareByDescending<SupplierDashboardProfileDataModel> { it.openOrderCount }
+            .thenByDescending { it.actionRequiredOrderCount }
+            .thenByDescending { it.latestActivityMillis }
+    )
+
+    return SupplierModeDashboardDataModel(
+        supplierIds = supplierIds.map { it.toString() },
+        supplierProfiles = dashboardProfiles,
+        generatedAtMillis = now,
+        orderCount = orders.size,
+        openOrderCount = orders.count { !it.status.isClosedForSupplierDashboard() },
+        actionRequiredOrderCount = orders.count {
+            it.status == SupplierOrderStatusDataModel.Sent ||
+                    it.status == SupplierOrderStatusDataModel.SeenBySupplier ||
+                    it.status == SupplierOrderStatusDataModel.IssueReported
+        },
+        packedOrderCount = orders.count { it.status == SupplierOrderStatusDataModel.Packed },
+        inDeliveryOrderCount = orders.count { it.status == SupplierOrderStatusDataModel.InDelivery },
+        deliveredOrderCount = orders.count { it.status == SupplierOrderStatusDataModel.Delivered || it.status == SupplierOrderStatusDataModel.PartiallyDelivered },
+        issueOrderCount = orders.count { it.status == SupplierOrderStatusDataModel.IssueReported || it.status == SupplierOrderStatusDataModel.Cancelled },
+        lineCount = lines.size,
+        catalogSkuCount = (lines.map { it.goodsItemId } + priceBookGoodsItemIds).filter { it.isNotBlank() }.distinct().size,
+        partnerCount = (orders.map { it.storeId } + supplierPriceRows.map { it.storeId }).filter { it.isNotBlank() }.distinct().size,
+        activeContractCount = contracts.count { it.status == SUPPLIER_CONTRACT_STATUS_ACTIVE },
+        pendingContractCount = contracts.count { it.status == SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER || it.status == SUPPLIER_CONTRACT_STATUS_PENDING_STORE },
+        statusBuckets = statusBuckets,
+        demandHighlights = demandHighlights,
+        partnerHighlights = partnerHighlights,
+        actionQueue = actionQueue,
+        deliveryBuckets = deliveryBuckets,
+        readiness = readiness,
+        manufacturerBridge = manufacturerBridge
+    )
 }
 
 
@@ -7179,6 +7836,71 @@ private fun barcodeClashesInsideTransaction(
         }
 }
 
+private fun supplierCanMaintainPriceBookInsideTransaction(
+    userId: UUID,
+    storeId: UUID,
+    supplierId: UUID,
+    goodsItemId: UUID
+): Boolean {
+    if (!userHasSupplierAccessInsideTransaction(userId, supplierId)) return false
+
+    val goodsItemExists = StockItems
+        .select(StockItems.id)
+        .where {
+            (StockItems.id eq goodsItemId) and
+                    (StockItems.storeId eq storeId) and
+                    (StockItems.isActive eq true)
+        }
+        .empty()
+        .not()
+    if (!goodsItemExists) return false
+
+    val existingPriceBookRow = SupplierGoodsPrices
+        .select(SupplierGoodsPrices.id)
+        .where {
+            (SupplierGoodsPrices.storeId eq storeId) and
+                    (SupplierGoodsPrices.supplierId eq supplierId) and
+                    (SupplierGoodsPrices.goodsItemId eq goodsItemId)
+        }
+        .empty()
+        .not()
+    if (existingPriceBookRow) return true
+
+    val relatedOrderIds = SupplierOrders
+        .select(SupplierOrders.id)
+        .where {
+            (SupplierOrders.storeId eq storeId) and
+                    (SupplierOrders.supplierId eq supplierId) and
+                    (SupplierOrders.isActive eq true)
+        }
+        .map { it[SupplierOrders.id] }
+
+    val relatedOrderLineExists = relatedOrderIds.isNotEmpty() && SupplierOrderLines
+        .select(SupplierOrderLines.id)
+        .where {
+            (SupplierOrderLines.orderId inList relatedOrderIds) and
+                    (SupplierOrderLines.isActive eq true) and
+                    ((SupplierOrderLines.goodsItemId eq goodsItemId) or (SupplierOrderLines.substituteGoodsItemId eq goodsItemId))
+        }
+        .empty()
+        .not()
+    if (relatedOrderLineExists) return true
+
+    return SupplierPartnershipContracts
+        .select(SupplierPartnershipContracts.status, SupplierPartnershipContracts.goodsItemIds)
+        .where {
+            (SupplierPartnershipContracts.storeId eq storeId) and
+                    (SupplierPartnershipContracts.supplierId eq supplierId) and
+                    (SupplierPartnershipContracts.isActive eq true)
+        }
+        .map { row -> row[SupplierPartnershipContracts.status] to row[SupplierPartnershipContracts.goodsItemIds] }
+        .any { (status, goodsItemIds) ->
+            status != SUPPLIER_CONTRACT_STATUS_DECLINED &&
+                    status != SUPPLIER_CONTRACT_STATUS_ARCHIVED &&
+                    (goodsItemIds.isEmpty() || goodsItemId.toString() in goodsItemIds)
+        }
+}
+
 private fun upsertSupplierGoodsPriceInsideTransaction(
     userId: UUID,
     storeId: UUID,
@@ -7237,6 +7959,43 @@ private fun upsertSupplierGoodsPriceInsideTransaction(
             it[SupplierGoodsPrices.isActive] = true
         }
     }
+}
+
+private fun learnSupplierPriceFromResponseLineInsideTransaction(
+    userId: UUID,
+    storeId: UUID,
+    supplierId: UUID,
+    line: SupplierOrderLineDataModel,
+    now: Long
+) {
+    val offeredPrice = line.supplierOfferedSupplyPrice ?: return
+    if (offeredPrice.price.toMoneyDouble() <= 0.0) return
+    val acceptedQuantity = line.supplierAcceptedQuantity ?: line.requestedQuantity
+    if (acceptedQuantity.total <= 0.0) return
+
+    val effectiveGoodsItemId = (line.substituteGoodsItemId?.takeIf { it.isNotBlank() } ?: line.goodsItemId)
+        .let { raw -> runCatching { UUID.fromString(raw) }.getOrNull() }
+        ?: return
+    val goodsRow = StockItems
+        .selectAll()
+        .where {
+            (StockItems.id eq effectiveGoodsItemId) and
+                    (StockItems.storeId eq storeId) and
+                    (StockItems.isActive eq true)
+        }
+        .singleOrNull()
+        ?: return
+
+    upsertSupplierGoodsPriceInsideTransaction(
+        userId = userId,
+        storeId = storeId,
+        supplierId = supplierId,
+        goodsItemId = effectiveGoodsItemId,
+        supplyPrice = offeredPrice.copy(supplierId = supplierId.toString()),
+        supplierBarcode = goodsRow.stockBarcodeValues().firstOrNull { it.isNotBlank() },
+        supplierGoodsName = goodsRow[StockItems.name].operationLogVisibleText(effectiveGoodsItemId.toString()),
+        now = now
+    )
 }
 
 private fun defaultServerQuantityForGoodsItem(
@@ -7949,6 +8708,7 @@ fun Application.module() {
         exception<Throwable> { call, cause ->
             if (cause.isClassLoadingFailure()) {
                 stabilizeServerRuntimeClassLoader("status-pages-classloading-failure")
+                refreshSharedRuntimeSerializersAfterClassLoadingFailure("status-pages:${call.request.path()}", cause)
                 call.application.environment.log.error(
                     "AITA server classloader failure on ${call.request.httpMethod.value} ${call.request.path()} " +
                             "thread=${classLoaderDebugName(Thread.currentThread().contextClassLoader)} " +
@@ -10795,6 +11555,36 @@ fun Application.module() {
 
         route("/supplierGoodsPrices") {
             authenticate("auth-jwt") {
+                get("/my") {
+                    val userId = call.checkPrincipal() ?: return@get
+
+                    val result = newSuspendedTransaction(aitaServerIoContext) {
+                        val supplierIds = accessibleSupplierIdsForUserInsideTransaction(userId)
+                        if (supplierIds.isEmpty()) {
+                            emptyList()
+                        } else {
+                            SupplierGoodsPrices
+                                .selectAll()
+                                .where {
+                                    (SupplierGoodsPrices.supplierId inList supplierIds) and
+                                            (SupplierGoodsPrices.isActive eq true)
+                                }
+                                .map { it.toSupplierGoodsPriceDataModel() }
+                                .sortedByDescending { price -> price.lastUsedAtMillis ?: price.updatedAtMillis }
+                        }
+                    }
+
+                    call.genericResponse(
+                        status = HttpStatusCode.OK,
+                        payload = result,
+                        message = simpleMessage(
+                            main = "Supplier price book loaded",
+                            ru = "Книга цен поставщика загружена",
+                            kk = "Жеткізуші бағалар кітабы жүктелді"
+                        )
+                    )
+                }
+
                 get("/get") {
                     val userId = call.checkPrincipal() ?: return@get
                     val storeId = call.headerUuid("store_id")
@@ -10835,7 +11625,19 @@ fun Application.module() {
                         val goodsItemId = runCatching { UUID.fromString(body.goodsItemId) }.getOrNull()
                             ?: return@newSuspendedTransaction null
 
-                        if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_SUPPLIER_PRICES_MANAGE, requireWorkshift = true))
+                        val canManageFromStore = userCanUseStoreActionInsideTransaction(
+                            userId = userId,
+                            storeId = storeId,
+                            permission = STORE_PERMISSION_SUPPLIER_PRICES_MANAGE,
+                            requireWorkshift = true
+                        )
+                        val canManageFromSupplier = supplierCanMaintainPriceBookInsideTransaction(
+                            userId = userId,
+                            storeId = storeId,
+                            supplierId = supplierId,
+                            goodsItemId = goodsItemId
+                        )
+                        if (!canManageFromStore && !canManageFromSupplier)
                             return@newSuspendedTransaction null
 
                         val now = System.currentTimeMillis()
@@ -11435,7 +12237,7 @@ fun Application.module() {
 
                         if (storeId != null && !userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_SUPPLIER_ORDERS_VIEW, requireWorkshift = false)) return@newSuspendedTransaction null
                         if (supplierId != null && !userHasSupplierAccessInsideTransaction(userId, supplierId) && storeId == null) return@newSuspendedTransaction null
-                        if (storeId == null && supplierId == null && accessibleSupplierIds.isEmpty()) return@newSuspendedTransaction null
+                        if (storeId == null && supplierId == null && accessibleSupplierIds.isEmpty()) return@newSuspendedTransaction emptyList<SupplierPartnershipContractDataModel>()
 
                         var filter: Op<Boolean> = SupplierPartnershipContracts.isActive eq true
                         storeId?.let { filter = filter and (SupplierPartnershipContracts.storeId eq it) }
@@ -11669,6 +12471,23 @@ fun Application.module() {
 
         route("/supplierOrders") {
             authenticate("auth-jwt") {
+                get("/dashboard") {
+                    val userId = call.checkPrincipal() ?: return@get
+                    val dashboard = newSuspendedTransaction(aitaServerIoContext) {
+                        supplierModeDashboardInsideTransaction(userId)
+                    }
+
+                    call.genericResponse(
+                        status = HttpStatusCode.OK,
+                        payload = dashboard,
+                        message = simpleMessage(
+                            main = "Supplier dashboard loaded",
+                            ru = "Панель поставщика загружена",
+                            kk = "Жеткізуші панелі жүктелді"
+                        )
+                    )
+                }
+
                 get("/get") {
                     val userId = call.checkPrincipal() ?: return@get
                     val storeId = call.headerUuid("store_id")
@@ -11688,13 +12507,30 @@ fun Application.module() {
 
                         if (storeId != null && !userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_SUPPLIER_ORDERS_VIEW, requireWorkshift = false)) return@newSuspendedTransaction null
                         if (supplierId != null && !userHasSupplierAccessInsideTransaction(userId, supplierId)) return@newSuspendedTransaction null
-                        if (storeId == null && supplierId == null && accessibleSupplierIds.isEmpty()) return@newSuspendedTransaction null
+                        if (storeId == null && supplierId == null && accessibleSupplierIds.isEmpty()) return@newSuspendedTransaction emptyList<SupplierOrderWithLinesDataModel>()
 
                         var orderFilter: Op<Boolean> = SupplierOrders.isActive eq true
                         storeId?.let { orderFilter = orderFilter and (SupplierOrders.storeId eq it) }
                         supplierId?.let { orderFilter = orderFilter and (SupplierOrders.supplierId eq it) }
                         if (storeId == null && supplierId == null) {
                             orderFilter = orderFilter and (SupplierOrders.supplierId inList accessibleSupplierIds)
+                        }
+
+                        val supplierSideSeenIds = when {
+                            storeId == null && supplierId == null -> accessibleSupplierIds
+                            storeId == null && supplierId != null -> listOf(supplierId)
+                            else -> emptyList()
+                        }
+                        if (supplierSideSeenIds.isNotEmpty()) {
+                            val now = System.currentTimeMillis()
+                            SupplierOrders.update({
+                                (SupplierOrders.supplierId inList supplierSideSeenIds) and
+                                        (SupplierOrders.status eq SupplierOrderStatusDataModel.Sent.name) and
+                                        (SupplierOrders.isActive eq true)
+                            }) {
+                                it[SupplierOrders.status] = SupplierOrderStatusDataModel.SeenBySupplier.name
+                                it[SupplierOrders.updatedAtMillis] = now
+                            }
                         }
 
                         val orders = SupplierOrders
@@ -11828,6 +12664,7 @@ fun Application.module() {
                             val requestedOrder = body.order
                             val supplierStatus = supplierOrderStatusAllowedFromSupplier(requestedOrder.status, existingOrder.status)
                             val supplierPatch = existingOrder.copy(
+                                amount = requestedOrder.amount ?: existingOrder.amount,
                                 confirmedDeliveryTimeMillis = requestedOrder.confirmedDeliveryTimeMillis,
                                 supplierComment = requestedOrder.supplierComment,
                                 supplierCommentLocalized = requestedOrder.supplierCommentLocalized,
@@ -11839,6 +12676,7 @@ fun Application.module() {
                             ).cleanForStorage(existing[SupplierOrders.userId], storeId, supplierId, now)
 
                             SupplierOrders.update({ SupplierOrders.id eq orderId }) {
+                                it[SupplierOrders.amount] = supplierPatch.amount
                                 it[SupplierOrders.confirmedDeliveryTimeMillis] = supplierPatch.confirmedDeliveryTimeMillis
                                 it[SupplierOrders.supplierComment] = supplierPatch.supplierComment
                                 it[SupplierOrders.supplierCommentLocalized] = supplierPatch.supplierCommentLocalized
@@ -11867,6 +12705,16 @@ fun Application.module() {
                                     it[SupplierOrderLines.supplierOfferedSupplyPrice] = cleanLine.supplierOfferedSupplyPrice
                                     it[SupplierOrderLines.substituteGoodsItemId] = cleanLine.substituteGoodsItemId
                                         ?.let { raw -> runCatching { UUID.fromString(raw) }.getOrNull() }
+                                }
+
+                                if (supplierStatus != SupplierOrderStatusDataModel.Cancelled && supplierStatus != SupplierOrderStatusDataModel.IssueReported) {
+                                    learnSupplierPriceFromResponseLineInsideTransaction(
+                                        userId = userId,
+                                        storeId = storeId,
+                                        supplierId = supplierId,
+                                        line = cleanLine,
+                                        now = now
+                                    )
                                 }
                             }
 
@@ -14753,7 +15601,7 @@ fun Application.module() {
                             )
                         } ?: call.respondAitaUnauthorized()
                     }
-                
+
                     } catch (throwable: Throwable) {
                         call.safeGenericResponseNoPayload(
                             status = HttpStatusCode.Conflict,

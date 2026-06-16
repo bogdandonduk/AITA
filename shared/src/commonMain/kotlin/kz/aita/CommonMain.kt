@@ -4612,10 +4612,15 @@ val supplierOrderLinesState =
 val supplierPartnershipContractsState =
     MutableDataStateFlow<List<SupplierPartnershipContractDataModel>>(GlobalScope)
 
+val supplierModeDashboardState =
+    MutableDataStateFlow<SupplierModeDashboardDataModel>(GlobalScope)
+
 private val getSupplierGoodsPricesMutex = Mutex()
+private val getMySupplierGoodsPricesMutex = Mutex()
 private val upsertSupplierGoodsPriceMutex = Mutex()
 
 private val getSupplierOrdersMutex = Mutex()
+private val getSupplierModeDashboardMutex = Mutex()
 private val addSupplierOrderMutex = Mutex()
 private val updateSupplierOrderMutex = Mutex()
 private val deleteSupplierOrderMutex = Mutex()
@@ -4657,6 +4662,28 @@ fun getSupplierGoodsPrices(
         }
 }
 
+fun getMySupplierGoodsPrices(
+    onCompleted: ((DataState<List<SupplierGoodsPriceDataModel>>) -> Unit)? = null
+) {
+    if (!getMySupplierGoodsPricesMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getMySupplierGoodsPricesMutex.withLock {
+                val response = networkRequest<List<SupplierGoodsPriceDataModel>, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getMySupplierGoodsPricesPath.first
+                )
+
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    supplierGoodsPricesState.emit(DataState.Success(response.payload, response.message))
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
 fun upsertSupplierGoodsPrice(
     price: SupplierGoodsPriceDataModel,
     onCompleted: ((DataState<SupplierGoodsPriceDataModel>) -> Unit)? = null
@@ -4683,6 +4710,7 @@ fun upsertSupplierGoodsPrice(
                         )
                     )
                     onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                    refreshSupplierModeWorkspaceIfActive(includeContracts = false)
                 }
             }
         }
@@ -4745,6 +4773,160 @@ data class SupplierPartnershipContractDataModel(
 data class SupplierOrderWithLinesDataModel(
     val order: SupplierOrderDataModel,
     val lines: List<SupplierOrderLineDataModel>
+)
+
+@kotlinx.serialization.Serializable
+data class SupplierDashboardStatusBucketDataModel(
+    val status: SupplierOrderStatusDataModel = SupplierOrderStatusDataModel.Draft,
+    val orderCount: Int = 0,
+    val lineCount: Int = 0
+)
+
+@kotlinx.serialization.Serializable
+data class SupplierDashboardDemandDataModel(
+    val goodsItemId: String = "",
+    val goodsItemNameSnapshot: List<LocalizedStringDataModel> = emptyList(),
+    val barcodeSnapshots: List<String> = emptyList(),
+    val measurementUnitIdSnapshot: String? = null,
+    val requestedQuantityTotal: Double = 0.0,
+    val requestLineCount: Int = 0,
+    val openOrderCount: Int = 0,
+    val storeCount: Int = 0,
+    val latestStatus: SupplierOrderStatusDataModel = SupplierOrderStatusDataModel.Draft,
+    val latestActivityMillis: Long = 0L,
+    val latestExpectedSupplyPrice: PriceDataModel? = null,
+    val latestOfferedSupplyPrice: PriceDataModel? = null
+)
+
+@kotlinx.serialization.Serializable
+data class SupplierDashboardPartnerDataModel(
+    val storeId: String = "",
+    val storeNameSnapshot: List<LocalizedStringDataModel> = emptyList(),
+    val storePublicIdSnapshot: String = "",
+    val storeAddressTextSnapshot: String = "",
+    val orderCount: Int = 0,
+    val openOrderCount: Int = 0,
+    val deliveredOrderCount: Int = 0,
+    val issueOrderCount: Int = 0,
+    val latestStatus: SupplierOrderStatusDataModel = SupplierOrderStatusDataModel.Draft,
+    val latestActivityMillis: Long = 0L,
+    val activeContractCount: Int = 0,
+    val pendingContractCount: Int = 0
+)
+
+@kotlinx.serialization.Serializable
+data class SupplierDashboardProfileDataModel(
+    val supplierId: String = "",
+    val name: List<LocalizedStringDataModel> = emptyList(),
+    val phoneNumbers: List<String> = emptyList(),
+    val emails: List<String> = emptyList(),
+    val orderCount: Int = 0,
+    val openOrderCount: Int = 0,
+    val actionRequiredOrderCount: Int = 0,
+    val catalogSkuCount: Int = 0,
+    val partnerCount: Int = 0,
+    val latestActivityMillis: Long = 0L
+)
+
+@kotlinx.serialization.Serializable
+data class SupplierDashboardActionDataModel(
+    val actionId: String = "",
+    val actionType: String = "",
+    val priority: Int = 0,
+    val orderId: String = "",
+    val storeId: String = "",
+    val supplierId: String = "",
+    val storeNameSnapshot: List<LocalizedStringDataModel> = emptyList(),
+    val storePublicIdSnapshot: String = "",
+    val status: SupplierOrderStatusDataModel = SupplierOrderStatusDataModel.Draft,
+    val dueAtMillis: Long? = null,
+    val latestActivityMillis: Long = 0L,
+    val lineCount: Int = 0,
+    val missingAcceptedQuantityCount: Int = 0,
+    val missingOfferedPriceCount: Int = 0,
+    val amount: PriceDataModel? = null,
+    val goodsPreview: List<LocalizedStringDataModel> = emptyList()
+)
+
+@kotlinx.serialization.Serializable
+data class SupplierDashboardDeliveryBucketDataModel(
+    val bucketId: String = "",
+    val title: List<LocalizedStringDataModel> = emptyList(),
+    val orderCount: Int = 0,
+    val lineCount: Int = 0,
+    val storeCount: Int = 0,
+    val actionRequiredOrderCount: Int = 0,
+    val packedOrderCount: Int = 0,
+    val inDeliveryOrderCount: Int = 0,
+    val issueOrderCount: Int = 0,
+    val earliestDueAtMillis: Long? = null,
+    val latestDueAtMillis: Long? = null,
+    val goodsPreview: List<LocalizedStringDataModel> = emptyList()
+)
+
+@kotlinx.serialization.Serializable
+data class SupplierDashboardReadinessDataModel(
+    val openOrderCount: Int = 0,
+    val answerNeededOrderCount: Int = 0,
+    val responseReadyOrderCount: Int = 0,
+    val readyToPackOrderCount: Int = 0,
+    val packReadyLineCount: Int = 0,
+    val missingAcceptedQuantityLineCount: Int = 0,
+    val missingOfferedPriceLineCount: Int = 0,
+    val priceBookCoveredLineCount: Int = 0,
+    val priceBookMissingLineCount: Int = 0,
+    val priceBookCoveragePercent: Int = 0,
+    val estimatedReadyAmount: PriceDataModel? = null,
+    val earliestDueAtMillis: Long? = null,
+    val generatedAtMillis: Long = 0L
+)
+
+@kotlinx.serialization.Serializable
+data class SupplierDashboardManufacturerBridgeDataModel(
+    val bridgeId: String = "",
+    val goodsItemId: String = "",
+    val goodsItemNameSnapshot: List<LocalizedStringDataModel> = emptyList(),
+    val barcodeSnapshots: List<String> = emptyList(),
+    val measurementUnitIdSnapshot: String? = null,
+    val requestedQuantityTotal: Double = 0.0,
+    val acceptedQuantityTotal: Double = 0.0,
+    val missingQuantityTotal: Double = 0.0,
+    val openOrderCount: Int = 0,
+    val confirmedOrderCount: Int = 0,
+    val storeCount: Int = 0,
+    val priceBookRowCount: Int = 0,
+    val responseCoveragePercent: Int = 0,
+    val estimatedAcceptedAmount: PriceDataModel? = null,
+    val earliestDueAtMillis: Long? = null,
+    val latestActivityMillis: Long = 0L,
+    val priorityScore: Int = 0,
+    val suggestedAction: String = ""
+)
+
+@kotlinx.serialization.Serializable
+data class SupplierModeDashboardDataModel(
+    val supplierIds: List<String> = emptyList(),
+    val supplierProfiles: List<SupplierDashboardProfileDataModel> = emptyList(),
+    val generatedAtMillis: Long = 0L,
+    val orderCount: Int = 0,
+    val openOrderCount: Int = 0,
+    val actionRequiredOrderCount: Int = 0,
+    val packedOrderCount: Int = 0,
+    val inDeliveryOrderCount: Int = 0,
+    val deliveredOrderCount: Int = 0,
+    val issueOrderCount: Int = 0,
+    val lineCount: Int = 0,
+    val catalogSkuCount: Int = 0,
+    val partnerCount: Int = 0,
+    val activeContractCount: Int = 0,
+    val pendingContractCount: Int = 0,
+    val statusBuckets: List<SupplierDashboardStatusBucketDataModel> = emptyList(),
+    val demandHighlights: List<SupplierDashboardDemandDataModel> = emptyList(),
+    val partnerHighlights: List<SupplierDashboardPartnerDataModel> = emptyList(),
+    val actionQueue: List<SupplierDashboardActionDataModel> = emptyList(),
+    val deliveryBuckets: List<SupplierDashboardDeliveryBucketDataModel> = emptyList(),
+    val readiness: SupplierDashboardReadinessDataModel = SupplierDashboardReadinessDataModel(),
+    val manufacturerBridge: List<SupplierDashboardManufacturerBridgeDataModel> = emptyList()
 )
 
 fun getSupplierOrders(
@@ -4832,6 +5014,43 @@ fun getMySupplierSideOrders(
         }
 }
 
+fun getSupplierModeDashboard(
+    onCompleted: ((DataState<SupplierModeDashboardDataModel>) -> Unit)? = null
+) {
+    if (!getSupplierModeDashboardMutex.isLocked)
+        GlobalScope.launch(Dispatchers.ourIo) {
+            getSupplierModeDashboardMutex.withLock {
+                val response = networkRequest<SupplierModeDashboardDataModel, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getSupplierDashboardPath.first
+                )
+
+                if (response.negative || response.payload == null) {
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    supplierModeDashboardState.emit(DataState.Success(response.payload, response.message))
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                }
+            }
+        }
+}
+
+fun refreshSupplierModeWorkspace(includeContracts: Boolean = false) {
+    getSuppliers()
+    getMySupplierSideOrders()
+    getMySupplierGoodsPrices()
+    getSupplierModeDashboard()
+    if (includeContracts) {
+        getSupplierContracts()
+    }
+}
+
+private fun refreshSupplierModeWorkspaceIfActive(includeContracts: Boolean = false) {
+    if (appModeState.value == APP_MODE_SUPPLIER || appModeState.value == APP_MODE_MANUFACTURER) {
+        refreshSupplierModeWorkspace(includeContracts = includeContracts)
+    }
+}
+
 fun addSupplierOrder(
     orderWithLines: SupplierOrderWithLinesDataModel,
     onCompleted: ((DataState<SupplierOrderWithLinesDataModel>) -> Unit)? = null
@@ -4865,6 +5084,7 @@ fun addSupplierOrder(
                         )
                     )
 
+                    getSupplierModeDashboard()
                     postInAppNotification(response.message, NotificationType.Positive)
                     onCompleted?.invoke(DataState.Success(response.payload, response.message))
                 }
@@ -4902,6 +5122,7 @@ fun updateSupplierOrder(
                             response.message
                         )
                     )
+                    getSupplierModeDashboard()
                     postInAppNotification(response.message, NotificationType.Positive)
                     onCompleted?.invoke(DataState.Success(response.payload, response.message))
                 }
@@ -4981,6 +5202,7 @@ fun updateSupplierOrdersSupplierStatus(
                         transient = true
                     )
                     getMySupplierSideOrders()
+                    getSupplierModeDashboard()
                 } else {
                     postInAppNotification(
                         lastFailureMessage ?: localizedStringResourceMessage(
@@ -5027,6 +5249,7 @@ fun deleteSupplierOrder(
                             response.message
                         )
                     )
+                    getSupplierModeDashboard()
                     postInAppNotification(response.message, NotificationType.Positive)
                     onCompleted?.invoke(DataState.Success(orderId, response.message))
                 }
@@ -5065,6 +5288,7 @@ fun receiveSupplierOrder(
                         )
                     )
                     response.payload.order.storeId.takeIf { it.isNotBlank() }?.let { getStockBatches(it) }
+                    getSupplierModeDashboard()
                     postInAppNotification(response.message, NotificationType.Positive)
                     onCompleted?.invoke(DataState.Success(response.payload, response.message))
                 }
@@ -5125,6 +5349,7 @@ fun upsertSupplierContract(
                             response.message
                         )
                     )
+                    getSupplierModeDashboard()
                     postInAppNotification(response.message, NotificationType.Positive)
                     onCompleted?.invoke(DataState.Success(response.payload, response.message))
                 }
@@ -5155,6 +5380,7 @@ fun acceptSupplierContract(
                             response.message
                         )
                     )
+                    getSupplierModeDashboard()
                     postInAppNotification(response.message, NotificationType.Positive)
                     onCompleted?.invoke(DataState.Success(response.payload, response.message))
                 }
@@ -5185,6 +5411,7 @@ fun declineSupplierContract(
                             response.message
                         )
                     )
+                    getSupplierModeDashboard()
                     postInAppNotification(response.message, NotificationType.Positive)
                     onCompleted?.invoke(DataState.Success(response.payload, response.message))
                 }
@@ -5215,6 +5442,7 @@ fun archiveSupplierContract(
                             response.message
                         )
                     )
+                    getSupplierModeDashboard()
                     postInAppNotification(response.message, NotificationType.Positive)
                     onCompleted?.invoke(DataState.Success(response.payload, response.message))
                 }
@@ -5277,7 +5505,7 @@ const val CLOUD_TRANSPORT_STATUS_UNAVAILABLE = -1
 @PublishedApi
 internal const val REALTIME_ACCESS_TOKEN_REFRESH_SKEW_MILLIS = 60_000L
 
-private const val DEFAULT_AITA_SERVER_URL = "http://10.202.10.145:8080"
+private const val DEFAULT_AITA_SERVER_URL = "http://10.202.10.147:8080"
 private val DEFAULT_AITA_SERVER_URL_PAIR = Pair(DEFAULT_AITA_SERVER_URL, "1")
 @Volatile
 private var currentNetworkRequestCandidateServerUrlsMemory: List<String> = emptyList()
@@ -5351,6 +5579,7 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
         deleteDebtorPath = Pair("debtors/delete", "42"),
         payDebtorDebtPath = Pair("debtors/pay", "43"),
         getSupplierGoodsPricesPath = Pair("supplierGoodsPrices/get", "31"),
+        getMySupplierGoodsPricesPath = Pair("supplierGoodsPrices/my", "1685"),
         upsertSupplierGoodsPricePath = Pair("supplierGoodsPrices/upsert", "32"),
         deleteSupplierGoodsPricesPath = Pair("supplierGoodsPrices/delete", "33"),
         getSupplierOrdersPath = Pair("supplierOrders/get", "34"),
@@ -5358,6 +5587,7 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
         updateSupplierOrderPath = Pair("supplierOrders/update", "36"),
         deleteSupplierOrdersPath = Pair("supplierOrders/delete", "37"),
         receiveSupplierOrderPath = Pair("supplierOrders/receive", "38"),
+        getSupplierDashboardPath = Pair("supplierOrders/dashboard", "1616"),
         getSupplierContractsPath = Pair("supplierContracts/get", "1479"),
         upsertSupplierContractPath = Pair("supplierContracts/upsert", "1480"),
         acceptSupplierContractPath = Pair("supplierContracts/accept", "1481"),
@@ -11369,6 +11599,19 @@ private fun String.isCloudSessionRefreshNotificationText(): Boolean {
     ).any { marker -> normalized.contains(marker) }
 }
 
+private fun String.isUnreadableServerResponseNotificationText(): Boolean {
+    val normalized = normalizedNotificationText()
+    if (normalized.isBlank()) return false
+
+    return listOf(
+        "server response could not be read",
+        "could not read server response",
+        "не удалось прочитать ответ сервера",
+        "сервер жауабын оқу мүмкін болмады",
+        "сервер жауабын оқу",
+    ).any { marker -> normalized.contains(marker) }
+}
+
 private fun shouldPostCloudSessionRefreshNotificationNow(): Boolean {
     if (cloudSessionRefreshNotificationPostedForCurrentRequirement) return false
     cloudSessionRefreshNotificationPostedForCurrentRequirement = true
@@ -11731,6 +11974,14 @@ private fun shouldPostNotificationConsideringCloudTransport(
         cloudTransportRecoveryNotificationPending = false
         markCloudTransportReachableForNotifications(authRefreshRequired = null)
         return shouldPost
+    }
+
+    if (text.isUnreadableServerResponseNotificationText()) {
+        val serverIsAlreadyReachable = realtimeUpdatesConnectedState.value ||
+                cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_REACHABLE
+        val serverIsBeingProbed = activeNetworkOperationsState.value > 0 &&
+                cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_UNKNOWN
+        if (serverIsAlreadyReachable || serverIsBeingProbed) return false
     }
 
     if (!text.isCloudTransportFailureNotificationText()) return true
@@ -13554,6 +13805,10 @@ internal fun <Response> unreadableNetworkResponseDataModel(
     status: HttpStatusCode,
     rawBody: String
 ): ResponseDataModel<Response> {
+    if (status.value >= 500) {
+        return genericHttpErrorNetworkResponseDataModel(status)
+    }
+
     return ResponseDataModel<Response>(
         message = localizedStringResourceMessage(
             id = 225,
@@ -13792,6 +14047,7 @@ fun addSupplier(
                 } else {
                     val supplier = response.payload!!
                     suppliersState.emit(DataState.Success(suppliersState.payloadValue.orEmpty().upsertById(supplier), response.message))
+                    refreshSupplierModeWorkspaceIfActive(includeContracts = true)
                     onCompleted?.invoke(DataState.Success(supplier, response.message))
                 }
             }
@@ -13817,6 +14073,7 @@ fun updateSupplier(
                 } else {
                     val supplier = response.payload!!
                     suppliersState.emit(DataState.Success(suppliersState.payloadValue.orEmpty().upsertById(supplier), response.message))
+                    refreshSupplierModeWorkspaceIfActive(includeContracts = true)
                     onCompleted?.invoke(DataState.Success(supplier, response.message))
                 }
             }
@@ -13841,6 +14098,7 @@ fun deleteSupplier(
                     onCompleted?.invoke(DataState.Empty(response.message))
                 } else {
                     suppliersState.emit(DataState.Success(suppliersState.payloadValue.orEmpty().filterNot { it.id == supplierId }, response.message))
+                    refreshSupplierModeWorkspaceIfActive(includeContracts = true)
                     onCompleted?.invoke(DataState.Success(supplierId, response.message))
                 }
             }
@@ -15369,6 +15627,7 @@ data class GlobalAppConfigurationDataModel(
     val deleteDebtorPath: Pair<String, String> = Pair("debtors/delete", "42"),
     val payDebtorDebtPath: Pair<String, String> = Pair("debtors/pay", "43"),
     val getSupplierGoodsPricesPath: Pair<String, String> = Pair("supplierGoodsPrices/get", "31"),
+    val getMySupplierGoodsPricesPath: Pair<String, String> = Pair("supplierGoodsPrices/my", "1685"),
     val upsertSupplierGoodsPricePath: Pair<String, String> = Pair("supplierGoodsPrices/upsert", "32"),
     val deleteSupplierGoodsPricesPath: Pair<String, String> = Pair("supplierGoodsPrices/delete", "33"),
 
@@ -15377,6 +15636,7 @@ data class GlobalAppConfigurationDataModel(
     val updateSupplierOrderPath: Pair<String, String> = Pair("supplierOrders/update", "36"),
     val deleteSupplierOrdersPath: Pair<String, String> = Pair("supplierOrders/delete", "37"),
     val receiveSupplierOrderPath: Pair<String, String> = Pair("supplierOrders/receive", "38"),
+    val getSupplierDashboardPath: Pair<String, String> = Pair("supplierOrders/dashboard", "1616"),
     val getSupplierContractsPath: Pair<String, String> = Pair("supplierContracts/get", "1479"),
     val upsertSupplierContractPath: Pair<String, String> = Pair("supplierContracts/upsert", "1480"),
     val acceptSupplierContractPath: Pair<String, String> = Pair("supplierContracts/accept", "1481"),
@@ -15455,6 +15715,9 @@ data class SupplierOrderLineDataModel(
     val goodsItemNameSnapshot: List<LocalizedStringDataModel> = emptyList(),
     val goodsItemBarcodeSnapshots: List<String> = emptyList(),
     val goodsItemMeasurementUnitIdSnapshot: String? = null,
+    val substituteGoodsItemNameSnapshot: List<LocalizedStringDataModel> = emptyList(),
+    val substituteGoodsItemBarcodeSnapshots: List<String> = emptyList(),
+    val substituteGoodsItemMeasurementUnitIdSnapshot: String? = null,
 
     val deliveredBatchIds: List<String> = emptyList(),
 
@@ -16321,6 +16584,16 @@ data class SupplierDataModel(
 fun List<SupplierDataModel>.upsertById(item: SupplierDataModel): List<SupplierDataModel> {
     val index = indexOfFirst { it.id == item.id }
     return if (index < 0) this + item else toMutableList().also { it[index] = item }
+}
+
+fun List<SupplierDataModel>.supplierProfilesOwnedBy(userId: String?): List<SupplierDataModel> {
+    val cleanUserId = userId?.trim()?.takeIf { it.isNotBlank() } ?: return emptyList()
+    return filter { supplier -> supplier.isActive && supplier.userIds.contains(cleanUserId) }
+        .sortedBy { supplier ->
+            supplier.name.extractLocalizedString("main")
+                ?: supplier.name.firstOrNull()?.value
+                ?: supplier.id
+        }
 }
 
 const val AITA_TOKEN_NEVER_EXPIRES_AT_MILLIS = 253402300799000L
