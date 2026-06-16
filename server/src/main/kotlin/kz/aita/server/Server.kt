@@ -6473,12 +6473,12 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
 
     val demandHighlights = lines
         .groupBy { it.goodsItemId }
-        .mapNotNull bridgeItem@{ (goodsItemId, itemLines) ->
+        .mapNotNull demandHighlightItem@{ (goodsItemId, itemLines) ->
             val relatedOrders = itemLines.mapNotNull { ordersById[it.orderId] }.distinctBy { it.id }
             val latestOrder = relatedOrders.maxByOrNull { it.updatedAtMillis.takeIf { value -> value > 0L } ?: it.orderedAtMillis }
-                ?: return@mapNotNull null
+                ?: return@demandHighlightItem null
             val sampleLine = itemLines.maxByOrNull { line -> ordersById[line.orderId]?.updatedAtMillis ?: 0L } ?: itemLines.firstOrNull()
-                ?: return@mapNotNull null
+                ?: return@demandHighlightItem null
             SupplierDashboardDemandDataModel(
                 goodsItemId = goodsItemId,
                 goodsItemNameSnapshot = sampleLine.goodsItemNameSnapshot,
