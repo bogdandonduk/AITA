@@ -26802,6 +26802,7 @@ fun AppConfiguration.BarcodeTextInput(
                 val generatedBarcode = generateInternalEan13Barcode(
                     buildList {
                         addAll(stateValues.stock.orEmpty().flatMap { it.allBarcodeValues() })
+                        addAll(genericGoodsItemsState.payloadValue.orEmpty().flatMap { it.barcode.orEmpty() })
                         addAll(existingBarcodeValues)
                         add(currentText.ifBlank { value })
                     }.filter { it.isNotBlank() }

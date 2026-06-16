@@ -13319,9 +13319,12 @@ fun Application.module() {
               .singleOrNull() ?: return@newSuspendedTransaction null
 
             Users.update({ Users.id eq uuid }) {
-              if (existing[Users.appLanguage] != language) it[Users.appLanguage] = language
-              if (existing[Users.appThemeId] != themeId) it[Users.appThemeId] = themeId
-              if (existing[Users.appSizeModeId] != sizeModeId) it[Users.appSizeModeId] = sizeModeId
+              // Always assign all preference columns. Exposed can throw when an UPDATE body
+              // conditionally assigns no columns, which made tapping the already-selected
+              // language/theme/scale look like an internal server error.
+              it[Users.appLanguage] = language
+              it[Users.appThemeId] = themeId
+              it[Users.appSizeModeId] = sizeModeId
             }
 
             Users
@@ -13402,41 +13405,26 @@ fun Application.module() {
               ?.takeIf { !Pw.verify(it.toCharArray(), existingUser[Users.passwordHash]) }
               ?.let { Pw.hash(it.toCharArray()) }
 
+            val appLanguage = normalizeAppLanguagePreference(newAccount.appLanguage)
+            val appThemeId = normalizeAppThemePreference(newAccount.appThemeId)
+            val appSizeModeId = normalizeAppSizeModePreference(newAccount.appSizeModeId)
+
             Users.update({ Users.id eq uuid }) {
-              if (existingUser[Users.phoneNumber] != phoneNumber)
-                it[Users.phoneNumber] = phoneNumber
-
-              if (existingUser[Users.email] != email)
-                it[Users.email] = email
-
-              if (existingUser[Users.firstName] != firstName)
-                it[Users.firstName] = firstName
-
-              if (existingUser[Users.lastName] != lastName)
-                it[Users.lastName] = lastName
-
-              if (existingUser[Users.countryLocale] != countryLocale)
-                it[Users.countryLocale] = countryLocale
-
-              val appLanguage = normalizeAppLanguagePreference(newAccount.appLanguage)
-              val appThemeId = normalizeAppThemePreference(newAccount.appThemeId)
-              val appSizeModeId = normalizeAppSizeModePreference(newAccount.appSizeModeId)
-
-              if (existingUser[Users.appLanguage] != appLanguage)
-                it[Users.appLanguage] = appLanguage
-
-              if (existingUser[Users.appThemeId] != appThemeId)
-                it[Users.appThemeId] = appThemeId
-
-              if (existingUser[Users.appSizeModeId] != appSizeModeId)
-                it[Users.appSizeModeId] = appSizeModeId
+              // Keep account update no-op safe too: unchanged profile saves should still
+              // return the current account instead of creating an empty SQL UPDATE.
+              it[Users.phoneNumber] = phoneNumber
+              it[Users.email] = email
+              it[Users.firstName] = firstName
+              it[Users.lastName] = lastName
+              it[Users.countryLocale] = countryLocale
+              it[Users.appLanguage] = appLanguage
+              it[Users.appThemeId] = appThemeId
+              it[Users.appSizeModeId] = appSizeModeId
+              it[Users.isActive] = isActive
 
               newHash?.run {
                 it[Users.passwordHash] = this
               }
-
-              if (existingUser[Users.isActive] != isActive)
-                it[Users.isActive] = isActive
             }
 
             "ok"
