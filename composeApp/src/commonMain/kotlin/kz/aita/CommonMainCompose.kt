@@ -391,6 +391,7 @@ private fun StateHost?.autoFocusScopeKey(): String = this?.toString() ?: "global
 
 private object SupplierPickerAutoFocusStateHost : StateHost()
 private object CartQuantityBottomSheetAutoFocusStateHost : StateHost()
+private object CartReturnPriceBottomSheetAutoFocusStateHost : StateHost()
 
 private fun List<NavigationScreenModel>.routesAutoFocusKey(): String =
     joinToString(">") { it.route }
@@ -3598,7 +3599,9 @@ private data class TransactionSelectionSmartSets(
     val lowStockIds: Set<String> = emptySet(),
     val expiringIds: List<String> = emptyList(),
     val freshIds: List<String> = emptyList(),
+    val freshItemCount: Int = 0,
     val slowMovingIds: List<String> = emptyList(),
+    val inStockIds: Set<String> = emptySet(),
     val totalStockCount: Int = 0,
     val quickItemCount: Int = 0,
     val inStockItemCount: Int = 0
@@ -3723,19 +3726,22 @@ private fun AppConfiguration.buildTransactionSelectionSmartSets(
         storeId.isNullOrBlank() || transaction.storeId == storeId
     }
     val stockById = stock.associateBy { it.id }
-    val stockByBarcode = stock
-        .flatMap { item ->
-            item.allBarcodeValues().flatMap { barcode ->
-                listOf(barcode, barcode.toStoredGoodsItemBarcode())
-            }.filter { it.isNotBlank() }.map { it to item }
-        }
-        .associate { it }
+    val stockByBarcode = lazy(LazyThreadSafetyMode.NONE) {
+        stock
+            .flatMap { item ->
+                item.allBarcodeValues().flatMap { barcode ->
+                    listOf(barcode, barcode.toStoredGoodsItemBarcode())
+                }.filter { it.isNotBlank() }.map { it to item }
+            }
+            .associate { it }
+    }
 
     fun popularIds(source: List<TransactionDataModel>): List<String> {
+        if (source.isEmpty()) return emptyList()
         return source
             .flatMap { transaction ->
                 transaction.goodsInTransaction
-                    .mapNotNull { it.transactionSelectionStockItemId(stockById, stockByBarcode) }
+                    .mapNotNull { it.transactionSelectionStockItemId(stockById, stockByBarcode.value) }
                     .distinct()
                     .map { itemId -> itemId to transaction.id.ifBlank { "${transaction.timeMillis}:$itemId" } }
             }
@@ -3748,10 +3754,11 @@ private fun AppConfiguration.buildTransactionSelectionSmartSets(
     }
 
     fun recentIds(source: List<TransactionDataModel>): List<String> {
+        if (source.isEmpty()) return emptyList()
         return source
             .sortedByDescending { it.timeMillis }
             .flatMap { it.goodsInTransaction }
-            .mapNotNull { it.transactionSelectionStockItemId(stockById, stockByBarcode) }
+            .mapNotNull { it.transactionSelectionStockItemId(stockById, stockByBarcode.value) }
             .distinct()
             .take(30)
     }
@@ -3789,6 +3796,11 @@ private fun AppConfiguration.buildTransactionSelectionSmartSets(
         .map { it.id }
         .toList()
 
+    val inStockIds = quantityByItem
+        .filterValues { quantity -> quantity > 0.0 }
+        .keys
+        .toSet()
+
     val expiringIds = activeBatches
         .asSequence()
         .filter { batch -> batch.expirationDateMillis?.let { it >= todayStart && it < expiringSoonCutoffExclusive } == true }
@@ -3797,28 +3809,27 @@ private fun AppConfiguration.buildTransactionSelectionSmartSets(
         .distinct()
         .toList()
 
-    val freshIds = activeStock
-        .asSequence()
-        .filter { item ->
-            val itemBatches = activeBatchesByItem[item.id].orEmpty()
-            itemBatches.isEmpty() || itemBatches.any { it.isFreshForTransactionSelection(now) }
+    val freshIds = mutableListOf<String>()
+    var freshItemCount = 0
+    activeStock.forEach { item ->
+        val itemBatches = activeBatchesByItem[item.id].orEmpty()
+        if (itemBatches.isEmpty() || itemBatches.any { it.isFreshForTransactionSelection(now) }) {
+            freshItemCount += 1
+            if (freshIds.size < 40) freshIds += item.id
         }
-        .sortedBy { it.name.extractLocalizedString(stateValues.appLanguage).orEmpty().lowercase() }
-        .map { it.id }
-        .toList()
+    }
 
     val recentlySoldIds = saleTransactions
         .asSequence()
         .sortedByDescending { it.timeMillis }
         .take(250)
         .flatMap { transaction -> transaction.goodsInTransaction.asSequence() }
-        .mapNotNull { it.transactionSelectionStockItemId(stockById, stockByBarcode) }
+        .mapNotNull { it.transactionSelectionStockItemId(stockById, stockByBarcode.value) }
         .toSet()
 
     val slowMovingIds = activeStock
         .asSequence()
         .filter { item -> (quantityByItem[item.id] ?: 0.0) > 0.0 && item.id !in recentlySoldIds }
-        .sortedBy { it.name.extractLocalizedString(stateValues.appLanguage).orEmpty().lowercase() }
         .map { it.id }
         .take(30)
         .toList()
@@ -3838,10 +3849,12 @@ private fun AppConfiguration.buildTransactionSelectionSmartSets(
         lowStockIds = lowStockIds,
         expiringIds = expiringIds,
         freshIds = freshIds,
+        freshItemCount = freshItemCount,
         slowMovingIds = slowMovingIds,
+        inStockIds = inStockIds,
         totalStockCount = stock.size,
         quickItemCount = stock.count { it.isQuickItem },
-        inStockItemCount = quantityByItem.values.count { quantity -> quantity > 0.0 }
+        inStockItemCount = inStockIds.size
     )
 }
 
@@ -3922,7 +3935,7 @@ fun AppConfiguration.TransactionSelectionScreen(
                 add(TabContent("quick", tabLabelWithCount(stateValues.stringQuick, transactionSmartSets.quickItemCount)))
                 add(TabContent("in_stock", tabLabelWithCount(localizedStringResource(1180, "In stock"), transactionSmartSets.inStockItemCount)))
                 if (transactionSmartSets.freshIds.isNotEmpty()) {
-                    add(TabContent("fresh", tabLabelWithCount(localizedStringResource(1310, "Fresh"), transactionSmartSets.freshIds.size)))
+                    add(TabContent("fresh", tabLabelWithCount(localizedStringResource(1310, "Fresh"), transactionSmartSets.freshItemCount)))
                 }
 
                 if (transactionSmartSets.popularIds.isNotEmpty()) {
@@ -4044,6 +4057,22 @@ fun AppConfiguration.TransactionSelectionScreen(
             else -> emptyList()
         }
 
+        val selectedTransactionFilterId = scopeRowContent.id
+        val transactionSelectionFilter = remember(selectedTransactionFilterId, transactionSmartSets) {
+            when (selectedTransactionFilterId) {
+                "quick" -> ({ item: GoodsItemDataModel -> item.isQuickItem })
+                "in_stock" -> ({ item: GoodsItemDataModel -> item.id in transactionSmartSets.inStockIds })
+                "popular" -> ({ item: GoodsItemDataModel -> item.transactionSelectionMatchesIdSet(transactionSmartSets.popularIds) })
+                "recent" -> ({ item: GoodsItemDataModel -> item.transactionSelectionMatchesIdSet(transactionSmartSets.recentIds) })
+                "restock" -> ({ item: GoodsItemDataModel -> item.transactionSelectionMatchesIdSet(transactionSmartSets.restockIds) })
+                "low_stock" -> ({ item: GoodsItemDataModel -> item.transactionSelectionMatchesIdSet(transactionSmartSets.lowStockIds) })
+                "expiring" -> ({ item: GoodsItemDataModel -> item.transactionSelectionMatchesIdSet(transactionSmartSets.expiringIds) })
+                "fresh" -> ({ item: GoodsItemDataModel -> item.transactionSelectionMatchesIdSet(transactionSmartSets.freshIds) })
+                "slow" -> ({ item: GoodsItemDataModel -> item.transactionSelectionMatchesIdSet(transactionSmartSets.slowMovingIds) })
+                else -> null
+            }
+        }
+
         StockWarehouseScreenContent(
             modifier = Modifier.weight(1f),
             searchQuery = searchTextFieldContent.value.text,
@@ -4055,37 +4084,8 @@ fun AppConfiguration.TransactionSelectionScreen(
             transactionTypeIndex = context.transactionTypeIndex,
             preferredOrderIds = selectedPreferredOrderIds,
             scrollStateHost = context.stateHost,
-            scrollStateKey = "transaction_selection_scroll_${context.transactionTypeIndex}_${context.clientId}_${scopeRowContent.id}",
-            onFilter = when (scopeRowContent.id) {
-                "quick" -> {
-                    { it.isQuickItem }
-                }
-                "in_stock" -> {
-                    { item -> itemHasPresentStockBatchForTransactionSelection(item) }
-                }
-                "popular" -> {
-                    { item -> item.transactionSelectionMatchesIdSet(transactionSmartSets.popularIds) }
-                }
-                "recent" -> {
-                    { item -> item.transactionSelectionMatchesIdSet(transactionSmartSets.recentIds) }
-                }
-                "restock" -> {
-                    { item -> item.transactionSelectionMatchesIdSet(transactionSmartSets.restockIds) }
-                }
-                "low_stock" -> {
-                    { item -> item.transactionSelectionMatchesIdSet(transactionSmartSets.lowStockIds) }
-                }
-                "expiring" -> {
-                    { item -> item.transactionSelectionMatchesIdSet(transactionSmartSets.expiringIds) }
-                }
-                "fresh" -> {
-                    { item -> item.transactionSelectionMatchesIdSet(transactionSmartSets.freshIds) }
-                }
-                "slow" -> {
-                    { item -> item.transactionSelectionMatchesIdSet(transactionSmartSets.slowMovingIds) }
-                }
-                else -> null
-            },
+            scrollStateKey = "transaction_selection_scroll_${context.transactionTypeIndex}_${context.clientId}_${selectedTransactionFilterId}",
+            onFilter = transactionSelectionFilter,
             onClick = addToCartAction
         )
     }
@@ -5031,22 +5031,34 @@ private fun AppConfiguration.buildTransactionReceiptLines(
     transactionTypeIndex: Int,
     saleMethodIds: Map<String, String> = emptyMap(),
     returnReasons: Map<String, String> = emptyMap(),
+    returnBatchSelections: Map<String, CartReturnBatchSelectionDataModel> = emptyMap(),
     clientId: Int = 0
 ): List<TransactionReceiptLineDataModel> {
+    val stockById = stock.associateBy { it.id }
+    val batchesByGoodsItemId = stockBatches
+        .filter { it.isActive }
+        .groupBy { it.goodsItemId }
+
     return cart.mapIndexedNotNull { index, cartItem ->
-        val goodsItem = stock.find { it.id == cartItem.id } ?: return@mapIndexedNotNull null
+        val goodsItem = stockById[cartItem.id] ?: return@mapIndexedNotNull null
         val saleMethodId = saleMethodIds["${transactionTypeIndex}:$clientId:${goodsItem.id}"]
             ?: SALE_METHOD_RETAIL
-        val batch = stockBatches
-            .filter { it.goodsItemId == goodsItem.id && it.isActive }
-            .sortedForShelf(goodsItem)
-            .firstOrNull()
-        val price = goodsItem.priceForTransaction(
+        val itemBatches = batchesByGoodsItemId[goodsItem.id].orEmpty()
+        val returnSelection = returnBatchSelections[cartReturnBatchSelectionKey(transactionTypeIndex, clientId, goodsItem.id)]
+        val resolvedReturn = if (transactionTypeIndex == 1) {
+            resolveReturnBatchSelection(goodsItem, cartItem, itemBatches, returnSelection)
+        } else {
+            null
+        }
+        val batch = resolvedReturn?.batch
+            ?: itemBatches.sortedForShelf(goodsItem).firstOrNull { it.id == goodsItem.activeShelfBatchId }
+            ?: itemBatches.sortedForShelf(goodsItem).firstOrNull()
+        val price = resolvedReturn?.price ?: goodsItem.priceForTransaction(
             transactionTypeIndex = transactionTypeIndex,
             saleMethodId = saleMethodId,
             quantityTotal = cartItem.quantity.total,
             batch = batch
-        )
+        ).withFallbackCurrency(defaultTransactionCurrencyCode())
         val currencySymbol = stateValues.globalAppConfiguration.countries
             .getCurrency(price.currency)
             ?.symbol
@@ -5067,7 +5079,8 @@ private fun AppConfiguration.buildTransactionReceiptLines(
                 returnReasons[cartReturnReasonKey(transactionTypeIndex, clientId, goodsItem.id)].orEmpty()
             } else {
                 ""
-            }
+            },
+            stockBatchId = if (transactionTypeIndex == 1) resolvedReturn?.selection?.stockBatchId else null
         )
     }
 }
@@ -5286,11 +5299,12 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
         val latestSnapshot by latestTransactionReceiptSnapshotState.collectAsState()
         val saleMethodIds by cartSaleMethodIdsState.collectAsState()
         val cartReturnReasons by getCartReturnReasonsState().collectAsState()
+        val returnBatchSelections by getCartReturnBatchSelectionsState().collectAsState()
         val paymentDrafts by getTransactionPaymentDraftsState().collectAsState()
 
         val paymentDraft = paymentDrafts[transactionSupplySupplierKey(context.transactionTypeIndex, context.clientId)]
 
-        val liveLines = remember(goodsInCart, stateValues.stock, stateValues.stockBatches, context.transactionTypeIndex, context.clientId, saleMethodIds, cartReturnReasons) {
+        val liveLines = remember(goodsInCart, stateValues.stock, stateValues.stockBatches, context.transactionTypeIndex, context.clientId, saleMethodIds, cartReturnReasons, returnBatchSelections) {
             buildTransactionReceiptLines(
                 cart = goodsInCart,
                 stock = stateValues.stock.orEmpty(),
@@ -5298,6 +5312,7 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
                 transactionTypeIndex = context.transactionTypeIndex,
                 saleMethodIds = saleMethodIds,
                 returnReasons = cartReturnReasons,
+                returnBatchSelections = returnBatchSelections,
                 clientId = context.clientId
             )
         }
@@ -5363,7 +5378,8 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
                     goodsItemId = it.goodsItemId,
                     quantityUnit = it.quantity,
                     currencyCode = it.currencyCode,
-                    returnReason = if (context.transactionTypeIndex == 1) it.returnReason.trim() else ""
+                    returnReason = if (context.transactionTypeIndex == 1) it.returnReason.trim() else "",
+                    stockBatchId = if (context.transactionTypeIndex == 1) it.stockBatchId else null
                 )
             },
             paidCash = draft.paidCash,
@@ -6659,6 +6675,387 @@ private fun AppConfiguration.CartQuantityBottomSheet(
 }
 
 
+private data class ResolvedReturnBatchSelectionUiModel(
+    val batch: GoodsBatchDataModel?,
+    val price: PriceDataModel,
+    val selection: CartReturnBatchSelectionDataModel,
+    val hasAnyBatch: Boolean
+)
+
+private fun AppConfiguration.defaultTransactionCurrencyCode(): String =
+    stateValues.globalAppConfiguration.countries.withTajikistanFallback()
+        .find { it.locale.equals(stateValues.userAccount?.countryLocale, true) }
+        ?.currencies
+        ?.firstOrNull()
+        ?.code
+        ?: "KZT"
+
+private fun PriceDataModel.withFallbackCurrency(currencyCode: String): PriceDataModel =
+    if (currency.isBlank()) copy(currency = currencyCode) else this
+
+private fun AppConfiguration.returnCandidateBatchesFor(
+    goodsItem: GoodsItemDataModel,
+    batches: List<GoodsBatchDataModel>
+): List<GoodsBatchDataModel> {
+    val activeStoreId = stateValues.activeStoreId
+    return batches
+        .asSequence()
+        .filter { batch ->
+            batch.goodsItemId == goodsItem.id &&
+                    batch.isActive &&
+                    when (batch.status) {
+                        StockBatchStatusDataModel.Delivered,
+                        StockBatchStatusDataModel.OnShelf,
+                        StockBatchStatusDataModel.SoldOut -> true
+                        else -> false
+                    } &&
+                    batchBelongsToInventoryStoreForUi(batch.storeId, activeStoreId)
+        }
+        .sortedWith(
+            compareBy<GoodsBatchDataModel> { if (it.status == StockBatchStatusDataModel.OnShelf) 0 else 1 }
+                .thenBy { if (it.quantity.total > 0.000001) 0 else 1 }
+                .thenBy { if (it.id == goodsItem.activeShelfBatchId) 0 else 1 }
+                .thenBy { it.shelfPriority }
+                .thenBy { it.expirationDateMillis ?: Long.MAX_VALUE }
+                .thenByDescending { it.quantity.total }
+                .thenByDescending { it.deliveredAtMillis ?: 0L }
+        )
+        .toList()
+}
+
+private fun AppConfiguration.defaultReturnBatchFor(
+    goodsItem: GoodsItemDataModel,
+    candidateBatches: List<GoodsBatchDataModel>
+): GoodsBatchDataModel? =
+    candidateBatches.firstOrNull { it.status == StockBatchStatusDataModel.OnShelf && it.quantity.total > 0.000001 }
+        ?: candidateBatches.firstOrNull { it.id == goodsItem.activeShelfBatchId }
+        ?: candidateBatches.firstOrNull { it.quantity.total > 0.000001 }
+        ?: candidateBatches.firstOrNull()
+
+private fun AppConfiguration.resolveReturnBatchSelection(
+    goodsItem: GoodsItemDataModel,
+    cartItem: GoodsItemInCartDataModel,
+    allBatches: List<GoodsBatchDataModel>,
+    selection: CartReturnBatchSelectionDataModel?
+): ResolvedReturnBatchSelectionUiModel {
+    val defaultCurrency = selection?.currencyCode?.takeIf { it.isNotBlank() } ?: defaultTransactionCurrencyCode()
+    val candidates = returnCandidateBatchesFor(goodsItem, allBatches)
+    val selectedBatch = selection?.stockBatchId?.let { selectedId -> candidates.firstOrNull { it.id == selectedId } }
+    val batch = selectedBatch ?: defaultReturnBatchFor(goodsItem, candidates)
+    val basePrice = goodsItem.priceForTransaction(
+        transactionTypeIndex = 1,
+        saleMethodId = SALE_METHOD_RETAIL,
+        quantityTotal = cartItem.quantity.total,
+        batch = batch
+    ).withFallbackCurrency(defaultCurrency)
+    val selectedAmount = selection?.pricePerUnit?.takeIf { it >= 0.0 }
+    val price = (selectedAmount?.let { basePrice.withMoneyAmount(it) } ?: basePrice).withFallbackCurrency(defaultCurrency)
+    val normalized = CartReturnBatchSelectionDataModel(
+        goodsItemId = goodsItem.id,
+        stockBatchId = batch?.id,
+        pricePerUnit = price.price.toMoneyDouble().roundMoney(),
+        currencyCode = price.currency.ifBlank { defaultCurrency },
+        updatedAtMillis = selection?.updatedAtMillis ?: 0L
+    )
+    return ResolvedReturnBatchSelectionUiModel(
+        batch = batch,
+        price = price,
+        selection = normalized,
+        hasAnyBatch = candidates.isNotEmpty()
+    )
+}
+
+private fun AppConfiguration.returnBatchPriceForDisplay(
+    goodsItem: GoodsItemDataModel,
+    batch: GoodsBatchDataModel?,
+    currencyCode: String
+): PriceDataModel =
+    goodsItem.priceForTransaction(
+        transactionTypeIndex = 1,
+        saleMethodId = SALE_METHOD_RETAIL,
+        quantityTotal = 1.0,
+        batch = batch
+    ).withFallbackCurrency(currencyCode)
+
+private fun AppConfiguration.returnBatchSummaryText(
+    goodsItem: GoodsItemDataModel,
+    batch: GoodsBatchDataModel?,
+    allBatches: List<GoodsBatchDataModel>,
+    currencyCode: String
+): String {
+    if (batch == null) return localizedStringResource(1315, "Returned no-stock batch")
+    val index = allBatches.indexOfFirst { it.id == batch.id }.takeIf { it >= 0 }?.plus(1)
+    val price = returnBatchPriceForDisplay(goodsItem, batch, currencyCode)
+    return listOfNotNull(
+        index?.let { "#$it" },
+        stockBatchStatusText(batch.status),
+        batch.quantity.quantityText(stateValues.appLanguage),
+        "${price.price.toMoneyDouble().moneyText()} ${price.currency}".trim(),
+        batch.deliveredAtMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let { "${localizedStringResource(342, "Delivered")} $it" },
+        batch.expirationDateMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let { "${localizedStringResource(234, "Expires")} $it" }
+    ).joinToString(" • ")
+}
+
+@Composable
+private fun AppConfiguration.CartReturnPriceBatchBottomSheet(
+    goodsItem: GoodsItemDataModel,
+    cartItem: GoodsItemInCartDataModel,
+    allBatches: List<GoodsBatchDataModel>,
+    selection: CartReturnBatchSelectionDataModel?,
+    onDismiss: () -> Unit,
+    onConfirm: (CartReturnBatchSelectionDataModel) -> Unit
+) {
+    val autoFocusAmount = platformAllowsAutomaticTextFieldFocus()
+    val suppressSystemKeyboard = getPlatformName().contains("android", ignoreCase = true)
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val defaultResolved = remember(goodsItem.id, cartItem.quantity.total, allBatches, selection) {
+        resolveReturnBatchSelection(goodsItem, cartItem, allBatches, selection)
+    }
+    val defaultCurrency = defaultResolved.price.currency.ifBlank { defaultTransactionCurrencyCode() }
+    var amountText by rememberSaveable(goodsItem.id, selection?.stockBatchId, selection?.pricePerUnit, defaultResolved.price.price) {
+        mutableStateOf(moneyInputFromDouble(defaultResolved.price.price.toMoneyDouble()))
+    }
+    var selectedBatchId by rememberSaveable(goodsItem.id, selection?.stockBatchId, defaultResolved.selection.stockBatchId) {
+        mutableStateOf(defaultResolved.selection.stockBatchId.orEmpty())
+    }
+    val enteredAmount = amountText.toMoneyDouble().roundMoney()
+    val candidateBatches = remember(goodsItem.id, allBatches, stateValues.activeStoreId) {
+        returnCandidateBatchesFor(goodsItem, allBatches)
+    }
+    val filteredBatches = remember(candidateBatches, amountText, defaultCurrency) {
+        val hasTypedPrice = amountText.isNotBlank()
+        if (!hasTypedPrice) {
+            candidateBatches
+        } else {
+            candidateBatches.filter { batch ->
+                abs(returnBatchPriceForDisplay(goodsItem, batch, defaultCurrency).price.toMoneyDouble().roundMoney() - enteredAmount) <= 0.009
+            }
+        }
+    }
+    val selectedBatch = candidateBatches.firstOrNull { it.id == selectedBatchId }
+    val visibleBatches = remember(filteredBatches, selectedBatch) {
+        (listOfNotNull(selectedBatch) + filteredBatches).distinctBy { it.id }
+    }
+    val itemName = goodsItem.name.visibleLocalizedString(stateValues.appLanguage, localizedStringResource(365, "Goods item"))
+    var amountFieldContent: GenericTextFieldContent? = null
+
+    AitaBottomSheet(
+        title = stateValues.stringReturnPrice,
+        iconPath = stateValues.drawablePathIconTransactionReturn,
+        onDismiss = onDismiss
+    ) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(stateValues.marginTextField),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = itemName,
+                color = stateValues.TextColor,
+                fontSize = stateValues.titleTextSize,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+            amountFieldContent = genericTextField(
+                modifier = Modifier.fillMaxWidth(),
+                titleText = stateValues.stringReturnPrice,
+                valueInitial = amountText,
+                stateHost = CartReturnPriceBottomSheetAutoFocusStateHost,
+                stateKey = goodsItem.id,
+                isFocusedInitial = autoFocusAmount,
+                autoFocus = autoFocusAmount,
+                forceRefocus = false,
+                readOnly = suppressSystemKeyboard,
+                keyboardType = KeyboardType.Decimal,
+                imeWithAction = ImeWithAction(ImeAction.Done),
+                leadingIconPath = stateValues.drawablePathIconTransactionReturn,
+                showClearButton = true,
+                selectionBackgroundColor = stateValues.AccentColor,
+                selectionFocusTextColor = stateValues.AccentTextColor,
+                updateIsFocusedAction = { focusState ->
+                    if (focusState.isFocused && suppressSystemKeyboard) keyboardController?.hide()
+                },
+                onTransformValue = { paymentInputNormalize(it.trim().replace(',', '.')) },
+                onValueChange = { rawValue, applyChange ->
+                    val normalized = paymentInputNormalize(rawValue.trim().replace(',', '.'))
+                    if (normalized.isEmpty() || normalized == "." || normalized.matches(Regex("^\\d*(\\.\\d{0,2})?$"))) {
+                        amountText = normalized
+                        applyChange()
+                    }
+                }
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = "${moneyInputFromDouble(enteredAmount)} $defaultCurrency".trim(),
+                color = stateValues.AccentColor,
+                fontSize = stateValues.accentTextSize,
+                fontWeight = FontWeight.Bold,
+                style = TextStyle(shadow = accentTextShadow(stateValues.AccentColor, stateValues.AccentColor)),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            TransactionNumpad(
+                modifier = Modifier.fillMaxWidth(),
+                allowDecimal = true,
+                onInput = { token ->
+                    val nextText = paymentInputAppend(amountText, token)
+                    amountText = nextText
+                    amountFieldContent?.replaceText(nextText, applyTransform = false)
+                }
+            )
+
+            Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+            Text(
+                modifier = Modifier.fillMaxWidth(),
+                text = localizedStringResource(1316, "Return to stock batch"),
+                color = stateValues.TextColor,
+                fontSize = stateValues.smallTextSize,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            when {
+                candidateBatches.isEmpty() -> {
+                    Text(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .foregroundSubtleShadow(stateValues.cornerRadius)
+                            .clip(RoundedCornerShape(stateValues.cornerRadius))
+                            .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
+                            .padding(10.dp),
+                        text = localizedStringResource(1317, "No stock batches exist for this item yet. Return will create/use a special returned-items batch."),
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                visibleBatches.isEmpty() -> {
+                    Text(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .foregroundSubtleShadow(stateValues.cornerRadius)
+                            .clip(RoundedCornerShape(stateValues.cornerRadius))
+                            .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor, RoundedCornerShape(stateValues.cornerRadius))
+                            .padding(10.dp),
+                        text = localizedStringResource(1318, "No batch has this return price. Clear/change the price or select a different batch."),
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f, fill = false)
+                            .heightIn(max = 220.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        itemsIndexed(visibleBatches, key = { _, batch -> batch.id }) { _, batch ->
+                            val selected = selectedBatchId == batch.id
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .foregroundSubtleShadow(stateValues.cornerRadius)
+                                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                                    .background(if (selected) stateValues.AccentColor.copy(alpha = 0.10f) else stateValues.BackgroundColor)
+                                    .border(
+                                        stateValues.unfocusedBorderWidth,
+                                        if (selected) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+                                        RoundedCornerShape(stateValues.cornerRadius)
+                                    )
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = ripple(color = stateValues.AccentColor)
+                                    ) { selectedBatchId = batch.id }
+                                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                AitaRoundCheckbox(
+                                    checked = selected,
+                                    onCheckedChange = null,
+                                    borderColor = if (selected) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+                                    containerSize = 28.dp,
+                                    circleSize = 20.dp
+                                )
+
+                                Spacer(modifier = Modifier.width(8.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = returnBatchSummaryText(goodsItem, batch, candidateBatches, defaultCurrency),
+                                        color = if (selected) stateValues.AccentColor else stateValues.TextColor,
+                                        fontSize = stateValues.smallTextSize,
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+
+                                    if (selected) {
+                                        Text(
+                                            text = localizedStringResource(1396, "Selected"),
+                                            color = stateValues.AccentColor,
+                                            fontSize = stateValues.smallTextSize,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = stateValues.stringCancel,
+                    enabledColor = stateValues.PlaceholderTextColor,
+                    onClick = onDismiss
+                )
+
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = stateValues.stringConfirm,
+                    enabled = amountText.isNotBlank() && enteredAmount >= 0.0,
+                    enabledColor = stateValues.AccentColor,
+                    onClick = {
+                        onConfirm(
+                            CartReturnBatchSelectionDataModel(
+                                goodsItemId = goodsItem.id,
+                                stockBatchId = selectedBatchId.takeIf { selectedId -> candidateBatches.any { it.id == selectedId } },
+                                pricePerUnit = enteredAmount,
+                                currencyCode = defaultCurrency,
+                                updatedAtMillis = getCurrentTimeMillis()
+                            )
+                        )
+                    }
+                )
+            }
+        }
+    }
+}
+
+
 
 @Composable
 private fun AppConfiguration.TransactionNumpad(
@@ -7229,6 +7626,7 @@ fun AppConfiguration.TransactionPaymentScreen() {
             context.clientId
         ).collectAsState()
         val saleMethodIds by cartSaleMethodIdsState.collectAsState()
+        val returnBatchSelections by getCartReturnBatchSelectionsState().collectAsState()
 
         val lines = remember(
             goodsInCart,
@@ -7237,7 +7635,8 @@ fun AppConfiguration.TransactionPaymentScreen() {
             context.transactionTypeIndex,
             context.clientId,
             stateValues.appLanguage,
-            saleMethodIds
+            saleMethodIds,
+            returnBatchSelections
         ) {
             buildTransactionReceiptLines(
                 cart = goodsInCart,
@@ -7245,6 +7644,7 @@ fun AppConfiguration.TransactionPaymentScreen() {
                 stockBatches = stateValues.stockBatches.orEmpty(),
                 transactionTypeIndex = context.transactionTypeIndex,
                 saleMethodIds = saleMethodIds,
+                returnBatchSelections = returnBatchSelections,
                 clientId = context.clientId
             )
         }
@@ -8286,8 +8686,12 @@ fun AppConfiguration.GoodsItemInCartWidget(
     conditionChecks: Map<String, Boolean> = emptyMap(),
     highlightedConditionKey: String? = null,
     returnReason: String = "",
+    itemBatches: List<GoodsBatchDataModel> = emptyList(),
+    availableSaleQuantity: Double? = null,
+    returnBatchSelection: CartReturnBatchSelectionDataModel? = null,
     onConditionCheckedChange: (String, Boolean) -> Unit = { _, _ -> },
     setReturnReasonAction: (String) -> Unit = {},
+    setReturnBatchSelectionAction: (CartReturnBatchSelectionDataModel) -> Unit = {},
     setSaleMethodAction: (String) -> Unit = {},
     setQuantityAction: (Double) -> Unit = {},
     increaseQuantityAction: () -> Unit,
@@ -8297,14 +8701,19 @@ fun AppConfiguration.GoodsItemInCartWidget(
     var showQuantityBottomSheet by rememberSaveable(goodsItemInCart.id, goodsItemInCart.quantity.total) {
         mutableStateOf(false)
     }
+    var showReturnPriceBottomSheet by rememberSaveable(goodsItemInCart.id) {
+        mutableStateOf(false)
+    }
     val quantityStep = goodsItemInCart.quantity.pricedAmount.takeIf { it > 0.0 } ?: 1.0
     val canDecreaseQuantity = goodsItemInCart.quantity.total - quantityStep >= quantityStep - 0.000001
 
     val localScope = rememberCoroutineScope()
     var quantityLimitError by rememberSaveable(goodsItemInCart.id) { mutableStateOf<String?>(null) }
 
+    fun currentAvailableSaleQuantity(): Double = availableSaleQuantity ?: availableSaleQuantityFor(goodsItem)
+
     fun showQuantityLimitError() {
-        val message = cartQuantityLimitMessage(goodsItem, availableSaleQuantityFor(goodsItem))
+        val message = cartQuantityLimitMessage(goodsItem, currentAvailableSaleQuantity())
         quantityLimitError = message
         localScope.launch {
             delay(2_600L)
@@ -8315,7 +8724,7 @@ fun AppConfiguration.GoodsItemInCartWidget(
     }
 
     fun runIfSaleQuantityAvailable(targetTotal: Double, action: () -> Unit) {
-        if (transactionTypeIndex == 0 && targetTotal > availableSaleQuantityFor(goodsItem) + 0.000001) {
+        if (transactionTypeIndex == 0 && targetTotal > currentAvailableSaleQuantity() + 0.000001) {
             showQuantityLimitError()
         } else {
             quantityLimitError = null
@@ -8333,6 +8742,20 @@ fun AppConfiguration.GoodsItemInCartWidget(
                     setQuantityAction(total)
                     showQuantityBottomSheet = false
                 }
+            }
+        )
+    }
+
+    if (showReturnPriceBottomSheet) {
+        CartReturnPriceBatchBottomSheet(
+            goodsItem = goodsItem,
+            cartItem = goodsItemInCart,
+            allBatches = itemBatches,
+            selection = returnBatchSelection,
+            onDismiss = { showReturnPriceBottomSheet = false },
+            onConfirm = { selection ->
+                setReturnBatchSelectionAction(selection)
+                showReturnPriceBottomSheet = false
             }
         )
     }
@@ -8507,20 +8930,27 @@ fun AppConfiguration.GoodsItemInCartWidget(
 
             val cartUnitText = goodsItemInCart.quantity.immutableUnitName.extractLocalizedString(stateValues.appLanguage).orEmpty()
             val quantityText = goodsItemInCart.quantity.quantityText(stateValues.appLanguage)
-            val activeStoreId = stateValues.activeStoreId
-            val itemBatches = stateValues.stockBatches.orEmpty().filter {
-                it.goodsItemId == goodsItem.id &&
-                        it.isActive &&
-                        (transactionTypeIndex != 0 || batchBelongsToInventoryStoreForUi(it.storeId, activeStoreId))
+            val sortedItemBatches = remember(itemBatches, goodsItem.id, goodsItem.activeShelfBatchId) {
+                itemBatches.filter { it.goodsItemId == goodsItem.id && it.isActive }.sortedForShelf(goodsItem)
             }
-            val activeBatch = itemBatches.sortedForShelf(goodsItem).firstOrNull { it.id == goodsItem.activeShelfBatchId }
-                ?: itemBatches.sortedForShelf(goodsItem).firstOrNull()
-            val promotedItemPrice = goodsItem.promotedPriceForTransaction(
-                transactionTypeIndex = transactionTypeIndex,
-                saleMethodId = saleMethodId,
-                quantityTotal = goodsItemInCart.quantity.total,
-                batch = activeBatch
-            )
+            val resolvedReturnSelection = if (transactionTypeIndex == 1) {
+                resolveReturnBatchSelection(goodsItem, goodsItemInCart, itemBatches, returnBatchSelection)
+            } else {
+                null
+            }
+            val activeBatch = resolvedReturnSelection?.batch
+                ?: sortedItemBatches.firstOrNull { it.id == goodsItem.activeShelfBatchId }
+                ?: sortedItemBatches.firstOrNull()
+            val promotedItemPrice = if (transactionTypeIndex == 1 && resolvedReturnSelection != null) {
+                PromotedPriceDataModel(resolvedReturnSelection.price, resolvedReturnSelection.price, null)
+            } else {
+                goodsItem.promotedPriceForTransaction(
+                    transactionTypeIndex = transactionTypeIndex,
+                    saleMethodId = saleMethodId,
+                    quantityTotal = goodsItemInCart.quantity.total,
+                    batch = activeBatch
+                )
+            }
             val itemPrice = promotedItemPrice.finalPrice
             val itemPriceTitle = when (transactionTypeIndex) {
                 0 -> if (saleMethodId == SALE_METHOD_WHOLESALE && goodsItem.isWholesaleEligible(goodsItemInCart.quantity.total)) {
@@ -8532,9 +8962,13 @@ fun AppConfiguration.GoodsItemInCartWidget(
                 else -> stateValues.stringSupplyPrice
             }
             val lineTotal = itemPrice.price.replace(',', '.').toDoubleOrNull()?.let { it * goodsItemInCart.quantity.total }
-            val availableQuantity = itemBatches
-                .filter { it.status != StockBatchStatusDataModel.Deleted && it.status != StockBatchStatusDataModel.WrittenOff }
-                .sumOf { it.quantity.total }
+            val availableQuantity = if (transactionTypeIndex == 0) {
+                currentAvailableSaleQuantity()
+            } else {
+                itemBatches
+                    .filter { it.status != StockBatchStatusDataModel.Deleted && it.status != StockBatchStatusDataModel.WrittenOff }
+                    .sumOf { it.quantity.total }
+            }
 
             StockCardInfoLine(
                 title = localizedStringResource(263, "In cart"),
@@ -8542,11 +8976,57 @@ fun AppConfiguration.GoodsItemInCartWidget(
                 textColor = textColor
             )
 
-            StockPromotionPriceInfoLine(
-                title = itemPriceTitle,
-                promotedPrice = promotedItemPrice,
-                textColor = textColor
-            )
+            if (transactionTypeIndex == 1) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .foregroundSubtleShadow(stateValues.cornerRadius)
+                        .clip(RoundedCornerShape(stateValues.cornerRadius))
+                        .background(stateValues.BackgroundColor)
+                        .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = ripple(color = stateValues.AccentColor)
+                        ) { showReturnPriceBottomSheet = true }
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = itemPriceTitle,
+                            color = stateValues.AccentColor,
+                            fontSize = stateValues.smallTextSize,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = listOfNotNull(
+                                "${itemPrice.price.toMoneyDouble().moneyText()} ${itemPrice.currency}".trim(),
+                                resolvedReturnSelection?.batch?.let { batch ->
+                                    returnBatchSummaryText(goodsItem, batch, returnCandidateBatchesFor(goodsItem, itemBatches), itemPrice.currency)
+                                } ?: localizedStringResource(1315, "Returned no-stock batch")
+                            ).joinToString(" • "),
+                            color = textColor,
+                            fontSize = stateValues.textSize,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Text(
+                        text = "›",
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.titleTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            } else {
+                StockPromotionPriceInfoLine(
+                    title = itemPriceTitle,
+                    promotedPrice = promotedItemPrice,
+                    textColor = textColor
+                )
+            }
 
             goodsItem.firstViolatedPromotionRestriction(
                 transactionTypeIndex = transactionTypeIndex,
@@ -8586,7 +9066,7 @@ fun AppConfiguration.GoodsItemInCartWidget(
                 StockCardInfoLine(
                     title = localizedStringResource(265, "Active batch"),
                     value = listOfNotNull(
-                        "#${itemBatches.sortedForShelf(goodsItem).indexOfFirst { it.id == batch.id } + 1}",
+                        "#${sortedItemBatches.indexOfFirst { it.id == batch.id } + 1}",
                         batchSupplierText,
                         batch.quantity.quantityText(stateValues.appLanguage),
                         batch.deliveredAtMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let { "${localizedStringResource(342, "Delivered")} $it" },
@@ -8917,6 +9397,7 @@ fun AppConfiguration.TransactionCartScreen() {
         ).collectAsState()
         val saleMethodIds by cartSaleMethodIdsState.collectAsState()
         val cartReturnReasons by getCartReturnReasonsState().collectAsState()
+        val returnBatchSelections by getCartReturnBatchSelectionsState().collectAsState()
         val cartConditionChecks by getCartConditionChecksState().collectAsState()
         val cartScrollStates by getTransactionCartScrollStatesState().collectAsState()
         val cartStateKey = transactionSupplySupplierKey(context.transactionTypeIndex, context.clientId)
@@ -8961,20 +9442,31 @@ fun AppConfiguration.TransactionCartScreen() {
                 }
         }
 
-        val cartAvailabilityByItem = remember(goodsInCart, stateValues.stock, stateValues.stockBatches, stateValues.appLanguage) {
-            goodsInCart.mapNotNull { cartItem ->
-                stateValues.stock.orEmpty().find { it.id == cartItem.id }?.let { goodsItem ->
-                    cartItem.id to availableSaleQuantityFor(goodsItem)
-                }
-            }.toMap()
+        val stockById = remember(stateValues.stock) {
+            stateValues.stock.orEmpty().associateBy { it.id }
         }
-        val cartAvailabilitySignature = cartAvailabilityByItem.entries
-            .sortedBy { it.key }
-            .joinToString("|") { "${it.key}:${it.value}" }
+        val batchesByGoodsItemId = remember(stateValues.stockBatches, stateValues.activeStoreId) {
+            stateValues.stockBatches.orEmpty()
+                .filter { batch ->
+                    batch.isActive && batchBelongsToInventoryStoreForUi(batch.storeId, stateValues.activeStoreId)
+                }
+                .groupBy { it.goodsItemId }
+        }
+        val cartItemsWithGoods = remember(goodsInCart, stockById) {
+            goodsInCart.mapIndexedNotNull { index, cartItem ->
+                stockById[cartItem.id]?.let { Triple(index, cartItem, it) }
+            }
+        }
+        val cartAvailabilityByItem = remember(goodsInCart, batchesByGoodsItemId) {
+            goodsInCart.associate { cartItem ->
+                cartItem.id to batchesByGoodsItemId[cartItem.id].orEmpty()
+                    .filter { it.status != StockBatchStatusDataModel.Deleted && it.status != StockBatchStatusDataModel.WrittenOff && it.status != StockBatchStatusDataModel.SoldOut }
+                    .sumOf { it.quantity.total }
+            }
+        }
 
-        LaunchedEffect(cartAvailabilitySignature) {
-            val changedLines = goodsInCart.mapNotNull { cartItem ->
-                val goodsItem = stateValues.stock.orEmpty().find { it.id == cartItem.id } ?: return@mapNotNull null
+        LaunchedEffect(cartAvailabilityByItem) {
+            val changedLines = cartItemsWithGoods.mapNotNull { (_, cartItem, goodsItem) ->
                 val previous = rememberedCartAvailability[cartItem.id]
                 val current = cartAvailabilityByItem[cartItem.id] ?: return@mapNotNull null
                 if (previous == null || abs(previous - current) <= 0.000001) {
@@ -9063,25 +9555,22 @@ fun AppConfiguration.TransactionCartScreen() {
             return stockConditions + transactionCondition
         }
 
-        val cartItemsWithGoods = remember(goodsInCart, stateValues.stock) {
-            goodsInCart.mapIndexedNotNull { index, cartItem ->
-                stateValues.stock?.find { it.id == cartItem.id }?.let { Triple(index, cartItem, it) }
-            }
-        }
-
-        val validCartConditionKeys = remember(
+        val conditionsByCartId = remember(
             cartItemsWithGoods,
             stateValues.appLanguage,
             context.transactionTypeIndex,
             context.clientId,
             acceptableConditionText
         ) {
-            cartItemsWithGoods.flatMap { (_, cartItem, goodsItem) ->
-                cartConditionsFor(cartItem, goodsItem).map { it.key }
-            }.toSet()
+            cartItemsWithGoods.associate { (_, cartItem, goodsItem) ->
+                cartItem.id to cartConditionsFor(cartItem, goodsItem)
+            }
+        }
+        val validCartConditionKeys = remember(conditionsByCartId) {
+            conditionsByCartId.values.flatten().map { it.key }.toSet()
         }
 
-        LaunchedEffect(context.transactionTypeIndex, context.clientId, validCartConditionKeys.joinToString("|")) {
+        LaunchedEffect(context.transactionTypeIndex, context.clientId, validCartConditionKeys) {
             pruneCartConditionChecks(context.transactionTypeIndex, context.clientId, validCartConditionKeys)
         }
 
@@ -9097,76 +9586,87 @@ fun AppConfiguration.TransactionCartScreen() {
                     .weight(1f)
                     .padding(stateValues.marginTextField)
             ) {
-                itemsIndexed(goodsInCart) { index, cartItem ->
-                    val goodsItem = stateValues.stock?.find { it.id == cartItem.id }
-
-                    if (goodsItem != null) {
-                        GoodsItemInCartWidget(
-                            modifier = Modifier.fillParentMaxWidth(),
-                            index = index,
-                            goodsItemInCart = cartItem,
-                            goodsItem = goodsItem,
-                            transactionTypeIndex = context.transactionTypeIndex,
-                            saleMethodId = saleMethodIds["${context.transactionTypeIndex}:${context.clientId}:${cartItem.id}"] ?: SALE_METHOD_RETAIL,
-                            conditions = cartConditionsFor(cartItem, goodsItem),
-                            conditionChecks = cartConditionChecks,
-                            highlightedConditionKey = highlightedConditionKey,
-                            returnReason = cartReturnReasons[cartReturnReasonKey(context.transactionTypeIndex, context.clientId, cartItem.id)].orEmpty(),
-                            onConditionCheckedChange = { conditionKey, checked ->
-                                setCartConditionChecked(conditionKey, checked)
-                            },
-                            setReturnReasonAction = { reason ->
-                                setCartReturnReason(
-                                    transactionTypeIndex = context.transactionTypeIndex,
-                                    clientId = context.clientId,
-                                    goodsItemId = cartItem.id,
-                                    reason = reason
-                                )
-                            },
-                            setSaleMethodAction = { methodId ->
-                                setCartSaleMethodId(
-                                    transactionTypeIndex = context.transactionTypeIndex,
-                                    clientId = context.clientId,
-                                    goodsItemId = cartItem.id,
-                                    saleMethodId = methodId
-                                )
-                            },
-                            onDelete = {
-                                deleteCartById(
-                                    id = cartItem.id,
-                                    transactionTypeIndex = context.transactionTypeIndex,
-                                    clientId = context.clientId
-                                )
-                            },
-                            setQuantityAction = { total ->
-                                setCartQuantity(
-                                    id = cartItem.id,
-                                    transactionTypeIndex = context.transactionTypeIndex,
-                                    clientId = context.clientId,
-                                    current = cartItem.quantity,
-                                    total = total
-                                )
-                            },
-                            increaseQuantityAction = {
-                                changeCartQuantity(
-                                    id = cartItem.id,
-                                    transactionTypeIndex = context.transactionTypeIndex,
-                                    clientId = context.clientId,
-                                    current = cartItem.quantity,
-                                    deltaSteps = 1
-                                )
-                            },
-                            decreaseQuantityAction = {
-                                changeCartQuantity(
-                                    id = cartItem.id,
-                                    transactionTypeIndex = context.transactionTypeIndex,
-                                    clientId = context.clientId,
-                                    current = cartItem.quantity,
-                                    deltaSteps = -1
-                                )
-                            }
-                        )
-                    }
+                itemsIndexed(
+                    items = cartItemsWithGoods,
+                    key = { _, triple -> triple.second.id }
+                ) { _, (index, cartItem, goodsItem) ->
+                    val itemBatches = batchesByGoodsItemId[cartItem.id].orEmpty()
+                    GoodsItemInCartWidget(
+                        modifier = Modifier.fillParentMaxWidth(),
+                        index = index,
+                        goodsItemInCart = cartItem,
+                        goodsItem = goodsItem,
+                        transactionTypeIndex = context.transactionTypeIndex,
+                        saleMethodId = saleMethodIds["${context.transactionTypeIndex}:${context.clientId}:${cartItem.id}"] ?: SALE_METHOD_RETAIL,
+                        conditions = conditionsByCartId[cartItem.id].orEmpty(),
+                        conditionChecks = cartConditionChecks,
+                        highlightedConditionKey = highlightedConditionKey,
+                        returnReason = cartReturnReasons[cartReturnReasonKey(context.transactionTypeIndex, context.clientId, cartItem.id)].orEmpty(),
+                        itemBatches = itemBatches,
+                        availableSaleQuantity = cartAvailabilityByItem[cartItem.id],
+                        returnBatchSelection = returnBatchSelections[cartReturnBatchSelectionKey(context.transactionTypeIndex, context.clientId, cartItem.id)],
+                        onConditionCheckedChange = { conditionKey, checked ->
+                            setCartConditionChecked(conditionKey, checked)
+                        },
+                        setReturnReasonAction = { reason ->
+                            setCartReturnReason(
+                                transactionTypeIndex = context.transactionTypeIndex,
+                                clientId = context.clientId,
+                                goodsItemId = cartItem.id,
+                                reason = reason
+                            )
+                        },
+                        setReturnBatchSelectionAction = { selection ->
+                            setCartReturnBatchSelection(
+                                transactionTypeIndex = context.transactionTypeIndex,
+                                clientId = context.clientId,
+                                goodsItemId = cartItem.id,
+                                selection = selection
+                            )
+                        },
+                        setSaleMethodAction = { methodId ->
+                            setCartSaleMethodId(
+                                transactionTypeIndex = context.transactionTypeIndex,
+                                clientId = context.clientId,
+                                goodsItemId = cartItem.id,
+                                saleMethodId = methodId
+                            )
+                        },
+                        onDelete = {
+                            deleteCartById(
+                                id = cartItem.id,
+                                transactionTypeIndex = context.transactionTypeIndex,
+                                clientId = context.clientId
+                            )
+                        },
+                        setQuantityAction = { total ->
+                            setCartQuantity(
+                                id = cartItem.id,
+                                transactionTypeIndex = context.transactionTypeIndex,
+                                clientId = context.clientId,
+                                current = cartItem.quantity,
+                                total = total
+                            )
+                        },
+                        increaseQuantityAction = {
+                            changeCartQuantity(
+                                id = cartItem.id,
+                                transactionTypeIndex = context.transactionTypeIndex,
+                                clientId = context.clientId,
+                                current = cartItem.quantity,
+                                deltaSteps = 1
+                            )
+                        },
+                        decreaseQuantityAction = {
+                            changeCartQuantity(
+                                id = cartItem.id,
+                                transactionTypeIndex = context.transactionTypeIndex,
+                                clientId = context.clientId,
+                                current = cartItem.quantity,
+                                deltaSteps = -1
+                            )
+                        }
+                    )
                 }
             }
         }
@@ -9181,14 +9681,13 @@ fun AppConfiguration.TransactionCartScreen() {
 
         val lastScreen = currentTransactionScreens.lastOrNull()
 
-        val invalidWholesaleCartItems = remember(goodsInCart, stateValues.stock, saleMethodIds, context.transactionTypeIndex, context.clientId) {
+        val invalidWholesaleCartItems = remember(cartItemsWithGoods, saleMethodIds, context.transactionTypeIndex, context.clientId, stateValues.appLanguage) {
             if (context.transactionTypeIndex != 0) {
                 emptyList()
             } else {
-                goodsInCart.mapNotNull { cartItem ->
+                cartItemsWithGoods.mapNotNull { (_, cartItem, goodsItem) ->
                     val selectedMethodId = saleMethodIds["${context.transactionTypeIndex}:${context.clientId}:${cartItem.id}"]
-                    val goodsItem = stateValues.stock?.find { it.id == cartItem.id }
-                    if (selectedMethodId == SALE_METHOD_WHOLESALE && goodsItem != null && !goodsItem.isWholesaleEligible(cartItem.quantity.total)) {
+                    if (selectedMethodId == SALE_METHOD_WHOLESALE && !goodsItem.isWholesaleEligible(cartItem.quantity.total)) {
                         goodsItem.name.extractLocalizedString(stateValues.appLanguage) ?: goodsItem.firstBarcode().ifBlank { cartItem.id }
                     } else {
                         null
@@ -9197,22 +9696,29 @@ fun AppConfiguration.TransactionCartScreen() {
             }
         }
 
-        val firstUncheckedCondition = cartItemsWithGoods.firstNotNullOfOrNull { (index, cartItem, goodsItem) ->
-            cartConditionsFor(cartItem, goodsItem).firstOrNull { condition ->
+        val firstUncheckedCondition = cartItemsWithGoods.firstNotNullOfOrNull { (index, cartItem, _) ->
+            conditionsByCartId[cartItem.id].orEmpty().firstOrNull { condition ->
                 !condition.automaticallySatisfied || (condition.requiresManualConfirmation && cartConditionChecks[condition.key] != true)
             }?.let { condition -> index to condition }
         }
 
-        val invalidPromotionRestrictions = cartItemsWithGoods.mapNotNull { (index, cartItem, goodsItem) ->
-            val activeBatch = stateValues.stockBatches.orEmpty()
-                .filter { it.goodsItemId == goodsItem.id && it.isActive }
-                .sortedForShelf(goodsItem)
-                .firstOrNull { it.id == goodsItem.activeShelfBatchId }
-                ?: stateValues.stockBatches.orEmpty()
-                    .filter { it.goodsItemId == goodsItem.id && it.isActive }
-                    .sortedForShelf(goodsItem)
-                    .firstOrNull()
+        fun activeCartBatch(goodsItem: GoodsItemDataModel, cartItem: GoodsItemInCartDataModel): GoodsBatchDataModel? {
+            val itemBatches = batchesByGoodsItemId[goodsItem.id].orEmpty()
+            return if (context.transactionTypeIndex == 1) {
+                resolveReturnBatchSelection(
+                    goodsItem = goodsItem,
+                    cartItem = cartItem,
+                    allBatches = itemBatches,
+                    selection = returnBatchSelections[cartReturnBatchSelectionKey(context.transactionTypeIndex, context.clientId, goodsItem.id)]
+                ).batch
+            } else {
+                itemBatches.sortedForShelf(goodsItem).firstOrNull { it.id == goodsItem.activeShelfBatchId }
+                    ?: itemBatches.sortedForShelf(goodsItem).firstOrNull()
+            }
+        }
 
+        val invalidPromotionRestrictions = cartItemsWithGoods.mapNotNull { (index, cartItem, goodsItem) ->
+            val activeBatch = activeCartBatch(goodsItem, cartItem)
             goodsItem.firstViolatedPromotionRestriction(
                 transactionTypeIndex = context.transactionTypeIndex,
                 quantityTotal = cartItem.quantity.total,
@@ -9225,27 +9731,40 @@ fun AppConfiguration.TransactionCartScreen() {
 
         val cartTotalPrice = cartItemsWithGoods.sumOf { (_, cartItem, goodsItem) ->
             val saleMethodId = saleMethodIds["${context.transactionTypeIndex}:${context.clientId}:${cartItem.id}"] ?: SALE_METHOD_RETAIL
-            val activeBatch = stateValues.stockBatches.orEmpty()
-                .filter { it.goodsItemId == goodsItem.id && it.isActive }
-                .sortedForShelf(goodsItem)
-                .firstOrNull { it.id == goodsItem.activeShelfBatchId }
-                ?: stateValues.stockBatches.orEmpty()
-                    .filter { it.goodsItemId == goodsItem.id && it.isActive }
-                    .sortedForShelf(goodsItem)
-                    .firstOrNull()
-
-            goodsItem.priceForTransaction(
-                transactionTypeIndex = context.transactionTypeIndex,
-                saleMethodId = saleMethodId,
-                quantityTotal = cartItem.quantity.total,
-                batch = activeBatch
-            ).price.toMoneyDouble() * cartItem.quantity.total
+            val itemBatches = batchesByGoodsItemId[goodsItem.id].orEmpty()
+            val price = if (context.transactionTypeIndex == 1) {
+                resolveReturnBatchSelection(
+                    goodsItem = goodsItem,
+                    cartItem = cartItem,
+                    allBatches = itemBatches,
+                    selection = returnBatchSelections[cartReturnBatchSelectionKey(context.transactionTypeIndex, context.clientId, goodsItem.id)]
+                ).price
+            } else {
+                goodsItem.priceForTransaction(
+                    transactionTypeIndex = context.transactionTypeIndex,
+                    saleMethodId = saleMethodId,
+                    quantityTotal = cartItem.quantity.total,
+                    batch = activeCartBatch(goodsItem, cartItem)
+                )
+            }
+            price.price.toMoneyDouble() * cartItem.quantity.total
         }
 
         val cartCurrency = cartItemsWithGoods.firstNotNullOfOrNull { (_, cartItem, goodsItem) ->
             val saleMethodId = saleMethodIds["${context.transactionTypeIndex}:${context.clientId}:${cartItem.id}"] ?: SALE_METHOD_RETAIL
-            goodsItem.priceForTransaction(context.transactionTypeIndex, saleMethodId, cartItem.quantity.total).currency.takeIf { it.isNotBlank() }
-        } ?: stateValues.globalAppConfiguration.countries.withTajikistanFallback().find { it.locale.equals(stateValues.userAccount?.countryLocale, true) }?.currencies?.firstOrNull()?.code ?: "KZT"
+            val itemBatches = batchesByGoodsItemId[goodsItem.id].orEmpty()
+            val price = if (context.transactionTypeIndex == 1) {
+                resolveReturnBatchSelection(
+                    goodsItem = goodsItem,
+                    cartItem = cartItem,
+                    allBatches = itemBatches,
+                    selection = returnBatchSelections[cartReturnBatchSelectionKey(context.transactionTypeIndex, context.clientId, goodsItem.id)]
+                ).price
+            } else {
+                goodsItem.priceForTransaction(context.transactionTypeIndex, saleMethodId, cartItem.quantity.total, activeCartBatch(goodsItem, cartItem))
+            }
+            price.currency.takeIf { it.isNotBlank() }
+        } ?: defaultTransactionCurrencyCode()
 
         val cartPiecesCount = cartItemsWithGoods.sumOf { (_, cartItem, _) ->
             if (cartItem.quantity.roundTotal) round(cartItem.quantity.total).toInt().coerceAtLeast(0) else 1
@@ -10474,21 +10993,23 @@ fun AppConfiguration.StockWarehouseScreenContent(
 ){
     when (val state = stateValues.stockState) {
         is DataState.Success -> {
-            if (state.payload.run { onFilter?.let { filter { onFilter(it) } } ?: this }.isEmpty()) {
+            val stockPayload = state.payload
+            if (stockPayload.isEmpty()) {
                 MessageText(
                     modifier = modifier
                         .fillMaxSize(),
                     stateValues.stringListEmpty
                 )
             } else {
-                val stockPayload = state.payload
                 val activeStoreId = stateValues.activeStoreId
                 val stockBatches = stateValues.stockBatches.orEmpty()
-                val warehouseBatchesByItem = remember(stockBatches) {
-                    stockWarehouseBatchesByItemForUi(stockBatches)
+                val showWarehouseInfoTile = searchQuery == null && transactionTypeIndex == null
+                val needsWarehouseQuantityMap = showWarehouseInfoTile || sortMode == "quantity"
+                val warehouseBatchesByItem = remember(stockBatches, needsWarehouseQuantityMap) {
+                    if (needsWarehouseQuantityMap) stockWarehouseBatchesByItemForUi(stockBatches) else emptyMap()
                 }
-                val warehouseQuantityByItem = remember(warehouseBatchesByItem) {
-                    warehouseBatchesByItem.mapValues { (_, batches) -> batches.sumOf { it.quantity.total } }
+                val warehouseQuantityByItem = remember(warehouseBatchesByItem, needsWarehouseQuantityMap) {
+                    if (needsWarehouseQuantityMap) warehouseBatchesByItem.mapValues { (_, batches) -> batches.sumOf { it.quantity.total } } else emptyMap()
                 }
                 val displayBatchesByItem = remember(stockBatches, transactionTypeIndex, activeStoreId) {
                     stockBatches
@@ -10660,7 +11181,6 @@ fun AppConfiguration.StockWarehouseScreenContent(
                     }
                     if (preferredOrder.isEmpty() && !sortAscending) sorted.reversed() else sorted
                 }
-                val showWarehouseInfoTile = searchQuery == null && transactionTypeIndex == null
                 val sortedItems = remember(showWarehouseInfoTile, selectedWarehouseFilterId, unfilteredSortedItems, warehouseBatchesByItem) {
                     if (showWarehouseInfoTile) {
                         stockWarehouseItemsForFilter(
@@ -10757,15 +11277,15 @@ fun AppConfiguration.StockWarehouseScreenContent(
                 }
                 val pageSize = stateValues.globalAppConfiguration.pagingDefaultPageSize.coerceIn(20, 100)
                 val visibleItems = remember(sortedItems, page, pageSize) { sortedItems.clientPaged(page, pageSize) }
-                val overviewMetrics = remember(unfilteredSortedItems, warehouseBatchesByItem) {
-                    stockWarehouseMetricsForUi(unfilteredSortedItems, warehouseBatchesByItem)
-                }
 
                 Column(
                     modifier = modifier
                         .fillMaxWidth()
                 ) {
                     if (showWarehouseInfoTile) {
+                        val overviewMetrics = remember(unfilteredSortedItems, warehouseBatchesByItem) {
+                            stockWarehouseMetricsForUi(unfilteredSortedItems, warehouseBatchesByItem)
+                        }
                         StockWarehouseInfoTile(
                             modifier = Modifier.padding(start = 8.dp, end = 8.dp, top = 8.dp),
                             metrics = overviewMetrics,

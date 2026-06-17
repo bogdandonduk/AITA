@@ -8143,12 +8143,35 @@ private fun normalizeTransactionGoodsInsideTransaction(
     ) ?: return NormalizedTransactionGoodsResult(null, "not_found")
 
     val goodsItem = itemRow.toGoodsItemDataModel()
-    val activeBatch = activeStockBatchesForGoodsItemInsideTransaction(
+    val requestedStockBatchIdText = if (transactionType == "return") {
+      line.stockBatchId?.trim()?.takeIf { it.isNotBlank() }
+    } else {
+      null
+    }
+    val requestedStockBatchId = requestedStockBatchIdText?.let { text ->
+      runCatching { UUID.fromString(text) }.getOrNull()
+        ?: return NormalizedTransactionGoodsResult(null, "return_batch_not_found")
+    }
+    val activeBatchRows = activeStockBatchesForGoodsItemInsideTransaction(
       storeId = storeId,
       goodsItemId = itemRow[StockItems.id],
       activeShelfBatchId = itemRow[StockItems.activeShelfBatchId],
-      visibleStoreGroup = transactionType == "purchase"
-    ).firstOrNull()?.toGoodsBatchDataModel()
+      visibleStoreGroup = transactionType == "purchase" || transactionType == "return"
+    ).let { rows ->
+      if (transactionType != "return") rows else rows.filter { row ->
+        when (row[StockBatchesV2.status]) {
+          StockBatchStatusDataModel.Delivered.name,
+          StockBatchStatusDataModel.OnShelf.name,
+          StockBatchStatusDataModel.SoldOut.name -> true
+          else -> false
+        }
+      }
+    }
+    val selectedReturnBatchRow = requestedStockBatchId?.let { selectedId ->
+      activeBatchRows.firstOrNull { row -> row[StockBatchesV2.id] == selectedId }
+        ?: return NormalizedTransactionGoodsResult(null, "return_batch_not_found")
+    }
+    val activeBatch = (selectedReturnBatchRow ?: activeBatchRows.firstOrNull())?.toGoodsBatchDataModel()
 
     val requestedSaleMethodId = if (line.saleMethodId == SALE_METHOD_WHOLESALE) {
       SALE_METHOD_WHOLESALE
@@ -8182,6 +8205,7 @@ private fun normalizeTransactionGoodsInsideTransaction(
     )
 
     val normalizedPricePerUnit = when {
+      transactionType == "return" && line.pricePerUnit >= 0.0 -> line.pricePerUnit
       transactionType == "accept" && line.pricePerUnit > 0.0 -> line.pricePerUnit
       resolvedPrice.price.isNotBlank() -> resolvedPrice.price.toMoneyDouble()
       line.pricePerUnit >= 0.0 -> line.pricePerUnit
@@ -8196,7 +8220,8 @@ private fun normalizeTransactionGoodsInsideTransaction(
       quantityUnit = line.quantityUnit ?: defaultServerQuantityForGoodsItem(goodsItem.measurementUnitId, line.quantity),
       currencyCode = line.currencyCode?.takeIf { it.isNotBlank() }
         ?: resolvedPrice.currency.takeIf { it.isNotBlank() },
-      returnReason = if (transactionType == "return") line.returnReason.trim().take(500) else ""
+      returnReason = if (transactionType == "return") line.returnReason.trim().take(500) else "",
+      stockBatchId = if (transactionType == "return") selectedReturnBatchRow?.get(StockBatchesV2.id)?.toString() else null
     )
   }
 
@@ -8405,7 +8430,10 @@ private fun addStockForTransactionLineInsideTransaction(
   addedQuantity: Double,
   now: Long,
   preferredPricePerUnit: Double,
-  preferredSupplierIdText: String? = null
+  preferredSupplierIdText: String? = null,
+  preferredStockBatchIdText: String? = null,
+  preferredCurrencyCode: String? = null,
+  isReturnTransaction: Boolean = false
 ): Boolean {
   val goodsItemId = itemRow[StockItems.id]
   val activeShelfBatchId = itemRow[StockItems.activeShelfBatchId]
@@ -8413,18 +8441,50 @@ private fun addStockForTransactionLineInsideTransaction(
   val preferredSupplierId = preferredSupplierIdText
     ?.takeIf { it.isNotBlank() }
     ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+  val preferredStockBatchId = preferredStockBatchIdText
+    ?.trim()
+    ?.takeIf { it.isNotBlank() }
+    ?.let { runCatching { UUID.fromString(it) }.getOrNull() ?: return false }
+  val currencyCode = preferredCurrencyCode?.trim()?.takeIf { it.isNotBlank() }
+    ?: (
+       itemRow[StockItems.returnPrices] + itemRow[StockItems.salePrices] + itemRow[StockItems.supplyPrices] + itemRow[StockItems.wholesalePrices]
+       ).firstOrNull { it.currency.isNotBlank() }?.currency
+    ?: ""
+  val returnedNoStockBatchNote = "aita_returned_no_stock_batch"
 
   if (quantityToAdd <= 0.0) return true
 
-  val targetBatch = activeStockBatchesForGoodsItemInsideTransaction(
+  val candidateBatches = activeStockBatchesForGoodsItemInsideTransaction(
     storeId = storeId,
     goodsItemId = goodsItemId,
-    activeShelfBatchId = activeShelfBatchId
-  ).firstOrNull { row ->
-    row[StockBatchesV2.status] != StockBatchStatusDataModel.Deleted.name &&
-       row[StockBatchesV2.status] != StockBatchStatusDataModel.WrittenOff.name &&
-       (preferredSupplierId == null || row[StockBatchesV2.supplierId] == preferredSupplierId)
+    activeShelfBatchId = activeShelfBatchId,
+    visibleStoreGroup = isReturnTransaction
+  ).let { rows ->
+    if (!isReturnTransaction) rows else rows.filter { row ->
+      when (row[StockBatchesV2.status]) {
+        StockBatchStatusDataModel.Delivered.name,
+        StockBatchStatusDataModel.OnShelf.name,
+        StockBatchStatusDataModel.SoldOut.name -> true
+        else -> false
+      }
+    }
   }
+
+  val preferredBatch = preferredStockBatchId?.let { selectedId ->
+    candidateBatches.firstOrNull { row -> row[StockBatchesV2.id] == selectedId } ?: return false
+  }
+
+  val targetBatch = preferredBatch
+    ?: candidateBatches.firstOrNull { row ->
+      row[StockBatchesV2.status] != StockBatchStatusDataModel.Deleted.name &&
+         row[StockBatchesV2.status] != StockBatchStatusDataModel.WrittenOff.name &&
+         (preferredSupplierId == null || row[StockBatchesV2.supplierId] == preferredSupplierId)
+    }
+    ?: if (isReturnTransaction) {
+      candidateBatches.firstOrNull { row -> row[StockBatchesV2.additionalNotes] == returnedNoStockBatchNote }
+    } else {
+      null
+    }
 
   if (targetBatch != null) {
     val batchId = targetBatch[StockBatchesV2.id]
@@ -8453,14 +8513,16 @@ private fun addStockForTransactionLineInsideTransaction(
     return true
   }
 
+  val fallbackPrice = PriceDataModel(
+    price = preferredPricePerUnit.coerceAtLeast(0.0).toStockMoneyText(),
+    currency = currencyCode,
+    supplierId = preferredSupplierIdText.orEmpty()
+  )
   val supplyPrice = itemRow[StockItems.supplyPrices].firstOrNull()
     ?: itemRow[StockItems.salePrices].firstOrNull()
     ?: itemRow[StockItems.returnPrices].firstOrNull()
-    ?: PriceDataModel(
-      price = preferredPricePerUnit.toString(),
-      currency = "",
-      supplierId = ""
-    )
+    ?: fallbackPrice
+  val returnPriceOverride = if (isReturnTransaction && preferredPricePerUnit >= 0.0) fallbackPrice else null
 
   val batchId = UUID.randomUUID()
   StockBatchesV2.insert {
@@ -8473,7 +8535,7 @@ private fun addStockForTransactionLineInsideTransaction(
     it[StockBatchesV2.quantity] = defaultServerQuantityForGoodsItem(itemRow[StockItems.measurementUnitId], quantityToAdd)
     it[StockBatchesV2.supplyPrice] = supplyPrice
     it[StockBatchesV2.salePriceOverride] = null
-    it[StockBatchesV2.returnPriceOverride] = null
+    it[StockBatchesV2.returnPriceOverride] = returnPriceOverride
     it[StockBatchesV2.wholesalePriceOverride] = null
     it[StockBatchesV2.deliveredAtMillis] = now
     it[StockBatchesV2.manufacturedAtMillis] = null
@@ -8483,8 +8545,16 @@ private fun addStockForTransactionLineInsideTransaction(
     it[StockBatchesV2.shelfPosition] = null
     it[StockBatchesV2.shelfPriority] = 0
     it[StockBatchesV2.status] = StockBatchStatusDataModel.Delivered.name
-    it[StockBatchesV2.additionalNotes] = null
-    it[StockBatchesV2.additionalNotesLocalized] = emptyList()
+    it[StockBatchesV2.additionalNotes] = if (isReturnTransaction) returnedNoStockBatchNote else null
+    it[StockBatchesV2.additionalNotesLocalized] = if (isReturnTransaction) {
+      simpleMessage(
+        main = "Returned items with no previous stock batch",
+        ru = "Возвраты без предыдущей складской партии",
+        kk = "Алдыңғы қойма партиясы жоқ қайтарымдар"
+      )
+    } else {
+      emptyList()
+    }
     it[StockBatchesV2.createdAtMillis] = now
     it[StockBatchesV2.updatedAtMillis] = now
     it[StockBatchesV2.createdByUserId] = userId
@@ -8561,7 +8631,10 @@ private fun applyTransactionStockMutationInsideTransaction(
         addedQuantity = line.quantity,
         now = now,
         preferredPricePerUnit = line.pricePerUnit,
-        preferredSupplierIdText = line.supplierIdText
+        preferredSupplierIdText = line.supplierIdText,
+        preferredStockBatchIdText = line.stockBatchId,
+        preferredCurrencyCode = line.currencyCode,
+        isReturnTransaction = transaction.type == "return"
       )
 
       else -> false
@@ -15444,6 +15517,11 @@ fun Application.module() {
                     main = "Promotion restriction is not satisfied",
                     ru = "Условие промо-периода не выполнено",
                     kk = "Промо-кезең шарты орындалмады"
+                  )
+                  "return_batch_not_found" -> simpleMessage(
+                    main = "Selected return stock batch was not found",
+                    ru = "Выбранная партия для возврата не найдена",
+                    kk = "Қайтарым үшін таңдалған қойма партиясы табылмады"
                   )
                   else -> simpleMessage(
                     main = "Not enough stock or item barcode was not found",

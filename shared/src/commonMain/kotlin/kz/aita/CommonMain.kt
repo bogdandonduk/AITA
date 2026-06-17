@@ -676,6 +676,15 @@ data class TransactionCartScrollStateDataModel(
 )
 
 @kotlinx.serialization.Serializable
+data class CartReturnBatchSelectionDataModel(
+    val goodsItemId: String,
+    val stockBatchId: String? = null,
+    val pricePerUnit: Double? = null,
+    val currencyCode: String = "",
+    val updatedAtMillis: Long = 0L
+)
+
+@kotlinx.serialization.Serializable
 data class TransactionReceiptSnapshotDataModel(
     val transaction: TransactionDataModel,
     val store: StoreDataModel?,
@@ -700,7 +709,8 @@ data class TransactionReceiptLineDataModel(
     val currencySymbol: String,
     val saleMethodId: String = SALE_METHOD_RETAIL,
     val saleMethodName: List<LocalizedStringDataModel> = saleMethodLocalizedName(saleMethodId),
-    val returnReason: String = ""
+    val returnReason: String = "",
+    val stockBatchId: String? = null
 ) {
     val total: Double
         get() = quantity.total * pricePerUnit
@@ -2105,6 +2115,83 @@ fun setTransactionSupplySupplierId(transactionTypeIndex: Int, clientId: Int, sup
 
 fun clearTransactionSupplySupplierId(transactionTypeIndex: Int, clientId: Int) {
     setTransactionSupplySupplierId(transactionTypeIndex, clientId, null)
+}
+
+private val cartReturnBatchSelectionsState = MutableStateFlow<Map<String, CartReturnBatchSelectionDataModel>>(emptyMap())
+
+fun getCartReturnBatchSelectionsState(): StateFlow<Map<String, CartReturnBatchSelectionDataModel>> =
+    cartReturnBatchSelectionsState.asStateFlow()
+
+fun cartReturnBatchSelectionKey(transactionTypeIndex: Int, clientId: Int, goodsItemId: String): String =
+    "${transactionKey(transactionTypeIndex, clientId)}:$goodsItemId"
+
+fun currentCartReturnBatchSelection(transactionTypeIndex: Int, clientId: Int, goodsItemId: String): CartReturnBatchSelectionDataModel? =
+    cartReturnBatchSelectionsState.value[cartReturnBatchSelectionKey(transactionTypeIndex, clientId, goodsItemId)]
+
+fun setCartReturnBatchSelection(
+    transactionTypeIndex: Int,
+    clientId: Int,
+    goodsItemId: String,
+    selection: CartReturnBatchSelectionDataModel?
+) {
+    GlobalScope.launch(Dispatchers.ourIo) {
+        val cleanGoodsItemId = goodsItemId.trim().takeIf { it.isNotBlank() } ?: return@launch
+        val key = cartReturnBatchSelectionKey(transactionTypeIndex, clientId, cleanGoodsItemId)
+        val normalizedSelection = selection
+            ?.takeIf { transactionTypeIndex == 1 }
+            ?.let { selected ->
+                selected.copy(
+                    goodsItemId = cleanGoodsItemId,
+                    stockBatchId = selected.stockBatchId?.trim()?.takeIf { it.isNotBlank() },
+                    pricePerUnit = selected.pricePerUnit?.coerceAtLeast(0.0)?.roundMoney(),
+                    currencyCode = selected.currencyCode.trim().uppercase(),
+                    updatedAtMillis = getCurrentTimeMillis()
+                )
+            }
+
+        val updated = cartReturnBatchSelectionsState.value.toMutableMap().apply {
+            if (normalizedSelection == null) remove(key) else put(key, normalizedSelection)
+        }
+
+        if (updated != cartReturnBatchSelectionsState.value) {
+            cartReturnBatchSelectionsState.emit(updated)
+            persistTransactionCartUiState()
+        }
+    }
+}
+
+private fun removeCartReturnBatchSelection(transactionTypeIndex: Int, clientId: Int, goodsItemId: String) {
+    GlobalScope.launch(Dispatchers.ourIo) {
+        val updated = cartReturnBatchSelectionsState.value.toMutableMap().apply {
+            remove(cartReturnBatchSelectionKey(transactionTypeIndex, clientId, goodsItemId))
+        }
+        if (updated != cartReturnBatchSelectionsState.value) {
+            cartReturnBatchSelectionsState.emit(updated)
+            persistTransactionCartUiState()
+        }
+    }
+}
+
+private fun removeCartReturnBatchSelections(transactionTypeIndex: Int, clientId: Int) {
+    GlobalScope.launch(Dispatchers.ourIo) {
+        val prefix = "${transactionKey(transactionTypeIndex, clientId)}:"
+        val updated = cartReturnBatchSelectionsState.value.filterKeys { !it.startsWith(prefix) }
+        if (updated != cartReturnBatchSelectionsState.value) {
+            cartReturnBatchSelectionsState.emit(updated)
+            persistTransactionCartUiState()
+        }
+    }
+}
+
+private fun removeCartReturnBatchSelectionsByGoodsItemId(goodsItemId: String) {
+    GlobalScope.launch(Dispatchers.ourIo) {
+        val suffix = ":$goodsItemId"
+        val updated = cartReturnBatchSelectionsState.value.filterKeys { key -> !key.endsWith(suffix) }
+        if (updated != cartReturnBatchSelectionsState.value) {
+            cartReturnBatchSelectionsState.emit(updated)
+            persistTransactionCartUiState()
+        }
+    }
 }
 
 private const val MAX_RETURN_REASON_LENGTH = 500
@@ -5505,7 +5592,7 @@ const val CLOUD_TRANSPORT_STATUS_UNAVAILABLE = -1
 @PublishedApi
 internal const val REALTIME_ACCESS_TOKEN_REFRESH_SKEW_MILLIS = 60_000L
 
-private const val DEFAULT_AITA_SERVER_URL = "http://192.168.1.168:8080"
+private const val DEFAULT_AITA_SERVER_URL = "http://192.168.1.170:8080"
 private val DEFAULT_AITA_SERVER_URL_PAIR = Pair(DEFAULT_AITA_SERVER_URL, "1")
 @Volatile
 private var currentNetworkRequestCandidateServerUrlsMemory: List<String> = emptyList()
@@ -8425,6 +8512,7 @@ private const val CACHE_CART_SALE_METHOD_IDS = "transaction_cart_sale_method_ids
 private const val CACHE_TRANSACTION_PAYMENT_DRAFTS = "transaction_payment_drafts"
 private const val CACHE_TRANSACTION_SUPPLY_SUPPLIER_IDS = "transaction_supply_supplier_ids"
 private const val CACHE_TRANSACTION_RETURN_REASONS = "transaction_return_reasons"
+private const val CACHE_TRANSACTION_RETURN_BATCH_SELECTIONS = "transaction_return_batch_selections"
 private const val CACHE_CART_CONDITION_CHECKS = "transaction_cart_condition_checks"
 private const val CACHE_TRANSACTION_CART_SCROLL_STATES = "transaction_cart_scroll_states"
 private const val CACHE_PENDING_SESSION_CLEANUPS = "pending_session_cleanups"
@@ -9585,6 +9673,7 @@ private suspend fun persistTransactionCartUiState() {
     putJsonCache(CACHE_TRANSACTION_PAYMENT_DRAFTS, transactionPaymentDraftsState.value)
     putJsonCache(CACHE_TRANSACTION_SUPPLY_SUPPLIER_IDS, transactionSupplySupplierIdsState.value)
     putJsonCache(CACHE_TRANSACTION_RETURN_REASONS, cartReturnReasonsState.value)
+    putJsonCache(CACHE_TRANSACTION_RETURN_BATCH_SELECTIONS, cartReturnBatchSelectionsState.value)
     putJsonCache(CACHE_CART_CONDITION_CHECKS, cartConditionChecksState.value)
     putJsonCache(CACHE_TRANSACTION_CART_SCROLL_STATES, transactionCartScrollStatesState.value)
 }
@@ -9601,6 +9690,17 @@ private suspend fun loadTransactionCartUiState() {
     }
     getJsonCache<Map<String, String>>(CACHE_TRANSACTION_RETURN_REASONS)?.let { cached ->
         cartReturnReasonsState.emit(cached.mapValues { it.value.take(MAX_RETURN_REASON_LENGTH) }.filterValues { it.trim().isNotBlank() })
+    }
+    getJsonCache<Map<String, CartReturnBatchSelectionDataModel>>(CACHE_TRANSACTION_RETURN_BATCH_SELECTIONS)?.let { cached ->
+        cartReturnBatchSelectionsState.emit(
+            cached.mapValues { (_, value) ->
+                value.copy(
+                    stockBatchId = value.stockBatchId?.trim()?.takeIf { it.isNotBlank() },
+                    pricePerUnit = value.pricePerUnit?.coerceAtLeast(0.0)?.roundMoney(),
+                    currencyCode = value.currencyCode.trim().uppercase()
+                )
+            }.filterKeys { it.startsWith("1:") }
+        )
     }
     getJsonCache<Map<String, Boolean>>(CACHE_CART_CONDITION_CHECKS)?.let { cached ->
         cartConditionChecksState.emit(cached)
@@ -9830,7 +9930,8 @@ private fun TransactionDataModel.withClientOperationId(): TransactionDataModel =
                         line.pricePerUnit.toString(),
                         line.saleMethodId,
                         line.supplierIdText.orEmpty(),
-                        line.returnReason.trim()
+                        line.returnReason.trim(),
+                        line.stockBatchId.orEmpty()
                     ).joinToString(":")
                 }
             ).joinToString(";")
@@ -9945,14 +10046,47 @@ private fun mutateLocalBatchQuantity(batches: List<GoodsBatchDataModel>, item: G
     }
     if (delta == 0.0) return batches
 
-    val candidateIds = listOfNotNull(item.activeShelfBatchId).toMutableList().apply {
+    val candidateIds = mutableListOf<String>().apply {
+        line.stockBatchId?.takeIf { it.isNotBlank() }?.let { add(it) }
+        item.activeShelfBatchId?.let { add(it) }
         addAll(batches.filter { it.goodsItemId == item.id && it.isActive }.sortedBy { it.shelfPriority }.map { it.id })
     }.distinct()
-    val targetId = candidateIds.firstOrNull { id -> batches.any { it.id == id } } ?: return batches
+    val targetId = candidateIds.firstOrNull { id -> batches.any { it.id == id } }
+    if (targetId == null) {
+        if (transactionType != "return" || delta <= 0.0) return batches
+        val now = getCurrentTimeMillis()
+        val currencyCode = line.currencyCode?.takeIf { it.isNotBlank() }
+            ?: (item.returnPrices + item.salePrices + item.supplyPrices + item.wholesalePrices).firstOrNull { it.currency.isNotBlank() }?.currency
+            ?: ""
+        val fallbackPrice = PriceDataModel(line.pricePerUnit.coerceAtLeast(0.0).toStockMoneyText(), currencyCode, "")
+        val batch = GoodsBatchDataModel(
+            id = createClientOperationId("local-return-batch", item.id + line.barcode + now.toString()),
+            goodsItemId = item.id,
+            userId = item.userId,
+            storeId = item.storeId,
+            quantity = line.quantityUnit?.copy(total = delta) ?: QuantityDataModel("0", emptyList(), delta, 1.0, true),
+            supplyPrice = item.supplyPrices.firstOrNull() ?: item.salePrices.firstOrNull() ?: item.returnPrices.firstOrNull() ?: fallbackPrice,
+            returnPriceOverride = fallbackPrice,
+            deliveredAtMillis = now,
+            status = StockBatchStatusDataModel.Delivered,
+            additionalNotes = "aita_returned_no_stock_batch",
+            additionalNotesLocalized = listOf(
+                LocalizedStringDataModel("main", "Returned items with no previous stock batch"),
+                LocalizedStringDataModel("ru", "Возвраты без предыдущей складской партии"),
+                LocalizedStringDataModel("kk", "Алдыңғы қойма партиясы жоқ қайтарымдар")
+            ),
+            createdAtMillis = now,
+            updatedAtMillis = now,
+            createdByUserId = item.userId,
+            isActive = true
+        )
+        return batches + batch
+    }
     return batches.map { batch ->
         if (batch.id == targetId) {
             val updatedQuantity = batch.quantity.copy(total = (batch.quantity.total + delta).coerceAtLeast(0.0))
-            batch.copy(quantity = updatedQuantity, updatedAtMillis = getCurrentTimeMillis())
+            val updatedStatus = if (batch.status == StockBatchStatusDataModel.SoldOut && delta > 0.0) StockBatchStatusDataModel.Delivered else batch.status
+            batch.copy(quantity = updatedQuantity, status = updatedStatus, updatedAtMillis = getCurrentTimeMillis())
         } else batch
     }
 }
@@ -11500,6 +11634,7 @@ suspend fun deleteCart(transactionTypeIndex: Int, clientId: Int) {
     appDatabase.app_databaseQueries.deleteCart(transactionTypeIndex.toLong(), clientId.toLong())
     removeCartSaleMethodIds(transactionTypeIndex, clientId)
     removeCartReturnReasons(transactionTypeIndex, clientId)
+    removeCartReturnBatchSelections(transactionTypeIndex, clientId)
     removeCartConditionChecks(transactionTypeIndex, clientId)
     clearTransactionCartScrollState(transactionTypeIndex, clientId)
     clearTransactionPaymentDraft(transactionTypeIndex, clientId)
@@ -11513,6 +11648,7 @@ fun deleteCartById(id: String, transactionTypeIndex: Int, clientId: Int) {
         appDatabase.app_databaseQueries.deleteCartById(id, transactionTypeIndex.toLong(), clientId.toLong())
         removeCartSaleMethodId(transactionTypeIndex, clientId, id)
         removeCartReturnReason(transactionTypeIndex, clientId, id)
+        removeCartReturnBatchSelection(transactionTypeIndex, clientId, id)
         removeCartConditionChecks(transactionTypeIndex, clientId, id)
     }
 }
@@ -11520,6 +11656,7 @@ fun deleteCartById(id: String, transactionTypeIndex: Int, clientId: Int) {
 suspend fun deleteCartItemById(id: String) {
     appDatabase.app_databaseQueries.deleteById(id)
     removeCartReturnReasonsByGoodsItemId(id)
+    removeCartReturnBatchSelectionsByGoodsItemId(id)
 }
 
 fun observeCart(transactionTypeIndex: Int, clientId: Int): Flow<List<GoodsItemInCartDataModel>?> =
@@ -16007,7 +16144,8 @@ data class GoodsItemInTransactionDataModel(
     val goodsItemId: String? = null,
     val quantityUnit: QuantityDataModel? = null,
     val currencyCode: String? = null,
-    val returnReason: String = ""
+    val returnReason: String = "",
+    val stockBatchId: String? = null
 )
 
 @kotlinx.serialization.Serializable
