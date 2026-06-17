@@ -377,6 +377,16 @@ private fun AppConfiguration.sortActionIconPath(): String {
 private fun AppConfiguration.sortActionIconFallback(): DrawableResource =
     if (normalizeAppThemePreference(stateValues.appThemeId) == 1L) Res.drawable._61_1 else Res.drawable._61_0
 
+@Composable
+private fun AppConfiguration.nextPageIconPath(): String {
+    val normalizedThemeId = normalizeAppThemePreference(stateValues.appThemeId)
+    return stateValues.drawables.orEmpty().extractPath(90L, normalizedThemeId)
+        ?: "svg/90_${normalizedThemeId}.svg"
+}
+
+private fun AppConfiguration.nextPageIconFallback(): DrawableResource =
+    if (normalizeAppThemePreference(stateValues.appThemeId) == 1L) Res.drawable._90_1 else Res.drawable._90_0
+
 private fun StateHost?.autoFocusScopeKey(): String = this?.toString() ?: "global"
 
 private object SupplierPickerAutoFocusStateHost : StateHost()
@@ -2344,7 +2354,9 @@ private fun AppConfiguration.PagingControls(
             fillMaxWidthIfTextPresent = false,
             text = localizedStringResource(579, "Next"),
             enabled = page + 1 < totalPages,
-            iconPath = stateValues.drawablePathIconExpandMore,
+            iconPath = nextPageIconPath(),
+            iconRes = nextPageIconFallback(),
+            iconAfterText = true,
             confirmationRequired = false,
             onClick = { onPageChange((page + 1).coerceAtMost(totalPages - 1)) }
         )
@@ -3586,7 +3598,10 @@ private data class TransactionSelectionSmartSets(
     val lowStockIds: Set<String> = emptySet(),
     val expiringIds: List<String> = emptyList(),
     val freshIds: List<String> = emptyList(),
-    val slowMovingIds: List<String> = emptyList()
+    val slowMovingIds: List<String> = emptyList(),
+    val totalStockCount: Int = 0,
+    val quickItemCount: Int = 0,
+    val inStockItemCount: Int = 0
 )
 
 private fun GoodsBatchDataModel.isSelectableActiveStockBatch(): Boolean {
@@ -3752,48 +3767,61 @@ private fun AppConfiguration.buildTransactionSelectionSmartSets(
         batch.isSelectableActiveStockBatch() &&
                 (storeId.isNullOrBlank() || batchBelongsToInventoryStoreForUi(batch.storeId, storeId))
     }
+    val activeBatchesByItem = activeBatches.groupBy { it.goodsItemId }
+    val quantityByItem = activeBatchesByItem.mapValues { (_, itemBatches) -> itemBatches.sumOf { it.quantity.total } }
+    val activeStock = stock.filter { it.isActive }
     val now = getCurrentTimeMillis()
     val todayStart = stockDayStartMillis(now)
     val expiringSoonCutoffExclusive = todayStart + 15L * AITA_ONE_DAY_MILLIS
 
-    val lowStockIds = stock
-        .filter { it.isActive }
+    val lowStockIds = activeStock
+        .asSequence()
         .filter { item ->
-            val quantity = item.transactionSelectionQuantity(activeBatches)
+            val quantity = quantityByItem[item.id] ?: 0.0
             quantity > 0.0 && quantity <= 5.0
         }
         .map { it.id }
         .toSet()
 
-    val outOfStockIds = stock
-        .filter { it.isActive }
-        .filter { item -> item.transactionSelectionQuantity(activeBatches) <= 0.0 }
+    val outOfStockIds = activeStock
+        .asSequence()
+        .filter { item -> (quantityByItem[item.id] ?: 0.0) <= 0.0 }
         .map { it.id }
+        .toList()
 
     val expiringIds = activeBatches
+        .asSequence()
         .filter { batch -> batch.expirationDateMillis?.let { it >= todayStart && it < expiringSoonCutoffExclusive } == true }
         .sortedBy { it.expirationDateMillis ?: Long.MAX_VALUE }
         .map { it.goodsItemId }
         .distinct()
+        .toList()
 
-    val freshIds = stock
-        .filter { it.isActive }
-        .filter { item -> itemIsFreshForTransactionSelection(item, batches, now) }
+    val freshIds = activeStock
+        .asSequence()
+        .filter { item ->
+            val itemBatches = activeBatchesByItem[item.id].orEmpty()
+            itemBatches.isEmpty() || itemBatches.any { it.isFreshForTransactionSelection(now) }
+        }
         .sortedBy { it.name.extractLocalizedString(stateValues.appLanguage).orEmpty().lowercase() }
         .map { it.id }
+        .toList()
 
-    val dashboard = buildStoreAnalyticsDashboard(
-        storeId = storeId.orEmpty(),
-        transactions = scopedTransactions,
-        stock = stock,
-        batches = batches,
-        fallbackCurrencyCode = currentAnalyticsCurrencyCode()
-    )
+    val recentlySoldIds = saleTransactions
+        .asSequence()
+        .sortedByDescending { it.timeMillis }
+        .take(250)
+        .flatMap { transaction -> transaction.goodsInTransaction.asSequence() }
+        .mapNotNull { it.transactionSelectionStockItemId(stockById, stockByBarcode) }
+        .toSet()
 
-    val slowMovingIds = dashboard.slowMovingItems
+    val slowMovingIds = activeStock
+        .asSequence()
+        .filter { item -> (quantityByItem[item.id] ?: 0.0) > 0.0 && item.id !in recentlySoldIds }
+        .sortedBy { it.name.extractLocalizedString(stateValues.appLanguage).orEmpty().lowercase() }
         .map { it.id }
-        .filter { stockById.containsKey(it) }
         .take(30)
+        .toList()
 
     val restockIds = (outOfStockIds + lowStockIds)
         .distinct()
@@ -3810,7 +3838,10 @@ private fun AppConfiguration.buildTransactionSelectionSmartSets(
         lowStockIds = lowStockIds,
         expiringIds = expiringIds,
         freshIds = freshIds,
-        slowMovingIds = slowMovingIds
+        slowMovingIds = slowMovingIds,
+        totalStockCount = stock.size,
+        quickItemCount = stock.count { it.isQuickItem },
+        inStockItemCount = quantityByItem.values.count { quantity -> quantity > 0.0 }
     )
 }
 
@@ -3884,14 +3915,12 @@ fun AppConfiguration.TransactionSelectionScreen(
         val transactionSelectionTabs = remember(
             context.transactionTypeIndex,
             transactionSmartSets,
-            stateValues.stock,
-            stateValues.stockBatches,
             stateValues.appLanguage
         ) {
             buildList {
-                add(TabContent("all", tabLabelWithCount(stateValues.stringAll, stateValues.stock.orEmpty().size)))
-                add(TabContent("quick", tabLabelWithCount(stateValues.stringQuick, stateValues.stock.orEmpty().count { it.isQuickItem })))
-                add(TabContent("in_stock", tabLabelWithCount(localizedStringResource(1180, "In stock"), stateValues.stock.orEmpty().count { item -> itemBatchesForActiveInventoryStore(item).any { it.isSelectableActiveStockBatch() } })))
+                add(TabContent("all", tabLabelWithCount(stateValues.stringAll, transactionSmartSets.totalStockCount)))
+                add(TabContent("quick", tabLabelWithCount(stateValues.stringQuick, transactionSmartSets.quickItemCount)))
+                add(TabContent("in_stock", tabLabelWithCount(localizedStringResource(1180, "In stock"), transactionSmartSets.inStockItemCount)))
                 if (transactionSmartSets.freshIds.isNotEmpty()) {
                     add(TabContent("fresh", tabLabelWithCount(localizedStringResource(1310, "Fresh"), transactionSmartSets.freshIds.size)))
                 }
@@ -3955,7 +3984,8 @@ fun AppConfiguration.TransactionSelectionScreen(
             },
             forceRefocus = false,
             modifier = Modifier.padding(stateValues.marginTextField),
-            barcodeCamScanner = true
+            barcodeCamScanner = true,
+            captureTransactionBarcodeInput = true
         )
 
         val scopeRowContent = tabRowWidget(
@@ -4304,7 +4334,18 @@ fun AppConfiguration.TransactionScreen() {
             )
 
             val quickAddRequest by quickStockAddSheetRequestState.collectAsState()
-            quickAddRequest?.let { request ->
+            val scopedQuickAddRequest = quickAddRequest?.takeIf { request ->
+                request.transactionTypeIndex == transactionTypeIndex && request.clientId == clientId
+            }
+
+            LaunchedEffect(transactionTypeIndex, clientId, quickAddRequest) {
+                val request = quickAddRequest
+                if (request != null && (request.transactionTypeIndex != transactionTypeIndex || request.clientId != clientId)) {
+                    quickStockAddSheetRequestState.emit(null)
+                }
+            }
+
+            scopedQuickAddRequest?.let { request ->
                 QuickStockAddBottomSheet(
                     request = request,
                     onDismiss = { closeQuickStockAddSheet() }
@@ -10044,6 +10085,12 @@ private data class StockWarehouseMetricsData(
     val activeBatchCount: Int
 )
 
+private data class StockWarehouseSearchResult(
+    val items: List<GoodsItemDataModel>,
+    val exactHit: GoodsItemDataModel? = null,
+    val exactQuery: String = ""
+)
+
 private const val STOCK_WAREHOUSE_FILTER_TOTAL = "total"
 private const val STOCK_WAREHOUSE_FILTER_IN_STOCK = "in_stock"
 private const val STOCK_WAREHOUSE_FILTER_OUT = "out"
@@ -10080,13 +10127,13 @@ private fun GoodsItemDataModel.stockWarehouseHasNoBarcodeForUi(): Boolean =
 private fun stockWarehouseItemsForFilter(
     filterId: String,
     items: List<GoodsItemDataModel>,
-    batches: List<GoodsBatchDataModel>
+    batchesByItem: Map<String, List<GoodsBatchDataModel>>
 ): List<GoodsItemDataModel> {
     if (filterId == STOCK_WAREHOUSE_FILTER_TOTAL) return items
 
-    val batchesByItem = stockWarehouseBatchesByItemForUi(batches)
+    val quantityByItem = batchesByItem.mapValues { (_, itemBatches) -> itemBatches.sumOf { it.quantity.total } }
     return items.filter { item ->
-        val quantity = item.stockWarehouseQuantityForUi(batchesByItem)
+        val quantity = quantityByItem[item.id] ?: 0.0
         when (filterId) {
             STOCK_WAREHOUSE_FILTER_IN_STOCK -> quantity > 0.0
             STOCK_WAREHOUSE_FILTER_OUT -> quantity <= 0.0
@@ -10098,26 +10145,44 @@ private fun stockWarehouseItemsForFilter(
     }
 }
 
-private fun stockWarehouseMetricsForUi(
+private fun stockWarehouseItemsForFilter(
+    filterId: String,
     items: List<GoodsItemDataModel>,
     batches: List<GoodsBatchDataModel>
+): List<GoodsItemDataModel> = stockWarehouseItemsForFilter(
+    filterId = filterId,
+    items = items,
+    batchesByItem = stockWarehouseBatchesByItemForUi(batches)
+)
+
+private fun stockWarehouseMetricsForUi(
+    items: List<GoodsItemDataModel>,
+    batchesByItem: Map<String, List<GoodsBatchDataModel>>
 ): StockWarehouseMetricsData {
-    val activeBatches = stockWarehouseActiveBatchesForUi(batches)
-    val batchesByItem = activeBatches.groupBy { it.goodsItemId }
+    val activeBatchCount = batchesByItem.values.sumOf { it.size }
+    val quantityByItem = batchesByItem.mapValues { (_, itemBatches) -> itemBatches.sumOf { it.quantity.total } }
 
     return StockWarehouseMetricsData(
         totalItems = items.size,
-        inStockItems = items.count { it.stockWarehouseQuantityForUi(batchesByItem) > 0.0 },
-        outOfStockItems = items.count { it.stockWarehouseQuantityForUi(batchesByItem) <= 0.0 },
+        inStockItems = items.count { item -> (quantityByItem[item.id] ?: 0.0) > 0.0 },
+        outOfStockItems = items.count { item -> (quantityByItem[item.id] ?: 0.0) <= 0.0 },
         lowStockItems = items.count { item ->
-            val quantity = item.stockWarehouseQuantityForUi(batchesByItem)
+            val quantity = quantityByItem[item.id] ?: 0.0
             quantity > 0.0 && quantity <= 5.0
         },
         expiringSoonItems = items.count { it.stockWarehouseExpiringSoonForUi(batchesByItem) },
         noBarcodeItems = items.count { item -> item.stockWarehouseHasNoBarcodeForUi() },
-        activeBatchCount = activeBatches.size
+        activeBatchCount = activeBatchCount
     )
 }
+
+private fun stockWarehouseMetricsForUi(
+    items: List<GoodsItemDataModel>,
+    batches: List<GoodsBatchDataModel>
+): StockWarehouseMetricsData = stockWarehouseMetricsForUi(
+    items = items,
+    batchesByItem = stockWarehouseBatchesByItemForUi(batches)
+)
 
 private fun AppConfiguration.stockItemLabelDataForUi(
     goodsItem: GoodsItemDataModel,
@@ -10416,8 +10481,48 @@ fun AppConfiguration.StockWarehouseScreenContent(
                     stateValues.stringListEmpty
                 )
             } else {
+                val stockPayload = state.payload
+                val activeStoreId = stateValues.activeStoreId
+                val stockBatches = stateValues.stockBatches.orEmpty()
+                val warehouseBatchesByItem = remember(stockBatches) {
+                    stockWarehouseBatchesByItemForUi(stockBatches)
+                }
+                val warehouseQuantityByItem = remember(warehouseBatchesByItem) {
+                    warehouseBatchesByItem.mapValues { (_, batches) -> batches.sumOf { it.quantity.total } }
+                }
+                val displayBatchesByItem = remember(stockBatches, transactionTypeIndex, activeStoreId) {
+                    stockBatches
+                        .asSequence()
+                        .filter { batch ->
+                            batch.isActive && (
+                                    transactionTypeIndex == null ||
+                                            (batchBelongsToInventoryStoreForUi(batch.storeId, activeStoreId) && batch.isSelectableActiveStockBatch())
+                                    )
+                        }
+                        .groupBy { it.goodsItemId }
+                }
+                val sellableItemIdsForActiveStore = remember(stockBatches, activeStoreId) {
+                    if (activeStoreId.isNullOrBlank()) {
+                        emptySet()
+                    } else {
+                        stockBatches
+                            .asSequence()
+                            .filter { batch ->
+                                batch.isActive &&
+                                        batch.isSelectableActiveStockBatch() &&
+                                        batchBelongsToInventoryStoreForUi(batch.storeId, activeStoreId)
+                            }
+                            .map { it.goodsItemId }
+                            .filter { it.isNotBlank() }
+                            .toSet()
+                    }
+                }
+
                 var lSearchQuery: String by rememberSaveable {
                     mutableStateOf("")
+                }
+                var appliedSearchQuery: String by rememberSaveable(searchQuery, transactionTypeIndex) {
+                    mutableStateOf(searchQuery.orEmpty())
                 }
                 var selectedStockItemIds by rememberSaveable {
                     mutableStateOf(emptyList<String>())
@@ -10456,6 +10561,13 @@ fun AppConfiguration.StockWarehouseScreenContent(
                     }
                 }
 
+                LaunchedEffect(lSearchQuery, transactionTypeIndex) {
+                    if (transactionTypeIndex == null && lSearchQuery.isNotBlank()) {
+                        delay(160)
+                    }
+                    appliedSearchQuery = lSearchQuery
+                }
+
                 var lastExactSearchHandledKey by rememberSaveable {
                     mutableStateOf("")
                 }
@@ -10470,81 +10582,105 @@ fun AppConfiguration.StockWarehouseScreenContent(
                         ?: onExactSearchHit?.invoke(item)
                 }
 
-                val baseItems = state.payload
-                    .let { payload -> onFilter?.let { filterAction -> payload.filter { filterAction(it) } } ?: payload }
-                    .let { filtered ->
-                        if (transactionTypeIndex == null) {
-                            filtered
-                        } else {
-                            val activeStoreId = stateValues.activeStoreId
-                            filtered.filter { item -> activeStoreId.isNullOrBlank() || sameInventoryStoreGroupForUi(activeStoreId, item.storeId) || itemHasSellableBatchInStoreForUi(item.id, activeStoreId) }
+                val baseItems = remember(stockPayload, onFilter, transactionTypeIndex, activeStoreId, sellableItemIdsForActiveStore) {
+                    stockPayload
+                        .let { payload -> onFilter?.let { filterAction -> payload.filter { filterAction(it) } } ?: payload }
+                        .let { filtered ->
+                            if (transactionTypeIndex == null) {
+                                filtered
+                            } else {
+                                filtered.filter { item ->
+                                    activeStoreId.isNullOrBlank() ||
+                                            sameInventoryStoreGroupForUi(activeStoreId, item.storeId) ||
+                                            item.id in sellableItemIdsForActiveStore
+                                }
+                            }
                         }
-                    }
-                val items = lSearchQuery
-                    .takeIf {
-                        it.isNotEmpty()
-                    }?.let { query ->
-                        val candidate = query.transactionBarcodeCandidate() ?: query
-                        val embeddedWeightBarcodes = candidate.parseEmbeddedWeightBarcodeFormats()
+                }
 
-                        if (embeddedWeightBarcodes.isNotEmpty()) {
-                            baseItems
-                                .filter { item ->
+                val searchResult = remember(baseItems, appliedSearchQuery) {
+                    appliedSearchQuery
+                        .takeIf { it.isNotEmpty() }
+                        ?.let { query ->
+                            val candidate = query.transactionBarcodeCandidate() ?: query
+                            val embeddedWeightBarcodes = candidate.parseEmbeddedWeightBarcodeFormats()
+
+                            if (embeddedWeightBarcodes.isNotEmpty()) {
+                                val found = baseItems.filter { item ->
                                     item.matchesScannedBarcode(candidate) || embeddedWeightBarcodes.any { barcode ->
                                         item.matchesEmbeddedWeightBarcode(barcode)
                                     }
                                 }
-                                .also { found ->
-                                    if (found.size == 1) {
-                                        handleExactSearchHit(found.first(), candidate)
-                                    }
-                                }
-                        } else {
-                            baseItems
-                                .search<GoodsItemDataModel>(query)
-                                .apply {
-                                    if (second && first.isNotEmpty()) {
-                                        handleExactSearchHit(first.first(), query)
-                                    }
-                                }.first
-                        }
-                    } ?: baseItems
+                                StockWarehouseSearchResult(
+                                    items = found,
+                                    exactHit = found.singleOrNull(),
+                                    exactQuery = candidate
+                                )
+                            } else {
+                                val found = baseItems.search<GoodsItemDataModel>(query)
+                                StockWarehouseSearchResult(
+                                    items = found.first,
+                                    exactHit = if (found.second) found.first.firstOrNull() else null,
+                                    exactQuery = query
+                                )
+                            }
+                        } ?: StockWarehouseSearchResult(items = baseItems)
+                }
+                val items = searchResult.items
 
-                val unfilteredSortedItems = items.let { original ->
-                    val preferredOrder = preferredOrderIds
+                LaunchedEffect(searchResult.exactHit?.id, searchResult.exactQuery) {
+                    val exactHit = searchResult.exactHit
+                    if (exactHit != null && searchResult.exactQuery.isNotBlank()) {
+                        handleExactSearchHit(exactHit, searchResult.exactQuery)
+                    }
+                }
+
+                val preferredOrder = remember(preferredOrderIds) {
+                    preferredOrderIds
                         .filter { it.isNotBlank() }
                         .withIndex()
                         .associate { it.value to it.index }
-
+                }
+                val unfilteredSortedItems = remember(
+                    items,
+                    preferredOrder,
+                    sortMode,
+                    sortAscending,
+                    warehouseQuantityByItem,
+                    stateValues.appLanguage
+                ) {
                     val sorted = when {
-                        preferredOrder.isNotEmpty() -> original.sortedWith(
+                        preferredOrder.isNotEmpty() -> items.sortedWith(
                             compareBy<GoodsItemDataModel> { preferredOrder[it.id] ?: Int.MAX_VALUE }
                                 .thenBy { it.name.extractLocalizedString(stateValues.appLanguage).orEmpty().lowercase() }
                         )
-                        sortMode == "quantity" -> original.sortedBy { item ->
-                            stateValues.stockBatches.orEmpty()
-                                .filter { it.goodsItemId == item.id && it.isActive && it.status != StockBatchStatusDataModel.Deleted && it.status != StockBatchStatusDataModel.WrittenOff }
-                                .sumOf { it.quantity.total }
-                        }
-                        sortMode == "created" -> original.sortedBy { it.createdAtMillis }
-                        else -> original.sortedBy { it.name.extractLocalizedString(stateValues.appLanguage).orEmpty().lowercase() }
+                        sortMode == "quantity" -> items.sortedBy { item -> warehouseQuantityByItem[item.id] ?: 0.0 }
+                        sortMode == "created" -> items.sortedBy { it.createdAtMillis }
+                        else -> items.sortedBy { it.name.extractLocalizedString(stateValues.appLanguage).orEmpty().lowercase() }
                     }
                     if (preferredOrder.isEmpty() && !sortAscending) sorted.reversed() else sorted
                 }
                 val showWarehouseInfoTile = searchQuery == null && transactionTypeIndex == null
-                val sortedItems = if (showWarehouseInfoTile) {
-                    stockWarehouseItemsForFilter(
-                        filterId = selectedWarehouseFilterId,
-                        items = unfilteredSortedItems,
-                        batches = stateValues.stockBatches.orEmpty()
-                    )
-                } else {
-                    unfilteredSortedItems
+                val sortedItems = remember(showWarehouseInfoTile, selectedWarehouseFilterId, unfilteredSortedItems, warehouseBatchesByItem) {
+                    if (showWarehouseInfoTile) {
+                        stockWarehouseItemsForFilter(
+                            filterId = selectedWarehouseFilterId,
+                            items = unfilteredSortedItems,
+                            batchesByItem = warehouseBatchesByItem
+                        )
+                    } else {
+                        unfilteredSortedItems
+                    }
                 }
 
-                val selectableItemIds = sortedItems.map { it.id }.filter { it.isNotBlank() }.distinct()
-                LaunchedEffect(selectableItemIds.joinToString("|")) {
-                    val cleaned = selectedStockItemIds.filter { it in selectableItemIds }.distinct()
+                val selectableItemIds = remember(sortedItems) {
+                    sortedItems.map { it.id }.filter { it.isNotBlank() }.distinct()
+                }
+                val selectableItemIdSet = remember(selectableItemIds) { selectableItemIds.toSet() }
+                val selectionCleanupFirstId = selectableItemIds.firstOrNull().orEmpty()
+                val selectionCleanupLastId = selectableItemIds.lastOrNull().orEmpty()
+                LaunchedEffect(selectableItemIds.size, selectionCleanupFirstId, selectionCleanupLastId, appliedSearchQuery, selectedWarehouseFilterId) {
+                    val cleaned = selectedStockItemIds.filter { it in selectableItemIdSet }.distinct()
                     if (cleaned != selectedStockItemIds) selectedStockItemIds = cleaned
                 }
 
@@ -10574,7 +10710,7 @@ fun AppConfiguration.StockWarehouseScreenContent(
                 }
 
                 fun setSelectionForItemId(itemId: String, shouldSelect: Boolean) {
-                    if (!selectionAvailable || itemId.isBlank() || itemId !in selectableItemIds) return
+                    if (!selectionAvailable || itemId.isBlank() || itemId !in selectableItemIdSet) return
                     selectedStockItemIds = if (shouldSelect) {
                         (selectedStockItemIds + itemId).distinct()
                     } else {
@@ -10591,7 +10727,7 @@ fun AppConfiguration.StockWarehouseScreenContent(
                     val selectedLabels = selectedStockItemsInScreenOrder().mapNotNull { item ->
                         stockItemLabelDataForUi(
                             goodsItem = item,
-                            batches = stateValues.stockBatches.orEmpty().filter { batch -> batch.goodsItemId == item.id && batch.isActive },
+                            batches = displayBatchesByItem[item.id].orEmpty(),
                             copies = 1
                         )
                     }
@@ -10616,12 +10752,14 @@ fun AppConfiguration.StockWarehouseScreenContent(
                     }
                 }
 
-                var page by rememberSaveable(lSearchQuery, sortMode, sortAscending, selectedWarehouseFilterId, sortedItems.size) {
+                var page by rememberSaveable(appliedSearchQuery, sortMode, sortAscending, selectedWarehouseFilterId, sortedItems.size) {
                     mutableStateOf(0)
                 }
                 val pageSize = stateValues.globalAppConfiguration.pagingDefaultPageSize.coerceIn(20, 100)
-                val visibleItems = sortedItems.clientPaged(page, pageSize)
-                val overviewMetrics = stockWarehouseMetricsForUi(unfilteredSortedItems, stateValues.stockBatches.orEmpty())
+                val visibleItems = remember(sortedItems, page, pageSize) { sortedItems.clientPaged(page, pageSize) }
+                val overviewMetrics = remember(unfilteredSortedItems, warehouseBatchesByItem) {
+                    stockWarehouseMetricsForUi(unfilteredSortedItems, warehouseBatchesByItem)
+                }
 
                 Column(
                     modifier = modifier
@@ -10655,9 +10793,16 @@ fun AppConfiguration.StockWarehouseScreenContent(
                             stateKey = scrollStateKey
                         )
 
+                        LaunchedEffect(page, appliedSearchQuery, selectedWarehouseFilterId, sortMode, sortAscending) {
+                            warehouseListState.scrollToItem(0)
+                        }
+
                         var selectionDragShouldSelect by remember(selectionMode) { mutableStateOf<Boolean?>(null) }
                         var selectionDragTouchedIds by remember(selectionMode) { mutableStateOf(emptySet<String>()) }
                         val latestSelectedStockItemIds by rememberUpdatedState(selectedStockItemIds)
+                        val latestSelectableItemIdSet by rememberUpdatedState(selectableItemIdSet)
+                        val visibleItemsFirstId = visibleItems.firstOrNull()?.id.orEmpty()
+                        val visibleItemsLastId = visibleItems.lastOrNull()?.id.orEmpty()
 
                         fun stockItemIdAtListY(y: Float): String? {
                             val yInt = y.toInt()
@@ -10665,7 +10810,7 @@ fun AppConfiguration.StockWarehouseScreenContent(
                                 .firstOrNull { info -> yInt >= info.offset && yInt <= info.offset + info.size }
                                 ?.key
                                 ?.let { it as? String }
-                                ?.takeIf { it in selectableItemIds }
+                                ?.takeIf { it in latestSelectableItemIdSet }
                         }
 
                         fun applyDragSelectionAt(y: Float, shouldSelectOverride: Boolean? = null) {
@@ -10682,7 +10827,7 @@ fun AppConfiguration.StockWarehouseScreenContent(
                                 .fillMaxWidth()
                                 .weight(1f)
                                 .padding(8.dp)
-                                .pointerInput(selectionMode, selectableItemIds.joinToString("|")) {
+                                .pointerInput(selectionMode, visibleItems.size, visibleItemsFirstId, visibleItemsLastId) {
                                     if (!selectionMode) return@pointerInput
                                     detectDragGestures(
                                         onDragStart = { offset ->
@@ -10706,13 +10851,9 @@ fun AppConfiguration.StockWarehouseScreenContent(
                                 }
                         ) {
                             items(visibleItems, key = { it.id }) { item ->
-                                val activeStoreId = stateValues.activeStoreId
-                                val itemBatches = stateValues.stockBatches.orEmpty().filter { batch ->
-                                    batch.goodsItemId == item.id &&
-                                            batch.isActive &&
-                                            (transactionTypeIndex == null || (batchBelongsToInventoryStoreForUi(batch.storeId, activeStoreId) && batch.isSelectableActiveStockBatch()))
-                                }
+                                val itemBatches = displayBatchesByItem[item.id].orEmpty()
                                 val availableQuantity = itemBatches
+                                    .asSequence()
                                     .filter { batch ->
                                         if (transactionTypeIndex == null) {
                                             batch.status != StockBatchStatusDataModel.Deleted && batch.status != StockBatchStatusDataModel.WrittenOff
@@ -10723,7 +10864,7 @@ fun AppConfiguration.StockWarehouseScreenContent(
                                     .sumOf { it.quantity.total }
                                 val trulyOutOfStock = disableIfOutOfStock && availableQuantity <= 0.0
 
-                                val canOperateThisStoreInventory = activeStoreId.isNullOrBlank() || sameInventoryStoreGroupForUi(activeStoreId, item.storeId) || itemHasSellableBatchInStoreForUi(item.id, activeStoreId)
+                                val canOperateThisStoreInventory = activeStoreId.isNullOrBlank() || sameInventoryStoreGroupForUi(activeStoreId, item.storeId) || item.id in sellableItemIdsForActiveStore
 
                                 GoodsItemInStockWidget(
                                     modifier = Modifier
@@ -27571,6 +27712,7 @@ fun AppConfiguration.searchTextField(
     updateIsFocusedAction: ((FocusState) -> Unit)? = null,
     forceRefocus: Boolean = false,
     barcodeCamScanner: Boolean = false,
+    captureTransactionBarcodeInput: Boolean = false,
     focusedBorderWidth: Dp = stateValues.focusedBorderWidth,
     unfocusedBorderWidth: Dp = stateValues.unfocusedBorderWidth,
     focusedBorderColor: Color = stateValues.AccentColor,
@@ -27601,7 +27743,7 @@ fun AppConfiguration.searchTextField(
             barcodeCamScannerVisible = true
             coroutineScope.launch {
                 delay(100)
-                requestTransactionBarcodeFocus()
+                if (captureTransactionBarcodeInput) requestTransactionBarcodeFocus()
             }
         }
 
@@ -27609,7 +27751,7 @@ fun AppConfiguration.searchTextField(
             barcodeCamScannerVisible = false
             coroutineScope.launch {
                 delay(120)
-                requestTransactionBarcodeFocus()
+                if (captureTransactionBarcodeInput) requestTransactionBarcodeFocus()
             }
         }
 
@@ -27626,7 +27768,7 @@ fun AppConfiguration.searchTextField(
             )
             coroutineScope.launch {
                 delay(120)
-                requestTransactionBarcodeFocus()
+                if (captureTransactionBarcodeInput) requestTransactionBarcodeFocus()
             }
         }
 
@@ -27649,7 +27791,7 @@ fun AppConfiguration.searchTextField(
             coroutineScope.launch {
                 openPlatformAppSettings?.invoke(PlatformPermissionKind.Camera)
                 delay(120)
-                requestTransactionBarcodeFocus()
+                if (captureTransactionBarcodeInput) requestTransactionBarcodeFocus()
             }
         }
 
@@ -27659,7 +27801,7 @@ fun AppConfiguration.searchTextField(
                 permissionState = permissionState,
                 onDismiss = {
                     cameraPermissionDialogState = null
-                    requestTransactionBarcodeFocus()
+                    if (captureTransactionBarcodeInput) requestTransactionBarcodeFocus()
                 },
                 onConfirm = {
                     cameraPermissionDialogState = null
@@ -27688,7 +27830,6 @@ fun AppConfiguration.searchTextField(
             leadingIconPath = stateValues.drawablePathIconSearch,
             trailingIconExtraPath = if (cameraScannerAvailable) stateValues.drawablePathIconBarcodeCamScanner else null,
             trailingIconExtraContentDescription = localizedStringResource(982, "Camera barcode scanner"),
-            captureTransactionBarcodeInput = true,
             successHighlightPulseKey = barcodeFillHighlightPulseKey,
             trailingIconExtraOnClick = if (cameraScannerAvailable) {
                 {
@@ -27705,6 +27846,7 @@ fun AppConfiguration.searchTextField(
                     }
                 }
             } else null,
+            captureTransactionBarcodeInput = captureTransactionBarcodeInput
         )
 
         val onCameraBarcodeDetected: (String) -> Unit = { raw ->
@@ -27719,24 +27861,28 @@ fun AppConfiguration.searchTextField(
                     lastCameraBarcodeMillis = now
                     barcodeFillHighlightPulseKey += 1
 
-                    val handled = activeTransactionBarcodeHandler?.invoke(candidate) == true
-                    if (!handled) {
-                        postInAppNotification(
-                            listOf(
-                                LocalizedStringDataModel("main", "Barcode: $candidate"),
-                                LocalizedStringDataModel("en", "Barcode: $candidate"),
-                                LocalizedStringDataModel("ru", "Штрих-код: $candidate"),
-                                LocalizedStringDataModel("kk", "Штрих-код: $candidate")
-                            ),
-                            NotificationType.Neutral,
-                            transient = true
-                        )
+                    if (captureTransactionBarcodeInput) {
+                        val handled = activeTransactionBarcodeHandler?.invoke(candidate) == true
+                        if (!handled) {
+                            postInAppNotification(
+                                listOf(
+                                    LocalizedStringDataModel("main", "Barcode: $candidate"),
+                                    LocalizedStringDataModel("en", "Barcode: $candidate"),
+                                    LocalizedStringDataModel("ru", "Штрих-код: $candidate"),
+                                    LocalizedStringDataModel("kk", "Штрих-код: $candidate")
+                                ),
+                                NotificationType.Neutral,
+                                transient = true
+                            )
+                        }
+                    } else {
+                        textFieldContent?.replaceText(candidate, applyTransform = false)
                     }
                     closeScanner()
                 }
             }
 
-            requestTransactionBarcodeFocus()
+            if (captureTransactionBarcodeInput) requestTransactionBarcodeFocus()
         }
 
         AnimatedVisibility(
@@ -49486,6 +49632,7 @@ fun AppConfiguration.actionButton(
     cornerRadius: Dp = stateValues.cornerRadius,
 
     icon: @Composable (() -> Unit)? = null,
+    iconAfterText: Boolean = false,
 
     iconPath: String? = null,
     iconRes: DrawableResource? = null,
@@ -49675,29 +49822,34 @@ fun AppConfiguration.actionButton(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (effectiveLoading) {
-            CircularProgressIndicator(
-                modifier = Modifier
-                    .size(iconSize)
-                    .align(Alignment.CenterVertically),
-                color = textColor,
-                strokeWidth = 2.dp
-            )
-        } else {
-            icon?.invoke() ?: inferredIconPath?.run {
-                CpImage(
+        @Composable
+        fun ActionButtonIconSlot() {
+            if (effectiveLoading) {
+                CircularProgressIndicator(
                     modifier = Modifier
-                        .size(iconSize)
-                        .align(Alignment.CenterVertically),
-                    url = this,
-                    fallbackRes = resolvedIconRes,
-                    contentDescription = iconContentDescription,
-                    tintColor = iconTintColor
+                        .size(iconSize),
+                    color = textColor,
+                    strokeWidth = 2.dp
                 )
+            } else {
+                icon?.invoke() ?: inferredIconPath?.run {
+                    CpImage(
+                        modifier = Modifier
+                            .size(iconSize),
+                        url = this,
+                        fallbackRes = resolvedIconRes,
+                        contentDescription = iconContentDescription,
+                        tintColor = iconTintColor
+                    )
+                }
             }
         }
 
-        if (iconPresent && textPresent)
+        if (iconPresent && !iconAfterText) {
+            ActionButtonIconSlot()
+        }
+
+        if (iconPresent && textPresent && !iconAfterText)
             Spacer(modifier = Modifier.width(8.dp))
 
         if (textPresent) {
@@ -49735,6 +49887,13 @@ fun AppConfiguration.actionButton(
                     )
                 }
             }
+        }
+
+        if (iconPresent && textPresent && iconAfterText)
+            Spacer(modifier = Modifier.width(8.dp))
+
+        if (iconPresent && iconAfterText) {
+            ActionButtonIconSlot()
         }
     }
 

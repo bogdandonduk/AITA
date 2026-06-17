@@ -5505,7 +5505,7 @@ const val CLOUD_TRANSPORT_STATUS_UNAVAILABLE = -1
 @PublishedApi
 internal const val REALTIME_ACCESS_TOKEN_REFRESH_SKEW_MILLIS = 60_000L
 
-private const val DEFAULT_AITA_SERVER_URL = "http://10.202.5.35:8080"
+private const val DEFAULT_AITA_SERVER_URL = "http://192.168.1.168:8080"
 private val DEFAULT_AITA_SERVER_URL_PAIR = Pair(DEFAULT_AITA_SERVER_URL, "1")
 @Volatile
 private var currentNetworkRequestCandidateServerUrlsMemory: List<String> = emptyList()
@@ -6428,6 +6428,39 @@ val getStockBatchesMutex = Mutex()
 val addGoodsItemMutex = Mutex()
 val updateGoodsItemMutex = Mutex()
 val deleteGoodsItemMutex = Mutex()
+private const val STOCK_ITEM_DELETE_TOMBSTONE_TTL_MILLIS = 2L * 60L * 1000L
+private val recentlyDeletedStockItemIds = mutableMapOf<String, Long>()
+private val recentlyDeletedStockItemIdsMutex = Mutex()
+
+private fun pruneRecentlyDeletedStockItemIdsLocked(now: Long = getCurrentTimeMillis()) {
+    recentlyDeletedStockItemIds
+        .filterValues { expiresAt -> expiresAt <= now }
+        .keys
+        .toList()
+        .forEach { recentlyDeletedStockItemIds.remove(it) }
+}
+
+private suspend fun rememberRecentlyDeletedStockItemId(id: String) {
+    val cleanId = id.trim().takeIf { it.isNotBlank() } ?: return
+    recentlyDeletedStockItemIdsMutex.withLock {
+        val now = getCurrentTimeMillis()
+        pruneRecentlyDeletedStockItemIdsLocked(now)
+        recentlyDeletedStockItemIds[cleanId] = now + STOCK_ITEM_DELETE_TOMBSTONE_TTL_MILLIS
+    }
+}
+
+private suspend fun filterRecentlyDeletedStockItems(items: List<GoodsItemDataModel>): List<GoodsItemDataModel> {
+    if (items.isEmpty()) return items
+    return recentlyDeletedStockItemIdsMutex.withLock {
+        pruneRecentlyDeletedStockItemIdsLocked()
+        if (recentlyDeletedStockItemIds.isEmpty()) {
+            items
+        } else {
+            items.filterNot { item -> item.id in recentlyDeletedStockItemIds }
+        }
+    }
+}
+
 val getStockItemBranchAvailabilityMutex = Mutex()
 val moveStockBatchMutex = Mutex()
 
@@ -9689,7 +9722,7 @@ private fun localNetworkSnapshot(): LocalNetworkSnapshotDataModel {
 
 private suspend fun applyLocalNetworkSnapshot(snapshot: LocalNetworkSnapshotDataModel) {
     val message = localNetworkMessage(734, "Local branch state updated", "Локальное состояние филиала обновлено", "Филиалдың жергілікті күйі жаңартылды")
-    if (snapshot.stock.isNotEmpty()) stockState.emit(DataState.Success(snapshot.stock, message))
+    if (snapshot.stock.isNotEmpty()) stockState.emit(DataState.Success(filterRecentlyDeletedStockItems(snapshot.stock), message))
     if (snapshot.stockBatches.isNotEmpty()) stockBatchesState.emit(DataState.Success(snapshot.stockBatches, message))
     if (snapshot.transactions.isNotEmpty()) transactionsState.emit(DataState.Success(snapshot.transactions, message))
     if (snapshot.debtors.isNotEmpty()) debtorsState.emit(DataState.Success(snapshot.debtors, message))
@@ -10570,7 +10603,7 @@ val realtimeUpdatesConnectedState = MutableStateFlow(false)
 
 private suspend fun loadCachedStoreScopedData(storeId: String) {
     getJsonCache<List<GoodsItemDataModel>>(storeScopedCacheKey("stock", storeId))?.let {
-        stockState.emit(DataState.Success(it, cacheMessage()))
+        stockState.emit(DataState.Success(filterRecentlyDeletedStockItems(it), cacheMessage()))
     }
     getJsonCache<List<GoodsBatchDataModel>>(storeScopedCacheKey("stock_batches", storeId))?.let {
         stockBatchesState.emit(DataState.Success(it, cacheMessage()))
@@ -14245,8 +14278,10 @@ fun getStock(storeId: String) {
                     headers = mapOf("store_id" to storeId)
                 )
 
-                if (!response.negative)
-                    stockState.emit(DataState.Success(response.payload!!, response.message))
+                if (!response.negative) {
+                    val cleanPayload = filterRecentlyDeletedStockItems(response.payload.orEmpty())
+                    stockState.emit(DataState.Success(cleanPayload, response.message))
+                }
             }
         }
 }
@@ -14285,7 +14320,7 @@ fun getParentStoreStock(
             )
 
             val state: DataState<List<GoodsItemDataModel>> = if (!response.negative) {
-                DataState.Success(response.payload.orEmpty(), response.message)
+                DataState.Success(filterRecentlyDeletedStockItems(response.payload.orEmpty()), response.message)
             } else {
                 DataState.Empty(response.message)
             }
@@ -14430,13 +14465,18 @@ fun deleteGoodsItem(id: String, storeId: String, onCompleted: (() -> Unit)?) {
 
                     onCompleted?.invoke()
                 } else {
-                    postInAppNotification(response.message, NotificationType.Positive)
+                    val deletedId = response.payload?.takeIf { it.isNotBlank() } ?: id
+                    rememberRecentlyDeletedStockItemId(deletedId)
+                    postInAppNotification(response.message, NotificationType.Positive, transient = true)
 
                     stockState.payloadValue?.run {
-                        stockState.emit(DataState.Success(filter { it.id != response.payload }))
+                        stockState.emit(DataState.Success(filter { it.id != deletedId }))
+                    }
+                    parentStoreStockState.payloadValue?.run {
+                        parentStoreStockState.emit(DataState.Success(filter { it.id != deletedId }))
                     }
 
-                    deleteCartItemById(id)
+                    deleteCartItemById(deletedId)
 
                     onCompleted?.invoke()
                 }
