@@ -11226,8 +11226,7 @@ BEGIN
             FROM jsonb_array_elements_text(seed.barcodes) WITH ORDINALITY AS barcode_row(barcode_value, ordinality)
         ), '[]'::jsonb),
         jsonb_build_array(
-            jsonb_build_object('language', 'main', 'value', seed.name),
-            jsonb_build_object('language', 'ru', 'value', seed.name)
+            jsonb_build_object('language', 'main', 'value', seed.name)
         ),
         '[]'::jsonb,
         '0',

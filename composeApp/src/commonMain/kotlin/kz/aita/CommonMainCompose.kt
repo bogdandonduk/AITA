@@ -3345,7 +3345,7 @@ private fun AppConfiguration.transactionStockCandidatesForUi(
     val stock = stateValues.stock.orEmpty()
     if (activeStoreId.isNullOrBlank()) return stock
 
-    val stores = stateValues.stores
+    val stores = stateValues.stores.orEmpty()
     val storeRootById = buildMap {
         stores.forEach { store ->
             put(store.id, store.rootStoreId())
@@ -4740,10 +4740,17 @@ fun AppConfiguration.TransactionScreen() {
                 }
             }
 
+            val leftTransactionPaneModel =
+                navigationScreensLeft.lastOrNull() as? NavigationScreenModel.Transaction
+                    ?: NavigationScreenModel.Transaction.Selection
+            val rightTransactionPaneModel =
+                navigationScreensRight.lastOrNull() as? NavigationScreenModel.Transaction
+                    ?: NavigationScreenModel.Transaction.Cart
+
             if (stateValues.isNarrowScreen) {
                 TransactionPaneContent(
                     modifier = Modifier.weight(1f),
-                    model = navigationScreensLeft.last(),
+                    model = leftTransactionPaneModel,
                     onBarcodeCaptureFocusRequested = { requestTransactionBarcodeFocus() }
                 )
             } else {
@@ -4752,13 +4759,13 @@ fun AppConfiguration.TransactionScreen() {
                 ) {
                     TransactionPaneContent(
                         modifier = Modifier.weight(1f),
-                        model = navigationScreensLeft.last(),
+                        model = leftTransactionPaneModel,
                         onBarcodeCaptureFocusRequested = { requestTransactionBarcodeFocus() }
                     )
 
                     TransactionPaneContent(
                         modifier = Modifier.weight(1f),
-                        model = navigationScreensRight.last(),
+                        model = rightTransactionPaneModel,
                         onBarcodeCaptureFocusRequested = { requestTransactionBarcodeFocus() }
                     )
                 }
