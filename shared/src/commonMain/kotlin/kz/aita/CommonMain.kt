@@ -6548,6 +6548,18 @@ private suspend fun filterRecentlyDeletedStockItems(items: List<GoodsItemDataMod
     }
 }
 
+private suspend fun filterRecentlyDeletedStockBatches(batches: List<GoodsBatchDataModel>): List<GoodsBatchDataModel> {
+    if (batches.isEmpty()) return batches
+    return recentlyDeletedStockItemIdsMutex.withLock {
+        pruneRecentlyDeletedStockItemIdsLocked()
+        if (recentlyDeletedStockItemIds.isEmpty()) {
+            batches
+        } else {
+            batches.filterNot { batch -> recentlyDeletedStockItemIds.containsKey(batch.goodsItemId) }
+        }
+    }
+}
+
 val getStockItemBranchAvailabilityMutex = Mutex()
 val moveStockBatchMutex = Mutex()
 
@@ -8547,13 +8559,18 @@ internal suspend fun ensureCachedGlobalConfigurationPrimedForNetwork() {
 }
 
 private val AITA_SERVER_ENDPOINT_ROOT_SEGMENTS = setOf(
+    "analytics",
     "auth",
+    "balance",
     "cashregister",
     "config",
     "debtors",
     "finance",
     "generic",
+    "healthz",
+    "logs",
     "notifications",
+    "readyz",
     "res",
     "rt",
     "security",
@@ -8562,6 +8579,7 @@ private val AITA_SERVER_ENDPOINT_ROOT_SEGMENTS = setOf(
     "stores",
     "subscriptions",
     "suppliers",
+    "suppliercontracts",
     "suppliergoodsprices",
     "supplierorders",
     "support",
@@ -8591,15 +8609,19 @@ private fun String.withoutKnownAitaEndpointPath(): String {
 }
 
 private fun looksLikeLocalDevelopmentHostWithoutPort(authority: String): Boolean {
-    val host = authority
+    val cleanAuthority = authority
         .trim()
-        .trimStart('[')
-        .trimEnd(']')
         .substringBefore('/')
         .substringBefore('?')
         .substringBefore('#')
+    val host = when {
+        cleanAuthority.startsWith("[") -> cleanAuthority.substringAfter('[').substringBefore(']')
+        cleanAuthority.count { it == ':' } == 1 && cleanAuthority.substringAfter(':').all { it.isDigit() } -> cleanAuthority.substringBefore(':')
+        else -> cleanAuthority
+    }
 
     if (host.equals("localhost", ignoreCase = true)) return true
+    if (host == "::1") return true
     if (host == "10.0.2.2") return true
     if (host == "127.0.0.1") return true
     if (host.startsWith("192.168.")) return true
@@ -8654,7 +8676,14 @@ fun normalizedHttpServerUrlOrNull(raw: String?): String? {
         trimmed.startsWith("ws://", ignoreCase = true) -> "http://" + trimmed.substringAfter("://")
         trimmed.startsWith("wss://", ignoreCase = true) -> "https://" + trimmed.substringAfter("://")
         "://" in trimmed -> return null
-        else -> "http://$trimmed"
+        else -> {
+            val authorityCandidate = trimmed
+                .substringBefore('/')
+                .substringBefore('?')
+                .substringBefore('#')
+            val inferredScheme = if (looksLikeLocalDevelopmentHostWithoutPort(authorityCandidate)) "http" else "https"
+            "$inferredScheme://$trimmed"
+        }
     }
         .withoutKnownAitaEndpointPath()
         .withDefaultAitaPortForLocalHostIfMissing(hadExplicitScheme)
@@ -8720,9 +8749,11 @@ internal fun chooseClientServerUrlPair(
 ): Pair<String, String> {
     val currentNormalized = normalizedHttpServerUrlOrNull(current.first)
     val incomingNormalized = normalizedHttpServerUrlOrNull(incoming.first) ?: return current
+    val defaultNormalized = normalizedHttpServerUrlOrNull(DEFAULT_AITA_SERVER_URL)
 
     return when {
         currentNormalized == null -> Pair(incomingNormalized, incoming.second)
+        currentNormalized == defaultNormalized && incomingNormalized != defaultNormalized -> Pair(incomingNormalized, incoming.second)
         currentNormalized == incomingNormalized -> current
         else -> Pair(currentNormalized, current.second)
     }
@@ -8738,8 +8769,12 @@ internal suspend fun resolvedServerUrlCandidates(explicitServerUrl: String? = nu
         getJsonCache<GlobalAppConfigurationDataModel>(CACHE_GLOBAL_CONFIG)?.serverUrl?.first
     }.getOrNull()?.let { normalizedHttpServerUrlOrNull(it) }
     val defaultNormalized = normalizedHttpServerUrlOrNull(DEFAULT_AITA_SERVER_URL)
+    val cachedNonDefault = cachedConfiguredNormalized?.takeIf { it != defaultNormalized }
+    val currentCandidate = currentConfiguredNormalized?.takeUnless { it == defaultNormalized && cachedNonDefault != null }
 
     val selected = explicitNormalized
+        ?: currentCandidate
+        ?: cachedNonDefault
         ?: currentConfiguredNormalized
         ?: cachedConfiguredNormalized
         ?: defaultNormalized
@@ -8758,7 +8793,10 @@ internal suspend fun rememberReachableServerUrl(serverUrl: String) {
 
     val currentConfiguration = globalAppConfigurationState.payloadValue
     val currentNormalized = normalizedHttpServerUrlOrNull(currentConfiguration.serverUrl.first)
-    if (currentNormalized == null) {
+    val defaultNormalized = normalizedHttpServerUrlOrNull(DEFAULT_AITA_SERVER_URL)
+    val shouldRemember = currentNormalized == null ||
+            (currentNormalized == defaultNormalized && normalized != defaultNormalized)
+    if (shouldRemember) {
         globalAppConfigurationState.emit(
             DataState.Success(
                 currentConfiguration.copy(serverUrl = Pair(normalized, currentConfiguration.serverUrl.second)),
@@ -9822,10 +9860,10 @@ private fun localNetworkSnapshot(): LocalNetworkSnapshotDataModel {
 
 private suspend fun applyLocalNetworkSnapshot(snapshot: LocalNetworkSnapshotDataModel) {
     val message = localNetworkMessage(734, "Local branch state updated", "Локальное состояние филиала обновлено", "Филиалдың жергілікті күйі жаңартылды")
-    if (snapshot.stock.isNotEmpty()) stockState.emit(DataState.Success(filterRecentlyDeletedStockItems(snapshot.stock), message))
-    if (snapshot.stockBatches.isNotEmpty()) stockBatchesState.emit(DataState.Success(snapshot.stockBatches, message))
-    if (snapshot.transactions.isNotEmpty()) transactionsState.emit(DataState.Success(snapshot.transactions, message))
-    if (snapshot.debtors.isNotEmpty()) debtorsState.emit(DataState.Success(snapshot.debtors, message))
+    stockState.emit(DataState.Success(filterRecentlyDeletedStockItems(snapshot.stock), message))
+    stockBatchesState.emit(DataState.Success(filterRecentlyDeletedStockBatches(snapshot.stockBatches), message))
+    transactionsState.emit(DataState.Success(snapshot.transactions, message))
+    debtorsState.emit(DataState.Success(snapshot.debtors, message))
     snapshot.cashRegister?.let {
         cashRegisterState.emit(DataState.Success(it, message))
         cashRegisterAmountState.emit(it.currentAmount)
@@ -10041,7 +10079,7 @@ private fun mutateLocalBatchQuantity(batches: List<GoodsBatchDataModel>, item: G
     if (item == null) return batches
     val delta = when (transactionType) {
         "sale", "purchase" -> -line.quantity
-        "return", "supply", "acceptance" -> line.quantity
+        "return", "accept", "supply", "acceptance" -> line.quantity
         else -> 0.0
     }
     if (delta == 0.0) return batches
@@ -10740,7 +10778,7 @@ private suspend fun loadCachedStoreScopedData(storeId: String) {
         stockState.emit(DataState.Success(filterRecentlyDeletedStockItems(it), cacheMessage()))
     }
     getJsonCache<List<GoodsBatchDataModel>>(storeScopedCacheKey("stock_batches", storeId))?.let {
-        stockBatchesState.emit(DataState.Success(it, cacheMessage()))
+        stockBatchesState.emit(DataState.Success(filterRecentlyDeletedStockBatches(it), cacheMessage()))
     }
     getJsonCache<List<TransactionDataModel>>(storeScopedCacheKey("transactions", storeId))?.let {
         transactionsState.emit(DataState.Success(it, cacheMessage()))
@@ -12646,32 +12684,31 @@ fun saveNotificationToServer(notification: NotificationDataModel) {
 }
 
 fun markNotificationRead(notificationId: String) {
-    if (!markNotificationReadMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
-            markNotificationReadMutex.withLock {
-                val local = notificationsState.payloadValue.orEmpty()
-                val target = local.firstOrNull { it.id == notificationId }
-                removeActiveInAppNotification(notificationId)
-                if (target == null) return@withLock
+    GlobalScope.launch(Dispatchers.ourIo) {
+        markNotificationReadMutex.withLock {
+            val local = notificationsState.payloadValue.orEmpty()
+            val target = local.firstOrNull { it.id == notificationId }
+            removeActiveInAppNotification(notificationId)
+            if (target == null) return@withLock
 
-                val now = getCurrentTimeMillis()
-                notificationsState.emit(
-                    DataState.Success(local.map { if (it.id == notificationId) it.copy(readAtMillis = now) else it })
-                )
+            val now = getCurrentTimeMillis()
+            notificationsState.emit(
+                DataState.Success(local.map { if (it.id == notificationId) it.copy(readAtMillis = now) else it })
+            )
 
-                if (!target.isSavedOnServer) return@withLock
+            if (!target.isSavedOnServer) return@withLock
 
-                val response = networkRequest<List<NotificationDataModel>, List<String>>(
-                    method = HttpMethod.Put,
-                    endpointUrl = "notifications/read",
-                    body = listOf(notificationId)
-                )
+            val response = networkRequest<List<NotificationDataModel>, List<String>>(
+                method = HttpMethod.Put,
+                endpointUrl = "notifications/read",
+                body = listOf(notificationId)
+            )
 
-                if (!response.negative && response.payload != null) {
-                    notificationsState.emit(DataState.Success(response.payload.filterNot { it.isLocalOnlyNotification() }))
-                }
+            if (!response.negative && response.payload != null) {
+                notificationsState.emit(DataState.Success(response.payload.filterNot { it.isLocalOnlyNotification() }))
             }
         }
+    }
 }
 
 fun markAllNotificationsRead() {
@@ -13451,7 +13488,7 @@ fun syncUserPreferencesToServer(
     appSizeModeId: Long = appSizeModeIdState.value,
     postFailure: Boolean = true
 ) {
-    if (getStoredUserAuthTokens?.invoke() == null || updateUserPreferencesMutex.isLocked) return
+    if (getStoredUserAuthTokens?.invoke() == null) return
 
     GlobalScope.launch(Dispatchers.ourIo) {
         updateUserPreferencesMutex.withLock {
@@ -14612,6 +14649,9 @@ fun deleteGoodsItem(id: String, storeId: String, onCompleted: (() -> Unit)?) {
                     parentStoreStockState.payloadValue?.run {
                         parentStoreStockState.emit(DataState.Success(filter { it.id != deletedId }))
                     }
+                    stockBatchesState.payloadValue?.run {
+                        stockBatchesState.emit(DataState.Success(filter { it.goodsItemId != deletedId }))
+                    }
 
                     deleteCartItemById(deletedId)
 
@@ -14633,7 +14673,7 @@ fun getStockBatches(storeId: String) {
 
                 if (!response.negative) {
                     response.payload?.let { batches ->
-                        stockBatchesState.emit(DataState.Success(batches, response.message))
+                        stockBatchesState.emit(DataState.Success(filterRecentlyDeletedStockBatches(batches), response.message))
                     }
                 }
             }
@@ -15341,46 +15381,45 @@ fun setActiveShelfBatch(
         return
     }
 
-    if (!setActiveShelfBatchMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
-            setActiveShelfBatchMutex.withLock {
-                val response = networkRequest<GoodsItemDataModel, GoodsBatchDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = "stockBatches/setActiveShelfBatch",
-                    body = batch,
-                    headers = mapOf("store_id" to storeId)
+    GlobalScope.launch(Dispatchers.ourIo) {
+        setActiveShelfBatchMutex.withLock {
+            val response = networkRequest<GoodsItemDataModel, GoodsBatchDataModel>(
+                method = HttpMethod.Post,
+                endpointUrl = "stockBatches/setActiveShelfBatch",
+                body = batch,
+                headers = mapOf("store_id" to storeId)
+            )
+
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty())
+            } else {
+                val isGenuineShelfChange = response.message.orEmpty().isNotEmpty() &&
+                    knownPreviousActiveShelfBatchId != response.payload.activeShelfBatchId
+
+                if (isGenuineShelfChange)
+                    postInAppNotification(response.message, NotificationType.Positive)
+
+                stockState.emit(
+                    DataState.Success(
+                        mutableListOf<GoodsItemDataModel>().also { newList ->
+                            stockState.payloadValue?.let { newList.addAll(it) }
+
+                            val index = newList.indexOfFirst { it.id == response.payload.id }
+
+                            if (index != -1)
+                                newList[index] = response.payload
+                            else
+                                newList.add(response.payload)
+                        },
+                        response.message
+                    )
                 )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty())
-                } else {
-                    val isGenuineShelfChange = response.message.orEmpty().isNotEmpty() &&
-                            knownPreviousActiveShelfBatchId != response.payload.activeShelfBatchId
-
-                    if (isGenuineShelfChange)
-                        postInAppNotification(response.message, NotificationType.Positive)
-
-                    stockState.emit(
-                        DataState.Success(
-                            mutableListOf<GoodsItemDataModel>().also { newList ->
-                                stockState.payloadValue?.let { newList.addAll(it) }
-
-                                val index = newList.indexOfFirst { it.id == response.payload.id }
-
-                                if (index != -1)
-                                    newList[index] = response.payload
-                                else
-                                    newList.add(response.payload)
-                            },
-                            response.message
-                        )
-                    )
-
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 @kotlinx.serialization.Serializable
@@ -16461,26 +16500,31 @@ data class ResponseDataModel<T>(
 
 @Suppress("UNCHECKED_CAST")
 fun <T : Searchable> List<Searchable>.search(query: String, vararg extraOperands: String): Pair<List<T>, Boolean> {
-    singleOrNull {
-        it.searchUnique(query, *extraOperands)
-    }?.run {
-        return map { it as T } to true
-    }
+    val cleanQuery = query.trim()
+    if (cleanQuery.isBlank()) return emptyList<T>() to false
 
-    val exact = filter {
-        it.searchExact(query, *extraOperands)
-    }
-    val contains = filter {
-        it.searchContains(query, *extraOperands) && !exact.contains(it)
-    }
-
-    return mutableListOf<Searchable>()
-        .apply {
-            addAll(exact)
-            addAll(contains)
+    val uniqueHits = mutableListOf<Searchable>()
+    for (item in this) {
+        if (item.searchUnique(cleanQuery, *extraOperands)) {
+            uniqueHits += item
+            if (uniqueHits.size > 1) break
         }
-        .toList()
-        .map { it as T } to false
+    }
+    if (uniqueHits.size == 1) {
+        return uniqueHits.map { it as T } to true
+    }
+
+    val exact = mutableListOf<Searchable>()
+    val contains = mutableListOf<Searchable>()
+    for (item in this) {
+        if (item.searchExact(cleanQuery, *extraOperands)) {
+            exact += item
+        } else if (item.searchContains(cleanQuery, *extraOperands)) {
+            contains += item
+        }
+    }
+
+    return (exact + contains).map { it as T } to false
 }
 
 interface Searchable {
@@ -16501,7 +16545,9 @@ interface Searchable {
     }
 
     fun searchUnique(query: String, vararg extraOperands: String): Boolean {
-        return uniqueSearchOperands.all { it.equals(query, true) } && extraOperands.any { it.equals(query, true) }
+        val cleanQuery = query.trim().takeIf { it.isNotBlank() } ?: return false
+        return uniqueSearchOperands.any { it.equals(cleanQuery, true) }
+                || extraOperands.any { it.equals(cleanQuery, true) }
     }
 }
 

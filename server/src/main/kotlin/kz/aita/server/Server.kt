@@ -60,6 +60,7 @@ import org.jetbrains.exposed.sql.statements.UpdateBuilder
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.postgresql.util.PSQLException
 import java.net.URI
+import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -241,6 +242,113 @@ private val assetsRootPath: Path by lazy {
 private fun ApplicationConfig.optionalString(path: String): String? =
   runCatching { propertyOrNull(path)?.getString()?.trim()?.takeIf { it.isNotEmpty() } }.getOrNull()
 
+private fun decodeDatabaseUrlPart(raw: String?): String? = raw
+  ?.takeIf { it.isNotBlank() }
+  ?.let { value ->
+    val plusSafeValue = value.replace("+", "%2B")
+    runCatching { URLDecoder.decode(plusSafeValue, StandardCharsets.UTF_8.name()) }.getOrDefault(value)
+  }
+
+private fun postgresUrlForUriParsing(rawUrl: String): String {
+  val trimmed = rawUrl.trim()
+  return if (trimmed.startsWith("jdbc:postgresql://", ignoreCase = true)) {
+    "postgresql://" + trimmed.substringAfter("://")
+  } else {
+    trimmed
+  }
+}
+
+private fun String.withoutAuthorityUserInfo(): String {
+  val authorityEndIndex = listOf(
+    indexOf('/'),
+    indexOf('?'),
+    indexOf('#')
+  ).filter { it >= 0 }.minOrNull() ?: length
+  val authority = substring(0, authorityEndIndex)
+  val sanitizedAuthority = authority.substringAfterLast('@', authority)
+  return sanitizedAuthority + substring(authorityEndIndex)
+}
+
+private fun String.withoutDatabaseCredentialQueryParams(): String {
+  val fragmentIndex = indexOf('#')
+  val queryEndIndex = if (fragmentIndex >= 0) fragmentIndex else length
+  val queryStartIndex = indexOf('?').takeIf { it >= 0 && it < queryEndIndex } ?: return this
+  val prefix = substring(0, queryStartIndex)
+  val query = substring(queryStartIndex + 1, queryEndIndex)
+  val fragment = if (fragmentIndex >= 0) substring(fragmentIndex) else ""
+  val filteredQuery = query
+    .split('&')
+    .map { it.trim() }
+    .filter { it.isNotBlank() }
+    .filterNot { pair ->
+      val key = decodeDatabaseUrlPart(pair.substringBefore('=', pair))
+        ?.lowercase(Locale.ROOT)
+        .orEmpty()
+      key in setOf("user", "username", "password", "pass")
+    }
+    .joinToString("&")
+  return prefix + filteredQuery.takeIf { it.isNotBlank() }?.let { "?$it" }.orEmpty() + fragment
+}
+
+private fun databaseUrlAuthorityUserInfoFallback(rawUrl: String): String? {
+  val authority = rawUrl
+    .substringAfter("://", rawUrl)
+    .substringBefore('/')
+    .substringBefore('?')
+    .substringBefore('#')
+  val atIndex = authority.lastIndexOf('@')
+  if (atIndex <= 0) return null
+  return authority.substring(0, atIndex).takeIf { it.isNotBlank() }
+}
+
+
+private fun databaseUrlEmbeddedCredentials(rawUrl: String): Pair<String?, String?> {
+  val normalizedForParsing = postgresUrlForUriParsing(rawUrl)
+  val queryValues = normalizedForParsing
+    .substringAfter('?', "")
+    .substringBefore('#')
+    .takeIf { it.isNotBlank() }
+    ?.split('&')
+    ?.mapNotNull { pair ->
+      val key = decodeDatabaseUrlPart(pair.substringBefore('=', ""))
+        ?.lowercase(Locale.ROOT)
+        ?.takeIf { it.isNotBlank() }
+        ?: return@mapNotNull null
+      val value = decodeDatabaseUrlPart(pair.substringAfter('=', ""))
+        ?.takeIf { it.isNotBlank() }
+        ?: return@mapNotNull null
+      key to value
+    }
+    ?.toMap()
+    .orEmpty()
+  val queryUser = queryValues["user"] ?: queryValues["username"]
+  val queryPassword = queryValues["password"] ?: queryValues["pass"]
+
+  val userInfo = runCatching { URI(normalizedForParsing).rawUserInfo }.getOrNull()
+    ?.takeIf { it.isNotBlank() }
+    ?: databaseUrlAuthorityUserInfoFallback(normalizedForParsing)
+    ?: return queryUser to queryPassword
+
+  val rawUser = userInfo.substringBefore(':', userInfo)
+  val rawPassword = userInfo.substringAfter(':', "")
+  return (decodeDatabaseUrlPart(rawUser) ?: queryUser) to (decodeDatabaseUrlPart(rawPassword) ?: queryPassword)
+}
+
+private fun normalizePostgresJdbcUrl(rawUrl: String): String {
+  val trimmed = rawUrl.trim()
+  if (trimmed.startsWith("jdbc:postgresql://", ignoreCase = true)) {
+    return ("jdbc:postgresql://" + trimmed.substringAfter("://").withoutAuthorityUserInfo())
+      .withoutDatabaseCredentialQueryParams()
+  }
+  if (trimmed.startsWith("jdbc:", ignoreCase = true)) return trimmed.withoutDatabaseCredentialQueryParams()
+  if (!trimmed.startsWith("postgres://", ignoreCase = true) &&
+    !trimmed.startsWith("postgresql://", ignoreCase = true)
+  ) return trimmed
+
+  return ("jdbc:postgresql://" + trimmed.substringAfter("://").withoutAuthorityUserInfo())
+    .withoutDatabaseCredentialQueryParams()
+}
+
 private fun Application.configString(path: String, envName: String, default: String): String =
   environment.config.optionalString(path) ?: envOrSystem(envName) ?: default
 
@@ -277,7 +385,12 @@ private fun parseAllowedCorsOrigins(raw: String): List<AllowedCorsOrigin> {
     .mapNotNull { origin ->
       if (origin == "*") return@mapNotNull AllowedCorsOrigin("*", "*")
 
-      val candidate = if (origin.contains("://")) origin else "https://$origin"
+      val candidate = if (origin.contains("://")) {
+        origin
+      } else {
+        val scheme = if (publicServerUrlShouldDefaultToHttp(origin)) "http" else "https"
+        "$scheme://$origin"
+      }
       val uri = runCatching { URI(candidate) }.getOrNull() ?: return@mapNotNull null
       val scheme = uri.scheme?.lowercase(Locale.ROOT)?.takeIf { it.isNotBlank() } ?: "https"
       val host = uri.host?.lowercase(Locale.ROOT)?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
@@ -286,17 +399,117 @@ private fun parseAllowedCorsOrigins(raw: String): List<AllowedCorsOrigin> {
     }
 }
 
+private fun publicServerUrlShouldDefaultToHttp(rawUrl: String): Boolean {
+  val lower = rawUrl.trim().lowercase(Locale.ROOT)
+  return lower.startsWith("localhost") ||
+     lower.startsWith("127.") ||
+     lower.startsWith("0.0.0.0") ||
+     lower.startsWith("10.") ||
+     lower.startsWith("192.168.") ||
+     lower.startsWith("[::1]") ||
+     lower.startsWith("::1") ||
+     Regex("^172\\.(1[6-9]|2[0-9]|3[01])\\.").containsMatchIn(lower)
+}
+
+private fun normalizePublicServerUrlCandidate(rawUrl: String?): String? {
+  val trimmed = rawUrl
+    ?.trim()
+    ?.trimEnd('/')
+    ?.takeIf { it.isNotBlank() }
+    ?: return null
+  val withScheme = if (trimmed.contains("://")) {
+    trimmed
+  } else {
+    val scheme = if (publicServerUrlShouldDefaultToHttp(trimmed)) "http" else "https"
+    "$scheme://$trimmed"
+  }
+
+  return runCatching { URI(withScheme) }.getOrNull()?.let { uri ->
+    val scheme = uri.scheme
+      ?.lowercase(Locale.ROOT)
+      ?.takeIf { it == "http" || it == "https" }
+      ?: return@let null
+    val authority = uri.rawAuthority
+      ?.takeIf { it.isNotBlank() }
+      ?: return@let null
+    "$scheme://$authority"
+  }
+}
+
 private fun Application.publicServerUrl(): String? =
-  (environment.config.optionalString("app.publicServerUrl")
-    ?: envOrSystem("AITA_PUBLIC_SERVER_URL")
-    ?: envOrSystem("AITA_PUBLIC_BASE_URL"))
+  listOf(
+    envOrSystem("AITA_PUBLIC_SERVER_URL"),
+    envOrSystem("AITA_PUBLIC_BASE_URL"),
+    environment.config.optionalString("app.publicServerUrl")
+  ).firstNotNullOfOrNull(::normalizePublicServerUrlCandidate)
+
+private fun String.firstForwardedHeaderValue(): String? =
+  split(',')
+    .firstOrNull()
+    ?.trim()
     ?.trimEnd('/')
     ?.takeIf { it.isNotBlank() }
 
-private fun Application.buildGlobalConfigurationJson(): String {
-  val globalConfigPath = configAppRootPath.resolve("global.json")
-  val raw = Files.readString(globalConfigPath)
-  val publicUrl = publicServerUrl() ?: return raw
+private fun ApplicationCall.inferredPublicServerUrl(): String? {
+  val forwardedHost = request.header("X-Forwarded-Host")?.firstForwardedHeaderValue()
+  val host = forwardedHost
+    ?: request.header(HttpHeaders.Host)?.firstForwardedHeaderValue()
+    ?: request.origin.serverHost.takeIf { it.isNotBlank() }?.let { originHost ->
+      val originPort = request.origin.serverPort
+      val includePort = originPort > 0 && originPort !in setOf(80, 443)
+      if (includePort) "$originHost:$originPort" else originHost
+    }
+    ?: return null
+
+  val forwardedProto = request.header("X-Forwarded-Proto")
+    ?.firstForwardedHeaderValue()
+    ?.lowercase(Locale.ROOT)
+  val forwardedSsl = request.header("X-Forwarded-Ssl")
+    ?.firstForwardedHeaderValue()
+    ?.lowercase(Locale.ROOT)
+  val scheme = when {
+    forwardedProto in setOf("http", "https") -> forwardedProto
+    forwardedSsl == "on" -> "https"
+    request.origin.scheme.isNotBlank() -> request.origin.scheme
+    else -> "http"
+  }
+
+  return normalizePublicServerUrlCandidate("$scheme://$host")
+}
+
+private fun serverResourceBytes(vararg resourcePaths: String): ByteArray? {
+  val loader = aitaServerRuntimeClassLoader
+  return resourcePaths
+    .asSequence()
+    .map { it.trim().removePrefix("/") }
+    .filter { it.isNotBlank() }
+    .firstNotNullOfOrNull { resourcePath ->
+      loader.getResourceAsStream(resourcePath)?.use { stream -> stream.readBytes() }
+    }
+}
+
+private fun serverResourceText(vararg resourcePaths: String): String? =
+  serverResourceBytes(*resourcePaths)?.toString(StandardCharsets.UTF_8)
+
+private fun readServerTextFile(path: Path, vararg resourceFallbacks: String): String {
+  val normalizedPath = path.normalizedAbsolute()
+  return if (Files.isRegularFile(normalizedPath)) {
+    Files.readString(normalizedPath, StandardCharsets.UTF_8)
+  } else {
+    serverResourceText(*resourceFallbacks)
+      ?: error("Missing configured static file: $normalizedPath and classpath fallbacks: ${resourceFallbacks.joinToString()}")
+  }
+}
+
+private fun Application.buildGlobalConfigurationJson(publicUrlOverride: String? = null): String {
+  val raw = readServerTextFile(
+    configAppRootPath.resolve("global.json"),
+    "config/app/global.json",
+    "app/global.json"
+  )
+  val publicUrl = normalizePublicServerUrlCandidate(publicUrlOverride)
+    ?: publicServerUrl()
+    ?: return raw
 
   return runCatching {
     val root = Json.parseToJsonElement(raw).jsonObject
@@ -313,14 +526,80 @@ private fun Application.buildGlobalConfigurationJson(): String {
   }
 }
 
-private suspend fun ApplicationCall.respondStaticJsonFile(path: Path) {
+private suspend fun ApplicationCall.respondStaticJsonFile(path: Path, vararg resourceFallbacks: String) {
   val normalizedPath = path.normalizedAbsolute()
-  if (!Files.isRegularFile(normalizedPath)) {
-    application.environment.log.error("Missing configured static file: $normalizedPath")
+  if (Files.isRegularFile(normalizedPath)) {
+    respondFile(normalizedPath.toFile())
+    return
+  }
+
+  val fallback = serverResourceText(*resourceFallbacks)
+  if (fallback == null) {
+    application.environment.log.error(
+      "Missing configured static file: $normalizedPath and classpath fallbacks: ${resourceFallbacks.joinToString()}"
+    )
     respond(HttpStatusCode.NotFound)
     return
   }
-  respondFile(normalizedPath.toFile())
+
+  respondText(
+    text = fallback,
+    contentType = ContentType.Application.Json,
+    status = HttpStatusCode.OK
+  )
+}
+
+private fun safeStaticResourceRelativePath(parts: List<String>?): String? {
+  val normalized = parts
+    .orEmpty()
+    .map { it.trim() }
+    .filter { it.isNotBlank() }
+    .joinToString("/")
+    .replace('\\', '/')
+    .trim('/')
+
+  if (normalized.isBlank()) return null
+  if (normalized.startsWith(".") || "/../" in "/$normalized/" || normalized.contains("//")) return null
+  return normalized
+}
+
+private suspend fun ApplicationCall.respondDrawableAsset(relativePath: String) {
+  val drawableRoot = assetsRootPath.resolve("drawable").normalizedAbsolute()
+  val normalizedPath = drawableRoot.resolve(relativePath).normalizedAbsolute()
+  if (!normalizedPath.startsWith(drawableRoot)) {
+    respond(HttpStatusCode.BadRequest)
+    return
+  }
+
+  if (Files.isRegularFile(normalizedPath)) {
+    respondFile(normalizedPath.toFile())
+    return
+  }
+
+  val fallback = serverResourceBytes(
+    "assets/drawable/$relativePath",
+    "drawable/$relativePath"
+  )
+
+  if (fallback == null) {
+    application.environment.log.error("Missing drawable asset: $normalizedPath")
+    respond(HttpStatusCode.NotFound)
+    return
+  }
+
+  val contentType = when (relativePath.substringAfterLast('.', "").lowercase(Locale.ROOT)) {
+    "svg" -> ContentType.parse("image/svg+xml")
+    "png" -> ContentType.Image.PNG
+    "jpg", "jpeg" -> ContentType.Image.JPEG
+    "json" -> ContentType.Application.Json
+    else -> ContentType.Application.OctetStream
+  }
+
+  respondBytes(
+    bytes = fallback,
+    contentType = contentType,
+    status = HttpStatusCode.OK
+  )
 }
 
 fun metaFrom(call: ApplicationCall, deviceInfo: ClientDeviceInfoDataModel? = null): Map<String, String> {
@@ -1038,7 +1317,11 @@ fun getResponses(): List<RemoteResponseDataModel> {
 
   return synchronized(responsesCacheLock) {
     responsesCache ?: Json.decodeFromString<List<RemoteResponseDataModel>>(
-      Files.readString(configAppRootPath.resolve("responses.json"))
+      readServerTextFile(
+        configAppRootPath.resolve("responses.json"),
+        "config/app/responses.json",
+        "app/responses.json"
+      )
     ).also { responsesCache = it }
   }
 }
@@ -1048,15 +1331,26 @@ private fun ResultRow.toUserAccountDataModel(): UserAccountDataModel {
   val userIdText = userId.toString()
 
   val ownedStoreIds = Stores
-    .selectAll()
+    .select(Stores.id, Stores.ownerUserIds)
+    .where { Stores.isActive eq true }
     .mapNotNull { row -> row[Stores.id].toString().takeIf { row[Stores.ownerUserIds].contains(userIdText) } }
     .distinct()
 
-  val managedStoreIds = StoreUsers
+  val rawManagedStoreIds = StoreUsers
     .select(StoreUsers.storeId)
     .where { StoreUsers.userId eq userId }
-    .map { it[StoreUsers.storeId].toString() }
+    .map { it[StoreUsers.storeId] }
     .distinct()
+
+  val managedStoreIds = if (rawManagedStoreIds.isEmpty()) {
+    emptyList()
+  } else {
+    Stores
+      .select(Stores.id)
+      .where { (Stores.id inList rawManagedStoreIds) and (Stores.isActive eq true) }
+      .map { it[Stores.id].toString() }
+      .distinct()
+  }
 
   val supplierIds = Suppliers
     .select(Suppliers.id, Suppliers.userIds)
@@ -1097,7 +1391,9 @@ private fun ResultRow.toUserAccountDataModel(): UserAccountDataModel {
     managedStoreIds = managedStoreIds,
     manufacturerAccountIds = manufacturerIds.takeIf { it.isNotEmpty() }?.let { jsonBase.encodeToString(it) },
     buyerAccountId = userIdText,
-    activeStoreId = this[Users.activeStoreId]?.toString(),
+    activeStoreId = this[Users.activeStoreId]
+      ?.takeIf { activeStoreId -> userHasStoreAccessInsideTransaction(userId, activeStoreId) }
+      ?.toString(),
     appLanguage = this[Users.appLanguage],
     appThemeId = this[Users.appThemeId],
     appSizeModeId = this[Users.appSizeModeId],
@@ -1285,7 +1581,7 @@ object Workers: Table("workers") {
   val placeId = uuid("place_id")
   val privilegeModes = jsonb("privilege_modes", Json, ListSerializer(WorkerPrivilegeModeDataModel.serializer()))
   val phoneNumber = varchar("phone_number", 32).uniqueIndex()
-  val email = varchar("phone_number", 255).uniqueIndex()
+  val email = varchar("email", 255).uniqueIndex()
   val firstName = varchar("first_name", 255)
   val lastName = varchar("last_name", 255)
   val salary = text("salary").default("0")
@@ -1603,6 +1899,7 @@ object Stores: Table("stores") {
   val phoneNumbers = jsonb("phone_numbers", Json, ListSerializer(String.serializer()))
   val emails = jsonb("emails", Json, ListSerializer(String.serializer()))
   val countryLocales = jsonb("country_locales", Json, ListSerializer(String.serializer()))
+  val isActive = bool("is_active").default(true)
 
   val createdAt = timestamp("created_at").defaultExpression(CurrentTimestamp)
   val updatedAt = timestamp("updated_at").defaultExpression(CurrentTimestamp)
@@ -3600,7 +3897,27 @@ private val AitaRuntimeClassLoaderPlugin = createApplicationPlugin(name = "AitaR
   }
 }
 
+private fun configureKtorDeploymentPortForCloudRuntime() {
+  val cleanPort = listOfNotNull(
+    envOrSystem("ktor.deployment.port"),
+    envOrSystem("AITA_PORT"),
+    envOrSystem("PORT"),
+    "8080"
+  ).firstNotNullOfOrNull { rawPort ->
+    rawPort.toIntOrNull()?.takeIf { it in 1..65_535 }?.toString()
+  } ?: return
+
+  if (System.getProperty("AITA_PORT").isNullOrBlank()) {
+    System.setProperty("AITA_PORT", cleanPort)
+  }
+
+  if (System.getProperty("ktor.deployment.port").isNullOrBlank()) {
+    System.setProperty("ktor.deployment.port", cleanPort)
+  }
+}
+
 fun main(args: Array<String>) {
+  configureKtorDeploymentPortForCloudRuntime()
   stabilizeServerRuntimeClassLoader("main")
   Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
     if (throwable.isClassLoadingFailure()) {
@@ -4328,21 +4645,121 @@ private fun rootStoreIdForAccessInsideTransaction(storeId: UUID): UUID {
     ?: storeId
 }
 
+private fun activeRootStoreIdForAccessInsideTransaction(storeId: UUID): UUID? {
+  val storeRow = Stores
+    .select(Stores.id, Stores.parentStoreId, Stores.isActive)
+    .where { Stores.id eq storeId }
+    .singleOrNull()
+    ?: return null
+  if (!storeRow[Stores.isActive]) return null
+
+  val parentStoreId = storeRow[Stores.parentStoreId] ?: return storeRow[Stores.id]
+  val parentActive = Stores
+    .select(Stores.id)
+    .where { (Stores.id eq parentStoreId) and (Stores.isActive eq true) }
+    .empty()
+    .not()
+  return parentStoreId.takeIf { parentActive }
+}
+
 private fun stockVisibleStoreIdsInsideTransaction(storeId: UUID): List<UUID> {
-  val rootStoreId = rootStoreIdForAccessInsideTransaction(storeId)
+  val rootStoreId = activeRootStoreIdForAccessInsideTransaction(storeId) ?: return emptyList()
   val directBranches = Stores
     .select(Stores.id)
-    .where { Stores.parentStoreId eq rootStoreId }
+    .where { (Stores.parentStoreId eq rootStoreId) and (Stores.isActive eq true) }
     .map { it[Stores.id] }
 
   return (listOf(rootStoreId) + directBranches).distinct()
+}
+
+private fun userHasRootInventoryScopeInsideTransaction(userId: UUID, rootStoreId: UUID): Boolean {
+  val activeRootExists = Stores
+    .select(Stores.id, Stores.ownerUserIds)
+    .where { (Stores.id eq rootStoreId) and (Stores.isActive eq true) }
+    .singleOrNull()
+    ?: return false
+
+  if (activeRootExists[Stores.ownerUserIds].contains(userId.toString())) return true
+
+  val directRootUserAccess = StoreUsers
+    .select(StoreUsers.storeId)
+    .where { (StoreUsers.userId eq userId) and (StoreUsers.storeId eq rootStoreId) }
+    .empty()
+    .not()
+
+  if (directRootUserAccess) return true
+
+  return StoreWorkerMemberships
+    .select(StoreWorkerMemberships.storeId)
+    .where {
+      (StoreWorkerMemberships.userId eq userId) and
+         (StoreWorkerMemberships.storeId eq rootStoreId) and
+         (StoreWorkerMemberships.isActive eq true)
+    }
+    .empty()
+    .not()
+}
+
+private fun activeBranchStoreIdsAccessibleToUserInsideTransaction(userId: UUID, rootStoreId: UUID): List<UUID> {
+  val activeBranchIds = Stores
+    .select(Stores.id)
+    .where { (Stores.parentStoreId eq rootStoreId) and (Stores.isActive eq true) }
+    .map { it[Stores.id] }
+
+  if (activeBranchIds.isEmpty()) return emptyList()
+
+  val ownerId = userId.toString()
+  val ownedBranchIds = Stores
+    .select(Stores.id, Stores.ownerUserIds)
+    .where { (Stores.id inList activeBranchIds) and (Stores.isActive eq true) }
+    .filter { row -> row[Stores.ownerUserIds].contains(ownerId) }
+    .map { it[Stores.id] }
+
+  val directUserBranchIds = StoreUsers
+    .select(StoreUsers.storeId)
+    .where { (StoreUsers.userId eq userId) and (StoreUsers.storeId inList activeBranchIds) }
+    .map { it[StoreUsers.storeId] }
+
+  val workerBranchIds = StoreWorkerMemberships
+    .select(StoreWorkerMemberships.storeId)
+    .where {
+      (StoreWorkerMemberships.userId eq userId) and
+         (StoreWorkerMemberships.storeId inList activeBranchIds) and
+         (StoreWorkerMemberships.isActive eq true)
+    }
+    .map { it[StoreWorkerMemberships.storeId] }
+
+  return (ownedBranchIds + directUserBranchIds + workerBranchIds).distinct()
+}
+
+private fun stockVisibleStoreIdsForUserInsideTransaction(userId: UUID, storeId: UUID): List<UUID> {
+  val rootStoreId = activeRootStoreIdForAccessInsideTransaction(storeId) ?: return emptyList()
+  if (userHasRootInventoryScopeInsideTransaction(userId, rootStoreId)) {
+    return stockVisibleStoreIdsInsideTransaction(rootStoreId)
+  }
+
+  if (storeId == rootStoreId) {
+    return activeBranchStoreIdsAccessibleToUserInsideTransaction(userId, rootStoreId)
+  }
+
+  val activeBranchExists = Stores
+    .select(Stores.id)
+    .where { (Stores.id eq storeId) and (Stores.parentStoreId eq rootStoreId) and (Stores.isActive eq true) }
+    .empty()
+    .not()
+
+  if (!activeBranchExists || !userHasStoreAccessInsideTransaction(userId, storeId)) return emptyList()
+
+  return listOf(storeId)
 }
 
 private fun userHasStoreAccessInsideTransaction(
   userId: UUID,
   storeId: UUID
 ): Boolean {
-  val rootStoreId = rootStoreIdForAccessInsideTransaction(storeId)
+  val rootStoreId = activeRootStoreIdForAccessInsideTransaction(storeId) ?: return false
+
+  if (isStoreOwnerInsideTransaction(userId, storeId)) return true
 
   val directAccess = StoreUsers
     .selectAll()
@@ -4381,17 +4798,17 @@ private fun userHasSupplierAccessInsideTransaction(
 
 
 private fun isStoreOwnerInsideTransaction(userId: UUID, storeId: UUID): Boolean {
-  val rootStoreId = rootStoreIdForAccessInsideTransaction(storeId)
+  val rootStoreId = activeRootStoreIdForAccessInsideTransaction(storeId) ?: return false
   return Stores
     .select(Stores.ownerUserIds)
-    .where { Stores.id eq rootStoreId }
+    .where { (Stores.id eq rootStoreId) and (Stores.isActive eq true) }
     .singleOrNull()
     ?.get(Stores.ownerUserIds)
     ?.contains(userId.toString()) == true
 }
 
 private fun activeWorkerPermissionsInsideTransaction(userId: UUID, storeId: UUID): List<String> {
-  val rootStoreId = rootStoreIdForAccessInsideTransaction(storeId)
+  val rootStoreId = activeRootStoreIdForAccessInsideTransaction(storeId) ?: return emptyList()
   return normalizeStorePermissionIds(
     StoreWorkerMemberships
       .select(StoreWorkerMemberships.permissions)
@@ -4511,7 +4928,7 @@ private fun actorCanManageExistingWorkerPermissionsInsideTransaction(
 
 private fun userRequiresWorkshiftInsideTransaction(userId: UUID, storeId: UUID): Boolean {
   if (isStoreOwnerInsideTransaction(userId, storeId)) return false
-  val rootStoreId = rootStoreIdForAccessInsideTransaction(storeId)
+  val rootStoreId = activeRootStoreIdForAccessInsideTransaction(storeId) ?: return false
   return StoreWorkerMemberships
     .select(StoreWorkerMemberships.id)
     .where {
@@ -4524,6 +4941,7 @@ private fun userRequiresWorkshiftInsideTransaction(userId: UUID, storeId: UUID):
 }
 
 private fun activeWorkshiftIdInsideTransaction(userId: UUID, storeId: UUID): UUID? {
+  activeRootStoreIdForAccessInsideTransaction(storeId) ?: return null
   val exactShift = Workshifts
     .select(Workshifts.id)
     .where {
@@ -4539,8 +4957,7 @@ private fun activeWorkshiftIdInsideTransaction(userId: UUID, storeId: UUID): UUI
 
   if (exactShift != null) return exactShift
 
-  val rootStoreId = rootStoreIdForAccessInsideTransaction(storeId)
-  val visibleStoreIds = stockVisibleStoreIdsInsideTransaction(rootStoreId)
+  val visibleStoreIds = stockVisibleStoreIdsForUserInsideTransaction(userId, storeId)
     .filter { it != storeId }
 
   if (visibleStoreIds.isEmpty()) return null
@@ -4590,17 +5007,19 @@ private fun ResultRow.toOperationLogDataModel(): OperationLogDataModel {
   )
 }
 
-private fun operationLogStoreIdsForScopeInsideTransaction(storeId: UUID, scope: String): List<UUID> {
-  val rootStoreId = rootStoreIdForAccessInsideTransaction(storeId)
-  val parentScope = scope.equals(OPERATION_LOG_SCOPE_ROOT, ignoreCase = true) || storeId == rootStoreId
+private fun operationLogStoreIdsForScopeInsideTransaction(userId: UUID, storeId: UUID, scope: String): List<UUID> {
+  val rootStoreId = activeRootStoreIdForAccessInsideTransaction(storeId) ?: return emptyList()
+  val visibleStoreIds = stockVisibleStoreIdsForUserInsideTransaction(userId, storeId)
+    .distinct()
+  if (visibleStoreIds.isEmpty()) return emptyList()
 
-  return if (parentScope) {
-    listOf(rootStoreId) + Stores
-      .select(Stores.id)
-      .where { Stores.parentStoreId eq rootStoreId }
-      .map { it[Stores.id] }
+  val parentScope = scope.equals(OPERATION_LOG_SCOPE_ROOT, ignoreCase = true) || storeId == rootStoreId
+  if (!parentScope) return listOf(storeId).filter { it in visibleStoreIds }
+
+  return if (userHasRootInventoryScopeInsideTransaction(userId, rootStoreId)) {
+    visibleStoreIds
   } else {
-    listOf(storeId)
+    listOf(storeId).filter { it in visibleStoreIds }
   }
 }
 
@@ -5188,6 +5607,7 @@ private fun storeWorkerNotificationRecipientUserIdsInsideTransaction(
 ): List<UUID> {
   val rootStoreId = rootStoreIdForAccessInsideTransaction(storeId)
   val storeIds = storeGroupIdsInsideTransaction(rootStoreId)
+  if (storeIds.isEmpty()) return emptyList()
 
   val ownerIds = Stores
     .select(Stores.ownerUserIds)
@@ -5742,20 +6162,27 @@ private fun ResultRow.toStoreDataModel(branches: List<StoreDataModel> = emptyLis
 }
 
 private fun List<ResultRow>.toHierarchicalStoreDataModels(): List<StoreDataModel> {
-  val branchRowsByParent = filter { it[Stores.parentStoreId] != null }
-    .groupBy { it[Stores.parentStoreId]!! }
+  val rowsById = linkedMapOf<UUID, ResultRow>()
+  forEach { row -> rowsById.putIfAbsent(row[Stores.id], row) }
 
-  val branchModels = filter { it[Stores.parentStoreId] != null }
+  val orderedRows = rowsById.values.toList()
+  val parentRows = orderedRows.filter { it[Stores.parentStoreId] == null }
+  val parentIds = parentRows.map { it[Stores.id] }.toSet()
+  val branchRowsByParent = orderedRows
+    .filter { it[Stores.parentStoreId] != null }
+    .groupBy { it[Stores.parentStoreId] ?: it[Stores.id] }
+
+  val parentModels = parentRows.map { row ->
+    row.toStoreDataModel(
+      branches = branchRowsByParent[row[Stores.id]].orEmpty().map { it.toStoreDataModel() }
+    )
+  }
+
+  val orphanBranchModels = orderedRows
+    .filter { row -> row[Stores.parentStoreId]?.let { parentId -> parentId !in parentIds } == true }
     .map { it.toStoreDataModel() }
 
-  val parentModels = filter { it[Stores.parentStoreId] == null }
-    .map { row ->
-      row.toStoreDataModel(
-        branches = branchRowsByParent[row[Stores.id]].orEmpty().map { it.toStoreDataModel() }
-      )
-    }
-
-  return parentModels + branchModels
+  return parentModels + orphanBranchModels
 }
 
 private fun ResultRow.toStoreWorkerDataModel(): StoreWorkerDataModel {
@@ -7314,10 +7741,18 @@ private fun ResultRow.toStockBatchMovementDataModel(): StockBatchMovementDataMod
 }
 
 private fun storeGroupIdsInsideTransaction(rootStoreId: UUID): List<UUID> {
+  val activeRootExists = Stores
+    .select(Stores.id)
+    .where { (Stores.id eq rootStoreId) and (Stores.parentStoreId.isNull()) and (Stores.isActive eq true) }
+    .empty()
+    .not()
+  if (!activeRootExists) return emptyList()
+
   return Stores
     .select(Stores.id)
     .where {
-      (Stores.id eq rootStoreId) or (Stores.parentStoreId eq (rootStoreId as UUID?))
+      ((Stores.id eq rootStoreId) or (Stores.parentStoreId eq (rootStoreId as UUID?))) and
+         (Stores.isActive eq true)
     }
     .map { it[Stores.id] }
 }
@@ -7372,9 +7807,10 @@ private fun stockItemsMatchByIdentity(source: ResultRow, candidate: ResultRow): 
 
 private fun matchingStockItemRowsForStoreGroupInsideTransaction(
   rootStoreId: UUID,
-  sourceItemRow: ResultRow
+  sourceItemRow: ResultRow,
+  visibleStoreIdsOverride: List<UUID>? = null
 ): List<ResultRow> {
-  val storeIds = storeGroupIdsInsideTransaction(rootStoreId)
+  val storeIds = visibleStoreIdsOverride?.takeIf { it.isNotEmpty() } ?: storeGroupIdsInsideTransaction(rootStoreId)
   if (storeIds.isEmpty()) return emptyList()
 
   return StockItems
@@ -7400,6 +7836,7 @@ private fun activePhysicalBatchRowsForGoodsItemInsideTransaction(
       row[StockBatchesV2.quantity].total > 0.0 &&
          row[StockBatchesV2.status] !in setOf(
         StockBatchStatusDataModel.Ordered.name,
+        StockBatchStatusDataModel.Reserved.name,
         StockBatchStatusDataModel.InTransit.name,
         StockBatchStatusDataModel.SoldOut.name,
         StockBatchStatusDataModel.WrittenOff.name,
@@ -7410,7 +7847,8 @@ private fun activePhysicalBatchRowsForGoodsItemInsideTransaction(
 
 private fun buildStockBranchAvailabilityInsideTransaction(
   currentStoreId: UUID,
-  sourceGoodsItemId: UUID
+  sourceGoodsItemId: UUID,
+  visibleStoreIdsOverride: List<UUID>? = null
 ): StockItemBranchAvailabilityDataModel? {
   val sourceItemRow = StockItems
     .selectAll()
@@ -7422,14 +7860,18 @@ private fun buildStockBranchAvailabilityInsideTransaction(
     ?: return null
 
   val rootStoreId = rootStoreIdForAccessInsideTransaction(sourceItemRow[StockItems.storeId])
-  val storeIds = storeGroupIdsInsideTransaction(rootStoreId)
+  val storeIds = visibleStoreIdsOverride?.takeIf { it.isNotEmpty() } ?: storeGroupIdsInsideTransaction(rootStoreId)
+  if (sourceItemRow[StockItems.storeId] !in storeIds) return null
   val storesById = Stores
     .selectAll()
     .where { Stores.id inList storeIds }
     .associateBy { it[Stores.id] }
 
-  val matchingItemsByStore = matchingStockItemRowsForStoreGroupInsideTransaction(rootStoreId, sourceItemRow)
-    .groupBy { it[StockItems.storeId] }
+  val matchingItemsByStore = matchingStockItemRowsForStoreGroupInsideTransaction(
+    rootStoreId = rootStoreId,
+    sourceItemRow = sourceItemRow,
+    visibleStoreIdsOverride = storeIds
+  ).groupBy { it[StockItems.storeId] }
 
   val locations = storeIds
     .mapNotNull { storeId ->
@@ -8034,12 +8476,16 @@ private fun defaultServerQuantityForGoodsItem(
 private fun findStockItemRowByTransactionBarcodeInsideTransaction(
   storeId: UUID,
   barcode: String,
-  preferAvailableBatches: Boolean = false
+  preferAvailableBatches: Boolean = false,
+  visibleStoreIdsOverride: List<UUID>? = null
 ): ResultRow? {
   val cleanBarcode = barcode.trim()
   if (cleanBarcode.isBlank()) return null
 
-  val visibleStoreIds = stockVisibleStoreIdsInsideTransaction(storeId)
+  val visibleStoreIds = visibleStoreIdsOverride?.takeIf { it.isNotEmpty() }
+    ?: stockVisibleStoreIdsInsideTransaction(storeId)
+  if (visibleStoreIds.isEmpty()) return null
+
   val matchingRows = StockItems
     .selectAll()
     .where {
@@ -8053,7 +8499,7 @@ private fun findStockItemRowByTransactionBarcodeInsideTransaction(
   if (matchingRows.isEmpty()) return null
 
   val goodsItemIdsWithBatchesInStore = StockBatchesV2
-    .select(StockBatchesV2.goodsItemId)
+    .select(StockBatchesV2.goodsItemId, StockBatchesV2.status)
     .where {
       (StockBatchesV2.storeId inList visibleStoreIds) and
          (StockBatchesV2.goodsItemId inList matchingRows.map { it[StockItems.id] }) and
@@ -8061,7 +8507,9 @@ private fun findStockItemRowByTransactionBarcodeInsideTransaction(
     }
     .filter { row ->
       val status = row[StockBatchesV2.status]
-      status != StockBatchStatusDataModel.Deleted.name &&
+      status != StockBatchStatusDataModel.Ordered.name &&
+         status != StockBatchStatusDataModel.Reserved.name &&
+         status != StockBatchStatusDataModel.Deleted.name &&
          status != StockBatchStatusDataModel.InTransit.name &&
          status != StockBatchStatusDataModel.WrittenOff.name &&
          status != StockBatchStatusDataModel.SoldOut.name
@@ -8082,13 +8530,53 @@ private fun findStockItemRowByTransactionBarcodeInsideTransaction(
   ).firstOrNull()
 }
 
+private fun findStockItemRowForTransactionLineInsideTransaction(
+  storeId: UUID,
+  line: GoodsItemInTransactionDataModel,
+  preferAvailableBatches: Boolean = false,
+  visibleStoreIdsOverride: List<UUID>? = null
+): ResultRow? {
+  val visibleStoreIds = visibleStoreIdsOverride?.takeIf { it.isNotEmpty() }
+    ?: stockVisibleStoreIdsInsideTransaction(storeId)
+  if (visibleStoreIds.isEmpty()) return null
+  val requestedGoodsItemId = line.goodsItemId
+    ?.trim()
+    ?.takeIf { it.isNotBlank() }
+    ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+
+  if (requestedGoodsItemId != null) {
+    StockItems
+      .selectAll()
+      .where {
+        (StockItems.id eq requestedGoodsItemId) and
+           (StockItems.storeId inList visibleStoreIds) and
+           (StockItems.isActive eq true)
+      }
+      .singleOrNull()
+      ?.let { return it }
+  }
+
+  return findStockItemRowByTransactionBarcodeInsideTransaction(
+    storeId = storeId,
+    barcode = line.barcode,
+    preferAvailableBatches = preferAvailableBatches,
+    visibleStoreIdsOverride = visibleStoreIds
+  )
+}
+
 private fun activeStockBatchesForGoodsItemInsideTransaction(
   storeId: UUID,
   goodsItemId: UUID,
   activeShelfBatchId: UUID?,
-  visibleStoreGroup: Boolean = false
+  visibleStoreGroup: Boolean = false,
+  visibleStoreIdsOverride: List<UUID>? = null
 ): List<ResultRow> {
-  val storeIds = if (visibleStoreGroup) stockVisibleStoreIdsInsideTransaction(storeId) else listOf(storeId)
+  val storeIds = if (visibleStoreGroup) {
+    visibleStoreIdsOverride?.takeIf { it.isNotEmpty() } ?: stockVisibleStoreIdsInsideTransaction(storeId)
+  } else {
+    listOf(storeId)
+  }
+  if (storeIds.isEmpty()) return emptyList()
 
   return StockBatchesV2
     .selectAll()
@@ -8099,7 +8587,9 @@ private fun activeStockBatchesForGoodsItemInsideTransaction(
     }
     .filter { row ->
       val status = row[StockBatchesV2.status]
-      status != StockBatchStatusDataModel.Deleted.name &&
+      status != StockBatchStatusDataModel.Ordered.name &&
+         status != StockBatchStatusDataModel.Reserved.name &&
+         status != StockBatchStatusDataModel.Deleted.name &&
          status != StockBatchStatusDataModel.InTransit.name &&
          status != StockBatchStatusDataModel.WrittenOff.name
     }
@@ -8124,7 +8614,8 @@ private data class NormalizedTransactionGoodsResult(
 private fun normalizeTransactionGoodsInsideTransaction(
   storeId: UUID,
   transactionType: String,
-  lines: List<GoodsItemInTransactionDataModel>
+  lines: List<GoodsItemInTransactionDataModel>,
+  visibleStoreIdsOverride: List<UUID>? = null
 ): NormalizedTransactionGoodsResult {
   val transactionTypeIndex = when (transactionType) {
     "purchase" -> 0
@@ -8136,10 +8627,11 @@ private fun normalizeTransactionGoodsInsideTransaction(
   val normalizedLines = mutableListOf<GoodsItemInTransactionDataModel>()
 
   for (line in lines) {
-    val itemRow = findStockItemRowByTransactionBarcodeInsideTransaction(
+    val itemRow = findStockItemRowForTransactionLineInsideTransaction(
       storeId = storeId,
-      barcode = line.barcode,
-      preferAvailableBatches = transactionType == "purchase"
+      line = line,
+      preferAvailableBatches = transactionType == "purchase",
+      visibleStoreIdsOverride = visibleStoreIdsOverride
     ) ?: return NormalizedTransactionGoodsResult(null, "not_found")
 
     val goodsItem = itemRow.toGoodsItemDataModel()
@@ -8156,7 +8648,8 @@ private fun normalizeTransactionGoodsInsideTransaction(
       storeId = storeId,
       goodsItemId = itemRow[StockItems.id],
       activeShelfBatchId = itemRow[StockItems.activeShelfBatchId],
-      visibleStoreGroup = transactionType == "purchase" || transactionType == "return"
+      visibleStoreGroup = transactionType == "purchase" || transactionType == "return",
+      visibleStoreIdsOverride = visibleStoreIdsOverride
     ).let { rows ->
       if (transactionType != "return") rows else rows.filter { row ->
         when (row[StockBatchesV2.status]) {
@@ -8285,16 +8778,149 @@ private fun preserveGoodsItemNameInTransactionsInsideTransaction(
   return updatedTransactions
 }
 
+private data class TransactionHistoryGoodsSnapshot(
+  val storeId: UUID,
+  val goodsItemId: String,
+  val name: List<LocalizedStringDataModel>,
+  val measurementUnitId: String,
+  val barcodeValues: List<String>,
+  val fallbackCurrencyCode: String?
+)
+
+private fun ResultRow.toTransactionHistoryGoodsSnapshot(): TransactionHistoryGoodsSnapshot {
+  val fallbackCurrencyCode = sequenceOf(
+    this[StockItems.salePrices],
+    this[StockItems.returnPrices],
+    this[StockItems.supplyPrices],
+    this[StockItems.wholesalePrices]
+  ).flatten().firstOrNull { it.currency.isNotBlank() }?.currency
+
+  return TransactionHistoryGoodsSnapshot(
+    storeId = this[StockItems.storeId],
+    goodsItemId = this[StockItems.id].toString(),
+    name = this[StockItems.name],
+    measurementUnitId = this[StockItems.measurementUnitId],
+    barcodeValues = stockBarcodeValues(),
+    fallbackCurrencyCode = fallbackCurrencyCode
+  )
+}
+
 private fun preserveExistingGoodsItemNamesInTransactionHistoryInsideTransaction(): Int {
-  var updatedTransactions = 0
-  StockItems
-    .selectAll()
-    .forEach { goodsItemRow ->
-      updatedTransactions += preserveGoodsItemNameInTransactionsInsideTransaction(
-        storeId = goodsItemRow[StockItems.storeId],
-        goodsItemRow = goodsItemRow
-      )
+  val transactionRows = Transactions
+    .select(
+      Transactions.id,
+      Transactions.storeId,
+      Transactions.goodsInTransaction
+    )
+    .toList()
+
+  if (transactionRows.isEmpty()) return 0
+
+  val snapshots = StockItems
+    .select(
+      StockItems.id,
+      StockItems.storeId,
+      StockItems.name,
+      StockItems.measurementUnitId,
+      StockItems.barcodes,
+      StockItems.barcodeModels,
+      StockItems.salePrices,
+      StockItems.returnPrices,
+      StockItems.supplyPrices,
+      StockItems.wholesalePrices
+    )
+    .map { row -> row.toTransactionHistoryGoodsSnapshot() }
+
+  if (snapshots.isEmpty()) return 0
+
+  fun barcodeHistoryLookupKeys(rawBarcode: String): List<String> {
+    val candidates = rawBarcode
+      .toStoredGoodsItemBarcodeCandidates()
+      .plus(rawBarcode.toStoredGoodsItemBarcode())
+      .plus(rawBarcode)
+
+    return candidates
+      .flatMap { candidate ->
+        listOf(
+          candidate.trim(),
+          candidate.normalizedBarcodeToken()
+        )
+      }
+      .filter { it.isNotBlank() }
+      .distinct()
+  }
+
+  val snapshotsByStore = snapshots.groupBy { it.storeId }
+  val snapshotsByStoreAndId = snapshots
+    .filter { it.goodsItemId.isNotBlank() }
+    .associateBy { it.storeId to it.goodsItemId }
+  val snapshotsByStoreAndBarcode = buildMap<Pair<UUID, String>, TransactionHistoryGoodsSnapshot> {
+    snapshots.forEach { snapshot ->
+      snapshot.barcodeValues
+        .flatMap { barcode -> barcodeHistoryLookupKeys(barcode) }
+        .forEach { barcode -> putIfAbsent(snapshot.storeId to barcode, snapshot) }
     }
+  }
+
+  fun findSnapshotForLine(storeId: UUID, line: GoodsItemInTransactionDataModel): TransactionHistoryGoodsSnapshot? {
+    line.goodsItemId
+      ?.takeIf { it.isNotBlank() }
+      ?.let { goodsItemId -> snapshotsByStoreAndId[storeId to goodsItemId] }
+      ?.let { return it }
+
+    val barcodeCandidates = barcodeHistoryLookupKeys(line.barcode)
+
+    barcodeCandidates
+      .firstNotNullOfOrNull { candidate -> snapshotsByStoreAndBarcode[storeId to candidate] }
+      ?.let { return it }
+
+    if (barcodeCandidates.isEmpty()) return null
+
+    return snapshotsByStore[storeId]
+      .orEmpty()
+      .firstOrNull { snapshot ->
+        snapshot.barcodeValues.any { storedBarcode ->
+          storedBarcodeMatchesScannedTransactionBarcode(
+            storedBarcode = storedBarcode,
+            scannedBarcode = line.barcode
+          ) || storedBarcodeMatchesScannedTransactionBarcode(
+            storedBarcode = line.barcode,
+            scannedBarcode = storedBarcode
+          )
+        }
+      }
+  }
+
+  var updatedTransactions = 0
+
+  transactionRows.forEach { transactionRow ->
+    val transactionId = transactionRow[Transactions.id]
+    val storeId = transactionRow[Transactions.storeId]
+    val originalLines = transactionRow[Transactions.goodsInTransaction]
+    var changed = false
+
+    val updatedLines = originalLines.map { line ->
+      val snapshot = findSnapshotForLine(storeId, line) ?: return@map line
+
+      val updatedLine = line.copy(
+        name = line.name.takeIf { it.isNotEmpty() } ?: snapshot.name,
+        goodsItemId = line.goodsItemId?.takeIf { it.isNotBlank() } ?: snapshot.goodsItemId,
+        quantityUnit = line.quantityUnit ?: defaultServerQuantityForGoodsItem(snapshot.measurementUnitId, line.quantity),
+        currencyCode = line.currencyCode?.takeIf { it.isNotBlank() } ?: snapshot.fallbackCurrencyCode
+      )
+
+      if (updatedLine != line) changed = true
+      updatedLine
+    }
+
+    if (changed) {
+      Transactions.update({ Transactions.id eq transactionId }) { update ->
+        update[Transactions.goodsInTransaction] = updatedLines
+      }
+      updatedTransactions += 1
+    }
+  }
+
   return updatedTransactions
 }
 
@@ -8302,9 +8928,15 @@ private fun updateGoodsItemActiveShelfBatchInsideTransaction(
   goodsItemId: UUID,
   storeId: UUID,
   now: Long,
-  visibleStoreGroup: Boolean = false
+  visibleStoreGroup: Boolean = false,
+  visibleStoreIdsOverride: List<UUID>? = null
 ) {
-  val storeIds = if (visibleStoreGroup) stockVisibleStoreIdsInsideTransaction(storeId) else listOf(storeId)
+  val storeIds = if (visibleStoreGroup) {
+    visibleStoreIdsOverride?.takeIf { it.isNotEmpty() } ?: stockVisibleStoreIdsInsideTransaction(storeId)
+  } else {
+    listOf(storeId)
+  }
+  if (storeIds.isEmpty()) return
   val currentActiveBatchId = StockItems
     .selectAll()
     .where { StockItems.id eq goodsItemId }
@@ -8323,7 +8955,9 @@ private fun updateGoodsItemActiveShelfBatchInsideTransaction(
       .firstOrNull()
       ?.let { row ->
         val status = row[StockBatchesV2.status]
-        status != StockBatchStatusDataModel.Deleted.name &&
+        status != StockBatchStatusDataModel.Ordered.name &&
+           status != StockBatchStatusDataModel.Reserved.name &&
+           status != StockBatchStatusDataModel.Deleted.name &&
            status != StockBatchStatusDataModel.InTransit.name &&
            status != StockBatchStatusDataModel.WrittenOff.name &&
            status != StockBatchStatusDataModel.SoldOut.name &&
@@ -8343,7 +8977,9 @@ private fun updateGoodsItemActiveShelfBatchInsideTransaction(
       }
       .filter { row ->
         val status = row[StockBatchesV2.status]
-        status != StockBatchStatusDataModel.Deleted.name &&
+        status != StockBatchStatusDataModel.Ordered.name &&
+           status != StockBatchStatusDataModel.Reserved.name &&
+           status != StockBatchStatusDataModel.Deleted.name &&
            status != StockBatchStatusDataModel.InTransit.name &&
            status != StockBatchStatusDataModel.WrittenOff.name &&
            status != StockBatchStatusDataModel.SoldOut.name &&
@@ -8374,7 +9010,8 @@ private fun subtractStockForTransactionLineInsideTransaction(
   storeId: UUID,
   itemRow: ResultRow,
   requestedQuantity: Double,
-  now: Long
+  now: Long,
+  visibleStoreIdsOverride: List<UUID>? = null
 ): Boolean {
   val goodsItemId = itemRow[StockItems.id]
   val activeShelfBatchId = itemRow[StockItems.activeShelfBatchId]
@@ -8386,8 +9023,12 @@ private fun subtractStockForTransactionLineInsideTransaction(
     storeId = storeId,
     goodsItemId = goodsItemId,
     activeShelfBatchId = activeShelfBatchId,
-    visibleStoreGroup = true
-  ).filter { it[StockBatchesV2.quantity].total > 0.0 }
+    visibleStoreGroup = true,
+    visibleStoreIdsOverride = visibleStoreIdsOverride
+  ).filter { row ->
+    row[StockBatchesV2.quantity].total > 0.0 &&
+       row[StockBatchesV2.status] != StockBatchStatusDataModel.SoldOut.name
+  }
 
   val available = batches.sumOf { it[StockBatchesV2.quantity].total }
   if (available + 0.000001 < quantityToSubtract)
@@ -8419,7 +9060,13 @@ private fun subtractStockForTransactionLineInsideTransaction(
     remaining -= taken
   }
 
-  updateGoodsItemActiveShelfBatchInsideTransaction(goodsItemId, storeId, now, visibleStoreGroup = true)
+  updateGoodsItemActiveShelfBatchInsideTransaction(
+    goodsItemId = goodsItemId,
+    storeId = storeId,
+    now = now,
+    visibleStoreGroup = true,
+    visibleStoreIdsOverride = visibleStoreIdsOverride
+  )
   return true
 }
 
@@ -8433,7 +9080,8 @@ private fun addStockForTransactionLineInsideTransaction(
   preferredSupplierIdText: String? = null,
   preferredStockBatchIdText: String? = null,
   preferredCurrencyCode: String? = null,
-  isReturnTransaction: Boolean = false
+  isReturnTransaction: Boolean = false,
+  visibleStoreIdsOverride: List<UUID>? = null
 ): Boolean {
   val goodsItemId = itemRow[StockItems.id]
   val activeShelfBatchId = itemRow[StockItems.activeShelfBatchId]
@@ -8458,7 +9106,8 @@ private fun addStockForTransactionLineInsideTransaction(
     storeId = storeId,
     goodsItemId = goodsItemId,
     activeShelfBatchId = activeShelfBatchId,
-    visibleStoreGroup = isReturnTransaction
+    visibleStoreGroup = isReturnTransaction,
+    visibleStoreIdsOverride = visibleStoreIdsOverride
   ).let { rows ->
     if (!isReturnTransaction) rows else rows.filter { row ->
       when (row[StockBatchesV2.status]) {
@@ -8607,13 +9256,15 @@ private fun applyTransactionStockMutationInsideTransaction(
   userId: UUID,
   storeId: UUID,
   transaction: TransactionDataModel,
-  now: Long
+  now: Long,
+  visibleStoreIdsOverride: List<UUID>? = null
 ): Boolean {
   for (line in transaction.goodsInTransaction) {
-    val itemRow = findStockItemRowByTransactionBarcodeInsideTransaction(
+    val itemRow = findStockItemRowForTransactionLineInsideTransaction(
       storeId = storeId,
-      barcode = line.barcode,
-      preferAvailableBatches = transaction.type == "purchase"
+      line = line,
+      preferAvailableBatches = transaction.type == "purchase",
+      visibleStoreIdsOverride = visibleStoreIdsOverride
     ) ?: return false
 
     val ok = when (transaction.type) {
@@ -8621,7 +9272,8 @@ private fun applyTransactionStockMutationInsideTransaction(
         storeId = storeId,
         itemRow = itemRow,
         requestedQuantity = line.quantity,
-        now = now
+        now = now,
+        visibleStoreIdsOverride = visibleStoreIdsOverride
       )
 
       "return", "accept" -> addStockForTransactionLineInsideTransaction(
@@ -8634,7 +9286,8 @@ private fun applyTransactionStockMutationInsideTransaction(
         preferredSupplierIdText = line.supplierIdText,
         preferredStockBatchIdText = line.stockBatchId,
         preferredCurrencyCode = line.currencyCode,
-        isReturnTransaction = transaction.type == "return"
+        isReturnTransaction = transaction.type == "return",
+        visibleStoreIdsOverride = visibleStoreIdsOverride
       )
 
       else -> false
@@ -8680,7 +9333,7 @@ fun Application.module() {
   install(CachingHeaders) {
     options { _, outgoing ->
       when (outgoing.contentType?.withoutParameters()) {
-        ContentType.Image.SVG,
+        ContentType.parse("image/svg+xml"),
         ContentType.Image.PNG,
         ContentType.Image.JPEG,
         ContentType("image", "webp") ->
@@ -8695,9 +9348,15 @@ fun Application.module() {
     }
   }
   val productionMode = isProductionMode()
-  val allowedCorsOrigins = parseAllowedCorsOrigins(
+  val configuredCorsOrigins = parseAllowedCorsOrigins(
     environment.config.optionalString("cors.allowedOrigins") ?: envOrSystem("AITA_CORS_ALLOWED_ORIGINS").orEmpty()
   )
+  val publicServerCorsOrigins = if (configuredCorsOrigins.isEmpty()) {
+    publicServerUrl()?.let(::parseAllowedCorsOrigins).orEmpty()
+  } else {
+    emptyList()
+  }
+  val allowedCorsOrigins = configuredCorsOrigins.ifEmpty { publicServerCorsOrigins }
 
   install(CORS) {
     when {
@@ -8710,7 +9369,7 @@ fun Application.module() {
       }
 
       allowedCorsOrigins.isEmpty() && productionMode -> {
-        error("AITA_CORS_ALLOWED_ORIGINS must be configured in production")
+        error("AITA_CORS_ALLOWED_ORIGINS or AITA_PUBLIC_SERVER_URL must be configured in production")
       }
 
       allowedCorsOrigins.isEmpty() -> {
@@ -8816,13 +9475,31 @@ fun Application.module() {
     notificationRetentionDaemonStarted = false
   }
 
-  val dbUrl = environment.config.optionalString("db.url") ?: envOrSystem("AITA_DB_URL").orEmpty()
-  val dbUser = environment.config.optionalString("db.user") ?: envOrSystem("DB_USER").orEmpty()
-  val dbPass = environment.config.optionalString("db.pass") ?: envOrSystem("DB_PASS").orEmpty()
+  val rawDbUrl = environment.config.optionalString("db.url")
+    ?: envOrSystem("AITA_DB_URL")
+    ?: envOrSystem("DATABASE_URL")
+    ?: envOrSystem("JDBC_DATABASE_URL")
+    ?: ""
+  val (embeddedDbUser, embeddedDbPass) = databaseUrlEmbeddedCredentials(rawDbUrl)
+  val dbUrl = rawDbUrl.takeIf { it.isNotBlank() }?.let(::normalizePostgresJdbcUrl).orEmpty()
+  val dbUser = environment.config.optionalString("db.user")
+    ?: envOrSystem("DB_USER")
+    ?: envOrSystem("AITA_DB_USER")
+    ?: envOrSystem("AITA_DB_USERNAME")
+    ?: envOrSystem("DB_USERNAME")
+    ?: embeddedDbUser
+    ?: ""
+  val dbPass = environment.config.optionalString("db.pass")
+    ?: envOrSystem("DB_PASS")
+    ?: envOrSystem("AITA_DB_PASS")
+    ?: envOrSystem("AITA_DB_PASSWORD")
+    ?: envOrSystem("DB_PASSWORD")
+    ?: embeddedDbPass
+    ?: ""
 
-  require(dbUrl.isNotBlank()) { "AITA_DB_URL must be configured" }
-  require(dbUser.isNotBlank()) { "DB_USER must be configured" }
-  require(dbPass.isNotBlank()) { "DB_PASS must be configured" }
+  require(dbUrl.isNotBlank()) { "AITA_DB_URL, DATABASE_URL, or JDBC_DATABASE_URL must be configured" }
+  require(dbUser.isNotBlank()) { "DB_USER, AITA_DB_USER, DB_USERNAME, or DATABASE_URL user info must be configured" }
+  require(dbPass.isNotBlank()) { "DB_PASS, AITA_DB_PASS, AITA_DB_PASSWORD, DB_PASSWORD, or DATABASE_URL user info must be configured" }
 
   val hikariMaxPoolSize = configInt("db.maximumPoolSize", "AITA_DB_MAX_POOL_SIZE", 10).coerceAtLeast(1)
   val hikariMinimumIdle = configInt("db.minimumIdle", "AITA_DB_MIN_IDLE", 2).coerceIn(0, hikariMaxPoolSize)
@@ -8876,7 +9553,7 @@ fun Application.module() {
 
   org.jetbrains.exposed.sql.transactions.transaction {
     if (configBoolean("app.schemaAutoRepair", "AITA_SCHEMA_AUTO_REPAIR", false)) {
-      SchemaUtils.createMissingTablesAndColumns(Users, RefreshSessions, SecuritySessionEvents, Stores, StockItems, StockBatchesV2, StockBatchMovements, Suppliers, SupplierGoodsPrices, SupplierOrders, SupplierOrderLines, Debtors, TransactionReturnItems, Notifications, SupportTickets, SupportMessages, StoreWorkerRequests, StoreWorkerMemberships, StoreWorkerRoleTemplates, Workshifts, CashRegisters, CashRegisterEvents, UserWallets, UserWalletLedgerEntries, TopUpPaymentIntents, StoreSubscriptionStates, StoreSubscriptionChargeEvents, OperationLogs, Manufacturers, GenericGoodsItems, GenericGoodsItemCandidates, GenericGoodsCategories)
+      SchemaUtils.createMissingTablesAndColumns(Users, RefreshSessions, SecuritySessionEvents, Stores, StoreUsers, Transactions, TransactionReturnItems, StockItems, StockBatchesV2, StockBatchMovements, Suppliers, SupplierGoodsPrices, SupplierPartnershipContracts, SupplierOrders, SupplierOrderLines, Debtors, UserBalances, StoreSubscriptions, StoreActivationHistory, Notifications, SupportTickets, SupportMessages, StoreWorkerRequests, StoreWorkerMemberships, StoreWorkerRoleTemplates, Workshifts, CashRegisters, CashRegisterEvents, UserWallets, UserWalletLedgerEntries, TopUpPaymentIntents, StoreSubscriptionStates, StoreSubscriptionChargeEvents, OperationLogs, Manufacturers, GenericGoodsItems, GenericGoodsItemCandidates, GenericGoodsCategories)
     }
     sanitizeGenericGoodsCategoryPrefixesInsideTransaction()
     seedGenericGoodsCategoriesInsideTransaction()
@@ -9121,6 +9798,7 @@ fun Application.module() {
           val instant = Instant.now()
 
           var state23505Reached: Boolean
+          var lateUniqueConflictResult = 0
 
           do {
             state23505Reached = try {
@@ -9148,12 +9826,43 @@ fun Application.module() {
                 false
               }
             } catch (exception: ExposedSQLException) {
-              val constraint = (exception.cause as? PSQLException)?.serverErrorMessage?.constraint
-              val isPkCollision = exception.sqlState == "23505" && constraint?.equals("users_pkey", true) == true
+              val constraint = (exception.cause as? PSQLException)?.serverErrorMessage?.constraint.orEmpty()
+              val isUniqueCollision = exception.sqlState == "23505"
+              val isPkCollision = isUniqueCollision && constraint.equals("users_pkey", true)
 
-              isPkCollision
+              when {
+                (isPkCollision || (isUniqueCollision && constraint.contains("public", ignoreCase = true))) -> true
+                isUniqueCollision && constraint.contains("phone", ignoreCase = true) -> {
+                  lateUniqueConflictResult = 2
+                  false
+                }
+                isUniqueCollision && constraint.contains("email", ignoreCase = true) -> {
+                  lateUniqueConflictResult = 3
+                  false
+                }
+                isUniqueCollision -> {
+                  lateUniqueConflictResult = 1
+                  false
+                }
+                else -> throw exception
+              }
             }
           } while (state23505Reached)
+
+          when (lateUniqueConflictResult) {
+            1 -> return@post call.genericResponseNoPayload(
+              HttpStatusCode.Conflict,
+              message = getResponse("2").message
+            )
+            2 -> return@post call.genericResponseNoPayload(
+              HttpStatusCode.Conflict,
+              message = getResponse("0").message
+            )
+            3 -> return@post call.genericResponseNoPayload(
+              HttpStatusCode.Conflict,
+              message = getResponse("1").message
+            )
+          }
 
           id?.run {
             val tokenPair: TokenPair = tokenService.newPair(this, metaFrom(call, body.deviceInfo))
@@ -9845,10 +10554,14 @@ fun Application.module() {
 
         put("/read") {
           val userId = call.checkPrincipal() ?: return@put
-          val ids = runCatching { call.receiveAita<List<String>>() }.getOrElse {
-            val one = call.receiveTextAita().trim().trim('"')
-            listOf(one)
-          }.filter { it.isNotBlank() }
+          val rawIdsBody = runCatching { call.receiveTextAita().trim() }.getOrNull().orEmpty()
+          val ids = when {
+            rawIdsBody.isBlank() -> emptyList()
+            rawIdsBody.startsWith("[") -> runCatching { jsonBase.decodeFromString<List<String>>(rawIdsBody) }.getOrElse { emptyList() }
+            else -> listOf(runCatching { jsonBase.decodeFromString<String>(rawIdsBody) }.getOrElse { rawIdsBody.trim('"') })
+          }
+            .map { it.trim().trim('"') }
+            .filter { it.isNotBlank() }
           val now = System.currentTimeMillis()
 
           val updated = newSuspendedTransaction(aitaServerIoContext) {
@@ -9990,30 +10703,51 @@ fun Application.module() {
     }
 
     get("/config/global") {
+      val publicUrlForThisCall = call.application.publicServerUrl() ?: call.inferredPublicServerUrl()
       call.respondText(
-        text = call.application.buildGlobalConfigurationJson(),
+        text = call.application.buildGlobalConfigurationJson(publicUrlForThisCall),
         contentType = ContentType.Application.Json,
         status = HttpStatusCode.OK
       )
     }
 
     get("/res/string") {
-      call.respondStaticJsonFile(assetsRootPath.resolve("values/strings.json"))
+      call.respondStaticJsonFile(
+        assetsRootPath.resolve("values/strings.json"),
+        "assets/values/strings.json",
+        "values/strings.json"
+      )
     }
 
     get("/res/dimension") {
-      call.respondStaticJsonFile(assetsRootPath.resolve("values/dimensions.json"))
+      call.respondStaticJsonFile(
+        assetsRootPath.resolve("values/dimensions.json"),
+        "assets/values/dimensions.json",
+        "values/dimensions.json"
+      )
     }
 
     get("/res/color") {
-      call.respondStaticJsonFile(assetsRootPath.resolve("values/colors.json"))
+      call.respondStaticJsonFile(
+        assetsRootPath.resolve("values/colors.json"),
+        "assets/values/colors.json",
+        "values/colors.json"
+      )
     }
 
     get("/res/drawableConfig") {
-      call.respondStaticJsonFile(assetsRootPath.resolve("drawable/drawables.json"))
+      call.respondStaticJsonFile(
+        assetsRootPath.resolve("drawable/drawables.json"),
+        "assets/drawable/drawables.json",
+        "drawable/drawables.json"
+      )
     }
 
-    staticFiles("/res/drawable", assetsRootPath.resolve("drawable").toFile())
+    get("/res/drawable/{path...}") {
+      val relativePath = safeStaticResourceRelativePath(call.parameters.getAll("path"))
+        ?: return@get call.respond(HttpStatusCode.BadRequest)
+      call.respondDrawableAsset(relativePath)
+    }
 
     route("/stock") {
       authenticate("auth-jwt") {
@@ -10026,7 +10760,8 @@ fun Application.module() {
             if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_READ, requireWorkshift = false))
               return@newSuspendedTransaction null
 
-            val visibleStoreIds = stockVisibleStoreIdsInsideTransaction(storeId)
+            val visibleStoreIds = stockVisibleStoreIdsForUserInsideTransaction(userId, storeId)
+            if (visibleStoreIds.isEmpty()) return@newSuspendedTransaction null
 
             StockItems
               .selectAll()
@@ -10116,7 +10851,9 @@ fun Application.module() {
             if (!canViewHistory)
               return@newSuspendedTransaction null
 
-            val visibleStoreIds = stockVisibleStoreIdsInsideTransaction(storeId)
+            val visibleStoreIds = stockVisibleStoreIdsForUserInsideTransaction(userId, storeId)
+            if (visibleStoreIds.isEmpty()) return@newSuspendedTransaction null
+
             val itemVisible = StockItems
               .select(StockItems.id)
               .where {
@@ -10567,7 +11304,8 @@ fun Application.module() {
             if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_READ, requireWorkshift = false))
               return@newSuspendedTransaction null
 
-            val visibleStoreIds = stockVisibleStoreIdsInsideTransaction(storeId)
+            val visibleStoreIds = stockVisibleStoreIdsForUserInsideTransaction(userId, storeId)
+            if (visibleStoreIds.isEmpty()) return@newSuspendedTransaction null
 
             StockBatchesV2
               .selectAll()
@@ -10597,7 +11335,14 @@ fun Application.module() {
             if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_READ, requireWorkshift = false))
               return@newSuspendedTransaction null
 
-            buildStockBranchAvailabilityInsideTransaction(storeId, goodsItemId)
+            val visibleStoreIds = stockVisibleStoreIdsForUserInsideTransaction(userId, storeId)
+            if (visibleStoreIds.isEmpty()) return@newSuspendedTransaction null
+
+            buildStockBranchAvailabilityInsideTransaction(
+              currentStoreId = storeId,
+              sourceGoodsItemId = goodsItemId,
+              visibleStoreIdsOverride = visibleStoreIds
+            )
           }
 
           availability?.let {
@@ -10679,6 +11424,7 @@ fun Application.module() {
             val sourceStatus = sourceBatchRow[StockBatchesV2.status]
             if (sourceStatus in setOf(
                 StockBatchStatusDataModel.Ordered.name,
+                StockBatchStatusDataModel.Reserved.name,
                 StockBatchStatusDataModel.InTransit.name,
                 StockBatchStatusDataModel.SoldOut.name,
                 StockBatchStatusDataModel.WrittenOff.name,
@@ -11544,7 +12290,7 @@ fun Application.module() {
             if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_BATCH_SET_ACTIVE_SHELF, requireWorkshift = true))
               return@newSuspendedTransaction null
 
-            val batchExists = StockBatchesV2
+            val batchRow = StockBatchesV2
               .selectAll()
               .where {
                 (StockBatchesV2.id eq batchId) and
@@ -11552,11 +12298,21 @@ fun Application.module() {
                    (StockBatchesV2.storeId eq storeId) and
                    (StockBatchesV2.isActive eq true)
               }
-              .empty()
-              .not()
+              .singleOrNull()
+              ?: return@newSuspendedTransaction null
 
-            if (!batchExists)
+            val batchStatus = batchRow[StockBatchesV2.status]
+            if (batchStatus in setOf(
+                StockBatchStatusDataModel.Ordered.name,
+                StockBatchStatusDataModel.Reserved.name,
+                StockBatchStatusDataModel.InTransit.name,
+                StockBatchStatusDataModel.SoldOut.name,
+                StockBatchStatusDataModel.WrittenOff.name,
+                StockBatchStatusDataModel.Deleted.name
+              ) || batchRow[StockBatchesV2.quantity].total <= 0.0
+            ) {
               return@newSuspendedTransaction null
+            }
 
             val existingItemRow = StockItems
               .selectAll()
@@ -11628,9 +12384,7 @@ fun Application.module() {
 
     route("/supplierGoodsPrices") {
       authenticate("auth-jwt") {
-        get("/my") {
-          val userId = call.checkPrincipal() ?: return@get
-
+        suspend fun respondMySupplierGoodsPrices(call: RoutingCall, userId: UUID) {
           val result = newSuspendedTransaction(aitaServerIoContext) {
             val supplierIds = accessibleSupplierIdsForUserInsideTransaction(userId)
             if (supplierIds.isEmpty()) {
@@ -11656,6 +12410,16 @@ fun Application.module() {
               kk = "Жеткізуші бағалар кітабы жүктелді"
             )
           )
+        }
+
+        get("/my") {
+          val userId = call.checkPrincipal() ?: return@get
+          respondMySupplierGoodsPrices(call, userId)
+        }
+
+        get("/supplier/get") {
+          val userId = call.checkPrincipal() ?: return@get
+          respondMySupplierGoodsPrices(call, userId)
         }
 
         get("/get") {
@@ -11805,14 +12569,22 @@ fun Application.module() {
         get("/get") {
           val userId = call.checkPrincipal() ?: return@get
 
-          val stores = newSuspendedTransaction(aitaServerIoContext) {
+          val stores: List<StoreDataModel>? = newSuspendedTransaction(aitaServerIoContext) {
             val noUser = Users
               .select(Users.id)
               .where { Users.id eq userId }
               .empty()
 
             if (noUser)
-              call.respondAitaUnauthorized()
+              return@newSuspendedTransaction null
+
+            val userIdText = userId.toString()
+            val ownedStoreIds = Stores
+              .select(Stores.id, Stores.ownerUserIds)
+              .where { (Stores.isActive eq true) }
+              .mapNotNull { row ->
+                row[Stores.id].takeIf { row[Stores.ownerUserIds].contains(userIdText) }
+              }
 
             val directStoreIds = StoreUsers
               .select(StoreUsers.storeId)
@@ -11827,26 +12599,58 @@ fun Application.module() {
               }
               .map { it[StoreWorkerMemberships.storeId] }
 
-            val accessibleRootStoreIds = (directStoreIds + workerStoreIds).distinct()
-            val accessibleRootStoreIdsNullable = accessibleRootStoreIds.map { it as UUID? }
+            val explicitStoreIds = (ownedStoreIds + directStoreIds + workerStoreIds).distinct()
 
-            if (accessibleRootStoreIds.isEmpty()) {
+            if (explicitStoreIds.isEmpty()) {
               emptyList()
             } else {
-              Stores
-                .selectAll()
-                .where {
-                  (Stores.id inList accessibleRootStoreIds) or
-                     (Stores.parentStoreId inList accessibleRootStoreIdsNullable)
-                }
+              val explicitStoreRows = Stores
+                .select(Stores.id, Stores.parentStoreId)
+                .where { (Stores.id inList explicitStoreIds) and (Stores.isActive eq true) }
                 .toList()
-                .toHierarchicalStoreDataModels()
+
+              val rootIdsWithFullBranchAccess = explicitStoreRows
+                .filter { it[Stores.parentStoreId] == null }
+                .map { it[Stores.id] }
+                .toSet()
+              val branchIdsWithDirectAccess = explicitStoreRows
+                .filter { it[Stores.parentStoreId] != null }
+                .map { it[Stores.id] }
+                .toSet()
+              val visibleRootIds = explicitStoreRows
+                .map { it[Stores.parentStoreId] ?: it[Stores.id] }
+                .toSet()
+
+              if (visibleRootIds.isEmpty()) {
+                emptyList()
+              } else {
+                val visibleRootIdList = visibleRootIds.toList()
+                val rootIdsWithFullBranchAccessNullable = rootIdsWithFullBranchAccess.map { it as UUID? }
+                val directBranchIdList = branchIdsWithDirectAccess.toList()
+
+                Stores
+                  .selectAll()
+                  .where {
+                    var visibleStoreFilter: Op<Boolean> = Stores.id inList visibleRootIdList
+                    if (rootIdsWithFullBranchAccessNullable.isNotEmpty()) {
+                      visibleStoreFilter = visibleStoreFilter or (Stores.parentStoreId inList rootIdsWithFullBranchAccessNullable)
+                    }
+                    if (directBranchIdList.isNotEmpty()) {
+                      visibleStoreFilter = visibleStoreFilter or (Stores.id inList directBranchIdList)
+                    }
+                    (Stores.isActive eq true) and visibleStoreFilter
+                  }
+                  .toList()
+                  .toHierarchicalStoreDataModels()
+              }
             }
           }
 
+          val authorizedStores = stores ?: return@get call.respondAitaUnauthorized()
+
           call.genericListResponse(
             HttpStatusCode.OK,
-            stores
+            authorizedStores
           )
         }
 
@@ -11977,6 +12781,7 @@ fun Application.module() {
                   it[Stores.phoneNumbers] = body.phoneNumbers
                   it[Stores.emails] = body.emails
                   it[Stores.countryLocales] = body.countryLocales
+                  it[Stores.isActive] = true
                   it[Stores.createdAt] = instant
                   it[Stores.updatedAt] = instant
                 }
@@ -13273,16 +14078,16 @@ fun Application.module() {
         get("/get") {
           val userId = call.checkPrincipal() ?: return@get
 
-          val balance = newSuspendedTransaction(aitaServerIoContext) {
+          val balanceResult: Pair<Boolean, UserBalanceDataModel?> = newSuspendedTransaction(aitaServerIoContext) {
             val noUser = Users
               .select(Users.id)
               .where { Users.id eq userId }
               .empty()
 
             if (noUser)
-              call.respondAitaUnauthorized()
+              return@newSuspendedTransaction false to null
 
-            UserBalances
+            true to UserBalances
               .selectAll()
               .where { UserBalances.userId eq userId }
               .singleOrNull()
@@ -13295,7 +14100,9 @@ fun Application.module() {
               }
           }
 
-          balance?.let {
+          if (!balanceResult.first) return@get call.respondAitaUnauthorized()
+
+          balanceResult.second?.let { balance ->
             call.genericResponse(
               HttpStatusCode.OK,
               balance
@@ -13453,7 +14260,7 @@ fun Application.module() {
             val phoneNumberClash = Users
               .select(Users.id, Users.phoneNumber)
               .where {
-                (Users.phoneNumber eq newAccount.phoneNumber) and (Users.id neq uuid)
+                (Users.phoneNumber eq phoneNumber) and (Users.id neq uuid)
               }
               .empty()
               .not()
@@ -13462,7 +14269,7 @@ fun Application.module() {
             val emailClash = Users
               .select(Users.id, Users.email)
               .where {
-                (Users.email eq newAccount.email) and (Users.id neq uuid)
+                (Users.email eq email) and (Users.id neq uuid)
               }
               .empty()
               .not()
@@ -13850,7 +14657,11 @@ fun Application.module() {
               .innerJoin(Stores, { StoreWorkerMemberships.storeId }, { Stores.id })
               .innerJoin(Users, { StoreWorkerMemberships.userId }, { Users.id })
               .selectAll()
-              .where { (StoreWorkerMemberships.userId eq userId) and (StoreWorkerMemberships.isActive eq true) }
+              .where {
+                (StoreWorkerMemberships.userId eq userId) and
+                   (StoreWorkerMemberships.isActive eq true) and
+                   (Stores.isActive eq true)
+              }
               .orderBy(StoreWorkerMemberships.acceptedAtMillis, SortOrder.DESC)
               .map { it.toStoreWorkerDataModel() }
           }
@@ -14062,7 +14873,7 @@ fun Application.module() {
               .innerJoin(Stores, { StoreWorkerRequests.storeId }, { Stores.id })
               .innerJoin(Users, { StoreWorkerRequests.requesterUserId }, { Users.id })
               .selectAll()
-              .where { StoreWorkerRequests.requesterUserId eq userId }
+              .where { (StoreWorkerRequests.requesterUserId eq userId) and (Stores.isActive eq true) }
               .orderBy(StoreWorkerRequests.requestedAtMillis, SortOrder.DESC)
               .map { it.toStoreWorkerRequestDataModel() }
           }
@@ -15320,7 +16131,8 @@ fun Application.module() {
             if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_LOGS_VIEW, requireWorkshift = false))
               return@newSuspendedTransaction null
 
-            val storeIds = operationLogStoreIdsForScopeInsideTransaction(storeId, scope)
+            val storeIds = operationLogStoreIdsForScopeInsideTransaction(userId, storeId, scope)
+            if (storeIds.isEmpty()) return@newSuspendedTransaction null
 
             OperationLogs
               .selectAll()
@@ -15421,7 +16233,8 @@ fun Application.module() {
             if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_TRANSACTION_HISTORY_VIEW, requireWorkshift = false))
               return@newSuspendedTransaction null
 
-            val visibleStoreIds = stockVisibleStoreIdsInsideTransaction(storeId)
+            val visibleStoreIds = stockVisibleStoreIdsForUserInsideTransaction(userId, storeId)
+            if (visibleStoreIds.isEmpty()) return@newSuspendedTransaction null
 
             Transactions
               .selectAll()
@@ -15493,10 +16306,15 @@ fun Application.module() {
                 return@newSuspendedTransaction null
               }
 
+              val visibleStoreIds = stockVisibleStoreIdsForUserInsideTransaction(userId, storeId)
+              if (visibleStoreIds.isEmpty())
+                return@newSuspendedTransaction null
+
               val normalizedGoodsResult = normalizeTransactionGoodsInsideTransaction(
                 storeId = storeId,
                 transactionType = body.type,
-                lines = body.goodsInTransaction
+                lines = body.goodsInTransaction,
+                visibleStoreIdsOverride = visibleStoreIds
               )
 
               val normalizedGoodsInTransaction = normalizedGoodsResult.lines
@@ -15557,7 +16375,8 @@ fun Application.module() {
                 userId = userId,
                 storeId = storeId,
                 transaction = transactionToSave,
-                now = timeMillis
+                now = timeMillis,
+                visibleStoreIdsOverride = visibleStoreIds
               )
 
               if (!stockMutationOk) {

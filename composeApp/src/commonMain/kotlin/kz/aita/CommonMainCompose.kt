@@ -3216,11 +3216,19 @@ private fun String.looksLikeCompleteRetailBarcodeInput(): Boolean {
     val candidate = transactionBarcodeCandidate() ?: return false
     val scannerEnded = any { it == '\n' || it == '\r' || it == '\t' }
 
-    return scannerEnded && candidate.length >= 4 ||
-            candidate.length in setOf(12, 13, 14) && candidate.hasValidGtinChecksum() ||
-            candidate.length == 13 && candidate.isKnownRegionalBarcodePrefix() ||
+    if (scannerEnded && candidate.length >= 4) return true
+    if (!candidate.all { it.isDigit() }) return false
+
+    return (candidate.length in setOf(8, 12, 13, 14) && candidate.hasValidGtinChecksum()) ||
+            (candidate.length == 13 && candidate.isKnownRegionalBarcodePrefix()) ||
             candidate.length >= 16
 }
+
+private fun String.compactTransactionBarcodeInput(): String = trim()
+    .replace("\r", "")
+    .replace("\n", "")
+    .replace("\t", "")
+    .replace(" ", "")
 
 private fun GoodsItemDataModel.matchesScannedBarcode(candidate: String): Boolean {
     return allBarcodeValues().any { barcode ->
@@ -3270,9 +3278,12 @@ private fun AppConfiguration.availableSaleQuantityFor(goodsItem: GoodsItemDataMo
             batch.goodsItemId == goodsItem.id &&
                     batchBelongsToInventoryStoreForUi(batch.storeId, activeStoreId) &&
                     batch.isActive &&
+                    batch.status != StockBatchStatusDataModel.Ordered &&
+                    batch.status != StockBatchStatusDataModel.Reserved &&
                     batch.status != StockBatchStatusDataModel.Deleted &&
                     batch.status != StockBatchStatusDataModel.WrittenOff &&
-                    batch.status != StockBatchStatusDataModel.SoldOut
+                    batch.status != StockBatchStatusDataModel.SoldOut &&
+                    batch.status != StockBatchStatusDataModel.InTransit
         }
         .sumOf { it.quantity.total.coerceAtLeast(0.0) }
 }
@@ -3303,9 +3314,8 @@ private fun AppConfiguration.sameInventoryStoreGroupForUi(firstStoreId: String?,
     val second = secondStoreId?.takeIf { it.isNotBlank() } ?: return false
     if (first == second) return true
 
-    val stores = stateValues.stores.orEmpty()
     fun rootId(storeId: String): String {
-        val store = stores.find { it.id == storeId }
+        val store = stateValues.stores.findStoreOrBranchForUi(storeId)
         return store?.parentStoreId?.takeIf { it.isNotBlank() } ?: store?.id ?: storeId
     }
 
@@ -3319,6 +3329,8 @@ private fun AppConfiguration.itemHasSellableBatchInStoreForUi(goodsItemId: Strin
                 batchBelongsToInventoryStoreForUi(batch.storeId, cleanStoreId) &&
                 batch.isActive &&
                 batch.quantity.total > 0.0 &&
+                batch.status != StockBatchStatusDataModel.Ordered &&
+                batch.status != StockBatchStatusDataModel.Reserved &&
                 batch.status != StockBatchStatusDataModel.Deleted &&
                 batch.status != StockBatchStatusDataModel.WrittenOff &&
                 batch.status != StockBatchStatusDataModel.SoldOut &&
@@ -3326,30 +3338,59 @@ private fun AppConfiguration.itemHasSellableBatchInStoreForUi(goodsItemId: Strin
     }
 }
 
-private fun AppConfiguration.transactionStockCandidatesForUi(): List<GoodsItemDataModel> {
+private fun AppConfiguration.transactionStockCandidatesForUi(
+    sortForDisplay: Boolean = true
+): List<GoodsItemDataModel> {
     val activeStoreId = stateValues.activeStoreId
     val stock = stateValues.stock.orEmpty()
     if (activeStoreId.isNullOrBlank()) return stock
 
-    val batches = stateValues.stockBatches.orEmpty()
-    return stock
-        .filter { item -> sameInventoryStoreGroupForUi(activeStoreId, item.storeId) || itemHasSellableBatchInStoreForUi(item.id, activeStoreId) }
-        .sortedWith(
-            compareBy<GoodsItemDataModel> { item -> if (item.storeId == activeStoreId) 0 else 1 }
-                .thenByDescending { item ->
-                    batches.any { batch ->
-                        batch.goodsItemId == item.id &&
-                                batchBelongsToInventoryStoreForUi(batch.storeId, activeStoreId) &&
-                                batch.isActive &&
-                                batch.quantity.total > 0.0 &&
-                                batch.status != StockBatchStatusDataModel.Deleted &&
-                                batch.status != StockBatchStatusDataModel.WrittenOff &&
-                                batch.status != StockBatchStatusDataModel.SoldOut &&
-                                batch.status != StockBatchStatusDataModel.InTransit
-                    }
-                }
-                .thenBy { item -> item.name.extractLocalizedString(stateValues.appLanguage).orEmpty().lowercase() }
-        )
+    val stores = stateValues.stores
+    val storeRootById = buildMap {
+        stores.forEach { store ->
+            put(store.id, store.rootStoreId())
+            store.branches.forEach { branch -> put(branch.id, branch.rootStoreId()) }
+        }
+    }
+    fun rootStoreIdFor(storeId: String?): String = storeId
+        ?.takeIf { it.isNotBlank() }
+        ?.let { storeRootById[it] ?: it }
+        .orEmpty()
+
+    val activeRootStoreId = rootStoreIdFor(activeStoreId)
+    val sellableItemIds = stateValues.stockBatches.orEmpty()
+        .asSequence()
+        .filter { batch ->
+            batch.isActive &&
+                    batch.quantity.total > 0.0 &&
+                    batch.status != StockBatchStatusDataModel.Ordered &&
+                    batch.status != StockBatchStatusDataModel.Reserved &&
+                    batch.status != StockBatchStatusDataModel.Deleted &&
+                    batch.status != StockBatchStatusDataModel.WrittenOff &&
+                    batch.status != StockBatchStatusDataModel.SoldOut &&
+                    batch.status != StockBatchStatusDataModel.InTransit &&
+                    rootStoreIdFor(batch.storeId) == activeRootStoreId
+        }
+        .map { it.goodsItemId }
+        .filter { it.isNotBlank() }
+        .toSet()
+
+    val scopedStock = stock
+        .filter { item -> rootStoreIdFor(item.storeId) == activeRootStoreId || item.id in sellableItemIds }
+
+    if (!sortForDisplay) return scopedStock
+
+    return scopedStock.sortedWith(
+        compareBy<GoodsItemDataModel> { item ->
+            when {
+                item.storeId == activeStoreId -> 0
+                rootStoreIdFor(item.storeId) == activeRootStoreId -> 1
+                else -> 2
+            }
+        }
+            .thenByDescending { item -> item.id in sellableItemIds }
+            .thenBy { item -> item.name.extractLocalizedString(stateValues.appLanguage).orEmpty().lowercase() }
+    )
 }
 
 private fun AppConfiguration.postCartQuantityLimitNotification(goodsItem: GoodsItemDataModel) {
@@ -3368,10 +3409,14 @@ private fun AppConfiguration.tryHandleTransactionBarcodeInput(
 ): Boolean {
     val candidate = rawInput.transactionBarcodeCandidate() ?: return false
 
-    if (candidate.length > 32) return true
+    if (candidate.length > 32) return false
+
+    val compactInput = rawInput.compactTransactionBarcodeInput()
+    val numericBarcodeTypedAlone = candidate.length >= 4 && candidate.all { it.isDigit() } && compactInput == candidate
+    if (!rawInput.looksLikeCompleteRetailBarcodeInput() && !numericBarcodeTypedAlone) return false
 
     val embeddedWeightBarcodes = candidate.parseEmbeddedWeightBarcodeFormats()
-    val stock = transactionStockCandidatesForUi()
+    val stock = transactionStockCandidatesForUi(sortForDisplay = false)
 
     val weightedMatch = embeddedWeightBarcodes.firstNotNullOfOrNull { barcode ->
         stock.firstOrNull { item ->
@@ -3521,7 +3566,7 @@ private fun AppConfiguration.TransactionBarcodeHidInput(
         activeTransactionBarcodeFocusAction = requestFocusWithoutSoftKeyboard
     }
 
-    DisposableEffect(transactionTypeIndex, clientId) {
+    DisposableEffect(transactionTypeIndex, clientId, barcodeHandler, focusRequester) {
         onDispose {
             if (activeTransactionBarcodeHandler === barcodeHandler) activeTransactionBarcodeHandler = null
             if (activeTransactionBarcodeFocusRequester == focusRequester) {
@@ -3610,6 +3655,8 @@ private data class TransactionSelectionSmartSets(
 private fun GoodsBatchDataModel.isSelectableActiveStockBatch(): Boolean {
     return isActive &&
             quantity.total > 0.0 &&
+            status != StockBatchStatusDataModel.Ordered &&
+            status != StockBatchStatusDataModel.Reserved &&
             status != StockBatchStatusDataModel.Deleted &&
             status != StockBatchStatusDataModel.WrittenOff &&
             status != StockBatchStatusDataModel.SoldOut &&
@@ -3722,10 +3769,18 @@ private fun AppConfiguration.buildTransactionSelectionSmartSets(
 ): TransactionSelectionSmartSets {
     if (stock.isEmpty()) return TransactionSelectionSmartSets()
 
-    val scopedTransactions = transactions.filter { transaction ->
-        storeId.isNullOrBlank() || transaction.storeId == storeId
+    val activeBatches = batches.filter { batch ->
+        batch.isSelectableActiveStockBatch() &&
+                (storeId.isNullOrBlank() || batchBelongsToInventoryStoreForUi(batch.storeId, storeId))
     }
-    val stockById = stock.associateBy { it.id }
+    val activeBatchesByItem = activeBatches.groupBy { it.goodsItemId }
+    val quantityByItem = activeBatchesByItem.mapValues { (_, itemBatches) -> itemBatches.sumOf { it.quantity.total } }
+    val inStockIds = quantityByItem
+        .filterValues { quantity -> quantity > 0.0 }
+        .keys
+        .toSet()
+
+    val stockById = lazy(LazyThreadSafetyMode.NONE) { stock.associateBy { it.id } }
     val stockByBarcode = lazy(LazyThreadSafetyMode.NONE) {
         stock
             .flatMap { item ->
@@ -3736,111 +3791,140 @@ private fun AppConfiguration.buildTransactionSelectionSmartSets(
             .associate { it }
     }
 
+    val scopedTransactions = if (transactions.isEmpty()) {
+        emptyList()
+    } else {
+        transactions
+            .asSequence()
+            .filter { transaction -> storeId.isNullOrBlank() || transaction.storeId == storeId }
+            .take(600)
+            .toList()
+    }
+
     fun popularIds(source: List<TransactionDataModel>): List<String> {
         if (source.isEmpty()) return emptyList()
+        val byId = stockById.value
+        val byBarcode = stockByBarcode.value
         return source
+            .asSequence()
             .flatMap { transaction ->
                 transaction.goodsInTransaction
-                    .mapNotNull { it.transactionSelectionStockItemId(stockById, stockByBarcode.value) }
+                    .asSequence()
+                    .mapNotNull { it.transactionSelectionStockItemId(byId, byBarcode) }
                     .distinct()
                     .map { itemId -> itemId to transaction.id.ifBlank { "${transaction.timeMillis}:$itemId" } }
             }
             .groupBy({ it.first }, { it.second })
             .mapValues { (_, transactionIds) -> transactionIds.distinct().size }
             .entries
-            .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { stockById[it.key]?.name?.extractLocalizedString(stateValues.appLanguage).orEmpty().lowercase() })
+            .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { byId[it.key]?.name?.extractLocalizedString(stateValues.appLanguage).orEmpty().lowercase() })
             .map { it.key }
-            .take(30)
+            .take(24)
     }
 
     fun recentIds(source: List<TransactionDataModel>): List<String> {
         if (source.isEmpty()) return emptyList()
+        val byId = stockById.value
+        val byBarcode = stockByBarcode.value
         return source
+            .asSequence()
             .sortedByDescending { it.timeMillis }
-            .flatMap { it.goodsInTransaction }
-            .mapNotNull { it.transactionSelectionStockItemId(stockById, stockByBarcode.value) }
+            .take(180)
+            .flatMap { it.goodsInTransaction.asSequence() }
+            .mapNotNull { it.transactionSelectionStockItemId(byId, byBarcode) }
             .distinct()
-            .take(30)
+            .take(24)
+            .toList()
     }
 
-    val saleTransactions = scopedTransactions.filter { it.type == "purchase" }
-    val transactionSpecificTransactions = scopedTransactions.filter { it.type == transactionServerType(transactionTypeIndex) }
+    val saleTransactions = if (scopedTransactions.isEmpty()) emptyList() else scopedTransactions.filter { it.type == "purchase" }
+    val transactionSpecificTransactions = if (scopedTransactions.isEmpty()) emptyList() else scopedTransactions.filter { it.type == transactionServerType(transactionTypeIndex) }
     val transactionSpecificRecentTransactions = when (transactionTypeIndex) {
         1 -> saleTransactions
         else -> transactionSpecificTransactions
     }
 
-    val activeBatches = batches.filter { batch ->
-        batch.isSelectableActiveStockBatch() &&
-                (storeId.isNullOrBlank() || batchBelongsToInventoryStoreForUi(batch.storeId, storeId))
-    }
-    val activeBatchesByItem = activeBatches.groupBy { it.goodsItemId }
-    val quantityByItem = activeBatchesByItem.mapValues { (_, itemBatches) -> itemBatches.sumOf { it.quantity.total } }
-    val activeStock = stock.filter { it.isActive }
     val now = getCurrentTimeMillis()
     val todayStart = stockDayStartMillis(now)
     val expiringSoonCutoffExclusive = todayStart + 15L * AITA_ONE_DAY_MILLIS
 
-    val lowStockIds = activeStock
-        .asSequence()
-        .filter { item ->
-            val quantity = quantityByItem[item.id] ?: 0.0
-            quantity > 0.0 && quantity <= 5.0
-        }
-        .map { it.id }
-        .toSet()
-
-    val outOfStockIds = activeStock
-        .asSequence()
-        .filter { item -> (quantityByItem[item.id] ?: 0.0) <= 0.0 }
-        .map { it.id }
-        .toList()
-
-    val inStockIds = quantityByItem
-        .filterValues { quantity -> quantity > 0.0 }
-        .keys
-        .toSet()
-
-    val expiringIds = activeBatches
-        .asSequence()
-        .filter { batch -> batch.expirationDateMillis?.let { it >= todayStart && it < expiringSoonCutoffExclusive } == true }
-        .sortedBy { it.expirationDateMillis ?: Long.MAX_VALUE }
-        .map { it.goodsItemId }
-        .distinct()
-        .toList()
-
     val freshIds = mutableListOf<String>()
     var freshItemCount = 0
-    activeStock.forEach { item ->
-        val itemBatches = activeBatchesByItem[item.id].orEmpty()
-        if (itemBatches.isEmpty() || itemBatches.any { it.isFreshForTransactionSelection(now) }) {
-            freshItemCount += 1
-            if (freshIds.size < 40) freshIds += item.id
+    if (transactionTypeIndex != 1) {
+        val seenFreshItemIds = mutableSetOf<String>()
+        activeBatches.forEach { batch ->
+            val itemId = batch.goodsItemId
+            if (itemId.isNotBlank() && batch.isFreshForTransactionSelection(now) && seenFreshItemIds.add(itemId)) {
+                freshItemCount += 1
+                if (freshIds.size < 32) freshIds += itemId
+            }
         }
     }
 
-    val recentlySoldIds = saleTransactions
-        .asSequence()
-        .sortedByDescending { it.timeMillis }
-        .take(250)
-        .flatMap { transaction -> transaction.goodsInTransaction.asSequence() }
-        .mapNotNull { it.transactionSelectionStockItemId(stockById, stockByBarcode.value) }
-        .toSet()
+    val expiringIds = if (transactionTypeIndex == 0 || transactionTypeIndex == 2) {
+        activeBatches
+            .asSequence()
+            .filter { batch -> batch.expirationDateMillis?.let { it >= todayStart && it < expiringSoonCutoffExclusive } == true }
+            .sortedBy { it.expirationDateMillis ?: Long.MAX_VALUE }
+            .map { it.goodsItemId }
+            .distinct()
+            .take(32)
+            .toList()
+    } else {
+        emptyList()
+    }
 
-    val slowMovingIds = activeStock
-        .asSequence()
-        .filter { item -> (quantityByItem[item.id] ?: 0.0) > 0.0 && item.id !in recentlySoldIds }
-        .map { it.id }
-        .take(30)
-        .toList()
+    val lowStockIds = if (transactionTypeIndex == 2) {
+        stock
+            .asSequence()
+            .filter { item ->
+                item.isActive && item.id.isNotBlank() &&
+                        (quantityByItem[item.id] ?: 0.0) > 0.0 &&
+                        (quantityByItem[item.id] ?: 0.0) <= 5.0
+            }
+            .map { it.id }
+            .toSet()
+    } else {
+        emptySet()
+    }
 
-    val restockIds = (outOfStockIds + lowStockIds)
-        .distinct()
-        .sortedWith(
-            compareBy<String> { id -> if (id in outOfStockIds) 0 else 1 }
-                .thenBy { id -> stockById[id]?.name?.extractLocalizedString(stateValues.appLanguage).orEmpty().lowercase() }
-        )
-        .take(40)
+    val restockIds = if (transactionTypeIndex == 2) {
+        val byId = stockById.value
+        val outOfStockIds = stock
+            .asSequence()
+            .filter { item -> item.isActive && item.id.isNotBlank() && (quantityByItem[item.id] ?: 0.0) <= 0.0 }
+            .map { it.id }
+            .take(180)
+            .toList()
+
+        (outOfStockIds + lowStockIds)
+            .distinct()
+            .sortedWith(
+                compareBy<String> { id -> if (id in outOfStockIds) 0 else 1 }
+                    .thenBy { id -> byId[id]?.name?.extractLocalizedString(stateValues.appLanguage).orEmpty().lowercase() }
+            )
+            .take(32)
+    } else {
+        emptyList()
+    }
+
+    val slowMovingIds = if ((transactionTypeIndex == 0 || transactionTypeIndex == 2) && saleTransactions.isNotEmpty()) {
+        val recentlySoldIds = saleTransactions
+            .asSequence()
+            .sortedByDescending { it.timeMillis }
+            .take(180)
+            .flatMap { transaction -> transaction.goodsInTransaction.asSequence() }
+            .mapNotNull { it.transactionSelectionStockItemId(stockById.value, stockByBarcode.value) }
+            .toSet()
+
+        inStockIds
+            .asSequence()
+            .filter { itemId -> itemId !in recentlySoldIds }
+            .take(24)
+            .toList()
+    } else {
+        emptyList()
+    }
 
     return TransactionSelectionSmartSets(
         popularIds = popularIds(transactionSpecificTransactions),
@@ -3903,24 +3987,44 @@ fun AppConfiguration.TransactionSelectionScreen(
             context.clientId
         ).collectAsState()
 
-        LaunchedEffect(stateValues.activeStoreId) {
-            stateValues.activeStoreId?.let { getTransactions(it) }
+        var transactionHistorySuggestionsReady by remember(context.transactionTypeIndex, context.clientId, stateValues.activeStoreId) {
+            mutableStateOf(false)
+        }
+
+        LaunchedEffect(context.transactionTypeIndex, context.clientId, stateValues.activeStoreId) {
+            transactionHistorySuggestionsReady = false
+            val storeIdForHistory = stateValues.activeStoreId
+            delay(700)
+            storeIdForHistory?.let { getTransactions(it) }
+            delay(220)
+            transactionHistorySuggestionsReady = true
         }
 
         val transactionsPayload by transactionsState.payload.collectAsState()
+        val transactionHistoryForSuggestions = if (transactionHistorySuggestionsReady) transactionsPayload.orEmpty() else emptyList()
+        val transactionScopedStock = remember(
+            stateValues.stock,
+            stateValues.stockBatches,
+            stateValues.stores,
+            stateValues.activeStoreId
+        ) {
+            transactionStockCandidatesForUi(sortForDisplay = false)
+        }
+
         val transactionSmartSets = remember(
             context.transactionTypeIndex,
             stateValues.activeStoreId,
-            transactionsPayload,
-            stateValues.stock,
+            transactionHistorySuggestionsReady,
+            transactionHistoryForSuggestions,
+            transactionScopedStock,
             stateValues.stockBatches,
             stateValues.appLanguage
         ) {
             buildTransactionSelectionSmartSets(
                 storeId = stateValues.activeStoreId,
                 transactionTypeIndex = context.transactionTypeIndex,
-                transactions = transactionsPayload.orEmpty(),
-                stock = stateValues.stock.orEmpty(),
+                transactions = transactionHistoryForSuggestions,
+                stock = transactionScopedStock,
                 batches = stateValues.stockBatches.orEmpty()
             )
         }
@@ -4004,7 +4108,8 @@ fun AppConfiguration.TransactionSelectionScreen(
         val scopeRowContent = tabRowWidget(
             modifier = Modifier.padding(horizontal = stateValues.marginTextField),
             tabs = transactionSelectionTabs,
-            selectedIndexInitial = "quick"
+            selectedIndexInitial = "quick",
+            persistSelection = false
         )
 
         val addToCartAction: (GoodsItemDataModel) -> Unit = { goodsItem ->
@@ -4046,7 +4151,12 @@ fun AppConfiguration.TransactionSelectionScreen(
             }
         }
 
-        val selectedPreferredOrderIds = when (scopeRowContent.id) {
+        val selectedTransactionFilterId = scopeRowContent.id
+        val transactionSearchQuery = searchTextFieldContent.value.text.trim()
+        val transactionSearchAcrossAllStock = transactionSearchQuery.isNotBlank()
+        val selectedPreferredOrderIds = if (transactionSearchAcrossAllStock) {
+            emptyList()
+        } else when (selectedTransactionFilterId) {
             "popular" -> transactionSmartSets.popularIds
             "recent" -> transactionSmartSets.recentIds
             "restock" -> transactionSmartSets.restockIds
@@ -4057,19 +4167,20 @@ fun AppConfiguration.TransactionSelectionScreen(
             else -> emptyList()
         }
 
-        val selectedTransactionFilterId = scopeRowContent.id
-        val transactionSelectionFilter = remember(selectedTransactionFilterId, transactionSmartSets) {
-            when (selectedTransactionFilterId) {
-                "quick" -> ({ item: GoodsItemDataModel -> item.isQuickItem })
-                "in_stock" -> ({ item: GoodsItemDataModel -> item.id in transactionSmartSets.inStockIds })
-                "popular" -> ({ item: GoodsItemDataModel -> item.transactionSelectionMatchesIdSet(transactionSmartSets.popularIds) })
-                "recent" -> ({ item: GoodsItemDataModel -> item.transactionSelectionMatchesIdSet(transactionSmartSets.recentIds) })
-                "restock" -> ({ item: GoodsItemDataModel -> item.transactionSelectionMatchesIdSet(transactionSmartSets.restockIds) })
-                "low_stock" -> ({ item: GoodsItemDataModel -> item.transactionSelectionMatchesIdSet(transactionSmartSets.lowStockIds) })
-                "expiring" -> ({ item: GoodsItemDataModel -> item.transactionSelectionMatchesIdSet(transactionSmartSets.expiringIds) })
-                "fresh" -> ({ item: GoodsItemDataModel -> item.transactionSelectionMatchesIdSet(transactionSmartSets.freshIds) })
-                "slow" -> ({ item: GoodsItemDataModel -> item.transactionSelectionMatchesIdSet(transactionSmartSets.slowMovingIds) })
-                else -> null
+        val transactionSelectionStockItems = remember(transactionScopedStock, selectedTransactionFilterId, transactionSmartSets, transactionSearchAcrossAllStock) {
+            if (transactionSearchAcrossAllStock) {
+                transactionScopedStock
+            } else when (selectedTransactionFilterId) {
+                "quick" -> transactionScopedStock.filter { item -> item.isQuickItem }
+                "in_stock" -> transactionScopedStock.filter { item -> item.id in transactionSmartSets.inStockIds }
+                "popular" -> transactionScopedStock.filter { item -> item.transactionSelectionMatchesIdSet(transactionSmartSets.popularIds) }
+                "recent" -> transactionScopedStock.filter { item -> item.transactionSelectionMatchesIdSet(transactionSmartSets.recentIds) }
+                "restock" -> transactionScopedStock.filter { item -> item.transactionSelectionMatchesIdSet(transactionSmartSets.restockIds) }
+                "low_stock" -> transactionScopedStock.filter { item -> item.transactionSelectionMatchesIdSet(transactionSmartSets.lowStockIds) }
+                "expiring" -> transactionScopedStock.filter { item -> item.transactionSelectionMatchesIdSet(transactionSmartSets.expiringIds) }
+                "fresh" -> transactionScopedStock.filter { item -> item.transactionSelectionMatchesIdSet(transactionSmartSets.freshIds) }
+                "slow" -> transactionScopedStock.filter { item -> item.transactionSelectionMatchesIdSet(transactionSmartSets.slowMovingIds) }
+                else -> transactionScopedStock
             }
         }
 
@@ -4082,10 +4193,11 @@ fun AppConfiguration.TransactionSelectionScreen(
             showStockType = false,
             showBatches = false,
             transactionTypeIndex = context.transactionTypeIndex,
+            stockItemsOverride = transactionSelectionStockItems,
             preferredOrderIds = selectedPreferredOrderIds,
             scrollStateHost = context.stateHost,
             scrollStateKey = "transaction_selection_scroll_${context.transactionTypeIndex}_${context.clientId}_${selectedTransactionFilterId}",
-            onFilter = transactionSelectionFilter,
+            onFilter = null,
             onClick = addToCartAction
         )
     }
@@ -4204,6 +4316,23 @@ fun AppConfiguration.TransactionSelectionScreen(
 //  }
 //}
 
+
+@Composable
+private fun AppConfiguration.TransactionPaneContent(
+    model: NavigationScreenModel.Transaction,
+    modifier: Modifier = Modifier,
+    onBarcodeCaptureFocusRequested: () -> Unit
+) {
+    Box(modifier = modifier) {
+        when (model) {
+            is NavigationScreenModel.Transaction.Cart -> TransactionCartScreen()
+            is NavigationScreenModel.Transaction.Selection -> TransactionSelectionScreen(onBarcodeCaptureFocusRequested = onBarcodeCaptureFocusRequested)
+            is NavigationScreenModel.Transaction.Payment -> TransactionPaymentScreen()
+            is NavigationScreenModel.Transaction.ReceiptPreview -> TransactionReceiptPreviewScreen()
+            else -> {}
+        }
+    }
+}
 
 private suspend fun resetTransactionCartNavigationState(transactionTypeIndex: Int, clientId: Int) {
     when (transactionTypeIndex) {
@@ -4612,99 +4741,26 @@ fun AppConfiguration.TransactionScreen() {
             }
 
             if (stateValues.isNarrowScreen) {
-                AnimatedContent(
-                    modifier = Modifier
-                        .weight(1f),
-                    targetState = navigationScreensLeft.last()
-                ) { model ->
-                    when (model) {
-                        is NavigationScreenModel.Transaction.Cart -> {
-                            TransactionCartScreen()
-                        }
-
-                        is NavigationScreenModel.Transaction.Selection -> {
-                            TransactionSelectionScreen(
-                                onBarcodeCaptureFocusRequested = {
-                                    requestTransactionBarcodeFocus()
-                                }
-                            )
-                        }
-
-                        is NavigationScreenModel.Transaction.Payment -> {
-                            TransactionPaymentScreen()
-                        }
-
-                        is NavigationScreenModel.Transaction.ReceiptPreview -> {
-                            TransactionReceiptPreviewScreen()
-                        }
-
-                        else -> {}
-                    }
-                }
+                TransactionPaneContent(
+                    modifier = Modifier.weight(1f),
+                    model = navigationScreensLeft.last(),
+                    onBarcodeCaptureFocusRequested = { requestTransactionBarcodeFocus() }
+                )
             } else {
                 Row(
-                    modifier = Modifier
-                        .weight(1f)
+                    modifier = Modifier.weight(1f)
                 ) {
-                    AnimatedContent(
-                        modifier = Modifier
-                            .weight(1f),
-                        targetState = navigationScreensLeft.last()
-                    ) { model ->
-                        when (model) {
-                            is NavigationScreenModel.Transaction.Cart -> {
-                                TransactionCartScreen()
-                            }
+                    TransactionPaneContent(
+                        modifier = Modifier.weight(1f),
+                        model = navigationScreensLeft.last(),
+                        onBarcodeCaptureFocusRequested = { requestTransactionBarcodeFocus() }
+                    )
 
-                            is NavigationScreenModel.Transaction.Selection -> {
-                                TransactionSelectionScreen(
-                                    onBarcodeCaptureFocusRequested = {
-                                        requestTransactionBarcodeFocus()
-                                    }
-                                )
-                            }
-
-                            is NavigationScreenModel.Transaction.Payment -> {
-                                TransactionPaymentScreen()
-                            }
-
-                            is NavigationScreenModel.Transaction.ReceiptPreview -> {
-                                TransactionReceiptPreviewScreen()
-                            }
-
-                            else -> {}
-                        }
-                    }
-
-                    AnimatedContent(
-                        modifier = Modifier
-                            .weight(1f),
-                        targetState = navigationScreensRight.last()
-                    ) { model ->
-                        when (model) {
-                            is NavigationScreenModel.Transaction.Cart -> {
-                                TransactionCartScreen()
-                            }
-
-                            is NavigationScreenModel.Transaction.Selection -> {
-                                TransactionSelectionScreen(
-                                    onBarcodeCaptureFocusRequested = {
-                                        requestTransactionBarcodeFocus()
-                                    }
-                                )
-                            }
-
-                            is NavigationScreenModel.Transaction.Payment -> {
-                                TransactionPaymentScreen()
-                            }
-
-                            is NavigationScreenModel.Transaction.ReceiptPreview -> {
-                                TransactionReceiptPreviewScreen()
-                            }
-
-                            else -> {}
-                        }
-                    }
+                    TransactionPaneContent(
+                        modifier = Modifier.weight(1f),
+                        model = navigationScreensRight.last(),
+                        onBarcodeCaptureFocusRequested = { requestTransactionBarcodeFocus() }
+                    )
                 }
             }
         }
@@ -8939,8 +8995,12 @@ fun AppConfiguration.GoodsItemInCartWidget(
                 null
             }
             val activeBatch = resolvedReturnSelection?.batch
-                ?: sortedItemBatches.firstOrNull { it.id == goodsItem.activeShelfBatchId }
-                ?: sortedItemBatches.firstOrNull()
+                ?: if (transactionTypeIndex == 0) {
+                    sortedItemBatches.bestBatchForSale(goodsItem)
+                } else {
+                    sortedItemBatches.firstOrNull { it.id == goodsItem.activeShelfBatchId }
+                        ?: sortedItemBatches.firstOrNull()
+                }
             val promotedItemPrice = if (transactionTypeIndex == 1 && resolvedReturnSelection != null) {
                 PromotedPriceDataModel(resolvedReturnSelection.price, resolvedReturnSelection.price, null)
             } else {
@@ -9460,7 +9520,14 @@ fun AppConfiguration.TransactionCartScreen() {
         val cartAvailabilityByItem = remember(goodsInCart, batchesByGoodsItemId) {
             goodsInCart.associate { cartItem ->
                 cartItem.id to batchesByGoodsItemId[cartItem.id].orEmpty()
-                    .filter { it.status != StockBatchStatusDataModel.Deleted && it.status != StockBatchStatusDataModel.WrittenOff && it.status != StockBatchStatusDataModel.SoldOut }
+                    .filter {
+                        it.status != StockBatchStatusDataModel.Ordered &&
+                                it.status != StockBatchStatusDataModel.Reserved &&
+                                it.status != StockBatchStatusDataModel.Deleted &&
+                                it.status != StockBatchStatusDataModel.InTransit &&
+                                it.status != StockBatchStatusDataModel.WrittenOff &&
+                                it.status != StockBatchStatusDataModel.SoldOut
+                    }
                     .sumOf { it.quantity.total }
             }
         }
@@ -10062,7 +10129,8 @@ fun AppConfiguration.tabRowWidget(
     modifier: Modifier = Modifier,
     tabs: List<TabContent>,
 
-    selectedIndexInitial: String = tabs.first().id,
+    selectedIndexInitial: String = tabs.firstOrNull()?.id.orEmpty(),
+    persistSelection: Boolean = true,
     selectedContainerColor: Color = stateValues.AccentColor,
     unselectedContainerColor: Color = Color.Transparent,
 
@@ -10077,15 +10145,18 @@ fun AppConfiguration.tabRowWidget(
     titleTextSize: TextUnit = stateValues.accentTextSize,
     titleTextColor: Color = stateValues.TextColor,
 ): TabRowContent {
-    var selectedId by rememberSaveable {
-        mutableStateOf(selectedIndexInitial)
-    }
-
-    LaunchedEffect(selectedIndexInitial) {
-        selectedId = selectedIndexInitial
-    }
-
     val tabsKey = remember(tabs) { tabs.joinToString(separator = "|") { it.id } }
+    val savedSelectedIdState = rememberSaveable(tabsKey, selectedIndexInitial) { mutableStateOf(selectedIndexInitial) }
+    val transientSelectedIdState = remember(tabsKey, selectedIndexInitial) { mutableStateOf(selectedIndexInitial) }
+    val selectedIdState = if (persistSelection) savedSelectedIdState else transientSelectedIdState
+    var selectedId by selectedIdState
+
+    LaunchedEffect(selectedIndexInitial, tabsKey) {
+        if (tabs.any { it.id == selectedIndexInitial } && selectedId != selectedIndexInitial) {
+            selectedId = selectedIndexInitial
+        }
+    }
+
     LaunchedEffect(tabsKey) {
         if (tabs.none { it.id == selectedId }) {
             selectedId = selectedIndexInitial
@@ -10452,6 +10523,25 @@ fun AppConfiguration.StockWarehouseScreen() {
     var sortAscending by rememberSaveable { mutableStateOf(true) }
     var labelPrintItemId by rememberSaveable { mutableStateOf<String?>(null) }
     val labelPrintItem = stateValues.stock.orEmpty().find { it.id == labelPrintItemId }
+    val stockWarehouseQuantitySortAvailable = remember(stateValues.stockBatches, stateValues.activeStoreId) {
+        val activeStoreId = stateValues.activeStoreId
+        stateValues.stockBatches.orEmpty().any { batch ->
+            batch.isActive &&
+                    batch.status != StockBatchStatusDataModel.Ordered &&
+                    batch.status != StockBatchStatusDataModel.Deleted &&
+                    batch.status != StockBatchStatusDataModel.InTransit &&
+                    batch.status != StockBatchStatusDataModel.SoldOut &&
+                    batch.status != StockBatchStatusDataModel.WrittenOff &&
+                    batch.quantity.total > 0.0 &&
+                    (activeStoreId.isNullOrBlank() || batchBelongsToInventoryStoreForUi(batch.storeId, activeStoreId))
+        }
+    }
+
+    LaunchedEffect(stockWarehouseQuantitySortAvailable, sortMode) {
+        if (!stockWarehouseQuantitySortAvailable && sortMode == "quantity") {
+            sortMode = "name"
+        }
+    }
 
     labelPrintItem?.let { item ->
         StockItemLabelPrintBottomSheet(
@@ -10493,14 +10583,19 @@ fun AppConfiguration.StockWarehouseScreen() {
                     fontWeight = FontWeight.Bold
                 )
 
+                val sortTabs = buildList {
+                    add(TabContent("name", stateValues.stringName) { sortMode = it })
+                    add(TabContent("price", localizedStringResource(340, "Prices")) { sortMode = it })
+                    if (stockWarehouseQuantitySortAvailable) {
+                        add(TabContent("quantity", localizedStringResource(513, "Quantity")) { sortMode = it })
+                    }
+                    add(TabContent("created", localizedStringResource(514, "Time added")) { sortMode = it })
+                }
+
                 tabRowWidget(
                     modifier = Modifier.fillMaxWidth(),
-                    tabs = listOf(
-                        TabContent("name", stateValues.stringName) { sortMode = it },
-                        TabContent("quantity", localizedStringResource(513, "Quantity")) { sortMode = it },
-                        TabContent("created", localizedStringResource(514, "Time added")) { sortMode = it }
-                    ),
-                    selectedIndexInitial = sortMode,
+                    tabs = sortTabs,
+                    selectedIndexInitial = sortMode.takeIf { mode -> sortTabs.any { it.id == mode } } ?: "name",
                     textSize = stateValues.smallTextSize
                 )
 
@@ -10518,6 +10613,8 @@ fun AppConfiguration.StockWarehouseScreen() {
 
         val openEdit: (GoodsItemDataModel) -> Unit = { item ->
             coroutineScope.launch {
+                NavigationScreenModel.Stock.AddEditGoodsItem.removeState("stock_add_edit_add_session_id")
+                NavigationScreenModel.Stock.AddEditGoodsItem.removeState("stock_add_edit_global_template")
                 NavigationScreenModel.Stock.AddEditGoodsItem.setState(
                     NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_EDITED_GOODS_ITEM_ID to item.id
                 )
@@ -10530,6 +10627,8 @@ fun AppConfiguration.StockWarehouseScreen() {
 
         val openAddBatch: (GoodsItemDataModel) -> Unit = { item ->
             coroutineScope.launch {
+                NavigationScreenModel.Stock.AddEditGoodsItem.removeState("stock_add_edit_add_session_id")
+                NavigationScreenModel.Stock.AddEditGoodsItem.removeState("stock_add_edit_global_template")
                 NavigationScreenModel.Stock.AddEditGoodsItem.setState(
                     NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_EDITED_GOODS_ITEM_ID to item.id
                 )
@@ -10549,6 +10648,8 @@ fun AppConfiguration.StockWarehouseScreen() {
                     NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_EDITED_GOODS_ITEM_ID
                 )
                 NavigationScreenModel.Stock.AddEditGoodsItem.removeState("stock_add_edit_start_add_batch")
+                NavigationScreenModel.Stock.AddEditGoodsItem.removeState("stock_add_edit_global_template")
+                NavigationScreenModel.Stock.AddEditGoodsItem.setState("stock_add_edit_add_session_id" to getCurrentTimeMillis().toString())
                 NavigationScreenModel.Stock.AddEditGoodsItem.setState("stock_add_edit_selected_tab" to "info")
                 Navigation.Stock.go(NavigationScreenModel.Stock.AddEditGoodsItem, forceSecond = true)
             }
@@ -10620,8 +10721,12 @@ private const val STOCK_WAREHOUSE_FILTER_NO_BARCODE = "no_barcode"
 private fun stockWarehouseActiveBatchesForUi(batches: List<GoodsBatchDataModel>): List<GoodsBatchDataModel> =
     batches.filter { batch ->
         batch.isActive &&
+                batch.status != StockBatchStatusDataModel.Ordered &&
                 batch.status != StockBatchStatusDataModel.Deleted &&
-                batch.status != StockBatchStatusDataModel.WrittenOff
+                batch.status != StockBatchStatusDataModel.InTransit &&
+                batch.status != StockBatchStatusDataModel.SoldOut &&
+                batch.status != StockBatchStatusDataModel.WrittenOff &&
+                batch.quantity.total > 0.0
     }
 
 private fun stockWarehouseBatchesByItemForUi(batches: List<GoodsBatchDataModel>): Map<String, List<GoodsBatchDataModel>> =
@@ -10630,6 +10735,93 @@ private fun stockWarehouseBatchesByItemForUi(batches: List<GoodsBatchDataModel>)
 private fun GoodsItemDataModel.stockWarehouseQuantityForUi(
     batchesByItem: Map<String, List<GoodsBatchDataModel>>
 ): Double = batchesByItem[id].orEmpty().sumOf { it.quantity.total }
+
+private fun GoodsItemDataModel.stockWarehouseSortPriceForUi(): Double? =
+    salePrices
+        .firstOrNull { it.price.toMoneyDouble() > 0.0 }
+        ?.price
+        ?.toMoneyDouble()
+        ?: returnPrices
+            .firstOrNull { it.price.toMoneyDouble() > 0.0 }
+            ?.price
+            ?.toMoneyDouble()
+
+private fun stockWarehouseFallbackOrderMap(items: List<GoodsItemDataModel>): Map<String, Int> =
+    items
+        .asSequence()
+        .mapIndexedNotNull { index, item -> item.id.takeIf { it.isNotBlank() }?.let { it to index } }
+        .toMap()
+
+private fun stockWarehouseQuantitySortedItems(
+    items: List<GoodsItemDataModel>,
+    quantityByItem: Map<String, Double>,
+    fallbackOrder: Map<String, Int>,
+    ascending: Boolean
+): List<GoodsItemDataModel> {
+    val farFallback = Int.MAX_VALUE / 2
+    return items.sortedWith { left, right ->
+        val leftQuantity = quantityByItem[left.id] ?: 0.0
+        val rightQuantity = quantityByItem[right.id] ?: 0.0
+        val leftHasRealStock = leftQuantity > 0.0
+        val rightHasRealStock = rightQuantity > 0.0
+
+        when {
+            leftHasRealStock && rightHasRealStock -> {
+                val quantityCompare = if (ascending) {
+                    leftQuantity.compareTo(rightQuantity)
+                } else {
+                    rightQuantity.compareTo(leftQuantity)
+                }
+                if (quantityCompare != 0) quantityCompare
+                else (fallbackOrder[left.id] ?: farFallback).compareTo(fallbackOrder[right.id] ?: farFallback)
+            }
+            leftHasRealStock != rightHasRealStock -> {
+                if (ascending) {
+                    if (leftHasRealStock) 1 else -1
+                } else {
+                    if (leftHasRealStock) -1 else 1
+                }
+            }
+            else -> (fallbackOrder[left.id] ?: farFallback).compareTo(fallbackOrder[right.id] ?: farFallback)
+        }
+    }
+}
+
+private fun AppConfiguration.stockWarehouseDefaultSortedItems(
+    items: List<GoodsItemDataModel>,
+    preferredOrder: Map<String, Int>,
+    sortMode: String?,
+    sortAscending: Boolean
+): List<GoodsItemDataModel> {
+    val language = stateValues.appLanguage
+    if (sortMode == "price" && preferredOrder.isEmpty()) {
+        val pricedItems = items
+            .mapNotNull { item -> item.stockWarehouseSortPriceForUi()?.let { price -> item to price } }
+            .sortedWith(
+                compareBy<Pair<GoodsItemDataModel, Double>> { it.second }
+                    .thenBy { it.first.name.extractLocalizedString(language).orEmpty().lowercase() }
+            )
+            .let { if (sortAscending) it else it.reversed() }
+            .map { it.first }
+        val pricedIds = pricedItems.map { it.id }.toSet()
+        val unpricedItems = items
+            .asSequence()
+            .filter { it.id !in pricedIds }
+            .sortedBy { it.name.extractLocalizedString(language).orEmpty().lowercase() }
+            .toList()
+        return pricedItems + unpricedItems
+    }
+
+    val sorted = when {
+        preferredOrder.isNotEmpty() -> items.sortedWith(
+            compareBy<GoodsItemDataModel> { preferredOrder[it.id] ?: Int.MAX_VALUE }
+                .thenBy { it.name.extractLocalizedString(language).orEmpty().lowercase() }
+        )
+        sortMode == "created" -> items.sortedBy { it.createdAtMillis }
+        else -> items.sortedBy { it.name.extractLocalizedString(language).orEmpty().lowercase() }
+    }
+    return if (preferredOrder.isEmpty() && !sortAscending) sorted.reversed() else sorted
+}
 
 private fun GoodsItemDataModel.stockWarehouseExpiringSoonForUi(
     batchesByItem: Map<String, List<GoodsBatchDataModel>>,
@@ -10973,6 +11165,7 @@ private fun AppConfiguration.StockWarehouseInfoTile(
 fun AppConfiguration.StockWarehouseScreenContent(
     modifier: Modifier = Modifier,
     searchQuery: String? = null,
+    stockItemsOverride: List<GoodsItemDataModel>? = null,
     disableIfOutOfStock: Boolean = false,
     showStockType: Boolean = true,
     showBatches: Boolean = true,
@@ -10993,7 +11186,7 @@ fun AppConfiguration.StockWarehouseScreenContent(
 ){
     when (val state = stateValues.stockState) {
         is DataState.Success -> {
-            val stockPayload = state.payload
+            val stockPayload = stockItemsOverride ?: state.payload
             if (stockPayload.isEmpty()) {
                 MessageText(
                     modifier = modifier
@@ -11003,27 +11196,39 @@ fun AppConfiguration.StockWarehouseScreenContent(
             } else {
                 val activeStoreId = stateValues.activeStoreId
                 val stockBatches = stateValues.stockBatches.orEmpty()
+                val stockPayloadAlreadyScopedForTransaction = stockItemsOverride != null && transactionTypeIndex != null
                 val showWarehouseInfoTile = searchQuery == null && transactionTypeIndex == null
-                val needsWarehouseQuantityMap = showWarehouseInfoTile || sortMode == "quantity"
+                val selectedSortMode = sortMode ?: "name"
+                val needsWarehouseQuantityMap = showWarehouseInfoTile || selectedSortMode == "quantity"
                 val warehouseBatchesByItem = remember(stockBatches, needsWarehouseQuantityMap) {
                     if (needsWarehouseQuantityMap) stockWarehouseBatchesByItemForUi(stockBatches) else emptyMap()
                 }
                 val warehouseQuantityByItem = remember(warehouseBatchesByItem, needsWarehouseQuantityMap) {
                     if (needsWarehouseQuantityMap) warehouseBatchesByItem.mapValues { (_, batches) -> batches.sumOf { it.quantity.total } } else emptyMap()
                 }
-                val displayBatchesByItem = remember(stockBatches, transactionTypeIndex, activeStoreId) {
-                    stockBatches
-                        .asSequence()
-                        .filter { batch ->
-                            batch.isActive && (
-                                    transactionTypeIndex == null ||
-                                            (batchBelongsToInventoryStoreForUi(batch.storeId, activeStoreId) && batch.isSelectableActiveStockBatch())
-                                    )
-                        }
-                        .groupBy { it.goodsItemId }
+                val needsDisplayBatchesByItem = showBatches || disableIfOutOfStock || onPrintLabel != null
+                val stockPayloadItemIdsForBatchDisplay = remember(stockPayload, stockItemsOverride) {
+                    if (stockItemsOverride == null) emptySet()
+                    else stockPayload.map { it.id }.filter { it.isNotBlank() }.toSet()
                 }
-                val sellableItemIdsForActiveStore = remember(stockBatches, activeStoreId) {
-                    if (activeStoreId.isNullOrBlank()) {
+                val displayBatchesByItem = remember(stockBatches, transactionTypeIndex, activeStoreId, needsDisplayBatchesByItem, stockPayloadItemIdsForBatchDisplay) {
+                    if (!needsDisplayBatchesByItem) {
+                        emptyMap()
+                    } else {
+                        stockBatches
+                            .asSequence()
+                            .filter { batch ->
+                                (stockPayloadItemIdsForBatchDisplay.isEmpty() || batch.goodsItemId in stockPayloadItemIdsForBatchDisplay) &&
+                                        batch.isActive && (
+                                        transactionTypeIndex == null ||
+                                                (batchBelongsToInventoryStoreForUi(batch.storeId, activeStoreId) && batch.isSelectableActiveStockBatch())
+                                        )
+                            }
+                            .groupBy { it.goodsItemId }
+                    }
+                }
+                val sellableItemIdsForActiveStore = remember(stockBatches, activeStoreId, stockPayloadAlreadyScopedForTransaction) {
+                    if (stockPayloadAlreadyScopedForTransaction || activeStoreId.isNullOrBlank()) {
                         emptySet()
                     } else {
                         stockBatches
@@ -11083,14 +11288,24 @@ fun AppConfiguration.StockWarehouseScreenContent(
                 }
 
                 LaunchedEffect(lSearchQuery, transactionTypeIndex) {
-                    if (transactionTypeIndex == null && lSearchQuery.isNotBlank()) {
-                        delay(160)
+                    if (lSearchQuery.isNotBlank()) {
+                        if (transactionTypeIndex == null) {
+                            delay(160)
+                        } else if (!lSearchQuery.looksLikeCompleteRetailBarcodeInput()) {
+                            delay(90)
+                        }
                     }
                     appliedSearchQuery = lSearchQuery
                 }
 
                 var lastExactSearchHandledKey by rememberSaveable {
                     mutableStateOf("")
+                }
+
+                LaunchedEffect(appliedSearchQuery) {
+                    if (appliedSearchQuery.isBlank() && lastExactSearchHandledKey.isNotEmpty()) {
+                        lastExactSearchHandledKey = ""
+                    }
                 }
 
                 fun handleExactSearchHit(item: GoodsItemDataModel, query: String) {
@@ -11103,14 +11318,14 @@ fun AppConfiguration.StockWarehouseScreenContent(
                         ?: onExactSearchHit?.invoke(item)
                 }
 
-                val baseItems = remember(stockPayload, onFilter, transactionTypeIndex, activeStoreId, sellableItemIdsForActiveStore) {
+                val baseItems = remember(stockPayload, onFilter, transactionTypeIndex, activeStoreId, sellableItemIdsForActiveStore, stockPayloadAlreadyScopedForTransaction) {
                     stockPayload
                         .let { payload -> onFilter?.let { filterAction -> payload.filter { filterAction(it) } } ?: payload }
                         .let { filtered ->
-                            if (transactionTypeIndex == null) {
-                                filtered
-                            } else {
-                                filtered.filter { item ->
+                            when {
+                                transactionTypeIndex == null -> filtered
+                                stockPayloadAlreadyScopedForTransaction -> filtered
+                                else -> filtered.filter { item ->
                                     activeStoreId.isNullOrBlank() ||
                                             sameInventoryStoreGroupForUi(activeStoreId, item.storeId) ||
                                             item.id in sellableItemIdsForActiveStore
@@ -11162,24 +11377,53 @@ fun AppConfiguration.StockWarehouseScreenContent(
                         .withIndex()
                         .associate { it.value to it.index }
                 }
-                val unfilteredSortedItems = remember(
+                val defaultSortedItems = remember(
                     items,
                     preferredOrder,
-                    sortMode,
+                    selectedSortMode,
                     sortAscending,
-                    warehouseQuantityByItem,
                     stateValues.appLanguage
                 ) {
-                    val sorted = when {
-                        preferredOrder.isNotEmpty() -> items.sortedWith(
-                            compareBy<GoodsItemDataModel> { preferredOrder[it.id] ?: Int.MAX_VALUE }
-                                .thenBy { it.name.extractLocalizedString(stateValues.appLanguage).orEmpty().lowercase() }
-                        )
-                        sortMode == "quantity" -> items.sortedBy { item -> warehouseQuantityByItem[item.id] ?: 0.0 }
-                        sortMode == "created" -> items.sortedBy { it.createdAtMillis }
-                        else -> items.sortedBy { it.name.extractLocalizedString(stateValues.appLanguage).orEmpty().lowercase() }
+                    stockWarehouseDefaultSortedItems(
+                        items = items,
+                        preferredOrder = preferredOrder,
+                        sortMode = selectedSortMode.takeUnless { it == "quantity" },
+                        sortAscending = sortAscending
+                    )
+                }
+                var lastNonQuantitySortOrderIds by rememberSaveable(searchQuery, transactionTypeIndex) {
+                    mutableStateOf(emptyList<String>())
+                }
+                val defaultSortedItemIds = remember(defaultSortedItems) {
+                    defaultSortedItems.map { it.id }.filter { it.isNotBlank() }
+                }
+                LaunchedEffect(selectedSortMode, defaultSortedItemIds) {
+                    if (selectedSortMode != "quantity" || lastNonQuantitySortOrderIds.isEmpty()) {
+                        lastNonQuantitySortOrderIds = defaultSortedItemIds
                     }
-                    if (preferredOrder.isEmpty() && !sortAscending) sorted.reversed() else sorted
+                }
+                val quantityFallbackOrder = remember(lastNonQuantitySortOrderIds, defaultSortedItems) {
+                    if (lastNonQuantitySortOrderIds.isEmpty()) stockWarehouseFallbackOrderMap(defaultSortedItems)
+                    else lastNonQuantitySortOrderIds.withIndex().associate { it.value to it.index }
+                }
+                val unfilteredSortedItems = remember(
+                    defaultSortedItems,
+                    items,
+                    selectedSortMode,
+                    sortAscending,
+                    warehouseQuantityByItem,
+                    quantityFallbackOrder
+                ) {
+                    if (selectedSortMode == "quantity" && warehouseQuantityByItem.any { it.value > 0.0 }) {
+                        stockWarehouseQuantitySortedItems(
+                            items = items,
+                            quantityByItem = warehouseQuantityByItem,
+                            fallbackOrder = quantityFallbackOrder,
+                            ascending = sortAscending
+                        )
+                    } else {
+                        defaultSortedItems
+                    }
                 }
                 val sortedItems = remember(showWarehouseInfoTile, selectedWarehouseFilterId, unfilteredSortedItems, warehouseBatchesByItem) {
                     if (showWarehouseInfoTile) {
@@ -11193,18 +11437,23 @@ fun AppConfiguration.StockWarehouseScreenContent(
                     }
                 }
 
-                val selectableItemIds = remember(sortedItems) {
-                    sortedItems.map { it.id }.filter { it.isNotBlank() }.distinct()
+                val selectionHostAvailable = searchQuery == null && transactionTypeIndex == null
+                val selectableItemIds = remember(sortedItems, selectionHostAvailable) {
+                    if (selectionHostAvailable) sortedItems.map { it.id }.filter { it.isNotBlank() }.distinct() else emptyList()
                 }
                 val selectableItemIdSet = remember(selectableItemIds) { selectableItemIds.toSet() }
                 val selectionCleanupFirstId = selectableItemIds.firstOrNull().orEmpty()
                 val selectionCleanupLastId = selectableItemIds.lastOrNull().orEmpty()
-                LaunchedEffect(selectableItemIds.size, selectionCleanupFirstId, selectionCleanupLastId, appliedSearchQuery, selectedWarehouseFilterId) {
-                    val cleaned = selectedStockItemIds.filter { it in selectableItemIdSet }.distinct()
-                    if (cleaned != selectedStockItemIds) selectedStockItemIds = cleaned
+                LaunchedEffect(selectionHostAvailable, selectableItemIds.size, selectionCleanupFirstId, selectionCleanupLastId, appliedSearchQuery, selectedWarehouseFilterId) {
+                    if (!selectionHostAvailable) {
+                        if (selectedStockItemIds.isNotEmpty()) selectedStockItemIds = emptyList()
+                    } else {
+                        val cleaned = selectedStockItemIds.filter { it in selectableItemIdSet }.distinct()
+                        if (cleaned != selectedStockItemIds) selectedStockItemIds = cleaned
+                    }
                 }
 
-                val selectionAvailable = searchQuery == null && transactionTypeIndex == null && selectableItemIds.isNotEmpty()
+                val selectionAvailable = selectionHostAvailable && selectableItemIds.isNotEmpty()
                 val selectionMode = selectionAvailable && selectedStockItemIds.isNotEmpty()
 
                 fun toggleSelection(item: GoodsItemDataModel) {
@@ -11272,7 +11521,7 @@ fun AppConfiguration.StockWarehouseScreenContent(
                     }
                 }
 
-                var page by rememberSaveable(appliedSearchQuery, sortMode, sortAscending, selectedWarehouseFilterId, sortedItems.size) {
+                var page by rememberSaveable(appliedSearchQuery, selectedSortMode, sortAscending, selectedWarehouseFilterId, sortedItems.size) {
                     mutableStateOf(0)
                 }
                 val pageSize = stateValues.globalAppConfiguration.pagingDefaultPageSize.coerceIn(20, 100)
@@ -11313,7 +11562,7 @@ fun AppConfiguration.StockWarehouseScreenContent(
                             stateKey = scrollStateKey
                         )
 
-                        LaunchedEffect(page, appliedSearchQuery, selectedWarehouseFilterId, sortMode, sortAscending) {
+                        LaunchedEffect(page, appliedSearchQuery, selectedWarehouseFilterId, selectedSortMode, sortAscending) {
                             warehouseListState.scrollToItem(0)
                         }
 
@@ -13997,6 +14246,8 @@ fun List<GoodsBatchDataModel>.bestBatchForSale(
         it.id == goodsItem.activeShelfBatchId &&
                 it.isActive &&
                 it.quantity.total > 0.0 &&
+                it.status != StockBatchStatusDataModel.Ordered &&
+                it.status != StockBatchStatusDataModel.Reserved &&
                 it.status != StockBatchStatusDataModel.SoldOut &&
                 it.status != StockBatchStatusDataModel.Deleted &&
                 it.status != StockBatchStatusDataModel.WrittenOff &&
@@ -14009,6 +14260,8 @@ fun List<GoodsBatchDataModel>.bestBatchForSale(
         it.goodsItemId == goodsItem.id &&
                 it.isActive &&
                 it.quantity.total > 0.0 &&
+                it.status != StockBatchStatusDataModel.Ordered &&
+                it.status != StockBatchStatusDataModel.Reserved &&
                 it.status != StockBatchStatusDataModel.SoldOut &&
                 it.status != StockBatchStatusDataModel.Deleted &&
                 it.status != StockBatchStatusDataModel.WrittenOff &&
@@ -15592,7 +15845,13 @@ private fun AppConfiguration.StockLocationAvailabilityCard(
             textColor = stateValues.TextColor
         )
 
-        val movableBatches = location.batches.filter { it.quantity.total > 0.0 && it.isActive && it.status != StockBatchStatusDataModel.InTransit }
+        val movableBatches = location.batches.filter {
+            it.quantity.total > 0.0 &&
+                    it.isActive &&
+                    it.status != StockBatchStatusDataModel.Ordered &&
+                    it.status != StockBatchStatusDataModel.Reserved &&
+                    it.status != StockBatchStatusDataModel.InTransit
+        }
         Spacer(modifier = Modifier.height(8.dp))
 
         if (movableBatches.isEmpty()) {
@@ -17413,15 +17672,20 @@ private fun AppConfiguration.StockLocalizedStringGroupEditor(
         }
     }
 
-    var focusTargetIndex by rememberSaveable {
+    val persistentEditorKey = localizedGroupEditorPersistentKey(persistentKey)
+    val editorIdentityKey = persistentEditorKey ?: listOf(
+        title,
+        placeholder,
+        values.joinToString("|") { "${it.language}:${it.value}" }
+    ).joinToString("::")
+
+    var focusTargetIndex by rememberSaveable(editorIdentityKey) {
         mutableStateOf(-1)
     }
 
-    var data by rememberSaveable {
+    var data by rememberSaveable(editorIdentityKey) {
         mutableStateOf(sanitizeEditorItems(values.toDomainSelectionItems(fallbackLanguageId)))
     }
-
-    val persistentEditorKey = localizedGroupEditorPersistentKey(persistentKey)
 
     LaunchedEffect(persistentEditorKey, fallbackLanguageId, languageDomains.map { it.id }) {
         val key = persistentEditorKey ?: return@LaunchedEffect
@@ -17474,6 +17738,7 @@ private fun AppConfiguration.StockLocalizedStringGroupEditor(
                 titleText = if (index == 0) title else "$title ${index + 1}",
                 placeholderText = placeholder,
                 valueInitial = item.value.text,
+                identityKey = "$editorIdentityKey:localized-row:$index",
                 titleIconButtonPath = if (sanitizedData.size == 1) null else stateValues.drawablePathIconDelete,
                 onTitleIconButtonClick = if (sanitizedData.size == 1) null else {
                     {
@@ -26089,12 +26354,13 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
         ?.id
         ?: "0"
 
-    val draftStorageKey = remember(existing?.id, stateValues.userAccount?.id, stateValues.activeStoreId) {
+    val addStockItemSessionId = addEditState["stock_add_edit_add_session_id"].orEmpty()
+    val draftStorageKey = remember(existing?.id, addStockItemSessionId, stateValues.userAccount?.id, stateValues.activeStoreId) {
         listOf(
             "stock-add-edit-goods-item",
             stateValues.userAccount?.id?.takeIf { it.isNotBlank() } ?: "anonymous",
             stateValues.activeStoreId ?: "no-store",
-            existing?.id ?: "new"
+            existing?.id ?: "new:${addStockItemSessionId.ifBlank { "default" }}"
         ).joinToString(":")
     }
 
@@ -26147,19 +26413,20 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
         )
     }
 
-    var draft by remember(existing?.id, defaultCurrency, defaultMeasurementUnitId, stateValues.appLanguage) {
+    val stockAddEditDraftIdentity = existing?.id ?: "new:${stateValues.userAccount?.id.orEmpty()}:${stateValues.activeStoreId.orEmpty()}:${addStockItemSessionId.ifBlank { "default" }}"
+    var draft by remember(stockAddEditDraftIdentity, defaultCurrency, defaultMeasurementUnitId) {
         mutableStateOf(
             existing?.toStockAddEditDraft() ?: newDraft()
         )
     }
 
-    var showGlobalGoodsSheet by rememberSaveable(existing?.id ?: "new_stock_item") {
+    var showGlobalGoodsSheet by rememberSaveable(existing?.id ?: "new_stock_item:$addStockItemSessionId") {
         mutableStateOf(false)
     }
-    var showParentStoreStockSheet by rememberSaveable(existing?.id ?: "new_stock_item", stateValues.activeStoreId ?: "no_store") {
+    var showParentStoreStockSheet by rememberSaveable(existing?.id ?: "new_stock_item:$addStockItemSessionId", stateValues.activeStoreId ?: "no_store") {
         mutableStateOf(false)
     }
-    var stockAddEditUndoDraft by remember(existing?.id) {
+    var stockAddEditUndoDraft by remember(existing?.id ?: "new_stock_item:$addStockItemSessionId") {
         mutableStateOf<StockAddEditDraft?>(null)
     }
 
@@ -26234,7 +26501,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
         }
     }
 
-    var selectedTabId by rememberSaveable(existing?.id ?: "new_stock_item") {
+    var selectedTabId by rememberSaveable(existing?.id ?: "new_stock_item:$addStockItemSessionId") {
         mutableStateOf(addEditState["stock_add_edit_selected_tab"] ?: "info")
     }
 
@@ -26244,7 +26511,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
         }
     }
 
-    var returnPriceManuallyEdited by rememberSaveable(existing?.id ?: "new_stock_item") {
+    var returnPriceManuallyEdited by rememberSaveable(existing?.id ?: "new_stock_item:$addStockItemSessionId") {
         mutableStateOf(
             existing?.let {
                 it.returnPrices
@@ -26441,23 +26708,25 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
         }
     }
 
-    if (showParentStoreStockSheet && stateValues.activeStoreId != null) {
-        ParentStoreStockSelectionBottomSheet(
-            activeStoreId = stateValues.activeStoreId!!,
-            draft = draft,
-            existing = existing,
-            onDismiss = { showParentStoreStockSheet = false },
-            onApply = { parentItem ->
-                stockAddEditUndoDraft = draft
-                draft = parentItem.toParentStoreStockTemplateDraft(draft, existing)
-                showParentStoreStockSheet = false
-                postInAppNotification(
-                    "${localizedStringResource(1216, "Parent item applied")}: ${parentItem.visibleParentStoreStockName(stateValues.appLanguage)}",
-                    NotificationType.Positive,
-                    transient = true
-                )
-            }
-        )
+    stateValues.activeStoreId?.let { activeStoreIdForParentSheet ->
+        if (showParentStoreStockSheet) {
+            ParentStoreStockSelectionBottomSheet(
+                activeStoreId = activeStoreIdForParentSheet,
+                draft = draft,
+                existing = existing,
+                onDismiss = { showParentStoreStockSheet = false },
+                onApply = { parentItem ->
+                    stockAddEditUndoDraft = draft
+                    draft = parentItem.toParentStoreStockTemplateDraft(draft, existing)
+                    showParentStoreStockSheet = false
+                    postInAppNotification(
+                        "${localizedStringResource(1216, "Parent item applied")}: ${parentItem.visibleParentStoreStockName(stateValues.appLanguage)}",
+                        NotificationType.Positive,
+                        transient = true
+                    )
+                }
+            )
+        }
     }
 
     if (showGlobalGoodsSheet) {
@@ -45082,6 +45351,8 @@ private fun localDrawableResourceForPath(
         "88_1" -> Res.drawable._88_1
         "89_0" -> Res.drawable._89_0
         "89_1" -> Res.drawable._89_1
+        "90_0" -> Res.drawable._90_0
+        "90_1" -> Res.drawable._90_1
         else -> fallbackRes
     }
 }
@@ -46184,6 +46455,7 @@ fun AppConfiguration.genericTextField(
 
     stateHost: StateHost? = null,
     stateKey: String? = null,
+    identityKey: String? = null,
 
     enabled: Boolean = true,
     readOnly: Boolean = false,
@@ -46266,12 +46538,16 @@ fun AppConfiguration.genericTextField(
 
     val initialTextFieldText = stateValue ?: valueInitial ?: ""
     val initialTextFieldMeta = decodePersistentTextFieldMeta(stateMetaValue, initialTextFieldText.length)
+    val textFieldIdentityKey = identityKey
+        ?: persistentTextDraftKey
+        ?: stateKey
+        ?: listOf(titleText, placeholderText, leadingIconPath.orEmpty()).joinToString("|")
 
-    var textFieldValue by rememberSaveable(stateSaver = TextFieldValue.Saver) {
+    var textFieldValue by rememberSaveable(textFieldIdentityKey, stateSaver = TextFieldValue.Saver) {
         mutableStateOf(TextFieldValue(initialTextFieldText, selection = initialTextFieldMeta.selection))
     }
 
-    var persistentTextDraftLoaded by rememberSaveable(persistentTextDraftKey ?: "no_persistent_text_draft") {
+    var persistentTextDraftLoaded by rememberSaveable(textFieldIdentityKey, persistentTextDraftKey ?: "no_persistent_text_draft") {
         mutableStateOf(false)
     }
 
@@ -46345,15 +46621,15 @@ fun AppConfiguration.genericTextField(
         }
     }
 
-    var lastLocalTextEditMillis by remember {
+    var lastLocalTextEditMillis by remember(textFieldIdentityKey) {
         mutableStateOf(0L)
     }
 
-    var isFocused by rememberSaveable {
+    var isFocused by rememberSaveable(textFieldIdentityKey) {
         mutableStateOf(isFocusedInitial || (initialTextFieldMeta.focused && platformAllowsAutomaticTextFieldFocus()))
     }
 
-    var focusRequester by remember {
+    var focusRequester by remember(textFieldIdentityKey) {
         mutableStateOf(FocusRequester())
     }
 
@@ -46378,28 +46654,28 @@ fun AppConfiguration.genericTextField(
         }
     }
 
-    var isContentValid by rememberSaveable {
+    var isContentValid by rememberSaveable(textFieldIdentityKey) {
         mutableStateOf(true)
     }
 
-    var voicePermissionDialogState by rememberSaveable {
+    var voicePermissionDialogState by rememberSaveable(textFieldIdentityKey) {
         mutableStateOf<PlatformPermissionState?>(null)
     }
     val voicePermissionRequestText = voiceInputPermissionTexts(this)
 
-    var isVoiceListening by rememberSaveable {
+    var isVoiceListening by rememberSaveable(textFieldIdentityKey) {
         mutableStateOf(false)
     }
 
-    var voiceLevel by rememberSaveable {
+    var voiceLevel by rememberSaveable(textFieldIdentityKey) {
         mutableStateOf(0f)
     }
 
-    var voiceStatusText by rememberSaveable {
+    var voiceStatusText by rememberSaveable(textFieldIdentityKey) {
         mutableStateOf("")
     }
 
-    var successHighlightActive by rememberSaveable {
+    var successHighlightActive by rememberSaveable(textFieldIdentityKey) {
         mutableStateOf(false)
     }
 
@@ -47724,6 +48000,7 @@ fun AppConfiguration.domainSelectionTextField(
     titleText: String = "",
     stateHost: StateHost? = null,
     stateKey: String? = null,
+    identityKey: String? = null,
     placeholderText: String = "",
     titleIconButtonPath: String? = null,
     titleIconButtonRes: DrawableResource? = null,
@@ -47756,10 +48033,13 @@ fun AppConfiguration.domainSelectionTextField(
 ): DomainSelectionTextFieldContent {
     val primaryDomainIdsKey = remember(domains) { domains.joinToString("|") { it.id } }
     val secondaryDomainIdsKey = remember(secondaryDomains) { secondaryDomains.orEmpty().joinToString("|") { it.id } }
+    val domainFieldIdentityKey = identityKey
+        ?: stateKey
+        ?: listOf(titleText, placeholderText, primaryDomainIdsKey, secondaryDomainIdsKey).joinToString("|")
     val persistentSelectedDomainKey = persistentUiDraftKey(stateHost, stateKey, "selected-domain")
     val persistentSelectedSecondaryDomainKey = persistentUiDraftKey(stateHost, stateKey, "selected-secondary-domain")
 
-    var selectedId by rememberSaveable {
+    var selectedId by rememberSaveable(domainFieldIdentityKey, primaryDomainIdsKey) {
         mutableStateOf(lockedDomainId ?: selectedInitial)
     }
 
@@ -47779,7 +48059,7 @@ fun AppConfiguration.domainSelectionTextField(
         }
     }
 
-    var selected by remember {
+    var selected by remember(domainFieldIdentityKey, primaryDomainIdsKey) {
         mutableStateOf(
             domains.find { it.id.equals(selectedId, true) } ?: try {
                 domains.first()
@@ -47808,7 +48088,7 @@ fun AppConfiguration.domainSelectionTextField(
         }
     }
 
-    var selectedSecondaryId by rememberSaveable {
+    var selectedSecondaryId by rememberSaveable(domainFieldIdentityKey, secondaryDomainIdsKey) {
         mutableStateOf(lockedSecondaryDomainId ?: selectedSecondaryInitial)
     }
 
@@ -47829,7 +48109,7 @@ fun AppConfiguration.domainSelectionTextField(
         }
     }
 
-    var selectedSecondary by remember {
+    var selectedSecondary by remember(domainFieldIdentityKey, secondaryDomainIdsKey) {
         mutableStateOf(secondaryDomains?.find { it.id.equals(selectedSecondaryId, true) } ?: secondaryDomains?.first())
     }
 
@@ -47847,14 +48127,14 @@ fun AppConfiguration.domainSelectionTextField(
         }
     }
 
-    val isDomainSelectionDropdownExpandedState = remember {
+    val isDomainSelectionDropdownExpandedState = remember(domainFieldIdentityKey) {
         MutableTransitionState(false)
             .apply {
                 targetState = false
             }
     }
 
-    val isSecondaryDomainSelectionDropdownExpandedState = remember {
+    val isSecondaryDomainSelectionDropdownExpandedState = remember(domainFieldIdentityKey) {
         MutableTransitionState(false)
             .apply {
                 targetState = false
@@ -47900,7 +48180,7 @@ fun AppConfiguration.domainSelectionTextField(
                     )
             }
 
-        var isFocused by rememberSaveable {
+        var isFocused by rememberSaveable(domainFieldIdentityKey) {
             mutableStateOf(isFocusedInitial)
         }
 
@@ -48000,6 +48280,7 @@ fun AppConfiguration.domainSelectionTextField(
                 titleText = "",
                 stateHost = stateHost,
                 stateKey = stateKey,
+                identityKey = domainFieldIdentityKey,
                 placeholderText = placeholderText,
                 isFocusedInitial = isFocusedInitial,
                 leadingIcon = selectedSecondary?.run {

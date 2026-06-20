@@ -84,6 +84,15 @@ ktor {
     }
 }
 
+tasks.processResources {
+    from("assets") {
+        into("assets")
+    }
+    from("config") {
+        into("config")
+    }
+}
+
 tasks.withType<JavaExec>().configureEach {
     systemProperty("io.ktor.development", "false")
     systemProperty("ktor.development", "false")

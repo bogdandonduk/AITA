@@ -31,9 +31,17 @@
       "first": "auth/logOut",
       "second": "6"
     },
+    "connectionCheckPath": {
+      "first": "auth/ping",
+      "second": "1147"
+    },
     "getSecuritySessionsPath": {
       "first": "security/sessions/get",
       "second": "44"
+    },
+    "getSecuritySessionHistoryPath": {
+      "first": "security/sessions/history",
+      "second": "104"
     },
     "revokeSecuritySessionPath": {
       "first": "security/sessions/revoke",
@@ -151,13 +159,33 @@
       "first": "transactions/complete",
       "second": "30"
     },
+    "getDebtorsPath": {
+      "first": "debtors/get",
+      "second": "39"
+    },
+    "addDebtorPath": {
+      "first": "debtors/add",
+      "second": "40"
+    },
+    "updateDebtorPath": {
+      "first": "debtors/update",
+      "second": "41"
+    },
+    "deleteDebtorPath": {
+      "first": "debtors/delete",
+      "second": "42"
+    },
+    "payDebtorDebtPath": {
+      "first": "debtors/pay",
+      "second": "43"
+    },
     "getSupplierGoodsPricesPath": {
       "first": "supplierGoodsPrices/get",
       "second": "31"
     },
-    "getSupplierSideGoodsPricesPath": {
-      "first": "supplierGoodsPrices/supplier/get",
-      "second": "1682"
+    "getMySupplierGoodsPricesPath": {
+      "first": "supplierGoodsPrices/my",
+      "second": "1685"
     },
     "upsertSupplierGoodsPricePath": {
       "first": "supplierGoodsPrices/upsert",
@@ -182,6 +210,10 @@
     "receiveSupplierOrderPath": {
       "first": "supplierOrders/receive",
       "second": "38"
+    },
+    "getSupplierDashboardPath": {
+      "first": "supplierOrders/dashboard",
+      "second": "1616"
     },
     "getSupplierContractsPath": {
       "first": "supplierContracts/get",
