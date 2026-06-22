@@ -28690,7 +28690,7 @@
     },
     {
       "id": 1449,
-      "value": [
+      "values": [
         {
           "language": "main",
           "value": "Offer note"
@@ -31506,19 +31506,19 @@
       "id": 1583,
       "values": [
         {
-          "locale": "main",
+          "language": "main",
           "value": "Supplier terms guard"
         },
         {
-          "locale": "en",
+          "language": "en",
           "value": "Supplier terms guard"
         },
         {
-          "locale": "ru",
+          "language": "ru",
           "value": "Страж условий поставщика"
         },
         {
-          "locale": "kk",
+          "language": "kk",
           "value": "Жеткізуші шарттарының күзеті"
         }
       ]
@@ -31527,19 +31527,19 @@
       "id": 1584,
       "values": [
         {
-          "locale": "main",
+          "language": "main",
           "value": "Terms guard"
         },
         {
-          "locale": "en",
+          "language": "en",
           "value": "Terms guard"
         },
         {
-          "locale": "ru",
+          "language": "ru",
           "value": "Страж условий"
         },
         {
-          "locale": "kk",
+          "language": "kk",
           "value": "Шарттар күзеті"
         }
       ]
@@ -31548,19 +31548,19 @@
       "id": 1585,
       "values": [
         {
-          "locale": "main",
+          "language": "main",
           "value": "Operational effect"
         },
         {
-          "locale": "en",
+          "language": "en",
           "value": "Operational effect"
         },
         {
-          "locale": "ru",
+          "language": "ru",
           "value": "Операционный эффект"
         },
         {
-          "locale": "kk",
+          "language": "kk",
           "value": "Операциялық әсер"
         }
       ]
@@ -31569,19 +31569,19 @@
       "id": 1586,
       "values": [
         {
-          "locale": "main",
+          "language": "main",
           "value": "Affected open orders"
         },
         {
-          "locale": "en",
+          "language": "en",
           "value": "Affected open orders"
         },
         {
-          "locale": "ru",
+          "language": "ru",
           "value": "Затронутые открытые заказы"
         },
         {
-          "locale": "kk",
+          "language": "kk",
           "value": "Әсер ететін ашық тапсырыстар"
         }
       ]
@@ -31590,19 +31590,19 @@
       "id": 1587,
       "values": [
         {
-          "locale": "main",
+          "language": "main",
           "value": "Covered goods"
         },
         {
-          "locale": "en",
+          "language": "en",
           "value": "Covered goods"
         },
         {
-          "locale": "ru",
+          "language": "ru",
           "value": "Охваченные товары"
         },
         {
-          "locale": "kk",
+          "language": "kk",
           "value": "Қамтылған тауарлар"
         }
       ]
@@ -31611,19 +31611,19 @@
       "id": 1588,
       "values": [
         {
-          "locale": "main",
+          "language": "main",
           "value": "Blocking supply until accepted"
         },
         {
-          "locale": "en",
+          "language": "en",
           "value": "Blocking supply until accepted"
         },
         {
-          "locale": "ru",
+          "language": "ru",
           "value": "Блокирует поставку до принятия"
         },
         {
-          "locale": "kk",
+          "language": "kk",
           "value": "Қабылданғанша жеткізуді бұғаттайды"
         }
       ]
@@ -31632,19 +31632,19 @@
       "id": 1589,
       "values": [
         {
-          "locale": "main",
+          "language": "main",
           "value": "Active terms protecting supply"
         },
         {
-          "locale": "en",
+          "language": "en",
           "value": "Active terms protecting supply"
         },
         {
-          "locale": "ru",
+          "language": "ru",
           "value": "Активные условия защищают поставку"
         },
         {
-          "locale": "kk",
+          "language": "kk",
           "value": "Белсенді шарттар жеткізуді қорғайды"
         }
       ]
@@ -31653,19 +31653,19 @@
       "id": 1590,
       "values": [
         {
-          "locale": "main",
+          "language": "main",
           "value": "Waiting for supplier acceptance"
         },
         {
-          "locale": "en",
+          "language": "en",
           "value": "Waiting for supplier acceptance"
         },
         {
-          "locale": "ru",
+          "language": "ru",
           "value": "Ожидает принятия поставщиком"
         },
         {
-          "locale": "kk",
+          "language": "kk",
           "value": "Жеткізушінің қабылдауын күтеді"
         }
       ]
@@ -31674,19 +31674,19 @@
       "id": 1591,
       "values": [
         {
-          "locale": "main",
+          "language": "main",
           "value": "Waiting for store acceptance"
         },
         {
-          "locale": "en",
+          "language": "en",
           "value": "Waiting for store acceptance"
         },
         {
-          "locale": "ru",
+          "language": "ru",
           "value": "Ожидает принятия магазином"
         },
         {
-          "locale": "kk",
+          "language": "kk",
           "value": "Дүкеннің қабылдауын күтеді"
         }
       ]
@@ -31695,19 +31695,19 @@
       "id": 1592,
       "values": [
         {
-          "locale": "main",
+          "language": "main",
           "value": "No terms guard signals yet"
         },
         {
-          "locale": "en",
+          "language": "en",
           "value": "No terms guard signals yet"
         },
         {
-          "locale": "ru",
+          "language": "ru",
           "value": "Пока нет сигналов стража условий"
         },
         {
-          "locale": "kk",
+          "language": "kk",
           "value": "Әзірге шарттар күзеті сигналдары жоқ"
         }
       ]
@@ -31716,19 +31716,19 @@
       "id": 1593,
       "values": [
         {
-          "locale": "main",
+          "language": "main",
           "value": "Create or accept supplier contracts and this board will show which real orders they unlock or block."
         },
         {
-          "locale": "en",
+          "language": "en",
           "value": "Create or accept supplier contracts and this board will show which real orders they unlock or block."
         },
         {
-          "locale": "ru",
+          "language": "ru",
           "value": "Создайте или примите договоры поставщика, и эта доска покажет, какие реальные заказы они открывают или блокируют."
         },
         {
-          "locale": "kk",
+          "language": "kk",
           "value": "Жеткізуші келісімдерін жасаңыз немесе қабылдаңыз, сонда бұл тақта қай нақты тапсырыстарды ашатынын немесе бұғаттайтынын көрсетеді."
         }
       ]
@@ -31737,19 +31737,19 @@
       "id": 1594,
       "values": [
         {
-          "locale": "main",
+          "language": "main",
           "value": "Open contract board"
         },
         {
-          "locale": "en",
+          "language": "en",
           "value": "Open contract board"
         },
         {
-          "locale": "ru",
+          "language": "ru",
           "value": "Открыть доску договоров"
         },
         {
-          "locale": "kk",
+          "language": "kk",
           "value": "Келісімдер тақтасын ашу"
         }
       ]
@@ -31758,19 +31758,19 @@
       "id": 1595,
       "values": [
         {
-          "locale": "main",
+          "language": "main",
           "value": "Open affected orders"
         },
         {
-          "locale": "en",
+          "language": "en",
           "value": "Open affected orders"
         },
         {
-          "locale": "ru",
+          "language": "ru",
           "value": "Открыть затронутые заказы"
         },
         {
-          "locale": "kk",
+          "language": "kk",
           "value": "Әсер ететін тапсырыстарды ашу"
         }
       ]
@@ -31779,19 +31779,19 @@
       "id": 1596,
       "values": [
         {
-          "locale": "main",
+          "language": "main",
           "value": "Copy terms brief"
         },
         {
-          "locale": "en",
+          "language": "en",
           "value": "Copy terms brief"
         },
         {
-          "locale": "ru",
+          "language": "ru",
           "value": "Скопировать сводку условий"
         },
         {
-          "locale": "kk",
+          "language": "kk",
           "value": "Шарттар қысқаша мәліметін көшіру"
         }
       ]
@@ -31800,19 +31800,19 @@
       "id": 1597,
       "values": [
         {
-          "locale": "main",
+          "language": "main",
           "value": "Terms brief"
         },
         {
-          "locale": "en",
+          "language": "en",
           "value": "Terms brief"
         },
         {
-          "locale": "ru",
+          "language": "ru",
           "value": "Сводка условий"
         },
         {
-          "locale": "kk",
+          "language": "kk",
           "value": "Шарттар қысқашасы"
         }
       ]
@@ -31821,19 +31821,19 @@
       "id": 1598,
       "values": [
         {
-          "locale": "main",
+          "language": "main",
           "value": "Price terms"
         },
         {
-          "locale": "en",
+          "language": "en",
           "value": "Price terms"
         },
         {
-          "locale": "ru",
+          "language": "ru",
           "value": "Ценовые условия"
         },
         {
-          "locale": "kk",
+          "language": "kk",
           "value": "Баға шарттары"
         }
       ]
@@ -31842,19 +31842,19 @@
       "id": 1599,
       "values": [
         {
-          "locale": "main",
+          "language": "main",
           "value": "Custom terms"
         },
         {
-          "locale": "en",
+          "language": "en",
           "value": "Custom terms"
         },
         {
-          "locale": "ru",
+          "language": "ru",
           "value": "Особые условия"
         },
         {
-          "locale": "kk",
+          "language": "kk",
           "value": "Арнайы шарттар"
         }
       ]
@@ -31863,19 +31863,19 @@
       "id": 1600,
       "values": [
         {
-          "locale": "main",
+          "language": "main",
           "value": "Delivery terms"
         },
         {
-          "locale": "en",
+          "language": "en",
           "value": "Delivery terms"
         },
         {
-          "locale": "ru",
+          "language": "ru",
           "value": "Условия доставки"
         },
         {
-          "locale": "kk",
+          "language": "kk",
           "value": "Жеткізу шарттары"
         }
       ]
@@ -31884,19 +31884,19 @@
       "id": 1601,
       "values": [
         {
-          "locale": "main",
+          "language": "main",
           "value": "Payment terms"
         },
         {
-          "locale": "en",
+          "language": "en",
           "value": "Payment terms"
         },
         {
-          "locale": "ru",
+          "language": "ru",
           "value": "Условия оплаты"
         },
         {
-          "locale": "kk",
+          "language": "kk",
           "value": "Төлем шарттары"
         }
       ]
@@ -31905,19 +31905,19 @@
       "id": 1602,
       "values": [
         {
-          "locale": "main",
+          "language": "main",
           "value": "Guarded orders"
         },
         {
-          "locale": "en",
+          "language": "en",
           "value": "Guarded orders"
         },
         {
-          "locale": "ru",
+          "language": "ru",
           "value": "Заказы под защитой"
         },
         {
-          "locale": "kk",
+          "language": "kk",
           "value": "Қорғалған тапсырыстар"
         }
       ]
@@ -31926,19 +31926,19 @@
       "id": 1603,
       "values": [
         {
-          "locale": "main",
+          "language": "main",
           "value": "The terms guard connects contracts with live supplier orders, like a traffic light before goods move."
         },
         {
-          "locale": "en",
+          "language": "en",
           "value": "The terms guard connects contracts with live supplier orders, like a traffic light before goods move."
         },
         {
-          "locale": "ru",
+          "language": "ru",
           "value": "Страж условий связывает договоры с живыми заказами поставщика, как светофор перед движением товара."
         },
         {
-          "locale": "kk",
+          "language": "kk",
           "value": "Шарттар күзеті келісімдерді нақты жеткізуші тапсырыстарымен байланыстырады, тауар қозғалар алдындағы бағдаршам сияқты."
         }
       ]
@@ -31947,20 +31947,2582 @@
       "id": 1604,
       "values": [
         {
-          "locale": "main",
+          "language": "main",
           "value": "Related order lines"
         },
         {
-          "locale": "en",
+          "language": "en",
           "value": "Related order lines"
         },
         {
-          "locale": "ru",
+          "language": "ru",
           "value": "Связанные строки заказа"
         },
         {
-          "locale": "kk",
+          "language": "kk",
           "value": "Байланысты тапсырыс жолдары"
+        }
+      ]
+    },
+    {
+      "id": 1605,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier response"
+        },
+        {
+          "language": "en",
+          "value": "Supplier response"
+        },
+        {
+          "language": "ru",
+          "value": "Ответ поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші жауабы"
+        }
+      ]
+    },
+    {
+      "id": 1606,
+      "values": [
+        {
+          "language": "main",
+          "value": "Confirmed delivery"
+        },
+        {
+          "language": "en",
+          "value": "Confirmed delivery"
+        },
+        {
+          "language": "ru",
+          "value": "Подтверждённая доставка"
+        },
+        {
+          "language": "kk",
+          "value": "Расталған жеткізу"
+        }
+      ]
+    },
+    {
+      "id": 1607,
+      "values": [
+        {
+          "language": "main",
+          "value": "External reference"
+        },
+        {
+          "language": "en",
+          "value": "External reference"
+        },
+        {
+          "language": "ru",
+          "value": "Внешний номер"
+        },
+        {
+          "language": "kk",
+          "value": "Сыртқы нөмір"
+        }
+      ]
+    },
+    {
+      "id": 1608,
+      "values": [
+        {
+          "language": "main",
+          "value": "Accepted quantity"
+        },
+        {
+          "language": "en",
+          "value": "Accepted quantity"
+        },
+        {
+          "language": "ru",
+          "value": "Принятое количество"
+        },
+        {
+          "language": "kk",
+          "value": "Қабылданған саны"
+        }
+      ]
+    },
+    {
+      "id": 1609,
+      "values": [
+        {
+          "language": "main",
+          "value": "Offered supply price"
+        },
+        {
+          "language": "en",
+          "value": "Offered supply price"
+        },
+        {
+          "language": "ru",
+          "value": "Предложенная цена поставки"
+        },
+        {
+          "language": "kk",
+          "value": "Ұсынылған жеткізу бағасы"
+        }
+      ]
+    },
+    {
+      "id": 1610,
+      "values": [
+        {
+          "language": "main",
+          "value": "Line comment"
+        },
+        {
+          "language": "en",
+          "value": "Line comment"
+        },
+        {
+          "language": "ru",
+          "value": "Комментарий к строке"
+        },
+        {
+          "language": "kk",
+          "value": "Жол түсініктемесі"
+        }
+      ]
+    },
+    {
+      "id": 1611,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier editable answer"
+        },
+        {
+          "language": "en",
+          "value": "Supplier editable answer"
+        },
+        {
+          "language": "ru",
+          "value": "Редактируемый ответ поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізушінің өңделетін жауабы"
+        }
+      ]
+    },
+    {
+      "id": 1612,
+      "values": [
+        {
+          "language": "main",
+          "value": "Stores see accepted quantity, price, delivery date and comments before goods move."
+        },
+        {
+          "language": "en",
+          "value": "Stores see accepted quantity, price, delivery date and comments before goods move."
+        },
+        {
+          "language": "ru",
+          "value": "Магазин видит принятое количество, цену, дату доставки и комментарии до движения товара."
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен тауар қозғалғанға дейін қабылданған санды, бағаны, жеткізу күнін және түсініктемені көреді."
+        }
+      ]
+    },
+    {
+      "id": 1613,
+      "values": [
+        {
+          "language": "main",
+          "value": "Use request"
+        },
+        {
+          "language": "en",
+          "value": "Use request"
+        },
+        {
+          "language": "ru",
+          "value": "Взять запрос"
+        },
+        {
+          "language": "kk",
+          "value": "Сұранысты алу"
+        }
+      ]
+    },
+    {
+      "id": 1614,
+      "values": [
+        {
+          "language": "main",
+          "value": "Mark issue"
+        },
+        {
+          "language": "en",
+          "value": "Mark issue"
+        },
+        {
+          "language": "ru",
+          "value": "Отметить проблему"
+        },
+        {
+          "language": "kk",
+          "value": "Мәселені белгілеу"
+        }
+      ]
+    },
+    {
+      "id": 1615,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier response draft"
+        },
+        {
+          "language": "en",
+          "value": "Supplier response draft"
+        },
+        {
+          "language": "ru",
+          "value": "Черновик ответа поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші жауабының жобасы"
+        }
+      ]
+    },
+    {
+      "id": 1616,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier control tower"
+        },
+        {
+          "language": "en",
+          "value": "Supplier control tower"
+        },
+        {
+          "language": "ru",
+          "value": "Пульт поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші басқару мұнарасы"
+        }
+      ]
+    },
+    {
+      "id": 1617,
+      "values": [
+        {
+          "language": "main",
+          "value": "Server pulse"
+        },
+        {
+          "language": "en",
+          "value": "Server pulse"
+        },
+        {
+          "language": "ru",
+          "value": "Пульс сервера"
+        },
+        {
+          "language": "kk",
+          "value": "Сервер пульсі"
+        }
+      ]
+    },
+    {
+      "id": 1618,
+      "values": [
+        {
+          "language": "main",
+          "value": "Backend-confirmed supplier metrics"
+        },
+        {
+          "language": "en",
+          "value": "Backend-confirmed supplier metrics"
+        },
+        {
+          "language": "ru",
+          "value": "Метрики поставщика подтверждены сервером"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші метрикалары сервермен расталды"
+        }
+      ]
+    },
+    {
+      "id": 1619,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier profiles"
+        },
+        {
+          "language": "en",
+          "value": "Supplier profiles"
+        },
+        {
+          "language": "ru",
+          "value": "Профили поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші профильдері"
+        }
+      ]
+    },
+    {
+      "id": 1620,
+      "values": [
+        {
+          "language": "main",
+          "value": "No supplier profile yet"
+        },
+        {
+          "language": "en",
+          "value": "No supplier profile yet"
+        },
+        {
+          "language": "ru",
+          "value": "Профиля поставщика пока нет"
+        },
+        {
+          "language": "kk",
+          "value": "Әзірге жеткізуші профилі жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1621,
+      "values": [
+        {
+          "language": "main",
+          "value": "Create a supplier profile from the Suppliers screen, then incoming store orders will feed this desk."
+        },
+        {
+          "language": "en",
+          "value": "Create a supplier profile from the Suppliers screen, then incoming store orders will feed this desk."
+        },
+        {
+          "language": "ru",
+          "value": "Создайте профиль поставщика на экране поставщиков, затем входящие заказы магазинов попадут в этот пульт."
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізушілер экранында жеткізуші профилін жасаңыз, содан кейін дүкен тапсырыстары осы пультке түседі."
+        }
+      ]
+    },
+    {
+      "id": 1622,
+      "values": [
+        {
+          "language": "main",
+          "value": "Status mix"
+        },
+        {
+          "language": "en",
+          "value": "Status mix"
+        },
+        {
+          "language": "ru",
+          "value": "Разрез статусов"
+        },
+        {
+          "language": "kk",
+          "value": "Күйлер қоспасы"
+        }
+      ]
+    },
+    {
+      "id": 1623,
+      "values": [
+        {
+          "language": "main",
+          "value": "Backend dashboard is warming up"
+        },
+        {
+          "language": "en",
+          "value": "Backend dashboard is warming up"
+        },
+        {
+          "language": "ru",
+          "value": "Серверная панель прогревается"
+        },
+        {
+          "language": "kk",
+          "value": "Серверлік панель дайындалуда"
+        }
+      ]
+    },
+    {
+      "id": 1624,
+      "values": [
+        {
+          "language": "main",
+          "value": "Create supplier profile"
+        },
+        {
+          "language": "en",
+          "value": "Create supplier profile"
+        },
+        {
+          "language": "ru",
+          "value": "Создать профиль поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші профилін жасау"
+        }
+      ]
+    },
+    {
+      "id": 1625,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier identity"
+        },
+        {
+          "language": "en",
+          "value": "Supplier identity"
+        },
+        {
+          "language": "ru",
+          "value": "Профиль поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші тұлғасы"
+        }
+      ]
+    },
+    {
+      "id": 1626,
+      "values": [
+        {
+          "language": "main",
+          "value": "This account can receive store orders through these supplier profiles."
+        },
+        {
+          "language": "en",
+          "value": "This account can receive store orders through these supplier profiles."
+        },
+        {
+          "language": "ru",
+          "value": "Этот аккаунт может принимать заказы магазинов через эти профили поставщика."
+        },
+        {
+          "language": "kk",
+          "value": "Бұл аккаунт осы жеткізуші профильдері арқылы дүкен тапсырыстарын қабылдай алады."
+        }
+      ]
+    },
+    {
+      "id": 1627,
+      "values": [
+        {
+          "language": "main",
+          "value": "Set up your supplier profile"
+        },
+        {
+          "language": "en",
+          "value": "Set up your supplier profile"
+        },
+        {
+          "language": "ru",
+          "value": "Настройте профиль поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші профилін баптаңыз"
+        }
+      ]
+    },
+    {
+      "id": 1628,
+      "values": [
+        {
+          "language": "main",
+          "value": "Create the business identity stores will order from. It is like hanging your sign above the warehouse door."
+        },
+        {
+          "language": "en",
+          "value": "Create the business identity stores will order from. It is like hanging your sign above the warehouse door."
+        },
+        {
+          "language": "ru",
+          "value": "Создайте бизнес-профиль, у которого магазины будут делать заказы. Это как повесить вывеску над дверью склада."
+        },
+        {
+          "language": "kk",
+          "value": "Дүкендер тапсырыс беретін бизнес-профиль жасаңыз. Бұл қойма есігінің үстіне маңдайша ілгендей."
+        }
+      ]
+    },
+    {
+      "id": 1629,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier profile created. The desk is refreshing."
+        },
+        {
+          "language": "en",
+          "value": "Supplier profile created. The desk is refreshing."
+        },
+        {
+          "language": "ru",
+          "value": "Профиль поставщика создан. Пульт обновляется."
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші профилі жасалды. Пульт жаңарып жатыр."
+        }
+      ]
+    },
+    {
+      "id": 1630,
+      "values": [
+        {
+          "language": "main",
+          "value": "Active supplier profiles"
+        },
+        {
+          "language": "en",
+          "value": "Active supplier profiles"
+        },
+        {
+          "language": "ru",
+          "value": "Активные профили поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Белсенді жеткізуші профильдері"
+        }
+      ]
+    },
+    {
+      "id": 1631,
+      "values": [
+        {
+          "language": "main",
+          "value": "Orders will arrive here"
+        },
+        {
+          "language": "en",
+          "value": "Orders will arrive here"
+        },
+        {
+          "language": "ru",
+          "value": "Заказы будут приходить сюда"
+        },
+        {
+          "language": "kk",
+          "value": "Тапсырыстар осында келеді"
+        }
+      ]
+    },
+    {
+      "id": 1632,
+      "values": [
+        {
+          "language": "main",
+          "value": "Owned by this account"
+        },
+        {
+          "language": "en",
+          "value": "Owned by this account"
+        },
+        {
+          "language": "ru",
+          "value": "Принадлежит этому аккаунту"
+        },
+        {
+          "language": "kk",
+          "value": "Осы аккаунтқа тиесілі"
+        }
+      ]
+    },
+    {
+      "id": 1633,
+      "values": [
+        {
+          "language": "main",
+          "value": "Create another profile"
+        },
+        {
+          "language": "en",
+          "value": "Create another profile"
+        },
+        {
+          "language": "ru",
+          "value": "Создать ещё один профиль"
+        },
+        {
+          "language": "kk",
+          "value": "Тағы бір профиль жасау"
+        }
+      ]
+    },
+    {
+      "id": 1634,
+      "values": [
+        {
+          "language": "main",
+          "value": "No contact yet"
+        },
+        {
+          "language": "en",
+          "value": "No contact yet"
+        },
+        {
+          "language": "ru",
+          "value": "Контактов пока нет"
+        },
+        {
+          "language": "kk",
+          "value": "Әзірге байланыс жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1635,
+      "values": [
+        {
+          "language": "main",
+          "value": "Incoming store orders start here after a store chooses this supplier."
+        },
+        {
+          "language": "en",
+          "value": "Incoming store orders start here after a store chooses this supplier."
+        },
+        {
+          "language": "ru",
+          "value": "Входящие заказы магазинов начнутся здесь после того, как магазин выберет этого поставщика."
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен осы жеткізушіні таңдағаннан кейін кіріс тапсырыстар осы жерден басталады."
+        }
+      ]
+    },
+    {
+      "id": 1636,
+      "values": [
+        {
+          "language": "main",
+          "value": "Refresh supplier desk"
+        },
+        {
+          "language": "en",
+          "value": "Refresh supplier desk"
+        },
+        {
+          "language": "ru",
+          "value": "Обновить пульт поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші пультін жаңарту"
+        }
+      ]
+    },
+    {
+      "id": 1637,
+      "values": [
+        {
+          "language": "main",
+          "value": "Resolve supplier issue"
+        },
+        {
+          "language": "en",
+          "value": "Resolve supplier issue"
+        },
+        {
+          "language": "ru",
+          "value": "Решить проблему поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші мәселесін шешу"
+        }
+      ]
+    },
+    {
+      "id": 1638,
+      "values": [
+        {
+          "language": "main",
+          "value": "Answer store request"
+        },
+        {
+          "language": "en",
+          "value": "Answer store request"
+        },
+        {
+          "language": "ru",
+          "value": "Ответить на заявку магазина"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен сұранысына жауап беру"
+        }
+      ]
+    },
+    {
+      "id": 1639,
+      "values": [
+        {
+          "language": "main",
+          "value": "Complete quantities and prices"
+        },
+        {
+          "language": "en",
+          "value": "Complete quantities and prices"
+        },
+        {
+          "language": "ru",
+          "value": "Заполнить количества и цены"
+        },
+        {
+          "language": "kk",
+          "value": "Сандар мен бағаларды толтыру"
+        }
+      ]
+    },
+    {
+      "id": 1640,
+      "values": [
+        {
+          "language": "main",
+          "value": "Pack confirmed goods"
+        },
+        {
+          "language": "en",
+          "value": "Pack confirmed goods"
+        },
+        {
+          "language": "ru",
+          "value": "Упаковать подтверждённые товары"
+        },
+        {
+          "language": "kk",
+          "value": "Расталған тауарларды жинау"
+        }
+      ]
+    },
+    {
+      "id": 1641,
+      "values": [
+        {
+          "language": "main",
+          "value": "Start delivery run"
+        },
+        {
+          "language": "en",
+          "value": "Start delivery run"
+        },
+        {
+          "language": "ru",
+          "value": "Начать доставку"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуді бастау"
+        }
+      ]
+    },
+    {
+      "id": 1642,
+      "values": [
+        {
+          "language": "main",
+          "value": "Add delivery terms"
+        },
+        {
+          "language": "en",
+          "value": "Add delivery terms"
+        },
+        {
+          "language": "ru",
+          "value": "Добавить условия доставки"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізу шарттарын қосу"
+        }
+      ]
+    },
+    {
+      "id": 1643,
+      "values": [
+        {
+          "language": "main",
+          "value": "Follow delivery"
+        },
+        {
+          "language": "en",
+          "value": "Follow delivery"
+        },
+        {
+          "language": "ru",
+          "value": "Сопроводить доставку"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуді бақылау"
+        }
+      ]
+    },
+    {
+      "id": 1644,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier action"
+        },
+        {
+          "language": "en",
+          "value": "Supplier action"
+        },
+        {
+          "language": "ru",
+          "value": "Действие поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші әрекеті"
+        }
+      ]
+    },
+    {
+      "id": 1645,
+      "values": [
+        {
+          "language": "main",
+          "value": "Due"
+        },
+        {
+          "language": "en",
+          "value": "Due"
+        },
+        {
+          "language": "ru",
+          "value": "Срок"
+        },
+        {
+          "language": "kk",
+          "value": "Мерзім"
+        }
+      ]
+    },
+    {
+      "id": 1646,
+      "values": [
+        {
+          "language": "main",
+          "value": "Qty gaps"
+        },
+        {
+          "language": "en",
+          "value": "Qty gaps"
+        },
+        {
+          "language": "ru",
+          "value": "Пробелы в количестве"
+        },
+        {
+          "language": "kk",
+          "value": "Сан олқылықтары"
+        }
+      ]
+    },
+    {
+      "id": 1647,
+      "values": [
+        {
+          "language": "main",
+          "value": "Price gaps"
+        },
+        {
+          "language": "en",
+          "value": "Price gaps"
+        },
+        {
+          "language": "ru",
+          "value": "Пробелы в цене"
+        },
+        {
+          "language": "kk",
+          "value": "Баға олқылықтары"
+        }
+      ]
+    },
+    {
+      "id": 1648,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier action queue"
+        },
+        {
+          "language": "en",
+          "value": "Supplier action queue"
+        },
+        {
+          "language": "ru",
+          "value": "Очередь действий поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші әрекеттер кезегі"
+        }
+      ]
+    },
+    {
+      "id": 1649,
+      "values": [
+        {
+          "language": "main",
+          "value": "Server-ranked next moves: answer, fill gaps, pack, dispatch, or fix issues before the queue turns into noise."
+        },
+        {
+          "language": "en",
+          "value": "Server-ranked next moves: answer, fill gaps, pack, dispatch, or fix issues before the queue turns into noise."
+        },
+        {
+          "language": "ru",
+          "value": "Следующие шаги от сервера: ответить, заполнить пробелы, упаковать, отправить или исправить проблемы, пока очередь не стала шумом."
+        },
+        {
+          "language": "kk",
+          "value": "Сервер ұсынған келесі қадамдар: жауап беру, олқылықтарды толтыру, жинау, жөнелту немесе кезек шуға айналмай тұрып мәселелерді түзету."
+        }
+      ]
+    },
+    {
+      "id": 1650,
+      "values": [
+        {
+          "language": "main",
+          "value": "Actions"
+        },
+        {
+          "language": "en",
+          "value": "Actions"
+        },
+        {
+          "language": "ru",
+          "value": "Действия"
+        },
+        {
+          "language": "kk",
+          "value": "Әрекеттер"
+        }
+      ]
+    },
+    {
+      "id": 1651,
+      "values": [
+        {
+          "language": "main",
+          "value": "Top priority"
+        },
+        {
+          "language": "en",
+          "value": "Top priority"
+        },
+        {
+          "language": "ru",
+          "value": "Главный приоритет"
+        },
+        {
+          "language": "kk",
+          "value": "Басты басымдық"
+        }
+      ]
+    },
+    {
+      "id": 1652,
+      "values": [
+        {
+          "language": "main",
+          "value": "Payment after delivery, according to partner terms"
+        },
+        {
+          "language": "en",
+          "value": "Payment after delivery, according to partner terms"
+        },
+        {
+          "language": "ru",
+          "value": "Оплата после доставки согласно условиям партнёра"
+        },
+        {
+          "language": "kk",
+          "value": "Серіктес шарттары бойынша жеткізуден кейін төлем"
+        }
+      ]
+    },
+    {
+      "id": 1653,
+      "values": [
+        {
+          "language": "main",
+          "value": "We can fulfill the requested lines. Quantities and prices are filled for your confirmation."
+        },
+        {
+          "language": "en",
+          "value": "We can fulfill the requested lines. Quantities and prices are filled for your confirmation."
+        },
+        {
+          "language": "ru",
+          "value": "Мы можем выполнить запрошенные строки. Количества и цены заполнены для подтверждения."
+        },
+        {
+          "language": "kk",
+          "value": "Сұралған жолдарды орындай аламыз. Растау үшін сандар мен бағалар толтырылды."
+        }
+      ]
+    },
+    {
+      "id": 1654,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier answer draft filled"
+        },
+        {
+          "language": "en",
+          "value": "Supplier answer draft filled"
+        },
+        {
+          "language": "ru",
+          "value": "Черновик ответа поставщика заполнен"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші жауабының жобасы толтырылды"
+        }
+      ]
+    },
+    {
+      "id": 1655,
+      "values": [
+        {
+          "language": "main",
+          "value": "Fill quick confirmation"
+        },
+        {
+          "language": "en",
+          "value": "Fill quick confirmation"
+        },
+        {
+          "language": "ru",
+          "value": "Быстро заполнить подтверждение"
+        },
+        {
+          "language": "kk",
+          "value": "Растауды тез толтыру"
+        }
+      ]
+    },
+    {
+      "id": 1656,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier catalog item"
+        },
+        {
+          "language": "en",
+          "value": "Supplier catalog item"
+        },
+        {
+          "language": "ru",
+          "value": "Позиция каталога поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші каталогындағы тауар"
+        }
+      ]
+    },
+    {
+      "id": 1657,
+      "values": [
+        {
+          "language": "main",
+          "value": "No substitution"
+        },
+        {
+          "language": "en",
+          "value": "No substitution"
+        },
+        {
+          "language": "ru",
+          "value": "Без замены"
+        },
+        {
+          "language": "kk",
+          "value": "Ауыстыру жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1658,
+      "values": [
+        {
+          "language": "main",
+          "value": "Substitute suggestion"
+        },
+        {
+          "language": "en",
+          "value": "Substitute suggestion"
+        },
+        {
+          "language": "ru",
+          "value": "Предложение замены"
+        },
+        {
+          "language": "kk",
+          "value": "Ауыстыру ұсынысы"
+        }
+      ]
+    },
+    {
+      "id": 1659,
+      "values": [
+        {
+          "language": "main",
+          "value": "Use this when the requested SKU is unavailable but another store-known item can save the order."
+        },
+        {
+          "language": "en",
+          "value": "Use this when the requested SKU is unavailable but another store-known item can save the order."
+        },
+        {
+          "language": "ru",
+          "value": "Используйте это, когда запрошенного SKU нет, но другой известный магазину товар может спасти заказ."
+        },
+        {
+          "language": "kk",
+          "value": "Сұралған SKU жоқ кезде, бірақ дүкенге белгілі басқа тауар тапсырысты сақтай алса, осыны қолданыңыз."
+        }
+      ]
+    },
+    {
+      "id": 1660,
+      "values": [
+        {
+          "language": "main",
+          "value": "Delivery promise radar"
+        },
+        {
+          "language": "en",
+          "value": "Delivery promise radar"
+        },
+        {
+          "language": "ru",
+          "value": "Радар обещаний доставки"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізу уәделері радары"
+        }
+      ]
+    },
+    {
+      "id": 1661,
+      "values": [
+        {
+          "language": "main",
+          "value": "Server groups open orders by promised dates, so the supplier sees what is late, what leaves today, and what can wait."
+        },
+        {
+          "language": "en",
+          "value": "Server groups open orders by promised dates, so the supplier sees what is late, what leaves today, and what can wait."
+        },
+        {
+          "language": "ru",
+          "value": "Сервер группирует открытые заказы по обещанным датам, чтобы поставщик видел, что опаздывает, что уходит сегодня, а что может подождать."
+        },
+        {
+          "language": "kk",
+          "value": "Сервер ашық тапсырыстарды уәде күндері бойынша топтайды, сондықтан жеткізуші ненің кешіккенін, ненің бүгін кететінін және ненің күте алатынын көреді."
+        }
+      ]
+    },
+    {
+      "id": 1662,
+      "values": [
+        {
+          "language": "main",
+          "value": "Promise bucket"
+        },
+        {
+          "language": "en",
+          "value": "Promise bucket"
+        },
+        {
+          "language": "ru",
+          "value": "Группа обещаний"
+        },
+        {
+          "language": "kk",
+          "value": "Уәде тобы"
+        }
+      ]
+    },
+    {
+      "id": 1663,
+      "values": [
+        {
+          "language": "main",
+          "value": "No promised date"
+        },
+        {
+          "language": "en",
+          "value": "No promised date"
+        },
+        {
+          "language": "ru",
+          "value": "Без обещанной даты"
+        },
+        {
+          "language": "kk",
+          "value": "Уәде күні жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1664,
+      "values": [
+        {
+          "language": "main",
+          "value": "Overdue promises"
+        },
+        {
+          "language": "en",
+          "value": "Overdue promises"
+        },
+        {
+          "language": "ru",
+          "value": "Просроченные обещания"
+        },
+        {
+          "language": "kk",
+          "value": "Кешіккен уәделер"
+        }
+      ]
+    },
+    {
+      "id": 1665,
+      "values": [
+        {
+          "language": "main",
+          "value": "Due today"
+        },
+        {
+          "language": "en",
+          "value": "Due today"
+        },
+        {
+          "language": "ru",
+          "value": "На сегодня"
+        },
+        {
+          "language": "kk",
+          "value": "Бүгінге"
+        }
+      ]
+    },
+    {
+      "id": 1666,
+      "values": [
+        {
+          "language": "main",
+          "value": "Due tomorrow"
+        },
+        {
+          "language": "en",
+          "value": "Due tomorrow"
+        },
+        {
+          "language": "ru",
+          "value": "На завтра"
+        },
+        {
+          "language": "kk",
+          "value": "Ертеңге"
+        }
+      ]
+    },
+    {
+      "id": 1667,
+      "values": [
+        {
+          "language": "main",
+          "value": "Delivery promise"
+        },
+        {
+          "language": "en",
+          "value": "Delivery promise"
+        },
+        {
+          "language": "ru",
+          "value": "Обещание доставки"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізу уәдесі"
+        }
+      ]
+    },
+    {
+      "id": 1668,
+      "values": [
+        {
+          "language": "main",
+          "value": "This week"
+        },
+        {
+          "language": "en",
+          "value": "This week"
+        },
+        {
+          "language": "ru",
+          "value": "На этой неделе"
+        },
+        {
+          "language": "kk",
+          "value": "Осы аптада"
+        }
+      ]
+    },
+    {
+      "id": 1669,
+      "values": [
+        {
+          "language": "main",
+          "value": "Later"
+        },
+        {
+          "language": "en",
+          "value": "Later"
+        },
+        {
+          "language": "ru",
+          "value": "Позже"
+        },
+        {
+          "language": "kk",
+          "value": "Кейін"
+        }
+      ]
+    },
+    {
+      "id": 1670,
+      "values": [
+        {
+          "language": "main",
+          "value": "Stores"
+        },
+        {
+          "language": "en",
+          "value": "Stores"
+        },
+        {
+          "language": "ru",
+          "value": "Магазины"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкендер"
+        }
+      ]
+    },
+    {
+      "id": 1671,
+      "values": [
+        {
+          "language": "main",
+          "value": "Lines"
+        },
+        {
+          "language": "en",
+          "value": "Lines"
+        },
+        {
+          "language": "ru",
+          "value": "Строки"
+        },
+        {
+          "language": "kk",
+          "value": "Жолдар"
+        }
+      ]
+    },
+    {
+      "id": 1672,
+      "values": [
+        {
+          "language": "main",
+          "value": "Promises"
+        },
+        {
+          "language": "en",
+          "value": "Promises"
+        },
+        {
+          "language": "ru",
+          "value": "Обещания"
+        },
+        {
+          "language": "kk",
+          "value": "Уәделер"
+        }
+      ]
+    },
+    {
+      "id": 1673,
+      "values": [
+        {
+          "language": "main",
+          "value": "Due range"
+        },
+        {
+          "language": "en",
+          "value": "Due range"
+        },
+        {
+          "language": "ru",
+          "value": "Диапазон сроков"
+        },
+        {
+          "language": "kk",
+          "value": "Мерзім аралығы"
+        }
+      ]
+    },
+    {
+      "id": 1674,
+      "values": [
+        {
+          "language": "main",
+          "value": "Packed"
+        },
+        {
+          "language": "en",
+          "value": "Packed"
+        },
+        {
+          "language": "ru",
+          "value": "Упаковано"
+        },
+        {
+          "language": "kk",
+          "value": "Жиналған"
+        }
+      ]
+    },
+    {
+      "id": 1675,
+      "values": [
+        {
+          "language": "main",
+          "value": "Driving"
+        },
+        {
+          "language": "en",
+          "value": "Driving"
+        },
+        {
+          "language": "ru",
+          "value": "В пути"
+        },
+        {
+          "language": "kk",
+          "value": "Жолда"
+        }
+      ]
+    },
+    {
+      "id": 1676,
+      "values": [
+        {
+          "language": "main",
+          "value": "Clear promise filter"
+        },
+        {
+          "language": "en",
+          "value": "Clear promise filter"
+        },
+        {
+          "language": "ru",
+          "value": "Сбросить фильтр обещаний"
+        },
+        {
+          "language": "kk",
+          "value": "Уәде сүзгісін тазалау"
+        }
+      ]
+    },
+    {
+      "id": 1677,
+      "values": [
+        {
+          "language": "main",
+          "value": "Saved supplier price"
+        },
+        {
+          "language": "en",
+          "value": "Saved supplier price"
+        },
+        {
+          "language": "ru",
+          "value": "Сохранённая цена поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Сақталған жеткізуші бағасы"
+        }
+      ]
+    },
+    {
+      "id": 1678,
+      "values": [
+        {
+          "language": "main",
+          "value": "Price-book stores"
+        },
+        {
+          "language": "en",
+          "value": "Price-book stores"
+        },
+        {
+          "language": "ru",
+          "value": "Магазины в книге цен"
+        },
+        {
+          "language": "kk",
+          "value": "Баға кітабындағы дүкендер"
+        }
+      ]
+    },
+    {
+      "id": 1679,
+      "values": [
+        {
+          "language": "main",
+          "value": "With saved prices"
+        },
+        {
+          "language": "en",
+          "value": "With saved prices"
+        },
+        {
+          "language": "ru",
+          "value": "С сохранёнными ценами"
+        },
+        {
+          "language": "kk",
+          "value": "Сақталған бағалармен"
+        }
+      ]
+    },
+    {
+      "id": 1680,
+      "values": [
+        {
+          "language": "main",
+          "value": "Confirmed supplier responses now update a server-backed price book, so the catalog slowly becomes a reusable offer shelf instead of a paper memory."
+        },
+        {
+          "language": "en",
+          "value": "Confirmed supplier responses now update a server-backed price book, so the catalog slowly becomes a reusable offer shelf instead of a paper memory."
+        },
+        {
+          "language": "ru",
+          "value": "Подтверждённые ответы поставщика теперь обновляют серверную книгу цен, поэтому каталог постепенно становится многоразовой полкой предложений, а не бумажной памятью."
+        },
+        {
+          "language": "kk",
+          "value": "Расталған жеткізуші жауаптары енді сервердегі баға кітабын жаңартады, сондықтан каталог біртіндеп қайта қолданылатын ұсыныс сөресіне айналады."
+        }
+      ]
+    },
+    {
+      "id": 1681,
+      "values": [
+        {
+          "language": "main",
+          "value": "No open quantity yet"
+        },
+        {
+          "language": "en",
+          "value": "No open quantity yet"
+        },
+        {
+          "language": "ru",
+          "value": "Открытого количества пока нет"
+        },
+        {
+          "language": "kk",
+          "value": "Әзірге ашық сан жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1682,
+      "values": [
+        {
+          "language": "main",
+          "value": "Price book ready"
+        },
+        {
+          "language": "en",
+          "value": "Price book ready"
+        },
+        {
+          "language": "ru",
+          "value": "Книга цен готова"
+        },
+        {
+          "language": "kk",
+          "value": "Баға кітабы дайын"
+        }
+      ]
+    },
+    {
+      "id": 1683,
+      "values": [
+        {
+          "language": "main",
+          "value": "Saved prices"
+        },
+        {
+          "language": "en",
+          "value": "Saved prices"
+        },
+        {
+          "language": "ru",
+          "value": "Сохранённые цены"
+        },
+        {
+          "language": "kk",
+          "value": "Сақталған бағалар"
+        }
+      ]
+    },
+    {
+      "id": 1684,
+      "values": [
+        {
+          "language": "main",
+          "value": "Confirmed response prices automatically refresh this book."
+        },
+        {
+          "language": "en",
+          "value": "Confirmed response prices automatically refresh this book."
+        },
+        {
+          "language": "ru",
+          "value": "Цены из подтверждённых ответов автоматически обновляют эту книгу."
+        },
+        {
+          "language": "kk",
+          "value": "Расталған жауап бағалары бұл кітапты автоматты түрде жаңартады."
+        }
+      ]
+    },
+    {
+      "id": 1686,
+      "values": [
+        {
+          "language": "main",
+          "value": "Readiness board"
+        },
+        {
+          "language": "en",
+          "value": "Readiness board"
+        },
+        {
+          "language": "ru",
+          "value": "Доска готовности"
+        },
+        {
+          "language": "kk",
+          "value": "Дайындық тақтасы"
+        }
+      ]
+    },
+    {
+      "id": 1687,
+      "values": [
+        {
+          "language": "main",
+          "value": "Server checks open orders for answer gaps, saved price coverage and pack-ready lines before the supplier starts clicking."
+        },
+        {
+          "language": "en",
+          "value": "Server checks open orders for answer gaps, saved price coverage and pack-ready lines before the supplier starts clicking."
+        },
+        {
+          "language": "ru",
+          "value": "Сервер проверяет открытые заказы на пробелы в ответах, покрытие книгой цен и готовность к упаковке до того, как поставщик начнёт кликать."
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші баспай тұрып сервер ашық тапсырыстардағы жауап олқылықтарын, баға кітабы қамтуын және жинауға дайын жолдарды тексереді."
+        }
+      ]
+    },
+    {
+      "id": 1688,
+      "values": [
+        {
+          "language": "main",
+          "value": "Answer needed"
+        },
+        {
+          "language": "en",
+          "value": "Answer needed"
+        },
+        {
+          "language": "ru",
+          "value": "Нужен ответ"
+        },
+        {
+          "language": "kk",
+          "value": "Жауап керек"
+        }
+      ]
+    },
+    {
+      "id": 1689,
+      "values": [
+        {
+          "language": "main",
+          "value": "Ready to pack"
+        },
+        {
+          "language": "en",
+          "value": "Ready to pack"
+        },
+        {
+          "language": "ru",
+          "value": "Готово к сборке"
+        },
+        {
+          "language": "kk",
+          "value": "Жинауға дайын"
+        }
+      ]
+    },
+    {
+      "id": 1690,
+      "values": [
+        {
+          "language": "main",
+          "value": "Price coverage"
+        },
+        {
+          "language": "en",
+          "value": "Price coverage"
+        },
+        {
+          "language": "ru",
+          "value": "Покрытие ценами"
+        },
+        {
+          "language": "kk",
+          "value": "Бағамен қамту"
+        }
+      ]
+    },
+    {
+      "id": 1691,
+      "values": [
+        {
+          "language": "main",
+          "value": "Response gaps"
+        },
+        {
+          "language": "en",
+          "value": "Response gaps"
+        },
+        {
+          "language": "ru",
+          "value": "Пробелы ответа"
+        },
+        {
+          "language": "kk",
+          "value": "Жауап олқылықтары"
+        }
+      ]
+    },
+    {
+      "id": 1692,
+      "values": [
+        {
+          "language": "main",
+          "value": "Ready value"
+        },
+        {
+          "language": "en",
+          "value": "Ready value"
+        },
+        {
+          "language": "ru",
+          "value": "Готовая сумма"
+        },
+        {
+          "language": "kk",
+          "value": "Дайын сома"
+        }
+      ]
+    },
+    {
+      "id": 1693,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open answer gaps"
+        },
+        {
+          "language": "en",
+          "value": "Open answer gaps"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть пробелы ответа"
+        },
+        {
+          "language": "kk",
+          "value": "Жауап олқылықтарын ашу"
+        }
+      ]
+    },
+    {
+      "id": 1694,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open pack queue"
+        },
+        {
+          "language": "en",
+          "value": "Open pack queue"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть очередь сборки"
+        },
+        {
+          "language": "kk",
+          "value": "Жинау кезегін ашу"
+        }
+      ]
+    },
+    {
+      "id": 1695,
+      "values": [
+        {
+          "language": "main",
+          "value": "Use price book"
+        },
+        {
+          "language": "en",
+          "value": "Use price book"
+        },
+        {
+          "language": "ru",
+          "value": "Взять из книги цен"
+        },
+        {
+          "language": "kk",
+          "value": "Баға кітабынан алу"
+        }
+      ]
+    },
+    {
+      "id": 1696,
+      "values": [
+        {
+          "language": "main",
+          "value": "Fill from price book"
+        },
+        {
+          "language": "en",
+          "value": "Fill from price book"
+        },
+        {
+          "language": "ru",
+          "value": "Заполнить из книги цен"
+        },
+        {
+          "language": "kk",
+          "value": "Баға кітабынан толтыру"
+        }
+      ]
+    },
+    {
+      "id": 1697,
+      "values": [
+        {
+          "language": "main",
+          "value": "Price book draft filled"
+        },
+        {
+          "language": "en",
+          "value": "Price book draft filled"
+        },
+        {
+          "language": "ru",
+          "value": "Черновик заполнен из книги цен"
+        },
+        {
+          "language": "kk",
+          "value": "Жоба баға кітабынан толтырылды"
+        }
+      ]
+    },
+    {
+      "id": 1698,
+      "values": [
+        {
+          "language": "main",
+          "value": "No matching saved price yet"
+        },
+        {
+          "language": "en",
+          "value": "No matching saved price yet"
+        },
+        {
+          "language": "ru",
+          "value": "Подходящей сохранённой цены пока нет"
+        },
+        {
+          "language": "kk",
+          "value": "Сәйкес сақталған баға әзірге жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1699,
+      "values": [
+        {
+          "language": "main",
+          "value": "Pack-ready lines"
+        },
+        {
+          "language": "en",
+          "value": "Pack-ready lines"
+        },
+        {
+          "language": "ru",
+          "value": "Строки к сборке"
+        },
+        {
+          "language": "kk",
+          "value": "Жинауға дайын жолдар"
+        }
+      ]
+    },
+    {
+      "id": 1700,
+      "values": [
+        {
+          "language": "main",
+          "value": "Price ladder shelf"
+        },
+        {
+          "language": "en",
+          "value": "Price ladder shelf"
+        },
+        {
+          "language": "ru",
+          "value": "Полка ценовой лестницы"
+        },
+        {
+          "language": "kk",
+          "value": "Баға сатысы сөресі"
+        }
+      ]
+    },
+    {
+      "id": 1701,
+      "values": [
+        {
+          "language": "main",
+          "value": "Tune reusable supplier price, minimum order and package size. Stores keep their item, supplier keeps the offer memory."
+        },
+        {
+          "language": "en",
+          "value": "Tune reusable supplier price, minimum order and package size. Stores keep their item, supplier keeps the offer memory."
+        },
+        {
+          "language": "ru",
+          "value": "Настройте цену поставщика, минимальный заказ и размер упаковки. Магазин хранит свой товар, поставщик — память предложения."
+        },
+        {
+          "language": "kk",
+          "value": "Қайта қолданылатын жеткізуші бағасын, ең аз тапсырысты және қаптама санын баптаңыз. Дүкен өз тауарын, жеткізуші ұсыныс жадын сақтайды."
+        }
+      ]
+    },
+    {
+      "id": 1702,
+      "values": [
+        {
+          "language": "main",
+          "value": "Save price ladder"
+        },
+        {
+          "language": "en",
+          "value": "Save price ladder"
+        },
+        {
+          "language": "ru",
+          "value": "Сохранить ценовую лестницу"
+        },
+        {
+          "language": "kk",
+          "value": "Баға сатысын сақтау"
+        }
+      ]
+    },
+    {
+      "id": 1703,
+      "values": [
+        {
+          "language": "main",
+          "value": "Price ladder saved"
+        },
+        {
+          "language": "en",
+          "value": "Price ladder saved"
+        },
+        {
+          "language": "ru",
+          "value": "Ценовая лестница сохранена"
+        },
+        {
+          "language": "kk",
+          "value": "Баға сатысы сақталды"
+        }
+      ]
+    },
+    {
+      "id": 1704,
+      "values": [
+        {
+          "language": "main",
+          "value": "No store link for this price yet"
+        },
+        {
+          "language": "en",
+          "value": "No store link for this price yet"
+        },
+        {
+          "language": "ru",
+          "value": "Для этой цены пока нет связи с магазином"
+        },
+        {
+          "language": "kk",
+          "value": "Бұл бағаға дүкен байланысы әлі жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1705,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier article"
+        },
+        {
+          "language": "en",
+          "value": "Supplier article"
+        },
+        {
+          "language": "ru",
+          "value": "Артикул поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші артикулы"
+        }
+      ]
+    },
+    {
+      "id": 1706,
+      "values": [
+        {
+          "language": "main",
+          "value": "MOQ / package"
+        },
+        {
+          "language": "en",
+          "value": "MOQ / package"
+        },
+        {
+          "language": "ru",
+          "value": "Мин. заказ / упаковка"
+        },
+        {
+          "language": "kk",
+          "value": "Ең аз тапсырыс / қаптама"
+        }
+      ]
+    },
+    {
+      "id": 1707,
+      "values": [
+        {
+          "language": "main",
+          "value": "Manual price book"
+        },
+        {
+          "language": "en",
+          "value": "Manual price book"
+        },
+        {
+          "language": "ru",
+          "value": "Ручная книга цен"
+        },
+        {
+          "language": "kk",
+          "value": "Қолмен баға кітабы"
+        }
+      ]
+    },
+    {
+      "id": 1708,
+      "values": [
+        {
+          "language": "main",
+          "value": "Set a supplier-side price before the next store request arrives."
+        },
+        {
+          "language": "en",
+          "value": "Set a supplier-side price before the next store request arrives."
+        },
+        {
+          "language": "ru",
+          "value": "Задайте цену со стороны поставщика до следующего запроса магазина."
+        },
+        {
+          "language": "kk",
+          "value": "Келесі дүкен сұранысы келгенге дейін жеткізуші бағасын қойыңыз."
+        }
+      ]
+    },
+    {
+      "id": 1709,
+      "values": [
+        {
+          "language": "main",
+          "value": "Enter supplier price first"
+        },
+        {
+          "language": "en",
+          "value": "Enter supplier price first"
+        },
+        {
+          "language": "ru",
+          "value": "Сначала введите цену поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Алдымен жеткізуші бағасын енгізіңіз"
+        }
+      ]
+    },
+    {
+      "id": 1710,
+      "values": [
+        {
+          "language": "main",
+          "value": "Manufacturer bridge"
+        },
+        {
+          "language": "en",
+          "value": "Manufacturer bridge"
+        },
+        {
+          "language": "ru",
+          "value": "Мост к производителю"
+        },
+        {
+          "language": "kk",
+          "value": "Өндіруші көпірі"
+        }
+      ]
+    },
+    {
+      "id": 1711,
+      "values": [
+        {
+          "language": "main",
+          "value": "Server converts store demand into upstream production signals: what to quote, what to produce, and what may become backorder pressure."
+        },
+        {
+          "language": "en",
+          "value": "Server converts store demand into upstream production signals: what to quote, what to produce, and what may become backorder pressure."
+        },
+        {
+          "language": "ru",
+          "value": "Сервер превращает спрос магазинов в сигналы для производства: что рассчитать, что изготовить и где может возникнуть давление предзаказов."
+        },
+        {
+          "language": "kk",
+          "value": "Сервер дүкен сұранысын өндіріс сигналдарына айналдырады: нені бағалау, нені өндіру және қай жерде алдын ала тапсырыс қысымы болуы мүмкін."
+        }
+      ]
+    },
+    {
+      "id": 1712,
+      "values": [
+        {
+          "language": "main",
+          "value": "Factory queue"
+        },
+        {
+          "language": "en",
+          "value": "Factory queue"
+        },
+        {
+          "language": "ru",
+          "value": "Очередь фабрики"
+        },
+        {
+          "language": "kk",
+          "value": "Фабрика кезегі"
+        }
+      ]
+    },
+    {
+      "id": 1713,
+      "values": [
+        {
+          "language": "main",
+          "value": "Accepted qty"
+        },
+        {
+          "language": "en",
+          "value": "Accepted qty"
+        },
+        {
+          "language": "ru",
+          "value": "Принятое кол-во"
+        },
+        {
+          "language": "kk",
+          "value": "Қабылданған сан"
+        }
+      ]
+    },
+    {
+      "id": 1714,
+      "values": [
+        {
+          "language": "main",
+          "value": "Missing qty"
+        },
+        {
+          "language": "en",
+          "value": "Missing qty"
+        },
+        {
+          "language": "ru",
+          "value": "Не хватает"
+        },
+        {
+          "language": "kk",
+          "value": "Жетіспейді"
+        }
+      ]
+    },
+    {
+      "id": 1715,
+      "values": [
+        {
+          "language": "main",
+          "value": "Response coverage"
+        },
+        {
+          "language": "en",
+          "value": "Response coverage"
+        },
+        {
+          "language": "ru",
+          "value": "Покрытие ответом"
+        },
+        {
+          "language": "kk",
+          "value": "Жауап қамтуы"
+        }
+      ]
+    },
+    {
+      "id": 1716,
+      "values": [
+        {
+          "language": "main",
+          "value": "Quote upstream"
+        },
+        {
+          "language": "en",
+          "value": "Quote upstream"
+        },
+        {
+          "language": "ru",
+          "value": "Запросить расчёт выше"
+        },
+        {
+          "language": "kk",
+          "value": "Жоғарыдан баға сұрау"
+        }
+      ]
+    },
+    {
+      "id": 1717,
+      "values": [
+        {
+          "language": "main",
+          "value": "Produce / reserve"
+        },
+        {
+          "language": "en",
+          "value": "Produce / reserve"
+        },
+        {
+          "language": "ru",
+          "value": "Произвести / зарезервировать"
+        },
+        {
+          "language": "kk",
+          "value": "Өндіру / резервтеу"
+        }
+      ]
+    },
+    {
+      "id": 1718,
+      "values": [
+        {
+          "language": "main",
+          "value": "Ship to stores"
+        },
+        {
+          "language": "en",
+          "value": "Ship to stores"
+        },
+        {
+          "language": "ru",
+          "value": "Отгрузить магазинам"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкендерге жөнелту"
+        }
+      ]
+    },
+    {
+      "id": 1719,
+      "values": [
+        {
+          "language": "main",
+          "value": "Add factory price"
+        },
+        {
+          "language": "en",
+          "value": "Add factory price"
+        },
+        {
+          "language": "ru",
+          "value": "Добавить заводскую цену"
+        },
+        {
+          "language": "kk",
+          "value": "Зауыт бағасын қосу"
+        }
+      ]
+    },
+    {
+      "id": 1720,
+      "values": [
+        {
+          "language": "main",
+          "value": "Watch backorder"
+        },
+        {
+          "language": "en",
+          "value": "Watch backorder"
+        },
+        {
+          "language": "ru",
+          "value": "Следить за предзаказом"
+        },
+        {
+          "language": "kk",
+          "value": "Алдын ала тапсырысты бақылау"
+        }
+      ]
+    },
+    {
+      "id": 1721,
+      "values": [
+        {
+          "language": "main",
+          "value": "Demand is stable"
+        },
+        {
+          "language": "en",
+          "value": "Demand is stable"
+        },
+        {
+          "language": "ru",
+          "value": "Спрос стабилен"
+        },
+        {
+          "language": "kk",
+          "value": "Сұраныс тұрақты"
+        }
+      ]
+    },
+    {
+      "id": 1722,
+      "values": [
+        {
+          "language": "main",
+          "value": "Priority score"
+        },
+        {
+          "language": "en",
+          "value": "Priority score"
+        },
+        {
+          "language": "ru",
+          "value": "Оценка приоритета"
+        },
+        {
+          "language": "kk",
+          "value": "Басымдық ұпайы"
+        }
+      ]
+    },
+    {
+      "id": 1723,
+      "values": [
+        {
+          "language": "main",
+          "value": "Earliest due"
+        },
+        {
+          "language": "en",
+          "value": "Earliest due"
+        },
+        {
+          "language": "ru",
+          "value": "Ближайший срок"
+        },
+        {
+          "language": "kk",
+          "value": "Ең жақын мерзім"
+        }
+      ]
+    },
+    {
+      "id": 1724,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open factory-linked orders"
+        },
+        {
+          "language": "en",
+          "value": "Open factory-linked orders"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть связанные заказы"
+        },
+        {
+          "language": "kk",
+          "value": "Байланысты тапсырыстарды ашу"
+        }
+      ]
+    },
+    {
+      "id": 1725,
+      "values": [
+        {
+          "language": "main",
+          "value": "Copy factory brief"
+        },
+        {
+          "language": "en",
+          "value": "Copy factory brief"
+        },
+        {
+          "language": "ru",
+          "value": "Скопировать сводку для фабрики"
+        },
+        {
+          "language": "kk",
+          "value": "Фабрикаға қысқаша мәлімет көшіру"
+        }
+      ]
+    },
+    {
+      "id": 1726,
+      "values": [
+        {
+          "language": "main",
+          "value": "No manufacturer bridge signals yet"
+        },
+        {
+          "language": "en",
+          "value": "No manufacturer bridge signals yet"
+        },
+        {
+          "language": "ru",
+          "value": "Сигналов моста к производителю пока нет"
+        },
+        {
+          "language": "kk",
+          "value": "Өндіруші көпірінің сигналдары әзірге жоқ"
+        }
+      ]
+    },
+    {
+      "id": 1727,
+      "values": [
+        {
+          "language": "main",
+          "value": "Factory value"
+        },
+        {
+          "language": "en",
+          "value": "Factory value"
+        },
+        {
+          "language": "ru",
+          "value": "Сумма для фабрики"
+        },
+        {
+          "language": "kk",
+          "value": "Фабрика сомасы"
         }
       ]
     }
