@@ -367,6 +367,34 @@ private fun Application.configLong(path: String, envName: String, default: Long)
   return raw?.toLongOrNull() ?: default
 }
 
+
+private fun Throwable.aitaCauseChainSummary(): String =
+  generateSequence(this as Throwable?) { it.cause }
+    .take(12)
+    .mapIndexed { index, cause ->
+      val message = cause.message?.takeIf { it.isNotBlank() } ?: "<no message>"
+      "#$index ${cause::class.qualifiedName}: $message"
+    }
+    .joinToString(" | ")
+
+private fun Throwable.isFlywayValidationFailureForLocalRepair(): Boolean =
+  generateSequence(this as Throwable?) { it.cause }.any { cause ->
+    val className = cause::class.qualifiedName.orEmpty()
+    val message = cause.message.orEmpty()
+    className.contains("FlywayValidateException", ignoreCase = true) ||
+       message.contains("Validate failed", ignoreCase = true) ||
+       (message.contains("checksum", ignoreCase = true) && message.contains("migration", ignoreCase = true)) ||
+       (message.contains("resolved migration", ignoreCase = true) && message.contains("applied", ignoreCase = true))
+  }
+
+private fun Application.logStartupFailure(stage: String, throwable: Throwable) {
+  val summary = throwable.aitaCauseChainSummary()
+  environment.log.error("AITA startup failed during $stage. Cause chain: $summary", throwable)
+  System.err.println("AITA startup failed during $stage")
+  System.err.println(summary)
+  throwable.printStackTrace(System.err)
+}
+
 private fun Application.isProductionMode(): Boolean {
   val configured = environment.config.optionalString("app.environment") ?: envOrSystem("AITA_ENV") ?: LOCAL_ENVIRONMENT_NAME
   return configured.lowercase(Locale.ROOT) in setOf("prod", "production", "stage", "staging", "cloud")
@@ -9534,6 +9562,11 @@ fun Application.module() {
   val flywayValidateOnMigrate = configBoolean("flyway.validateOnMigrate", "AITA_FLYWAY_VALIDATE_ON_MIGRATE", true)
   val flywayCleanDisabled = configBoolean("flyway.cleanDisabled", "AITA_FLYWAY_CLEAN_DISABLED", true)
   val flywayBaselineOnMigrate = configBoolean("flyway.baselineOnMigrate", "AITA_FLYWAY_BASELINE_ON_MIGRATE", true)
+  val flywayRepairOnValidateFailure = configBoolean(
+    "flyway.repairOnValidateFailure",
+    "AITA_FLYWAY_REPAIR_ON_VALIDATE_FAILURE",
+    default = !productionMode
+  )
 
   val flyway = Flyway.configure()
     .dataSource(ds)
@@ -9544,9 +9577,39 @@ fun Application.module() {
     .load()
 
   if (flywayRunOnStart) {
-    flyway.migrate()
+    try {
+      flyway.migrate()
+    } catch (throwable: Throwable) {
+      if (flywayRepairOnValidateFailure && throwable.isFlywayValidationFailureForLocalRepair()) {
+        environment.log.warn(
+          "AITA Flyway validation failed in non-production mode. Running Flyway repair once, then retrying migrate. " +
+             "Set AITA_FLYWAY_REPAIR_ON_VALIDATE_FAILURE=false to disable this local checksum recovery. " +
+             "Cause chain: ${throwable.aitaCauseChainSummary()}",
+          throwable
+        )
+        System.err.println(
+          "AITA Flyway validation failed in non-production mode; running Flyway repair once, then retrying migrate. " +
+             throwable.aitaCauseChainSummary()
+        )
+        try {
+          flyway.repair()
+          flyway.migrate()
+        } catch (repairThrowable: Throwable) {
+          logStartupFailure("Flyway migration after local repair", repairThrowable)
+          throw repairThrowable
+        }
+      } else {
+        logStartupFailure("Flyway migration", throwable)
+        throw throwable
+      }
+    }
   } else if (flywayValidateOnMigrate) {
-    flyway.validate()
+    try {
+      flyway.validate()
+    } catch (throwable: Throwable) {
+      logStartupFailure("Flyway validation", throwable)
+      throw throwable
+    }
   }
 
   Database.connect(ds)

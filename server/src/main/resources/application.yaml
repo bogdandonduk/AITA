@@ -52,3 +52,4 @@ flyway:
   validateOnMigrate: ${?AITA_FLYWAY_VALIDATE_ON_MIGRATE}
   runOnStart: ${?AITA_FLYWAY_RUN_ON_START}
   cleanDisabled: ${?AITA_FLYWAY_CLEAN_DISABLED}
+  repairOnValidateFailure: ${?AITA_FLYWAY_REPAIR_ON_VALIDATE_FAILURE}

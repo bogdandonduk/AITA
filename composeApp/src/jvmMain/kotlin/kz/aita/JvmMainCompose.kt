@@ -33,7 +33,6 @@ private val keyring: Keyring by lazy { Keyring.create() }
 private val rng = SecureRandom()
 private val fallbackEncryptionKeys = ConcurrentHashMap<String, ByteArray>()
 
-
 private const val JVM_SECURE_STORE_DIR = "secure"
 
 private fun String.toJvmBooleanLenientOrNull(): Boolean? = when (trim().lowercase(Locale.ROOT)) {
