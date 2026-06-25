@@ -12,6 +12,9 @@ import java.awt.Desktop
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 import java.io.File
+import java.io.FileOutputStream
+import java.io.OutputStream
+import java.io.PrintStream
 import java.net.URI
 import java.net.URLEncoder
 import java.nio.file.Files
@@ -34,6 +37,106 @@ private val rng = SecureRandom()
 private val fallbackEncryptionKeys = ConcurrentHashMap<String, ByteArray>()
 
 private const val JVM_SECURE_STORE_DIR = "secure"
+
+private const val DESKTOP_DIAGNOSTIC_LOG_FILE_NAME = "aita-desktop.log"
+private const val DESKTOP_DIAGNOSTIC_LOG_MAX_BYTES = 8L * 1024L * 1024L
+private const val DESKTOP_DIAGNOSTIC_LOG_BACKUP_COUNT = 4
+
+private fun desktopEnvOrSystem(name: String): String? =
+    System.getenv(name)?.takeIf { it.isNotBlank() }
+        ?: System.getProperty(name)?.takeIf { it.isNotBlank() }
+
+private fun desktopAitaLogRootDir(): File {
+    desktopEnvOrSystem("AITA_CLIENT_LOG_DIR")?.let { configured ->
+        return File(configured).apply { mkdirs() }
+    }
+
+    val userHome = System.getProperty("user.home").orEmpty().takeIf { it.isNotBlank() } ?: "."
+    val osName = System.getProperty("os.name").orEmpty().lowercase(Locale.ROOT)
+    return when {
+        osName.contains("win") -> {
+            val base = System.getenv("LOCALAPPDATA") ?: userHome
+            File(base, ".aita${File.separator}Logs${File.separator}AITA")
+        }
+        osName.contains("mac") -> File(userHome, ".aita${File.separator}Logs${File.separator}AITA")
+        else -> {
+            val base = System.getenv("XDG_STATE_HOME") ?: File(userHome, ".local/state").absolutePath
+            File(base, "aita/logs")
+        }
+    }.apply { mkdirs() }
+}
+
+private fun rotateDesktopDiagnosticLogIfNeeded(logFile: File) {
+    runCatching {
+        if (!logFile.exists() || logFile.length() < DESKTOP_DIAGNOSTIC_LOG_MAX_BYTES) return
+        for (index in DESKTOP_DIAGNOSTIC_LOG_BACKUP_COUNT downTo 1) {
+            val source = if (index == 1) logFile else File(logFile.parentFile, "${logFile.name}.${index - 1}")
+            val target = File(logFile.parentFile, "${logFile.name}.$index")
+            if (target.exists()) target.delete()
+            if (source.exists()) source.renameTo(target)
+        }
+    }
+}
+
+private class DesktopTeeOutputStream(
+    private val primary: OutputStream,
+    private val secondary: OutputStream
+) : OutputStream() {
+    @Synchronized
+    override fun write(b: Int) {
+        primary.write(b)
+        secondary.write(b)
+    }
+
+    @Synchronized
+    override fun write(b: ByteArray, off: Int, len: Int) {
+        primary.write(b, off, len)
+        secondary.write(b, off, len)
+    }
+
+    @Synchronized
+    override fun flush() {
+        primary.flush()
+        secondary.flush()
+    }
+}
+
+private fun installDesktopDiagnosticLogging() {
+    val originalOut = System.out
+    val originalErr = System.err
+    val logFile = runCatching {
+        val file = File(desktopAitaLogRootDir(), DESKTOP_DIAGNOSTIC_LOG_FILE_NAME)
+        file.parentFile?.mkdirs()
+        rotateDesktopDiagnosticLogIfNeeded(file)
+        file
+    }.getOrNull()
+
+    if (logFile != null) {
+        runCatching {
+            val logStream = FileOutputStream(logFile, true)
+            System.setOut(PrintStream(DesktopTeeOutputStream(originalOut, logStream), true, Charsets.UTF_8.name()))
+            System.setErr(PrintStream(DesktopTeeOutputStream(originalErr, logStream), true, Charsets.UTF_8.name()))
+        }.onFailure { throwable ->
+            originalErr.println("AITA desktop diagnostic logging failed: ${throwable.message}")
+        }
+    }
+
+    Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+        System.err.println("AITA desktop uncaught exception in thread '${thread.name}': ${throwable::class.qualifiedName}: ${throwable.message}")
+        throwable.printStackTrace(System.err)
+    }
+
+    println("AITA desktop diagnostic log: ${logFile?.absolutePath ?: "unavailable"}")
+    println("AITA desktop cache dir: $cacheDirPath")
+    println("AITA desktop runtime: java=${System.getProperty("java.version")} os=${System.getProperty("os.name")} ${System.getProperty("os.version")} arch=${System.getProperty("os.arch")}")
+}
+
+private fun configureClientServerUrlOverrideFromEnvironment() {
+    val override = desktopEnvOrSystem("AITA_CLIENT_SERVER_URL")
+        ?: desktopEnvOrSystem("AITA_SERVER_URL")
+        ?: return
+    setRuntimeClientServerUrlOverride(override)
+}
 
 private fun String.toJvmBooleanLenientOrNull(): Boolean? = when (trim().lowercase(Locale.ROOT)) {
     "true", "1", "yes", "y", "on" -> true
@@ -641,6 +744,9 @@ fun main() {
             }
         }
     ).toFile().absolutePath
+
+    installDesktopDiagnosticLogging()
+    configureClientServerUrlOverrideFromEnvironment()
 
     installReceiptPlatformJvm()
     installDesktopVoiceInputJvm()

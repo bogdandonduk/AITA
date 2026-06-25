@@ -5595,6 +5595,8 @@ internal const val REALTIME_ACCESS_TOKEN_REFRESH_SKEW_MILLIS = 60_000L
 private const val DEFAULT_AITA_SERVER_URL = "http://192.168.1.170:8080"
 private val DEFAULT_AITA_SERVER_URL_PAIR = Pair(DEFAULT_AITA_SERVER_URL, "1")
 @Volatile
+private var runtimeClientServerUrlOverride: String? = null
+@Volatile
 private var currentNetworkRequestCandidateServerUrlsMemory: List<String> = emptyList()
 
 val GlobalScope = CoroutineScope(SupervisorJob())
@@ -8545,11 +8547,16 @@ internal suspend fun ensureCachedGlobalConfigurationPrimedForNetwork() {
             // Keep the configured server address stable. Cached/server configuration may be old
             // after Wi-Fi/hotspot changes, so it must not silently replace the address that the
             // client is currently using.
+            val runtimeOverrideNormalized = normalizedHttpServerUrlOrNull(runtimeClientServerUrlOverride)
             val cachedConfigurationForThisInstall = cachedConfiguration.copy(
-                serverUrl = chooseClientServerUrlPair(
-                    current = currentConfiguration.serverUrl,
-                    incoming = cachedConfiguration.serverUrl
-                )
+                serverUrl = if (runtimeOverrideNormalized != null) {
+                    Pair(runtimeOverrideNormalized, currentConfiguration.serverUrl.second)
+                } else {
+                    chooseClientServerUrlPair(
+                        current = currentConfiguration.serverUrl,
+                        incoming = cachedConfiguration.serverUrl
+                    )
+                }
             )
             globalAppConfigurationState.emit(DataState.Success(cachedConfigurationForThisInstall, cacheMessage()))
         }
@@ -8700,6 +8707,23 @@ fun normalizedClientServerUrlOverride(raw: String?, currentRaw: String?): String
     return normalized.takeIf { it != currentNormalized }
 }
 
+fun setRuntimeClientServerUrlOverride(raw: String?) {
+    val normalized = normalizedHttpServerUrlOrNull(raw)
+    runtimeClientServerUrlOverride = normalized
+    if (normalized == null) return
+
+    val currentConfiguration = globalAppConfigurationState.payloadValue
+    globalAppConfigurationState.emit(
+        DataState.Success(
+            currentConfiguration.copy(serverUrl = Pair(normalized, currentConfiguration.serverUrl.second)),
+            cacheMessage()
+        )
+    )
+    logNetworkAttempt("runtime server URL override = $normalized")
+}
+
+fun currentRuntimeClientServerUrlOverride(): String? = runtimeClientServerUrlOverride
+
 fun setClientServerUrlFromUserInput(raw: String, refreshNow: Boolean = true): Boolean {
     val normalized = normalizedHttpServerUrlOrNull(raw)
     if (normalized == null) {
@@ -8764,6 +8788,7 @@ internal suspend fun resolvedServerUrlCandidates(explicitServerUrl: String? = nu
     ensureCachedGlobalConfigurationPrimedForNetwork()
 
     val explicitNormalized = normalizedHttpServerUrlOrNull(explicitServerUrl)
+    val runtimeOverrideNormalized = normalizedHttpServerUrlOrNull(runtimeClientServerUrlOverride)
     val currentConfiguredNormalized = normalizedHttpServerUrlOrNull(globalAppConfigurationState.payloadValue.serverUrl.first)
     val cachedConfiguredNormalized = runCatching {
         getJsonCache<GlobalAppConfigurationDataModel>(CACHE_GLOBAL_CONFIG)?.serverUrl?.first
@@ -8773,6 +8798,7 @@ internal suspend fun resolvedServerUrlCandidates(explicitServerUrl: String? = nu
     val currentCandidate = currentConfiguredNormalized?.takeUnless { it == defaultNormalized && cachedNonDefault != null }
 
     val selected = explicitNormalized
+        ?: runtimeOverrideNormalized
         ?: currentCandidate
         ?: cachedNonDefault
         ?: currentConfiguredNormalized
@@ -10884,6 +10910,7 @@ private fun startAppCacheCollectors() {
     GlobalScope.launch(Dispatchers.ourIo) {
         globalAppConfigurationState.payload.collect { nextConfiguration ->
             val existingCached = getJsonCache<GlobalAppConfigurationDataModel>(CACHE_GLOBAL_CONFIG)
+            val runtimeOverrideNormalized = normalizedHttpServerUrlOrNull(runtimeClientServerUrlOverride)
             val nextNormalized = normalizedHttpServerUrlOrNull(nextConfiguration.serverUrl.first)
             val defaultNormalized = normalizedHttpServerUrlOrNull(DEFAULT_AITA_SERVER_URL)
             val existingNonDefault = existingCached?.serverUrl?.takeIf { cachedPair ->
@@ -10891,6 +10918,7 @@ private fun startAppCacheCollectors() {
                 cachedNormalized != null && cachedNormalized != defaultNormalized
             }
             val serverUrlForCache = when {
+                runtimeOverrideNormalized != null -> Pair(runtimeOverrideNormalized, nextConfiguration.serverUrl.second)
                 existingNonDefault != null && (nextNormalized == null || nextNormalized == defaultNormalized) -> existingNonDefault
                 else -> nextConfiguration.serverUrl
             }

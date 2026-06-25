@@ -172,11 +172,11 @@ dependencies {
 
 compose.desktop {
     application {
-        mainClass = "kz.aita.jvm.app.system.MainKt"
+        mainClass = "kz.aita.JvmMainComposeKt"
 
         nativeDistributions {
             // Only the formats you need:
-            targetFormats(TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Dmg)
+            targetFormats(TargetFormat.Msi, TargetFormat.Exe, TargetFormat.Deb, TargetFormat.Dmg)
             modules("java.sql", "java.logging", "java.xml", "jdk.crypto.ec")
             // MSI requires a 3-part numeric version:
             packageVersion = "1.0.0"
