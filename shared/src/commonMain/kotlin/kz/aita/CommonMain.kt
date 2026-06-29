@@ -906,17 +906,21 @@ fun refreshReceiptPrinterDevices(onCompleted: ((ReceiptPlatformActionResult) -> 
 
 fun configureReceiptPrinterDevice(deviceId: String?, onCompleted: ((ReceiptPlatformActionResult) -> Unit)? = null) {
     GlobalScope.launch(Dispatchers.ourIo) {
+        val cleanDeviceId = deviceId?.trim()?.takeIf { it.isNotBlank() }
         val result = runCatching {
-            configurePlatformReceiptPrinterDeviceAction?.invoke(deviceId)
+            configurePlatformReceiptPrinterDeviceAction?.invoke(cleanDeviceId)
                 ?: ReceiptPlatformActionResult(false, "Receipt printer configuration is not available on this platform")
         }.getOrElse { throwable ->
             ReceiptPlatformActionResult(false, throwable.message ?: "Could not configure receipt printer")
         }
 
         if (result.success) {
-            configuredReceiptPrinterDeviceIdState.emit(deviceId)
-            val devices = listPlatformReceiptPrinterDevicesAction?.invoke().orEmpty()
-            receiptPrinterDevicesState.emit(devices)
+            configuredReceiptPrinterDeviceIdState.emit(cleanDeviceId)
+            runCatching {
+                val devices = listPlatformReceiptPrinterDevicesAction?.invoke().orEmpty()
+                receiptPrinterDevicesState.emit(devices)
+                configuredReceiptPrinterDeviceIdState.emit(devices.firstOrNull { it.configured }?.id ?: cleanDeviceId)
+            }
         }
 
         onCompleted?.invoke(result)
@@ -1009,17 +1013,21 @@ fun refreshLabelPrinterDevices(onCompleted: ((ReceiptPlatformActionResult) -> Un
 
 fun configureLabelPrinterDevice(deviceId: String?, onCompleted: ((ReceiptPlatformActionResult) -> Unit)? = null) {
     GlobalScope.launch(Dispatchers.ourIo) {
+        val cleanDeviceId = deviceId?.trim()?.takeIf { it.isNotBlank() }
         val result = runCatching {
-            configurePlatformLabelPrinterDeviceAction?.invoke(deviceId)
+            configurePlatformLabelPrinterDeviceAction?.invoke(cleanDeviceId)
                 ?: ReceiptPlatformActionResult(false, "Sticky label printer configuration is not available on this platform")
         }.getOrElse { throwable ->
             ReceiptPlatformActionResult(false, throwable.message ?: "Could not configure sticky label printer")
         }
 
         if (result.success) {
-            configuredLabelPrinterDeviceIdState.emit(deviceId)
-            val devices = listPlatformLabelPrinterDevicesAction?.invoke().orEmpty()
-            labelPrinterDevicesState.emit(devices)
+            configuredLabelPrinterDeviceIdState.emit(cleanDeviceId)
+            runCatching {
+                val devices = listPlatformLabelPrinterDevicesAction?.invoke().orEmpty()
+                labelPrinterDevicesState.emit(devices)
+                configuredLabelPrinterDeviceIdState.emit(devices.firstOrNull { it.configured }?.id ?: cleanDeviceId)
+            }
         }
 
         onCompleted?.invoke(result)
@@ -1503,22 +1511,214 @@ fun List<StockItemLabelDataModel>.buildStockItemLabelsSheetPdfBytes(): ByteArray
 }
 
 
+
+private const val RECEIPT_ESC_POS_CODE_PAGE_CP866 = 17
+private const val RECEIPT_ESC_POS_58MM_COLUMNS = 32
+private const val RECEIPT_ESC_POS_SEPARATOR = "--------------------------------"
+
+private fun MutableList<Byte>.addEscPosCommand(vararg values: Int) {
+    values.forEach { value -> add(value.toByte()) }
+}
+
+private fun cp866ByteForCyrillic(ch: Char): Int? = when (ch) {
+    'А' -> 0x80
+    'Б' -> 0x81
+    'В' -> 0x82
+    'Г' -> 0x83
+    'Д' -> 0x84
+    'Е' -> 0x85
+    'Ж' -> 0x86
+    'З' -> 0x87
+    'И' -> 0x88
+    'Й' -> 0x89
+    'К' -> 0x8A
+    'Л' -> 0x8B
+    'М' -> 0x8C
+    'Н' -> 0x8D
+    'О' -> 0x8E
+    'П' -> 0x8F
+    'Р' -> 0x90
+    'С' -> 0x91
+    'Т' -> 0x92
+    'У' -> 0x93
+    'Ф' -> 0x94
+    'Х' -> 0x95
+    'Ц' -> 0x96
+    'Ч' -> 0x97
+    'Ш' -> 0x98
+    'Щ' -> 0x99
+    'Ъ' -> 0x9A
+    'Ы' -> 0x9B
+    'Ь' -> 0x9C
+    'Э' -> 0x9D
+    'Ю' -> 0x9E
+    'Я' -> 0x9F
+    'а' -> 0xA0
+    'б' -> 0xA1
+    'в' -> 0xA2
+    'г' -> 0xA3
+    'д' -> 0xA4
+    'е' -> 0xA5
+    'ж' -> 0xA6
+    'з' -> 0xA7
+    'и' -> 0xA8
+    'й' -> 0xA9
+    'к' -> 0xAA
+    'л' -> 0xAB
+    'м' -> 0xAC
+    'н' -> 0xAD
+    'о' -> 0xAE
+    'п' -> 0xAF
+    'р' -> 0xE0
+    'с' -> 0xE1
+    'т' -> 0xE2
+    'у' -> 0xE3
+    'ф' -> 0xE4
+    'х' -> 0xE5
+    'ц' -> 0xE6
+    'ч' -> 0xE7
+    'ш' -> 0xE8
+    'щ' -> 0xE9
+    'ъ' -> 0xEA
+    'ы' -> 0xEB
+    'ь' -> 0xEC
+    'э' -> 0xED
+    'ю' -> 0xEE
+    'я' -> 0xEF
+    'Ё' -> 0xF0
+    'ё' -> 0xF1
+    '№' -> 0xFC
+    else -> null
+}
+
+private fun escPosFallbackAscii(ch: Char): String = when (ch) {
+    '\u00A0' -> " "
+    '—', '–', '−' -> "-"
+    '“', '”', '«', '»' -> "\""
+    '‘', '’' -> "'"
+    '₸' -> "KZT"
+    '₽' -> "RUB"
+    '€' -> "EUR"
+    '$' -> "$"
+    'Ә', 'ә' -> "a"
+    'Ғ', 'ғ' -> "g"
+    'Қ', 'қ' -> "k"
+    'Ң', 'ң' -> "n"
+    'Ө', 'ө' -> "o"
+    'Ұ', 'ұ' -> "u"
+    'Ү', 'ү' -> "u"
+    'Һ', 'һ' -> "h"
+    'І', 'і' -> "i"
+    else -> "?"
+}
+
+private fun String.toEscPosCp866Bytes(): List<Byte> {
+    val result = mutableListOf<Byte>()
+    for (ch in this) {
+        when {
+            ch == '\r' -> Unit
+            ch == '\n' -> result += 0x0A.toByte()
+            ch == '\t' -> result += ' '.code.toByte()
+            ch.code in 32..126 -> result += ch.code.toByte()
+            else -> {
+                val cp866 = cp866ByteForCyrillic(ch)
+                if (cp866 != null) {
+                    result += cp866.toByte()
+                } else {
+                    escPosFallbackAscii(ch).forEach { fallback ->
+                        result += if (fallback.code in 32..126) fallback.code.toByte() else '?'.code.toByte()
+                    }
+                }
+            }
+        }
+    }
+    return result
+}
+
+private fun MutableList<Byte>.addEscPosText(value: String) {
+    addAll(value.toEscPosCp866Bytes())
+}
+
+private fun wrapReceiptLineFor58mm(line: String, width: Int = RECEIPT_ESC_POS_58MM_COLUMNS): List<String> {
+    val clean = line.replace('\t', ' ').trimEnd()
+    if (clean.length <= width) return listOf(clean)
+
+    val indent = clean.takeWhile { it == ' ' }.take(width / 3)
+    val words = clean.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+    if (words.isEmpty()) return listOf("")
+
+    val result = mutableListOf<String>()
+    var current = indent
+
+    fun flushCurrent() {
+        if (current.isNotBlank()) result += current.trimEnd()
+        current = indent
+    }
+
+    fun appendChunkedWord(word: String) {
+        var remaining = word
+        while (remaining.isNotEmpty()) {
+            val available = (width - current.length).coerceAtLeast(1)
+            val chunk = remaining.take(available)
+            current += chunk
+            remaining = remaining.drop(chunk.length)
+            if (remaining.isNotEmpty()) flushCurrent()
+        }
+    }
+
+    for (word in words) {
+        val prefix = if (current.isBlank() || current == indent) "" else " "
+        if (word.length > width - indent.length) {
+            if (current != indent) flushCurrent()
+            appendChunkedWord(word)
+            continue
+        }
+        if (current.length + prefix.length + word.length <= width) {
+            current += prefix + word
+        } else {
+            flushCurrent()
+            current += word
+        }
+    }
+    flushCurrent()
+    return result.ifEmpty { listOf(clean.take(width)) }
+}
+
+private fun MutableList<Byte>.addEscPosWrappedLine(line: String, width: Int = RECEIPT_ESC_POS_58MM_COLUMNS) {
+    if (line.trim() == RECEIPT_ESC_POS_SEPARATOR) {
+        addEscPosText(RECEIPT_ESC_POS_SEPARATOR + "\n")
+        return
+    }
+    wrapReceiptLineFor58mm(line, width).forEach { wrapped ->
+        addEscPosText(wrapped + "\n")
+    }
+}
+
+private fun MutableList<Byte>.startReceiptEscPosDocument() {
+    addEscPosCommand(0x1B, 0x40) // initialize printer
+    addEscPosCommand(0x1B, 0x74, RECEIPT_ESC_POS_CODE_PAGE_CP866) // CP866 Cyrillic table used by many XP-58/AOKIA-class ESC/POS printers
+}
+
+private fun MutableList<Byte>.finishReceiptEscPosDocument() {
+    addEscPosText("\n\n")
+    addEscPosCommand(0x1D, 0x56, 0x42, 0x00) // partial cut when supported; ignored by many tear-bar 58mm devices
+}
+
 fun buildReceiptPrinterTestEscPosBytes(title: String = "AITA printer test", dateText: String = ""): ByteArray {
     val bytes = mutableListOf<Byte>()
-    fun add(vararg values: Int) { values.forEach { bytes += it.toByte() } }
-    fun addText(value: String) { bytes += value.escPosSafe().encodeToByteArray().toList() }
-
-    add(0x1B, 0x40)
-    add(0x1B, 0x61, 0x01)
-    add(0x1B, 0x45, 0x01)
-    addText(title.ifBlank { "AITA printer test" } + "\n")
-    add(0x1B, 0x45, 0x00)
-    if (dateText.isNotBlank()) addText(dateText + "\n")
-    addText("--------------------------------\n")
-    addText("Thermal receipt printer is ready.\n")
-    addText("This path uses ESC/POS bytes, not A4 PDF.\n")
-    addText("\n\n")
-    add(0x1D, 0x56, 0x42, 0x00)
+    bytes.startReceiptEscPosDocument()
+    bytes.addEscPosCommand(0x1B, 0x61, 0x01)
+    bytes.addEscPosCommand(0x1B, 0x45, 0x01)
+    bytes.addEscPosWrappedLine(title.ifBlank { "AITA printer test" })
+    bytes.addEscPosCommand(0x1B, 0x45, 0x00)
+    if (dateText.isNotBlank()) bytes.addEscPosWrappedLine(dateText)
+    bytes.addEscPosCommand(0x1B, 0x61, 0x00)
+    bytes.addEscPosWrappedLine(RECEIPT_ESC_POS_SEPARATOR)
+    bytes.addEscPosWrappedLine("AOKIA / XP-58 USB ESC/POS path")
+    bytes.addEscPosWrappedLine("58 mm receipt paper, 32-column layout")
+    bytes.addEscPosWrappedLine("Кириллица: чек готов")
+    bytes.addEscPosWrappedLine("If this printed, AITA can send receipts directly.")
+    bytes.finishReceiptEscPosDocument()
     return bytes.toByteArray()
 }
 
@@ -1870,27 +2070,27 @@ fun AnalyticsReportSnapshotDataModel.analyticsReportPdfFileName(): String {
     return "analytics_report_${safeStore}_${generatedAtMillis}.pdf"
 }
 
-private fun String.escPosSafe(): String {
-    return map { ch -> if (ch.code in 32..126 || ch == '\n') ch else '?' }.joinToString("")
-}
 
 fun TransactionReceiptSnapshotDataModel.buildReceiptEscPosBytes(language: String, labels: ReceiptTextLabelsDataModel): ByteArray {
-    val text = buildReceiptPlainText(language, labels).escPosSafe()
+    val plainLines = buildReceiptPlainText(language, labels)
+        .lines()
+        .dropLastWhile { it.isBlank() }
     val bytes = mutableListOf<Byte>()
-    fun add(vararg values: Int) { values.forEach { bytes += it.toByte() } }
-    fun addText(value: String) { bytes += value.encodeToByteArray().toList() }
+    bytes.startReceiptEscPosDocument()
 
-    add(0x1B, 0x40)
-    add(0x1B, 0x61, 0x01)
-    add(0x1B, 0x45, 0x01)
-    addText((store?.name?.let { receiptVisibleString(it, language, labels.store) } ?: labels.store) + "\n")
-    add(0x1B, 0x45, 0x00)
-    addText("${labels.receipt} ${receiptNumberText(labels)}\n")
-    add(0x1B, 0x61, 0x00)
-    addText("--------------------------------\n")
-    addText(text.substringAfter("--------------------------------\n", text))
-    addText("\n\n")
-    add(0x1D, 0x56, 0x42, 0x00)
+    val header = plainLines.firstOrNull()?.trim().orEmpty()
+    if (header.isNotBlank()) {
+        bytes.addEscPosCommand(0x1B, 0x61, 0x01)
+        bytes.addEscPosCommand(0x1B, 0x45, 0x01)
+        bytes.addEscPosWrappedLine(header)
+        bytes.addEscPosCommand(0x1B, 0x45, 0x00)
+        bytes.addEscPosCommand(0x1B, 0x61, 0x00)
+    }
+
+    plainLines.drop(if (header.isBlank()) 0 else 1).forEach { line ->
+        bytes.addEscPosWrappedLine(line)
+    }
+    bytes.finishReceiptEscPosDocument()
     return bytes.toByteArray()
 }
 
@@ -5592,7 +5792,7 @@ const val CLOUD_TRANSPORT_STATUS_UNAVAILABLE = -1
 @PublishedApi
 internal const val REALTIME_ACCESS_TOKEN_REFRESH_SKEW_MILLIS = 60_000L
 
-private const val DEFAULT_AITA_SERVER_URL = "http://10.202.1.184:8080"
+private const val DEFAULT_AITA_SERVER_URL = "http://10.202.5.35:8080"
 private val DEFAULT_AITA_SERVER_URL_PAIR = Pair(DEFAULT_AITA_SERVER_URL, "1")
 @Volatile
 private var runtimeClientServerUrlOverride: String? = null

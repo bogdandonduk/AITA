@@ -473,29 +473,65 @@ fun installDesktopVoiceInputJvm() {
 
 private fun installDesktopPlatformActionsJvm() {
     ReceiptPlatformJvmBridge.loadPersistedEscPosDevicePath()
+    configuredReceiptPrinterDeviceIdState.value = ReceiptPlatformJvmBridge.escPosDevicePath
     configuredLabelPrinterProtocolState.value = LabelPrinterPlatformJvmBridge.labelPrinterProtocol
+
+    fun safeDesktopFileName(rawName: String, fallbackName: String, requiredExtension: String? = null): String {
+        val fallback = fallbackName.ifBlank { "aita-file" }
+        val sanitized = rawName
+            .trim()
+            .replace(Regex("""[\\/:*?"<>|\p{Cntrl}]+"""), "_")
+            .trim { it.isWhitespace() || it == '.' || it == '_' }
+            .ifBlank { fallback }
+            .take(160)
+            .trim { it.isWhitespace() || it == '.' || it == '_' }
+            .ifBlank { fallback }
+        return if (requiredExtension != null && !sanitized.endsWith(requiredExtension, ignoreCase = true)) {
+            sanitized.substringBeforeLast('.', sanitized) + requiredExtension
+        } else {
+            sanitized
+        }
+    }
+
+    fun uniqueDesktopFile(directory: File, preferredName: String): File {
+        directory.mkdirs()
+        val baseName = preferredName.substringBeforeLast('.', preferredName)
+        val extension = preferredName.substringAfterLast('.', "").takeIf { preferredName.contains('.') }?.let { ".$it" }.orEmpty()
+        var candidate = File(directory, preferredName)
+        var index = 2
+        while (candidate.exists() && index <= 999) {
+            candidate = File(directory, "$baseName-$index$extension")
+            index++
+        }
+        return candidate
+    }
 
     fun writePdfToDownloads(fileName: String, pdfBytes: ByteArray): File {
         val downloads = File(System.getProperty("user.home"), "Downloads").takeIf { it.exists() && it.isDirectory }
             ?: File(System.getProperty("user.home"))
-        val file = File(downloads, fileName.ifBlank { "receipt.pdf" })
+        val safeName = safeDesktopFileName(fileName, "receipt.pdf", ".pdf")
+        val file = uniqueDesktopFile(downloads, safeName)
         file.writeBytes(pdfBytes)
         return file
     }
 
     fun writePdfToTemp(fileName: String, pdfBytes: ByteArray): File {
-        val safeName = fileName.ifBlank { "receipt.pdf" }
-        val file = File(System.getProperty("java.io.tmpdir"), safeName)
+        val tempDir = File(System.getProperty("java.io.tmpdir"), "aita_documents")
+        val safeName = safeDesktopFileName(fileName, "receipt.pdf", ".pdf")
+        val file = uniqueDesktopFile(tempDir, safeName)
         file.writeBytes(pdfBytes)
+        file.deleteOnExit()
         return file
     }
 
     fun writeHtmlToTemp(fileName: String, html: String): File {
-        val safeName = fileName.ifBlank { "aita-document.html" }.let { name ->
-            if (name.endsWith(".html", ignoreCase = true) || name.endsWith(".htm", ignoreCase = true)) name else "$name.html"
-        }
-        val file = File(System.getProperty("java.io.tmpdir"), safeName)
+        val tempDir = File(System.getProperty("java.io.tmpdir"), "aita_documents")
+        val rawName = fileName.ifBlank { "aita-document.html" }
+        val extension = if (rawName.endsWith(".htm", ignoreCase = true)) ".htm" else ".html"
+        val safeName = safeDesktopFileName(rawName, "aita-document$extension", extension)
+        val file = uniqueDesktopFile(tempDir, safeName)
         file.writeText(html, Charsets.UTF_8)
+        file.deleteOnExit()
         return file
     }
 
@@ -857,7 +893,7 @@ fun main() {
                         Runtime.getRuntime().exec(arrayOf("open", "x-apple.systempreferences:com.apple.BluetoothSettings"))
                     }
                     osName.contains("win") -> {
-                        Runtime.getRuntime().exec(arrayOf("cmd", "/c", "start", "ms-settings:bluetooth"))
+                        Runtime.getRuntime().exec(arrayOf("cmd", "/c", "start", "", "ms-settings:printers"))
                     }
                     else -> {
                         runCatching { Runtime.getRuntime().exec(arrayOf("blueman-manager")) }

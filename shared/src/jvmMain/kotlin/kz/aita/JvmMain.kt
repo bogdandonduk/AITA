@@ -7,20 +7,29 @@ import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import io.ktor.client.engine.*
 import io.ktor.client.engine.okhttp.*
+import com.fazecast.jSerialComm.SerialPort
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Cache
 import okhttp3.OkHttpClient
-import java.awt.Desktop
 import java.io.File
-import java.net.URI
-import java.net.URLEncoder
+import java.net.InetSocketAddress
+import java.net.Socket
 import java.nio.file.Files
 import java.util.*
+import java.util.concurrent.TimeUnit
 import javax.print.DocFlavor
+import javax.print.PrintService
 import javax.print.PrintServiceLookup
 import javax.print.SimpleDoc
+import javax.print.attribute.HashPrintRequestAttributeSet
+import javax.print.attribute.standard.JobName
+import javax.print.attribute.standard.PrinterIsAcceptingJobs
+import javax.print.attribute.standard.PrinterState
+import javax.print.attribute.standard.PrinterStateReason
+import javax.print.attribute.standard.PrinterStateReasons
+import javax.print.attribute.standard.QueuedJobCount
 import kotlin.io.path.Path
 
 actual fun getCurrentTimeMillis(): Long = System.currentTimeMillis()
@@ -134,15 +143,16 @@ actual var getSqlDelightDriver: (() -> SqlDriver?)? = {
 
 object ReceiptPlatformJvmBridge {
     /**
-     * Optional desktop ESC/POS writer. Configure it for USB serial, COM port, network printer, or tests.
+     * Optional desktop ESC/POS writer. Configure it for tests or future native bridges.
      */
     var writeEscPosBytes: (suspend (ByteArray) -> Boolean)? = null
 
     /**
-     * Simple cable/device-path writer for the first real-device pass.
-     * Linux: /dev/usb/lp0, /dev/ttyUSB0
-     * macOS: /dev/cu.usbserial-XXXX
-     * Windows: COM3 or \.\COM3
+     * Desktop receipt-printer target. Supported values:
+     * - print-service:XP-58 (copy 1)  -> Windows/macOS/Linux system printer, written as RAW ESC/POS where possible
+     * - serial:COM3                   -> serial/virtual-COM printer through jSerialComm
+     * - tcp://192.168.1.50:9100       -> network ESC/POS printer
+     * - /dev/usb/lp0                  -> Linux/macOS raw device file
      * You can also set AITA_RECEIPT_PRINTER_DEVICE before launching the desktop app.
      */
     var escPosDevicePath: String? = System.getenv("AITA_RECEIPT_PRINTER_DEVICE")
@@ -150,10 +160,46 @@ object ReceiptPlatformJvmBridge {
         ?.takeIf { it.isNotBlank() }
 
     private const val PRINT_SERVICE_PREFIX = "print-service:"
+    private const val SERIAL_PORT_PREFIX = "serial:"
+    private const val TCP_PREFIX = "tcp://"
+    private const val TCP_SHORT_PREFIX = "tcp:"
+    private const val FILE_PREFIX = "file:"
     private const val RECEIPT_PRINTER_DEVICE_FILE_NAME = "aita_receipt_printer_device.txt"
+    private const val DEFAULT_RECEIPT_PRINTER_SERIAL_BAUD_RATE = 9600
+    private const val WINDOWS_PRINTER_NOT_READY_MARKER = "AITA_PRINTER_NOT_READY:"
 
     private fun receiptPrinterDevicePreferenceFile(): File {
         return File(cacheDirPath.ifBlank { System.getProperty("java.io.tmpdir") }, RECEIPT_PRINTER_DEVICE_FILE_NAME)
+    }
+
+    private fun currentOsName(): String = System.getProperty("os.name").orEmpty().lowercase(Locale.ROOT)
+    private fun isWindows(): Boolean = currentOsName().contains("win")
+
+    private class WindowsPrinterNotReadyException(message: String) : IllegalStateException(message)
+
+    private fun Throwable.isWindowsPrinterNotReadyFailure(): Boolean {
+        var cursor: Throwable? = this
+        while (cursor != null) {
+            if (cursor is WindowsPrinterNotReadyException) return true
+            if (cursor.message?.contains(WINDOWS_PRINTER_NOT_READY_MARKER) == true) return true
+            cursor = cursor.cause
+        }
+        return false
+    }
+
+    private fun throwWindowsRawPrintFailure(output: String, fallbackMessage: String): Nothing {
+        val markerIndex = output.indexOf(WINDOWS_PRINTER_NOT_READY_MARKER)
+        if (markerIndex >= 0) {
+            val cleanMessage = output
+                .substring(markerIndex + WINDOWS_PRINTER_NOT_READY_MARKER.length)
+                .lineSequence()
+                .firstOrNull()
+                ?.trim()
+                ?.takeIf { it.isNotBlank() }
+                ?: "Windows reports the receipt printer is not ready"
+            throw WindowsPrinterNotReadyException(cleanMessage)
+        }
+        error(output.ifBlank { fallbackMessage })
     }
 
     fun loadPersistedEscPosDevicePath() {
@@ -176,87 +222,709 @@ object ReceiptPlatformJvmBridge {
             val file = receiptPrinterDevicePreferenceFile()
             file.parentFile?.mkdirs()
             if (cleanPath == null) file.delete() else file.writeText(cleanPath)
+        }.onFailure { throwable ->
+            System.err.println("AITA receipt printer preference write failed: ${throwable.message}")
         }
     }
 
     private fun likelyReceiptPrinterName(name: String): Boolean {
         val clean = name.lowercase(Locale.ROOT)
-        return listOf("pos", "esc", "receipt", "thermal", "xprinter", "gprinter", "rongta", "sunmi", "mtp", "rp", "xp-", "чек", "касс")
-            .any { clean.contains(it) }
+        return listOf(
+            "aokia",
+            "ak-3558",
+            "ak3558",
+            "xp-58",
+            "xp58",
+            "xprinter",
+            "x-printer",
+            "pos58",
+            "pos-58",
+            "58mm",
+            "esc/pos",
+            "escpos",
+            "receipt",
+            "thermal",
+            "gprinter",
+            "rongta",
+            "sunmi",
+            "mtp",
+            "pos",
+            "чек",
+            "термо",
+            "касс"
+        ).any { clean.contains(it) }
+    }
+
+    private fun systemPrintServices(): List<PrintService> = runCatching {
+        PrintServiceLookup.lookupPrintServices(null, null)
+            .orEmpty()
+            .toList()
+    }.getOrElse { throwable ->
+        System.err.println("AITA receipt printer system service lookup failed: ${throwable.message}")
+        emptyList()
+    }
+
+    private fun defaultPrintServiceName(): String? = runCatching {
+        PrintServiceLookup.lookupDefaultPrintService()?.name?.trim()?.takeIf { it.isNotBlank() }
+    }.getOrNull()
+
+    private fun configuredTarget(): String = escPosDevicePath?.trim().orEmpty()
+
+    private fun serviceId(serviceName: String): String = PRINT_SERVICE_PREFIX + serviceName
+
+    private fun configuredMatchesPrintService(configured: String, serviceName: String): Boolean {
+        if (configured.isBlank()) return false
+        val serviceTarget = serviceId(serviceName)
+        return configured.equals(serviceTarget, ignoreCase = true) || configured.equals(serviceName, ignoreCase = true)
+    }
+
+    private fun printServiceNameFromTarget(target: String): String? {
+        val clean = target.trim()
+        if (clean.startsWith(PRINT_SERVICE_PREFIX, ignoreCase = true)) {
+            return clean.substring(PRINT_SERVICE_PREFIX.length).trim().takeIf { it.isNotBlank() }
+        }
+        return systemPrintServices()
+            .firstOrNull { service -> service.name.equals(clean, ignoreCase = true) }
+            ?.name
+    }
+
+    private fun printServiceCandidateSubtitle(
+        configured: Boolean,
+        probableReceiptPrinter: Boolean,
+        defaultPrinter: Boolean,
+        healthNotes: List<String>
+    ): String {
+        val platform = if (isWindows()) "Windows" else "System"
+        val base = when {
+            configured -> "$platform RAW ESC/POS printer • selected"
+            probableReceiptPrinter && defaultPrinter -> "$platform default printer • likely AOKIA/XP-58 thermal receipt printer"
+            probableReceiptPrinter -> "$platform printer • likely AOKIA/XP-58 thermal receipt printer"
+            defaultPrinter -> "$platform default printer • choose only if this is the thermal ESC/POS printer"
+            else -> "$platform printer • choose only if it accepts raw ESC/POS receipt bytes"
+        }
+        val healthText = healthNotes.take(4).joinToString(" • ").takeIf { it.isNotBlank() }
+        return if (healthText == null) base else "$base • Status: $healthText"
+    }
+
+    private fun printAttributeText(value: String): String {
+        return value
+            .replace('_', ' ')
+            .replace('-', ' ')
+            .trim()
+            .replace(Regex("\\s+"), " ")
+            .lowercase(Locale.ROOT)
+    }
+
+    private fun printServiceHealthNotes(service: PrintService): List<String> = runCatching {
+        val notes = mutableListOf<String>()
+
+        val acceptingJobs = service.getAttribute(PrinterIsAcceptingJobs::class.java)
+        if (acceptingJobs == PrinterIsAcceptingJobs.NOT_ACCEPTING_JOBS) {
+            notes += "not accepting jobs"
+        }
+
+        val printerState = service.getAttribute(PrinterState::class.java)
+        if (printerState != null && printerState != PrinterState.IDLE && printerState != PrinterState.UNKNOWN) {
+            notes += printAttributeText(printerState.toString())
+        }
+
+        val stateReasons = service.getAttribute(PrinterStateReasons::class.java)
+        val visibleReasons = stateReasons
+            ?.keys
+            .orEmpty()
+            .map { reason: PrinterStateReason -> printAttributeText(reason.toString()) }
+            .filter { reason ->
+                reason.isNotBlank() && reason !in setOf(
+                    "none",
+                    "other",
+                    "moving to paused",
+                    "connecting to device"
+                )
+            }
+        notes += visibleReasons
+
+        val queuedJobs = service.getAttribute(QueuedJobCount::class.java)?.value
+            ?.takeIf { it > 0 }
+        if (queuedJobs != null) {
+            notes += if (queuedJobs == 1) "1 queued job" else "$queuedJobs queued jobs"
+        }
+
+        notes.distinct()
+    }.getOrElse { throwable ->
+        System.err.println("AITA receipt printer status lookup failed for '${service.name}': ${throwable.message}")
+        emptyList()
+    }
+
+    private fun printServiceCanAcceptImmediateJobs(healthNotes: List<String>): Boolean {
+        if (healthNotes.isEmpty()) return true
+        val blockingWords = listOf(
+            "not accepting jobs",
+            "paused",
+            "stopped",
+            "shutdown",
+            "offline",
+            "timed out",
+            "media empty",
+            "media jam",
+            "door open",
+            "cover open"
+        )
+        return healthNotes.none { note -> blockingWords.any { word -> note.contains(word, ignoreCase = true) } }
+    }
+
+    private fun listSystemPrintServiceCandidates(configured: String): List<PlatformReceiptPrinterDataModel> {
+        val defaultServiceName = defaultPrintServiceName()
+        val services = systemPrintServices()
+        val includeAllWindowsServices = isWindows() && services.size <= 12
+        return services.mapNotNull { service ->
+            val serviceName = service.name?.trim().orEmpty()
+            if (serviceName.isBlank()) return@mapNotNull null
+            val probableReceiptPrinter = likelyReceiptPrinterName(serviceName)
+            val isConfigured = configuredMatchesPrintService(configured, serviceName)
+            val isDefault = defaultServiceName?.equals(serviceName, ignoreCase = true) == true
+            if (!probableReceiptPrinter && !isConfigured && !isDefault && !includeAllWindowsServices) return@mapNotNull null
+            val healthNotes = printServiceHealthNotes(service)
+            PlatformReceiptPrinterDataModel(
+                id = serviceId(serviceName),
+                name = serviceName,
+                subtitle = printServiceCandidateSubtitle(
+                    configured = isConfigured,
+                    probableReceiptPrinter = probableReceiptPrinter,
+                    defaultPrinter = isDefault,
+                    healthNotes = healthNotes
+                ),
+                configured = isConfigured,
+                available = printServiceCanAcceptImmediateJobs(healthNotes)
+            )
+        }
+    }
+
+    private fun serialBaudRate(): Int {
+        val raw = System.getenv("AITA_RECEIPT_PRINTER_SERIAL_BAUD")
+            ?: System.getProperty("AITA_RECEIPT_PRINTER_SERIAL_BAUD")
+        return raw?.trim()?.toIntOrNull()?.takeIf { it in 1_200..921_600 }
+            ?: DEFAULT_RECEIPT_PRINTER_SERIAL_BAUD_RATE
+    }
+
+    private fun cleanSerialPortName(raw: String): String {
+        val clean = raw.trim().removePrefix(SERIAL_PORT_PREFIX).trim()
+        return if (clean.startsWith("\\\\.\\")) clean.removePrefix("\\\\.\\") else clean
+    }
+
+    private fun configuredMatchesSerialPort(configured: String, systemPortName: String): Boolean {
+        if (configured.isBlank() || systemPortName.isBlank()) return false
+        val cleanConfigured = cleanSerialPortName(configured)
+        return configured.equals(SERIAL_PORT_PREFIX + systemPortName, ignoreCase = true) ||
+                cleanConfigured.equals(systemPortName, ignoreCase = true)
+    }
+
+    private fun serialPortNameFromTarget(target: String): String? {
+        val clean = target.trim()
+        if (clean.startsWith(SERIAL_PORT_PREFIX, ignoreCase = true)) {
+            return cleanSerialPortName(clean).takeIf { it.isNotBlank() }
+        }
+        val portName = cleanSerialPortName(clean)
+        if (portName.matches(Regex("(?i)^COM\\d+$"))) return portName
+        return SerialPort.getCommPorts()
+            .orEmpty()
+            .firstOrNull { port ->
+                port.systemPortName.equals(portName, ignoreCase = true) ||
+                        port.descriptivePortName.equals(portName, ignoreCase = true) ||
+                        port.portDescription.equals(portName, ignoreCase = true)
+            }
+            ?.systemPortName
+    }
+
+    private fun configuredSerialPortDisplayName(configured: String): String? {
+        val clean = configured.trim()
+        val portName = cleanSerialPortName(clean)
+        return when {
+            clean.startsWith(SERIAL_PORT_PREFIX, ignoreCase = true) && portName.isNotBlank() -> portName
+            portName.matches(Regex("(?i)^COM\\d+$")) -> portName
+            else -> null
+        }
+    }
+
+    private fun listSerialPortCandidates(configured: String): List<PlatformReceiptPrinterDataModel> {
+        return runCatching {
+            SerialPort.getCommPorts()
+                .orEmpty()
+                .mapNotNull { port ->
+                    val systemPortName = port.systemPortName?.trim().orEmpty()
+                    if (systemPortName.isBlank()) return@mapNotNull null
+                    val descriptiveName = port.descriptivePortName?.trim().orEmpty()
+                    val portDescription = port.portDescription?.trim().orEmpty()
+                    val searchable = listOf(systemPortName, descriptiveName, portDescription).joinToString(" ")
+                    val likely = likelyReceiptPrinterName(searchable) || searchable.lowercase(Locale.ROOT).contains("usb")
+                    val isConfigured = configuredMatchesSerialPort(configured, systemPortName)
+                    if (!likely && !isConfigured) return@mapNotNull null
+                    PlatformReceiptPrinterDataModel(
+                        id = SERIAL_PORT_PREFIX + systemPortName,
+                        name = systemPortName,
+                        subtitle = listOf(
+                            descriptiveName.takeIf { it.isNotBlank() },
+                            portDescription.takeIf { it.isNotBlank() },
+                            "Serial ESC/POS ${serialBaudRate()} baud"
+                        ).filterNotNull().distinct().joinToString(" • "),
+                        configured = isConfigured,
+                        available = true
+                    )
+                }
+        }.getOrElse { throwable ->
+            System.err.println("AITA receipt printer serial port lookup failed: ${throwable.message}")
+            emptyList()
+        }
+    }
+
+    private fun tcpTargetFrom(target: String): Pair<String, Int>? {
+        val clean = target.trim()
+        val hostPort = when {
+            clean.startsWith(TCP_PREFIX, ignoreCase = true) -> clean.substring(TCP_PREFIX.length)
+            clean.startsWith(TCP_SHORT_PREFIX, ignoreCase = true) -> clean.substring(TCP_SHORT_PREFIX.length)
+            else -> return null
+        }.trim().trim('/')
+        val host = hostPort.substringBefore(':').trim()
+        val port = hostPort.substringAfter(':', "9100").trim().toIntOrNull() ?: 9100
+        return host.takeIf { it.isNotBlank() }?.let { it to port }
     }
 
     fun knownEscPosDeviceCandidates(): List<String> {
-        val configured = escPosDevicePath?.trim()?.takeIf { it.isNotBlank() && !it.startsWith(PRINT_SERVICE_PREFIX) }
-        val osName = System.getProperty("os.name").orEmpty().lowercase(Locale.ROOT)
+        val configured = configuredTarget().takeIf { configured ->
+            configured.isNotBlank() &&
+                    !configured.startsWith(PRINT_SERVICE_PREFIX, ignoreCase = true) &&
+                    !configured.startsWith(SERIAL_PORT_PREFIX, ignoreCase = true) &&
+                    configuredSerialPortDisplayName(configured) == null &&
+                    tcpTargetFrom(configured) == null &&
+                    printServiceNameFromTarget(configured) == null
+        }
         val candidates = mutableListOf<String>()
         configured?.let { candidates += it }
-        if (!osName.contains("win")) {
-            candidates += listOf("/dev/usb/lp0", "/dev/usb/lp1", "/dev/usb/lp2", "/dev/ttyUSB0", "/dev/ttyUSB1", "/dev/ttyUSB2", "/dev/ttyACM0", "/dev/ttyACM1")
+        if (!isWindows()) {
+            candidates += listOf(
+                "/dev/usb/lp0",
+                "/dev/usb/lp1",
+                "/dev/usb/lp2",
+                "/dev/ttyUSB0",
+                "/dev/ttyUSB1",
+                "/dev/ttyUSB2",
+                "/dev/ttyACM0",
+                "/dev/ttyACM1"
+            )
             val dev = File("/dev")
             if (dev.exists() && dev.isDirectory) {
                 dev.listFiles()
                     .orEmpty()
                     .filter { file ->
                         val name = file.name.lowercase(Locale.ROOT)
-                        name.startsWith("cu.usb") || name.startsWith("cu.slab") || name.startsWith("tty.usb") || name.startsWith("tty.slab")
+                        name.startsWith("cu.usb") ||
+                                name.startsWith("cu.slab") ||
+                                name.startsWith("tty.usb") ||
+                                name.startsWith("tty.slab")
                     }
+                    .forEach { candidates += it.absolutePath }
+            }
+            val devUsb = File("/dev/usb")
+            if (devUsb.exists() && devUsb.isDirectory) {
+                devUsb.listFiles()
+                    .orEmpty()
+                    .filter { file -> file.name.lowercase(Locale.ROOT).startsWith("lp") }
                     .forEach { candidates += it.absolutePath }
             }
         }
         return candidates.distinct()
     }
 
-    private fun listSystemPrintServiceCandidates(configured: String): List<PlatformReceiptPrinterDataModel> {
-        return runCatching {
-            PrintServiceLookup.lookupPrintServices(null, null)
-                .orEmpty()
-                .mapNotNull { service ->
-                    val serviceName = service.name?.trim().orEmpty()
-                    if (serviceName.isBlank()) return@mapNotNull null
-                    val id = PRINT_SERVICE_PREFIX + serviceName
-                    val probableReceiptPrinter = likelyReceiptPrinterName(serviceName)
-                    val isConfigured = id == configured
-                    if (!probableReceiptPrinter && !isConfigured) return@mapNotNull null
-                    PlatformReceiptPrinterDataModel(
-                        id = id,
-                        name = serviceName,
-                        subtitle = if (isConfigured) "Configured system ESC/POS print service" else "Likely thermal receipt printer from system printers",
-                        configured = isConfigured,
-                        available = true
-                    )
-                }
-        }.getOrElse { emptyList() }
-    }
-
-    fun listConfiguredAndDetectedPrinters(): List<PlatformReceiptPrinterDataModel> {
-        val configured = escPosDevicePath?.trim().orEmpty()
-        val devicePathPrinters = knownEscPosDeviceCandidates()
-            .mapNotNull { rawPath ->
-                val clean = rawPath.trim().takeIf { it.isNotBlank() } ?: return@mapNotNull null
-                val exists = runCatching { File(normalizedDevicePath(clean)).exists() }.getOrDefault(false)
-                val isConfigured = clean == configured
-                if (!isConfigured && !exists) return@mapNotNull null
-                PlatformReceiptPrinterDataModel(
-                    id = clean,
-                    name = clean.substringAfterLast('/').ifBlank { clean },
-                    subtitle = if (isConfigured) "Configured ESC/POS device path" else "Detected local ESC/POS device path",
-                    configured = isConfigured,
-                    available = exists || isConfigured
-                )
-            }
-        return (devicePathPrinters + listSystemPrintServiceCandidates(configured))
-            .distinctBy { it.id }
-            .sortedWith(compareByDescending<PlatformReceiptPrinterDataModel> { it.configured }.thenBy { it.name.lowercase(Locale.ROOT) })
-    }
-
     private fun normalizedDevicePath(rawPath: String): String {
-        val clean = rawPath.trim()
-        val osName = System.getProperty("os.name").orEmpty().lowercase(Locale.ROOT)
-        return if (osName.contains("win") && clean.matches(Regex("(?i)^COM\\d+$"))) {
+        val clean = rawPath.trim().let { path ->
+            if (path.startsWith(FILE_PREFIX, ignoreCase = true)) path.substring(FILE_PREFIX.length) else path
+        }.trim()
+        return if (isWindows() && clean.matches(Regex("(?i)^COM\\d+$"))) {
             "\\\\.\\$clean"
         } else {
             clean
         }
+    }
+
+    private fun listDevicePathCandidates(configured: String): List<PlatformReceiptPrinterDataModel> {
+        return knownEscPosDeviceCandidates()
+            .mapNotNull { rawPath ->
+                val clean = rawPath.trim().let { path ->
+                    if (path.startsWith(FILE_PREFIX, ignoreCase = true)) path.substring(FILE_PREFIX.length) else path
+                }.trim().takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                val exists = runCatching { File(normalizedDevicePath(clean)).exists() }.getOrDefault(false)
+                val isConfigured = configured.equals(clean, ignoreCase = true) || configured.equals(FILE_PREFIX + clean, ignoreCase = true)
+                if (!isConfigured && !exists) return@mapNotNull null
+                PlatformReceiptPrinterDataModel(
+                    id = clean,
+                    name = clean.substringAfterLast('/').substringAfterLast('\\').ifBlank { clean },
+                    subtitle = if (isConfigured) "Raw ESC/POS device path • selected" else "Detected raw ESC/POS device path",
+                    configured = isConfigured,
+                    available = exists || isConfigured
+                )
+            }
+    }
+
+    private fun listConfiguredNetworkCandidate(configured: String): List<PlatformReceiptPrinterDataModel> {
+        val target = tcpTargetFrom(configured) ?: return emptyList()
+        return listOf(
+            PlatformReceiptPrinterDataModel(
+                id = configured,
+                name = "${target.first}:${target.second}",
+                subtitle = "Network ESC/POS printer • selected",
+                configured = true,
+                available = true
+            )
+        )
+    }
+
+    private fun configuredPrintServiceDisplayName(configured: String): String? {
+        val clean = configured.trim()
+        return if (clean.startsWith(PRINT_SERVICE_PREFIX, ignoreCase = true)) {
+            clean.substring(PRINT_SERVICE_PREFIX.length).trim().takeIf { it.isNotBlank() }
+        } else {
+            null
+        }
+    }
+
+    private fun listSavedUnavailableConfiguredCandidate(
+        configured: String,
+        detected: List<PlatformReceiptPrinterDataModel>
+    ): List<PlatformReceiptPrinterDataModel> {
+        if (configured.isBlank()) return emptyList()
+        val detectedIds = detected.map { it.id.lowercase(Locale.ROOT) }.toSet()
+
+        configuredPrintServiceDisplayName(configured)?.let { serviceName ->
+            val id = serviceId(serviceName)
+            if (id.lowercase(Locale.ROOT) !in detectedIds) {
+                return listOf(
+                    PlatformReceiptPrinterDataModel(
+                        id = id,
+                        name = serviceName,
+                        subtitle = "Saved Windows/System receipt printer • reinstall, reconnect, or refresh after Windows sees it",
+                        configured = true,
+                        available = false
+                    )
+                )
+            }
+        }
+
+        configuredSerialPortDisplayName(configured)?.let { portName ->
+            val id = SERIAL_PORT_PREFIX + portName
+            if (id.lowercase(Locale.ROOT) !in detectedIds) {
+                return listOf(
+                    PlatformReceiptPrinterDataModel(
+                        id = id,
+                        name = portName,
+                        subtitle = "Saved serial ESC/POS printer port • reconnect it, then refresh",
+                        configured = true,
+                        available = false
+                    )
+                )
+            }
+        }
+
+        return emptyList()
+    }
+
+    fun listConfiguredAndDetectedPrinters(): List<PlatformReceiptPrinterDataModel> {
+        val configured = configuredTarget()
+        val detected = listConfiguredNetworkCandidate(configured) +
+                listDevicePathCandidates(configured) +
+                listSerialPortCandidates(configured) +
+                listSystemPrintServiceCandidates(configured)
+        return (listSavedUnavailableConfiguredCandidate(configured, detected) + detected)
+            .distinctBy { it.id.lowercase(Locale.ROOT) }
+            .sortedWith(
+                compareByDescending<PlatformReceiptPrinterDataModel> { it.configured }
+                    .thenByDescending { likelyReceiptPrinterName(it.name + " " + it.subtitle) }
+                    .thenByDescending { it.available }
+                    .thenBy { it.name.lowercase(Locale.ROOT) }
+            )
+    }
+
+    private fun printWithJavaPrintService(service: PrintService, printerBytes: ByteArray) {
+        val preferredFlavors = listOf(
+            DocFlavor.BYTE_ARRAY.AUTOSENSE,
+            DocFlavor.BYTE_ARRAY.TEXT_PLAIN_HOST,
+            DocFlavor.BYTE_ARRAY.TEXT_PLAIN_UTF_8
+        )
+        val flavor = preferredFlavors.firstOrNull { candidate ->
+            runCatching { service.isDocFlavorSupported(candidate) }.getOrDefault(false)
+        } ?: DocFlavor.BYTE_ARRAY.AUTOSENSE
+        val attributes = HashPrintRequestAttributeSet().apply {
+            add(JobName("AITA ESC/POS receipt", Locale.getDefault()))
+        }
+        service.createPrintJob().print(SimpleDoc(printerBytes, flavor, null), attributes)
+    }
+
+    private fun windowsRawPrinterPowerShellScript(): String {
+        val d = '$'
+        return """
+param(
+    [Parameter(Mandatory=${d}true)][string]${d}PrinterName,
+    [Parameter(Mandatory=${d}true)][string]${d}DataPath
+)
+${d}ErrorActionPreference = "Stop"
+function Fail-AitaPrinterNotReady([string]${d}Message) {
+    throw "${WINDOWS_PRINTER_NOT_READY_MARKER} ${d}Message"
+}
+function Read-AitaText(${d}Value) {
+    if (${d}null -eq ${d}Value) { return "" }
+    return ${d}Value.ToString()
+}
+function Get-AitaPrintManagementPrinter([string]${d}Name) {
+    try {
+        return Get-Printer -ErrorAction SilentlyContinue | Where-Object { ${d}_.Name -eq ${d}Name } | Select-Object -First 1
+    } catch {
+        return ${d}null
+    }
+}
+function Get-AitaPrinterStatusObject([string]${d}Name) {
+    try {
+        ${d}candidate = Get-CimInstance -ClassName Win32_Printer -ErrorAction SilentlyContinue | Where-Object { ${d}_.Name -eq ${d}Name } | Select-Object -First 1
+        if (${d}null -ne ${d}candidate) { return ${d}candidate }
+    } catch { }
+    try {
+        return Get-WmiObject -Class Win32_Printer -ErrorAction SilentlyContinue | Where-Object { ${d}_.Name -eq ${d}Name } | Select-Object -First 1
+    } catch {
+        return ${d}null
+    }
+}
+${d}printManagementPrinter = Get-AitaPrintManagementPrinter ${d}PrinterName
+if (${d}null -ne ${d}printManagementPrinter) {
+    ${d}printerStatusText = (Read-AitaText ${d}printManagementPrinter.PrinterStatus).ToLowerInvariant()
+    if (${d}printerStatusText -match "paused|stopped") {
+        Fail-AitaPrinterNotReady "Windows shows printer '${d}PrinterName' as paused or stopped. Open the print queue and choose Resume printing."
+    }
+    if (${d}printerStatusText -match "offline|not\s*available|server\s*unknown") {
+        Fail-AitaPrinterNotReady "Windows shows printer '${d}PrinterName' as offline or unavailable. Check USB and power, then refresh printers in AITA."
+    }
+    if (${d}printerStatusText -match "paper|jam|dooropen|cover|outputbin") {
+        Fail-AitaPrinterNotReady "Windows reports paper, jam, output-bin, or cover problem on printer '${d}PrinterName'. Check the 58mm paper roll and close the cover."
+    }
+    if (${d}printerStatusText -match "error|userintervention|outofmemory|notavailable") {
+        Fail-AitaPrinterNotReady "Windows reports printer '${d}PrinterName' needs attention. Check the queue, cable, paper and cover."
+    }
+}
+${d}printerStatusObject = Get-AitaPrinterStatusObject ${d}PrinterName
+if (${d}null -ne ${d}printerStatusObject) {
+    [int]${d}printerState = 0
+    [int]${d}printerStatus = 0
+    [int]${d}detectedErrorState = 0
+    if (${d}null -ne ${d}printerStatusObject.PrinterState) { ${d}printerState = [int]${d}printerStatusObject.PrinterState }
+    if (${d}null -ne ${d}printerStatusObject.PrinterStatus) { ${d}printerStatus = [int]${d}printerStatusObject.PrinterStatus }
+    if (${d}null -ne ${d}printerStatusObject.DetectedErrorState) { ${d}detectedErrorState = [int]${d}printerStatusObject.DetectedErrorState }
+    ${d}stateLooksLikeLegacyFlags = ${d}printerState -gt 25
+    if ([bool]${d}printerStatusObject.WorkOffline -or (${d}printerState -eq 8) -or (${d}stateLooksLikeLegacyFlags -and ((${d}printerState -band 128) -ne 0)) -or ${d}printerStatus -eq 7 -or ${d}detectedErrorState -eq 9) {
+        Fail-AitaPrinterNotReady "Windows shows printer '${d}PrinterName' as offline. Check USB and power, then refresh printers in AITA."
+    }
+    if ((${d}printerState -eq 1) -or (${d}printerStatus -eq 6) -or (${d}stateLooksLikeLegacyFlags -and ((${d}printerState -band 1) -ne 0))) {
+        Fail-AitaPrinterNotReady "Windows shows printer '${d}PrinterName' as paused or stopped. Open the print queue and choose Resume printing."
+    }
+    if ((${d}printerState -in 4,5,6,7,12,23) -or (${d}stateLooksLikeLegacyFlags -and (((${d}printerState -band 8) -ne 0) -or ((${d}printerState -band 16) -ne 0) -or ((${d}printerState -band 64) -ne 0) -or ((${d}printerState -band 4194304) -ne 0))) -or (${d}detectedErrorState -in 3,4,7,8,11)) {
+        Fail-AitaPrinterNotReady "Windows reports paper, jam, output-bin, or cover problem on printer '${d}PrinterName'. Check the 58mm paper roll and close the cover."
+    }
+    if ((${d}printerState -in 2,13,21,22) -or (${d}stateLooksLikeLegacyFlags -and (((${d}printerState -band 2) -ne 0) -or ((${d}printerState -band 1048576) -ne 0))) -or (${d}detectedErrorState -in 6,10)) {
+        Fail-AitaPrinterNotReady "Windows reports printer '${d}PrinterName' needs attention. Check the queue, cable, paper and cover."
+    }
+}
+${d}source = @"
+using System;
+using System.Runtime.InteropServices;
+
+public class AitaRawPrinter {
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public class DOC_INFO_1 {
+        [MarshalAs(UnmanagedType.LPWStr)] public string pDocName;
+        [MarshalAs(UnmanagedType.LPWStr)] public string pOutputFile;
+        [MarshalAs(UnmanagedType.LPWStr)] public string pDataType;
+    }
+
+    [DllImport("winspool.Drv", EntryPoint="OpenPrinterW", SetLastError=true, CharSet=CharSet.Unicode)]
+    public static extern bool OpenPrinter(string szPrinter, out IntPtr hPrinter, IntPtr pd);
+
+    [DllImport("winspool.Drv", EntryPoint="ClosePrinter", SetLastError=true)]
+    public static extern bool ClosePrinter(IntPtr hPrinter);
+
+    [DllImport("winspool.Drv", EntryPoint="StartDocPrinterW", SetLastError=true, CharSet=CharSet.Unicode)]
+    public static extern int StartDocPrinter(IntPtr hPrinter, int level, [In] DOC_INFO_1 di);
+
+    [DllImport("winspool.Drv", EntryPoint="EndDocPrinter", SetLastError=true)]
+    public static extern bool EndDocPrinter(IntPtr hPrinter);
+
+    [DllImport("winspool.Drv", EntryPoint="StartPagePrinter", SetLastError=true)]
+    public static extern bool StartPagePrinter(IntPtr hPrinter);
+
+    [DllImport("winspool.Drv", EntryPoint="EndPagePrinter", SetLastError=true)]
+    public static extern bool EndPagePrinter(IntPtr hPrinter);
+
+    [DllImport("winspool.Drv", EntryPoint="WritePrinter", SetLastError=true)]
+    public static extern bool WritePrinter(IntPtr hPrinter, IntPtr pBytes, int dwCount, out int dwWritten);
+}
+"@
+Add-Type -TypeDefinition ${d}source
+${d}bytes = [System.IO.File]::ReadAllBytes(${d}DataPath)
+if (${d}bytes.Length -le 0) { throw "No bytes to print" }
+${d}hPrinter = [IntPtr]::Zero
+${d}buffer = [IntPtr]::Zero
+${d}docStarted = ${d}false
+${d}pageStarted = ${d}false
+try {
+    if (-not [AitaRawPrinter]::OpenPrinter(${d}PrinterName, [ref]${d}hPrinter, [IntPtr]::Zero)) {
+        ${d}lastError = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+        throw "OpenPrinter failed for '${d}PrinterName' (Win32=${d}lastError)"
+    }
+    ${d}doc = New-Object AitaRawPrinter+DOC_INFO_1
+    ${d}doc.pDocName = "AITA ESC/POS receipt"
+    ${d}doc.pOutputFile = ${d}null
+    ${d}doc.pDataType = "RAW"
+    if ([AitaRawPrinter]::StartDocPrinter(${d}hPrinter, 1, ${d}doc) -eq 0) {
+        ${d}lastError = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+        throw "StartDocPrinter failed (Win32=${d}lastError)"
+    }
+    ${d}docStarted = ${d}true
+    if (-not [AitaRawPrinter]::StartPagePrinter(${d}hPrinter)) {
+        ${d}lastError = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+        throw "StartPagePrinter failed (Win32=${d}lastError)"
+    }
+    ${d}pageStarted = ${d}true
+    ${d}buffer = [Runtime.InteropServices.Marshal]::AllocHGlobal(${d}bytes.Length)
+    [Runtime.InteropServices.Marshal]::Copy(${d}bytes, 0, ${d}buffer, ${d}bytes.Length)
+    [int]${d}written = 0
+    if (-not [AitaRawPrinter]::WritePrinter(${d}hPrinter, ${d}buffer, ${d}bytes.Length, [ref]${d}written)) {
+        ${d}lastError = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+        throw "WritePrinter failed (Win32=${d}lastError)"
+    }
+    if (${d}written -ne ${d}bytes.Length) {
+        throw "WritePrinter wrote ${d}written of ${d}(${d}bytes.Length) bytes"
+    }
+    Write-Output "OK ${d}written bytes"
+}
+finally {
+    if (${d}buffer -ne [IntPtr]::Zero) { [Runtime.InteropServices.Marshal]::FreeHGlobal(${d}buffer) }
+    if (${d}pageStarted) { [void][AitaRawPrinter]::EndPagePrinter(${d}hPrinter) }
+    if (${d}docStarted) { [void][AitaRawPrinter]::EndDocPrinter(${d}hPrinter) }
+    if (${d}hPrinter -ne [IntPtr]::Zero) { [void][AitaRawPrinter]::ClosePrinter(${d}hPrinter) }
+}
+""".trimIndent()
+    }
+
+    private fun printWithWindowsRawSpooler(serviceName: String, printerBytes: ByteArray) {
+        val spoolDir = File(cacheDirPath.ifBlank { System.getProperty("java.io.tmpdir") }, "receipt_printer_spool").apply { mkdirs() }
+        val dataFile = File.createTempFile("aita_receipt_", ".bin", spoolDir)
+        val scriptFile = File.createTempFile("aita_raw_print_", ".ps1", spoolDir)
+        val outputFile = File.createTempFile("aita_raw_print_", ".log", spoolDir)
+        try {
+            dataFile.writeBytes(printerBytes)
+            scriptFile.writeText(windowsRawPrinterPowerShellScript(), Charsets.UTF_8)
+            val process = ProcessBuilder(
+                "powershell.exe",
+                "-NoProfile",
+                "-NonInteractive",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                scriptFile.absolutePath,
+                "-PrinterName",
+                serviceName,
+                "-DataPath",
+                dataFile.absolutePath
+            )
+                .redirectErrorStream(true)
+                .redirectOutput(outputFile)
+                .start()
+            val completed = process.waitFor(25, TimeUnit.SECONDS)
+            val output = runCatching { outputFile.readText(Charsets.UTF_8).trim() }.getOrDefault("")
+            if (!completed) {
+                process.destroyForcibly()
+                val killed = process.waitFor(2, TimeUnit.SECONDS)
+                val finalOutput = if (killed) runCatching { outputFile.readText(Charsets.UTF_8).trim() }.getOrDefault(output) else output
+                throwWindowsRawPrintFailure(
+                    output = finalOutput,
+                    fallbackMessage = buildString {
+                        append("Windows RAW print timed out")
+                        if (finalOutput.isNotBlank()) append(": ").append(finalOutput.take(1_000))
+                    }
+                )
+            }
+            if (process.exitValue() != 0) {
+                throwWindowsRawPrintFailure(
+                    output = output,
+                    fallbackMessage = "Windows RAW print failed with exit code ${process.exitValue()}"
+                )
+            }
+            if (output.isNotBlank()) println("AITA receipt printer Windows RAW: ${output.take(1_000)}")
+        } finally {
+            runCatching { dataFile.delete() }
+            runCatching { scriptFile.delete() }
+            runCatching { outputFile.delete() }
+        }
+    }
+
+    private fun writeToPrintService(serviceName: String, printerBytes: ByteArray): Boolean {
+        val service = systemPrintServices()
+            .firstOrNull { it.name.equals(serviceName, ignoreCase = true) }
+            ?: error("Printer '$serviceName' is not installed")
+
+        val healthNotes = printServiceHealthNotes(service)
+        if (!printServiceCanAcceptImmediateJobs(healthNotes)) {
+            error("Printer '${service.name}' is not ready: ${healthNotes.joinToString(", ")}. Check the system printer queue, resume it if paused, then refresh printers in AITA.")
+        }
+
+        if (isWindows()) {
+            val rawResult = runCatching {
+                printWithWindowsRawSpooler(service.name, printerBytes)
+                true
+            }.onFailure { throwable ->
+                if (throwable.isWindowsPrinterNotReadyFailure()) throw throwable
+                System.err.println("AITA receipt printer Windows RAW spooler failed, trying Java PrintService: ${throwable.message}")
+            }
+            if (rawResult.getOrDefault(false)) return true
+        }
+
+        printWithJavaPrintService(service, printerBytes)
+        return true
+    }
+
+    private fun writeToSerialPort(portName: String, printerBytes: ByteArray): Boolean {
+        val cleanPortName = cleanSerialPortName(portName)
+        val port = SerialPort.getCommPorts()
+            .orEmpty()
+            .firstOrNull { candidate -> candidate.systemPortName.equals(cleanPortName, ignoreCase = true) }
+            ?: SerialPort.getCommPort(cleanPortName)
+        port.setComPortParameters(serialBaudRate(), 8, SerialPort.ONE_STOP_BIT, SerialPort.NO_PARITY)
+        port.setComPortTimeouts(SerialPort.TIMEOUT_WRITE_BLOCKING, 2_000, 5_000)
+        if (!port.openPort(5_000)) error("Could not open serial printer port $cleanPortName")
+        return try {
+            port.outputStream.use { output ->
+                output.write(printerBytes)
+                output.flush()
+            }
+            true
+        } finally {
+            runCatching { port.closePort() }
+        }
+    }
+
+    private fun writeToTcpPrinter(target: Pair<String, Int>, printerBytes: ByteArray): Boolean {
+        Socket().use { socket ->
+            socket.tcpNoDelay = true
+            socket.connect(InetSocketAddress(target.first, target.second), 5_000)
+            socket.getOutputStream().use { output ->
+                output.write(printerBytes)
+                output.flush()
+            }
+        }
+        return true
+    }
+
+    private fun writeToDeviceFile(target: String, printerBytes: ByteArray): Boolean {
+        val file = File(normalizedDevicePath(target))
+        file.outputStream().use { output ->
+            output.write(printerBytes)
+            output.flush()
+        }
+        return true
     }
 
     suspend fun writeEscPosBytesToConfiguredPrinter(printerBytes: ByteArray): Boolean {
@@ -264,187 +932,23 @@ object ReceiptPlatformJvmBridge {
             return customWriter(printerBytes)
         }
 
-        val target = escPosDevicePath?.trim()?.takeIf { it.isNotBlank() } ?: return false
+        val target = configuredTarget().takeIf { it.isNotBlank() } ?: return false
 
         return withContext(Dispatchers.IO) {
-            if (target.startsWith(PRINT_SERVICE_PREFIX)) {
-                val serviceName = target.removePrefix(PRINT_SERVICE_PREFIX)
-                val service = PrintServiceLookup.lookupPrintServices(null, null)
-                    .orEmpty()
-                    .firstOrNull { it.name == serviceName }
-                    ?: return@withContext false
-                val job = service.createPrintJob()
-                job.print(SimpleDoc(printerBytes, DocFlavor.BYTE_ARRAY.AUTOSENSE, null), null)
-                true
-            } else {
-                val file = File(normalizedDevicePath(target))
-                file.outputStream().use { output ->
-                    output.write(printerBytes)
-                    output.flush()
-                }
-                true
+            val printServiceName = printServiceNameFromTarget(target)
+            val serialPortName = serialPortNameFromTarget(target)
+            val tcpTarget = tcpTargetFrom(target)
+            when {
+                printServiceName != null -> writeToPrintService(printServiceName, printerBytes)
+                serialPortName != null -> writeToSerialPort(serialPortName, printerBytes)
+                tcpTarget != null -> writeToTcpPrinter(tcpTarget, printerBytes)
+                else -> writeToDeviceFile(target, printerBytes)
             }
         }
     }
 }
 
-fun installReceiptPlatformJvm() {
-    ReceiptPlatformJvmBridge.loadPersistedEscPosDevicePath()
-    fun writePdfToDownloads(fileName: String, pdfBytes: ByteArray): File {
-        val downloads = File(System.getProperty("user.home"), "Downloads").takeIf { it.exists() && it.isDirectory }
-            ?: File(System.getProperty("user.home"))
-        val file = File(downloads, fileName.ifBlank { "receipt.pdf" })
-        file.writeBytes(pdfBytes)
-        return file
-    }
 
-    fun writePdfToTemp(fileName: String, pdfBytes: ByteArray): File {
-        val safeName = fileName.ifBlank { "receipt.pdf" }
-        val file = File(System.getProperty("java.io.tmpdir"), safeName)
-        file.writeBytes(pdfBytes)
-        return file
-    }
-
-    fun writeHtmlToTemp(fileName: String, html: String): File {
-        val safeName = fileName.ifBlank { "aita-document.html" }.let { name ->
-            if (name.endsWith(".html", ignoreCase = true) || name.endsWith(".htm", ignoreCase = true)) name else "$name.html"
-        }
-        val file = File(System.getProperty("java.io.tmpdir"), safeName)
-        file.writeText(html, Charsets.UTF_8)
-        return file
-    }
-
-    fun desktop(): Desktop? = if (Desktop.isDesktopSupported()) Desktop.getDesktop() else null
-
-    saveReceiptPdfFile = { fileName, pdfBytes ->
-        withContext(Dispatchers.IO) {
-            runCatching {
-                val file = writePdfToDownloads(fileName, pdfBytes)
-                ReceiptPlatformActionResult(true, "Saved to ${file.absolutePath}")
-            }.getOrElse {
-                ReceiptPlatformActionResult(false, it.message ?: "Could not save PDF")
-            }
-        }
-    }
-
-    shareReceiptPdfFile = { fileName, pdfBytes, whatsappOnly ->
-        withContext(Dispatchers.IO) {
-            runCatching {
-                val file = writePdfToTemp(fileName, pdfBytes)
-                val desktop = desktop()
-                val shareLabel = if (fileName.contains("report", true) || fileName.contains("analytics", true)) "AITA analytics report" else "AITA receipt"
-                if (whatsappOnly) {
-                    val text = URLEncoder.encode("$shareLabel: ${file.absolutePath}", "UTF-8")
-                    if (desktop != null && desktop.isSupported(Desktop.Action.BROWSE)) {
-                        desktop.browse(URI("https://web.whatsapp.com/send?text=$text"))
-                    }
-                    if (desktop != null && desktop.isSupported(Desktop.Action.OPEN)) {
-                        desktop.open(file)
-                    }
-                    ReceiptPlatformActionResult(true, "Opened WhatsApp Web and PDF")
-                } else {
-                    if (desktop != null && desktop.isSupported(Desktop.Action.OPEN)) {
-                        desktop.open(file)
-                        ReceiptPlatformActionResult(true, "Opened PDF")
-                    } else {
-                        ReceiptPlatformActionResult(true, "PDF created at ${file.absolutePath}")
-                    }
-                }
-            }.getOrElse {
-                ReceiptPlatformActionResult(false, it.message ?: "Could not share PDF")
-            }
-        }
-    }
-
-
-
-    printPdfDocumentPlatformAction = { fileName, pdfBytes ->
-        withContext(Dispatchers.IO) {
-            runCatching {
-                val file = writePdfToTemp(fileName.ifBlank { "aita-document.pdf" }, pdfBytes)
-                val desktop = desktop()
-                when {
-                    desktop != null && desktop.isSupported(Desktop.Action.PRINT) -> {
-                        desktop.print(file)
-                        ReceiptPlatformActionResult(true, "Opening system print dialog")
-                    }
-                    desktop != null && desktop.isSupported(Desktop.Action.OPEN) -> {
-                        desktop.open(file)
-                        ReceiptPlatformActionResult(true, "Opened PDF; print from the viewer")
-                    }
-                    else -> ReceiptPlatformActionResult(true, "PDF created at ${file.absolutePath}")
-                }
-            }.getOrElse { throwable ->
-                ReceiptPlatformActionResult(false, throwable.message ?: "Could not print PDF document")
-            }
-        }
-    }
-
-    printHtmlDocumentPlatformAction = { fileName, html ->
-        withContext(Dispatchers.IO) {
-            runCatching {
-                val file = writeHtmlToTemp(fileName.ifBlank { "aita-document.html" }, html)
-                val desktop = desktop()
-                when {
-                    desktop != null && desktop.isSupported(Desktop.Action.BROWSE) -> {
-                        desktop.browse(file.toURI())
-                        ReceiptPlatformActionResult(true, "Opened label for printing")
-                    }
-                    desktop != null && desktop.isSupported(Desktop.Action.OPEN) -> {
-                        desktop.open(file)
-                        ReceiptPlatformActionResult(true, "Opened label; print from the viewer")
-                    }
-                    else -> ReceiptPlatformActionResult(true, "HTML label created at ${file.absolutePath}")
-                }
-            }.getOrElse { throwable ->
-                ReceiptPlatformActionResult(false, throwable.message ?: "Could not print HTML document")
-            }
-        }
-    }
-
-    listPlatformReceiptPrinterDevicesAction = {
-        withContext(Dispatchers.IO) {
-            ReceiptPlatformJvmBridge.listConfiguredAndDetectedPrinters()
-        }
-    }
-
-    configurePlatformReceiptPrinterDeviceAction = { deviceId ->
-        ReceiptPlatformJvmBridge.configureEscPosDevicePath(deviceId)
-        ReceiptPlatformActionResult(
-            true,
-            if (deviceId.isNullOrBlank()) "Receipt printer cleared" else "Receipt printer selected"
-        )
-    }
-
-
-    printReceiptPlatformAction = { _, _, printerBytes ->
-        withContext(Dispatchers.IO) {
-            runCatching {
-                if (ReceiptPlatformJvmBridge.writeEscPosBytesToConfiguredPrinter(printerBytes)) {
-                    ReceiptPlatformActionResult(true, "Receipt sent to printer")
-                } else {
-                    ReceiptPlatformActionResult(false, "Desktop ESC/POS receipt printer is not configured")
-                }
-            }.getOrElse {
-                ReceiptPlatformActionResult(false, it.message ?: "Could not print receipt")
-            }
-        }
-    }
-
-    printReceiptEscPosBytes = { printerBytes ->
-        withContext(Dispatchers.IO) {
-            runCatching {
-                if (ReceiptPlatformJvmBridge.writeEscPosBytesToConfiguredPrinter(printerBytes)) {
-                    ReceiptPlatformActionResult(true, "Receipt sent to printer")
-                } else {
-                    ReceiptPlatformActionResult(false, "Desktop ESC/POS receipt printer is not configured")
-                }
-            }.getOrElse {
-                ReceiptPlatformActionResult(false, it.message ?: "Could not print receipt")
-            }
-        }
-    }
-}
 actual object LocalAitaLanTransport {
     private val running = java.util.concurrent.atomic.AtomicBoolean(false)
     private var tcpServer: java.net.ServerSocket? = null

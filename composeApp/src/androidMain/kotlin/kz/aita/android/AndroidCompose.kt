@@ -913,7 +913,7 @@ fun installReceiptPlatformAndroid(context: Context) {
 
     fun likelyReceiptPrinterName(name: String): Boolean {
         val clean = name.lowercase()
-        return listOf("pos", "esc", "receipt", "printer", "thermal", "xprinter", "gprinter", "rongta", "sunmi", "mtp", "rp", "xp-")
+        return listOf("aokia", "ak-3558", "ak3558", "xp-58", "xp58", "pos", "esc", "receipt", "printer", "thermal", "xprinter", "gprinter", "rongta", "sunmi", "mtp", "rp", "xp-")
             .any { clean.contains(it) }
     }
 

@@ -177,7 +177,7 @@ compose.desktop {
         nativeDistributions {
             // Only the formats you need:
             targetFormats(TargetFormat.Msi, TargetFormat.Exe, TargetFormat.Deb, TargetFormat.Dmg)
-            modules("java.sql", "java.logging", "java.xml", "jdk.crypto.ec")
+            modules("java.sql", "java.logging", "java.xml", "java.desktop", "java.datatransfer", "jdk.crypto.ec", "jdk.charsets")
             // MSI requires a 3-part numeric version:
             packageVersion = "1.0.0"
 
