@@ -5592,12 +5592,18 @@ const val CLOUD_TRANSPORT_STATUS_UNAVAILABLE = -1
 @PublishedApi
 internal const val REALTIME_ACCESS_TOKEN_REFRESH_SKEW_MILLIS = 60_000L
 
-private const val DEFAULT_AITA_SERVER_URL = "http://192.168.1.170:8080"
+private const val DEFAULT_AITA_SERVER_URL = "http://192.168.0.24:8080"
 private val DEFAULT_AITA_SERVER_URL_PAIR = Pair(DEFAULT_AITA_SERVER_URL, "1")
 @Volatile
 private var runtimeClientServerUrlOverride: String? = null
 @Volatile
 private var currentNetworkRequestCandidateServerUrlsMemory: List<String> = emptyList()
+
+// Keep the production/development server address visible again while the app is still moving fast:
+// CommonMain.kt provides the bootstrap URL, and server/config/app/global.json provides the server-published URL.
+// Cached, remembered, and environment-derived addresses are intentionally not used for default URL selection here.
+@Volatile
+private var clientVisibleServerUrlFilesOnly: Boolean = true
 
 val GlobalScope = CoroutineScope(SupervisorJob())
 
@@ -8544,18 +8550,22 @@ internal suspend fun ensureCachedGlobalConfigurationPrimedForNetwork() {
 
         getJsonCache<GlobalAppConfigurationDataModel>(CACHE_GLOBAL_CONFIG)?.let { cachedConfiguration ->
             val currentConfiguration = globalAppConfigurationState.payloadValue
-            // Keep the configured server address stable. Cached/server configuration may be old
-            // after Wi-Fi/hotspot changes, so it must not silently replace the address that the
-            // client is currently using.
-            val runtimeOverrideNormalized = normalizedHttpServerUrlOrNull(runtimeClientServerUrlOverride)
+            // Cached global configuration is still useful for paths/resource IDs, but not for the
+            // server URL while clientVisibleServerUrlFilesOnly is enabled. This prevents an old
+            // local SQLite cache from silently winning over CommonMain.kt/global.json.
             val cachedConfigurationForThisInstall = cachedConfiguration.copy(
-                serverUrl = if (runtimeOverrideNormalized != null) {
-                    Pair(runtimeOverrideNormalized, currentConfiguration.serverUrl.second)
+                serverUrl = if (clientVisibleServerUrlFilesOnly) {
+                    currentConfiguration.serverUrl
                 } else {
-                    chooseClientServerUrlPair(
-                        current = currentConfiguration.serverUrl,
-                        incoming = cachedConfiguration.serverUrl
-                    )
+                    val runtimeOverrideNormalized = normalizedHttpServerUrlOrNull(runtimeClientServerUrlOverride)
+                    if (runtimeOverrideNormalized != null) {
+                        Pair(runtimeOverrideNormalized, currentConfiguration.serverUrl.second)
+                    } else {
+                        chooseClientServerUrlPair(
+                            current = currentConfiguration.serverUrl,
+                            incoming = cachedConfiguration.serverUrl
+                        )
+                    }
                 }
             )
             globalAppConfigurationState.emit(DataState.Success(cachedConfigurationForThisInstall, cacheMessage()))
@@ -8722,6 +8732,10 @@ fun setRuntimeClientServerUrlOverride(raw: String?) {
     logNetworkAttempt("runtime server URL override = $normalized")
 }
 
+fun setHiddenClientServerUrlResolutionEnabled(enabled: Boolean) {
+    clientVisibleServerUrlFilesOnly = !enabled
+}
+
 fun currentRuntimeClientServerUrlOverride(): String? = runtimeClientServerUrlOverride
 
 fun setClientServerUrlFromUserInput(raw: String, refreshNow: Boolean = true): Boolean {
@@ -8788,23 +8802,31 @@ internal suspend fun resolvedServerUrlCandidates(explicitServerUrl: String? = nu
     ensureCachedGlobalConfigurationPrimedForNetwork()
 
     val explicitNormalized = normalizedHttpServerUrlOrNull(explicitServerUrl)
-    val runtimeOverrideNormalized = normalizedHttpServerUrlOrNull(runtimeClientServerUrlOverride)
     val currentConfiguredNormalized = normalizedHttpServerUrlOrNull(globalAppConfigurationState.payloadValue.serverUrl.first)
-    val cachedConfiguredNormalized = runCatching {
-        getJsonCache<GlobalAppConfigurationDataModel>(CACHE_GLOBAL_CONFIG)?.serverUrl?.first
-    }.getOrNull()?.let { normalizedHttpServerUrlOrNull(it) }
     val defaultNormalized = normalizedHttpServerUrlOrNull(DEFAULT_AITA_SERVER_URL)
-    val cachedNonDefault = cachedConfiguredNormalized?.takeIf { it != defaultNormalized }
-    val currentCandidate = currentConfiguredNormalized?.takeUnless { it == defaultNormalized && cachedNonDefault != null }
 
-    val selected = explicitNormalized
-        ?: runtimeOverrideNormalized
-        ?: currentCandidate
-        ?: cachedNonDefault
-        ?: currentConfiguredNormalized
-        ?: cachedConfiguredNormalized
-        ?: defaultNormalized
-        ?: DEFAULT_AITA_SERVER_URL
+    val selected = if (clientVisibleServerUrlFilesOnly) {
+        explicitNormalized
+            ?: currentConfiguredNormalized
+            ?: defaultNormalized
+            ?: DEFAULT_AITA_SERVER_URL
+    } else {
+        val runtimeOverrideNormalized = normalizedHttpServerUrlOrNull(runtimeClientServerUrlOverride)
+        val cachedConfiguredNormalized = runCatching {
+            getJsonCache<GlobalAppConfigurationDataModel>(CACHE_GLOBAL_CONFIG)?.serverUrl?.first
+        }.getOrNull()?.let { normalizedHttpServerUrlOrNull(it) }
+        val cachedNonDefault = cachedConfiguredNormalized?.takeIf { it != defaultNormalized }
+        val currentCandidate = currentConfiguredNormalized?.takeUnless { it == defaultNormalized && cachedNonDefault != null }
+
+        explicitNormalized
+            ?: runtimeOverrideNormalized
+            ?: currentCandidate
+            ?: cachedNonDefault
+            ?: currentConfiguredNormalized
+            ?: cachedConfiguredNormalized
+            ?: defaultNormalized
+            ?: DEFAULT_AITA_SERVER_URL
+    }
 
     val normalizedCandidates = listOf(selected).distinct()
     currentNetworkRequestCandidateServerUrlsMemory = normalizedCandidates
@@ -8816,6 +8838,10 @@ internal suspend fun resolvedServerUrlCandidates(explicitServerUrl: String? = nu
 internal suspend fun rememberReachableServerUrl(serverUrl: String) {
     val normalized = normalizedHttpServerUrlOrNull(serverUrl) ?: return
     currentNetworkRequestCandidateServerUrlsMemory = listOf(normalized)
+
+    if (clientVisibleServerUrlFilesOnly) {
+        return
+    }
 
     val currentConfiguration = globalAppConfigurationState.payloadValue
     val currentNormalized = normalizedHttpServerUrlOrNull(currentConfiguration.serverUrl.first)
@@ -10834,7 +10860,11 @@ private suspend fun loadCachedStoreScopedData(storeId: String) {
 private suspend fun loadCachedApplicationData() {
     getJsonCache<GlobalAppConfigurationDataModel>(CACHE_GLOBAL_CONFIG)?.let {
         val currentConfiguration = globalAppConfigurationState.payloadValue
-        val anchoredServerUrl = chooseClientServerUrlPair(currentConfiguration.serverUrl, it.serverUrl)
+        val anchoredServerUrl = if (clientVisibleServerUrlFilesOnly) {
+            currentConfiguration.serverUrl
+        } else {
+            chooseClientServerUrlPair(currentConfiguration.serverUrl, it.serverUrl)
+        }
         globalAppConfigurationState.emit(
             DataState.Success(
                 it.copy(serverUrl = anchoredServerUrl),
@@ -10909,20 +10939,24 @@ private fun startAppCacheCollectors() {
 
     GlobalScope.launch(Dispatchers.ourIo) {
         globalAppConfigurationState.payload.collect { nextConfiguration ->
-            val existingCached = getJsonCache<GlobalAppConfigurationDataModel>(CACHE_GLOBAL_CONFIG)
-            val runtimeOverrideNormalized = normalizedHttpServerUrlOrNull(runtimeClientServerUrlOverride)
-            val nextNormalized = normalizedHttpServerUrlOrNull(nextConfiguration.serverUrl.first)
-            val defaultNormalized = normalizedHttpServerUrlOrNull(DEFAULT_AITA_SERVER_URL)
-            val existingNonDefault = existingCached?.serverUrl?.takeIf { cachedPair ->
-                val cachedNormalized = normalizedHttpServerUrlOrNull(cachedPair.first)
-                cachedNormalized != null && cachedNormalized != defaultNormalized
+            if (clientVisibleServerUrlFilesOnly) {
+                putJsonCache(CACHE_GLOBAL_CONFIG, nextConfiguration)
+            } else {
+                val existingCached = getJsonCache<GlobalAppConfigurationDataModel>(CACHE_GLOBAL_CONFIG)
+                val runtimeOverrideNormalized = normalizedHttpServerUrlOrNull(runtimeClientServerUrlOverride)
+                val nextNormalized = normalizedHttpServerUrlOrNull(nextConfiguration.serverUrl.first)
+                val defaultNormalized = normalizedHttpServerUrlOrNull(DEFAULT_AITA_SERVER_URL)
+                val existingNonDefault = existingCached?.serverUrl?.takeIf { cachedPair ->
+                    val cachedNormalized = normalizedHttpServerUrlOrNull(cachedPair.first)
+                    cachedNormalized != null && cachedNormalized != defaultNormalized
+                }
+                val serverUrlForCache = when {
+                    runtimeOverrideNormalized != null -> Pair(runtimeOverrideNormalized, nextConfiguration.serverUrl.second)
+                    existingNonDefault != null && (nextNormalized == null || nextNormalized == defaultNormalized) -> existingNonDefault
+                    else -> nextConfiguration.serverUrl
+                }
+                putJsonCache(CACHE_GLOBAL_CONFIG, nextConfiguration.copy(serverUrl = serverUrlForCache))
             }
-            val serverUrlForCache = when {
-                runtimeOverrideNormalized != null -> Pair(runtimeOverrideNormalized, nextConfiguration.serverUrl.second)
-                existingNonDefault != null && (nextNormalized == null || nextNormalized == defaultNormalized) -> existingNonDefault
-                else -> nextConfiguration.serverUrl
-            }
-            putJsonCache(CACHE_GLOBAL_CONFIG, nextConfiguration.copy(serverUrl = serverUrlForCache))
         }
     }
     GlobalScope.launch(Dispatchers.ourIo) { stringsState.payload.collect { it?.let { putJsonCache(CACHE_STRINGS, it) } } }

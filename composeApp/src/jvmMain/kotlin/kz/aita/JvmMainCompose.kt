@@ -132,9 +132,18 @@ private fun installDesktopDiagnosticLogging() {
 }
 
 private fun configureClientServerUrlOverrideFromEnvironment() {
+    val envOverrideEnabled = desktopEnvOrSystem("AITA_ENABLE_CLIENT_SERVER_URL_ENV_OVERRIDE")
+        ?.toJvmBooleanLenientOrNull()
+        ?: false
+    if (!envOverrideEnabled) {
+        println("AITA desktop server URL env override disabled; using CommonMain.kt bootstrap and /config/global global.json.")
+        return
+    }
+
     val override = desktopEnvOrSystem("AITA_CLIENT_SERVER_URL")
         ?: desktopEnvOrSystem("AITA_SERVER_URL")
         ?: return
+    setHiddenClientServerUrlResolutionEnabled(true)
     setRuntimeClientServerUrlOverride(override)
 }
 

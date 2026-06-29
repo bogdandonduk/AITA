@@ -471,6 +471,13 @@ private fun Application.publicServerUrl(): String? =
     environment.config.optionalString("app.publicServerUrl")
   ).firstNotNullOfOrNull(::normalizePublicServerUrlCandidate)
 
+private fun Application.dynamicGlobalConfigurationServerUrlRewriteEnabled(): Boolean =
+  configBoolean(
+    path = "app.dynamicGlobalConfigServerUrlRewrite",
+    envName = "AITA_DYNAMIC_GLOBAL_CONFIG_SERVER_URL_REWRITE",
+    default = false
+  )
+
 private fun String.firstForwardedHeaderValue(): String? =
   split(',')
     .firstOrNull()
@@ -535,6 +542,10 @@ private fun Application.buildGlobalConfigurationJson(publicUrlOverride: String? 
     "config/app/global.json",
     "app/global.json"
   )
+  if (!dynamicGlobalConfigurationServerUrlRewriteEnabled()) {
+    return raw
+  }
+
   val publicUrl = normalizePublicServerUrlCandidate(publicUrlOverride)
     ?: publicServerUrl()
     ?: return raw
