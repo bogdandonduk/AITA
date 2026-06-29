@@ -216,56 +216,8 @@ private fun deleteJvmSecret(account: String) {
     }
 }
 
-object ReceiptPlatformJvmBridge {
-    /**
-     * Optional desktop ESC/POS writer. Configure it for USB serial, COM port, network printer, or tests.
-     */
-    var writeEscPosBytes: (suspend (ByteArray) -> Boolean)? = null
-
-    /**
-     * Simple cable/device-path writer for the first real-device pass.
-     * Linux: /dev/usb/lp0, /dev/ttyUSB0
-     * macOS: /dev/cu.usbserial-XXXX
-     * Windows: COM3 or \.\COM3
-     * You can also set AITA_RECEIPT_PRINTER_DEVICE before launching the desktop app.
-     */
-    var escPosDevicePath: String? = System.getenv("AITA_RECEIPT_PRINTER_DEVICE")
-        ?.trim()
-        ?.takeIf { it.isNotBlank() }
-
-    fun configureEscPosDevicePath(path: String?) {
-        escPosDevicePath = path
-            ?.trim()
-            ?.takeIf { it.isNotBlank() }
-    }
-
-    private fun normalizedDevicePath(rawPath: String): String {
-        val clean = rawPath.trim()
-        val osName = System.getProperty("os.name").orEmpty().lowercase(Locale.ROOT)
-        return if (osName.contains("win") && clean.matches(Regex("(?i)^COM\\d+$"))) {
-            "\\\\.\\$clean"
-        } else {
-            clean
-        }
-    }
-
-    suspend fun writeEscPosBytesToConfiguredPrinter(printerBytes: ByteArray): Boolean {
-        writeEscPosBytes?.let { customWriter ->
-            return customWriter(printerBytes)
-        }
-
-        val path = escPosDevicePath?.trim()?.takeIf { it.isNotBlank() } ?: return false
-
-        return withContext(Dispatchers.IO) {
-            val file = File(normalizedDevicePath(path))
-            file.outputStream().use { output ->
-                output.write(printerBytes)
-                output.flush()
-            }
-            true
-        }
-    }
-}
+// ReceiptPlatformJvmBridge is provided by the shared JVM source set. Keeping one JVM class for
+// receipt printers avoids duplicate kz.aita.ReceiptPlatformJvmBridge classes on the desktop classpath.
 
 
 object LabelPrinterPlatformJvmBridge {
@@ -519,7 +471,8 @@ fun installDesktopVoiceInputJvm() {
     }
 }
 
-fun installReceiptPlatformJvm() {
+private fun installDesktopPlatformActionsJvm() {
+    ReceiptPlatformJvmBridge.loadPersistedEscPosDevicePath()
     configuredLabelPrinterProtocolState.value = LabelPrinterPlatformJvmBridge.labelPrinterProtocol
 
     fun writePdfToDownloads(fileName: String, pdfBytes: ByteArray): File {
@@ -587,6 +540,28 @@ fun installReceiptPlatformJvm() {
         }
     }
 
+    printPdfDocumentPlatformAction = { fileName, pdfBytes ->
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val file = writePdfToTemp(fileName.ifBlank { "aita-document.pdf" }, pdfBytes)
+                val desktop = desktop()
+                when {
+                    desktop != null && desktop.isSupported(Desktop.Action.PRINT) -> {
+                        desktop.print(file)
+                        ReceiptPlatformActionResult(true, "Opening system print dialog")
+                    }
+                    desktop != null && desktop.isSupported(Desktop.Action.OPEN) -> {
+                        desktop.open(file)
+                        ReceiptPlatformActionResult(true, "Opened PDF; print from the viewer")
+                    }
+                    else -> ReceiptPlatformActionResult(true, "PDF created at ${file.absolutePath}")
+                }
+            }.getOrElse { throwable ->
+                ReceiptPlatformActionResult(false, throwable.message ?: "Could not print PDF document")
+            }
+        }
+    }
+
     printHtmlDocumentPlatformAction = { fileName, html ->
         withContext(Dispatchers.IO) {
             runCatching {
@@ -608,6 +583,21 @@ fun installReceiptPlatformJvm() {
             }
         }
     }
+
+    listPlatformReceiptPrinterDevicesAction = {
+        withContext(Dispatchers.IO) {
+            ReceiptPlatformJvmBridge.listConfiguredAndDetectedPrinters()
+        }
+    }
+
+    configurePlatformReceiptPrinterDeviceAction = { deviceId ->
+        ReceiptPlatformJvmBridge.configureEscPosDevicePath(deviceId)
+        ReceiptPlatformActionResult(
+            true,
+            if (deviceId.isNullOrBlank()) "Receipt printer cleared" else "Receipt printer selected"
+        )
+    }
+
 
     printReceiptPlatformAction = { _, _, printerBytes ->
         withContext(Dispatchers.IO) {
@@ -757,7 +747,7 @@ fun main() {
     installDesktopDiagnosticLogging()
     configureClientServerUrlOverrideFromEnvironment()
 
-    installReceiptPlatformJvm()
+    installDesktopPlatformActionsJvm()
     installDesktopVoiceInputJvm()
 
     val cacheFile = File(cacheDirPath, "ua.bin")
