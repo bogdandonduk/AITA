@@ -1241,6 +1241,13 @@ private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallb
     put(1799L, mapOf("main" to "No answered shortage pressure yet", "en" to "No answered shortage pressure yet", "ru" to "Пока нет недопоставок по отвеченным заказам", "kk" to "Жауап берілген тапсырыстарда жетіспеу қысымы әзірге жоқ"))
     put(1800L, mapOf("main" to "Open shortage orders", "en" to "Open shortage orders", "ru" to "Открыть заказы с недопоставкой", "kk" to "Жетіспейтін тапсырыстарды ашу"))
     put(1801L, mapOf("main" to "Store negotiation", "en" to "Store negotiation", "ru" to "Согласование с магазином", "kk" to "Дүкенмен келісу"))
+    put(1802L, mapOf("main" to "Recovery plan", "en" to "Recovery plan", "ru" to "План восстановления", "kk" to "Қалпына келтіру жоспары"))
+    put(1803L, mapOf("main" to "Split delivery", "en" to "Split delivery", "ru" to "Разделить поставку", "kk" to "Жеткізуді бөлу"))
+    put(1804L, mapOf("main" to "Source more stock", "en" to "Source more stock", "ru" to "Найти ещё товар", "kk" to "Қосымша қор табу"))
+    put(1805L, mapOf("main" to "Source or cancel", "en" to "Source or cancel", "ru" to "Найти или отменить", "kk" to "Табу немесе бас тарту"))
+    put(1806L, mapOf("main" to "Partial lines", "en" to "Partial lines", "ru" to "Частичные строки", "kk" to "Ішінара жолдар"))
+    put(1807L, mapOf("main" to "Fully short lines", "en" to "Fully short lines", "ru" to "Полностью недостающие строки", "kk" to "Толық жетіспейтін жолдар"))
+    put(1808L, mapOf("main" to "Store names are omitted from this copied shortage brief.", "en" to "Store names are omitted from this copied shortage brief.", "ru" to "Названия магазинов не попадают в скопированную сводку недопоставки.", "kk" to "Көшірілген жетіспеу мәліметінен дүкен атаулары алынып тасталады."))
 }
 
 
@@ -26700,6 +26707,13 @@ private fun AppConfiguration.supplierBackorderActionTitle(action: String): Strin
     else -> localizedStringResource(1720, "Watch backorder")
 }
 
+private fun AppConfiguration.supplierBackorderRecoveryLaneTitle(lane: String): String = when (lane) {
+    "split_delivery" -> localizedStringResource(1803, "Split delivery")
+    "split_source" -> localizedStringResource(1804, "Source more stock")
+    "source_or_cancel" -> localizedStringResource(1805, "Source or cancel")
+    else -> localizedStringResource(1720, "Watch backorder")
+}
+
 private fun AppConfiguration.supplierBackorderSearchKey(item: SupplierDashboardBackorderDataModel): String = buildString {
     append(item.backorderId).append(' ')
     append(item.goodsItemId).append(' ')
@@ -26710,8 +26724,12 @@ private fun AppConfiguration.supplierBackorderSearchKey(item: SupplierDashboardB
     append(item.storePreview.visibleLocalizedString("main", "")).append(' ')
     append(item.attentionSummary.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
     append(item.attentionSummary.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryHint.visibleLocalizedString("main", "")).append(' ')
     append(item.suggestedAction).append(' ')
+    append(item.recoveryLane).append(' ')
     append(supplierBackorderActionTitle(item.suggestedAction)).append(' ')
+    append(supplierBackorderRecoveryLaneTitle(item.recoveryLane)).append(' ')
     append(item.requestedQuantityTotal).append(' ')
     append(item.acceptedQuantityTotal).append(' ')
     append(item.missingQuantityTotal)
@@ -26727,7 +26745,14 @@ private fun AppConfiguration.supplierBackorderBrief(item: SupplierDashboardBacko
     append(localizedStringResource(1797, "Affected orders")).append(": ").append(item.affectedOrderCount).append('\n')
     append(localizedStringResource(1422, "Stores asking")).append(": ").append(item.affectedStoreCount).append('\n')
     append(localizedStringResource(1773, "Declined lines")).append(": ").append(item.declinedLineCount).append('\n')
-    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1788, "Store names are omitted from this copied factory brief.")).append('\n')
+    append(localizedStringResource(1806, "Partial lines")).append(": ").append(item.partialLineCount).append('\n')
+    append(localizedStringResource(1807, "Fully short lines")).append(": ").append(item.fullyShortLineCount).append('\n')
+    append(localizedStringResource(1802, "Recovery plan")).append(": ").append(supplierBackorderRecoveryLaneTitle(item.recoveryLane)).append('\n')
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief.")).append('\n')
+    item.recoveryHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1802, "Recovery plan")).append(": ").append(hint).append('\n') }
     item.attentionSummary.visibleLocalizedString(stateValues.appLanguage, "")
         .ifBlank { item.attentionSummary.visibleLocalizedString("main", "") }
         .takeIf { it.isNotBlank() }
@@ -26751,6 +26776,8 @@ private fun AppConfiguration.SupplierBackorderWatchCard(item: SupplierDashboardB
         .ifBlank { item.storePreview.visibleLocalizedString("main", "") }
     val attentionText = item.attentionSummary.visibleLocalizedString(stateValues.appLanguage, "")
         .ifBlank { item.attentionSummary.visibleLocalizedString("main", "") }
+    val recoveryHintText = item.recoveryHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryHint.visibleLocalizedString("main", "") }
 
     Column(
         modifier = Modifier
@@ -26830,6 +26857,9 @@ private fun AppConfiguration.SupplierBackorderWatchCard(item: SupplierDashboardB
         StockCardInfoLine(localizedStringResource(1797, "Affected orders"), item.affectedOrderCount.toString(), stateValues.TextColor)
         StockCardInfoLine(localizedStringResource(1422, "Stores asking"), item.affectedStoreCount.toString(), stateValues.TextColor)
         StockCardInfoLine(localizedStringResource(1773, "Declined lines"), item.declinedLineCount.toString(), stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1806, "Partial lines"), item.partialLineCount.toString(), stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1807, "Fully short lines"), item.fullyShortLineCount.toString(), stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1802, "Recovery plan"), supplierBackorderRecoveryLaneTitle(item.recoveryLane), stateValues.TextColor)
         storePreviewText.takeIf { it.isNotBlank() }?.let { preview ->
             StockCardInfoLine(localizedStringResource(1789, "Internal stores"), preview, stateValues.TextColor)
         }
@@ -26837,6 +26867,32 @@ private fun AppConfiguration.SupplierBackorderWatchCard(item: SupplierDashboardB
             StockCardInfoLine(localizedStringResource(1723, "Earliest due"), receiptUiDateTime(due), stateValues.TextColor)
         }
         StockCardInfoLine(localizedStringResource(1722, "Priority score"), item.priorityScore.toString(), stateValues.TextColor)
+
+        if (recoveryHintText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.08f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.30f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Text(
+                    text = localizedStringResource(1802, "Recovery plan"),
+                    color = stateValues.AccentColor,
+                    fontSize = stateValues.smallTextSize,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = recoveryHintText,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.smallTextSize,
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
 
         if (attentionText.isNotBlank()) {
             Column(

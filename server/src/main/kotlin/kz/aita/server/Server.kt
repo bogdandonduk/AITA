@@ -6709,7 +6709,9 @@ private fun SupplierOrderDataModel.cleanForStorage(userId: UUID, storeId: UUID, 
 private fun SupplierOrderLineDataModel.cleanForStorage(orderId: UUID): SupplierOrderLineDataModel = copy(
   orderId = orderId.toString(),
   requestedQuantity = requestedQuantity.copy(total = requestedQuantity.total.coerceAtLeast(0.0)),
-  supplierAcceptedQuantity = supplierAcceptedQuantity?.copy(total = supplierAcceptedQuantity.total.coerceAtLeast(0.0)),
+  supplierAcceptedQuantity = supplierAcceptedQuantity?.let { quantity ->
+    quantity.copy(total = quantity.total.coerceAtLeast(0.0))
+  },
   supplierOfferedSupplyPrice = supplierOfferedSupplyPrice
     ?.let { price ->
       price.price.toMoneyDouble()
@@ -8087,7 +8089,19 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
       val acceptedQuantityTotal = itemLines.sumOf { line -> (line.supplierDeskAcceptedQuantityTotal() ?: 0.0).coerceAtLeast(0.0) }.roundMoney()
       val missingQuantityTotal = (requestedQuantityTotal - acceptedQuantityTotal).coerceAtLeast(0.0).roundMoney()
       if (missingQuantityTotal <= 0.000001) return@backorderItem null
-      val declinedLineCount = itemLines.count { line -> (line.supplierDeskAcceptedQuantityTotal() ?: 0.0) <= 0.000001 }
+      val partialLineCount = itemLines.count { line ->
+        val requested = line.requestedQuantity.total.coerceAtLeast(0.0)
+        val accepted = (line.supplierDeskAcceptedQuantityTotal() ?: 0.0).coerceAtLeast(0.0)
+        accepted > 0.000001 && accepted < requested - 0.000001
+      }
+      val fullyShortLineCount = itemLines.count { line -> (line.supplierDeskAcceptedQuantityTotal() ?: 0.0) <= 0.000001 }
+      val declinedLineCount = fullyShortLineCount
+      val recoveryLane = when {
+        fullyShortLineCount > 0 && partialLineCount > 0 -> "split_source"
+        fullyShortLineCount > 0 -> "source_or_cancel"
+        partialLineCount > 0 -> "split_delivery"
+        else -> "watch"
+      }
       val earliestDueAtMillis = relatedOrders
         .mapNotNull { order -> order.confirmedDeliveryTimeMillis ?: order.desiredDeliveryTimeMillis }
         .minOrNull()
@@ -8123,6 +8137,28 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
         "$declinedLineCount отклонённ(ых) строк(и) нужно согласовать с магазином или верхним поставщиком",
         "$declinedLineCount қабылданбаған жол дүкенмен немесе жоғары жеткізушімен келісуді күтеді"
       )
+      val recoveryHint = when (recoveryLane) {
+        "split_delivery" -> supplierDashboardJoinedMessage(
+          listOf("Partial fulfillment: tell the store what ships now and plan the remaining quantity."),
+          listOf("Частичное выполнение: сообщите магазину, что едет сейчас, и спланируйте остаток."),
+          listOf("Ішінара орындау: дүкенге қазір не жіберілетінін айтып, қалған санды жоспарлаңыз.")
+        )
+        "split_source" -> supplierDashboardJoinedMessage(
+          listOf("Mixed shortage: ship accepted stock, then source or negotiate fully short lines."),
+          listOf("Смешанная недопоставка: отправьте принятое наличие, затем найдите или согласуйте полностью недостающие строки."),
+          listOf("Аралас жетіспеу: қабылданған қорды жіберіп, толық жетіспейтін жолдарды табыңыз немесе келісіңіз.")
+        )
+        "source_or_cancel" -> supplierDashboardJoinedMessage(
+          listOf("Full shortage: source more stock upstream or agree a cancellation/substitution with the store."),
+          listOf("Полная недопоставка: найдите товар выше по цепочке или согласуйте отмену/замену с магазином."),
+          listOf("Толық жетіспеу: жоғары арнадан тауар табыңыз немесе дүкенмен бас тарту/ауыстыруды келісіңіз.")
+        )
+        else -> supplierDashboardJoinedMessage(
+          listOf("Watch the gap until the supplier/store resolution is clear."),
+          listOf("Следите за разницей, пока решение поставщика/магазина не станет ясным."),
+          listOf("Жеткізуші/дүкен шешімі анық болғанша айырманы бақылаңыз.")
+        )
+      }
       val duePressure = earliestDueAtMillis?.let { due ->
         when {
           due < now -> 26
@@ -8131,9 +8167,10 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
           else -> 4
         }
       } ?: 2
-      val suggestedAction = when {
-        declinedLineCount >= itemLines.size -> "negotiate"
-        relatedOrders.any { order -> order.status == SupplierOrderStatusDataModel.Confirmed } -> "source"
+      val suggestedAction = when (recoveryLane) {
+        "source_or_cancel" -> "negotiate"
+        "split_source" -> "source"
+        "split_delivery" -> if (relatedOrders.any { order -> order.status == SupplierOrderStatusDataModel.Confirmed }) "source" else "watch"
         else -> "watch"
       }
       val priorityScore = (
@@ -8157,6 +8194,10 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
         missingQuantityTotal = missingQuantityTotal,
         missingLineCount = itemLines.size,
         declinedLineCount = declinedLineCount,
+        partialLineCount = partialLineCount,
+        fullyShortLineCount = fullyShortLineCount,
+        recoveryLane = recoveryLane,
+        recoveryHint = recoveryHint,
         affectedOrderCount = relatedOrders.size,
         affectedStoreCount = relatedOrders.map { it.storeId }.filter { it.isNotBlank() }.distinct().size,
         earliestDueAtMillis = earliestDueAtMillis,
