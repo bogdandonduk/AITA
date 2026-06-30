@@ -4910,6 +4910,7 @@ private val getSupplierOrdersMutex = Mutex()
 private val getSupplierModeDashboardMutex = Mutex()
 private val addSupplierOrderMutex = Mutex()
 private val updateSupplierOrderMutex = Mutex()
+private val updateSupplierOrdersStatusMutex = Mutex()
 private val deleteSupplierOrderMutex = Mutex()
 private val receiveSupplierOrderMutex = Mutex()
 private val getSupplierContractsMutex = Mutex()
@@ -5063,6 +5064,64 @@ data class SupplierOrderWithLinesDataModel(
 )
 
 @kotlinx.serialization.Serializable
+data class SupplierOrderStatusUpdateRequestDataModel(
+    val orderIds: List<String> = emptyList(),
+    val status: SupplierOrderStatusDataModel = SupplierOrderStatusDataModel.SeenBySupplier,
+    val comment: String? = null
+)
+
+fun PriceDataModel?.hasPositiveSupplierDeskPrice(): Boolean =
+    this?.price?.toMoneyDouble()?.let { amount -> amount > 0.0 } == true
+
+fun SupplierOrderLineDataModel.supplierDeskAcceptedQuantityTotal(): Double? =
+    supplierAcceptedQuantity?.total?.coerceAtLeast(0.0)
+
+fun SupplierOrderLineDataModel.supplierDeskPhysicalQuantityTotal(): Double =
+    (supplierAcceptedQuantity?.total ?: requestedQuantity.total).coerceAtLeast(0.0)
+
+fun SupplierOrderLineDataModel.hasPositiveSupplierDeskAcceptedQuantity(): Boolean =
+    (supplierDeskAcceptedQuantityTotal() ?: 0.0) > 0.0
+
+fun SupplierOrderLineDataModel.isMissingSupplierDeskAcceptedQuantity(): Boolean =
+    supplierAcceptedQuantity == null
+
+fun SupplierOrderLineDataModel.isMissingSupplierDeskOfferedPriceForAcceptedQuantity(): Boolean =
+    hasPositiveSupplierDeskAcceptedQuantity() && !supplierOfferedSupplyPrice.hasPositiveSupplierDeskPrice()
+
+fun SupplierOrderLineDataModel.needsSupplierDeskOfferedPrice(): Boolean =
+    (supplierDeskAcceptedQuantityTotal() ?: 1.0) > 0.0
+
+fun SupplierOrderLineDataModel.hasCompleteSupplierResponseLineForSupplierDesk(): Boolean {
+    val acceptedTotal = supplierDeskAcceptedQuantityTotal() ?: return false
+    return acceptedTotal <= 0.0 || supplierOfferedSupplyPrice.hasPositiveSupplierDeskPrice()
+}
+
+fun SupplierOrderDataModel.hasCompleteSupplierResponseForSupplierDesk(activeLines: List<SupplierOrderLineDataModel>): Boolean {
+    val cleanLines = activeLines.filter { it.isActive }
+    return cleanLines.isNotEmpty() &&
+            confirmedDeliveryTimeMillis != null &&
+            cleanLines.any { line -> (line.supplierDeskAcceptedQuantityTotal() ?: 0.0) > 0.0 } &&
+            cleanLines.all { line -> line.hasCompleteSupplierResponseLineForSupplierDesk() }
+}
+
+fun SupplierOrderDataModel.isSupplierReadyToPackForSupplierDesk(activeLines: List<SupplierOrderLineDataModel>): Boolean =
+    status == SupplierOrderStatusDataModel.Confirmed && hasCompleteSupplierResponseForSupplierDesk(activeLines)
+
+fun SupplierOrderWithLinesDataModel.hasCompleteSupplierResponseForSupplierDesk(): Boolean =
+    order.hasCompleteSupplierResponseForSupplierDesk(lines)
+
+fun SupplierOrderWithLinesDataModel.isSupplierReadyToPackForSupplierDesk(): Boolean =
+    order.isSupplierReadyToPackForSupplierDesk(lines)
+
+fun SupplierOrderWithLinesDataModel.hasSupplierResponseGapsForSupplierDesk(): Boolean {
+    val cleanLines = lines.filter { it.isActive }
+    return cleanLines.isEmpty() ||
+            order.confirmedDeliveryTimeMillis == null ||
+            cleanLines.none { line -> (line.supplierDeskAcceptedQuantityTotal() ?: 0.0) > 0.0 } ||
+            cleanLines.any { line -> !line.hasCompleteSupplierResponseLineForSupplierDesk() }
+}
+
+@kotlinx.serialization.Serializable
 data class SupplierDashboardStatusBucketDataModel(
     val status: SupplierOrderStatusDataModel = SupplierOrderStatusDataModel.Draft,
     val orderCount: Int = 0,
@@ -5132,7 +5191,8 @@ data class SupplierDashboardActionDataModel(
     val missingAcceptedQuantityCount: Int = 0,
     val missingOfferedPriceCount: Int = 0,
     val amount: PriceDataModel? = null,
-    val goodsPreview: List<LocalizedStringDataModel> = emptyList()
+    val goodsPreview: List<LocalizedStringDataModel> = emptyList(),
+    val attentionSummary: List<LocalizedStringDataModel> = emptyList()
 )
 
 @kotlinx.serialization.Serializable
@@ -5152,6 +5212,41 @@ data class SupplierDashboardDeliveryBucketDataModel(
 )
 
 @kotlinx.serialization.Serializable
+data class SupplierDashboardDispatchRunDataModel(
+    val runId: String = "",
+    val supplierId: String = "",
+    val storeId: String = "",
+    val storeNameSnapshot: List<LocalizedStringDataModel> = emptyList(),
+    val storePublicIdSnapshot: String = "",
+    val storeAddressTextSnapshot: String = "",
+    val orderIds: List<String> = emptyList(),
+    val packableOrderIds: List<String> = emptyList(),
+    val dispatchableOrderIds: List<String> = emptyList(),
+    val attentionOrderIds: List<String> = emptyList(),
+    val contractBlockedOrderIds: List<String> = emptyList(),
+    val statusMix: List<SupplierDashboardStatusBucketDataModel> = emptyList(),
+    val orderCount: Int = 0,
+    val lineCount: Int = 0,
+    val readyToPackOrderCount: Int = 0,
+    val packedOrderCount: Int = 0,
+    val inDeliveryOrderCount: Int = 0,
+    val issueOrderCount: Int = 0,
+    val actionRequiredOrderCount: Int = 0,
+    val activeContractCount: Int = 0,
+    val pendingContractCount: Int = 0,
+    val earliestDueAtMillis: Long? = null,
+    val latestDueAtMillis: Long? = null,
+    val latestActivityMillis: Long = 0L,
+    val goodsPreview: List<LocalizedStringDataModel> = emptyList(),
+    val packChecklist: List<LocalizedStringDataModel> = emptyList(),
+    val attentionSummary: List<LocalizedStringDataModel> = emptyList(),
+    val driverHandoffChecklist: List<LocalizedStringDataModel> = emptyList(),
+    val estimatedAmount: PriceDataModel? = null,
+    val priorityScore: Int = 0,
+    val suggestedAction: String = ""
+)
+
+@kotlinx.serialization.Serializable
 data class SupplierDashboardReadinessDataModel(
     val openOrderCount: Int = 0,
     val answerNeededOrderCount: Int = 0,
@@ -5163,6 +5258,14 @@ data class SupplierDashboardReadinessDataModel(
     val priceBookCoveredLineCount: Int = 0,
     val priceBookMissingLineCount: Int = 0,
     val priceBookCoveragePercent: Int = 0,
+    val responseLineCount: Int = 0,
+    val answeredLineCount: Int = 0,
+    val declinedLineCount: Int = 0,
+    val positiveAcceptedLineCount: Int = 0,
+    val requestedQuantityTotal: Double = 0.0,
+    val acceptedQuantityTotal: Double = 0.0,
+    val responseProgressPercent: Int = 0,
+    val acceptedVsRequestedPercent: Int = 0,
     val estimatedReadyAmount: PriceDataModel? = null,
     val earliestDueAtMillis: Long? = null,
     val generatedAtMillis: Long = 0L
@@ -5175,6 +5278,11 @@ data class SupplierDashboardManufacturerBridgeDataModel(
     val goodsItemNameSnapshot: List<LocalizedStringDataModel> = emptyList(),
     val barcodeSnapshots: List<String> = emptyList(),
     val measurementUnitIdSnapshot: String? = null,
+    val orderIds: List<String> = emptyList(),
+    val quoteNeededOrderIds: List<String> = emptyList(),
+    val productionOrderIds: List<String> = emptyList(),
+    val shipmentOrderIds: List<String> = emptyList(),
+    val storePreview: List<LocalizedStringDataModel> = emptyList(),
     val requestedQuantityTotal: Double = 0.0,
     val acceptedQuantityTotal: Double = 0.0,
     val missingQuantityTotal: Double = 0.0,
@@ -5187,7 +5295,31 @@ data class SupplierDashboardManufacturerBridgeDataModel(
     val earliestDueAtMillis: Long? = null,
     val latestActivityMillis: Long = 0L,
     val priorityScore: Int = 0,
-    val suggestedAction: String = ""
+    val suggestedAction: String = "",
+    val attentionSummary: List<LocalizedStringDataModel> = emptyList()
+)
+
+@kotlinx.serialization.Serializable
+data class SupplierDashboardBackorderDataModel(
+    val backorderId: String = "",
+    val goodsItemId: String = "",
+    val goodsItemNameSnapshot: List<LocalizedStringDataModel> = emptyList(),
+    val barcodeSnapshots: List<String> = emptyList(),
+    val measurementUnitIdSnapshot: String? = null,
+    val affectedOrderIds: List<String> = emptyList(),
+    val storePreview: List<LocalizedStringDataModel> = emptyList(),
+    val requestedQuantityTotal: Double = 0.0,
+    val acceptedQuantityTotal: Double = 0.0,
+    val missingQuantityTotal: Double = 0.0,
+    val missingLineCount: Int = 0,
+    val declinedLineCount: Int = 0,
+    val affectedOrderCount: Int = 0,
+    val affectedStoreCount: Int = 0,
+    val earliestDueAtMillis: Long? = null,
+    val latestActivityMillis: Long = 0L,
+    val priorityScore: Int = 0,
+    val suggestedAction: String = "",
+    val attentionSummary: List<LocalizedStringDataModel> = emptyList()
 )
 
 @kotlinx.serialization.Serializable
@@ -5211,9 +5343,14 @@ data class SupplierModeDashboardDataModel(
     val demandHighlights: List<SupplierDashboardDemandDataModel> = emptyList(),
     val partnerHighlights: List<SupplierDashboardPartnerDataModel> = emptyList(),
     val actionQueue: List<SupplierDashboardActionDataModel> = emptyList(),
+    val bulkSeenOrderIds: List<String> = emptyList(),
+    val bulkPackableOrderIds: List<String> = emptyList(),
+    val bulkDispatchableOrderIds: List<String> = emptyList(),
     val deliveryBuckets: List<SupplierDashboardDeliveryBucketDataModel> = emptyList(),
+    val dispatchRuns: List<SupplierDashboardDispatchRunDataModel> = emptyList(),
     val readiness: SupplierDashboardReadinessDataModel = SupplierDashboardReadinessDataModel(),
-    val manufacturerBridge: List<SupplierDashboardManufacturerBridgeDataModel> = emptyList()
+    val manufacturerBridge: List<SupplierDashboardManufacturerBridgeDataModel> = emptyList(),
+    val backorderWatch: List<SupplierDashboardBackorderDataModel> = emptyList()
 )
 
 fun getSupplierOrders(
@@ -5417,94 +5554,103 @@ fun updateSupplierOrder(
         }
 }
 
+private suspend fun emitSupplierOrderBundlesFromServerResponse(
+    bundles: List<SupplierOrderWithLinesDataModel>,
+    message: List<LocalizedStringDataModel>?
+) {
+    val changedOrderIds = bundles.map { it.order.id }.filter { it.isNotBlank() }.toSet()
+    supplierOrdersState.emit(
+        DataState.Success(
+            supplierOrdersState.payloadValue.orEmpty()
+                .filterNot { it.id in changedOrderIds } + bundles.map { it.order },
+            message
+        )
+    )
+    supplierOrderLinesState.emit(
+        DataState.Success(
+            supplierOrderLinesState.payloadValue.orEmpty()
+                .filterNot { line -> line.orderId in changedOrderIds } + bundles.flatMap { it.lines },
+            message
+        )
+    )
+}
+
 fun updateSupplierOrdersSupplierStatus(
     orderBundles: List<SupplierOrderWithLinesDataModel>,
     status: SupplierOrderStatusDataModel,
     comment: String? = null,
     onCompleted: ((Int) -> Unit)? = null
 ) {
-    val cleanBundles = orderBundles
-        .filter { it.order.id.isNotBlank() }
-        .distinctBy { it.order.id }
+    updateSupplierOrdersSupplierStatusByIds(
+        orderIds = orderBundles.map { it.order.id },
+        status = status,
+        comment = comment,
+        onCompleted = onCompleted
+    )
+}
 
-    if (cleanBundles.isEmpty()) {
+fun updateSupplierOrdersSupplierStatusByIds(
+    orderIds: List<String>,
+    status: SupplierOrderStatusDataModel,
+    comment: String? = null,
+    onCompleted: ((Int) -> Unit)? = null
+) {
+    val cleanOrderIds = orderIds
+        .map { it.trim() }
+        .filter { it.isNotBlank() }
+        .distinct()
+
+    if (cleanOrderIds.isEmpty()) {
         onCompleted?.invoke(0)
         return
     }
 
-    if (!updateSupplierOrderMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
-            updateSupplierOrderMutex.withLock {
-                val cleanComment = comment?.trim()?.takeIf { it.isNotBlank() }
-                val now = getCurrentTimeMillis()
-                var successCount = 0
-                var lastFailureMessage: List<LocalizedStringDataModel>? = null
+    if (updateSupplierOrdersStatusMutex.isLocked) {
+        onCompleted?.invoke(0)
+        return
+    }
 
-                for (bundle in cleanBundles) {
-                    val patched = bundle.copy(
-                        order = bundle.order.copy(
-                            status = status,
-                            supplierComment = cleanComment ?: bundle.order.supplierComment,
-                            supplierCommentLocalized = cleanComment?.let { listOf(LocalizedStringDataModel(appLanguageState.value, it)) }
-                                ?: bundle.order.supplierCommentLocalized,
-                            updatedAtMillis = now
-                        )
-                    )
+    GlobalScope.launch(Dispatchers.ourIo) {
+        updateSupplierOrdersStatusMutex.withLock {
+            val response = networkRequest<List<SupplierOrderWithLinesDataModel>, SupplierOrderStatusUpdateRequestDataModel>(
+                method = HttpMethod.Put,
+                endpointUrl = globalAppConfigurationState.payloadValue.updateSupplierOrdersStatusPath.first,
+                body = SupplierOrderStatusUpdateRequestDataModel(
+                    orderIds = cleanOrderIds,
+                    status = status,
+                    comment = comment?.trim()?.takeIf { it.isNotBlank() }
+                )
+            )
 
-                    val response = networkRequest<SupplierOrderWithLinesDataModel, SupplierOrderWithLinesDataModel>(
-                        method = HttpMethod.Put,
-                        endpointUrl = globalAppConfigurationState.payloadValue.updateSupplierOrderPath.first,
-                        body = patched
-                    )
-
-                    if (response.negative || response.payload == null) {
-                        lastFailureMessage = response.message
-                    } else {
-                        successCount += 1
-                        supplierOrdersState.emit(
-                            DataState.Success(
-                                supplierOrdersState.payloadValue.orEmpty().upsertById(response.payload.order),
-                                response.message
-                            )
-                        )
-                        supplierOrderLinesState.emit(
-                            DataState.Success(
-                                supplierOrderLinesState.payloadValue.orEmpty()
-                                    .filterNot { line -> line.orderId == response.payload.order.id } + response.payload.lines,
-                                response.message
-                            )
-                        )
-                    }
-                }
-
-                if (successCount > 0) {
-                    postInAppNotification(
-                        localizedStringResourceMessage(
-                            id = 1574,
-                            main = "Supplier dispatch lane updated",
-                            ru = "Маршрут поставщика обновлён",
-                            kk = "Жеткізуші жеткізу бағыты жаңартылды"
-                        ),
-                        NotificationType.Positive,
-                        transient = true
-                    )
-                    getMySupplierSideOrders()
-                    getSupplierModeDashboard()
-                } else {
-                    postInAppNotification(
-                        lastFailureMessage ?: localizedStringResourceMessage(
-                            id = 1575,
-                            main = "Could not update supplier dispatch lane",
-                            ru = "Не удалось обновить маршрут поставщика",
-                            kk = "Жеткізуші жеткізу бағытын жаңарту мүмкін болмады"
-                        ),
-                        NotificationType.Negative
-                    )
-                }
-
-                onCompleted?.invoke(successCount)
+            if (response.negative || response.payload == null) {
+                postInAppNotification(
+                    response.message ?: localizedStringResourceMessage(
+                        id = 1575,
+                        main = "Could not update supplier dispatch lane",
+                        ru = "Не удалось обновить маршрут поставщика",
+                        kk = "Жеткізуші жеткізу бағытын жаңарту мүмкін болмады"
+                    ),
+                    NotificationType.Negative
+                )
+                onCompleted?.invoke(0)
+            } else {
+                emitSupplierOrderBundlesFromServerResponse(response.payload, response.message)
+                postInAppNotification(
+                    response.message ?: localizedStringResourceMessage(
+                        id = 1574,
+                        main = "Supplier dispatch lane updated",
+                        ru = "Маршрут поставщика обновлён",
+                        kk = "Жеткізуші жеткізу бағыты жаңартылды"
+                    ),
+                    NotificationType.Positive,
+                    transient = true
+                )
+                getMySupplierSideOrders()
+                getSupplierModeDashboard()
+                onCompleted?.invoke(response.payload.size)
             }
         }
+    }
 }
 
 fun deleteSupplierOrder(
@@ -5792,7 +5938,7 @@ const val CLOUD_TRANSPORT_STATUS_UNAVAILABLE = -1
 @PublishedApi
 internal const val REALTIME_ACCESS_TOKEN_REFRESH_SKEW_MILLIS = 60_000L
 
-private const val DEFAULT_AITA_SERVER_URL = "http://10.202.5.35:8080"
+private const val DEFAULT_AITA_SERVER_URL = "http://10.202.5.34:8080"
 private val DEFAULT_AITA_SERVER_URL_PAIR = Pair(DEFAULT_AITA_SERVER_URL, "1")
 @Volatile
 private var runtimeClientServerUrlOverride: String? = null
@@ -5880,6 +6026,7 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
         getSupplierOrdersPath = Pair("supplierOrders/get", "34"),
         addSupplierOrderPath = Pair("supplierOrders/add", "35"),
         updateSupplierOrderPath = Pair("supplierOrders/update", "36"),
+        updateSupplierOrdersStatusPath = Pair("supplierOrders/status", "1751"),
         deleteSupplierOrdersPath = Pair("supplierOrders/delete", "37"),
         receiveSupplierOrderPath = Pair("supplierOrders/receive", "38"),
         getSupplierDashboardPath = Pair("supplierOrders/dashboard", "1616"),
@@ -16112,6 +16259,7 @@ data class GlobalAppConfigurationDataModel(
     val getSupplierOrdersPath: Pair<String, String> = Pair("supplierOrders/get", "34"),
     val addSupplierOrderPath: Pair<String, String> = Pair("supplierOrders/add", "35"),
     val updateSupplierOrderPath: Pair<String, String> = Pair("supplierOrders/update", "36"),
+    val updateSupplierOrdersStatusPath: Pair<String, String> = Pair("supplierOrders/status", "1751"),
     val deleteSupplierOrdersPath: Pair<String, String> = Pair("supplierOrders/delete", "37"),
     val receiveSupplierOrderPath: Pair<String, String> = Pair("supplierOrders/receive", "38"),
     val getSupplierDashboardPath: Pair<String, String> = Pair("supplierOrders/dashboard", "1616"),

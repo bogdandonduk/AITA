@@ -51,6 +51,7 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNotNull
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.lessEq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.neq
 import org.jetbrains.exposed.sql.javatime.CurrentTimestamp
 import org.jetbrains.exposed.sql.javatime.timestamp
 import org.jetbrains.exposed.sql.json.contains
@@ -3611,10 +3612,13 @@ private fun prewarmSharedRuntimeSerializers() {
   touch("SupplierDashboardProfileDataModel") { SupplierDashboardProfileDataModel.serializer() }
   touch("SupplierDashboardActionDataModel") { SupplierDashboardActionDataModel.serializer() }
   touch("SupplierDashboardDeliveryBucketDataModel") { SupplierDashboardDeliveryBucketDataModel.serializer() }
+  touch("SupplierDashboardDispatchRunDataModel") { SupplierDashboardDispatchRunDataModel.serializer() }
   touch("SupplierDashboardReadinessDataModel") { SupplierDashboardReadinessDataModel.serializer() }
   touch("SupplierDashboardManufacturerBridgeDataModel") { SupplierDashboardManufacturerBridgeDataModel.serializer() }
+  touch("SupplierDashboardBackorderDataModel") { SupplierDashboardBackorderDataModel.serializer() }
   touch("SupplierModeDashboardDataModel") { SupplierModeDashboardDataModel.serializer() }
   touch("SupplierOrderWithLinesDataModel") { SupplierOrderWithLinesDataModel.serializer() }
+  touch("SupplierOrderStatusUpdateRequestDataModel") { SupplierOrderStatusUpdateRequestDataModel.serializer() }
   touch("SupportMessageSendRequestDataModel") { SupportMessageSendRequestDataModel.serializer() }
   touch("SupportMessagesReadRequestDataModel") { SupportMessagesReadRequestDataModel.serializer() }
   touch("SupportTicketActionRequestDataModel") { SupportTicketActionRequestDataModel.serializer() }
@@ -3779,6 +3783,7 @@ private fun prewarmSharedRuntimeSerializers() {
     "kz.aita.ReceiveSupplierOrderRequestDataModel",
     "kz.aita.ReceiveSupplierOrderLineDataModel",
     "kz.aita.SupplierOrderWithLinesDataModel",
+    "kz.aita.SupplierOrderStatusUpdateRequestDataModel",
     "kz.aita.UserPreferencesDataModel",
     "kz.aita.AccountSubscriptionStatusDataModel",
     "kz.aita.ActivationHistoryEntryDataModel",
@@ -3821,8 +3826,10 @@ private fun prewarmSharedRuntimeSerializers() {
     "kz.aita.SupplierDashboardProfileDataModel",
     "kz.aita.SupplierDashboardActionDataModel",
     "kz.aita.SupplierDashboardDeliveryBucketDataModel",
+    "kz.aita.SupplierDashboardDispatchRunDataModel",
     "kz.aita.SupplierDashboardReadinessDataModel",
     "kz.aita.SupplierDashboardManufacturerBridgeDataModel",
+    "kz.aita.SupplierDashboardBackorderDataModel",
     "kz.aita.SupplierModeDashboardDataModel",
     "kz.aita.GoodsBatchDataModel",
     "kz.aita.GoodsBatchShelfQueueDataModel",
@@ -6702,6 +6709,13 @@ private fun SupplierOrderDataModel.cleanForStorage(userId: UUID, storeId: UUID, 
 private fun SupplierOrderLineDataModel.cleanForStorage(orderId: UUID): SupplierOrderLineDataModel = copy(
   orderId = orderId.toString(),
   requestedQuantity = requestedQuantity.copy(total = requestedQuantity.total.coerceAtLeast(0.0)),
+  supplierAcceptedQuantity = supplierAcceptedQuantity?.copy(total = supplierAcceptedQuantity.total.coerceAtLeast(0.0)),
+  supplierOfferedSupplyPrice = supplierOfferedSupplyPrice
+    ?.let { price ->
+      price.price.toMoneyDouble()
+        .takeIf { amount -> amount > 0.0 }
+        ?.let { amount -> price.copy(price = amount.roundMoney().toStockMoneyText()) }
+    },
   additionalNotes = additionalNotes?.trim()?.takeIf { it.isNotBlank() },
   additionalNotesLocalized = additionalNotesLocalized
     .map { it.copy(language = it.language.trim(), value = it.value.trim()) }
@@ -6713,6 +6727,33 @@ private fun SupplierOrderLineDataModel.cleanForStorage(orderId: UUID): SupplierO
     .filter { it.language.isNotBlank() && it.value.isNotBlank() }
     .distinctBy { it.language }
 )
+
+private fun supplierResponseAmountForStorage(
+  lines: List<SupplierOrderLineDataModel>,
+  supplierId: UUID,
+  fallbackCurrency: String? = null
+): PriceDataModel? {
+  val amountLines = lines.mapNotNull { line ->
+    val acceptedQuantity = line.supplierAcceptedQuantity?.total?.coerceAtLeast(0.0)?.takeIf { it > 0.0 }
+      ?: return@mapNotNull null
+    val offeredPrice = line.supplierOfferedSupplyPrice?.takeIf { it.hasPositiveSupplierDeskPrice() }
+      ?: return@mapNotNull null
+    acceptedQuantity to offeredPrice
+  }
+  val totalAmount = amountLines.sumOf { (quantity, price) -> quantity * price.price.toMoneyDouble() }.roundMoney()
+  if (totalAmount <= 0.0) return null
+
+  val currency = amountLines
+    .firstNotNullOfOrNull { (_, price) -> price.currency.takeIf { it.isNotBlank() } }
+    ?: fallbackCurrency?.takeIf { it.isNotBlank() }
+    ?: "KZT"
+
+  return PriceDataModel(
+    price = totalAmount.toStockMoneyText(),
+    currency = currency,
+    supplierId = supplierId.toString()
+  )
+}
 
 private fun supplierOrderWithLinesInsideTransaction(orderId: UUID): SupplierOrderWithLinesDataModel? {
   val order = SupplierOrders
@@ -6732,20 +6773,112 @@ private fun supplierOrderWithLinesInsideTransaction(orderId: UUID): SupplierOrde
 
 private fun supplierOrderStatusAllowedFromSupplier(
   requested: SupplierOrderStatusDataModel,
-  current: SupplierOrderStatusDataModel
+  current: SupplierOrderStatusDataModel,
+  requestedOrder: SupplierOrderDataModel,
+  requestedLines: List<SupplierOrderLineDataModel>
 ): SupplierOrderStatusDataModel {
   return when (requested) {
-    SupplierOrderStatusDataModel.SeenBySupplier,
-    SupplierOrderStatusDataModel.Confirmed,
-    SupplierOrderStatusDataModel.Packed,
-    SupplierOrderStatusDataModel.InDelivery,
-    SupplierOrderStatusDataModel.IssueReported,
-    SupplierOrderStatusDataModel.Cancelled -> requested
+    SupplierOrderStatusDataModel.SeenBySupplier -> when (current) {
+      SupplierOrderStatusDataModel.Sent,
+      SupplierOrderStatusDataModel.SeenBySupplier -> SupplierOrderStatusDataModel.SeenBySupplier
+      else -> current
+    }
+    SupplierOrderStatusDataModel.Confirmed -> when {
+      current in setOf(
+        SupplierOrderStatusDataModel.Sent,
+        SupplierOrderStatusDataModel.SeenBySupplier,
+        SupplierOrderStatusDataModel.Confirmed
+      ) && requestedOrder.hasCompleteSupplierResponseForSupplierDesk(requestedLines) -> SupplierOrderStatusDataModel.Confirmed
+      else -> current
+    }
+    SupplierOrderStatusDataModel.IssueReported -> if (current.isClosedForSupplierDashboard()) current else SupplierOrderStatusDataModel.IssueReported
+    SupplierOrderStatusDataModel.Cancelled -> if (current.isClosedForSupplierDashboard()) current else SupplierOrderStatusDataModel.Cancelled
+    SupplierOrderStatusDataModel.Packed -> when {
+      current == SupplierOrderStatusDataModel.Packed -> SupplierOrderStatusDataModel.Packed
+      current == SupplierOrderStatusDataModel.InDelivery -> current
+      current == SupplierOrderStatusDataModel.Confirmed && requestedOrder.hasCompleteSupplierResponseForSupplierDesk(requestedLines) -> SupplierOrderStatusDataModel.Packed
+      else -> current
+    }
+    SupplierOrderStatusDataModel.InDelivery -> if (current == SupplierOrderStatusDataModel.Packed || current == SupplierOrderStatusDataModel.InDelivery) {
+      SupplierOrderStatusDataModel.InDelivery
+    } else {
+      current
+    }
     SupplierOrderStatusDataModel.PartiallyDelivered,
     SupplierOrderStatusDataModel.Delivered -> current
     SupplierOrderStatusDataModel.Draft,
-    SupplierOrderStatusDataModel.Sent -> if (current == SupplierOrderStatusDataModel.Draft || current == SupplierOrderStatusDataModel.Sent) requested else current
+    SupplierOrderStatusDataModel.Sent -> current
   }
+}
+
+private fun supplierOrderStatusBlockedMessage(requestedStatus: SupplierOrderStatusDataModel): List<LocalizedStringDataModel> = when (requestedStatus) {
+  SupplierOrderStatusDataModel.Packed -> simpleMessage(
+    main = "Confirm delivery time, at least one accepted quantity, and positive offered prices before packing this supplier order",
+    ru = "Перед сборкой заказа подтвердите время доставки, хотя бы одно принятое количество и положительные цены поставщика",
+    kk = "Жинамас бұрын жеткізу уақытын, кемінде бір қабылданған санды және оң жеткізуші бағаларын растаңыз"
+  )
+  SupplierOrderStatusDataModel.InDelivery -> simpleMessage(
+    main = "Pack this supplier order before starting delivery",
+    ru = "Сначала соберите заказ поставщика, затем запускайте доставку",
+    kk = "Жеткізуді бастамас бұрын жеткізуші тапсырысын жинаңыз"
+  )
+  SupplierOrderStatusDataModel.PartiallyDelivered,
+  SupplierOrderStatusDataModel.Delivered -> simpleMessage(
+    main = "Receive supplier deliveries from the store receiving screen",
+    ru = "Принимайте поставки на стороне магазина через экран приёмки",
+    kk = "Жеткізуші жеткізілімдерін дүкеннің қабылдау экранынан қабылдаңыз"
+  )
+  SupplierOrderStatusDataModel.Confirmed -> simpleMessage(
+    main = "Fill accepted quantities, offered prices, and confirmed delivery time before confirming this supplier order",
+    ru = "Перед подтверждением заказа заполните принятые количества, цены поставщика и подтверждённое время доставки",
+    kk = "Жеткізуші тапсырысын растау алдында қабылданған санды, бағаны және жеткізу уақытын толтырыңыз"
+  )
+  SupplierOrderStatusDataModel.Draft,
+  SupplierOrderStatusDataModel.Sent,
+  SupplierOrderStatusDataModel.SeenBySupplier -> simpleMessage(
+    main = "Supplier order cannot move backward to that status",
+    ru = "Заказ поставщика нельзя вернуть в этот статус",
+    kk = "Жеткізуші тапсырысын бұл мәртебеге кері қайтаруға болмайды"
+  )
+  SupplierOrderStatusDataModel.IssueReported,
+  SupplierOrderStatusDataModel.Cancelled -> simpleMessage(
+    main = "This supplier order is already closed",
+    ru = "Этот заказ поставщика уже закрыт",
+    kk = "Бұл жеткізуші тапсырысы жабылған"
+  )
+}
+
+private fun supplierOrderStatusSuccessMessage(updatedStatus: SupplierOrderStatusDataModel): List<LocalizedStringDataModel> = when (updatedStatus) {
+  SupplierOrderStatusDataModel.SeenBySupplier -> simpleMessage(
+    main = "Supplier order marked as seen",
+    ru = "Заказ поставщику отмечен как просмотренный",
+    kk = "Жеткізуші тапсырысы қаралды деп белгіленді"
+  )
+  SupplierOrderStatusDataModel.Packed -> simpleMessage(
+    main = "Supplier order packed",
+    ru = "Заказ поставщика собран",
+    kk = "Жеткізуші тапсырысы жиналды"
+  )
+  SupplierOrderStatusDataModel.InDelivery -> simpleMessage(
+    main = "Supplier delivery started",
+    ru = "Доставка поставщика запущена",
+    kk = "Жеткізуші жеткізілімі басталды"
+  )
+  SupplierOrderStatusDataModel.IssueReported -> simpleMessage(
+    main = "Supplier issue reported",
+    ru = "Проблема поставщика отмечена",
+    kk = "Жеткізуші мәселесі белгіленді"
+  )
+  SupplierOrderStatusDataModel.Cancelled -> simpleMessage(
+    main = "Supplier order cancelled",
+    ru = "Заказ поставщика отменён",
+    kk = "Жеткізуші тапсырысы тоқтатылды"
+  )
+  else -> simpleMessage(
+    main = "Supplier order status updated",
+    ru = "Статус заказа поставщика обновлён",
+    kk = "Жеткізуші тапсырысының мәртебесі жаңартылды"
+  )
 }
 
 private fun List<SupplierOrderWithLinesDataModel>.withSupplierDeskSnapshotsInsideTransaction(): List<SupplierOrderWithLinesDataModel> {
@@ -6877,6 +7010,162 @@ private fun supplierDashboardDeliveryBucketTitle(bucketId: String): List<Localiz
   )
 }
 
+
+private fun supplierDashboardJoinedMessage(
+  mainLines: List<String>,
+  ruLines: List<String> = mainLines,
+  kkLines: List<String> = mainLines
+): List<LocalizedStringDataModel> {
+  val main = mainLines.map { it.trim() }.filter { it.isNotBlank() }.joinToString("\n")
+  if (main.isBlank()) return emptyList()
+  val ru = ruLines.map { it.trim() }.filter { it.isNotBlank() }.joinToString("\n").ifBlank { main }
+  val kk = kkLines.map { it.trim() }.filter { it.isNotBlank() }.joinToString("\n").ifBlank { main }
+  return simpleMessage(main = main, ru = ru, kk = kk)
+}
+
+private fun supplierDashboardOrderAttentionSummary(
+  order: SupplierOrderDataModel,
+  activeLines: List<SupplierOrderLineDataModel>,
+  pendingContractCount: Int = 0
+): List<LocalizedStringDataModel> {
+  val missingAcceptedQuantityCount = activeLines.count { line -> line.isMissingSupplierDeskAcceptedQuantity() }
+  val missingOfferedPriceCount = activeLines.count { line -> line.isMissingSupplierDeskOfferedPriceForAcceptedQuantity() }
+  val positiveAcceptedLineCount = activeLines.count { line -> line.hasPositiveSupplierDeskAcceptedQuantity() }
+  val allLinesAnsweredButNothingAccepted = activeLines.isNotEmpty() &&
+      missingAcceptedQuantityCount == 0 &&
+      positiveAcceptedLineCount == 0 &&
+      order.status in setOf(SupplierOrderStatusDataModel.SeenBySupplier, SupplierOrderStatusDataModel.Confirmed)
+
+  val main = mutableListOf<String>()
+  val ru = mutableListOf<String>()
+  val kk = mutableListOf<String>()
+
+  fun add(mainText: String, ruText: String, kkText: String) {
+    main += mainText
+    ru += ruText
+    kk += kkText
+  }
+
+  when (order.status) {
+    SupplierOrderStatusDataModel.IssueReported -> add(
+      "Issue is open; resolve it before normal dispatch",
+      "Есть открытая проблема; решите её перед обычной доставкой",
+      "Мәселе ашық; әдеттегі жеткізу алдында оны шешіңіз"
+    )
+    SupplierOrderStatusDataModel.Cancelled -> add(
+      "Order is cancelled",
+      "Заказ отменён",
+      "Тапсырыс тоқтатылды"
+    )
+    SupplierOrderStatusDataModel.Packed -> add(
+      "Packed and waiting for driver start",
+      "Собрано и ждёт запуска доставки",
+      "Жиналды және жеткізуді бастауды күтеді"
+    )
+    SupplierOrderStatusDataModel.InDelivery -> add(
+      "Driver is on route; store receiving closes the loop",
+      "Водитель в пути; приёмка магазина закрывает цикл",
+      "Жүргізуші жолда; дүкен қабылдауы циклды жабады"
+    )
+    else -> Unit
+  }
+
+  if (activeLines.isEmpty()) add(
+    "No active goods lines",
+    "Нет активных товарных строк",
+    "Белсенді тауар жолдары жоқ"
+  )
+  if (missingAcceptedQuantityCount > 0) add(
+    "$missingAcceptedQuantityCount line(s) need accepted quantity",
+    "$missingAcceptedQuantityCount строк(и) ждут принятое количество",
+    "$missingAcceptedQuantityCount жол қабылданған санды күтеді"
+  )
+  if (missingOfferedPriceCount > 0) add(
+    "$missingOfferedPriceCount accepted line(s) need offered price",
+    "$missingOfferedPriceCount принят(ых) строк(и) ждут цену поставщика",
+    "$missingOfferedPriceCount қабылданған жол жеткізуші бағасын күтеді"
+  )
+  if (allLinesAnsweredButNothingAccepted) add(
+    "At least one line must be accepted before packing",
+    "Перед сборкой нужно принять хотя бы одну строку",
+    "Жинамас бұрын кемінде бір жол қабылдануы керек"
+  )
+  if (order.status in setOf(SupplierOrderStatusDataModel.Confirmed, SupplierOrderStatusDataModel.Packed, SupplierOrderStatusDataModel.InDelivery) && order.confirmedDeliveryTimeMillis == null) add(
+    "Confirmed delivery time is missing",
+    "Не указано подтверждённое время доставки",
+    "Расталған жеткізу уақыты жоқ"
+  )
+  if (order.status in setOf(SupplierOrderStatusDataModel.Packed, SupplierOrderStatusDataModel.InDelivery) && order.paymentTerms.isNullOrBlank()) add(
+    "Payment terms are not recorded yet",
+    "Условия оплаты ещё не записаны",
+    "Төлем шарттары әлі жазылмаған"
+  )
+  if (order.status in setOf(SupplierOrderStatusDataModel.Packed, SupplierOrderStatusDataModel.InDelivery) && order.externalReference.isNullOrBlank()) add(
+    "Supplier reference / waybill number is empty",
+    "Номер поставщика / накладной пустой",
+    "Жеткізуші нөмірі / жүкқұжат нөмірі бос"
+  )
+  if (pendingContractCount > 0) add(
+    "$pendingContractCount pending contract check(s)",
+    "$pendingContractCount ожидающ(их) проверк(и) договора",
+    "$pendingContractCount күтіп тұрған келісімшарт тексеруі"
+  )
+
+  return supplierDashboardJoinedMessage(main, ru, kk)
+}
+
+private fun supplierDashboardRunAttentionSummary(
+  issueCount: Int,
+  pendingContractCount: Int,
+  actionRequiredCount: Int,
+  readyToPackCount: Int,
+  packedCount: Int,
+  inDeliveryCount: Int
+): List<LocalizedStringDataModel> {
+  val main = mutableListOf<String>()
+  val ru = mutableListOf<String>()
+  val kk = mutableListOf<String>()
+
+  fun add(mainText: String, ruText: String, kkText: String) {
+    main += mainText
+    ru += ruText
+    kk += kkText
+  }
+
+  if (issueCount > 0) add(
+    "$issueCount issue order(s) need human decision",
+    "$issueCount заказ(ов) с проблемой требуют решения",
+    "$issueCount мәселелі тапсырыс шешім күтеді"
+  )
+  if (pendingContractCount > 0) add(
+    "$pendingContractCount contract blocker(s)",
+    "$pendingContractCount блокер(ов) договора",
+    "$pendingContractCount келісімшарт бөгеті"
+  )
+  if (actionRequiredCount > 0) add(
+    "$actionRequiredCount order(s) still need answer or response gaps",
+    "$actionRequiredCount заказ(ов) ещё ждут ответ или заполнение пробелов",
+    "$actionRequiredCount тапсырыс жауапты немесе бос орындарды күтеді"
+  )
+  if (readyToPackCount > 0) add(
+    "$readyToPackCount order(s) can be packed now",
+    "$readyToPackCount заказ(ов) можно собрать сейчас",
+    "$readyToPackCount тапсырысты қазір жинауға болады"
+  )
+  if (packedCount > 0) add(
+    "$packedCount packed order(s) can start delivery",
+    "$packedCount собранн(ых) заказ(ов) можно отправить",
+    "$packedCount жиналған тапсырысты жеткізуге жіберуге болады"
+  )
+  if (inDeliveryCount > 0) add(
+    "$inDeliveryCount order(s) already on the road",
+    "$inDeliveryCount заказ(ов) уже в пути",
+    "$inDeliveryCount тапсырыс жолда"
+  )
+
+  return supplierDashboardJoinedMessage(main, ru, kk)
+}
+
 private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDashboardDataModel {
   val now = System.currentTimeMillis()
   val supplierProfiles = accessibleSupplierProfilesForUserInsideTransaction(userId)
@@ -6889,7 +7178,11 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
 
   val rawOrders = SupplierOrders
     .selectAll()
-    .where { (SupplierOrders.supplierId inList supplierIds) and (SupplierOrders.isActive eq true) }
+    .where {
+      (SupplierOrders.supplierId inList supplierIds) and
+         (SupplierOrders.isActive eq true) and
+         (SupplierOrders.status neq SupplierOrderStatusDataModel.Draft.name)
+    }
     .map { it.toSupplierOrderDataModel() }
     .sortedByDescending { it.updatedAtMillis.takeIf { value -> value > 0L } ?: it.orderedAtMillis }
 
@@ -6996,6 +7289,49 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
     )
     .take(8)
 
+  val responseReadyStatuses = setOf(
+    SupplierOrderStatusDataModel.Sent,
+    SupplierOrderStatusDataModel.SeenBySupplier,
+    SupplierOrderStatusDataModel.Confirmed
+  )
+  fun SupplierOrderWithLinesDataModel.needsSupplierDashboardAction(): Boolean =
+    order.isActive &&
+       !order.status.isClosedForSupplierDashboard() &&
+       (order.status == SupplierOrderStatusDataModel.Sent ||
+          order.status == SupplierOrderStatusDataModel.SeenBySupplier ||
+          order.status == SupplierOrderStatusDataModel.IssueReported ||
+          (order.status in responseReadyStatuses && hasSupplierResponseGapsForSupplierDesk()))
+
+  fun supplierBridgeTargetGoodsItemId(line: SupplierOrderLineDataModel): String =
+    line.substituteGoodsItemId?.takeIf { it.isNotBlank() } ?: line.goodsItemId
+
+  fun SupplierOrderWithLinesDataModel.blockingSupplierContractsForDashboard(): List<SupplierPartnershipContractDataModel> {
+    val relatedContracts = contractsByStore[order.storeId].orEmpty().filter { contract ->
+      contract.isActive &&
+         contract.supplierId == order.supplierId &&
+         contract.status != SUPPLIER_CONTRACT_STATUS_ACTIVE &&
+         contract.status != SUPPLIER_CONTRACT_STATUS_ARCHIVED
+    }
+    if (relatedContracts.isEmpty()) return emptyList()
+
+    val movingGoodsItemIds = lines
+      .asSequence()
+      .filter { line -> line.isActive }
+      .map { line -> supplierBridgeTargetGoodsItemId(line) }
+      .filter { goodsItemId -> goodsItemId.isNotBlank() }
+      .toSet()
+    if (movingGoodsItemIds.isEmpty()) return emptyList()
+
+    return relatedContracts.filter { contract ->
+      contract.scopeType == SUPPLIER_CONTRACT_SCOPE_PARTNERSHIP ||
+         contract.goodsItemIds.isEmpty() ||
+         contract.goodsItemIds.any { goodsItemId -> goodsItemId in movingGoodsItemIds }
+    }
+  }
+
+  fun SupplierOrderWithLinesDataModel.hasSupplierDashboardContractBlocker(): Boolean =
+    blockingSupplierContractsForDashboard().isNotEmpty()
+
   val actionQueue = bundles
     .asSequence()
     .filter { bundle -> bundle.order.isActive && !bundle.order.status.isClosedForSupplierDashboard() }
@@ -7004,16 +7340,24 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
       val bundleLines = bundle.lines.filter { it.isActive }
       val dueAtMillis = order.confirmedDeliveryTimeMillis ?: order.desiredDeliveryTimeMillis
       val missingAcceptedQuantityCount = bundleLines.count { it.supplierAcceptedQuantity == null }
-      val missingOfferedPriceCount = bundleLines.count { it.supplierOfferedSupplyPrice == null }
+      val missingOfferedPriceCount = bundleLines.count { line ->
+        line.isMissingSupplierDeskOfferedPriceForAcceptedQuantity()
+      }
+      val orderContractBlockerCount = bundle.blockingSupplierContractsForDashboard().count()
+      val attentionSummary = supplierDashboardOrderAttentionSummary(
+        order = order,
+        activeLines = bundleLines,
+        pendingContractCount = orderContractBlockerCount
+      )
       val missingHeaderDetails = order.status in listOf(
-        SupplierOrderStatusDataModel.Confirmed,
         SupplierOrderStatusDataModel.Packed,
         SupplierOrderStatusDataModel.InDelivery
-      ) && (order.confirmedDeliveryTimeMillis == null || order.paymentTerms.isNullOrBlank() || order.externalReference.isNullOrBlank())
+      ) && (order.paymentTerms.isNullOrBlank() || order.externalReference.isNullOrBlank())
       val actionType = when {
         order.status == SupplierOrderStatusDataModel.IssueReported -> "issue"
+        orderContractBlockerCount > 0 -> "contract"
         order.status == SupplierOrderStatusDataModel.Sent || order.status == SupplierOrderStatusDataModel.SeenBySupplier -> "answer"
-        order.status == SupplierOrderStatusDataModel.Confirmed && (missingAcceptedQuantityCount > 0 || missingOfferedPriceCount > 0) -> "complete_response"
+        order.status == SupplierOrderStatusDataModel.Confirmed && !bundle.hasCompleteSupplierResponseForSupplierDesk() -> "complete_response"
         missingHeaderDetails -> "terms"
         order.status == SupplierOrderStatusDataModel.Confirmed -> "pack"
         order.status == SupplierOrderStatusDataModel.Packed -> "dispatch"
@@ -7030,6 +7374,7 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
       } ?: 0
       val basePriority = when (actionType) {
         "issue" -> 100
+        "contract" -> 94
         "answer" -> 90
         "complete_response" -> 84
         "pack" -> 72
@@ -7041,12 +7386,22 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
       val preview = bundleLines
         .take(3)
         .joinToString(" • ") { line ->
-          val title = line.goodsItemNameSnapshot.firstOrNull { it.value.isNotBlank() }?.value
+          val title = line.substituteGoodsItemNameSnapshot.firstOrNull { it.value.isNotBlank() }?.value
+            ?: line.goodsItemNameSnapshot.firstOrNull { it.value.isNotBlank() }?.value
+            ?: line.substituteGoodsItemBarcodeSnapshots.firstOrNull()
             ?: line.goodsItemBarcodeSnapshots.firstOrNull()
+            ?: line.substituteGoodsItemId?.take(8)
             ?: line.goodsItemId.take(8)
-          val quantityText = line.requestedQuantity.total.takeIf { it > 0.0 }?.let { value ->
-            val whole = value.toLong()
-            if (value == whole.toDouble()) whole.toString() else value.toString()
+          val quantityValue = when (order.status) {
+            SupplierOrderStatusDataModel.Confirmed,
+            SupplierOrderStatusDataModel.Packed,
+            SupplierOrderStatusDataModel.InDelivery -> line.supplierDeskPhysicalQuantityTotal()
+            else -> line.requestedQuantity.total.coerceAtLeast(0.0)
+          }
+          val quantityText = quantityValue.takeIf { it > 0.0 }?.let { value ->
+            val safe = value.roundMoney()
+            val whole = safe.toLong()
+            if (safe == whole.toDouble()) whole.toString() else safe.toString()
           }.orEmpty()
           if (quantityText.isBlank()) title else "$title × $quantityText"
         }
@@ -7066,7 +7421,8 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
         missingAcceptedQuantityCount = missingAcceptedQuantityCount,
         missingOfferedPriceCount = missingOfferedPriceCount,
         amount = order.amount,
-        goodsPreview = preview.takeIf { it.isNotBlank() }?.let { listOf(LocalizedStringDataModel("main", it)) }.orEmpty()
+        goodsPreview = preview.takeIf { it.isNotBlank() }?.let { listOf(LocalizedStringDataModel("main", it)) }.orEmpty(),
+        attentionSummary = attentionSummary
       )
     }
     .sortedWith(
@@ -7105,11 +7461,7 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
         orderCount = bucketOrders.size,
         lineCount = bucketLines.size,
         storeCount = bucketOrders.map { it.storeId }.filter { it.isNotBlank() }.distinct().size,
-        actionRequiredOrderCount = bucketOrders.count { order ->
-          order.status == SupplierOrderStatusDataModel.Sent ||
-             order.status == SupplierOrderStatusDataModel.SeenBySupplier ||
-             order.status == SupplierOrderStatusDataModel.IssueReported
-        },
+        actionRequiredOrderCount = bucketBundles.count { bundle -> bundle.needsSupplierDashboardAction() },
         packedOrderCount = bucketOrders.count { it.status == SupplierOrderStatusDataModel.Packed },
         inDeliveryOrderCount = bucketOrders.count { it.status == SupplierOrderStatusDataModel.InDelivery },
         issueOrderCount = bucketOrders.count { it.status == SupplierOrderStatusDataModel.IssueReported || it.status == SupplierOrderStatusDataModel.Cancelled },
@@ -7129,42 +7481,65 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
     bundle.order.isActive && !bundle.order.status.isClosedForSupplierDashboard()
   }
   val openLines = openBundles.flatMap { bundle -> bundle.lines.filter { it.isActive } }
+  val responseCandidateBundles = openBundles.filter { bundle -> bundle.order.status in responseReadyStatuses }
+  val responseCandidateLines = responseCandidateBundles.flatMap { bundle -> bundle.lines.filter { it.isActive } }
   val supplierPriceBookKeys = supplierPriceRows
     .map { price -> "${price.storeId}|${price.supplierId}|${price.goodsItemId}" }
     .toSet()
-  fun supplierBridgeTargetGoodsItemId(line: SupplierOrderLineDataModel): String =
-    line.substituteGoodsItemId?.takeIf { it.isNotBlank() } ?: line.goodsItemId
   fun supplierPriceBookKeyFor(order: SupplierOrderDataModel, line: SupplierOrderLineDataModel): String {
     val targetGoodsItemId = supplierBridgeTargetGoodsItemId(line)
     return "${order.storeId}|${order.supplierId}|$targetGoodsItemId"
   }
-  val priceBookCoveredLineCount = openLines.count { line ->
+  val bulkSeenOrderIds = openBundles
+    .filter { bundle -> bundle.order.status == SupplierOrderStatusDataModel.Sent }
+    .map { bundle -> bundle.order.id }
+    .filter { orderId -> orderId.isNotBlank() }
+    .distinct()
+  val bulkPackableOrderIds = openBundles
+    .filter { bundle ->
+      bundle.order.status == SupplierOrderStatusDataModel.Confirmed &&
+         bundle.hasCompleteSupplierResponseForSupplierDesk() &&
+         !bundle.hasSupplierDashboardContractBlocker()
+    }
+    .map { bundle -> bundle.order.id }
+    .filter { orderId -> orderId.isNotBlank() }
+    .distinct()
+  val bulkDispatchableOrderIds = openBundles
+    .filter { bundle ->
+      bundle.order.status == SupplierOrderStatusDataModel.Packed &&
+         !bundle.hasSupplierDashboardContractBlocker()
+    }
+    .map { bundle -> bundle.order.id }
+    .filter { orderId -> orderId.isNotBlank() }
+    .distinct()
+  val priceBookCoveredLineCount = responseCandidateLines.count { line ->
     val order = ordersById[line.orderId] ?: return@count false
     supplierPriceBookKeyFor(order, line) in supplierPriceBookKeys
   }
-  val missingAcceptedQuantityLineCount = openLines.count { it.supplierAcceptedQuantity == null }
-  val missingOfferedPriceLineCount = openLines.count { it.supplierOfferedSupplyPrice == null }
-  val responseReadyStatuses = setOf(
-    SupplierOrderStatusDataModel.Sent,
-    SupplierOrderStatusDataModel.SeenBySupplier,
-    SupplierOrderStatusDataModel.Confirmed
-  )
+  val missingAcceptedQuantityLineCount = responseCandidateLines.count { it.supplierAcceptedQuantity == null }
+  val missingOfferedPriceLineCount = responseCandidateLines.count { line ->
+    line.isMissingSupplierDeskOfferedPriceForAcceptedQuantity()
+  }
+  val answeredLineCount = responseCandidateLines.count { line -> !line.isMissingSupplierDeskAcceptedQuantity() }
+  val declinedLineCount = responseCandidateLines.count { line ->
+    line.supplierDeskAcceptedQuantityTotal()?.let { accepted -> accepted <= 0.000001 } == true
+  }
+  val positiveAcceptedLineCount = responseCandidateLines.count { line -> line.hasPositiveSupplierDeskAcceptedQuantity() }
+  val requestedQuantityTotal = responseCandidateLines.sumOf { line -> line.requestedQuantity.total.coerceAtLeast(0.0) }.roundMoney()
+  val acceptedQuantityTotal = responseCandidateLines.sumOf { line -> (line.supplierDeskAcceptedQuantityTotal() ?: 0.0).coerceAtLeast(0.0) }.roundMoney()
+  val responseProgressPercent = if (responseCandidateLines.isEmpty()) 0 else (((answeredLineCount * 100.0) / responseCandidateLines.size) + 0.5).toInt().coerceIn(0, 100)
+  val acceptedVsRequestedPercent = if (requestedQuantityTotal <= 0.000001) 0 else (((acceptedQuantityTotal * 100.0) / requestedQuantityTotal) + 0.5).toInt().coerceIn(0, 999)
   val responseReadyOrders = openBundles.filter { bundle ->
-    val bundleLines = bundle.lines.filter { it.isActive }
-    bundleLines.isNotEmpty() &&
-       bundle.order.status in responseReadyStatuses &&
-       bundleLines.all { it.supplierAcceptedQuantity != null && it.supplierOfferedSupplyPrice != null } &&
-       bundle.order.confirmedDeliveryTimeMillis != null
+    bundle.order.status in responseReadyStatuses && bundle.hasCompleteSupplierResponseForSupplierDesk()
   }
   val readyToPackOrders = openBundles.filter { bundle ->
-    val bundleLines = bundle.lines.filter { it.isActive }
-    bundle.order.status == SupplierOrderStatusDataModel.Confirmed &&
-       bundleLines.isNotEmpty() &&
-       bundleLines.all { it.supplierAcceptedQuantity != null && it.supplierOfferedSupplyPrice != null } &&
-       bundle.order.confirmedDeliveryTimeMillis != null
+    bundle.isSupplierReadyToPackForSupplierDesk() && !bundle.hasSupplierDashboardContractBlocker()
   }
+  val readyToPackOrderIdsForReadiness = readyToPackOrders.map { bundle -> bundle.order.id }.toSet()
   val readyAmountLines = openLines.filter { line ->
-    line.supplierAcceptedQuantity != null && line.supplierOfferedSupplyPrice != null
+    line.orderId in readyToPackOrderIdsForReadiness &&
+       (line.supplierDeskAcceptedQuantityTotal() ?: 0.0) > 0.0 &&
+       line.supplierOfferedSupplyPrice.hasPositiveSupplierDeskPrice()
   }
   val readyAmountValue = readyAmountLines.sumOf { line ->
     (line.supplierAcceptedQuantity?.total ?: 0.0).coerceAtLeast(0.0) *
@@ -7175,25 +7550,336 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
   } ?: supplierPriceRows.firstOrNull()?.supplyPrice?.currency?.takeIf { it.isNotBlank() } ?: "KZT"
   val readiness = SupplierDashboardReadinessDataModel(
     openOrderCount = openBundles.size,
-    answerNeededOrderCount = openBundles.count { bundle ->
-      bundle.order.status == SupplierOrderStatusDataModel.Sent ||
-         bundle.order.status == SupplierOrderStatusDataModel.SeenBySupplier ||
-         bundle.order.status == SupplierOrderStatusDataModel.IssueReported
-    },
+    answerNeededOrderCount = openBundles.count { bundle -> bundle.needsSupplierDashboardAction() },
     responseReadyOrderCount = responseReadyOrders.size,
     readyToPackOrderCount = readyToPackOrders.size,
-    packReadyLineCount = readyToPackOrders.sumOf { bundle -> bundle.lines.count { it.isActive } },
+    packReadyLineCount = readyToPackOrders.sumOf { bundle ->
+      bundle.lines.count { line -> line.isActive && line.hasPositiveSupplierDeskAcceptedQuantity() }
+    },
     missingAcceptedQuantityLineCount = missingAcceptedQuantityLineCount,
     missingOfferedPriceLineCount = missingOfferedPriceLineCount,
     priceBookCoveredLineCount = priceBookCoveredLineCount,
-    priceBookMissingLineCount = (openLines.size - priceBookCoveredLineCount).coerceAtLeast(0),
-    priceBookCoveragePercent = if (openLines.isEmpty()) 0 else (((priceBookCoveredLineCount * 100.0) / openLines.size) + 0.5).toInt().coerceIn(0, 100),
+    priceBookMissingLineCount = (responseCandidateLines.size - priceBookCoveredLineCount).coerceAtLeast(0),
+    priceBookCoveragePercent = if (responseCandidateLines.isEmpty()) 0 else (((priceBookCoveredLineCount * 100.0) / responseCandidateLines.size) + 0.5).toInt().coerceIn(0, 100),
+    responseLineCount = responseCandidateLines.size,
+    answeredLineCount = answeredLineCount,
+    declinedLineCount = declinedLineCount,
+    positiveAcceptedLineCount = positiveAcceptedLineCount,
+    requestedQuantityTotal = requestedQuantityTotal,
+    acceptedQuantityTotal = acceptedQuantityTotal,
+    responseProgressPercent = responseProgressPercent,
+    acceptedVsRequestedPercent = acceptedVsRequestedPercent,
     estimatedReadyAmount = readyAmountValue.takeIf { it > 0.0 }?.let { amount ->
       PriceDataModel(amount.toStockMoneyText(), readyAmountCurrency, supplierIds.firstOrNull()?.toString().orEmpty())
     },
     earliestDueAtMillis = openBundles.mapNotNull { bundle -> bundle.order.confirmedDeliveryTimeMillis ?: bundle.order.desiredDeliveryTimeMillis }.minOrNull(),
     generatedAtMillis = now
   )
+
+  val readyToPackOrderIds = readyToPackOrderIdsForReadiness
+  val safeDispatchableOrderIds = bulkDispatchableOrderIds.toSet()
+  val dispatchRuns = openBundles
+    .asSequence()
+    .filter { bundle -> bundle.order.status != SupplierOrderStatusDataModel.Draft }
+    .groupBy { bundle ->
+      val storeKey = bundle.order.storeId.ifBlank { bundle.order.storePublicIdSnapshot }.ifBlank { bundle.order.id }
+      val dueKey = (bundle.order.confirmedDeliveryTimeMillis ?: bundle.order.desiredDeliveryTimeMillis)
+        ?.let { due -> supplierDashboardDayStartMillis(due).toString() }
+        ?: "unscheduled"
+      "${bundle.order.supplierId}|$storeKey|$dueKey"
+    }
+    .map { (runKey, runBundlesRaw) ->
+      val runBundles = runBundlesRaw.sortedWith(
+        compareBy<SupplierOrderWithLinesDataModel> { bundle -> bundle.order.confirmedDeliveryTimeMillis ?: bundle.order.desiredDeliveryTimeMillis ?: Long.MAX_VALUE }
+          .thenByDescending { bundle -> bundle.order.updatedAtMillis.takeIf { value -> value > 0L } ?: bundle.order.orderedAtMillis }
+      )
+      val runOrders = runBundles.map { it.order }.distinctBy { it.id }
+      val physicallyActionableOrderIds = runOrders
+        .filter { order ->
+          order.id in readyToPackOrderIds ||
+             order.status == SupplierOrderStatusDataModel.Packed ||
+             order.status == SupplierOrderStatusDataModel.InDelivery
+        }
+        .map { order -> order.id }
+        .toSet()
+      val runLines = runBundles.flatMap { bundle -> bundle.lines.filter { it.isActive } }
+      val packLines = runLines.filter { line ->
+        line.orderId in physicallyActionableOrderIds && line.supplierDeskPhysicalQuantityTotal() > 0.0
+      }
+      val responseGapOrderIds = runBundles.filter { bundle ->
+        bundle.order.status in responseReadyStatuses && bundle.hasSupplierResponseGapsForSupplierDesk()
+      }.map { bundle -> bundle.order.id }.toSet()
+      val sampleOrder = runOrders
+        .maxByOrNull { order -> order.updatedAtMillis.takeIf { value -> value > 0L } ?: order.orderedAtMillis }
+        ?: runOrders.firstOrNull()
+      val dueValues = runOrders.mapNotNull { order -> order.confirmedDeliveryTimeMillis ?: order.desiredDeliveryTimeMillis }
+      val statusMix = SupplierOrderStatusDataModel.entries.mapNotNull { status ->
+        val statusOrders = runOrders.filter { order -> order.status == status }
+        val statusLineCount = statusOrders.sumOf { order -> linesByOrder[order.id].orEmpty().count { it.isActive } }
+        if (statusOrders.isEmpty() && statusLineCount == 0) null else SupplierDashboardStatusBucketDataModel(
+          status = status,
+          orderCount = statusOrders.size,
+          lineCount = statusLineCount
+        )
+      }
+      val runLineGroups = runLines
+        .groupBy { line ->
+          (line.substituteGoodsItemId?.takeIf { it.isNotBlank() } ?: line.goodsItemId)
+            .ifBlank { line.goodsItemBarcodeSnapshots.firstOrNull().orEmpty() }
+            .ifBlank { line.id }
+        }
+        .values
+        .toList()
+      fun supplierRunLineTitle(line: SupplierOrderLineDataModel): String =
+        line.substituteGoodsItemNameSnapshot.firstOrNull { it.value.isNotBlank() }?.value
+          ?: line.goodsItemNameSnapshot.firstOrNull { it.value.isNotBlank() }?.value
+          ?: line.substituteGoodsItemBarcodeSnapshots.firstOrNull()
+          ?: line.goodsItemBarcodeSnapshots.firstOrNull()
+          ?: line.substituteGoodsItemId?.take(8)
+          ?: line.goodsItemId.take(8)
+      fun supplierRunQuantityText(value: Double): String {
+        val safe = value.coerceAtLeast(0.0).roundMoney()
+        val whole = safe.toLong()
+        return if (safe == whole.toDouble()) whole.toString() else safe.toString()
+      }
+      val preview = runLineGroups
+        .take(5)
+        .joinToString(" • ") { itemLines ->
+          val first = itemLines.first()
+          val title = supplierRunLineTitle(first)
+          val quantityTotal = itemLines.sumOf { line -> line.supplierDeskPhysicalQuantityTotal() }.roundMoney()
+          val quantityText = quantityTotal.takeIf { it > 0.0 }?.let(::supplierRunQuantityText).orEmpty()
+          if (quantityText.isBlank()) title else "$title × $quantityText"
+        }
+      val packChecklistLineGroups = packLines
+        .groupBy { line ->
+          (line.substituteGoodsItemId?.takeIf { it.isNotBlank() } ?: line.goodsItemId)
+            .ifBlank { line.goodsItemBarcodeSnapshots.firstOrNull().orEmpty() }
+            .ifBlank { line.id }
+        }
+        .values
+        .toList()
+      val packChecklist = packChecklistLineGroups
+        .sortedBy { itemLines -> supplierRunLineTitle(itemLines.first()).lowercase() }
+        .take(10)
+        .joinToString("\n") { itemLines ->
+          val first = itemLines.first()
+          val title = supplierRunLineTitle(first)
+          val quantityTotal = itemLines.sumOf { line -> line.supplierDeskPhysicalQuantityTotal() }.roundMoney()
+          val barcode = first.substituteGoodsItemBarcodeSnapshots.firstOrNull() ?: first.goodsItemBarcodeSnapshots.firstOrNull()
+          buildString {
+            append("□ ").append(title)
+            quantityTotal.takeIf { it > 0.0 }?.let { amount -> append(" × ").append(supplierRunQuantityText(amount)) }
+            barcode?.takeIf { it.isNotBlank() }?.let { code -> append(" · ").append(code) }
+          }
+        }
+      val amountLines = runLines
+        .filter { line -> line.orderId in physicallyActionableOrderIds }
+        .mapNotNull amountLine@{ line ->
+        val order = ordersById[line.orderId] ?: return@amountLine null
+        val targetGoodsItemId = supplierBridgeTargetGoodsItemId(line)
+        val quantity = line.supplierDeskPhysicalQuantityTotal()
+        if (quantity <= 0.0) return@amountLine null
+        val price = line.supplierOfferedSupplyPrice
+          ?: line.expectedSupplyPrice
+          ?: supplierPriceRows
+            .filter { price ->
+              price.isActive &&
+                 price.storeId == order.storeId &&
+                 price.supplierId == order.supplierId &&
+                 price.goodsItemId == targetGoodsItemId
+            }
+            .maxByOrNull { price -> price.lastUsedAtMillis ?: price.updatedAtMillis }
+            ?.supplyPrice
+          ?: return@amountLine null
+        quantity to price
+      }
+      val amountValue = amountLines.sumOf { (quantity, price) -> quantity * price.price.toMoneyDouble() }.roundMoney()
+      val amountCurrency = amountLines.firstOrNull()?.second?.currency?.takeIf { it.isNotBlank() }
+        ?: runOrders.firstNotNullOfOrNull { order -> order.amount?.currency?.takeIf { it.isNotBlank() } }
+        ?: supplierPriceRows.firstOrNull()?.supplyPrice?.currency?.takeIf { it.isNotBlank() }
+        ?: "KZT"
+      val runGoodsItemIds = runLines
+        .map { line -> supplierBridgeTargetGoodsItemId(line) }
+        .filter { goodsItemId -> goodsItemId.isNotBlank() }
+        .toSet()
+      val relatedContracts = contracts.filter { contract ->
+        contract.isActive &&
+           sampleOrder != null &&
+           contract.storeId == sampleOrder.storeId &&
+           contract.supplierId == sampleOrder.supplierId &&
+           (contract.scopeType == SUPPLIER_CONTRACT_SCOPE_PARTNERSHIP ||
+              contract.goodsItemIds.isEmpty() ||
+              contract.goodsItemIds.any { goodsItemId -> goodsItemId in runGoodsItemIds })
+      }
+      val runContractBlockers = relatedContracts.filter { contract ->
+        contract.status != SUPPLIER_CONTRACT_STATUS_ACTIVE &&
+           contract.status != SUPPLIER_CONTRACT_STATUS_ARCHIVED
+      }
+      val contractBlockedOrderIds = runBundles
+        .filter { bundle -> bundle.hasSupplierDashboardContractBlocker() }
+        .map { bundle -> bundle.order.id }
+        .filter { orderId -> orderId.isNotBlank() }
+        .distinct()
+      val packableOrderIds = runOrders.filter { order -> order.id in readyToPackOrderIds }.map { it.id }
+      val dispatchableOrderIds = runOrders.filter { order -> order.id in safeDispatchableOrderIds }.map { it.id }
+      val packedCount = runOrders.count { order -> order.status == SupplierOrderStatusDataModel.Packed }
+      val dispatchableCount = dispatchableOrderIds.size
+      val readyToPackCount = packableOrderIds.size
+      val inDeliveryCount = runOrders.count { order -> order.status == SupplierOrderStatusDataModel.InDelivery }
+      val issueCount = runOrders.count { order -> order.status == SupplierOrderStatusDataModel.IssueReported }
+      val actionRequiredOrderIds = runBundles
+        .filter { bundle -> bundle.needsSupplierDashboardAction() || bundle.order.id in responseGapOrderIds }
+        .map { bundle -> bundle.order.id }
+        .distinct()
+      val actionRequiredCount = actionRequiredOrderIds.size
+      val pendingContractCount = runContractBlockers.size
+      val activeContractCount = relatedContracts.count { contract -> contract.status == SUPPLIER_CONTRACT_STATUS_ACTIVE }
+      val attentionOrderIds = (actionRequiredOrderIds + contractBlockedOrderIds).distinct()
+      val earliestDueAtMillis = dueValues.minOrNull()
+      val latestDueAtMillis = dueValues.maxOrNull()
+      val latestActivityMillis = runOrders
+        .map { order -> order.updatedAtMillis.takeIf { value -> value > 0L } ?: order.orderedAtMillis }
+        .maxOrNull()
+        ?: 0L
+      val dueBoost = earliestDueAtMillis?.let { due ->
+        when {
+          due < now -> 30
+          due < now + AITA_SUPPLIER_DAY_MILLIS -> 20
+          due < now + 3L * AITA_SUPPLIER_DAY_MILLIS -> 12
+          else -> 4
+        }
+      } ?: 2
+      val suggestedAction = when {
+        issueCount > 0 -> "issue"
+        pendingContractCount > 0 -> "contract"
+        actionRequiredCount > 0 -> "answer"
+        readyToPackCount > 0 -> "pack"
+        dispatchableCount > 0 -> "dispatch"
+        inDeliveryCount > 0 -> "delivery"
+        else -> "plan"
+      }
+      val priorityScore = (
+        issueCount * 40 +
+           pendingContractCount * 26 +
+           actionRequiredCount * 20 +
+           readyToPackCount * 16 +
+           dispatchableCount * 14 +
+           inDeliveryCount * 8 +
+           runOrders.size * 3 +
+           dueBoost
+        ).coerceAtLeast(0)
+      val runAttentionSummary = supplierDashboardRunAttentionSummary(
+        issueCount = issueCount,
+        pendingContractCount = pendingContractCount,
+        actionRequiredCount = actionRequiredCount,
+        readyToPackCount = readyToPackCount,
+        packedCount = dispatchableCount,
+        inDeliveryCount = inDeliveryCount
+      )
+      val handoffMain = mutableListOf<String>()
+      val handoffRu = mutableListOf<String>()
+      val handoffKk = mutableListOf<String>()
+      fun addHandoff(mainText: String, ruText: String, kkText: String) {
+        handoffMain += mainText
+        handoffRu += ruText
+        handoffKk += kkText
+      }
+      if (contractBlockedOrderIds.isNotEmpty()) {
+        addHandoff(
+          "□ Do not pack or load ${contractBlockedOrderIds.size} contract-blocked order(s)",
+          "□ Не собирайте и не грузите ${contractBlockedOrderIds.size} заказ(ов), заблокированных договором",
+          "□ Келісімшарт бөгеген ${contractBlockedOrderIds.size} тапсырысты жинамаңыз және тиеп жібермеңіз"
+        )
+      }
+      if (readyToPackCount > 0 || packedCount > 0 || inDeliveryCount > 0) {
+        addHandoff(
+          "□ Verify run and order count: ${runOrders.size}",
+          "□ Проверьте маршрут и число заказов: ${runOrders.size}",
+          "□ Бағыт пен тапсырыс санын тексеріңіз: ${runOrders.size}"
+        )
+        sampleOrder?.storeAddressTextSnapshot?.takeIf { it.isNotBlank() }?.let { address ->
+          addHandoff(
+            "□ Confirm delivery address: $address",
+            "□ Проверьте адрес доставки: $address",
+            "□ Жеткізу мекенжайын тексеріңіз: $address"
+          )
+        }
+        if (readyToPackCount > 0) addHandoff(
+          "□ Pack before driver: $readyToPackCount order(s)",
+          "□ Собрать до передачи водителю: $readyToPackCount заказ(ов)",
+          "□ Жүргізушіге дейін жинау: $readyToPackCount тапсырыс"
+        )
+        if (dispatchableCount > 0) addHandoff(
+          "□ Load packed orders: $dispatchableCount",
+          "□ Загрузить собранные заказы: $dispatchableCount",
+          "□ Жиналған тапсырыстарды тиеу: $dispatchableCount"
+        )
+        if (inDeliveryCount > 0) addHandoff(
+          "□ Already on route: $inDeliveryCount order(s)",
+          "□ Уже в пути: $inDeliveryCount заказ(ов)",
+          "□ Жолда: $inDeliveryCount тапсырыс"
+        )
+        amountValue.takeIf { it > 0.0 }?.let { amount ->
+          val amountText = "${amount.toStockMoneyText()} $amountCurrency"
+          addHandoff(
+            "□ Manifest amount: $amountText",
+            "□ Сумма манифеста: $amountText",
+            "□ Манифест сомасы: $amountText"
+          )
+        }
+        packChecklist.takeIf { it.isNotBlank() }?.let { checklist ->
+          addHandoff(
+            checklist,
+            checklist,
+            checklist
+          )
+        }
+      }
+      val driverHandoffChecklist = supplierDashboardJoinedMessage(handoffMain, handoffRu, handoffKk)
+
+      SupplierDashboardDispatchRunDataModel(
+        runId = "dispatch_${runKey.take(96)}",
+        supplierId = sampleOrder?.supplierId.orEmpty(),
+        storeId = sampleOrder?.storeId.orEmpty(),
+        storeNameSnapshot = sampleOrder?.storeNameSnapshot.orEmpty(),
+        storePublicIdSnapshot = sampleOrder?.storePublicIdSnapshot.orEmpty(),
+        storeAddressTextSnapshot = sampleOrder?.storeAddressTextSnapshot.orEmpty(),
+        orderIds = runOrders.map { it.id },
+        packableOrderIds = packableOrderIds,
+        dispatchableOrderIds = dispatchableOrderIds,
+        attentionOrderIds = attentionOrderIds,
+        contractBlockedOrderIds = contractBlockedOrderIds,
+        statusMix = statusMix,
+        orderCount = runOrders.size,
+        lineCount = runLines.size,
+        readyToPackOrderCount = readyToPackCount,
+        packedOrderCount = packedCount,
+        inDeliveryOrderCount = inDeliveryCount,
+        issueOrderCount = issueCount,
+        actionRequiredOrderCount = actionRequiredCount,
+        activeContractCount = activeContractCount,
+        pendingContractCount = pendingContractCount,
+        earliestDueAtMillis = earliestDueAtMillis,
+        latestDueAtMillis = latestDueAtMillis,
+        latestActivityMillis = latestActivityMillis,
+        goodsPreview = preview.takeIf { it.isNotBlank() }?.let { listOf(LocalizedStringDataModel("main", it)) }.orEmpty(),
+        packChecklist = packChecklist.takeIf { it.isNotBlank() }?.let { listOf(LocalizedStringDataModel("main", it)) }.orEmpty(),
+        attentionSummary = runAttentionSummary,
+        driverHandoffChecklist = driverHandoffChecklist,
+        estimatedAmount = amountValue.takeIf { it > 0.0 }?.let { amount ->
+          PriceDataModel(amount.toStockMoneyText(), amountCurrency, sampleOrder?.supplierId.orEmpty())
+        },
+        priorityScore = priorityScore,
+        suggestedAction = suggestedAction
+      )
+    }
+    .sortedWith(
+      compareByDescending<SupplierDashboardDispatchRunDataModel> { it.priorityScore }
+        .thenBy { it.earliestDueAtMillis ?: Long.MAX_VALUE }
+        .thenByDescending { it.latestActivityMillis }
+    )
+    .take(12)
 
   val manufacturerBridge = openLines
     .filter { line -> supplierBridgeTargetGoodsItemId(line).isNotBlank() }
@@ -7222,7 +7908,7 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
       val priceBookRowsForItem = supplierPriceRows.filter { price -> price.goodsItemId == goodsItemId }
       val responseCoveredLineCount = itemLines.count { line ->
         line.supplierAcceptedQuantity != null &&
-           (line.supplierOfferedSupplyPrice != null || run {
+           (!line.hasPositiveSupplierDeskAcceptedQuantity() || line.supplierOfferedSupplyPrice.hasPositiveSupplierDeskPrice() || run {
              val order = ordersById[line.orderId]
              order != null && supplierPriceBookKeyFor(order, line) in supplierPriceBookKeys
            })
@@ -7254,7 +7940,69 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
         .map { order -> order.updatedAtMillis.takeIf { value -> value > 0L } ?: order.orderedAtMillis }
         .maxOrNull()
         ?: 0L
-      val missingResponseLineCount = itemLines.count { line -> line.supplierAcceptedQuantity == null || line.supplierOfferedSupplyPrice == null }
+      fun itemLineNeedsFactoryQuote(line: SupplierOrderLineDataModel): Boolean {
+        if (line.supplierAcceptedQuantity == null) return true
+        if (!line.isMissingSupplierDeskOfferedPriceForAcceptedQuantity()) return false
+        val order = ordersById[line.orderId] ?: return true
+        return supplierPriceBookKeyFor(order, line) !in supplierPriceBookKeys
+      }
+      val quoteNeededLines = itemLines.filter { line -> itemLineNeedsFactoryQuote(line) }
+      val missingResponseLineCount = quoteNeededLines.size
+      val quoteNeededOrderIds = quoteNeededLines
+        .mapNotNull { line -> ordersById[line.orderId]?.id }
+        .distinct()
+      val productionOrderIds = relatedOrders
+        .filter { order -> order.status == SupplierOrderStatusDataModel.Confirmed }
+        .filter { order -> itemLines.any { line -> line.orderId == order.id && line.hasPositiveSupplierDeskAcceptedQuantity() } }
+        .map { order -> order.id }
+        .distinct()
+      val shipmentOrderIds = relatedOrders
+        .filter { order ->
+          order.status == SupplierOrderStatusDataModel.Packed ||
+             order.status == SupplierOrderStatusDataModel.InDelivery
+        }
+        .filter { order -> itemLines.any { line -> line.orderId == order.id && line.hasPositiveSupplierDeskAcceptedQuantity() } }
+        .map { order -> order.id }
+        .distinct()
+      val storePreview = relatedOrders
+        .map { order ->
+          order.storeNameSnapshot.firstOrNull { name -> name.value.isNotBlank() }?.value
+            ?: order.storePublicIdSnapshot.takeIf { it.isNotBlank() }
+            ?: order.storeId.take(8)
+        }
+        .filter { it.isNotBlank() }
+        .distinct()
+        .take(4)
+        .joinToString(" • ")
+      val bridgeAttentionMain = mutableListOf<String>()
+      val bridgeAttentionRu = mutableListOf<String>()
+      val bridgeAttentionKk = mutableListOf<String>()
+      fun addBridgeAttention(mainText: String, ruText: String, kkText: String) {
+        bridgeAttentionMain += mainText
+        bridgeAttentionRu += ruText
+        bridgeAttentionKk += kkText
+      }
+      if (missingResponseLineCount > 0) addBridgeAttention(
+        "$missingResponseLineCount line(s) still need quote, accepted quantity, or price before upstream commitment",
+        "$missingResponseLineCount строк(и) ещё ждут расчёт, принятое количество или цену до передачи выше",
+        "$missingResponseLineCount жол жоғарыға берілмес бұрын баға, қабылданған сан немесе баға күтеді"
+      )
+      if (missingQuantityTotal > 0.0 && acceptedQuantityTotal > 0.0) addBridgeAttention(
+        "Short ${missingQuantityTotal.toStockMoneyText()} against requested demand",
+        "Не хватает ${missingQuantityTotal.toStockMoneyText()} относительно заявки",
+        "Сұраныспен салыстырғанда ${missingQuantityTotal.toStockMoneyText()} жетіспейді"
+      )
+      if (priceBookRowsForItem.isEmpty()) addBridgeAttention(
+        "No reusable supplier price is saved for this goods yet",
+        "Для этого товара ещё нет сохранённой цены поставщика",
+        "Бұл тауарға сақталған жеткізуші бағасы әлі жоқ"
+      )
+      if (shipmentOrderIds.isNotEmpty()) addBridgeAttention(
+        "${shipmentOrderIds.size} order(s) are already packed or moving",
+        "${shipmentOrderIds.size} заказ(ов) уже собрано или в пути",
+        "${shipmentOrderIds.size} тапсырыс жиналған немесе жолда"
+      )
+      val bridgeAttentionSummary = supplierDashboardJoinedMessage(bridgeAttentionMain, bridgeAttentionRu, bridgeAttentionKk)
       val duePressure = earliestDueAtMillis?.let { due ->
         when {
           due < now -> 24
@@ -7280,6 +8028,11 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
         goodsItemNameSnapshot = if (sampleUsesSubstitute) sampleLine.substituteGoodsItemNameSnapshot else sampleLine.goodsItemNameSnapshot,
         barcodeSnapshots = if (sampleUsesSubstitute) sampleLine.substituteGoodsItemBarcodeSnapshots else sampleLine.goodsItemBarcodeSnapshots,
         measurementUnitIdSnapshot = if (sampleUsesSubstitute) sampleLine.substituteGoodsItemMeasurementUnitIdSnapshot else sampleLine.goodsItemMeasurementUnitIdSnapshot,
+        orderIds = relatedOrders.map { order -> order.id },
+        quoteNeededOrderIds = quoteNeededOrderIds,
+        productionOrderIds = productionOrderIds,
+        shipmentOrderIds = shipmentOrderIds,
+        storePreview = storePreview.takeIf { it.isNotBlank() }?.let { listOf(LocalizedStringDataModel("main", it)) }.orEmpty(),
         requestedQuantityTotal = requestedQuantityTotal,
         acceptedQuantityTotal = acceptedQuantityTotal,
         missingQuantityTotal = missingQuantityTotal,
@@ -7294,11 +8047,127 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
         earliestDueAtMillis = earliestDueAtMillis,
         latestActivityMillis = latestActivityMillis,
         priorityScore = priorityScore,
-        suggestedAction = suggestedAction
+        suggestedAction = suggestedAction,
+        attentionSummary = bridgeAttentionSummary
       )
     }
     .sortedWith(
       compareByDescending<SupplierDashboardManufacturerBridgeDataModel> { it.priorityScore }
+        .thenBy { it.earliestDueAtMillis ?: Long.MAX_VALUE }
+        .thenByDescending { it.latestActivityMillis }
+    )
+    .take(10)
+
+  val backorderWatch = openLines
+    .filter { line -> line.supplierAcceptedQuantity != null }
+    .mapNotNull { line ->
+      val order = ordersById[line.orderId] ?: return@mapNotNull null
+      val requested = line.requestedQuantity.total.coerceAtLeast(0.0)
+      val accepted = (line.supplierDeskAcceptedQuantityTotal() ?: 0.0).coerceAtLeast(0.0)
+      val missing = (requested - accepted).coerceAtLeast(0.0).roundMoney()
+      if (requested <= 0.0 || missing <= 0.000001) return@mapNotNull null
+      val goodsItemId = supplierBridgeTargetGoodsItemId(line).ifBlank { line.goodsItemId }
+      if (goodsItemId.isBlank()) return@mapNotNull null
+      Triple(goodsItemId, line, missing)
+    }
+    .groupBy { shortage -> shortage.first }
+    .mapNotNull backorderItem@{ (goodsItemId, shortages) ->
+      val itemLines = shortages.map { it.second }
+      val relatedOrders = itemLines
+        .mapNotNull { line -> ordersById[line.orderId] }
+        .filter { order -> !order.status.isClosedForSupplierDashboard() }
+        .distinctBy { it.id }
+      if (relatedOrders.isEmpty()) return@backorderItem null
+      val sampleLine = itemLines
+        .maxByOrNull { line -> ordersById[line.orderId]?.updatedAtMillis ?: 0L }
+        ?: itemLines.firstOrNull()
+        ?: return@backorderItem null
+      val sampleUsesSubstitute = sampleLine.substituteGoodsItemId?.takeIf { it.isNotBlank() } == goodsItemId
+      val requestedQuantityTotal = itemLines.sumOf { line -> line.requestedQuantity.total.coerceAtLeast(0.0) }.roundMoney()
+      val acceptedQuantityTotal = itemLines.sumOf { line -> (line.supplierDeskAcceptedQuantityTotal() ?: 0.0).coerceAtLeast(0.0) }.roundMoney()
+      val missingQuantityTotal = (requestedQuantityTotal - acceptedQuantityTotal).coerceAtLeast(0.0).roundMoney()
+      if (missingQuantityTotal <= 0.000001) return@backorderItem null
+      val declinedLineCount = itemLines.count { line -> (line.supplierDeskAcceptedQuantityTotal() ?: 0.0) <= 0.000001 }
+      val earliestDueAtMillis = relatedOrders
+        .mapNotNull { order -> order.confirmedDeliveryTimeMillis ?: order.desiredDeliveryTimeMillis }
+        .minOrNull()
+      val latestActivityMillis = relatedOrders
+        .map { order -> order.updatedAtMillis.takeIf { value -> value > 0L } ?: order.orderedAtMillis }
+        .maxOrNull()
+        ?: 0L
+      val storePreview = relatedOrders
+        .map { order ->
+          order.storeNameSnapshot.firstOrNull { name -> name.value.isNotBlank() }?.value
+            ?: order.storePublicIdSnapshot.takeIf { it.isNotBlank() }
+            ?: order.storeId.take(8)
+        }
+        .filter { it.isNotBlank() }
+        .distinct()
+        .take(4)
+        .joinToString(" • ")
+      val shortageMain = mutableListOf<String>()
+      val shortageRu = mutableListOf<String>()
+      val shortageKk = mutableListOf<String>()
+      fun addShortageAttention(mainText: String, ruText: String, kkText: String) {
+        shortageMain += mainText
+        shortageRu += ruText
+        shortageKk += kkText
+      }
+      addShortageAttention(
+        "Short ${missingQuantityTotal.toStockMoneyText()} across ${relatedOrders.size} order(s)",
+        "Не хватает ${missingQuantityTotal.toStockMoneyText()} по ${relatedOrders.size} заказ(ам)",
+        "${relatedOrders.size} тапсырыс бойынша ${missingQuantityTotal.toStockMoneyText()} жетіспейді"
+      )
+      if (declinedLineCount > 0) addShortageAttention(
+        "$declinedLineCount declined line(s) should be confirmed with the store or upstream supplier",
+        "$declinedLineCount отклонённ(ых) строк(и) нужно согласовать с магазином или верхним поставщиком",
+        "$declinedLineCount қабылданбаған жол дүкенмен немесе жоғары жеткізушімен келісуді күтеді"
+      )
+      val duePressure = earliestDueAtMillis?.let { due ->
+        when {
+          due < now -> 26
+          due < now + AITA_SUPPLIER_DAY_MILLIS -> 18
+          due < now + 3L * AITA_SUPPLIER_DAY_MILLIS -> 10
+          else -> 4
+        }
+      } ?: 2
+      val suggestedAction = when {
+        declinedLineCount >= itemLines.size -> "negotiate"
+        relatedOrders.any { order -> order.status == SupplierOrderStatusDataModel.Confirmed } -> "source"
+        else -> "watch"
+      }
+      val priorityScore = (
+        relatedOrders.size * 12 +
+           itemLines.size * 5 +
+           declinedLineCount * 8 +
+           missingQuantityTotal.coerceAtMost(999.0).toInt() +
+           duePressure
+        ).coerceAtLeast(0)
+
+      SupplierDashboardBackorderDataModel(
+        backorderId = "backorder_${goodsItemId}_${relatedOrders.joinToString("-") { it.id.take(8) }}",
+        goodsItemId = goodsItemId,
+        goodsItemNameSnapshot = if (sampleUsesSubstitute) sampleLine.substituteGoodsItemNameSnapshot else sampleLine.goodsItemNameSnapshot,
+        barcodeSnapshots = if (sampleUsesSubstitute) sampleLine.substituteGoodsItemBarcodeSnapshots else sampleLine.goodsItemBarcodeSnapshots,
+        measurementUnitIdSnapshot = if (sampleUsesSubstitute) sampleLine.substituteGoodsItemMeasurementUnitIdSnapshot else sampleLine.goodsItemMeasurementUnitIdSnapshot,
+        affectedOrderIds = relatedOrders.map { order -> order.id },
+        storePreview = storePreview.takeIf { it.isNotBlank() }?.let { listOf(LocalizedStringDataModel("main", it)) }.orEmpty(),
+        requestedQuantityTotal = requestedQuantityTotal,
+        acceptedQuantityTotal = acceptedQuantityTotal,
+        missingQuantityTotal = missingQuantityTotal,
+        missingLineCount = itemLines.size,
+        declinedLineCount = declinedLineCount,
+        affectedOrderCount = relatedOrders.size,
+        affectedStoreCount = relatedOrders.map { it.storeId }.filter { it.isNotBlank() }.distinct().size,
+        earliestDueAtMillis = earliestDueAtMillis,
+        latestActivityMillis = latestActivityMillis,
+        priorityScore = priorityScore,
+        suggestedAction = suggestedAction,
+        attentionSummary = supplierDashboardJoinedMessage(shortageMain, shortageRu, shortageKk)
+      )
+    }
+    .sortedWith(
+      compareByDescending<SupplierDashboardBackorderDataModel> { it.priorityScore }
         .thenBy { it.earliestDueAtMillis ?: Long.MAX_VALUE }
         .thenByDescending { it.latestActivityMillis }
     )
@@ -7319,10 +8188,8 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
       emails = supplier.emails.orEmpty(),
       orderCount = profileOrders.size,
       openOrderCount = profileOrders.count { !it.status.isClosedForSupplierDashboard() },
-      actionRequiredOrderCount = profileOrders.count {
-        it.status == SupplierOrderStatusDataModel.Sent ||
-           it.status == SupplierOrderStatusDataModel.SeenBySupplier ||
-           it.status == SupplierOrderStatusDataModel.IssueReported
+      actionRequiredOrderCount = bundles.count { bundle ->
+        bundle.order.supplierId == supplier.id && bundle.needsSupplierDashboardAction()
       },
       catalogSkuCount = (profileLines.map { it.goodsItemId } + profilePriceBookGoodsItemIds).filter { it.isNotBlank() }.distinct().size,
       partnerCount = (profileOrders.map { it.storeId } + supplierPriceRows.filter { it.supplierId == supplier.id }.map { it.storeId }).filter { it.isNotBlank() }.distinct().size,
@@ -7342,11 +8209,7 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
     generatedAtMillis = now,
     orderCount = orders.size,
     openOrderCount = orders.count { !it.status.isClosedForSupplierDashboard() },
-    actionRequiredOrderCount = orders.count {
-      it.status == SupplierOrderStatusDataModel.Sent ||
-         it.status == SupplierOrderStatusDataModel.SeenBySupplier ||
-         it.status == SupplierOrderStatusDataModel.IssueReported
-    },
+    actionRequiredOrderCount = openBundles.count { bundle -> bundle.needsSupplierDashboardAction() },
     packedOrderCount = orders.count { it.status == SupplierOrderStatusDataModel.Packed },
     inDeliveryOrderCount = orders.count { it.status == SupplierOrderStatusDataModel.InDelivery },
     deliveredOrderCount = orders.count { it.status == SupplierOrderStatusDataModel.Delivered || it.status == SupplierOrderStatusDataModel.PartiallyDelivered },
@@ -7360,9 +8223,14 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
     demandHighlights = demandHighlights,
     partnerHighlights = partnerHighlights,
     actionQueue = actionQueue,
+    bulkSeenOrderIds = bulkSeenOrderIds,
+    bulkPackableOrderIds = bulkPackableOrderIds,
+    bulkDispatchableOrderIds = bulkDispatchableOrderIds,
     deliveryBuckets = deliveryBuckets,
+    dispatchRuns = dispatchRuns,
     readiness = readiness,
-    manufacturerBridge = manufacturerBridge
+    manufacturerBridge = manufacturerBridge,
+    backorderWatch = backorderWatch
   )
 }
 
@@ -8451,7 +9319,7 @@ private fun learnSupplierPriceFromResponseLineInsideTransaction(
 ) {
   val offeredPrice = line.supplierOfferedSupplyPrice ?: return
   if (offeredPrice.price.toMoneyDouble() <= 0.0) return
-  val acceptedQuantity = line.supplierAcceptedQuantity ?: line.requestedQuantity
+  val acceptedQuantity = line.supplierAcceptedQuantity ?: return
   if (acceptedQuantity.total <= 0.0) return
 
   val effectiveGoodsItemId = (line.substituteGoodsItemId?.takeIf { it.isNotBlank() } ?: line.goodsItemId)
@@ -13174,7 +14042,6 @@ fun Application.module() {
           val userId = call.checkPrincipal() ?: return@get
           val storeId = call.headerUuid("store_id")
           val supplierId = call.headerUuid("supplier_id")
-
           val result = newSuspendedTransaction(aitaServerIoContext) {
             val accessibleSupplierIds = if (storeId == null && supplierId == null) {
               Suppliers
@@ -13444,6 +14311,11 @@ fun Application.module() {
           val userId = call.checkPrincipal() ?: return@get
           val storeId = call.headerUuid("store_id")
           val supplierId = call.headerUuid("supplier_id")
+          val shouldMarkSeen = call.request.headers["mark_seen"]
+            ?.trim()
+            ?.lowercase()
+            ?.let { value -> value == "1" || value == "true" || value == "yes" || value == "seen" }
+            ?: false
 
           val result = newSuspendedTransaction(aitaServerIoContext) {
             val accessibleSupplierIds = if (storeId == null && supplierId == null) {
@@ -13467,21 +14339,26 @@ fun Application.module() {
             if (storeId == null && supplierId == null) {
               orderFilter = orderFilter and (SupplierOrders.supplierId inList accessibleSupplierIds)
             }
-
-            val supplierSideSeenIds = when {
-              storeId == null && supplierId == null -> accessibleSupplierIds
-              storeId == null && supplierId != null -> listOf(supplierId)
-              else -> emptyList()
+            if (storeId == null) {
+              orderFilter = orderFilter and (SupplierOrders.status neq SupplierOrderStatusDataModel.Draft.name)
             }
-            if (supplierSideSeenIds.isNotEmpty()) {
-              val now = System.currentTimeMillis()
-              SupplierOrders.update({
-                (SupplierOrders.supplierId inList supplierSideSeenIds) and
-                   (SupplierOrders.status eq SupplierOrderStatusDataModel.Sent.name) and
-                   (SupplierOrders.isActive eq true)
-              }) {
-                it[SupplierOrders.status] = SupplierOrderStatusDataModel.SeenBySupplier.name
-                it[SupplierOrders.updatedAtMillis] = now
+
+            if (shouldMarkSeen) {
+              val supplierSideSeenIds = when {
+                storeId == null && supplierId == null -> accessibleSupplierIds
+                storeId == null && supplierId != null -> listOf(supplierId)
+                else -> emptyList()
+              }
+              if (supplierSideSeenIds.isNotEmpty()) {
+                val now = System.currentTimeMillis()
+                SupplierOrders.update({
+                  (SupplierOrders.supplierId inList supplierSideSeenIds) and
+                     (SupplierOrders.status eq SupplierOrderStatusDataModel.Sent.name) and
+                     (SupplierOrders.isActive eq true)
+                }) {
+                  it[SupplierOrders.status] = SupplierOrderStatusDataModel.SeenBySupplier.name
+                  it[SupplierOrders.updatedAtMillis] = now
+                }
               }
             }
 
@@ -13614,9 +14491,41 @@ fun Application.module() {
             if (canEditFromSupplier && !canEditFromStore) {
               val existingOrder = existing.toSupplierOrderDataModel()
               val requestedOrder = body.order
-              val supplierStatus = supplierOrderStatusAllowedFromSupplier(requestedOrder.status, existingOrder.status)
+              val requestedActiveLines = body.lines
+                .filter { it.isActive }
+                .map { line -> line.cleanForStorage(orderId) }
+              if (requestedOrder.status == SupplierOrderStatusDataModel.Packed || requestedOrder.status == SupplierOrderStatusDataModel.InDelivery) {
+                val movingGoodsItemIds = requestedActiveLines.mapNotNull { line ->
+                  runCatching { UUID.fromString(line.substituteGoodsItemId?.takeIf { it.isNotBlank() } ?: line.goodsItemId) }.getOrNull()
+                }
+                if (supplierContractBlocksStoreSupplyInsideTransaction(storeId, supplierId, movingGoodsItemIds) != null) {
+                  failureMessage = supplierContractGuardFailureMessage()
+                  return@newSuspendedTransaction null
+                }
+              }
+              val requestedSupplierStatus = when {
+                requestedOrder.status == SupplierOrderStatusDataModel.Sent &&
+                   existingOrder.status == SupplierOrderStatusDataModel.Sent -> SupplierOrderStatusDataModel.SeenBySupplier
+                requestedOrder.status == SupplierOrderStatusDataModel.Draft &&
+                   existingOrder.status == SupplierOrderStatusDataModel.Sent -> SupplierOrderStatusDataModel.SeenBySupplier
+                else -> requestedOrder.status
+              }
+              val supplierStatus = supplierOrderStatusAllowedFromSupplier(
+                requested = requestedSupplierStatus,
+                current = existingOrder.status,
+                requestedOrder = requestedOrder.copy(status = requestedSupplierStatus),
+                requestedLines = requestedActiveLines
+              )
+              if (requestedSupplierStatus != existingOrder.status && supplierStatus == existingOrder.status) {
+                failureMessage = supplierOrderStatusBlockedMessage(requestedSupplierStatus)
+                return@newSuspendedTransaction null
+              }
               val supplierPatch = existingOrder.copy(
-                amount = requestedOrder.amount ?: existingOrder.amount,
+                amount = supplierResponseAmountForStorage(
+                  lines = requestedActiveLines,
+                  supplierId = supplierId,
+                  fallbackCurrency = existingOrder.amount?.currency ?: requestedOrder.amount?.currency
+                ),
                 confirmedDeliveryTimeMillis = requestedOrder.confirmedDeliveryTimeMillis,
                 supplierComment = requestedOrder.supplierComment,
                 supplierCommentLocalized = requestedOrder.supplierCommentLocalized,
@@ -13744,6 +14653,132 @@ fun Application.module() {
               kk = "Жеткізуші тапсырысын жаңарту мүмкін болмады"
             )
           )
+        }
+
+        put("/status") {
+          val userId = call.checkPrincipal() ?: return@put
+          val request = call.receiveAita<SupplierOrderStatusUpdateRequestDataModel>()
+          val orderIds = request.orderIds
+            .asSequence()
+            .mapNotNull { raw -> runCatching { UUID.fromString(raw.trim()) }.getOrNull() }
+            .distinct()
+            .take(200)
+            .toList()
+          if (orderIds.isEmpty()) {
+            return@put call.genericResponseNoPayload(
+              HttpStatusCode.BadRequest,
+              simpleMessage(
+                main = "No supplier orders selected",
+                ru = "Заказы поставщику не выбраны",
+                kk = "Жеткізуші тапсырыстары таңдалмады"
+              )
+            )
+          }
+
+          var failureMessage: List<LocalizedStringDataModel>? = null
+          val updated = newSuspendedTransaction(aitaServerIoContext) {
+            val rowsById = SupplierOrders
+              .selectAll()
+              .where { (SupplierOrders.id inList orderIds) and (SupplierOrders.isActive eq true) }
+              .associateBy { row -> row[SupplierOrders.id] }
+            if (rowsById.isEmpty()) {
+              failureMessage = simpleMessage(
+                main = "Selected supplier orders were not found",
+                ru = "Выбранные заказы поставщику не найдены",
+                kk = "Таңдалған жеткізуші тапсырыстары табылмады"
+              )
+              return@newSuspendedTransaction emptyList<SupplierOrderWithLinesDataModel>()
+            }
+
+            val accessibleRows = orderIds
+              .mapNotNull { orderId -> rowsById[orderId] }
+              .filter { row -> userHasSupplierAccessInsideTransaction(userId, row[SupplierOrders.supplierId]) }
+            if (accessibleRows.isEmpty()) return@newSuspendedTransaction null
+
+            val accessibleOrderIds = accessibleRows.map { row -> row[SupplierOrders.id] }
+            val linesByOrderId = SupplierOrderLines
+              .selectAll()
+              .where { (SupplierOrderLines.orderId inList accessibleOrderIds) and (SupplierOrderLines.isActive eq true) }
+              .map { it.toSupplierOrderLineDataModel() }
+              .groupBy { line -> line.orderId }
+
+            val now = System.currentTimeMillis()
+            val cleanComment = request.comment?.trim()?.takeIf { it.isNotBlank() }
+            val cleanCommentLocalized = cleanComment?.let { listOf(LocalizedStringDataModel("main", it)) }
+            val updatedOrderIds = mutableListOf<UUID>()
+            var blockedCount = 0
+
+            accessibleRows.forEach { existing ->
+              val orderId = existing[SupplierOrders.id]
+              val existingOrder = existing.toSupplierOrderDataModel()
+              val activeLines = linesByOrderId[orderId.toString()].orEmpty()
+              if (request.status == SupplierOrderStatusDataModel.Packed || request.status == SupplierOrderStatusDataModel.InDelivery) {
+                val movingGoodsItemIds = activeLines.mapNotNull { line ->
+                  runCatching { UUID.fromString(line.substituteGoodsItemId?.takeIf { it.isNotBlank() } ?: line.goodsItemId) }.getOrNull()
+                }
+                if (supplierContractBlocksStoreSupplyInsideTransaction(existing[SupplierOrders.storeId], existing[SupplierOrders.supplierId], movingGoodsItemIds) != null) {
+                  blockedCount += 1
+                  failureMessage = supplierContractGuardFailureMessage()
+                  return@forEach
+                }
+              }
+              val requestedOrder = existingOrder.copy(
+                status = request.status,
+                supplierComment = cleanComment ?: existingOrder.supplierComment,
+                supplierCommentLocalized = cleanCommentLocalized ?: existingOrder.supplierCommentLocalized,
+                updatedAtMillis = now,
+                isActive = existing[SupplierOrders.isActive]
+              )
+              val supplierStatus = supplierOrderStatusAllowedFromSupplier(
+                requested = request.status,
+                current = existingOrder.status,
+                requestedOrder = requestedOrder,
+                requestedLines = activeLines
+              )
+
+              if (request.status != existingOrder.status && supplierStatus == existingOrder.status) {
+                blockedCount += 1
+                failureMessage = supplierOrderStatusBlockedMessage(request.status)
+                return@forEach
+              }
+
+              SupplierOrders.update({ SupplierOrders.id eq orderId }) {
+                cleanComment?.let { comment ->
+                  it[SupplierOrders.supplierComment] = comment
+                  it[SupplierOrders.supplierCommentLocalized] = cleanCommentLocalized.orEmpty()
+                }
+                it[SupplierOrders.status] = supplierStatus.name
+                it[SupplierOrders.updatedAtMillis] = now
+              }
+              updatedOrderIds += orderId
+            }
+
+            if (updatedOrderIds.isEmpty()) {
+              if (blockedCount > 0 && failureMessage == null) failureMessage = supplierOrderStatusBlockedMessage(request.status)
+              return@newSuspendedTransaction emptyList<SupplierOrderWithLinesDataModel>()
+            }
+
+            updatedOrderIds
+              .mapNotNull { orderId -> supplierOrderWithLinesInsideTransaction(orderId) }
+              .withSupplierDeskSnapshotsInsideTransaction()
+          }
+
+          when {
+            updated == null -> call.respondAitaUnauthorized()
+            updated.isEmpty() -> call.genericResponseNoPayload(
+              HttpStatusCode.BadRequest,
+              failureMessage ?: simpleMessage(
+                main = "Could not update selected supplier orders",
+                ru = "Не удалось обновить выбранные заказы поставщику",
+                kk = "Таңдалған жеткізуші тапсырыстарын жаңарту мүмкін болмады"
+              )
+            )
+            else -> call.genericListResponse(
+              status = HttpStatusCode.OK,
+              payload = updated,
+              message = supplierOrderStatusSuccessMessage(request.status)
+            )
+          }
         }
 
         delete("/delete") {

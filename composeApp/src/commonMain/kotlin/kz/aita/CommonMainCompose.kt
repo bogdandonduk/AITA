@@ -79,6 +79,7 @@ import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 import kotlin.math.abs
 import kotlin.math.round
+import kotlin.math.roundToInt
 import kotlin.random.Random
 import kotlin.text.equals
 import kotlin.time.ExperimentalTime
@@ -1167,6 +1168,79 @@ private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallb
     put(1725L, mapOf("main" to "Copy factory brief", "en" to "Copy factory brief", "ru" to "Скопировать сводку для фабрики", "kk" to "Фабрикаға қысқаша мәлімет көшіру"))
     put(1726L, mapOf("main" to "No manufacturer bridge signals yet", "en" to "No manufacturer bridge signals yet", "ru" to "Сигналов моста к производителю пока нет", "kk" to "Өндіруші көпірінің сигналдары әзірге жоқ"))
     put(1727L, mapOf("main" to "Factory value", "en" to "Factory value", "ru" to "Сумма для фабрики", "kk" to "Фабрика сомасы"))
+    put(1728L, mapOf("main" to "Server dispatch board", "en" to "Server dispatch board", "ru" to "Серверная доска доставки", "kk" to "Серверлік жеткізу тақтасы"))
+    put(1729L, mapOf("main" to "Backend groups supplier runs by store, promised date and current fulfilment pressure, so desktop and mobile screens see the same delivery priorities.", "en" to "Backend groups supplier runs by store, promised date and current fulfilment pressure, so desktop and mobile screens see the same delivery priorities.", "ru" to "Сервер группирует маршруты поставщика по магазину, обещанной дате и текущему давлению исполнения, чтобы desktop и mobile видели одни и те же приоритеты доставки.", "kk" to "Сервер жеткізуші бағыттарын дүкен, уәде етілген күн және орындау қысымы бойынша топтайды, сондықтан desktop пен mobile бірдей жеткізу басымдықтарын көреді."))
+    put(1730L, mapOf("main" to "Planned runs", "en" to "Planned runs", "ru" to "Плановые маршруты", "kk" to "Жоспарланған бағыттар"))
+    put(1731L, mapOf("main" to "Runs from supplier dashboard", "en" to "Runs from supplier dashboard", "ru" to "Маршруты из панели поставщика", "kk" to "Жеткізуші панелінен бағыттар"))
+    put(1732L, mapOf("main" to "Driver-ready", "en" to "Driver-ready", "ru" to "Готово водителю", "kk" to "Жүргізушіге дайын"))
+    put(1733L, mapOf("main" to "Server dispatch run", "en" to "Server dispatch run", "ru" to "Серверный маршрут", "kk" to "Серверлік бағыт"))
+    put(1734L, mapOf("main" to "Priority", "en" to "Priority", "ru" to "Приоритет", "kk" to "Басымдық"))
+    put(1735L, mapOf("main" to "Suggested action", "en" to "Suggested action", "ru" to "Рекомендуемое действие", "kk" to "Ұсынылған әрекет"))
+    put(1736L, mapOf("main" to "Answer store", "en" to "Answer store", "ru" to "Ответить магазину", "kk" to "Дүкенге жауап беру"))
+    put(1737L, mapOf("main" to "Clear contract", "en" to "Clear contract", "ru" to "Очистить договор", "kk" to "Келісімді тазалау"))
+    put(1738L, mapOf("main" to "Pack goods", "en" to "Pack goods", "ru" to "Упаковать товар", "kk" to "Тауарды жинау"))
+    put(1739L, mapOf("main" to "Send driver", "en" to "Send driver", "ru" to "Отправить водителя", "kk" to "Жүргізушіні жіберу"))
+    put(1740L, mapOf("main" to "Track delivery", "en" to "Track delivery", "ru" to "Отслеживать доставку", "kk" to "Жеткізуді бақылау"))
+    put(1741L, mapOf("main" to "Plan route", "en" to "Plan route", "ru" to "Спланировать маршрут", "kk" to "Бағытты жоспарлау"))
+    put(1742L, mapOf("main" to "Resolve issue", "en" to "Resolve issue", "ru" to "Решить проблему", "kk" to "Мәселені шешу"))
+    put(1743L, mapOf("main" to "Server manifest copied", "en" to "Server manifest copied", "ru" to "Серверный манифест скопирован", "kk" to "Серверлік манифест көшірілді"))
+    put(1744L, mapOf("main" to "No server dispatch runs yet", "en" to "No server dispatch runs yet", "ru" to "Серверных маршрутов пока нет", "kk" to "Әзірге серверлік бағыт жоқ"))
+    put(1745L, mapOf("main" to "Dashboard dispatch runs will appear after at least one open supplier order leaves draft.", "en" to "Dashboard dispatch runs will appear after at least one open supplier order leaves draft.", "ru" to "Маршруты панели появятся, когда хотя бы один открытый заказ поставщику выйдет из черновика.", "kk" to "Панель бағыттары кемінде бір ашық жеткізуші тапсырысы жобадан шыққанда пайда болады."))
+    put(1746L, mapOf("main" to "Pack checklist", "en" to "Pack checklist", "ru" to "Чек-лист сборки", "kk" to "Жинау чек-парағы"))
+    put(1747L, mapOf("main" to "Server run actions", "en" to "Server run actions", "ru" to "Действия серверного маршрута", "kk" to "Серверлік бағыт әрекеттері"))
+    put(1748L, mapOf("main" to "No server-ready orders in this run", "en" to "No server-ready orders in this run", "ru" to "В этом маршруте нет заказов, готовых к сборке", "kk" to "Бұл бағытта жинауға дайын серверлік тапсырыс жоқ"))
+    put(1749L, mapOf("main" to "No packed server orders in this run", "en" to "No packed server orders in this run", "ru" to "В этом маршруте нет собранных серверных заказов", "kk" to "Бұл бағытта жиналған серверлік тапсырыс жоқ"))
+    put(1750L, mapOf("main" to "Server run status changed", "en" to "Server run status changed", "ru" to "Статус серверного маршрута изменён", "kk" to "Серверлік бағыт мәртебесі өзгерді"))
+    put(1752L, mapOf("main" to "Open order", "en" to "Open order", "ru" to "Открыть заказ", "kk" to "Тапсырысты ашу"))
+    put(1753L, mapOf("main" to "Mark seen", "en" to "Mark seen", "ru" to "Отметить просмотренным", "kk" to "Қаралды деп белгілеу"))
+    put(1754L, mapOf("main" to "Quick step", "en" to "Quick step", "ru" to "Быстрый шаг", "kk" to "Жылдам қадам"))
+    put(1755L, mapOf("main" to "Open the order to fill quantities, prices, delivery terms, or issue notes.", "en" to "Open the order to fill quantities, prices, delivery terms, or issue notes.", "ru" to "Откройте заказ, чтобы заполнить количества, цены, условия доставки или заметки по проблеме.", "kk" to "Санды, бағаны, жеткізу шарттарын немесе мәселе жазбасын толтыру үшін тапсырысты ашыңыз."))
+    put(1756L, mapOf("main" to "Attention notes", "en" to "Attention notes", "ru" to "Что проверить", "kk" to "Тексеру керек"))
+    put(1757L, mapOf("main" to "Driver handoff", "en" to "Driver handoff", "ru" to "Передача водителю", "kk" to "Жүргізушіге тапсыру"))
+    put(1758L, mapOf("main" to "Decline line", "en" to "Decline line", "ru" to "Отклонить строку", "kk" to "Жолды қабылдамау"))
+    put(1759L, mapOf("main" to "Not answered yet", "en" to "Not answered yet", "ru" to "Ответ ещё не заполнен", "kk" to "Жауап әлі толтырылмаған"))
+    put(1760L, mapOf("main" to "Unavailable for this delivery", "en" to "Unavailable for this delivery", "ru" to "Недоступно для этой поставки", "kk" to "Бұл жеткізуге қолжетімсіз"))
+    put(1761L, mapOf("main" to "Mark all seen", "en" to "Mark all seen", "ru" to "Отметить все просмотренными", "kk" to "Барлығын қаралды деп белгілеу"))
+    put(1762L, mapOf("main" to "New requests", "en" to "New requests", "ru" to "Новые запросы", "kk" to "Жаңа сұраныстар"))
+    put(1763L, mapOf("main" to "Response progress", "en" to "Response progress", "ru" to "Готовность ответа", "kk" to "Жауап дайындығы"))
+    put(1764L, mapOf("main" to "Answered", "en" to "Answered", "ru" to "Отвечено", "kk" to "Жауап берілді"))
+    put(1765L, mapOf("main" to "Declined", "en" to "Declined", "ru" to "Отклонено", "kk" to "Қабылданбады"))
+    put(1766L, mapOf("main" to "Need quantity", "en" to "Need quantity", "ru" to "Нужно количество", "kk" to "Саны керек"))
+    put(1767L, mapOf("main" to "Need price", "en" to "Need price", "ru" to "Нужна цена", "kk" to "Баға керек"))
+    put(1768L, mapOf("main" to "Ready to confirm", "en" to "Ready to confirm", "ru" to "Можно подтверждать", "kk" to "Растауға дайын"))
+    put(1769L, mapOf("main" to "Pack all ready", "en" to "Pack all ready", "ru" to "Собрать всё готовое", "kk" to "Дайынның бәрін жинау"))
+    put(1770L, mapOf("main" to "Start all packed", "en" to "Start all packed", "ru" to "Отправить всё собранное", "kk" to "Жиналғанның бәрін жіберу"))
+    put(1771L, mapOf("main" to "Response filled", "en" to "Response filled", "ru" to "Ответ заполнен", "kk" to "Жауап толтырылды"))
+    put(1772L, mapOf("main" to "Accepted quantity", "en" to "Accepted quantity", "ru" to "Принятое количество", "kk" to "Қабылданған саны"))
+    put(1773L, mapOf("main" to "Declined lines", "en" to "Declined lines", "ru" to "Отклонённые строки", "kk" to "Қабылданбаған жолдар"))
+    put(1774L, mapOf("main" to "Fill quantity, price, and delivery date first", "en" to "Fill quantity, price, and delivery date first", "ru" to "Сначала заполните количество, цену и дату доставки", "kk" to "Алдымен санды, бағаны және жеткізу күнін толтырыңыз"))
+    put(1775L, mapOf("main" to "Confirm first, then pack", "en" to "Confirm first, then pack", "ru" to "Сначала подтвердите, затем собирайте", "kk" to "Алдымен растаңыз, содан кейін жинаңыз"))
+    put(1776L, mapOf("main" to "Pack first, then start delivery", "en" to "Pack first, then start delivery", "ru" to "Сначала соберите, затем запускайте доставку", "kk" to "Алдымен жинаңыз, содан кейін жеткізуді бастаңыз"))
+    put(1777L, mapOf("main" to "Visible cards", "en" to "Visible cards", "ru" to "Видимые карточки", "kk" to "Көрінетін карталар"))
+    put(1778L, mapOf("main" to "Server-safe bulk", "en" to "Server-safe bulk", "ru" to "Безопасная серверная пачка", "kk" to "Сервердегі қауіпсіз топ"))
+    put(1779L, mapOf("main" to "Saving a new supplier answer marks the request as seen.", "en" to "Saving a new supplier answer marks the request as seen.", "ru" to "Сохранение нового ответа поставщика отмечает запрос просмотренным.", "kk" to "Жеткізушінің жаңа жауабын сақтау сұранысты қаралды деп белгілейді."))
+    put(1780L, mapOf("main" to "Accepted now", "en" to "Accepted now", "ru" to "Принято сейчас", "kk" to "Қазір қабылданды"))
+    put(1781L, mapOf("main" to "Projected amount", "en" to "Projected amount", "ru" to "Расчётная сумма", "kk" to "Есептік сома"))
+    put(1782L, mapOf("main" to "Bulk buttons use all server-known safe orders, not only the visible cards below.", "en" to "Bulk buttons use all server-known safe orders, not only the visible cards below.", "ru" to "Пакетные кнопки используют все безопасные серверные заказы, а не только видимые карточки ниже.", "kk" to "Топтық түймелер төмендегі көрінетін карталарды ғана емес, сервер білетін қауіпсіз тапсырыстардың бәрін қолданады."))
+    put(1783L, mapOf("main" to "Factory staging", "en" to "Factory staging", "ru" to "Стадии фабрики", "kk" to "Фабрика кезеңдері"))
+    put(1784L, mapOf("main" to "Quote", "en" to "Quote", "ru" to "Расчёт", "kk" to "Баға беру"))
+    put(1785L, mapOf("main" to "Produce", "en" to "Produce", "ru" to "Производство", "kk" to "Өндіру"))
+    put(1786L, mapOf("main" to "Ship", "en" to "Ship", "ru" to "Отгрузка", "kk" to "Жөнелту"))
+    put(1787L, mapOf("main" to "Upstream privacy", "en" to "Upstream privacy", "ru" to "Приватность для фабрики", "kk" to "Жоғары арна құпиялығы"))
+    put(1788L, mapOf("main" to "Store names are omitted from this copied factory brief.", "en" to "Store names are omitted from this copied factory brief.", "ru" to "Названия магазинов не попадают в скопированную сводку для фабрики.", "kk" to "Көшірілген фабрика қысқаша мәліметінен дүкен атаулары алынып тасталады."))
+    put(1789L, mapOf("main" to "Internal stores", "en" to "Internal stores", "ru" to "Магазины внутри AITA", "kk" to "AITA ішіндегі дүкендер"))
+    put(1790L, mapOf("main" to "Accepted orders", "en" to "Accepted orders", "ru" to "Принятые заказы", "kk" to "Қабылданған тапсырыстар"))
+    put(1791L, mapOf("main" to "Contract-blocked orders", "en" to "Contract-blocked orders", "ru" to "Заказы, заблокированные договором", "kk" to "Келісімшарт бөгеген тапсырыстар"))
+    put(1792L, mapOf("main" to "Clear contracts before packing or dispatching this run.", "en" to "Clear contracts before packing or dispatching this run.", "ru" to "Закройте договоры перед сборкой или отправкой этого маршрута.", "kk" to "Бұл бағытты жинау немесе жөнелту алдында келісімшарттарды реттеңіз."))
+    put(1793L, mapOf("main" to "Pack and dispatch buttons use only server-safe, unblocked orders.", "en" to "Pack and dispatch buttons use only server-safe, unblocked orders.", "ru" to "Кнопки сборки и отправки используют только безопасные и не заблокированные сервером заказы.", "kk" to "Жинау және жөнелту түймелері тек сервер қауіпсіз деп тапқан, бөгелмеген тапсырыстарды қолданады."))
+    put(1794L, mapOf("main" to "Backorder watch", "en" to "Backorder watch", "ru" to "Контроль недопоставок", "kk" to "Жеткізілмегенді бақылау"))
+    put(1795L, mapOf("main" to "Server watches accepted-vs-requested gaps after supplier answers, so shortages become a clear upstream or store negotiation queue.", "en" to "Server watches accepted-vs-requested gaps after supplier answers, so shortages become a clear upstream or store negotiation queue.", "ru" to "Сервер следит за разницей между запрошенным и принятым после ответа поставщика, поэтому недопоставки становятся понятной очередью для верхнего поставщика или согласования с магазином.", "kk" to "Сервер жеткізуші жауабынан кейін сұралған мен қабылданған арасындағы айырманы бақылайды, сондықтан жетіспеулер жоғары арнаға немесе дүкенмен келісуге арналған айқын кезекке айналады."))
+    put(1796L, mapOf("main" to "Short qty", "en" to "Short qty", "ru" to "Не хватает", "kk" to "Жетіспейді"))
+    put(1797L, mapOf("main" to "Affected orders", "en" to "Affected orders", "ru" to "Затронутые заказы", "kk" to "Әсер еткен тапсырыстар"))
+    put(1798L, mapOf("main" to "Copy shortage brief", "en" to "Copy shortage brief", "ru" to "Скопировать сводку недопоставки", "kk" to "Жетіспеу мәліметін көшіру"))
+    put(1799L, mapOf("main" to "No answered shortage pressure yet", "en" to "No answered shortage pressure yet", "ru" to "Пока нет недопоставок по отвеченным заказам", "kk" to "Жауап берілген тапсырыстарда жетіспеу қысымы әзірге жоқ"))
+    put(1800L, mapOf("main" to "Open shortage orders", "en" to "Open shortage orders", "ru" to "Открыть заказы с недопоставкой", "kk" to "Жетіспейтін тапсырыстарды ашу"))
+    put(1801L, mapOf("main" to "Store negotiation", "en" to "Store negotiation", "ru" to "Согласование с магазином", "kk" to "Дүкенмен келісу"))
 }
 
 
@@ -19879,6 +19953,12 @@ private fun AppConfiguration.supplierDeskSubstituteTitle(line: SupplierOrderLine
         .ifBlank { substituteId.take(8) }
 }
 
+private fun AppConfiguration.supplierDeskFulfillmentLineTitle(line: SupplierOrderLineDataModel): String =
+    supplierDeskSubstituteTitle(line).ifBlank { supplierDeskLineTitle(line) }
+
+private fun SupplierOrderLineDataModel.supplierDeskFulfillmentQuantity(): QuantityDataModel =
+    supplierAcceptedQuantity ?: requestedQuantity
+
 private fun AppConfiguration.buildSupplierSubstituteOptions(lines: List<SupplierOrderLineDataModel>): List<SupplierSubstituteOptionUiModel> {
     return lines
         .asSequence()
@@ -19949,6 +20029,7 @@ private fun AppConfiguration.supplierDashboardActionTitle(action: SupplierDashbo
     "complete_response" -> localizedStringResource(1639, "Complete quantities and prices")
     "pack" -> localizedStringResource(1640, "Pack confirmed goods")
     "dispatch" -> localizedStringResource(1641, "Start delivery run")
+    "contract" -> localizedStringResource(1737, "Clear contract")
     "terms" -> localizedStringResource(1642, "Add delivery terms")
     "delivery" -> localizedStringResource(1643, "Follow delivery")
     else -> localizedStringResource(1644, "Supplier action")
@@ -19985,13 +20066,77 @@ private fun AppConfiguration.supplierDashboardActionIcon(action: SupplierDashboa
     "answer", "complete_response" -> stateValues.drawablePathIconAppModeSupplier to stateValues.drawableResIconAppModeSupplier.value
     "pack" -> stateValues.drawablePathIconStock to stateValues.drawableResIconStock.value
     "dispatch", "delivery" -> stateValues.drawablePathIconSupplierDispatch to stateValues.drawableResIconSupplierDispatch.value
-    "terms" -> stateValues.drawablePathIconSupplierContracts to stateValues.drawableResIconSupplierContracts.value
+    "contract", "terms" -> stateValues.drawablePathIconSupplierContracts to stateValues.drawableResIconSupplierContracts.value
     else -> stateValues.drawablePathIconAppModeSupplier to stateValues.drawableResIconAppModeSupplier.value
 }
 
+private fun SupplierDashboardActionDataModel.supplierDashboardQuickStatus(): SupplierOrderStatusDataModel? = when (actionType) {
+    "answer" -> SupplierOrderStatusDataModel.SeenBySupplier.takeIf { status == SupplierOrderStatusDataModel.Sent }
+    "pack" -> SupplierOrderStatusDataModel.Packed
+    "dispatch" -> SupplierOrderStatusDataModel.InDelivery
+    else -> null
+}
+
+private fun AppConfiguration.supplierDashboardQuickActionLabel(status: SupplierOrderStatusDataModel): String = when (status) {
+    SupplierOrderStatusDataModel.SeenBySupplier -> localizedStringResource(1753, "Mark seen")
+    SupplierOrderStatusDataModel.Packed -> localizedStringResource(1570, "Mark packed")
+    SupplierOrderStatusDataModel.InDelivery -> localizedStringResource(1571, "Start delivery")
+    else -> localizedStringResource(1754, "Quick step")
+}
+
+private fun AppConfiguration.supplierDashboardQuickActionIcon(status: SupplierOrderStatusDataModel): Pair<String, DrawableResource?> = when (status) {
+    SupplierOrderStatusDataModel.Packed,
+    SupplierOrderStatusDataModel.InDelivery -> stateValues.drawablePathIconSupplierDispatch to stateValues.drawableResIconSupplierDispatch.value
+    else -> stateValues.drawablePathIconCheck to stateValues.drawableResIconCheck.value
+}
+
 @Composable
-private fun AppConfiguration.SupplierActionQueueCard(actions: List<SupplierDashboardActionDataModel>) {
-    if (actions.isEmpty()) return
+private fun AppConfiguration.SupplierActionQueueCard(
+    actions: List<SupplierDashboardActionDataModel>,
+    bulkSeenOrderIds: List<String> = emptyList(),
+    bulkPackableOrderIds: List<String> = emptyList(),
+    bulkDispatchableOrderIds: List<String> = emptyList()
+) {
+    if (actions.isEmpty() && bulkSeenOrderIds.isEmpty() && bulkPackableOrderIds.isEmpty() && bulkDispatchableOrderIds.isEmpty()) return
+
+    fun cleanSupplierBulkIds(ids: List<String>): List<String> = ids
+        .map { it.trim() }
+        .filter { it.isNotBlank() }
+        .distinct()
+
+    val visibleSeenOrderIds = remember(actions) {
+        actions
+            .filter { action -> action.actionType == "answer" && action.status == SupplierOrderStatusDataModel.Sent }
+            .map { action -> action.orderId.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+    }
+    val visiblePackOrderIds = remember(actions) {
+        actions
+            .filter { action -> action.actionType == "pack" && action.status == SupplierOrderStatusDataModel.Confirmed }
+            .map { action -> action.orderId.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+    }
+    val visibleDispatchOrderIds = remember(actions) {
+        actions
+            .filter { action -> action.actionType == "dispatch" && action.status == SupplierOrderStatusDataModel.Packed }
+            .map { action -> action.orderId.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+    }
+    val sentActionOrderIds = remember(bulkSeenOrderIds, visibleSeenOrderIds) {
+        cleanSupplierBulkIds(bulkSeenOrderIds).ifEmpty { visibleSeenOrderIds }
+    }
+    val packActionOrderIds = remember(bulkPackableOrderIds, visiblePackOrderIds) {
+        cleanSupplierBulkIds(bulkPackableOrderIds).ifEmpty { visiblePackOrderIds }
+    }
+    val dispatchActionOrderIds = remember(bulkDispatchableOrderIds, visibleDispatchOrderIds) {
+        cleanSupplierBulkIds(bulkDispatchableOrderIds).ifEmpty { visibleDispatchOrderIds }
+    }
+    val bulkCoversMoreThanVisible = sentActionOrderIds.size > visibleSeenOrderIds.size ||
+            packActionOrderIds.size > visiblePackOrderIds.size ||
+            dispatchActionOrderIds.size > visibleDispatchOrderIds.size
 
     Column(
         modifier = Modifier
@@ -20030,15 +20175,75 @@ private fun AppConfiguration.SupplierActionQueueCard(actions: List<SupplierDashb
             }
         }
 
+        val serverBulkCount = (sentActionOrderIds + packActionOrderIds + dispatchActionOrderIds).distinct().size
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1650, "Actions")}: ${actions.size}") }
-            Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1651, "Top priority")}: ${actions.maxOfOrNull { it.priority } ?: 0}") }
+            Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1777, "Visible cards")}: ${actions.size}") }
+            Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1778, "Server-safe bulk")}: $serverBulkCount") }
+        }
+        if (bulkCoversMoreThanVisible) {
+            Text(
+                text = localizedStringResource(1782, "Bulk buttons use all server-known safe orders, not only the visible cards below."),
+                color = stateValues.PlaceholderTextColor,
+                fontSize = stateValues.smallTextSize
+            )
         }
 
-        actions.take(5).forEach { action ->
+        if (sentActionOrderIds.isNotEmpty()) {
+            actionButton(
+                modifier = Modifier.fillMaxWidth(),
+                text = "${localizedStringResource(1761, "Mark all seen")} • ${sentActionOrderIds.size}",
+                subText = localizedStringResource(1762, "New requests"),
+                iconPath = stateValues.drawablePathIconCheck,
+                iconRes = stateValues.drawableResIconCheck.value,
+                textSize = stateValues.smallTextSize,
+                confirmationRequired = false,
+                onClick = {
+                    updateSupplierOrdersSupplierStatusByIds(
+                        orderIds = sentActionOrderIds,
+                        status = SupplierOrderStatusDataModel.SeenBySupplier
+                    )
+                }
+            )
+        }
+
+        if (packActionOrderIds.isNotEmpty()) {
+            actionButton(
+                modifier = Modifier.fillMaxWidth(),
+                text = "${localizedStringResource(1769, "Pack all ready")} • ${packActionOrderIds.size}",
+                iconPath = stateValues.drawablePathIconSupplierDispatch,
+                iconRes = stateValues.drawableResIconSupplierDispatch.value,
+                textSize = stateValues.smallTextSize,
+                confirmationRequired = true,
+                onClick = {
+                    updateSupplierOrdersSupplierStatusByIds(
+                        orderIds = packActionOrderIds,
+                        status = SupplierOrderStatusDataModel.Packed
+                    )
+                }
+            )
+        }
+
+        if (dispatchActionOrderIds.isNotEmpty()) {
+            actionButton(
+                modifier = Modifier.fillMaxWidth(),
+                text = "${localizedStringResource(1770, "Start all packed")} • ${dispatchActionOrderIds.size}",
+                iconPath = stateValues.drawablePathIconSupplierDispatch,
+                iconRes = stateValues.drawableResIconSupplierDispatch.value,
+                textSize = stateValues.smallTextSize,
+                confirmationRequired = true,
+                onClick = {
+                    updateSupplierOrdersSupplierStatusByIds(
+                        orderIds = dispatchActionOrderIds,
+                        status = SupplierOrderStatusDataModel.InDelivery
+                    )
+                }
+            )
+        }
+
+        actions.take(6).forEach { action ->
             SupplierActionQueueItem(action = action)
         }
     }
@@ -20049,60 +20254,167 @@ private fun AppConfiguration.SupplierActionQueueItem(action: SupplierDashboardAc
     val coroutineScope = rememberCoroutineScope()
     val icon = supplierDashboardActionIcon(action)
     val searchSeed = action.orderId.ifBlank { action.storeId.ifBlank { action.storePublicIdSnapshot } }
+    val quickStatus = remember(action.actionId, action.actionType, action.status) { action.supplierDashboardQuickStatus() }
+    val quickActionIcon = quickStatus?.let { supplierDashboardQuickActionIcon(it) }
+    val attentionText = action.attentionSummary.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { action.attentionSummary.visibleLocalizedString("main", "") }
 
-    Row(
+    val primaryActionTitle = if (action.actionType == "contract") {
+        localizedStringResource(1737, "Clear contract")
+    } else {
+        localizedStringResource(1752, "Open order")
+    }
+
+    fun openOrderFromQueue() {
+        coroutineScope.launch {
+            if (action.actionType == "contract") {
+                Navigation.goMain(NavigationScreenModel.Supplier.Contracts.Main)
+            } else {
+                NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to searchSeed)
+                Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
+            }
+        }
+    }
+
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(stateValues.cornerRadius))
             .background(stateValues.AccentColor.copy(alpha = 0.07f))
             .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.35f), RoundedCornerShape(stateValues.cornerRadius))
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = ripple(color = stateValues.AccentColor)
-            ) {
-                coroutineScope.launch {
-                    NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to searchSeed)
-                    Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
-                }
-            }
             .padding(stateValues.marginTextField),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        CpImage(
-            modifier = Modifier.size(28.dp),
-            url = icon.first,
-            fallbackRes = icon.second,
-            contentDescription = supplierDashboardActionTitle(action),
-            tintColor = stateValues.AccentColor
-        )
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = supplierDashboardActionTitle(action),
-                color = stateValues.TextColor,
-                fontSize = stateValues.textSize,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = ripple(color = stateValues.AccentColor),
+                    onClick = { openOrderFromQueue() }
+                ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            CpImage(
+                modifier = Modifier.size(28.dp),
+                url = icon.first,
+                fallbackRes = icon.second,
+                contentDescription = supplierDashboardActionTitle(action),
+                tintColor = stateValues.AccentColor
             )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = supplierDashboardActionTitle(action),
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.textSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = supplierDashboardActionSubtitle(action),
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
             Text(
-                text = supplierDashboardActionSubtitle(action),
-                color = stateValues.PlaceholderTextColor,
+                text = action.priority.toString(),
+                color = stateValues.AccentColor,
                 fontSize = stateValues.smallTextSize,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.End
             )
         }
-        Text(
-            text = action.priority.toString(),
-            color = stateValues.AccentColor,
-            fontSize = stateValues.smallTextSize,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.End
-        )
+
+        if (attentionText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.BackgroundColor.copy(alpha = 0.72f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.28f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Text(
+                    text = localizedStringResource(1756, "Attention notes"),
+                    color = stateValues.AccentColor,
+                    fontSize = stateValues.smallTextSize,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = attentionText,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.smallTextSize,
+                    maxLines = 6,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        } else if (quickStatus == null) {
+            Text(
+                text = localizedStringResource(1755, "Open the order to fill quantities, prices, delivery terms, or issue notes."),
+                color = stateValues.PlaceholderTextColor,
+                fontSize = stateValues.smallTextSize
+            )
+        }
+
+        if (stateValues.isNarrowScreen) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = primaryActionTitle,
+                    iconPath = if (action.actionType == "contract") stateValues.drawablePathIconSupplierContracts else stateValues.drawablePathIconAppModeSupplier,
+                    iconRes = if (action.actionType == "contract") stateValues.drawableResIconSupplierContracts.value else stateValues.drawableResIconAppModeSupplier.value,
+                    textSize = stateValues.smallTextSize,
+                    confirmationRequired = false,
+                    onClick = { openOrderFromQueue() }
+                )
+                quickStatus?.let { status ->
+                    actionButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = supplierDashboardQuickActionLabel(status),
+                        enabled = action.orderId.isNotBlank(),
+                        iconPath = quickActionIcon?.first,
+                        iconRes = quickActionIcon?.second,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = status == SupplierOrderStatusDataModel.Packed || status == SupplierOrderStatusDataModel.InDelivery,
+                        onClick = { updateSupplierOrdersSupplierStatusByIds(listOf(action.orderId), status) }
+                    )
+                }
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = primaryActionTitle,
+                    iconPath = if (action.actionType == "contract") stateValues.drawablePathIconSupplierContracts else stateValues.drawablePathIconAppModeSupplier,
+                    iconRes = if (action.actionType == "contract") stateValues.drawableResIconSupplierContracts.value else stateValues.drawableResIconAppModeSupplier.value,
+                    textSize = stateValues.smallTextSize,
+                    confirmationRequired = false,
+                    onClick = { openOrderFromQueue() }
+                )
+                quickStatus?.let { status ->
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = supplierDashboardQuickActionLabel(status),
+                        enabled = action.orderId.isNotBlank(),
+                        iconPath = quickActionIcon?.first,
+                        iconRes = quickActionIcon?.second,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = status == SupplierOrderStatusDataModel.Packed || status == SupplierOrderStatusDataModel.InDelivery,
+                        onClick = { updateSupplierOrdersSupplierStatusByIds(listOf(action.orderId), status) }
+                    )
+                }
+            }
+        }
     }
 }
-
 
 @Composable
 private fun AppConfiguration.SupplierReadinessBoardCard(
@@ -20113,10 +20425,22 @@ private fun AppConfiguration.SupplierReadinessBoardCard(
     val hasAnySignal = readiness.openOrderCount > 0 ||
             readiness.priceBookCoveredLineCount > 0 ||
             readiness.answerNeededOrderCount > 0 ||
-            readiness.readyToPackOrderCount > 0
+            readiness.readyToPackOrderCount > 0 ||
+            readiness.responseLineCount > 0 ||
+            readiness.acceptedQuantityTotal > 0.0
     if (!hasAnySignal) return
 
     val gapCount = readiness.missingAcceptedQuantityLineCount + readiness.missingOfferedPriceLineCount
+    val responseFilledText = if (readiness.responseLineCount > 0) {
+        "${readiness.answeredLineCount}/${readiness.responseLineCount} • ${readiness.responseProgressPercent}%"
+    } else {
+        "0%"
+    }
+    val acceptedQuantityText = listOf(
+        readiness.acceptedQuantityTotal.toStockMoneyText(),
+        readiness.requestedQuantityTotal.takeIf { it > 0.0 }?.toStockMoneyText()?.let { requested -> "/ $requested" }.orEmpty(),
+        readiness.acceptedVsRequestedPercent.takeIf { readiness.requestedQuantityTotal > 0.0 }?.let { percent -> "• $percent%" }.orEmpty()
+    ).filter { it.isNotBlank() }.joinToString(" ")
     val readyValue = readiness.estimatedReadyAmount.supplierDeskMoneyText()
         .ifBlank { readiness.readyToPackOrderCount.takeIf { it > 0 }?.toString().orEmpty() }
         .ifBlank { "0" }
@@ -20165,6 +20489,7 @@ private fun AppConfiguration.SupplierReadinessBoardCard(
             ) {
                 SupplierCatalogChip(text = "${localizedStringResource(1688, "Answer needed")}: ${readiness.answerNeededOrderCount}")
                 SupplierCatalogChip(text = "${localizedStringResource(1689, "Ready to pack")}: ${readiness.readyToPackOrderCount}")
+                SupplierCatalogChip(text = "${localizedStringResource(1771, "Response filled")}: ${readiness.responseProgressPercent}%")
                 SupplierCatalogChip(text = "${localizedStringResource(1690, "Price coverage")}: ${readiness.priceBookCoveragePercent}%")
                 SupplierCatalogChip(text = "${localizedStringResource(1691, "Response gaps")}: $gapCount")
             }
@@ -20180,12 +20505,21 @@ private fun AppConfiguration.SupplierReadinessBoardCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
+                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1771, "Response filled")}: ${readiness.responseProgressPercent}%") }
                 Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1690, "Price coverage")}: ${readiness.priceBookCoveragePercent}%") }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
                 Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1691, "Response gaps")}: $gapCount") }
+                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1773, "Declined lines")}: ${readiness.declinedLineCount}") }
             }
         }
 
         StockCardInfoLine(localizedStringResource(1692, "Ready value"), readyValue, stateValues.AccentColor)
+        StockCardInfoLine(localizedStringResource(1771, "Response filled"), responseFilledText, if (readiness.responseProgressPercent >= 100 && readiness.responseLineCount > 0) stateValues.AccentColor else stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1772, "Accepted quantity"), acceptedQuantityText, stateValues.TextColor)
         StockCardInfoLine(localizedStringResource(1699, "Pack-ready lines"), readiness.packReadyLineCount.toString(), stateValues.TextColor)
         readiness.earliestDueAtMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let { due ->
             StockCardInfoLine(localizedStringResource(1645, "Due"), due, stateValues.TextColor)
@@ -21075,8 +21409,11 @@ private fun AppConfiguration.SupplierCatalogScreen() {
         }
     }
 
-    val activeOrders = remember(orders) { orders.orEmpty().filter { it.isActive } }
-    val activeLines = remember(lines) { lines.orEmpty().filter { it.isActive } }
+    val activeOrders = remember(orders) { orders.orEmpty().filter { it.isActive && it.status != SupplierOrderStatusDataModel.Draft } }
+    val activeLines = remember(lines, activeOrders) {
+        val activeOrderIds = activeOrders.map { it.id }.toSet()
+        lines.orEmpty().filter { line -> line.isActive && line.orderId in activeOrderIds }
+    }
     val activeSupplierPrices = remember(supplierPrices) { supplierPrices.orEmpty().filter { it.isActive } }
     val catalogItems = remember(activeOrders, activeLines, activeSupplierPrices, stateValues.appLanguage) {
         buildSupplierCatalogItems(activeOrders, activeLines, activeSupplierPrices)
@@ -21630,8 +21967,11 @@ private fun AppConfiguration.SupplierCustomersScreen() {
         }
     }
 
-    val activeOrders = remember(orders) { orders.orEmpty().filter { it.isActive } }
-    val activeLines = remember(lines) { lines.orEmpty().filter { it.isActive } }
+    val activeOrders = remember(orders) { orders.orEmpty().filter { it.isActive && it.status != SupplierOrderStatusDataModel.Draft } }
+    val activeLines = remember(lines, activeOrders) {
+        val activeOrderIds = activeOrders.map { it.id }.toSet()
+        lines.orEmpty().filter { line -> line.isActive && line.orderId in activeOrderIds }
+    }
     val partnerItems = remember(activeOrders, activeLines, stateValues.appLanguage) {
         buildSupplierPartnerItems(activeOrders, activeLines)
     }
@@ -22033,14 +22373,15 @@ private fun AppConfiguration.supplierOrderLineDraftUsingPriceBook(
 )
 
 private fun AppConfiguration.supplierOrderLineResponseDraft(line: SupplierOrderLineDataModel): SupplierOrderLineResponseDraft {
-    val responseQuantity = line.supplierAcceptedQuantity ?: line.requestedQuantity
     val responseComment = line.supplierCommentLocalized.extractLocalizedString(stateValues.appLanguage)
         ?: line.supplierCommentLocalized.extractLocalizedString("main")
         ?: line.supplierComment.orEmpty()
 
     return SupplierOrderLineResponseDraft(
-        acceptedQuantityText = stockQuantityInputTextFromAmount(responseQuantity.total, line.requestedQuantity),
-        offeredPriceText = (line.supplierOfferedSupplyPrice ?: line.expectedSupplyPrice).supplierDeskPriceInputText(),
+        acceptedQuantityText = line.supplierAcceptedQuantity
+            ?.let { quantity -> stockQuantityInputTextFromAmount(quantity.total, line.requestedQuantity) }
+            .orEmpty(),
+        offeredPriceText = line.supplierOfferedSupplyPrice.supplierDeskPriceInputText(),
         commentText = responseComment,
         substituteGoodsItemId = line.substituteGoodsItemId.orEmpty()
     )
@@ -22054,10 +22395,10 @@ private fun AppConfiguration.supplierOrderLineWithResponseDraft(
     val cleanComment = draft.commentText.trim().takeIf { it.isNotBlank() }
     val cleanPriceText = draft.offeredPriceText.filterSupplierDeskPriceInput()
     val priceCurrency = (line.supplierOfferedSupplyPrice ?: line.expectedSupplyPrice)?.currency?.takeIf { it.isNotBlank() } ?: "KZT"
-    val acceptedQuantity = parseStockQuantityInputText(draft.acceptedQuantityText, line.requestedQuantity)
-        ?.let { line.requestedQuantity.withStockQuantityInputTotalValue(it) }
-        ?: line.supplierAcceptedQuantity
-        ?: line.requestedQuantity
+    val acceptedQuantity = draft.acceptedQuantityText.trim()
+        .takeIf { it.isNotBlank() }
+        ?.let { raw -> parseStockQuantityInputText(raw, line.requestedQuantity) }
+        ?.let { parsed -> line.requestedQuantity.withStockQuantityInputTotalValue(parsed) }
 
     return line.copy(
         supplierAcceptedQuantity = acceptedQuantity,
@@ -22096,15 +22437,15 @@ private fun AppConfiguration.patchSupplierDeskOrder(
         (line.supplierOfferedSupplyPrice ?: line.expectedSupplyPrice)?.currency?.takeIf { it.isNotBlank() }
     } ?: order.amount?.currency ?: "KZT"
     val responseAmount = patchedLines.sumOf { line ->
-        val price = (line.supplierOfferedSupplyPrice ?: line.expectedSupplyPrice)?.price?.toMoneyDouble() ?: 0.0
-        val quantity = (line.supplierAcceptedQuantity ?: line.requestedQuantity).total
+        val price = line.supplierOfferedSupplyPrice?.price?.toMoneyDouble() ?: 0.0
+        val quantity = line.supplierAcceptedQuantity?.total?.coerceAtLeast(0.0) ?: 0.0
         price * quantity
     }.roundMoney()
 
     updateSupplierOrder(
         SupplierOrderWithLinesDataModel(
             order = order.copy(
-                amount = responseAmount.takeIf { it > 0.0 }?.let { PriceDataModel(it.toStockMoneyText(), responseCurrency, order.supplierId) } ?: order.amount,
+                amount = responseAmount.takeIf { it > 0.0 }?.let { PriceDataModel(it.toStockMoneyText(), responseCurrency, order.supplierId) },
                 confirmedDeliveryTimeMillis = stockDateInputTextToMillis(confirmedDeliveryDateText),
                 status = status,
                 supplierComment = cleanComment,
@@ -22138,8 +22479,8 @@ private fun AppConfiguration.SupplierOrderLineResponseEditor(
     val lineNotesText = line.additionalNotesLocalized.extractLocalizedString(stateValues.appLanguage)
         ?: line.additionalNotesLocalized.extractLocalizedString("main")
         ?: line.additionalNotes
-    val responseQuantityText = (line.supplierAcceptedQuantity ?: line.requestedQuantity).quantityText(stateValues.appLanguage)
-    val responsePriceText = (line.supplierOfferedSupplyPrice ?: line.expectedSupplyPrice).supplierDeskMoneyText()
+    val responseQuantityText = line.supplierAcceptedQuantity?.quantityText(stateValues.appLanguage).orEmpty()
+    val responsePriceText = line.supplierOfferedSupplyPrice.supplierDeskMoneyText()
     val responseCommentText = line.supplierCommentLocalized.extractLocalizedString(stateValues.appLanguage)
         ?: line.supplierCommentLocalized.extractLocalizedString("main")
         ?: line.supplierComment
@@ -22334,9 +22675,28 @@ private fun AppConfiguration.SupplierOrderLineResponseEditor(
                     }
                 )
             }
+
+            actionButton(
+                text = localizedStringResource(1758, "Decline line"),
+                iconPath = stateValues.drawablePathIconCancel,
+                iconRes = stateValues.drawableResIconCancel.value,
+                enabledColor = stateValues.ErrorColor,
+                fillMaxWidthIfTextPresent = false,
+                confirmationRequired = false,
+                onClick = {
+                    onDraftChanged(
+                        draft.copy(
+                            acceptedQuantityText = stockQuantityInputTextFromAmount(0.0, line.requestedQuantity),
+                            offeredPriceText = "",
+                            commentText = draft.commentText.ifBlank { localizedStringResource(1760, "Unavailable for this delivery") },
+                            substituteGoodsItemId = ""
+                        )
+                    )
+                }
+            )
         } else {
-            StockCardInfoLine(localizedStringResource(1608, "Accepted quantity"), responseQuantityText, stateValues.TextColor)
-            StockCardInfoLine(localizedStringResource(1609, "Offered supply price"), responsePriceText, stateValues.TextColor)
+            StockCardInfoLine(localizedStringResource(1608, "Accepted quantity"), responseQuantityText.ifBlank { localizedStringResource(1759, "Not answered yet") }, stateValues.TextColor)
+            StockCardInfoLine(localizedStringResource(1609, "Offered supply price"), responsePriceText.ifBlank { localizedStringResource(1759, "Not answered yet") }, stateValues.TextColor)
             responseCommentText?.takeIf { it.isNotBlank() }?.let {
                 StockCardInfoLine(localizedStringResource(1610, "Line comment"), it, stateValues.TextColor)
             }
@@ -22356,7 +22716,15 @@ private fun AppConfiguration.SupplierOrderDeskCard(
 ) {
     val allowedStatuses = supplierDeskAllowedStatuses()
     val activeLines = remember(lines) { lines.filter { it.isActive } }
-    var selectedStatusId by rememberSaveable(order.id, order.status.name) { mutableStateOf(order.status.name) }
+    var selectedStatusId by rememberSaveable(order.id, order.status.name) {
+        mutableStateOf(
+            when (order.status) {
+                SupplierOrderStatusDataModel.Draft,
+                SupplierOrderStatusDataModel.Sent -> SupplierOrderStatusDataModel.SeenBySupplier.name
+                else -> order.status.name
+            }
+        )
+    }
     var commentText by rememberSaveable(order.id, order.supplierComment.orEmpty()) {
         mutableStateOf(
             order.supplierCommentLocalized.extractLocalizedString(stateValues.appLanguage)
@@ -22392,6 +22760,42 @@ private fun AppConfiguration.SupplierOrderDeskCard(
     val priceBookMatchedLineCount = activeLines.count { line -> priceBookForLine(line) != null }
 
     val selectedStatus = runCatching { SupplierOrderStatusDataModel.valueOf(selectedStatusId) }.getOrDefault(order.status)
+    val draftResponseLines = activeLines.map { line ->
+        supplierOrderLineWithResponseDraft(
+            line = line,
+            supplierId = order.supplierId,
+            draft = lineDrafts[line.id] ?: supplierOrderLineResponseDraft(line)
+        )
+    }
+    val draftAnsweredLineCount = draftResponseLines.count { line -> line.supplierAcceptedQuantity != null }
+    val draftDeclinedLineCount = draftResponseLines.count { line -> line.supplierDeskAcceptedQuantityTotal() == 0.0 }
+    val draftMissingQuantityLineCount = draftResponseLines.count { line -> line.isMissingSupplierDeskAcceptedQuantity() }
+    val draftMissingPriceLineCount = draftResponseLines.count { line -> line.isMissingSupplierDeskOfferedPriceForAcceptedQuantity() }
+    val draftHasPositiveAcceptedLine = draftResponseLines.any { line -> line.hasPositiveSupplierDeskAcceptedQuantity() }
+    val draftDeliveryTimeReady = stockDateInputTextToMillis(confirmedDeliveryDateText) != null
+    val draftReadyToConfirm = activeLines.isNotEmpty() &&
+            draftDeliveryTimeReady &&
+            draftHasPositiveAcceptedLine &&
+            draftResponseLines.all { line -> line.hasCompleteSupplierResponseLineForSupplierDesk() }
+    val draftRequestedQuantityTotal = activeLines.sumOf { line -> line.requestedQuantity.total.coerceAtLeast(0.0) }.roundMoney()
+    val draftAcceptedQuantityTotal = draftResponseLines.sumOf { line -> line.supplierAcceptedQuantity?.total?.coerceAtLeast(0.0) ?: 0.0 }.roundMoney()
+    val draftAcceptedPercent = if (draftRequestedQuantityTotal > 0.0) {
+        ((draftAcceptedQuantityTotal / draftRequestedQuantityTotal) * 100.0).roundToInt().coerceIn(0, 999)
+    } else {
+        0
+    }
+    val draftResponseCurrency = draftResponseLines.firstNotNullOfOrNull { line ->
+        line.supplierOfferedSupplyPrice?.currency?.takeIf { it.isNotBlank() }
+    } ?: order.amount?.currency ?: "KZT"
+    val draftProjectedAmount = draftResponseLines.sumOf { line ->
+        val quantity = line.supplierAcceptedQuantity?.total?.coerceAtLeast(0.0) ?: 0.0
+        val price = line.supplierOfferedSupplyPrice?.price?.toMoneyDouble() ?: 0.0
+        quantity * price
+    }.roundMoney()
+    val draftProjectedAmountText = draftProjectedAmount
+        .takeIf { it > 0.0 }
+        ?.let { amount -> "${amount.toStockMoneyText()} $draftResponseCurrency" }
+        .orEmpty()
     val storeTitle = supplierDeskStoreTitle(order)
     val totalQuantityText = activeLines
         .joinToString(" • ") { line -> line.requestedQuantity.quantityText(stateValues.appLanguage) }
@@ -22600,6 +23004,72 @@ private fun AppConfiguration.SupplierOrderDeskCard(
                     fontSize = stateValues.smallTextSize
                 )
 
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(stateValues.cornerRadius))
+                        .background(stateValues.BackgroundColor.copy(alpha = 0.78f))
+                        .border(
+                            stateValues.unfocusedBorderWidth,
+                            if (draftReadyToConfirm) stateValues.AccentColor.copy(alpha = 0.55f) else stateValues.PlaceholderTextColor.copy(alpha = 0.35f),
+                            RoundedCornerShape(stateValues.cornerRadius)
+                        )
+                        .padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = if (draftReadyToConfirm) localizedStringResource(1768, "Ready to confirm") else localizedStringResource(1763, "Response progress"),
+                        color = if (draftReadyToConfirm) stateValues.AccentColor else stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (stateValues.isNarrowScreen) {
+                        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                            SupplierCatalogChip(text = "${localizedStringResource(1764, "Answered")}: $draftAnsweredLineCount/${activeLines.size}")
+                            SupplierCatalogChip(text = "${localizedStringResource(1765, "Declined")}: $draftDeclinedLineCount")
+                            SupplierCatalogChip(text = "${localizedStringResource(1766, "Need quantity")}: $draftMissingQuantityLineCount")
+                            SupplierCatalogChip(text = "${localizedStringResource(1767, "Need price")}: $draftMissingPriceLineCount")
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1764, "Answered")}: $draftAnsweredLineCount/${activeLines.size}") }
+                            Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1765, "Declined")}: $draftDeclinedLineCount") }
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1766, "Need quantity")}: $draftMissingQuantityLineCount") }
+                            Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1767, "Need price")}: $draftMissingPriceLineCount") }
+                        }
+                    }
+                    val acceptedProgressText = "${draftAcceptedQuantityTotal.toStockMoneyText()}/${draftRequestedQuantityTotal.toStockMoneyText()} • $draftAcceptedPercent%"
+                    if (stateValues.isNarrowScreen) {
+                        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                            SupplierCatalogChip(text = "${localizedStringResource(1780, "Accepted now")}: $acceptedProgressText")
+                            SupplierCatalogChip(text = "${localizedStringResource(1781, "Projected amount")}: ${draftProjectedAmountText.ifBlank { "—" }}")
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1780, "Accepted now")}: $acceptedProgressText") }
+                            Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1781, "Projected amount")}: ${draftProjectedAmountText.ifBlank { "—" }}") }
+                        }
+                    }
+                    if (order.status == SupplierOrderStatusDataModel.Sent) {
+                        Text(
+                            text = localizedStringResource(1779, "Saving a new supplier answer marks the request as seen."),
+                            color = stateValues.PlaceholderTextColor,
+                            fontSize = stateValues.smallTextSize
+                        )
+                    }
+                }
+
                 actionButton(
                     modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(1655, "Fill quick confirmation"),
@@ -22701,8 +23171,10 @@ private fun AppConfiguration.SupplierOrderDeskCard(
                 actionButton(
                     modifier = Modifier.weight(1f),
                     text = localizedStringResource(1362, "Confirm"),
+                    enabled = draftReadyToConfirm,
                     iconPath = stateValues.drawablePathIconTransactionSupply,
                     confirmationRequired = false,
+                    onDisabledClick = { postInAppNotification(localizedStringResource(1774, "Fill quantity, price, and delivery date first"), NotificationType.Neutral, transient = true) },
                     onClick = { saveSupplierResponse(SupplierOrderStatusDataModel.Confirmed) }
                 )
             }
@@ -22714,15 +23186,19 @@ private fun AppConfiguration.SupplierOrderDeskCard(
                 actionButton(
                     modifier = Modifier.weight(1f),
                     text = localizedStringResource(1363, "Packed"),
+                    enabled = order.status == SupplierOrderStatusDataModel.Confirmed && draftReadyToConfirm,
                     iconPath = stateValues.drawablePathIconStock,
-                    confirmationRequired = false,
+                    confirmationRequired = true,
+                    onDisabledClick = { postInAppNotification(localizedStringResource(1775, "Confirm first, then pack"), NotificationType.Neutral, transient = true) },
                     onClick = { saveSupplierResponse(SupplierOrderStatusDataModel.Packed) }
                 )
                 actionButton(
                     modifier = Modifier.weight(1f),
                     text = localizedStringResource(1364, "In delivery"),
+                    enabled = order.status == SupplierOrderStatusDataModel.Packed,
                     iconPath = stateValues.drawablePathIconStores,
-                    confirmationRequired = false,
+                    confirmationRequired = true,
+                    onDisabledClick = { postInAppNotification(localizedStringResource(1776, "Pack first, then start delivery"), NotificationType.Neutral, transient = true) },
                     onClick = { saveSupplierResponse(SupplierOrderStatusDataModel.InDelivery) }
                 )
             }
@@ -23044,14 +23520,18 @@ private fun AppConfiguration.SupplierOrdersInboxScreen() {
 
     val activeOrders = remember(orders) {
         orders.orEmpty()
-            .filter { it.isActive }
+            .filter { it.isActive && it.status != SupplierOrderStatusDataModel.Draft }
             .sortedByDescending { it.supplierDeskSortTime() }
     }
-    val linesByOrder = remember(lines) { lines.orEmpty().filter { it.isActive }.groupBy { it.orderId } }
     val activeOrdersById = remember(activeOrders) { activeOrders.associateBy { it.id } }
+    val linesByOrder = remember(lines, activeOrdersById) {
+        lines.orEmpty()
+            .filter { line -> line.isActive && line.orderId in activeOrdersById }
+            .groupBy { it.orderId }
+    }
     val substituteOptionsByStore = remember(lines, activeOrdersById, stateValues.appLanguage) {
         lines.orEmpty()
-            .filter { it.isActive }
+            .filter { line -> line.isActive && line.orderId in activeOrdersById }
             .groupBy { line -> activeOrdersById[line.orderId]?.storeId.orEmpty() }
             .mapValues { (_, storeLines) -> buildSupplierSubstituteOptions(storeLines) }
     }
@@ -23063,13 +23543,8 @@ private fun AppConfiguration.SupplierOrdersInboxScreen() {
             val statusMatches = when (statusFilter) {
                 "all" -> true
                 "open" -> !order.status.isSupplierOrderClosed()
-                "answer_gaps" -> !order.status.isSupplierOrderClosed() && orderLines.any { line ->
-                    line.supplierAcceptedQuantity == null || line.supplierOfferedSupplyPrice == null
-                }
-                "ready_to_pack" -> order.status == SupplierOrderStatusDataModel.Confirmed &&
-                        order.confirmedDeliveryTimeMillis != null &&
-                        orderLines.isNotEmpty() &&
-                        orderLines.all { line -> line.supplierAcceptedQuantity != null && line.supplierOfferedSupplyPrice != null }
+                "answer_gaps" -> !order.status.isSupplierOrderClosed() && SupplierOrderWithLinesDataModel(order, orderLines).hasSupplierResponseGapsForSupplierDesk()
+                "ready_to_pack" -> order.isSupplierReadyToPackForSupplierDesk(orderLines)
                 else -> order.status.name == statusFilter
             }
             val dueMatches = order.matchesSupplierDueFilter(dueFilter, supplierDashboardNow)
@@ -23079,12 +23554,19 @@ private fun AppConfiguration.SupplierOrdersInboxScreen() {
     }
     val openCount = supplierDashboard?.openOrderCount ?: activeOrders.count { !it.status.isSupplierOrderClosed() }
     val todayAttentionCount = supplierDashboard?.actionRequiredOrderCount ?: activeOrders.count { order ->
-        !order.status.isSupplierOrderClosed() && (order.status == SupplierOrderStatusDataModel.Sent || order.status == SupplierOrderStatusDataModel.SeenBySupplier)
+        val orderLines = linesByOrder[order.id].orEmpty()
+        !order.status.isSupplierOrderClosed() &&
+                (order.status == SupplierOrderStatusDataModel.Sent ||
+                        order.status == SupplierOrderStatusDataModel.SeenBySupplier ||
+                        order.status == SupplierOrderStatusDataModel.IssueReported ||
+                        SupplierOrderWithLinesDataModel(order, orderLines).hasSupplierResponseGapsForSupplierDesk())
     }
     val linesCount = supplierDashboard?.lineCount ?: activeOrders.sumOf { order -> linesByOrder[order.id].orEmpty().size }
     val supplierProfileCount = supplierDashboard?.supplierIds?.size ?: 0
     val manufacturerBridgeCount = supplierDashboard?.manufacturerBridge?.size ?: 0
     val manufacturerBridgePriority = supplierDashboard?.manufacturerBridge?.maxOfOrNull { it.priorityScore } ?: 0
+    val backorderWatchCount = supplierDashboard?.backorderWatch?.size ?: 0
+    val backorderShortQuantity = supplierDashboard?.backorderWatch?.sumOf { it.missingQuantityTotal }?.roundMoney() ?: 0.0
     val supplierStatusMixText = supplierDashboard?.statusBuckets
         ?.take(4)
         ?.joinToString(" • ") { bucket -> "${supplierOrderStatusTitle(bucket.status)} ${bucket.orderCount}" }
@@ -23215,6 +23697,9 @@ private fun AppConfiguration.SupplierOrdersInboxScreen() {
                         supplierStatusMixText.takeIf { it.isNotBlank() }?.let { statusMix ->
                             StockCardInfoLine(localizedStringResource(1622, "Status mix"), statusMix, stateValues.TextColor)
                         }
+                        if (backorderWatchCount > 0) {
+                            StockCardInfoLine(localizedStringResource(1794, "Backorder watch"), "$backorderWatchCount • ${backorderShortQuantity.toStockMoneyText()}", stateValues.TextColor)
+                        }
                         supplierDashboard?.generatedAtMillis?.takeIf { it > 0L }?.let { generatedAt ->
                             StockCardInfoLine(localizedStringResource(1617, "Server pulse"), receiptUiDateTime(generatedAt), stateValues.TextColor)
                         }
@@ -23228,7 +23713,12 @@ private fun AppConfiguration.SupplierOrdersInboxScreen() {
 
             supplierDashboard?.actionQueue?.takeIf { it.isNotEmpty() }?.let { actions ->
                 item {
-                    SupplierActionQueueCard(actions = actions)
+                    SupplierActionQueueCard(
+                        actions = actions,
+                        bulkSeenOrderIds = supplierDashboard?.bulkSeenOrderIds.orEmpty(),
+                        bulkPackableOrderIds = supplierDashboard?.bulkPackableOrderIds.orEmpty(),
+                        bulkDispatchableOrderIds = supplierDashboard?.bulkDispatchableOrderIds.orEmpty()
+                    )
                 }
             }
 
@@ -24175,6 +24665,7 @@ private fun AppConfiguration.SupplierContractsScreen() {
 
 
 private data class SupplierDispatchLaneUiModel(
+    val laneKey: String,
     val storeKey: String,
     val storeTitle: String,
     val publicId: String,
@@ -24212,12 +24703,16 @@ private fun AppConfiguration.buildSupplierDispatchLanes(
 
     return movableOrders
         .groupBy { order ->
-            order.storeId
+            val storeKey = order.storeId
                 .ifBlank { order.storePublicIdSnapshot }
                 .ifBlank { supplierDeskStoreTitle(order) }
                 .ifBlank { order.id }
+            val dueDayKey = order.supplierDueAtMillis()
+                ?.let { dueMillis -> (dueMillis - (dueMillis % AITA_SUPPLIER_UI_DAY_MILLIS)).toString() }
+                ?: "unscheduled"
+            "$storeKey|$dueDayKey"
         }
-        .map { (storeKey, storeOrdersRaw) ->
+        .map { (laneKey, storeOrdersRaw) ->
             val storeOrders = storeOrdersRaw.sortedWith(
                 compareBy<SupplierOrderDataModel> { it.desiredDeliveryTimeMillis ?: Long.MAX_VALUE }
                     .thenByDescending { it.supplierDeskSortTime() }
@@ -24226,6 +24721,10 @@ private fun AppConfiguration.buildSupplierDispatchLanes(
                 SupplierOrderWithLinesDataModel(order = order, lines = activeLinesByOrder[order.id].orEmpty())
             }
             val newestOrder = storeOrders.maxByOrNull { it.supplierDeskSortTime() } ?: storeOrders.first()
+            val storeKey = newestOrder.storeId
+                .ifBlank { newestOrder.storePublicIdSnapshot }
+                .ifBlank { supplierDeskStoreTitle(newestOrder) }
+                .ifBlank { newestOrder.id }
             val storeLines = bundles.flatMap { it.lines }
             val storeTitle = storeOrders
                 .asSequence()
@@ -24249,17 +24748,19 @@ private fun AppConfiguration.buildSupplierDispatchLanes(
             }
             val goodsPreview = storeLines
                 .groupBy { line ->
-                    line.goodsItemId
-                        .ifBlank { line.goodsItemBarcodeSnapshots.firstOrNull().orEmpty() }
-                        .ifBlank { supplierDeskLineTitle(line) }
+                    line.substituteGoodsItemId?.takeIf { it.isNotBlank() }
+                        ?: line.goodsItemId
+                            .ifBlank { line.substituteGoodsItemBarcodeSnapshots.firstOrNull().orEmpty() }
+                            .ifBlank { line.goodsItemBarcodeSnapshots.firstOrNull().orEmpty() }
+                            .ifBlank { supplierDeskFulfillmentLineTitle(line) }
                 }
                 .values
                 .take(4)
                 .joinToString(" • ") { itemLines ->
                     val first = itemLines.first()
-                    val total = itemLines.sumOf { it.requestedQuantity.total.coerceAtLeast(0.0) }
-                    val quantityText = if (total > 0.0) first.requestedQuantity.copy(total = total).quantityText(stateValues.appLanguage) else itemLines.size.toString()
-                    supplierDeskLineTitle(first) + " × " + quantityText
+                    val total = itemLines.sumOf { it.supplierDeskFulfillmentQuantity().total.coerceAtLeast(0.0) }
+                    val quantityText = if (total > 0.0) first.supplierDeskFulfillmentQuantity().copy(total = total).quantityText(stateValues.appLanguage) else itemLines.size.toString()
+                    supplierDeskFulfillmentLineTitle(first) + " × " + quantityText
                 }
                 .ifBlank { localizedStringResource(1566, "No goods lines yet") }
             val manifest = buildString {
@@ -24274,7 +24775,11 @@ private fun AppConfiguration.buildSupplierDispatchLanes(
                         append(" — ").append(dateText)
                     }
                     activeLinesByOrder[order.id].orEmpty().take(8).forEach { line ->
-                        append('\n').append("  • ").append(supplierDeskLineTitle(line)).append(" × ").append(line.requestedQuantity.quantityText(stateValues.appLanguage))
+                        append('\n')
+                            .append("  • ")
+                            .append(supplierDeskFulfillmentLineTitle(line))
+                            .append(" × ")
+                            .append(line.supplierDeskFulfillmentQuantity().quantityText(stateValues.appLanguage))
                     }
                 }
             }
@@ -24293,12 +24798,17 @@ private fun AppConfiguration.buildSupplierDispatchLanes(
                 }
                 storeLines.forEach { line ->
                     append(line.goodsItemId).append(' ')
+                    append(line.substituteGoodsItemId.orEmpty()).append(' ')
                     append(supplierDeskLineTitle(line)).append(' ')
+                    append(supplierDeskFulfillmentLineTitle(line)).append(' ')
                     append(line.goodsItemBarcodeSnapshots.joinToString(" ")).append(' ')
+                    append(line.substituteGoodsItemBarcodeSnapshots.joinToString(" ")).append(' ')
+                    append(line.supplierDeskFulfillmentQuantity().quantityText(stateValues.appLanguage)).append(' ')
                 }
             }.lowercase()
 
             SupplierDispatchLaneUiModel(
+                laneKey = laneKey,
                 storeKey = storeKey,
                 storeTitle = storeTitle,
                 publicId = publicId,
@@ -24306,13 +24816,17 @@ private fun AppConfiguration.buildSupplierDispatchLanes(
                 bundles = bundles,
                 orderCount = storeOrders.size,
                 lineCount = storeLines.size,
-                needsConfirmationCount = storeOrders.count { it.status == SupplierOrderStatusDataModel.Sent || it.status == SupplierOrderStatusDataModel.SeenBySupplier },
+                needsConfirmationCount = bundles.count { bundle ->
+                    bundle.order.status == SupplierOrderStatusDataModel.Sent ||
+                            bundle.order.status == SupplierOrderStatusDataModel.SeenBySupplier ||
+                            (bundle.order.status == SupplierOrderStatusDataModel.Confirmed && bundle.hasSupplierResponseGapsForSupplierDesk())
+                },
                 packedCount = storeOrders.count { it.status == SupplierOrderStatusDataModel.Packed },
                 inDeliveryCount = storeOrders.count { it.status == SupplierOrderStatusDataModel.InDelivery },
                 issueCount = storeOrders.count { it.status == SupplierOrderStatusDataModel.IssueReported },
                 activeContractCount = relatedContracts.count { it.status == SUPPLIER_CONTRACT_STATUS_ACTIVE },
                 pendingContractCount = relatedContracts.count { it.status == SUPPLIER_CONTRACT_STATUS_PENDING_STORE || it.status == SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER },
-                nextDeliveryMillis = storeOrders.mapNotNull { it.desiredDeliveryTimeMillis }.minOrNull(),
+                nextDeliveryMillis = storeOrders.mapNotNull { it.supplierDueAtMillis() }.minOrNull(),
                 lastActivityMillis = newestOrder.supplierDeskSortTime(),
                 goodsPreview = goodsPreview,
                 manifest = manifest,
@@ -24331,12 +24845,7 @@ private fun AppConfiguration.buildSupplierDispatchLanes(
 private fun AppConfiguration.SupplierDispatchLaneCard(lane: SupplierDispatchLaneUiModel) {
     val coroutineScope = rememberCoroutineScope()
     val packableBundles = remember(lane.bundles) {
-        lane.bundles.filter { bundle ->
-            bundle.order.status == SupplierOrderStatusDataModel.Sent ||
-                    bundle.order.status == SupplierOrderStatusDataModel.SeenBySupplier ||
-                    bundle.order.status == SupplierOrderStatusDataModel.Confirmed ||
-                    bundle.order.status == SupplierOrderStatusDataModel.IssueReported
-        }
+        lane.bundles.filter { bundle -> bundle.isSupplierReadyToPackForSupplierDesk() }
     }
     val deliverableBundles = remember(lane.bundles) {
         lane.bundles.filter { it.order.status == SupplierOrderStatusDataModel.Packed }
@@ -24523,11 +25032,479 @@ private fun AppConfiguration.SupplierDispatchLaneCard(lane: SupplierDispatchLane
     }
 }
 
+
+private fun AppConfiguration.supplierDispatchRunTitle(run: SupplierDashboardDispatchRunDataModel): String =
+    run.storeNameSnapshot.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { run.storePublicIdSnapshot }
+        .ifBlank { run.storeAddressTextSnapshot }
+        .ifBlank { run.storeId.take(8) }
+        .ifBlank { localizedStringResource(1733, "Server dispatch run") }
+
+private fun AppConfiguration.supplierDispatchRunSuggestedActionTitle(action: String): String = when (action) {
+    "issue" -> localizedStringResource(1742, "Resolve issue")
+    "contract" -> localizedStringResource(1737, "Clear contract")
+    "answer" -> localizedStringResource(1736, "Answer store")
+    "pack" -> localizedStringResource(1738, "Pack goods")
+    "dispatch" -> localizedStringResource(1739, "Send driver")
+    "delivery" -> localizedStringResource(1740, "Track delivery")
+    else -> localizedStringResource(1741, "Plan route")
+}
+
+private fun AppConfiguration.supplierDispatchRunSearchText(run: SupplierDashboardDispatchRunDataModel): String = buildString {
+    append(run.runId).append(' ')
+    append(run.supplierId).append(' ')
+    append(run.storeId).append(' ')
+    append(supplierDispatchRunTitle(run)).append(' ')
+    append(run.storePublicIdSnapshot).append(' ')
+    append(run.storeAddressTextSnapshot).append(' ')
+    append(run.goodsPreview.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(run.packChecklist.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(run.attentionSummary.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(run.driverHandoffChecklist.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(run.orderIds.joinToString(" ")).append(' ')
+    append(run.packableOrderIds.joinToString(" ")).append(' ')
+    append(run.dispatchableOrderIds.joinToString(" ")).append(' ')
+    append(run.attentionOrderIds.joinToString(" ")).append(' ')
+    append(run.contractBlockedOrderIds.joinToString(" ")).append(' ')
+    append(run.statusMix.joinToString(" ") { bucket -> bucket.status.name + " " + supplierOrderStatusTitle(bucket.status) }).append(' ')
+    append(supplierDispatchRunSuggestedActionTitle(run.suggestedAction))
+}.lowercase()
+
+private fun SupplierDashboardDispatchRunDataModel.matchesSupplierDispatchFilter(laneFilter: String): Boolean = when (laneFilter) {
+    "confirm" -> actionRequiredOrderCount > 0
+    "packed" -> packedOrderCount > 0 || readyToPackOrderCount > 0
+    "delivery" -> inDeliveryOrderCount > 0
+    "issue" -> issueOrderCount > 0
+    "contracts" -> pendingContractCount > 0
+    else -> true
+}
+
+private fun AppConfiguration.supplierDispatchRunManifest(run: SupplierDashboardDispatchRunDataModel): String = buildString {
+    append(localizedStringResource(1733, "Server dispatch run")).append(" — ").append(supplierDispatchRunTitle(run)).append('\n')
+    run.storePublicIdSnapshot.takeIf { it.isNotBlank() }?.let { publicId -> append("ID: ").append(publicId).append('\n') }
+    run.storeAddressTextSnapshot.takeIf { it.isNotBlank() }?.let { address -> append(localizedStringResource(147, "Address")).append(": ").append(address).append('\n') }
+    append(localizedStringResource(1735, "Suggested action")).append(": ").append(supplierDispatchRunSuggestedActionTitle(run.suggestedAction)).append('\n')
+    append(localizedStringResource(1734, "Priority")).append(": ").append(run.priorityScore).append('\n')
+    append(localizedStringResource(1563, "Orders in lane")).append(": ").append(run.orderCount).append('\n')
+    append(localizedStringResource(1564, "Goods lines")).append(": ").append(run.lineCount).append('\n')
+    run.estimatedAmount.supplierDeskMoneyText().takeIf { it.isNotBlank() }?.let { amount ->
+        append(localizedStringResource(581, "Amount")).append(": ").append(amount).append('\n')
+    }
+    run.earliestDueAtMillis?.takeIf { it > 0L }?.let { due -> append(localizedStringResource(1723, "Earliest due")).append(": ").append(receiptUiDateTime(due)).append('\n') }
+    run.latestDueAtMillis?.takeIf { it > 0L && it != run.earliestDueAtMillis }?.let { due -> append(localizedStringResource(1565, "Next delivery")).append(": ").append(receiptUiDateTime(due)).append('\n') }
+    append(localizedStringResource(1562, "Contract check")).append(": ").append(run.activeContractCount).append(" / ").append(run.pendingContractCount).append('\n')
+    if (run.contractBlockedOrderIds.isNotEmpty()) {
+        append(localizedStringResource(1791, "Contract-blocked orders")).append(": ").append(run.contractBlockedOrderIds.size).append('\n')
+        append(localizedStringResource(1793, "Pack and dispatch buttons use only server-safe, unblocked orders.")).append('\n')
+    }
+    run.statusMix.takeIf { it.isNotEmpty() }?.let { mix ->
+        append(localizedStringResource(200, "Status")).append(": ")
+        append(mix.joinToString(" • ") { bucket -> "${supplierOrderStatusTitle(bucket.status)} ${bucket.orderCount}" })
+        append('\n')
+    }
+    run.goodsPreview.visibleLocalizedString(stateValues.appLanguage, "").takeIf { it.isNotBlank() }?.let { goods ->
+        append(localizedStringResource(1564, "Goods lines")).append(": ").append(goods).append('\n')
+    }
+    run.packChecklist.visibleLocalizedString(stateValues.appLanguage, "").takeIf { it.isNotBlank() }?.let { checklist ->
+        append(localizedStringResource(1746, "Pack checklist")).append(":\n").append(checklist).append('\n')
+    }
+    run.attentionSummary.visibleLocalizedString(stateValues.appLanguage, "").takeIf { it.isNotBlank() }?.let { attention ->
+        append(localizedStringResource(1756, "Attention notes")).append(":\n").append(attention).append('\n')
+    }
+    run.driverHandoffChecklist.visibleLocalizedString(stateValues.appLanguage, "").takeIf { it.isNotBlank() }?.let { handoff ->
+        append(localizedStringResource(1757, "Driver handoff")).append(":\n").append(handoff).append('\n')
+    }
+    if (run.orderIds.isNotEmpty()) {
+        append(localizedStringResource(1369, "Open orders")).append(": ").append(run.orderIds.joinToString(", ") { it.take(12) })
+    }
+}
+
+@Composable
+private fun AppConfiguration.SupplierServerDispatchRunCard(
+    run: SupplierDashboardDispatchRunDataModel,
+    localBundlesByOrderId: Map<String, SupplierOrderWithLinesDataModel> = emptyMap()
+) {
+    val coroutineScope = rememberCoroutineScope()
+    val title = supplierDispatchRunTitle(run)
+    val goodsPreview = run.goodsPreview.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { localizedStringResource(1566, "No goods lines yet") }
+    val packChecklistText = run.packChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { run.packChecklist.visibleLocalizedString("main", "") }
+    val attentionText = run.attentionSummary.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { run.attentionSummary.visibleLocalizedString("main", "") }
+    val handoffText = run.driverHandoffChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { run.driverHandoffChecklist.visibleLocalizedString("main", "") }
+    val actionTitle = supplierDispatchRunSuggestedActionTitle(run.suggestedAction)
+    val amountText = run.estimatedAmount.supplierDeskMoneyText()
+    val statusSummary = run.statusMix
+        .take(4)
+        .joinToString(" • ") { bucket -> "${supplierOrderStatusTitle(bucket.status)} ${bucket.orderCount}" }
+    val expectedLocalOrderCount = run.orderIds.filter { it.isNotBlank() }.distinct().size
+    val loadedLocalOrderCount = run.orderIds
+        .filter { it.isNotBlank() }
+        .distinct()
+        .count { orderId -> localBundlesByOrderId[orderId] != null }
+    val packableOrderIds = remember(run.packableOrderIds) {
+        run.packableOrderIds
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+    }
+    val dispatchableOrderIds = remember(run.dispatchableOrderIds) {
+        run.dispatchableOrderIds
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+    }
+    val contractBlockedOrderIds = remember(run.contractBlockedOrderIds) {
+        run.contractBlockedOrderIds
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+    }
+    val borderColor = when {
+        run.issueOrderCount > 0 -> stateValues.ErrorColor
+        run.pendingContractCount > 0 || run.actionRequiredOrderCount > 0 -> stateValues.AccentColor
+        else -> stateValues.PlaceholderTextColor
+    }
+    val localLoadTextColor = if (expectedLocalOrderCount > 0 && loadedLocalOrderCount < expectedLocalOrderCount) {
+        stateValues.AccentColor
+    } else {
+        stateValues.PlaceholderTextColor
+    }
+
+    fun openRunOrders() {
+        coroutineScope.launch {
+            NavigationScreenModel.Supplier.Orders.Main.setState(
+                NavigationScreenModel.KEY_STATE_SEARCH_QUERY to run.storeId
+                    .ifBlank { run.storePublicIdSnapshot }
+                    .ifBlank { title }
+            )
+            Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
+        }
+    }
+
+    fun openRunContracts() {
+        coroutineScope.launch {
+            Navigation.goMain(NavigationScreenModel.Supplier.Contracts.Main)
+        }
+    }
+
+    fun copyManifest() {
+        copyTextToClipboard(supplierDispatchRunManifest(run))
+        postInAppNotification(localizedStringResource(1743, "Server manifest copied"), NotificationType.Positive, transient = true)
+    }
+
+    @Composable
+    fun MarkPackedButton(modifier: Modifier, textSize: TextUnit) {
+        actionButton(
+            modifier = modifier,
+            text = localizedStringResource(1570, "Mark packed"),
+            enabled = packableOrderIds.isNotEmpty(),
+            iconPath = stateValues.drawablePathIconSupplierDispatch,
+            iconRes = stateValues.drawableResIconSupplierDispatch.value,
+            textSize = textSize,
+            confirmationRequired = true,
+            onDisabledClick = { postInAppNotification(localizedStringResource(1748, "No server-ready orders in this run"), NotificationType.Neutral, transient = true) },
+            onClick = { updateSupplierOrdersSupplierStatusByIds(packableOrderIds, SupplierOrderStatusDataModel.Packed) }
+        )
+    }
+
+    @Composable
+    fun StartDeliveryButton(modifier: Modifier, textSize: TextUnit) {
+        actionButton(
+            modifier = modifier,
+            text = localizedStringResource(1571, "Start delivery"),
+            enabled = dispatchableOrderIds.isNotEmpty(),
+            iconPath = stateValues.drawablePathIconSupplierDispatch,
+            iconRes = stateValues.drawableResIconSupplierDispatch.value,
+            textSize = textSize,
+            confirmationRequired = true,
+            onDisabledClick = { postInAppNotification(localizedStringResource(1749, "No packed server orders in this run"), NotificationType.Neutral, transient = true) },
+            onClick = { updateSupplierOrdersSupplierStatusByIds(dispatchableOrderIds, SupplierOrderStatusDataModel.InDelivery) }
+        )
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .border(
+                if (run.issueOrderCount > 0 || run.pendingContractCount > 0 || run.actionRequiredOrderCount > 0) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
+                borderColor,
+                RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .padding(stateValues.marginTextFieldGroup),
+        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(46.dp)
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CpImage(
+                    modifier = Modifier.size(28.dp),
+                    url = stateValues.drawablePathIconSupplierDispatch,
+                    fallbackRes = stateValues.drawableResIconSupplierDispatch.value,
+                    contentDescription = localizedStringResource(1733, "Server dispatch run"),
+                    tintColor = stateValues.AccentColor
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.titleTextSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = listOf(run.storePublicIdSnapshot, run.storeAddressTextSnapshot).filter { it.isNotBlank() }.joinToString(" • ").ifBlank { run.storeId.take(8) },
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Text(
+                text = actionTitle,
+                color = if (run.issueOrderCount > 0) stateValues.ErrorColor else stateValues.AccentColor,
+                fontSize = stateValues.smallTextSize,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.End,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        Text(
+            text = goodsPreview,
+            color = stateValues.TextColor,
+            fontSize = stateValues.textSize,
+            fontWeight = FontWeight.Bold,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        if (packChecklistText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.06f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.35f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Text(
+                    text = localizedStringResource(1746, "Pack checklist"),
+                    color = stateValues.AccentColor,
+                    fontSize = stateValues.smallTextSize,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = packChecklistText,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.smallTextSize,
+                    maxLines = 8,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        if (attentionText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(if (run.issueOrderCount > 0 || run.pendingContractCount > 0) stateValues.ErrorColor.copy(alpha = 0.07f) else stateValues.AccentColor.copy(alpha = 0.05f))
+                    .border(stateValues.unfocusedBorderWidth, if (run.issueOrderCount > 0 || run.pendingContractCount > 0) stateValues.ErrorColor.copy(alpha = 0.42f) else stateValues.AccentColor.copy(alpha = 0.28f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Text(
+                    text = localizedStringResource(1756, "Attention notes"),
+                    color = if (run.issueOrderCount > 0 || run.pendingContractCount > 0) stateValues.ErrorColor else stateValues.AccentColor,
+                    fontSize = stateValues.smallTextSize,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = attentionText,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.smallTextSize,
+                    maxLines = 7,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        if (handoffText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.BackgroundColor.copy(alpha = 0.86f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor.copy(alpha = 0.45f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Text(
+                    text = localizedStringResource(1757, "Driver handoff"),
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.smallTextSize,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = handoffText,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.smallTextSize,
+                    maxLines = 10,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        if (contractBlockedOrderIds.isNotEmpty()) {
+            Text(
+                text = localizedStringResource(1792, "Clear contracts before packing or dispatching this run."),
+                color = stateValues.ErrorColor,
+                fontSize = stateValues.smallTextSize,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = localizedStringResource(1793, "Pack and dispatch buttons use only server-safe, unblocked orders."),
+                color = stateValues.PlaceholderTextColor,
+                fontSize = stateValues.smallTextSize
+            )
+        }
+
+        if (stateValues.isNarrowScreen) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                SupplierCatalogChip(text = "${localizedStringResource(1735, "Suggested action")}: $actionTitle")
+                SupplierCatalogChip(text = "${localizedStringResource(1734, "Priority")}: ${run.priorityScore}")
+                SupplierCatalogChip(text = "${localizedStringResource(1732, "Driver-ready")}: ${packableOrderIds.size + dispatchableOrderIds.size}")
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1735, "Suggested action")}: $actionTitle") }
+                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1734, "Priority")}: ${run.priorityScore}") }
+                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1732, "Driver-ready")}: ${packableOrderIds.size + dispatchableOrderIds.size}") }
+            }
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            StockCardInfoLine(localizedStringResource(1563, "Orders in lane"), run.orderCount.toString(), stateValues.TextColor)
+            if (expectedLocalOrderCount > 0) {
+                StockCardInfoLine(localizedStringResource(1369, "Open orders"), "$loadedLocalOrderCount / $expectedLocalOrderCount", localLoadTextColor)
+            }
+            StockCardInfoLine(localizedStringResource(1564, "Goods lines"), run.lineCount.toString(), stateValues.TextColor)
+            amountText.takeIf { it.isNotBlank() }?.let { StockCardInfoLine(localizedStringResource(581, "Amount"), it, stateValues.TextColor) }
+            run.earliestDueAtMillis?.takeIf { it > 0L }?.let { due -> StockCardInfoLine(localizedStringResource(1723, "Earliest due"), receiptUiDateTime(due), stateValues.TextColor) }
+            StockCardInfoLine(localizedStringResource(1561, "Needs confirmation"), run.actionRequiredOrderCount.toString(), if (run.actionRequiredOrderCount > 0) stateValues.AccentColor else stateValues.PlaceholderTextColor)
+            StockCardInfoLine(localizedStringResource(1562, "Contract check"), "${run.activeContractCount} / ${run.pendingContractCount}", if (run.pendingContractCount > 0) stateValues.ErrorColor else stateValues.TextColor)
+            if (contractBlockedOrderIds.isNotEmpty()) {
+                StockCardInfoLine(localizedStringResource(1791, "Contract-blocked orders"), contractBlockedOrderIds.size.toString(), stateValues.ErrorColor)
+            }
+            statusSummary.takeIf { it.isNotBlank() }?.let { StockCardInfoLine(localizedStringResource(200, "Status"), it, stateValues.PlaceholderTextColor) }
+            run.latestActivityMillis.takeIf { it > 0L }?.let { StockCardInfoLine(localizedStringResource(1463, "Last activity"), receiptUiDateTime(it), stateValues.PlaceholderTextColor) }
+        }
+
+        Text(
+            text = localizedStringResource(1747, "Server run actions"),
+            color = stateValues.TextColor,
+            fontSize = stateValues.smallTextSize,
+            fontWeight = FontWeight.Bold
+        )
+
+        if (contractBlockedOrderIds.isNotEmpty()) {
+            actionButton(
+                modifier = Modifier.fillMaxWidth(),
+                text = localizedStringResource(1737, "Clear contract"),
+                iconPath = stateValues.drawablePathIconSupplierContracts,
+                iconRes = stateValues.drawableResIconSupplierContracts.value,
+                textSize = stateValues.smallTextSize,
+                confirmationRequired = false,
+                onClick = { openRunContracts() }
+            )
+        }
+
+        if (stateValues.isNarrowScreen) {
+            Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1568, "Open run orders"),
+                    iconPath = stateValues.drawablePathIconAppModeSupplier,
+                    iconRes = stateValues.drawableResIconAppModeSupplier.value,
+                    confirmationRequired = false,
+                    onClick = { openRunOrders() }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1569, "Copy driver manifest"),
+                    iconPath = stateValues.drawablePathIconClipboard,
+                    iconRes = stateValues.drawableResIconClipboard.value,
+                    confirmationRequired = false,
+                    onClick = { copyManifest() }
+                )
+                MarkPackedButton(Modifier.fillMaxWidth(), stateValues.textSize)
+                StartDeliveryButton(Modifier.fillMaxWidth(), stateValues.textSize)
+            }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                ) {
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(1568, "Open run orders"),
+                        iconPath = stateValues.drawablePathIconAppModeSupplier,
+                        iconRes = stateValues.drawableResIconAppModeSupplier.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = { openRunOrders() }
+                    )
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(1569, "Copy driver manifest"),
+                        iconPath = stateValues.drawablePathIconClipboard,
+                        iconRes = stateValues.drawableResIconClipboard.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = { copyManifest() }
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                ) {
+                    MarkPackedButton(Modifier.weight(1f), stateValues.smallTextSize)
+                    StartDeliveryButton(Modifier.weight(1f), stateValues.smallTextSize)
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun AppConfiguration.SupplierDispatchScreen() {
     val orders by supplierOrdersState.payload.collectAsState()
     val lines by supplierOrderLinesState.payload.collectAsState()
     val contracts by supplierPartnershipContractsState.payload.collectAsState()
+    val supplierDashboard by supplierModeDashboardState.payload.collectAsState()
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var laneFilter by rememberSaveable { mutableStateOf("all") }
 
@@ -24544,6 +25521,23 @@ private fun AppConfiguration.SupplierDispatchScreen() {
             contracts = contracts.orEmpty()
         )
     }
+    val serverDispatchRuns = remember(supplierDashboard) { supplierDashboard?.dispatchRuns.orEmpty() }
+    val dispatchAttentionActions = remember(supplierDashboard) {
+        supplierDashboard?.actionQueue.orEmpty()
+            .filter { action -> action.actionType in setOf("issue", "answer", "complete_response", "terms", "pack", "dispatch") }
+            .take(6)
+    }
+    val localSupplierOrderBundlesById = remember(orders, lines) {
+        val activeLinesByOrder = lines.orEmpty().filter { it.isActive }.groupBy { it.orderId }
+        orders.orEmpty()
+            .filter { order -> order.isActive && order.id.isNotBlank() }
+            .associate { order ->
+                order.id to SupplierOrderWithLinesDataModel(
+                    order = order,
+                    lines = activeLinesByOrder[order.id].orEmpty()
+                )
+            }
+    }
     val normalizedSearch = searchQuery.trim().lowercase()
     val visibleLanes = remember(lanes, normalizedSearch, laneFilter) {
         lanes.filter { lane ->
@@ -24559,9 +25553,17 @@ private fun AppConfiguration.SupplierDispatchScreen() {
             filterMatches && queryMatches
         }
     }
+    val visibleServerDispatchRuns = remember(serverDispatchRuns, normalizedSearch, laneFilter, stateValues.appLanguage) {
+        serverDispatchRuns.filter { run ->
+            run.matchesSupplierDispatchFilter(laneFilter) &&
+                    (normalizedSearch.isBlank() || supplierDispatchRunSearchText(run).contains(normalizedSearch))
+        }
+    }
     val readyCount = lanes.count { it.packedCount > 0 }
     val inDeliveryCount = lanes.count { it.inDeliveryCount > 0 }
     val attentionCount = lanes.count { it.needsConfirmationCount > 0 || it.issueCount > 0 || it.pendingContractCount > 0 }
+    val serverRunCount = serverDispatchRuns.size
+    val serverDriverReadyCount = serverDispatchRuns.count { it.readyToPackOrderCount > 0 || it.packedOrderCount > 0 }
     val featurePlan = supplierMarketWinningFeatures()
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -24640,6 +25642,13 @@ private fun AppConfiguration.SupplierDispatchScreen() {
                                 iconPath = stateValues.drawablePathIconSupplierContracts,
                                 iconRes = stateValues.drawableResIconSupplierContracts.value
                             )
+                            SupplierDeskSummaryCard(
+                                title = localizedStringResource(1730, "Planned runs"),
+                                value = serverRunCount.toString(),
+                                subtitle = localizedStringResource(1731, "Runs from supplier dashboard"),
+                                iconPath = stateValues.drawablePathIconSupplierDispatch,
+                                iconRes = stateValues.drawableResIconSupplierDispatch.value
+                            )
                         }
                     } else {
                         Row(
@@ -24669,6 +25678,14 @@ private fun AppConfiguration.SupplierDispatchScreen() {
                                 subtitle = localizedStringResource(1581, "Confirmations, issues or contracts to clear"),
                                 iconPath = stateValues.drawablePathIconSupplierContracts,
                                 iconRes = stateValues.drawableResIconSupplierContracts.value
+                            )
+                            SupplierDeskSummaryCard(
+                                modifier = Modifier.weight(1f),
+                                title = localizedStringResource(1730, "Planned runs"),
+                                value = serverRunCount.toString(),
+                                subtitle = "${localizedStringResource(1732, "Driver-ready")}: $serverDriverReadyCount",
+                                iconPath = stateValues.drawablePathIconSupplierDispatch,
+                                iconRes = stateValues.drawableResIconSupplierDispatch.value
                             )
                         }
                     }
@@ -24716,6 +25733,69 @@ private fun AppConfiguration.SupplierDispatchScreen() {
                 }
             }
 
+            if (dispatchAttentionActions.isNotEmpty()) {
+                item {
+                    SupplierActionQueueCard(
+                        actions = dispatchAttentionActions,
+                        bulkSeenOrderIds = supplierDashboard?.bulkSeenOrderIds.orEmpty(),
+                        bulkPackableOrderIds = supplierDashboard?.bulkPackableOrderIds.orEmpty(),
+                        bulkDispatchableOrderIds = supplierDashboard?.bulkDispatchableOrderIds.orEmpty()
+                    )
+                }
+            }
+
+            if (serverDispatchRuns.isNotEmpty()) {
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+                            .clip(RoundedCornerShape(stateValues.cornerRadius))
+                            .background(stateValues.AccentColor.copy(alpha = 0.07f))
+                            .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
+                            .padding(stateValues.marginTextFieldGroup),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = localizedStringResource(1728, "Server dispatch board"),
+                            color = stateValues.TextColor,
+                            fontSize = stateValues.titleTextSize,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = localizedStringResource(1729, "Backend groups supplier runs by store, promised date and current fulfilment pressure, so desktop and mobile screens see the same delivery priorities."),
+                            color = stateValues.PlaceholderTextColor,
+                            fontSize = stateValues.smallTextSize
+                        )
+                    }
+                }
+                if (visibleServerDispatchRuns.isEmpty()) {
+                    item {
+                        MessageText(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = localizedStringResource(1380, "No orders match this filter")
+                        )
+                    }
+                } else {
+                    items(
+                        visibleServerDispatchRuns,
+                        key = { run -> run.runId.ifBlank { run.storeId.ifBlank { run.orderIds.joinToString("-") } } }
+                    ) { run ->
+                        SupplierServerDispatchRunCard(run, localSupplierOrderBundlesById)
+                    }
+                }
+            }
+
+            item {
+                Text(
+                    text = localizedStringResource(1557, "Delivery runs"),
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.titleTextSize,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
             if (lanes.isEmpty()) {
                 item {
                     MessageText(
@@ -24733,7 +25813,7 @@ private fun AppConfiguration.SupplierDispatchScreen() {
                     )
                 }
             } else {
-                items(visibleLanes, key = { it.storeKey }) { lane ->
+                items(visibleLanes, key = { it.laneKey }) { lane ->
                     SupplierDispatchLaneCard(lane)
                 }
             }
@@ -25347,8 +26427,16 @@ private fun AppConfiguration.supplierManufacturerBridgeActionTitle(action: Strin
 private fun AppConfiguration.supplierManufacturerBridgeSearchKey(item: SupplierDashboardManufacturerBridgeDataModel): String = buildString {
     append(item.bridgeId).append(' ')
     append(item.goodsItemId).append(' ')
+    append(item.orderIds.joinToString(" ")).append(' ')
+    append(item.quoteNeededOrderIds.joinToString(" ")).append(' ')
+    append(item.productionOrderIds.joinToString(" ")).append(' ')
+    append(item.shipmentOrderIds.joinToString(" ")).append(' ')
     append(supplierManufacturerBridgeTitle(item)).append(' ')
     append(item.barcodeSnapshots.joinToString(" ")).append(' ')
+    append(item.storePreview.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.storePreview.visibleLocalizedString("main", "")).append(' ')
+    append(item.attentionSummary.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.attentionSummary.visibleLocalizedString("main", "")).append(' ')
     append(item.suggestedAction).append(' ')
     append(supplierManufacturerBridgeActionTitle(item.suggestedAction)).append(' ')
     append(item.requestedQuantityTotal).append(' ')
@@ -25366,6 +26454,15 @@ private fun AppConfiguration.supplierManufacturerBridgeBrief(item: SupplierDashb
     append(localizedStringResource(1422, "Stores asking")).append(": ").append(item.storeCount).append('\n')
     append(localizedStringResource(1423, "Open requests")).append(": ").append(item.openOrderCount).append('\n')
     append(localizedStringResource(1715, "Response coverage")).append(": ").append(item.responseCoveragePercent).append('%').append('\n')
+    append(localizedStringResource(1783, "Factory staging")).append(": ")
+        .append(localizedStringResource(1784, "Quote")).append(' ').append(item.quoteNeededOrderIds.size).append(" • ")
+        .append(localizedStringResource(1785, "Produce")).append(' ').append(item.productionOrderIds.size).append(" • ")
+        .append(localizedStringResource(1786, "Ship")).append(' ').append(item.shipmentOrderIds.size).append('\n')
+    item.attentionSummary.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.attentionSummary.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { attention -> append(localizedStringResource(1756, "Attention notes")).append(": ").append(attention).append('\n') }
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1788, "Store names are omitted from this copied factory brief.")).append('\n')
     item.estimatedAcceptedAmount.supplierDeskMoneyText().takeIf { it.isNotBlank() }?.let { amount ->
         append(localizedStringResource(1727, "Factory value")).append(": ").append(amount).append('\n')
     }
@@ -25385,6 +26482,10 @@ private fun AppConfiguration.SupplierManufacturerBridgeCard(item: SupplierDashbo
     val missingQuantityText = supplierManufacturerBridgeQuantityText(item.missingQuantityTotal, item.measurementUnitIdSnapshot)
     val actionTitle = supplierManufacturerBridgeActionTitle(item.suggestedAction)
     val amountText = item.estimatedAcceptedAmount.supplierDeskMoneyText()
+    val storePreviewText = item.storePreview.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.storePreview.visibleLocalizedString("main", "") }
+    val attentionText = item.attentionSummary.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.attentionSummary.visibleLocalizedString("main", "") }
 
     Column(
         modifier = Modifier
@@ -25467,9 +26568,29 @@ private fun AppConfiguration.SupplierManufacturerBridgeCard(item: SupplierDashbo
             }
         }
 
+        if (stateValues.isNarrowScreen) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                SupplierCatalogChip(text = "${localizedStringResource(1784, "Quote")}: ${item.quoteNeededOrderIds.size}")
+                SupplierCatalogChip(text = "${localizedStringResource(1785, "Produce")}: ${item.productionOrderIds.size}")
+                SupplierCatalogChip(text = "${localizedStringResource(1786, "Ship")}: ${item.shipmentOrderIds.size}")
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1784, "Quote")}: ${item.quoteNeededOrderIds.size}") }
+                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1785, "Produce")}: ${item.productionOrderIds.size}") }
+                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1786, "Ship")}: ${item.shipmentOrderIds.size}") }
+            }
+        }
+
+        storePreviewText.takeIf { it.isNotBlank() }?.let { preview ->
+            StockCardInfoLine(localizedStringResource(1789, "Internal stores"), preview, stateValues.TextColor)
+        }
         StockCardInfoLine(localizedStringResource(1422, "Stores asking"), item.storeCount.toString(), stateValues.TextColor)
         StockCardInfoLine(localizedStringResource(1423, "Open requests"), item.openOrderCount.toString(), stateValues.TextColor)
-        StockCardInfoLine(localizedStringResource(1689, "Ready to pack"), item.confirmedOrderCount.toString(), stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1790, "Accepted orders"), item.confirmedOrderCount.toString(), stateValues.TextColor)
         StockCardInfoLine(localizedStringResource(1715, "Response coverage"), "${item.responseCoveragePercent}%", stateValues.TextColor)
         StockCardInfoLine(localizedStringResource(1707, "Manual price book"), item.priceBookRowCount.toString(), stateValues.TextColor)
         amountText.takeIf { it.isNotBlank() }?.let { StockCardInfoLine(localizedStringResource(1727, "Factory value"), it, stateValues.TextColor) }
@@ -25477,6 +26598,38 @@ private fun AppConfiguration.SupplierManufacturerBridgeCard(item: SupplierDashbo
             StockCardInfoLine(localizedStringResource(1723, "Earliest due"), receiptUiDateTime(due), stateValues.TextColor)
         }
         StockCardInfoLine(localizedStringResource(1722, "Priority score"), item.priorityScore.toString(), stateValues.TextColor)
+
+        if (attentionText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.06f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.28f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Text(
+                    text = localizedStringResource(1756, "Attention notes"),
+                    color = stateValues.AccentColor,
+                    fontSize = stateValues.smallTextSize,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = attentionText,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.smallTextSize,
+                    maxLines = 5,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        Text(
+            text = localizedStringResource(1788, "Store names are omitted from this copied factory brief."),
+            color = stateValues.PlaceholderTextColor,
+            fontSize = stateValues.smallTextSize
+        )
 
         if (stateValues.isNarrowScreen) {
             Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
@@ -25535,6 +26688,239 @@ private fun AppConfiguration.SupplierManufacturerBridgeCard(item: SupplierDashbo
     }
 }
 
+
+private fun AppConfiguration.supplierBackorderTitle(item: SupplierDashboardBackorderDataModel): String =
+    item.goodsItemNameSnapshot.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.barcodeSnapshots.firstOrNull().orEmpty() }
+        .ifBlank { item.goodsItemId.take(8) }
+
+private fun AppConfiguration.supplierBackorderActionTitle(action: String): String = when (action) {
+    "negotiate" -> localizedStringResource(1801, "Store negotiation")
+    "source" -> localizedStringResource(1717, "Produce / reserve")
+    else -> localizedStringResource(1720, "Watch backorder")
+}
+
+private fun AppConfiguration.supplierBackorderSearchKey(item: SupplierDashboardBackorderDataModel): String = buildString {
+    append(item.backorderId).append(' ')
+    append(item.goodsItemId).append(' ')
+    append(item.affectedOrderIds.joinToString(" ")).append(' ')
+    append(supplierBackorderTitle(item)).append(' ')
+    append(item.barcodeSnapshots.joinToString(" ")).append(' ')
+    append(item.storePreview.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.storePreview.visibleLocalizedString("main", "")).append(' ')
+    append(item.attentionSummary.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.attentionSummary.visibleLocalizedString("main", "")).append(' ')
+    append(item.suggestedAction).append(' ')
+    append(supplierBackorderActionTitle(item.suggestedAction)).append(' ')
+    append(item.requestedQuantityTotal).append(' ')
+    append(item.acceptedQuantityTotal).append(' ')
+    append(item.missingQuantityTotal)
+}.lowercase()
+
+private fun AppConfiguration.supplierBackorderBrief(item: SupplierDashboardBackorderDataModel): String = buildString {
+    append(localizedStringResource(1794, "Backorder watch")).append('\n')
+    append(supplierBackorderTitle(item)).append('\n')
+    if (item.barcodeSnapshots.isNotEmpty()) append(localizedStringResource(69, "Barcode")).append(": ").append(item.barcodeSnapshots.joinToString(", ")).append('\n')
+    append(localizedStringResource(1424, "Total requested")).append(": ").append(supplierManufacturerBridgeQuantityText(item.requestedQuantityTotal, item.measurementUnitIdSnapshot)).append('\n')
+    append(localizedStringResource(1713, "Accepted qty")).append(": ").append(supplierManufacturerBridgeQuantityText(item.acceptedQuantityTotal, item.measurementUnitIdSnapshot)).append('\n')
+    append(localizedStringResource(1796, "Short qty")).append(": ").append(supplierManufacturerBridgeQuantityText(item.missingQuantityTotal, item.measurementUnitIdSnapshot)).append('\n')
+    append(localizedStringResource(1797, "Affected orders")).append(": ").append(item.affectedOrderCount).append('\n')
+    append(localizedStringResource(1422, "Stores asking")).append(": ").append(item.affectedStoreCount).append('\n')
+    append(localizedStringResource(1773, "Declined lines")).append(": ").append(item.declinedLineCount).append('\n')
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1788, "Store names are omitted from this copied factory brief.")).append('\n')
+    item.attentionSummary.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.attentionSummary.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { attention -> append(localizedStringResource(1756, "Attention notes")).append(": ").append(attention).append('\n') }
+    item.earliestDueAtMillis?.takeIf { it > 0L }?.let { due ->
+        append(localizedStringResource(1723, "Earliest due")).append(": ").append(receiptUiDateTime(due)).append('\n')
+    }
+    append(localizedStringResource(1722, "Priority score")).append(": ").append(item.priorityScore).append('\n')
+    append(localizedStringResource(1650, "Actions")).append(": ").append(supplierBackorderActionTitle(item.suggestedAction))
+}
+
+@Composable
+private fun AppConfiguration.SupplierBackorderWatchCard(item: SupplierDashboardBackorderDataModel) {
+    val coroutineScope = rememberCoroutineScope()
+    val title = supplierBackorderTitle(item)
+    val actionTitle = supplierBackorderActionTitle(item.suggestedAction)
+    val requestedQuantityText = supplierManufacturerBridgeQuantityText(item.requestedQuantityTotal, item.measurementUnitIdSnapshot)
+    val acceptedQuantityText = supplierManufacturerBridgeQuantityText(item.acceptedQuantityTotal, item.measurementUnitIdSnapshot)
+    val missingQuantityText = supplierManufacturerBridgeQuantityText(item.missingQuantityTotal, item.measurementUnitIdSnapshot)
+    val storePreviewText = item.storePreview.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.storePreview.visibleLocalizedString("main", "") }
+    val attentionText = item.attentionSummary.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.attentionSummary.visibleLocalizedString("main", "") }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .border(stateValues.unfocusedBorderWidth, stateValues.ErrorColor.copy(alpha = 0.65f), RoundedCornerShape(stateValues.cornerRadius))
+            .padding(stateValues.marginTextFieldGroup),
+        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.ErrorColor.copy(alpha = 0.10f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CpImage(
+                    modifier = Modifier.size(32.dp),
+                    url = stateValues.drawablePathIconSupplierDemandRadar,
+                    fallbackRes = stateValues.drawableResIconSupplierDemandRadar.value,
+                    contentDescription = localizedStringResource(1794, "Backorder watch"),
+                    tintColor = stateValues.ErrorColor
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.accentTextSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = item.barcodeSnapshots.take(3).joinToString(" • ").ifBlank { item.goodsItemId.take(8) },
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Text(
+                text = actionTitle,
+                color = stateValues.ErrorColor,
+                fontSize = stateValues.smallTextSize,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.End,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        if (stateValues.isNarrowScreen) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                SupplierCatalogChip(text = "${localizedStringResource(1424, "Total requested")}: $requestedQuantityText")
+                SupplierCatalogChip(text = "${localizedStringResource(1713, "Accepted qty")}: $acceptedQuantityText")
+                SupplierCatalogChip(text = "${localizedStringResource(1796, "Short qty")}: $missingQuantityText")
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1424, "Total requested")}: $requestedQuantityText") }
+                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1713, "Accepted qty")}: $acceptedQuantityText") }
+                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1796, "Short qty")}: $missingQuantityText") }
+            }
+        }
+
+        StockCardInfoLine(localizedStringResource(1797, "Affected orders"), item.affectedOrderCount.toString(), stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1422, "Stores asking"), item.affectedStoreCount.toString(), stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1773, "Declined lines"), item.declinedLineCount.toString(), stateValues.TextColor)
+        storePreviewText.takeIf { it.isNotBlank() }?.let { preview ->
+            StockCardInfoLine(localizedStringResource(1789, "Internal stores"), preview, stateValues.TextColor)
+        }
+        item.earliestDueAtMillis?.takeIf { it > 0L }?.let { due ->
+            StockCardInfoLine(localizedStringResource(1723, "Earliest due"), receiptUiDateTime(due), stateValues.TextColor)
+        }
+        StockCardInfoLine(localizedStringResource(1722, "Priority score"), item.priorityScore.toString(), stateValues.TextColor)
+
+        if (attentionText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.ErrorColor.copy(alpha = 0.06f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.ErrorColor.copy(alpha = 0.28f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Text(
+                    text = localizedStringResource(1756, "Attention notes"),
+                    color = stateValues.ErrorColor,
+                    fontSize = stateValues.smallTextSize,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = attentionText,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.smallTextSize,
+                    maxLines = 5,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        if (stateValues.isNarrowScreen) {
+            Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1800, "Open shortage orders"),
+                    iconPath = stateValues.drawablePathIconAppModeSupplier,
+                    iconRes = stateValues.drawableResIconAppModeSupplier.value,
+                    confirmationRequired = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.goodsItemId)
+                            Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
+                        }
+                    }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1798, "Copy shortage brief"),
+                    iconPath = stateValues.drawablePathIconClipboard,
+                    iconRes = stateValues.drawableResIconClipboard.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(supplierBackorderBrief(item)) }
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1800, "Open shortage orders"),
+                    iconPath = stateValues.drawablePathIconAppModeSupplier,
+                    iconRes = stateValues.drawableResIconAppModeSupplier.value,
+                    textSize = stateValues.smallTextSize,
+                    confirmationRequired = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.goodsItemId)
+                            Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
+                        }
+                    }
+                )
+                actionButton(
+                    modifier = Modifier.weight(1f),
+                    text = localizedStringResource(1798, "Copy shortage brief"),
+                    iconPath = stateValues.drawablePathIconClipboard,
+                    iconRes = stateValues.drawableResIconClipboard.value,
+                    textSize = stateValues.smallTextSize,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(supplierBackorderBrief(item)) }
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun AppConfiguration.SupplierInsightsScreen() {
     val orders by supplierOrdersState.payload.collectAsState()
@@ -25550,8 +26936,11 @@ private fun AppConfiguration.SupplierInsightsScreen() {
         }
     }
 
-    val activeOrders = remember(orders) { orders.orEmpty().filter { it.isActive } }
-    val activeLines = remember(lines) { lines.orEmpty().filter { it.isActive } }
+    val activeOrders = remember(orders) { orders.orEmpty().filter { it.isActive && it.status != SupplierOrderStatusDataModel.Draft } }
+    val activeLines = remember(lines, activeOrders) {
+        val activeOrderIds = activeOrders.map { it.id }.toSet()
+        lines.orEmpty().filter { line -> line.isActive && line.orderId in activeOrderIds }
+    }
     val activeContracts = remember(contracts) { contracts.orEmpty().filter { it.isActive } }
     val radarItems = remember(activeOrders, activeLines, stateValues.appLanguage) {
         buildSupplierDemandRadarItems(activeOrders, activeLines)
@@ -25574,6 +26963,14 @@ private fun AppConfiguration.SupplierInsightsScreen() {
             normalizedSearch.isBlank() || supplierManufacturerBridgeSearchKey(item).contains(normalizedSearch)
         }
     }
+    val backorderWatchItems = remember(supplierDashboard, stateValues.appLanguage) {
+        supplierDashboard?.backorderWatch.orEmpty()
+    }
+    val visibleBackorderWatchItems = remember(backorderWatchItems, normalizedSearch, stateValues.appLanguage) {
+        backorderWatchItems.filter { item ->
+            normalizedSearch.isBlank() || supplierBackorderSearchKey(item).contains(normalizedSearch)
+        }
+    }
     val openOrdersCount = supplierDashboard?.openOrderCount ?: activeOrders.count { !it.status.isSupplierOrderClosed() }
     val attentionCount = supplierDashboard?.actionRequiredOrderCount ?: activeOrders.count { it.status == SupplierOrderStatusDataModel.Sent || it.status == SupplierOrderStatusDataModel.SeenBySupplier || it.status == SupplierOrderStatusDataModel.IssueReported }
     val pendingContractCount = supplierDashboard?.pendingContractCount ?: activeContracts.count { it.status == SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER || it.status == SUPPLIER_CONTRACT_STATUS_PENDING_STORE }
@@ -25582,6 +26979,8 @@ private fun AppConfiguration.SupplierInsightsScreen() {
     val supplierProfileCount = supplierDashboard?.supplierIds?.size ?: 0
     val manufacturerBridgeCount = manufacturerBridgeItems.size
     val manufacturerBridgePriority = manufacturerBridgeItems.maxOfOrNull { it.priorityScore } ?: 0
+    val backorderWatchCount = backorderWatchItems.size
+    val backorderShortQuantity = backorderWatchItems.sumOf { it.missingQuantityTotal }.roundMoney()
     val supplierStatusMixText = supplierDashboard?.statusBuckets
         ?.take(4)
         ?.joinToString(" • ") { bucket -> "${supplierOrderStatusTitle(bucket.status)} ${bucket.orderCount}" }
@@ -25702,6 +27101,9 @@ private fun AppConfiguration.SupplierInsightsScreen() {
                         StockCardInfoLine(localizedStringResource(1619, "Supplier profiles"), supplierProfileCount.toString(), stateValues.TextColor)
                         supplierStatusMixText.takeIf { it.isNotBlank() }?.let { statusMix ->
                             StockCardInfoLine(localizedStringResource(1622, "Status mix"), statusMix, stateValues.TextColor)
+                        }
+                        if (backorderWatchCount > 0) {
+                            StockCardInfoLine(localizedStringResource(1794, "Backorder watch"), "$backorderWatchCount • ${backorderShortQuantity.toStockMoneyText()}", stateValues.TextColor)
                         }
                         supplierDashboard?.generatedAtMillis?.takeIf { it > 0L }?.let { generatedAt ->
                             StockCardInfoLine(localizedStringResource(1617, "Server pulse"), receiptUiDateTime(generatedAt), stateValues.TextColor)
@@ -25904,6 +27306,72 @@ private fun AppConfiguration.SupplierInsightsScreen() {
             } else {
                 items(visibleManufacturerBridgeItems, key = { it.bridgeId.ifBlank { it.goodsItemId } }) { item ->
                     SupplierManufacturerBridgeCard(item)
+                }
+            }
+
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(stateValues.cornerRadius))
+                        .background(stateValues.ErrorColor.copy(alpha = 0.07f))
+                        .border(stateValues.unfocusedBorderWidth, stateValues.ErrorColor.copy(alpha = 0.60f), RoundedCornerShape(stateValues.cornerRadius))
+                        .padding(stateValues.marginTextFieldGroup),
+                    verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                    ) {
+                        CpImage(
+                            modifier = Modifier.size(40.dp),
+                            url = stateValues.drawablePathIconSupplierDemandRadar,
+                            fallbackRes = stateValues.drawableResIconSupplierDemandRadar.value,
+                            contentDescription = localizedStringResource(1794, "Backorder watch"),
+                            tintColor = stateValues.ErrorColor
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = localizedStringResource(1794, "Backorder watch"),
+                                color = stateValues.TextColor,
+                                fontSize = stateValues.titleTextSize,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = localizedStringResource(1795, "Server watches accepted-vs-requested gaps after supplier answers, so shortages become a clear upstream or store negotiation queue."),
+                                color = stateValues.PlaceholderTextColor,
+                                fontSize = stateValues.smallTextSize
+                            )
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1797, "Affected orders")}: ${backorderWatchItems.sumOf { it.affectedOrderCount }}") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1796, "Short qty")}: ${backorderShortQuantity.toStockMoneyText()}") }
+                    }
+                }
+            }
+
+            if (backorderWatchItems.isEmpty()) {
+                item {
+                    MessageText(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(1799, "No answered shortage pressure yet")
+                    )
+                }
+            } else if (visibleBackorderWatchItems.isEmpty()) {
+                item {
+                    MessageText(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(1380, "No orders match this filter")
+                    )
+                }
+            } else {
+                items(visibleBackorderWatchItems, key = { it.backorderId.ifBlank { it.goodsItemId } }) { item ->
+                    SupplierBackorderWatchCard(item)
                 }
             }
 
@@ -36590,20 +38058,36 @@ private fun AppConfiguration.ClipboardCopyButton(
     modifier: Modifier = Modifier,
     contentDescription: String? = null
 ) {
-    val resolvedContentDescription = contentDescription ?: localizedStringResource(503, "Copy")
-    val iconRes = stateValues.drawableResIconClipboard.value
-    val iconPath = stateValues.drawablePathIconClipboard
+    var copyPulse by rememberSaveable(textToCopy) { mutableStateOf(0) }
+    var copied by rememberSaveable(textToCopy) { mutableStateOf(false) }
+
+    LaunchedEffect(copyPulse) {
+        if (copyPulse > 0) {
+            copied = true
+            delay(2200L)
+            copied = false
+        }
+    }
+
+    val resolvedContentDescription = contentDescription ?: if (copied) localizedStringResource(501, "Copied to clipboard") else localizedStringResource(503, "Copy")
+    val iconRes = if (copied) stateValues.drawableResIconCheck.value else stateValues.drawableResIconClipboard.value
+    val iconPath = if (copied) stateValues.drawablePathIconCheck else stateValues.drawablePathIconClipboard
+    val borderColor = if (copied) stateValues.OkayColor else stateValues.PlaceholderTextColor
+    val tintColor = if (copied) stateValues.OkayColor else stateValues.TextColor
 
     Box(
         modifier = modifier
             .size(34.dp)
             .clip(RoundedCornerShape(17.dp))
-            .background(stateValues.BackgroundColor)
-            .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor, RoundedCornerShape(17.dp))
+            .background(if (copied) stateValues.OkayColor.copy(alpha = 0.10f) else stateValues.BackgroundColor)
+            .border(stateValues.unfocusedBorderWidth, borderColor, RoundedCornerShape(17.dp))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(color = stateValues.AccentColor),
-                onClick = { copyTextToClipboard(textToCopy) }
+                onClick = {
+                    copyTextToClipboard(textToCopy)
+                    copyPulse += 1
+                }
             )
             .padding(7.dp),
         contentAlignment = Alignment.Center
@@ -36613,7 +38097,7 @@ private fun AppConfiguration.ClipboardCopyButton(
             url = iconPath,
             fallbackRes = iconRes,
             contentDescription = resolvedContentDescription,
-            tintColor = stateValues.TextColor
+            tintColor = tintColor
         )
     }
 }
@@ -38055,8 +39539,11 @@ private fun AppConfiguration.SupplierWorkspaceMenuTile() {
         }
     }
 
-    val activeOrders = remember(orders) { orders.orEmpty().filter { it.isActive } }
-    val activeLines = remember(lines) { lines.orEmpty().filter { it.isActive } }
+    val activeOrders = remember(orders) { orders.orEmpty().filter { it.isActive && it.status != SupplierOrderStatusDataModel.Draft } }
+    val activeLines = remember(lines, activeOrders) {
+        val activeOrderIds = activeOrders.map { it.id }.toSet()
+        lines.orEmpty().filter { line -> line.isActive && line.orderId in activeOrderIds }
+    }
     val fallbackOpenOrdersCount = remember(activeOrders) { activeOrders.count { !it.status.isSupplierOrderClosed() } }
     val fallbackPartnerCount = remember(activeOrders, stateValues.appLanguage) {
         activeOrders.map { it.storeId.ifBlank { supplierDeskStoreTitle(it) } }.filter { it.isNotBlank() }.distinct().size
