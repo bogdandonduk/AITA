@@ -7192,6 +7192,8 @@ private fun supplierDashboardRunAttentionSummary(
   return supplierDashboardJoinedMessage(main, ru, kk)
 }
 
+private fun <T> supplierDashboardChunk(block: () -> T): T = block()
+
 private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDashboardDataModel {
   val now = System.currentTimeMillis()
   val supplierProfiles = accessibleSupplierProfilesForUserInsideTransaction(userId)
@@ -7246,74 +7248,80 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
     .filter { it.isNotBlank() }
     .distinct()
 
-  val statusBuckets = SupplierOrderStatusDataModel.entries.mapNotNull { status ->
-    val statusOrders = orders.filter { it.status == status }
-    val lineCount = statusOrders.sumOf { linesByOrder[it.id].orEmpty().size }
-    if (statusOrders.isEmpty() && lineCount == 0) null else SupplierDashboardStatusBucketDataModel(
-      status = status,
-      orderCount = statusOrders.size,
-      lineCount = lineCount
-    )
+  val statusBuckets = supplierDashboardChunk {
+    SupplierOrderStatusDataModel.entries.mapNotNull { status ->
+      val statusOrders = orders.filter { it.status == status }
+      val lineCount = statusOrders.sumOf { linesByOrder[it.id].orEmpty().size }
+      if (statusOrders.isEmpty() && lineCount == 0) null else SupplierDashboardStatusBucketDataModel(
+        status = status,
+        orderCount = statusOrders.size,
+        lineCount = lineCount
+      )
+    }
   }
 
-  val demandHighlights = lines
-    .groupBy { it.goodsItemId }
-    .mapNotNull demandHighlightItem@{ (goodsItemId, itemLines) ->
-      val relatedOrders = itemLines.mapNotNull { ordersById[it.orderId] }.distinctBy { it.id }
-      val latestOrder = relatedOrders.maxByOrNull { it.updatedAtMillis.takeIf { value -> value > 0L } ?: it.orderedAtMillis }
+  val demandHighlights = supplierDashboardChunk {
+    lines
+      .groupBy { it.goodsItemId }
+      .mapNotNull demandHighlightItem@{ (goodsItemId, itemLines) ->
+        val relatedOrders = itemLines.mapNotNull { ordersById[it.orderId] }.distinctBy { it.id }
+        val latestOrder = relatedOrders.maxByOrNull { it.updatedAtMillis.takeIf { value -> value > 0L } ?: it.orderedAtMillis }
+          ?: return@demandHighlightItem null
+        val sampleLine = itemLines.maxByOrNull { line -> ordersById[line.orderId]?.updatedAtMillis ?: 0L } ?: itemLines.firstOrNull()
         ?: return@demandHighlightItem null
-      val sampleLine = itemLines.maxByOrNull { line -> ordersById[line.orderId]?.updatedAtMillis ?: 0L } ?: itemLines.firstOrNull()
-      ?: return@demandHighlightItem null
-      SupplierDashboardDemandDataModel(
-        goodsItemId = goodsItemId,
-        goodsItemNameSnapshot = sampleLine.goodsItemNameSnapshot,
-        barcodeSnapshots = sampleLine.goodsItemBarcodeSnapshots,
-        measurementUnitIdSnapshot = sampleLine.goodsItemMeasurementUnitIdSnapshot,
-        requestedQuantityTotal = itemLines.sumOf { it.requestedQuantity.total.coerceAtLeast(0.0) },
-        requestLineCount = itemLines.size,
-        openOrderCount = relatedOrders.count { !it.status.isClosedForSupplierDashboard() },
-        storeCount = relatedOrders.map { it.storeId }.filter { it.isNotBlank() }.distinct().size,
-        latestStatus = latestOrder.status,
-        latestActivityMillis = latestOrder.updatedAtMillis.takeIf { it > 0L } ?: latestOrder.orderedAtMillis,
-        latestExpectedSupplyPrice = itemLines.asSequence().mapNotNull { it.expectedSupplyPrice }.firstOrNull(),
-        latestOfferedSupplyPrice = itemLines.asSequence().mapNotNull { it.supplierOfferedSupplyPrice }.firstOrNull()
+        SupplierDashboardDemandDataModel(
+          goodsItemId = goodsItemId,
+          goodsItemNameSnapshot = sampleLine.goodsItemNameSnapshot,
+          barcodeSnapshots = sampleLine.goodsItemBarcodeSnapshots,
+          measurementUnitIdSnapshot = sampleLine.goodsItemMeasurementUnitIdSnapshot,
+          requestedQuantityTotal = itemLines.sumOf { it.requestedQuantity.total.coerceAtLeast(0.0) },
+          requestLineCount = itemLines.size,
+          openOrderCount = relatedOrders.count { !it.status.isClosedForSupplierDashboard() },
+          storeCount = relatedOrders.map { it.storeId }.filter { it.isNotBlank() }.distinct().size,
+          latestStatus = latestOrder.status,
+          latestActivityMillis = latestOrder.updatedAtMillis.takeIf { it > 0L } ?: latestOrder.orderedAtMillis,
+          latestExpectedSupplyPrice = itemLines.asSequence().mapNotNull { it.expectedSupplyPrice }.firstOrNull(),
+          latestOfferedSupplyPrice = itemLines.asSequence().mapNotNull { it.supplierOfferedSupplyPrice }.firstOrNull()
+        )
+      }
+      .sortedWith(
+        compareByDescending<SupplierDashboardDemandDataModel> { it.openOrderCount }
+          .thenByDescending { it.requestLineCount }
+          .thenByDescending { it.latestActivityMillis }
       )
-    }
-    .sortedWith(
-      compareByDescending<SupplierDashboardDemandDataModel> { it.openOrderCount }
-        .thenByDescending { it.requestLineCount }
-        .thenByDescending { it.latestActivityMillis }
-    )
-    .take(8)
+      .take(8)
+  }
 
   val contractsByStore = contracts.groupBy { it.storeId }
-  val partnerHighlights = orders
-    .groupBy { it.storeId.ifBlank { it.storePublicIdSnapshot }.ifBlank { it.id } }
-    .map { (storeKey, storeOrdersRaw) ->
-      val storeOrders = storeOrdersRaw.sortedByDescending { it.updatedAtMillis.takeIf { value -> value > 0L } ?: it.orderedAtMillis }
-      val latest = storeOrders.firstOrNull()
-      val storeContracts = latest?.storeId?.let { contractsByStore[it].orEmpty() }.orEmpty()
-      SupplierDashboardPartnerDataModel(
-        storeId = latest?.storeId ?: storeKey,
-        storeNameSnapshot = latest?.storeNameSnapshot.orEmpty(),
-        storePublicIdSnapshot = latest?.storePublicIdSnapshot.orEmpty(),
-        storeAddressTextSnapshot = latest?.storeAddressTextSnapshot.orEmpty(),
-        orderCount = storeOrders.size,
-        openOrderCount = storeOrders.count { !it.status.isClosedForSupplierDashboard() },
-        deliveredOrderCount = storeOrders.count { it.status == SupplierOrderStatusDataModel.Delivered || it.status == SupplierOrderStatusDataModel.PartiallyDelivered },
-        issueOrderCount = storeOrders.count { it.status == SupplierOrderStatusDataModel.IssueReported || it.status == SupplierOrderStatusDataModel.Cancelled },
-        latestStatus = latest?.status ?: SupplierOrderStatusDataModel.Draft,
-        latestActivityMillis = latest?.updatedAtMillis?.takeIf { it > 0L } ?: latest?.orderedAtMillis ?: 0L,
-        activeContractCount = storeContracts.count { it.status == SUPPLIER_CONTRACT_STATUS_ACTIVE },
-        pendingContractCount = storeContracts.count { it.status == SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER || it.status == SUPPLIER_CONTRACT_STATUS_PENDING_STORE }
+  val partnerHighlights = supplierDashboardChunk {
+    orders
+      .groupBy { it.storeId.ifBlank { it.storePublicIdSnapshot }.ifBlank { it.id } }
+      .map { (storeKey, storeOrdersRaw) ->
+        val storeOrders = storeOrdersRaw.sortedByDescending { it.updatedAtMillis.takeIf { value -> value > 0L } ?: it.orderedAtMillis }
+        val latest = storeOrders.firstOrNull()
+        val storeContracts = latest?.storeId?.let { contractsByStore[it].orEmpty() }.orEmpty()
+        SupplierDashboardPartnerDataModel(
+          storeId = latest?.storeId ?: storeKey,
+          storeNameSnapshot = latest?.storeNameSnapshot.orEmpty(),
+          storePublicIdSnapshot = latest?.storePublicIdSnapshot.orEmpty(),
+          storeAddressTextSnapshot = latest?.storeAddressTextSnapshot.orEmpty(),
+          orderCount = storeOrders.size,
+          openOrderCount = storeOrders.count { !it.status.isClosedForSupplierDashboard() },
+          deliveredOrderCount = storeOrders.count { it.status == SupplierOrderStatusDataModel.Delivered || it.status == SupplierOrderStatusDataModel.PartiallyDelivered },
+          issueOrderCount = storeOrders.count { it.status == SupplierOrderStatusDataModel.IssueReported || it.status == SupplierOrderStatusDataModel.Cancelled },
+          latestStatus = latest?.status ?: SupplierOrderStatusDataModel.Draft,
+          latestActivityMillis = latest?.updatedAtMillis?.takeIf { it > 0L } ?: latest?.orderedAtMillis ?: 0L,
+          activeContractCount = storeContracts.count { it.status == SUPPLIER_CONTRACT_STATUS_ACTIVE },
+          pendingContractCount = storeContracts.count { it.status == SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER || it.status == SUPPLIER_CONTRACT_STATUS_PENDING_STORE }
+        )
+      }
+      .sortedWith(
+        compareByDescending<SupplierDashboardPartnerDataModel> { it.openOrderCount }
+          .thenByDescending { it.issueOrderCount }
+          .thenByDescending { it.latestActivityMillis }
       )
-    }
-    .sortedWith(
-      compareByDescending<SupplierDashboardPartnerDataModel> { it.openOrderCount }
-        .thenByDescending { it.issueOrderCount }
-        .thenByDescending { it.latestActivityMillis }
-    )
-    .take(8)
+      .take(8)
+  }
 
   val responseReadyStatuses = setOf(
     SupplierOrderStatusDataModel.Sent,
@@ -7358,147 +7366,151 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
   fun SupplierOrderWithLinesDataModel.hasSupplierDashboardContractBlocker(): Boolean =
     blockingSupplierContractsForDashboard().isNotEmpty()
 
-  val actionQueue = bundles
-    .asSequence()
-    .filter { bundle -> bundle.order.isActive && !bundle.order.status.isClosedForSupplierDashboard() }
-    .mapNotNull { bundle ->
-      val order = bundle.order
-      val bundleLines = bundle.lines.filter { it.isActive }
-      val dueAtMillis = order.confirmedDeliveryTimeMillis ?: order.desiredDeliveryTimeMillis
-      val missingAcceptedQuantityCount = bundleLines.count { it.supplierAcceptedQuantity == null }
-      val missingOfferedPriceCount = bundleLines.count { line ->
-        line.isMissingSupplierDeskOfferedPriceForAcceptedQuantity()
-      }
-      val orderContractBlockerCount = bundle.blockingSupplierContractsForDashboard().count()
-      val attentionSummary = supplierDashboardOrderAttentionSummary(
-        order = order,
-        activeLines = bundleLines,
-        pendingContractCount = orderContractBlockerCount
-      )
-      val missingHeaderDetails = order.status in listOf(
-        SupplierOrderStatusDataModel.Packed,
-        SupplierOrderStatusDataModel.InDelivery
-      ) && (order.paymentTerms.isNullOrBlank() || order.externalReference.isNullOrBlank())
-      val actionType = when {
-        order.status == SupplierOrderStatusDataModel.IssueReported -> "issue"
-        orderContractBlockerCount > 0 -> "contract"
-        order.status == SupplierOrderStatusDataModel.Sent || order.status == SupplierOrderStatusDataModel.SeenBySupplier -> "answer"
-        order.status == SupplierOrderStatusDataModel.Confirmed && !bundle.hasCompleteSupplierResponseForSupplierDesk() -> "complete_response"
-        missingHeaderDetails -> "terms"
-        order.status == SupplierOrderStatusDataModel.Confirmed -> "pack"
-        order.status == SupplierOrderStatusDataModel.Packed -> "dispatch"
-        order.status == SupplierOrderStatusDataModel.InDelivery || order.status == SupplierOrderStatusDataModel.PartiallyDelivered -> "delivery"
-        else -> null
-      } ?: return@mapNotNull null
-      val dueBoost = when (supplierDashboardDeliveryBucketId(now, dueAtMillis)) {
-        "overdue" -> 20
-        "today" -> 12
-        "tomorrow", "week" -> 6
-        else -> 0
-      }
-      val basePriority = when (actionType) {
-        "issue" -> 100
-        "contract" -> 94
-        "answer" -> 90
-        "complete_response" -> 84
-        "pack" -> 72
-        "dispatch" -> 70
-        "terms" -> 58
-        "delivery" -> 48
-        else -> 10
-      }
-      val preview = bundleLines
-        .take(3)
-        .joinToString(" • ") { line ->
-          val title = line.substituteGoodsItemNameSnapshot.firstOrNull { it.value.isNotBlank() }?.value
-            ?: line.goodsItemNameSnapshot.firstOrNull { it.value.isNotBlank() }?.value
-            ?: line.substituteGoodsItemBarcodeSnapshots.firstOrNull()
-            ?: line.goodsItemBarcodeSnapshots.firstOrNull()
-            ?: line.substituteGoodsItemId?.take(8)
-            ?: line.goodsItemId.take(8)
-          val quantityValue = when (order.status) {
-            SupplierOrderStatusDataModel.Confirmed,
-            SupplierOrderStatusDataModel.Packed,
-            SupplierOrderStatusDataModel.InDelivery -> line.supplierDeskPhysicalQuantityTotal()
-            else -> line.requestedQuantity.total.coerceAtLeast(0.0)
+  val actionQueue = supplierDashboardChunk {
+    bundles
+      .asSequence()
+      .filter { bundle -> bundle.order.isActive && !bundle.order.status.isClosedForSupplierDashboard() }
+      .mapNotNull { bundle ->
+        val order = bundle.order
+        val bundleLines = bundle.lines.filter { it.isActive }
+        val dueAtMillis = order.confirmedDeliveryTimeMillis ?: order.desiredDeliveryTimeMillis
+        val missingAcceptedQuantityCount = bundleLines.count { it.supplierAcceptedQuantity == null }
+        val missingOfferedPriceCount = bundleLines.count { line ->
+          line.isMissingSupplierDeskOfferedPriceForAcceptedQuantity()
+        }
+        val orderContractBlockerCount = bundle.blockingSupplierContractsForDashboard().count()
+        val attentionSummary = supplierDashboardOrderAttentionSummary(
+          order = order,
+          activeLines = bundleLines,
+          pendingContractCount = orderContractBlockerCount
+        )
+        val missingHeaderDetails = order.status in listOf(
+          SupplierOrderStatusDataModel.Packed,
+          SupplierOrderStatusDataModel.InDelivery
+        ) && (order.paymentTerms.isNullOrBlank() || order.externalReference.isNullOrBlank())
+        val actionType = when {
+          order.status == SupplierOrderStatusDataModel.IssueReported -> "issue"
+          orderContractBlockerCount > 0 -> "contract"
+          order.status == SupplierOrderStatusDataModel.Sent || order.status == SupplierOrderStatusDataModel.SeenBySupplier -> "answer"
+          order.status == SupplierOrderStatusDataModel.Confirmed && !bundle.hasCompleteSupplierResponseForSupplierDesk() -> "complete_response"
+          missingHeaderDetails -> "terms"
+          order.status == SupplierOrderStatusDataModel.Confirmed -> "pack"
+          order.status == SupplierOrderStatusDataModel.Packed -> "dispatch"
+          order.status == SupplierOrderStatusDataModel.InDelivery || order.status == SupplierOrderStatusDataModel.PartiallyDelivered -> "delivery"
+          else -> null
+        } ?: return@mapNotNull null
+        val dueBoost = when (supplierDashboardDeliveryBucketId(now, dueAtMillis)) {
+          "overdue" -> 20
+          "today" -> 12
+          "tomorrow", "week" -> 6
+          else -> 0
+        }
+        val basePriority = when (actionType) {
+          "issue" -> 100
+          "contract" -> 94
+          "answer" -> 90
+          "complete_response" -> 84
+          "pack" -> 72
+          "dispatch" -> 70
+          "terms" -> 58
+          "delivery" -> 48
+          else -> 10
+        }
+        val preview = bundleLines
+          .take(3)
+          .joinToString(" • ") { line ->
+            val title = line.substituteGoodsItemNameSnapshot.firstOrNull { it.value.isNotBlank() }?.value
+              ?: line.goodsItemNameSnapshot.firstOrNull { it.value.isNotBlank() }?.value
+              ?: line.substituteGoodsItemBarcodeSnapshots.firstOrNull()
+              ?: line.goodsItemBarcodeSnapshots.firstOrNull()
+              ?: line.substituteGoodsItemId?.take(8)
+              ?: line.goodsItemId.take(8)
+            val quantityValue = when (order.status) {
+              SupplierOrderStatusDataModel.Confirmed,
+              SupplierOrderStatusDataModel.Packed,
+              SupplierOrderStatusDataModel.InDelivery -> line.supplierDeskPhysicalQuantityTotal()
+              else -> line.requestedQuantity.total.coerceAtLeast(0.0)
+            }
+            val quantityText = quantityValue.takeIf { it > 0.0 }?.let { value ->
+              val safe = value.roundMoney()
+              val whole = safe.toLong()
+              if (safe == whole.toDouble()) whole.toString() else safe.toString()
+            }.orEmpty()
+            if (quantityText.isBlank()) title else "$title × $quantityText"
           }
-          val quantityText = quantityValue.takeIf { it > 0.0 }?.let { value ->
-            val safe = value.roundMoney()
-            val whole = safe.toLong()
-            if (safe == whole.toDouble()) whole.toString() else safe.toString()
-          }.orEmpty()
-          if (quantityText.isBlank()) title else "$title × $quantityText"
-        }
-      SupplierDashboardActionDataModel(
-        actionId = "${actionType}_${order.id}",
-        actionType = actionType,
-        priority = basePriority + dueBoost,
-        orderId = order.id,
-        storeId = order.storeId,
-        supplierId = order.supplierId,
-        storeNameSnapshot = order.storeNameSnapshot,
-        storePublicIdSnapshot = order.storePublicIdSnapshot,
-        status = order.status,
-        dueAtMillis = dueAtMillis,
-        latestActivityMillis = order.updatedAtMillis.takeIf { it > 0L } ?: order.orderedAtMillis,
-        lineCount = bundleLines.size,
-        missingAcceptedQuantityCount = missingAcceptedQuantityCount,
-        missingOfferedPriceCount = missingOfferedPriceCount,
-        amount = order.amount,
-        goodsPreview = preview.takeIf { it.isNotBlank() }?.let { listOf(LocalizedStringDataModel("main", it)) }.orEmpty(),
-        attentionSummary = attentionSummary
+        SupplierDashboardActionDataModel(
+          actionId = "${actionType}_${order.id}",
+          actionType = actionType,
+          priority = basePriority + dueBoost,
+          orderId = order.id,
+          storeId = order.storeId,
+          supplierId = order.supplierId,
+          storeNameSnapshot = order.storeNameSnapshot,
+          storePublicIdSnapshot = order.storePublicIdSnapshot,
+          status = order.status,
+          dueAtMillis = dueAtMillis,
+          latestActivityMillis = order.updatedAtMillis.takeIf { it > 0L } ?: order.orderedAtMillis,
+          lineCount = bundleLines.size,
+          missingAcceptedQuantityCount = missingAcceptedQuantityCount,
+          missingOfferedPriceCount = missingOfferedPriceCount,
+          amount = order.amount,
+          goodsPreview = preview.takeIf { it.isNotBlank() }?.let { listOf(LocalizedStringDataModel("main", it)) }.orEmpty(),
+          attentionSummary = attentionSummary
+        )
+      }
+      .sortedWith(
+        compareByDescending<SupplierDashboardActionDataModel> { it.priority }
+          .thenBy { it.dueAtMillis ?: Long.MAX_VALUE }
+          .thenByDescending { it.latestActivityMillis }
       )
-    }
-    .sortedWith(
-      compareByDescending<SupplierDashboardActionDataModel> { it.priority }
-        .thenBy { it.dueAtMillis ?: Long.MAX_VALUE }
-        .thenByDescending { it.latestActivityMillis }
-    )
-    .take(10)
-    .toList()
+      .take(10)
+      .toList()
+  }
 
-  val deliveryBuckets = bundles
-    .asSequence()
-    .filter { bundle -> bundle.order.isActive && !bundle.order.status.isClosedForSupplierDashboard() }
-    .groupBy { bundle ->
-      supplierDashboardDeliveryBucketId(
-        now = now,
-        dueAtMillis = bundle.order.confirmedDeliveryTimeMillis ?: bundle.order.desiredDeliveryTimeMillis
+  val deliveryBuckets = supplierDashboardChunk {
+    bundles
+      .asSequence()
+      .filter { bundle -> bundle.order.isActive && !bundle.order.status.isClosedForSupplierDashboard() }
+      .groupBy { bundle ->
+        supplierDashboardDeliveryBucketId(
+          now = now,
+          dueAtMillis = bundle.order.confirmedDeliveryTimeMillis ?: bundle.order.desiredDeliveryTimeMillis
+        )
+      }
+      .map { (bucketId, bucketBundles) ->
+        val bucketOrders = bucketBundles.map { it.order }.distinctBy { it.id }
+        val bucketLines = bucketBundles.flatMap { bundle -> bundle.lines.filter { it.isActive } }
+        val dueValues = bucketOrders.mapNotNull { order -> order.confirmedDeliveryTimeMillis ?: order.desiredDeliveryTimeMillis }
+        val preview = bucketLines
+          .distinctBy { it.goodsItemId.ifBlank { it.id } }
+          .take(4)
+          .joinToString(" • ") { line ->
+            line.goodsItemNameSnapshot.firstOrNull { it.value.isNotBlank() }?.value
+              ?: line.goodsItemBarcodeSnapshots.firstOrNull()
+              ?: line.goodsItemId.take(8)
+          }
+  
+        SupplierDashboardDeliveryBucketDataModel(
+          bucketId = bucketId,
+          title = supplierDashboardDeliveryBucketTitle(bucketId),
+          orderCount = bucketOrders.size,
+          lineCount = bucketLines.size,
+          storeCount = bucketOrders.map { it.storeId }.filter { it.isNotBlank() }.distinct().size,
+          actionRequiredOrderCount = bucketBundles.count { bundle -> bundle.needsSupplierDashboardAction() },
+          packedOrderCount = bucketOrders.count { it.status == SupplierOrderStatusDataModel.Packed },
+          inDeliveryOrderCount = bucketOrders.count { it.status == SupplierOrderStatusDataModel.InDelivery },
+          issueOrderCount = bucketOrders.count { it.status == SupplierOrderStatusDataModel.IssueReported || it.status == SupplierOrderStatusDataModel.Cancelled },
+          earliestDueAtMillis = dueValues.minOrNull(),
+          latestDueAtMillis = dueValues.maxOrNull(),
+          goodsPreview = preview.takeIf { it.isNotBlank() }?.let { listOf(LocalizedStringDataModel("main", it)) }.orEmpty()
+        )
+      }
+      .sortedWith(
+        compareBy<SupplierDashboardDeliveryBucketDataModel> { supplierDashboardDeliveryBucketRank(it.bucketId) }
+          .thenByDescending { it.actionRequiredOrderCount }
+          .thenByDescending { it.orderCount }
       )
-    }
-    .map { (bucketId, bucketBundles) ->
-      val bucketOrders = bucketBundles.map { it.order }.distinctBy { it.id }
-      val bucketLines = bucketBundles.flatMap { bundle -> bundle.lines.filter { it.isActive } }
-      val dueValues = bucketOrders.mapNotNull { order -> order.confirmedDeliveryTimeMillis ?: order.desiredDeliveryTimeMillis }
-      val preview = bucketLines
-        .distinctBy { it.goodsItemId.ifBlank { it.id } }
-        .take(4)
-        .joinToString(" • ") { line ->
-          line.goodsItemNameSnapshot.firstOrNull { it.value.isNotBlank() }?.value
-            ?: line.goodsItemBarcodeSnapshots.firstOrNull()
-            ?: line.goodsItemId.take(8)
-        }
-
-      SupplierDashboardDeliveryBucketDataModel(
-        bucketId = bucketId,
-        title = supplierDashboardDeliveryBucketTitle(bucketId),
-        orderCount = bucketOrders.size,
-        lineCount = bucketLines.size,
-        storeCount = bucketOrders.map { it.storeId }.filter { it.isNotBlank() }.distinct().size,
-        actionRequiredOrderCount = bucketBundles.count { bundle -> bundle.needsSupplierDashboardAction() },
-        packedOrderCount = bucketOrders.count { it.status == SupplierOrderStatusDataModel.Packed },
-        inDeliveryOrderCount = bucketOrders.count { it.status == SupplierOrderStatusDataModel.InDelivery },
-        issueOrderCount = bucketOrders.count { it.status == SupplierOrderStatusDataModel.IssueReported || it.status == SupplierOrderStatusDataModel.Cancelled },
-        earliestDueAtMillis = dueValues.minOrNull(),
-        latestDueAtMillis = dueValues.maxOrNull(),
-        goodsPreview = preview.takeIf { it.isNotBlank() }?.let { listOf(LocalizedStringDataModel("main", it)) }.orEmpty()
-      )
-    }
-    .sortedWith(
-      compareBy<SupplierDashboardDeliveryBucketDataModel> { supplierDashboardDeliveryBucketRank(it.bucketId) }
-        .thenByDescending { it.actionRequiredOrderCount }
-        .thenByDescending { it.orderCount }
-    )
+  }
 
 
   val openBundles = bundles.filter { bundle ->
@@ -7572,6256 +7584,7222 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
   val readyAmountCurrency = readyAmountLines.firstNotNullOfOrNull { line ->
     line.supplierOfferedSupplyPrice?.currency?.takeIf { it.isNotBlank() }
   } ?: supplierPriceRows.firstOrNull()?.supplyPrice?.currency?.takeIf { it.isNotBlank() } ?: "KZT"
-  val readiness = SupplierDashboardReadinessDataModel(
-    openOrderCount = openBundles.size,
-    answerNeededOrderCount = openBundles.count { bundle -> bundle.needsSupplierDashboardAction() },
-    responseReadyOrderCount = responseReadyOrders.size,
-    readyToPackOrderCount = readyToPackOrders.size,
-    packReadyLineCount = readyToPackOrders.sumOf { bundle ->
-      bundle.lines.count { line -> line.isActive && line.hasPositiveSupplierDeskAcceptedQuantity() }
-    },
-    missingAcceptedQuantityLineCount = missingAcceptedQuantityLineCount,
-    missingOfferedPriceLineCount = missingOfferedPriceLineCount,
-    priceBookCoveredLineCount = priceBookCoveredLineCount,
-    priceBookMissingLineCount = (responseCandidateLines.size - priceBookCoveredLineCount).coerceAtLeast(0),
-    priceBookCoveragePercent = if (responseCandidateLines.isEmpty()) 0 else (((priceBookCoveredLineCount * 100.0) / responseCandidateLines.size) + 0.5).toInt().coerceIn(0, 100),
-    responseLineCount = responseCandidateLines.size,
-    answeredLineCount = answeredLineCount,
-    declinedLineCount = declinedLineCount,
-    positiveAcceptedLineCount = positiveAcceptedLineCount,
-    requestedQuantityTotal = requestedQuantityTotal,
-    acceptedQuantityTotal = acceptedQuantityTotal,
-    responseProgressPercent = responseProgressPercent,
-    acceptedVsRequestedPercent = acceptedVsRequestedPercent,
-    estimatedReadyAmount = readyAmountValue.takeIf { it > 0.0 }?.let { amount ->
-      PriceDataModel(amount.toStockMoneyText(), readyAmountCurrency, supplierIds.firstOrNull()?.toString().orEmpty())
-    },
-    earliestDueAtMillis = openBundles.mapNotNull { bundle -> bundle.order.confirmedDeliveryTimeMillis ?: bundle.order.desiredDeliveryTimeMillis }.minOrNull(),
-    generatedAtMillis = now
-  )
+  val readiness = supplierDashboardChunk {
+    SupplierDashboardReadinessDataModel(
+      openOrderCount = openBundles.size,
+      answerNeededOrderCount = openBundles.count { bundle -> bundle.needsSupplierDashboardAction() },
+      responseReadyOrderCount = responseReadyOrders.size,
+      readyToPackOrderCount = readyToPackOrders.size,
+      packReadyLineCount = readyToPackOrders.sumOf { bundle ->
+        bundle.lines.count { line -> line.isActive && line.hasPositiveSupplierDeskAcceptedQuantity() }
+      },
+      missingAcceptedQuantityLineCount = missingAcceptedQuantityLineCount,
+      missingOfferedPriceLineCount = missingOfferedPriceLineCount,
+      priceBookCoveredLineCount = priceBookCoveredLineCount,
+      priceBookMissingLineCount = (responseCandidateLines.size - priceBookCoveredLineCount).coerceAtLeast(0),
+      priceBookCoveragePercent = if (responseCandidateLines.isEmpty()) 0 else (((priceBookCoveredLineCount * 100.0) / responseCandidateLines.size) + 0.5).toInt().coerceIn(0, 100),
+      responseLineCount = responseCandidateLines.size,
+      answeredLineCount = answeredLineCount,
+      declinedLineCount = declinedLineCount,
+      positiveAcceptedLineCount = positiveAcceptedLineCount,
+      requestedQuantityTotal = requestedQuantityTotal,
+      acceptedQuantityTotal = acceptedQuantityTotal,
+      responseProgressPercent = responseProgressPercent,
+      acceptedVsRequestedPercent = acceptedVsRequestedPercent,
+      estimatedReadyAmount = readyAmountValue.takeIf { it > 0.0 }?.let { amount ->
+        PriceDataModel(amount.toStockMoneyText(), readyAmountCurrency, supplierIds.firstOrNull()?.toString().orEmpty())
+      },
+      earliestDueAtMillis = openBundles.mapNotNull { bundle -> bundle.order.confirmedDeliveryTimeMillis ?: bundle.order.desiredDeliveryTimeMillis }.minOrNull(),
+      generatedAtMillis = now
+    )
+  }
 
   val readyToPackOrderIds = readyToPackOrderIdsForReadiness
   val safeDispatchableOrderIds = bulkDispatchableOrderIds.toSet()
-  val dispatchRuns = openBundles
-    .asSequence()
-    .filter { bundle -> bundle.order.status != SupplierOrderStatusDataModel.Draft }
-    .groupBy { bundle ->
-      val storeKey = bundle.order.storeId.ifBlank { bundle.order.storePublicIdSnapshot }.ifBlank { bundle.order.id }
-      val dueKey = (bundle.order.confirmedDeliveryTimeMillis ?: bundle.order.desiredDeliveryTimeMillis)
-        ?.let { due -> supplierDashboardDayStartMillis(due).toString() }
-        ?: "unscheduled"
-      "${bundle.order.supplierId}|$storeKey|$dueKey"
-    }
-    .map { (runKey, runBundlesRaw) ->
-      val runBundles = runBundlesRaw.sortedWith(
-        compareBy<SupplierOrderWithLinesDataModel> { bundle -> bundle.order.confirmedDeliveryTimeMillis ?: bundle.order.desiredDeliveryTimeMillis ?: Long.MAX_VALUE }
-          .thenByDescending { bundle -> bundle.order.updatedAtMillis.takeIf { value -> value > 0L } ?: bundle.order.orderedAtMillis }
+  val dispatchRuns = supplierDashboardChunk {
+    openBundles
+      .asSequence()
+      .filter { bundle -> bundle.order.status != SupplierOrderStatusDataModel.Draft }
+      .groupBy { bundle ->
+        val storeKey = bundle.order.storeId.ifBlank { bundle.order.storePublicIdSnapshot }.ifBlank { bundle.order.id }
+        val dueKey = (bundle.order.confirmedDeliveryTimeMillis ?: bundle.order.desiredDeliveryTimeMillis)
+          ?.let { due -> supplierDashboardDayStartMillis(due).toString() }
+          ?: "unscheduled"
+        "${bundle.order.supplierId}|$storeKey|$dueKey"
+      }
+      .map { (runKey, runBundlesRaw) ->
+        val runBundles = runBundlesRaw.sortedWith(
+          compareBy<SupplierOrderWithLinesDataModel> { bundle -> bundle.order.confirmedDeliveryTimeMillis ?: bundle.order.desiredDeliveryTimeMillis ?: Long.MAX_VALUE }
+            .thenByDescending { bundle -> bundle.order.updatedAtMillis.takeIf { value -> value > 0L } ?: bundle.order.orderedAtMillis }
+        )
+        val runOrders = runBundles.map { it.order }.distinctBy { it.id }
+        val physicallyActionableOrderIds = runOrders
+          .filter { order ->
+            order.id in readyToPackOrderIds ||
+               order.status == SupplierOrderStatusDataModel.Packed ||
+               order.status == SupplierOrderStatusDataModel.InDelivery
+          }
+          .map { order -> order.id }
+          .toSet()
+        val runLines = runBundles.flatMap { bundle -> bundle.lines.filter { it.isActive } }
+        val packLines = runLines.filter { line ->
+          line.orderId in physicallyActionableOrderIds && line.supplierDeskPhysicalQuantityTotal() > 0.0
+        }
+        val responseGapOrderIds = runBundles.filter { bundle ->
+          bundle.order.status in responseReadyStatuses && bundle.hasSupplierResponseGapsForSupplierDesk()
+        }.map { bundle -> bundle.order.id }.toSet()
+        val sampleOrder = runOrders
+          .maxByOrNull { order -> order.updatedAtMillis.takeIf { value -> value > 0L } ?: order.orderedAtMillis }
+          ?: runOrders.firstOrNull()
+        val dueValues = runOrders.mapNotNull { order -> order.confirmedDeliveryTimeMillis ?: order.desiredDeliveryTimeMillis }
+        val statusMix = SupplierOrderStatusDataModel.entries.mapNotNull { status ->
+          val statusOrders = runOrders.filter { order -> order.status == status }
+          val statusLineCount = statusOrders.sumOf { order -> linesByOrder[order.id].orEmpty().count { it.isActive } }
+          if (statusOrders.isEmpty() && statusLineCount == 0) null else SupplierDashboardStatusBucketDataModel(
+            status = status,
+            orderCount = statusOrders.size,
+            lineCount = statusLineCount
+          )
+        }
+        val runLineGroups = runLines
+          .groupBy { line ->
+            (line.substituteGoodsItemId?.takeIf { it.isNotBlank() } ?: line.goodsItemId)
+              .ifBlank { line.goodsItemBarcodeSnapshots.firstOrNull().orEmpty() }
+              .ifBlank { line.id }
+          }
+          .values
+          .toList()
+        fun supplierRunLineTitle(line: SupplierOrderLineDataModel): String =
+          line.substituteGoodsItemNameSnapshot.firstOrNull { it.value.isNotBlank() }?.value
+            ?: line.goodsItemNameSnapshot.firstOrNull { it.value.isNotBlank() }?.value
+            ?: line.substituteGoodsItemBarcodeSnapshots.firstOrNull()
+            ?: line.goodsItemBarcodeSnapshots.firstOrNull()
+            ?: line.substituteGoodsItemId?.take(8)
+            ?: line.goodsItemId.take(8)
+        fun supplierRunQuantityText(value: Double): String {
+          val safe = value.coerceAtLeast(0.0).roundMoney()
+          val whole = safe.toLong()
+          return if (safe == whole.toDouble()) whole.toString() else safe.toString()
+        }
+        val preview = runLineGroups
+          .take(5)
+          .joinToString(" • ") { itemLines ->
+            val first = itemLines.first()
+            val title = supplierRunLineTitle(first)
+            val quantityTotal = itemLines.sumOf { line -> line.supplierDeskPhysicalQuantityTotal() }.roundMoney()
+            val quantityText = quantityTotal.takeIf { it > 0.0 }?.let(::supplierRunQuantityText).orEmpty()
+            if (quantityText.isBlank()) title else "$title × $quantityText"
+          }
+        val packChecklistLineGroups = packLines
+          .groupBy { line ->
+            (line.substituteGoodsItemId?.takeIf { it.isNotBlank() } ?: line.goodsItemId)
+              .ifBlank { line.goodsItemBarcodeSnapshots.firstOrNull().orEmpty() }
+              .ifBlank { line.id }
+          }
+          .values
+          .toList()
+        val packChecklist = packChecklistLineGroups
+          .sortedBy { itemLines -> supplierRunLineTitle(itemLines.first()).lowercase() }
+          .take(10)
+          .joinToString("\n") { itemLines ->
+            val first = itemLines.first()
+            val title = supplierRunLineTitle(first)
+            val quantityTotal = itemLines.sumOf { line -> line.supplierDeskPhysicalQuantityTotal() }.roundMoney()
+            val barcode = first.substituteGoodsItemBarcodeSnapshots.firstOrNull() ?: first.goodsItemBarcodeSnapshots.firstOrNull()
+            buildString {
+              append("□ ").append(title)
+              quantityTotal.takeIf { it > 0.0 }?.let { amount -> append(" × ").append(supplierRunQuantityText(amount)) }
+              barcode?.takeIf { it.isNotBlank() }?.let { code -> append(" · ").append(code) }
+            }
+          }
+        val amountLines = runLines
+          .filter { line -> line.orderId in physicallyActionableOrderIds }
+          .mapNotNull amountLine@{ line ->
+          val order = ordersById[line.orderId] ?: return@amountLine null
+          val targetGoodsItemId = supplierBridgeTargetGoodsItemId(line)
+          val quantity = line.supplierDeskPhysicalQuantityTotal()
+          if (quantity <= 0.0) return@amountLine null
+          val price = line.supplierOfferedSupplyPrice
+            ?: line.expectedSupplyPrice
+            ?: supplierPriceRows
+              .filter { price ->
+                price.isActive &&
+                   price.storeId == order.storeId &&
+                   price.supplierId == order.supplierId &&
+                   price.goodsItemId == targetGoodsItemId
+              }
+              .maxByOrNull { price -> price.lastUsedAtMillis ?: price.updatedAtMillis }
+              ?.supplyPrice
+            ?: return@amountLine null
+          quantity to price
+        }
+        val amountValue = amountLines.sumOf { (quantity, price) -> quantity * price.price.toMoneyDouble() }.roundMoney()
+        val amountCurrency = amountLines.firstOrNull()?.second?.currency?.takeIf { it.isNotBlank() }
+          ?: runOrders.firstNotNullOfOrNull { order -> order.amount?.currency?.takeIf { it.isNotBlank() } }
+          ?: supplierPriceRows.firstOrNull()?.supplyPrice?.currency?.takeIf { it.isNotBlank() }
+          ?: "KZT"
+        val runGoodsItemIds = runLines
+          .map { line -> supplierBridgeTargetGoodsItemId(line) }
+          .filter { goodsItemId -> goodsItemId.isNotBlank() }
+          .toSet()
+        val relatedContracts = contracts.filter { contract ->
+          contract.isActive &&
+             sampleOrder != null &&
+             contract.storeId == sampleOrder.storeId &&
+             contract.supplierId == sampleOrder.supplierId &&
+             (contract.scopeType == SUPPLIER_CONTRACT_SCOPE_PARTNERSHIP ||
+                contract.goodsItemIds.isEmpty() ||
+                contract.goodsItemIds.any { goodsItemId -> goodsItemId in runGoodsItemIds })
+        }
+        val runContractBlockers = relatedContracts.filter { contract ->
+          contract.status != SUPPLIER_CONTRACT_STATUS_ACTIVE &&
+             contract.status != SUPPLIER_CONTRACT_STATUS_ARCHIVED
+        }
+        val contractBlockedOrderIds = runBundles
+          .filter { bundle -> bundle.hasSupplierDashboardContractBlocker() }
+          .map { bundle -> bundle.order.id }
+          .filter { orderId -> orderId.isNotBlank() }
+          .distinct()
+        val packableOrderIds = runOrders.filter { order -> order.id in readyToPackOrderIds }.map { it.id }
+        val dispatchableOrderIds = runOrders.filter { order -> order.id in safeDispatchableOrderIds }.map { it.id }
+        val packedCount = runOrders.count { order -> order.status == SupplierOrderStatusDataModel.Packed }
+        val dispatchableCount = dispatchableOrderIds.size
+        val readyToPackCount = packableOrderIds.size
+        val inDeliveryCount = runOrders.count { order -> order.status == SupplierOrderStatusDataModel.InDelivery }
+        val issueCount = runOrders.count { order -> order.status == SupplierOrderStatusDataModel.IssueReported }
+        val actionRequiredOrderIds = runBundles
+          .filter { bundle -> bundle.needsSupplierDashboardAction() || bundle.order.id in responseGapOrderIds }
+          .map { bundle -> bundle.order.id }
+          .distinct()
+        val actionRequiredCount = actionRequiredOrderIds.size
+        val pendingContractCount = runContractBlockers.size
+        val activeContractCount = relatedContracts.count { contract -> contract.status == SUPPLIER_CONTRACT_STATUS_ACTIVE }
+        val attentionOrderIds = (actionRequiredOrderIds + contractBlockedOrderIds).distinct()
+        val earliestDueAtMillis = dueValues.minOrNull()
+        val latestDueAtMillis = dueValues.maxOrNull()
+        val latestActivityMillis = runOrders
+          .map { order -> order.updatedAtMillis.takeIf { value -> value > 0L } ?: order.orderedAtMillis }
+          .maxOrNull()
+          ?: 0L
+        val dueBoost = when (supplierDashboardDeliveryBucketId(now, earliestDueAtMillis)) {
+          "overdue" -> 30
+          "today" -> 20
+          "tomorrow", "week" -> 12
+          "later" -> 4
+          else -> 2
+        }
+        val suggestedAction = when {
+          issueCount > 0 -> "issue"
+          pendingContractCount > 0 -> "contract"
+          actionRequiredCount > 0 -> "answer"
+          readyToPackCount > 0 -> "pack"
+          dispatchableCount > 0 -> "dispatch"
+          inDeliveryCount > 0 -> "delivery"
+          else -> "plan"
+        }
+        val priorityScore = (
+          issueCount * 40 +
+             pendingContractCount * 26 +
+             actionRequiredCount * 20 +
+             readyToPackCount * 16 +
+             dispatchableCount * 14 +
+             inDeliveryCount * 8 +
+             runOrders.size * 3 +
+             dueBoost
+          ).coerceAtLeast(0)
+        val runAttentionSummary = supplierDashboardRunAttentionSummary(
+          issueCount = issueCount,
+          pendingContractCount = pendingContractCount,
+          actionRequiredCount = actionRequiredCount,
+          readyToPackCount = readyToPackCount,
+          packedCount = dispatchableCount,
+          inDeliveryCount = inDeliveryCount
+        )
+        val handoffMain = mutableListOf<String>()
+        val handoffRu = mutableListOf<String>()
+        val handoffKk = mutableListOf<String>()
+        fun addHandoff(mainText: String, ruText: String, kkText: String) {
+          handoffMain += mainText
+          handoffRu += ruText
+          handoffKk += kkText
+        }
+        if (contractBlockedOrderIds.isNotEmpty()) {
+          addHandoff(
+            "□ Do not pack or load ${contractBlockedOrderIds.size} contract-blocked order(s)",
+            "□ Не собирайте и не грузите ${contractBlockedOrderIds.size} заказ(ов), заблокированных договором",
+            "□ Келісімшарт бөгеген ${contractBlockedOrderIds.size} тапсырысты жинамаңыз және тиеп жібермеңіз"
+          )
+        }
+        if (readyToPackCount > 0 || packedCount > 0 || inDeliveryCount > 0) {
+          addHandoff(
+            "□ Verify run and order count: ${runOrders.size}",
+            "□ Проверьте маршрут и число заказов: ${runOrders.size}",
+            "□ Бағыт пен тапсырыс санын тексеріңіз: ${runOrders.size}"
+          )
+          sampleOrder?.storeAddressTextSnapshot?.takeIf { it.isNotBlank() }?.let { address ->
+            addHandoff(
+              "□ Confirm delivery address: $address",
+              "□ Проверьте адрес доставки: $address",
+              "□ Жеткізу мекенжайын тексеріңіз: $address"
+            )
+          }
+          if (readyToPackCount > 0) addHandoff(
+            "□ Pack before driver: $readyToPackCount order(s)",
+            "□ Собрать до передачи водителю: $readyToPackCount заказ(ов)",
+            "□ Жүргізушіге дейін жинау: $readyToPackCount тапсырыс"
+          )
+          if (dispatchableCount > 0) addHandoff(
+            "□ Load packed orders: $dispatchableCount",
+            "□ Загрузить собранные заказы: $dispatchableCount",
+            "□ Жиналған тапсырыстарды тиеу: $dispatchableCount"
+          )
+          if (inDeliveryCount > 0) addHandoff(
+            "□ Already on route: $inDeliveryCount order(s)",
+            "□ Уже в пути: $inDeliveryCount заказ(ов)",
+            "□ Жолда: $inDeliveryCount тапсырыс"
+          )
+          amountValue.takeIf { it > 0.0 }?.let { amount ->
+            val amountText = "${amount.toStockMoneyText()} $amountCurrency"
+            addHandoff(
+              "□ Manifest amount: $amountText",
+              "□ Сумма манифеста: $amountText",
+              "□ Манифест сомасы: $amountText"
+            )
+          }
+          packChecklist.takeIf { it.isNotBlank() }?.let { checklist ->
+            addHandoff(
+              checklist,
+              checklist,
+              checklist
+            )
+          }
+        }
+        val driverHandoffChecklist = supplierDashboardJoinedMessage(handoffMain, handoffRu, handoffKk)
+  
+        SupplierDashboardDispatchRunDataModel(
+          runId = "dispatch_${runKey.take(96)}",
+          supplierId = sampleOrder?.supplierId.orEmpty(),
+          storeId = sampleOrder?.storeId.orEmpty(),
+          storeNameSnapshot = sampleOrder?.storeNameSnapshot.orEmpty(),
+          storePublicIdSnapshot = sampleOrder?.storePublicIdSnapshot.orEmpty(),
+          storeAddressTextSnapshot = sampleOrder?.storeAddressTextSnapshot.orEmpty(),
+          orderIds = runOrders.map { it.id },
+          packableOrderIds = packableOrderIds,
+          dispatchableOrderIds = dispatchableOrderIds,
+          attentionOrderIds = attentionOrderIds,
+          contractBlockedOrderIds = contractBlockedOrderIds,
+          statusMix = statusMix,
+          orderCount = runOrders.size,
+          lineCount = runLines.size,
+          readyToPackOrderCount = readyToPackCount,
+          packedOrderCount = packedCount,
+          inDeliveryOrderCount = inDeliveryCount,
+          issueOrderCount = issueCount,
+          actionRequiredOrderCount = actionRequiredCount,
+          activeContractCount = activeContractCount,
+          pendingContractCount = pendingContractCount,
+          earliestDueAtMillis = earliestDueAtMillis,
+          latestDueAtMillis = latestDueAtMillis,
+          latestActivityMillis = latestActivityMillis,
+          goodsPreview = preview.takeIf { it.isNotBlank() }?.let { listOf(LocalizedStringDataModel("main", it)) }.orEmpty(),
+          packChecklist = packChecklist.takeIf { it.isNotBlank() }?.let { listOf(LocalizedStringDataModel("main", it)) }.orEmpty(),
+          attentionSummary = runAttentionSummary,
+          driverHandoffChecklist = driverHandoffChecklist,
+          estimatedAmount = amountValue.takeIf { it > 0.0 }?.let { amount ->
+            PriceDataModel(amount.toStockMoneyText(), amountCurrency, sampleOrder?.supplierId.orEmpty())
+          },
+          priorityScore = priorityScore,
+          suggestedAction = suggestedAction
+        )
+      }
+      .sortedWith(
+        compareByDescending<SupplierDashboardDispatchRunDataModel> { it.priorityScore }
+          .thenBy { it.earliestDueAtMillis ?: Long.MAX_VALUE }
+          .thenByDescending { it.latestActivityMillis }
       )
-      val runOrders = runBundles.map { it.order }.distinctBy { it.id }
-      val physicallyActionableOrderIds = runOrders
-        .filter { order ->
-          order.id in readyToPackOrderIds ||
+      .take(12)
+  }
+
+  val manufacturerBridge = supplierDashboardChunk {
+    openLines
+      .filter { line -> supplierBridgeTargetGoodsItemId(line).isNotBlank() }
+      .groupBy { line -> supplierBridgeTargetGoodsItemId(line) }
+      .mapNotNull bridgeItem@{ (goodsItemId, itemLines) ->
+        val relatedOrders = itemLines
+          .mapNotNull { line -> ordersById[line.orderId] }
+          .filter { order -> !order.status.isClosedForSupplierDashboard() }
+          .distinctBy { it.id }
+        if (relatedOrders.isEmpty()) return@bridgeItem null
+  
+        val sampleLine = itemLines
+          .maxByOrNull { line -> ordersById[line.orderId]?.updatedAtMillis ?: 0L }
+          ?: itemLines.firstOrNull()
+          ?: return@bridgeItem null
+        val sampleUsesSubstitute = sampleLine.substituteGoodsItemId?.takeIf { it.isNotBlank() } == goodsItemId
+        val requestedQuantityTotal = itemLines.sumOf { line -> line.requestedQuantity.total.coerceAtLeast(0.0) }.roundMoney()
+        val acceptedQuantityTotal = itemLines.sumOf { line -> line.supplierAcceptedQuantity?.total?.coerceAtLeast(0.0) ?: 0.0 }.roundMoney()
+        val missingQuantityTotal = (requestedQuantityTotal - acceptedQuantityTotal).coerceAtLeast(0.0).roundMoney()
+        val openOrderCount = relatedOrders.count { order -> !order.status.isClosedForSupplierDashboard() }
+        val confirmedOrderCount = relatedOrders.count { order ->
+          order.status == SupplierOrderStatusDataModel.Confirmed ||
              order.status == SupplierOrderStatusDataModel.Packed ||
              order.status == SupplierOrderStatusDataModel.InDelivery
         }
-        .map { order -> order.id }
-        .toSet()
-      val runLines = runBundles.flatMap { bundle -> bundle.lines.filter { it.isActive } }
-      val packLines = runLines.filter { line ->
-        line.orderId in physicallyActionableOrderIds && line.supplierDeskPhysicalQuantityTotal() > 0.0
-      }
-      val responseGapOrderIds = runBundles.filter { bundle ->
-        bundle.order.status in responseReadyStatuses && bundle.hasSupplierResponseGapsForSupplierDesk()
-      }.map { bundle -> bundle.order.id }.toSet()
-      val sampleOrder = runOrders
-        .maxByOrNull { order -> order.updatedAtMillis.takeIf { value -> value > 0L } ?: order.orderedAtMillis }
-        ?: runOrders.firstOrNull()
-      val dueValues = runOrders.mapNotNull { order -> order.confirmedDeliveryTimeMillis ?: order.desiredDeliveryTimeMillis }
-      val statusMix = SupplierOrderStatusDataModel.entries.mapNotNull { status ->
-        val statusOrders = runOrders.filter { order -> order.status == status }
-        val statusLineCount = statusOrders.sumOf { order -> linesByOrder[order.id].orEmpty().count { it.isActive } }
-        if (statusOrders.isEmpty() && statusLineCount == 0) null else SupplierDashboardStatusBucketDataModel(
-          status = status,
-          orderCount = statusOrders.size,
-          lineCount = statusLineCount
-        )
-      }
-      val runLineGroups = runLines
-        .groupBy { line ->
-          (line.substituteGoodsItemId?.takeIf { it.isNotBlank() } ?: line.goodsItemId)
-            .ifBlank { line.goodsItemBarcodeSnapshots.firstOrNull().orEmpty() }
-            .ifBlank { line.id }
+        val priceBookRowsForItem = supplierPriceRows.filter { price -> price.goodsItemId == goodsItemId }
+        val responseCoveredLineCount = itemLines.count { line ->
+          line.supplierAcceptedQuantity != null &&
+             (!line.hasPositiveSupplierDeskAcceptedQuantity() || line.supplierOfferedSupplyPrice.hasPositiveSupplierDeskPrice() || run {
+               val order = ordersById[line.orderId]
+               order != null && supplierPriceBookKeyFor(order, line) in supplierPriceBookKeys
+             })
         }
-        .values
-        .toList()
-      fun supplierRunLineTitle(line: SupplierOrderLineDataModel): String =
-        line.substituteGoodsItemNameSnapshot.firstOrNull { it.value.isNotBlank() }?.value
-          ?: line.goodsItemNameSnapshot.firstOrNull { it.value.isNotBlank() }?.value
-          ?: line.substituteGoodsItemBarcodeSnapshots.firstOrNull()
-          ?: line.goodsItemBarcodeSnapshots.firstOrNull()
-          ?: line.substituteGoodsItemId?.take(8)
-          ?: line.goodsItemId.take(8)
-      fun supplierRunQuantityText(value: Double): String {
-        val safe = value.coerceAtLeast(0.0).roundMoney()
-        val whole = safe.toLong()
-        return if (safe == whole.toDouble()) whole.toString() else safe.toString()
-      }
-      val preview = runLineGroups
-        .take(5)
-        .joinToString(" • ") { itemLines ->
-          val first = itemLines.first()
-          val title = supplierRunLineTitle(first)
-          val quantityTotal = itemLines.sumOf { line -> line.supplierDeskPhysicalQuantityTotal() }.roundMoney()
-          val quantityText = quantityTotal.takeIf { it > 0.0 }?.let(::supplierRunQuantityText).orEmpty()
-          if (quantityText.isBlank()) title else "$title × $quantityText"
-        }
-      val packChecklistLineGroups = packLines
-        .groupBy { line ->
-          (line.substituteGoodsItemId?.takeIf { it.isNotBlank() } ?: line.goodsItemId)
-            .ifBlank { line.goodsItemBarcodeSnapshots.firstOrNull().orEmpty() }
-            .ifBlank { line.id }
-        }
-        .values
-        .toList()
-      val packChecklist = packChecklistLineGroups
-        .sortedBy { itemLines -> supplierRunLineTitle(itemLines.first()).lowercase() }
-        .take(10)
-        .joinToString("\n") { itemLines ->
-          val first = itemLines.first()
-          val title = supplierRunLineTitle(first)
-          val quantityTotal = itemLines.sumOf { line -> line.supplierDeskPhysicalQuantityTotal() }.roundMoney()
-          val barcode = first.substituteGoodsItemBarcodeSnapshots.firstOrNull() ?: first.goodsItemBarcodeSnapshots.firstOrNull()
-          buildString {
-            append("□ ").append(title)
-            quantityTotal.takeIf { it > 0.0 }?.let { amount -> append(" × ").append(supplierRunQuantityText(amount)) }
-            barcode?.takeIf { it.isNotBlank() }?.let { code -> append(" · ").append(code) }
-          }
-        }
-      val amountLines = runLines
-        .filter { line -> line.orderId in physicallyActionableOrderIds }
-        .mapNotNull amountLine@{ line ->
-        val order = ordersById[line.orderId] ?: return@amountLine null
-        val targetGoodsItemId = supplierBridgeTargetGoodsItemId(line)
-        val quantity = line.supplierDeskPhysicalQuantityTotal()
-        if (quantity <= 0.0) return@amountLine null
-        val price = line.supplierOfferedSupplyPrice
-          ?: line.expectedSupplyPrice
-          ?: supplierPriceRows
+        val amountLines = itemLines.mapNotNull lineAmount@{ line ->
+          val order = ordersById[line.orderId] ?: return@lineAmount null
+          val quantity = line.supplierAcceptedQuantity?.total?.coerceAtLeast(0.0) ?: return@lineAmount null
+          val price = line.supplierOfferedSupplyPrice ?: supplierPriceRows
             .filter { price ->
               price.isActive &&
                  price.storeId == order.storeId &&
                  price.supplierId == order.supplierId &&
-                 price.goodsItemId == targetGoodsItemId
+                 price.goodsItemId == goodsItemId
             }
             .maxByOrNull { price -> price.lastUsedAtMillis ?: price.updatedAtMillis }
             ?.supplyPrice
-          ?: return@amountLine null
-        quantity to price
-      }
-      val amountValue = amountLines.sumOf { (quantity, price) -> quantity * price.price.toMoneyDouble() }.roundMoney()
-      val amountCurrency = amountLines.firstOrNull()?.second?.currency?.takeIf { it.isNotBlank() }
-        ?: runOrders.firstNotNullOfOrNull { order -> order.amount?.currency?.takeIf { it.isNotBlank() } }
-        ?: supplierPriceRows.firstOrNull()?.supplyPrice?.currency?.takeIf { it.isNotBlank() }
-        ?: "KZT"
-      val runGoodsItemIds = runLines
-        .map { line -> supplierBridgeTargetGoodsItemId(line) }
-        .filter { goodsItemId -> goodsItemId.isNotBlank() }
-        .toSet()
-      val relatedContracts = contracts.filter { contract ->
-        contract.isActive &&
-           sampleOrder != null &&
-           contract.storeId == sampleOrder.storeId &&
-           contract.supplierId == sampleOrder.supplierId &&
-           (contract.scopeType == SUPPLIER_CONTRACT_SCOPE_PARTNERSHIP ||
-              contract.goodsItemIds.isEmpty() ||
-              contract.goodsItemIds.any { goodsItemId -> goodsItemId in runGoodsItemIds })
-      }
-      val runContractBlockers = relatedContracts.filter { contract ->
-        contract.status != SUPPLIER_CONTRACT_STATUS_ACTIVE &&
-           contract.status != SUPPLIER_CONTRACT_STATUS_ARCHIVED
-      }
-      val contractBlockedOrderIds = runBundles
-        .filter { bundle -> bundle.hasSupplierDashboardContractBlocker() }
-        .map { bundle -> bundle.order.id }
-        .filter { orderId -> orderId.isNotBlank() }
-        .distinct()
-      val packableOrderIds = runOrders.filter { order -> order.id in readyToPackOrderIds }.map { it.id }
-      val dispatchableOrderIds = runOrders.filter { order -> order.id in safeDispatchableOrderIds }.map { it.id }
-      val packedCount = runOrders.count { order -> order.status == SupplierOrderStatusDataModel.Packed }
-      val dispatchableCount = dispatchableOrderIds.size
-      val readyToPackCount = packableOrderIds.size
-      val inDeliveryCount = runOrders.count { order -> order.status == SupplierOrderStatusDataModel.InDelivery }
-      val issueCount = runOrders.count { order -> order.status == SupplierOrderStatusDataModel.IssueReported }
-      val actionRequiredOrderIds = runBundles
-        .filter { bundle -> bundle.needsSupplierDashboardAction() || bundle.order.id in responseGapOrderIds }
-        .map { bundle -> bundle.order.id }
-        .distinct()
-      val actionRequiredCount = actionRequiredOrderIds.size
-      val pendingContractCount = runContractBlockers.size
-      val activeContractCount = relatedContracts.count { contract -> contract.status == SUPPLIER_CONTRACT_STATUS_ACTIVE }
-      val attentionOrderIds = (actionRequiredOrderIds + contractBlockedOrderIds).distinct()
-      val earliestDueAtMillis = dueValues.minOrNull()
-      val latestDueAtMillis = dueValues.maxOrNull()
-      val latestActivityMillis = runOrders
-        .map { order -> order.updatedAtMillis.takeIf { value -> value > 0L } ?: order.orderedAtMillis }
-        .maxOrNull()
-        ?: 0L
-      val dueBoost = when (supplierDashboardDeliveryBucketId(now, earliestDueAtMillis)) {
-        "overdue" -> 30
-        "today" -> 20
-        "tomorrow", "week" -> 12
-        "later" -> 4
-        else -> 2
-      }
-      val suggestedAction = when {
-        issueCount > 0 -> "issue"
-        pendingContractCount > 0 -> "contract"
-        actionRequiredCount > 0 -> "answer"
-        readyToPackCount > 0 -> "pack"
-        dispatchableCount > 0 -> "dispatch"
-        inDeliveryCount > 0 -> "delivery"
-        else -> "plan"
-      }
-      val priorityScore = (
-        issueCount * 40 +
-           pendingContractCount * 26 +
-           actionRequiredCount * 20 +
-           readyToPackCount * 16 +
-           dispatchableCount * 14 +
-           inDeliveryCount * 8 +
-           runOrders.size * 3 +
-           dueBoost
-        ).coerceAtLeast(0)
-      val runAttentionSummary = supplierDashboardRunAttentionSummary(
-        issueCount = issueCount,
-        pendingContractCount = pendingContractCount,
-        actionRequiredCount = actionRequiredCount,
-        readyToPackCount = readyToPackCount,
-        packedCount = dispatchableCount,
-        inDeliveryCount = inDeliveryCount
-      )
-      val handoffMain = mutableListOf<String>()
-      val handoffRu = mutableListOf<String>()
-      val handoffKk = mutableListOf<String>()
-      fun addHandoff(mainText: String, ruText: String, kkText: String) {
-        handoffMain += mainText
-        handoffRu += ruText
-        handoffKk += kkText
-      }
-      if (contractBlockedOrderIds.isNotEmpty()) {
-        addHandoff(
-          "□ Do not pack or load ${contractBlockedOrderIds.size} contract-blocked order(s)",
-          "□ Не собирайте и не грузите ${contractBlockedOrderIds.size} заказ(ов), заблокированных договором",
-          "□ Келісімшарт бөгеген ${contractBlockedOrderIds.size} тапсырысты жинамаңыз және тиеп жібермеңіз"
-        )
-      }
-      if (readyToPackCount > 0 || packedCount > 0 || inDeliveryCount > 0) {
-        addHandoff(
-          "□ Verify run and order count: ${runOrders.size}",
-          "□ Проверьте маршрут и число заказов: ${runOrders.size}",
-          "□ Бағыт пен тапсырыс санын тексеріңіз: ${runOrders.size}"
-        )
-        sampleOrder?.storeAddressTextSnapshot?.takeIf { it.isNotBlank() }?.let { address ->
-          addHandoff(
-            "□ Confirm delivery address: $address",
-            "□ Проверьте адрес доставки: $address",
-            "□ Жеткізу мекенжайын тексеріңіз: $address"
-          )
+          ?: return@lineAmount null
+          quantity to price
         }
-        if (readyToPackCount > 0) addHandoff(
-          "□ Pack before driver: $readyToPackCount order(s)",
-          "□ Собрать до передачи водителю: $readyToPackCount заказ(ов)",
-          "□ Жүргізушіге дейін жинау: $readyToPackCount тапсырыс"
-        )
-        if (dispatchableCount > 0) addHandoff(
-          "□ Load packed orders: $dispatchableCount",
-          "□ Загрузить собранные заказы: $dispatchableCount",
-          "□ Жиналған тапсырыстарды тиеу: $dispatchableCount"
-        )
-        if (inDeliveryCount > 0) addHandoff(
-          "□ Already on route: $inDeliveryCount order(s)",
-          "□ Уже в пути: $inDeliveryCount заказ(ов)",
-          "□ Жолда: $inDeliveryCount тапсырыс"
-        )
-        amountValue.takeIf { it > 0.0 }?.let { amount ->
-          val amountText = "${amount.toStockMoneyText()} $amountCurrency"
-          addHandoff(
-            "□ Manifest amount: $amountText",
-            "□ Сумма манифеста: $amountText",
-            "□ Манифест сомасы: $amountText"
-          )
+        val amountValue = amountLines.sumOf { (quantity, price) -> quantity * price.price.toMoneyDouble() }.roundMoney()
+        val amountCurrency = amountLines.firstOrNull()?.second?.currency?.takeIf { it.isNotBlank() }
+          ?: priceBookRowsForItem.firstOrNull()?.supplyPrice?.currency?.takeIf { it.isNotBlank() }
+          ?: supplierPriceRows.firstOrNull()?.supplyPrice?.currency?.takeIf { it.isNotBlank() }
+          ?: "KZT"
+        val earliestDueAtMillis = relatedOrders
+          .mapNotNull { order -> order.confirmedDeliveryTimeMillis ?: order.desiredDeliveryTimeMillis }
+          .minOrNull()
+        val latestActivityMillis = relatedOrders
+          .map { order -> order.updatedAtMillis.takeIf { value -> value > 0L } ?: order.orderedAtMillis }
+          .maxOrNull()
+          ?: 0L
+        fun itemLineNeedsFactoryQuote(line: SupplierOrderLineDataModel): Boolean {
+          if (line.supplierAcceptedQuantity == null) return true
+          if (!line.isMissingSupplierDeskOfferedPriceForAcceptedQuantity()) return false
+          val order = ordersById[line.orderId] ?: return true
+          return supplierPriceBookKeyFor(order, line) !in supplierPriceBookKeys
         }
-        packChecklist.takeIf { it.isNotBlank() }?.let { checklist ->
-          addHandoff(
-            checklist,
-            checklist,
-            checklist
-          )
-        }
-      }
-      val driverHandoffChecklist = supplierDashboardJoinedMessage(handoffMain, handoffRu, handoffKk)
-
-      SupplierDashboardDispatchRunDataModel(
-        runId = "dispatch_${runKey.take(96)}",
-        supplierId = sampleOrder?.supplierId.orEmpty(),
-        storeId = sampleOrder?.storeId.orEmpty(),
-        storeNameSnapshot = sampleOrder?.storeNameSnapshot.orEmpty(),
-        storePublicIdSnapshot = sampleOrder?.storePublicIdSnapshot.orEmpty(),
-        storeAddressTextSnapshot = sampleOrder?.storeAddressTextSnapshot.orEmpty(),
-        orderIds = runOrders.map { it.id },
-        packableOrderIds = packableOrderIds,
-        dispatchableOrderIds = dispatchableOrderIds,
-        attentionOrderIds = attentionOrderIds,
-        contractBlockedOrderIds = contractBlockedOrderIds,
-        statusMix = statusMix,
-        orderCount = runOrders.size,
-        lineCount = runLines.size,
-        readyToPackOrderCount = readyToPackCount,
-        packedOrderCount = packedCount,
-        inDeliveryOrderCount = inDeliveryCount,
-        issueOrderCount = issueCount,
-        actionRequiredOrderCount = actionRequiredCount,
-        activeContractCount = activeContractCount,
-        pendingContractCount = pendingContractCount,
-        earliestDueAtMillis = earliestDueAtMillis,
-        latestDueAtMillis = latestDueAtMillis,
-        latestActivityMillis = latestActivityMillis,
-        goodsPreview = preview.takeIf { it.isNotBlank() }?.let { listOf(LocalizedStringDataModel("main", it)) }.orEmpty(),
-        packChecklist = packChecklist.takeIf { it.isNotBlank() }?.let { listOf(LocalizedStringDataModel("main", it)) }.orEmpty(),
-        attentionSummary = runAttentionSummary,
-        driverHandoffChecklist = driverHandoffChecklist,
-        estimatedAmount = amountValue.takeIf { it > 0.0 }?.let { amount ->
-          PriceDataModel(amount.toStockMoneyText(), amountCurrency, sampleOrder?.supplierId.orEmpty())
-        },
-        priorityScore = priorityScore,
-        suggestedAction = suggestedAction
-      )
-    }
-    .sortedWith(
-      compareByDescending<SupplierDashboardDispatchRunDataModel> { it.priorityScore }
-        .thenBy { it.earliestDueAtMillis ?: Long.MAX_VALUE }
-        .thenByDescending { it.latestActivityMillis }
-    )
-    .take(12)
-
-  val manufacturerBridge = openLines
-    .filter { line -> supplierBridgeTargetGoodsItemId(line).isNotBlank() }
-    .groupBy { line -> supplierBridgeTargetGoodsItemId(line) }
-    .mapNotNull bridgeItem@{ (goodsItemId, itemLines) ->
-      val relatedOrders = itemLines
-        .mapNotNull { line -> ordersById[line.orderId] }
-        .filter { order -> !order.status.isClosedForSupplierDashboard() }
-        .distinctBy { it.id }
-      if (relatedOrders.isEmpty()) return@bridgeItem null
-
-      val sampleLine = itemLines
-        .maxByOrNull { line -> ordersById[line.orderId]?.updatedAtMillis ?: 0L }
-        ?: itemLines.firstOrNull()
-        ?: return@bridgeItem null
-      val sampleUsesSubstitute = sampleLine.substituteGoodsItemId?.takeIf { it.isNotBlank() } == goodsItemId
-      val requestedQuantityTotal = itemLines.sumOf { line -> line.requestedQuantity.total.coerceAtLeast(0.0) }.roundMoney()
-      val acceptedQuantityTotal = itemLines.sumOf { line -> line.supplierAcceptedQuantity?.total?.coerceAtLeast(0.0) ?: 0.0 }.roundMoney()
-      val missingQuantityTotal = (requestedQuantityTotal - acceptedQuantityTotal).coerceAtLeast(0.0).roundMoney()
-      val openOrderCount = relatedOrders.count { order -> !order.status.isClosedForSupplierDashboard() }
-      val confirmedOrderCount = relatedOrders.count { order ->
-        order.status == SupplierOrderStatusDataModel.Confirmed ||
-           order.status == SupplierOrderStatusDataModel.Packed ||
-           order.status == SupplierOrderStatusDataModel.InDelivery
-      }
-      val priceBookRowsForItem = supplierPriceRows.filter { price -> price.goodsItemId == goodsItemId }
-      val responseCoveredLineCount = itemLines.count { line ->
-        line.supplierAcceptedQuantity != null &&
-           (!line.hasPositiveSupplierDeskAcceptedQuantity() || line.supplierOfferedSupplyPrice.hasPositiveSupplierDeskPrice() || run {
-             val order = ordersById[line.orderId]
-             order != null && supplierPriceBookKeyFor(order, line) in supplierPriceBookKeys
-           })
-      }
-      val amountLines = itemLines.mapNotNull lineAmount@{ line ->
-        val order = ordersById[line.orderId] ?: return@lineAmount null
-        val quantity = line.supplierAcceptedQuantity?.total?.coerceAtLeast(0.0) ?: return@lineAmount null
-        val price = line.supplierOfferedSupplyPrice ?: supplierPriceRows
-          .filter { price ->
-            price.isActive &&
-               price.storeId == order.storeId &&
-               price.supplierId == order.supplierId &&
-               price.goodsItemId == goodsItemId
+        val quoteNeededLines = itemLines.filter { line -> itemLineNeedsFactoryQuote(line) }
+        val missingResponseLineCount = quoteNeededLines.size
+        val quoteNeededOrderIds = quoteNeededLines
+          .mapNotNull { line -> ordersById[line.orderId]?.id }
+          .distinct()
+        val productionOrderIds = relatedOrders
+          .filter { order -> order.status == SupplierOrderStatusDataModel.Confirmed }
+          .filter { order -> itemLines.any { line -> line.orderId == order.id && line.hasPositiveSupplierDeskAcceptedQuantity() } }
+          .map { order -> order.id }
+          .distinct()
+        val shipmentOrderIds = relatedOrders
+          .filter { order ->
+            order.status == SupplierOrderStatusDataModel.Packed ||
+               order.status == SupplierOrderStatusDataModel.InDelivery
           }
-          .maxByOrNull { price -> price.lastUsedAtMillis ?: price.updatedAtMillis }
-          ?.supplyPrice
-        ?: return@lineAmount null
-        quantity to price
-      }
-      val amountValue = amountLines.sumOf { (quantity, price) -> quantity * price.price.toMoneyDouble() }.roundMoney()
-      val amountCurrency = amountLines.firstOrNull()?.second?.currency?.takeIf { it.isNotBlank() }
-        ?: priceBookRowsForItem.firstOrNull()?.supplyPrice?.currency?.takeIf { it.isNotBlank() }
-        ?: supplierPriceRows.firstOrNull()?.supplyPrice?.currency?.takeIf { it.isNotBlank() }
-        ?: "KZT"
-      val earliestDueAtMillis = relatedOrders
-        .mapNotNull { order -> order.confirmedDeliveryTimeMillis ?: order.desiredDeliveryTimeMillis }
-        .minOrNull()
-      val latestActivityMillis = relatedOrders
-        .map { order -> order.updatedAtMillis.takeIf { value -> value > 0L } ?: order.orderedAtMillis }
-        .maxOrNull()
-        ?: 0L
-      fun itemLineNeedsFactoryQuote(line: SupplierOrderLineDataModel): Boolean {
-        if (line.supplierAcceptedQuantity == null) return true
-        if (!line.isMissingSupplierDeskOfferedPriceForAcceptedQuantity()) return false
-        val order = ordersById[line.orderId] ?: return true
-        return supplierPriceBookKeyFor(order, line) !in supplierPriceBookKeys
-      }
-      val quoteNeededLines = itemLines.filter { line -> itemLineNeedsFactoryQuote(line) }
-      val missingResponseLineCount = quoteNeededLines.size
-      val quoteNeededOrderIds = quoteNeededLines
-        .mapNotNull { line -> ordersById[line.orderId]?.id }
-        .distinct()
-      val productionOrderIds = relatedOrders
-        .filter { order -> order.status == SupplierOrderStatusDataModel.Confirmed }
-        .filter { order -> itemLines.any { line -> line.orderId == order.id && line.hasPositiveSupplierDeskAcceptedQuantity() } }
-        .map { order -> order.id }
-        .distinct()
-      val shipmentOrderIds = relatedOrders
-        .filter { order ->
-          order.status == SupplierOrderStatusDataModel.Packed ||
-             order.status == SupplierOrderStatusDataModel.InDelivery
+          .filter { order -> itemLines.any { line -> line.orderId == order.id && line.hasPositiveSupplierDeskAcceptedQuantity() } }
+          .map { order -> order.id }
+          .distinct()
+        val storePreview = relatedOrders
+          .map { order ->
+            order.storeNameSnapshot.firstOrNull { name -> name.value.isNotBlank() }?.value
+              ?: order.storePublicIdSnapshot.takeIf { it.isNotBlank() }
+              ?: order.storeId.take(8)
+          }
+          .filter { it.isNotBlank() }
+          .distinct()
+          .take(4)
+          .joinToString(" • ")
+        val bridgeAttentionMain = mutableListOf<String>()
+        val bridgeAttentionRu = mutableListOf<String>()
+        val bridgeAttentionKk = mutableListOf<String>()
+        fun addBridgeAttention(mainText: String, ruText: String, kkText: String) {
+          bridgeAttentionMain += mainText
+          bridgeAttentionRu += ruText
+          bridgeAttentionKk += kkText
         }
-        .filter { order -> itemLines.any { line -> line.orderId == order.id && line.hasPositiveSupplierDeskAcceptedQuantity() } }
-        .map { order -> order.id }
-        .distinct()
-      val storePreview = relatedOrders
-        .map { order ->
-          order.storeNameSnapshot.firstOrNull { name -> name.value.isNotBlank() }?.value
-            ?: order.storePublicIdSnapshot.takeIf { it.isNotBlank() }
-            ?: order.storeId.take(8)
+        if (missingResponseLineCount > 0) addBridgeAttention(
+          "$missingResponseLineCount line(s) still need quote, accepted quantity, or price before upstream commitment",
+          "$missingResponseLineCount строк(и) ещё ждут расчёт, принятое количество или цену до передачи выше",
+          "$missingResponseLineCount жол жоғарыға берілмес бұрын баға, қабылданған сан немесе баға күтеді"
+        )
+        if (missingQuantityTotal > 0.0 && acceptedQuantityTotal > 0.0) addBridgeAttention(
+          "Short ${missingQuantityTotal.toStockMoneyText()} against requested demand",
+          "Не хватает ${missingQuantityTotal.toStockMoneyText()} относительно заявки",
+          "Сұраныспен салыстырғанда ${missingQuantityTotal.toStockMoneyText()} жетіспейді"
+        )
+        if (priceBookRowsForItem.isEmpty()) addBridgeAttention(
+          "No reusable supplier price is saved for this goods yet",
+          "Для этого товара ещё нет сохранённой цены поставщика",
+          "Бұл тауарға сақталған жеткізуші бағасы әлі жоқ"
+        )
+        if (shipmentOrderIds.isNotEmpty()) addBridgeAttention(
+          "${shipmentOrderIds.size} order(s) are already packed or moving",
+          "${shipmentOrderIds.size} заказ(ов) уже собрано или в пути",
+          "${shipmentOrderIds.size} тапсырыс жиналған немесе жолда"
+        )
+        val bridgeAttentionSummary = supplierDashboardJoinedMessage(bridgeAttentionMain, bridgeAttentionRu, bridgeAttentionKk)
+        val duePressure = when (supplierDashboardDeliveryBucketId(now, earliestDueAtMillis)) {
+          "overdue" -> 24
+          "today" -> 18
+          "tomorrow", "week" -> 12
+          "later" -> 4
+          else -> 2
         }
-        .filter { it.isNotBlank() }
-        .distinct()
-        .take(4)
-        .joinToString(" • ")
-      val bridgeAttentionMain = mutableListOf<String>()
-      val bridgeAttentionRu = mutableListOf<String>()
-      val bridgeAttentionKk = mutableListOf<String>()
-      fun addBridgeAttention(mainText: String, ruText: String, kkText: String) {
-        bridgeAttentionMain += mainText
-        bridgeAttentionRu += ruText
-        bridgeAttentionKk += kkText
+        val suggestedAction = when {
+          relatedOrders.any { order -> order.status == SupplierOrderStatusDataModel.Packed || order.status == SupplierOrderStatusDataModel.InDelivery } -> "ship"
+          confirmedOrderCount > 0 && acceptedQuantityTotal > 0.0 -> "produce"
+          missingResponseLineCount > 0 -> "quote"
+          priceBookRowsForItem.isEmpty() -> "price_book"
+          missingQuantityTotal > 0.0 -> "backorder"
+          else -> "watch"
+        }
+        val priorityScore = (openOrderCount * 10 + confirmedOrderCount * 7 + missingResponseLineCount * 5 + duePressure + missingQuantityTotal.coerceAtMost(999.0).toInt())
+          .coerceAtLeast(0)
+  
+        SupplierDashboardManufacturerBridgeDataModel(
+          bridgeId = "${goodsItemId}:${relatedOrders.joinToString("-") { it.id.take(8) }}",
+          goodsItemId = goodsItemId,
+          goodsItemNameSnapshot = if (sampleUsesSubstitute) sampleLine.substituteGoodsItemNameSnapshot else sampleLine.goodsItemNameSnapshot,
+          barcodeSnapshots = if (sampleUsesSubstitute) sampleLine.substituteGoodsItemBarcodeSnapshots else sampleLine.goodsItemBarcodeSnapshots,
+          measurementUnitIdSnapshot = if (sampleUsesSubstitute) sampleLine.substituteGoodsItemMeasurementUnitIdSnapshot else sampleLine.goodsItemMeasurementUnitIdSnapshot,
+          orderIds = relatedOrders.map { order -> order.id },
+          quoteNeededOrderIds = quoteNeededOrderIds,
+          productionOrderIds = productionOrderIds,
+          shipmentOrderIds = shipmentOrderIds,
+          storePreview = storePreview.takeIf { it.isNotBlank() }?.let { listOf(LocalizedStringDataModel("main", it)) }.orEmpty(),
+          requestedQuantityTotal = requestedQuantityTotal,
+          acceptedQuantityTotal = acceptedQuantityTotal,
+          missingQuantityTotal = missingQuantityTotal,
+          openOrderCount = openOrderCount,
+          confirmedOrderCount = confirmedOrderCount,
+          storeCount = relatedOrders.map { it.storeId }.filter { it.isNotBlank() }.distinct().size,
+          priceBookRowCount = priceBookRowsForItem.size,
+          responseCoveragePercent = if (itemLines.isEmpty()) 0 else (((responseCoveredLineCount * 100.0) / itemLines.size) + 0.5).toInt().coerceIn(0, 100),
+          estimatedAcceptedAmount = amountValue.takeIf { it > 0.0 }?.let { amount ->
+            PriceDataModel(amount.toStockMoneyText(), amountCurrency, supplierIds.firstOrNull()?.toString().orEmpty())
+          },
+          earliestDueAtMillis = earliestDueAtMillis,
+          latestActivityMillis = latestActivityMillis,
+          priorityScore = priorityScore,
+          suggestedAction = suggestedAction,
+          attentionSummary = bridgeAttentionSummary
+        )
       }
-      if (missingResponseLineCount > 0) addBridgeAttention(
-        "$missingResponseLineCount line(s) still need quote, accepted quantity, or price before upstream commitment",
-        "$missingResponseLineCount строк(и) ещё ждут расчёт, принятое количество или цену до передачи выше",
-        "$missingResponseLineCount жол жоғарыға берілмес бұрын баға, қабылданған сан немесе баға күтеді"
+      .sortedWith(
+        compareByDescending<SupplierDashboardManufacturerBridgeDataModel> { it.priorityScore }
+          .thenBy { it.earliestDueAtMillis ?: Long.MAX_VALUE }
+          .thenByDescending { it.latestActivityMillis }
       )
-      if (missingQuantityTotal > 0.0 && acceptedQuantityTotal > 0.0) addBridgeAttention(
-        "Short ${missingQuantityTotal.toStockMoneyText()} against requested demand",
-        "Не хватает ${missingQuantityTotal.toStockMoneyText()} относительно заявки",
-        "Сұраныспен салыстырғанда ${missingQuantityTotal.toStockMoneyText()} жетіспейді"
-      )
-      if (priceBookRowsForItem.isEmpty()) addBridgeAttention(
-        "No reusable supplier price is saved for this goods yet",
-        "Для этого товара ещё нет сохранённой цены поставщика",
-        "Бұл тауарға сақталған жеткізуші бағасы әлі жоқ"
-      )
-      if (shipmentOrderIds.isNotEmpty()) addBridgeAttention(
-        "${shipmentOrderIds.size} order(s) are already packed or moving",
-        "${shipmentOrderIds.size} заказ(ов) уже собрано или в пути",
-        "${shipmentOrderIds.size} тапсырыс жиналған немесе жолда"
-      )
-      val bridgeAttentionSummary = supplierDashboardJoinedMessage(bridgeAttentionMain, bridgeAttentionRu, bridgeAttentionKk)
-      val duePressure = when (supplierDashboardDeliveryBucketId(now, earliestDueAtMillis)) {
-        "overdue" -> 24
-        "today" -> 18
-        "tomorrow", "week" -> 12
-        "later" -> 4
-        else -> 2
-      }
-      val suggestedAction = when {
-        relatedOrders.any { order -> order.status == SupplierOrderStatusDataModel.Packed || order.status == SupplierOrderStatusDataModel.InDelivery } -> "ship"
-        confirmedOrderCount > 0 && acceptedQuantityTotal > 0.0 -> "produce"
-        missingResponseLineCount > 0 -> "quote"
-        priceBookRowsForItem.isEmpty() -> "price_book"
-        missingQuantityTotal > 0.0 -> "backorder"
-        else -> "watch"
-      }
-      val priorityScore = (openOrderCount * 10 + confirmedOrderCount * 7 + missingResponseLineCount * 5 + duePressure + missingQuantityTotal.coerceAtMost(999.0).toInt())
-        .coerceAtLeast(0)
+      .take(10)
+  }
 
-      SupplierDashboardManufacturerBridgeDataModel(
-        bridgeId = "${goodsItemId}:${relatedOrders.joinToString("-") { it.id.take(8) }}",
-        goodsItemId = goodsItemId,
-        goodsItemNameSnapshot = if (sampleUsesSubstitute) sampleLine.substituteGoodsItemNameSnapshot else sampleLine.goodsItemNameSnapshot,
-        barcodeSnapshots = if (sampleUsesSubstitute) sampleLine.substituteGoodsItemBarcodeSnapshots else sampleLine.goodsItemBarcodeSnapshots,
-        measurementUnitIdSnapshot = if (sampleUsesSubstitute) sampleLine.substituteGoodsItemMeasurementUnitIdSnapshot else sampleLine.goodsItemMeasurementUnitIdSnapshot,
-        orderIds = relatedOrders.map { order -> order.id },
-        quoteNeededOrderIds = quoteNeededOrderIds,
-        productionOrderIds = productionOrderIds,
-        shipmentOrderIds = shipmentOrderIds,
-        storePreview = storePreview.takeIf { it.isNotBlank() }?.let { listOf(LocalizedStringDataModel("main", it)) }.orEmpty(),
-        requestedQuantityTotal = requestedQuantityTotal,
-        acceptedQuantityTotal = acceptedQuantityTotal,
-        missingQuantityTotal = missingQuantityTotal,
-        openOrderCount = openOrderCount,
-        confirmedOrderCount = confirmedOrderCount,
-        storeCount = relatedOrders.map { it.storeId }.filter { it.isNotBlank() }.distinct().size,
-        priceBookRowCount = priceBookRowsForItem.size,
-        responseCoveragePercent = if (itemLines.isEmpty()) 0 else (((responseCoveredLineCount * 100.0) / itemLines.size) + 0.5).toInt().coerceIn(0, 100),
-        estimatedAcceptedAmount = amountValue.takeIf { it > 0.0 }?.let { amount ->
-          PriceDataModel(amount.toStockMoneyText(), amountCurrency, supplierIds.firstOrNull()?.toString().orEmpty())
-        },
-        earliestDueAtMillis = earliestDueAtMillis,
-        latestActivityMillis = latestActivityMillis,
-        priorityScore = priorityScore,
-        suggestedAction = suggestedAction,
-        attentionSummary = bridgeAttentionSummary
-      )
-    }
-    .sortedWith(
-      compareByDescending<SupplierDashboardManufacturerBridgeDataModel> { it.priorityScore }
-        .thenBy { it.earliestDueAtMillis ?: Long.MAX_VALUE }
-        .thenByDescending { it.latestActivityMillis }
-    )
-    .take(10)
-
-  val backorderWatchAll = openLines
-    .filter { line -> line.supplierAcceptedQuantity != null }
-    .mapNotNull { line ->
-      val order = ordersById[line.orderId] ?: return@mapNotNull null
-      val requested = line.requestedQuantity.total.coerceAtLeast(0.0)
-      val accepted = (line.supplierDeskAcceptedQuantityTotal() ?: 0.0).coerceAtLeast(0.0)
-      val missing = (requested - accepted).coerceAtLeast(0.0).roundMoney()
-      if (requested <= 0.0 || missing <= 0.000001) return@mapNotNull null
-      val goodsItemId = supplierBridgeTargetGoodsItemId(line).ifBlank { line.goodsItemId }
-      if (goodsItemId.isBlank()) return@mapNotNull null
-      Triple(goodsItemId, line, missing)
-    }
-    .groupBy { shortage -> shortage.first }
-    .mapNotNull backorderItem@{ (goodsItemId, shortages) ->
-      val itemLines = shortages.map { it.second }
-      val relatedOrders = itemLines
-        .mapNotNull { line -> ordersById[line.orderId] }
-        .filter { order -> !order.status.isClosedForSupplierDashboard() }
-        .distinctBy { it.id }
-      if (relatedOrders.isEmpty()) return@backorderItem null
-      val sampleLine = itemLines
-        .maxByOrNull { line -> ordersById[line.orderId]?.updatedAtMillis ?: 0L }
-        ?: itemLines.firstOrNull()
-        ?: return@backorderItem null
-      val sampleUsesSubstitute = sampleLine.substituteGoodsItemId?.takeIf { it.isNotBlank() } == goodsItemId
-      val requestedQuantityTotal = itemLines.sumOf { line -> line.requestedQuantity.total.coerceAtLeast(0.0) }.roundMoney()
-      val acceptedQuantityTotal = itemLines.sumOf { line -> (line.supplierDeskAcceptedQuantityTotal() ?: 0.0).coerceAtLeast(0.0) }.roundMoney()
-      val missingQuantityTotal = (requestedQuantityTotal - acceptedQuantityTotal).coerceAtLeast(0.0).roundMoney()
-      if (missingQuantityTotal <= 0.000001) return@backorderItem null
-      val partialLineCount = itemLines.count { line ->
+  val backorderWatchAll = supplierDashboardChunk {
+    openLines
+      .filter { line -> line.supplierAcceptedQuantity != null }
+      .mapNotNull { line ->
+        val order = ordersById[line.orderId] ?: return@mapNotNull null
         val requested = line.requestedQuantity.total.coerceAtLeast(0.0)
         val accepted = (line.supplierDeskAcceptedQuantityTotal() ?: 0.0).coerceAtLeast(0.0)
-        accepted > 0.000001 && accepted < requested - 0.000001
+        val missing = (requested - accepted).coerceAtLeast(0.0).roundMoney()
+        if (requested <= 0.0 || missing <= 0.000001) return@mapNotNull null
+        val goodsItemId = supplierBridgeTargetGoodsItemId(line).ifBlank { line.goodsItemId }
+        if (goodsItemId.isBlank()) return@mapNotNull null
+        Triple(goodsItemId, line, missing)
       }
-      val fullyShortLineCount = itemLines.count { line -> (line.supplierDeskAcceptedQuantityTotal() ?: 0.0) <= 0.000001 }
-      val declinedLineCount = fullyShortLineCount
-      val recoveryLane = when {
-        fullyShortLineCount > 0 && partialLineCount > 0 -> "split_source"
-        fullyShortLineCount > 0 -> "source_or_cancel"
-        partialLineCount > 0 -> "split_delivery"
-        else -> "watch"
-      }
-      val earliestDueAtMillis = relatedOrders
-        .mapNotNull { order -> order.confirmedDeliveryTimeMillis ?: order.desiredDeliveryTimeMillis }
-        .minOrNull()
-      val recoveryDueBucket = earliestDueAtMillis
-        ?.let { due -> supplierDashboardDeliveryBucketId(now, due) }
-        .orEmpty()
-      val latestActivityMillis = relatedOrders
-        .map { order -> order.updatedAtMillis.takeIf { value -> value > 0L } ?: order.orderedAtMillis }
-        .maxOrNull()
-        ?: 0L
-      val affectedOrderCount = relatedOrders.size
-      val affectedStoreCount = relatedOrders
-        .map { order -> order.storeId.ifBlank { order.storePublicIdSnapshot } }
-        .filter { it.isNotBlank() }
-        .distinct()
-        .size
-      val recoveryLoadOrderPressure = (affectedOrderCount * 9).coerceAtMost(36)
-      val recoveryLoadStorePressure = (affectedStoreCount * 12).coerceAtMost(36)
-      val storePreview = relatedOrders
-        .map { order ->
-          order.storeNameSnapshot.firstOrNull { name -> name.value.isNotBlank() }?.value
-            ?: order.storePublicIdSnapshot.takeIf { it.isNotBlank() }
-            ?: order.storeId.take(8)
+      .groupBy { shortage -> shortage.first }
+      .mapNotNull backorderItem@{ (goodsItemId, shortages) ->
+        val itemLines = shortages.map { it.second }
+        val relatedOrders = itemLines
+          .mapNotNull { line -> ordersById[line.orderId] }
+          .filter { order -> !order.status.isClosedForSupplierDashboard() }
+          .distinctBy { it.id }
+        if (relatedOrders.isEmpty()) return@backorderItem null
+        val sampleLine = itemLines
+          .maxByOrNull { line -> ordersById[line.orderId]?.updatedAtMillis ?: 0L }
+          ?: itemLines.firstOrNull()
+          ?: return@backorderItem null
+        val sampleUsesSubstitute = sampleLine.substituteGoodsItemId?.takeIf { it.isNotBlank() } == goodsItemId
+        val requestedQuantityTotal = itemLines.sumOf { line -> line.requestedQuantity.total.coerceAtLeast(0.0) }.roundMoney()
+        val acceptedQuantityTotal = itemLines.sumOf { line -> (line.supplierDeskAcceptedQuantityTotal() ?: 0.0).coerceAtLeast(0.0) }.roundMoney()
+        val missingQuantityTotal = (requestedQuantityTotal - acceptedQuantityTotal).coerceAtLeast(0.0).roundMoney()
+        if (missingQuantityTotal <= 0.000001) return@backorderItem null
+        val partialLineCount = supplierDashboardChunk {
+          itemLines.count { line ->
+            val requested = line.requestedQuantity.total.coerceAtLeast(0.0)
+            val accepted = (line.supplierDeskAcceptedQuantityTotal() ?: 0.0).coerceAtLeast(0.0)
+            accepted > 0.000001 && accepted < requested - 0.000001
+          }
         }
-        .filter { it.isNotBlank() }
-        .distinct()
-        .take(4)
-        .joinToString(" • ")
-      val shortageMain = mutableListOf<String>()
-      val shortageRu = mutableListOf<String>()
-      val shortageKk = mutableListOf<String>()
-      fun addShortageAttention(mainText: String, ruText: String, kkText: String) {
-        shortageMain += mainText
-        shortageRu += ruText
-        shortageKk += kkText
-      }
-      addShortageAttention(
-        "Short ${missingQuantityTotal.toStockMoneyText()} across ${relatedOrders.size} order(s)",
-        "Не хватает ${missingQuantityTotal.toStockMoneyText()} по ${relatedOrders.size} заказ(ам)",
-        "${relatedOrders.size} тапсырыс бойынша ${missingQuantityTotal.toStockMoneyText()} жетіспейді"
-      )
-      if (declinedLineCount > 0) addShortageAttention(
-        "$declinedLineCount declined line(s) should be confirmed with the store or upstream supplier",
-        "$declinedLineCount отклонённ(ых) строк(и) нужно согласовать с магазином или верхним поставщиком",
-        "$declinedLineCount қабылданбаған жол дүкенмен немесе жоғары жеткізушімен келісуді күтеді"
-      )
-      val recoveryHint = when (recoveryLane) {
-        "split_delivery" -> supplierDashboardJoinedMessage(
-          listOf("Partial fulfillment: tell the store what ships now and plan the remaining quantity."),
-          listOf("Частичное выполнение: сообщите магазину, что едет сейчас, и спланируйте остаток."),
-          listOf("Ішінара орындау: дүкенге қазір не жіберілетінін айтып, қалған санды жоспарлаңыз.")
-        )
-        "split_source" -> supplierDashboardJoinedMessage(
-          listOf("Mixed shortage: ship accepted stock, then source or negotiate fully short lines."),
-          listOf("Смешанная недопоставка: отправьте принятое наличие, затем найдите или согласуйте полностью недостающие строки."),
-          listOf("Аралас жетіспеу: қабылданған қорды жіберіп, толық жетіспейтін жолдарды табыңыз немесе келісіңіз.")
-        )
-        "source_or_cancel" -> supplierDashboardJoinedMessage(
-          listOf("Full shortage: source more stock upstream or agree a cancellation/substitution with the store."),
-          listOf("Полная недопоставка: найдите товар выше по цепочке или согласуйте отмену/замену с магазином."),
-          listOf("Толық жетіспеу: жоғары арнадан тауар табыңыз немесе дүкенмен бас тарту/ауыстыруды келісіңіз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Watch the gap until the supplier/store resolution is clear."),
-          listOf("Следите за разницей, пока решение поставщика/магазина не станет ясным."),
-          listOf("Жеткізуші/дүкен шешімі анық болғанша айырманы бақылаңыз.")
-        )
-      }
-      val recoveryUrgencyLane = when (recoveryDueBucket) {
-        "overdue" -> "overdue"
-        "today" -> "today"
-        "tomorrow", "week" -> "soon"
-        "later" -> "flexible"
-        else -> when {
-          fullyShortLineCount > 0 -> "today"
-          partialLineCount > 0 -> "soon"
-          else -> "flexible"
+        val fullyShortLineCount = supplierDashboardChunk {
+          itemLines.count { line -> (line.supplierDeskAcceptedQuantityTotal() ?: 0.0) <= 0.000001 }
         }
-      }
-      val recoveryUrgencyHint = when (recoveryUrgencyLane) {
-        "overdue" -> supplierDashboardJoinedMessage(
-          listOf("Overdue shortage: call the store before any pack or dispatch step."),
-          listOf("Просроченная недопоставка: свяжитесь с магазином до сборки или отправки."),
-          listOf("Мерзімі өткен жетіспеу: жинау немесе жөнелту алдында дүкенмен байланысыңыз.")
+        val declinedLineCount = supplierDashboardChunk {
+          fullyShortLineCount
+        }
+        val recoveryLane = supplierDashboardChunk {
+          when {
+            fullyShortLineCount > 0 && partialLineCount > 0 -> "split_source"
+            fullyShortLineCount > 0 -> "source_or_cancel"
+            partialLineCount > 0 -> "split_delivery"
+            else -> "watch"
+          }
+        }
+        val earliestDueAtMillis = supplierDashboardChunk {
+          relatedOrders
+            .mapNotNull { order -> order.confirmedDeliveryTimeMillis ?: order.desiredDeliveryTimeMillis }
+            .minOrNull()
+        }
+        val recoveryDueBucket = supplierDashboardChunk {
+          earliestDueAtMillis
+            ?.let { due -> supplierDashboardDeliveryBucketId(now, due) }
+            .orEmpty()
+        }
+        val latestActivityMillis = supplierDashboardChunk {
+          relatedOrders
+            .map { order -> order.updatedAtMillis.takeIf { value -> value > 0L } ?: order.orderedAtMillis }
+            .maxOrNull()
+            ?: 0L
+        }
+        val affectedOrderCount = supplierDashboardChunk {
+          relatedOrders.size
+        }
+        val affectedStoreCount = supplierDashboardChunk {
+          relatedOrders
+            .map { order -> order.storeId.ifBlank { order.storePublicIdSnapshot } }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .size
+        }
+        val recoveryLoadOrderPressure = supplierDashboardChunk {
+          (affectedOrderCount * 9).coerceAtMost(36)
+        }
+        val recoveryLoadStorePressure = supplierDashboardChunk {
+          (affectedStoreCount * 12).coerceAtMost(36)
+        }
+        val storePreview = supplierDashboardChunk {
+          relatedOrders
+            .map { order ->
+              order.storeNameSnapshot.firstOrNull { name -> name.value.isNotBlank() }?.value
+                ?: order.storePublicIdSnapshot.takeIf { it.isNotBlank() }
+                ?: order.storeId.take(8)
+            }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .take(4)
+            .joinToString(" • ")
+        }
+        val shortageMain = supplierDashboardChunk {
+          mutableListOf<String>()
+        }
+        val shortageRu = supplierDashboardChunk {
+          mutableListOf<String>()
+        }
+        val shortageKk = supplierDashboardChunk {
+          mutableListOf<String>()
+        }
+        fun addShortageAttention(mainText: String, ruText: String, kkText: String) {
+          shortageMain += mainText
+          shortageRu += ruText
+          shortageKk += kkText
+        }
+        addShortageAttention(
+          "Short ${missingQuantityTotal.toStockMoneyText()} across ${relatedOrders.size} order(s)",
+          "Не хватает ${missingQuantityTotal.toStockMoneyText()} по ${relatedOrders.size} заказ(ам)",
+          "${relatedOrders.size} тапсырыс бойынша ${missingQuantityTotal.toStockMoneyText()} жетіспейді"
         )
-        "today" -> supplierDashboardJoinedMessage(
-          listOf("Due today: lock the ship-now quantity and record the recovery promise."),
-          listOf("Срок сегодня: зафиксируйте количество к отправке сейчас и обещание по восстановлению."),
-          listOf("Мерзімі бүгін: қазір жөнелетін санды және қалпына келтіру уәдесін бекітіңіз.")
+        if (declinedLineCount > 0) addShortageAttention(
+          "$declinedLineCount declined line(s) should be confirmed with the store or upstream supplier",
+          "$declinedLineCount отклонённ(ых) строк(и) нужно согласовать с магазином или верхним поставщиком",
+          "$declinedLineCount қабылданбаған жол дүкенмен немесе жоғары жеткізушімен келісуді күтеді"
         )
-        "soon" -> supplierDashboardJoinedMessage(
-          listOf("Due soon: reserve accepted stock and start upstream sourcing before the route is packed."),
-          listOf("Срок скоро: зарезервируйте принятое наличие и начните поиск выше по цепочке до сборки маршрута."),
-          listOf("Мерзімі жақын: қабылданған қорды резервтеп, бағыт жиналмай тұрып жоғары арнадан іздеуді бастаңыз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Flexible timing: keep it visible until the missing quantity has a second-drop, substitute, or cancel decision."),
-          listOf("Гибкий срок: держите задачу видимой, пока по недостающему количеству нет второй поставки, замены или отмены."),
-          listOf("Икемді мерзім: жетіспейтін сан бойынша екінші жеткізу, ауыстыру немесе бас тарту шешімі шыққанша көрініп тұрсын.")
-        )
-      }
-      val recoveryOwnerLane = when {
-        recoveryUrgencyLane == "overdue" || (recoveryUrgencyLane == "today" && fullyShortLineCount > 0) -> "store_contact"
-        recoveryLane == "source_or_cancel" || recoveryLane == "split_source" -> "upstream_sourcing"
-        recoveryLane == "split_delivery" && acceptedQuantityTotal > 0.0 -> "pack_lead"
-        else -> "watch_desk"
-      }
-      val recoveryOwnerHint = when (recoveryOwnerLane) {
-        "store_contact" -> supplierDashboardJoinedMessage(
-          listOf("Store contact owns this first: agree delay, substitution, or cancellation before packing."),
-          listOf("Сначала владелец — связь с магазином: согласуйте задержку, замену или отмену до сборки."),
-          listOf("Алдымен дүкенмен байланыс жауапты: жинауға дейін кешігу, ауыстыру немесе бас тартуды келісіңіз.")
-        )
-        "upstream_sourcing" -> supplierDashboardJoinedMessage(
-          listOf("Sourcing owner should ask upstream for stock or a substitute, then update the store promise."),
-          listOf("Ответственный за поиск должен запросить товар или замену выше по цепочке, затем обновить обещание магазину."),
-          listOf("Іздеу жауаптысы жоғары арнадан қор немесе ауыстыру сұрап, кейін дүкенге уәдені жаңартуы керек.")
-        )
-        "pack_lead" -> supplierDashboardJoinedMessage(
-          listOf("Pack lead owns the ship-now quantity; recovery owner keeps the missing quantity out of accidental dispatch."),
-          listOf("Сборщик отвечает за количество к отправке сейчас; владелец восстановления не даёт недостающему количеству случайно уйти в отправку."),
-          listOf("Жинау жетекшісі қазір жөнелетін санға жауапты; қалпына келтіру иесі жетіспейтін санның қате жөнелтілуін болдырмайды.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Watch desk keeps this visible until a second drop, substitute, or cancellation owner is chosen."),
-          listOf("Пульт наблюдения держит задачу видимой, пока не выбран владелец второй поставки, замены или отмены."),
-          listOf("Бақылау пульті екінші жеткізу, ауыстыру немесе бас тарту иесі таңдалғанша тапсырманы көрініп ұстайды.")
-        )
-      }
-      val recoveryCheckpointAtMillis = when {
-        earliestDueAtMillis != null && earliestDueAtMillis < now -> now
-        earliestDueAtMillis != null -> earliestDueAtMillis
-        recoveryUrgencyLane == "today" -> now + AITA_SUPPLIER_DAY_MILLIS / 4L
-        recoveryUrgencyLane == "soon" -> now + AITA_SUPPLIER_DAY_MILLIS
-        else -> now + 3L * AITA_SUPPLIER_DAY_MILLIS
-      }
-      val recoverySlaLane = when {
-        recoveryUrgencyLane == "overdue" -> "call_now"
-        recoveryUrgencyLane == "today" || recoveryOwnerLane == "store_contact" -> "commit_today"
-        recoveryLane == "split_delivery" -> "before_pack"
-        else -> "monitor"
-      }
-      val recoverySlaHint = when (recoverySlaLane) {
-        "call_now" -> supplierDashboardJoinedMessage(
-          listOf("Promise clock is red: call the store now and record a new recovery promise before any dispatch step."),
-          listOf("Часы обещания красные: позвоните в магазин сейчас и зафиксируйте новое обещание восстановления до отправки."),
-          listOf("Уәде сағаты қызыл: дүкенге қазір қоңырау шалып, жөнелтуге дейін жаңа қалпына келтіру уәдесін бекітіңіз.")
-        )
-        "commit_today" -> supplierDashboardJoinedMessage(
-          listOf("Promise clock is due today: commit ship-now quantity plus shortage recovery owner on the same workday."),
-          listOf("Обещание на сегодня: в этот же рабочий день зафиксируйте количество к отправке и ответственного за восстановление."),
-          listOf("Уәде бүгінге: осы жұмыс күні қазір жөнелетін санды және жетіспеуді қалпына келтіру иесін бекітіңіз.")
-        )
-        "before_pack" -> supplierDashboardJoinedMessage(
-          listOf("Promise clock is tied to packing: confirm the second-drop or substitute decision before this SKU enters packflow."),
-          listOf("Часы привязаны к сборке: подтвердите вторую поставку или замену до входа SKU в сборку."),
-          listOf("Уәде сағаты жинауға байланған: SKU жинауға кірмей тұрып екінші жеткізу немесе ауыстыру шешімін бекітіңіз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Promise clock is in monitor mode: keep the shortage visible until recovery has a dated owner."),
-          listOf("Часы в режиме наблюдения: держите недопоставку видимой, пока у восстановления нет ответственного и срока."),
-          listOf("Уәде сағаты бақылауда: қалпына келтіруде жауапты және мерзім пайда болғанша жетіспеу көрініп тұрсын.")
-        )
-      }
-      val recoveryEscalationLane = when (recoveryOwnerLane) {
-        "store_contact" -> "store_escalation"
-        "upstream_sourcing" -> "sourcing_escalation"
-        "pack_lead" -> "pack_hold"
-        else -> "watch_only"
-      }
-      val recoveryEscalationHint = when (recoveryEscalationLane) {
-        "store_escalation" -> supplierDashboardJoinedMessage(
-          listOf("Escalate through the store contact path if the buyer has not accepted delay, substitute, or cancellation."),
-          listOf("Эскалируйте через контакт магазина, если покупатель не принял задержку, замену или отмену."),
-          listOf("Сатып алушы кідіріс, ауыстыру немесе бас тартуды қабылдамаса, дүкен байланысы арқылы көтеріңіз.")
-        )
-        "sourcing_escalation" -> supplierDashboardJoinedMessage(
-          listOf("Escalate upstream sourcing when the missing quantity has no reserve, quote, or substitute path."),
-          listOf("Эскалируйте поиск выше по цепочке, если у недостающего количества нет резерва, расчёта или замены."),
-          listOf("Жетіспейтін санға резерв, баға немесе ауыстыру жолы болмаса, жоғары арнадан іздеуді көтеріңіз.")
-        )
-        "pack_hold" -> supplierDashboardJoinedMessage(
-          listOf("Escalation is a pack hold: do not let missing quantity ride with the accepted stock by mistake."),
-          listOf("Эскалация — стоп сборки: не дайте недостающему количеству случайно уйти вместе с принятым наличием."),
-          listOf("Көтеру — жинауды ұстау: жетіспейтін санның қабылданған қормен бірге қате кетуіне жол бермеңіз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("No escalation yet: keep watching until the next owner or promise becomes clear."),
-          listOf("Эскалации пока нет: наблюдайте, пока следующий ответственный или обещание не станет понятным."),
-          listOf("Әзірге көтеру жоқ: келесі жауапты немесе уәде анық болғанша бақылаңыз.")
-        )
-      }
-      val recoveryProofLane = when {
-        recoveryEscalationLane == "pack_hold" -> "pack_guard_proof"
-        recoverySlaLane == "call_now" || recoverySlaLane == "commit_today" || recoveryOwnerLane == "store_contact" -> "store_ack_required"
-        recoveryOwnerLane == "upstream_sourcing" || recoveryLane == "source_or_cancel" || recoveryLane == "split_source" -> "sourcing_note_required"
-        else -> "watch_note"
-      }
-      val recoveryProofHint = when (recoveryProofLane) {
-        "store_ack_required" -> supplierDashboardJoinedMessage(
-          listOf("Proof before dispatch: capture store acknowledgement for the short quantity, delay, substitute, or cancellation path."),
-          listOf("Подтверждение до отправки: зафиксируйте согласие магазина по недостающему количеству, задержке, замене или отмене."),
-          listOf("Жөнелтуге дейін дәлел: жетіспейтін сан, кідіріс, ауыстыру немесе бас тарту бойынша дүкен келісімін бекітіңіз.")
-        )
-        "sourcing_note_required" -> supplierDashboardJoinedMessage(
-          listOf("Proof before closing: add an upstream sourcing note with reserve, ETA, substitute, or no-stock result."),
-          listOf("Подтверждение до закрытия: добавьте заметку поиска выше по цепочке с резервом, сроком, заменой или результатом нет наличия."),
-          listOf("Жабуға дейін дәлел: резерв, мерзім, ауыстыру немесе қор жоқ нәтижесі бар жоғары арна іздеу жазбасын қосыңыз.")
-        )
-        "pack_guard_proof" -> supplierDashboardJoinedMessage(
-          listOf("Proof before packflow: mark the accepted stock separately and keep missing quantity out of packed/dispatch totals."),
-          listOf("Подтверждение до сборки: отдельно отметьте принятое наличие и не включайте недостающее количество в сборку/отправку."),
-          listOf("Жинауға дейін дәлел: қабылданған қорды бөлек белгілеңіз және жетіспейтін санды жинау/жөнелту санына қоспаңыз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Watch note: keep a dated note so the shortage does not disappear between supplier, store, and pack desk."),
-          listOf("Заметка наблюдения: оставьте датированную заметку, чтобы недопоставка не потерялась между поставщиком, магазином и сборкой."),
-          listOf("Бақылау жазбасы: жетіспеу жеткізуші, дүкен және жинау арасында жоғалмауы үшін күні бар жазба қалдырыңыз.")
-        )
-      }
-      val recoveryOutcomeLane = when {
-        recoveryLane == "split_delivery" -> "second_drop"
-        recoveryLane == "split_source" -> "substitute_offer"
-        recoveryLane == "source_or_cancel" && (recoveryUrgencyLane == "overdue" || recoveryUrgencyLane == "today") -> "cancel_review"
-        recoveryLane == "source_or_cancel" -> "substitute_offer"
-        acceptedQuantityTotal > 0.000001 -> "ship_now_guard"
-        else -> "watch_to_close"
-      }
-      val recoveryOutcomeHint = when (recoveryOutcomeLane) {
-        "second_drop" -> supplierDashboardJoinedMessage(
-          listOf("Resolution path: send accepted stock now, then create a dated second-drop promise for the short quantity."),
-          listOf("Путь решения: отправьте принятое наличие сейчас, затем создайте обещание второй поставки на недостающее количество с датой."),
-          listOf("Шешім жолы: қабылданған қорды қазір жіберіп, жетіспейтін санға күні бар екінші жеткізу уәдесін жасаңыз.")
-        )
-        "substitute_offer" -> supplierDashboardJoinedMessage(
-          listOf("Resolution path: offer an upstream substitute or reserve result before the store promise is closed."),
-          listOf("Путь решения: предложите замену или результат резерва выше по цепочке до закрытия обещания магазину."),
-          listOf("Шешім жолы: дүкен уәдесі жабылмай тұрып жоғары арнадан ауыстыру немесе резерв нәтижесін ұсыныңыз.")
-        )
-        "cancel_review" -> supplierDashboardJoinedMessage(
-          listOf("Resolution path: review cancellation with the store if no reserve or substitute can meet the due promise."),
-          listOf("Путь решения: обсудите отмену с магазином, если резерв или замена не успевают к обещанному сроку."),
-          listOf("Шешім жолы: резерв немесе ауыстыру уәде мерзіміне үлгермесе, дүкенмен бас тартуды қараңыз.")
-        )
-        "ship_now_guard" -> supplierDashboardJoinedMessage(
-          listOf("Resolution path: ship only the accepted quantity and keep the unresolved remainder on the watch queue."),
-          listOf("Путь решения: отправьте только принятое количество и оставьте нерешённый остаток в очереди контроля."),
-          listOf("Шешім жолы: тек қабылданған санды жіберіп, шешілмеген қалдықты бақылау кезегінде қалдырыңыз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Resolution path: keep the shortage open until a dated second drop, substitute, or cancellation is chosen."),
-          listOf("Путь решения: держите недопоставку открытой, пока не выбрана вторая поставка, замена или отмена с датой."),
-          listOf("Шешім жолы: күні бар екінші жеткізу, ауыстыру немесе бас тарту таңдалғанша жетіспеуді ашық ұстаңыз.")
-        )
-      }
-      val recoveryPackGuardLane = when {
-        acceptedQuantityTotal <= 0.000001 -> "block_pack"
-        fullyShortLineCount > 0 || partialLineCount > 0 -> "split_pack_only"
-        recoveryProofLane != "watch_note" -> "proof_before_pack"
-        else -> "safe_to_pack"
-      }
-      val recoveryPackGuardHint = when (recoveryPackGuardLane) {
-        "block_pack" -> supplierDashboardJoinedMessage(
-          listOf("Pack guard: do not pack this SKU until the store accepts cancellation/substitute or upstream stock is found."),
-          listOf("Защита сборки: не собирайте этот SKU, пока магазин не примет отмену/замену или пока не найден товар выше по цепочке."),
-          listOf("Жинау күзеті: дүкен бас тарту/ауыстыруды қабылдамайынша немесе жоғары арнадан қор табылмайынша бұл SKU-ды жинамаңыз.")
-        )
-        "split_pack_only" -> supplierDashboardJoinedMessage(
-          listOf("Pack guard: allow only the accepted quantity into packflow; the short quantity needs its own recovery promise."),
-          listOf("Защита сборки: допускайте в сборку только принятое количество; недостающее количество требует отдельного обещания восстановления."),
-          listOf("Жинау күзеті: жинауға тек қабылданған санды жіберіңіз; жетіспейтін санға бөлек қалпына келтіру уәдесі керек.")
-        )
-        "proof_before_pack" -> supplierDashboardJoinedMessage(
-          listOf("Pack guard: collect the required recovery proof before changing pack or dispatch status."),
-          listOf("Защита сборки: соберите нужное подтверждение восстановления до изменения статуса сборки или отправки."),
-          listOf("Жинау күзеті: жинау немесе жөнелту мәртебесін өзгертпей тұрып қажет қалпына келтіру дәлелін жинаңыз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Pack guard: accepted quantity and proof look clean; keep watching only if the promise changes."),
-          listOf("Защита сборки: принятое количество и подтверждение выглядят чисто; наблюдайте только если обещание изменится."),
-          listOf("Жинау күзеті: қабылданған сан мен дәлел таза көрінеді; уәде өзгерсе ғана бақылаңыз.")
-        )
-      }
-      val recoveryContactLane = when {
-        recoverySlaLane == "call_now" || recoveryOwnerLane == "store_contact" -> "store_call"
-        recoveryOutcomeLane == "substitute_offer" -> "substitute_answer"
-        recoveryOwnerLane == "upstream_sourcing" || recoveryEscalationLane == "sourcing_escalation" -> "upstream_request"
-        recoveryPackGuardLane == "block_pack" || recoveryEscalationLane == "pack_hold" -> "pack_lead_note"
-        else -> "watch_note"
-      }
-      val recoveryContactHint = when (recoveryContactLane) {
-        "store_call" -> supplierDashboardJoinedMessage(
-          listOf("Contact lane: call or message the store now with accepted, short, and proposed recovery quantities."),
-          listOf("Канал связи: сейчас позвоните или напишите магазину с принятым, недостающим и предложенным количеством восстановления."),
-          listOf("Байланыс арнасы: дүкенге қазір қоңырау шалып немесе жазып, қабылданған, жетіспейтін және қалпына келтіру санын айтыңыз.")
-        )
-        "substitute_answer" -> supplierDashboardJoinedMessage(
-          listOf("Contact lane: prepare a substitute or cancellation answer before the store promise is closed."),
-          listOf("Канал связи: подготовьте ответ по замене или отмене до закрытия обещания магазину."),
-          listOf("Байланыс арнасы: дүкен уәдесі жабылмай тұрып ауыстыру немесе бас тарту жауабын дайындаңыз.")
-        )
-        "upstream_request" -> supplierDashboardJoinedMessage(
-          listOf("Contact lane: ask upstream for reserve, ETA, or substitute, then mirror the answer back to the store."),
-          listOf("Канал связи: запросите выше по цепочке резерв, срок или замену, затем перенесите ответ магазину."),
-          listOf("Байланыс арнасы: жоғары арнадан резерв, мерзім немесе ауыстыру сұрап, жауапты дүкенге жеткізіңіз.")
-        )
-        "pack_lead_note" -> supplierDashboardJoinedMessage(
-          listOf("Contact lane: leave the pack lead a note that only accepted quantity may enter packflow."),
-          listOf("Канал связи: оставьте старшему сборки заметку, что в сборку идёт только принятое количество."),
-          listOf("Байланыс арнасы: жинау жетекшісіне тек қабылданған сан жинауға кіретінін белгілеңіз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Contact lane: keep a watch note until the second drop, substitute, or cancellation is clear."),
-          listOf("Канал связи: оставьте заметку наблюдения, пока не понятна вторая поставка, замена или отмена."),
-          listOf("Байланыс арнасы: екінші жеткізу, ауыстыру немесе бас тарту анықталғанша бақылау жазбасын қалдырыңыз.")
-        )
-      }
-      val recoveryContactGoodsName = (if (sampleUsesSubstitute) sampleLine.substituteGoodsItemNameSnapshot else sampleLine.goodsItemNameSnapshot)
-        .firstOrNull { name -> name.value.isNotBlank() }
-        ?.value
-        ?: (if (sampleUsesSubstitute) sampleLine.substituteGoodsItemBarcodeSnapshots else sampleLine.goodsItemBarcodeSnapshots).firstOrNull()
-        ?: goodsItemId.take(8)
-      val recoveryContactPathMain = when (recoveryContactLane) {
-        "store_call" -> "confirm delay, second drop, substitute, or cancellation"
-        "substitute_answer" -> "offer substitute or cancellation decision"
-        "upstream_request" -> "ask upstream for reserve, ETA, or substitute"
-        "pack_lead_note" -> "pack only accepted quantity and hold the shortage"
-        else -> "keep shortage visible until resolution"
-      }
-      val recoveryContactPathRu = when (recoveryContactLane) {
-        "store_call" -> "согласовать задержку, вторую поставку, замену или отмену"
-        "substitute_answer" -> "предложить замену или решение по отмене"
-        "upstream_request" -> "запросить выше по цепочке резерв, срок или замену"
-        "pack_lead_note" -> "собрать только принятое количество и удержать недостачу"
-        else -> "держать недопоставку видимой до решения"
-      }
-      val recoveryContactPathKk = when (recoveryContactLane) {
-        "store_call" -> "кешігу, екінші жеткізу, ауыстыру немесе бас тартуды келісу"
-        "substitute_answer" -> "ауыстыру немесе бас тарту шешімін ұсыну"
-        "upstream_request" -> "жоғары арнадан резерв, мерзім немесе ауыстыру сұрау"
-        "pack_lead_note" -> "тек қабылданған санды жинап, жетіспейтінін ұстау"
-        else -> "шешімге дейін жетіспеуді көрінетін ұстау"
-      }
-      val recoveryContactScript = supplierDashboardJoinedMessage(
-        listOf(
-          "AITA shortage recovery: $recoveryContactGoodsName.",
-          "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()} across ${relatedOrders.size} order(s).",
-          "Recovery path: $recoveryContactPathMain.",
-          "Please confirm the next promise before packing or dispatch changes."
-        ),
-        listOf(
-          "AITA восстановление недопоставки: $recoveryContactGoodsName.",
-          "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()} по ${relatedOrders.size} заказ(ам).",
-          "Путь восстановления: $recoveryContactPathRu.",
-          "Подтвердите следующее обещание до изменения сборки или отправки."
-        ),
-        listOf(
-          "AITA жетіспеуді қалпына келтіру: $recoveryContactGoodsName.",
-          "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()} — ${relatedOrders.size} тапсырыс.",
-          "Қалпына келтіру жолы: $recoveryContactPathKk.",
-          "Жинау немесе жөнелту өзгермей тұрып келесі уәдені растаңыз."
-        )
-      )
-      val recoveryRiskDueScore = when (recoveryUrgencyLane) {
-        "overdue" -> 30
-        "today" -> 22
-        "soon" -> 14
-        else -> 4
-      }
-      val recoveryRiskShortageScore = (
-        fullyShortLineCount * 8 +
-          partialLineCount * 4 +
-          missingQuantityTotal.coerceAtMost(24.0).toInt()
-        ).coerceIn(0, 30)
-      val recoveryRiskDecisionScore = when (recoveryOutcomeLane) {
-        "cancel_review" -> 18
-        "substitute_offer" -> 15
-        "second_drop" -> 10
-        "ship_now_guard" -> 6
-        else -> 2
-      }
-      val recoveryRiskPackScore = when (recoveryPackGuardLane) {
-        "block_pack" -> 16
-        "split_pack_only" -> 11
-        "proof_before_pack" -> 8
-        else -> 0
-      }
-      val recoveryRiskContactScore = when (recoveryContactLane) {
-        "store_call" -> 12
-        "substitute_answer" -> 10
-        "upstream_request" -> 8
-        "pack_lead_note" -> 5
-        else -> 1
-      }
-      val recoveryRiskScore = (
-        recoveryRiskDueScore +
-          recoveryRiskShortageScore +
-          recoveryRiskDecisionScore +
-          recoveryRiskPackScore +
-          recoveryRiskContactScore
-        ).coerceIn(0, 100)
-      val recoveryRiskLane = when {
-        recoveryRiskScore >= 78 || recoveryUrgencyLane == "overdue" -> "critical_recovery"
-        recoveryRiskScore >= 58 || recoveryOutcomeLane == "cancel_review" || recoveryOutcomeLane == "substitute_offer" -> "decision_pressure"
-        recoveryRiskScore >= 38 || recoveryPackGuardLane != "safe_to_pack" || recoveryOwnerLane == "upstream_sourcing" -> "pack_sourcing_watch"
-        else -> "steady_watch"
-      }
-      val recoveryRiskHint = when (recoveryRiskLane) {
-        "critical_recovery" -> supplierDashboardJoinedMessage(
-          listOf("High-risk shortage: owner, store promise, and pack guard should be checked before this order moves."),
-          listOf("Высокий риск недопоставки: проверьте ответственного, обещание магазину и защиту сборки до движения заказа."),
-          listOf("Жоғары тәуекелді жетіспеу: тапсырыс қозғалмай тұрып жауаптыны, дүкен уәдесін және жинау күзетін тексеріңіз.")
-        )
-        "decision_pressure" -> supplierDashboardJoinedMessage(
-          listOf("Decision pressure: resolve substitute, second-drop, or cancellation answer before the worker packs around the gap."),
-          listOf("Нужно решение: согласуйте замену, вторую поставку или отмену до сборки вокруг дефицита."),
-          listOf("Шешім қысымы: жетіспеуді айналып жинамас бұрын ауыстыру, екінші жеткізу немесе бас тартуды келісіңіз.")
-        )
-        "pack_sourcing_watch" -> supplierDashboardJoinedMessage(
-          listOf("Pack/sourcing watch: keep accepted stock separated from the missing quantity and chase upstream ETA."),
-          listOf("Контроль сборки/поиска: отделите принятое наличие от недостающего количества и запросите срок выше по цепочке."),
-          listOf("Жинау/іздеу бақылауы: қабылданған қорды жетіспейтін саннан бөліп, жоғары арнадан мерзімді сұраңыз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Steady watch: keep the shortage visible until the recovery promise is dated and owned."),
-          listOf("Спокойное наблюдение: держите недопоставку видимой, пока обещание восстановления не получит срок и владельца."),
-          listOf("Тұрақты бақылау: қалпына келтіру уәдесінде мерзім және жауапты пайда болғанша жетіспеуді көрініп ұстаңыз.")
-        )
-      }
-      val riskMain = mutableListOf<String>()
-      val riskRu = mutableListOf<String>()
-      val riskKk = mutableListOf<String>()
-      fun addRecoveryRiskReason(mainText: String, ruText: String, kkText: String) {
-        riskMain += mainText
-        riskRu += ruText
-        riskKk += kkText
-      }
-      val riskUrgencyLabelMain = when (recoveryUrgencyLane) {
-        "overdue" -> "overdue"
-        "today" -> "due today"
-        "soon" -> "due soon"
-        else -> "flexible"
-      }
-      val riskUrgencyLabelRu = when (recoveryUrgencyLane) {
-        "overdue" -> "просрочено"
-        "today" -> "сегодня"
-        "soon" -> "скоро"
-        else -> "гибко"
-      }
-      val riskUrgencyLabelKk = when (recoveryUrgencyLane) {
-        "overdue" -> "мерзімі өткен"
-        "today" -> "бүгін"
-        "soon" -> "жақын"
-        else -> "икемді"
-      }
-      val riskOutcomeLabelMain = when (recoveryOutcomeLane) {
-        "cancel_review" -> "cancel review"
-        "substitute_offer" -> "substitute offer"
-        "second_drop" -> "second drop"
-        "ship_now_guard" -> "ship-now guard"
-        else -> "watch to close"
-      }
-      val riskOutcomeLabelRu = when (recoveryOutcomeLane) {
-        "cancel_review" -> "проверка отмены"
-        "substitute_offer" -> "предложение замены"
-        "second_drop" -> "вторая поставка"
-        "ship_now_guard" -> "защита текущей отправки"
-        else -> "наблюдать до закрытия"
-      }
-      val riskOutcomeLabelKk = when (recoveryOutcomeLane) {
-        "cancel_review" -> "бас тартуды тексеру"
-        "substitute_offer" -> "ауыстыру ұсынысы"
-        "second_drop" -> "екінші жеткізу"
-        "ship_now_guard" -> "қазіргі жөнелтуді қорғау"
-        else -> "жабылғанша бақылау"
-      }
-      val riskPackGuardLabelMain = when (recoveryPackGuardLane) {
-        "block_pack" -> "block packing"
-        "split_pack_only" -> "split pack only"
-        "proof_before_pack" -> "proof before pack"
-        else -> "safe to pack"
-      }
-      val riskPackGuardLabelRu = when (recoveryPackGuardLane) {
-        "block_pack" -> "заблокировать сборку"
-        "split_pack_only" -> "только разделённая сборка"
-        "proof_before_pack" -> "подтверждение до сборки"
-        else -> "можно собирать"
-      }
-      val riskPackGuardLabelKk = when (recoveryPackGuardLane) {
-        "block_pack" -> "жинауды бұғаттау"
-        "split_pack_only" -> "тек бөлінген жинау"
-        "proof_before_pack" -> "жинауға дейін дәлел"
-        else -> "жинауға қауіпсіз"
-      }
-      val riskContactLabelMain = when (recoveryContactLane) {
-        "store_call" -> "store call"
-        "substitute_answer" -> "substitute answer"
-        "upstream_request" -> "upstream request"
-        "pack_lead_note" -> "pack note"
-        else -> "watch note"
-      }
-      val riskContactLabelRu = when (recoveryContactLane) {
-        "store_call" -> "звонок магазину"
-        "substitute_answer" -> "ответ по замене"
-        "upstream_request" -> "запрос выше по цепочке"
-        "pack_lead_note" -> "заметка сборке"
-        else -> "заметка наблюдения"
-      }
-      val riskContactLabelKk = when (recoveryContactLane) {
-        "store_call" -> "дүкенге қоңырау"
-        "substitute_answer" -> "ауыстыру жауабы"
-        "upstream_request" -> "жоғары арнаға сұраныс"
-        "pack_lead_note" -> "жинауға белгі"
-        else -> "бақылау белгісі"
-      }
-      if (recoveryUrgencyLane == "overdue" || recoveryUrgencyLane == "today") addRecoveryRiskReason(
-        "Promise timing is $riskUrgencyLabelMain",
-        "Срок обещания: $riskUrgencyLabelRu",
-        "Уәде мерзімі: $riskUrgencyLabelKk"
-      )
-      if (fullyShortLineCount > 0) addRecoveryRiskReason(
-        "Fully short lines: $fullyShortLineCount",
-        "Полностью недостающих строк: $fullyShortLineCount",
-        "Толық жетіспейтін жолдар: $fullyShortLineCount"
-      )
-      if (partialLineCount > 0) addRecoveryRiskReason(
-        "Partial lines need split delivery proof: $partialLineCount",
-        "Частичные строки требуют подтверждения разделённой поставки: $partialLineCount",
-        "Ішінара жолдарға бөлінген жеткізу дәлелі керек: $partialLineCount"
-      )
-      if (recoveryOutcomeLane == "cancel_review" || recoveryOutcomeLane == "substitute_offer") addRecoveryRiskReason(
-        "Store decision path: $riskOutcomeLabelMain",
-        "Решение с магазином: $riskOutcomeLabelRu",
-        "Дүкен шешімі: $riskOutcomeLabelKk"
-      )
-      if (recoveryPackGuardLane != "safe_to_pack") addRecoveryRiskReason(
-        "Pack guard active: $riskPackGuardLabelMain",
-        "Защита сборки активна: $riskPackGuardLabelRu",
-        "Жинау күзеті белсенді: $riskPackGuardLabelKk"
-      )
-      if (recoveryContactLane == "store_call" || recoveryContactLane == "substitute_answer" || recoveryContactLane == "upstream_request") addRecoveryRiskReason(
-        "Contact lane: $riskContactLabelMain",
-        "Канал связи: $riskContactLabelRu",
-        "Байланыс арнасы: $riskContactLabelKk"
-      )
-      if (riskMain.isEmpty()) addRecoveryRiskReason(
-        "No critical blocker yet; keep this visible until recovery is dated.",
-        "Критического блокера пока нет; держите задачу видимой до срока восстановления.",
-        "Әзірге маңызды бөгет жоқ; қалпына келтіру мерзімі шыққанша көрініп ұстаңыз."
-      )
-      val recoveryRiskReasons = supplierDashboardJoinedMessage(riskMain, riskRu, riskKk)
-      val recoveryConfidenceScore = (
-        48 +
-          when (recoveryRiskLane) {
-            "critical_recovery" -> -24
-            "decision_pressure" -> -14
-            "pack_sourcing_watch" -> -6
-            else -> 12
-          } +
+        val recoveryHint = supplierDashboardChunk {
+          when (recoveryLane) {
+            "split_delivery" -> supplierDashboardJoinedMessage(
+              listOf("Partial fulfillment: tell the store what ships now and plan the remaining quantity."),
+              listOf("Частичное выполнение: сообщите магазину, что едет сейчас, и спланируйте остаток."),
+              listOf("Ішінара орындау: дүкенге қазір не жіберілетінін айтып, қалған санды жоспарлаңыз.")
+            )
+            "split_source" -> supplierDashboardJoinedMessage(
+              listOf("Mixed shortage: ship accepted stock, then source or negotiate fully short lines."),
+              listOf("Смешанная недопоставка: отправьте принятое наличие, затем найдите или согласуйте полностью недостающие строки."),
+              listOf("Аралас жетіспеу: қабылданған қорды жіберіп, толық жетіспейтін жолдарды табыңыз немесе келісіңіз.")
+            )
+            "source_or_cancel" -> supplierDashboardJoinedMessage(
+              listOf("Full shortage: source more stock upstream or agree a cancellation/substitution with the store."),
+              listOf("Полная недопоставка: найдите товар выше по цепочке или согласуйте отмену/замену с магазином."),
+              listOf("Толық жетіспеу: жоғары арнадан тауар табыңыз немесе дүкенмен бас тарту/ауыстыруды келісіңіз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Watch the gap until the supplier/store resolution is clear."),
+              listOf("Следите за разницей, пока решение поставщика/магазина не станет ясным."),
+              listOf("Жеткізуші/дүкен шешімі анық болғанша айырманы бақылаңыз.")
+            )
+          }
+        }
+        val recoveryUrgencyLane = supplierDashboardChunk {
+          when (recoveryDueBucket) {
+            "overdue" -> "overdue"
+            "today" -> "today"
+            "tomorrow", "week" -> "soon"
+            "later" -> "flexible"
+            else -> when {
+              fullyShortLineCount > 0 -> "today"
+              partialLineCount > 0 -> "soon"
+              else -> "flexible"
+            }
+          }
+        }
+        val recoveryUrgencyHint = supplierDashboardChunk {
+          when (recoveryUrgencyLane) {
+            "overdue" -> supplierDashboardJoinedMessage(
+              listOf("Overdue shortage: call the store before any pack or dispatch step."),
+              listOf("Просроченная недопоставка: свяжитесь с магазином до сборки или отправки."),
+              listOf("Мерзімі өткен жетіспеу: жинау немесе жөнелту алдында дүкенмен байланысыңыз.")
+            )
+            "today" -> supplierDashboardJoinedMessage(
+              listOf("Due today: lock the ship-now quantity and record the recovery promise."),
+              listOf("Срок сегодня: зафиксируйте количество к отправке сейчас и обещание по восстановлению."),
+              listOf("Мерзімі бүгін: қазір жөнелетін санды және қалпына келтіру уәдесін бекітіңіз.")
+            )
+            "soon" -> supplierDashboardJoinedMessage(
+              listOf("Due soon: reserve accepted stock and start upstream sourcing before the route is packed."),
+              listOf("Срок скоро: зарезервируйте принятое наличие и начните поиск выше по цепочке до сборки маршрута."),
+              listOf("Мерзімі жақын: қабылданған қорды резервтеп, бағыт жиналмай тұрып жоғары арнадан іздеуді бастаңыз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Flexible timing: keep it visible until the missing quantity has a second-drop, substitute, or cancel decision."),
+              listOf("Гибкий срок: держите задачу видимой, пока по недостающему количеству нет второй поставки, замены или отмены."),
+              listOf("Икемді мерзім: жетіспейтін сан бойынша екінші жеткізу, ауыстыру немесе бас тарту шешімі шыққанша көрініп тұрсын.")
+            )
+          }
+        }
+        val recoveryOwnerLane = supplierDashboardChunk {
+          when {
+            recoveryUrgencyLane == "overdue" || (recoveryUrgencyLane == "today" && fullyShortLineCount > 0) -> "store_contact"
+            recoveryLane == "source_or_cancel" || recoveryLane == "split_source" -> "upstream_sourcing"
+            recoveryLane == "split_delivery" && acceptedQuantityTotal > 0.0 -> "pack_lead"
+            else -> "watch_desk"
+          }
+        }
+        val recoveryOwnerHint = supplierDashboardChunk {
           when (recoveryOwnerLane) {
-            "store_contact", "upstream_sourcing", "pack_lead" -> 12
-            else -> 2
-          } +
-          when (recoveryProofLane) {
-            "watch_note" -> 12
-            "store_ack_required", "sourcing_note_required" -> -6
-            else -> -10
-          } +
-          when (recoveryPackGuardLane) {
-            "safe_to_pack" -> 10
-            "split_pack_only", "proof_before_pack" -> 3
-            else -> -12
-          } +
-          when (recoveryContactLane) {
-            "store_call", "substitute_answer", "upstream_request" -> 6
-            "pack_lead_note" -> 4
-            else -> 1
-          } +
+            "store_contact" -> supplierDashboardJoinedMessage(
+              listOf("Store contact owns this first: agree delay, substitution, or cancellation before packing."),
+              listOf("Сначала владелец — связь с магазином: согласуйте задержку, замену или отмену до сборки."),
+              listOf("Алдымен дүкенмен байланыс жауапты: жинауға дейін кешігу, ауыстыру немесе бас тартуды келісіңіз.")
+            )
+            "upstream_sourcing" -> supplierDashboardJoinedMessage(
+              listOf("Sourcing owner should ask upstream for stock or a substitute, then update the store promise."),
+              listOf("Ответственный за поиск должен запросить товар или замену выше по цепочке, затем обновить обещание магазину."),
+              listOf("Іздеу жауаптысы жоғары арнадан қор немесе ауыстыру сұрап, кейін дүкенге уәдені жаңартуы керек.")
+            )
+            "pack_lead" -> supplierDashboardJoinedMessage(
+              listOf("Pack lead owns the ship-now quantity; recovery owner keeps the missing quantity out of accidental dispatch."),
+              listOf("Сборщик отвечает за количество к отправке сейчас; владелец восстановления не даёт недостающему количеству случайно уйти в отправку."),
+              listOf("Жинау жетекшісі қазір жөнелетін санға жауапты; қалпына келтіру иесі жетіспейтін санның қате жөнелтілуін болдырмайды.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Watch desk keeps this visible until a second drop, substitute, or cancellation owner is chosen."),
+              listOf("Пульт наблюдения держит задачу видимой, пока не выбран владелец второй поставки, замены или отмены."),
+              listOf("Бақылау пульті екінші жеткізу, ауыстыру немесе бас тарту иесі таңдалғанша тапсырманы көрініп ұстайды.")
+            )
+          }
+        }
+        val recoveryCheckpointAtMillis = supplierDashboardChunk {
+          when {
+            earliestDueAtMillis != null && earliestDueAtMillis < now -> now
+            earliestDueAtMillis != null -> earliestDueAtMillis
+            recoveryUrgencyLane == "today" -> now + AITA_SUPPLIER_DAY_MILLIS / 4L
+            recoveryUrgencyLane == "soon" -> now + AITA_SUPPLIER_DAY_MILLIS
+            else -> now + 3L * AITA_SUPPLIER_DAY_MILLIS
+          }
+        }
+        val recoverySlaLane = supplierDashboardChunk {
+          when {
+            recoveryUrgencyLane == "overdue" -> "call_now"
+            recoveryUrgencyLane == "today" || recoveryOwnerLane == "store_contact" -> "commit_today"
+            recoveryLane == "split_delivery" -> "before_pack"
+            else -> "monitor"
+          }
+        }
+        val recoverySlaHint = supplierDashboardChunk {
           when (recoverySlaLane) {
-            "call_now", "commit_today", "before_pack" -> 4
-            else -> 1
+            "call_now" -> supplierDashboardJoinedMessage(
+              listOf("Promise clock is red: call the store now and record a new recovery promise before any dispatch step."),
+              listOf("Часы обещания красные: позвоните в магазин сейчас и зафиксируйте новое обещание восстановления до отправки."),
+              listOf("Уәде сағаты қызыл: дүкенге қазір қоңырау шалып, жөнелтуге дейін жаңа қалпына келтіру уәдесін бекітіңіз.")
+            )
+            "commit_today" -> supplierDashboardJoinedMessage(
+              listOf("Promise clock is due today: commit ship-now quantity plus shortage recovery owner on the same workday."),
+              listOf("Обещание на сегодня: в этот же рабочий день зафиксируйте количество к отправке и ответственного за восстановление."),
+              listOf("Уәде бүгінге: осы жұмыс күні қазір жөнелетін санды және жетіспеуді қалпына келтіру иесін бекітіңіз.")
+            )
+            "before_pack" -> supplierDashboardJoinedMessage(
+              listOf("Promise clock is tied to packing: confirm the second-drop or substitute decision before this SKU enters packflow."),
+              listOf("Часы привязаны к сборке: подтвердите вторую поставку или замену до входа SKU в сборку."),
+              listOf("Уәде сағаты жинауға байланған: SKU жинауға кірмей тұрып екінші жеткізу немесе ауыстыру шешімін бекітіңіз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Promise clock is in monitor mode: keep the shortage visible until recovery has a dated owner."),
+              listOf("Часы в режиме наблюдения: держите недопоставку видимой, пока у восстановления нет ответственного и срока."),
+              listOf("Уәде сағаты бақылауда: қалпына келтіруде жауапты және мерзім пайда болғанша жетіспеу көрініп тұрсын.")
+            )
           }
-        ).coerceIn(0, 100)
-      val recoveryConfidenceLane = when {
-        recoveryPackGuardLane == "block_pack" || recoveryRiskLane == "critical_recovery" -> "blocked_until_decision"
-        recoveryProofLane != "watch_note" || recoveryOutcomeLane == "cancel_review" || recoveryOutcomeLane == "substitute_offer" -> "needs_confirmation"
-        recoveryConfidenceScore >= 76 -> "ready_to_recover"
-        else -> "watch_confidence"
-      }
-      val recoveryConfidenceHint = when (recoveryConfidenceLane) {
-        "blocked_until_decision" -> supplierDashboardJoinedMessage(
-          listOf("Low confidence: do not pack this shortage until decision, proof, and store/upstream answer are visible."),
-          listOf("Низкая уверенность: не собирайте эту недопоставку, пока не видны решение, подтверждение и ответ магазина/верхнего канала."),
-          listOf("Сенімділік төмен: шешім, дәлел және дүкен/жоғары арна жауабы көрінбейінше бұл жетіспеуді жинамаңыз.")
-        )
-        "needs_confirmation" -> supplierDashboardJoinedMessage(
-          listOf("Needs confirmation: the recovery path exists, but proof or store/upstream answer should be captured before status changes."),
-          listOf("Нужно подтверждение: путь восстановления есть, но до смены статуса зафиксируйте доказательство или ответ магазина/верхнего канала."),
-          listOf("Растау керек: қалпына келтіру жолы бар, бірақ мәртебе өзгермей тұрып дәлелді немесе дүкен/жоғары арна жауабын бекітіңіз.")
-        )
-        "ready_to_recover" -> supplierDashboardJoinedMessage(
-          listOf("Ready to recover: owner, guard, and next promise look clear enough for the worker to proceed carefully."),
-          listOf("Восстановление готово: ответственный, защита и следующее обещание достаточно понятны для аккуратного продолжения."),
-          listOf("Қалпына келтіруге дайын: жауапты, күзет және келесі уәде жұмысшыға мұқият жалғастыруға жеткілікті анық.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Watch confidence: keep the shortage visible and raise confidence by adding owner, proof, and next promise."),
-          listOf("Уверенность наблюдения: держите недопоставку видимой и повышайте уверенность через ответственного, доказательство и следующее обещание."),
-          listOf("Бақылау сенімділігі: жетіспеуді көрініп ұстап, жауапты, дәлел және келесі уәде арқылы сенімділікті көтеріңіз.")
-        )
-      }
-      val recoveryConfidenceChecklist = when (recoveryConfidenceLane) {
-        "blocked_until_decision" -> supplierDashboardJoinedMessage(
-          listOf("□ Hold packing\n□ Confirm decision owner\n□ Capture store/upstream answer\n□ Recheck accepted-only quantity before dispatch"),
-          listOf("□ Удержать сборку\n□ Подтвердить ответственного за решение\n□ Зафиксировать ответ магазина/верхнего канала\n□ Проверить только принятое количество перед отправкой"),
-          listOf("□ Жинауды ұстау\n□ Шешім иесін растау\n□ Дүкен/жоғары арна жауабын бекіту\n□ Жөнелту алдында тек қабылданған санды тексеру")
-        )
-        "needs_confirmation" -> supplierDashboardJoinedMessage(
-          listOf("□ Add proof note\n□ Date the next promise\n□ Mirror answer to store\n□ Keep shortage out of packed totals"),
-          listOf("□ Добавить заметку-подтверждение\n□ Поставить дату следующего обещания\n□ Передать ответ магазину\n□ Не включать недостачу в собранные итоги"),
-          listOf("□ Дәлел жазбасын қосу\n□ Келесі уәденің күнін қою\n□ Жауапты дүкенге жеткізу\n□ Жетіспейтін санды жиналған қорытындыға қоспау")
-        )
-        "ready_to_recover" -> supplierDashboardJoinedMessage(
-          listOf("□ Pack accepted quantity only\n□ Keep recovery note attached\n□ Follow second-drop/substitute path\n□ Close watch after confirmed recovery"),
-          listOf("□ Собирать только принятое количество\n□ Держать заметку восстановления рядом\n□ Следовать второй поставке/замене\n□ Закрыть контроль после подтверждённого восстановления"),
-          listOf("□ Тек қабылданған санды жинау\n□ Қалпына келтіру жазбасын бірге ұстау\n□ Екінші жеткізу/ауыстыру жолын орындау\n□ Расталған қалпына келтіруден кейін бақылауды жабу")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("□ Assign owner\n□ Add next promise\n□ Decide proof needed\n□ Recheck risk before packing"),
-          listOf("□ Назначить ответственного\n□ Добавить следующее обещание\n□ Решить, какое подтверждение нужно\n□ Проверить риск перед сборкой"),
-          listOf("□ Жауаптыны тағайындау\n□ Келесі уәдені қосу\n□ Қандай дәлел керек екенін шешу\n□ Жинауға дейін тәуекелді тексеру")
-        )
-      }
-      val recoveryFollowUpLane = when {
-        recoverySlaLane == "call_now" || recoveryUrgencyLane == "overdue" -> "follow_up_now"
-        recoveryConfidenceLane == "blocked_until_decision" || recoveryRiskLane == "critical_recovery" || recoveryOwnerLane == "store_contact" -> "same_day_check"
-        recoveryPackGuardLane != "safe_to_pack" || recoverySlaLane == "before_pack" || recoveryLane == "split_delivery" -> "before_pack_check"
-        else -> "watch_later"
-      }
-      val recoveryFollowUpAtMillis = when (recoveryFollowUpLane) {
-        "follow_up_now" -> now
-        "same_day_check" -> listOfNotNull(
-          recoveryCheckpointAtMillis,
-          now + AITA_SUPPLIER_DAY_MILLIS / 4L
-        ).minOrNull()
-        "before_pack_check" -> listOfNotNull(
-          earliestDueAtMillis,
-          recoveryCheckpointAtMillis,
-          now + AITA_SUPPLIER_DAY_MILLIS
-        ).filter { checkpoint -> checkpoint >= now }.minOrNull() ?: (now + AITA_SUPPLIER_DAY_MILLIS)
-        else -> recoveryCheckpointAtMillis ?: (now + 3L * AITA_SUPPLIER_DAY_MILLIS)
-      }
-      val recoveryFollowUpHint = when (recoveryFollowUpLane) {
-        "follow_up_now" -> supplierDashboardJoinedMessage(
-          listOf("Follow-up cadence: this shortage needs a worker touch now before packing, dispatch, or a promise change proceeds."),
-          listOf("Ритм связи: эту недопоставку нужно обработать сейчас до сборки, отправки или изменения обещания."),
-          listOf("Байланыс ырғағы: бұл жетіспеуді жинау, жөнелту немесе уәде өзгермей тұрып қазір қарау керек.")
-        )
-        "same_day_check" -> supplierDashboardJoinedMessage(
-          listOf("Follow-up cadence: check again the same workday so the store/upstream answer does not stall."),
-          listOf("Ритм связи: проверьте ещё раз в тот же рабочий день, чтобы ответ магазина/верхнего канала не завис."),
-          listOf("Байланыс ырғағы: дүкен/жоғары арна жауабы тоқтап қалмауы үшін осы жұмыс күні қайта тексеріңіз.")
-        )
-        "before_pack_check" -> supplierDashboardJoinedMessage(
-          listOf("Follow-up cadence: recheck before packflow so only accepted quantity moves and the shortage remains owned."),
-          listOf("Ритм связи: перепроверьте до сборки, чтобы двигалось только принятое количество, а недостача оставалась с ответственным."),
-          listOf("Байланыс ырғағы: жинауға дейін қайта тексеріп, тек қабылданған сан қозғалсын және жетіспеу жауаптыда қалсын.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Follow-up cadence: keep a light watch and revisit if due time, owner, or shortage quantity changes."),
-          listOf("Ритм связи: держите лёгкое наблюдение и вернитесь, если изменится срок, ответственный или недостающее количество."),
-          listOf("Байланыс ырғағы: жеңіл бақылауда ұстап, мерзім, жауапты немесе жетіспейтін сан өзгерсе қайта қараңыз.")
-        )
-      }
-      val recoveryFollowUpPathMain = when (recoveryFollowUpLane) {
-        "follow_up_now" -> "touch this now and freeze the next promise"
-        "same_day_check" -> "check again today and mirror the answer to the store"
-        "before_pack_check" -> "verify before packing only accepted quantity"
-        else -> "watch lightly until the recovery promise changes"
-      }
-      val recoveryFollowUpPathRu = when (recoveryFollowUpLane) {
-        "follow_up_now" -> "обработать сейчас и зафиксировать следующее обещание"
-        "same_day_check" -> "проверить сегодня ещё раз и передать ответ магазину"
-        "before_pack_check" -> "проверить до сборки только принятое количество"
-        else -> "наблюдать легко до изменения обещания восстановления"
-      }
-      val recoveryFollowUpPathKk = when (recoveryFollowUpLane) {
-        "follow_up_now" -> "қазір қарау және келесі уәдені бекіту"
-        "same_day_check" -> "бүгін қайта тексеріп, жауапты дүкенге жеткізу"
-        "before_pack_check" -> "жинауға дейін тек қабылданған санды тексеру"
-        else -> "қалпына келтіру уәдесі өзгергенше жеңіл бақылау"
-      }
-      val recoveryFollowUpScript = supplierDashboardJoinedMessage(
-        listOf(
-          "AITA recovery follow-up: $recoveryContactGoodsName.",
-          "Follow-up path: $recoveryFollowUpPathMain.",
-          "Short ${missingQuantityTotal.toStockMoneyText()} after accepting ${acceptedQuantityTotal.toStockMoneyText()} of ${requestedQuantityTotal.toStockMoneyText()}.",
-          "Keep store names internal and update the order note after this touch."
-        ),
-        listOf(
-          "AITA контроль восстановления: $recoveryContactGoodsName.",
-          "Путь контроля: $recoveryFollowUpPathRu.",
-          "Не хватает ${missingQuantityTotal.toStockMoneyText()} после принятия ${acceptedQuantityTotal.toStockMoneyText()} из ${requestedQuantityTotal.toStockMoneyText()}.",
-          "Держите названия магазинов внутри AITA и обновите заметку заказа после касания."
-        ),
-        listOf(
-          "AITA қалпына келтіруді бақылау: $recoveryContactGoodsName.",
-          "Бақылау жолы: $recoveryFollowUpPathKk.",
-          "${requestedQuantityTotal.toStockMoneyText()} ішінен ${acceptedQuantityTotal.toStockMoneyText()} қабылданғаннан кейін ${missingQuantityTotal.toStockMoneyText()} жетіспейді.",
-          "Дүкен атауларын AITA ішінде сақтап, осы әрекеттен кейін тапсырыс жазбасын жаңартыңыз."
-        )
-      )
-      val recoveryHandoffLane = when {
-        recoveryPackGuardLane == "block_pack" || recoveryEscalationLane == "pack_hold" || recoveryFollowUpLane == "before_pack_check" -> "pack_handoff"
-        recoveryOwnerLane == "upstream_sourcing" || recoveryContactLane == "upstream_request" || recoveryLane == "split_source" -> "sourcing_handoff"
-        recoveryOwnerLane == "store_contact" || recoveryContactLane == "store_call" || recoveryContactLane == "substitute_answer" || recoveryOutcomeLane == "cancel_review" || recoveryOutcomeLane == "substitute_offer" -> "store_handoff"
-        else -> "watch_handoff"
-      }
-      val recoveryHandoffHint = when (recoveryHandoffLane) {
-        "store_handoff" -> supplierDashboardJoinedMessage(
-          listOf("Handoff lane: store contact owns the next answer; pass accepted, short, and decision options without exposing other stores."),
-          listOf("Передача: следующий ответ за контактом магазина; передайте принятое, недостающее и варианты решения без раскрытия других магазинов."),
-          listOf("Тапсыру: келесі жауап дүкен байланысында; басқа дүкендерді ашпай, қабылданған, жетіспейтін және шешім нұсқаларын беріңіз.")
-        )
-        "sourcing_handoff" -> supplierDashboardJoinedMessage(
-          listOf("Handoff lane: upstream sourcing owns the missing quantity; pass reserve, ETA, substitute, or no-stock result back to the store desk."),
-          listOf("Передача: поиск выше по цепочке отвечает за недостающее количество; верните резерв, срок, замену или результат нет наличия на пульт магазина."),
-          listOf("Тапсыру: жетіспейтін сан жоғары арна іздеуінде; резерв, мерзім, ауыстыру немесе қор жоқ нәтижесін дүкен пультіне қайтарыңыз.")
-        )
-        "pack_handoff" -> supplierDashboardJoinedMessage(
-          listOf("Handoff lane: pack desk must move accepted quantity only and keep the shortage note attached until recovery closes."),
-          listOf("Передача: сборка должна двигать только принятое количество и держать заметку недопоставки до закрытия восстановления."),
-          listOf("Тапсыру: жинау тек қабылданған санды қозғап, қалпына келтіру жабылғанша жетіспеу жазбасын бірге ұстауы керек.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Handoff lane: watch desk keeps the shortage visible and hands over when owner, proof, or promise changes."),
-          listOf("Передача: пульт наблюдения держит недопоставку видимой и передаёт её при смене ответственного, доказательства или обещания."),
-          listOf("Тапсыру: бақылау пульті жетіспеуді көрініп ұстап, жауапты, дәлел немесе уәде өзгергенде тапсырады.")
-        )
-      }
-      val recoveryHandoffChecklist = when (recoveryHandoffLane) {
-        "store_handoff" -> supplierDashboardJoinedMessage(
-          listOf("□ Share accepted quantity\n□ Share short quantity\n□ Ask delay/substitute/cancel decision\n□ Record store answer before dispatch"),
-          listOf("□ Передать принятое количество\n□ Передать недостающее количество\n□ Запросить решение задержка/замена/отмена\n□ Записать ответ магазина до отправки"),
-          listOf("□ Қабылданған санды беру\n□ Жетіспейтін санды беру\n□ Кідіріс/ауыстыру/бас тарту шешімін сұрау\n□ Жөнелтуге дейін дүкен жауабын жазу")
-        )
-        "sourcing_handoff" -> supplierDashboardJoinedMessage(
-          listOf("□ Ask upstream availability\n□ Date reserve or ETA\n□ Note substitute option\n□ Return result to store contact"),
-          listOf("□ Запросить наличие выше\n□ Поставить дату резерва или срока\n□ Отметить вариант замены\n□ Вернуть результат контакту магазина"),
-          listOf("□ Жоғары арнадағы қолжетімділікті сұрау\n□ Резерв немесе мерзім күнін қою\n□ Ауыстыру нұсқасын белгілеу\n□ Нәтижені дүкен байланысына қайтару")
-        )
-        "pack_handoff" -> supplierDashboardJoinedMessage(
-          listOf("□ Mark accepted-only pack quantity\n□ Keep missing quantity out of dispatch\n□ Attach recovery proof\n□ Recheck before final status change"),
-          listOf("□ Отметить сборку только принятого количества\n□ Не включать недостачу в отправку\n□ Прикрепить доказательство восстановления\n□ Проверить перед финальной сменой статуса"),
-          listOf("□ Тек қабылданған санды жинау деп белгілеу\n□ Жетіспеуді жөнелтуге қоспау\n□ Қалпына келтіру дәлелін тіркеу\n□ Соңғы мәртебе өзгермей тұрып тексеру")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("□ Keep watch open\n□ Assign next owner if due changes\n□ Recalculate risk before packing\n□ Close only after recovery result is recorded"),
-          listOf("□ Оставить контроль открытым\n□ Назначить следующего ответственного при смене срока\n□ Пересчитать риск перед сборкой\n□ Закрыть только после записи результата восстановления"),
-          listOf("□ Бақылауды ашық ұстау\n□ Мерзім өзгерсе келесі жауаптыны тағайындау\n□ Жинауға дейін тәуекелді қайта есептеу\n□ Қалпына келтіру нәтижесі жазылғаннан кейін ғана жабу")
-        )
-      }
-      val recoveryHandoffPathMain = when (recoveryHandoffLane) {
-        "store_handoff" -> "store desk needs a delay, substitute, or cancel answer"
-        "sourcing_handoff" -> "upstream desk needs reserve, ETA, substitute, or no-stock result"
-        "pack_handoff" -> "pack desk must move accepted quantity only"
-        else -> "watch desk keeps ownership until the next promise changes"
-      }
-      val recoveryHandoffPathRu = when (recoveryHandoffLane) {
-        "store_handoff" -> "пульту магазина нужен ответ задержка, замена или отмена"
-        "sourcing_handoff" -> "верхнему поиску нужен резерв, срок, замена или результат нет наличия"
-        "pack_handoff" -> "сборка должна двигать только принятое количество"
-        else -> "пульт наблюдения держит задачу до изменения следующего обещания"
-      }
-      val recoveryHandoffPathKk = when (recoveryHandoffLane) {
-        "store_handoff" -> "дүкен пультіне кідіріс, ауыстыру немесе бас тарту жауабы керек"
-        "sourcing_handoff" -> "жоғары іздеуге резерв, мерзім, ауыстыру немесе қор жоқ нәтижесі керек"
-        "pack_handoff" -> "жинау тек қабылданған санды қозғауы керек"
-        else -> "бақылау пульті келесі уәде өзгергенше жауапкершілікті ұстайды"
-      }
-      val recoveryHandoffScript = supplierDashboardJoinedMessage(
-        listOf(
-          "AITA recovery handoff: $recoveryContactGoodsName.",
-          "Handoff path: $recoveryHandoffPathMain.",
-          "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()}.",
-          "Keep this handoff inside AITA and update the recovery note after the next owner answers."
-        ),
-        listOf(
-          "AITA передача восстановления: $recoveryContactGoodsName.",
-          "Путь передачи: $recoveryHandoffPathRu.",
-          "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()}.",
-          "Держите эту передачу внутри AITA и обновите заметку восстановления после ответа следующего ответственного."
-        ),
-        listOf(
-          "AITA қалпына келтіруді тапсыру: $recoveryContactGoodsName.",
-          "Тапсыру жолы: $recoveryHandoffPathKk.",
-          "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()}.",
-          "Бұл тапсыруды AITA ішінде ұстап, келесі жауапты жауап бергеннен кейін қалпына келтіру жазбасын жаңартыңыз."
-        )
-      )
-      val recoveryClosureBlockerCount = listOf(
-        recoveryPackGuardLane == "block_pack",
-        recoveryConfidenceLane == "blocked_until_decision",
-        recoveryRiskLane == "critical_recovery",
-        recoveryProofLane != "watch_note",
-        recoveryFollowUpLane == "follow_up_now",
-        recoveryHandoffLane != "watch_handoff"
-      ).count { blocked -> blocked }
-      val recoveryClosureScore = (
-        recoveryConfidenceScore -
-          (recoveryRiskScore / 2) -
-          recoveryClosureBlockerCount * 10 +
-          if (acceptedQuantityTotal > 0.000001) 12 else 0
-        ).coerceIn(0, 100)
-      val recoveryClosureLane = when {
-        recoveryPackGuardLane == "block_pack" || recoveryConfidenceLane == "blocked_until_decision" || recoveryRiskLane == "critical_recovery" -> "blocked_open"
-        recoveryProofLane != "watch_note" || recoveryHandoffLane != "watch_handoff" || recoveryFollowUpLane == "follow_up_now" -> "needs_close_note"
-        recoveryClosureScore >= 62 && acceptedQuantityTotal > 0.000001 && (recoveryPackGuardLane == "safe_to_pack" || recoveryPackGuardLane == "split_pack_only") -> "ready_with_guard"
-        else -> "watch_until_clear"
-      }
-      val recoveryClosureHint = when (recoveryClosureLane) {
-        "blocked_open" -> supplierDashboardJoinedMessage(
-          listOf("Close gate is locked: keep the shortage open until decision, proof, and pack guard blockers are cleared."),
-          listOf("Ворота закрытия заблокированы: держите недопоставку открытой, пока не сняты решение, доказательство и стоп сборки."),
-          listOf("Жабу қақпасы бұғатталған: шешім, дәлел және жинау қорғаны шешілмейінше жетіспеуді ашық ұстаңыз.")
-        )
-        "needs_close_note" -> supplierDashboardJoinedMessage(
-          listOf("Close gate needs a dated note: write owner, next promise, and what stays short before closing any worker task."),
-          listOf("Для закрытия нужна заметка с датой: укажите ответственного, следующее обещание и что остаётся недостающим до закрытия задачи."),
-          listOf("Жабуға күні бар жазба керек: тапсырманы жаппас бұрын жауаптыны, келесі уәдені және не жетіспейтінін жазыңыз.")
-        )
-        "ready_with_guard" -> supplierDashboardJoinedMessage(
-          listOf("Ready with guard: ship accepted quantity only, keep missing quantity in the recovery note, and close only the completed worker step."),
-          listOf("Готово с защитой: отправляйте только принятое количество, оставьте недостачу в заметке восстановления и закрывайте только выполненный шаг."),
-          listOf("Қорғанмен дайын: тек қабылданған санды жіберіп, жетіспейтін санды қалпына келтіру жазбасында қалдырып, тек орындалған қадамды жабыңыз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Watch until clear: keep this shortage visible until second drop, substitute, cancellation, or store answer is recorded."),
-          listOf("Наблюдайте до ясности: держите недопоставку видимой, пока не записана вторая поставка, замена, отмена или ответ магазина."),
-          listOf("Анық болғанша бақылаңыз: екінші жеткізу, ауыстыру, бас тарту немесе дүкен жауабы жазылғанша жетіспеуді көрініп ұстаңыз.")
-        )
-      }
-      val recoveryClosureChecklist = when (recoveryClosureLane) {
-        "blocked_open" -> supplierDashboardJoinedMessage(
-          listOf("□ Do not close shortage\n□ Clear decision blocker\n□ Attach proof or store/upstream answer\n□ Recheck pack guard before dispatch"),
-          listOf("□ Не закрывать недопоставку\n□ Снять блокер решения\n□ Приложить доказательство или ответ магазина/поставщика\n□ Проверить стоп сборки до отправки"),
-          listOf("□ Жетіспеуді жаппау\n□ Шешім бөгетін шешу\n□ Дүкен/жоғары арна жауабын немесе дәлелді тіркеу\n□ Жөнелтуге дейін жинау қорғанын тексеру")
-        )
-        "needs_close_note" -> supplierDashboardJoinedMessage(
-          listOf("□ Add dated recovery note\n□ Name next owner\n□ Keep missing quantity separate\n□ Copy note to the next handoff lane"),
-          listOf("□ Добавить заметку восстановления с датой\n□ Указать следующего ответственного\n□ Держать недостачу отдельно\n□ Скопировать заметку в следующую передачу"),
-          listOf("□ Күні бар қалпына келтіру жазбасын қосу\n□ Келесі жауаптыны атау\n□ Жетіспейтін санды бөлек ұстау\n□ Жазбаны келесі тапсыруға көшіру")
-        )
-        "ready_with_guard" -> supplierDashboardJoinedMessage(
-          listOf("□ Close completed step only\n□ Ship accepted quantity only\n□ Leave shortage watch open\n□ Confirm next promise remains visible"),
-          listOf("□ Закрыть только выполненный шаг\n□ Отправить только принятое количество\n□ Оставить контроль недостачи открытым\n□ Проверить, что следующее обещание видно"),
-          listOf("□ Тек орындалған қадамды жабу\n□ Тек қабылданған санды жіберу\n□ Жетіспеуді бақылауды ашық қалдыру\n□ Келесі уәденің көрінетінін растау")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("□ Keep watch open\n□ Wait for second-drop/substitute/cancel result\n□ Refresh risk after next contact\n□ Close only when recovery result is recorded"),
-          listOf("□ Оставить контроль открытым\n□ Ждать вторую поставку/замену/отмену\n□ Обновить риск после следующего контакта\n□ Закрывать только после записи результата восстановления"),
-          listOf("□ Бақылауды ашық ұстау\n□ Екінші жеткізу/ауыстыру/бас тарту нәтижесін күту\n□ Келесі байланыстан кейін тәуекелді жаңарту\n□ Қалпына келтіру нәтижесі жазылғанда ғана жабу")
-        )
-      }
-      val recoveryClosurePathMain = when (recoveryClosureLane) {
-        "blocked_open" -> "do not close; blocker is still active"
-        "needs_close_note" -> "add dated note before closing any worker step"
-        "ready_with_guard" -> "close completed step only and keep shortage watch open"
-        else -> "watch remains open until recovery result is recorded"
-      }
-      val recoveryClosurePathRu = when (recoveryClosureLane) {
-        "blocked_open" -> "не закрывать; блокер ещё активен"
-        "needs_close_note" -> "добавить заметку с датой до закрытия шага"
-        "ready_with_guard" -> "закрыть только выполненный шаг и оставить контроль недостачи"
-        else -> "контроль остаётся открытым до записи результата восстановления"
-      }
-      val recoveryClosurePathKk = when (recoveryClosureLane) {
-        "blocked_open" -> "жаппау; бөгет әлі белсенді"
-        "needs_close_note" -> "қадамды жабар алдында күні бар жазба қосу"
-        "ready_with_guard" -> "тек орындалған қадамды жауып, жетіспеуді бақылауды ашық қалдыру"
-        else -> "қалпына келтіру нәтижесі жазылғанша бақылау ашық қалады"
-      }
-      val recoveryClosureScript = supplierDashboardJoinedMessage(
-        listOf(
-          "AITA close gate: $recoveryContactGoodsName.",
-          "Gate path: $recoveryClosurePathMain.",
-          "Close score $recoveryClosureScore/100; requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()}.",
-          "Do not expose store names outside AITA; leave shortage watch open until recovery result is recorded."
-        ),
-        listOf(
-          "AITA ворота закрытия: $recoveryContactGoodsName.",
-          "Путь ворот: $recoveryClosurePathRu.",
-          "Оценка закрытия $recoveryClosureScore/100; запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()}.",
-          "Не раскрывайте названия магазинов вне AITA; оставьте контроль недостачи открытым до записи результата восстановления."
-        ),
-        listOf(
-          "AITA жабу қақпасы: $recoveryContactGoodsName.",
-          "Қақпа жолы: $recoveryClosurePathKk.",
-          "Жабу ұпайы $recoveryClosureScore/100; сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()}.",
-          "Дүкен атауларын AITA сыртында ашпаңыз; қалпына келтіру нәтижесі жазылғанша жетіспеуді бақылауды ашық қалдырыңыз."
-        )
-      )
-      val recoveryLedgerBlockerCount = listOf(
-        recoveryClosureLane == "blocked_open",
-        recoveryClosureLane == "needs_close_note",
-        recoveryProofLane != "watch_note",
-        recoveryHandoffLane != "watch_handoff",
-        recoveryFollowUpLane == "follow_up_now",
-        recoveryPackGuardLane == "block_pack",
-        recoveryConfidenceScore < 55,
-        recoveryRiskScore >= 75
-      ).count { blocked -> blocked }
-      val recoveryLedgerScore = (
-        100 -
-          recoveryLedgerBlockerCount * 11 -
-          (if (recoveryClosureScore < 50) 10 else 0) +
-          (if (recoveryRiskScore >= 82) -8 else 0) +
-          (if (recoveryConfidenceLane == "ready_to_recover") 8 else 0) +
-          (if (recoveryClosureLane == "ready_with_guard") 6 else 0)
-        ).coerceIn(0, 100)
-      val recoveryLedgerLane = when {
-        recoveryClosureLane == "blocked_open" || recoveryPackGuardLane == "block_pack" || recoveryConfidenceLane == "blocked_until_decision" -> "audit_blocker"
-        recoveryOutcomeLane == "substitute_offer" || recoveryOutcomeLane == "cancel_review" || recoveryProofLane == "store_ack_required" || recoveryContactLane == "substitute_answer" -> "decision_record"
-        recoveryPackGuardLane == "split_pack_only" || recoveryPackGuardLane == "proof_before_pack" || recoveryHandoffLane == "pack_handoff" -> "pack_record"
-        recoveryClosureLane == "ready_with_guard" && recoveryLedgerScore >= 70 -> "ledger_ready"
-        else -> "watch_record"
-      }
-      val recoveryLedgerHint = when (recoveryLedgerLane) {
-        "audit_blocker" -> supplierDashboardJoinedMessage(
-          listOf("Recovery ledger has an active blocker: keep proof, owner, and pack guard visible before any worker closes the shortage."),
-          listOf("В журнале восстановления есть активный блокер: держите доказательство, ответственного и защиту сборки видимыми до закрытия недопоставки."),
-          listOf("Қалпына келтіру журналында белсенді бөгет бар: жетіспеуді жабар алдында дәлелді, жауаптыны және жинау қорғанын көрінетін етіңіз.")
-        )
-        "decision_record" -> supplierDashboardJoinedMessage(
-          listOf("Decision record needed: write the store answer or substitute/cancel result before the shortage moves forward."),
-          listOf("Нужна запись решения: внесите ответ магазина или итог замены/отмены до движения недопоставки дальше."),
-          listOf("Шешім жазбасы керек: жетіспеу әрі қарай жылжымас бұрын дүкен жауабын немесе ауыстыру/бас тарту нәтижесін жазыңыз.")
-        )
-        "pack_record" -> supplierDashboardJoinedMessage(
-          listOf("Pack record needed: tell the pack lead exactly what ships, what stays short, and which proof protects dispatch."),
-          listOf("Нужна запись для сборки: укажите старшему сборки, что отправляется, что остаётся недостающим и какое доказательство защищает отправку."),
-          listOf("Жинау жазбасы керек: жинау жетекшісіне не жөнелтілетінін, не жетіспейтінін және жөнелтуді қандай дәлел қорғайтынын көрсетіңіз.")
-        )
-        "ledger_ready" -> supplierDashboardJoinedMessage(
-          listOf("Ledger is ready: close only the completed worker step and keep the remaining shortage visible until recovery result is recorded."),
-          listOf("Журнал готов: закрывайте только выполненный рабочий шаг и оставьте остаток недопоставки видимым до записи результата восстановления."),
-          listOf("Журнал дайын: тек орындалған жұмыс қадамын жауып, қалпына келтіру нәтижесі жазылғанша қалған жетіспеуді көрінетін қалдырыңыз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Watch record: keep the current promise, owner, and next follow-up together so the shortage cannot disappear between shifts."),
-          listOf("Запись наблюдения: держите текущее обещание, ответственного и следующий контроль вместе, чтобы недопоставка не потерялась между сменами."),
-          listOf("Бақылау жазбасы: жетіспеу ауысымдар арасында жоғалмауы үшін ағымдағы уәдені, жауаптыны және келесі бақылауды бірге ұстаңыз.")
-        )
-      }
-      val recoveryLedgerChecklist = when (recoveryLedgerLane) {
-        "audit_blocker" -> supplierDashboardJoinedMessage(
-          listOf("□ Keep shortage open\n□ Name blocker owner\n□ Attach proof or answer\n□ Recheck pack guard before closing"),
-          listOf("□ Оставить недопоставку открытой\n□ Указать ответственного за блокер\n□ Приложить доказательство или ответ\n□ Проверить защиту сборки перед закрытием"),
-          listOf("□ Жетіспеуді ашық қалдыру\n□ Бөгет жауаптысын атау\n□ Дәлел немесе жауап тіркеу\n□ Жабар алдында жинау қорғанын тексеру")
-        )
-        "decision_record" -> supplierDashboardJoinedMessage(
-          listOf("□ Record store answer\n□ Record substitute/cancel result\n□ Keep accepted and missing quantities separate\n□ Copy decision to follow-up note"),
-          listOf("□ Записать ответ магазина\n□ Записать итог замены/отмены\n□ Держать принятое и недостающее количество отдельно\n□ Скопировать решение в заметку контроля"),
-          listOf("□ Дүкен жауабын жазу\n□ Ауыстыру/бас тарту нәтижесін жазу\n□ Қабылданған және жетіспейтін санды бөлек ұстау\n□ Шешімді бақылау жазбасына көшіру")
-        )
-        "pack_record" -> supplierDashboardJoinedMessage(
-          listOf("□ Mark accepted quantity for pack\n□ Mark missing quantity as open\n□ Add dispatch-safe proof\n□ Leave second-drop/substitute promise visible"),
-          listOf("□ Отметить принятое количество для сборки\n□ Оставить недостачу открытой\n□ Добавить доказательство безопасной отправки\n□ Оставить видимым обещание второй поставки/замены"),
-          listOf("□ Қабылданған санды жинауға белгілеу\n□ Жетіспейтін санды ашық қалдыру\n□ Қауіпсіз жөнелту дәлелін қосу\n□ Екінші жеткізу/ауыстыру уәдесін көрінетін қалдыру")
-        )
-        "ledger_ready" -> supplierDashboardJoinedMessage(
-          listOf("□ Close completed worker step only\n□ Keep recovery watch open\n□ Preserve owner and next promise\n□ Reopen if store or upstream answer changes"),
-          listOf("□ Закрыть только выполненный рабочий шаг\n□ Оставить контроль восстановления открытым\n□ Сохранить ответственного и следующее обещание\n□ Открыть снова, если ответ магазина или верхнего канала изменится"),
-          listOf("□ Тек орындалған жұмыс қадамын жабу\n□ Қалпына келтіру бақылауын ашық қалдыру\n□ Жауаптыны және келесі уәдені сақтау\n□ Дүкен немесе жоғары арна жауабы өзгерсе қайта ашу")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("□ Keep promise, owner, and follow-up together\n□ Refresh risk after next contact\n□ Do not hide missing quantity\n□ Close only after recovery result is recorded"),
-          listOf("□ Держать обещание, ответственного и контроль вместе\n□ Обновить риск после следующего контакта\n□ Не скрывать недостающее количество\n□ Закрывать только после записи результата восстановления"),
-          listOf("□ Уәде, жауапты және бақылауды бірге ұстау\n□ Келесі байланыстан кейін тәуекелді жаңарту\n□ Жетіспейтін санды жасырмау\n□ Қалпына келтіру нәтижесі жазылған соң ғана жабу")
-        )
-      }
-      val recoveryLedgerPathMain = when (recoveryLedgerLane) {
-        "audit_blocker" -> "blocker must stay visible in AITA"
-        "decision_record" -> "record store/substitute/cancel decision"
-        "pack_record" -> "record dispatch-safe pack instruction"
-        "ledger_ready" -> "ledger ready; close completed step only"
-        else -> "watch record remains open"
-      }
-      val recoveryLedgerPathRu = when (recoveryLedgerLane) {
-        "audit_blocker" -> "блокер должен оставаться видимым в AITA"
-        "decision_record" -> "записать решение магазина/замены/отмены"
-        "pack_record" -> "записать безопасную инструкцию сборки"
-        "ledger_ready" -> "журнал готов; закрыть только выполненный шаг"
-        else -> "запись наблюдения остаётся открытой"
-      }
-      val recoveryLedgerPathKk = when (recoveryLedgerLane) {
-        "audit_blocker" -> "бөгет AITA ішінде көрінуі керек"
-        "decision_record" -> "дүкен/ауыстыру/бас тарту шешімін жазу"
-        "pack_record" -> "қауіпсіз жинау нұсқауын жазу"
-        "ledger_ready" -> "журнал дайын; тек орындалған қадамды жабу"
-        else -> "бақылау жазбасы ашық қалады"
-      }
-      val recoveryLedgerScript = supplierDashboardJoinedMessage(
-        listOf(
-          "AITA recovery ledger: $recoveryContactGoodsName.",
-          "Ledger path: $recoveryLedgerPathMain.",
-          "Ledger score $recoveryLedgerScore/100; requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()}.",
-          "Keep store names inside AITA and update this ledger after the next proof, decision, or pack change."
-        ),
-        listOf(
-          "AITA журнал восстановления: $recoveryContactGoodsName.",
-          "Путь журнала: $recoveryLedgerPathRu.",
-          "Оценка журнала $recoveryLedgerScore/100; запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()}.",
-          "Держите названия магазинов внутри AITA и обновите этот журнал после следующего доказательства, решения или изменения сборки."
-        ),
-        listOf(
-          "AITA қалпына келтіру журналы: $recoveryContactGoodsName.",
-          "Журнал жолы: $recoveryLedgerPathKk.",
-          "Журнал ұпайы $recoveryLedgerScore/100; сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()}.",
-          "Дүкен атауларын AITA ішінде ұстаңыз және келесі дәлел, шешім немесе жинау өзгерісінен кейін осы журналды жаңартыңыз."
-        )
-      )
-      val recoveryTriageScore = (
-        recoveryRiskScore / 2 +
-          (100 - recoveryConfidenceScore) / 4 +
-          (100 - recoveryClosureScore) / 5 +
-          (100 - recoveryLedgerScore) / 5 +
-          when (recoveryUrgencyLane) {
-            "overdue" -> 18
-            "today" -> 12
-            "soon" -> 7
-            else -> 2
-          } +
-          when (recoveryFollowUpLane) {
-            "follow_up_now" -> 9
-            "same_day_check" -> 6
-            "before_pack_check" -> 4
-            else -> 1
+        }
+        val recoveryEscalationLane = supplierDashboardChunk {
+          when (recoveryOwnerLane) {
+            "store_contact" -> "store_escalation"
+            "upstream_sourcing" -> "sourcing_escalation"
+            "pack_lead" -> "pack_hold"
+            else -> "watch_only"
           }
-        ).coerceIn(0, 100)
-      val recoveryTriageLane = when {
-        recoveryRiskLane == "critical_recovery" || recoveryClosureLane == "blocked_open" || recoveryLedgerLane == "audit_blocker" -> "triage_now"
-        recoveryOutcomeLane == "cancel_review" || recoveryOutcomeLane == "substitute_offer" || recoveryConfidenceLane == "needs_confirmation" -> "decision_lane"
-        recoveryPackGuardLane == "block_pack" || recoveryPackGuardLane == "split_pack_only" || recoveryHandoffLane == "pack_handoff" -> "pack_split_lane"
-        recoveryConfidenceLane == "ready_to_recover" && recoveryLedgerLane == "ledger_ready" -> "ready_lane"
-        recoveryOwnerLane == "upstream_sourcing" || recoveryContactLane == "upstream_request" || recoveryLane == "split_source" -> "sourcing_lane"
-        else -> "watch_lane"
-      }
-      val recoveryTriageHint = when (recoveryTriageLane) {
-        "triage_now" -> supplierDashboardJoinedMessage(
-          listOf("Triage desk: handle this shortage now; keep packing blocked until the red recovery blockers are cleared in AITA."),
-          listOf("Пульт сортировки: обработайте эту недопоставку сейчас; держите сборку заблокированной, пока красные блокеры не сняты в AITA."),
-          listOf("Іріктеу пульті: бұл жетіспеуді қазір өңдеңіз; қызыл қалпына келтіру бөгеттері AITA ішінде шешілгенше жинауды тоқтатыңыз.")
-        )
-        "decision_lane" -> supplierDashboardJoinedMessage(
-          listOf("Triage desk: buyer/store decision is the next unlock; capture substitute, delay, or cancel answer before worker closure."),
-          listOf("Пульт сортировки: следующее разблокирование — решение покупателя/магазина; зафиксируйте замену, задержку или отмену до закрытия задачи."),
-          listOf("Іріктеу пульті: келесі ашу — сатып алушы/дүкен шешімі; тапсырманы жаппай тұрып ауыстыру, кідіріс немесе бас тарту жауабын бекітіңіз.")
-        )
-        "pack_split_lane" -> supplierDashboardJoinedMessage(
-          listOf("Triage desk: split the accepted stock from the missing quantity before packflow touches this SKU."),
-          listOf("Пульт сортировки: отделите принятое наличие от недостающего количества до попадания SKU в сборку."),
-          listOf("Іріктеу пульті: SKU жинауға түспей тұрып қабылданған қорды жетіспейтін саннан бөліңіз.")
-        )
-        "sourcing_lane" -> supplierDashboardJoinedMessage(
-          listOf("Triage desk: upstream sourcing is the next move; ask for reserve, ETA, substitute, or no-stock proof."),
-          listOf("Пульт сортировки: следующий шаг — поиск выше по цепочке; запросите резерв, срок, замену или подтверждение отсутствия товара."),
-          listOf("Іріктеу пульті: келесі қадам — жоғары арнадан іздеу; резерв, мерзім, ауыстыру немесе қор жоқ дәлелін сұраңыз.")
-        )
-        "ready_lane" -> supplierDashboardJoinedMessage(
-          listOf("Triage desk: recovery looks ready; close only completed worker steps and keep the shortage promise visible."),
-          listOf("Пульт сортировки: восстановление выглядит готовым; закрывайте только выполненные рабочие шаги и оставляйте обещание недопоставки видимым."),
-          listOf("Іріктеу пульті: қалпына келтіру дайын сияқты; тек орындалған жұмыс қадамдарын жауып, жетіспеу уәдесін көрінетін ұстаңыз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Triage desk: keep watching; refresh owner, promise, and proof after the next store or upstream answer."),
-          listOf("Пульт сортировки: продолжайте наблюдение; обновите ответственного, обещание и доказательство после следующего ответа магазина или верхнего канала."),
-          listOf("Іріктеу пульті: бақылауды жалғастырыңыз; дүкен немесе жоғары арнаның келесі жауабынан кейін жауаптыны, уәдені және дәлелді жаңартыңыз.")
-        )
-      }
-      val recoveryTriageChecklist = when (recoveryTriageLane) {
-        "triage_now" -> supplierDashboardJoinedMessage(
-          listOf("□ Freeze pack/dispatch change\n□ Contact owner now\n□ Record blocker proof\n□ Re-score after answer"),
-          listOf("□ Заморозить сборку/отправку\n□ Связаться с ответственным сейчас\n□ Записать доказательство блокера\n□ Пересчитать после ответа"),
-          listOf("□ Жинау/жөнелту өзгерісін тоқтату\n□ Жауаптымен қазір байланысу\n□ Бөгет дәлелін жазу\n□ Жауаптан кейін қайта бағалау")
-        )
-        "decision_lane" -> supplierDashboardJoinedMessage(
-          listOf("□ Ask for store/buyer answer\n□ Save substitute/delay/cancel decision\n□ Keep missing quantity separate\n□ Update follow-up time"),
-          listOf("□ Запросить ответ магазина/покупателя\n□ Сохранить решение по замене/задержке/отмене\n□ Держать недостачу отдельно\n□ Обновить время контроля"),
-          listOf("□ Дүкен/сатып алушы жауабын сұрау\n□ Ауыстыру/кідіріс/бас тарту шешімін сақтау\n□ Жетіспейтін санды бөлек ұстау\n□ Бақылау уақытын жаңарту")
-        )
-        "pack_split_lane" -> supplierDashboardJoinedMessage(
-          listOf("□ Pack accepted quantity only\n□ Hold missing quantity\n□ Add split note\n□ Keep second-drop promise open"),
-          listOf("□ Собрать только принятое количество\n□ Удержать недостачу\n□ Добавить заметку разделения\n□ Оставить обещание второй поставки открытым"),
-          listOf("□ Тек қабылданған санды жинау\n□ Жетіспейтін санды ұстау\n□ Бөлу жазбасын қосу\n□ Екінші жеткізу уәдесін ашық ұстау")
-        )
-        "sourcing_lane" -> supplierDashboardJoinedMessage(
-          listOf("□ Ask upstream for stock\n□ Save reserve/ETA/substitute result\n□ Mirror answer to store\n□ Keep ledger visible"),
-          listOf("□ Запросить товар выше по цепочке\n□ Сохранить резерв/срок/замену\n□ Передать ответ магазину\n□ Держать журнал видимым"),
-          listOf("□ Жоғары арнадан қор сұрау\n□ Резерв/мерзім/ауыстыру нәтижесін сақтау\n□ Жауапты дүкенге жеткізу\n□ Журналды көрінетін ұстау")
-        )
-        "ready_lane" -> supplierDashboardJoinedMessage(
-          listOf("□ Close completed worker step only\n□ Preserve recovery promise\n□ Reopen if answer changes\n□ Keep store names private"),
-          listOf("□ Закрыть только выполненный рабочий шаг\n□ Сохранить обещание восстановления\n□ Открыть снова при изменении ответа\n□ Держать названия магазинов приватными"),
-          listOf("□ Тек орындалған жұмыс қадамын жабу\n□ Қалпына келтіру уәдесін сақтау\n□ Жауап өзгерсе қайта ашу\n□ Дүкен атауларын құпия ұстау")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("□ Watch owner and promise\n□ Refresh after next contact\n□ Keep missing quantity visible\n□ Close only after recorded result"),
-          listOf("□ Наблюдать за ответственным и обещанием\n□ Обновить после следующего контакта\n□ Держать недостачу видимой\n□ Закрывать только после записанного результата"),
-          listOf("□ Жауапты мен уәдені бақылау\n□ Келесі байланыстан кейін жаңарту\n□ Жетіспейтін санды көрінетін ұстау\n□ Жазылған нәтижеден кейін ғана жабу")
-        )
-      }
-      val recoveryTriagePathMain = when (recoveryTriageLane) {
-        "triage_now" -> "operator handles now and keeps packflow blocked"
-        "decision_lane" -> "capture buyer/store decision"
-        "pack_split_lane" -> "split pack accepted quantity only"
-        "sourcing_lane" -> "ask upstream and mirror answer back"
-        "ready_lane" -> "ready with guard; close completed step only"
-        else -> "watch until next proof or promise changes"
-      }
-      val recoveryTriagePathRu = when (recoveryTriageLane) {
-        "triage_now" -> "оператор обрабатывает сейчас и держит сборку заблокированной"
-        "decision_lane" -> "зафиксировать решение покупателя/магазина"
-        "pack_split_lane" -> "собрать отдельно только принятое количество"
-        "sourcing_lane" -> "запросить выше по цепочке и передать ответ"
-        "ready_lane" -> "готово с защитой; закрыть только выполненный шаг"
-        else -> "наблюдать до изменения доказательства или обещания"
-      }
-      val recoveryTriagePathKk = when (recoveryTriageLane) {
-        "triage_now" -> "оператор қазір өңдеп, жинауды тоқтатылған ұстайды"
-        "decision_lane" -> "сатып алушы/дүкен шешімін бекіту"
-        "pack_split_lane" -> "тек қабылданған санды бөлек жинау"
-        "sourcing_lane" -> "жоғары арнадан сұрап, жауапты жеткізу"
-        "ready_lane" -> "қорғанмен дайын; тек орындалған қадамды жабу"
-        else -> "дәлел немесе уәде өзгергенше бақылау"
-      }
-      val recoveryTriageScript = supplierDashboardJoinedMessage(
-        listOf(
-          "AITA recovery triage: $recoveryContactGoodsName.",
-          "Triage path: $recoveryTriagePathMain.",
-          "Triage score $recoveryTriageScore/100; risk $recoveryRiskScore/100; confidence $recoveryConfidenceScore/100; ledger $recoveryLedgerScore/100.",
-          "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()} across ${relatedOrders.size} order(s)."
-        ),
-        listOf(
-          "AITA сортировка восстановления: $recoveryContactGoodsName.",
-          "Путь сортировки: $recoveryTriagePathRu.",
-          "Оценка сортировки $recoveryTriageScore/100; риск $recoveryRiskScore/100; уверенность $recoveryConfidenceScore/100; журнал $recoveryLedgerScore/100.",
-          "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()} по ${relatedOrders.size} заказ(ам)."
-        ),
-        listOf(
-          "AITA қалпына келтіру іріктеуі: $recoveryContactGoodsName.",
-          "Іріктеу жолы: $recoveryTriagePathKk.",
-          "Іріктеу ұпайы $recoveryTriageScore/100; тәуекел $recoveryRiskScore/100; сенім $recoveryConfidenceScore/100; журнал $recoveryLedgerScore/100.",
-          "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()} — ${relatedOrders.size} тапсырыс."
-        )
-      )
-      val recoveryCommandScore = (
-        recoveryTriageScore * 2 / 5 +
-          recoveryRiskScore / 4 +
-          (100 - recoveryConfidenceScore) / 5 +
-          when (recoveryUrgencyLane) {
-            "overdue" -> 16
-            "today" -> 11
-            "soon" -> 6
-            else -> 2
-          } +
+        }
+        val recoveryEscalationHint = supplierDashboardChunk {
+          when (recoveryEscalationLane) {
+            "store_escalation" -> supplierDashboardJoinedMessage(
+              listOf("Escalate through the store contact path if the buyer has not accepted delay, substitute, or cancellation."),
+              listOf("Эскалируйте через контакт магазина, если покупатель не принял задержку, замену или отмену."),
+              listOf("Сатып алушы кідіріс, ауыстыру немесе бас тартуды қабылдамаса, дүкен байланысы арқылы көтеріңіз.")
+            )
+            "sourcing_escalation" -> supplierDashboardJoinedMessage(
+              listOf("Escalate upstream sourcing when the missing quantity has no reserve, quote, or substitute path."),
+              listOf("Эскалируйте поиск выше по цепочке, если у недостающего количества нет резерва, расчёта или замены."),
+              listOf("Жетіспейтін санға резерв, баға немесе ауыстыру жолы болмаса, жоғары арнадан іздеуді көтеріңіз.")
+            )
+            "pack_hold" -> supplierDashboardJoinedMessage(
+              listOf("Escalation is a pack hold: do not let missing quantity ride with the accepted stock by mistake."),
+              listOf("Эскалация — стоп сборки: не дайте недостающему количеству случайно уйти вместе с принятым наличием."),
+              listOf("Көтеру — жинауды ұстау: жетіспейтін санның қабылданған қормен бірге қате кетуіне жол бермеңіз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("No escalation yet: keep watching until the next owner or promise becomes clear."),
+              listOf("Эскалации пока нет: наблюдайте, пока следующий ответственный или обещание не станет понятным."),
+              listOf("Әзірге көтеру жоқ: келесі жауапты немесе уәде анық болғанша бақылаңыз.")
+            )
+          }
+        }
+        val recoveryProofLane = supplierDashboardChunk {
+          when {
+            recoveryEscalationLane == "pack_hold" -> "pack_guard_proof"
+            recoverySlaLane == "call_now" || recoverySlaLane == "commit_today" || recoveryOwnerLane == "store_contact" -> "store_ack_required"
+            recoveryOwnerLane == "upstream_sourcing" || recoveryLane == "source_or_cancel" || recoveryLane == "split_source" -> "sourcing_note_required"
+            else -> "watch_note"
+          }
+        }
+        val recoveryProofHint = supplierDashboardChunk {
+          when (recoveryProofLane) {
+            "store_ack_required" -> supplierDashboardJoinedMessage(
+              listOf("Proof before dispatch: capture store acknowledgement for the short quantity, delay, substitute, or cancellation path."),
+              listOf("Подтверждение до отправки: зафиксируйте согласие магазина по недостающему количеству, задержке, замене или отмене."),
+              listOf("Жөнелтуге дейін дәлел: жетіспейтін сан, кідіріс, ауыстыру немесе бас тарту бойынша дүкен келісімін бекітіңіз.")
+            )
+            "sourcing_note_required" -> supplierDashboardJoinedMessage(
+              listOf("Proof before closing: add an upstream sourcing note with reserve, ETA, substitute, or no-stock result."),
+              listOf("Подтверждение до закрытия: добавьте заметку поиска выше по цепочке с резервом, сроком, заменой или результатом нет наличия."),
+              listOf("Жабуға дейін дәлел: резерв, мерзім, ауыстыру немесе қор жоқ нәтижесі бар жоғары арна іздеу жазбасын қосыңыз.")
+            )
+            "pack_guard_proof" -> supplierDashboardJoinedMessage(
+              listOf("Proof before packflow: mark the accepted stock separately and keep missing quantity out of packed/dispatch totals."),
+              listOf("Подтверждение до сборки: отдельно отметьте принятое наличие и не включайте недостающее количество в сборку/отправку."),
+              listOf("Жинауға дейін дәлел: қабылданған қорды бөлек белгілеңіз және жетіспейтін санды жинау/жөнелту санына қоспаңыз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Watch note: keep a dated note so the shortage does not disappear between supplier, store, and pack desk."),
+              listOf("Заметка наблюдения: оставьте датированную заметку, чтобы недопоставка не потерялась между поставщиком, магазином и сборкой."),
+              listOf("Бақылау жазбасы: жетіспеу жеткізуші, дүкен және жинау арасында жоғалмауы үшін күні бар жазба қалдырыңыз.")
+            )
+          }
+        }
+        val recoveryOutcomeLane = supplierDashboardChunk {
+          when {
+            recoveryLane == "split_delivery" -> "second_drop"
+            recoveryLane == "split_source" -> "substitute_offer"
+            recoveryLane == "source_or_cancel" && (recoveryUrgencyLane == "overdue" || recoveryUrgencyLane == "today") -> "cancel_review"
+            recoveryLane == "source_or_cancel" -> "substitute_offer"
+            acceptedQuantityTotal > 0.000001 -> "ship_now_guard"
+            else -> "watch_to_close"
+          }
+        }
+        val recoveryOutcomeHint = supplierDashboardChunk {
+          when (recoveryOutcomeLane) {
+            "second_drop" -> supplierDashboardJoinedMessage(
+              listOf("Resolution path: send accepted stock now, then create a dated second-drop promise for the short quantity."),
+              listOf("Путь решения: отправьте принятое наличие сейчас, затем создайте обещание второй поставки на недостающее количество с датой."),
+              listOf("Шешім жолы: қабылданған қорды қазір жіберіп, жетіспейтін санға күні бар екінші жеткізу уәдесін жасаңыз.")
+            )
+            "substitute_offer" -> supplierDashboardJoinedMessage(
+              listOf("Resolution path: offer an upstream substitute or reserve result before the store promise is closed."),
+              listOf("Путь решения: предложите замену или результат резерва выше по цепочке до закрытия обещания магазину."),
+              listOf("Шешім жолы: дүкен уәдесі жабылмай тұрып жоғары арнадан ауыстыру немесе резерв нәтижесін ұсыныңыз.")
+            )
+            "cancel_review" -> supplierDashboardJoinedMessage(
+              listOf("Resolution path: review cancellation with the store if no reserve or substitute can meet the due promise."),
+              listOf("Путь решения: обсудите отмену с магазином, если резерв или замена не успевают к обещанному сроку."),
+              listOf("Шешім жолы: резерв немесе ауыстыру уәде мерзіміне үлгермесе, дүкенмен бас тартуды қараңыз.")
+            )
+            "ship_now_guard" -> supplierDashboardJoinedMessage(
+              listOf("Resolution path: ship only the accepted quantity and keep the unresolved remainder on the watch queue."),
+              listOf("Путь решения: отправьте только принятое количество и оставьте нерешённый остаток в очереди контроля."),
+              listOf("Шешім жолы: тек қабылданған санды жіберіп, шешілмеген қалдықты бақылау кезегінде қалдырыңыз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Resolution path: keep the shortage open until a dated second drop, substitute, or cancellation is chosen."),
+              listOf("Путь решения: держите недопоставку открытой, пока не выбрана вторая поставка, замена или отмена с датой."),
+              listOf("Шешім жолы: күні бар екінші жеткізу, ауыстыру немесе бас тарту таңдалғанша жетіспеуді ашық ұстаңыз.")
+            )
+          }
+        }
+        val recoveryPackGuardLane = supplierDashboardChunk {
+          when {
+            acceptedQuantityTotal <= 0.000001 -> "block_pack"
+            fullyShortLineCount > 0 || partialLineCount > 0 -> "split_pack_only"
+            recoveryProofLane != "watch_note" -> "proof_before_pack"
+            else -> "safe_to_pack"
+          }
+        }
+        val recoveryPackGuardHint = supplierDashboardChunk {
           when (recoveryPackGuardLane) {
-            "block_pack" -> 12
-            "split_pack_only" -> 8
-            "proof_before_pack" -> 5
-            else -> 0
-          } +
+            "block_pack" -> supplierDashboardJoinedMessage(
+              listOf("Pack guard: do not pack this SKU until the store accepts cancellation/substitute or upstream stock is found."),
+              listOf("Защита сборки: не собирайте этот SKU, пока магазин не примет отмену/замену или пока не найден товар выше по цепочке."),
+              listOf("Жинау күзеті: дүкен бас тарту/ауыстыруды қабылдамайынша немесе жоғары арнадан қор табылмайынша бұл SKU-ды жинамаңыз.")
+            )
+            "split_pack_only" -> supplierDashboardJoinedMessage(
+              listOf("Pack guard: allow only the accepted quantity into packflow; the short quantity needs its own recovery promise."),
+              listOf("Защита сборки: допускайте в сборку только принятое количество; недостающее количество требует отдельного обещания восстановления."),
+              listOf("Жинау күзеті: жинауға тек қабылданған санды жіберіңіз; жетіспейтін санға бөлек қалпына келтіру уәдесі керек.")
+            )
+            "proof_before_pack" -> supplierDashboardJoinedMessage(
+              listOf("Pack guard: collect the required recovery proof before changing pack or dispatch status."),
+              listOf("Защита сборки: соберите нужное подтверждение восстановления до изменения статуса сборки или отправки."),
+              listOf("Жинау күзеті: жинау немесе жөнелту мәртебесін өзгертпей тұрып қажет қалпына келтіру дәлелін жинаңыз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Pack guard: accepted quantity and proof look clean; keep watching only if the promise changes."),
+              listOf("Защита сборки: принятое количество и подтверждение выглядят чисто; наблюдайте только если обещание изменится."),
+              listOf("Жинау күзеті: қабылданған сан мен дәлел таза көрінеді; уәде өзгерсе ғана бақылаңыз.")
+            )
+          }
+        }
+        val recoveryContactLane = supplierDashboardChunk {
+          when {
+            recoverySlaLane == "call_now" || recoveryOwnerLane == "store_contact" -> "store_call"
+            recoveryOutcomeLane == "substitute_offer" -> "substitute_answer"
+            recoveryOwnerLane == "upstream_sourcing" || recoveryEscalationLane == "sourcing_escalation" -> "upstream_request"
+            recoveryPackGuardLane == "block_pack" || recoveryEscalationLane == "pack_hold" -> "pack_lead_note"
+            else -> "watch_note"
+          }
+        }
+        val recoveryContactHint = supplierDashboardChunk {
           when (recoveryContactLane) {
-            "store_call" -> 8
-            "substitute_answer" -> 7
-            "upstream_request" -> 6
+            "store_call" -> supplierDashboardJoinedMessage(
+              listOf("Contact lane: call or message the store now with accepted, short, and proposed recovery quantities."),
+              listOf("Канал связи: сейчас позвоните или напишите магазину с принятым, недостающим и предложенным количеством восстановления."),
+              listOf("Байланыс арнасы: дүкенге қазір қоңырау шалып немесе жазып, қабылданған, жетіспейтін және қалпына келтіру санын айтыңыз.")
+            )
+            "substitute_answer" -> supplierDashboardJoinedMessage(
+              listOf("Contact lane: prepare a substitute or cancellation answer before the store promise is closed."),
+              listOf("Канал связи: подготовьте ответ по замене или отмене до закрытия обещания магазину."),
+              listOf("Байланыс арнасы: дүкен уәдесі жабылмай тұрып ауыстыру немесе бас тарту жауабын дайындаңыз.")
+            )
+            "upstream_request" -> supplierDashboardJoinedMessage(
+              listOf("Contact lane: ask upstream for reserve, ETA, or substitute, then mirror the answer back to the store."),
+              listOf("Канал связи: запросите выше по цепочке резерв, срок или замену, затем перенесите ответ магазину."),
+              listOf("Байланыс арнасы: жоғары арнадан резерв, мерзім немесе ауыстыру сұрап, жауапты дүкенге жеткізіңіз.")
+            )
+            "pack_lead_note" -> supplierDashboardJoinedMessage(
+              listOf("Contact lane: leave the pack lead a note that only accepted quantity may enter packflow."),
+              listOf("Канал связи: оставьте старшему сборки заметку, что в сборку идёт только принятое количество."),
+              listOf("Байланыс арнасы: жинау жетекшісіне тек қабылданған сан жинауға кіретінін белгілеңіз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Contact lane: keep a watch note until the second drop, substitute, or cancellation is clear."),
+              listOf("Канал связи: оставьте заметку наблюдения, пока не понятна вторая поставка, замена или отмена."),
+              listOf("Байланыс арнасы: екінші жеткізу, ауыстыру немесе бас тарту анықталғанша бақылау жазбасын қалдырыңыз.")
+            )
+          }
+        }
+        val recoveryContactGoodsName = supplierDashboardChunk {
+          (if (sampleUsesSubstitute) sampleLine.substituteGoodsItemNameSnapshot else sampleLine.goodsItemNameSnapshot)
+            .firstOrNull { name -> name.value.isNotBlank() }
+            ?.value
+            ?: (if (sampleUsesSubstitute) sampleLine.substituteGoodsItemBarcodeSnapshots else sampleLine.goodsItemBarcodeSnapshots).firstOrNull()
+            ?: goodsItemId.take(8)
+        }
+        val recoveryContactPathMain = supplierDashboardChunk {
+          when (recoveryContactLane) {
+            "store_call" -> "confirm delay, second drop, substitute, or cancellation"
+            "substitute_answer" -> "offer substitute or cancellation decision"
+            "upstream_request" -> "ask upstream for reserve, ETA, or substitute"
+            "pack_lead_note" -> "pack only accepted quantity and hold the shortage"
+            else -> "keep shortage visible until resolution"
+          }
+        }
+        val recoveryContactPathRu = supplierDashboardChunk {
+          when (recoveryContactLane) {
+            "store_call" -> "согласовать задержку, вторую поставку, замену или отмену"
+            "substitute_answer" -> "предложить замену или решение по отмене"
+            "upstream_request" -> "запросить выше по цепочке резерв, срок или замену"
+            "pack_lead_note" -> "собрать только принятое количество и удержать недостачу"
+            else -> "держать недопоставку видимой до решения"
+          }
+        }
+        val recoveryContactPathKk = supplierDashboardChunk {
+          when (recoveryContactLane) {
+            "store_call" -> "кешігу, екінші жеткізу, ауыстыру немесе бас тартуды келісу"
+            "substitute_answer" -> "ауыстыру немесе бас тарту шешімін ұсыну"
+            "upstream_request" -> "жоғары арнадан резерв, мерзім немесе ауыстыру сұрау"
+            "pack_lead_note" -> "тек қабылданған санды жинап, жетіспейтінін ұстау"
+            else -> "шешімге дейін жетіспеуді көрінетін ұстау"
+          }
+        }
+        val recoveryContactScript = supplierDashboardChunk {
+          supplierDashboardJoinedMessage(
+            listOf(
+              "AITA shortage recovery: $recoveryContactGoodsName.",
+              "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()} across ${relatedOrders.size} order(s).",
+              "Recovery path: $recoveryContactPathMain.",
+              "Please confirm the next promise before packing or dispatch changes."
+            ),
+            listOf(
+              "AITA восстановление недопоставки: $recoveryContactGoodsName.",
+              "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()} по ${relatedOrders.size} заказ(ам).",
+              "Путь восстановления: $recoveryContactPathRu.",
+              "Подтвердите следующее обещание до изменения сборки или отправки."
+            ),
+            listOf(
+              "AITA жетіспеуді қалпына келтіру: $recoveryContactGoodsName.",
+              "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()} — ${relatedOrders.size} тапсырыс.",
+              "Қалпына келтіру жолы: $recoveryContactPathKk.",
+              "Жинау немесе жөнелту өзгермей тұрып келесі уәдені растаңыз."
+            )
+          )
+        }
+        val recoveryRiskDueScore = supplierDashboardChunk {
+          when (recoveryUrgencyLane) {
+            "overdue" -> 30
+            "today" -> 22
+            "soon" -> 14
+            else -> 4
+          }
+        }
+        val recoveryRiskShortageScore = supplierDashboardChunk {
+          (
+            fullyShortLineCount * 8 +
+              partialLineCount * 4 +
+              missingQuantityTotal.coerceAtMost(24.0).toInt()
+            ).coerceIn(0, 30)
+        }
+        val recoveryRiskDecisionScore = supplierDashboardChunk {
+          when (recoveryOutcomeLane) {
+            "cancel_review" -> 18
+            "substitute_offer" -> 15
+            "second_drop" -> 10
+            "ship_now_guard" -> 6
+            else -> 2
+          }
+        }
+        val recoveryRiskPackScore = supplierDashboardChunk {
+          when (recoveryPackGuardLane) {
+            "block_pack" -> 16
+            "split_pack_only" -> 11
+            "proof_before_pack" -> 8
+            else -> 0
+          }
+        }
+        val recoveryRiskContactScore = supplierDashboardChunk {
+          when (recoveryContactLane) {
+            "store_call" -> 12
+            "substitute_answer" -> 10
+            "upstream_request" -> 8
+            "pack_lead_note" -> 5
             else -> 1
           }
-        ).coerceIn(0, 100)
-      val recoveryCommandLane = when {
-        recoveryPackGuardLane == "block_pack" || recoveryClosureLane == "blocked_open" || recoveryLedgerLane == "audit_blocker" -> "stop_pack"
-        recoveryContactLane == "store_call" || recoveryContactLane == "substitute_answer" || recoveryOutcomeLane == "cancel_review" || recoveryOutcomeLane == "substitute_offer" -> "call_store"
-        recoveryOwnerLane == "upstream_sourcing" || recoveryContactLane == "upstream_request" || recoveryTriageLane == "sourcing_lane" -> "source_now"
-        recoveryLane == "split_delivery" || recoveryTriageLane == "pack_split_lane" || recoveryPackGuardLane == "split_pack_only" -> "split_and_ship"
-        recoveryTriageLane == "ready_lane" || (recoveryConfidenceLane == "ready_to_recover" && recoveryLedgerLane == "ledger_ready") -> "ready_with_note"
-        else -> "monitor_promise"
-      }
-      val recoveryCommandHint = when (recoveryCommandLane) {
-        "stop_pack" -> supplierDashboardJoinedMessage(
-          listOf("Command desk: stop packflow for this SKU until blocker proof, owner, and close gate are visible in AITA."),
-          listOf("Командный пульт: остановите сборку этого SKU, пока доказательство блокера, ответственный и ворота закрытия не видны в AITA."),
-          listOf("Команда пульті: бөгет дәлелі, жауапты және жабу қақпасы AITA ішінде көрінгенше бұл SKU жинауын тоқтатыңыз.")
-        )
-        "call_store" -> supplierDashboardJoinedMessage(
-          listOf("Command desk: call or message the store/buyer now, capture the substitute, delay, or cancel answer, then refresh the recovery promise."),
-          listOf("Командный пульт: позвоните или напишите магазину/покупателю сейчас, зафиксируйте ответ по замене, задержке или отмене, затем обновите обещание восстановления."),
-          listOf("Команда пульті: дүкенге/сатып алушыға қазір қоңырау шалып немесе жазыңыз, ауыстыру, кідіріс немесе бас тарту жауабын бекітіп, қалпына келтіру уәдесін жаңартыңыз.")
-        )
-        "source_now" -> supplierDashboardJoinedMessage(
-          listOf("Command desk: ask upstream for reserve, ETA, substitute, or no-stock proof before the shortage moves further."),
-          listOf("Командный пульт: запросите выше по цепочке резерв, срок, замену или подтверждение отсутствия товара до движения недопоставки дальше."),
-          listOf("Команда пульті: жетіспеу әрі қарай жылжымай тұрып жоғары арнадан резерв, мерзім, ауыстыру немесе қор жоқ дәлелін сұраңыз.")
-        )
-        "split_and_ship" -> supplierDashboardJoinedMessage(
-          listOf("Command desk: split accepted quantity from missing quantity, ship only guarded stock, and keep the second drop visible."),
-          listOf("Командный пульт: отделите принятое количество от недостачи, отправляйте только защищённый товар и оставьте вторую поставку видимой."),
-          listOf("Команда пульті: қабылданған санды жетіспейтін саннан бөліп, тек қорғалған қорды жіберіңіз және екінші жеткізуді көрінетін қалдырыңыз.")
-        )
-        "ready_with_note" -> supplierDashboardJoinedMessage(
-          listOf("Command desk: recovery is ready with guard; close only the completed worker step and keep remaining shortage promises visible."),
-          listOf("Командный пульт: восстановление готово с защитой; закройте только выполненный рабочий шаг и оставьте видимыми оставшиеся обещания недопоставки."),
-          listOf("Команда пульті: қалпына келтіру қорғанмен дайын; тек орындалған жұмыс қадамын жауып, қалған жетіспеу уәделерін көрінетін қалдырыңыз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Command desk: monitor promise, owner, and next follow-up; refresh the command when store or upstream answer changes."),
-          listOf("Командный пульт: наблюдайте за обещанием, ответственным и следующим контролем; обновите команду при изменении ответа магазина или верхнего канала."),
-          listOf("Команда пульті: уәде, жауапты және келесі бақылауды қадағалаңыз; дүкен немесе жоғары арна жауабы өзгерсе команданы жаңартыңыз.")
-        )
-      }
-      val recoveryCommandChecklist = when (recoveryCommandLane) {
-        "stop_pack" -> supplierDashboardJoinedMessage(
-          listOf("□ Stop packflow for this SKU\n□ Name blocker owner\n□ Attach proof or answer\n□ Reopen only after command score drops"),
-          listOf("□ Остановить сборку этого SKU\n□ Назвать ответственного за блокер\n□ Приложить доказательство или ответ\n□ Открыть движение только после снижения оценки команды"),
-          listOf("□ Бұл SKU жинауын тоқтату\n□ Бөгет жауаптысын атау\n□ Дәлел немесе жауап тіркеу\n□ Команда ұпайы төмендеген соң ғана қозғалысты ашу")
-        )
-        "call_store" -> supplierDashboardJoinedMessage(
-          listOf("□ Contact store/buyer\n□ Save substitute/delay/cancel answer\n□ Update follow-up time\n□ Keep store names private outside AITA"),
-          listOf("□ Связаться с магазином/покупателем\n□ Сохранить ответ по замене/задержке/отмене\n□ Обновить время контроля\n□ Держать названия магазинов приватными вне AITA"),
-          listOf("□ Дүкенмен/сатып алушымен байланысу\n□ Ауыстыру/кідіріс/бас тарту жауабын сақтау\n□ Бақылау уақытын жаңарту\n□ AITA сыртында дүкен атауларын құпия ұстау")
-        )
-        "source_now" -> supplierDashboardJoinedMessage(
-          listOf("□ Ask upstream for reserve or ETA\n□ Record substitute/no-stock proof\n□ Mirror answer to store\n□ Keep shortage ledger open"),
-          listOf("□ Запросить резерв или срок выше по цепочке\n□ Записать замену или подтверждение отсутствия\n□ Передать ответ магазину\n□ Оставить журнал недопоставки открытым"),
-          listOf("□ Жоғары арнадан резерв немесе мерзім сұрау\n□ Ауыстыру немесе қор жоқ дәлелін жазу\n□ Жауапты дүкенге жеткізу\n□ Жетіспеу журналын ашық қалдыру")
-        )
-        "split_and_ship" -> supplierDashboardJoinedMessage(
-          listOf("□ Pack accepted quantity only\n□ Keep missing quantity open\n□ Add second-drop promise\n□ Check proof before dispatch"),
-          listOf("□ Собрать только принятое количество\n□ Оставить недостачу открытой\n□ Добавить обещание второй поставки\n□ Проверить доказательство перед отправкой"),
-          listOf("□ Тек қабылданған санды жинау\n□ Жетіспейтін санды ашық қалдыру\n□ Екінші жеткізу уәдесін қосу\n□ Жөнелту алдында дәлелді тексеру")
-        )
-        "ready_with_note" -> supplierDashboardJoinedMessage(
-          listOf("□ Close completed step only\n□ Preserve recovery note\n□ Keep remaining promise visible\n□ Reopen if answer changes"),
-          listOf("□ Закрыть только выполненный шаг\n□ Сохранить заметку восстановления\n□ Оставить оставшееся обещание видимым\n□ Открыть снова при изменении ответа"),
-          listOf("□ Тек орындалған қадамды жабу\n□ Қалпына келтіру жазбасын сақтау\n□ Қалған уәдені көрінетін қалдыру\n□ Жауап өзгерсе қайта ашу")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("□ Watch owner\n□ Watch promise\n□ Refresh after next answer\n□ Keep missing quantity visible"),
-          listOf("□ Следить за ответственным\n□ Следить за обещанием\n□ Обновить после следующего ответа\n□ Держать недостачу видимой"),
-          listOf("□ Жауаптыны бақылау\n□ Уәдені бақылау\n□ Келесі жауаптан кейін жаңарту\n□ Жетіспейтін санды көрінетін ұстау")
-        )
-      }
-      val recoveryCommandPathMain = when (recoveryCommandLane) {
-        "stop_pack" -> "stop packflow until blockers clear"
-        "call_store" -> "call store or buyer and capture answer"
-        "source_now" -> "source upstream stock or proof"
-        "split_and_ship" -> "split accepted stock and ship guarded quantity"
-        "ready_with_note" -> "ready with guard; close completed step only"
-        else -> "monitor promise and next follow-up"
-      }
-      val recoveryCommandPathRu = when (recoveryCommandLane) {
-        "stop_pack" -> "остановить сборку до снятия блокеров"
-        "call_store" -> "связаться с магазином или покупателем и записать ответ"
-        "source_now" -> "найти товар или доказательство выше по цепочке"
-        "split_and_ship" -> "разделить принятое наличие и отправить защищённое количество"
-        "ready_with_note" -> "готово с защитой; закрыть только выполненный шаг"
-        else -> "наблюдать за обещанием и следующим контролем"
-      }
-      val recoveryCommandPathKk = when (recoveryCommandLane) {
-        "stop_pack" -> "бөгеттер шешілгенше жинауды тоқтату"
-        "call_store" -> "дүкенмен немесе сатып алушымен байланысып, жауапты жазу"
-        "source_now" -> "жоғары арнадан қор немесе дәлел табу"
-        "split_and_ship" -> "қабылданған қорды бөліп, қорғалған санды жіберу"
-        "ready_with_note" -> "қорғанмен дайын; тек орындалған қадамды жабу"
-        else -> "уәде мен келесі бақылауды қадағалау"
-      }
-      val recoveryCommandScript = supplierDashboardJoinedMessage(
-        listOf(
-          "AITA recovery command: $recoveryContactGoodsName.",
-          "Command: $recoveryCommandPathMain.",
-          "Command score $recoveryCommandScore/100; triage $recoveryTriageScore/100; risk $recoveryRiskScore/100; confidence $recoveryConfidenceScore/100.",
-          "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()} across ${relatedOrders.size} order(s)."
-        ),
-        listOf(
-          "AITA команда восстановления: $recoveryContactGoodsName.",
-          "Команда: $recoveryCommandPathRu.",
-          "Оценка команды $recoveryCommandScore/100; сортировка $recoveryTriageScore/100; риск $recoveryRiskScore/100; уверенность $recoveryConfidenceScore/100.",
-          "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()} по ${relatedOrders.size} заказ(ам)."
-        ),
-        listOf(
-          "AITA қалпына келтіру командасы: $recoveryContactGoodsName.",
-          "Команда: $recoveryCommandPathKk.",
-          "Команда ұпайы $recoveryCommandScore/100; іріктеу $recoveryTriageScore/100; тәуекел $recoveryRiskScore/100; сенім $recoveryConfidenceScore/100.",
-          "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()} — ${relatedOrders.size} тапсырыс."
-        )
-      )
-      val recoveryPromiseShieldScore = (
-          18 +
+        }
+        val recoveryRiskScore = supplierDashboardChunk {
+          (
+            recoveryRiskDueScore +
+              recoveryRiskShortageScore +
+              recoveryRiskDecisionScore +
+              recoveryRiskPackScore +
+              recoveryRiskContactScore
+            ).coerceIn(0, 100)
+        }
+        val recoveryRiskLane = supplierDashboardChunk {
+          when {
+            recoveryRiskScore >= 78 || recoveryUrgencyLane == "overdue" -> "critical_recovery"
+            recoveryRiskScore >= 58 || recoveryOutcomeLane == "cancel_review" || recoveryOutcomeLane == "substitute_offer" -> "decision_pressure"
+            recoveryRiskScore >= 38 || recoveryPackGuardLane != "safe_to_pack" || recoveryOwnerLane == "upstream_sourcing" -> "pack_sourcing_watch"
+            else -> "steady_watch"
+          }
+        }
+        val recoveryRiskHint = supplierDashboardChunk {
+          when (recoveryRiskLane) {
+            "critical_recovery" -> supplierDashboardJoinedMessage(
+              listOf("High-risk shortage: owner, store promise, and pack guard should be checked before this order moves."),
+              listOf("Высокий риск недопоставки: проверьте ответственного, обещание магазину и защиту сборки до движения заказа."),
+              listOf("Жоғары тәуекелді жетіспеу: тапсырыс қозғалмай тұрып жауаптыны, дүкен уәдесін және жинау күзетін тексеріңіз.")
+            )
+            "decision_pressure" -> supplierDashboardJoinedMessage(
+              listOf("Decision pressure: resolve substitute, second-drop, or cancellation answer before the worker packs around the gap."),
+              listOf("Нужно решение: согласуйте замену, вторую поставку или отмену до сборки вокруг дефицита."),
+              listOf("Шешім қысымы: жетіспеуді айналып жинамас бұрын ауыстыру, екінші жеткізу немесе бас тартуды келісіңіз.")
+            )
+            "pack_sourcing_watch" -> supplierDashboardJoinedMessage(
+              listOf("Pack/sourcing watch: keep accepted stock separated from the missing quantity and chase upstream ETA."),
+              listOf("Контроль сборки/поиска: отделите принятое наличие от недостающего количества и запросите срок выше по цепочке."),
+              listOf("Жинау/іздеу бақылауы: қабылданған қорды жетіспейтін саннан бөліп, жоғары арнадан мерзімді сұраңыз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Steady watch: keep the shortage visible until the recovery promise is dated and owned."),
+              listOf("Спокойное наблюдение: держите недопоставку видимой, пока обещание восстановления не получит срок и владельца."),
+              listOf("Тұрақты бақылау: қалпына келтіру уәдесінде мерзім және жауапты пайда болғанша жетіспеуді көрініп ұстаңыз.")
+            )
+          }
+        }
+        val riskMain = supplierDashboardChunk {
+          mutableListOf<String>()
+        }
+        val riskRu = supplierDashboardChunk {
+          mutableListOf<String>()
+        }
+        val riskKk = supplierDashboardChunk {
+          mutableListOf<String>()
+        }
+        fun addRecoveryRiskReason(mainText: String, ruText: String, kkText: String) {
+          riskMain += mainText
+          riskRu += ruText
+          riskKk += kkText
+        }
+        val riskUrgencyLabelMain = supplierDashboardChunk {
           when (recoveryUrgencyLane) {
+            "overdue" -> "overdue"
+            "today" -> "due today"
+            "soon" -> "due soon"
+            else -> "flexible"
+          }
+        }
+        val riskUrgencyLabelRu = supplierDashboardChunk {
+          when (recoveryUrgencyLane) {
+            "overdue" -> "просрочено"
+            "today" -> "сегодня"
+            "soon" -> "скоро"
+            else -> "гибко"
+          }
+        }
+        val riskUrgencyLabelKk = supplierDashboardChunk {
+          when (recoveryUrgencyLane) {
+            "overdue" -> "мерзімі өткен"
+            "today" -> "бүгін"
+            "soon" -> "жақын"
+            else -> "икемді"
+          }
+        }
+        val riskOutcomeLabelMain = supplierDashboardChunk {
+          when (recoveryOutcomeLane) {
+            "cancel_review" -> "cancel review"
+            "substitute_offer" -> "substitute offer"
+            "second_drop" -> "second drop"
+            "ship_now_guard" -> "ship-now guard"
+            else -> "watch to close"
+          }
+        }
+        val riskOutcomeLabelRu = supplierDashboardChunk {
+          when (recoveryOutcomeLane) {
+            "cancel_review" -> "проверка отмены"
+            "substitute_offer" -> "предложение замены"
+            "second_drop" -> "вторая поставка"
+            "ship_now_guard" -> "защита текущей отправки"
+            else -> "наблюдать до закрытия"
+          }
+        }
+        val riskOutcomeLabelKk = supplierDashboardChunk {
+          when (recoveryOutcomeLane) {
+            "cancel_review" -> "бас тартуды тексеру"
+            "substitute_offer" -> "ауыстыру ұсынысы"
+            "second_drop" -> "екінші жеткізу"
+            "ship_now_guard" -> "қазіргі жөнелтуді қорғау"
+            else -> "жабылғанша бақылау"
+          }
+        }
+        val riskPackGuardLabelMain = supplierDashboardChunk {
+          when (recoveryPackGuardLane) {
+            "block_pack" -> "block packing"
+            "split_pack_only" -> "split pack only"
+            "proof_before_pack" -> "proof before pack"
+            else -> "safe to pack"
+          }
+        }
+        val riskPackGuardLabelRu = supplierDashboardChunk {
+          when (recoveryPackGuardLane) {
+            "block_pack" -> "заблокировать сборку"
+            "split_pack_only" -> "только разделённая сборка"
+            "proof_before_pack" -> "подтверждение до сборки"
+            else -> "можно собирать"
+          }
+        }
+        val riskPackGuardLabelKk = supplierDashboardChunk {
+          when (recoveryPackGuardLane) {
+            "block_pack" -> "жинауды бұғаттау"
+            "split_pack_only" -> "тек бөлінген жинау"
+            "proof_before_pack" -> "жинауға дейін дәлел"
+            else -> "жинауға қауіпсіз"
+          }
+        }
+        val riskContactLabelMain = supplierDashboardChunk {
+          when (recoveryContactLane) {
+            "store_call" -> "store call"
+            "substitute_answer" -> "substitute answer"
+            "upstream_request" -> "upstream request"
+            "pack_lead_note" -> "pack note"
+            else -> "watch note"
+          }
+        }
+        val riskContactLabelRu = supplierDashboardChunk {
+          when (recoveryContactLane) {
+            "store_call" -> "звонок магазину"
+            "substitute_answer" -> "ответ по замене"
+            "upstream_request" -> "запрос выше по цепочке"
+            "pack_lead_note" -> "заметка сборке"
+            else -> "заметка наблюдения"
+          }
+        }
+        val riskContactLabelKk = supplierDashboardChunk {
+          when (recoveryContactLane) {
+            "store_call" -> "дүкенге қоңырау"
+            "substitute_answer" -> "ауыстыру жауабы"
+            "upstream_request" -> "жоғары арнаға сұраныс"
+            "pack_lead_note" -> "жинауға белгі"
+            else -> "бақылау белгісі"
+          }
+        }
+        if (recoveryUrgencyLane == "overdue" || recoveryUrgencyLane == "today") addRecoveryRiskReason(
+          "Promise timing is $riskUrgencyLabelMain",
+          "Срок обещания: $riskUrgencyLabelRu",
+          "Уәде мерзімі: $riskUrgencyLabelKk"
+        )
+        if (fullyShortLineCount > 0) addRecoveryRiskReason(
+          "Fully short lines: $fullyShortLineCount",
+          "Полностью недостающих строк: $fullyShortLineCount",
+          "Толық жетіспейтін жолдар: $fullyShortLineCount"
+        )
+        if (partialLineCount > 0) addRecoveryRiskReason(
+          "Partial lines need split delivery proof: $partialLineCount",
+          "Частичные строки требуют подтверждения разделённой поставки: $partialLineCount",
+          "Ішінара жолдарға бөлінген жеткізу дәлелі керек: $partialLineCount"
+        )
+        if (recoveryOutcomeLane == "cancel_review" || recoveryOutcomeLane == "substitute_offer") addRecoveryRiskReason(
+          "Store decision path: $riskOutcomeLabelMain",
+          "Решение с магазином: $riskOutcomeLabelRu",
+          "Дүкен шешімі: $riskOutcomeLabelKk"
+        )
+        if (recoveryPackGuardLane != "safe_to_pack") addRecoveryRiskReason(
+          "Pack guard active: $riskPackGuardLabelMain",
+          "Защита сборки активна: $riskPackGuardLabelRu",
+          "Жинау күзеті белсенді: $riskPackGuardLabelKk"
+        )
+        if (recoveryContactLane == "store_call" || recoveryContactLane == "substitute_answer" || recoveryContactLane == "upstream_request") addRecoveryRiskReason(
+          "Contact lane: $riskContactLabelMain",
+          "Канал связи: $riskContactLabelRu",
+          "Байланыс арнасы: $riskContactLabelKk"
+        )
+        if (riskMain.isEmpty()) addRecoveryRiskReason(
+          "No critical blocker yet; keep this visible until recovery is dated.",
+          "Критического блокера пока нет; держите задачу видимой до срока восстановления.",
+          "Әзірге маңызды бөгет жоқ; қалпына келтіру мерзімі шыққанша көрініп ұстаңыз."
+        )
+        val recoveryRiskReasons = supplierDashboardChunk {
+          supplierDashboardJoinedMessage(riskMain, riskRu, riskKk)
+        }
+        val recoveryConfidenceScore = supplierDashboardChunk {
+          (
+            48 +
+              when (recoveryRiskLane) {
+                "critical_recovery" -> -24
+                "decision_pressure" -> -14
+                "pack_sourcing_watch" -> -6
+                else -> 12
+              } +
+              when (recoveryOwnerLane) {
+                "store_contact", "upstream_sourcing", "pack_lead" -> 12
+                else -> 2
+              } +
+              when (recoveryProofLane) {
+                "watch_note" -> 12
+                "store_ack_required", "sourcing_note_required" -> -6
+                else -> -10
+              } +
+              when (recoveryPackGuardLane) {
+                "safe_to_pack" -> 10
+                "split_pack_only", "proof_before_pack" -> 3
+                else -> -12
+              } +
+              when (recoveryContactLane) {
+                "store_call", "substitute_answer", "upstream_request" -> 6
+                "pack_lead_note" -> 4
+                else -> 1
+              } +
+              when (recoverySlaLane) {
+                "call_now", "commit_today", "before_pack" -> 4
+                else -> 1
+              }
+            ).coerceIn(0, 100)
+        }
+        val recoveryConfidenceLane = supplierDashboardChunk {
+          when {
+            recoveryPackGuardLane == "block_pack" || recoveryRiskLane == "critical_recovery" -> "blocked_until_decision"
+            recoveryProofLane != "watch_note" || recoveryOutcomeLane == "cancel_review" || recoveryOutcomeLane == "substitute_offer" -> "needs_confirmation"
+            recoveryConfidenceScore >= 76 -> "ready_to_recover"
+            else -> "watch_confidence"
+          }
+        }
+        val recoveryConfidenceHint = supplierDashboardChunk {
+          when (recoveryConfidenceLane) {
+            "blocked_until_decision" -> supplierDashboardJoinedMessage(
+              listOf("Low confidence: do not pack this shortage until decision, proof, and store/upstream answer are visible."),
+              listOf("Низкая уверенность: не собирайте эту недопоставку, пока не видны решение, подтверждение и ответ магазина/верхнего канала."),
+              listOf("Сенімділік төмен: шешім, дәлел және дүкен/жоғары арна жауабы көрінбейінше бұл жетіспеуді жинамаңыз.")
+            )
+            "needs_confirmation" -> supplierDashboardJoinedMessage(
+              listOf("Needs confirmation: the recovery path exists, but proof or store/upstream answer should be captured before status changes."),
+              listOf("Нужно подтверждение: путь восстановления есть, но до смены статуса зафиксируйте доказательство или ответ магазина/верхнего канала."),
+              listOf("Растау керек: қалпына келтіру жолы бар, бірақ мәртебе өзгермей тұрып дәлелді немесе дүкен/жоғары арна жауабын бекітіңіз.")
+            )
+            "ready_to_recover" -> supplierDashboardJoinedMessage(
+              listOf("Ready to recover: owner, guard, and next promise look clear enough for the worker to proceed carefully."),
+              listOf("Восстановление готово: ответственный, защита и следующее обещание достаточно понятны для аккуратного продолжения."),
+              listOf("Қалпына келтіруге дайын: жауапты, күзет және келесі уәде жұмысшыға мұқият жалғастыруға жеткілікті анық.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Watch confidence: keep the shortage visible and raise confidence by adding owner, proof, and next promise."),
+              listOf("Уверенность наблюдения: держите недопоставку видимой и повышайте уверенность через ответственного, доказательство и следующее обещание."),
+              listOf("Бақылау сенімділігі: жетіспеуді көрініп ұстап, жауапты, дәлел және келесі уәде арқылы сенімділікті көтеріңіз.")
+            )
+          }
+        }
+        val recoveryConfidenceChecklist = supplierDashboardChunk {
+          when (recoveryConfidenceLane) {
+            "blocked_until_decision" -> supplierDashboardJoinedMessage(
+              listOf("□ Hold packing\n□ Confirm decision owner\n□ Capture store/upstream answer\n□ Recheck accepted-only quantity before dispatch"),
+              listOf("□ Удержать сборку\n□ Подтвердить ответственного за решение\n□ Зафиксировать ответ магазина/верхнего канала\n□ Проверить только принятое количество перед отправкой"),
+              listOf("□ Жинауды ұстау\n□ Шешім иесін растау\n□ Дүкен/жоғары арна жауабын бекіту\n□ Жөнелту алдында тек қабылданған санды тексеру")
+            )
+            "needs_confirmation" -> supplierDashboardJoinedMessage(
+              listOf("□ Add proof note\n□ Date the next promise\n□ Mirror answer to store\n□ Keep shortage out of packed totals"),
+              listOf("□ Добавить заметку-подтверждение\n□ Поставить дату следующего обещания\n□ Передать ответ магазину\n□ Не включать недостачу в собранные итоги"),
+              listOf("□ Дәлел жазбасын қосу\n□ Келесі уәденің күнін қою\n□ Жауапты дүкенге жеткізу\n□ Жетіспейтін санды жиналған қорытындыға қоспау")
+            )
+            "ready_to_recover" -> supplierDashboardJoinedMessage(
+              listOf("□ Pack accepted quantity only\n□ Keep recovery note attached\n□ Follow second-drop/substitute path\n□ Close watch after confirmed recovery"),
+              listOf("□ Собирать только принятое количество\n□ Держать заметку восстановления рядом\n□ Следовать второй поставке/замене\n□ Закрыть контроль после подтверждённого восстановления"),
+              listOf("□ Тек қабылданған санды жинау\n□ Қалпына келтіру жазбасын бірге ұстау\n□ Екінші жеткізу/ауыстыру жолын орындау\n□ Расталған қалпына келтіруден кейін бақылауды жабу")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("□ Assign owner\n□ Add next promise\n□ Decide proof needed\n□ Recheck risk before packing"),
+              listOf("□ Назначить ответственного\n□ Добавить следующее обещание\n□ Решить, какое подтверждение нужно\n□ Проверить риск перед сборкой"),
+              listOf("□ Жауаптыны тағайындау\n□ Келесі уәдені қосу\n□ Қандай дәлел керек екенін шешу\n□ Жинауға дейін тәуекелді тексеру")
+            )
+          }
+        }
+        val recoveryFollowUpLane = supplierDashboardChunk {
+          when {
+            recoverySlaLane == "call_now" || recoveryUrgencyLane == "overdue" -> "follow_up_now"
+            recoveryConfidenceLane == "blocked_until_decision" || recoveryRiskLane == "critical_recovery" || recoveryOwnerLane == "store_contact" -> "same_day_check"
+            recoveryPackGuardLane != "safe_to_pack" || recoverySlaLane == "before_pack" || recoveryLane == "split_delivery" -> "before_pack_check"
+            else -> "watch_later"
+          }
+        }
+        val recoveryFollowUpAtMillis = supplierDashboardChunk {
+          when (recoveryFollowUpLane) {
+            "follow_up_now" -> now
+            "same_day_check" -> listOfNotNull(
+              recoveryCheckpointAtMillis,
+              now + AITA_SUPPLIER_DAY_MILLIS / 4L
+            ).minOrNull()
+            "before_pack_check" -> listOfNotNull(
+              earliestDueAtMillis,
+              recoveryCheckpointAtMillis,
+              now + AITA_SUPPLIER_DAY_MILLIS
+            ).filter { checkpoint -> checkpoint >= now }.minOrNull() ?: (now + AITA_SUPPLIER_DAY_MILLIS)
+            else -> recoveryCheckpointAtMillis ?: (now + 3L * AITA_SUPPLIER_DAY_MILLIS)
+          }
+        }
+        val recoveryFollowUpHint = supplierDashboardChunk {
+          when (recoveryFollowUpLane) {
+            "follow_up_now" -> supplierDashboardJoinedMessage(
+              listOf("Follow-up cadence: this shortage needs a worker touch now before packing, dispatch, or a promise change proceeds."),
+              listOf("Ритм связи: эту недопоставку нужно обработать сейчас до сборки, отправки или изменения обещания."),
+              listOf("Байланыс ырғағы: бұл жетіспеуді жинау, жөнелту немесе уәде өзгермей тұрып қазір қарау керек.")
+            )
+            "same_day_check" -> supplierDashboardJoinedMessage(
+              listOf("Follow-up cadence: check again the same workday so the store/upstream answer does not stall."),
+              listOf("Ритм связи: проверьте ещё раз в тот же рабочий день, чтобы ответ магазина/верхнего канала не завис."),
+              listOf("Байланыс ырғағы: дүкен/жоғары арна жауабы тоқтап қалмауы үшін осы жұмыс күні қайта тексеріңіз.")
+            )
+            "before_pack_check" -> supplierDashboardJoinedMessage(
+              listOf("Follow-up cadence: recheck before packflow so only accepted quantity moves and the shortage remains owned."),
+              listOf("Ритм связи: перепроверьте до сборки, чтобы двигалось только принятое количество, а недостача оставалась с ответственным."),
+              listOf("Байланыс ырғағы: жинауға дейін қайта тексеріп, тек қабылданған сан қозғалсын және жетіспеу жауаптыда қалсын.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Follow-up cadence: keep a light watch and revisit if due time, owner, or shortage quantity changes."),
+              listOf("Ритм связи: держите лёгкое наблюдение и вернитесь, если изменится срок, ответственный или недостающее количество."),
+              listOf("Байланыс ырғағы: жеңіл бақылауда ұстап, мерзім, жауапты немесе жетіспейтін сан өзгерсе қайта қараңыз.")
+            )
+          }
+        }
+        val recoveryFollowUpPathMain = supplierDashboardChunk {
+          when (recoveryFollowUpLane) {
+            "follow_up_now" -> "touch this now and freeze the next promise"
+            "same_day_check" -> "check again today and mirror the answer to the store"
+            "before_pack_check" -> "verify before packing only accepted quantity"
+            else -> "watch lightly until the recovery promise changes"
+          }
+        }
+        val recoveryFollowUpPathRu = supplierDashboardChunk {
+          when (recoveryFollowUpLane) {
+            "follow_up_now" -> "обработать сейчас и зафиксировать следующее обещание"
+            "same_day_check" -> "проверить сегодня ещё раз и передать ответ магазину"
+            "before_pack_check" -> "проверить до сборки только принятое количество"
+            else -> "наблюдать легко до изменения обещания восстановления"
+          }
+        }
+        val recoveryFollowUpPathKk = supplierDashboardChunk {
+          when (recoveryFollowUpLane) {
+            "follow_up_now" -> "қазір қарау және келесі уәдені бекіту"
+            "same_day_check" -> "бүгін қайта тексеріп, жауапты дүкенге жеткізу"
+            "before_pack_check" -> "жинауға дейін тек қабылданған санды тексеру"
+            else -> "қалпына келтіру уәдесі өзгергенше жеңіл бақылау"
+          }
+        }
+        val recoveryFollowUpScript = supplierDashboardChunk {
+          supplierDashboardJoinedMessage(
+            listOf(
+              "AITA recovery follow-up: $recoveryContactGoodsName.",
+              "Follow-up path: $recoveryFollowUpPathMain.",
+              "Short ${missingQuantityTotal.toStockMoneyText()} after accepting ${acceptedQuantityTotal.toStockMoneyText()} of ${requestedQuantityTotal.toStockMoneyText()}.",
+              "Keep store names internal and update the order note after this touch."
+            ),
+            listOf(
+              "AITA контроль восстановления: $recoveryContactGoodsName.",
+              "Путь контроля: $recoveryFollowUpPathRu.",
+              "Не хватает ${missingQuantityTotal.toStockMoneyText()} после принятия ${acceptedQuantityTotal.toStockMoneyText()} из ${requestedQuantityTotal.toStockMoneyText()}.",
+              "Держите названия магазинов внутри AITA и обновите заметку заказа после касания."
+            ),
+            listOf(
+              "AITA қалпына келтіруді бақылау: $recoveryContactGoodsName.",
+              "Бақылау жолы: $recoveryFollowUpPathKk.",
+              "${requestedQuantityTotal.toStockMoneyText()} ішінен ${acceptedQuantityTotal.toStockMoneyText()} қабылданғаннан кейін ${missingQuantityTotal.toStockMoneyText()} жетіспейді.",
+              "Дүкен атауларын AITA ішінде сақтап, осы әрекеттен кейін тапсырыс жазбасын жаңартыңыз."
+            )
+          )
+        }
+        val recoveryHandoffLane = supplierDashboardChunk {
+          when {
+            recoveryPackGuardLane == "block_pack" || recoveryEscalationLane == "pack_hold" || recoveryFollowUpLane == "before_pack_check" -> "pack_handoff"
+            recoveryOwnerLane == "upstream_sourcing" || recoveryContactLane == "upstream_request" || recoveryLane == "split_source" -> "sourcing_handoff"
+            recoveryOwnerLane == "store_contact" || recoveryContactLane == "store_call" || recoveryContactLane == "substitute_answer" || recoveryOutcomeLane == "cancel_review" || recoveryOutcomeLane == "substitute_offer" -> "store_handoff"
+            else -> "watch_handoff"
+          }
+        }
+        val recoveryHandoffHint = supplierDashboardChunk {
+          when (recoveryHandoffLane) {
+            "store_handoff" -> supplierDashboardJoinedMessage(
+              listOf("Handoff lane: store contact owns the next answer; pass accepted, short, and decision options without exposing other stores."),
+              listOf("Передача: следующий ответ за контактом магазина; передайте принятое, недостающее и варианты решения без раскрытия других магазинов."),
+              listOf("Тапсыру: келесі жауап дүкен байланысында; басқа дүкендерді ашпай, қабылданған, жетіспейтін және шешім нұсқаларын беріңіз.")
+            )
+            "sourcing_handoff" -> supplierDashboardJoinedMessage(
+              listOf("Handoff lane: upstream sourcing owns the missing quantity; pass reserve, ETA, substitute, or no-stock result back to the store desk."),
+              listOf("Передача: поиск выше по цепочке отвечает за недостающее количество; верните резерв, срок, замену или результат нет наличия на пульт магазина."),
+              listOf("Тапсыру: жетіспейтін сан жоғары арна іздеуінде; резерв, мерзім, ауыстыру немесе қор жоқ нәтижесін дүкен пультіне қайтарыңыз.")
+            )
+            "pack_handoff" -> supplierDashboardJoinedMessage(
+              listOf("Handoff lane: pack desk must move accepted quantity only and keep the shortage note attached until recovery closes."),
+              listOf("Передача: сборка должна двигать только принятое количество и держать заметку недопоставки до закрытия восстановления."),
+              listOf("Тапсыру: жинау тек қабылданған санды қозғап, қалпына келтіру жабылғанша жетіспеу жазбасын бірге ұстауы керек.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Handoff lane: watch desk keeps the shortage visible and hands over when owner, proof, or promise changes."),
+              listOf("Передача: пульт наблюдения держит недопоставку видимой и передаёт её при смене ответственного, доказательства или обещания."),
+              listOf("Тапсыру: бақылау пульті жетіспеуді көрініп ұстап, жауапты, дәлел немесе уәде өзгергенде тапсырады.")
+            )
+          }
+        }
+        val recoveryHandoffChecklist = supplierDashboardChunk {
+          when (recoveryHandoffLane) {
+            "store_handoff" -> supplierDashboardJoinedMessage(
+              listOf("□ Share accepted quantity\n□ Share short quantity\n□ Ask delay/substitute/cancel decision\n□ Record store answer before dispatch"),
+              listOf("□ Передать принятое количество\n□ Передать недостающее количество\n□ Запросить решение задержка/замена/отмена\n□ Записать ответ магазина до отправки"),
+              listOf("□ Қабылданған санды беру\n□ Жетіспейтін санды беру\n□ Кідіріс/ауыстыру/бас тарту шешімін сұрау\n□ Жөнелтуге дейін дүкен жауабын жазу")
+            )
+            "sourcing_handoff" -> supplierDashboardJoinedMessage(
+              listOf("□ Ask upstream availability\n□ Date reserve or ETA\n□ Note substitute option\n□ Return result to store contact"),
+              listOf("□ Запросить наличие выше\n□ Поставить дату резерва или срока\n□ Отметить вариант замены\n□ Вернуть результат контакту магазина"),
+              listOf("□ Жоғары арнадағы қолжетімділікті сұрау\n□ Резерв немесе мерзім күнін қою\n□ Ауыстыру нұсқасын белгілеу\n□ Нәтижені дүкен байланысына қайтару")
+            )
+            "pack_handoff" -> supplierDashboardJoinedMessage(
+              listOf("□ Mark accepted-only pack quantity\n□ Keep missing quantity out of dispatch\n□ Attach recovery proof\n□ Recheck before final status change"),
+              listOf("□ Отметить сборку только принятого количества\n□ Не включать недостачу в отправку\n□ Прикрепить доказательство восстановления\n□ Проверить перед финальной сменой статуса"),
+              listOf("□ Тек қабылданған санды жинау деп белгілеу\n□ Жетіспеуді жөнелтуге қоспау\n□ Қалпына келтіру дәлелін тіркеу\n□ Соңғы мәртебе өзгермей тұрып тексеру")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("□ Keep watch open\n□ Assign next owner if due changes\n□ Recalculate risk before packing\n□ Close only after recovery result is recorded"),
+              listOf("□ Оставить контроль открытым\n□ Назначить следующего ответственного при смене срока\n□ Пересчитать риск перед сборкой\n□ Закрыть только после записи результата восстановления"),
+              listOf("□ Бақылауды ашық ұстау\n□ Мерзім өзгерсе келесі жауаптыны тағайындау\n□ Жинауға дейін тәуекелді қайта есептеу\n□ Қалпына келтіру нәтижесі жазылғаннан кейін ғана жабу")
+            )
+          }
+        }
+        val recoveryHandoffPathMain = supplierDashboardChunk {
+          when (recoveryHandoffLane) {
+            "store_handoff" -> "store desk needs a delay, substitute, or cancel answer"
+            "sourcing_handoff" -> "upstream desk needs reserve, ETA, substitute, or no-stock result"
+            "pack_handoff" -> "pack desk must move accepted quantity only"
+            else -> "watch desk keeps ownership until the next promise changes"
+          }
+        }
+        val recoveryHandoffPathRu = supplierDashboardChunk {
+          when (recoveryHandoffLane) {
+            "store_handoff" -> "пульту магазина нужен ответ задержка, замена или отмена"
+            "sourcing_handoff" -> "верхнему поиску нужен резерв, срок, замена или результат нет наличия"
+            "pack_handoff" -> "сборка должна двигать только принятое количество"
+            else -> "пульт наблюдения держит задачу до изменения следующего обещания"
+          }
+        }
+        val recoveryHandoffPathKk = supplierDashboardChunk {
+          when (recoveryHandoffLane) {
+            "store_handoff" -> "дүкен пультіне кідіріс, ауыстыру немесе бас тарту жауабы керек"
+            "sourcing_handoff" -> "жоғары іздеуге резерв, мерзім, ауыстыру немесе қор жоқ нәтижесі керек"
+            "pack_handoff" -> "жинау тек қабылданған санды қозғауы керек"
+            else -> "бақылау пульті келесі уәде өзгергенше жауапкершілікті ұстайды"
+          }
+        }
+        val recoveryHandoffScript = supplierDashboardChunk {
+          supplierDashboardJoinedMessage(
+            listOf(
+              "AITA recovery handoff: $recoveryContactGoodsName.",
+              "Handoff path: $recoveryHandoffPathMain.",
+              "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()}.",
+              "Keep this handoff inside AITA and update the recovery note after the next owner answers."
+            ),
+            listOf(
+              "AITA передача восстановления: $recoveryContactGoodsName.",
+              "Путь передачи: $recoveryHandoffPathRu.",
+              "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()}.",
+              "Держите эту передачу внутри AITA и обновите заметку восстановления после ответа следующего ответственного."
+            ),
+            listOf(
+              "AITA қалпына келтіруді тапсыру: $recoveryContactGoodsName.",
+              "Тапсыру жолы: $recoveryHandoffPathKk.",
+              "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()}.",
+              "Бұл тапсыруды AITA ішінде ұстап, келесі жауапты жауап бергеннен кейін қалпына келтіру жазбасын жаңартыңыз."
+            )
+          )
+        }
+        val recoveryClosureBlockerCount = supplierDashboardChunk {
+          listOf(
+            recoveryPackGuardLane == "block_pack",
+            recoveryConfidenceLane == "blocked_until_decision",
+            recoveryRiskLane == "critical_recovery",
+            recoveryProofLane != "watch_note",
+            recoveryFollowUpLane == "follow_up_now",
+            recoveryHandoffLane != "watch_handoff"
+          ).count { blocked -> blocked }
+        }
+        val recoveryClosureScore = supplierDashboardChunk {
+          (
+            recoveryConfidenceScore -
+              (recoveryRiskScore / 2) -
+              recoveryClosureBlockerCount * 10 +
+              if (acceptedQuantityTotal > 0.000001) 12 else 0
+            ).coerceIn(0, 100)
+        }
+        val recoveryClosureLane = supplierDashboardChunk {
+          when {
+            recoveryPackGuardLane == "block_pack" || recoveryConfidenceLane == "blocked_until_decision" || recoveryRiskLane == "critical_recovery" -> "blocked_open"
+            recoveryProofLane != "watch_note" || recoveryHandoffLane != "watch_handoff" || recoveryFollowUpLane == "follow_up_now" -> "needs_close_note"
+            recoveryClosureScore >= 62 && acceptedQuantityTotal > 0.000001 && (recoveryPackGuardLane == "safe_to_pack" || recoveryPackGuardLane == "split_pack_only") -> "ready_with_guard"
+            else -> "watch_until_clear"
+          }
+        }
+        val recoveryClosureHint = supplierDashboardChunk {
+          when (recoveryClosureLane) {
+            "blocked_open" -> supplierDashboardJoinedMessage(
+              listOf("Close gate is locked: keep the shortage open until decision, proof, and pack guard blockers are cleared."),
+              listOf("Ворота закрытия заблокированы: держите недопоставку открытой, пока не сняты решение, доказательство и стоп сборки."),
+              listOf("Жабу қақпасы бұғатталған: шешім, дәлел және жинау қорғаны шешілмейінше жетіспеуді ашық ұстаңыз.")
+            )
+            "needs_close_note" -> supplierDashboardJoinedMessage(
+              listOf("Close gate needs a dated note: write owner, next promise, and what stays short before closing any worker task."),
+              listOf("Для закрытия нужна заметка с датой: укажите ответственного, следующее обещание и что остаётся недостающим до закрытия задачи."),
+              listOf("Жабуға күні бар жазба керек: тапсырманы жаппас бұрын жауаптыны, келесі уәдені және не жетіспейтінін жазыңыз.")
+            )
+            "ready_with_guard" -> supplierDashboardJoinedMessage(
+              listOf("Ready with guard: ship accepted quantity only, keep missing quantity in the recovery note, and close only the completed worker step."),
+              listOf("Готово с защитой: отправляйте только принятое количество, оставьте недостачу в заметке восстановления и закрывайте только выполненный шаг."),
+              listOf("Қорғанмен дайын: тек қабылданған санды жіберіп, жетіспейтін санды қалпына келтіру жазбасында қалдырып, тек орындалған қадамды жабыңыз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Watch until clear: keep this shortage visible until second drop, substitute, cancellation, or store answer is recorded."),
+              listOf("Наблюдайте до ясности: держите недопоставку видимой, пока не записана вторая поставка, замена, отмена или ответ магазина."),
+              listOf("Анық болғанша бақылаңыз: екінші жеткізу, ауыстыру, бас тарту немесе дүкен жауабы жазылғанша жетіспеуді көрініп ұстаңыз.")
+            )
+          }
+        }
+        val recoveryClosureChecklist = supplierDashboardChunk {
+          when (recoveryClosureLane) {
+            "blocked_open" -> supplierDashboardJoinedMessage(
+              listOf("□ Do not close shortage\n□ Clear decision blocker\n□ Attach proof or store/upstream answer\n□ Recheck pack guard before dispatch"),
+              listOf("□ Не закрывать недопоставку\n□ Снять блокер решения\n□ Приложить доказательство или ответ магазина/поставщика\n□ Проверить стоп сборки до отправки"),
+              listOf("□ Жетіспеуді жаппау\n□ Шешім бөгетін шешу\n□ Дүкен/жоғары арна жауабын немесе дәлелді тіркеу\n□ Жөнелтуге дейін жинау қорғанын тексеру")
+            )
+            "needs_close_note" -> supplierDashboardJoinedMessage(
+              listOf("□ Add dated recovery note\n□ Name next owner\n□ Keep missing quantity separate\n□ Copy note to the next handoff lane"),
+              listOf("□ Добавить заметку восстановления с датой\n□ Указать следующего ответственного\n□ Держать недостачу отдельно\n□ Скопировать заметку в следующую передачу"),
+              listOf("□ Күні бар қалпына келтіру жазбасын қосу\n□ Келесі жауаптыны атау\n□ Жетіспейтін санды бөлек ұстау\n□ Жазбаны келесі тапсыруға көшіру")
+            )
+            "ready_with_guard" -> supplierDashboardJoinedMessage(
+              listOf("□ Close completed step only\n□ Ship accepted quantity only\n□ Leave shortage watch open\n□ Confirm next promise remains visible"),
+              listOf("□ Закрыть только выполненный шаг\n□ Отправить только принятое количество\n□ Оставить контроль недостачи открытым\n□ Проверить, что следующее обещание видно"),
+              listOf("□ Тек орындалған қадамды жабу\n□ Тек қабылданған санды жіберу\n□ Жетіспеуді бақылауды ашық қалдыру\n□ Келесі уәденің көрінетінін растау")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("□ Keep watch open\n□ Wait for second-drop/substitute/cancel result\n□ Refresh risk after next contact\n□ Close only when recovery result is recorded"),
+              listOf("□ Оставить контроль открытым\n□ Ждать вторую поставку/замену/отмену\n□ Обновить риск после следующего контакта\n□ Закрывать только после записи результата восстановления"),
+              listOf("□ Бақылауды ашық ұстау\n□ Екінші жеткізу/ауыстыру/бас тарту нәтижесін күту\n□ Келесі байланыстан кейін тәуекелді жаңарту\n□ Қалпына келтіру нәтижесі жазылғанда ғана жабу")
+            )
+          }
+        }
+        val recoveryClosurePathMain = supplierDashboardChunk {
+          when (recoveryClosureLane) {
+            "blocked_open" -> "do not close; blocker is still active"
+            "needs_close_note" -> "add dated note before closing any worker step"
+            "ready_with_guard" -> "close completed step only and keep shortage watch open"
+            else -> "watch remains open until recovery result is recorded"
+          }
+        }
+        val recoveryClosurePathRu = supplierDashboardChunk {
+          when (recoveryClosureLane) {
+            "blocked_open" -> "не закрывать; блокер ещё активен"
+            "needs_close_note" -> "добавить заметку с датой до закрытия шага"
+            "ready_with_guard" -> "закрыть только выполненный шаг и оставить контроль недостачи"
+            else -> "контроль остаётся открытым до записи результата восстановления"
+          }
+        }
+        val recoveryClosurePathKk = supplierDashboardChunk {
+          when (recoveryClosureLane) {
+            "blocked_open" -> "жаппау; бөгет әлі белсенді"
+            "needs_close_note" -> "қадамды жабар алдында күні бар жазба қосу"
+            "ready_with_guard" -> "тек орындалған қадамды жауып, жетіспеуді бақылауды ашық қалдыру"
+            else -> "қалпына келтіру нәтижесі жазылғанша бақылау ашық қалады"
+          }
+        }
+        val recoveryClosureScript = supplierDashboardChunk {
+          supplierDashboardJoinedMessage(
+            listOf(
+              "AITA close gate: $recoveryContactGoodsName.",
+              "Gate path: $recoveryClosurePathMain.",
+              "Close score $recoveryClosureScore/100; requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()}.",
+              "Do not expose store names outside AITA; leave shortage watch open until recovery result is recorded."
+            ),
+            listOf(
+              "AITA ворота закрытия: $recoveryContactGoodsName.",
+              "Путь ворот: $recoveryClosurePathRu.",
+              "Оценка закрытия $recoveryClosureScore/100; запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()}.",
+              "Не раскрывайте названия магазинов вне AITA; оставьте контроль недостачи открытым до записи результата восстановления."
+            ),
+            listOf(
+              "AITA жабу қақпасы: $recoveryContactGoodsName.",
+              "Қақпа жолы: $recoveryClosurePathKk.",
+              "Жабу ұпайы $recoveryClosureScore/100; сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()}.",
+              "Дүкен атауларын AITA сыртында ашпаңыз; қалпына келтіру нәтижесі жазылғанша жетіспеуді бақылауды ашық қалдырыңыз."
+            )
+          )
+        }
+        val recoveryLedgerBlockerCount = supplierDashboardChunk {
+          listOf(
+            recoveryClosureLane == "blocked_open",
+            recoveryClosureLane == "needs_close_note",
+            recoveryProofLane != "watch_note",
+            recoveryHandoffLane != "watch_handoff",
+            recoveryFollowUpLane == "follow_up_now",
+            recoveryPackGuardLane == "block_pack",
+            recoveryConfidenceScore < 55,
+            recoveryRiskScore >= 75
+          ).count { blocked -> blocked }
+        }
+        val recoveryLedgerScore = supplierDashboardChunk {
+          (
+            100 -
+              recoveryLedgerBlockerCount * 11 -
+              (if (recoveryClosureScore < 50) 10 else 0) +
+              (if (recoveryRiskScore >= 82) -8 else 0) +
+              (if (recoveryConfidenceLane == "ready_to_recover") 8 else 0) +
+              (if (recoveryClosureLane == "ready_with_guard") 6 else 0)
+            ).coerceIn(0, 100)
+        }
+        val recoveryLedgerLane = supplierDashboardChunk {
+          when {
+            recoveryClosureLane == "blocked_open" || recoveryPackGuardLane == "block_pack" || recoveryConfidenceLane == "blocked_until_decision" -> "audit_blocker"
+            recoveryOutcomeLane == "substitute_offer" || recoveryOutcomeLane == "cancel_review" || recoveryProofLane == "store_ack_required" || recoveryContactLane == "substitute_answer" -> "decision_record"
+            recoveryPackGuardLane == "split_pack_only" || recoveryPackGuardLane == "proof_before_pack" || recoveryHandoffLane == "pack_handoff" -> "pack_record"
+            recoveryClosureLane == "ready_with_guard" && recoveryLedgerScore >= 70 -> "ledger_ready"
+            else -> "watch_record"
+          }
+        }
+        val recoveryLedgerHint = supplierDashboardChunk {
+          when (recoveryLedgerLane) {
+            "audit_blocker" -> supplierDashboardJoinedMessage(
+              listOf("Recovery ledger has an active blocker: keep proof, owner, and pack guard visible before any worker closes the shortage."),
+              listOf("В журнале восстановления есть активный блокер: держите доказательство, ответственного и защиту сборки видимыми до закрытия недопоставки."),
+              listOf("Қалпына келтіру журналында белсенді бөгет бар: жетіспеуді жабар алдында дәлелді, жауаптыны және жинау қорғанын көрінетін етіңіз.")
+            )
+            "decision_record" -> supplierDashboardJoinedMessage(
+              listOf("Decision record needed: write the store answer or substitute/cancel result before the shortage moves forward."),
+              listOf("Нужна запись решения: внесите ответ магазина или итог замены/отмены до движения недопоставки дальше."),
+              listOf("Шешім жазбасы керек: жетіспеу әрі қарай жылжымас бұрын дүкен жауабын немесе ауыстыру/бас тарту нәтижесін жазыңыз.")
+            )
+            "pack_record" -> supplierDashboardJoinedMessage(
+              listOf("Pack record needed: tell the pack lead exactly what ships, what stays short, and which proof protects dispatch."),
+              listOf("Нужна запись для сборки: укажите старшему сборки, что отправляется, что остаётся недостающим и какое доказательство защищает отправку."),
+              listOf("Жинау жазбасы керек: жинау жетекшісіне не жөнелтілетінін, не жетіспейтінін және жөнелтуді қандай дәлел қорғайтынын көрсетіңіз.")
+            )
+            "ledger_ready" -> supplierDashboardJoinedMessage(
+              listOf("Ledger is ready: close only the completed worker step and keep the remaining shortage visible until recovery result is recorded."),
+              listOf("Журнал готов: закрывайте только выполненный рабочий шаг и оставьте остаток недопоставки видимым до записи результата восстановления."),
+              listOf("Журнал дайын: тек орындалған жұмыс қадамын жауып, қалпына келтіру нәтижесі жазылғанша қалған жетіспеуді көрінетін қалдырыңыз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Watch record: keep the current promise, owner, and next follow-up together so the shortage cannot disappear between shifts."),
+              listOf("Запись наблюдения: держите текущее обещание, ответственного и следующий контроль вместе, чтобы недопоставка не потерялась между сменами."),
+              listOf("Бақылау жазбасы: жетіспеу ауысымдар арасында жоғалмауы үшін ағымдағы уәдені, жауаптыны және келесі бақылауды бірге ұстаңыз.")
+            )
+          }
+        }
+        val recoveryLedgerChecklist = supplierDashboardChunk {
+          when (recoveryLedgerLane) {
+            "audit_blocker" -> supplierDashboardJoinedMessage(
+              listOf("□ Keep shortage open\n□ Name blocker owner\n□ Attach proof or answer\n□ Recheck pack guard before closing"),
+              listOf("□ Оставить недопоставку открытой\n□ Указать ответственного за блокер\n□ Приложить доказательство или ответ\n□ Проверить защиту сборки перед закрытием"),
+              listOf("□ Жетіспеуді ашық қалдыру\n□ Бөгет жауаптысын атау\n□ Дәлел немесе жауап тіркеу\n□ Жабар алдында жинау қорғанын тексеру")
+            )
+            "decision_record" -> supplierDashboardJoinedMessage(
+              listOf("□ Record store answer\n□ Record substitute/cancel result\n□ Keep accepted and missing quantities separate\n□ Copy decision to follow-up note"),
+              listOf("□ Записать ответ магазина\n□ Записать итог замены/отмены\n□ Держать принятое и недостающее количество отдельно\n□ Скопировать решение в заметку контроля"),
+              listOf("□ Дүкен жауабын жазу\n□ Ауыстыру/бас тарту нәтижесін жазу\n□ Қабылданған және жетіспейтін санды бөлек ұстау\n□ Шешімді бақылау жазбасына көшіру")
+            )
+            "pack_record" -> supplierDashboardJoinedMessage(
+              listOf("□ Mark accepted quantity for pack\n□ Mark missing quantity as open\n□ Add dispatch-safe proof\n□ Leave second-drop/substitute promise visible"),
+              listOf("□ Отметить принятое количество для сборки\n□ Оставить недостачу открытой\n□ Добавить доказательство безопасной отправки\n□ Оставить видимым обещание второй поставки/замены"),
+              listOf("□ Қабылданған санды жинауға белгілеу\n□ Жетіспейтін санды ашық қалдыру\n□ Қауіпсіз жөнелту дәлелін қосу\n□ Екінші жеткізу/ауыстыру уәдесін көрінетін қалдыру")
+            )
+            "ledger_ready" -> supplierDashboardJoinedMessage(
+              listOf("□ Close completed worker step only\n□ Keep recovery watch open\n□ Preserve owner and next promise\n□ Reopen if store or upstream answer changes"),
+              listOf("□ Закрыть только выполненный рабочий шаг\n□ Оставить контроль восстановления открытым\n□ Сохранить ответственного и следующее обещание\n□ Открыть снова, если ответ магазина или верхнего канала изменится"),
+              listOf("□ Тек орындалған жұмыс қадамын жабу\n□ Қалпына келтіру бақылауын ашық қалдыру\n□ Жауаптыны және келесі уәдені сақтау\n□ Дүкен немесе жоғары арна жауабы өзгерсе қайта ашу")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("□ Keep promise, owner, and follow-up together\n□ Refresh risk after next contact\n□ Do not hide missing quantity\n□ Close only after recovery result is recorded"),
+              listOf("□ Держать обещание, ответственного и контроль вместе\n□ Обновить риск после следующего контакта\n□ Не скрывать недостающее количество\n□ Закрывать только после записи результата восстановления"),
+              listOf("□ Уәде, жауапты және бақылауды бірге ұстау\n□ Келесі байланыстан кейін тәуекелді жаңарту\n□ Жетіспейтін санды жасырмау\n□ Қалпына келтіру нәтижесі жазылған соң ғана жабу")
+            )
+          }
+        }
+        val recoveryLedgerPathMain = supplierDashboardChunk {
+          when (recoveryLedgerLane) {
+            "audit_blocker" -> "blocker must stay visible in AITA"
+            "decision_record" -> "record store/substitute/cancel decision"
+            "pack_record" -> "record dispatch-safe pack instruction"
+            "ledger_ready" -> "ledger ready; close completed step only"
+            else -> "watch record remains open"
+          }
+        }
+        val recoveryLedgerPathRu = supplierDashboardChunk {
+          when (recoveryLedgerLane) {
+            "audit_blocker" -> "блокер должен оставаться видимым в AITA"
+            "decision_record" -> "записать решение магазина/замены/отмены"
+            "pack_record" -> "записать безопасную инструкцию сборки"
+            "ledger_ready" -> "журнал готов; закрыть только выполненный шаг"
+            else -> "запись наблюдения остаётся открытой"
+          }
+        }
+        val recoveryLedgerPathKk = supplierDashboardChunk {
+          when (recoveryLedgerLane) {
+            "audit_blocker" -> "бөгет AITA ішінде көрінуі керек"
+            "decision_record" -> "дүкен/ауыстыру/бас тарту шешімін жазу"
+            "pack_record" -> "қауіпсіз жинау нұсқауын жазу"
+            "ledger_ready" -> "журнал дайын; тек орындалған қадамды жабу"
+            else -> "бақылау жазбасы ашық қалады"
+          }
+        }
+        val recoveryLedgerScript = supplierDashboardChunk {
+          supplierDashboardJoinedMessage(
+            listOf(
+              "AITA recovery ledger: $recoveryContactGoodsName.",
+              "Ledger path: $recoveryLedgerPathMain.",
+              "Ledger score $recoveryLedgerScore/100; requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()}.",
+              "Keep store names inside AITA and update this ledger after the next proof, decision, or pack change."
+            ),
+            listOf(
+              "AITA журнал восстановления: $recoveryContactGoodsName.",
+              "Путь журнала: $recoveryLedgerPathRu.",
+              "Оценка журнала $recoveryLedgerScore/100; запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()}.",
+              "Держите названия магазинов внутри AITA и обновите этот журнал после следующего доказательства, решения или изменения сборки."
+            ),
+            listOf(
+              "AITA қалпына келтіру журналы: $recoveryContactGoodsName.",
+              "Журнал жолы: $recoveryLedgerPathKk.",
+              "Журнал ұпайы $recoveryLedgerScore/100; сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()}.",
+              "Дүкен атауларын AITA ішінде ұстаңыз және келесі дәлел, шешім немесе жинау өзгерісінен кейін осы журналды жаңартыңыз."
+            )
+          )
+        }
+        val recoveryTriageScore = supplierDashboardChunk {
+          (
+            recoveryRiskScore / 2 +
+              (100 - recoveryConfidenceScore) / 4 +
+              (100 - recoveryClosureScore) / 5 +
+              (100 - recoveryLedgerScore) / 5 +
+              when (recoveryUrgencyLane) {
+                "overdue" -> 18
+                "today" -> 12
+                "soon" -> 7
+                else -> 2
+              } +
+              when (recoveryFollowUpLane) {
+                "follow_up_now" -> 9
+                "same_day_check" -> 6
+                "before_pack_check" -> 4
+                else -> 1
+              }
+            ).coerceIn(0, 100)
+        }
+        val recoveryTriageLane = supplierDashboardChunk {
+          when {
+            recoveryRiskLane == "critical_recovery" || recoveryClosureLane == "blocked_open" || recoveryLedgerLane == "audit_blocker" -> "triage_now"
+            recoveryOutcomeLane == "cancel_review" || recoveryOutcomeLane == "substitute_offer" || recoveryConfidenceLane == "needs_confirmation" -> "decision_lane"
+            recoveryPackGuardLane == "block_pack" || recoveryPackGuardLane == "split_pack_only" || recoveryHandoffLane == "pack_handoff" -> "pack_split_lane"
+            recoveryConfidenceLane == "ready_to_recover" && recoveryLedgerLane == "ledger_ready" -> "ready_lane"
+            recoveryOwnerLane == "upstream_sourcing" || recoveryContactLane == "upstream_request" || recoveryLane == "split_source" -> "sourcing_lane"
+            else -> "watch_lane"
+          }
+        }
+        val recoveryTriageHint = supplierDashboardChunk {
+          when (recoveryTriageLane) {
+            "triage_now" -> supplierDashboardJoinedMessage(
+              listOf("Triage desk: handle this shortage now; keep packing blocked until the red recovery blockers are cleared in AITA."),
+              listOf("Пульт сортировки: обработайте эту недопоставку сейчас; держите сборку заблокированной, пока красные блокеры не сняты в AITA."),
+              listOf("Іріктеу пульті: бұл жетіспеуді қазір өңдеңіз; қызыл қалпына келтіру бөгеттері AITA ішінде шешілгенше жинауды тоқтатыңыз.")
+            )
+            "decision_lane" -> supplierDashboardJoinedMessage(
+              listOf("Triage desk: buyer/store decision is the next unlock; capture substitute, delay, or cancel answer before worker closure."),
+              listOf("Пульт сортировки: следующее разблокирование — решение покупателя/магазина; зафиксируйте замену, задержку или отмену до закрытия задачи."),
+              listOf("Іріктеу пульті: келесі ашу — сатып алушы/дүкен шешімі; тапсырманы жаппай тұрып ауыстыру, кідіріс немесе бас тарту жауабын бекітіңіз.")
+            )
+            "pack_split_lane" -> supplierDashboardJoinedMessage(
+              listOf("Triage desk: split the accepted stock from the missing quantity before packflow touches this SKU."),
+              listOf("Пульт сортировки: отделите принятое наличие от недостающего количества до попадания SKU в сборку."),
+              listOf("Іріктеу пульті: SKU жинауға түспей тұрып қабылданған қорды жетіспейтін саннан бөліңіз.")
+            )
+            "sourcing_lane" -> supplierDashboardJoinedMessage(
+              listOf("Triage desk: upstream sourcing is the next move; ask for reserve, ETA, substitute, or no-stock proof."),
+              listOf("Пульт сортировки: следующий шаг — поиск выше по цепочке; запросите резерв, срок, замену или подтверждение отсутствия товара."),
+              listOf("Іріктеу пульті: келесі қадам — жоғары арнадан іздеу; резерв, мерзім, ауыстыру немесе қор жоқ дәлелін сұраңыз.")
+            )
+            "ready_lane" -> supplierDashboardJoinedMessage(
+              listOf("Triage desk: recovery looks ready; close only completed worker steps and keep the shortage promise visible."),
+              listOf("Пульт сортировки: восстановление выглядит готовым; закрывайте только выполненные рабочие шаги и оставляйте обещание недопоставки видимым."),
+              listOf("Іріктеу пульті: қалпына келтіру дайын сияқты; тек орындалған жұмыс қадамдарын жауып, жетіспеу уәдесін көрінетін ұстаңыз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Triage desk: keep watching; refresh owner, promise, and proof after the next store or upstream answer."),
+              listOf("Пульт сортировки: продолжайте наблюдение; обновите ответственного, обещание и доказательство после следующего ответа магазина или верхнего канала."),
+              listOf("Іріктеу пульті: бақылауды жалғастырыңыз; дүкен немесе жоғары арнаның келесі жауабынан кейін жауаптыны, уәдені және дәлелді жаңартыңыз.")
+            )
+          }
+        }
+        val recoveryTriageChecklist = supplierDashboardChunk {
+          when (recoveryTriageLane) {
+            "triage_now" -> supplierDashboardJoinedMessage(
+              listOf("□ Freeze pack/dispatch change\n□ Contact owner now\n□ Record blocker proof\n□ Re-score after answer"),
+              listOf("□ Заморозить сборку/отправку\n□ Связаться с ответственным сейчас\n□ Записать доказательство блокера\n□ Пересчитать после ответа"),
+              listOf("□ Жинау/жөнелту өзгерісін тоқтату\n□ Жауаптымен қазір байланысу\n□ Бөгет дәлелін жазу\n□ Жауаптан кейін қайта бағалау")
+            )
+            "decision_lane" -> supplierDashboardJoinedMessage(
+              listOf("□ Ask for store/buyer answer\n□ Save substitute/delay/cancel decision\n□ Keep missing quantity separate\n□ Update follow-up time"),
+              listOf("□ Запросить ответ магазина/покупателя\n□ Сохранить решение по замене/задержке/отмене\n□ Держать недостачу отдельно\n□ Обновить время контроля"),
+              listOf("□ Дүкен/сатып алушы жауабын сұрау\n□ Ауыстыру/кідіріс/бас тарту шешімін сақтау\n□ Жетіспейтін санды бөлек ұстау\n□ Бақылау уақытын жаңарту")
+            )
+            "pack_split_lane" -> supplierDashboardJoinedMessage(
+              listOf("□ Pack accepted quantity only\n□ Hold missing quantity\n□ Add split note\n□ Keep second-drop promise open"),
+              listOf("□ Собрать только принятое количество\n□ Удержать недостачу\n□ Добавить заметку разделения\n□ Оставить обещание второй поставки открытым"),
+              listOf("□ Тек қабылданған санды жинау\n□ Жетіспейтін санды ұстау\n□ Бөлу жазбасын қосу\n□ Екінші жеткізу уәдесін ашық ұстау")
+            )
+            "sourcing_lane" -> supplierDashboardJoinedMessage(
+              listOf("□ Ask upstream for stock\n□ Save reserve/ETA/substitute result\n□ Mirror answer to store\n□ Keep ledger visible"),
+              listOf("□ Запросить товар выше по цепочке\n□ Сохранить резерв/срок/замену\n□ Передать ответ магазину\n□ Держать журнал видимым"),
+              listOf("□ Жоғары арнадан қор сұрау\n□ Резерв/мерзім/ауыстыру нәтижесін сақтау\n□ Жауапты дүкенге жеткізу\n□ Журналды көрінетін ұстау")
+            )
+            "ready_lane" -> supplierDashboardJoinedMessage(
+              listOf("□ Close completed worker step only\n□ Preserve recovery promise\n□ Reopen if answer changes\n□ Keep store names private"),
+              listOf("□ Закрыть только выполненный рабочий шаг\n□ Сохранить обещание восстановления\n□ Открыть снова при изменении ответа\n□ Держать названия магазинов приватными"),
+              listOf("□ Тек орындалған жұмыс қадамын жабу\n□ Қалпына келтіру уәдесін сақтау\n□ Жауап өзгерсе қайта ашу\n□ Дүкен атауларын құпия ұстау")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("□ Watch owner and promise\n□ Refresh after next contact\n□ Keep missing quantity visible\n□ Close only after recorded result"),
+              listOf("□ Наблюдать за ответственным и обещанием\n□ Обновить после следующего контакта\n□ Держать недостачу видимой\n□ Закрывать только после записанного результата"),
+              listOf("□ Жауапты мен уәдені бақылау\n□ Келесі байланыстан кейін жаңарту\n□ Жетіспейтін санды көрінетін ұстау\n□ Жазылған нәтижеден кейін ғана жабу")
+            )
+          }
+        }
+        val recoveryTriagePathMain = supplierDashboardChunk {
+          when (recoveryTriageLane) {
+            "triage_now" -> "operator handles now and keeps packflow blocked"
+            "decision_lane" -> "capture buyer/store decision"
+            "pack_split_lane" -> "split pack accepted quantity only"
+            "sourcing_lane" -> "ask upstream and mirror answer back"
+            "ready_lane" -> "ready with guard; close completed step only"
+            else -> "watch until next proof or promise changes"
+          }
+        }
+        val recoveryTriagePathRu = supplierDashboardChunk {
+          when (recoveryTriageLane) {
+            "triage_now" -> "оператор обрабатывает сейчас и держит сборку заблокированной"
+            "decision_lane" -> "зафиксировать решение покупателя/магазина"
+            "pack_split_lane" -> "собрать отдельно только принятое количество"
+            "sourcing_lane" -> "запросить выше по цепочке и передать ответ"
+            "ready_lane" -> "готово с защитой; закрыть только выполненный шаг"
+            else -> "наблюдать до изменения доказательства или обещания"
+          }
+        }
+        val recoveryTriagePathKk = supplierDashboardChunk {
+          when (recoveryTriageLane) {
+            "triage_now" -> "оператор қазір өңдеп, жинауды тоқтатылған ұстайды"
+            "decision_lane" -> "сатып алушы/дүкен шешімін бекіту"
+            "pack_split_lane" -> "тек қабылданған санды бөлек жинау"
+            "sourcing_lane" -> "жоғары арнадан сұрап, жауапты жеткізу"
+            "ready_lane" -> "қорғанмен дайын; тек орындалған қадамды жабу"
+            else -> "дәлел немесе уәде өзгергенше бақылау"
+          }
+        }
+        val recoveryTriageScript = supplierDashboardChunk {
+          supplierDashboardJoinedMessage(
+            listOf(
+              "AITA recovery triage: $recoveryContactGoodsName.",
+              "Triage path: $recoveryTriagePathMain.",
+              "Triage score $recoveryTriageScore/100; risk $recoveryRiskScore/100; confidence $recoveryConfidenceScore/100; ledger $recoveryLedgerScore/100.",
+              "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()} across ${relatedOrders.size} order(s)."
+            ),
+            listOf(
+              "AITA сортировка восстановления: $recoveryContactGoodsName.",
+              "Путь сортировки: $recoveryTriagePathRu.",
+              "Оценка сортировки $recoveryTriageScore/100; риск $recoveryRiskScore/100; уверенность $recoveryConfidenceScore/100; журнал $recoveryLedgerScore/100.",
+              "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()} по ${relatedOrders.size} заказ(ам)."
+            ),
+            listOf(
+              "AITA қалпына келтіру іріктеуі: $recoveryContactGoodsName.",
+              "Іріктеу жолы: $recoveryTriagePathKk.",
+              "Іріктеу ұпайы $recoveryTriageScore/100; тәуекел $recoveryRiskScore/100; сенім $recoveryConfidenceScore/100; журнал $recoveryLedgerScore/100.",
+              "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()} — ${relatedOrders.size} тапсырыс."
+            )
+          )
+        }
+        val recoveryCommandScore = supplierDashboardChunk {
+          (
+            recoveryTriageScore * 2 / 5 +
+              recoveryRiskScore / 4 +
+              (100 - recoveryConfidenceScore) / 5 +
+              when (recoveryUrgencyLane) {
+                "overdue" -> 16
+                "today" -> 11
+                "soon" -> 6
+                else -> 2
+              } +
+              when (recoveryPackGuardLane) {
+                "block_pack" -> 12
+                "split_pack_only" -> 8
+                "proof_before_pack" -> 5
+                else -> 0
+              } +
+              when (recoveryContactLane) {
+                "store_call" -> 8
+                "substitute_answer" -> 7
+                "upstream_request" -> 6
+                else -> 1
+              }
+            ).coerceIn(0, 100)
+        }
+        val recoveryCommandLane = supplierDashboardChunk {
+          when {
+            recoveryPackGuardLane == "block_pack" || recoveryClosureLane == "blocked_open" || recoveryLedgerLane == "audit_blocker" -> "stop_pack"
+            recoveryContactLane == "store_call" || recoveryContactLane == "substitute_answer" || recoveryOutcomeLane == "cancel_review" || recoveryOutcomeLane == "substitute_offer" -> "call_store"
+            recoveryOwnerLane == "upstream_sourcing" || recoveryContactLane == "upstream_request" || recoveryTriageLane == "sourcing_lane" -> "source_now"
+            recoveryLane == "split_delivery" || recoveryTriageLane == "pack_split_lane" || recoveryPackGuardLane == "split_pack_only" -> "split_and_ship"
+            recoveryTriageLane == "ready_lane" || (recoveryConfidenceLane == "ready_to_recover" && recoveryLedgerLane == "ledger_ready") -> "ready_with_note"
+            else -> "monitor_promise"
+          }
+        }
+        val recoveryCommandHint = supplierDashboardChunk {
+          when (recoveryCommandLane) {
+            "stop_pack" -> supplierDashboardJoinedMessage(
+              listOf("Command desk: stop packflow for this SKU until blocker proof, owner, and close gate are visible in AITA."),
+              listOf("Командный пульт: остановите сборку этого SKU, пока доказательство блокера, ответственный и ворота закрытия не видны в AITA."),
+              listOf("Команда пульті: бөгет дәлелі, жауапты және жабу қақпасы AITA ішінде көрінгенше бұл SKU жинауын тоқтатыңыз.")
+            )
+            "call_store" -> supplierDashboardJoinedMessage(
+              listOf("Command desk: call or message the store/buyer now, capture the substitute, delay, or cancel answer, then refresh the recovery promise."),
+              listOf("Командный пульт: позвоните или напишите магазину/покупателю сейчас, зафиксируйте ответ по замене, задержке или отмене, затем обновите обещание восстановления."),
+              listOf("Команда пульті: дүкенге/сатып алушыға қазір қоңырау шалып немесе жазыңыз, ауыстыру, кідіріс немесе бас тарту жауабын бекітіп, қалпына келтіру уәдесін жаңартыңыз.")
+            )
+            "source_now" -> supplierDashboardJoinedMessage(
+              listOf("Command desk: ask upstream for reserve, ETA, substitute, or no-stock proof before the shortage moves further."),
+              listOf("Командный пульт: запросите выше по цепочке резерв, срок, замену или подтверждение отсутствия товара до движения недопоставки дальше."),
+              listOf("Команда пульті: жетіспеу әрі қарай жылжымай тұрып жоғары арнадан резерв, мерзім, ауыстыру немесе қор жоқ дәлелін сұраңыз.")
+            )
+            "split_and_ship" -> supplierDashboardJoinedMessage(
+              listOf("Command desk: split accepted quantity from missing quantity, ship only guarded stock, and keep the second drop visible."),
+              listOf("Командный пульт: отделите принятое количество от недостачи, отправляйте только защищённый товар и оставьте вторую поставку видимой."),
+              listOf("Команда пульті: қабылданған санды жетіспейтін саннан бөліп, тек қорғалған қорды жіберіңіз және екінші жеткізуді көрінетін қалдырыңыз.")
+            )
+            "ready_with_note" -> supplierDashboardJoinedMessage(
+              listOf("Command desk: recovery is ready with guard; close only the completed worker step and keep remaining shortage promises visible."),
+              listOf("Командный пульт: восстановление готово с защитой; закройте только выполненный рабочий шаг и оставьте видимыми оставшиеся обещания недопоставки."),
+              listOf("Команда пульті: қалпына келтіру қорғанмен дайын; тек орындалған жұмыс қадамын жауып, қалған жетіспеу уәделерін көрінетін қалдырыңыз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Command desk: monitor promise, owner, and next follow-up; refresh the command when store or upstream answer changes."),
+              listOf("Командный пульт: наблюдайте за обещанием, ответственным и следующим контролем; обновите команду при изменении ответа магазина или верхнего канала."),
+              listOf("Команда пульті: уәде, жауапты және келесі бақылауды қадағалаңыз; дүкен немесе жоғары арна жауабы өзгерсе команданы жаңартыңыз.")
+            )
+          }
+        }
+        val recoveryCommandChecklist = supplierDashboardChunk {
+          when (recoveryCommandLane) {
+            "stop_pack" -> supplierDashboardJoinedMessage(
+              listOf("□ Stop packflow for this SKU\n□ Name blocker owner\n□ Attach proof or answer\n□ Reopen only after command score drops"),
+              listOf("□ Остановить сборку этого SKU\n□ Назвать ответственного за блокер\n□ Приложить доказательство или ответ\n□ Открыть движение только после снижения оценки команды"),
+              listOf("□ Бұл SKU жинауын тоқтату\n□ Бөгет жауаптысын атау\n□ Дәлел немесе жауап тіркеу\n□ Команда ұпайы төмендеген соң ғана қозғалысты ашу")
+            )
+            "call_store" -> supplierDashboardJoinedMessage(
+              listOf("□ Contact store/buyer\n□ Save substitute/delay/cancel answer\n□ Update follow-up time\n□ Keep store names private outside AITA"),
+              listOf("□ Связаться с магазином/покупателем\n□ Сохранить ответ по замене/задержке/отмене\n□ Обновить время контроля\n□ Держать названия магазинов приватными вне AITA"),
+              listOf("□ Дүкенмен/сатып алушымен байланысу\n□ Ауыстыру/кідіріс/бас тарту жауабын сақтау\n□ Бақылау уақытын жаңарту\n□ AITA сыртында дүкен атауларын құпия ұстау")
+            )
+            "source_now" -> supplierDashboardJoinedMessage(
+              listOf("□ Ask upstream for reserve or ETA\n□ Record substitute/no-stock proof\n□ Mirror answer to store\n□ Keep shortage ledger open"),
+              listOf("□ Запросить резерв или срок выше по цепочке\n□ Записать замену или подтверждение отсутствия\n□ Передать ответ магазину\n□ Оставить журнал недопоставки открытым"),
+              listOf("□ Жоғары арнадан резерв немесе мерзім сұрау\n□ Ауыстыру немесе қор жоқ дәлелін жазу\n□ Жауапты дүкенге жеткізу\n□ Жетіспеу журналын ашық қалдыру")
+            )
+            "split_and_ship" -> supplierDashboardJoinedMessage(
+              listOf("□ Pack accepted quantity only\n□ Keep missing quantity open\n□ Add second-drop promise\n□ Check proof before dispatch"),
+              listOf("□ Собрать только принятое количество\n□ Оставить недостачу открытой\n□ Добавить обещание второй поставки\n□ Проверить доказательство перед отправкой"),
+              listOf("□ Тек қабылданған санды жинау\n□ Жетіспейтін санды ашық қалдыру\n□ Екінші жеткізу уәдесін қосу\n□ Жөнелту алдында дәлелді тексеру")
+            )
+            "ready_with_note" -> supplierDashboardJoinedMessage(
+              listOf("□ Close completed step only\n□ Preserve recovery note\n□ Keep remaining promise visible\n□ Reopen if answer changes"),
+              listOf("□ Закрыть только выполненный шаг\n□ Сохранить заметку восстановления\n□ Оставить оставшееся обещание видимым\n□ Открыть снова при изменении ответа"),
+              listOf("□ Тек орындалған қадамды жабу\n□ Қалпына келтіру жазбасын сақтау\n□ Қалған уәдені көрінетін қалдыру\n□ Жауап өзгерсе қайта ашу")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("□ Watch owner\n□ Watch promise\n□ Refresh after next answer\n□ Keep missing quantity visible"),
+              listOf("□ Следить за ответственным\n□ Следить за обещанием\n□ Обновить после следующего ответа\n□ Держать недостачу видимой"),
+              listOf("□ Жауаптыны бақылау\n□ Уәдені бақылау\n□ Келесі жауаптан кейін жаңарту\n□ Жетіспейтін санды көрінетін ұстау")
+            )
+          }
+        }
+        val recoveryCommandPathMain = supplierDashboardChunk {
+          when (recoveryCommandLane) {
+            "stop_pack" -> "stop packflow until blockers clear"
+            "call_store" -> "call store or buyer and capture answer"
+            "source_now" -> "source upstream stock or proof"
+            "split_and_ship" -> "split accepted stock and ship guarded quantity"
+            "ready_with_note" -> "ready with guard; close completed step only"
+            else -> "monitor promise and next follow-up"
+          }
+        }
+        val recoveryCommandPathRu = supplierDashboardChunk {
+          when (recoveryCommandLane) {
+            "stop_pack" -> "остановить сборку до снятия блокеров"
+            "call_store" -> "связаться с магазином или покупателем и записать ответ"
+            "source_now" -> "найти товар или доказательство выше по цепочке"
+            "split_and_ship" -> "разделить принятое наличие и отправить защищённое количество"
+            "ready_with_note" -> "готово с защитой; закрыть только выполненный шаг"
+            else -> "наблюдать за обещанием и следующим контролем"
+          }
+        }
+        val recoveryCommandPathKk = supplierDashboardChunk {
+          when (recoveryCommandLane) {
+            "stop_pack" -> "бөгеттер шешілгенше жинауды тоқтату"
+            "call_store" -> "дүкенмен немесе сатып алушымен байланысып, жауапты жазу"
+            "source_now" -> "жоғары арнадан қор немесе дәлел табу"
+            "split_and_ship" -> "қабылданған қорды бөліп, қорғалған санды жіберу"
+            "ready_with_note" -> "қорғанмен дайын; тек орындалған қадамды жабу"
+            else -> "уәде мен келесі бақылауды қадағалау"
+          }
+        }
+        val recoveryCommandScript = supplierDashboardChunk {
+          supplierDashboardJoinedMessage(
+            listOf(
+              "AITA recovery command: $recoveryContactGoodsName.",
+              "Command: $recoveryCommandPathMain.",
+              "Command score $recoveryCommandScore/100; triage $recoveryTriageScore/100; risk $recoveryRiskScore/100; confidence $recoveryConfidenceScore/100.",
+              "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()} across ${relatedOrders.size} order(s)."
+            ),
+            listOf(
+              "AITA команда восстановления: $recoveryContactGoodsName.",
+              "Команда: $recoveryCommandPathRu.",
+              "Оценка команды $recoveryCommandScore/100; сортировка $recoveryTriageScore/100; риск $recoveryRiskScore/100; уверенность $recoveryConfidenceScore/100.",
+              "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()} по ${relatedOrders.size} заказ(ам)."
+            ),
+            listOf(
+              "AITA қалпына келтіру командасы: $recoveryContactGoodsName.",
+              "Команда: $recoveryCommandPathKk.",
+              "Команда ұпайы $recoveryCommandScore/100; іріктеу $recoveryTriageScore/100; тәуекел $recoveryRiskScore/100; сенім $recoveryConfidenceScore/100.",
+              "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()} — ${relatedOrders.size} тапсырыс."
+            )
+          )
+        }
+        val recoveryPromiseShieldScore = supplierDashboardChunk {
+          (
+              18 +
+              when (recoveryUrgencyLane) {
+                "overdue" -> 26
+                "today" -> 18
+                "soon" -> 10
+                else -> 3
+              } +
+              when (recoveryCommandLane) {
+                "stop_pack" -> 16
+                "call_store" -> 12
+                "source_now" -> 10
+                "split_and_ship" -> 7
+                "ready_with_note" -> -10
+                else -> 2
+              } +
+              when {
+                recoveryRiskScore >= 78 -> 16
+                recoveryRiskScore >= 60 -> 10
+                recoveryRiskScore >= 42 -> 5
+                else -> 1
+              } +
+              when {
+                recoveryConfidenceScore < 40 -> 12
+                recoveryConfidenceScore < 60 -> 7
+                recoveryConfidenceLane == "ready_to_recover" -> -8
+                else -> 1
+              } +
+              when {
+                recoveryLedgerScore < 48 -> 8
+                recoveryLedgerLane == "ledger_ready" -> -6
+                else -> 2
+              } +
+              fullyShortLineCount * 4 +
+              partialLineCount * 3 +
+              (if (recoveryOutcomeLane == "substitute_offer" || recoveryOutcomeLane == "cancel_review") 8 else 0) +
+              (if (recoveryPackGuardLane == "block_pack") 8 else 0) -
+              (if (acceptedQuantityTotal > 0.000001 && recoveryPackGuardLane == "split_pack_only") 4 else 0)
+            ).coerceIn(0, 100)
+        }
+        val recoveryPromiseShieldLane = supplierDashboardChunk {
+          when {
+            recoveryUrgencyLane == "overdue" || recoveryCommandLane == "stop_pack" || recoveryPromiseShieldScore >= 78 -> "promise_at_risk"
+            recoveryCommandLane == "ready_with_note" && recoveryConfidenceLane == "ready_to_recover" && recoveryLedgerLane == "ledger_ready" -> "promise_safe"
+            recoveryContactLane == "store_call" || recoveryContactLane == "substitute_answer" || recoveryOutcomeLane == "cancel_review" || recoveryOutcomeLane == "substitute_offer" -> "store_answer_needed"
+            recoveryCommandLane == "source_now" || recoveryTriageLane == "sourcing_lane" || fullyShortLineCount > 0 -> "source_before_promise"
+            recoveryCommandLane == "split_and_ship" || (acceptedQuantityTotal > 0.000001 && partialLineCount > 0) -> "split_promise"
+            else -> "promise_watch"
+          }
+        }
+        val recoveryPromiseShieldHint = supplierDashboardChunk {
+          when (recoveryPromiseShieldLane) {
+            "promise_at_risk" -> supplierDashboardJoinedMessage(
+              listOf("Promise shield: do not let this shortage become a customer-facing promise until the blocker, due time, and pack guard are refreshed."),
+              listOf("Щит обещания: не превращайте эту недопоставку в обещание клиенту, пока не обновлены блокер, срок и защита сборки."),
+              listOf("Уәде қалқаны: бөгет, мерзім және жинау қорғаны жаңартылмайынша бұл жетіспеуді клиентке айтылатын уәдеге айналдырмаңыз.")
+            )
+            "store_answer_needed" -> supplierDashboardJoinedMessage(
+              listOf("Promise shield: store or buyer answer is needed before a substitute, delay, or cancellation can be promised downstream."),
+              listOf("Щит обещания: нужен ответ магазина или покупателя, прежде чем обещать дальше замену, задержку или отмену."),
+              listOf("Уәде қалқаны: ауыстыру, кідіріс немесе бас тартуды төменгі арнаға уәде етпес бұрын дүкен/сатып алушы жауабы керек.")
+            )
+            "source_before_promise" -> supplierDashboardJoinedMessage(
+              listOf("Promise shield: ask upstream for reserve, ETA, substitute, or no-stock proof before the store updates its customer promise."),
+              listOf("Щит обещания: запросите выше резерв, срок, замену или доказательство отсутствия товара до обновления обещания магазина клиенту."),
+              listOf("Уәде қалқаны: дүкен клиент уәдесін жаңартпас бұрын жоғары арнадан резерв, мерзім, ауыстыру немесе қор жоқ дәлелін сұраңыз.")
+            )
+            "split_promise" -> supplierDashboardJoinedMessage(
+              listOf("Promise shield: accepted stock can be promised separately, but the short quantity needs a dated second-drop or substitute promise."),
+              listOf("Щит обещания: принятое наличие можно обещать отдельно, но недостаче нужно датированное обещание второй поставки или замены."),
+              listOf("Уәде қалқаны: қабылданған қорды бөлек уәде етуге болады, бірақ жетіспейтін санға күн қойылған екінші жеткізу немесе ауыстыру уәдесі керек.")
+            )
+            "promise_safe" -> supplierDashboardJoinedMessage(
+              listOf("Promise shield: command, confidence, and ledger look safe; share only the guarded recovery result and keep store names private."),
+              listOf("Щит обещания: команда, уверенность и журнал выглядят безопасно; передавайте только защищённый результат восстановления и держите названия магазинов приватными."),
+              listOf("Уәде қалқаны: команда, сенім және журнал қауіпсіз көрінеді; тек қорғалған қалпына келтіру нәтижесін беріп, дүкен атауларын құпия ұстаңыз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Promise shield: keep this shortage visible until owner, due promise, and next follow-up are still aligned."),
+              listOf("Щит обещания: держите эту недопоставку видимой, пока ответственный, обещанный срок и следующий контроль остаются согласованы."),
+              listOf("Уәде қалқаны: жауапты, уәде мерзімі және келесі бақылау үйлескенше бұл жетіспеуді көрінетін ұстаңыз.")
+            )
+          }
+        }
+        val recoveryPromiseShieldChecklist = supplierDashboardChunk {
+          when (recoveryPromiseShieldLane) {
+            "promise_at_risk" -> supplierDashboardJoinedMessage(
+              listOf("□ Freeze customer-facing promise\n□ Refresh blocker owner\n□ Recheck pack guard\n□ Write new safe promise after answer"),
+              listOf("□ Заморозить обещание клиенту\n□ Обновить ответственного за блокер\n□ Проверить защиту сборки\n□ Записать новое безопасное обещание после ответа"),
+              listOf("□ Клиентке айтылатын уәдені тоқтату\n□ Бөгет жауаптысын жаңарту\n□ Жинау қорғанын тексеру\n□ Жауаптан кейін жаңа қауіпсіз уәде жазу")
+            )
+            "store_answer_needed" -> supplierDashboardJoinedMessage(
+              listOf("□ Ask store/buyer decision\n□ Save substitute/delay/cancel answer\n□ Mirror only safe wording\n□ Set next follow-up"),
+              listOf("□ Запросить решение магазина/покупателя\n□ Сохранить ответ замена/задержка/отмена\n□ Передать только безопасную формулировку\n□ Назначить следующий контроль"),
+              listOf("□ Дүкен/сатып алушы шешімін сұрау\n□ Ауыстыру/кідіріс/бас тарту жауабын сақтау\n□ Тек қауіпсіз мәтінді жеткізу\n□ Келесі бақылауды қою")
+            )
+            "source_before_promise" -> supplierDashboardJoinedMessage(
+              listOf("□ Ask upstream for reserve/ETA\n□ Save no-stock or substitute proof\n□ Do not overpromise missing quantity\n□ Re-score after sourcing answer"),
+              listOf("□ Запросить резерв/срок выше\n□ Сохранить отсутствие или замену\n□ Не обещать лишнюю недостачу\n□ Пересчитать после ответа поиска"),
+              listOf("□ Жоғары арнадан резерв/мерзім сұрау\n□ Қор жоқ немесе ауыстыру дәлелін сақтау\n□ Жетіспейтін санды артық уәде етпеу\n□ Іздеу жауабынан кейін қайта бағалау")
+            )
+            "split_promise" -> supplierDashboardJoinedMessage(
+              listOf("□ Promise accepted quantity only\n□ Keep short quantity separate\n□ Add second-drop date\n□ Keep shortage watch open"),
+              listOf("□ Обещать только принятое количество\n□ Держать недостачу отдельно\n□ Добавить дату второй поставки\n□ Оставить наблюдение открытым"),
+              listOf("□ Тек қабылданған санды уәде ету\n□ Жетіспейтін санды бөлек ұстау\n□ Екінші жеткізу күнін қосу\n□ Жетіспеуді бақылауды ашық қалдыру")
+            )
+            "promise_safe" -> supplierDashboardJoinedMessage(
+              listOf("□ Share guarded result\n□ Keep private store details inside AITA\n□ Close only completed worker step\n□ Reopen if promise changes"),
+              listOf("□ Передать защищённый результат\n□ Держать детали магазинов внутри AITA\n□ Закрыть только выполненный шаг\n□ Открыть снова при изменении обещания"),
+              listOf("□ Қорғалған нәтижені жеткізу\n□ Дүкен деректерін AITA ішінде сақтау\n□ Тек орындалған қадамды жабу\n□ Уәде өзгерсе қайта ашу")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("□ Watch promise owner\n□ Check next follow-up\n□ Keep missing quantity visible\n□ Update shield after every answer"),
+              listOf("□ Наблюдать за ответственным обещания\n□ Проверить следующий контроль\n□ Держать недостачу видимой\n□ Обновлять щит после каждого ответа"),
+              listOf("□ Уәде жауаптысын бақылау\n□ Келесі бақылауды тексеру\n□ Жетіспейтін санды көрінетін ұстау\n□ Әр жауаптан кейін қалқанды жаңарту")
+            )
+          }
+        }
+        val recoveryPromiseShieldPathMain = supplierDashboardChunk {
+          when (recoveryPromiseShieldLane) {
+            "promise_at_risk" -> "hold downstream promise until blocker clears"
+            "store_answer_needed" -> "capture store answer before promising"
+            "source_before_promise" -> "source upstream proof before promise"
+            "split_promise" -> "promise accepted quantity separately"
+            "promise_safe" -> "safe guarded promise"
+            else -> "watch promise alignment"
+          }
+        }
+        val recoveryPromiseShieldPathRu = supplierDashboardChunk {
+          when (recoveryPromiseShieldLane) {
+            "promise_at_risk" -> "удерживать обещание вниз по цепочке до снятия блокера"
+            "store_answer_needed" -> "зафиксировать ответ магазина до обещания"
+            "source_before_promise" -> "получить доказательство выше до обещания"
+            "split_promise" -> "обещать принятое количество отдельно"
+            "promise_safe" -> "безопасное защищённое обещание"
+            else -> "наблюдать согласованность обещания"
+          }
+        }
+        val recoveryPromiseShieldPathKk = supplierDashboardChunk {
+          when (recoveryPromiseShieldLane) {
+            "promise_at_risk" -> "бөгет шешілгенше төменгі арна уәдесін ұстау"
+            "store_answer_needed" -> "уәде етпес бұрын дүкен жауабын бекіту"
+            "source_before_promise" -> "уәдеге дейін жоғары арна дәлелін алу"
+            "split_promise" -> "қабылданған санды бөлек уәде ету"
+            "promise_safe" -> "қауіпсіз қорғалған уәде"
+            else -> "уәде үйлесімін бақылау"
+          }
+        }
+        val recoveryPromiseShieldScript = supplierDashboardChunk {
+          supplierDashboardJoinedMessage(
+            listOf(
+              "AITA promise shield: $recoveryContactGoodsName.",
+              "Promise path: $recoveryPromiseShieldPathMain.",
+              "Promise score $recoveryPromiseShieldScore/100; command $recoveryCommandScore/100; risk $recoveryRiskScore/100; confidence $recoveryConfidenceScore/100.",
+              "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()} across ${relatedOrders.size} order(s). Keep store names private outside AITA."
+            ),
+            listOf(
+              "AITA щит обещания: $recoveryContactGoodsName.",
+              "Путь обещания: $recoveryPromiseShieldPathRu.",
+              "Оценка обещания $recoveryPromiseShieldScore/100; команда $recoveryCommandScore/100; риск $recoveryRiskScore/100; уверенность $recoveryConfidenceScore/100.",
+              "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()} по ${relatedOrders.size} заказ(ам). Названия магазинов держите приватными вне AITA."
+            ),
+            listOf(
+              "AITA уәде қалқаны: $recoveryContactGoodsName.",
+              "Уәде жолы: $recoveryPromiseShieldPathKk.",
+              "Уәде ұпайы $recoveryPromiseShieldScore/100; команда $recoveryCommandScore/100; тәуекел $recoveryRiskScore/100; сенім $recoveryConfidenceScore/100.",
+              "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()} — ${relatedOrders.size} тапсырыс. AITA сыртында дүкен атауларын құпия ұстаңыз."
+            )
+          )
+        }
+        val recoveryWaveLane = supplierDashboardChunk {
+          when {
+            recoveryCommandLane == "stop_pack" || recoveryPackGuardLane == "block_pack" || recoveryClosureLane == "blocked_open" || recoveryPromiseShieldLane == "promise_at_risk" -> "wave_command"
+            recoveryContactLane == "store_call" || recoveryContactLane == "substitute_answer" || recoveryOwnerLane == "store_contact" || recoveryPromiseShieldLane == "store_answer_needed" -> "wave_contact"
+            recoveryCommandLane == "source_now" || recoveryOwnerLane == "upstream_sourcing" || recoveryContactLane == "upstream_request" || recoveryPromiseShieldLane == "source_before_promise" -> "wave_source"
+            recoveryCommandLane == "split_and_ship" || recoveryLane == "split_delivery" || recoveryPromiseShieldLane == "split_promise" || recoveryPackGuardLane == "split_pack_only" -> "wave_split"
+            recoveryCommandLane == "ready_with_note" || recoveryTriageLane == "ready_lane" || recoveryConfidenceLane == "ready_to_recover" || recoveryPromiseShieldLane == "promise_safe" -> "wave_ready"
+            else -> "wave_watch"
+          }
+        }
+        val duePressure = supplierDashboardChunk {
+          when (recoveryDueBucket) {
             "overdue" -> 26
             "today" -> 18
-            "soon" -> 10
-            else -> 3
-          } +
-          when (recoveryCommandLane) {
-            "stop_pack" -> 16
-            "call_store" -> 12
-            "source_now" -> 10
-            "split_and_ship" -> 7
-            "ready_with_note" -> -10
-            else -> 2
-          } +
-          when {
-            recoveryRiskScore >= 78 -> 16
-            recoveryRiskScore >= 60 -> 10
-            recoveryRiskScore >= 42 -> 5
-            else -> 1
-          } +
-          when {
-            recoveryConfidenceScore < 40 -> 12
-            recoveryConfidenceScore < 60 -> 7
-            recoveryConfidenceLane == "ready_to_recover" -> -8
-            else -> 1
-          } +
-          when {
-            recoveryLedgerScore < 48 -> 8
-            recoveryLedgerLane == "ledger_ready" -> -6
-            else -> 2
-          } +
-          fullyShortLineCount * 4 +
-          partialLineCount * 3 +
-          (if (recoveryOutcomeLane == "substitute_offer" || recoveryOutcomeLane == "cancel_review") 8 else 0) +
-          (if (recoveryPackGuardLane == "block_pack") 8 else 0) -
-          (if (acceptedQuantityTotal > 0.000001 && recoveryPackGuardLane == "split_pack_only") 4 else 0)
-        ).coerceIn(0, 100)
-      val recoveryPromiseShieldLane = when {
-        recoveryUrgencyLane == "overdue" || recoveryCommandLane == "stop_pack" || recoveryPromiseShieldScore >= 78 -> "promise_at_risk"
-        recoveryCommandLane == "ready_with_note" && recoveryConfidenceLane == "ready_to_recover" && recoveryLedgerLane == "ledger_ready" -> "promise_safe"
-        recoveryContactLane == "store_call" || recoveryContactLane == "substitute_answer" || recoveryOutcomeLane == "cancel_review" || recoveryOutcomeLane == "substitute_offer" -> "store_answer_needed"
-        recoveryCommandLane == "source_now" || recoveryTriageLane == "sourcing_lane" || fullyShortLineCount > 0 -> "source_before_promise"
-        recoveryCommandLane == "split_and_ship" || (acceptedQuantityTotal > 0.000001 && partialLineCount > 0) -> "split_promise"
-        else -> "promise_watch"
-      }
-      val recoveryPromiseShieldHint = when (recoveryPromiseShieldLane) {
-        "promise_at_risk" -> supplierDashboardJoinedMessage(
-          listOf("Promise shield: do not let this shortage become a customer-facing promise until the blocker, due time, and pack guard are refreshed."),
-          listOf("Щит обещания: не превращайте эту недопоставку в обещание клиенту, пока не обновлены блокер, срок и защита сборки."),
-          listOf("Уәде қалқаны: бөгет, мерзім және жинау қорғаны жаңартылмайынша бұл жетіспеуді клиентке айтылатын уәдеге айналдырмаңыз.")
-        )
-        "store_answer_needed" -> supplierDashboardJoinedMessage(
-          listOf("Promise shield: store or buyer answer is needed before a substitute, delay, or cancellation can be promised downstream."),
-          listOf("Щит обещания: нужен ответ магазина или покупателя, прежде чем обещать дальше замену, задержку или отмену."),
-          listOf("Уәде қалқаны: ауыстыру, кідіріс немесе бас тартуды төменгі арнаға уәде етпес бұрын дүкен/сатып алушы жауабы керек.")
-        )
-        "source_before_promise" -> supplierDashboardJoinedMessage(
-          listOf("Promise shield: ask upstream for reserve, ETA, substitute, or no-stock proof before the store updates its customer promise."),
-          listOf("Щит обещания: запросите выше резерв, срок, замену или доказательство отсутствия товара до обновления обещания магазина клиенту."),
-          listOf("Уәде қалқаны: дүкен клиент уәдесін жаңартпас бұрын жоғары арнадан резерв, мерзім, ауыстыру немесе қор жоқ дәлелін сұраңыз.")
-        )
-        "split_promise" -> supplierDashboardJoinedMessage(
-          listOf("Promise shield: accepted stock can be promised separately, but the short quantity needs a dated second-drop or substitute promise."),
-          listOf("Щит обещания: принятое наличие можно обещать отдельно, но недостаче нужно датированное обещание второй поставки или замены."),
-          listOf("Уәде қалқаны: қабылданған қорды бөлек уәде етуге болады, бірақ жетіспейтін санға күн қойылған екінші жеткізу немесе ауыстыру уәдесі керек.")
-        )
-        "promise_safe" -> supplierDashboardJoinedMessage(
-          listOf("Promise shield: command, confidence, and ledger look safe; share only the guarded recovery result and keep store names private."),
-          listOf("Щит обещания: команда, уверенность и журнал выглядят безопасно; передавайте только защищённый результат восстановления и держите названия магазинов приватными."),
-          listOf("Уәде қалқаны: команда, сенім және журнал қауіпсіз көрінеді; тек қорғалған қалпына келтіру нәтижесін беріп, дүкен атауларын құпия ұстаңыз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Promise shield: keep this shortage visible until owner, due promise, and next follow-up are still aligned."),
-          listOf("Щит обещания: держите эту недопоставку видимой, пока ответственный, обещанный срок и следующий контроль остаются согласованы."),
-          listOf("Уәде қалқаны: жауапты, уәде мерзімі және келесі бақылау үйлескенше бұл жетіспеуді көрінетін ұстаңыз.")
-        )
-      }
-      val recoveryPromiseShieldChecklist = when (recoveryPromiseShieldLane) {
-        "promise_at_risk" -> supplierDashboardJoinedMessage(
-          listOf("□ Freeze customer-facing promise\n□ Refresh blocker owner\n□ Recheck pack guard\n□ Write new safe promise after answer"),
-          listOf("□ Заморозить обещание клиенту\n□ Обновить ответственного за блокер\n□ Проверить защиту сборки\n□ Записать новое безопасное обещание после ответа"),
-          listOf("□ Клиентке айтылатын уәдені тоқтату\n□ Бөгет жауаптысын жаңарту\n□ Жинау қорғанын тексеру\n□ Жауаптан кейін жаңа қауіпсіз уәде жазу")
-        )
-        "store_answer_needed" -> supplierDashboardJoinedMessage(
-          listOf("□ Ask store/buyer decision\n□ Save substitute/delay/cancel answer\n□ Mirror only safe wording\n□ Set next follow-up"),
-          listOf("□ Запросить решение магазина/покупателя\n□ Сохранить ответ замена/задержка/отмена\n□ Передать только безопасную формулировку\n□ Назначить следующий контроль"),
-          listOf("□ Дүкен/сатып алушы шешімін сұрау\n□ Ауыстыру/кідіріс/бас тарту жауабын сақтау\n□ Тек қауіпсіз мәтінді жеткізу\n□ Келесі бақылауды қою")
-        )
-        "source_before_promise" -> supplierDashboardJoinedMessage(
-          listOf("□ Ask upstream for reserve/ETA\n□ Save no-stock or substitute proof\n□ Do not overpromise missing quantity\n□ Re-score after sourcing answer"),
-          listOf("□ Запросить резерв/срок выше\n□ Сохранить отсутствие или замену\n□ Не обещать лишнюю недостачу\n□ Пересчитать после ответа поиска"),
-          listOf("□ Жоғары арнадан резерв/мерзім сұрау\n□ Қор жоқ немесе ауыстыру дәлелін сақтау\n□ Жетіспейтін санды артық уәде етпеу\n□ Іздеу жауабынан кейін қайта бағалау")
-        )
-        "split_promise" -> supplierDashboardJoinedMessage(
-          listOf("□ Promise accepted quantity only\n□ Keep short quantity separate\n□ Add second-drop date\n□ Keep shortage watch open"),
-          listOf("□ Обещать только принятое количество\n□ Держать недостачу отдельно\n□ Добавить дату второй поставки\n□ Оставить наблюдение открытым"),
-          listOf("□ Тек қабылданған санды уәде ету\n□ Жетіспейтін санды бөлек ұстау\n□ Екінші жеткізу күнін қосу\n□ Жетіспеуді бақылауды ашық қалдыру")
-        )
-        "promise_safe" -> supplierDashboardJoinedMessage(
-          listOf("□ Share guarded result\n□ Keep private store details inside AITA\n□ Close only completed worker step\n□ Reopen if promise changes"),
-          listOf("□ Передать защищённый результат\n□ Держать детали магазинов внутри AITA\n□ Закрыть только выполненный шаг\n□ Открыть снова при изменении обещания"),
-          listOf("□ Қорғалған нәтижені жеткізу\n□ Дүкен деректерін AITA ішінде сақтау\n□ Тек орындалған қадамды жабу\n□ Уәде өзгерсе қайта ашу")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("□ Watch promise owner\n□ Check next follow-up\n□ Keep missing quantity visible\n□ Update shield after every answer"),
-          listOf("□ Наблюдать за ответственным обещания\n□ Проверить следующий контроль\n□ Держать недостачу видимой\n□ Обновлять щит после каждого ответа"),
-          listOf("□ Уәде жауаптысын бақылау\n□ Келесі бақылауды тексеру\n□ Жетіспейтін санды көрінетін ұстау\n□ Әр жауаптан кейін қалқанды жаңарту")
-        )
-      }
-      val recoveryPromiseShieldPathMain = when (recoveryPromiseShieldLane) {
-        "promise_at_risk" -> "hold downstream promise until blocker clears"
-        "store_answer_needed" -> "capture store answer before promising"
-        "source_before_promise" -> "source upstream proof before promise"
-        "split_promise" -> "promise accepted quantity separately"
-        "promise_safe" -> "safe guarded promise"
-        else -> "watch promise alignment"
-      }
-      val recoveryPromiseShieldPathRu = when (recoveryPromiseShieldLane) {
-        "promise_at_risk" -> "удерживать обещание вниз по цепочке до снятия блокера"
-        "store_answer_needed" -> "зафиксировать ответ магазина до обещания"
-        "source_before_promise" -> "получить доказательство выше до обещания"
-        "split_promise" -> "обещать принятое количество отдельно"
-        "promise_safe" -> "безопасное защищённое обещание"
-        else -> "наблюдать согласованность обещания"
-      }
-      val recoveryPromiseShieldPathKk = when (recoveryPromiseShieldLane) {
-        "promise_at_risk" -> "бөгет шешілгенше төменгі арна уәдесін ұстау"
-        "store_answer_needed" -> "уәде етпес бұрын дүкен жауабын бекіту"
-        "source_before_promise" -> "уәдеге дейін жоғары арна дәлелін алу"
-        "split_promise" -> "қабылданған санды бөлек уәде ету"
-        "promise_safe" -> "қауіпсіз қорғалған уәде"
-        else -> "уәде үйлесімін бақылау"
-      }
-      val recoveryPromiseShieldScript = supplierDashboardJoinedMessage(
-        listOf(
-          "AITA promise shield: $recoveryContactGoodsName.",
-          "Promise path: $recoveryPromiseShieldPathMain.",
-          "Promise score $recoveryPromiseShieldScore/100; command $recoveryCommandScore/100; risk $recoveryRiskScore/100; confidence $recoveryConfidenceScore/100.",
-          "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()} across ${relatedOrders.size} order(s). Keep store names private outside AITA."
-        ),
-        listOf(
-          "AITA щит обещания: $recoveryContactGoodsName.",
-          "Путь обещания: $recoveryPromiseShieldPathRu.",
-          "Оценка обещания $recoveryPromiseShieldScore/100; команда $recoveryCommandScore/100; риск $recoveryRiskScore/100; уверенность $recoveryConfidenceScore/100.",
-          "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()} по ${relatedOrders.size} заказ(ам). Названия магазинов держите приватными вне AITA."
-        ),
-        listOf(
-          "AITA уәде қалқаны: $recoveryContactGoodsName.",
-          "Уәде жолы: $recoveryPromiseShieldPathKk.",
-          "Уәде ұпайы $recoveryPromiseShieldScore/100; команда $recoveryCommandScore/100; тәуекел $recoveryRiskScore/100; сенім $recoveryConfidenceScore/100.",
-          "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()} — ${relatedOrders.size} тапсырыс. AITA сыртында дүкен атауларын құпия ұстаңыз."
-        )
-      )
-      val recoveryWaveLane = when {
-        recoveryCommandLane == "stop_pack" || recoveryPackGuardLane == "block_pack" || recoveryClosureLane == "blocked_open" || recoveryPromiseShieldLane == "promise_at_risk" -> "wave_command"
-        recoveryContactLane == "store_call" || recoveryContactLane == "substitute_answer" || recoveryOwnerLane == "store_contact" || recoveryPromiseShieldLane == "store_answer_needed" -> "wave_contact"
-        recoveryCommandLane == "source_now" || recoveryOwnerLane == "upstream_sourcing" || recoveryContactLane == "upstream_request" || recoveryPromiseShieldLane == "source_before_promise" -> "wave_source"
-        recoveryCommandLane == "split_and_ship" || recoveryLane == "split_delivery" || recoveryPromiseShieldLane == "split_promise" || recoveryPackGuardLane == "split_pack_only" -> "wave_split"
-        recoveryCommandLane == "ready_with_note" || recoveryTriageLane == "ready_lane" || recoveryConfidenceLane == "ready_to_recover" || recoveryPromiseShieldLane == "promise_safe" -> "wave_ready"
-        else -> "wave_watch"
-      }
-      val duePressure = when (recoveryDueBucket) {
-        "overdue" -> 26
-        "today" -> 18
-        "tomorrow" -> 12
-        "week" -> 10
-        "later" -> 4
-        else -> 2
-      }
-      val followUpPressure = when (recoveryFollowUpLane) {
-        "follow_up_now" -> 10
-        "same_day_check" -> 7
-        "before_pack_check" -> 5
-        else -> 1
-      }
-      val recoveryWaveScore = (
-        recoveryRiskScore / 3 +
-          recoveryCommandScore / 4 +
-          recoveryPromiseShieldScore / 4 +
-          duePressure +
-          followUpPressure +
-          when (recoveryWaveLane) {
-            "wave_command" -> 18
-            "wave_contact" -> 12
-            "wave_source" -> 10
-            "wave_split" -> 8
-            "wave_ready" -> 4
+            "tomorrow" -> 12
+            "week" -> 10
+            "later" -> 4
             else -> 2
           }
-        ).coerceIn(0, 100)
-      val recoveryWaveHint = when (recoveryWaveLane) {
-        "wave_command" -> supplierDashboardJoinedMessage(
-          listOf("Recovery wave: command desk should stop unsafe packflow, freeze risky promises, and assign the next owner before this SKU moves."),
-          listOf("Волна восстановления: командный пульт должен остановить небезопасную сборку, заморозить рискованные обещания и назначить следующего ответственного до движения SKU."),
-          listOf("Қалпына келтіру толқыны: командалық пульт SKU қозғалғанша қауіпсіз емес жинауды тоқтатып, тәуекел уәделерді ұстап, келесі жауаптыны қоюы керек.")
-        )
-        "wave_contact" -> supplierDashboardJoinedMessage(
-          listOf("Recovery wave: contact store/buyer first, capture substitute, delay, or cancel answer, then refresh the promise shield."),
-          listOf("Волна восстановления: сначала свяжитесь с магазином/покупателем, зафиксируйте ответ замена/задержка/отмена и обновите щит обещания."),
-          listOf("Қалпына келтіру толқыны: алдымен дүкенмен/сатып алушымен байланысып, ауыстыру/кідіріс/бас тарту жауабын бекітіп, уәде қалқанын жаңартыңыз.")
-        )
-        "wave_source" -> supplierDashboardJoinedMessage(
-          listOf("Recovery wave: ask upstream for reserve, ETA, substitute, or no-stock proof before changing downstream promises."),
-          listOf("Волна восстановления: запросите выше резерв, срок, замену или доказательство отсутствия до изменения обещаний вниз по цепочке."),
-          listOf("Қалпына келтіру толқыны: төменгі арна уәдесін өзгертпес бұрын жоғары арнадан резерв, мерзім, ауыстыру немесе қор жоқ дәлелін сұраңыз.")
-        )
-        "wave_split" -> supplierDashboardJoinedMessage(
-          listOf("Recovery wave: split accepted quantity from missing quantity, protect the pack note, and keep the second-drop promise visible."),
-          listOf("Волна восстановления: отделите принятое количество от недостающего, защитите заметку сборки и оставьте обещание второй поставки видимым."),
-          listOf("Қалпына келтіру толқыны: қабылданған санды жетіспейтіннен бөліп, жинау жазбасын қорғап, екінші жеткізу уәдесін көрінетін ұстаңыз.")
-        )
-        "wave_ready" -> supplierDashboardJoinedMessage(
-          listOf("Recovery wave: guarded item is ready to move; close only the completed worker step and keep remaining shortage promises visible."),
-          listOf("Волна восстановления: защищённая позиция готова к движению; закрывайте только выполненный рабочий шаг и оставляйте оставшиеся обещания видимыми."),
-          listOf("Қалпына келтіру толқыны: қорғалған позиция қозғала алады; тек орындалған жұмыс қадамын жауып, қалған уәделерді көрінетін ұстаңыз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Recovery wave: keep this quiet shortage on watch with owner, next follow-up, and missing quantity still visible."),
-          listOf("Волна восстановления: держите тихую недопоставку на наблюдении с ответственным, следующим контролем и видимой недостачей."),
-          listOf("Қалпына келтіру толқыны: тыныш жетіспеуді жауаптымен, келесі бақылаумен және көрінетін жетіспейтін санмен бақылауда ұстаңыз.")
-        )
-      }
-      val recoveryAgingStartedAtMillis = latestActivityMillis.takeIf { it > 0L }
-        ?: relatedOrders
-          .map { order -> order.orderedAtMillis }
-          .filter { value -> value > 0L }
-          .minOrNull()
-      val recoveryAgingHours = recoveryAgingStartedAtMillis
-        ?.let { startedAt -> ((now - startedAt).coerceAtLeast(0L) / (AITA_SUPPLIER_DAY_MILLIS / 24L)).coerceAtMost(999L).toInt() }
-        ?: 0
-      val recoveryAgingScore = (
-        (recoveryAgingHours * 2).coerceAtMost(50) +
-          when (recoveryUrgencyLane) {
-            "overdue" -> 18
-            "today" -> 12
-            "soon" -> 6
-            else -> 2
-          } +
+        }
+        val followUpPressure = supplierDashboardChunk {
           when (recoveryFollowUpLane) {
-            "follow_up_now" -> 14
-            "same_day_check" -> 8
-            "before_pack_check" -> 6
+            "follow_up_now" -> 10
+            "same_day_check" -> 7
+            "before_pack_check" -> 5
             else -> 1
-          } +
+          }
+        }
+        val recoveryWaveScore = supplierDashboardChunk {
+          (
+            recoveryRiskScore / 3 +
+              recoveryCommandScore / 4 +
+              recoveryPromiseShieldScore / 4 +
+              duePressure +
+              followUpPressure +
+              when (recoveryWaveLane) {
+                "wave_command" -> 18
+                "wave_contact" -> 12
+                "wave_source" -> 10
+                "wave_split" -> 8
+                "wave_ready" -> 4
+                else -> 2
+              }
+            ).coerceIn(0, 100)
+        }
+        val recoveryWaveHint = supplierDashboardChunk {
+          when (recoveryWaveLane) {
+            "wave_command" -> supplierDashboardJoinedMessage(
+              listOf("Recovery wave: command desk should stop unsafe packflow, freeze risky promises, and assign the next owner before this SKU moves."),
+              listOf("Волна восстановления: командный пульт должен остановить небезопасную сборку, заморозить рискованные обещания и назначить следующего ответственного до движения SKU."),
+              listOf("Қалпына келтіру толқыны: командалық пульт SKU қозғалғанша қауіпсіз емес жинауды тоқтатып, тәуекел уәделерді ұстап, келесі жауаптыны қоюы керек.")
+            )
+            "wave_contact" -> supplierDashboardJoinedMessage(
+              listOf("Recovery wave: contact store/buyer first, capture substitute, delay, or cancel answer, then refresh the promise shield."),
+              listOf("Волна восстановления: сначала свяжитесь с магазином/покупателем, зафиксируйте ответ замена/задержка/отмена и обновите щит обещания."),
+              listOf("Қалпына келтіру толқыны: алдымен дүкенмен/сатып алушымен байланысып, ауыстыру/кідіріс/бас тарту жауабын бекітіп, уәде қалқанын жаңартыңыз.")
+            )
+            "wave_source" -> supplierDashboardJoinedMessage(
+              listOf("Recovery wave: ask upstream for reserve, ETA, substitute, or no-stock proof before changing downstream promises."),
+              listOf("Волна восстановления: запросите выше резерв, срок, замену или доказательство отсутствия до изменения обещаний вниз по цепочке."),
+              listOf("Қалпына келтіру толқыны: төменгі арна уәдесін өзгертпес бұрын жоғары арнадан резерв, мерзім, ауыстыру немесе қор жоқ дәлелін сұраңыз.")
+            )
+            "wave_split" -> supplierDashboardJoinedMessage(
+              listOf("Recovery wave: split accepted quantity from missing quantity, protect the pack note, and keep the second-drop promise visible."),
+              listOf("Волна восстановления: отделите принятое количество от недостающего, защитите заметку сборки и оставьте обещание второй поставки видимым."),
+              listOf("Қалпына келтіру толқыны: қабылданған санды жетіспейтіннен бөліп, жинау жазбасын қорғап, екінші жеткізу уәдесін көрінетін ұстаңыз.")
+            )
+            "wave_ready" -> supplierDashboardJoinedMessage(
+              listOf("Recovery wave: guarded item is ready to move; close only the completed worker step and keep remaining shortage promises visible."),
+              listOf("Волна восстановления: защищённая позиция готова к движению; закрывайте только выполненный рабочий шаг и оставляйте оставшиеся обещания видимыми."),
+              listOf("Қалпына келтіру толқыны: қорғалған позиция қозғала алады; тек орындалған жұмыс қадамын жауып, қалған уәделерді көрінетін ұстаңыз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Recovery wave: keep this quiet shortage on watch with owner, next follow-up, and missing quantity still visible."),
+              listOf("Волна восстановления: держите тихую недопоставку на наблюдении с ответственным, следующим контролем и видимой недостачей."),
+              listOf("Қалпына келтіру толқыны: тыныш жетіспеуді жауаптымен, келесі бақылаумен және көрінетін жетіспейтін санмен бақылауда ұстаңыз.")
+            )
+          }
+        }
+        val recoveryAgingStartedAtMillis = supplierDashboardChunk {
+          latestActivityMillis.takeIf { it > 0L }
+            ?: relatedOrders
+              .map { order -> order.orderedAtMillis }
+              .filter { value -> value > 0L }
+              .minOrNull()
+        }
+        val recoveryAgingHours = supplierDashboardChunk {
+          recoveryAgingStartedAtMillis
+            ?.let { startedAt -> ((now - startedAt).coerceAtLeast(0L) / (AITA_SUPPLIER_DAY_MILLIS / 24L)).coerceAtMost(999L).toInt() }
+            ?: 0
+        }
+        val recoveryAgingScore = supplierDashboardChunk {
+          (
+            (recoveryAgingHours * 2).coerceAtMost(50) +
+              when (recoveryUrgencyLane) {
+                "overdue" -> 18
+                "today" -> 12
+                "soon" -> 6
+                else -> 2
+              } +
+              when (recoveryFollowUpLane) {
+                "follow_up_now" -> 14
+                "same_day_check" -> 8
+                "before_pack_check" -> 6
+                else -> 1
+              } +
+              when (recoveryRiskLane) {
+                "critical_recovery" -> 12
+                "decision_pressure" -> 8
+                "pack_sourcing_watch" -> 5
+                else -> 1
+              } +
+              when (recoveryConfidenceLane) {
+                "blocked_until_decision" -> 8
+                "needs_confirmation" -> 5
+                "ready_to_recover" -> 0
+                else -> 2
+              }
+            ).coerceIn(0, 100)
+        }
+        val recoveryAgingLane = supplierDashboardChunk {
+          when {
+            recoveryAgingScore >= 75 || recoveryAgingHours >= 72 || (recoveryFollowUpAtMillis?.let { followUp -> followUp <= now } == true) -> "stale_blocker"
+            recoveryAgingScore >= 52 || recoveryAgingHours >= 24 || recoveryUrgencyLane == "overdue" || recoveryUrgencyLane == "today" -> "touch_today"
+            recoveryAgingHours <= 6 && (recoveryConfidenceLane == "ready_to_recover" || recoveryCommandLane == "ready_with_note") -> "fresh_recovery"
+            recoveryCommandLane == "ready_with_note" && recoveryLedgerLane == "ledger_ready" -> "fresh_recovery"
+            else -> "age_watch"
+          }
+        }
+        val recoveryAgingHint = supplierDashboardChunk {
+          when (recoveryAgingLane) {
+            "stale_blocker" -> supplierDashboardJoinedMessage(
+              listOf("Recovery aging: this shortage has gone stale or missed a follow-up. Touch the owner now before packflow or downstream promises move."),
+              listOf("Старение восстановления: недопоставка застоялась или пропустила контроль. Свяжитесь с ответственным сейчас до движения сборки или обещаний."),
+              listOf("Қалпына келтіру ескіруі: бұл жетіспеу тоқтап қалды немесе бақылауды өткізіп алды. Жинау не уәде қозғалғанша жауаптыны қазір қозғаңыз.")
+            )
+            "touch_today" -> supplierDashboardJoinedMessage(
+              listOf("Recovery aging: refresh this case today, update the promise/checklist, and keep the missing quantity visible."),
+              listOf("Старение восстановления: обновите этот кейс сегодня, освежите обещание/чек-лист и держите недостачу видимой."),
+              listOf("Қалпына келтіру ескіруі: бұл істі бүгін жаңартып, уәде/чек-парақты түзетіп, жетіспейтін санды көрінетін ұстаңыз.")
+            )
+            "fresh_recovery" -> supplierDashboardJoinedMessage(
+              listOf("Recovery aging: this recovery looks fresh; keep the close note clean and do not reopen old blockers unless a promise changes."),
+              listOf("Старение восстановления: восстановление свежее; держите закрывающую заметку чистой и не открывайте старые блокеры без изменения обещания."),
+              listOf("Қалпына келтіру ескіруі: қалпына келтіру жаңа; жабу жазбасын таза ұстап, уәде өзгермесе ескі бөгеттерді ашпаңыз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Recovery aging: keep this shortage on watch with a clear next touch before it becomes stale."),
+              listOf("Старение восстановления: держите недопоставку на наблюдении с понятным следующим касанием, пока она не застоялась."),
+              listOf("Қалпына келтіру ескіруі: жетіспеу ескірмей тұрып келесі байланысын анықтап бақылауда ұстаңыз.")
+            )
+          }
+        }
+        val recoveryAgingChecklist = supplierDashboardChunk {
+          when (recoveryAgingLane) {
+            "stale_blocker" -> supplierDashboardJoinedMessage(
+              listOf("□ Touch assigned owner now\n□ Reconfirm follow-up or promise\n□ Block unsafe pack/close actions\n□ Add fresh note before handoff"),
+              listOf("□ Связаться с ответственным сейчас\n□ Подтвердить контроль или обещание\n□ Заблокировать небезопасную сборку/закрытие\n□ Добавить свежую заметку до передачи"),
+              listOf("□ Жауаптымен қазір байланысу\n□ Бақылау не уәдені қайта бекіту\n□ Қауіпсіз емес жинау/жабуды тоқтату\n□ Берер алдында жаңа жазба қосу")
+            )
+            "touch_today" -> supplierDashboardJoinedMessage(
+              listOf("□ Refresh owner note today\n□ Update next follow-up\n□ Recheck promise shield\n□ Keep shortage visible"),
+              listOf("□ Сегодня обновить заметку ответственного\n□ Обновить следующий контроль\n□ Проверить щит обещания\n□ Держать недостачу видимой"),
+              listOf("□ Бүгін жауапты жазбасын жаңарту\n□ Келесі бақылауды жаңарту\n□ Уәде қалқанын тексеру\n□ Жетіспеуді көрінетін ұстау")
+            )
+            "fresh_recovery" -> supplierDashboardJoinedMessage(
+              listOf("□ Keep proof attached\n□ Close only completed step\n□ Leave remaining promise visible\n□ Watch for new shortage answer"),
+              listOf("□ Держать доказательство рядом\n□ Закрыть только выполненный шаг\n□ Оставить оставшееся обещание видимым\n□ Следить за новым ответом по недостаче"),
+              listOf("□ Дәлелді бірге сақтау\n□ Тек орындалған қадамды жабу\n□ Қалған уәдені көрінетін ұстау\n□ Жаңа жетіспеу жауабын бақылау")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("□ Set next touch\n□ Keep owner visible\n□ Watch due bucket\n□ Escalate if no fresh answer"),
+              listOf("□ Поставить следующее касание\n□ Держать ответственного видимым\n□ Следить за сроком\n□ Эскалировать без свежего ответа"),
+              listOf("□ Келесі байланысты қою\n□ Жауаптыны көрінетін ұстау\n□ Мерзім тобын бақылау\n□ Жаңа жауап болмаса көтеру")
+            )
+          }
+        }
+        val recoveryAgingPathMain = supplierDashboardChunk {
+          when (recoveryAgingLane) {
+            "stale_blocker" -> "stale blocker; touch owner now"
+            "touch_today" -> "refresh today"
+            "fresh_recovery" -> "fresh guarded recovery"
+            else -> "watch aging"
+          }
+        }
+        val recoveryAgingPathRu = supplierDashboardChunk {
+          when (recoveryAgingLane) {
+            "stale_blocker" -> "застойный блокер; связаться сейчас"
+            "touch_today" -> "обновить сегодня"
+            "fresh_recovery" -> "свежее защищённое восстановление"
+            else -> "наблюдать старение"
+          }
+        }
+        val recoveryAgingPathKk = supplierDashboardChunk {
+          when (recoveryAgingLane) {
+            "stale_blocker" -> "ескірген бөгет; қазір байланысу"
+            "touch_today" -> "бүгін жаңарту"
+            "fresh_recovery" -> "жаңа қорғалған қалпына келтіру"
+            else -> "ескіруді бақылау"
+          }
+        }
+        val recoveryAgingScript = supplierDashboardChunk {
+          supplierDashboardJoinedMessage(
+            listOf(
+              "AITA aging check: $recoveryContactGoodsName.",
+              "Aging path: $recoveryAgingPathMain; age ${recoveryAgingHours}h; aging score $recoveryAgingScore/100.",
+              "Wave ${recoveryWaveScore}/100; risk ${recoveryRiskScore}/100; follow-up ${recoveryFollowUpLane.ifBlank { "watch" }}.",
+              "Refresh the note, promise, and owner before this recovery becomes invisible. Keep store names private outside AITA."
+            ),
+            listOf(
+              "AITA проверка старения: $recoveryContactGoodsName.",
+              "Путь старения: $recoveryAgingPathRu; возраст ${recoveryAgingHours}ч; оценка $recoveryAgingScore/100.",
+              "Волна ${recoveryWaveScore}/100; риск ${recoveryRiskScore}/100; контроль ${recoveryFollowUpLane.ifBlank { "watch" }}.",
+              "Обновите заметку, обещание и ответственного, пока восстановление не стало невидимым. Названия магазинов держите приватными вне AITA."
+            ),
+            listOf(
+              "AITA ескіру тексерісі: $recoveryContactGoodsName.",
+              "Ескіру жолы: $recoveryAgingPathKk; жасы ${recoveryAgingHours}сағ; ұпай $recoveryAgingScore/100.",
+              "Толқын ${recoveryWaveScore}/100; тәуекел ${recoveryRiskScore}/100; бақылау ${recoveryFollowUpLane.ifBlank { "watch" }}.",
+              "Бұл қалпына келтіру көрінбей қалмай тұрып жазбаны, уәдені және жауаптыны жаңартыңыз. AITA сыртында дүкен атауларын құпия ұстаңыз."
+            )
+          )
+        }
+        val decisionBottleneckScore = supplierDashboardChunk {
+          (
+            (if (recoveryOutcomeLane == "substitute_offer" || recoveryOutcomeLane == "cancel_review") 26 else 0) +
+              (if (recoveryConfidenceLane == "blocked_until_decision") 22 else 0) +
+              (if (recoveryProofLane == "store_ack_required") 16 else 0) +
+              (if (recoveryTriageLane == "decision_lane" || recoveryTriageLane == "triage_now") 16 else 0) +
+              (if (fullyShortLineCount > 0) 8 else 0) +
+              (if (recoveryUrgencyLane == "overdue" || recoveryUrgencyLane == "today") 8 else 0)
+            ).coerceIn(0, 100)
+        }
+        val contactBottleneckScore = supplierDashboardChunk {
+          (
+            (if (recoveryContactLane == "store_call" || recoveryContactLane == "substitute_answer") 28 else 0) +
+              (if (recoveryOwnerLane == "store_contact") 18 else 0) +
+              (if (recoveryPromiseShieldLane == "store_answer_needed") 18 else 0) +
+              (if (recoverySlaLane == "call_now" || recoveryFollowUpLane == "follow_up_now") 12 else 0) +
+              (if (recoveryUrgencyLane == "overdue") 8 else 0)
+            ).coerceIn(0, 100)
+        }
+        val sourcingBottleneckScore = supplierDashboardChunk {
+          (
+            (if (recoveryCommandLane == "source_now" || recoveryOwnerLane == "upstream_sourcing") 26 else 0) +
+              (if (recoveryContactLane == "upstream_request" || recoveryPromiseShieldLane == "source_before_promise") 20 else 0) +
+              (if (recoveryLane == "source_or_cancel" || recoveryLane == "split_source") 16 else 0) +
+              fullyShortLineCount * 7 +
+              (if (recoveryEscalationLane == "sourcing_escalation") 10 else 0)
+            ).coerceIn(0, 100)
+        }
+        val packBottleneckScore = supplierDashboardChunk {
+          (
+            (if (recoveryCommandLane == "stop_pack" || recoveryPackGuardLane == "block_pack") 32 else 0) +
+              (if (recoveryEscalationLane == "pack_hold" || recoveryHandoffLane == "pack_handoff") 18 else 0) +
+              (if (recoveryPackGuardLane == "split_pack_only") 12 else 0) +
+              (if (recoveryClosureLane == "blocked_open") 12 else 0) +
+              partialLineCount * 6
+            ).coerceIn(0, 100)
+        }
+        val proofBottleneckScore = supplierDashboardChunk {
+          (
+            (if (recoveryLedgerLane == "audit_blocker") 28 else 0) +
+              (if (recoveryLedgerScore < 55) 16 else 0) +
+              (if (recoveryProofLane == "sourcing_note_required" || recoveryProofLane == "pack_guard_proof") 16 else 0) +
+              (if (recoveryClosureLane == "needs_close_note") 14 else 0) +
+              (if (recoveryConfidenceScore < 55) 6 else 0)
+            ).coerceIn(0, 100)
+        }
+        val agingBottleneckScore = supplierDashboardChunk {
+          (
+            recoveryAgingScore / 2 +
+              (if (recoveryAgingLane == "stale_blocker") 26 else 0) +
+              (if (recoveryAgingHours >= 48) 12 else 0) +
+              (if (recoveryFollowUpAtMillis?.let { followUp -> followUp <= now } == true) 14 else 0)
+            ).coerceIn(0, 100)
+        }
+        val readyBottleneckScore = supplierDashboardChunk {
+          (
+            (if (recoveryConfidenceLane == "ready_to_recover") 22 else 0) +
+              (if (recoveryCommandLane == "ready_with_note") 18 else 0) +
+              (if (recoveryPromiseShieldLane == "promise_safe") 12 else 0) +
+              (if (recoveryLedgerLane == "ledger_ready") 8 else 0) +
+              (if (recoveryAgingLane == "fresh_recovery") 8 else 0)
+            ).coerceIn(0, 100)
+        }
+        val bottleneckCandidates = supplierDashboardChunk {
+          listOf(
+            "decision_bottleneck" to decisionBottleneckScore,
+            "contact_bottleneck" to contactBottleneckScore,
+            "sourcing_bottleneck" to sourcingBottleneckScore,
+            "pack_bottleneck" to packBottleneckScore,
+            "proof_bottleneck" to proofBottleneckScore,
+            "aging_bottleneck" to agingBottleneckScore,
+            "ready_bottleneck" to readyBottleneckScore,
+            "watch_bottleneck" to 18
+          )
+        }
+        val topBottleneckCandidate = supplierDashboardChunk {
+          bottleneckCandidates.maxByOrNull { candidate -> candidate.second }
+        }
+        val recoveryBottleneckScore = supplierDashboardChunk {
+          (topBottleneckCandidate?.second ?: 0).coerceIn(0, 100)
+        }
+        val recoveryBottleneckLane = supplierDashboardChunk {
+          when {
+            recoveryBottleneckScore <= 20 && recoveryWaveLane == "wave_watch" -> "watch_bottleneck"
+            recoveryBottleneckScore <= 20 && readyBottleneckScore > 0 -> "ready_bottleneck"
+            else -> topBottleneckCandidate?.first ?: "watch_bottleneck"
+          }
+        }
+        val recoveryBottleneckHint = supplierDashboardChunk {
+          when (recoveryBottleneckLane) {
+            "decision_bottleneck" -> supplierDashboardJoinedMessage(
+              listOf("Bottleneck map: a substitute, cancel, or store acknowledgement decision is the next hard gate before this recovery can move safely."),
+              listOf("Карта узких мест: решение по замене, отмене или подтверждению магазина — следующий жёсткий шлюз перед безопасным движением."),
+              listOf("Тар орын картасы: ауыстыру, бас тарту немесе дүкен растауы шешімі — қауіпсіз қозғалыс алдындағы басты қақпа.")
+            )
+            "contact_bottleneck" -> supplierDashboardJoinedMessage(
+              listOf("Bottleneck map: the store/contact answer is blocking the next promise. Use the script, record the answer, then re-score the recovery."),
+              listOf("Карта узких мест: ответ магазина/контакта блокирует следующее обещание. Используйте скрипт, запишите ответ и пересчитайте восстановление."),
+              listOf("Тар орын картасы: дүкен/байланыс жауабы келесі уәдеге бөгет. Скриптті қолданып, жауапты жазып, қалпына келтіруді қайта бағалаңыз.")
+            )
+            "sourcing_bottleneck" -> supplierDashboardJoinedMessage(
+              listOf("Bottleneck map: upstream stock, ETA, or no-stock proof is the blocker. Ask sourcing before editing downstream promises."),
+              listOf("Карта узких мест: блокер — наличие выше, срок или доказательство отсутствия. Запросите поиск до изменения обещаний вниз по цепочке."),
+              listOf("Тар орын картасы: бөгет — жоғары арна қоры, мерзімі немесе қор жоқ дәлелі. Төменгі уәделерді өзгертпей тұрып іздеуді сұраңыз.")
+            )
+            "pack_bottleneck" -> supplierDashboardJoinedMessage(
+              listOf("Bottleneck map: packflow is the blocker. Stop unsafe packing, split accepted quantity, and keep missing stock out of dispatch."),
+              listOf("Карта узких мест: блокер — сборка. Остановите небезопасную сборку, отделите принятое количество и не отправляйте недостачу."),
+              listOf("Тар орын картасы: бөгет — жинау. Қауіпсіз емес жинауды тоқтатып, қабылданған санды бөліп, жетіспейтін қорды жөнелтпеңіз.")
+            )
+            "proof_bottleneck" -> supplierDashboardJoinedMessage(
+              listOf("Bottleneck map: proof or ledger trace is missing. Attach the decision/pack/sourcing note before close or handoff."),
+              listOf("Карта узких мест: не хватает доказательства или следа журнала. Прикрепите заметку решения/сборки/поиска до закрытия или передачи."),
+              listOf("Тар орын картасы: дәлел не журнал ізі жетіспейді. Жабу немесе беру алдында шешім/жинау/іздеу жазбасын тіркеңіз.")
+            )
+            "aging_bottleneck" -> supplierDashboardJoinedMessage(
+              listOf("Bottleneck map: the case is going stale. Touch the owner now, refresh the follow-up, and prevent silent drift."),
+              listOf("Карта узких мест: кейс застаивается. Свяжитесь с ответственным, обновите контроль и не дайте задаче тихо уплыть."),
+              listOf("Тар орын картасы: іс ескіріп барады. Жауаптыны қозғап, бақылауды жаңартып, үнсіз жоғалуға жол бермеңіз.")
+            )
+            "ready_bottleneck" -> supplierDashboardJoinedMessage(
+              listOf("Bottleneck map: recovery is mostly ready. Move only the guarded step and keep any residual promise visible."),
+              listOf("Карта узких мест: восстановление почти готово. Двигайте только защищённый шаг и оставляйте остаточное обещание видимым."),
+              listOf("Тар орын картасы: қалпына келтіру дерлік дайын. Тек қорғалған қадамды жүргізіп, қалған уәдені көрінетін ұстаңыз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Bottleneck map: no single hard blocker dominates yet. Keep the shortage watched by owner, follow-up, and promise shield."),
+              listOf("Карта узких мест: один жёсткий блокер пока не доминирует. Держите недопоставку под наблюдением по ответственному, контролю и щиту обещания."),
+              listOf("Тар орын картасы: бір қатты бөгет әлі басым емес. Жетіспеуді жауапты, бақылау және уәде қалқаны бойынша бақылауда ұстаңыз.")
+            )
+          }
+        }
+        val recoveryBottleneckChecklist = supplierDashboardChunk {
+          when (recoveryBottleneckLane) {
+            "decision_bottleneck" -> supplierDashboardJoinedMessage(
+              listOf("□ Pick substitute/delay/cancel answer\n□ Save store acknowledgement\n□ Update promise shield\n□ Reopen sourcing only if answer fails"),
+              listOf("□ Выбрать ответ замена/задержка/отмена\n□ Сохранить подтверждение магазина\n□ Обновить щит обещания\n□ Открыть поиск снова только если ответ сорвался"),
+              listOf("□ Ауыстыру/кідіріс/бас тарту жауабын таңдау\n□ Дүкен растауын сақтау\n□ Уәде қалқанын жаңарту\n□ Жауап іске аспаса ғана іздеуді қайта ашу")
+            )
+            "contact_bottleneck" -> supplierDashboardJoinedMessage(
+              listOf("□ Call/send contact script\n□ Record exact answer\n□ Set next follow-up\n□ Keep store names private outside AITA"),
+              listOf("□ Позвонить/отправить скрипт\n□ Записать точный ответ\n□ Назначить следующий контроль\n□ Держать названия магазинов приватными вне AITA"),
+              listOf("□ Қоңырау шалу/скрипт жіберу\n□ Нақты жауапты жазу\n□ Келесі бақылауды қою\n□ AITA сыртында дүкен атауларын құпия ұстау")
+            )
+            "sourcing_bottleneck" -> supplierDashboardJoinedMessage(
+              listOf("□ Ask upstream reserve/ETA\n□ Save no-stock proof\n□ Offer substitute if needed\n□ Mirror safe answer downstream"),
+              listOf("□ Запросить резерв/срок выше\n□ Сохранить доказательство отсутствия\n□ Предложить замену при необходимости\n□ Передать безопасный ответ вниз"),
+              listOf("□ Жоғарыдан резерв/мерзім сұрау\n□ Қор жоқ дәлелін сақтау\n□ Керек болса ауыстыру ұсыну\n□ Қауіпсіз жауапты төменге беру")
+            )
+            "pack_bottleneck" -> supplierDashboardJoinedMessage(
+              listOf("□ Stop unsafe pack step\n□ Split accepted from missing\n□ Attach pack note\n□ Dispatch only guarded quantity"),
+              listOf("□ Остановить небезопасную сборку\n□ Отделить принятое от недостачи\n□ Прикрепить заметку сборки\n□ Отправить только защищённое количество"),
+              listOf("□ Қауіпсіз емес жинауды тоқтату\n□ Қабылданғанды жетіспейтіннен бөлу\n□ Жинау жазбасын тіркеу\n□ Тек қорғалған санды жөнелту")
+            )
+            "proof_bottleneck" -> supplierDashboardJoinedMessage(
+              listOf("□ Attach decision note\n□ Attach sourcing/pack proof\n□ Keep ledger open until proof exists\n□ Close only completed step"),
+              listOf("□ Прикрепить заметку решения\n□ Прикрепить доказательство поиска/сборки\n□ Держать журнал открытым до доказательства\n□ Закрыть только выполненный шаг"),
+              listOf("□ Шешім жазбасын тіркеу\n□ Іздеу/жинау дәлелін тіркеу\n□ Дәлел болғанша журналды ашық ұстау\n□ Тек орындалған қадамды жабу")
+            )
+            "aging_bottleneck" -> supplierDashboardJoinedMessage(
+              listOf("□ Touch owner now\n□ Refresh note and promise\n□ Reset follow-up time\n□ Escalate if no answer"),
+              listOf("□ Связаться с ответственным сейчас\n□ Обновить заметку и обещание\n□ Сбросить время контроля\n□ Эскалировать без ответа"),
+              listOf("□ Жауаптыны қазір қозғау\n□ Жазба мен уәдені жаңарту\n□ Бақылау уақытын қайта қою\n□ Жауап болмаса көтеру")
+            )
+            "ready_bottleneck" -> supplierDashboardJoinedMessage(
+              listOf("□ Move guarded recovery\n□ Close completed worker step\n□ Keep residual promise visible\n□ Watch for new answer"),
+              listOf("□ Двигать защищённое восстановление\n□ Закрыть выполненный рабочий шаг\n□ Оставить остаточное обещание видимым\n□ Следить за новым ответом"),
+              listOf("□ Қорғалған қалпына келтіруді жүргізу\n□ Орындалған жұмыс қадамын жабу\n□ Қалған уәдені көрінетін ұстау\n□ Жаңа жауапты бақылау")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("□ Keep owner visible\n□ Check next follow-up\n□ Preserve missing quantity\n□ Re-score after each answer"),
+              listOf("□ Держать ответственного видимым\n□ Проверить следующий контроль\n□ Сохранить недостачу видимой\n□ Пересчитать после каждого ответа"),
+              listOf("□ Жауаптыны көрінетін ұстау\n□ Келесі бақылауды тексеру\n□ Жетіспейтін санды сақтау\n□ Әр жауаптан кейін қайта бағалау")
+            )
+          }
+        }
+        val recoveryBottleneckPathMain = supplierDashboardChunk {
+          when (recoveryBottleneckLane) {
+            "decision_bottleneck" -> "decision is blocking recovery"
+            "contact_bottleneck" -> "store/contact answer is blocking recovery"
+            "sourcing_bottleneck" -> "upstream sourcing is blocking recovery"
+            "pack_bottleneck" -> "packflow guard is blocking recovery"
+            "proof_bottleneck" -> "proof and ledger trace are blocking recovery"
+            "aging_bottleneck" -> "stale follow-up is blocking recovery"
+            "ready_bottleneck" -> "ready but guarded"
+            else -> "watch without a dominant blocker"
+          }
+        }
+        val recoveryBottleneckPathRu = supplierDashboardChunk {
+          when (recoveryBottleneckLane) {
+            "decision_bottleneck" -> "решение блокирует восстановление"
+            "contact_bottleneck" -> "ответ магазина/контакта блокирует восстановление"
+            "sourcing_bottleneck" -> "поиск выше блокирует восстановление"
+            "pack_bottleneck" -> "защита сборки блокирует восстановление"
+            "proof_bottleneck" -> "доказательство и журнал блокируют восстановление"
+            "aging_bottleneck" -> "застой контроля блокирует восстановление"
+            "ready_bottleneck" -> "готово, но под защитой"
+            else -> "наблюдение без главного блокера"
+          }
+        }
+        val recoveryBottleneckPathKk = supplierDashboardChunk {
+          when (recoveryBottleneckLane) {
+            "decision_bottleneck" -> "шешім қалпына келтіруге бөгет"
+            "contact_bottleneck" -> "дүкен/байланыс жауабы қалпына келтіруге бөгет"
+            "sourcing_bottleneck" -> "жоғары арна іздеуі қалпына келтіруге бөгет"
+            "pack_bottleneck" -> "жинау қорғанысы қалпына келтіруге бөгет"
+            "proof_bottleneck" -> "дәлел және журнал ізі қалпына келтіруге бөгет"
+            "aging_bottleneck" -> "ескірген бақылау қалпына келтіруге бөгет"
+            "ready_bottleneck" -> "дайын, бірақ қорғалған"
+            else -> "басым бөгетсіз бақылау"
+          }
+        }
+        val recoveryBottleneckScript = supplierDashboardChunk {
+          supplierDashboardJoinedMessage(
+            listOf(
+              "AITA bottleneck map: $recoveryContactGoodsName.",
+              "Main bottleneck: $recoveryBottleneckPathMain; score $recoveryBottleneckScore/100.",
+              "Command ${recoveryCommandLane.ifBlank { "monitor" }}; wave ${recoveryWaveLane.ifBlank { "watch" }}; aging ${recoveryAgingLane.ifBlank { "watch" }}.",
+              "Clear this bottleneck before moving pack, promise, or close steps. Keep store names private outside AITA."
+            ),
+            listOf(
+              "AITA карта узкого места: $recoveryContactGoodsName.",
+              "Главное узкое место: $recoveryBottleneckPathRu; оценка $recoveryBottleneckScore/100.",
+              "Команда ${recoveryCommandLane.ifBlank { "monitor" }}; волна ${recoveryWaveLane.ifBlank { "watch" }}; старение ${recoveryAgingLane.ifBlank { "watch" }}.",
+              "Уберите этот блокер перед сборкой, обещанием или закрытием. Названия магазинов держите приватными вне AITA."
+            ),
+            listOf(
+              "AITA тар орын картасы: $recoveryContactGoodsName.",
+              "Негізгі тар орын: $recoveryBottleneckPathKk; ұпай $recoveryBottleneckScore/100.",
+              "Команда ${recoveryCommandLane.ifBlank { "monitor" }}; толқын ${recoveryWaveLane.ifBlank { "watch" }}; ескіру ${recoveryAgingLane.ifBlank { "watch" }}.",
+              "Жинау, уәде немесе жабу қадамына дейін осы бөгетті шешіңіз. AITA сыртында дүкен атауларын құпия ұстаңыз."
+            )
+          )
+        }
+        val recoveryLoadScore = supplierDashboardChunk {
+          (
+            recoveryLoadOrderPressure +
+              recoveryLoadStorePressure +
+              (itemLines.size * 5).coerceAtMost(20) +
+              (partialLineCount * 7).coerceAtMost(18) +
+              (fullyShortLineCount * 8).coerceAtMost(20) +
+              missingQuantityTotal.coerceAtMost(40.0).toInt() +
+              recoveryBottleneckScore / 5 +
+              recoveryRiskScore / 6 +
+              when (recoveryCommandLane) {
+                "stop_pack" -> 12
+                "call_store" -> 9
+                "source_now" -> 8
+                "split_and_ship" -> 6
+                else -> 2
+              } +
+              when (recoveryWaveLane) {
+                "wave_command" -> 10
+                "wave_contact" -> 8
+                "wave_source" -> 7
+                "wave_split" -> 5
+                else -> 1
+              }
+            ).coerceIn(0, 100)
+        }
+        val recoveryLoadLane = supplierDashboardChunk {
+          when {
+            recoveryLoadScore >= 78 || (affectedStoreCount >= 3 && affectedOrderCount >= 4) -> "heavy_load"
+            affectedStoreCount >= 2 || affectedOrderCount >= 3 -> "multi_store_load"
+            recoveryCommandLane == "split_and_ship" || recoveryPackGuardLane == "split_pack_only" || recoveryBottleneckLane == "pack_bottleneck" -> "pack_load"
+            recoveryCommandLane == "ready_with_note" || recoveryConfidenceLane == "ready_to_recover" || recoveryBottleneckLane == "ready_bottleneck" -> "ready_load"
+            else -> "watch_load"
+          }
+        }
+        val recoveryLoadHint = supplierDashboardChunk {
+          when (recoveryLoadLane) {
+            "heavy_load" -> supplierDashboardJoinedMessage(
+              listOf("Load map: this shortage is carrying several orders/stores or blockers. Split the work into owner, contact, sourcing, and pack touches before promising closure."),
+              listOf("Карта нагрузки: эта недопоставка держит несколько заказов/магазинов или блокеров. Разделите работу на ответственного, контакт, поиск и сборку до обещания закрытия."),
+              listOf("Жүктеме картасы: бұл жетіспеу бірнеше тапсырыс/дүкенді немесе бөгетті ұстап тұр. Жабуды уәде етпес бұрын жұмысты жауапты, байланыс, іздеу және жинау қадамдарына бөліңіз.")
+            )
+            "multi_store_load" -> supplierDashboardJoinedMessage(
+              listOf("Load map: coordinate the same answer across stores, keep names private outside AITA, and avoid one store receiving a different promise by accident."),
+              listOf("Карта нагрузки: согласуйте один ответ по магазинам, держите названия приватными вне AITA и не допускайте случайно разных обещаний."),
+              listOf("Жүктеме картасы: дүкендер бойынша бір жауапты келісіп, AITA сыртында атауларды құпия ұстаңыз және кездейсоқ әртүрлі уәделерге жол бермеңіз.")
+            )
+            "pack_load" -> supplierDashboardJoinedMessage(
+              listOf("Load map: packflow is the capacity touch. Keep accepted stock separate, block unsafe quantity, and record who may move the split."),
+              listOf("Карта нагрузки: нагрузка сейчас в сборке. Держите принятое наличие отдельно, блокируйте небезопасное количество и запишите, кто двигает разделение."),
+              listOf("Жүктеме картасы: қазір негізгі жүктеме жинауда. Қабылданған қорды бөлек ұстап, қауіпсіз емес санды бөгеп, бөлуді кім жүргізетінін жазыңыз.")
+            )
+            "ready_load" -> supplierDashboardJoinedMessage(
+              listOf("Load map: recovery looks ready. Move it in one controlled touch, close only the completed worker step, and leave residual promises visible."),
+              listOf("Карта нагрузки: восстановление похоже готово. Проведите его одним контролируемым касанием, закройте только выполненный шаг и оставьте остаточные обещания видимыми."),
+              listOf("Жүктеме картасы: қалпына келтіру дайын сияқты. Оны бір бақыланған қадаммен өткізіп, тек орындалған қадамды жауып, қалған уәделерді көрінетін қалдырыңыз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Load map: low coordination load. Keep it visible, but do not let it crowd out heavier recovery work."),
+              listOf("Карта нагрузки: координационная нагрузка низкая. Держите задачу видимой, но не позволяйте ей вытеснять более тяжёлые восстановления."),
+              listOf("Жүктеме картасы: үйлестіру жүктемесі төмен. Тапсырманы көрініп ұстаңыз, бірақ ауыр қалпына келтірулерді ығыстырмасын.")
+            )
+          }
+        }
+        val recoveryLoadChecklist = supplierDashboardChunk {
+          when (recoveryLoadLane) {
+            "heavy_load" -> supplierDashboardJoinedMessage(
+              listOf("□ Split work by owner\n□ Batch store-safe answers\n□ Record sourcing/pack proof\n□ Re-score after each touch"),
+              listOf("□ Разделить работу по ответственным\n□ Сгруппировать безопасные ответы\n□ Записать доказательства поиска/сборки\n□ Пересчитать после каждого касания"),
+              listOf("□ Жұмысты жауаптыларға бөлу\n□ Қауіпсіз жауаптарды топтау\n□ Іздеу/жинау дәлелін жазу\n□ Әр қадамнан кейін қайта бағалау")
+            )
+            "multi_store_load" -> supplierDashboardJoinedMessage(
+              listOf("□ Use one private store script\n□ Mirror the same ETA/substitute rule\n□ Flag divergent answers\n□ Keep follow-up time visible"),
+              listOf("□ Использовать один приватный скрипт\n□ Повторить одно правило срока/замены\n□ Отметить разные ответы\n□ Держать контроль видимым"),
+              listOf("□ Бір құпия дүкен скриптін қолдану\n□ Бір мерзім/ауыстыру ережесін қайталау\n□ Әртүрлі жауаптарды белгілеу\n□ Бақылау уақытын көрінетін ұстау")
+            )
+            "pack_load" -> supplierDashboardJoinedMessage(
+              listOf("□ Pack only accepted stock\n□ Hold missing quantity\n□ Attach split proof\n□ Confirm second-drop owner"),
+              listOf("□ Собирать только принятое наличие\n□ Удержать недостачу\n□ Приложить доказательство разделения\n□ Подтвердить владельца второй поставки"),
+              listOf("□ Тек қабылданған қорды жинау\n□ Жетіспейтін санды ұстау\n□ Бөлу дәлелін тіркеу\n□ Екінші жеткізу иесін растау")
+            )
+            "ready_load" -> supplierDashboardJoinedMessage(
+              listOf("□ Move guarded ready item\n□ Close completed worker step\n□ Keep promise ledger\n□ Watch next follow-up"),
+              listOf("□ Провести защищённую готовую позицию\n□ Закрыть выполненный шаг\n□ Сохранить журнал обещания\n□ Следить за следующим контролем"),
+              listOf("□ Қорғалған дайын позицияны өткізу\n□ Орындалған қадамды жабу\n□ Уәде журналын сақтау\n□ Келесі бақылауды қадағалау")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("□ Keep on watch\n□ Refresh after answer\n□ Do not over-prioritize\n□ Escalate if score rises"),
+              listOf("□ Оставить в наблюдении\n□ Обновить после ответа\n□ Не завышать приоритет\n□ Эскалировать при росте оценки"),
+              listOf("□ Бақылауда ұстау\n□ Жауаптан кейін жаңарту\n□ Басымдықты артық көтермеу\n□ Ұпай өссе эскалациялау")
+            )
+          }
+        }
+        val recoveryLoadPathMain = supplierDashboardChunk {
+          when (recoveryLoadLane) {
+            "heavy_load" -> "heavy coordination load"
+            "multi_store_load" -> "multi-store answer load"
+            "pack_load" -> "pack capacity load"
+            "ready_load" -> "ready recovery load"
+            else -> "watch load"
+          }
+        }
+        val recoveryLoadPathRu = supplierDashboardChunk {
+          when (recoveryLoadLane) {
+            "heavy_load" -> "тяжёлая координационная нагрузка"
+            "multi_store_load" -> "нагрузка ответов по нескольким магазинам"
+            "pack_load" -> "нагрузка сборки"
+            "ready_load" -> "нагрузка готового восстановления"
+            else -> "нагрузка наблюдения"
+          }
+        }
+        val recoveryLoadPathKk = supplierDashboardChunk {
+          when (recoveryLoadLane) {
+            "heavy_load" -> "ауыр үйлестіру жүктемесі"
+            "multi_store_load" -> "бірнеше дүкен жауабының жүктемесі"
+            "pack_load" -> "жинау қуатының жүктемесі"
+            "ready_load" -> "дайын қалпына келтіру жүктемесі"
+            else -> "бақылау жүктемесі"
+          }
+        }
+        val recoveryLoadScript = supplierDashboardChunk {
+          supplierDashboardJoinedMessage(
+            listOf(
+              "AITA recovery load: $recoveryContactGoodsName.",
+              "Load path: $recoveryLoadPathMain; score $recoveryLoadScore/100; orders $affectedOrderCount; stores $affectedStoreCount.",
+              "Bottleneck ${recoveryBottleneckLane.ifBlank { "watch_bottleneck" }}; command ${recoveryCommandLane.ifBlank { "monitor_promise" }}; wave ${recoveryWaveLane.ifBlank { "wave_watch" }}.",
+              "Batch the work so one shortage does not steal capacity silently. Keep store names private outside AITA."
+            ),
+            listOf(
+              "AITA нагрузка восстановления: $recoveryContactGoodsName.",
+              "Путь нагрузки: $recoveryLoadPathRu; оценка $recoveryLoadScore/100; заказов $affectedOrderCount; магазинов $affectedStoreCount.",
+              "Узкое место ${recoveryBottleneckLane.ifBlank { "watch_bottleneck" }}; команда ${recoveryCommandLane.ifBlank { "monitor_promise" }}; волна ${recoveryWaveLane.ifBlank { "wave_watch" }}.",
+              "Сгруппируйте работу, чтобы одна недопоставка не съела ресурс незаметно. Названия магазинов держите приватными вне AITA."
+            ),
+            listOf(
+              "AITA қалпына келтіру жүктемесі: $recoveryContactGoodsName.",
+              "Жүктеме жолы: $recoveryLoadPathKk; ұпай $recoveryLoadScore/100; тапсырыс $affectedOrderCount; дүкен $affectedStoreCount.",
+              "Тар орын ${recoveryBottleneckLane.ifBlank { "watch_bottleneck" }}; команда ${recoveryCommandLane.ifBlank { "monitor_promise" }}; толқын ${recoveryWaveLane.ifBlank { "wave_watch" }}.",
+              "Бір жетіспеу қуатты үнсіз жұтып қоймас үшін жұмысты топтаңыз. AITA сыртында дүкен атауларын құпия ұстаңыз."
+            )
+          )
+        }
+  
+        val requestCoveragePercent = supplierDashboardChunk {
+          if (requestedQuantityTotal > 0.000001) {
+            ((acceptedQuantityTotal / requestedQuantityTotal) * 100.0).toInt().coerceIn(0, 100)
+          } else 0
+        }
+        val recoveryImpactScore = supplierDashboardChunk {
+          (
+              8 +
+              when (recoveryUrgencyLane) {
+                "overdue" -> 20
+                "today" -> 15
+                "soon" -> 9
+                else -> 2
+              } +
+              when (recoveryPromiseShieldLane) {
+                "promise_at_risk" -> 20
+                "store_answer_needed" -> 14
+                "source_before_promise" -> 11
+                "split_promise" -> 7
+                "promise_safe" -> -8
+                else -> 2
+              } +
+              when (recoveryCommandLane) {
+                "stop_pack" -> 15
+                "call_store" -> 10
+                "source_now" -> 8
+                "split_and_ship" -> 5
+                "ready_with_note" -> -6
+                else -> 1
+              } +
+              when {
+                recoveryRiskScore >= 78 -> 14
+                recoveryRiskScore >= 60 -> 9
+                recoveryRiskScore >= 42 -> 4
+                else -> 1
+              } +
+              when (recoveryBottleneckLane) {
+                "decision_bottleneck" -> 8
+                "pack_bottleneck" -> 7
+                "sourcing_bottleneck" -> 6
+                "ready_bottleneck" -> -5
+                else -> 2
+              } +
+              when (recoveryLoadLane) {
+                "heavy_load" -> 10
+                "multi_store_load" -> 7
+                "pack_load" -> 5
+                "ready_load" -> -4
+                else -> 1
+              } +
+              affectedStoreCount.coerceAtMost(5) * 5 +
+              affectedOrderCount.coerceAtMost(6) * 4 +
+              fullyShortLineCount.coerceAtMost(6) * 4 +
+              partialLineCount.coerceAtMost(8) * 3 +
+              missingQuantityTotal.coerceAtMost(35.0).toInt() +
+              ((100 - requestCoveragePercent).coerceAtLeast(0) / 5)
+            ).coerceIn(0, 100)
+        }
+        val recoveryImpactLane = supplierDashboardChunk {
+          when {
+            recoveryPromiseShieldLane == "promise_at_risk" || recoveryCommandLane == "stop_pack" || recoveryImpactScore >= 82 -> "customer_promise_impact"
+            recoveryConfidenceLane == "ready_to_recover" && recoveryLedgerLane == "ledger_ready" && recoveryImpactScore <= 58 -> "controlled_impact"
+            affectedStoreCount >= 2 || affectedOrderCount >= 3 || recoveryLoadLane == "multi_store_load" -> "multi_store_impact"
+            recoveryUrgencyLane == "overdue" || recoveryUrgencyLane == "today" || recoveryPromiseShieldLane == "store_answer_needed" -> "store_replenishment_impact"
+            else -> "impact_watch"
+          }
+        }
+        val recoveryImpactHint = supplierDashboardChunk {
+          when (recoveryImpactLane) {
+            "customer_promise_impact" -> supplierDashboardJoinedMessage(
+              listOf("Impact guard: this shortage can leak into downstream customer promises. Freeze public promises until command, proof, and follow-up are refreshed."),
+              listOf("Защита влияния: эта недопоставка может попасть в обещания клиентам. Заморозьте внешние обещания, пока команда, доказательство и контроль не обновлены."),
+              listOf("Әсер қорғаны: бұл жетіспеу төменгі клиент уәделеріне өтуі мүмкін. Команда, дәлел және бақылау жаңарғанша сыртқы уәделерді тоқтатыңыз.")
+            )
+            "multi_store_impact" -> supplierDashboardJoinedMessage(
+              listOf("Impact guard: several stores or orders depend on this SKU, so batch answers and avoid fixing only one visible card."),
+              listOf("Защита влияния: несколько магазинов или заказов зависят от этого SKU, поэтому объедините ответы и не чините только одну видимую карточку."),
+              listOf("Әсер қорғаны: бірнеше дүкен немесе тапсырыс осы SKU-ға тәуелді, сондықтан жауаптарды топтаңыз және тек бір көрінетін карточканы ғана жаппаңыз.")
+            )
+            "store_replenishment_impact" -> supplierDashboardJoinedMessage(
+              listOf("Impact guard: replenishment is close to due. Tell the store whether to delay, substitute, split, or cancel before packflow moves."),
+              listOf("Защита влияния: пополнение близко к сроку. Сообщите магазину задержку, замену, разделение или отмену до движения сборки."),
+              listOf("Әсер қорғаны: толықтыру мерзімі жақын. Жинау жүрмей тұрып дүкенге кідіріс, ауыстыру, бөлу немесе бас тарту туралы айтыңыз.")
+            )
+            "controlled_impact" -> supplierDashboardJoinedMessage(
+              listOf("Impact guard: impact is controlled. Move the guarded quantity, keep the shortage note visible, and close only the completed worker step."),
+              listOf("Защита влияния: влияние под контролем. Двигайте защищённое количество, оставьте заметку недостачи видимой и закрывайте только выполненный шаг."),
+              listOf("Әсер қорғаны: әсер бақылауда. Қорғалған санды жүргізіңіз, жетіспеу жазбасын көрінетін қалдырып, тек орындалған қадамды жабыңыз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Impact guard: watch impact quietly and refresh the score when due time, owner answer, accepted quantity, or affected store count changes."),
+              listOf("Защита влияния: спокойно наблюдайте влияние и обновляйте оценку при изменении срока, ответа ответственного, принятого количества или числа магазинов."),
+              listOf("Әсер қорғаны: әсерді тыныш бақылап, мерзім, жауапты жауабы, қабылданған сан немесе дүкен саны өзгерсе ұпайды жаңартыңыз.")
+            )
+          }
+        }
+        val recoveryImpactChecklist = supplierDashboardChunk {
+          when (recoveryImpactLane) {
+            "customer_promise_impact" -> supplierDashboardJoinedMessage(
+              listOf("□ Freeze unsafe customer/store promises\n□ Confirm command owner\n□ Attach proof or answer\n□ Recalculate after follow-up"),
+              listOf("□ Заморозить небезопасные обещания клиенту/магазину\n□ Подтвердить ответственного команды\n□ Приложить доказательство или ответ\n□ Пересчитать после контроля"),
+              listOf("□ Қауіпсіз емес клиент/дүкен уәделерін тоқтату\n□ Команда жауаптысын растау\n□ Дәлел немесе жауап тіркеу\n□ Бақылаудан кейін қайта есептеу")
+            )
+            "multi_store_impact" -> supplierDashboardJoinedMessage(
+              listOf("□ Batch affected orders\n□ Send one privacy-safe answer\n□ Split stock fairly\n□ Keep all shortage rows visible"),
+              listOf("□ Сгруппировать затронутые заказы\n□ Отправить один приватный ответ\n□ Справедливо разделить наличие\n□ Держать все строки недостачи видимыми"),
+              listOf("□ Әсер еткен тапсырыстарды топтау\n□ Бір құпия қауіпсіз жауап жіберу\n□ Қорды әділ бөлу\n□ Барлық жетіспеу жолдарын көрінетін ұстау")
+            )
+            "store_replenishment_impact" -> supplierDashboardJoinedMessage(
+              listOf("□ Check due time\n□ Choose delay/substitute/split/cancel\n□ Tell store before packing\n□ Save follow-up time"),
+              listOf("□ Проверить срок\n□ Выбрать задержку/замену/разделение/отмену\n□ Сообщить магазину до сборки\n□ Сохранить время контроля"),
+              listOf("□ Мерзімді тексеру\n□ Кідіріс/ауыстыру/бөлу/бас тартуды таңдау\n□ Жинауға дейін дүкенге айту\n□ Бақылау уақытын сақтау")
+            )
+            "controlled_impact" -> supplierDashboardJoinedMessage(
+              listOf("□ Move guarded quantity\n□ Keep open shortage amount\n□ Preserve proof note\n□ Close only completed step"),
+              listOf("□ Двигать защищённое количество\n□ Оставить недостачу открытой\n□ Сохранить доказательство\n□ Закрыть только выполненный шаг"),
+              listOf("□ Қорғалған санды жүргізу\n□ Жетіспейтін санды ашық қалдыру\n□ Дәлел жазбасын сақтау\n□ Тек орындалған қадамды жабу")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("□ Watch due time\n□ Watch owner answer\n□ Keep shortage visible\n□ Refresh after change"),
+              listOf("□ Следить за сроком\n□ Следить за ответом ответственного\n□ Держать недостачу видимой\n□ Обновить после изменения"),
+              listOf("□ Мерзімді бақылау\n□ Жауапты жауабын бақылау\n□ Жетіспеуді көрінетін ұстау\n□ Өзгерістен кейін жаңарту")
+            )
+          }
+        }
+        val recoveryImpactPathMain = supplierDashboardChunk {
+          when (recoveryImpactLane) {
+            "customer_promise_impact" -> "protect downstream customer/store promise first"
+            "multi_store_impact" -> "batch multi-store shortage answer"
+            "store_replenishment_impact" -> "protect store replenishment before packflow"
+            "controlled_impact" -> "impact controlled; move guarded step only"
+            else -> "watch impact and refresh on change"
+          }
+        }
+        val recoveryImpactPathRu = supplierDashboardChunk {
+          when (recoveryImpactLane) {
+            "customer_promise_impact" -> "сначала защитить обещание клиенту/магазину"
+            "multi_store_impact" -> "сгруппировать ответ по нескольким магазинам"
+            "store_replenishment_impact" -> "защитить пополнение магазина до сборки"
+            "controlled_impact" -> "влияние под контролем; двигать только защищённый шаг"
+            else -> "наблюдать влияние и обновлять при изменении"
+          }
+        }
+        val recoveryImpactPathKk = supplierDashboardChunk {
+          when (recoveryImpactLane) {
+            "customer_promise_impact" -> "алдымен клиент/дүкен уәдесін қорғау"
+            "multi_store_impact" -> "бірнеше дүкен жетіспеу жауабын топтау"
+            "store_replenishment_impact" -> "жинауға дейін дүкен толықтыруын қорғау"
+            "controlled_impact" -> "әсер бақылауда; тек қорғалған қадамды жүргізу"
+            else -> "әсерді бақылап, өзгерісте жаңарту"
+          }
+        }
+        val recoveryImpactScript = supplierDashboardChunk {
+          supplierDashboardJoinedMessage(
+            listOf(
+              "AITA recovery impact: $recoveryContactGoodsName.",
+              "Impact path: $recoveryImpactPathMain.",
+              "Impact score $recoveryImpactScore/100; affected orders $affectedOrderCount; affected stores $affectedStoreCount; coverage $requestCoveragePercent%.",
+              "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()}."
+            ),
+            listOf(
+              "AITA влияние восстановления: $recoveryContactGoodsName.",
+              "Путь влияния: $recoveryImpactPathRu.",
+              "Оценка влияния $recoveryImpactScore/100; заказов $affectedOrderCount; магазинов $affectedStoreCount; покрытие $requestCoveragePercent%.",
+              "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()}."
+            ),
+            listOf(
+              "AITA қалпына келтіру әсері: $recoveryContactGoodsName.",
+              "Әсер жолы: $recoveryImpactPathKk.",
+              "Әсер ұпайы $recoveryImpactScore/100; тапсырыс $affectedOrderCount; дүкен $affectedStoreCount; қамту $requestCoveragePercent%.",
+              "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()}."
+            )
+          )
+        }
+  
+  
+        val recoveryCommitByMillis = supplierDashboardChunk {
+          when {
+            recoveryCommandLane == "stop_pack" || recoveryPackGuardLane == "block_pack" -> recoveryFollowUpAtMillis ?: recoveryCheckpointAtMillis ?: earliestDueAtMillis
+            recoveryPromiseShieldLane == "promise_at_risk" -> recoveryFollowUpAtMillis ?: recoveryCheckpointAtMillis ?: earliestDueAtMillis
+            recoveryPromiseShieldLane == "store_answer_needed" || recoveryContactLane == "store_call" -> recoveryFollowUpAtMillis ?: recoveryCheckpointAtMillis ?: earliestDueAtMillis
+            recoveryCommandLane == "source_now" || recoveryPromiseShieldLane == "source_before_promise" -> recoveryCheckpointAtMillis ?: recoveryFollowUpAtMillis ?: earliestDueAtMillis
+            recoveryCommandLane == "split_and_ship" || recoveryPromiseShieldLane == "split_promise" -> earliestDueAtMillis ?: recoveryCheckpointAtMillis ?: recoveryFollowUpAtMillis
+            recoveryConfidenceLane == "ready_to_recover" -> recoveryCheckpointAtMillis ?: earliestDueAtMillis ?: recoveryFollowUpAtMillis
+            else -> recoveryFollowUpAtMillis ?: earliestDueAtMillis ?: recoveryCheckpointAtMillis
+          }
+        }
+        val recoveryCommitBucket = supplierDashboardChunk {
+          recoveryCommitByMillis
+            ?.let { commitAt -> supplierDashboardDeliveryBucketId(now, commitAt) }
+            .orEmpty()
+        }
+        val recoveryCommitScore = supplierDashboardChunk {
+          (
+            10 +
+              when (recoveryCommitBucket) {
+                "overdue" -> 22
+                "today" -> 16
+                "tomorrow" -> 10
+                "week" -> 6
+                else -> 2
+              } +
+              when (recoveryPromiseShieldLane) {
+                "promise_at_risk" -> 18
+                "store_answer_needed" -> 13
+                "source_before_promise" -> 11
+                "split_promise" -> 7
+                "promise_safe" -> -8
+                else -> 2
+              } +
+              when (recoveryCommandLane) {
+                "stop_pack" -> 16
+                "call_store" -> 10
+                "source_now" -> 8
+                "split_and_ship" -> 6
+                "ready_with_note" -> -6
+                else -> 1
+              } +
+              when (recoveryImpactLane) {
+                "customer_promise_impact" -> 14
+                "store_replenishment_impact" -> 9
+                "multi_store_impact" -> 7
+                "controlled_impact" -> -6
+                else -> 2
+              } +
+              when (recoveryBottleneckLane) {
+                "decision_bottleneck" -> 9
+                "contact_bottleneck" -> 8
+                "sourcing_bottleneck" -> 7
+                "pack_bottleneck" -> 6
+                "ready_bottleneck" -> -4
+                else -> 1
+              } +
+              recoveryRiskScore / 6 +
+              recoveryImpactScore / 6 +
+              ((100 - requestCoveragePercent).coerceAtLeast(0) / 6) +
+              fullyShortLineCount.coerceAtMost(5) * 3 +
+              partialLineCount.coerceAtMost(6) * 2
+            ).coerceIn(0, 100)
+        }
+        val recoveryCommitLane = supplierDashboardChunk {
+          when {
+            recoveryCommandLane == "stop_pack" || recoveryPackGuardLane == "block_pack" || recoveryPromiseShieldLane == "promise_at_risk" || (recoveryImpactLane == "customer_promise_impact" && recoveryConfidenceLane != "ready_to_recover") -> "commit_blocked"
+            recoveryConfidenceLane == "ready_to_recover" && recoveryLedgerLane == "ledger_ready" && recoveryClosureLane != "blocked_open" && recoveryImpactLane == "controlled_impact" -> "commit_ready"
+            recoveryCommitBucket == "overdue" || recoveryCommitBucket == "today" || recoveryContactLane == "store_call" || recoveryPromiseShieldLane == "store_answer_needed" -> "commit_store_today"
+            recoveryCommandLane == "source_now" || recoveryPromiseShieldLane == "source_before_promise" || recoveryOwnerLane == "upstream_sourcing" || recoveryBottleneckLane == "sourcing_bottleneck" -> "commit_source_eta"
+            recoveryCommandLane == "split_and_ship" || recoveryLane == "split_delivery" || recoveryPromiseShieldLane == "split_promise" || recoveryPackGuardLane == "split_pack_only" -> "commit_split_eta"
+            else -> "commit_watch"
+          }
+        }
+        val recoveryCommitHint = supplierDashboardChunk {
+          when (recoveryCommitLane) {
+            "commit_blocked" -> supplierDashboardJoinedMessage(
+              listOf("Commit guard: do not promise this shortage downstream yet. Freeze store/customer ETA until pack safety, proof, and owner answer are clear."),
+              listOf("Защита обязательства: пока не обещайте эту недопоставку ниже по цепочке. Заморозьте срок для магазина/клиента до ясной сборки, доказательства и ответа ответственного."),
+              listOf("Міндеттеме қорғаны: бұл жетіспеуді төменгі арнаға әлі уәде етпеңіз. Жинау қауіпсіздігі, дәлел және жауапты жауабы анық болғанша дүкен/клиент мерзімін тоқтатыңыз.")
+            )
+            "commit_store_today" -> supplierDashboardJoinedMessage(
+              listOf("Commit guard: store-facing answer is due now. Give one clear delay, substitute, split-drop, or cancel answer before dispatch moves."),
+              listOf("Защита обязательства: ответ магазину нужен сейчас. Дайте понятную задержку, замену, разделение или отмену до движения отправки."),
+              listOf("Міндеттеме қорғаны: дүкенге жауап қазір керек. Жөнелту қозғалғанша нақты кідіріс, ауыстыру, бөлу немесе бас тарту жауабын беріңіз.")
+            )
+            "commit_source_eta" -> supplierDashboardJoinedMessage(
+              listOf("Commit guard: upstream ETA is the missing promise. Ask for reserve/arrival/no-stock proof before changing downstream dates."),
+              listOf("Защита обязательства: не хватает срока от поставщика выше. Запросите резерв/прибытие/доказательство отсутствия до изменения нижних дат."),
+              listOf("Міндеттеме қорғаны: жоғары арнадан мерзім жетіспейді. Төменгі күндерді өзгертпес бұрын резерв/келу/қор жоқ дәлелін сұраңыз.")
+            )
+            "commit_split_eta" -> supplierDashboardJoinedMessage(
+              listOf("Commit guard: split ETA is needed. Promise what ships now, what waits, and which quantity remains open."),
+              listOf("Защита обязательства: нужен срок разделения. Зафиксируйте что едет сейчас, что ждёт и какое количество остаётся открытым."),
+              listOf("Міндеттеме қорғаны: бөлу мерзімі керек. Қазір не кететінін, не күтетінін және қандай сан ашық қалатынын бекітіңіз.")
+            )
+            "commit_ready" -> supplierDashboardJoinedMessage(
+              listOf("Commit guard: commitment is ready with guardrails. Move only the safe step and keep remaining shortage promises visible."),
+              listOf("Защита обязательства: обязательство готово с ограничителями. Двигайте только безопасный шаг и держите оставшиеся обещания видимыми."),
+              listOf("Міндеттеме қорғаны: міндеттеме қорғанмен дайын. Тек қауіпсіз қадамды жүргізіп, қалған жетіспеу уәделерін көрінетін ұстаңыз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Commit guard: keep the recovery promise on watch and refresh it when owner, stock, proof, or due time changes."),
+              listOf("Защита обязательства: держите обещание восстановления на наблюдении и обновляйте при изменении ответственного, наличия, доказательства или срока."),
+              listOf("Міндеттеме қорғаны: қалпына келтіру уәдесін бақылауда ұстап, жауапты, қор, дәлел немесе мерзім өзгерсе жаңартыңыз.")
+            )
+          }
+        }
+        val recoveryCommitChecklist = supplierDashboardChunk {
+          when (recoveryCommitLane) {
+            "commit_blocked" -> supplierDashboardJoinedMessage(
+              listOf("□ Freeze downstream ETA\n□ Confirm pack guard\n□ Attach proof/owner answer\n□ Set next safe commit time"),
+              listOf("□ Заморозить нижний срок\n□ Подтвердить защиту сборки\n□ Приложить доказательство/ответ\n□ Поставить следующее безопасное время"),
+              listOf("□ Төменгі мерзімді тоқтату\n□ Жинау қорғанын растау\n□ Дәлел/жауап тіркеу\n□ Келесі қауіпсіз уақыт қою")
+            )
+            "commit_store_today" -> supplierDashboardJoinedMessage(
+              listOf("□ Call/store message today\n□ Choose delay/substitute/split/cancel\n□ Save answer in note\n□ Recheck promise shield"),
+              listOf("□ Позвонить/написать магазину сегодня\n□ Выбрать задержку/замену/разделение/отмену\n□ Сохранить ответ в заметке\n□ Перепроверить щит обещания"),
+              listOf("□ Бүгін дүкенге қоңырау/хабар\n□ Кідіріс/ауыстыру/бөлу/бас тарту таңдау\n□ Жауапты жазбаға сақтау\n□ Уәде қалқанын қайта тексеру")
+            )
+            "commit_source_eta" -> supplierDashboardJoinedMessage(
+              listOf("□ Ask upstream ETA\n□ Ask reserve quantity\n□ Save no-stock proof if needed\n□ Update store promise after answer"),
+              listOf("□ Запросить срок выше\n□ Запросить резерв количества\n□ Сохранить доказательство отсутствия\n□ Обновить обещание магазину после ответа"),
+              listOf("□ Жоғары арнадан мерзім сұрау\n□ Резерв санын сұрау\n□ Қор жоқ дәлелін сақтау\n□ Жауаптан кейін дүкен уәдесін жаңарту")
+            )
+            "commit_split_eta" -> supplierDashboardJoinedMessage(
+              listOf("□ Mark ship-now quantity\n□ Mark waiting quantity\n□ Add second-drop ETA\n□ Keep shortage open until closed"),
+              listOf("□ Отметить количество сейчас\n□ Отметить ожидающее количество\n□ Добавить срок второй поставки\n□ Держать недостачу открытой до закрытия"),
+              listOf("□ Қазір кететін санды белгілеу\n□ Күтетін санды белгілеу\n□ Екінші жеткізу мерзімін қосу\n□ Жабылғанша жетіспеуді ашық ұстау")
+            )
+            "commit_ready" -> supplierDashboardJoinedMessage(
+              listOf("□ Move guarded step\n□ Keep remaining shortage visible\n□ Copy safe promise note\n□ Close only completed work"),
+              listOf("□ Двигать защищённый шаг\n□ Оставить остаток недостачи видимым\n□ Скопировать безопасную заметку\n□ Закрыть только выполненную работу"),
+              listOf("□ Қорғалған қадамды жүргізу\n□ Қалған жетіспеуді көрінетін ұстау\n□ Қауіпсіз уәде жазбасын көшіру\n□ Тек орындалған жұмысты жабу")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("□ Watch owner answer\n□ Watch due time\n□ Refresh promise after change\n□ Keep privacy-safe note"),
+              listOf("□ Следить за ответом\n□ Следить за сроком\n□ Обновить обещание после изменения\n□ Держать приватную заметку"),
+              listOf("□ Жауапты бақылау\n□ Мерзімді бақылау\n□ Өзгерістен кейін уәдені жаңарту\n□ Құпия қауіпсіз жазба ұстау")
+            )
+          }
+        }
+        val recoveryCommitPathMain = supplierDashboardChunk {
+          when (recoveryCommitLane) {
+            "commit_blocked" -> "blocked; no downstream ETA yet"
+            "commit_store_today" -> "store answer due today"
+            "commit_source_eta" -> "upstream ETA needed"
+            "commit_split_eta" -> "split/drop ETA needed"
+            "commit_ready" -> "safe commitment ready"
+            else -> "watch commitment"
+          }
+        }
+        val recoveryCommitPathRu = supplierDashboardChunk {
+          when (recoveryCommitLane) {
+            "commit_blocked" -> "заблокировано; внешнего срока пока нет"
+            "commit_store_today" -> "ответ магазину нужен сегодня"
+            "commit_source_eta" -> "нужен срок выше по цепочке"
+            "commit_split_eta" -> "нужен срок разделения/допоставки"
+            "commit_ready" -> "безопасное обязательство готово"
+            else -> "наблюдать обязательство"
+          }
+        }
+        val recoveryCommitPathKk = supplierDashboardChunk {
+          when (recoveryCommitLane) {
+            "commit_blocked" -> "бөгелген; төменгі мерзім әлі жоқ"
+            "commit_store_today" -> "дүкен жауабы бүгін керек"
+            "commit_source_eta" -> "жоғары арна мерзімі керек"
+            "commit_split_eta" -> "бөлу/жеткізу мерзімі керек"
+            "commit_ready" -> "қауіпсіз міндеттеме дайын"
+            else -> "міндеттемені бақылау"
+          }
+        }
+        val recoveryCommitScript = supplierDashboardChunk {
+          supplierDashboardJoinedMessage(
+            listOf(
+              "Commit path: $recoveryCommitPathMain; score $recoveryCommitScore/100.",
+              "Commit by ${recoveryCommitByMillis?.let { commitAt -> supplierDashboardCopyDateTime(commitAt) } ?: "not set"}; impact ${recoveryImpactLane.ifBlank { "impact_watch" }}; promise ${recoveryPromiseShieldLane.ifBlank { "promise_watch" }}.",
+              "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()} — keep store names inside AITA."
+            ),
+            listOf(
+              "Путь обязательства: $recoveryCommitPathRu; оценка $recoveryCommitScore/100.",
+              "До ${recoveryCommitByMillis?.let { commitAt -> supplierDashboardCopyDateTime(commitAt) } ?: "не задано"}; влияние ${recoveryImpactLane.ifBlank { "impact_watch" }}; обещание ${recoveryPromiseShieldLane.ifBlank { "promise_watch" }}.",
+              "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, нехватка ${missingQuantityTotal.toStockMoneyText()} — названия магазинов держите внутри AITA."
+            ),
+            listOf(
+              "Міндеттеме жолы: $recoveryCommitPathKk; ұпай $recoveryCommitScore/100.",
+              "Мерзімі ${recoveryCommitByMillis?.let { commitAt -> supplierDashboardCopyDateTime(commitAt) } ?: "қойылмаған"}; әсер ${recoveryImpactLane.ifBlank { "impact_watch" }}; уәде ${recoveryPromiseShieldLane.ifBlank { "promise_watch" }}.",
+              "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()} — дүкен атауларын AITA ішінде ұстаңыз."
+            )
+          )
+        }
+  
+        val acceptedStockCanBeSplit = supplierDashboardChunk {
+          acceptedQuantityTotal > 0.000001 && missingQuantityTotal > 0.000001
+        }
+        val allocationPressureBase = supplierDashboardChunk {
+          (
+            affectedStoreCount.coerceAtMost(5) * 12 +
+              affectedOrderCount.coerceAtMost(8) * 7 +
+              fullyShortLineCount.coerceAtMost(6) * 5 +
+              partialLineCount.coerceAtMost(8) * 4 +
+              when (recoveryImpactLane) {
+                "customer_promise_impact" -> 16
+                "multi_store_impact" -> 12
+                "store_replenishment_impact" -> 9
+                "controlled_impact" -> -6
+                else -> 2
+              } +
+              when (recoveryCommitLane) {
+                "commit_blocked" -> 13
+                "commit_store_today" -> 10
+                "commit_source_eta" -> 8
+                "commit_split_eta" -> 6
+                "commit_ready" -> -5
+                else -> 1
+              } +
+              when (recoveryLoadLane) {
+                "heavy_load" -> 10
+                "multi_store_load" -> 9
+                "pack_load" -> 5
+                "ready_load" -> -4
+                else -> 1
+              } +
+              when (recoveryUrgencyLane) {
+                "overdue" -> 12
+                "today" -> 9
+                "soon" -> 5
+                else -> 1
+              } +
+              when (recoveryCommandLane) {
+                "stop_pack" -> 12
+                "call_store" -> 8
+                "source_now" -> 6
+                "split_and_ship" -> 4
+                "ready_with_note" -> -5
+                else -> 1
+              } +
+              when (recoveryPromiseShieldLane) {
+                "promise_at_risk" -> 14
+                "store_answer_needed" -> 9
+                "split_promise" -> 6
+                "promise_safe" -> -7
+                else -> 1
+              } +
+              ((100 - requestCoveragePercent).coerceAtLeast(0) / 4)
+            ).coerceIn(0, 100)
+        }
+        val recoveryAllocationScore = supplierDashboardChunk {
+          allocationPressureBase
+        }
+        val recoveryAllocationLane = supplierDashboardChunk {
+          when {
+            acceptedStockCanBeSplit && affectedStoreCount >= 2 && recoveryAllocationScore >= 58 -> "fair_split_needed"
+            acceptedStockCanBeSplit && affectedOrderCount >= 3 && recoveryAllocationScore >= 58 -> "fair_split_needed"
+            recoveryCommitLane == "commit_blocked" || recoveryPromiseShieldLane == "promise_at_risk" || recoveryImpactLane == "customer_promise_impact" || recoveryCommandLane == "stop_pack" -> "priority_allocation"
+            acceptedStockCanBeSplit && affectedStoreCount <= 1 -> "single_store_allocation"
+            recoveryConfidenceLane == "ready_to_recover" && recoveryLedgerLane == "ledger_ready" && recoveryAllocationScore <= 55 -> "allocation_ready"
+            recoveryCommitLane == "commit_ready" && recoveryImpactLane == "controlled_impact" -> "allocation_ready"
+            else -> "allocation_watch"
+          }
+        }
+        val recoveryAllocationHint = supplierDashboardChunk {
+          when (recoveryAllocationLane) {
+            "fair_split_needed" -> supplierDashboardJoinedMessage(
+              listOf("Allocation guard: accepted stock is not enough for every affected store/order. Split it deliberately and record who receives the first drop."),
+              listOf("Защита распределения: принятого наличия не хватает на все затронутые магазины/заказы. Разделите его осознанно и запишите, кто получает первую поставку."),
+              listOf("Бөлу қорғаны: қабылданған қор барлық әсер еткен дүкен/тапсырысқа жетпейді. Оны саналы бөліп, бірінші жеткізуді кім алатынын жазыңыз.")
+            )
+            "priority_allocation" -> supplierDashboardJoinedMessage(
+              listOf("Allocation guard: protect the riskiest promise first, then split remaining stock without hiding the shortage."),
+              listOf("Защита распределения: сначала защитите самое рискованное обещание, затем разделите остаток, не скрывая недопоставку."),
+              listOf("Бөлу қорғаны: алдымен ең қауіпті уәдені қорғап, қалған қорды жетіспеуді жасырмай бөліңіз.")
+            )
+            "single_store_allocation" -> supplierDashboardJoinedMessage(
+              listOf("Allocation guard: one store/order lane owns the accepted stock. Keep the second-drop note attached before packing."),
+              listOf("Защита распределения: принятое наличие относится к одному магазину/заказу. Перед сборкой оставьте заметку второй поставки."),
+              listOf("Бөлу қорғаны: қабылданған қор бір дүкен/тапсырыс арнасына тиесілі. Жинауға дейін екінші жеткізу жазбасын қалдырыңыз.")
+            )
+            "allocation_ready" -> supplierDashboardJoinedMessage(
+              listOf("Allocation guard: allocation is ready. Ship guarded quantity only and leave the remaining shortage open."),
+              listOf("Защита распределения: распределение готово. Отправляйте только защищённое количество и оставьте остаток недопоставки открытым."),
+              listOf("Бөлу қорғаны: бөлу дайын. Тек қорғалған санды жіберіп, қалған жетіспеуді ашық қалдырыңыз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Allocation guard: watch the accepted-vs-requested gap and refresh the split if stores, due time, or accepted quantity changes."),
+              listOf("Защита распределения: следите за разницей принято/запрошено и обновляйте разделение при изменении магазинов, срока или принятого количества."),
+              listOf("Бөлу қорғаны: қабылданған/сұралған айырмасын бақылап, дүкендер, мерзім немесе қабылданған сан өзгерсе бөлуді жаңартыңыз.")
+            )
+          }
+        }
+        val recoveryAllocationChecklist = supplierDashboardChunk {
+          when (recoveryAllocationLane) {
+            "fair_split_needed" -> supplierDashboardJoinedMessage(
+              listOf("□ Rank affected orders\n□ Split accepted stock fairly\n□ Save first-drop owner\n□ Keep remaining shortage open"),
+              listOf("□ Расставить затронутые заказы\n□ Справедливо разделить принятое наличие\n□ Сохранить получателя первой поставки\n□ Оставить остаток недопоставки открытым"),
+              listOf("□ Әсер еткен тапсырыстарды реттеу\n□ Қабылданған қорды әділ бөлу\n□ Бірінші жеткізу иесін сақтау\n□ Қалған жетіспеуді ашық қалдыру")
+            )
+            "priority_allocation" -> supplierDashboardJoinedMessage(
+              listOf("□ Freeze unsafe promises\n□ Give first stock to highest-risk lane\n□ Tell other lanes the recovery promise\n□ Record why priority won"),
+              listOf("□ Заморозить небезопасные обещания\n□ Отдать первый товар самой рискованной линии\n□ Сообщить другим линиям обещание восстановления\n□ Записать причину приоритета"),
+              listOf("□ Қауіпсіз емес уәделерді тоқтату\n□ Бірінші қорды ең қауіпті арнаға беру\n□ Басқа арналарға қалпына келтіру уәдесін айту\n□ Басымдық себебін жазу")
+            )
+            "single_store_allocation" -> supplierDashboardJoinedMessage(
+              listOf("□ Assign accepted stock to the store lane\n□ Attach second-drop note\n□ Block over-packing\n□ Recheck after supplier answer"),
+              listOf("□ Назначить принятое наличие линии магазина\n□ Прикрепить заметку второй поставки\n□ Заблокировать пересборку\n□ Проверить после ответа поставщика"),
+              listOf("□ Қабылданған қорды дүкен арнасына бекіту\n□ Екінші жеткізу жазбасын тіркеу\n□ Артық жинауды бұғаттау\n□ Жеткізуші жауабынан кейін тексеру")
+            )
+            "allocation_ready" -> supplierDashboardJoinedMessage(
+              listOf("□ Ship guarded allocation\n□ Keep proof visible\n□ Keep shortage ledger open\n□ Close only shipped quantity"),
+              listOf("□ Отправить защищённое распределение\n□ Оставить доказательство видимым\n□ Оставить журнал недопоставки открытым\n□ Закрыть только отправленное количество"),
+              listOf("□ Қорғалған бөлуді жіберу\n□ Дәлелді көрінетін қалдыру\n□ Жетіспеу журналын ашық қалдыру\n□ Тек жіберілген санды жабу")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("□ Watch store/order count\n□ Watch accepted quantity\n□ Refresh split before packing\n□ Keep shortage visible"),
+              listOf("□ Следить за числом магазинов/заказов\n□ Следить за принятым количеством\n□ Обновить разделение до сборки\n□ Держать недопоставку видимой"),
+              listOf("□ Дүкен/тапсырыс санын бақылау\n□ Қабылданған санды бақылау\n□ Жинауға дейін бөлуді жаңарту\n□ Жетіспеуді көрінетін ұстау")
+            )
+          }
+        }
+        val recoveryAllocationPathMain = supplierDashboardChunk {
+          when (recoveryAllocationLane) {
+            "fair_split_needed" -> "fair split needed across affected stores/orders"
+            "priority_allocation" -> "protect the highest-risk promise first"
+            "single_store_allocation" -> "single store lane owns accepted stock"
+            "allocation_ready" -> "allocation ready with guard"
+            else -> "watch allocation and refresh before packing"
+          }
+        }
+        val recoveryAllocationPathRu = supplierDashboardChunk {
+          when (recoveryAllocationLane) {
+            "fair_split_needed" -> "нужно справедливое разделение по магазинам/заказам"
+            "priority_allocation" -> "сначала защитить самое рискованное обещание"
+            "single_store_allocation" -> "принятое наличие относится к одному магазину"
+            "allocation_ready" -> "распределение готово с защитой"
+            else -> "наблюдать распределение и обновить до сборки"
+          }
+        }
+        val recoveryAllocationPathKk = supplierDashboardChunk {
+          when (recoveryAllocationLane) {
+            "fair_split_needed" -> "дүкендер/тапсырыстар бойынша әділ бөлу керек"
+            "priority_allocation" -> "алдымен ең қауіпті уәдені қорғау"
+            "single_store_allocation" -> "қабылданған қор бір дүкен арнасына тиесілі"
+            "allocation_ready" -> "бөлу қорғанмен дайын"
+            else -> "бөлуді бақылап, жинауға дейін жаңарту"
+          }
+        }
+        val recoveryAllocationScript = supplierDashboardChunk {
+          supplierDashboardJoinedMessage(
+            listOf(
+              "AITA allocation guard: $recoveryContactGoodsName.",
+              "Allocation path: $recoveryAllocationPathMain.",
+              "Allocation score $recoveryAllocationScore/100; affected orders $affectedOrderCount; affected stores $affectedStoreCount; coverage $requestCoveragePercent%.",
+              "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()}.",
+              "Commit ${recoveryCommitLane.ifBlank { "commit_watch" }}; impact ${recoveryImpactLane.ifBlank { "impact_watch" }}. Keep store names private outside AITA."
+            ),
+            listOf(
+              "AITA защита распределения: $recoveryContactGoodsName.",
+              "Путь распределения: $recoveryAllocationPathRu.",
+              "Оценка распределения $recoveryAllocationScore/100; заказов $affectedOrderCount; магазинов $affectedStoreCount; покрытие $requestCoveragePercent%.",
+              "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()}.",
+              "Обязательство ${recoveryCommitLane.ifBlank { "commit_watch" }}; влияние ${recoveryImpactLane.ifBlank { "impact_watch" }}. Названия магазинов держите приватными вне AITA."
+            ),
+            listOf(
+              "AITA бөлу қорғаны: $recoveryContactGoodsName.",
+              "Бөлу жолы: $recoveryAllocationPathKk.",
+              "Бөлу ұпайы $recoveryAllocationScore/100; тапсырыс $affectedOrderCount; дүкен $affectedStoreCount; қамту $requestCoveragePercent%.",
+              "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()}.",
+              "Міндеттеме ${recoveryCommitLane.ifBlank { "commit_watch" }}; әсер ${recoveryImpactLane.ifBlank { "impact_watch" }}. AITA сыртында дүкен атауларын құпия ұстаңыз."
+            )
+          )
+        }
+  
+  
+        val recoveryExceptionScore = supplierDashboardChunk {
+          (
+            recoveryAllocationScore / 4 +
+              recoveryCommitScore / 5 +
+              recoveryImpactScore / 5 +
+              recoveryPromiseShieldScore / 5 +
+              duePressure +
+              when (recoveryPackGuardLane) {
+                "block_pack" -> 18
+                "proof_before_pack" -> 10
+                "split_pack_only" -> 7
+                else -> 1
+              } +
+              when (recoveryOutcomeLane) {
+                "cancel_review" -> 16
+                "substitute_offer" -> 12
+                "second_drop" -> 8
+                "ship_now_guard" -> 3
+                else -> 1
+              } +
+              when (recoveryAllocationLane) {
+                "priority_allocation" -> 13
+                "fair_split_needed" -> 11
+                "single_store_allocation" -> 5
+                "allocation_ready" -> -8
+                else -> 1
+              } +
+              fullyShortLineCount * 5 +
+              declinedLineCount * 4 +
+              (if (requestCoveragePercent < 50) 10 else 0)
+            ).coerceIn(0, 100)
+        }
+        val recoveryExceptionLane = supplierDashboardChunk {
+          when {
+            recoveryPackGuardLane == "block_pack" || recoveryCommandLane == "stop_pack" || recoveryCommitLane == "commit_blocked" -> "exception_stop_pack"
+            recoveryOutcomeLane == "cancel_review" || (recoveryLane == "source_or_cancel" && fullyShortLineCount > 0) -> "exception_cancel_review"
+            recoveryOutcomeLane == "substitute_offer" || recoveryContactLane == "substitute_answer" -> "exception_substitute"
+            recoveryCommandLane == "source_now" || recoveryOwnerLane == "upstream_sourcing" || recoveryCommitLane == "commit_source_eta" -> "exception_sourcing"
+            recoveryAllocationLane == "fair_split_needed" || recoveryAllocationLane == "priority_allocation" -> "exception_allocation"
+            recoveryConfidenceLane == "ready_to_recover" && recoveryLedgerLane == "ledger_ready" && recoveryAllocationLane == "allocation_ready" -> "exception_ready"
+            else -> "exception_watch"
+          }
+        }
+        val recoveryExceptionHint = supplierDashboardChunk {
+          when (recoveryExceptionLane) {
+            "exception_stop_pack" -> supplierDashboardJoinedMessage(
+              listOf("Exception guard: stop unsafe packing until the blocker has an owner, proof, and a safe promise."),
+              listOf("Защита исключений: остановите небезопасную сборку, пока у блокера не будет ответственного, доказательства и безопасного обещания."),
+              listOf("Ерекше жағдай қорғаны: бөгетке жауапты, дәлел және қауіпсіз уәде қойылғанша қауіпті жинауды тоқтатыңыз.")
+            )
+            "exception_cancel_review" -> supplierDashboardJoinedMessage(
+              listOf("Exception guard: this shortage may need cancel review. Do not hide the missing quantity behind accepted stock."),
+              listOf("Защита исключений: этой недопоставке может понадобиться проверка отмены. Не скрывайте нехватку за принятым наличием."),
+              listOf("Ерекше жағдай қорғаны: бұл жетіспеуге бас тартуды тексеру керек болуы мүмкін. Жетіспеуді қабылданған қормен жасырмаңыз.")
+            )
+            "exception_substitute" -> supplierDashboardJoinedMessage(
+              listOf("Exception guard: substitution needs a clear answer before promise, allocation, or packflow moves."),
+              listOf("Защита исключений: замене нужен чёткий ответ до обещания, распределения или движения сборки."),
+              listOf("Ерекше жағдай қорғаны: ауыстыруға уәде, бөлу немесе жинау жүрмей тұрып нақты жауап керек.")
+            )
+            "exception_sourcing" -> supplierDashboardJoinedMessage(
+              listOf("Exception guard: upstream sourcing is the blocking lane. Capture reserve, ETA, substitute, or no-stock proof."),
+              listOf("Защита исключений: блокирует поиск выше по цепочке. Зафиксируйте резерв, срок, замену или отсутствие товара."),
+              listOf("Ерекше жағдай қорғаны: жоғары арнадан іздеу бөгеп тұр. Резерв, мерзім, ауыстыру немесе қор жоқ дәлелін бекітіңіз.")
+            )
+            "exception_allocation" -> supplierDashboardJoinedMessage(
+              listOf("Exception guard: split allocation carefully so scarce accepted stock is not double-promised."),
+              listOf("Защита исключений: аккуратно разделите распределение, чтобы дефицитное принятое наличие не было обещано дважды."),
+              listOf("Ерекше жағдай қорғаны: тапшы қабылданған қор екі рет уәде етілмес үшін бөлуді мұқият жасаңыз.")
+            )
+            "exception_ready" -> supplierDashboardJoinedMessage(
+              listOf("Exception guard: ready with proof. Move only the guarded recovery step and keep remaining shortage visible."),
+              listOf("Защита исключений: готово с доказательством. Двигайте только защищённый шаг восстановления и оставьте остаток видимым."),
+              listOf("Ерекше жағдай қорғаны: дәлелмен дайын. Тек қорғалған қалпына келтіру қадамын қозғап, қалған жетіспеуді көрінетін қалдырыңыз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Exception guard: no special blocker yet. Keep the exception lane visible while promises, sourcing, or allocation change."),
+              listOf("Защита исключений: особого блокера пока нет. Держите линию исключения видимой при изменении обещаний, поиска или распределения."),
+              listOf("Ерекше жағдай қорғаны: әзірше арнайы бөгет жоқ. Уәде, іздеу немесе бөлу өзгергенде ерекше жағдай арнасын көрінетін ұстаңыз.")
+            )
+          }
+        }
+        val recoveryExceptionChecklist = supplierDashboardChunk {
+          when (recoveryExceptionLane) {
+            "exception_stop_pack" -> supplierDashboardJoinedMessage(
+              listOf("□ Stop packflow\n□ Name blocker owner\n□ Save proof/answer\n□ Re-score before dispatch"),
+              listOf("□ Остановить сборку\n□ Назначить ответственного\n□ Сохранить доказательство/ответ\n□ Пересчитать до отправки"),
+              listOf("□ Жинауды тоқтату\n□ Бөгет жауаптысын қою\n□ Дәлел/жауапты сақтау\n□ Жөнелтуден бұрын қайта бағалау")
+            )
+            "exception_cancel_review" -> supplierDashboardJoinedMessage(
+              listOf("□ Confirm no stock path\n□ Ask store substitute/cancel\n□ Keep missing qty open\n□ Record decision reason"),
+              listOf("□ Подтвердить путь без наличия\n□ Спросить магазин замену/отмену\n□ Оставить недостачу открытой\n□ Записать причину решения"),
+              listOf("□ Қор жоқ жолын растау\n□ Дүкеннен ауыстыру/бас тартуды сұрау\n□ Жетіспеуді ашық қалдыру\n□ Шешім себебін жазу")
+            )
+            "exception_substitute" -> supplierDashboardJoinedMessage(
+              listOf("□ Confirm substitute SKU\n□ Ask store answer\n□ Attach accepted quantity\n□ Update promise shield"),
+              listOf("□ Подтвердить SKU замены\n□ Получить ответ магазина\n□ Прикрепить принятое количество\n□ Обновить щит обещания"),
+              listOf("□ Ауыстыру SKU растау\n□ Дүкен жауабын алу\n□ Қабылданған санды тіркеу\n□ Уәде қалқанын жаңарту")
+            )
+            "exception_sourcing" -> supplierDashboardJoinedMessage(
+              listOf("□ Request upstream ETA\n□ Save reserve/no-stock proof\n□ Set commit-by time\n□ Mirror safe answer downstream"),
+              listOf("□ Запросить срок выше\n□ Сохранить резерв/отсутствие\n□ Поставить срок обязательства\n□ Передать безопасный ответ вниз"),
+              listOf("□ Жоғары мерзімді сұрау\n□ Резерв/қор жоқ дәлелін сақтау\n□ Міндеттеме мерзімін қою\n□ Қауіпсіз жауапты төмен жеткізу")
+            )
+            "exception_allocation" -> supplierDashboardJoinedMessage(
+              listOf("□ Rank affected orders\n□ Split accepted stock once\n□ Mark second drop\n□ Prevent double promise"),
+              listOf("□ Расставить заказы\n□ Один раз разделить наличие\n□ Отметить вторую поставку\n□ Предотвратить двойное обещание"),
+              listOf("□ Тапсырыстарды реттеу\n□ Қабылданған қорды бір рет бөлу\n□ Екінші жеткізуді белгілеу\n□ Қос уәдені болдырмау")
+            )
+            "exception_ready" -> supplierDashboardJoinedMessage(
+              listOf("□ Move guarded step\n□ Keep proof attached\n□ Leave residual shortage open\n□ Close only completed quantity"),
+              listOf("□ Двигать защищённый шаг\n□ Оставить доказательство\n□ Остаток недостачи оставить открытым\n□ Закрыть только выполненное количество"),
+              listOf("□ Қорғалған қадамды қозғау\n□ Дәлелді тіркеулі қалдыру\n□ Қалған жетіспеуді ашық қалдыру\n□ Тек орындалған санды жабу")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("□ Watch exception score\n□ Refresh after answer\n□ Keep shortage visible\n□ Escalate if score rises"),
+              listOf("□ Следить за оценкой исключения\n□ Обновить после ответа\n□ Держать недостачу видимой\n□ Эскалировать при росте оценки"),
+              listOf("□ Ерекше ұпайды бақылау\n□ Жауаптан кейін жаңарту\n□ Жетіспеуді көрінетін ұстау\n□ Ұпай өссе көтеру")
+            )
+          }
+        }
+        val recoveryExceptionPathMain = supplierDashboardChunk {
+          when (recoveryExceptionLane) {
+            "exception_stop_pack" -> "stop pack until blocker proof is safe"
+            "exception_cancel_review" -> "cancel review or substitute answer needed"
+            "exception_substitute" -> "substitute answer before promise"
+            "exception_sourcing" -> "upstream sourcing proof blocks recovery"
+            "exception_allocation" -> "scarce accepted stock needs one fair split"
+            "exception_ready" -> "exception cleared with guarded proof"
+            else -> "watch exception lane"
+          }
+        }
+        val recoveryExceptionPathRu = supplierDashboardChunk {
+          when (recoveryExceptionLane) {
+            "exception_stop_pack" -> "остановить сборку до безопасного доказательства"
+            "exception_cancel_review" -> "нужна проверка отмены или ответ по замене"
+            "exception_substitute" -> "ответ по замене до обещания"
+            "exception_sourcing" -> "восстановление блокирует доказательство выше"
+            "exception_allocation" -> "дефицитное наличие требует одного справедливого разделения"
+            "exception_ready" -> "исключение закрыто защищённым доказательством"
+            else -> "наблюдать линию исключения"
+          }
+        }
+        val recoveryExceptionPathKk = supplierDashboardChunk {
+          when (recoveryExceptionLane) {
+            "exception_stop_pack" -> "қауіпсіз дәлелге дейін жинауды тоқтату"
+            "exception_cancel_review" -> "бас тартуды тексеру немесе ауыстыру жауабы керек"
+            "exception_substitute" -> "уәдеге дейін ауыстыру жауабы"
+            "exception_sourcing" -> "қалпына келтіруді жоғары арна дәлелі бөгейді"
+            "exception_allocation" -> "тапшы қор бір әділ бөлуді қажет етеді"
+            "exception_ready" -> "ерекше жағдай қорғалған дәлелмен тазартылды"
+            else -> "ерекше жағдай арнасын бақылау"
+          }
+        }
+        val recoveryExceptionScript = supplierDashboardChunk {
+          supplierDashboardJoinedMessage(
+            listOf(
+              "AITA exception guard: $recoveryContactGoodsName.",
+              "Exception path: $recoveryExceptionPathMain.",
+              "Exception score $recoveryExceptionScore/100; allocation $recoveryAllocationScore/100; commit $recoveryCommitScore/100; impact $recoveryImpactScore/100.",
+              "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()} across ${relatedOrders.size} order(s). Keep store names private outside AITA."
+            ),
+            listOf(
+              "AITA защита исключений: $recoveryContactGoodsName.",
+              "Путь исключения: $recoveryExceptionPathRu.",
+              "Оценка исключения $recoveryExceptionScore/100; распределение $recoveryAllocationScore/100; обязательство $recoveryCommitScore/100; влияние $recoveryImpactScore/100.",
+              "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()} по ${relatedOrders.size} заказ(ам). Названия магазинов держите приватными вне AITA."
+            ),
+            listOf(
+              "AITA ерекше жағдай қорғаны: $recoveryContactGoodsName.",
+              "Ерекше жағдай жолы: $recoveryExceptionPathKk.",
+              "Ерекше ұпай $recoveryExceptionScore/100; бөлу $recoveryAllocationScore/100; міндеттеме $recoveryCommitScore/100; әсер $recoveryImpactScore/100.",
+              "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()} — ${relatedOrders.size} тапсырыс. AITA сыртында дүкен атауларын құпия ұстаңыз."
+            )
+          )
+        }
+        val recoveryCauseScore = supplierDashboardChunk {
+          (
+            recoveryExceptionScore / 4 +
+              recoveryAllocationScore / 5 +
+              recoveryCommitScore / 6 +
+              recoveryImpactScore / 6 +
+              recoveryLoadScore / 7 +
+              recoveryBottleneckScore / 7 +
+              (100 - requestCoveragePercent).coerceAtLeast(0) / 5 +
+              fullyShortLineCount.coerceAtMost(6) * 5 +
+              partialLineCount.coerceAtMost(8) * 3 +
+              declinedLineCount.coerceAtMost(5) * 4 +
+              when (recoveryExceptionLane) {
+                "exception_stop_pack" -> 14
+                "exception_cancel_review" -> 12
+                "exception_substitute" -> 9
+                "exception_sourcing" -> 8
+                "exception_allocation" -> 7
+                "exception_ready" -> -8
+                else -> 1
+              } +
+              when (recoveryAllocationLane) {
+                "fair_split_needed" -> 10
+                "priority_allocation" -> 9
+                "allocation_ready" -> -6
+                else -> 1
+              } +
+              when (recoveryPromiseShieldLane) {
+                "promise_at_risk" -> 12
+                "store_answer_needed" -> 8
+                "promise_safe" -> -6
+                else -> 1
+              }
+            ).coerceIn(0, 100)
+        }
+        val recoveryCauseLane = supplierDashboardChunk {
+          when {
+            fullyShortLineCount > 0 && acceptedQuantityTotal <= 0.0 -> "zero_acceptance_cause"
+            recoveryExceptionLane != "exception_watch" && recoveryExceptionLane != "exception_ready" -> "exception_cause"
+            recoveryCommitLane == "commit_blocked" || recoveryPromiseShieldLane == "promise_at_risk" || recoveryImpactLane == "customer_promise_impact" -> "promise_conflict_cause"
+            recoveryAllocationLane == "fair_split_needed" || recoveryAllocationLane == "priority_allocation" || (partialLineCount > 0 && affectedStoreCount > 1) -> "allocation_cause"
+            partialLineCount > 0 || recoveryLoadLane == "heavy_load" || recoveryLoadLane == "pack_load" || recoveryBottleneckLane == "sourcing_bottleneck" -> "partial_capacity_cause"
+            recoveryConfidenceLane == "ready_to_recover" && recoveryLedgerLane == "ledger_ready" && recoveryClosureLane != "blocked_open" -> "cause_ready"
+            else -> "cause_watch"
+          }
+        }
+        val recoveryCauseHint = supplierDashboardChunk {
+          when (recoveryCauseLane) {
+            "zero_acceptance_cause" -> supplierDashboardJoinedMessage(
+              listOf("Cause guard: accepted quantity is zero for at least one line. Treat this as no-stock proof and pick source, substitute, or cancel before packing."),
+              listOf("Причина: по строке принято ноль. Считайте это доказательством отсутствия и выберите поиск, замену или отмену до сборки."),
+              listOf("Себеп қорғаны: кемі бір жолда қабылданған сан нөл. Мұны қор жоқ дәлелі деп алып, жинауға дейін іздеу, ауыстыру немесе бас тартуды таңдаңыз.")
+            )
+            "exception_cause" -> supplierDashboardJoinedMessage(
+              listOf("Cause guard: the shortage is driven by an exception blocker. Fix the blocker first so worker notes do not hide the real reason."),
+              listOf("Причина: недопоставка вызвана блокером исключения. Сначала решите блокер, чтобы рабочие заметки не скрывали настоящую причину."),
+              listOf("Себеп қорғаны: жетіспеуді ерекше жағдай бөгеті тудырып тұр. Алдымен бөгетті шешіп, жұмыс жазбалары нақты себепті жасырмасын.")
+            )
+            "promise_conflict_cause" -> supplierDashboardJoinedMessage(
+              listOf("Cause guard: downstream promise changed faster than stock recovery. Freeze the promise and reconnect store answer, ETA, and pack guard."),
+              listOf("Причина: нижнее обещание изменилось быстрее восстановления наличия. Заморозьте обещание и свяжите ответ магазина, срок и защиту сборки."),
+              listOf("Себеп қорғаны: төменгі уәде қор қалпына келуінен жылдам өзгерді. Уәдені тоқтатып, дүкен жауабы, мерзім және жинау қорғанын байланыстырыңыз.")
+            )
+            "allocation_cause" -> supplierDashboardJoinedMessage(
+              listOf("Cause guard: scarce accepted stock must be allocated once and visibly across affected orders before any promise is sent."),
+              listOf("Причина: дефицитное принятое наличие нужно один раз и прозрачно распределить по затронутым заказам до обещаний."),
+              listOf("Себеп қорғаны: тапшы қабылданған қор уәде жібермей тұрып әсер еткен тапсырыстарға бір рет әрі көрінетін бөлінуі керек.")
+            )
+            "partial_capacity_cause" -> supplierDashboardJoinedMessage(
+              listOf("Cause guard: supplier can cover part of the demand. Separate accepted capacity from missing capacity and date the recovery path."),
+              listOf("Причина: поставщик покрывает только часть спроса. Разделите принятую мощность и недостачу, затем поставьте дату восстановления."),
+              listOf("Себеп қорғаны: жеткізуші сұраныстың бір бөлігін ғана жабады. Қабылданған қуат пен жетіспеуді бөліп, қалпына келу күнін қойыңыз.")
+            )
+            "cause_ready" -> supplierDashboardJoinedMessage(
+              listOf("Cause guard: root cause is documented enough to move the guarded step. Keep residual shortage visible after action."),
+              listOf("Причина: корневая причина достаточно зафиксирована для защищённого шага. После действия оставьте остаточную недостачу видимой."),
+              listOf("Себеп қорғаны: түпкі себеп қорғалған қадамға жеткілікті бекітілді. Әрекеттен кейін қалған жетіспеуді көрінетін ұстаңыз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Cause guard: keep watching for the true shortage reason while owner, promise, and allocation lanes change."),
+              listOf("Причина: продолжайте наблюдать настоящую причину недопоставки при изменении ответственного, обещания и распределения."),
+              listOf("Себеп қорғаны: жауапты, уәде және бөлу өзгергенде жетіспеудің нақты себебін бақылауды жалғастырыңыз.")
+            )
+          }
+        }
+        val recoveryCauseChecklist = supplierDashboardChunk {
+          when (recoveryCauseLane) {
+            "zero_acceptance_cause" -> supplierDashboardJoinedMessage(
+              listOf("□ Mark no-stock proof\n□ Ask source/substitute/cancel\n□ Keep pack blocked\n□ Save final reason"),
+              listOf("□ Отметить доказательство нуля\n□ Запросить поиск/замену/отмену\n□ Держать сборку заблокированной\n□ Сохранить итоговую причину"),
+              listOf("□ Нөл қор дәлелін белгілеу\n□ Іздеу/ауыстыру/бас тартуды сұрау\n□ Жинауды бөгелген ұстау\n□ Қорытынды себепті сақтау")
+            )
+            "exception_cause" -> supplierDashboardJoinedMessage(
+              listOf("□ Name exception blocker\n□ Assign owner\n□ Add proof note\n□ Recheck promise shield"),
+              listOf("□ Назвать блокер исключения\n□ Назначить ответственного\n□ Добавить доказательство\n□ Проверить щит обещания"),
+              listOf("□ Ерекше бөгетті атау\n□ Жауапты қою\n□ Дәлел жазбасын қосу\n□ Уәде қалқанын тексеру")
+            )
+            "promise_conflict_cause" -> supplierDashboardJoinedMessage(
+              listOf("□ Freeze unsafe ETA\n□ Contact store\n□ Rebuild commit-by time\n□ Release only guarded promise"),
+              listOf("□ Заморозить небезопасный срок\n□ Связаться с магазином\n□ Пересобрать срок обещания\n□ Выпустить только защищённое обещание"),
+              listOf("□ Қауіпсіз емес мерзімді тоқтату\n□ Дүкенмен байланысу\n□ Міндеттеме уақытын қайта құру\n□ Тек қорғалған уәдені шығару")
+            )
+            "allocation_cause" -> supplierDashboardJoinedMessage(
+              listOf("□ Rank affected orders\n□ Split accepted stock once\n□ Record shortage remainder\n□ Notify with one answer"),
+              listOf("□ Ранжировать заказы\n□ Один раз разделить принятое\n□ Записать остаток недостачи\n□ Сообщить одним ответом"),
+              listOf("□ Тапсырыстарды саралау\n□ Қабылданғанды бір рет бөлу\n□ Қалған жетіспеуді жазу\n□ Бір жауаппен хабарлау")
+            )
+            "partial_capacity_cause" -> supplierDashboardJoinedMessage(
+              listOf("□ Separate covered qty\n□ Date second drop/source\n□ Keep missing qty open\n□ Update load score"),
+              listOf("□ Отделить покрытое количество\n□ Поставить дату второй поставки/поиска\n□ Оставить недостачу открытой\n□ Обновить нагрузку"),
+              listOf("□ Жабылған санды бөлу\n□ Екінші жеткізу/іздеу күнін қою\n□ Жетіспеуді ашық қалдыру\n□ Жүктеме ұпайын жаңарту")
+            )
+            "cause_ready" -> supplierDashboardJoinedMessage(
+              listOf("□ Move guarded step\n□ Keep residue visible\n□ Close only proofed action\n□ Refresh desk"),
+              listOf("□ Двинуть защищённый шаг\n□ Оставить остаток видимым\n□ Закрыть только доказанное действие\n□ Обновить пульт"),
+              listOf("□ Қорғалған қадамды қозғау\n□ Қалдықты көрінетін ұстау\n□ Тек дәлелденген әрекетті жабу\n□ Пультті жаңарту")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("□ Watch owner\n□ Watch promise\n□ Watch allocation\n□ Refresh after answer"),
+              listOf("□ Следить за ответственным\n□ Следить за обещанием\n□ Следить за распределением\n□ Обновить после ответа"),
+              listOf("□ Жауаптыны бақылау\n□ Уәдені бақылау\n□ Бөлуді бақылау\n□ Жауаптан кейін жаңарту")
+            )
+          }
+        }
+        val recoveryCausePathMain = supplierDashboardChunk {
+          when (recoveryCauseLane) {
+            "zero_acceptance_cause" -> "zero accepted stock"
+            "exception_cause" -> "exception blocker"
+            "promise_conflict_cause" -> "unsafe downstream promise"
+            "allocation_cause" -> "scarce stock allocation"
+            "partial_capacity_cause" -> "partial supplier capacity"
+            "cause_ready" -> "documented cause ready to move"
+            else -> "cause watch"
+          }
+        }
+        val recoveryCausePathRu = supplierDashboardChunk {
+          when (recoveryCauseLane) {
+            "zero_acceptance_cause" -> "ноль принятого наличия"
+            "exception_cause" -> "блокер исключения"
+            "promise_conflict_cause" -> "небезопасное нижнее обещание"
+            "allocation_cause" -> "распределение дефицитного наличия"
+            "partial_capacity_cause" -> "частичная мощность поставщика"
+            "cause_ready" -> "причина зафиксирована и готова"
+            else -> "наблюдение причины"
+          }
+        }
+        val recoveryCausePathKk = supplierDashboardChunk {
+          when (recoveryCauseLane) {
+            "zero_acceptance_cause" -> "қабылданған қор нөл"
+            "exception_cause" -> "ерекше жағдай бөгеті"
+            "promise_conflict_cause" -> "қауіпсіз емес төменгі уәде"
+            "allocation_cause" -> "тапшы қорды бөлу"
+            "partial_capacity_cause" -> "жеткізуші қуаты жартылай"
+            "cause_ready" -> "себеп бекітіліп дайын"
+            else -> "себепті бақылау"
+          }
+        }
+        val recoveryCauseScript = supplierDashboardChunk {
+          supplierDashboardJoinedMessage(
+            listOf(
+              "AITA cause guard: $recoveryContactGoodsName.",
+              "Root cause: $recoveryCausePathMain.",
+              "Cause score $recoveryCauseScore/100; exception $recoveryExceptionScore/100; allocation $recoveryAllocationScore/100; coverage $requestCoveragePercent%.",
+              "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()}. Keep store names private outside AITA."
+            ),
+            listOf(
+              "AITA защита причины: $recoveryContactGoodsName.",
+              "Корневая причина: $recoveryCausePathRu.",
+              "Оценка причины $recoveryCauseScore/100; исключение $recoveryExceptionScore/100; распределение $recoveryAllocationScore/100; покрытие $requestCoveragePercent%.",
+              "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()}. Названия магазинов держите приватными вне AITA."
+            ),
+            listOf(
+              "AITA себеп қорғаны: $recoveryContactGoodsName.",
+              "Түпкі себеп: $recoveryCausePathKk.",
+              "Себеп ұпайы $recoveryCauseScore/100; ерекше $recoveryExceptionScore/100; бөлу $recoveryAllocationScore/100; қамту $requestCoveragePercent%.",
+              "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()}. AITA сыртында дүкен атауларын құпия ұстаңыз."
+            )
+          )
+        }
+        val recoveryVerificationScore = supplierDashboardChunk {
+          (
+              recoveryExceptionScore / 3 +
+              recoveryCauseScore / 4 +
+              recoveryCommitScore / 6 +
+              recoveryAllocationScore / 6 +
+              recoveryImpactScore / 7 +
+              (100 - recoveryConfidenceScore) / 5 +
+              (100 - recoveryLedgerScore) / 5 +
+              duePressure +
+              when (recoveryProofLane) {
+                "store_ack_required" -> 14
+                "sourcing_note_required" -> 12
+                "pack_guard_proof" -> 10
+                else -> 2
+              } +
+              when (recoveryCauseLane) {
+                "zero_acceptance_cause" -> 15
+                "exception_cause" -> 13
+                "promise_conflict_cause" -> 10
+                "allocation_cause" -> 8
+                "partial_capacity_cause" -> 6
+                "cause_ready" -> -7
+                else -> 1
+              } +
+              when (recoveryExceptionLane) {
+                "exception_stop_pack" -> 18
+                "exception_cancel_review" -> 14
+                "exception_substitute" -> 10
+                "exception_sourcing" -> 9
+                "exception_allocation" -> 7
+                "exception_ready" -> -8
+                else -> 1
+              } +
+              when (recoveryCommitLane) {
+                "commit_blocked" -> 13
+                "commit_store_today" -> 9
+                "commit_source_eta" -> 7
+                "commit_split_eta" -> 5
+                "commit_ready" -> -6
+                else -> 1
+              } +
+              when (recoveryClosureLane) {
+                "blocked_open" -> 12
+                "needs_close_note" -> 7
+                "ready_with_guard" -> -5
+                else -> 1
+              }
+            ).coerceIn(0, 100)
+        }
+        val recoveryVerificationLane = supplierDashboardChunk {
+          when {
+            recoveryExceptionLane == "exception_stop_pack" || recoveryClosureLane == "blocked_open" || recoveryPackGuardLane == "block_pack" || recoveryCauseLane == "zero_acceptance_cause" -> "verify_blocked"
+            recoveryCauseLane == "exception_cause" || recoveryCauseLane == "promise_conflict_cause" || recoveryCauseLane == "allocation_cause" || recoveryCauseLane == "partial_capacity_cause" || recoveryCauseScore >= 70 -> "verify_cause_record"
+            recoveryOwnerLane == "store_contact" || recoveryContactLane == "store_call" || recoveryContactLane == "substitute_answer" || recoveryCommitLane == "commit_store_today" || recoveryPromiseShieldLane == "store_answer_needed" -> "verify_store_answer"
+            recoveryOwnerLane == "upstream_sourcing" || recoveryContactLane == "upstream_request" || recoveryCommitLane == "commit_source_eta" || recoveryExceptionLane == "exception_sourcing" -> "verify_source_proof"
+            recoveryPackGuardLane == "split_pack_only" || recoveryCommandLane == "split_and_ship" || recoveryAllocationLane == "fair_split_needed" || recoveryAllocationLane == "priority_allocation" -> "verify_pack_split"
+            recoveryConfidenceLane == "ready_to_recover" && recoveryLedgerLane == "ledger_ready" && recoveryExceptionLane == "exception_ready" && recoveryCauseLane == "cause_ready" -> "verify_ready"
+            recoveryCommitLane == "commit_ready" && recoveryAllocationLane == "allocation_ready" && recoveryClosureLane == "ready_with_guard" && recoveryCauseLane == "cause_ready" -> "verify_ready"
+            else -> "verify_watch"
+          }
+        }
+        val recoveryVerificationHint = supplierDashboardChunk {
+          when (recoveryVerificationLane) {
+            "verify_blocked" -> supplierDashboardJoinedMessage(
+              listOf("Verification guard: recovery is blocked. Keep packflow stopped until proof, owner, cause, and promise are safe in AITA."),
+              listOf("Защита проверки: восстановление заблокировано. Держите сборку остановленной, пока доказательство, ответственный, причина и обещание не безопасны в AITA."),
+              listOf("Тексеру қорғаны: қалпына келтіру бөгелді. Дәлел, жауапты, себеп және уәде AITA ішінде қауіпсіз болғанша жинауды тоқтатыңыз.")
+            )
+            "verify_cause_record" -> supplierDashboardJoinedMessage(
+              listOf("Verification guard: root cause still needs a recorded answer. Save why the shortage happened before closing, promising, or allocating stock."),
+              listOf("Защита проверки: по корневой причине ещё нужен зафиксированный ответ. Сохраните причину недопоставки до закрытия, обещания или распределения."),
+              listOf("Тексеру қорғаны: түпкі себепке жазылған жауап керек. Жабу, уәде немесе бөлу алдында жетіспеу себебін сақтаңыз.")
+            )
+            "verify_store_answer" -> supplierDashboardJoinedMessage(
+              listOf("Verification guard: store or buyer answer is the missing checkpoint. Capture substitute, delay, or cancel answer before promising downstream."),
+              listOf("Защита проверки: не хватает ответа магазина или покупателя. Зафиксируйте замену, задержку или отмену до обещания вниз."),
+              listOf("Тексеру қорғаны: дүкен немесе сатып алушы жауабы жетіспейді. Төменге уәде бермей тұрып ауыстыру, кідіріс немесе бас тарту жауабын бекітіңіз.")
+            )
+            "verify_source_proof" -> supplierDashboardJoinedMessage(
+              listOf("Verification guard: upstream sourcing proof is required. Save reserve, ETA, no-stock proof, or substitute path before closing recovery."),
+              listOf("Защита проверки: требуется доказательство поиска выше по цепочке. Сохраните резерв, срок, отсутствие товара или путь замены до закрытия восстановления."),
+              listOf("Тексеру қорғаны: жоғары арна іздеу дәлелі керек. Қалпына келтіруді жаппай тұрып резерв, мерзім, қор жоқ дәлелі немесе ауыстыру жолын сақтаңыз.")
+            )
+            "verify_pack_split" -> supplierDashboardJoinedMessage(
+              listOf("Verification guard: pack split needs a clear guarded quantity and remaining-shortage note before dispatch."),
+              listOf("Защита проверки: разделению сборки нужно чёткое защищённое количество и заметка остаточной недопоставки до отправки."),
+              listOf("Тексеру қорғаны: жинауды бөлуге жөнелтуден бұрын нақты қорғалған сан және қалған жетіспеу жазбасы керек.")
+            )
+            "verify_ready" -> supplierDashboardJoinedMessage(
+              listOf("Verification guard: ready to move with proof. Close only the verified recovery step and leave any remaining shortage visible."),
+              listOf("Защита проверки: готово к движению с доказательством. Закрывайте только проверенный шаг восстановления и оставляйте остаток видимым."),
+              listOf("Тексеру қорғаны: дәлелмен қозғауға дайын. Тек тексерілген қалпына келтіру қадамын жауып, қалған жетіспеуді көрінетін қалдырыңыз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Verification guard: watch the recovery lane and refresh verification after each supplier/store answer."),
+              listOf("Защита проверки: наблюдайте линию восстановления и обновляйте проверку после каждого ответа поставщика/магазина."),
+              listOf("Тексеру қорғаны: қалпына келтіру арнасын бақылап, әр жеткізуші/дүкен жауабынан кейін тексеруді жаңартыңыз.")
+            )
+          }
+        }
+        val recoveryVerificationChecklist = supplierDashboardChunk {
+          when (recoveryVerificationLane) {
+            "verify_blocked" -> supplierDashboardJoinedMessage(
+              listOf("□ Keep pack stopped\n□ Name recovery owner\n□ Attach proof/answer\n□ Re-score before dispatch"),
+              listOf("□ Держать сборку остановленной\n□ Назначить ответственного\n□ Прикрепить доказательство/ответ\n□ Пересчитать до отправки"),
+              listOf("□ Жинауды тоқтату\n□ Қалпына келтіру жауаптысын қою\n□ Дәлел/жауапты тіркеу\n□ Жөнелтуге дейін қайта бағалау")
+            )
+            "verify_cause_record" -> supplierDashboardJoinedMessage(
+              listOf("□ Confirm root cause\n□ Record source of answer\n□ Link cause to action\n□ Recheck promise safety"),
+              listOf("□ Подтвердить корневую причину\n□ Записать источник ответа\n□ Связать причину с действием\n□ Перепроверить безопасность обещания"),
+              listOf("□ Түпкі себепті растау\n□ Жауап көзін жазу\n□ Себепті әрекетпен байланыстыру\n□ Уәде қауіпсіздігін қайта тексеру")
+            )
+            "verify_store_answer" -> supplierDashboardJoinedMessage(
+              listOf("□ Contact store/buyer\n□ Save substitute/delay/cancel answer\n□ Update promise shield\n□ Set follow-up time"),
+              listOf("□ Связаться с магазином/покупателем\n□ Сохранить ответ замена/задержка/отмена\n□ Обновить щит обещания\n□ Назначить контроль"),
+              listOf("□ Дүкен/сатып алушымен байланысу\n□ Ауыстыру/кідіріс/бас тарту жауабын сақтау\n□ Уәде қалқанын жаңарту\n□ Қайта тексеру уақытын қою")
+            )
+            "verify_source_proof" -> supplierDashboardJoinedMessage(
+              listOf("□ Request reserve/ETA\n□ Save no-stock proof\n□ Mirror safe answer downstream\n□ Keep missing qty open"),
+              listOf("□ Запросить резерв/срок\n□ Сохранить доказательство отсутствия\n□ Передать безопасный ответ вниз\n□ Оставить недостачу открытой"),
+              listOf("□ Резерв/мерзім сұрау\n□ Қор жоқ дәлелін сақтау\n□ Қауіпсіз жауапты төмен жеткізу\n□ Жетіспеуді ашық қалдыру")
+            )
+            "verify_pack_split" -> supplierDashboardJoinedMessage(
+              listOf("□ Mark accepted quantity\n□ Mark missing quantity\n□ Attach pack note\n□ Dispatch guarded quantity only"),
+              listOf("□ Отметить принятое количество\n□ Отметить недостачу\n□ Прикрепить заметку сборки\n□ Отправить только защищённое количество"),
+              listOf("□ Қабылданған санды белгілеу\n□ Жетіспейтін санды белгілеу\n□ Жинау жазбасын тіркеу\n□ Тек қорғалған санды жөнелту")
+            )
+            "verify_ready" -> supplierDashboardJoinedMessage(
+              listOf("□ Move verified step\n□ Keep proof attached\n□ Close completed quantity only\n□ Watch residual shortage"),
+              listOf("□ Двигать проверенный шаг\n□ Оставить доказательство\n□ Закрыть только выполненное количество\n□ Наблюдать остаток недопоставки"),
+              listOf("□ Тексерілген қадамды қозғау\n□ Дәлелді тіркеулі қалдыру\n□ Тек орындалған санды жабу\n□ Қалған жетіспеуді бақылау")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("□ Watch verification score\n□ Refresh after answer\n□ Preserve shortage ledger\n□ Escalate if blockers appear"),
+              listOf("□ Следить за оценкой проверки\n□ Обновить после ответа\n□ Сохранить журнал недопоставки\n□ Эскалировать при появлении блокеров"),
+              listOf("□ Тексеру ұпайын бақылау\n□ Жауаптан кейін жаңарту\n□ Жетіспеу журналын сақтау\n□ Бөгеттер пайда болса көтеру")
+            )
+          }
+        }
+        val recoveryVerificationPathMain = supplierDashboardChunk {
+          when (recoveryVerificationLane) {
+            "verify_blocked" -> "blocked until proof, cause, and promise are safe"
+            "verify_cause_record" -> "root cause record verifies why the shortage stays open"
+            "verify_store_answer" -> "store or buyer answer verifies next promise"
+            "verify_source_proof" -> "upstream proof verifies recovery"
+            "verify_pack_split" -> "pack split needs guarded quantity note"
+            "verify_ready" -> "verified recovery ready to move"
+            else -> "watch verification after each answer"
+          }
+        }
+        val recoveryVerificationPathRu = supplierDashboardChunk {
+          when (recoveryVerificationLane) {
+            "verify_blocked" -> "заблокировано до безопасного доказательства, причины и обещания"
+            "verify_cause_record" -> "запись причины подтверждает почему недопоставка открыта"
+            "verify_store_answer" -> "ответ магазина/покупателя проверяет следующее обещание"
+            "verify_source_proof" -> "доказательство выше подтверждает восстановление"
+            "verify_pack_split" -> "разделению сборки нужна заметка защищённого количества"
+            "verify_ready" -> "проверенное восстановление готово к движению"
+            else -> "наблюдать проверку после каждого ответа"
+          }
+        }
+        val recoveryVerificationPathKk = supplierDashboardChunk {
+          when (recoveryVerificationLane) {
+            "verify_blocked" -> "қауіпсіз дәлел, себеп және уәдеге дейін бөгелген"
+            "verify_cause_record" -> "себеп жазбасы жетіспеудің неге ашық екенін растайды"
+            "verify_store_answer" -> "дүкен/сатып алушы жауабы келесі уәдені тексереді"
+            "verify_source_proof" -> "жоғары арна дәлелі қалпына келтіруді растайды"
+            "verify_pack_split" -> "жинауды бөлуге қорғалған сан жазбасы керек"
+            "verify_ready" -> "тексерілген қалпына келтіру қозғауға дайын"
+            else -> "әр жауаптан кейін тексеруді бақылау"
+          }
+        }
+        val recoveryVerificationScript = supplierDashboardChunk {
+          supplierDashboardJoinedMessage(
+            listOf(
+              "AITA verification guard: $recoveryContactGoodsName.",
+              "Verification path: $recoveryVerificationPathMain.",
+              "Verification score $recoveryVerificationScore/100; cause $recoveryCauseScore/100; exception $recoveryExceptionScore/100; ledger $recoveryLedgerScore/100; confidence $recoveryConfidenceScore/100.",
+              "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()}. Keep store names private outside AITA."
+            ),
+            listOf(
+              "AITA защита проверки: $recoveryContactGoodsName.",
+              "Путь проверки: $recoveryVerificationPathRu.",
+              "Оценка проверки $recoveryVerificationScore/100; причина $recoveryCauseScore/100; исключение $recoveryExceptionScore/100; журнал $recoveryLedgerScore/100; уверенность $recoveryConfidenceScore/100.",
+              "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()}. Названия магазинов держите приватными вне AITA."
+            ),
+            listOf(
+              "AITA тексеру қорғаны: $recoveryContactGoodsName.",
+              "Тексеру жолы: $recoveryVerificationPathKk.",
+              "Тексеру ұпайы $recoveryVerificationScore/100; себеп $recoveryCauseScore/100; ерекше $recoveryExceptionScore/100; журнал $recoveryLedgerScore/100; сенім $recoveryConfidenceScore/100.",
+              "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()}. AITA сыртында дүкен атауларын құпия ұстаңыз."
+            )
+          )
+        }
+  
+        val recoveryApprovalScore = supplierDashboardChunk {
+          (
+              recoveryVerificationScore / 3 +
+              recoveryExceptionScore / 4 +
+              recoveryCommitScore / 5 +
+              recoveryAllocationScore / 6 +
+              recoveryClosureScore / 6 +
+              duePressure +
+              when (recoveryVerificationLane) {
+                "verify_blocked" -> 20
+                "verify_cause_record" -> 12
+                "verify_store_answer" -> 10
+                "verify_source_proof" -> 9
+                "verify_pack_split" -> 8
+                "verify_ready" -> -9
+                else -> 1
+              } +
+              when (recoveryExceptionLane) {
+                "exception_stop_pack" -> 16
+                "exception_cancel_review" -> 13
+                "exception_substitute" -> 9
+                "exception_sourcing" -> 8
+                "exception_allocation" -> 7
+                "exception_ready" -> -7
+                else -> 1
+              } +
+              when (recoveryPackGuardLane) {
+                "block_pack" -> 14
+                "proof_before_pack" -> 9
+                "split_pack_only" -> 6
+                "safe_to_pack" -> -4
+                else -> 1
+              } +
+              when (recoveryCommitLane) {
+                "commit_blocked" -> 11
+                "commit_store_today" -> 8
+                "commit_source_eta" -> 7
+                "commit_split_eta" -> 5
+                "commit_ready" -> -5
+                else -> 1
+              } +
+              (if (recoveryLedgerLane == "ledger_ready") -4 else 4) +
+              (if (recoveryConfidenceLane == "ready_to_recover") -5 else 5)
+            ).coerceIn(0, 100)
+        }
+        val recoveryApprovalLane = supplierDashboardChunk {
+          when {
+            recoveryVerificationLane == "verify_blocked" || recoveryExceptionLane == "exception_stop_pack" || recoveryPackGuardLane == "block_pack" || recoveryCommitLane == "commit_blocked" -> "approval_blocked"
+            recoveryExceptionLane == "exception_cancel_review" || recoveryCauseLane == "exception_cause" || recoveryCauseLane == "promise_conflict_cause" || recoveryApprovalScore >= 78 -> "approval_manager_review"
+            recoveryVerificationLane == "verify_store_answer" || recoveryOwnerLane == "store_contact" || recoveryContactLane == "store_call" || recoveryPromiseShieldLane == "store_answer_needed" -> "approval_store_ack"
+            recoveryVerificationLane == "verify_source_proof" || recoveryOwnerLane == "upstream_sourcing" || recoveryContactLane == "upstream_request" || recoveryCommitLane == "commit_source_eta" -> "approval_source_ack"
+            recoveryVerificationLane == "verify_pack_split" || recoveryPackGuardLane == "proof_before_pack" || recoveryPackGuardLane == "split_pack_only" || recoveryCommandLane == "split_and_ship" -> "approval_pack_lead"
+            recoveryVerificationLane == "verify_ready" && recoveryLedgerLane == "ledger_ready" && recoveryClosureLane == "ready_with_guard" -> "approval_ready"
+            recoveryCommitLane == "commit_ready" && recoveryAllocationLane == "allocation_ready" && recoveryExceptionLane == "exception_ready" && recoveryCauseLane == "cause_ready" -> "approval_ready"
+            else -> "approval_watch"
+          }
+        }
+        val recoveryApprovalHint = supplierDashboardChunk {
+          when (recoveryApprovalLane) {
+            "approval_blocked" -> supplierDashboardJoinedMessage(
+              listOf("Approval gate: recovery is blocked. Keep packflow stopped until verification, promise, and exception blockers are signed off."),
+              listOf("Шлюз согласования: восстановление заблокировано. Держите сборку остановленной, пока проверка, обещание и исключения не согласованы."),
+              listOf("Бекіту қақпасы: қалпына келтіру бөгелді. Тексеру, уәде және ерекше бөгеттер бекітілгенше жинауды тоқтатыңыз.")
+            )
+            "approval_manager_review" -> supplierDashboardJoinedMessage(
+              listOf("Approval gate: manager review is needed before cancel, substitute, or unsafe-promise decisions move downstream."),
+              listOf("Шлюз согласования: перед отменой, заменой или небезопасным обещанием вниз нужен обзор руководителя."),
+              listOf("Бекіту қақпасы: бас тарту, ауыстыру немесе қауіпсіз емес уәде төменге кетпей тұрып басқарушы қарауы керек.")
+            )
+            "approval_store_ack" -> supplierDashboardJoinedMessage(
+              listOf("Approval gate: store or buyer acknowledgement is the missing sign-off. Capture substitute, delay, or cancel answer inside AITA."),
+              listOf("Шлюз согласования: не хватает подтверждения магазина или покупателя. Зафиксируйте ответ замена/задержка/отмена в AITA."),
+              listOf("Бекіту қақпасы: дүкен немесе сатып алушы растауы жетіспейді. Ауыстыру/кідіріс/бас тарту жауабын AITA ішінде сақтаңыз.")
+            )
+            "approval_source_ack" -> supplierDashboardJoinedMessage(
+              listOf("Approval gate: upstream acknowledgement is required. Save reserve, ETA, no-stock, or substitute proof before promising recovery."),
+              listOf("Шлюз согласования: нужно подтверждение выше по цепочке. Сохраните резерв, срок, отсутствие или замену до обещания восстановления."),
+              listOf("Бекіту қақпасы: жоғары арна растауы керек. Қалпына келтіру уәдесіне дейін резерв, мерзім, қор жоқ немесе ауыстыру дәлелін сақтаңыз.")
+            )
+            "approval_pack_lead" -> supplierDashboardJoinedMessage(
+              listOf("Approval gate: pack lead must approve guarded quantity, split note, and remaining-shortage visibility before dispatch."),
+              listOf("Шлюз согласования: лидер сборки должен согласовать защищённое количество, заметку разделения и видимость остатка до отправки."),
+              listOf("Бекіту қақпасы: жөнелтуге дейін жинау жетекшісі қорғалған санды, бөлу жазбасын және қалған жетіспеуді бекітуі керек.")
+            )
+            "approval_ready" -> supplierDashboardJoinedMessage(
+              listOf("Approval gate: sign-off is ready. Move only the verified recovery step and keep any remaining shortage open."),
+              listOf("Шлюз согласования: согласование готово. Двигайте только проверенный шаг восстановления и оставьте остаток недопоставки открытым."),
+              listOf("Бекіту қақпасы: бекіту дайын. Тек тексерілген қалпына келтіру қадамын қозғап, қалған жетіспеуді ашық қалдырыңыз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Approval gate: watch approvals after each answer so quiet shortages do not bypass proof or owner sign-off."),
+              listOf("Шлюз согласования: следите за согласованиями после каждого ответа, чтобы тихие недопоставки не обходили доказательство или ответственного."),
+              listOf("Бекіту қақпасы: тыныш жетіспеулер дәлел немесе жауапты бекітуін айналып өтпеуі үшін әр жауаптан кейін бақылаңыз.")
+            )
+          }
+        }
+        val recoveryApprovalChecklist = supplierDashboardChunk {
+          when (recoveryApprovalLane) {
+            "approval_blocked" -> supplierDashboardJoinedMessage(
+              listOf("□ Stop packflow\n□ Name sign-off owner\n□ Attach proof or answer\n□ Re-open approval before dispatch"),
+              listOf("□ Остановить сборку\n□ Назначить ответственного за согласование\n□ Прикрепить доказательство или ответ\n□ Повторно открыть согласование до отправки"),
+              listOf("□ Жинауды тоқтату\n□ Бекіту жауаптысын атау\n□ Дәлел немесе жауап тіркеу\n□ Жөнелтуге дейін бекітуді қайта ашу")
+            )
+            "approval_manager_review" -> supplierDashboardJoinedMessage(
+              listOf("□ Review cancel/substitute risk\n□ Confirm downstream promise\n□ Save manager note\n□ Tell store safe answer"),
+              listOf("□ Проверить риск отмены/замены\n□ Подтвердить нижнее обещание\n□ Сохранить заметку руководителя\n□ Сообщить магазину безопасный ответ"),
+              listOf("□ Бас тарту/ауыстыру тәуекелін қарау\n□ Төменгі уәдені растау\n□ Басқарушы жазбасын сақтау\n□ Дүкенге қауіпсіз жауап беру")
+            )
+            "approval_store_ack" -> supplierDashboardJoinedMessage(
+              listOf("□ Contact store/buyer\n□ Save acknowledgement\n□ Refresh promise shield\n□ Set next follow-up"),
+              listOf("□ Связаться с магазином/покупателем\n□ Сохранить подтверждение\n□ Обновить щит обещания\n□ Назначить следующий контроль"),
+              listOf("□ Дүкен/сатып алушымен байланысу\n□ Растауды сақтау\n□ Уәде қалқанын жаңарту\n□ Келесі бақылауды қою")
+            )
+            "approval_source_ack" -> supplierDashboardJoinedMessage(
+              listOf("□ Ask upstream owner\n□ Save reserve/ETA proof\n□ Mirror safe ETA to store\n□ Keep missing qty open"),
+              listOf("□ Спросить ответственного выше\n□ Сохранить резерв/срок\n□ Передать безопасный срок магазину\n□ Оставить недостачу открытой"),
+              listOf("□ Жоғары жауаптыдан сұрау\n□ Резерв/мерзім дәлелін сақтау\n□ Қауіпсіз мерзімді дүкенге беру\n□ Жетіспеуді ашық қалдыру")
+            )
+            "approval_pack_lead" -> supplierDashboardJoinedMessage(
+              listOf("□ Confirm guarded quantity\n□ Attach split pack note\n□ Block over-pack\n□ Dispatch approved quantity only"),
+              listOf("□ Подтвердить защищённое количество\n□ Прикрепить заметку разделения\n□ Заблокировать пересборку\n□ Отправить только согласованное количество"),
+              listOf("□ Қорғалған санды растау\n□ Бөлінген жинау жазбасын тіркеу\n□ Артық жинауды бұғаттау\n□ Тек бекітілген санды жөнелту")
+            )
+            "approval_ready" -> supplierDashboardJoinedMessage(
+              listOf("□ Move approved recovery\n□ Close verified step only\n□ Keep residual shortage visible\n□ Recheck after promise change"),
+              listOf("□ Двигать согласованное восстановление\n□ Закрыть только проверенный шаг\n□ Оставить остаток видимым\n□ Перепроверить при изменении обещания"),
+              listOf("□ Бекітілген қалпына келтіруді қозғау\n□ Тек тексерілген қадамды жабу\n□ Қалдық жетіспеуді көрінетін ұстау\n□ Уәде өзгерсе қайта тексеру")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("□ Watch approval score\n□ Refresh after answer\n□ Keep owner visible\n□ Escalate if gate blocks"),
+              listOf("□ Следить за оценкой согласования\n□ Обновить после ответа\n□ Держать ответственного видимым\n□ Эскалировать при блокировке шлюза"),
+              listOf("□ Бекіту ұпайын бақылау\n□ Жауаптан кейін жаңарту\n□ Жауаптыны көрінетін ұстау\n□ Қақпа бөгесе көтеру")
+            )
+          }
+        }
+        val recoveryApprovalPathMain = supplierDashboardChunk {
+          when (recoveryApprovalLane) {
+            "approval_blocked" -> "approval blocked until proof and promise are safe"
+            "approval_manager_review" -> "manager review before exception decision"
+            "approval_store_ack" -> "store acknowledgement required"
+            "approval_source_ack" -> "upstream acknowledgement required"
+            "approval_pack_lead" -> "pack lead approves guarded quantity"
+            "approval_ready" -> "approved recovery ready to move"
+            else -> "watch approval after each answer"
+          }
+        }
+        val recoveryApprovalPathRu = supplierDashboardChunk {
+          when (recoveryApprovalLane) {
+            "approval_blocked" -> "согласование заблокировано до безопасных доказательств и обещания"
+            "approval_manager_review" -> "обзор руководителя перед решением исключения"
+            "approval_store_ack" -> "нужно подтверждение магазина"
+            "approval_source_ack" -> "нужно подтверждение выше по цепочке"
+            "approval_pack_lead" -> "лидер сборки согласует защищённое количество"
+            "approval_ready" -> "согласованное восстановление готово к движению"
+            else -> "наблюдать согласование после каждого ответа"
+          }
+        }
+        val recoveryApprovalPathKk = supplierDashboardChunk {
+          when (recoveryApprovalLane) {
+            "approval_blocked" -> "дәлел және уәде қауіпсіз болғанша бекіту бөгелген"
+            "approval_manager_review" -> "ерекше шешімге дейін басқарушы қарауы"
+            "approval_store_ack" -> "дүкен растауы керек"
+            "approval_source_ack" -> "жоғары арна растауы керек"
+            "approval_pack_lead" -> "жинау жетекшісі қорғалған санды бекітеді"
+            "approval_ready" -> "бекітілген қалпына келтіру қозғауға дайын"
+            else -> "әр жауаптан кейін бекітуді бақылау"
+          }
+        }
+        val recoveryApprovalScript = supplierDashboardChunk {
+          supplierDashboardJoinedMessage(
+            listOf(
+              "AITA approval gate: $recoveryContactGoodsName.",
+              "Approval path: $recoveryApprovalPathMain.",
+              "Approval score $recoveryApprovalScore/100; verification $recoveryVerificationScore/100; exception $recoveryExceptionScore/100; commit $recoveryCommitScore/100.",
+              "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()}. Keep store names private outside AITA."
+            ),
+            listOf(
+              "AITA шлюз согласования: $recoveryContactGoodsName.",
+              "Путь согласования: $recoveryApprovalPathRu.",
+              "Оценка согласования $recoveryApprovalScore/100; проверка $recoveryVerificationScore/100; исключение $recoveryExceptionScore/100; обязательство $recoveryCommitScore/100.",
+              "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()}. Названия магазинов держите приватными вне AITA."
+            ),
+            listOf(
+              "AITA бекіту қақпасы: $recoveryContactGoodsName.",
+              "Бекіту жолы: $recoveryApprovalPathKk.",
+              "Бекіту ұпайы $recoveryApprovalScore/100; тексеру $recoveryVerificationScore/100; ерекше $recoveryExceptionScore/100; міндеттеме $recoveryCommitScore/100.",
+              "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()}. AITA сыртында дүкен атауларын құпия ұстаңыз."
+            )
+          )
+        }
+        val recoveryExecutionScore = supplierDashboardChunk {
+          (
+              recoveryApprovalScore / 3 +
+              recoveryVerificationScore / 5 +
+              recoveryCommandScore / 6 +
+              recoveryCommitScore / 7 +
+              recoveryPromiseShieldScore / 7 +
+              recoveryExceptionScore / 8 +
+              recoveryAllocationScore / 8 +
+              duePressure / 2 +
+              when (recoveryApprovalLane) {
+                "approval_blocked" -> 18
+                "approval_manager_review" -> 14
+                "approval_store_ack" -> 10
+                "approval_source_ack" -> 9
+                "approval_pack_lead" -> 8
+                "approval_ready" -> -8
+                else -> 1
+              } +
+              when (recoveryVerificationLane) {
+                "verify_blocked" -> 16
+                "verify_cause_record" -> 10
+                "verify_store_answer" -> 8
+                "verify_source_proof" -> 7
+                "verify_pack_split" -> 6
+                "verify_ready" -> -7
+                else -> 1
+              } +
+              when (recoveryCommandLane) {
+                "stop_pack" -> 12
+                "call_store" -> 8
+                "source_now" -> 7
+                "split_and_ship" -> 6
+                "ready_with_note" -> -5
+                else -> 1
+              }
+            ).coerceIn(0, 100)
+        }
+        val recoveryExecutionLane = supplierDashboardChunk {
+          when {
+            recoveryApprovalLane == "approval_blocked" || recoveryVerificationLane == "verify_blocked" || recoveryExceptionLane == "exception_stop_pack" || recoveryPackGuardLane == "block_pack" -> "execution_blocked"
+            recoveryApprovalLane == "approval_store_ack" || recoveryVerificationLane == "verify_store_answer" || recoveryContactLane == "store_call" || recoveryPromiseShieldLane == "store_answer_needed" -> "execute_store_call"
+            recoveryApprovalLane == "approval_source_ack" || recoveryVerificationLane == "verify_source_proof" || recoveryCommitLane == "commit_source_eta" || recoveryContactLane == "upstream_request" -> "execute_source_eta"
+            recoveryApprovalLane == "approval_pack_lead" || recoveryVerificationLane == "verify_pack_split" || recoveryCommandLane == "split_and_ship" || recoveryPackGuardLane == "split_pack_only" || recoveryAllocationLane == "fair_split_needed" -> "execute_split_pack"
+            recoveryApprovalLane == "approval_ready" && recoveryVerificationLane == "verify_ready" && (recoveryConfidenceLane == "ready_to_recover" || recoveryCommandLane == "ready_with_note" || recoveryClosureLane == "ready_with_guard" || recoveryLedgerLane == "ledger_ready") -> "execute_ship_ready"
+            else -> "execution_watch"
+          }
+        }
+        val recoveryExecutionHint = supplierDashboardChunk {
+          when (recoveryExecutionLane) {
+            "execution_blocked" -> supplierDashboardJoinedMessage(
+              listOf("Execution gate: do not move the recovery yet. A blocker, verification gap, or unsafe pack guard still needs proof in AITA."),
+              listOf("Шлюз выполнения: пока не двигайте восстановление. Блокер, пробел проверки или небезопасная сборка требуют доказательства в AITA."),
+              listOf("Орындау қақпасы: қалпына келтіруді әлі қозғамаңыз. Бөгет, тексеру бос жері немесе қауіпсіз емес жинау AITA ішінде дәлел қажет етеді.")
+            )
+            "execute_store_call" -> supplierDashboardJoinedMessage(
+              listOf("Execution gate: the next real action is a store/buyer answer. Call, save the answer, then refresh promise shield before packing."),
+              listOf("Шлюз выполнения: следующее реальное действие — ответ магазина/покупателя. Позвоните, сохраните ответ и обновите щит обещания до сборки."),
+              listOf("Орындау қақпасы: келесі нақты әрекет — дүкен/сатып алушы жауабы. Қоңырау шалып, жауапты сақтап, жинауға дейін уәде қалқанын жаңартыңыз.")
+            )
+            "execute_source_eta" -> supplierDashboardJoinedMessage(
+              listOf("Execution gate: source or reserve the missing stock now. Record ETA, reserve, substitute, or no-stock proof before downstream promise changes."),
+              listOf("Шлюз выполнения: сейчас найдите или зарезервируйте недостающее наличие. Запишите срок, резерв, замену или отсутствие до изменения обещания вниз."),
+              listOf("Орындау қақпасы: жетіспейтін қорды қазір іздеп немесе резервтеңіз. Төменгі уәде өзгермей тұрып мерзім, резерв, ауыстыру немесе қор жоқ дәлелін жазыңыз.")
+            )
+            "execute_split_pack" -> supplierDashboardJoinedMessage(
+              listOf("Execution gate: split accepted quantity from missing quantity. Pack only the guarded amount and leave the residual shortage open."),
+              listOf("Шлюз выполнения: разделите принятое количество и недостачу. Собирайте только защищённое количество и оставьте остаток открытым."),
+              listOf("Орындау қақпасы: қабылданған сан мен жетіспеуді бөліңіз. Тек қорғалған санды жинап, қалдықты ашық қалдырыңыз.")
+            )
+            "execute_ship_ready" -> supplierDashboardJoinedMessage(
+              listOf("Execution gate: approved and verified. Move the guarded shipment/recovery step, then recheck any remaining shortage."),
+              listOf("Шлюз выполнения: согласовано и проверено. Двигайте защищённый шаг отправки/восстановления, затем перепроверьте остаток."),
+              listOf("Орындау қақпасы: бекітілді және тексерілді. Қорғалған жөнелту/қалпына келтіру қадамын қозғап, кейін қалған жетіспеуді қайта тексеріңіз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Execution gate: keep watching until approval, verification, and command lanes agree on one safe worker action."),
+              listOf("Шлюз выполнения: наблюдайте, пока согласование, проверка и команда не сойдутся в одно безопасное действие."),
+              listOf("Орындау қақпасы: бекіту, тексеру және команда бір қауіпсіз жұмыс әрекетіне келіскенше бақылаңыз.")
+            )
+          }
+        }
+        val recoveryExecutionChecklist = supplierDashboardChunk {
+          when (recoveryExecutionLane) {
+            "execution_blocked" -> supplierDashboardJoinedMessage(
+              listOf("□ Keep packflow stopped\n□ Name missing proof\n□ Re-open owner approval\n□ Re-score before execution"),
+              listOf("□ Держать сборку остановленной\n□ Назвать недостающее доказательство\n□ Переоткрыть согласование ответственного\n□ Пересчитать до выполнения"),
+              listOf("□ Жинауды тоқтату\n□ Жетіспейтін дәлелді атау\n□ Жауапты бекітуін қайта ашу\n□ Орындауға дейін қайта бағалау")
+            )
+            "execute_store_call" -> supplierDashboardJoinedMessage(
+              listOf("□ Call store/buyer\n□ Save substitute/delay/cancel answer\n□ Update promise shield\n□ Set follow-up time"),
+              listOf("□ Позвонить магазину/покупателю\n□ Сохранить замену/задержку/отмену\n□ Обновить щит обещания\n□ Поставить контроль"),
+              listOf("□ Дүкен/сатып алушыға қоңырау\n□ Ауыстыру/кідіріс/бас тартуды сақтау\n□ Уәде қалқанын жаңарту\n□ Бақылау уақытын қою")
+            )
+            "execute_source_eta" -> supplierDashboardJoinedMessage(
+              listOf("□ Ask upstream owner\n□ Save reserve or ETA\n□ Save no-stock proof if failed\n□ Mirror safe answer downstream"),
+              listOf("□ Спросить ответственного выше\n□ Сохранить резерв или срок\n□ При неудаче сохранить отсутствие\n□ Передать безопасный ответ вниз"),
+              listOf("□ Жоғары жауаптыдан сұрау\n□ Резерв немесе мерзімді сақтау\n□ Болмаса қор жоқ дәлелін сақтау\n□ Қауіпсіз жауапты төмен жеткізу")
+            )
+            "execute_split_pack" -> supplierDashboardJoinedMessage(
+              listOf("□ Lock approved quantity\n□ Mark residual shortage\n□ Attach split pack note\n□ Dispatch only guarded stock"),
+              listOf("□ Зафиксировать согласованное количество\n□ Отметить остаток недостачи\n□ Прикрепить заметку разделения\n□ Отправить только защищённое наличие"),
+              listOf("□ Бекітілген санды бекіту\n□ Қалдық жетіспеуді белгілеу\n□ Бөлу жинау жазбасын тіркеу\n□ Тек қорғалған қорды жөнелту")
+            )
+            "execute_ship_ready" -> supplierDashboardJoinedMessage(
+              listOf("□ Move approved shipment\n□ Keep proof attached\n□ Close completed quantity only\n□ Recheck leftover shortage"),
+              listOf("□ Двигать согласованную отправку\n□ Оставить доказательство\n□ Закрыть только выполненное количество\n□ Перепроверить остаток"),
+              listOf("□ Бекітілген жөнелтуді қозғау\n□ Дәлелді тіркеулі қалдыру\n□ Тек орындалған санды жабу\n□ Қалған жетіспеуді қайта тексеру")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("□ Watch execution score\n□ Refresh after answer\n□ Keep action owner visible\n□ Do not close silent shortages"),
+              listOf("□ Следить за оценкой выполнения\n□ Обновить после ответа\n□ Держать владельца действия видимым\n□ Не закрывать тихие недопоставки"),
+              listOf("□ Орындау ұпайын бақылау\n□ Жауаптан кейін жаңарту\n□ Әрекет иесін көрінетін ұстау\n□ Тыныш жетіспеулерді жаппау")
+            )
+          }
+        }
+        val recoveryExecutionPathMain = supplierDashboardChunk {
+          when (recoveryExecutionLane) {
+            "execution_blocked" -> "execution blocked until guard proof is safe"
+            "execute_store_call" -> "execute store answer before promise"
+            "execute_source_eta" -> "execute upstream reserve or ETA proof"
+            "execute_split_pack" -> "execute guarded split pack"
+            "execute_ship_ready" -> "approved recovery ready to ship or close"
+            else -> "watch execution until lanes agree"
+          }
+        }
+        val recoveryExecutionPathRu = supplierDashboardChunk {
+          when (recoveryExecutionLane) {
+            "execution_blocked" -> "выполнение заблокировано до безопасного доказательства"
+            "execute_store_call" -> "получить ответ магазина до обещания"
+            "execute_source_eta" -> "выполнить резерв или срок выше"
+            "execute_split_pack" -> "выполнить защищённое разделение сборки"
+            "execute_ship_ready" -> "согласованное восстановление готово к отправке или закрытию"
+            else -> "наблюдать выполнение, пока линии не совпадут"
+          }
+        }
+        val recoveryExecutionPathKk = supplierDashboardChunk {
+          when (recoveryExecutionLane) {
+            "execution_blocked" -> "қауіпсіз дәлелге дейін орындау бөгелген"
+            "execute_store_call" -> "уәдеге дейін дүкен жауабын орындау"
+            "execute_source_eta" -> "жоғары резерв немесе мерзім дәлелін орындау"
+            "execute_split_pack" -> "қорғалған бөлу жинауын орындау"
+            "execute_ship_ready" -> "бекітілген қалпына келтіру жөнелтуге немесе жабуға дайын"
+            else -> "арналар келіскенше орындауды бақылау"
+          }
+        }
+        val recoveryExecutionScript = supplierDashboardChunk {
+          supplierDashboardJoinedMessage(
+            listOf(
+              "AITA execution gate: $recoveryContactGoodsName.",
+              "Execution path: $recoveryExecutionPathMain.",
+              "Execution score $recoveryExecutionScore/100; approval $recoveryApprovalScore/100; verification $recoveryVerificationScore/100; command $recoveryCommandScore/100.",
+              "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()}. Move only the safe action and keep store names private outside AITA."
+            ),
+            listOf(
+              "AITA шлюз выполнения: $recoveryContactGoodsName.",
+              "Путь выполнения: $recoveryExecutionPathRu.",
+              "Оценка выполнения $recoveryExecutionScore/100; согласование $recoveryApprovalScore/100; проверка $recoveryVerificationScore/100; команда $recoveryCommandScore/100.",
+              "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()}. Двигайте только безопасное действие и держите названия магазинов приватными вне AITA."
+            ),
+            listOf(
+              "AITA орындау қақпасы: $recoveryContactGoodsName.",
+              "Орындау жолы: $recoveryExecutionPathKk.",
+              "Орындау ұпайы $recoveryExecutionScore/100; бекіту $recoveryApprovalScore/100; тексеру $recoveryVerificationScore/100; команда $recoveryCommandScore/100.",
+              "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()}. Тек қауіпсіз әрекетті қозғаңыз және AITA сыртында дүкен атауларын құпия ұстаңыз."
+            )
+          )
+        }
+  
+        val recoveryReleaseScore = supplierDashboardChunk {
+          (
+              recoveryExecutionScore / 3 +
+              recoveryApprovalScore / 6 +
+              recoveryVerificationScore / 7 +
+              recoveryCommitScore / 7 +
+              recoveryImpactScore / 8 +
+              recoveryAllocationScore / 8 +
+              duePressure / 2 +
+              when (recoveryExecutionLane) {
+                "execution_blocked" -> 18
+                "execute_store_call" -> 12
+                "execute_source_eta" -> 10
+                "execute_split_pack" -> 9
+                "execute_ship_ready" -> -8
+                else -> 1
+              } +
+              when (recoveryPromiseShieldLane) {
+                "promise_at_risk" -> 12
+                "store_answer_needed" -> 9
+                "source_before_promise" -> 8
+                "split_promise" -> 6
+                "promise_safe" -> -4
+                else -> 1
+              } +
+              when (recoveryPackGuardLane) {
+                "block_pack" -> 14
+                "split_pack_only" -> 7
+                "proof_before_pack" -> 6
+                "safe_to_pack" -> -4
+                else -> 1
+              }
+            ).coerceIn(0, 100)
+        }
+        val recoveryReleaseLane = supplierDashboardChunk {
+          when {
+            recoveryExecutionLane == "execution_blocked" || recoveryApprovalLane == "approval_blocked" || recoveryVerificationLane == "verify_blocked" || recoveryPackGuardLane == "block_pack" || recoveryCommitLane == "commit_blocked" -> "release_blocked"
+            recoveryExecutionLane == "execute_store_call" || recoveryApprovalLane == "approval_store_ack" || recoveryPromiseShieldLane == "store_answer_needed" || recoveryImpactLane == "customer_promise_impact" -> "release_store_update"
+            recoveryExecutionLane == "execute_source_eta" || recoveryApprovalLane == "approval_source_ack" || recoveryCommitLane == "commit_source_eta" || recoveryPromiseShieldLane == "source_before_promise" -> "release_source_eta"
+            recoveryExecutionLane == "execute_split_pack" || recoveryApprovalLane == "approval_pack_lead" || recoveryPackGuardLane == "split_pack_only" || recoveryPromiseShieldLane == "split_promise" || recoveryAllocationLane == "fair_split_needed" -> "release_split_dispatch"
+            recoveryExecutionLane == "execute_ship_ready" && recoveryApprovalLane == "approval_ready" && recoveryVerificationLane == "verify_ready" && (recoveryCommitLane == "commit_ready" || recoveryImpactLane == "controlled_impact" || recoveryReleaseScore <= 38) -> "release_ready"
+            else -> "release_watch"
+          }
+        }
+        val recoveryReleaseHint = supplierDashboardChunk {
+          when (recoveryReleaseLane) {
+            "release_blocked" -> supplierDashboardJoinedMessage(
+              listOf("Release gate: keep the recovery out of dispatch. Proof, approval, promise, or pack guard is still unsafe."),
+              listOf("Шлюз выпуска: не отправляйте восстановление в доставку. Доказательство, согласование, обещание или защита сборки ещё небезопасны."),
+              listOf("Шығару қақпасы: қалпына келтіруді жөнелтуге жібермеңіз. Дәлел, бекіту, уәде немесе жинау қорғанысы әлі қауіпсіз емес.")
+            )
+            "release_store_update" -> supplierDashboardJoinedMessage(
+              listOf("Release gate: update the store or buyer before release. Save the safe answer, then refresh the downstream promise."),
+              listOf("Шлюз выпуска: обновите магазин или покупателя до выпуска. Сохраните безопасный ответ, затем обновите нижнее обещание."),
+              listOf("Шығару қақпасы: шығаруға дейін дүкенді немесе сатып алушыны жаңартыңыз. Қауіпсіз жауапты сақтап, төменгі уәдені жаңартыңыз.")
+            )
+            "release_source_eta" -> supplierDashboardJoinedMessage(
+              listOf("Release gate: wait for upstream reserve or ETA proof. Release only after the source answer is recorded in AITA."),
+              listOf("Шлюз выпуска: дождитесь резерва или срока выше по цепочке. Выпускайте только после записи ответа поиска в AITA."),
+              listOf("Шығару қақпасы: жоғары арна резервін немесе мерзім дәлелін күтіңіз. Іздеу жауабы AITA-ға жазылғаннан кейін ғана шығарыңыз.")
+            )
+            "release_split_dispatch" -> supplierDashboardJoinedMessage(
+              listOf("Release gate: split dispatch is allowed only for guarded accepted quantity. Keep missing stock visible as a second recovery step."),
+              listOf("Шлюз выпуска: разделённая отправка разрешена только для защищённого принятого количества. Держите недостачу видимой как второй шаг восстановления."),
+              listOf("Шығару қақпасы: бөлінген жөнелту тек қорғалған қабылданған санға рұқсат. Жетіспейтін қорды екінші қалпына келтіру қадамы ретінде көрінетін ұстаңыз.")
+            )
+            "release_ready" -> supplierDashboardJoinedMessage(
+              listOf("Release gate: the recovery step is safe to release. Dispatch the guarded quantity and keep any residual shortage open."),
+              listOf("Шлюз выпуска: шаг восстановления безопасен к выпуску. Отправьте защищённое количество и оставьте остаток недостачи открытым."),
+              listOf("Шығару қақпасы: қалпына келтіру қадамын шығару қауіпсіз. Қорғалған санды жөнелтіп, қалған жетіспеуді ашық қалдырыңыз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Release gate: watch execution, promise, and pack guard together so answered shortages do not slip into dispatch quietly."),
+              listOf("Шлюз выпуска: наблюдайте выполнение, обещание и защиту сборки вместе, чтобы отвеченные недопоставки тихо не ушли в отправку."),
+              listOf("Шығару қақпасы: жауапталған жетіспеулер үнсіз жөнелтуге кетпеуі үшін орындау, уәде және жинау қорғанысын бірге бақылаңыз.")
+            )
+          }
+        }
+        val recoveryReleaseChecklist = supplierDashboardChunk {
+          when (recoveryReleaseLane) {
+            "release_blocked" -> supplierDashboardJoinedMessage(
+              listOf("□ Keep dispatch blocked\n□ Name unsafe gate\n□ Attach missing proof\n□ Recheck release before packflow moves"),
+              listOf("□ Заблокировать отправку\n□ Назвать небезопасный шлюз\n□ Прикрепить недостающее доказательство\n□ Перепроверить выпуск до движения сборки"),
+              listOf("□ Жөнелтуді бұғаттау\n□ Қауіпсіз емес қақпаны атау\n□ Жетіспейтін дәлелді тіркеу\n□ Жинау қозғалғанша шығаруды қайта тексеру")
+            )
+            "release_store_update" -> supplierDashboardJoinedMessage(
+              listOf("□ Call/update store\n□ Save answer in AITA\n□ Refresh promise shield\n□ Release only after acknowledgement"),
+              listOf("□ Позвонить/обновить магазин\n□ Сохранить ответ в AITA\n□ Обновить щит обещания\n□ Выпускать только после подтверждения"),
+              listOf("□ Дүкенге қоңырау/жаңарту\n□ Жауапты AITA-ға сақтау\n□ Уәде қалқанын жаңарту\n□ Растаудан кейін ғана шығару")
+            )
+            "release_source_eta" -> supplierDashboardJoinedMessage(
+              listOf("□ Confirm upstream ETA\n□ Save reserve/no-stock proof\n□ Mirror safe ETA downstream\n□ Keep missing quantity open"),
+              listOf("□ Подтвердить срок выше\n□ Сохранить резерв/отсутствие\n□ Передать безопасный срок вниз\n□ Оставить недостачу открытой"),
+              listOf("□ Жоғары мерзімді растау\n□ Резерв/қор жоқ дәлелін сақтау\n□ Қауіпсіз мерзімді төмен жеткізу\n□ Жетіспеуді ашық қалдыру")
+            )
+            "release_split_dispatch" -> supplierDashboardJoinedMessage(
+              listOf("□ Lock accepted quantity\n□ Add split dispatch note\n□ Label residual shortage\n□ Release guarded stock only"),
+              listOf("□ Зафиксировать принятое количество\n□ Добавить заметку разделённой отправки\n□ Отметить остаток недостачи\n□ Выпустить только защищённый товар"),
+              listOf("□ Қабылданған санды бекіту\n□ Бөлінген жөнелту жазбасын қосу\n□ Қалдық жетіспеуді белгілеу\n□ Тек қорғалған қорды шығару")
+            )
+            "release_ready" -> supplierDashboardJoinedMessage(
+              listOf("□ Release guarded recovery\n□ Keep proof attached\n□ Close moved quantity only\n□ Schedule leftover follow-up"),
+              listOf("□ Выпустить защищённое восстановление\n□ Оставить доказательство прикреплённым\n□ Закрыть только перемещённое количество\n□ Запланировать контроль остатка"),
+              listOf("□ Қорғалған қалпына келтіруді шығару\n□ Дәлелді тіркеулі қалдыру\n□ Тек қозғалған санды жабу\n□ Қалдық бақылауын жоспарлау")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("□ Watch release score\n□ Refresh after execution changes\n□ Keep owner visible\n□ Do not auto-close residual shortage"),
+              listOf("□ Следить за оценкой выпуска\n□ Обновлять после изменений выполнения\n□ Держать ответственного видимым\n□ Не закрывать остаток автоматически"),
+              listOf("□ Шығару ұпайын бақылау\n□ Орындау өзгерсе жаңарту\n□ Жауаптыны көрінетін ұстау\n□ Қалдықты автоматты жаппау")
+            )
+          }
+        }
+        val recoveryReleasePathMain = supplierDashboardChunk {
+          when (recoveryReleaseLane) {
+            "release_blocked" -> "release blocked until proof, promise, and pack guard are safe"
+            "release_store_update" -> "store update required before release"
+            "release_source_eta" -> "upstream ETA proof required before release"
+            "release_split_dispatch" -> "split dispatch guarded quantity only"
+            "release_ready" -> "guarded recovery ready for release"
+            else -> "watch release gate after execution changes"
+          }
+        }
+        val recoveryReleasePathRu = supplierDashboardChunk {
+          when (recoveryReleaseLane) {
+            "release_blocked" -> "выпуск заблокирован до безопасных доказательств, обещания и сборки"
+            "release_store_update" -> "обновление магазина нужно до выпуска"
+            "release_source_eta" -> "доказательство срока выше нужно до выпуска"
+            "release_split_dispatch" -> "разделённая отправка только защищённого количества"
+            "release_ready" -> "защищённое восстановление готово к выпуску"
+            else -> "наблюдать шлюз выпуска после изменений выполнения"
+          }
+        }
+        val recoveryReleasePathKk = supplierDashboardChunk {
+          when (recoveryReleaseLane) {
+            "release_blocked" -> "дәлел, уәде және жинау қауіпсіз болғанша шығару бөгелген"
+            "release_store_update" -> "шығаруға дейін дүкенді жаңарту керек"
+            "release_source_eta" -> "шығаруға дейін жоғары мерзім дәлелі керек"
+            "release_split_dispatch" -> "тек қорғалған санды бөлінген жөнелту"
+            "release_ready" -> "қорғалған қалпына келтіру шығаруға дайын"
+            else -> "орындау өзгергеннен кейін шығару қақпасын бақылау"
+          }
+        }
+        val recoveryReleaseScript = supplierDashboardChunk {
+          supplierDashboardJoinedMessage(
+            listOf(
+              "AITA release gate: $recoveryContactGoodsName.",
+              "Release path: $recoveryReleasePathMain.",
+              "Release score $recoveryReleaseScore/100; execution $recoveryExecutionScore/100; approval $recoveryApprovalScore/100; promise ${recoveryPromiseShieldScore}/100.",
+              "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()}. Keep store names private outside AITA."
+            ),
+            listOf(
+              "AITA шлюз выпуска: $recoveryContactGoodsName.",
+              "Путь выпуска: $recoveryReleasePathRu.",
+              "Оценка выпуска $recoveryReleaseScore/100; выполнение $recoveryExecutionScore/100; согласование $recoveryApprovalScore/100; обещание ${recoveryPromiseShieldScore}/100.",
+              "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()}. Названия магазинов держите приватными вне AITA."
+            ),
+            listOf(
+              "AITA шығару қақпасы: $recoveryContactGoodsName.",
+              "Шығару жолы: $recoveryReleasePathKk.",
+              "Шығару ұпайы $recoveryReleaseScore/100; орындау $recoveryExecutionScore/100; бекіту $recoveryApprovalScore/100; уәде ${recoveryPromiseShieldScore}/100.",
+              "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()}. AITA сыртында дүкен атауларын құпия ұстаңыз."
+            )
+          )
+        }
+  
+  
+        val recoverySealScore = supplierDashboardChunk {
+          (
+              recoveryReleaseScore / 3 +
+              recoveryExecutionScore / 6 +
+              recoveryApprovalScore / 8 +
+              recoveryVerificationScore / 8 +
+              recoveryPromiseShieldScore / 8 +
+              recoveryLedgerScore / 9 +
+              duePressure / 2 +
+              when (recoveryReleaseLane) {
+                "release_blocked" -> 19
+                "release_store_update" -> 13
+                "release_source_eta" -> 11
+                "release_split_dispatch" -> 9
+                "release_ready" -> -9
+                else -> 1
+              } +
+              when (recoveryClosureLane) {
+                "blocked_open" -> 10
+                "needs_close_note" -> 6
+                "ready_with_guard" -> -4
+                else -> 1
+              } +
+              when (recoveryLedgerLane) {
+                "audit_blocker" -> 8
+                "decision_record" -> 5
+                "pack_record" -> 4
+                "ledger_ready" -> -4
+                else -> 1
+              }
+            ).coerceIn(0, 100)
+        }
+        val recoverySealLane = supplierDashboardChunk {
+          when {
+            recoveryReleaseLane == "release_blocked" || recoveryExecutionLane == "execution_blocked" || recoveryApprovalLane == "approval_blocked" || recoveryVerificationLane == "verify_blocked" -> "seal_blocked"
+            recoveryReleaseLane == "release_store_update" || recoveryContactLane == "store_call" || recoveryPromiseShieldLane == "store_answer_needed" || recoveryApprovalLane == "approval_store_ack" -> "seal_store_notice"
+            recoveryReleaseLane == "release_source_eta" || recoveryCommitLane == "commit_source_eta" || recoveryVerificationLane == "verify_source_proof" || recoveryContactLane == "upstream_request" -> "seal_source_trace"
+            recoveryReleaseLane == "release_split_dispatch" || recoveryPackGuardLane == "split_pack_only" || recoveryAllocationLane == "fair_split_needed" || recoveryExecutionLane == "execute_split_pack" -> "seal_split_manifest"
+            recoveryReleaseLane == "release_ready" && recoveryExecutionLane == "execute_ship_ready" && (recoveryVerificationLane == "verify_ready" || recoveryLedgerLane == "ledger_ready") && recoveryPromiseShieldLane != "promise_at_risk" -> "seal_ready"
+            else -> "seal_watch"
+          }
+        }
+        val recoverySealHint = supplierDashboardChunk {
+          when (recoverySealLane) {
+            "seal_blocked" -> supplierDashboardJoinedMessage(
+              listOf("Seal gate: do not let this shortage leave recovery. One blocker is still unsafe for dispatch or close."),
+              listOf("Штамп-шлюз: не выпускайте эту недопоставку из восстановления. Один блокер ещё небезопасен для отправки или закрытия."),
+              listOf("Мөр қақпасы: бұл жетіспеуді қалпына келтіруден шығармаңыз. Бір бөгет әлі жөнелтуге немесе жабуға қауіпсіз емес.")
+            )
+            "seal_store_notice" -> supplierDashboardJoinedMessage(
+              listOf("Seal gate: final store notice is needed before the recovery can be treated as safe."),
+              listOf("Штамп-шлюз: финальное уведомление магазина нужно до того, как восстановление можно считать безопасным."),
+              listOf("Мөр қақпасы: қалпына келтіруді қауіпсіз деу үшін дүкенге соңғы хабарлама керек.")
+            )
+            "seal_source_trace" -> supplierDashboardJoinedMessage(
+              listOf("Seal gate: attach upstream ETA/reserve/no-stock trace before releasing the worker step."),
+              listOf("Штамп-шлюз: прикрепите след срока/резерва/отсутствия выше по цепочке до выпуска рабочего шага."),
+              listOf("Мөр қақпасы: жұмыс қадамын шығаруға дейін жоғары мерзім/резерв/қор жоқ ізін тіркеңіз.")
+            )
+            "seal_split_manifest" -> supplierDashboardJoinedMessage(
+              listOf("Seal gate: split manifest must clearly separate accepted shipped quantity from remaining shortage."),
+              listOf("Штамп-шлюз: разделённая ведомость должна ясно отделять отправляемое принятое количество от остатка недостачи."),
+              listOf("Мөр қақпасы: бөлінген ведомость жөнелетін қабылданған санды қалған жетіспеуден анық бөлуі керек.")
+            )
+            "seal_ready" -> supplierDashboardJoinedMessage(
+              listOf("Seal gate: recovery is sealed for the guarded worker step. Move it, but keep any remaining shortage open."),
+              listOf("Штамп-шлюз: восстановление проштамповано для защищённого рабочего шага. Двигайте его, но остаток недостачи оставьте открытым."),
+              listOf("Мөр қақпасы: қалпына келтіру қорғалған жұмыс қадамына мөрленді. Оны қозғаңыз, бірақ қалған жетіспеуді ашық қалдырыңыз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Seal gate: keep the final release stamp visible until proof, promise, and split state stay aligned."),
+              listOf("Штамп-шлюз: держите финальный штамп выпуска видимым, пока доказательство, обещание и разделение не совпадут."),
+              listOf("Мөр қақпасы: дәлел, уәде және бөлу күйі сәйкес болғанша соңғы шығару мөрін көрінетін ұстаңыз.")
+            )
+          }
+        }
+        val recoverySealChecklist = supplierDashboardChunk {
+          when (recoverySealLane) {
+            "seal_blocked" -> supplierDashboardJoinedMessage(
+              listOf("□ Keep release blocked\n□ Name the unsafe gate\n□ Attach missing proof\n□ Recheck before dispatch"),
+              listOf("□ Оставить выпуск заблокированным\n□ Назвать небезопасный шлюз\n□ Прикрепить недостающее доказательство\n□ Перепроверить до отправки"),
+              listOf("□ Шығаруды бөгелген күйде ұстау\n□ Қауіпсіз емес қақпаны атау\n□ Жетіспейтін дәлелді тіркеу\n□ Жөнелтуден бұрын қайта тексеру")
+            )
+            "seal_store_notice" -> supplierDashboardJoinedMessage(
+              listOf("□ Send final store notice\n□ Save acknowledgement\n□ Refresh promise shield\n□ Seal only acknowledged quantity"),
+              listOf("□ Отправить финальное уведомление магазину\n□ Сохранить подтверждение\n□ Обновить щит обещания\n□ Штамповать только подтверждённое количество"),
+              listOf("□ Дүкенге соңғы хабарлама жіберу\n□ Растауды сақтау\n□ Уәде қалқанын жаңарту\n□ Тек расталған санды мөрлеу")
+            )
+            "seal_source_trace" -> supplierDashboardJoinedMessage(
+              listOf("□ Attach upstream answer\n□ Mark ETA/reserve/no-stock\n□ Mirror safe trace downstream\n□ Keep missing quantity visible"),
+              listOf("□ Прикрепить ответ выше\n□ Отметить срок/резерв/отсутствие\n□ Передать безопасный след вниз\n□ Держать недостачу видимой"),
+              listOf("□ Жоғары жауапты тіркеу\n□ Мерзім/резерв/қор жоқты белгілеу\n□ Қауіпсіз ізді төмен жеткізу\n□ Жетіспеуді көрінетін ұстау")
+            )
+            "seal_split_manifest" -> supplierDashboardJoinedMessage(
+              listOf("□ Lock shipped accepted quantity\n□ Label residual shortage\n□ Add second-drop promise\n□ Seal split manifest before release"),
+              listOf("□ Зафиксировать отправляемое принятое количество\n□ Отметить остаток недостачи\n□ Добавить обещание второй поставки\n□ Проштамповать разделённую ведомость до выпуска"),
+              listOf("□ Жөнелетін қабылданған санды бекіту\n□ Қалдық жетіспеуді белгілеу\n□ Екінші жеткізу уәдесін қосу\n□ Шығаруға дейін бөлінген ведомосты мөрлеу")
+            )
+            "seal_ready" -> supplierDashboardJoinedMessage(
+              listOf("□ Seal guarded worker step\n□ Dispatch safe quantity\n□ Close moved quantity only\n□ Schedule residual follow-up"),
+              listOf("□ Проштамповать защищённый рабочий шаг\n□ Отправить безопасное количество\n□ Закрыть только перемещённое количество\n□ Запланировать контроль остатка"),
+              listOf("□ Қорғалған жұмыс қадамын мөрлеу\n□ Қауіпсіз санды жөнелту\n□ Тек қозғалған санды жабу\n□ Қалдық бақылауын жоспарлау")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("□ Watch seal score\n□ Refresh after release changes\n□ Keep owner visible\n□ Do not close residual shortage silently"),
+              listOf("□ Следить за оценкой штампа\n□ Обновлять после изменений выпуска\n□ Держать ответственного видимым\n□ Не закрывать остаток тихо"),
+              listOf("□ Мөр ұпайын бақылау\n□ Шығару өзгерген соң жаңарту\n□ Жауаптыны көрінетін ұстау\n□ Қалдықты үнсіз жаппау")
+            )
+          }
+        }
+        val recoverySealPathMain = supplierDashboardChunk {
+          when (recoverySealLane) {
+            "seal_blocked" -> "final seal blocked until unsafe gate is resolved"
+            "seal_store_notice" -> "final store notice required before seal"
+            "seal_source_trace" -> "upstream trace required before seal"
+            "seal_split_manifest" -> "split manifest must be sealed before release"
+            "seal_ready" -> "guarded recovery sealed for release"
+            else -> "watch final seal until proof and promise align"
+          }
+        }
+        val recoverySealPathRu = supplierDashboardChunk {
+          when (recoverySealLane) {
+            "seal_blocked" -> "финальный штамп заблокирован до решения небезопасного шлюза"
+            "seal_store_notice" -> "финальное уведомление магазина нужно до штампа"
+            "seal_source_trace" -> "след выше по цепочке нужен до штампа"
+            "seal_split_manifest" -> "разделённую ведомость нужно проштамповать до выпуска"
+            "seal_ready" -> "защищённое восстановление проштамповано к выпуску"
+            else -> "наблюдать финальный штамп, пока доказательство и обещание не совпадут"
+          }
+        }
+        val recoverySealPathKk = supplierDashboardChunk {
+          when (recoverySealLane) {
+            "seal_blocked" -> "қауіпсіз емес қақпа шешілгенше соңғы мөр бөгелген"
+            "seal_store_notice" -> "мөрге дейін дүкенге соңғы хабарлама керек"
+            "seal_source_trace" -> "мөрге дейін жоғары арна ізі керек"
+            "seal_split_manifest" -> "шығаруға дейін бөлінген ведомосты мөрлеу керек"
+            "seal_ready" -> "қорғалған қалпына келтіру шығаруға мөрленді"
+            else -> "дәлел мен уәде сәйкес болғанша соңғы мөрді бақылау"
+          }
+        }
+        val recoverySealScript = supplierDashboardChunk {
+          supplierDashboardJoinedMessage(
+            listOf(
+              "AITA seal gate: $recoveryContactGoodsName.",
+              "Seal path: $recoverySealPathMain.",
+              "Seal score $recoverySealScore/100; release $recoveryReleaseScore/100; execution $recoveryExecutionScore/100; verification $recoveryVerificationScore/100.",
+              "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()}. Keep store names private outside AITA."
+            ),
+            listOf(
+              "AITA штамп-шлюз: $recoveryContactGoodsName.",
+              "Путь штампа: $recoverySealPathRu.",
+              "Оценка штампа $recoverySealScore/100; выпуск $recoveryReleaseScore/100; выполнение $recoveryExecutionScore/100; проверка $recoveryVerificationScore/100.",
+              "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()}. Названия магазинов держите приватными вне AITA."
+            ),
+            listOf(
+              "AITA мөр қақпасы: $recoveryContactGoodsName.",
+              "Мөр жолы: $recoverySealPathKk.",
+              "Мөр ұпайы $recoverySealScore/100; шығару $recoveryReleaseScore/100; орындау $recoveryExecutionScore/100; тексеру $recoveryVerificationScore/100.",
+              "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()}. AITA сыртында дүкен атауларын құпия ұстаңыз."
+            )
+          )
+        }
+        val recoveryCloseoutScore = supplierDashboardChunk {
+          (
+              recoverySealScore / 3 +
+              recoveryReleaseScore / 5 +
+              recoveryExecutionScore / 7 +
+              recoveryVerificationScore / 8 +
+              recoveryApprovalScore / 8 +
+              recoveryLedgerScore / 10 +
+              recoveryClosureScore / 10 +
+              duePressure / 2 +
+              when (recoverySealLane) {
+                "seal_blocked" -> 18
+                "seal_store_notice" -> 11
+                "seal_source_trace" -> 9
+                "seal_split_manifest" -> 8
+                "seal_ready" -> -8
+                else -> 1
+              } +
+              when (recoveryReleaseLane) {
+                "release_blocked" -> 15
+                "release_store_update" -> 9
+                "release_source_eta" -> 8
+                "release_split_dispatch" -> 7
+                "release_ready" -> -6
+                else -> 1
+              } +
+              when (recoveryLedgerLane) {
+                "audit_blocker" -> 10
+                "decision_record" -> 7
+                "pack_record" -> 5
+                "ledger_ready" -> -5
+                else -> 1
+              } +
+              when (recoveryClosureLane) {
+                "blocked_open" -> 12
+                "needs_close_note" -> 7
+                "ready_with_guard" -> -5
+                else -> 1
+              }
+            ).coerceIn(0, 100)
+        }
+        val recoveryCloseoutLane = supplierDashboardChunk {
+          when {
+            recoverySealLane == "seal_blocked" || recoveryReleaseLane == "release_blocked" || recoveryExecutionLane == "execution_blocked" || recoveryApprovalLane == "approval_blocked" || recoveryVerificationLane == "verify_blocked" || recoveryClosureLane == "blocked_open" -> "closeout_blocked"
+            recoverySealLane == "seal_store_notice" || recoveryReleaseLane == "release_store_update" || recoveryApprovalLane == "approval_store_ack" || recoveryVerificationLane == "verify_store_answer" || recoveryPromiseShieldLane == "store_answer_needed" -> "closeout_store_notice"
+            recoverySealLane == "seal_source_trace" || recoveryReleaseLane == "release_source_eta" || recoveryApprovalLane == "approval_source_ack" || recoveryVerificationLane == "verify_source_proof" || recoveryCommitLane == "commit_source_eta" -> "closeout_source_trace"
+            recoverySealLane == "seal_split_manifest" || recoveryReleaseLane == "release_split_dispatch" || recoveryExecutionLane == "execute_split_pack" || recoveryPackGuardLane == "split_pack_only" || recoveryAllocationLane == "fair_split_needed" || recoveryAllocationLane == "priority_allocation" -> "closeout_split_leftover"
+            recoverySealLane == "seal_ready" && recoveryReleaseLane == "release_ready" && recoveryExecutionLane == "execute_ship_ready" && (recoveryVerificationLane == "verify_ready" || recoveryLedgerLane == "ledger_ready") && recoveryCloseoutScore <= 42 -> "closeout_ready"
+            else -> "closeout_watch"
+          }
+        }
+        val recoveryCloseoutHint = supplierDashboardChunk {
+          when (recoveryCloseoutLane) {
+            "closeout_blocked" -> supplierDashboardJoinedMessage(
+              listOf("Closeout guard: do not close or archive this recovery yet. One of the seal, release, execution, approval, verification, or closure gates is still blocking."),
+              listOf("Защита закрытия: ещё не закрывайте и не архивируйте это восстановление. Один из шлюзов штампа, выпуска, выполнения, согласования, проверки или закрытия всё ещё блокирует."),
+              listOf("Жабу қорғаны: бұл қалпына келтіруді әлі жаппаңыз және архивтемеңіз. Мөр, шығару, орындау, бекіту, тексеру немесе жабу қақпасының бірі әлі бөгеп тұр.")
+            )
+            "closeout_store_notice" -> supplierDashboardJoinedMessage(
+              listOf("Closeout guard: store or buyer notice is the last mile. Save the acknowledged answer before marking the recovery closed."),
+              listOf("Защита закрытия: уведомление магазина или покупателя — последний шаг. Сохраните подтверждённый ответ до отметки восстановления закрытым."),
+              listOf("Жабу қорғаны: дүкен немесе сатып алушы хабарламасы соңғы қадам. Қалпына келтіруді жабық деп белгілемей тұрып расталған жауапты сақтаңыз.")
+            )
+            "closeout_source_trace" -> supplierDashboardJoinedMessage(
+              listOf("Closeout guard: upstream reserve, no-stock proof, or ETA trace must be attached before the recovery can leave the watch list."),
+              listOf("Защита закрытия: резерв выше, доказательство отсутствия товара или срок должны быть прикреплены до ухода восстановления из списка наблюдения."),
+              listOf("Жабу қорғаны: қалпына келтіру бақылаудан шықпас бұрын жоғары резерв, қор жоқ дәлелі немесе мерзім ізі тіркелуі керек.")
+            )
+            "closeout_split_leftover" -> supplierDashboardJoinedMessage(
+              listOf("Closeout guard: split recovery needs a leftover-shortage note. Close only shipped/guarded quantity and leave the rest visible."),
+              listOf("Защита закрытия: разделённому восстановлению нужна заметка остаточной недопоставки. Закрывайте только отправленное/защищённое количество и оставляйте остаток видимым."),
+              listOf("Жабу қорғаны: бөлінген қалпына келтіруге қалған жетіспеу жазбасы керек. Тек жөнелтілген/қорғалған санды жауып, қалдығын көрінетін қалдырыңыз.")
+            )
+            "closeout_ready" -> supplierDashboardJoinedMessage(
+              listOf("Closeout guard: ready to close with proof. Archive the recovery note, keep residual shortage open, and let dispatch proceed only for safe quantity."),
+              listOf("Защита закрытия: готово к закрытию с доказательством. Архивируйте заметку восстановления, оставьте остаточную недопоставку открытой и двигайте отправку только по безопасному количеству."),
+              listOf("Жабу қорғаны: дәлелмен жабуға дайын. Қалпына келтіру жазбасын архивтеп, қалдық жетіспеуді ашық қалдырып, жөнелтуді тек қауіпсіз санмен жүргізіңіз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Closeout guard: keep watching until seal, release, proof, and leftover notes agree. This prevents silent closure of an answered shortage."),
+              listOf("Защита закрытия: наблюдайте, пока штамп, выпуск, доказательство и заметки остатка не согласованы. Это не даёт отвеченной недопоставке закрыться тихо."),
+              listOf("Жабу қорғаны: мөр, шығару, дәлел және қалдық жазбалары келісілгенше бақылаңыз. Бұл жауапталған жетіспеудің үнсіз жабылуына жол бермейді.")
+            )
+          }
+        }
+        val recoveryCloseoutChecklist = supplierDashboardChunk {
+          when (recoveryCloseoutLane) {
+            "closeout_blocked" -> supplierDashboardJoinedMessage(
+              listOf("□ Keep recovery open\n□ Name blocking gate\n□ Attach missing proof\n□ Recheck before archive"),
+              listOf("□ Оставить восстановление открытым\n□ Назвать блокирующий шлюз\n□ Прикрепить недостающее доказательство\n□ Перепроверить до архива"),
+              listOf("□ Қалпына келтіруді ашық қалдыру\n□ Бөгейтін қақпаны атау\n□ Жетіспейтін дәлелді тіркеу\n□ Архивке дейін қайта тексеру")
+            )
+            "closeout_store_notice" -> supplierDashboardJoinedMessage(
+              listOf("□ Save store/buyer answer\n□ Refresh promise note\n□ Mark acknowledged quantity\n□ Keep privacy-safe brief"),
+              listOf("□ Сохранить ответ магазина/покупателя\n□ Обновить заметку обещания\n□ Отметить подтверждённое количество\n□ Держать приватную сводку"),
+              listOf("□ Дүкен/сатып алушы жауабын сақтау\n□ Уәде жазбасын жаңарту\n□ Расталған санды белгілеу\n□ Құпия қысқаша мәтінді сақтау")
+            )
+            "closeout_source_trace" -> supplierDashboardJoinedMessage(
+              listOf("□ Attach upstream proof\n□ Save ETA/no-stock result\n□ Mirror safe note downstream\n□ Leave unfilled quantity open"),
+              listOf("□ Прикрепить доказательство выше\n□ Сохранить срок/нет товара\n□ Передать безопасную заметку вниз\n□ Оставить незаполненное количество открытым"),
+              listOf("□ Жоғары дәлелді тіркеу\n□ Мерзім/қор жоқ нәтижесін сақтау\n□ Қауіпсіз жазбаны төмен жеткізу\n□ Толмаған санды ашық қалдыру")
+            )
+            "closeout_split_leftover" -> supplierDashboardJoinedMessage(
+              listOf("□ Close shipped quantity only\n□ Label leftover shortage\n□ Schedule second drop or cancel review\n□ Keep split manifest attached"),
+              listOf("□ Закрыть только отправленное количество\n□ Обозначить остаточную недопоставку\n□ Запланировать вторую поставку или отмену\n□ Оставить разделённую ведомость"),
+              listOf("□ Тек жөнелтілген санды жабу\n□ Қалған жетіспеуді белгілеу\n□ Екінші жеткізу немесе бас тартуды жоспарлау\n□ Бөлінген ведомосты қалдыру")
+            )
+            "closeout_ready" -> supplierDashboardJoinedMessage(
+              listOf("□ Archive closeout note\n□ Keep residual shortage visible\n□ Release safe dispatch quantity\n□ Confirm next follow-up is set"),
+              listOf("□ Архивировать заметку закрытия\n□ Оставить остаточную недопоставку видимой\n□ Выпустить безопасное количество\n□ Проверить следующий контроль"),
+              listOf("□ Жабу жазбасын архивтеу\n□ Қалдық жетіспеуді көрінетін қалдыру\n□ Қауіпсіз санды жөнелту\n□ Келесі бақылаудың қойылғанын растау")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("□ Watch seal and release\n□ Keep owner visible\n□ Refresh proof after answer\n□ Avoid silent close"),
+              listOf("□ Наблюдать штамп и выпуск\n□ Держать ответственного видимым\n□ Обновить доказательство после ответа\n□ Не закрывать тихо"),
+              listOf("□ Мөр мен шығаруды бақылау\n□ Жауаптыны көрінетін ұстау\n□ Жауаптан кейін дәлелді жаңарту\n□ Үнсіз жаппау")
+            )
+          }
+        }
+        val recoveryCloseoutPathMain = supplierDashboardChunk {
+          when (recoveryCloseoutLane) {
+            "closeout_blocked" -> "blocked closeout"
+            "closeout_store_notice" -> "store notice before close"
+            "closeout_source_trace" -> "source trace before close"
+            "closeout_split_leftover" -> "split leftover kept open"
+            "closeout_ready" -> "proof-backed closeout ready"
+            else -> "closeout watch"
+          }
+        }
+        val recoveryCloseoutPathRu = supplierDashboardChunk {
+          when (recoveryCloseoutLane) {
+            "closeout_blocked" -> "закрытие заблокировано"
+            "closeout_store_notice" -> "уведомление магазина до закрытия"
+            "closeout_source_trace" -> "след поиска до закрытия"
+            "closeout_split_leftover" -> "остаток разделения остаётся открытым"
+            "closeout_ready" -> "закрытие готово с доказательством"
+            else -> "наблюдение закрытия"
+          }
+        }
+        val recoveryCloseoutPathKk = supplierDashboardChunk {
+          when (recoveryCloseoutLane) {
+            "closeout_blocked" -> "жабу бөгелген"
+            "closeout_store_notice" -> "жабуға дейін дүкен хабарламасы"
+            "closeout_source_trace" -> "жабуға дейін іздеу ізі"
+            "closeout_split_leftover" -> "бөлінген қалдық ашық қалады"
+            "closeout_ready" -> "дәлелмен жабуға дайын"
+            else -> "жабуды бақылау"
+          }
+        }
+        val recoveryCloseoutScript = supplierDashboardChunk {
+          supplierDashboardJoinedMessage(
+            listOf(
+              "AITA closeout guard: $recoveryContactGoodsName.",
+              "Closeout path: $recoveryCloseoutPathMain.",
+              "Closeout score $recoveryCloseoutScore/100; seal $recoverySealScore/100; release $recoveryReleaseScore/100; ledger $recoveryLedgerScore/100.",
+              "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()}. Close only verified quantity and keep store names private outside AITA."
+            ),
+            listOf(
+              "AITA защита закрытия: $recoveryContactGoodsName.",
+              "Путь закрытия: $recoveryCloseoutPathRu.",
+              "Оценка закрытия $recoveryCloseoutScore/100; штамп $recoverySealScore/100; выпуск $recoveryReleaseScore/100; журнал $recoveryLedgerScore/100.",
+              "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()}. Закрывайте только проверенное количество и держите названия магазинов приватными вне AITA."
+            ),
+            listOf(
+              "AITA жабу қорғаны: $recoveryContactGoodsName.",
+              "Жабу жолы: $recoveryCloseoutPathKk.",
+              "Жабу ұпайы $recoveryCloseoutScore/100; мөр $recoverySealScore/100; шығару $recoveryReleaseScore/100; журнал $recoveryLedgerScore/100.",
+              "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()}. Тек тексерілген санды жауып, AITA сыртында дүкен атауларын құпия ұстаңыз."
+            )
+          )
+        }
+  
+  
+        val recoveryReopenAtMillis = supplierDashboardChunk {
+          listOfNotNull(
+            recoveryFollowUpAtMillis?.takeIf { followUpAt -> followUpAt > now },
+            recoveryCommitByMillis?.takeIf { commitAt -> commitAt > now },
+            recoveryCheckpointAtMillis?.takeIf { checkpointAt -> checkpointAt > now },
+            earliestDueAtMillis?.takeIf { dueAt -> dueAt > now }
+          ).minOrNull()
+        }
+        val recoveryReopenScore = supplierDashboardChunk {
+          (
+            recoveryCloseoutScore / 3 +
+              recoverySealScore / 5 +
+              recoveryReleaseScore / 6 +
+              recoveryVerificationScore / 7 +
+              recoveryApprovalScore / 8 +
+              recoveryRiskScore / 8 +
+              when (recoveryCloseoutLane) {
+                "closeout_blocked" -> 25
+                "closeout_store_notice" -> 16
+                "closeout_source_trace" -> 14
+                "closeout_split_leftover" -> 12
+                "closeout_ready" -> -10
+                else -> 3
+              } +
+              when (recoveryFollowUpLane) {
+                "follow_up_now" -> 14
+                "same_day_check" -> 8
+                "before_pack_check" -> 6
+                else -> 1
+              } +
+              when (recoveryCommitLane) {
+                "commit_blocked" -> 13
+                "commit_store_today" -> 10
+                "commit_source_eta" -> 8
+                "commit_split_eta" -> 6
+                "commit_ready" -> -5
+                else -> 1
+              } +
+              when (recoveryPromiseShieldLane) {
+                "promise_at_risk" -> 12
+                "store_answer_needed" -> 9
+                "source_before_promise" -> 7
+                "split_promise" -> 5
+                "promise_safe" -> -5
+                else -> 1
+              } +
+              when {
+                fullyShortLineCount > 0 -> 8
+                partialLineCount > 0 -> 5
+                else -> 0
+              } +
+              affectedOrderCount.coerceAtMost(6) * 2
+            ).coerceIn(0, 100)
+        }
+        val recoveryReopenLane = supplierDashboardChunk {
+          when {
+            recoveryCloseoutLane == "closeout_blocked" || recoverySealLane == "seal_blocked" || recoveryReleaseLane == "release_blocked" || recoveryExecutionLane == "execution_blocked" -> "reopen_blocked"
+            recoveryCloseoutLane == "closeout_store_notice" || recoveryApprovalLane == "approval_store_ack" || recoveryVerificationLane == "verify_store_answer" || recoveryPromiseShieldLane == "store_answer_needed" -> "reopen_after_answer"
+            recoveryFollowUpLane == "follow_up_now" || recoveryCommitLane == "commit_store_today" || recoveryPromiseShieldLane == "promise_at_risk" || recoveryReopenScore >= 78 -> "reopen_if_promise_slips"
+            recoveryCloseoutLane == "closeout_split_leftover" || recoveryAllocationLane == "fair_split_needed" || recoveryAllocationLane == "priority_allocation" || (acceptedStockCanBeSplit && partialLineCount > 0) -> "reopen_split_leftover"
+            recoveryCloseoutLane == "closeout_ready" && recoverySealLane == "seal_ready" && recoveryReleaseLane == "release_ready" && recoveryReopenScore <= 42 -> "reopen_safe"
+            else -> "reopen_watch"
+          }
+        }
+        val recoveryReopenHint = supplierDashboardChunk {
+          when (recoveryReopenLane) {
+            "reopen_blocked" -> supplierDashboardJoinedMessage(
+              listOf("Reopen guard: closeout is blocked. Keep this shortage visible until seal, release, execution, and closeout blockers are cleared."),
+              listOf("Защита переоткрытия: закрытие заблокировано. Держите недопоставку видимой, пока штамп, выпуск, выполнение и закрытие не очищены."),
+              listOf("Қайта ашу қорғаны: жабу бөгелген. Мөр, шығару, орындау және жабу бөгеттері тазаланғанша жетіспеуді көрінетін ұстаңыз.")
+            )
+            "reopen_after_answer" -> supplierDashboardJoinedMessage(
+              listOf("Reopen guard: close only after the store/source answer is recorded. Reopen immediately if the answer changes quantity, substitute, or ETA."),
+              listOf("Защита переоткрытия: закрывайте только после записи ответа магазина/поиска. Переоткройте сразу, если ответ меняет количество, замену или срок."),
+              listOf("Қайта ашу қорғаны: дүкен/іздеу жауабы жазылғаннан кейін ғана жабыңыз. Жауап санды, ауыстыруды немесе мерзімді өзгертсе бірден қайта ашыңыз.")
+            )
+            "reopen_if_promise_slips" -> supplierDashboardJoinedMessage(
+              listOf("Reopen guard: promise is fragile. Keep a reopen checkpoint so a missed follow-up or slipped ETA brings the shortage back to the desk."),
+              listOf("Защита переоткрытия: обещание хрупкое. Оставьте контроль переоткрытия, чтобы пропущенный контроль или сдвиг срока вернул недопоставку на пульт."),
+              listOf("Қайта ашу қорғаны: уәде нәзік. Бақылау өткізіп алынса немесе мерзім сырғыса жетіспеу пультке қайтуы үшін қайта ашу бақылауын қалдырыңыз.")
+            )
+            "reopen_split_leftover" -> supplierDashboardJoinedMessage(
+              listOf("Reopen guard: split leftover remains. Close only shipped/verified quantity and reopen the shortage when second-drop stock arrives or fails."),
+              listOf("Защита переоткрытия: остался разделённый остаток. Закрывайте только отправленное/проверенное количество и переоткройте недопоставку при приходе или срыве второй поставки."),
+              listOf("Қайта ашу қорғаны: бөлінген қалдық бар. Тек жөнелтілген/тексерілген санды жауып, екінші жеткізу келсе немесе үзілсе жетіспеуді қайта ашыңыз.")
+            )
+            "reopen_safe" -> supplierDashboardJoinedMessage(
+              listOf("Reopen guard: closeout looks safe. Seal the note, but keep the reopen checkpoint visible until the next promise/follow-up passes."),
+              listOf("Защита переоткрытия: закрытие выглядит безопасным. Зафиксируйте заметку, но оставьте контроль переоткрытия видимым до следующего обещания/контроля."),
+              listOf("Қайта ашу қорғаны: жабу қауіпсіз көрінеді. Жазбаны бекітіңіз, бірақ келесі уәде/бақылау өткенше қайта ашу бақылауын көрінетін қалдырыңыз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Reopen guard: keep watch. If owner, ETA, proof, or accepted quantity changes, return this shortage to active recovery."),
+              listOf("Защита переоткрытия: наблюдайте. Если ответственный, срок, доказательство или принятое количество меняются, верните недопоставку в активное восстановление."),
+              listOf("Қайта ашу қорғаны: бақылаңыз. Жауапты, мерзім, дәлел немесе қабылданған сан өзгерсе жетіспеуді белсенді қалпына келтіруге қайтарыңыз.")
+            )
+          }
+        }
+        val recoveryReopenChecklist = supplierDashboardChunk {
+          when (recoveryReopenLane) {
+            "reopen_blocked" -> supplierDashboardJoinedMessage(
+              listOf("□ Keep shortage visible\n□ Do not archive blocked closeout\n□ Clear seal/release blockers\n□ Set reopen checkpoint"),
+              listOf("□ Держать недопоставку видимой\n□ Не архивировать заблокированное закрытие\n□ Очистить блокеры штампа/выпуска\n□ Поставить контроль переоткрытия"),
+              listOf("□ Жетіспеуді көрінетін ұстау\n□ Бөгелген жабуды архивтемеу\n□ Мөр/шығару бөгеттерін тазалау\n□ Қайта ашу бақылауын қою")
+            )
+            "reopen_after_answer" -> supplierDashboardJoinedMessage(
+              listOf("□ Save answer source\n□ Confirm quantity/ETA/substitute\n□ Re-score promise shield\n□ Reopen if answer changes"),
+              listOf("□ Сохранить источник ответа\n□ Подтвердить количество/срок/замену\n□ Пересчитать щит обещания\n□ Переоткрыть при изменении ответа"),
+              listOf("□ Жауап көзін сақтау\n□ Сан/мерзім/ауыстыруды растау\n□ Уәде қалқанын қайта бағалау\n□ Жауап өзгерсе қайта ашу")
+            )
+            "reopen_if_promise_slips" -> supplierDashboardJoinedMessage(
+              listOf("□ Keep next checkpoint\n□ Watch promise drift\n□ Notify owner before close\n□ Reopen on missed ETA"),
+              listOf("□ Оставить следующий контроль\n□ Следить за сдвигом обещания\n□ Сообщить ответственному до закрытия\n□ Переоткрыть при срыве срока"),
+              listOf("□ Келесі бақылауды қалдыру\n□ Уәде сырғуын бақылау\n□ Жабуға дейін жауаптыны хабарлау\n□ Мерзім үзілсе қайта ашу")
+            )
+            "reopen_split_leftover" -> supplierDashboardJoinedMessage(
+              listOf("□ Close shipped quantity only\n□ Keep leftover visible\n□ Date second drop\n□ Reopen if second drop fails"),
+              listOf("□ Закрыть только отправленное количество\n□ Оставить остаток видимым\n□ Поставить дату второй поставки\n□ Переоткрыть при срыве второй поставки"),
+              listOf("□ Тек жөнелтілген санды жабу\n□ Қалдықты көрінетін қалдыру\n□ Екінші жеткізу күнін қою\n□ Екінші жеткізу үзілсе қайта ашу")
+            )
+            "reopen_safe" -> supplierDashboardJoinedMessage(
+              listOf("□ Seal closeout note\n□ Keep reopen checkpoint\n□ Verify no leftover promise\n□ Archive after checkpoint clears"),
+              listOf("□ Зафиксировать заметку закрытия\n□ Оставить контроль переоткрытия\n□ Проверить отсутствие остаточного обещания\n□ Архивировать после прохождения контроля"),
+              listOf("□ Жабу жазбасын бекіту\n□ Қайта ашу бақылауын қалдыру\n□ Қалған уәде жоқтығын тексеру\n□ Бақылау өткен соң архивтеу")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("□ Watch owner/ETA/proof\n□ Keep missing qty visible\n□ Reopen on any mismatch"),
+              listOf("□ Следить за ответственным/сроком/доказательством\n□ Держать недостачу видимой\n□ Переоткрыть при любом расхождении"),
+              listOf("□ Жауапты/мерзім/дәлелді бақылау\n□ Жетіспейтін санды көрінетін ұстау\n□ Кез келген сәйкессіздікте қайта ашу")
+            )
+          }
+        }
+  
+        val recoveryReopenPathMain = supplierDashboardChunk {
+          when (recoveryReopenLane) {
+            "reopen_blocked" -> "blocked from closeout"
+            "reopen_after_answer" -> "reopen after changed answer"
+            "reopen_if_promise_slips" -> "reopen on promise slip"
+            "reopen_split_leftover" -> "split leftover stays reopenable"
+            "reopen_safe" -> "safe with reopen checkpoint"
+            else -> "watch for mismatch"
+          }
+        }
+        val recoveryReopenPathRu = supplierDashboardChunk {
+          when (recoveryReopenLane) {
+            "reopen_blocked" -> "заблокировано для закрытия"
+            "reopen_after_answer" -> "переоткрыть после изменения ответа"
+            "reopen_if_promise_slips" -> "переоткрыть при срыве обещания"
+            "reopen_split_leftover" -> "разделённый остаток остаётся переоткрываемым"
+            "reopen_safe" -> "безопасно с контролем переоткрытия"
+            else -> "наблюдать расхождения"
+          }
+        }
+        val recoveryReopenPathKk = supplierDashboardChunk {
+          when (recoveryReopenLane) {
+            "reopen_blocked" -> "жабуға бөгелген"
+            "reopen_after_answer" -> "жауап өзгерсе қайта ашу"
+            "reopen_if_promise_slips" -> "уәде бұзылса қайта ашу"
+            "reopen_split_leftover" -> "бөлінген қалдық қайта ашылатын күйде"
+            "reopen_safe" -> "қайта ашу бақылауымен қауіпсіз"
+            else -> "сәйкессіздікті бақылау"
+          }
+        }
+        val recoveryReopenScript = supplierDashboardChunk {
+          supplierDashboardJoinedMessage(
+            listOf(
+              "AITA reopen guard: $recoveryContactGoodsName.",
+              "Reopen path: $recoveryReopenPathMain; score $recoveryReopenScore/100.",
+              "Next checkpoint ${recoveryReopenAtMillis?.let { reopenAt -> supplierDashboardCopyDateTime(reopenAt) } ?: "not set"}; closeout ${recoveryCloseoutLane.ifBlank { "closeout_watch" }}; promise ${recoveryPromiseShieldLane.ifBlank { "promise_watch" }}.",
+              "Close verified quantity only and reopen if owner, ETA, proof, or accepted quantity changes. Keep store names private outside AITA."
+            ),
+            listOf(
+              "AITA защита переоткрытия: $recoveryContactGoodsName.",
+              "Путь переоткрытия: $recoveryReopenPathRu; оценка $recoveryReopenScore/100.",
+              "Следующий контроль ${recoveryReopenAtMillis?.let { reopenAt -> supplierDashboardCopyDateTime(reopenAt) } ?: "не задан"}; закрытие ${recoveryCloseoutLane.ifBlank { "closeout_watch" }}; обещание ${recoveryPromiseShieldLane.ifBlank { "promise_watch" }}.",
+              "Закрывайте только проверенное количество и переоткрывайте при изменении ответственного, срока, доказательства или принятого количества. Названия магазинов держите приватными вне AITA."
+            ),
+            listOf(
+              "AITA қайта ашу қорғаны: $recoveryContactGoodsName.",
+              "Қайта ашу жолы: $recoveryReopenPathKk; ұпай $recoveryReopenScore/100.",
+              "Келесі бақылау ${recoveryReopenAtMillis?.let { reopenAt -> supplierDashboardCopyDateTime(reopenAt) } ?: "қойылмаған"}; жабу ${recoveryCloseoutLane.ifBlank { "closeout_watch" }}; уәде ${recoveryPromiseShieldLane.ifBlank { "promise_watch" }}.",
+              "Тек тексерілген санды жауып, жауапты, мерзім, дәлел немесе қабылданған сан өзгерсе қайта ашыңыз. AITA сыртында дүкен атауларын құпия ұстаңыз."
+            )
+          )
+        }
+  
+        val recoveryReconciliationScore = supplierDashboardChunk {
+          (
+            recoveryReopenScore / 3 +
+              recoveryCloseoutScore / 4 +
+              recoverySealScore / 5 +
+              when (recoveryReopenLane) {
+                "reopen_blocked" -> 20
+                "reopen_after_answer" -> 13
+                "reopen_if_promise_slips" -> 12
+                "reopen_split_leftover" -> 9
+                "reopen_safe" -> -8
+                else -> 2
+              } +
+              when (recoveryCloseoutLane) {
+                "closeout_blocked" -> 13
+                "closeout_store_notice" -> 8
+                "closeout_source_trace" -> 7
+                "closeout_split_leftover" -> 6
+                "closeout_ready" -> -6
+                else -> 2
+              } +
+              when (recoveryAllocationLane) {
+                "fair_split_needed" -> 10
+                "priority_allocation" -> 8
+                "single_store_allocation" -> 4
+                "allocation_ready" -> -4
+                else -> 1
+              } +
+              when {
+                requestCoveragePercent <= 0 -> 11
+                requestCoveragePercent < 60 -> 8
+                requestCoveragePercent < 100 -> 5
+                else -> -3
+              } +
+              (fullyShortLineCount * 4) +
+              (partialLineCount * 2) +
+              if (affectedStoreCount > 1) 4 else 0
+            ).coerceIn(0, 100)
+        }
+        val recoveryReconciliationLane = supplierDashboardChunk {
+          when {
+            recoveryReopenLane == "reopen_blocked" || recoveryCloseoutLane == "closeout_blocked" || recoverySealLane == "seal_blocked" || recoveryReleaseLane == "release_blocked" -> "reconcile_blocked"
+            recoveryReopenLane == "reopen_after_answer" || recoveryApprovalLane == "approval_store_ack" || recoveryVerificationLane == "verify_store_answer" || recoveryCloseoutLane == "closeout_store_notice" -> "reconcile_store_delta"
+            recoveryReopenLane == "reopen_if_promise_slips" || recoveryCommitLane == "commit_source_eta" || recoveryReleaseLane == "release_source_eta" || recoveryCloseoutLane == "closeout_source_trace" -> "reconcile_source_delta"
+            recoveryReopenLane == "reopen_split_leftover" || recoveryCloseoutLane == "closeout_split_leftover" || recoverySealLane == "seal_split_manifest" || recoveryAllocationLane == "fair_split_needed" || recoveryAllocationLane == "priority_allocation" -> "reconcile_split_delta"
+            recoveryReopenLane == "reopen_safe" && recoveryCloseoutLane == "closeout_ready" && recoverySealLane == "seal_ready" && recoveryReconciliationScore <= 42 -> "reconcile_ready"
+            else -> "reconcile_watch"
+          }
+        }
+        val recoveryReconciliationHint = supplierDashboardChunk {
+          when (recoveryReconciliationLane) {
+            "reconcile_blocked" -> supplierDashboardJoinedMessage(
+              listOf("Reconciliation guard: do not close or dispatch-seal this shortage until blocked reopen, closeout, release, and seal gates agree."),
+              listOf("Защита сверки: не закрывайте и не штампуйте отправку, пока заблокированные переоткрытие, закрытие, выпуск и штамп не согласованы."),
+              listOf("Салыстыру қорғаны: бөгелген қайта ашу, жабу, шығару және мөр келісілгенше жетіспеуді жаппаңыз және жөнелтуді мөрлемеңіз.")
+            )
+            "reconcile_store_delta" -> supplierDashboardJoinedMessage(
+              listOf("Reconciliation guard: store-facing answer can change promised quantity, substitute, or ETA. Save the answer before final close."),
+              listOf("Защита сверки: ответ для магазина может изменить обещанное количество, замену или срок. Сохраните ответ до финального закрытия."),
+              listOf("Салыстыру қорғаны: дүкен жауабы уәде санын, ауыстыруды немесе мерзімді өзгерте алады. Соңғы жабуға дейін жауапты сақтаңыз.")
+            )
+            "reconcile_source_delta" -> supplierDashboardJoinedMessage(
+              listOf("Reconciliation guard: upstream/source ETA can still move. Reconcile source proof with the active promise before closeout."),
+              listOf("Защита сверки: срок поиска/верхней цепочки ещё может измениться. Сверьте доказательство поиска с активным обещанием до закрытия."),
+              listOf("Салыстыру қорғаны: жоғары арна/іздеу мерзімі әлі өзгеруі мүмкін. Жабуға дейін іздеу дәлелін белсенді уәдемен салыстырыңыз.")
+            )
+            "reconcile_split_delta" -> supplierDashboardJoinedMessage(
+              listOf("Reconciliation guard: accepted and missing quantities are split. Reconcile shipped quantity, leftover quantity, and second-drop promise."),
+              listOf("Защита сверки: принятое и недостающее количество разделены. Сверьте отправленное количество, остаток и обещание второй поставки."),
+              listOf("Салыстыру қорғаны: қабылданған және жетіспейтін сан бөлінген. Жөнелтілген санды, қалдықты және екінші жеткізу уәдесін салыстырыңыз.")
+            )
+            "reconcile_ready" -> supplierDashboardJoinedMessage(
+              listOf("Reconciliation guard: closeout is aligned. Seal the reconciled note and keep reopen watch until the next checkpoint passes."),
+              listOf("Защита сверки: закрытие согласовано. Штампуйте сверенную заметку и держите переоткрытие под наблюдением до следующего контроля."),
+              listOf("Салыстыру қорғаны: жабу сәйкестенді. Салыстырылған жазбаны мөрлеп, келесі бақылауға дейін қайта ашуды қадағалаңыз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Reconciliation guard: watch quantity, answer, source proof, split leftover, and reopen checkpoint for any mismatch."),
+              listOf("Защита сверки: наблюдайте количество, ответ, доказательство поиска, остаток разделения и контроль переоткрытия на любые расхождения."),
+              listOf("Салыстыру қорғаны: сан, жауап, іздеу дәлелі, бөлінген қалдық және қайта ашу бақылауын сәйкессіздікке қадағалаңыз.")
+            )
+          }
+        }
+        val recoveryReconciliationChecklist = supplierDashboardChunk {
+          when (recoveryReconciliationLane) {
+            "reconcile_blocked" -> supplierDashboardJoinedMessage(
+              listOf("□ Keep shortage open\n□ Block silent dispatch seal\n□ Match closeout/reopen gates\n□ Assign owner before close"),
+              listOf("□ Оставить недостачу открытой\n□ Заблокировать тихий штамп отправки\n□ Сверить закрытие/переоткрытие\n□ Назначить ответственного до закрытия"),
+              listOf("□ Жетіспеуді ашық қалдыру\n□ Үнсіз жөнелту мөрін тоқтату\n□ Жабу/қайта ашу қақпаларын салыстыру\n□ Жабуға дейін жауапты қою")
+            )
+            "reconcile_store_delta" -> supplierDashboardJoinedMessage(
+              listOf("□ Save store answer\n□ Reconcile promised quantity\n□ Update substitute/ETA\n□ Keep names private outside AITA"),
+              listOf("□ Сохранить ответ магазина\n□ Сверить обещанное количество\n□ Обновить замену/срок\n□ Держать названия приватными вне AITA"),
+              listOf("□ Дүкен жауабын сақтау\n□ Уәде санын салыстыру\n□ Ауыстыру/мерзімді жаңарту\n□ AITA сыртында атауларды құпия ұстау")
+            )
+            "reconcile_source_delta" -> supplierDashboardJoinedMessage(
+              listOf("□ Save upstream proof\n□ Compare ETA with promise\n□ Refresh commit guard\n□ Reopen if source slips"),
+              listOf("□ Сохранить доказательство поиска\n□ Сравнить срок с обещанием\n□ Обновить защиту обязательства\n□ Переоткрыть при срыве поиска"),
+              listOf("□ Жоғары арна дәлелін сақтау\n□ Мерзімді уәдемен салыстыру\n□ Міндеттеме қорғанын жаңарту\n□ Іздеу сырғыса қайта ашу")
+            )
+            "reconcile_split_delta" -> supplierDashboardJoinedMessage(
+              listOf("□ Reconcile shipped qty\n□ Reconcile leftover qty\n□ Date second drop\n□ Keep split manifest attached"),
+              listOf("□ Сверить отправленное количество\n□ Сверить остаток\n□ Поставить дату второй поставки\n□ Оставить ведомость разделения"),
+              listOf("□ Жөнелтілген санды салыстыру\n□ Қалдық санды салыстыру\n□ Екінші жеткізу күнін қою\n□ Бөлу ведомосын қалдыру")
+            )
+            "reconcile_ready" -> supplierDashboardJoinedMessage(
+              listOf("□ Seal reconciled note\n□ Close completed step only\n□ Keep reopen checkpoint\n□ Refresh if promise changes"),
+              listOf("□ Штамповать сверенную заметку\n□ Закрыть только выполненный шаг\n□ Оставить контроль переоткрытия\n□ Обновить при изменении обещания"),
+              listOf("□ Салыстырылған жазбаны мөрлеу\n□ Тек орындалған қадамды жабу\n□ Қайта ашу бақылауын қалдыру\n□ Уәде өзгерсе жаңарту")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("□ Watch quantity delta\n□ Watch answer/proof\n□ Keep shortage visible\n□ Re-score after change"),
+              listOf("□ Следить за разницей количества\n□ Следить за ответом/доказательством\n□ Держать недостачу видимой\n□ Пересчитать после изменения"),
+              listOf("□ Сан айырмасын бақылау\n□ Жауап/дәлелді бақылау\n□ Жетіспеуді көрінетін ұстау\n□ Өзгерістен кейін қайта бағалау")
+            )
+          }
+        }
+        val recoveryReconciliationPathMain = supplierDashboardChunk {
+          when (recoveryReconciliationLane) {
+            "reconcile_blocked" -> "blocked reconciliation; keep shortage open"
+            "reconcile_store_delta" -> "reconcile store-facing answer"
+            "reconcile_source_delta" -> "reconcile upstream/source proof"
+            "reconcile_split_delta" -> "reconcile shipped and leftover quantities"
+            "reconcile_ready" -> "reconciled and ready with reopen watch"
+            else -> "watch reconciliation drift"
+          }
+        }
+        val recoveryReconciliationPathRu = supplierDashboardChunk {
+          when (recoveryReconciliationLane) {
+            "reconcile_blocked" -> "сверка заблокирована; держать недостачу открытой"
+            "reconcile_store_delta" -> "сверить ответ для магазина"
+            "reconcile_source_delta" -> "сверить доказательство поиска"
+            "reconcile_split_delta" -> "сверить отправленное и остаток"
+            "reconcile_ready" -> "сверено и готово с наблюдением переоткрытия"
+            else -> "наблюдать дрейф сверки"
+          }
+        }
+        val recoveryReconciliationPathKk = supplierDashboardChunk {
+          when (recoveryReconciliationLane) {
+            "reconcile_blocked" -> "салыстыру бөгелген; жетіспеуді ашық ұстау"
+            "reconcile_store_delta" -> "дүкен жауабын салыстыру"
+            "reconcile_source_delta" -> "іздеу дәлелін салыстыру"
+            "reconcile_split_delta" -> "жөнелтілген және қалған санды салыстыру"
+            "reconcile_ready" -> "салыстырылды және қайта ашу бақылауымен дайын"
+            else -> "салыстыру ауытқуын бақылау"
+          }
+        }
+        val recoveryReconciliationScript = supplierDashboardChunk {
+          supplierDashboardJoinedMessage(
+            listOf(
+              "AITA reconciliation guard: $recoveryContactGoodsName.",
+              "Reconciliation path: $recoveryReconciliationPathMain; score $recoveryReconciliationScore/100.",
+              "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()}; coverage $requestCoveragePercent%.",
+              "Reopen ${recoveryReopenLane.ifBlank { "reopen_watch" }}; closeout ${recoveryCloseoutLane.ifBlank { "closeout_watch" }}. Keep store names private outside AITA."
+            ),
+            listOf(
+              "AITA защита сверки: $recoveryContactGoodsName.",
+              "Путь сверки: $recoveryReconciliationPathRu; оценка $recoveryReconciliationScore/100.",
+              "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()}; покрытие $requestCoveragePercent%.",
+              "Переоткрытие ${recoveryReopenLane.ifBlank { "reopen_watch" }}; закрытие ${recoveryCloseoutLane.ifBlank { "closeout_watch" }}. Названия магазинов держите приватными вне AITA."
+            ),
+            listOf(
+              "AITA салыстыру қорғаны: $recoveryContactGoodsName.",
+              "Салыстыру жолы: $recoveryReconciliationPathKk; ұпай $recoveryReconciliationScore/100.",
+              "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()}; қамту $requestCoveragePercent%.",
+              "Қайта ашу ${recoveryReopenLane.ifBlank { "reopen_watch" }}; жабу ${recoveryCloseoutLane.ifBlank { "closeout_watch" }}. AITA сыртында дүкен атауларын құпия ұстаңыз."
+            )
+          )
+        }
+  
+        val recoveryAuditScore = supplierDashboardChunk {
+          (
+            recoveryReconciliationScore / 2 +
+              recoveryReopenScore / 5 +
+              recoveryCloseoutScore / 6 +
+              recoverySealScore / 7 +
+              when (recoveryReconciliationLane) {
+                "reconcile_blocked" -> 24
+                "reconcile_store_delta" -> 15
+                "reconcile_source_delta" -> 14
+                "reconcile_split_delta" -> 13
+                "reconcile_ready" -> -10
+                else -> 2
+              } +
+              when (recoveryCloseoutLane) {
+                "closeout_blocked" -> 16
+                "closeout_store_notice" -> 10
+                "closeout_source_trace" -> 9
+                "closeout_split_leftover" -> 8
+                "closeout_ready" -> -6
+                else -> 1
+              } +
+              when (recoverySealLane) {
+                "seal_blocked" -> 14
+                "seal_store_notice" -> 9
+                "seal_source_trace" -> 8
+                "seal_split_manifest" -> 8
+                "seal_ready" -> -5
+                else -> 1
+              } +
+              when (recoveryProofLane) {
+                "store_ack_required" -> 7
+                "sourcing_note_required" -> 7
+                "pack_guard_proof" -> 6
+                else -> 0
+              } +
+              when {
+                fullyShortLineCount > 0 -> 7
+                partialLineCount > 0 -> 5
+                else -> 0
+              } +
+              affectedOrderCount.coerceAtMost(6) * 2 +
+              affectedStoreCount.coerceAtMost(5) * 2 +
+              ((100 - requestCoveragePercent).coerceAtLeast(0) / 8)
+            ).coerceIn(0, 100)
+        }
+        val recoveryAuditLane = supplierDashboardChunk {
+          when {
+            recoveryReconciliationLane == "reconcile_blocked" ||
+              recoveryCloseoutLane == "closeout_blocked" ||
+              recoverySealLane == "seal_blocked" ||
+              recoveryReleaseLane == "release_blocked" ||
+              recoveryExecutionLane == "execution_blocked" -> "audit_blocked"
+            recoveryReconciliationLane == "reconcile_split_delta" ||
+              (acceptedQuantityTotal > 0.000001 && (partialLineCount > 0 || missingQuantityTotal > acceptedQuantityTotal)) -> "audit_quantity_gap"
+            recoveryReconciliationLane == "reconcile_source_delta" ||
+              recoveryProofLane == "sourcing_note_required" ||
+              recoveryVerificationLane == "verify_source_proof" ||
+              recoverySealLane == "seal_source_trace" -> "audit_evidence_gap"
+            recoveryReconciliationLane == "reconcile_store_delta" ||
+              recoveryPromiseShieldLane == "store_answer_needed" ||
+              recoveryContactLane == "store_call" ||
+              recoveryReopenLane == "reopen_after_answer" -> "audit_store_note_gap"
+            recoveryReconciliationLane == "reconcile_ready" &&
+              (recoveryCloseoutLane == "closeout_ready" || recoverySealLane == "seal_ready") &&
+              recoveryAuditScore <= 46 -> "audit_ready"
+            else -> "audit_watch"
+          }
+        }
+        val recoveryAuditHint = supplierDashboardChunk {
+          when (recoveryAuditLane) {
+            "audit_blocked" -> supplierDashboardJoinedMessage(
+              listOf("Audit guard: stop closure until blocked gates, reconciliation, seal, and dispatch-safe quantity all agree."),
+              listOf("Защита аудита: остановите закрытие, пока заблокированные ворота, сверка, штамп и безопасное к отправке количество не совпадут."),
+              listOf("Аудит қорғаны: бөгелген қақпалар, салыстыру, мөр және жөнелтуге қауіпсіз сан келіскенше жабуды тоқтатыңыз.")
+            )
+            "audit_quantity_gap" -> supplierDashboardJoinedMessage(
+              listOf("Audit guard: quantity math still needs a paper trail. Match requested, accepted, shipped, and leftover quantities before close."),
+              listOf("Защита аудита: математике количества ещё нужен след. Сведите запрошенное, принятое, отправленное и остаток до закрытия."),
+              listOf("Аудит қорғаны: сан есебіне әлі із керек. Жабуға дейін сұралған, қабылданған, жөнелтілген және қалған санды сәйкестендіріңіз.")
+            )
+            "audit_evidence_gap" -> supplierDashboardJoinedMessage(
+              listOf("Audit guard: evidence is thin. Attach source proof, no-stock answer, ETA, or pack proof before this item leaves the watch desk."),
+              listOf("Защита аудита: доказательств мало. Приложите подтверждение поиска, ответ нет товара, срок или доказательство сборки до выхода из наблюдения."),
+              listOf("Аудит қорғаны: дәлел жұқа. Бұл позиция бақылаудан шықпай тұрып іздеу дәлелін, қор жоқ жауабын, мерзімді немесе жинау дәлелін тіркеңіз.")
+            )
+            "audit_store_note_gap" -> supplierDashboardJoinedMessage(
+              listOf("Audit guard: store-facing note is the last gap. Save the answer that explains delay, substitute, split, or cancel path."),
+              listOf("Защита аудита: последняя дырка — заметка для магазина. Сохраните ответ про задержку, замену, разделение или отмену."),
+              listOf("Аудит қорғаны: соңғы бос орын — дүкенге арналған жазба. Кідіріс, ауыстыру, бөлу немесе бас тарту жолын түсіндіретін жауапты сақтаңыз.")
+            )
+            "audit_ready" -> supplierDashboardJoinedMessage(
+              listOf("Audit guard: trail is clean. Close only the safe quantity, keep residual shortage visible, and archive the audit note."),
+              listOf("Защита аудита: след чистый. Закройте только безопасное количество, оставьте остаточную недостачу видимой и архивируйте заметку аудита."),
+              listOf("Аудит қорғаны: із таза. Тек қауіпсіз санды жабыңыз, қалған жетіспеуді көрінетін қалдырып, аудит жазбасын архивтеңіз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Audit guard: watch quietly. Recalculate if quantity, proof, answer, ETA, or reopen checkpoint changes."),
+              listOf("Защита аудита: спокойно наблюдайте. Пересчитайте, если изменится количество, доказательство, ответ, срок или контроль переоткрытия."),
+              listOf("Аудит қорғаны: тыныш бақылаңыз. Сан, дәлел, жауап, мерзім немесе қайта ашу бақылауы өзгерсе қайта есептеңіз.")
+            )
+          }
+        }
+        val recoveryAuditChecklist = supplierDashboardChunk {
+          when (recoveryAuditLane) {
+            "audit_blocked" -> supplierDashboardJoinedMessage(
+              listOf("□ Keep shortage visible\n□ Clear blocked gate\n□ Re-run reconciliation\n□ Save audit note"),
+              listOf("□ Оставить недостачу видимой\n□ Очистить заблокированные ворота\n□ Перезапустить сверку\n□ Сохранить заметку аудита"),
+              listOf("□ Жетіспеуді көрінетін ұстау\n□ Бөгелген қақпаны тазарту\n□ Салыстыруды қайта жүргізу\n□ Аудит жазбасын сақтау")
+            )
+            "audit_quantity_gap" -> supplierDashboardJoinedMessage(
+              listOf("□ Match requested vs accepted\n□ Mark shipped quantity\n□ Keep leftover quantity open\n□ Save quantity trail"),
+              listOf("□ Свести запрошено и принято\n□ Отметить отправленное количество\n□ Оставить остаток открытым\n□ Сохранить след количества"),
+              listOf("□ Сұралған мен қабылданғанды салыстыру\n□ Жөнелтілген санды белгілеу\n□ Қалған санды ашық қалдыру\n□ Сан ізін сақтау")
+            )
+            "audit_evidence_gap" -> supplierDashboardJoinedMessage(
+              listOf("□ Attach source/pack proof\n□ Save ETA or no-stock answer\n□ Link proof to promise\n□ Recheck score"),
+              listOf("□ Приложить доказательство поиска/сборки\n□ Сохранить срок или ответ нет товара\n□ Связать доказательство с обещанием\n□ Перепроверить оценку"),
+              listOf("□ Іздеу/жинау дәлелін тіркеу\n□ Мерзімді немесе қор жоқ жауабын сақтау\n□ Дәлелді уәдеге байлау\n□ Ұпайды қайта тексеру")
+            )
+            "audit_store_note_gap" -> supplierDashboardJoinedMessage(
+              listOf("□ Write store-safe note\n□ Confirm delay/substitute/split/cancel\n□ Keep private store names out\n□ Save copied answer"),
+              listOf("□ Написать безопасную заметку магазину\n□ Подтвердить задержку/замену/разделение/отмену\n□ Не выносить приватные названия\n□ Сохранить скопированный ответ"),
+              listOf("□ Дүкенге қауіпсіз жазба жазу\n□ Кідіріс/ауыстыру/бөлу/бас тартуды бекіту\n□ Жеке атауларды шығармау\n□ Көшірілген жауапты сақтау")
+            )
+            "audit_ready" -> supplierDashboardJoinedMessage(
+              listOf("□ Close safe quantity only\n□ Archive audit note\n□ Keep residual shortage open\n□ Leave reopen checkpoint"),
+              listOf("□ Закрыть только безопасное количество\n□ Архивировать заметку аудита\n□ Оставить остаточную недостачу открытой\n□ Оставить контроль переоткрытия"),
+              listOf("□ Тек қауіпсіз санды жабу\n□ Аудит жазбасын архивтеу\n□ Қалған жетіспеуді ашық қалдыру\n□ Қайта ашу бақылауын қалдыру")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("□ Watch quantity\n□ Watch proof\n□ Watch ETA/answer\n□ Refresh on change"),
+              listOf("□ Следить за количеством\n□ Следить за доказательством\n□ Следить за сроком/ответом\n□ Обновить при изменении"),
+              listOf("□ Санды бақылау\n□ Дәлелді бақылау\n□ Мерзім/жауапты бақылау\n□ Өзгерсе жаңарту")
+            )
+          }
+        }
+        val recoveryAuditPathMain = supplierDashboardChunk {
+          when (recoveryAuditLane) {
+            "audit_blocked" -> "clear blocked audit gates before closure"
+            "audit_quantity_gap" -> "match requested, accepted, shipped, and leftover quantities"
+            "audit_evidence_gap" -> "attach evidence before leaving recovery desk"
+            "audit_store_note_gap" -> "save store-safe answer before closeout"
+            "audit_ready" -> "audit-ready safe closeout"
+            else -> "watch audit trail and refresh on change"
+          }
+        }
+        val recoveryAuditPathRu = supplierDashboardChunk {
+          when (recoveryAuditLane) {
+            "audit_blocked" -> "очистить заблокированные ворота аудита до закрытия"
+            "audit_quantity_gap" -> "свести запрошенное, принятое, отправленное и остаток"
+            "audit_evidence_gap" -> "приложить доказательство до выхода из восстановления"
+            "audit_store_note_gap" -> "сохранить безопасный ответ магазину до закрытия"
+            "audit_ready" -> "безопасное закрытие после аудита"
+            else -> "наблюдать след аудита и обновлять при изменении"
+          }
+        }
+        val recoveryAuditPathKk = supplierDashboardChunk {
+          when (recoveryAuditLane) {
+            "audit_blocked" -> "жабуға дейін бөгелген аудит қақпаларын тазарту"
+            "audit_quantity_gap" -> "сұралған, қабылданған, жөнелтілген және қалған санды сәйкестендіру"
+            "audit_evidence_gap" -> "қалпына келтіруден шықпай тұрып дәлел тіркеу"
+            "audit_store_note_gap" -> "жабуға дейін дүкенге қауіпсіз жауапты сақтау"
+            "audit_ready" -> "аудиттен кейін қауіпсіз жабу"
+            else -> "аудит ізін бақылап, өзгерсе жаңарту"
+          }
+        }
+        val recoveryAuditScript = supplierDashboardChunk {
+          supplierDashboardJoinedMessage(
+            listOf(
+              "AITA audit guard: $recoveryContactGoodsName.",
+              "Audit path: $recoveryAuditPathMain; score $recoveryAuditScore/100.",
+              "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()}; reconcile ${recoveryReconciliationLane.ifBlank { "reconcile_watch" }}.",
+              "Closeout ${recoveryCloseoutLane.ifBlank { "closeout_watch" }}; seal ${recoverySealLane.ifBlank { "seal_watch" }}; reopen ${recoveryReopenLane.ifBlank { "reopen_watch" }}. Keep store names private outside AITA."
+            ),
+            listOf(
+              "AITA защита аудита: $recoveryContactGoodsName.",
+              "Путь аудита: $recoveryAuditPathRu; оценка $recoveryAuditScore/100.",
+              "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()}; сверка ${recoveryReconciliationLane.ifBlank { "reconcile_watch" }}.",
+              "Закрытие ${recoveryCloseoutLane.ifBlank { "closeout_watch" }}; штамп ${recoverySealLane.ifBlank { "seal_watch" }}; переоткрытие ${recoveryReopenLane.ifBlank { "reopen_watch" }}. Названия магазинов держите приватными вне AITA."
+            ),
+            listOf(
+              "AITA аудит қорғаны: $recoveryContactGoodsName.",
+              "Аудит жолы: $recoveryAuditPathKk; ұпай $recoveryAuditScore/100.",
+              "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()}; салыстыру ${recoveryReconciliationLane.ifBlank { "reconcile_watch" }}.",
+              "Жабу ${recoveryCloseoutLane.ifBlank { "closeout_watch" }}; мөр ${recoverySealLane.ifBlank { "seal_watch" }}; қайта ашу ${recoveryReopenLane.ifBlank { "reopen_watch" }}. AITA сыртында дүкен атауларын құпия ұстаңыз."
+            )
+          )
+        }
+  
+        val nextRecoveryStep = supplierDashboardChunk {
+          when {
+            recoveryUrgencyLane == "overdue" -> supplierDashboardJoinedMessage(
+              listOf("Contact the store and freeze a new recovery promise before dispatch."),
+              listOf("Свяжитесь с магазином и зафиксируйте новое обещание восстановления до отправки."),
+              listOf("Жөнелту алдында дүкенмен байланысып, жаңа қалпына келтіру уәдесін бекітіңіз.")
+            )
+            recoveryLane == "split_delivery" -> supplierDashboardJoinedMessage(
+              listOf("Split the delivery: ship accepted stock now and schedule the remaining quantity."),
+              listOf("Разделите поставку: отправьте принятое наличие сейчас и запланируйте остаток."),
+              listOf("Жеткізуді бөліңіз: қабылданған қорды қазір жіберіп, қалған санды жоспарлаңыз.")
+            )
+            recoveryLane == "split_source" -> supplierDashboardJoinedMessage(
+              listOf("Reserve accepted stock, then source or substitute fully short lines."),
+              listOf("Зарезервируйте принятое наличие, затем найдите или замените полностью недостающие строки."),
+              listOf("Қабылданған қорды резервтеп, толық жетіспейтін жолдарды табыңыз немесе ауыстырыңыз.")
+            )
+            recoveryLane == "source_or_cancel" -> supplierDashboardJoinedMessage(
+              listOf("Ask upstream for stock, then agree substitute/cancel if sourcing fails."),
+              listOf("Запросите товар выше по цепочке, затем согласуйте замену/отмену, если найти не получится."),
+              listOf("Жоғары арнадан қор сұрап, табылмаса ауыстыру/бас тартуды келісіңіз.")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("Keep monitoring until the shortage has a clear owner."),
+              listOf("Продолжайте наблюдать, пока у недопоставки не появится ответственный."),
+              listOf("Жетіспеудің нақты иесі анықталғанша бақылауды жалғастырыңыз.")
+            )
+          }
+        }
+        val recoveryChecklist = supplierDashboardChunk {
+          when (recoveryLane) {
+            "split_delivery" -> supplierDashboardJoinedMessage(
+              listOf("1. Reserve accepted stock\n2. Notify the store about the short quantity\n3. Add a second-drop promise before dispatch"),
+              listOf("1. Зарезервируйте принятое наличие\n2. Сообщите магазину недостающее количество\n3. Добавьте обещание второй поставки до отправки"),
+              listOf("1. Қабылданған қорды резервтеңіз\n2. Дүкенге жетіспейтін санды хабарлаңыз\n3. Жөнелтуге дейін екінші жеткізу уәдесін қосыңыз")
+            )
+            "split_source" -> supplierDashboardJoinedMessage(
+              listOf("1. Ship or reserve accepted stock\n2. Open upstream sourcing for fully short lines\n3. Confirm substitute/cancel decisions with the store"),
+              listOf("1. Отправьте или зарезервируйте принятое наличие\n2. Откройте поиск выше по цепочке для полностью недостающих строк\n3. Согласуйте замену/отмену с магазином"),
+              listOf("1. Қабылданған қорды жіберіңіз немесе резервтеңіз\n2. Толық жетіспейтін жолдар үшін жоғары арнадан іздеуді бастаңыз\n3. Дүкенмен ауыстыру/бас тарту шешімін бекітіңіз")
+            )
+            "source_or_cancel" -> supplierDashboardJoinedMessage(
+              listOf("1. Check upstream availability\n2. Offer substitute or cancellation\n3. Keep the order out of packing until the answer is agreed"),
+              listOf("1. Проверьте наличие выше по цепочке\n2. Предложите замену или отмену\n3. Не отправляйте заказ в сборку, пока ответ не согласован"),
+              listOf("1. Жоғары арнадағы қолжетімділікті тексеріңіз\n2. Ауыстыру немесе бас тартуды ұсыныңыз\n3. Жауап келісілгенше тапсырысты жинауға жібермеңіз")
+            )
+            else -> supplierDashboardJoinedMessage(
+              listOf("1. Watch accepted-vs-requested gap\n2. Assign owner\n3. Close after second-drop, substitute, or cancellation"),
+              listOf("1. Следите за разницей принято/запрошено\n2. Назначьте ответственного\n3. Закройте после второй поставки, замены или отмены"),
+              listOf("1. Қабылданған/сұралған айырмасын бақылаңыз\n2. Жауаптыны тағайындаңыз\n3. Екінші жеткізу, ауыстыру немесе бас тартудан кейін жабыңыз")
+            )
+          }
+        }
+        val suggestedAction = supplierDashboardChunk {
+          when (recoveryLane) {
+            "source_or_cancel" -> "negotiate"
+            "split_source" -> "source"
+            "split_delivery" -> if (relatedOrders.any { order -> order.status == SupplierOrderStatusDataModel.Confirmed }) "source" else "watch"
+            else -> "watch"
+          }
+        }
+        val ownerPressure = supplierDashboardChunk {
+          when (recoveryOwnerLane) {
+            "store_contact" -> 10
+            "upstream_sourcing" -> 6
+            "pack_lead" -> 4
+            else -> 1
+          }
+        }
+        val slaPressure = supplierDashboardChunk {
+          when (recoverySlaLane) {
+            "call_now" -> 14
+            "commit_today" -> 8
+            "before_pack" -> 5
+            else -> 1
+          }
+        }
+        val outcomePressure = supplierDashboardChunk {
+          when (recoveryOutcomeLane) {
+            "cancel_review" -> 9
+            "substitute_offer" -> 7
+            "second_drop" -> 5
+            "ship_now_guard" -> 3
+            else -> 1
+          }
+        }
+        val packGuardPressure = supplierDashboardChunk {
+          when (recoveryPackGuardLane) {
+            "block_pack" -> 10
+            "split_pack_only" -> 6
+            "proof_before_pack" -> 4
+            else -> 0
+          }
+        }
+        val contactPressure = supplierDashboardChunk {
+          when (recoveryContactLane) {
+            "store_call" -> 8
+            "substitute_answer" -> 6
+            "upstream_request" -> 5
+            "pack_lead_note" -> 3
+            else -> 0
+          }
+        }
+        val riskPressure = supplierDashboardChunk {
           when (recoveryRiskLane) {
             "critical_recovery" -> 12
             "decision_pressure" -> 8
             "pack_sourcing_watch" -> 5
             else -> 1
-          } +
-          when (recoveryConfidenceLane) {
-            "blocked_until_decision" -> 8
-            "needs_confirmation" -> 5
-            "ready_to_recover" -> 0
-            else -> 2
           }
-        ).coerceIn(0, 100)
-      val recoveryAgingLane = when {
-        recoveryAgingScore >= 75 || recoveryAgingHours >= 72 || (recoveryFollowUpAtMillis?.let { followUp -> followUp <= now } == true) -> "stale_blocker"
-        recoveryAgingScore >= 52 || recoveryAgingHours >= 24 || recoveryUrgencyLane == "overdue" || recoveryUrgencyLane == "today" -> "touch_today"
-        recoveryAgingHours <= 6 && (recoveryConfidenceLane == "ready_to_recover" || recoveryCommandLane == "ready_with_note") -> "fresh_recovery"
-        recoveryCommandLane == "ready_with_note" && recoveryLedgerLane == "ledger_ready" -> "fresh_recovery"
-        else -> "age_watch"
-      }
-      val recoveryAgingHint = when (recoveryAgingLane) {
-        "stale_blocker" -> supplierDashboardJoinedMessage(
-          listOf("Recovery aging: this shortage has gone stale or missed a follow-up. Touch the owner now before packflow or downstream promises move."),
-          listOf("Старение восстановления: недопоставка застоялась или пропустила контроль. Свяжитесь с ответственным сейчас до движения сборки или обещаний."),
-          listOf("Қалпына келтіру ескіруі: бұл жетіспеу тоқтап қалды немесе бақылауды өткізіп алды. Жинау не уәде қозғалғанша жауаптыны қазір қозғаңыз.")
-        )
-        "touch_today" -> supplierDashboardJoinedMessage(
-          listOf("Recovery aging: refresh this case today, update the promise/checklist, and keep the missing quantity visible."),
-          listOf("Старение восстановления: обновите этот кейс сегодня, освежите обещание/чек-лист и держите недостачу видимой."),
-          listOf("Қалпына келтіру ескіруі: бұл істі бүгін жаңартып, уәде/чек-парақты түзетіп, жетіспейтін санды көрінетін ұстаңыз.")
-        )
-        "fresh_recovery" -> supplierDashboardJoinedMessage(
-          listOf("Recovery aging: this recovery looks fresh; keep the close note clean and do not reopen old blockers unless a promise changes."),
-          listOf("Старение восстановления: восстановление свежее; держите закрывающую заметку чистой и не открывайте старые блокеры без изменения обещания."),
-          listOf("Қалпына келтіру ескіруі: қалпына келтіру жаңа; жабу жазбасын таза ұстап, уәде өзгермесе ескі бөгеттерді ашпаңыз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Recovery aging: keep this shortage on watch with a clear next touch before it becomes stale."),
-          listOf("Старение восстановления: держите недопоставку на наблюдении с понятным следующим касанием, пока она не застоялась."),
-          listOf("Қалпына келтіру ескіруі: жетіспеу ескірмей тұрып келесі байланысын анықтап бақылауда ұстаңыз.")
-        )
-      }
-      val recoveryAgingChecklist = when (recoveryAgingLane) {
-        "stale_blocker" -> supplierDashboardJoinedMessage(
-          listOf("□ Touch assigned owner now\n□ Reconfirm follow-up or promise\n□ Block unsafe pack/close actions\n□ Add fresh note before handoff"),
-          listOf("□ Связаться с ответственным сейчас\n□ Подтвердить контроль или обещание\n□ Заблокировать небезопасную сборку/закрытие\n□ Добавить свежую заметку до передачи"),
-          listOf("□ Жауаптымен қазір байланысу\n□ Бақылау не уәдені қайта бекіту\n□ Қауіпсіз емес жинау/жабуды тоқтату\n□ Берер алдында жаңа жазба қосу")
-        )
-        "touch_today" -> supplierDashboardJoinedMessage(
-          listOf("□ Refresh owner note today\n□ Update next follow-up\n□ Recheck promise shield\n□ Keep shortage visible"),
-          listOf("□ Сегодня обновить заметку ответственного\n□ Обновить следующий контроль\n□ Проверить щит обещания\n□ Держать недостачу видимой"),
-          listOf("□ Бүгін жауапты жазбасын жаңарту\n□ Келесі бақылауды жаңарту\n□ Уәде қалқанын тексеру\n□ Жетіспеуді көрінетін ұстау")
-        )
-        "fresh_recovery" -> supplierDashboardJoinedMessage(
-          listOf("□ Keep proof attached\n□ Close only completed step\n□ Leave remaining promise visible\n□ Watch for new shortage answer"),
-          listOf("□ Держать доказательство рядом\n□ Закрыть только выполненный шаг\n□ Оставить оставшееся обещание видимым\n□ Следить за новым ответом по недостаче"),
-          listOf("□ Дәлелді бірге сақтау\n□ Тек орындалған қадамды жабу\n□ Қалған уәдені көрінетін ұстау\n□ Жаңа жетіспеу жауабын бақылау")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("□ Set next touch\n□ Keep owner visible\n□ Watch due bucket\n□ Escalate if no fresh answer"),
-          listOf("□ Поставить следующее касание\n□ Держать ответственного видимым\n□ Следить за сроком\n□ Эскалировать без свежего ответа"),
-          listOf("□ Келесі байланысты қою\n□ Жауаптыны көрінетін ұстау\n□ Мерзім тобын бақылау\n□ Жаңа жауап болмаса көтеру")
-        )
-      }
-      val recoveryAgingPathMain = when (recoveryAgingLane) {
-        "stale_blocker" -> "stale blocker; touch owner now"
-        "touch_today" -> "refresh today"
-        "fresh_recovery" -> "fresh guarded recovery"
-        else -> "watch aging"
-      }
-      val recoveryAgingPathRu = when (recoveryAgingLane) {
-        "stale_blocker" -> "застойный блокер; связаться сейчас"
-        "touch_today" -> "обновить сегодня"
-        "fresh_recovery" -> "свежее защищённое восстановление"
-        else -> "наблюдать старение"
-      }
-      val recoveryAgingPathKk = when (recoveryAgingLane) {
-        "stale_blocker" -> "ескірген бөгет; қазір байланысу"
-        "touch_today" -> "бүгін жаңарту"
-        "fresh_recovery" -> "жаңа қорғалған қалпына келтіру"
-        else -> "ескіруді бақылау"
-      }
-      val recoveryAgingScript = supplierDashboardJoinedMessage(
-        listOf(
-          "AITA aging check: $recoveryContactGoodsName.",
-          "Aging path: $recoveryAgingPathMain; age ${recoveryAgingHours}h; aging score $recoveryAgingScore/100.",
-          "Wave ${recoveryWaveScore}/100; risk ${recoveryRiskScore}/100; follow-up ${recoveryFollowUpLane.ifBlank { "watch" }}.",
-          "Refresh the note, promise, and owner before this recovery becomes invisible. Keep store names private outside AITA."
-        ),
-        listOf(
-          "AITA проверка старения: $recoveryContactGoodsName.",
-          "Путь старения: $recoveryAgingPathRu; возраст ${recoveryAgingHours}ч; оценка $recoveryAgingScore/100.",
-          "Волна ${recoveryWaveScore}/100; риск ${recoveryRiskScore}/100; контроль ${recoveryFollowUpLane.ifBlank { "watch" }}.",
-          "Обновите заметку, обещание и ответственного, пока восстановление не стало невидимым. Названия магазинов держите приватными вне AITA."
-        ),
-        listOf(
-          "AITA ескіру тексерісі: $recoveryContactGoodsName.",
-          "Ескіру жолы: $recoveryAgingPathKk; жасы ${recoveryAgingHours}сағ; ұпай $recoveryAgingScore/100.",
-          "Толқын ${recoveryWaveScore}/100; тәуекел ${recoveryRiskScore}/100; бақылау ${recoveryFollowUpLane.ifBlank { "watch" }}.",
-          "Бұл қалпына келтіру көрінбей қалмай тұрып жазбаны, уәдені және жауаптыны жаңартыңыз. AITA сыртында дүкен атауларын құпия ұстаңыз."
-        )
-      )
-      val decisionBottleneckScore = (
-        (if (recoveryOutcomeLane == "substitute_offer" || recoveryOutcomeLane == "cancel_review") 26 else 0) +
-          (if (recoveryConfidenceLane == "blocked_until_decision") 22 else 0) +
-          (if (recoveryProofLane == "store_ack_required") 16 else 0) +
-          (if (recoveryTriageLane == "decision_lane" || recoveryTriageLane == "triage_now") 16 else 0) +
-          (if (fullyShortLineCount > 0) 8 else 0) +
-          (if (recoveryUrgencyLane == "overdue" || recoveryUrgencyLane == "today") 8 else 0)
-        ).coerceIn(0, 100)
-      val contactBottleneckScore = (
-        (if (recoveryContactLane == "store_call" || recoveryContactLane == "substitute_answer") 28 else 0) +
-          (if (recoveryOwnerLane == "store_contact") 18 else 0) +
-          (if (recoveryPromiseShieldLane == "store_answer_needed") 18 else 0) +
-          (if (recoverySlaLane == "call_now" || recoveryFollowUpLane == "follow_up_now") 12 else 0) +
-          (if (recoveryUrgencyLane == "overdue") 8 else 0)
-        ).coerceIn(0, 100)
-      val sourcingBottleneckScore = (
-        (if (recoveryCommandLane == "source_now" || recoveryOwnerLane == "upstream_sourcing") 26 else 0) +
-          (if (recoveryContactLane == "upstream_request" || recoveryPromiseShieldLane == "source_before_promise") 20 else 0) +
-          (if (recoveryLane == "source_or_cancel" || recoveryLane == "split_source") 16 else 0) +
-          fullyShortLineCount * 7 +
-          (if (recoveryEscalationLane == "sourcing_escalation") 10 else 0)
-        ).coerceIn(0, 100)
-      val packBottleneckScore = (
-        (if (recoveryCommandLane == "stop_pack" || recoveryPackGuardLane == "block_pack") 32 else 0) +
-          (if (recoveryEscalationLane == "pack_hold" || recoveryHandoffLane == "pack_handoff") 18 else 0) +
-          (if (recoveryPackGuardLane == "split_pack_only") 12 else 0) +
-          (if (recoveryClosureLane == "blocked_open") 12 else 0) +
-          partialLineCount * 6
-        ).coerceIn(0, 100)
-      val proofBottleneckScore = (
-        (if (recoveryLedgerLane == "audit_blocker") 28 else 0) +
-          (if (recoveryLedgerScore < 55) 16 else 0) +
-          (if (recoveryProofLane == "sourcing_note_required" || recoveryProofLane == "pack_guard_proof") 16 else 0) +
-          (if (recoveryClosureLane == "needs_close_note") 14 else 0) +
-          (if (recoveryConfidenceScore < 55) 6 else 0)
-        ).coerceIn(0, 100)
-      val agingBottleneckScore = (
-        recoveryAgingScore / 2 +
-          (if (recoveryAgingLane == "stale_blocker") 26 else 0) +
-          (if (recoveryAgingHours >= 48) 12 else 0) +
-          (if (recoveryFollowUpAtMillis?.let { followUp -> followUp <= now } == true) 14 else 0)
-        ).coerceIn(0, 100)
-      val readyBottleneckScore = (
-        (if (recoveryConfidenceLane == "ready_to_recover") 22 else 0) +
-          (if (recoveryCommandLane == "ready_with_note") 18 else 0) +
-          (if (recoveryPromiseShieldLane == "promise_safe") 12 else 0) +
-          (if (recoveryLedgerLane == "ledger_ready") 8 else 0) +
-          (if (recoveryAgingLane == "fresh_recovery") 8 else 0)
-        ).coerceIn(0, 100)
-      val bottleneckCandidates = listOf(
-        "decision_bottleneck" to decisionBottleneckScore,
-        "contact_bottleneck" to contactBottleneckScore,
-        "sourcing_bottleneck" to sourcingBottleneckScore,
-        "pack_bottleneck" to packBottleneckScore,
-        "proof_bottleneck" to proofBottleneckScore,
-        "aging_bottleneck" to agingBottleneckScore,
-        "ready_bottleneck" to readyBottleneckScore,
-        "watch_bottleneck" to 18
-      )
-      val topBottleneckCandidate = bottleneckCandidates.maxByOrNull { candidate -> candidate.second }
-      val recoveryBottleneckScore = (topBottleneckCandidate?.second ?: 0).coerceIn(0, 100)
-      val recoveryBottleneckLane = when {
-        recoveryBottleneckScore <= 20 && recoveryWaveLane == "wave_watch" -> "watch_bottleneck"
-        recoveryBottleneckScore <= 20 && readyBottleneckScore > 0 -> "ready_bottleneck"
-        else -> topBottleneckCandidate?.first ?: "watch_bottleneck"
-      }
-      val recoveryBottleneckHint = when (recoveryBottleneckLane) {
-        "decision_bottleneck" -> supplierDashboardJoinedMessage(
-          listOf("Bottleneck map: a substitute, cancel, or store acknowledgement decision is the next hard gate before this recovery can move safely."),
-          listOf("Карта узких мест: решение по замене, отмене или подтверждению магазина — следующий жёсткий шлюз перед безопасным движением."),
-          listOf("Тар орын картасы: ауыстыру, бас тарту немесе дүкен растауы шешімі — қауіпсіз қозғалыс алдындағы басты қақпа.")
-        )
-        "contact_bottleneck" -> supplierDashboardJoinedMessage(
-          listOf("Bottleneck map: the store/contact answer is blocking the next promise. Use the script, record the answer, then re-score the recovery."),
-          listOf("Карта узких мест: ответ магазина/контакта блокирует следующее обещание. Используйте скрипт, запишите ответ и пересчитайте восстановление."),
-          listOf("Тар орын картасы: дүкен/байланыс жауабы келесі уәдеге бөгет. Скриптті қолданып, жауапты жазып, қалпына келтіруді қайта бағалаңыз.")
-        )
-        "sourcing_bottleneck" -> supplierDashboardJoinedMessage(
-          listOf("Bottleneck map: upstream stock, ETA, or no-stock proof is the blocker. Ask sourcing before editing downstream promises."),
-          listOf("Карта узких мест: блокер — наличие выше, срок или доказательство отсутствия. Запросите поиск до изменения обещаний вниз по цепочке."),
-          listOf("Тар орын картасы: бөгет — жоғары арна қоры, мерзімі немесе қор жоқ дәлелі. Төменгі уәделерді өзгертпей тұрып іздеуді сұраңыз.")
-        )
-        "pack_bottleneck" -> supplierDashboardJoinedMessage(
-          listOf("Bottleneck map: packflow is the blocker. Stop unsafe packing, split accepted quantity, and keep missing stock out of dispatch."),
-          listOf("Карта узких мест: блокер — сборка. Остановите небезопасную сборку, отделите принятое количество и не отправляйте недостачу."),
-          listOf("Тар орын картасы: бөгет — жинау. Қауіпсіз емес жинауды тоқтатып, қабылданған санды бөліп, жетіспейтін қорды жөнелтпеңіз.")
-        )
-        "proof_bottleneck" -> supplierDashboardJoinedMessage(
-          listOf("Bottleneck map: proof or ledger trace is missing. Attach the decision/pack/sourcing note before close or handoff."),
-          listOf("Карта узких мест: не хватает доказательства или следа журнала. Прикрепите заметку решения/сборки/поиска до закрытия или передачи."),
-          listOf("Тар орын картасы: дәлел не журнал ізі жетіспейді. Жабу немесе беру алдында шешім/жинау/іздеу жазбасын тіркеңіз.")
-        )
-        "aging_bottleneck" -> supplierDashboardJoinedMessage(
-          listOf("Bottleneck map: the case is going stale. Touch the owner now, refresh the follow-up, and prevent silent drift."),
-          listOf("Карта узких мест: кейс застаивается. Свяжитесь с ответственным, обновите контроль и не дайте задаче тихо уплыть."),
-          listOf("Тар орын картасы: іс ескіріп барады. Жауаптыны қозғап, бақылауды жаңартып, үнсіз жоғалуға жол бермеңіз.")
-        )
-        "ready_bottleneck" -> supplierDashboardJoinedMessage(
-          listOf("Bottleneck map: recovery is mostly ready. Move only the guarded step and keep any residual promise visible."),
-          listOf("Карта узких мест: восстановление почти готово. Двигайте только защищённый шаг и оставляйте остаточное обещание видимым."),
-          listOf("Тар орын картасы: қалпына келтіру дерлік дайын. Тек қорғалған қадамды жүргізіп, қалған уәдені көрінетін ұстаңыз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Bottleneck map: no single hard blocker dominates yet. Keep the shortage watched by owner, follow-up, and promise shield."),
-          listOf("Карта узких мест: один жёсткий блокер пока не доминирует. Держите недопоставку под наблюдением по ответственному, контролю и щиту обещания."),
-          listOf("Тар орын картасы: бір қатты бөгет әлі басым емес. Жетіспеуді жауапты, бақылау және уәде қалқаны бойынша бақылауда ұстаңыз.")
-        )
-      }
-      val recoveryBottleneckChecklist = when (recoveryBottleneckLane) {
-        "decision_bottleneck" -> supplierDashboardJoinedMessage(
-          listOf("□ Pick substitute/delay/cancel answer\n□ Save store acknowledgement\n□ Update promise shield\n□ Reopen sourcing only if answer fails"),
-          listOf("□ Выбрать ответ замена/задержка/отмена\n□ Сохранить подтверждение магазина\n□ Обновить щит обещания\n□ Открыть поиск снова только если ответ сорвался"),
-          listOf("□ Ауыстыру/кідіріс/бас тарту жауабын таңдау\n□ Дүкен растауын сақтау\n□ Уәде қалқанын жаңарту\n□ Жауап іске аспаса ғана іздеуді қайта ашу")
-        )
-        "contact_bottleneck" -> supplierDashboardJoinedMessage(
-          listOf("□ Call/send contact script\n□ Record exact answer\n□ Set next follow-up\n□ Keep store names private outside AITA"),
-          listOf("□ Позвонить/отправить скрипт\n□ Записать точный ответ\n□ Назначить следующий контроль\n□ Держать названия магазинов приватными вне AITA"),
-          listOf("□ Қоңырау шалу/скрипт жіберу\n□ Нақты жауапты жазу\n□ Келесі бақылауды қою\n□ AITA сыртында дүкен атауларын құпия ұстау")
-        )
-        "sourcing_bottleneck" -> supplierDashboardJoinedMessage(
-          listOf("□ Ask upstream reserve/ETA\n□ Save no-stock proof\n□ Offer substitute if needed\n□ Mirror safe answer downstream"),
-          listOf("□ Запросить резерв/срок выше\n□ Сохранить доказательство отсутствия\n□ Предложить замену при необходимости\n□ Передать безопасный ответ вниз"),
-          listOf("□ Жоғарыдан резерв/мерзім сұрау\n□ Қор жоқ дәлелін сақтау\n□ Керек болса ауыстыру ұсыну\n□ Қауіпсіз жауапты төменге беру")
-        )
-        "pack_bottleneck" -> supplierDashboardJoinedMessage(
-          listOf("□ Stop unsafe pack step\n□ Split accepted from missing\n□ Attach pack note\n□ Dispatch only guarded quantity"),
-          listOf("□ Остановить небезопасную сборку\n□ Отделить принятое от недостачи\n□ Прикрепить заметку сборки\n□ Отправить только защищённое количество"),
-          listOf("□ Қауіпсіз емес жинауды тоқтату\n□ Қабылданғанды жетіспейтіннен бөлу\n□ Жинау жазбасын тіркеу\n□ Тек қорғалған санды жөнелту")
-        )
-        "proof_bottleneck" -> supplierDashboardJoinedMessage(
-          listOf("□ Attach decision note\n□ Attach sourcing/pack proof\n□ Keep ledger open until proof exists\n□ Close only completed step"),
-          listOf("□ Прикрепить заметку решения\n□ Прикрепить доказательство поиска/сборки\n□ Держать журнал открытым до доказательства\n□ Закрыть только выполненный шаг"),
-          listOf("□ Шешім жазбасын тіркеу\n□ Іздеу/жинау дәлелін тіркеу\n□ Дәлел болғанша журналды ашық ұстау\n□ Тек орындалған қадамды жабу")
-        )
-        "aging_bottleneck" -> supplierDashboardJoinedMessage(
-          listOf("□ Touch owner now\n□ Refresh note and promise\n□ Reset follow-up time\n□ Escalate if no answer"),
-          listOf("□ Связаться с ответственным сейчас\n□ Обновить заметку и обещание\n□ Сбросить время контроля\n□ Эскалировать без ответа"),
-          listOf("□ Жауаптыны қазір қозғау\n□ Жазба мен уәдені жаңарту\n□ Бақылау уақытын қайта қою\n□ Жауап болмаса көтеру")
-        )
-        "ready_bottleneck" -> supplierDashboardJoinedMessage(
-          listOf("□ Move guarded recovery\n□ Close completed worker step\n□ Keep residual promise visible\n□ Watch for new answer"),
-          listOf("□ Двигать защищённое восстановление\n□ Закрыть выполненный рабочий шаг\n□ Оставить остаточное обещание видимым\n□ Следить за новым ответом"),
-          listOf("□ Қорғалған қалпына келтіруді жүргізу\n□ Орындалған жұмыс қадамын жабу\n□ Қалған уәдені көрінетін ұстау\n□ Жаңа жауапты бақылау")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("□ Keep owner visible\n□ Check next follow-up\n□ Preserve missing quantity\n□ Re-score after each answer"),
-          listOf("□ Держать ответственного видимым\n□ Проверить следующий контроль\n□ Сохранить недостачу видимой\n□ Пересчитать после каждого ответа"),
-          listOf("□ Жауаптыны көрінетін ұстау\n□ Келесі бақылауды тексеру\n□ Жетіспейтін санды сақтау\n□ Әр жауаптан кейін қайта бағалау")
-        )
-      }
-      val recoveryBottleneckPathMain = when (recoveryBottleneckLane) {
-        "decision_bottleneck" -> "decision is blocking recovery"
-        "contact_bottleneck" -> "store/contact answer is blocking recovery"
-        "sourcing_bottleneck" -> "upstream sourcing is blocking recovery"
-        "pack_bottleneck" -> "packflow guard is blocking recovery"
-        "proof_bottleneck" -> "proof and ledger trace are blocking recovery"
-        "aging_bottleneck" -> "stale follow-up is blocking recovery"
-        "ready_bottleneck" -> "ready but guarded"
-        else -> "watch without a dominant blocker"
-      }
-      val recoveryBottleneckPathRu = when (recoveryBottleneckLane) {
-        "decision_bottleneck" -> "решение блокирует восстановление"
-        "contact_bottleneck" -> "ответ магазина/контакта блокирует восстановление"
-        "sourcing_bottleneck" -> "поиск выше блокирует восстановление"
-        "pack_bottleneck" -> "защита сборки блокирует восстановление"
-        "proof_bottleneck" -> "доказательство и журнал блокируют восстановление"
-        "aging_bottleneck" -> "застой контроля блокирует восстановление"
-        "ready_bottleneck" -> "готово, но под защитой"
-        else -> "наблюдение без главного блокера"
-      }
-      val recoveryBottleneckPathKk = when (recoveryBottleneckLane) {
-        "decision_bottleneck" -> "шешім қалпына келтіруге бөгет"
-        "contact_bottleneck" -> "дүкен/байланыс жауабы қалпына келтіруге бөгет"
-        "sourcing_bottleneck" -> "жоғары арна іздеуі қалпына келтіруге бөгет"
-        "pack_bottleneck" -> "жинау қорғанысы қалпына келтіруге бөгет"
-        "proof_bottleneck" -> "дәлел және журнал ізі қалпына келтіруге бөгет"
-        "aging_bottleneck" -> "ескірген бақылау қалпына келтіруге бөгет"
-        "ready_bottleneck" -> "дайын, бірақ қорғалған"
-        else -> "басым бөгетсіз бақылау"
-      }
-      val recoveryBottleneckScript = supplierDashboardJoinedMessage(
-        listOf(
-          "AITA bottleneck map: $recoveryContactGoodsName.",
-          "Main bottleneck: $recoveryBottleneckPathMain; score $recoveryBottleneckScore/100.",
-          "Command ${recoveryCommandLane.ifBlank { "monitor" }}; wave ${recoveryWaveLane.ifBlank { "watch" }}; aging ${recoveryAgingLane.ifBlank { "watch" }}.",
-          "Clear this bottleneck before moving pack, promise, or close steps. Keep store names private outside AITA."
-        ),
-        listOf(
-          "AITA карта узкого места: $recoveryContactGoodsName.",
-          "Главное узкое место: $recoveryBottleneckPathRu; оценка $recoveryBottleneckScore/100.",
-          "Команда ${recoveryCommandLane.ifBlank { "monitor" }}; волна ${recoveryWaveLane.ifBlank { "watch" }}; старение ${recoveryAgingLane.ifBlank { "watch" }}.",
-          "Уберите этот блокер перед сборкой, обещанием или закрытием. Названия магазинов держите приватными вне AITA."
-        ),
-        listOf(
-          "AITA тар орын картасы: $recoveryContactGoodsName.",
-          "Негізгі тар орын: $recoveryBottleneckPathKk; ұпай $recoveryBottleneckScore/100.",
-          "Команда ${recoveryCommandLane.ifBlank { "monitor" }}; толқын ${recoveryWaveLane.ifBlank { "watch" }}; ескіру ${recoveryAgingLane.ifBlank { "watch" }}.",
-          "Жинау, уәде немесе жабу қадамына дейін осы бөгетті шешіңіз. AITA сыртында дүкен атауларын құпия ұстаңыз."
-        )
-      )
-      val recoveryLoadScore = (
-        recoveryLoadOrderPressure +
-          recoveryLoadStorePressure +
-          (itemLines.size * 5).coerceAtMost(20) +
-          (partialLineCount * 7).coerceAtMost(18) +
-          (fullyShortLineCount * 8).coerceAtMost(20) +
-          missingQuantityTotal.coerceAtMost(40.0).toInt() +
-          recoveryBottleneckScore / 5 +
-          recoveryRiskScore / 6 +
+        }
+        val confidencePressure = supplierDashboardChunk {
+          when (recoveryConfidenceLane) {
+            "blocked_until_decision" -> 9
+            "needs_confirmation" -> 6
+            "watch_confidence" -> 3
+            else -> 0
+          }
+        }
+        val handoffPressure = supplierDashboardChunk {
+          when (recoveryHandoffLane) {
+            "store_handoff" -> 7
+            "sourcing_handoff" -> 6
+            "pack_handoff" -> 5
+            else -> 1
+          }
+        }
+        val closurePressure = supplierDashboardChunk {
+          when (recoveryClosureLane) {
+            "blocked_open" -> 9
+            "needs_close_note" -> 6
+            "ready_with_guard" -> 2
+            else -> 1
+          }
+        }
+        val ledgerPressure = supplierDashboardChunk {
+          when (recoveryLedgerLane) {
+            "audit_blocker" -> 9
+            "decision_record" -> 7
+            "pack_record" -> 5
+            "watch_record" -> 2
+            else -> 0
+          }
+        }
+        val triagePressure = supplierDashboardChunk {
+          when (recoveryTriageLane) {
+            "triage_now" -> 12
+            "decision_lane" -> 8
+            "pack_split_lane" -> 6
+            "sourcing_lane" -> 5
+            "watch_lane" -> 2
+            else -> 0
+          }
+        }
+        val commandPressure = supplierDashboardChunk {
           when (recoveryCommandLane) {
-            "stop_pack" -> 12
-            "call_store" -> 9
+            "stop_pack" -> 14
+            "call_store" -> 10
             "source_now" -> 8
             "split_and_ship" -> 6
-            else -> 2
-          } +
+            "monitor_promise" -> 2
+            else -> 1
+          }
+        }
+        val promiseShieldPressure = supplierDashboardChunk {
+          when (recoveryPromiseShieldLane) {
+            "promise_at_risk" -> 13
+            "store_answer_needed" -> 9
+            "source_before_promise" -> 8
+            "split_promise" -> 5
+            "promise_watch" -> 2
+            else -> 0
+          }
+        }
+        val wavePressure = supplierDashboardChunk {
           when (recoveryWaveLane) {
-            "wave_command" -> 10
+            "wave_command" -> 12
             "wave_contact" -> 8
             "wave_source" -> 7
             "wave_split" -> 5
-            else -> 1
+            "wave_watch" -> 2
+            else -> 0
           }
-        ).coerceIn(0, 100)
-      val recoveryLoadLane = when {
-        recoveryLoadScore >= 78 || (affectedStoreCount >= 3 && affectedOrderCount >= 4) -> "heavy_load"
-        affectedStoreCount >= 2 || affectedOrderCount >= 3 -> "multi_store_load"
-        recoveryCommandLane == "split_and_ship" || recoveryPackGuardLane == "split_pack_only" || recoveryBottleneckLane == "pack_bottleneck" -> "pack_load"
-        recoveryCommandLane == "ready_with_note" || recoveryConfidenceLane == "ready_to_recover" || recoveryBottleneckLane == "ready_bottleneck" -> "ready_load"
-        else -> "watch_load"
-      }
-      val recoveryLoadHint = when (recoveryLoadLane) {
-        "heavy_load" -> supplierDashboardJoinedMessage(
-          listOf("Load map: this shortage is carrying several orders/stores or blockers. Split the work into owner, contact, sourcing, and pack touches before promising closure."),
-          listOf("Карта нагрузки: эта недопоставка держит несколько заказов/магазинов или блокеров. Разделите работу на ответственного, контакт, поиск и сборку до обещания закрытия."),
-          listOf("Жүктеме картасы: бұл жетіспеу бірнеше тапсырыс/дүкенді немесе бөгетті ұстап тұр. Жабуды уәде етпес бұрын жұмысты жауапты, байланыс, іздеу және жинау қадамдарына бөліңіз.")
-        )
-        "multi_store_load" -> supplierDashboardJoinedMessage(
-          listOf("Load map: coordinate the same answer across stores, keep names private outside AITA, and avoid one store receiving a different promise by accident."),
-          listOf("Карта нагрузки: согласуйте один ответ по магазинам, держите названия приватными вне AITA и не допускайте случайно разных обещаний."),
-          listOf("Жүктеме картасы: дүкендер бойынша бір жауапты келісіп, AITA сыртында атауларды құпия ұстаңыз және кездейсоқ әртүрлі уәделерге жол бермеңіз.")
-        )
-        "pack_load" -> supplierDashboardJoinedMessage(
-          listOf("Load map: packflow is the capacity touch. Keep accepted stock separate, block unsafe quantity, and record who may move the split."),
-          listOf("Карта нагрузки: нагрузка сейчас в сборке. Держите принятое наличие отдельно, блокируйте небезопасное количество и запишите, кто двигает разделение."),
-          listOf("Жүктеме картасы: қазір негізгі жүктеме жинауда. Қабылданған қорды бөлек ұстап, қауіпсіз емес санды бөгеп, бөлуді кім жүргізетінін жазыңыз.")
-        )
-        "ready_load" -> supplierDashboardJoinedMessage(
-          listOf("Load map: recovery looks ready. Move it in one controlled touch, close only the completed worker step, and leave residual promises visible."),
-          listOf("Карта нагрузки: восстановление похоже готово. Проведите его одним контролируемым касанием, закройте только выполненный шаг и оставьте остаточные обещания видимыми."),
-          listOf("Жүктеме картасы: қалпына келтіру дайын сияқты. Оны бір бақыланған қадаммен өткізіп, тек орындалған қадамды жауып, қалған уәделерді көрінетін қалдырыңыз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Load map: low coordination load. Keep it visible, but do not let it crowd out heavier recovery work."),
-          listOf("Карта нагрузки: координационная нагрузка низкая. Держите задачу видимой, но не позволяйте ей вытеснять более тяжёлые восстановления."),
-          listOf("Жүктеме картасы: үйлестіру жүктемесі төмен. Тапсырманы көрініп ұстаңыз, бірақ ауыр қалпына келтірулерді ығыстырмасын.")
-        )
-      }
-      val recoveryLoadChecklist = when (recoveryLoadLane) {
-        "heavy_load" -> supplierDashboardJoinedMessage(
-          listOf("□ Split work by owner\n□ Batch store-safe answers\n□ Record sourcing/pack proof\n□ Re-score after each touch"),
-          listOf("□ Разделить работу по ответственным\n□ Сгруппировать безопасные ответы\n□ Записать доказательства поиска/сборки\n□ Пересчитать после каждого касания"),
-          listOf("□ Жұмысты жауаптыларға бөлу\n□ Қауіпсіз жауаптарды топтау\n□ Іздеу/жинау дәлелін жазу\n□ Әр қадамнан кейін қайта бағалау")
-        )
-        "multi_store_load" -> supplierDashboardJoinedMessage(
-          listOf("□ Use one private store script\n□ Mirror the same ETA/substitute rule\n□ Flag divergent answers\n□ Keep follow-up time visible"),
-          listOf("□ Использовать один приватный скрипт\n□ Повторить одно правило срока/замены\n□ Отметить разные ответы\n□ Держать контроль видимым"),
-          listOf("□ Бір құпия дүкен скриптін қолдану\n□ Бір мерзім/ауыстыру ережесін қайталау\n□ Әртүрлі жауаптарды белгілеу\n□ Бақылау уақытын көрінетін ұстау")
-        )
-        "pack_load" -> supplierDashboardJoinedMessage(
-          listOf("□ Pack only accepted stock\n□ Hold missing quantity\n□ Attach split proof\n□ Confirm second-drop owner"),
-          listOf("□ Собирать только принятое наличие\n□ Удержать недостачу\n□ Приложить доказательство разделения\n□ Подтвердить владельца второй поставки"),
-          listOf("□ Тек қабылданған қорды жинау\n□ Жетіспейтін санды ұстау\n□ Бөлу дәлелін тіркеу\n□ Екінші жеткізу иесін растау")
-        )
-        "ready_load" -> supplierDashboardJoinedMessage(
-          listOf("□ Move guarded ready item\n□ Close completed worker step\n□ Keep promise ledger\n□ Watch next follow-up"),
-          listOf("□ Провести защищённую готовую позицию\n□ Закрыть выполненный шаг\n□ Сохранить журнал обещания\n□ Следить за следующим контролем"),
-          listOf("□ Қорғалған дайын позицияны өткізу\n□ Орындалған қадамды жабу\n□ Уәде журналын сақтау\n□ Келесі бақылауды қадағалау")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("□ Keep on watch\n□ Refresh after answer\n□ Do not over-prioritize\n□ Escalate if score rises"),
-          listOf("□ Оставить в наблюдении\n□ Обновить после ответа\n□ Не завышать приоритет\n□ Эскалировать при росте оценки"),
-          listOf("□ Бақылауда ұстау\n□ Жауаптан кейін жаңарту\n□ Басымдықты артық көтермеу\n□ Ұпай өссе эскалациялау")
-        )
-      }
-      val recoveryLoadPathMain = when (recoveryLoadLane) {
-        "heavy_load" -> "heavy coordination load"
-        "multi_store_load" -> "multi-store answer load"
-        "pack_load" -> "pack capacity load"
-        "ready_load" -> "ready recovery load"
-        else -> "watch load"
-      }
-      val recoveryLoadPathRu = when (recoveryLoadLane) {
-        "heavy_load" -> "тяжёлая координационная нагрузка"
-        "multi_store_load" -> "нагрузка ответов по нескольким магазинам"
-        "pack_load" -> "нагрузка сборки"
-        "ready_load" -> "нагрузка готового восстановления"
-        else -> "нагрузка наблюдения"
-      }
-      val recoveryLoadPathKk = when (recoveryLoadLane) {
-        "heavy_load" -> "ауыр үйлестіру жүктемесі"
-        "multi_store_load" -> "бірнеше дүкен жауабының жүктемесі"
-        "pack_load" -> "жинау қуатының жүктемесі"
-        "ready_load" -> "дайын қалпына келтіру жүктемесі"
-        else -> "бақылау жүктемесі"
-      }
-      val recoveryLoadScript = supplierDashboardJoinedMessage(
-        listOf(
-          "AITA recovery load: $recoveryContactGoodsName.",
-          "Load path: $recoveryLoadPathMain; score $recoveryLoadScore/100; orders $affectedOrderCount; stores $affectedStoreCount.",
-          "Bottleneck ${recoveryBottleneckLane.ifBlank { "watch_bottleneck" }}; command ${recoveryCommandLane.ifBlank { "monitor_promise" }}; wave ${recoveryWaveLane.ifBlank { "wave_watch" }}.",
-          "Batch the work so one shortage does not steal capacity silently. Keep store names private outside AITA."
-        ),
-        listOf(
-          "AITA нагрузка восстановления: $recoveryContactGoodsName.",
-          "Путь нагрузки: $recoveryLoadPathRu; оценка $recoveryLoadScore/100; заказов $affectedOrderCount; магазинов $affectedStoreCount.",
-          "Узкое место ${recoveryBottleneckLane.ifBlank { "watch_bottleneck" }}; команда ${recoveryCommandLane.ifBlank { "monitor_promise" }}; волна ${recoveryWaveLane.ifBlank { "wave_watch" }}.",
-          "Сгруппируйте работу, чтобы одна недопоставка не съела ресурс незаметно. Названия магазинов держите приватными вне AITA."
-        ),
-        listOf(
-          "AITA қалпына келтіру жүктемесі: $recoveryContactGoodsName.",
-          "Жүктеме жолы: $recoveryLoadPathKk; ұпай $recoveryLoadScore/100; тапсырыс $affectedOrderCount; дүкен $affectedStoreCount.",
-          "Тар орын ${recoveryBottleneckLane.ifBlank { "watch_bottleneck" }}; команда ${recoveryCommandLane.ifBlank { "monitor_promise" }}; толқын ${recoveryWaveLane.ifBlank { "wave_watch" }}.",
-          "Бір жетіспеу қуатты үнсіз жұтып қоймас үшін жұмысты топтаңыз. AITA сыртында дүкен атауларын құпия ұстаңыз."
-        )
-      )
-
-      val requestCoveragePercent = if (requestedQuantityTotal > 0.000001) {
-        ((acceptedQuantityTotal / requestedQuantityTotal) * 100.0).toInt().coerceIn(0, 100)
-      } else 0
-      val recoveryImpactScore = (
-          8 +
-          when (recoveryUrgencyLane) {
-            "overdue" -> 20
-            "today" -> 15
-            "soon" -> 9
-            else -> 2
-          } +
-          when (recoveryPromiseShieldLane) {
-            "promise_at_risk" -> 20
-            "store_answer_needed" -> 14
-            "source_before_promise" -> 11
-            "split_promise" -> 7
-            "promise_safe" -> -8
-            else -> 2
-          } +
-          when (recoveryCommandLane) {
-            "stop_pack" -> 15
-            "call_store" -> 10
-            "source_now" -> 8
-            "split_and_ship" -> 5
-            "ready_with_note" -> -6
-            else -> 1
-          } +
-          when {
-            recoveryRiskScore >= 78 -> 14
-            recoveryRiskScore >= 60 -> 9
-            recoveryRiskScore >= 42 -> 4
-            else -> 1
-          } +
+        }
+        val agingPressure = supplierDashboardChunk {
+          when (recoveryAgingLane) {
+            "stale_blocker" -> 12
+            "touch_today" -> 7
+            "age_watch" -> 2
+            else -> 0
+          }
+        }
+        val bottleneckPressure = supplierDashboardChunk {
           when (recoveryBottleneckLane) {
-            "decision_bottleneck" -> 8
-            "pack_bottleneck" -> 7
-            "sourcing_bottleneck" -> 6
-            "ready_bottleneck" -> -5
-            else -> 2
-          } +
-          when (recoveryLoadLane) {
-            "heavy_load" -> 10
-            "multi_store_load" -> 7
-            "pack_load" -> 5
-            "ready_load" -> -4
-            else -> 1
-          } +
-          affectedStoreCount.coerceAtMost(5) * 5 +
-          affectedOrderCount.coerceAtMost(6) * 4 +
-          fullyShortLineCount.coerceAtMost(6) * 4 +
-          partialLineCount.coerceAtMost(8) * 3 +
-          missingQuantityTotal.coerceAtMost(35.0).toInt() +
-          ((100 - requestCoveragePercent).coerceAtLeast(0) / 5)
-        ).coerceIn(0, 100)
-      val recoveryImpactLane = when {
-        recoveryPromiseShieldLane == "promise_at_risk" || recoveryCommandLane == "stop_pack" || recoveryImpactScore >= 82 -> "customer_promise_impact"
-        recoveryConfidenceLane == "ready_to_recover" && recoveryLedgerLane == "ledger_ready" && recoveryImpactScore <= 58 -> "controlled_impact"
-        affectedStoreCount >= 2 || affectedOrderCount >= 3 || recoveryLoadLane == "multi_store_load" -> "multi_store_impact"
-        recoveryUrgencyLane == "overdue" || recoveryUrgencyLane == "today" || recoveryPromiseShieldLane == "store_answer_needed" -> "store_replenishment_impact"
-        else -> "impact_watch"
-      }
-      val recoveryImpactHint = when (recoveryImpactLane) {
-        "customer_promise_impact" -> supplierDashboardJoinedMessage(
-          listOf("Impact guard: this shortage can leak into downstream customer promises. Freeze public promises until command, proof, and follow-up are refreshed."),
-          listOf("Защита влияния: эта недопоставка может попасть в обещания клиентам. Заморозьте внешние обещания, пока команда, доказательство и контроль не обновлены."),
-          listOf("Әсер қорғаны: бұл жетіспеу төменгі клиент уәделеріне өтуі мүмкін. Команда, дәлел және бақылау жаңарғанша сыртқы уәделерді тоқтатыңыз.")
-        )
-        "multi_store_impact" -> supplierDashboardJoinedMessage(
-          listOf("Impact guard: several stores or orders depend on this SKU, so batch answers and avoid fixing only one visible card."),
-          listOf("Защита влияния: несколько магазинов или заказов зависят от этого SKU, поэтому объедините ответы и не чините только одну видимую карточку."),
-          listOf("Әсер қорғаны: бірнеше дүкен немесе тапсырыс осы SKU-ға тәуелді, сондықтан жауаптарды топтаңыз және тек бір көрінетін карточканы ғана жаппаңыз.")
-        )
-        "store_replenishment_impact" -> supplierDashboardJoinedMessage(
-          listOf("Impact guard: replenishment is close to due. Tell the store whether to delay, substitute, split, or cancel before packflow moves."),
-          listOf("Защита влияния: пополнение близко к сроку. Сообщите магазину задержку, замену, разделение или отмену до движения сборки."),
-          listOf("Әсер қорғаны: толықтыру мерзімі жақын. Жинау жүрмей тұрып дүкенге кідіріс, ауыстыру, бөлу немесе бас тарту туралы айтыңыз.")
-        )
-        "controlled_impact" -> supplierDashboardJoinedMessage(
-          listOf("Impact guard: impact is controlled. Move the guarded quantity, keep the shortage note visible, and close only the completed worker step."),
-          listOf("Защита влияния: влияние под контролем. Двигайте защищённое количество, оставьте заметку недостачи видимой и закрывайте только выполненный шаг."),
-          listOf("Әсер қорғаны: әсер бақылауда. Қорғалған санды жүргізіңіз, жетіспеу жазбасын көрінетін қалдырып, тек орындалған қадамды жабыңыз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Impact guard: watch impact quietly and refresh the score when due time, owner answer, accepted quantity, or affected store count changes."),
-          listOf("Защита влияния: спокойно наблюдайте влияние и обновляйте оценку при изменении срока, ответа ответственного, принятого количества или числа магазинов."),
-          listOf("Әсер қорғаны: әсерді тыныш бақылап, мерзім, жауапты жауабы, қабылданған сан немесе дүкен саны өзгерсе ұпайды жаңартыңыз.")
-        )
-      }
-      val recoveryImpactChecklist = when (recoveryImpactLane) {
-        "customer_promise_impact" -> supplierDashboardJoinedMessage(
-          listOf("□ Freeze unsafe customer/store promises\n□ Confirm command owner\n□ Attach proof or answer\n□ Recalculate after follow-up"),
-          listOf("□ Заморозить небезопасные обещания клиенту/магазину\n□ Подтвердить ответственного команды\n□ Приложить доказательство или ответ\n□ Пересчитать после контроля"),
-          listOf("□ Қауіпсіз емес клиент/дүкен уәделерін тоқтату\n□ Команда жауаптысын растау\n□ Дәлел немесе жауап тіркеу\n□ Бақылаудан кейін қайта есептеу")
-        )
-        "multi_store_impact" -> supplierDashboardJoinedMessage(
-          listOf("□ Batch affected orders\n□ Send one privacy-safe answer\n□ Split stock fairly\n□ Keep all shortage rows visible"),
-          listOf("□ Сгруппировать затронутые заказы\n□ Отправить один приватный ответ\n□ Справедливо разделить наличие\n□ Держать все строки недостачи видимыми"),
-          listOf("□ Әсер еткен тапсырыстарды топтау\n□ Бір құпия қауіпсіз жауап жіберу\n□ Қорды әділ бөлу\n□ Барлық жетіспеу жолдарын көрінетін ұстау")
-        )
-        "store_replenishment_impact" -> supplierDashboardJoinedMessage(
-          listOf("□ Check due time\n□ Choose delay/substitute/split/cancel\n□ Tell store before packing\n□ Save follow-up time"),
-          listOf("□ Проверить срок\n□ Выбрать задержку/замену/разделение/отмену\n□ Сообщить магазину до сборки\n□ Сохранить время контроля"),
-          listOf("□ Мерзімді тексеру\n□ Кідіріс/ауыстыру/бөлу/бас тартуды таңдау\n□ Жинауға дейін дүкенге айту\n□ Бақылау уақытын сақтау")
-        )
-        "controlled_impact" -> supplierDashboardJoinedMessage(
-          listOf("□ Move guarded quantity\n□ Keep open shortage amount\n□ Preserve proof note\n□ Close only completed step"),
-          listOf("□ Двигать защищённое количество\n□ Оставить недостачу открытой\n□ Сохранить доказательство\n□ Закрыть только выполненный шаг"),
-          listOf("□ Қорғалған санды жүргізу\n□ Жетіспейтін санды ашық қалдыру\n□ Дәлел жазбасын сақтау\n□ Тек орындалған қадамды жабу")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("□ Watch due time\n□ Watch owner answer\n□ Keep shortage visible\n□ Refresh after change"),
-          listOf("□ Следить за сроком\n□ Следить за ответом ответственного\n□ Держать недостачу видимой\n□ Обновить после изменения"),
-          listOf("□ Мерзімді бақылау\n□ Жауапты жауабын бақылау\n□ Жетіспеуді көрінетін ұстау\n□ Өзгерістен кейін жаңарту")
-        )
-      }
-      val recoveryImpactPathMain = when (recoveryImpactLane) {
-        "customer_promise_impact" -> "protect downstream customer/store promise first"
-        "multi_store_impact" -> "batch multi-store shortage answer"
-        "store_replenishment_impact" -> "protect store replenishment before packflow"
-        "controlled_impact" -> "impact controlled; move guarded step only"
-        else -> "watch impact and refresh on change"
-      }
-      val recoveryImpactPathRu = when (recoveryImpactLane) {
-        "customer_promise_impact" -> "сначала защитить обещание клиенту/магазину"
-        "multi_store_impact" -> "сгруппировать ответ по нескольким магазинам"
-        "store_replenishment_impact" -> "защитить пополнение магазина до сборки"
-        "controlled_impact" -> "влияние под контролем; двигать только защищённый шаг"
-        else -> "наблюдать влияние и обновлять при изменении"
-      }
-      val recoveryImpactPathKk = when (recoveryImpactLane) {
-        "customer_promise_impact" -> "алдымен клиент/дүкен уәдесін қорғау"
-        "multi_store_impact" -> "бірнеше дүкен жетіспеу жауабын топтау"
-        "store_replenishment_impact" -> "жинауға дейін дүкен толықтыруын қорғау"
-        "controlled_impact" -> "әсер бақылауда; тек қорғалған қадамды жүргізу"
-        else -> "әсерді бақылап, өзгерісте жаңарту"
-      }
-      val recoveryImpactScript = supplierDashboardJoinedMessage(
-        listOf(
-          "AITA recovery impact: $recoveryContactGoodsName.",
-          "Impact path: $recoveryImpactPathMain.",
-          "Impact score $recoveryImpactScore/100; affected orders $affectedOrderCount; affected stores $affectedStoreCount; coverage $requestCoveragePercent%.",
-          "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()}."
-        ),
-        listOf(
-          "AITA влияние восстановления: $recoveryContactGoodsName.",
-          "Путь влияния: $recoveryImpactPathRu.",
-          "Оценка влияния $recoveryImpactScore/100; заказов $affectedOrderCount; магазинов $affectedStoreCount; покрытие $requestCoveragePercent%.",
-          "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()}."
-        ),
-        listOf(
-          "AITA қалпына келтіру әсері: $recoveryContactGoodsName.",
-          "Әсер жолы: $recoveryImpactPathKk.",
-          "Әсер ұпайы $recoveryImpactScore/100; тапсырыс $affectedOrderCount; дүкен $affectedStoreCount; қамту $requestCoveragePercent%.",
-          "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()}."
-        )
-      )
-
-
-      val recoveryCommitByMillis = when {
-        recoveryCommandLane == "stop_pack" || recoveryPackGuardLane == "block_pack" -> recoveryFollowUpAtMillis ?: recoveryCheckpointAtMillis ?: earliestDueAtMillis
-        recoveryPromiseShieldLane == "promise_at_risk" -> recoveryFollowUpAtMillis ?: recoveryCheckpointAtMillis ?: earliestDueAtMillis
-        recoveryPromiseShieldLane == "store_answer_needed" || recoveryContactLane == "store_call" -> recoveryFollowUpAtMillis ?: recoveryCheckpointAtMillis ?: earliestDueAtMillis
-        recoveryCommandLane == "source_now" || recoveryPromiseShieldLane == "source_before_promise" -> recoveryCheckpointAtMillis ?: recoveryFollowUpAtMillis ?: earliestDueAtMillis
-        recoveryCommandLane == "split_and_ship" || recoveryPromiseShieldLane == "split_promise" -> earliestDueAtMillis ?: recoveryCheckpointAtMillis ?: recoveryFollowUpAtMillis
-        recoveryConfidenceLane == "ready_to_recover" -> recoveryCheckpointAtMillis ?: earliestDueAtMillis ?: recoveryFollowUpAtMillis
-        else -> recoveryFollowUpAtMillis ?: earliestDueAtMillis ?: recoveryCheckpointAtMillis
-      }
-      val recoveryCommitBucket = recoveryCommitByMillis
-        ?.let { commitAt -> supplierDashboardDeliveryBucketId(now, commitAt) }
-        .orEmpty()
-      val recoveryCommitScore = (
-        10 +
-          when (recoveryCommitBucket) {
-            "overdue" -> 22
-            "today" -> 16
-            "tomorrow" -> 10
-            "week" -> 6
-            else -> 2
-          } +
-          when (recoveryPromiseShieldLane) {
-            "promise_at_risk" -> 18
-            "store_answer_needed" -> 13
-            "source_before_promise" -> 11
-            "split_promise" -> 7
-            "promise_safe" -> -8
-            else -> 2
-          } +
-          when (recoveryCommandLane) {
-            "stop_pack" -> 16
-            "call_store" -> 10
-            "source_now" -> 8
-            "split_and_ship" -> 6
-            "ready_with_note" -> -6
-            else -> 1
-          } +
-          when (recoveryImpactLane) {
-            "customer_promise_impact" -> 14
-            "store_replenishment_impact" -> 9
-            "multi_store_impact" -> 7
-            "controlled_impact" -> -6
-            else -> 2
-          } +
-          when (recoveryBottleneckLane) {
-            "decision_bottleneck" -> 9
+            "pack_bottleneck" -> 11
+            "decision_bottleneck" -> 10
+            "sourcing_bottleneck" -> 9
             "contact_bottleneck" -> 8
-            "sourcing_bottleneck" -> 7
-            "pack_bottleneck" -> 6
-            "ready_bottleneck" -> -4
-            else -> 1
-          } +
-          recoveryRiskScore / 6 +
-          recoveryImpactScore / 6 +
-          ((100 - requestCoveragePercent).coerceAtLeast(0) / 6) +
-          fullyShortLineCount.coerceAtMost(5) * 3 +
-          partialLineCount.coerceAtMost(6) * 2
-        ).coerceIn(0, 100)
-      val recoveryCommitLane = when {
-        recoveryCommandLane == "stop_pack" || recoveryPackGuardLane == "block_pack" || recoveryPromiseShieldLane == "promise_at_risk" || (recoveryImpactLane == "customer_promise_impact" && recoveryConfidenceLane != "ready_to_recover") -> "commit_blocked"
-        recoveryConfidenceLane == "ready_to_recover" && recoveryLedgerLane == "ledger_ready" && recoveryClosureLane != "blocked_open" && recoveryImpactLane == "controlled_impact" -> "commit_ready"
-        recoveryCommitBucket == "overdue" || recoveryCommitBucket == "today" || recoveryContactLane == "store_call" || recoveryPromiseShieldLane == "store_answer_needed" -> "commit_store_today"
-        recoveryCommandLane == "source_now" || recoveryPromiseShieldLane == "source_before_promise" || recoveryOwnerLane == "upstream_sourcing" || recoveryBottleneckLane == "sourcing_bottleneck" -> "commit_source_eta"
-        recoveryCommandLane == "split_and_ship" || recoveryLane == "split_delivery" || recoveryPromiseShieldLane == "split_promise" || recoveryPackGuardLane == "split_pack_only" -> "commit_split_eta"
-        else -> "commit_watch"
-      }
-      val recoveryCommitHint = when (recoveryCommitLane) {
-        "commit_blocked" -> supplierDashboardJoinedMessage(
-          listOf("Commit guard: do not promise this shortage downstream yet. Freeze store/customer ETA until pack safety, proof, and owner answer are clear."),
-          listOf("Защита обязательства: пока не обещайте эту недопоставку ниже по цепочке. Заморозьте срок для магазина/клиента до ясной сборки, доказательства и ответа ответственного."),
-          listOf("Міндеттеме қорғаны: бұл жетіспеуді төменгі арнаға әлі уәде етпеңіз. Жинау қауіпсіздігі, дәлел және жауапты жауабы анық болғанша дүкен/клиент мерзімін тоқтатыңыз.")
-        )
-        "commit_store_today" -> supplierDashboardJoinedMessage(
-          listOf("Commit guard: store-facing answer is due now. Give one clear delay, substitute, split-drop, or cancel answer before dispatch moves."),
-          listOf("Защита обязательства: ответ магазину нужен сейчас. Дайте понятную задержку, замену, разделение или отмену до движения отправки."),
-          listOf("Міндеттеме қорғаны: дүкенге жауап қазір керек. Жөнелту қозғалғанша нақты кідіріс, ауыстыру, бөлу немесе бас тарту жауабын беріңіз.")
-        )
-        "commit_source_eta" -> supplierDashboardJoinedMessage(
-          listOf("Commit guard: upstream ETA is the missing promise. Ask for reserve/arrival/no-stock proof before changing downstream dates."),
-          listOf("Защита обязательства: не хватает срока от поставщика выше. Запросите резерв/прибытие/доказательство отсутствия до изменения нижних дат."),
-          listOf("Міндеттеме қорғаны: жоғары арнадан мерзім жетіспейді. Төменгі күндерді өзгертпес бұрын резерв/келу/қор жоқ дәлелін сұраңыз.")
-        )
-        "commit_split_eta" -> supplierDashboardJoinedMessage(
-          listOf("Commit guard: split ETA is needed. Promise what ships now, what waits, and which quantity remains open."),
-          listOf("Защита обязательства: нужен срок разделения. Зафиксируйте что едет сейчас, что ждёт и какое количество остаётся открытым."),
-          listOf("Міндеттеме қорғаны: бөлу мерзімі керек. Қазір не кететінін, не күтетінін және қандай сан ашық қалатынын бекітіңіз.")
-        )
-        "commit_ready" -> supplierDashboardJoinedMessage(
-          listOf("Commit guard: commitment is ready with guardrails. Move only the safe step and keep remaining shortage promises visible."),
-          listOf("Защита обязательства: обязательство готово с ограничителями. Двигайте только безопасный шаг и держите оставшиеся обещания видимыми."),
-          listOf("Міндеттеме қорғаны: міндеттеме қорғанмен дайын. Тек қауіпсіз қадамды жүргізіп, қалған жетіспеу уәделерін көрінетін ұстаңыз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Commit guard: keep the recovery promise on watch and refresh it when owner, stock, proof, or due time changes."),
-          listOf("Защита обязательства: держите обещание восстановления на наблюдении и обновляйте при изменении ответственного, наличия, доказательства или срока."),
-          listOf("Міндеттеме қорғаны: қалпына келтіру уәдесін бақылауда ұстап, жауапты, қор, дәлел немесе мерзім өзгерсе жаңартыңыз.")
-        )
-      }
-      val recoveryCommitChecklist = when (recoveryCommitLane) {
-        "commit_blocked" -> supplierDashboardJoinedMessage(
-          listOf("□ Freeze downstream ETA\n□ Confirm pack guard\n□ Attach proof/owner answer\n□ Set next safe commit time"),
-          listOf("□ Заморозить нижний срок\n□ Подтвердить защиту сборки\n□ Приложить доказательство/ответ\n□ Поставить следующее безопасное время"),
-          listOf("□ Төменгі мерзімді тоқтату\n□ Жинау қорғанын растау\n□ Дәлел/жауап тіркеу\n□ Келесі қауіпсіз уақыт қою")
-        )
-        "commit_store_today" -> supplierDashboardJoinedMessage(
-          listOf("□ Call/store message today\n□ Choose delay/substitute/split/cancel\n□ Save answer in note\n□ Recheck promise shield"),
-          listOf("□ Позвонить/написать магазину сегодня\n□ Выбрать задержку/замену/разделение/отмену\n□ Сохранить ответ в заметке\n□ Перепроверить щит обещания"),
-          listOf("□ Бүгін дүкенге қоңырау/хабар\n□ Кідіріс/ауыстыру/бөлу/бас тарту таңдау\n□ Жауапты жазбаға сақтау\n□ Уәде қалқанын қайта тексеру")
-        )
-        "commit_source_eta" -> supplierDashboardJoinedMessage(
-          listOf("□ Ask upstream ETA\n□ Ask reserve quantity\n□ Save no-stock proof if needed\n□ Update store promise after answer"),
-          listOf("□ Запросить срок выше\n□ Запросить резерв количества\n□ Сохранить доказательство отсутствия\n□ Обновить обещание магазину после ответа"),
-          listOf("□ Жоғары арнадан мерзім сұрау\n□ Резерв санын сұрау\n□ Қор жоқ дәлелін сақтау\n□ Жауаптан кейін дүкен уәдесін жаңарту")
-        )
-        "commit_split_eta" -> supplierDashboardJoinedMessage(
-          listOf("□ Mark ship-now quantity\n□ Mark waiting quantity\n□ Add second-drop ETA\n□ Keep shortage open until closed"),
-          listOf("□ Отметить количество сейчас\n□ Отметить ожидающее количество\n□ Добавить срок второй поставки\n□ Держать недостачу открытой до закрытия"),
-          listOf("□ Қазір кететін санды белгілеу\n□ Күтетін санды белгілеу\n□ Екінші жеткізу мерзімін қосу\n□ Жабылғанша жетіспеуді ашық ұстау")
-        )
-        "commit_ready" -> supplierDashboardJoinedMessage(
-          listOf("□ Move guarded step\n□ Keep remaining shortage visible\n□ Copy safe promise note\n□ Close only completed work"),
-          listOf("□ Двигать защищённый шаг\n□ Оставить остаток недостачи видимым\n□ Скопировать безопасную заметку\n□ Закрыть только выполненную работу"),
-          listOf("□ Қорғалған қадамды жүргізу\n□ Қалған жетіспеуді көрінетін ұстау\n□ Қауіпсіз уәде жазбасын көшіру\n□ Тек орындалған жұмысты жабу")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("□ Watch owner answer\n□ Watch due time\n□ Refresh promise after change\n□ Keep privacy-safe note"),
-          listOf("□ Следить за ответом\n□ Следить за сроком\n□ Обновить обещание после изменения\n□ Держать приватную заметку"),
-          listOf("□ Жауапты бақылау\n□ Мерзімді бақылау\n□ Өзгерістен кейін уәдені жаңарту\n□ Құпия қауіпсіз жазба ұстау")
-        )
-      }
-      val recoveryCommitPathMain = when (recoveryCommitLane) {
-        "commit_blocked" -> "blocked; no downstream ETA yet"
-        "commit_store_today" -> "store answer due today"
-        "commit_source_eta" -> "upstream ETA needed"
-        "commit_split_eta" -> "split/drop ETA needed"
-        "commit_ready" -> "safe commitment ready"
-        else -> "watch commitment"
-      }
-      val recoveryCommitPathRu = when (recoveryCommitLane) {
-        "commit_blocked" -> "заблокировано; внешнего срока пока нет"
-        "commit_store_today" -> "ответ магазину нужен сегодня"
-        "commit_source_eta" -> "нужен срок выше по цепочке"
-        "commit_split_eta" -> "нужен срок разделения/допоставки"
-        "commit_ready" -> "безопасное обязательство готово"
-        else -> "наблюдать обязательство"
-      }
-      val recoveryCommitPathKk = when (recoveryCommitLane) {
-        "commit_blocked" -> "бөгелген; төменгі мерзім әлі жоқ"
-        "commit_store_today" -> "дүкен жауабы бүгін керек"
-        "commit_source_eta" -> "жоғары арна мерзімі керек"
-        "commit_split_eta" -> "бөлу/жеткізу мерзімі керек"
-        "commit_ready" -> "қауіпсіз міндеттеме дайын"
-        else -> "міндеттемені бақылау"
-      }
-      val recoveryCommitScript = supplierDashboardJoinedMessage(
-        listOf(
-          "Commit path: $recoveryCommitPathMain; score $recoveryCommitScore/100.",
-          "Commit by ${recoveryCommitByMillis?.let { commitAt -> supplierDashboardCopyDateTime(commitAt) } ?: "not set"}; impact ${recoveryImpactLane.ifBlank { "impact_watch" }}; promise ${recoveryPromiseShieldLane.ifBlank { "promise_watch" }}.",
-          "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()} — keep store names inside AITA."
-        ),
-        listOf(
-          "Путь обязательства: $recoveryCommitPathRu; оценка $recoveryCommitScore/100.",
-          "До ${recoveryCommitByMillis?.let { commitAt -> supplierDashboardCopyDateTime(commitAt) } ?: "не задано"}; влияние ${recoveryImpactLane.ifBlank { "impact_watch" }}; обещание ${recoveryPromiseShieldLane.ifBlank { "promise_watch" }}.",
-          "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, нехватка ${missingQuantityTotal.toStockMoneyText()} — названия магазинов держите внутри AITA."
-        ),
-        listOf(
-          "Міндеттеме жолы: $recoveryCommitPathKk; ұпай $recoveryCommitScore/100.",
-          "Мерзімі ${recoveryCommitByMillis?.let { commitAt -> supplierDashboardCopyDateTime(commitAt) } ?: "қойылмаған"}; әсер ${recoveryImpactLane.ifBlank { "impact_watch" }}; уәде ${recoveryPromiseShieldLane.ifBlank { "promise_watch" }}.",
-          "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()} — дүкен атауларын AITA ішінде ұстаңыз."
-        )
-      )
-
-      val acceptedStockCanBeSplit = acceptedQuantityTotal > 0.000001 && missingQuantityTotal > 0.000001
-      val allocationPressureBase = (
-        affectedStoreCount.coerceAtMost(5) * 12 +
-          affectedOrderCount.coerceAtMost(8) * 7 +
-          fullyShortLineCount.coerceAtMost(6) * 5 +
-          partialLineCount.coerceAtMost(8) * 4 +
+            "proof_bottleneck" -> 7
+            "aging_bottleneck" -> 6
+            "watch_bottleneck" -> 2
+            else -> 0
+          }
+        }
+        val loadPressure = supplierDashboardChunk {
+          when (recoveryLoadLane) {
+            "heavy_load" -> 12
+            "multi_store_load" -> 8
+            "pack_load" -> 6
+            "ready_load" -> 2
+            "watch_load" -> 1
+            else -> 0
+          }
+        }
+        val impactPressure = supplierDashboardChunk {
           when (recoveryImpactLane) {
-            "customer_promise_impact" -> 16
-            "multi_store_impact" -> 12
-            "store_replenishment_impact" -> 9
-            "controlled_impact" -> -6
-            else -> 2
-          } +
+            "customer_promise_impact" -> 13
+            "multi_store_impact" -> 9
+            "store_replenishment_impact" -> 8
+            "impact_watch" -> 2
+            else -> 0
+          }
+        }
+        val commitPressure = supplierDashboardChunk {
           when (recoveryCommitLane) {
             "commit_blocked" -> 13
             "commit_store_today" -> 10
             "commit_source_eta" -> 8
             "commit_split_eta" -> 6
-            "commit_ready" -> -5
-            else -> 1
-          } +
-          when (recoveryLoadLane) {
-            "heavy_load" -> 10
-            "multi_store_load" -> 9
-            "pack_load" -> 5
-            "ready_load" -> -4
-            else -> 1
-          } +
-          when (recoveryUrgencyLane) {
-            "overdue" -> 12
-            "today" -> 9
-            "soon" -> 5
-            else -> 1
-          } +
-          when (recoveryCommandLane) {
-            "stop_pack" -> 12
-            "call_store" -> 8
-            "source_now" -> 6
-            "split_and_ship" -> 4
-            "ready_with_note" -> -5
-            else -> 1
-          } +
-          when (recoveryPromiseShieldLane) {
-            "promise_at_risk" -> 14
-            "store_answer_needed" -> 9
-            "split_promise" -> 6
-            "promise_safe" -> -7
-            else -> 1
-          } +
-          ((100 - requestCoveragePercent).coerceAtLeast(0) / 4)
-        ).coerceIn(0, 100)
-      val recoveryAllocationScore = allocationPressureBase
-      val recoveryAllocationLane = when {
-        acceptedStockCanBeSplit && affectedStoreCount >= 2 && recoveryAllocationScore >= 58 -> "fair_split_needed"
-        acceptedStockCanBeSplit && affectedOrderCount >= 3 && recoveryAllocationScore >= 58 -> "fair_split_needed"
-        recoveryCommitLane == "commit_blocked" || recoveryPromiseShieldLane == "promise_at_risk" || recoveryImpactLane == "customer_promise_impact" || recoveryCommandLane == "stop_pack" -> "priority_allocation"
-        acceptedStockCanBeSplit && affectedStoreCount <= 1 -> "single_store_allocation"
-        recoveryConfidenceLane == "ready_to_recover" && recoveryLedgerLane == "ledger_ready" && recoveryAllocationScore <= 55 -> "allocation_ready"
-        recoveryCommitLane == "commit_ready" && recoveryImpactLane == "controlled_impact" -> "allocation_ready"
-        else -> "allocation_watch"
-      }
-      val recoveryAllocationHint = when (recoveryAllocationLane) {
-        "fair_split_needed" -> supplierDashboardJoinedMessage(
-          listOf("Allocation guard: accepted stock is not enough for every affected store/order. Split it deliberately and record who receives the first drop."),
-          listOf("Защита распределения: принятого наличия не хватает на все затронутые магазины/заказы. Разделите его осознанно и запишите, кто получает первую поставку."),
-          listOf("Бөлу қорғаны: қабылданған қор барлық әсер еткен дүкен/тапсырысқа жетпейді. Оны саналы бөліп, бірінші жеткізуді кім алатынын жазыңыз.")
-        )
-        "priority_allocation" -> supplierDashboardJoinedMessage(
-          listOf("Allocation guard: protect the riskiest promise first, then split remaining stock without hiding the shortage."),
-          listOf("Защита распределения: сначала защитите самое рискованное обещание, затем разделите остаток, не скрывая недопоставку."),
-          listOf("Бөлу қорғаны: алдымен ең қауіпті уәдені қорғап, қалған қорды жетіспеуді жасырмай бөліңіз.")
-        )
-        "single_store_allocation" -> supplierDashboardJoinedMessage(
-          listOf("Allocation guard: one store/order lane owns the accepted stock. Keep the second-drop note attached before packing."),
-          listOf("Защита распределения: принятое наличие относится к одному магазину/заказу. Перед сборкой оставьте заметку второй поставки."),
-          listOf("Бөлу қорғаны: қабылданған қор бір дүкен/тапсырыс арнасына тиесілі. Жинауға дейін екінші жеткізу жазбасын қалдырыңыз.")
-        )
-        "allocation_ready" -> supplierDashboardJoinedMessage(
-          listOf("Allocation guard: allocation is ready. Ship guarded quantity only and leave the remaining shortage open."),
-          listOf("Защита распределения: распределение готово. Отправляйте только защищённое количество и оставьте остаток недопоставки открытым."),
-          listOf("Бөлу қорғаны: бөлу дайын. Тек қорғалған санды жіберіп, қалған жетіспеуді ашық қалдырыңыз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Allocation guard: watch the accepted-vs-requested gap and refresh the split if stores, due time, or accepted quantity changes."),
-          listOf("Защита распределения: следите за разницей принято/запрошено и обновляйте разделение при изменении магазинов, срока или принятого количества."),
-          listOf("Бөлу қорғаны: қабылданған/сұралған айырмасын бақылап, дүкендер, мерзім немесе қабылданған сан өзгерсе бөлуді жаңартыңыз.")
-        )
-      }
-      val recoveryAllocationChecklist = when (recoveryAllocationLane) {
-        "fair_split_needed" -> supplierDashboardJoinedMessage(
-          listOf("□ Rank affected orders\n□ Split accepted stock fairly\n□ Save first-drop owner\n□ Keep remaining shortage open"),
-          listOf("□ Расставить затронутые заказы\n□ Справедливо разделить принятое наличие\n□ Сохранить получателя первой поставки\n□ Оставить остаток недопоставки открытым"),
-          listOf("□ Әсер еткен тапсырыстарды реттеу\n□ Қабылданған қорды әділ бөлу\n□ Бірінші жеткізу иесін сақтау\n□ Қалған жетіспеуді ашық қалдыру")
-        )
-        "priority_allocation" -> supplierDashboardJoinedMessage(
-          listOf("□ Freeze unsafe promises\n□ Give first stock to highest-risk lane\n□ Tell other lanes the recovery promise\n□ Record why priority won"),
-          listOf("□ Заморозить небезопасные обещания\n□ Отдать первый товар самой рискованной линии\n□ Сообщить другим линиям обещание восстановления\n□ Записать причину приоритета"),
-          listOf("□ Қауіпсіз емес уәделерді тоқтату\n□ Бірінші қорды ең қауіпті арнаға беру\n□ Басқа арналарға қалпына келтіру уәдесін айту\n□ Басымдық себебін жазу")
-        )
-        "single_store_allocation" -> supplierDashboardJoinedMessage(
-          listOf("□ Assign accepted stock to the store lane\n□ Attach second-drop note\n□ Block over-packing\n□ Recheck after supplier answer"),
-          listOf("□ Назначить принятое наличие линии магазина\n□ Прикрепить заметку второй поставки\n□ Заблокировать пересборку\n□ Проверить после ответа поставщика"),
-          listOf("□ Қабылданған қорды дүкен арнасына бекіту\n□ Екінші жеткізу жазбасын тіркеу\n□ Артық жинауды бұғаттау\n□ Жеткізуші жауабынан кейін тексеру")
-        )
-        "allocation_ready" -> supplierDashboardJoinedMessage(
-          listOf("□ Ship guarded allocation\n□ Keep proof visible\n□ Keep shortage ledger open\n□ Close only shipped quantity"),
-          listOf("□ Отправить защищённое распределение\n□ Оставить доказательство видимым\n□ Оставить журнал недопоставки открытым\n□ Закрыть только отправленное количество"),
-          listOf("□ Қорғалған бөлуді жіберу\n□ Дәлелді көрінетін қалдыру\n□ Жетіспеу журналын ашық қалдыру\n□ Тек жіберілген санды жабу")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("□ Watch store/order count\n□ Watch accepted quantity\n□ Refresh split before packing\n□ Keep shortage visible"),
-          listOf("□ Следить за числом магазинов/заказов\n□ Следить за принятым количеством\n□ Обновить разделение до сборки\n□ Держать недопоставку видимой"),
-          listOf("□ Дүкен/тапсырыс санын бақылау\n□ Қабылданған санды бақылау\n□ Жинауға дейін бөлуді жаңарту\n□ Жетіспеуді көрінетін ұстау")
-        )
-      }
-      val recoveryAllocationPathMain = when (recoveryAllocationLane) {
-        "fair_split_needed" -> "fair split needed across affected stores/orders"
-        "priority_allocation" -> "protect the highest-risk promise first"
-        "single_store_allocation" -> "single store lane owns accepted stock"
-        "allocation_ready" -> "allocation ready with guard"
-        else -> "watch allocation and refresh before packing"
-      }
-      val recoveryAllocationPathRu = when (recoveryAllocationLane) {
-        "fair_split_needed" -> "нужно справедливое разделение по магазинам/заказам"
-        "priority_allocation" -> "сначала защитить самое рискованное обещание"
-        "single_store_allocation" -> "принятое наличие относится к одному магазину"
-        "allocation_ready" -> "распределение готово с защитой"
-        else -> "наблюдать распределение и обновить до сборки"
-      }
-      val recoveryAllocationPathKk = when (recoveryAllocationLane) {
-        "fair_split_needed" -> "дүкендер/тапсырыстар бойынша әділ бөлу керек"
-        "priority_allocation" -> "алдымен ең қауіпті уәдені қорғау"
-        "single_store_allocation" -> "қабылданған қор бір дүкен арнасына тиесілі"
-        "allocation_ready" -> "бөлу қорғанмен дайын"
-        else -> "бөлуді бақылап, жинауға дейін жаңарту"
-      }
-      val recoveryAllocationScript = supplierDashboardJoinedMessage(
-        listOf(
-          "AITA allocation guard: $recoveryContactGoodsName.",
-          "Allocation path: $recoveryAllocationPathMain.",
-          "Allocation score $recoveryAllocationScore/100; affected orders $affectedOrderCount; affected stores $affectedStoreCount; coverage $requestCoveragePercent%.",
-          "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()}.",
-          "Commit ${recoveryCommitLane.ifBlank { "commit_watch" }}; impact ${recoveryImpactLane.ifBlank { "impact_watch" }}. Keep store names private outside AITA."
-        ),
-        listOf(
-          "AITA защита распределения: $recoveryContactGoodsName.",
-          "Путь распределения: $recoveryAllocationPathRu.",
-          "Оценка распределения $recoveryAllocationScore/100; заказов $affectedOrderCount; магазинов $affectedStoreCount; покрытие $requestCoveragePercent%.",
-          "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()}.",
-          "Обязательство ${recoveryCommitLane.ifBlank { "commit_watch" }}; влияние ${recoveryImpactLane.ifBlank { "impact_watch" }}. Названия магазинов держите приватными вне AITA."
-        ),
-        listOf(
-          "AITA бөлу қорғаны: $recoveryContactGoodsName.",
-          "Бөлу жолы: $recoveryAllocationPathKk.",
-          "Бөлу ұпайы $recoveryAllocationScore/100; тапсырыс $affectedOrderCount; дүкен $affectedStoreCount; қамту $requestCoveragePercent%.",
-          "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()}.",
-          "Міндеттеме ${recoveryCommitLane.ifBlank { "commit_watch" }}; әсер ${recoveryImpactLane.ifBlank { "impact_watch" }}. AITA сыртында дүкен атауларын құпия ұстаңыз."
-        )
-      )
-
-
-      val recoveryExceptionScore = (
-        recoveryAllocationScore / 4 +
-          recoveryCommitScore / 5 +
-          recoveryImpactScore / 5 +
-          recoveryPromiseShieldScore / 5 +
-          duePressure +
-          when (recoveryPackGuardLane) {
-            "block_pack" -> 18
-            "proof_before_pack" -> 10
-            "split_pack_only" -> 7
-            else -> 1
-          } +
-          when (recoveryOutcomeLane) {
-            "cancel_review" -> 16
-            "substitute_offer" -> 12
-            "second_drop" -> 8
-            "ship_now_guard" -> 3
-            else -> 1
-          } +
+            "commit_watch" -> 2
+            else -> 0
+          }
+        }
+        val allocationPressure = supplierDashboardChunk {
           when (recoveryAllocationLane) {
-            "priority_allocation" -> 13
             "fair_split_needed" -> 11
+            "priority_allocation" -> 9
             "single_store_allocation" -> 5
-            "allocation_ready" -> -8
-            else -> 1
-          } +
-          fullyShortLineCount * 5 +
-          declinedLineCount * 4 +
-          (if (requestCoveragePercent < 50) 10 else 0)
-        ).coerceIn(0, 100)
-      val recoveryExceptionLane = when {
-        recoveryPackGuardLane == "block_pack" || recoveryCommandLane == "stop_pack" || recoveryCommitLane == "commit_blocked" -> "exception_stop_pack"
-        recoveryOutcomeLane == "cancel_review" || (recoveryLane == "source_or_cancel" && fullyShortLineCount > 0) -> "exception_cancel_review"
-        recoveryOutcomeLane == "substitute_offer" || recoveryContactLane == "substitute_answer" -> "exception_substitute"
-        recoveryCommandLane == "source_now" || recoveryOwnerLane == "upstream_sourcing" || recoveryCommitLane == "commit_source_eta" -> "exception_sourcing"
-        recoveryAllocationLane == "fair_split_needed" || recoveryAllocationLane == "priority_allocation" -> "exception_allocation"
-        recoveryConfidenceLane == "ready_to_recover" && recoveryLedgerLane == "ledger_ready" && recoveryAllocationLane == "allocation_ready" -> "exception_ready"
-        else -> "exception_watch"
-      }
-      val recoveryExceptionHint = when (recoveryExceptionLane) {
-        "exception_stop_pack" -> supplierDashboardJoinedMessage(
-          listOf("Exception guard: stop unsafe packing until the blocker has an owner, proof, and a safe promise."),
-          listOf("Защита исключений: остановите небезопасную сборку, пока у блокера не будет ответственного, доказательства и безопасного обещания."),
-          listOf("Ерекше жағдай қорғаны: бөгетке жауапты, дәлел және қауіпсіз уәде қойылғанша қауіпті жинауды тоқтатыңыз.")
-        )
-        "exception_cancel_review" -> supplierDashboardJoinedMessage(
-          listOf("Exception guard: this shortage may need cancel review. Do not hide the missing quantity behind accepted stock."),
-          listOf("Защита исключений: этой недопоставке может понадобиться проверка отмены. Не скрывайте нехватку за принятым наличием."),
-          listOf("Ерекше жағдай қорғаны: бұл жетіспеуге бас тартуды тексеру керек болуы мүмкін. Жетіспеуді қабылданған қормен жасырмаңыз.")
-        )
-        "exception_substitute" -> supplierDashboardJoinedMessage(
-          listOf("Exception guard: substitution needs a clear answer before promise, allocation, or packflow moves."),
-          listOf("Защита исключений: замене нужен чёткий ответ до обещания, распределения или движения сборки."),
-          listOf("Ерекше жағдай қорғаны: ауыстыруға уәде, бөлу немесе жинау жүрмей тұрып нақты жауап керек.")
-        )
-        "exception_sourcing" -> supplierDashboardJoinedMessage(
-          listOf("Exception guard: upstream sourcing is the blocking lane. Capture reserve, ETA, substitute, or no-stock proof."),
-          listOf("Защита исключений: блокирует поиск выше по цепочке. Зафиксируйте резерв, срок, замену или отсутствие товара."),
-          listOf("Ерекше жағдай қорғаны: жоғары арнадан іздеу бөгеп тұр. Резерв, мерзім, ауыстыру немесе қор жоқ дәлелін бекітіңіз.")
-        )
-        "exception_allocation" -> supplierDashboardJoinedMessage(
-          listOf("Exception guard: split allocation carefully so scarce accepted stock is not double-promised."),
-          listOf("Защита исключений: аккуратно разделите распределение, чтобы дефицитное принятое наличие не было обещано дважды."),
-          listOf("Ерекше жағдай қорғаны: тапшы қабылданған қор екі рет уәде етілмес үшін бөлуді мұқият жасаңыз.")
-        )
-        "exception_ready" -> supplierDashboardJoinedMessage(
-          listOf("Exception guard: ready with proof. Move only the guarded recovery step and keep remaining shortage visible."),
-          listOf("Защита исключений: готово с доказательством. Двигайте только защищённый шаг восстановления и оставьте остаток видимым."),
-          listOf("Ерекше жағдай қорғаны: дәлелмен дайын. Тек қорғалған қалпына келтіру қадамын қозғап, қалған жетіспеуді көрінетін қалдырыңыз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Exception guard: no special blocker yet. Keep the exception lane visible while promises, sourcing, or allocation change."),
-          listOf("Защита исключений: особого блокера пока нет. Держите линию исключения видимой при изменении обещаний, поиска или распределения."),
-          listOf("Ерекше жағдай қорғаны: әзірше арнайы бөгет жоқ. Уәде, іздеу немесе бөлу өзгергенде ерекше жағдай арнасын көрінетін ұстаңыз.")
-        )
-      }
-      val recoveryExceptionChecklist = when (recoveryExceptionLane) {
-        "exception_stop_pack" -> supplierDashboardJoinedMessage(
-          listOf("□ Stop packflow\n□ Name blocker owner\n□ Save proof/answer\n□ Re-score before dispatch"),
-          listOf("□ Остановить сборку\n□ Назначить ответственного\n□ Сохранить доказательство/ответ\n□ Пересчитать до отправки"),
-          listOf("□ Жинауды тоқтату\n□ Бөгет жауаптысын қою\n□ Дәлел/жауапты сақтау\n□ Жөнелтуден бұрын қайта бағалау")
-        )
-        "exception_cancel_review" -> supplierDashboardJoinedMessage(
-          listOf("□ Confirm no stock path\n□ Ask store substitute/cancel\n□ Keep missing qty open\n□ Record decision reason"),
-          listOf("□ Подтвердить путь без наличия\n□ Спросить магазин замену/отмену\n□ Оставить недостачу открытой\n□ Записать причину решения"),
-          listOf("□ Қор жоқ жолын растау\n□ Дүкеннен ауыстыру/бас тартуды сұрау\n□ Жетіспеуді ашық қалдыру\n□ Шешім себебін жазу")
-        )
-        "exception_substitute" -> supplierDashboardJoinedMessage(
-          listOf("□ Confirm substitute SKU\n□ Ask store answer\n□ Attach accepted quantity\n□ Update promise shield"),
-          listOf("□ Подтвердить SKU замены\n□ Получить ответ магазина\n□ Прикрепить принятое количество\n□ Обновить щит обещания"),
-          listOf("□ Ауыстыру SKU растау\n□ Дүкен жауабын алу\n□ Қабылданған санды тіркеу\n□ Уәде қалқанын жаңарту")
-        )
-        "exception_sourcing" -> supplierDashboardJoinedMessage(
-          listOf("□ Request upstream ETA\n□ Save reserve/no-stock proof\n□ Set commit-by time\n□ Mirror safe answer downstream"),
-          listOf("□ Запросить срок выше\n□ Сохранить резерв/отсутствие\n□ Поставить срок обязательства\n□ Передать безопасный ответ вниз"),
-          listOf("□ Жоғары мерзімді сұрау\n□ Резерв/қор жоқ дәлелін сақтау\n□ Міндеттеме мерзімін қою\n□ Қауіпсіз жауапты төмен жеткізу")
-        )
-        "exception_allocation" -> supplierDashboardJoinedMessage(
-          listOf("□ Rank affected orders\n□ Split accepted stock once\n□ Mark second drop\n□ Prevent double promise"),
-          listOf("□ Расставить заказы\n□ Один раз разделить наличие\n□ Отметить вторую поставку\n□ Предотвратить двойное обещание"),
-          listOf("□ Тапсырыстарды реттеу\n□ Қабылданған қорды бір рет бөлу\n□ Екінші жеткізуді белгілеу\n□ Қос уәдені болдырмау")
-        )
-        "exception_ready" -> supplierDashboardJoinedMessage(
-          listOf("□ Move guarded step\n□ Keep proof attached\n□ Leave residual shortage open\n□ Close only completed quantity"),
-          listOf("□ Двигать защищённый шаг\n□ Оставить доказательство\n□ Остаток недостачи оставить открытым\n□ Закрыть только выполненное количество"),
-          listOf("□ Қорғалған қадамды қозғау\n□ Дәлелді тіркеулі қалдыру\n□ Қалған жетіспеуді ашық қалдыру\n□ Тек орындалған санды жабу")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("□ Watch exception score\n□ Refresh after answer\n□ Keep shortage visible\n□ Escalate if score rises"),
-          listOf("□ Следить за оценкой исключения\n□ Обновить после ответа\n□ Держать недостачу видимой\n□ Эскалировать при росте оценки"),
-          listOf("□ Ерекше ұпайды бақылау\n□ Жауаптан кейін жаңарту\n□ Жетіспеуді көрінетін ұстау\n□ Ұпай өссе көтеру")
-        )
-      }
-      val recoveryExceptionPathMain = when (recoveryExceptionLane) {
-        "exception_stop_pack" -> "stop pack until blocker proof is safe"
-        "exception_cancel_review" -> "cancel review or substitute answer needed"
-        "exception_substitute" -> "substitute answer before promise"
-        "exception_sourcing" -> "upstream sourcing proof blocks recovery"
-        "exception_allocation" -> "scarce accepted stock needs one fair split"
-        "exception_ready" -> "exception cleared with guarded proof"
-        else -> "watch exception lane"
-      }
-      val recoveryExceptionPathRu = when (recoveryExceptionLane) {
-        "exception_stop_pack" -> "остановить сборку до безопасного доказательства"
-        "exception_cancel_review" -> "нужна проверка отмены или ответ по замене"
-        "exception_substitute" -> "ответ по замене до обещания"
-        "exception_sourcing" -> "восстановление блокирует доказательство выше"
-        "exception_allocation" -> "дефицитное наличие требует одного справедливого разделения"
-        "exception_ready" -> "исключение закрыто защищённым доказательством"
-        else -> "наблюдать линию исключения"
-      }
-      val recoveryExceptionPathKk = when (recoveryExceptionLane) {
-        "exception_stop_pack" -> "қауіпсіз дәлелге дейін жинауды тоқтату"
-        "exception_cancel_review" -> "бас тартуды тексеру немесе ауыстыру жауабы керек"
-        "exception_substitute" -> "уәдеге дейін ауыстыру жауабы"
-        "exception_sourcing" -> "қалпына келтіруді жоғары арна дәлелі бөгейді"
-        "exception_allocation" -> "тапшы қор бір әділ бөлуді қажет етеді"
-        "exception_ready" -> "ерекше жағдай қорғалған дәлелмен тазартылды"
-        else -> "ерекше жағдай арнасын бақылау"
-      }
-      val recoveryExceptionScript = supplierDashboardJoinedMessage(
-        listOf(
-          "AITA exception guard: $recoveryContactGoodsName.",
-          "Exception path: $recoveryExceptionPathMain.",
-          "Exception score $recoveryExceptionScore/100; allocation $recoveryAllocationScore/100; commit $recoveryCommitScore/100; impact $recoveryImpactScore/100.",
-          "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()} across ${relatedOrders.size} order(s). Keep store names private outside AITA."
-        ),
-        listOf(
-          "AITA защита исключений: $recoveryContactGoodsName.",
-          "Путь исключения: $recoveryExceptionPathRu.",
-          "Оценка исключения $recoveryExceptionScore/100; распределение $recoveryAllocationScore/100; обязательство $recoveryCommitScore/100; влияние $recoveryImpactScore/100.",
-          "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()} по ${relatedOrders.size} заказ(ам). Названия магазинов держите приватными вне AITA."
-        ),
-        listOf(
-          "AITA ерекше жағдай қорғаны: $recoveryContactGoodsName.",
-          "Ерекше жағдай жолы: $recoveryExceptionPathKk.",
-          "Ерекше ұпай $recoveryExceptionScore/100; бөлу $recoveryAllocationScore/100; міндеттеме $recoveryCommitScore/100; әсер $recoveryImpactScore/100.",
-          "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()} — ${relatedOrders.size} тапсырыс. AITA сыртында дүкен атауларын құпия ұстаңыз."
-        )
-      )
-      val recoveryCauseScore = (
-        recoveryExceptionScore / 4 +
-          recoveryAllocationScore / 5 +
-          recoveryCommitScore / 6 +
-          recoveryImpactScore / 6 +
-          recoveryLoadScore / 7 +
-          recoveryBottleneckScore / 7 +
-          (100 - requestCoveragePercent).coerceAtLeast(0) / 5 +
-          fullyShortLineCount.coerceAtMost(6) * 5 +
-          partialLineCount.coerceAtMost(8) * 3 +
-          declinedLineCount.coerceAtMost(5) * 4 +
+            "allocation_watch" -> 2
+            else -> 0
+          }
+        }
+        val exceptionPressure = supplierDashboardChunk {
           when (recoveryExceptionLane) {
-            "exception_stop_pack" -> 14
+            "exception_stop_pack" -> 15
             "exception_cancel_review" -> 12
             "exception_substitute" -> 9
             "exception_sourcing" -> 8
             "exception_allocation" -> 7
-            "exception_ready" -> -8
-            else -> 1
-          } +
-          when (recoveryAllocationLane) {
-            "fair_split_needed" -> 10
-            "priority_allocation" -> 9
-            "allocation_ready" -> -6
-            else -> 1
-          } +
-          when (recoveryPromiseShieldLane) {
-            "promise_at_risk" -> 12
-            "store_answer_needed" -> 8
-            "promise_safe" -> -6
+            "exception_ready" -> -5
             else -> 1
           }
-        ).coerceIn(0, 100)
-      val recoveryCauseLane = when {
-        fullyShortLineCount > 0 && acceptedQuantityTotal <= 0.0 -> "zero_acceptance_cause"
-        recoveryExceptionLane != "exception_watch" && recoveryExceptionLane != "exception_ready" -> "exception_cause"
-        recoveryCommitLane == "commit_blocked" || recoveryPromiseShieldLane == "promise_at_risk" || recoveryImpactLane == "customer_promise_impact" -> "promise_conflict_cause"
-        recoveryAllocationLane == "fair_split_needed" || recoveryAllocationLane == "priority_allocation" || (partialLineCount > 0 && affectedStoreCount > 1) -> "allocation_cause"
-        partialLineCount > 0 || recoveryLoadLane == "heavy_load" || recoveryLoadLane == "pack_load" || recoveryBottleneckLane == "sourcing_bottleneck" -> "partial_capacity_cause"
-        recoveryConfidenceLane == "ready_to_recover" && recoveryLedgerLane == "ledger_ready" && recoveryClosureLane != "blocked_open" -> "cause_ready"
-        else -> "cause_watch"
-      }
-      val recoveryCauseHint = when (recoveryCauseLane) {
-        "zero_acceptance_cause" -> supplierDashboardJoinedMessage(
-          listOf("Cause guard: accepted quantity is zero for at least one line. Treat this as no-stock proof and pick source, substitute, or cancel before packing."),
-          listOf("Причина: по строке принято ноль. Считайте это доказательством отсутствия и выберите поиск, замену или отмену до сборки."),
-          listOf("Себеп қорғаны: кемі бір жолда қабылданған сан нөл. Мұны қор жоқ дәлелі деп алып, жинауға дейін іздеу, ауыстыру немесе бас тартуды таңдаңыз.")
-        )
-        "exception_cause" -> supplierDashboardJoinedMessage(
-          listOf("Cause guard: the shortage is driven by an exception blocker. Fix the blocker first so worker notes do not hide the real reason."),
-          listOf("Причина: недопоставка вызвана блокером исключения. Сначала решите блокер, чтобы рабочие заметки не скрывали настоящую причину."),
-          listOf("Себеп қорғаны: жетіспеуді ерекше жағдай бөгеті тудырып тұр. Алдымен бөгетті шешіп, жұмыс жазбалары нақты себепті жасырмасын.")
-        )
-        "promise_conflict_cause" -> supplierDashboardJoinedMessage(
-          listOf("Cause guard: downstream promise changed faster than stock recovery. Freeze the promise and reconnect store answer, ETA, and pack guard."),
-          listOf("Причина: нижнее обещание изменилось быстрее восстановления наличия. Заморозьте обещание и свяжите ответ магазина, срок и защиту сборки."),
-          listOf("Себеп қорғаны: төменгі уәде қор қалпына келуінен жылдам өзгерді. Уәдені тоқтатып, дүкен жауабы, мерзім және жинау қорғанын байланыстырыңыз.")
-        )
-        "allocation_cause" -> supplierDashboardJoinedMessage(
-          listOf("Cause guard: scarce accepted stock must be allocated once and visibly across affected orders before any promise is sent."),
-          listOf("Причина: дефицитное принятое наличие нужно один раз и прозрачно распределить по затронутым заказам до обещаний."),
-          listOf("Себеп қорғаны: тапшы қабылданған қор уәде жібермей тұрып әсер еткен тапсырыстарға бір рет әрі көрінетін бөлінуі керек.")
-        )
-        "partial_capacity_cause" -> supplierDashboardJoinedMessage(
-          listOf("Cause guard: supplier can cover part of the demand. Separate accepted capacity from missing capacity and date the recovery path."),
-          listOf("Причина: поставщик покрывает только часть спроса. Разделите принятую мощность и недостачу, затем поставьте дату восстановления."),
-          listOf("Себеп қорғаны: жеткізуші сұраныстың бір бөлігін ғана жабады. Қабылданған қуат пен жетіспеуді бөліп, қалпына келу күнін қойыңыз.")
-        )
-        "cause_ready" -> supplierDashboardJoinedMessage(
-          listOf("Cause guard: root cause is documented enough to move the guarded step. Keep residual shortage visible after action."),
-          listOf("Причина: корневая причина достаточно зафиксирована для защищённого шага. После действия оставьте остаточную недостачу видимой."),
-          listOf("Себеп қорғаны: түпкі себеп қорғалған қадамға жеткілікті бекітілді. Әрекеттен кейін қалған жетіспеуді көрінетін ұстаңыз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Cause guard: keep watching for the true shortage reason while owner, promise, and allocation lanes change."),
-          listOf("Причина: продолжайте наблюдать настоящую причину недопоставки при изменении ответственного, обещания и распределения."),
-          listOf("Себеп қорғаны: жауапты, уәде және бөлу өзгергенде жетіспеудің нақты себебін бақылауды жалғастырыңыз.")
-        )
-      }
-      val recoveryCauseChecklist = when (recoveryCauseLane) {
-        "zero_acceptance_cause" -> supplierDashboardJoinedMessage(
-          listOf("□ Mark no-stock proof\n□ Ask source/substitute/cancel\n□ Keep pack blocked\n□ Save final reason"),
-          listOf("□ Отметить доказательство нуля\n□ Запросить поиск/замену/отмену\n□ Держать сборку заблокированной\n□ Сохранить итоговую причину"),
-          listOf("□ Нөл қор дәлелін белгілеу\n□ Іздеу/ауыстыру/бас тартуды сұрау\n□ Жинауды бөгелген ұстау\n□ Қорытынды себепті сақтау")
-        )
-        "exception_cause" -> supplierDashboardJoinedMessage(
-          listOf("□ Name exception blocker\n□ Assign owner\n□ Add proof note\n□ Recheck promise shield"),
-          listOf("□ Назвать блокер исключения\n□ Назначить ответственного\n□ Добавить доказательство\n□ Проверить щит обещания"),
-          listOf("□ Ерекше бөгетті атау\n□ Жауапты қою\n□ Дәлел жазбасын қосу\n□ Уәде қалқанын тексеру")
-        )
-        "promise_conflict_cause" -> supplierDashboardJoinedMessage(
-          listOf("□ Freeze unsafe ETA\n□ Contact store\n□ Rebuild commit-by time\n□ Release only guarded promise"),
-          listOf("□ Заморозить небезопасный срок\n□ Связаться с магазином\n□ Пересобрать срок обещания\n□ Выпустить только защищённое обещание"),
-          listOf("□ Қауіпсіз емес мерзімді тоқтату\n□ Дүкенмен байланысу\n□ Міндеттеме уақытын қайта құру\n□ Тек қорғалған уәдені шығару")
-        )
-        "allocation_cause" -> supplierDashboardJoinedMessage(
-          listOf("□ Rank affected orders\n□ Split accepted stock once\n□ Record shortage remainder\n□ Notify with one answer"),
-          listOf("□ Ранжировать заказы\n□ Один раз разделить принятое\n□ Записать остаток недостачи\n□ Сообщить одним ответом"),
-          listOf("□ Тапсырыстарды саралау\n□ Қабылданғанды бір рет бөлу\n□ Қалған жетіспеуді жазу\n□ Бір жауаппен хабарлау")
-        )
-        "partial_capacity_cause" -> supplierDashboardJoinedMessage(
-          listOf("□ Separate covered qty\n□ Date second drop/source\n□ Keep missing qty open\n□ Update load score"),
-          listOf("□ Отделить покрытое количество\n□ Поставить дату второй поставки/поиска\n□ Оставить недостачу открытой\n□ Обновить нагрузку"),
-          listOf("□ Жабылған санды бөлу\n□ Екінші жеткізу/іздеу күнін қою\n□ Жетіспеуді ашық қалдыру\n□ Жүктеме ұпайын жаңарту")
-        )
-        "cause_ready" -> supplierDashboardJoinedMessage(
-          listOf("□ Move guarded step\n□ Keep residue visible\n□ Close only proofed action\n□ Refresh desk"),
-          listOf("□ Двинуть защищённый шаг\n□ Оставить остаток видимым\n□ Закрыть только доказанное действие\n□ Обновить пульт"),
-          listOf("□ Қорғалған қадамды қозғау\n□ Қалдықты көрінетін ұстау\n□ Тек дәлелденген әрекетті жабу\n□ Пультті жаңарту")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("□ Watch owner\n□ Watch promise\n□ Watch allocation\n□ Refresh after answer"),
-          listOf("□ Следить за ответственным\n□ Следить за обещанием\n□ Следить за распределением\n□ Обновить после ответа"),
-          listOf("□ Жауаптыны бақылау\n□ Уәдені бақылау\n□ Бөлуді бақылау\n□ Жауаптан кейін жаңарту")
-        )
-      }
-      val recoveryCausePathMain = when (recoveryCauseLane) {
-        "zero_acceptance_cause" -> "zero accepted stock"
-        "exception_cause" -> "exception blocker"
-        "promise_conflict_cause" -> "unsafe downstream promise"
-        "allocation_cause" -> "scarce stock allocation"
-        "partial_capacity_cause" -> "partial supplier capacity"
-        "cause_ready" -> "documented cause ready to move"
-        else -> "cause watch"
-      }
-      val recoveryCausePathRu = when (recoveryCauseLane) {
-        "zero_acceptance_cause" -> "ноль принятого наличия"
-        "exception_cause" -> "блокер исключения"
-        "promise_conflict_cause" -> "небезопасное нижнее обещание"
-        "allocation_cause" -> "распределение дефицитного наличия"
-        "partial_capacity_cause" -> "частичная мощность поставщика"
-        "cause_ready" -> "причина зафиксирована и готова"
-        else -> "наблюдение причины"
-      }
-      val recoveryCausePathKk = when (recoveryCauseLane) {
-        "zero_acceptance_cause" -> "қабылданған қор нөл"
-        "exception_cause" -> "ерекше жағдай бөгеті"
-        "promise_conflict_cause" -> "қауіпсіз емес төменгі уәде"
-        "allocation_cause" -> "тапшы қорды бөлу"
-        "partial_capacity_cause" -> "жеткізуші қуаты жартылай"
-        "cause_ready" -> "себеп бекітіліп дайын"
-        else -> "себепті бақылау"
-      }
-      val recoveryCauseScript = supplierDashboardJoinedMessage(
-        listOf(
-          "AITA cause guard: $recoveryContactGoodsName.",
-          "Root cause: $recoveryCausePathMain.",
-          "Cause score $recoveryCauseScore/100; exception $recoveryExceptionScore/100; allocation $recoveryAllocationScore/100; coverage $requestCoveragePercent%.",
-          "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()}. Keep store names private outside AITA."
-        ),
-        listOf(
-          "AITA защита причины: $recoveryContactGoodsName.",
-          "Корневая причина: $recoveryCausePathRu.",
-          "Оценка причины $recoveryCauseScore/100; исключение $recoveryExceptionScore/100; распределение $recoveryAllocationScore/100; покрытие $requestCoveragePercent%.",
-          "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()}. Названия магазинов держите приватными вне AITA."
-        ),
-        listOf(
-          "AITA себеп қорғаны: $recoveryContactGoodsName.",
-          "Түпкі себеп: $recoveryCausePathKk.",
-          "Себеп ұпайы $recoveryCauseScore/100; ерекше $recoveryExceptionScore/100; бөлу $recoveryAllocationScore/100; қамту $requestCoveragePercent%.",
-          "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()}. AITA сыртында дүкен атауларын құпия ұстаңыз."
-        )
-      )
-      val recoveryVerificationScore = (
-          recoveryExceptionScore / 3 +
-          recoveryCauseScore / 4 +
-          recoveryCommitScore / 6 +
-          recoveryAllocationScore / 6 +
-          recoveryImpactScore / 7 +
-          (100 - recoveryConfidenceScore) / 5 +
-          (100 - recoveryLedgerScore) / 5 +
-          duePressure +
-          when (recoveryProofLane) {
-            "store_ack_required" -> 14
-            "sourcing_note_required" -> 12
-            "pack_guard_proof" -> 10
-            else -> 2
-          } +
+        }
+        val causePressure = supplierDashboardChunk {
           when (recoveryCauseLane) {
-            "zero_acceptance_cause" -> 15
-            "exception_cause" -> 13
-            "promise_conflict_cause" -> 10
-            "allocation_cause" -> 8
+            "zero_acceptance_cause" -> 13
+            "exception_cause" -> 11
+            "promise_conflict_cause" -> 9
+            "allocation_cause" -> 7
             "partial_capacity_cause" -> 6
-            "cause_ready" -> -7
-            else -> 1
-          } +
-          when (recoveryExceptionLane) {
-            "exception_stop_pack" -> 18
-            "exception_cancel_review" -> 14
-            "exception_substitute" -> 10
-            "exception_sourcing" -> 9
-            "exception_allocation" -> 7
-            "exception_ready" -> -8
-            else -> 1
-          } +
-          when (recoveryCommitLane) {
-            "commit_blocked" -> 13
-            "commit_store_today" -> 9
-            "commit_source_eta" -> 7
-            "commit_split_eta" -> 5
-            "commit_ready" -> -6
-            else -> 1
-          } +
-          when (recoveryClosureLane) {
-            "blocked_open" -> 12
-            "needs_close_note" -> 7
-            "ready_with_guard" -> -5
+            "cause_ready" -> -4
             else -> 1
           }
-        ).coerceIn(0, 100)
-      val recoveryVerificationLane = when {
-        recoveryExceptionLane == "exception_stop_pack" || recoveryClosureLane == "blocked_open" || recoveryPackGuardLane == "block_pack" || recoveryCauseLane == "zero_acceptance_cause" -> "verify_blocked"
-        recoveryCauseLane == "exception_cause" || recoveryCauseLane == "promise_conflict_cause" || recoveryCauseLane == "allocation_cause" || recoveryCauseLane == "partial_capacity_cause" || recoveryCauseScore >= 70 -> "verify_cause_record"
-        recoveryOwnerLane == "store_contact" || recoveryContactLane == "store_call" || recoveryContactLane == "substitute_answer" || recoveryCommitLane == "commit_store_today" || recoveryPromiseShieldLane == "store_answer_needed" -> "verify_store_answer"
-        recoveryOwnerLane == "upstream_sourcing" || recoveryContactLane == "upstream_request" || recoveryCommitLane == "commit_source_eta" || recoveryExceptionLane == "exception_sourcing" -> "verify_source_proof"
-        recoveryPackGuardLane == "split_pack_only" || recoveryCommandLane == "split_and_ship" || recoveryAllocationLane == "fair_split_needed" || recoveryAllocationLane == "priority_allocation" -> "verify_pack_split"
-        recoveryConfidenceLane == "ready_to_recover" && recoveryLedgerLane == "ledger_ready" && recoveryExceptionLane == "exception_ready" && recoveryCauseLane == "cause_ready" -> "verify_ready"
-        recoveryCommitLane == "commit_ready" && recoveryAllocationLane == "allocation_ready" && recoveryClosureLane == "ready_with_guard" && recoveryCauseLane == "cause_ready" -> "verify_ready"
-        else -> "verify_watch"
-      }
-      val recoveryVerificationHint = when (recoveryVerificationLane) {
-        "verify_blocked" -> supplierDashboardJoinedMessage(
-          listOf("Verification guard: recovery is blocked. Keep packflow stopped until proof, owner, cause, and promise are safe in AITA."),
-          listOf("Защита проверки: восстановление заблокировано. Держите сборку остановленной, пока доказательство, ответственный, причина и обещание не безопасны в AITA."),
-          listOf("Тексеру қорғаны: қалпына келтіру бөгелді. Дәлел, жауапты, себеп және уәде AITA ішінде қауіпсіз болғанша жинауды тоқтатыңыз.")
-        )
-        "verify_cause_record" -> supplierDashboardJoinedMessage(
-          listOf("Verification guard: root cause still needs a recorded answer. Save why the shortage happened before closing, promising, or allocating stock."),
-          listOf("Защита проверки: по корневой причине ещё нужен зафиксированный ответ. Сохраните причину недопоставки до закрытия, обещания или распределения."),
-          listOf("Тексеру қорғаны: түпкі себепке жазылған жауап керек. Жабу, уәде немесе бөлу алдында жетіспеу себебін сақтаңыз.")
-        )
-        "verify_store_answer" -> supplierDashboardJoinedMessage(
-          listOf("Verification guard: store or buyer answer is the missing checkpoint. Capture substitute, delay, or cancel answer before promising downstream."),
-          listOf("Защита проверки: не хватает ответа магазина или покупателя. Зафиксируйте замену, задержку или отмену до обещания вниз."),
-          listOf("Тексеру қорғаны: дүкен немесе сатып алушы жауабы жетіспейді. Төменге уәде бермей тұрып ауыстыру, кідіріс немесе бас тарту жауабын бекітіңіз.")
-        )
-        "verify_source_proof" -> supplierDashboardJoinedMessage(
-          listOf("Verification guard: upstream sourcing proof is required. Save reserve, ETA, no-stock proof, or substitute path before closing recovery."),
-          listOf("Защита проверки: требуется доказательство поиска выше по цепочке. Сохраните резерв, срок, отсутствие товара или путь замены до закрытия восстановления."),
-          listOf("Тексеру қорғаны: жоғары арна іздеу дәлелі керек. Қалпына келтіруді жаппай тұрып резерв, мерзім, қор жоқ дәлелі немесе ауыстыру жолын сақтаңыз.")
-        )
-        "verify_pack_split" -> supplierDashboardJoinedMessage(
-          listOf("Verification guard: pack split needs a clear guarded quantity and remaining-shortage note before dispatch."),
-          listOf("Защита проверки: разделению сборки нужно чёткое защищённое количество и заметка остаточной недопоставки до отправки."),
-          listOf("Тексеру қорғаны: жинауды бөлуге жөнелтуден бұрын нақты қорғалған сан және қалған жетіспеу жазбасы керек.")
-        )
-        "verify_ready" -> supplierDashboardJoinedMessage(
-          listOf("Verification guard: ready to move with proof. Close only the verified recovery step and leave any remaining shortage visible."),
-          listOf("Защита проверки: готово к движению с доказательством. Закрывайте только проверенный шаг восстановления и оставляйте остаток видимым."),
-          listOf("Тексеру қорғаны: дәлелмен қозғауға дайын. Тек тексерілген қалпына келтіру қадамын жауып, қалған жетіспеуді көрінетін қалдырыңыз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Verification guard: watch the recovery lane and refresh verification after each supplier/store answer."),
-          listOf("Защита проверки: наблюдайте линию восстановления и обновляйте проверку после каждого ответа поставщика/магазина."),
-          listOf("Тексеру қорғаны: қалпына келтіру арнасын бақылап, әр жеткізуші/дүкен жауабынан кейін тексеруді жаңартыңыз.")
-        )
-      }
-      val recoveryVerificationChecklist = when (recoveryVerificationLane) {
-        "verify_blocked" -> supplierDashboardJoinedMessage(
-          listOf("□ Keep pack stopped\n□ Name recovery owner\n□ Attach proof/answer\n□ Re-score before dispatch"),
-          listOf("□ Держать сборку остановленной\n□ Назначить ответственного\n□ Прикрепить доказательство/ответ\n□ Пересчитать до отправки"),
-          listOf("□ Жинауды тоқтату\n□ Қалпына келтіру жауаптысын қою\n□ Дәлел/жауапты тіркеу\n□ Жөнелтуге дейін қайта бағалау")
-        )
-        "verify_cause_record" -> supplierDashboardJoinedMessage(
-          listOf("□ Confirm root cause\n□ Record source of answer\n□ Link cause to action\n□ Recheck promise safety"),
-          listOf("□ Подтвердить корневую причину\n□ Записать источник ответа\n□ Связать причину с действием\n□ Перепроверить безопасность обещания"),
-          listOf("□ Түпкі себепті растау\n□ Жауап көзін жазу\n□ Себепті әрекетпен байланыстыру\n□ Уәде қауіпсіздігін қайта тексеру")
-        )
-        "verify_store_answer" -> supplierDashboardJoinedMessage(
-          listOf("□ Contact store/buyer\n□ Save substitute/delay/cancel answer\n□ Update promise shield\n□ Set follow-up time"),
-          listOf("□ Связаться с магазином/покупателем\n□ Сохранить ответ замена/задержка/отмена\n□ Обновить щит обещания\n□ Назначить контроль"),
-          listOf("□ Дүкен/сатып алушымен байланысу\n□ Ауыстыру/кідіріс/бас тарту жауабын сақтау\n□ Уәде қалқанын жаңарту\n□ Қайта тексеру уақытын қою")
-        )
-        "verify_source_proof" -> supplierDashboardJoinedMessage(
-          listOf("□ Request reserve/ETA\n□ Save no-stock proof\n□ Mirror safe answer downstream\n□ Keep missing qty open"),
-          listOf("□ Запросить резерв/срок\n□ Сохранить доказательство отсутствия\n□ Передать безопасный ответ вниз\n□ Оставить недостачу открытой"),
-          listOf("□ Резерв/мерзім сұрау\n□ Қор жоқ дәлелін сақтау\n□ Қауіпсіз жауапты төмен жеткізу\n□ Жетіспеуді ашық қалдыру")
-        )
-        "verify_pack_split" -> supplierDashboardJoinedMessage(
-          listOf("□ Mark accepted quantity\n□ Mark missing quantity\n□ Attach pack note\n□ Dispatch guarded quantity only"),
-          listOf("□ Отметить принятое количество\n□ Отметить недостачу\n□ Прикрепить заметку сборки\n□ Отправить только защищённое количество"),
-          listOf("□ Қабылданған санды белгілеу\n□ Жетіспейтін санды белгілеу\n□ Жинау жазбасын тіркеу\n□ Тек қорғалған санды жөнелту")
-        )
-        "verify_ready" -> supplierDashboardJoinedMessage(
-          listOf("□ Move verified step\n□ Keep proof attached\n□ Close completed quantity only\n□ Watch residual shortage"),
-          listOf("□ Двигать проверенный шаг\n□ Оставить доказательство\n□ Закрыть только выполненное количество\n□ Наблюдать остаток недопоставки"),
-          listOf("□ Тексерілген қадамды қозғау\n□ Дәлелді тіркеулі қалдыру\n□ Тек орындалған санды жабу\n□ Қалған жетіспеуді бақылау")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("□ Watch verification score\n□ Refresh after answer\n□ Preserve shortage ledger\n□ Escalate if blockers appear"),
-          listOf("□ Следить за оценкой проверки\n□ Обновить после ответа\n□ Сохранить журнал недопоставки\n□ Эскалировать при появлении блокеров"),
-          listOf("□ Тексеру ұпайын бақылау\n□ Жауаптан кейін жаңарту\n□ Жетіспеу журналын сақтау\n□ Бөгеттер пайда болса көтеру")
-        )
-      }
-      val recoveryVerificationPathMain = when (recoveryVerificationLane) {
-        "verify_blocked" -> "blocked until proof, cause, and promise are safe"
-        "verify_cause_record" -> "root cause record verifies why the shortage stays open"
-        "verify_store_answer" -> "store or buyer answer verifies next promise"
-        "verify_source_proof" -> "upstream proof verifies recovery"
-        "verify_pack_split" -> "pack split needs guarded quantity note"
-        "verify_ready" -> "verified recovery ready to move"
-        else -> "watch verification after each answer"
-      }
-      val recoveryVerificationPathRu = when (recoveryVerificationLane) {
-        "verify_blocked" -> "заблокировано до безопасного доказательства, причины и обещания"
-        "verify_cause_record" -> "запись причины подтверждает почему недопоставка открыта"
-        "verify_store_answer" -> "ответ магазина/покупателя проверяет следующее обещание"
-        "verify_source_proof" -> "доказательство выше подтверждает восстановление"
-        "verify_pack_split" -> "разделению сборки нужна заметка защищённого количества"
-        "verify_ready" -> "проверенное восстановление готово к движению"
-        else -> "наблюдать проверку после каждого ответа"
-      }
-      val recoveryVerificationPathKk = when (recoveryVerificationLane) {
-        "verify_blocked" -> "қауіпсіз дәлел, себеп және уәдеге дейін бөгелген"
-        "verify_cause_record" -> "себеп жазбасы жетіспеудің неге ашық екенін растайды"
-        "verify_store_answer" -> "дүкен/сатып алушы жауабы келесі уәдені тексереді"
-        "verify_source_proof" -> "жоғары арна дәлелі қалпына келтіруді растайды"
-        "verify_pack_split" -> "жинауды бөлуге қорғалған сан жазбасы керек"
-        "verify_ready" -> "тексерілген қалпына келтіру қозғауға дайын"
-        else -> "әр жауаптан кейін тексеруді бақылау"
-      }
-      val recoveryVerificationScript = supplierDashboardJoinedMessage(
-        listOf(
-          "AITA verification guard: $recoveryContactGoodsName.",
-          "Verification path: $recoveryVerificationPathMain.",
-          "Verification score $recoveryVerificationScore/100; cause $recoveryCauseScore/100; exception $recoveryExceptionScore/100; ledger $recoveryLedgerScore/100; confidence $recoveryConfidenceScore/100.",
-          "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()}. Keep store names private outside AITA."
-        ),
-        listOf(
-          "AITA защита проверки: $recoveryContactGoodsName.",
-          "Путь проверки: $recoveryVerificationPathRu.",
-          "Оценка проверки $recoveryVerificationScore/100; причина $recoveryCauseScore/100; исключение $recoveryExceptionScore/100; журнал $recoveryLedgerScore/100; уверенность $recoveryConfidenceScore/100.",
-          "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()}. Названия магазинов держите приватными вне AITA."
-        ),
-        listOf(
-          "AITA тексеру қорғаны: $recoveryContactGoodsName.",
-          "Тексеру жолы: $recoveryVerificationPathKk.",
-          "Тексеру ұпайы $recoveryVerificationScore/100; себеп $recoveryCauseScore/100; ерекше $recoveryExceptionScore/100; журнал $recoveryLedgerScore/100; сенім $recoveryConfidenceScore/100.",
-          "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()}. AITA сыртында дүкен атауларын құпия ұстаңыз."
-        )
-      )
-
-      val recoveryApprovalScore = (
-          recoveryVerificationScore / 3 +
-          recoveryExceptionScore / 4 +
-          recoveryCommitScore / 5 +
-          recoveryAllocationScore / 6 +
-          recoveryClosureScore / 6 +
-          duePressure +
+        }
+        val verificationPressure = supplierDashboardChunk {
           when (recoveryVerificationLane) {
-            "verify_blocked" -> 20
-            "verify_cause_record" -> 12
-            "verify_store_answer" -> 10
-            "verify_source_proof" -> 9
-            "verify_pack_split" -> 8
-            "verify_ready" -> -9
-            else -> 1
-          } +
-          when (recoveryExceptionLane) {
-            "exception_stop_pack" -> 16
-            "exception_cancel_review" -> 13
-            "exception_substitute" -> 9
-            "exception_sourcing" -> 8
-            "exception_allocation" -> 7
-            "exception_ready" -> -7
-            else -> 1
-          } +
-          when (recoveryPackGuardLane) {
-            "block_pack" -> 14
-            "proof_before_pack" -> 9
-            "split_pack_only" -> 6
-            "safe_to_pack" -> -4
-            else -> 1
-          } +
-          when (recoveryCommitLane) {
-            "commit_blocked" -> 11
-            "commit_store_today" -> 8
-            "commit_source_eta" -> 7
-            "commit_split_eta" -> 5
-            "commit_ready" -> -5
-            else -> 1
-          } +
-          (if (recoveryLedgerLane == "ledger_ready") -4 else 4) +
-          (if (recoveryConfidenceLane == "ready_to_recover") -5 else 5)
-        ).coerceIn(0, 100)
-      val recoveryApprovalLane = when {
-        recoveryVerificationLane == "verify_blocked" || recoveryExceptionLane == "exception_stop_pack" || recoveryPackGuardLane == "block_pack" || recoveryCommitLane == "commit_blocked" -> "approval_blocked"
-        recoveryExceptionLane == "exception_cancel_review" || recoveryCauseLane == "exception_cause" || recoveryCauseLane == "promise_conflict_cause" || recoveryApprovalScore >= 78 -> "approval_manager_review"
-        recoveryVerificationLane == "verify_store_answer" || recoveryOwnerLane == "store_contact" || recoveryContactLane == "store_call" || recoveryPromiseShieldLane == "store_answer_needed" -> "approval_store_ack"
-        recoveryVerificationLane == "verify_source_proof" || recoveryOwnerLane == "upstream_sourcing" || recoveryContactLane == "upstream_request" || recoveryCommitLane == "commit_source_eta" -> "approval_source_ack"
-        recoveryVerificationLane == "verify_pack_split" || recoveryPackGuardLane == "proof_before_pack" || recoveryPackGuardLane == "split_pack_only" || recoveryCommandLane == "split_and_ship" -> "approval_pack_lead"
-        recoveryVerificationLane == "verify_ready" && recoveryLedgerLane == "ledger_ready" && recoveryClosureLane == "ready_with_guard" -> "approval_ready"
-        recoveryCommitLane == "commit_ready" && recoveryAllocationLane == "allocation_ready" && recoveryExceptionLane == "exception_ready" && recoveryCauseLane == "cause_ready" -> "approval_ready"
-        else -> "approval_watch"
-      }
-      val recoveryApprovalHint = when (recoveryApprovalLane) {
-        "approval_blocked" -> supplierDashboardJoinedMessage(
-          listOf("Approval gate: recovery is blocked. Keep packflow stopped until verification, promise, and exception blockers are signed off."),
-          listOf("Шлюз согласования: восстановление заблокировано. Держите сборку остановленной, пока проверка, обещание и исключения не согласованы."),
-          listOf("Бекіту қақпасы: қалпына келтіру бөгелді. Тексеру, уәде және ерекше бөгеттер бекітілгенше жинауды тоқтатыңыз.")
-        )
-        "approval_manager_review" -> supplierDashboardJoinedMessage(
-          listOf("Approval gate: manager review is needed before cancel, substitute, or unsafe-promise decisions move downstream."),
-          listOf("Шлюз согласования: перед отменой, заменой или небезопасным обещанием вниз нужен обзор руководителя."),
-          listOf("Бекіту қақпасы: бас тарту, ауыстыру немесе қауіпсіз емес уәде төменге кетпей тұрып басқарушы қарауы керек.")
-        )
-        "approval_store_ack" -> supplierDashboardJoinedMessage(
-          listOf("Approval gate: store or buyer acknowledgement is the missing sign-off. Capture substitute, delay, or cancel answer inside AITA."),
-          listOf("Шлюз согласования: не хватает подтверждения магазина или покупателя. Зафиксируйте ответ замена/задержка/отмена в AITA."),
-          listOf("Бекіту қақпасы: дүкен немесе сатып алушы растауы жетіспейді. Ауыстыру/кідіріс/бас тарту жауабын AITA ішінде сақтаңыз.")
-        )
-        "approval_source_ack" -> supplierDashboardJoinedMessage(
-          listOf("Approval gate: upstream acknowledgement is required. Save reserve, ETA, no-stock, or substitute proof before promising recovery."),
-          listOf("Шлюз согласования: нужно подтверждение выше по цепочке. Сохраните резерв, срок, отсутствие или замену до обещания восстановления."),
-          listOf("Бекіту қақпасы: жоғары арна растауы керек. Қалпына келтіру уәдесіне дейін резерв, мерзім, қор жоқ немесе ауыстыру дәлелін сақтаңыз.")
-        )
-        "approval_pack_lead" -> supplierDashboardJoinedMessage(
-          listOf("Approval gate: pack lead must approve guarded quantity, split note, and remaining-shortage visibility before dispatch."),
-          listOf("Шлюз согласования: лидер сборки должен согласовать защищённое количество, заметку разделения и видимость остатка до отправки."),
-          listOf("Бекіту қақпасы: жөнелтуге дейін жинау жетекшісі қорғалған санды, бөлу жазбасын және қалған жетіспеуді бекітуі керек.")
-        )
-        "approval_ready" -> supplierDashboardJoinedMessage(
-          listOf("Approval gate: sign-off is ready. Move only the verified recovery step and keep any remaining shortage open."),
-          listOf("Шлюз согласования: согласование готово. Двигайте только проверенный шаг восстановления и оставьте остаток недопоставки открытым."),
-          listOf("Бекіту қақпасы: бекіту дайын. Тек тексерілген қалпына келтіру қадамын қозғап, қалған жетіспеуді ашық қалдырыңыз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Approval gate: watch approvals after each answer so quiet shortages do not bypass proof or owner sign-off."),
-          listOf("Шлюз согласования: следите за согласованиями после каждого ответа, чтобы тихие недопоставки не обходили доказательство или ответственного."),
-          listOf("Бекіту қақпасы: тыныш жетіспеулер дәлел немесе жауапты бекітуін айналып өтпеуі үшін әр жауаптан кейін бақылаңыз.")
-        )
-      }
-      val recoveryApprovalChecklist = when (recoveryApprovalLane) {
-        "approval_blocked" -> supplierDashboardJoinedMessage(
-          listOf("□ Stop packflow\n□ Name sign-off owner\n□ Attach proof or answer\n□ Re-open approval before dispatch"),
-          listOf("□ Остановить сборку\n□ Назначить ответственного за согласование\n□ Прикрепить доказательство или ответ\n□ Повторно открыть согласование до отправки"),
-          listOf("□ Жинауды тоқтату\n□ Бекіту жауаптысын атау\n□ Дәлел немесе жауап тіркеу\n□ Жөнелтуге дейін бекітуді қайта ашу")
-        )
-        "approval_manager_review" -> supplierDashboardJoinedMessage(
-          listOf("□ Review cancel/substitute risk\n□ Confirm downstream promise\n□ Save manager note\n□ Tell store safe answer"),
-          listOf("□ Проверить риск отмены/замены\n□ Подтвердить нижнее обещание\n□ Сохранить заметку руководителя\n□ Сообщить магазину безопасный ответ"),
-          listOf("□ Бас тарту/ауыстыру тәуекелін қарау\n□ Төменгі уәдені растау\n□ Басқарушы жазбасын сақтау\n□ Дүкенге қауіпсіз жауап беру")
-        )
-        "approval_store_ack" -> supplierDashboardJoinedMessage(
-          listOf("□ Contact store/buyer\n□ Save acknowledgement\n□ Refresh promise shield\n□ Set next follow-up"),
-          listOf("□ Связаться с магазином/покупателем\n□ Сохранить подтверждение\n□ Обновить щит обещания\n□ Назначить следующий контроль"),
-          listOf("□ Дүкен/сатып алушымен байланысу\n□ Растауды сақтау\n□ Уәде қалқанын жаңарту\n□ Келесі бақылауды қою")
-        )
-        "approval_source_ack" -> supplierDashboardJoinedMessage(
-          listOf("□ Ask upstream owner\n□ Save reserve/ETA proof\n□ Mirror safe ETA to store\n□ Keep missing qty open"),
-          listOf("□ Спросить ответственного выше\n□ Сохранить резерв/срок\n□ Передать безопасный срок магазину\n□ Оставить недостачу открытой"),
-          listOf("□ Жоғары жауаптыдан сұрау\n□ Резерв/мерзім дәлелін сақтау\n□ Қауіпсіз мерзімді дүкенге беру\n□ Жетіспеуді ашық қалдыру")
-        )
-        "approval_pack_lead" -> supplierDashboardJoinedMessage(
-          listOf("□ Confirm guarded quantity\n□ Attach split pack note\n□ Block over-pack\n□ Dispatch approved quantity only"),
-          listOf("□ Подтвердить защищённое количество\n□ Прикрепить заметку разделения\n□ Заблокировать пересборку\n□ Отправить только согласованное количество"),
-          listOf("□ Қорғалған санды растау\n□ Бөлінген жинау жазбасын тіркеу\n□ Артық жинауды бұғаттау\n□ Тек бекітілген санды жөнелту")
-        )
-        "approval_ready" -> supplierDashboardJoinedMessage(
-          listOf("□ Move approved recovery\n□ Close verified step only\n□ Keep residual shortage visible\n□ Recheck after promise change"),
-          listOf("□ Двигать согласованное восстановление\n□ Закрыть только проверенный шаг\n□ Оставить остаток видимым\n□ Перепроверить при изменении обещания"),
-          listOf("□ Бекітілген қалпына келтіруді қозғау\n□ Тек тексерілген қадамды жабу\n□ Қалдық жетіспеуді көрінетін ұстау\n□ Уәде өзгерсе қайта тексеру")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("□ Watch approval score\n□ Refresh after answer\n□ Keep owner visible\n□ Escalate if gate blocks"),
-          listOf("□ Следить за оценкой согласования\n□ Обновить после ответа\n□ Держать ответственного видимым\n□ Эскалировать при блокировке шлюза"),
-          listOf("□ Бекіту ұпайын бақылау\n□ Жауаптан кейін жаңарту\n□ Жауаптыны көрінетін ұстау\n□ Қақпа бөгесе көтеру")
-        )
-      }
-      val recoveryApprovalPathMain = when (recoveryApprovalLane) {
-        "approval_blocked" -> "approval blocked until proof and promise are safe"
-        "approval_manager_review" -> "manager review before exception decision"
-        "approval_store_ack" -> "store acknowledgement required"
-        "approval_source_ack" -> "upstream acknowledgement required"
-        "approval_pack_lead" -> "pack lead approves guarded quantity"
-        "approval_ready" -> "approved recovery ready to move"
-        else -> "watch approval after each answer"
-      }
-      val recoveryApprovalPathRu = when (recoveryApprovalLane) {
-        "approval_blocked" -> "согласование заблокировано до безопасных доказательств и обещания"
-        "approval_manager_review" -> "обзор руководителя перед решением исключения"
-        "approval_store_ack" -> "нужно подтверждение магазина"
-        "approval_source_ack" -> "нужно подтверждение выше по цепочке"
-        "approval_pack_lead" -> "лидер сборки согласует защищённое количество"
-        "approval_ready" -> "согласованное восстановление готово к движению"
-        else -> "наблюдать согласование после каждого ответа"
-      }
-      val recoveryApprovalPathKk = when (recoveryApprovalLane) {
-        "approval_blocked" -> "дәлел және уәде қауіпсіз болғанша бекіту бөгелген"
-        "approval_manager_review" -> "ерекше шешімге дейін басқарушы қарауы"
-        "approval_store_ack" -> "дүкен растауы керек"
-        "approval_source_ack" -> "жоғары арна растауы керек"
-        "approval_pack_lead" -> "жинау жетекшісі қорғалған санды бекітеді"
-        "approval_ready" -> "бекітілген қалпына келтіру қозғауға дайын"
-        else -> "әр жауаптан кейін бекітуді бақылау"
-      }
-      val recoveryApprovalScript = supplierDashboardJoinedMessage(
-        listOf(
-          "AITA approval gate: $recoveryContactGoodsName.",
-          "Approval path: $recoveryApprovalPathMain.",
-          "Approval score $recoveryApprovalScore/100; verification $recoveryVerificationScore/100; exception $recoveryExceptionScore/100; commit $recoveryCommitScore/100.",
-          "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()}. Keep store names private outside AITA."
-        ),
-        listOf(
-          "AITA шлюз согласования: $recoveryContactGoodsName.",
-          "Путь согласования: $recoveryApprovalPathRu.",
-          "Оценка согласования $recoveryApprovalScore/100; проверка $recoveryVerificationScore/100; исключение $recoveryExceptionScore/100; обязательство $recoveryCommitScore/100.",
-          "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()}. Названия магазинов держите приватными вне AITA."
-        ),
-        listOf(
-          "AITA бекіту қақпасы: $recoveryContactGoodsName.",
-          "Бекіту жолы: $recoveryApprovalPathKk.",
-          "Бекіту ұпайы $recoveryApprovalScore/100; тексеру $recoveryVerificationScore/100; ерекше $recoveryExceptionScore/100; міндеттеме $recoveryCommitScore/100.",
-          "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()}. AITA сыртында дүкен атауларын құпия ұстаңыз."
-        )
-      )
-      val recoveryExecutionScore = (
-          recoveryApprovalScore / 3 +
-          recoveryVerificationScore / 5 +
-          recoveryCommandScore / 6 +
-          recoveryCommitScore / 7 +
-          recoveryPromiseShieldScore / 7 +
-          recoveryExceptionScore / 8 +
-          recoveryAllocationScore / 8 +
-          duePressure / 2 +
-          when (recoveryApprovalLane) {
-            "approval_blocked" -> 18
-            "approval_manager_review" -> 14
-            "approval_store_ack" -> 10
-            "approval_source_ack" -> 9
-            "approval_pack_lead" -> 8
-            "approval_ready" -> -8
-            else -> 1
-          } +
-          when (recoveryVerificationLane) {
-            "verify_blocked" -> 16
-            "verify_cause_record" -> 10
+            "verify_blocked" -> 14
+            "verify_cause_record" -> 11
             "verify_store_answer" -> 8
             "verify_source_proof" -> 7
             "verify_pack_split" -> 6
-            "verify_ready" -> -7
-            else -> 1
-          } +
-          when (recoveryCommandLane) {
-            "stop_pack" -> 12
-            "call_store" -> 8
-            "source_now" -> 7
-            "split_and_ship" -> 6
-            "ready_with_note" -> -5
+            "verify_ready" -> -4
             else -> 1
           }
-        ).coerceIn(0, 100)
-      val recoveryExecutionLane = when {
-        recoveryApprovalLane == "approval_blocked" || recoveryVerificationLane == "verify_blocked" || recoveryExceptionLane == "exception_stop_pack" || recoveryPackGuardLane == "block_pack" -> "execution_blocked"
-        recoveryApprovalLane == "approval_store_ack" || recoveryVerificationLane == "verify_store_answer" || recoveryContactLane == "store_call" || recoveryPromiseShieldLane == "store_answer_needed" -> "execute_store_call"
-        recoveryApprovalLane == "approval_source_ack" || recoveryVerificationLane == "verify_source_proof" || recoveryCommitLane == "commit_source_eta" || recoveryContactLane == "upstream_request" -> "execute_source_eta"
-        recoveryApprovalLane == "approval_pack_lead" || recoveryVerificationLane == "verify_pack_split" || recoveryCommandLane == "split_and_ship" || recoveryPackGuardLane == "split_pack_only" || recoveryAllocationLane == "fair_split_needed" -> "execute_split_pack"
-        recoveryApprovalLane == "approval_ready" && recoveryVerificationLane == "verify_ready" && (recoveryConfidenceLane == "ready_to_recover" || recoveryCommandLane == "ready_with_note" || recoveryClosureLane == "ready_with_guard" || recoveryLedgerLane == "ledger_ready") -> "execute_ship_ready"
-        else -> "execution_watch"
-      }
-      val recoveryExecutionHint = when (recoveryExecutionLane) {
-        "execution_blocked" -> supplierDashboardJoinedMessage(
-          listOf("Execution gate: do not move the recovery yet. A blocker, verification gap, or unsafe pack guard still needs proof in AITA."),
-          listOf("Шлюз выполнения: пока не двигайте восстановление. Блокер, пробел проверки или небезопасная сборка требуют доказательства в AITA."),
-          listOf("Орындау қақпасы: қалпына келтіруді әлі қозғамаңыз. Бөгет, тексеру бос жері немесе қауіпсіз емес жинау AITA ішінде дәлел қажет етеді.")
-        )
-        "execute_store_call" -> supplierDashboardJoinedMessage(
-          listOf("Execution gate: the next real action is a store/buyer answer. Call, save the answer, then refresh promise shield before packing."),
-          listOf("Шлюз выполнения: следующее реальное действие — ответ магазина/покупателя. Позвоните, сохраните ответ и обновите щит обещания до сборки."),
-          listOf("Орындау қақпасы: келесі нақты әрекет — дүкен/сатып алушы жауабы. Қоңырау шалып, жауапты сақтап, жинауға дейін уәде қалқанын жаңартыңыз.")
-        )
-        "execute_source_eta" -> supplierDashboardJoinedMessage(
-          listOf("Execution gate: source or reserve the missing stock now. Record ETA, reserve, substitute, or no-stock proof before downstream promise changes."),
-          listOf("Шлюз выполнения: сейчас найдите или зарезервируйте недостающее наличие. Запишите срок, резерв, замену или отсутствие до изменения обещания вниз."),
-          listOf("Орындау қақпасы: жетіспейтін қорды қазір іздеп немесе резервтеңіз. Төменгі уәде өзгермей тұрып мерзім, резерв, ауыстыру немесе қор жоқ дәлелін жазыңыз.")
-        )
-        "execute_split_pack" -> supplierDashboardJoinedMessage(
-          listOf("Execution gate: split accepted quantity from missing quantity. Pack only the guarded amount and leave the residual shortage open."),
-          listOf("Шлюз выполнения: разделите принятое количество и недостачу. Собирайте только защищённое количество и оставьте остаток открытым."),
-          listOf("Орындау қақпасы: қабылданған сан мен жетіспеуді бөліңіз. Тек қорғалған санды жинап, қалдықты ашық қалдырыңыз.")
-        )
-        "execute_ship_ready" -> supplierDashboardJoinedMessage(
-          listOf("Execution gate: approved and verified. Move the guarded shipment/recovery step, then recheck any remaining shortage."),
-          listOf("Шлюз выполнения: согласовано и проверено. Двигайте защищённый шаг отправки/восстановления, затем перепроверьте остаток."),
-          listOf("Орындау қақпасы: бекітілді және тексерілді. Қорғалған жөнелту/қалпына келтіру қадамын қозғап, кейін қалған жетіспеуді қайта тексеріңіз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Execution gate: keep watching until approval, verification, and command lanes agree on one safe worker action."),
-          listOf("Шлюз выполнения: наблюдайте, пока согласование, проверка и команда не сойдутся в одно безопасное действие."),
-          listOf("Орындау қақпасы: бекіту, тексеру және команда бір қауіпсіз жұмыс әрекетіне келіскенше бақылаңыз.")
-        )
-      }
-      val recoveryExecutionChecklist = when (recoveryExecutionLane) {
-        "execution_blocked" -> supplierDashboardJoinedMessage(
-          listOf("□ Keep packflow stopped\n□ Name missing proof\n□ Re-open owner approval\n□ Re-score before execution"),
-          listOf("□ Держать сборку остановленной\n□ Назвать недостающее доказательство\n□ Переоткрыть согласование ответственного\n□ Пересчитать до выполнения"),
-          listOf("□ Жинауды тоқтату\n□ Жетіспейтін дәлелді атау\n□ Жауапты бекітуін қайта ашу\n□ Орындауға дейін қайта бағалау")
-        )
-        "execute_store_call" -> supplierDashboardJoinedMessage(
-          listOf("□ Call store/buyer\n□ Save substitute/delay/cancel answer\n□ Update promise shield\n□ Set follow-up time"),
-          listOf("□ Позвонить магазину/покупателю\n□ Сохранить замену/задержку/отмену\n□ Обновить щит обещания\n□ Поставить контроль"),
-          listOf("□ Дүкен/сатып алушыға қоңырау\n□ Ауыстыру/кідіріс/бас тартуды сақтау\n□ Уәде қалқанын жаңарту\n□ Бақылау уақытын қою")
-        )
-        "execute_source_eta" -> supplierDashboardJoinedMessage(
-          listOf("□ Ask upstream owner\n□ Save reserve or ETA\n□ Save no-stock proof if failed\n□ Mirror safe answer downstream"),
-          listOf("□ Спросить ответственного выше\n□ Сохранить резерв или срок\n□ При неудаче сохранить отсутствие\n□ Передать безопасный ответ вниз"),
-          listOf("□ Жоғары жауаптыдан сұрау\n□ Резерв немесе мерзімді сақтау\n□ Болмаса қор жоқ дәлелін сақтау\n□ Қауіпсіз жауапты төмен жеткізу")
-        )
-        "execute_split_pack" -> supplierDashboardJoinedMessage(
-          listOf("□ Lock approved quantity\n□ Mark residual shortage\n□ Attach split pack note\n□ Dispatch only guarded stock"),
-          listOf("□ Зафиксировать согласованное количество\n□ Отметить остаток недостачи\n□ Прикрепить заметку разделения\n□ Отправить только защищённое наличие"),
-          listOf("□ Бекітілген санды бекіту\n□ Қалдық жетіспеуді белгілеу\n□ Бөлу жинау жазбасын тіркеу\n□ Тек қорғалған қорды жөнелту")
-        )
-        "execute_ship_ready" -> supplierDashboardJoinedMessage(
-          listOf("□ Move approved shipment\n□ Keep proof attached\n□ Close completed quantity only\n□ Recheck leftover shortage"),
-          listOf("□ Двигать согласованную отправку\n□ Оставить доказательство\n□ Закрыть только выполненное количество\n□ Перепроверить остаток"),
-          listOf("□ Бекітілген жөнелтуді қозғау\n□ Дәлелді тіркеулі қалдыру\n□ Тек орындалған санды жабу\n□ Қалған жетіспеуді қайта тексеру")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("□ Watch execution score\n□ Refresh after answer\n□ Keep action owner visible\n□ Do not close silent shortages"),
-          listOf("□ Следить за оценкой выполнения\n□ Обновить после ответа\n□ Держать владельца действия видимым\n□ Не закрывать тихие недопоставки"),
-          listOf("□ Орындау ұпайын бақылау\n□ Жауаптан кейін жаңарту\n□ Әрекет иесін көрінетін ұстау\n□ Тыныш жетіспеулерді жаппау")
-        )
-      }
-      val recoveryExecutionPathMain = when (recoveryExecutionLane) {
-        "execution_blocked" -> "execution blocked until guard proof is safe"
-        "execute_store_call" -> "execute store answer before promise"
-        "execute_source_eta" -> "execute upstream reserve or ETA proof"
-        "execute_split_pack" -> "execute guarded split pack"
-        "execute_ship_ready" -> "approved recovery ready to ship or close"
-        else -> "watch execution until lanes agree"
-      }
-      val recoveryExecutionPathRu = when (recoveryExecutionLane) {
-        "execution_blocked" -> "выполнение заблокировано до безопасного доказательства"
-        "execute_store_call" -> "получить ответ магазина до обещания"
-        "execute_source_eta" -> "выполнить резерв или срок выше"
-        "execute_split_pack" -> "выполнить защищённое разделение сборки"
-        "execute_ship_ready" -> "согласованное восстановление готово к отправке или закрытию"
-        else -> "наблюдать выполнение, пока линии не совпадут"
-      }
-      val recoveryExecutionPathKk = when (recoveryExecutionLane) {
-        "execution_blocked" -> "қауіпсіз дәлелге дейін орындау бөгелген"
-        "execute_store_call" -> "уәдеге дейін дүкен жауабын орындау"
-        "execute_source_eta" -> "жоғары резерв немесе мерзім дәлелін орындау"
-        "execute_split_pack" -> "қорғалған бөлу жинауын орындау"
-        "execute_ship_ready" -> "бекітілген қалпына келтіру жөнелтуге немесе жабуға дайын"
-        else -> "арналар келіскенше орындауды бақылау"
-      }
-      val recoveryExecutionScript = supplierDashboardJoinedMessage(
-        listOf(
-          "AITA execution gate: $recoveryContactGoodsName.",
-          "Execution path: $recoveryExecutionPathMain.",
-          "Execution score $recoveryExecutionScore/100; approval $recoveryApprovalScore/100; verification $recoveryVerificationScore/100; command $recoveryCommandScore/100.",
-          "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()}. Move only the safe action and keep store names private outside AITA."
-        ),
-        listOf(
-          "AITA шлюз выполнения: $recoveryContactGoodsName.",
-          "Путь выполнения: $recoveryExecutionPathRu.",
-          "Оценка выполнения $recoveryExecutionScore/100; согласование $recoveryApprovalScore/100; проверка $recoveryVerificationScore/100; команда $recoveryCommandScore/100.",
-          "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()}. Двигайте только безопасное действие и держите названия магазинов приватными вне AITA."
-        ),
-        listOf(
-          "AITA орындау қақпасы: $recoveryContactGoodsName.",
-          "Орындау жолы: $recoveryExecutionPathKk.",
-          "Орындау ұпайы $recoveryExecutionScore/100; бекіту $recoveryApprovalScore/100; тексеру $recoveryVerificationScore/100; команда $recoveryCommandScore/100.",
-          "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()}. Тек қауіпсіз әрекетті қозғаңыз және AITA сыртында дүкен атауларын құпия ұстаңыз."
-        )
-      )
-
-      val recoveryReleaseScore = (
-          recoveryExecutionScore / 3 +
-          recoveryApprovalScore / 6 +
-          recoveryVerificationScore / 7 +
-          recoveryCommitScore / 7 +
-          recoveryImpactScore / 8 +
-          recoveryAllocationScore / 8 +
-          duePressure / 2 +
+        }
+        val approvalPressure = supplierDashboardChunk {
+          when (recoveryApprovalLane) {
+            "approval_blocked" -> 15
+            "approval_manager_review" -> 12
+            "approval_store_ack" -> 9
+            "approval_source_ack" -> 8
+            "approval_pack_lead" -> 7
+            "approval_ready" -> -5
+            else -> 1
+          }
+        }
+        val executionPressure = supplierDashboardChunk {
           when (recoveryExecutionLane) {
-            "execution_blocked" -> 18
-            "execute_store_call" -> 12
-            "execute_source_eta" -> 10
-            "execute_split_pack" -> 9
-            "execute_ship_ready" -> -8
-            else -> 1
-          } +
-          when (recoveryPromiseShieldLane) {
-            "promise_at_risk" -> 12
-            "store_answer_needed" -> 9
-            "source_before_promise" -> 8
-            "split_promise" -> 6
-            "promise_safe" -> -4
-            else -> 1
-          } +
-          when (recoveryPackGuardLane) {
-            "block_pack" -> 14
-            "split_pack_only" -> 7
-            "proof_before_pack" -> 6
-            "safe_to_pack" -> -4
+            "execution_blocked" -> 16
+            "execute_store_call" -> 10
+            "execute_source_eta" -> 9
+            "execute_split_pack" -> 8
+            "execute_ship_ready" -> -6
             else -> 1
           }
-        ).coerceIn(0, 100)
-      val recoveryReleaseLane = when {
-        recoveryExecutionLane == "execution_blocked" || recoveryApprovalLane == "approval_blocked" || recoveryVerificationLane == "verify_blocked" || recoveryPackGuardLane == "block_pack" || recoveryCommitLane == "commit_blocked" -> "release_blocked"
-        recoveryExecutionLane == "execute_store_call" || recoveryApprovalLane == "approval_store_ack" || recoveryPromiseShieldLane == "store_answer_needed" || recoveryImpactLane == "customer_promise_impact" -> "release_store_update"
-        recoveryExecutionLane == "execute_source_eta" || recoveryApprovalLane == "approval_source_ack" || recoveryCommitLane == "commit_source_eta" || recoveryPromiseShieldLane == "source_before_promise" -> "release_source_eta"
-        recoveryExecutionLane == "execute_split_pack" || recoveryApprovalLane == "approval_pack_lead" || recoveryPackGuardLane == "split_pack_only" || recoveryPromiseShieldLane == "split_promise" || recoveryAllocationLane == "fair_split_needed" -> "release_split_dispatch"
-        recoveryExecutionLane == "execute_ship_ready" && recoveryApprovalLane == "approval_ready" && recoveryVerificationLane == "verify_ready" && (recoveryCommitLane == "commit_ready" || recoveryImpactLane == "controlled_impact" || recoveryReleaseScore <= 38) -> "release_ready"
-        else -> "release_watch"
-      }
-      val recoveryReleaseHint = when (recoveryReleaseLane) {
-        "release_blocked" -> supplierDashboardJoinedMessage(
-          listOf("Release gate: keep the recovery out of dispatch. Proof, approval, promise, or pack guard is still unsafe."),
-          listOf("Шлюз выпуска: не отправляйте восстановление в доставку. Доказательство, согласование, обещание или защита сборки ещё небезопасны."),
-          listOf("Шығару қақпасы: қалпына келтіруді жөнелтуге жібермеңіз. Дәлел, бекіту, уәде немесе жинау қорғанысы әлі қауіпсіз емес.")
-        )
-        "release_store_update" -> supplierDashboardJoinedMessage(
-          listOf("Release gate: update the store or buyer before release. Save the safe answer, then refresh the downstream promise."),
-          listOf("Шлюз выпуска: обновите магазин или покупателя до выпуска. Сохраните безопасный ответ, затем обновите нижнее обещание."),
-          listOf("Шығару қақпасы: шығаруға дейін дүкенді немесе сатып алушыны жаңартыңыз. Қауіпсіз жауапты сақтап, төменгі уәдені жаңартыңыз.")
-        )
-        "release_source_eta" -> supplierDashboardJoinedMessage(
-          listOf("Release gate: wait for upstream reserve or ETA proof. Release only after the source answer is recorded in AITA."),
-          listOf("Шлюз выпуска: дождитесь резерва или срока выше по цепочке. Выпускайте только после записи ответа поиска в AITA."),
-          listOf("Шығару қақпасы: жоғары арна резервін немесе мерзім дәлелін күтіңіз. Іздеу жауабы AITA-ға жазылғаннан кейін ғана шығарыңыз.")
-        )
-        "release_split_dispatch" -> supplierDashboardJoinedMessage(
-          listOf("Release gate: split dispatch is allowed only for guarded accepted quantity. Keep missing stock visible as a second recovery step."),
-          listOf("Шлюз выпуска: разделённая отправка разрешена только для защищённого принятого количества. Держите недостачу видимой как второй шаг восстановления."),
-          listOf("Шығару қақпасы: бөлінген жөнелту тек қорғалған қабылданған санға рұқсат. Жетіспейтін қорды екінші қалпына келтіру қадамы ретінде көрінетін ұстаңыз.")
-        )
-        "release_ready" -> supplierDashboardJoinedMessage(
-          listOf("Release gate: the recovery step is safe to release. Dispatch the guarded quantity and keep any residual shortage open."),
-          listOf("Шлюз выпуска: шаг восстановления безопасен к выпуску. Отправьте защищённое количество и оставьте остаток недостачи открытым."),
-          listOf("Шығару қақпасы: қалпына келтіру қадамын шығару қауіпсіз. Қорғалған санды жөнелтіп, қалған жетіспеуді ашық қалдырыңыз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Release gate: watch execution, promise, and pack guard together so answered shortages do not slip into dispatch quietly."),
-          listOf("Шлюз выпуска: наблюдайте выполнение, обещание и защиту сборки вместе, чтобы отвеченные недопоставки тихо не ушли в отправку."),
-          listOf("Шығару қақпасы: жауапталған жетіспеулер үнсіз жөнелтуге кетпеуі үшін орындау, уәде және жинау қорғанысын бірге бақылаңыз.")
-        )
-      }
-      val recoveryReleaseChecklist = when (recoveryReleaseLane) {
-        "release_blocked" -> supplierDashboardJoinedMessage(
-          listOf("□ Keep dispatch blocked\n□ Name unsafe gate\n□ Attach missing proof\n□ Recheck release before packflow moves"),
-          listOf("□ Заблокировать отправку\n□ Назвать небезопасный шлюз\n□ Прикрепить недостающее доказательство\n□ Перепроверить выпуск до движения сборки"),
-          listOf("□ Жөнелтуді бұғаттау\n□ Қауіпсіз емес қақпаны атау\n□ Жетіспейтін дәлелді тіркеу\n□ Жинау қозғалғанша шығаруды қайта тексеру")
-        )
-        "release_store_update" -> supplierDashboardJoinedMessage(
-          listOf("□ Call/update store\n□ Save answer in AITA\n□ Refresh promise shield\n□ Release only after acknowledgement"),
-          listOf("□ Позвонить/обновить магазин\n□ Сохранить ответ в AITA\n□ Обновить щит обещания\n□ Выпускать только после подтверждения"),
-          listOf("□ Дүкенге қоңырау/жаңарту\n□ Жауапты AITA-ға сақтау\n□ Уәде қалқанын жаңарту\n□ Растаудан кейін ғана шығару")
-        )
-        "release_source_eta" -> supplierDashboardJoinedMessage(
-          listOf("□ Confirm upstream ETA\n□ Save reserve/no-stock proof\n□ Mirror safe ETA downstream\n□ Keep missing quantity open"),
-          listOf("□ Подтвердить срок выше\n□ Сохранить резерв/отсутствие\n□ Передать безопасный срок вниз\n□ Оставить недостачу открытой"),
-          listOf("□ Жоғары мерзімді растау\n□ Резерв/қор жоқ дәлелін сақтау\n□ Қауіпсіз мерзімді төмен жеткізу\n□ Жетіспеуді ашық қалдыру")
-        )
-        "release_split_dispatch" -> supplierDashboardJoinedMessage(
-          listOf("□ Lock accepted quantity\n□ Add split dispatch note\n□ Label residual shortage\n□ Release guarded stock only"),
-          listOf("□ Зафиксировать принятое количество\n□ Добавить заметку разделённой отправки\n□ Отметить остаток недостачи\n□ Выпустить только защищённый товар"),
-          listOf("□ Қабылданған санды бекіту\n□ Бөлінген жөнелту жазбасын қосу\n□ Қалдық жетіспеуді белгілеу\n□ Тек қорғалған қорды шығару")
-        )
-        "release_ready" -> supplierDashboardJoinedMessage(
-          listOf("□ Release guarded recovery\n□ Keep proof attached\n□ Close moved quantity only\n□ Schedule leftover follow-up"),
-          listOf("□ Выпустить защищённое восстановление\n□ Оставить доказательство прикреплённым\n□ Закрыть только перемещённое количество\n□ Запланировать контроль остатка"),
-          listOf("□ Қорғалған қалпына келтіруді шығару\n□ Дәлелді тіркеулі қалдыру\n□ Тек қозғалған санды жабу\n□ Қалдық бақылауын жоспарлау")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("□ Watch release score\n□ Refresh after execution changes\n□ Keep owner visible\n□ Do not auto-close residual shortage"),
-          listOf("□ Следить за оценкой выпуска\n□ Обновлять после изменений выполнения\n□ Держать ответственного видимым\n□ Не закрывать остаток автоматически"),
-          listOf("□ Шығару ұпайын бақылау\n□ Орындау өзгерсе жаңарту\n□ Жауаптыны көрінетін ұстау\n□ Қалдықты автоматты жаппау")
-        )
-      }
-      val recoveryReleasePathMain = when (recoveryReleaseLane) {
-        "release_blocked" -> "release blocked until proof, promise, and pack guard are safe"
-        "release_store_update" -> "store update required before release"
-        "release_source_eta" -> "upstream ETA proof required before release"
-        "release_split_dispatch" -> "split dispatch guarded quantity only"
-        "release_ready" -> "guarded recovery ready for release"
-        else -> "watch release gate after execution changes"
-      }
-      val recoveryReleasePathRu = when (recoveryReleaseLane) {
-        "release_blocked" -> "выпуск заблокирован до безопасных доказательств, обещания и сборки"
-        "release_store_update" -> "обновление магазина нужно до выпуска"
-        "release_source_eta" -> "доказательство срока выше нужно до выпуска"
-        "release_split_dispatch" -> "разделённая отправка только защищённого количества"
-        "release_ready" -> "защищённое восстановление готово к выпуску"
-        else -> "наблюдать шлюз выпуска после изменений выполнения"
-      }
-      val recoveryReleasePathKk = when (recoveryReleaseLane) {
-        "release_blocked" -> "дәлел, уәде және жинау қауіпсіз болғанша шығару бөгелген"
-        "release_store_update" -> "шығаруға дейін дүкенді жаңарту керек"
-        "release_source_eta" -> "шығаруға дейін жоғары мерзім дәлелі керек"
-        "release_split_dispatch" -> "тек қорғалған санды бөлінген жөнелту"
-        "release_ready" -> "қорғалған қалпына келтіру шығаруға дайын"
-        else -> "орындау өзгергеннен кейін шығару қақпасын бақылау"
-      }
-      val recoveryReleaseScript = supplierDashboardJoinedMessage(
-        listOf(
-          "AITA release gate: $recoveryContactGoodsName.",
-          "Release path: $recoveryReleasePathMain.",
-          "Release score $recoveryReleaseScore/100; execution $recoveryExecutionScore/100; approval $recoveryApprovalScore/100; promise ${recoveryPromiseShieldScore}/100.",
-          "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()}. Keep store names private outside AITA."
-        ),
-        listOf(
-          "AITA шлюз выпуска: $recoveryContactGoodsName.",
-          "Путь выпуска: $recoveryReleasePathRu.",
-          "Оценка выпуска $recoveryReleaseScore/100; выполнение $recoveryExecutionScore/100; согласование $recoveryApprovalScore/100; обещание ${recoveryPromiseShieldScore}/100.",
-          "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()}. Названия магазинов держите приватными вне AITA."
-        ),
-        listOf(
-          "AITA шығару қақпасы: $recoveryContactGoodsName.",
-          "Шығару жолы: $recoveryReleasePathKk.",
-          "Шығару ұпайы $recoveryReleaseScore/100; орындау $recoveryExecutionScore/100; бекіту $recoveryApprovalScore/100; уәде ${recoveryPromiseShieldScore}/100.",
-          "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()}. AITA сыртында дүкен атауларын құпия ұстаңыз."
-        )
-      )
-
-
-      val recoverySealScore = (
-          recoveryReleaseScore / 3 +
-          recoveryExecutionScore / 6 +
-          recoveryApprovalScore / 8 +
-          recoveryVerificationScore / 8 +
-          recoveryPromiseShieldScore / 8 +
-          recoveryLedgerScore / 9 +
-          duePressure / 2 +
+        }
+        val releasePressure = supplierDashboardChunk {
           when (recoveryReleaseLane) {
-            "release_blocked" -> 19
-            "release_store_update" -> 13
-            "release_source_eta" -> 11
-            "release_split_dispatch" -> 9
-            "release_ready" -> -9
-            else -> 1
-          } +
-          when (recoveryClosureLane) {
-            "blocked_open" -> 10
-            "needs_close_note" -> 6
-            "ready_with_guard" -> -4
-            else -> 1
-          } +
-          when (recoveryLedgerLane) {
-            "audit_blocker" -> 8
-            "decision_record" -> 5
-            "pack_record" -> 4
-            "ledger_ready" -> -4
-            else -> 1
-          }
-        ).coerceIn(0, 100)
-      val recoverySealLane = when {
-        recoveryReleaseLane == "release_blocked" || recoveryExecutionLane == "execution_blocked" || recoveryApprovalLane == "approval_blocked" || recoveryVerificationLane == "verify_blocked" -> "seal_blocked"
-        recoveryReleaseLane == "release_store_update" || recoveryContactLane == "store_call" || recoveryPromiseShieldLane == "store_answer_needed" || recoveryApprovalLane == "approval_store_ack" -> "seal_store_notice"
-        recoveryReleaseLane == "release_source_eta" || recoveryCommitLane == "commit_source_eta" || recoveryVerificationLane == "verify_source_proof" || recoveryContactLane == "upstream_request" -> "seal_source_trace"
-        recoveryReleaseLane == "release_split_dispatch" || recoveryPackGuardLane == "split_pack_only" || recoveryAllocationLane == "fair_split_needed" || recoveryExecutionLane == "execute_split_pack" -> "seal_split_manifest"
-        recoveryReleaseLane == "release_ready" && recoveryExecutionLane == "execute_ship_ready" && (recoveryVerificationLane == "verify_ready" || recoveryLedgerLane == "ledger_ready") && recoveryPromiseShieldLane != "promise_at_risk" -> "seal_ready"
-        else -> "seal_watch"
-      }
-      val recoverySealHint = when (recoverySealLane) {
-        "seal_blocked" -> supplierDashboardJoinedMessage(
-          listOf("Seal gate: do not let this shortage leave recovery. One blocker is still unsafe for dispatch or close."),
-          listOf("Штамп-шлюз: не выпускайте эту недопоставку из восстановления. Один блокер ещё небезопасен для отправки или закрытия."),
-          listOf("Мөр қақпасы: бұл жетіспеуді қалпына келтіруден шығармаңыз. Бір бөгет әлі жөнелтуге немесе жабуға қауіпсіз емес.")
-        )
-        "seal_store_notice" -> supplierDashboardJoinedMessage(
-          listOf("Seal gate: final store notice is needed before the recovery can be treated as safe."),
-          listOf("Штамп-шлюз: финальное уведомление магазина нужно до того, как восстановление можно считать безопасным."),
-          listOf("Мөр қақпасы: қалпына келтіруді қауіпсіз деу үшін дүкенге соңғы хабарлама керек.")
-        )
-        "seal_source_trace" -> supplierDashboardJoinedMessage(
-          listOf("Seal gate: attach upstream ETA/reserve/no-stock trace before releasing the worker step."),
-          listOf("Штамп-шлюз: прикрепите след срока/резерва/отсутствия выше по цепочке до выпуска рабочего шага."),
-          listOf("Мөр қақпасы: жұмыс қадамын шығаруға дейін жоғары мерзім/резерв/қор жоқ ізін тіркеңіз.")
-        )
-        "seal_split_manifest" -> supplierDashboardJoinedMessage(
-          listOf("Seal gate: split manifest must clearly separate accepted shipped quantity from remaining shortage."),
-          listOf("Штамп-шлюз: разделённая ведомость должна ясно отделять отправляемое принятое количество от остатка недостачи."),
-          listOf("Мөр қақпасы: бөлінген ведомость жөнелетін қабылданған санды қалған жетіспеуден анық бөлуі керек.")
-        )
-        "seal_ready" -> supplierDashboardJoinedMessage(
-          listOf("Seal gate: recovery is sealed for the guarded worker step. Move it, but keep any remaining shortage open."),
-          listOf("Штамп-шлюз: восстановление проштамповано для защищённого рабочего шага. Двигайте его, но остаток недостачи оставьте открытым."),
-          listOf("Мөр қақпасы: қалпына келтіру қорғалған жұмыс қадамына мөрленді. Оны қозғаңыз, бірақ қалған жетіспеуді ашық қалдырыңыз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Seal gate: keep the final release stamp visible until proof, promise, and split state stay aligned."),
-          listOf("Штамп-шлюз: держите финальный штамп выпуска видимым, пока доказательство, обещание и разделение не совпадут."),
-          listOf("Мөр қақпасы: дәлел, уәде және бөлу күйі сәйкес болғанша соңғы шығару мөрін көрінетін ұстаңыз.")
-        )
-      }
-      val recoverySealChecklist = when (recoverySealLane) {
-        "seal_blocked" -> supplierDashboardJoinedMessage(
-          listOf("□ Keep release blocked\n□ Name the unsafe gate\n□ Attach missing proof\n□ Recheck before dispatch"),
-          listOf("□ Оставить выпуск заблокированным\n□ Назвать небезопасный шлюз\n□ Прикрепить недостающее доказательство\n□ Перепроверить до отправки"),
-          listOf("□ Шығаруды бөгелген күйде ұстау\n□ Қауіпсіз емес қақпаны атау\n□ Жетіспейтін дәлелді тіркеу\n□ Жөнелтуден бұрын қайта тексеру")
-        )
-        "seal_store_notice" -> supplierDashboardJoinedMessage(
-          listOf("□ Send final store notice\n□ Save acknowledgement\n□ Refresh promise shield\n□ Seal only acknowledged quantity"),
-          listOf("□ Отправить финальное уведомление магазину\n□ Сохранить подтверждение\n□ Обновить щит обещания\n□ Штамповать только подтверждённое количество"),
-          listOf("□ Дүкенге соңғы хабарлама жіберу\n□ Растауды сақтау\n□ Уәде қалқанын жаңарту\n□ Тек расталған санды мөрлеу")
-        )
-        "seal_source_trace" -> supplierDashboardJoinedMessage(
-          listOf("□ Attach upstream answer\n□ Mark ETA/reserve/no-stock\n□ Mirror safe trace downstream\n□ Keep missing quantity visible"),
-          listOf("□ Прикрепить ответ выше\n□ Отметить срок/резерв/отсутствие\n□ Передать безопасный след вниз\n□ Держать недостачу видимой"),
-          listOf("□ Жоғары жауапты тіркеу\n□ Мерзім/резерв/қор жоқты белгілеу\n□ Қауіпсіз ізді төмен жеткізу\n□ Жетіспеуді көрінетін ұстау")
-        )
-        "seal_split_manifest" -> supplierDashboardJoinedMessage(
-          listOf("□ Lock shipped accepted quantity\n□ Label residual shortage\n□ Add second-drop promise\n□ Seal split manifest before release"),
-          listOf("□ Зафиксировать отправляемое принятое количество\n□ Отметить остаток недостачи\n□ Добавить обещание второй поставки\n□ Проштамповать разделённую ведомость до выпуска"),
-          listOf("□ Жөнелетін қабылданған санды бекіту\n□ Қалдық жетіспеуді белгілеу\n□ Екінші жеткізу уәдесін қосу\n□ Шығаруға дейін бөлінген ведомосты мөрлеу")
-        )
-        "seal_ready" -> supplierDashboardJoinedMessage(
-          listOf("□ Seal guarded worker step\n□ Dispatch safe quantity\n□ Close moved quantity only\n□ Schedule residual follow-up"),
-          listOf("□ Проштамповать защищённый рабочий шаг\n□ Отправить безопасное количество\n□ Закрыть только перемещённое количество\n□ Запланировать контроль остатка"),
-          listOf("□ Қорғалған жұмыс қадамын мөрлеу\n□ Қауіпсіз санды жөнелту\n□ Тек қозғалған санды жабу\n□ Қалдық бақылауын жоспарлау")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("□ Watch seal score\n□ Refresh after release changes\n□ Keep owner visible\n□ Do not close residual shortage silently"),
-          listOf("□ Следить за оценкой штампа\n□ Обновлять после изменений выпуска\n□ Держать ответственного видимым\n□ Не закрывать остаток тихо"),
-          listOf("□ Мөр ұпайын бақылау\n□ Шығару өзгерген соң жаңарту\n□ Жауаптыны көрінетін ұстау\n□ Қалдықты үнсіз жаппау")
-        )
-      }
-      val recoverySealPathMain = when (recoverySealLane) {
-        "seal_blocked" -> "final seal blocked until unsafe gate is resolved"
-        "seal_store_notice" -> "final store notice required before seal"
-        "seal_source_trace" -> "upstream trace required before seal"
-        "seal_split_manifest" -> "split manifest must be sealed before release"
-        "seal_ready" -> "guarded recovery sealed for release"
-        else -> "watch final seal until proof and promise align"
-      }
-      val recoverySealPathRu = when (recoverySealLane) {
-        "seal_blocked" -> "финальный штамп заблокирован до решения небезопасного шлюза"
-        "seal_store_notice" -> "финальное уведомление магазина нужно до штампа"
-        "seal_source_trace" -> "след выше по цепочке нужен до штампа"
-        "seal_split_manifest" -> "разделённую ведомость нужно проштамповать до выпуска"
-        "seal_ready" -> "защищённое восстановление проштамповано к выпуску"
-        else -> "наблюдать финальный штамп, пока доказательство и обещание не совпадут"
-      }
-      val recoverySealPathKk = when (recoverySealLane) {
-        "seal_blocked" -> "қауіпсіз емес қақпа шешілгенше соңғы мөр бөгелген"
-        "seal_store_notice" -> "мөрге дейін дүкенге соңғы хабарлама керек"
-        "seal_source_trace" -> "мөрге дейін жоғары арна ізі керек"
-        "seal_split_manifest" -> "шығаруға дейін бөлінген ведомосты мөрлеу керек"
-        "seal_ready" -> "қорғалған қалпына келтіру шығаруға мөрленді"
-        else -> "дәлел мен уәде сәйкес болғанша соңғы мөрді бақылау"
-      }
-      val recoverySealScript = supplierDashboardJoinedMessage(
-        listOf(
-          "AITA seal gate: $recoveryContactGoodsName.",
-          "Seal path: $recoverySealPathMain.",
-          "Seal score $recoverySealScore/100; release $recoveryReleaseScore/100; execution $recoveryExecutionScore/100; verification $recoveryVerificationScore/100.",
-          "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()}. Keep store names private outside AITA."
-        ),
-        listOf(
-          "AITA штамп-шлюз: $recoveryContactGoodsName.",
-          "Путь штампа: $recoverySealPathRu.",
-          "Оценка штампа $recoverySealScore/100; выпуск $recoveryReleaseScore/100; выполнение $recoveryExecutionScore/100; проверка $recoveryVerificationScore/100.",
-          "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()}. Названия магазинов держите приватными вне AITA."
-        ),
-        listOf(
-          "AITA мөр қақпасы: $recoveryContactGoodsName.",
-          "Мөр жолы: $recoverySealPathKk.",
-          "Мөр ұпайы $recoverySealScore/100; шығару $recoveryReleaseScore/100; орындау $recoveryExecutionScore/100; тексеру $recoveryVerificationScore/100.",
-          "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()}. AITA сыртында дүкен атауларын құпия ұстаңыз."
-        )
-      )
-      val recoveryCloseoutScore = (
-          recoverySealScore / 3 +
-          recoveryReleaseScore / 5 +
-          recoveryExecutionScore / 7 +
-          recoveryVerificationScore / 8 +
-          recoveryApprovalScore / 8 +
-          recoveryLedgerScore / 10 +
-          recoveryClosureScore / 10 +
-          duePressure / 2 +
-          when (recoverySealLane) {
-            "seal_blocked" -> 18
-            "seal_store_notice" -> 11
-            "seal_source_trace" -> 9
-            "seal_split_manifest" -> 8
-            "seal_ready" -> -8
-            else -> 1
-          } +
-          when (recoveryReleaseLane) {
-            "release_blocked" -> 15
-            "release_store_update" -> 9
-            "release_source_eta" -> 8
-            "release_split_dispatch" -> 7
+            "release_blocked" -> 17
+            "release_store_update" -> 11
+            "release_source_eta" -> 10
+            "release_split_dispatch" -> 8
             "release_ready" -> -6
             else -> 1
-          } +
-          when (recoveryLedgerLane) {
-            "audit_blocker" -> 10
-            "decision_record" -> 7
-            "pack_record" -> 5
-            "ledger_ready" -> -5
-            else -> 1
-          } +
-          when (recoveryClosureLane) {
-            "blocked_open" -> 12
-            "needs_close_note" -> 7
-            "ready_with_guard" -> -5
+          }
+        }
+        val sealPressure = supplierDashboardChunk {
+          when (recoverySealLane) {
+            "seal_blocked" -> 18
+            "seal_store_notice" -> 12
+            "seal_source_trace" -> 10
+            "seal_split_manifest" -> 8
+            "seal_ready" -> -7
             else -> 1
           }
-        ).coerceIn(0, 100)
-      val recoveryCloseoutLane = when {
-        recoverySealLane == "seal_blocked" || recoveryReleaseLane == "release_blocked" || recoveryExecutionLane == "execution_blocked" || recoveryApprovalLane == "approval_blocked" || recoveryVerificationLane == "verify_blocked" || recoveryClosureLane == "blocked_open" -> "closeout_blocked"
-        recoverySealLane == "seal_store_notice" || recoveryReleaseLane == "release_store_update" || recoveryApprovalLane == "approval_store_ack" || recoveryVerificationLane == "verify_store_answer" || recoveryPromiseShieldLane == "store_answer_needed" -> "closeout_store_notice"
-        recoverySealLane == "seal_source_trace" || recoveryReleaseLane == "release_source_eta" || recoveryApprovalLane == "approval_source_ack" || recoveryVerificationLane == "verify_source_proof" || recoveryCommitLane == "commit_source_eta" -> "closeout_source_trace"
-        recoverySealLane == "seal_split_manifest" || recoveryReleaseLane == "release_split_dispatch" || recoveryExecutionLane == "execute_split_pack" || recoveryPackGuardLane == "split_pack_only" || recoveryAllocationLane == "fair_split_needed" || recoveryAllocationLane == "priority_allocation" -> "closeout_split_leftover"
-        recoverySealLane == "seal_ready" && recoveryReleaseLane == "release_ready" && recoveryExecutionLane == "execute_ship_ready" && (recoveryVerificationLane == "verify_ready" || recoveryLedgerLane == "ledger_ready") && recoveryCloseoutScore <= 42 -> "closeout_ready"
-        else -> "closeout_watch"
-      }
-      val recoveryCloseoutHint = when (recoveryCloseoutLane) {
-        "closeout_blocked" -> supplierDashboardJoinedMessage(
-          listOf("Closeout guard: do not close or archive this recovery yet. One of the seal, release, execution, approval, verification, or closure gates is still blocking."),
-          listOf("Защита закрытия: ещё не закрывайте и не архивируйте это восстановление. Один из шлюзов штампа, выпуска, выполнения, согласования, проверки или закрытия всё ещё блокирует."),
-          listOf("Жабу қорғаны: бұл қалпына келтіруді әлі жаппаңыз және архивтемеңіз. Мөр, шығару, орындау, бекіту, тексеру немесе жабу қақпасының бірі әлі бөгеп тұр.")
-        )
-        "closeout_store_notice" -> supplierDashboardJoinedMessage(
-          listOf("Closeout guard: store or buyer notice is the last mile. Save the acknowledged answer before marking the recovery closed."),
-          listOf("Защита закрытия: уведомление магазина или покупателя — последний шаг. Сохраните подтверждённый ответ до отметки восстановления закрытым."),
-          listOf("Жабу қорғаны: дүкен немесе сатып алушы хабарламасы соңғы қадам. Қалпына келтіруді жабық деп белгілемей тұрып расталған жауапты сақтаңыз.")
-        )
-        "closeout_source_trace" -> supplierDashboardJoinedMessage(
-          listOf("Closeout guard: upstream reserve, no-stock proof, or ETA trace must be attached before the recovery can leave the watch list."),
-          listOf("Защита закрытия: резерв выше, доказательство отсутствия товара или срок должны быть прикреплены до ухода восстановления из списка наблюдения."),
-          listOf("Жабу қорғаны: қалпына келтіру бақылаудан шықпас бұрын жоғары резерв, қор жоқ дәлелі немесе мерзім ізі тіркелуі керек.")
-        )
-        "closeout_split_leftover" -> supplierDashboardJoinedMessage(
-          listOf("Closeout guard: split recovery needs a leftover-shortage note. Close only shipped/guarded quantity and leave the rest visible."),
-          listOf("Защита закрытия: разделённому восстановлению нужна заметка остаточной недопоставки. Закрывайте только отправленное/защищённое количество и оставляйте остаток видимым."),
-          listOf("Жабу қорғаны: бөлінген қалпына келтіруге қалған жетіспеу жазбасы керек. Тек жөнелтілген/қорғалған санды жауып, қалдығын көрінетін қалдырыңыз.")
-        )
-        "closeout_ready" -> supplierDashboardJoinedMessage(
-          listOf("Closeout guard: ready to close with proof. Archive the recovery note, keep residual shortage open, and let dispatch proceed only for safe quantity."),
-          listOf("Защита закрытия: готово к закрытию с доказательством. Архивируйте заметку восстановления, оставьте остаточную недопоставку открытой и двигайте отправку только по безопасному количеству."),
-          listOf("Жабу қорғаны: дәлелмен жабуға дайын. Қалпына келтіру жазбасын архивтеп, қалдық жетіспеуді ашық қалдырып, жөнелтуді тек қауіпсіз санмен жүргізіңіз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Closeout guard: keep watching until seal, release, proof, and leftover notes agree. This prevents silent closure of an answered shortage."),
-          listOf("Защита закрытия: наблюдайте, пока штамп, выпуск, доказательство и заметки остатка не согласованы. Это не даёт отвеченной недопоставке закрыться тихо."),
-          listOf("Жабу қорғаны: мөр, шығару, дәлел және қалдық жазбалары келісілгенше бақылаңыз. Бұл жауапталған жетіспеудің үнсіз жабылуына жол бермейді.")
-        )
-      }
-      val recoveryCloseoutChecklist = when (recoveryCloseoutLane) {
-        "closeout_blocked" -> supplierDashboardJoinedMessage(
-          listOf("□ Keep recovery open\n□ Name blocking gate\n□ Attach missing proof\n□ Recheck before archive"),
-          listOf("□ Оставить восстановление открытым\n□ Назвать блокирующий шлюз\n□ Прикрепить недостающее доказательство\n□ Перепроверить до архива"),
-          listOf("□ Қалпына келтіруді ашық қалдыру\n□ Бөгейтін қақпаны атау\n□ Жетіспейтін дәлелді тіркеу\n□ Архивке дейін қайта тексеру")
-        )
-        "closeout_store_notice" -> supplierDashboardJoinedMessage(
-          listOf("□ Save store/buyer answer\n□ Refresh promise note\n□ Mark acknowledged quantity\n□ Keep privacy-safe brief"),
-          listOf("□ Сохранить ответ магазина/покупателя\n□ Обновить заметку обещания\n□ Отметить подтверждённое количество\n□ Держать приватную сводку"),
-          listOf("□ Дүкен/сатып алушы жауабын сақтау\n□ Уәде жазбасын жаңарту\n□ Расталған санды белгілеу\n□ Құпия қысқаша мәтінді сақтау")
-        )
-        "closeout_source_trace" -> supplierDashboardJoinedMessage(
-          listOf("□ Attach upstream proof\n□ Save ETA/no-stock result\n□ Mirror safe note downstream\n□ Leave unfilled quantity open"),
-          listOf("□ Прикрепить доказательство выше\n□ Сохранить срок/нет товара\n□ Передать безопасную заметку вниз\n□ Оставить незаполненное количество открытым"),
-          listOf("□ Жоғары дәлелді тіркеу\n□ Мерзім/қор жоқ нәтижесін сақтау\n□ Қауіпсіз жазбаны төмен жеткізу\n□ Толмаған санды ашық қалдыру")
-        )
-        "closeout_split_leftover" -> supplierDashboardJoinedMessage(
-          listOf("□ Close shipped quantity only\n□ Label leftover shortage\n□ Schedule second drop or cancel review\n□ Keep split manifest attached"),
-          listOf("□ Закрыть только отправленное количество\n□ Обозначить остаточную недопоставку\n□ Запланировать вторую поставку или отмену\n□ Оставить разделённую ведомость"),
-          listOf("□ Тек жөнелтілген санды жабу\n□ Қалған жетіспеуді белгілеу\n□ Екінші жеткізу немесе бас тартуды жоспарлау\n□ Бөлінген ведомосты қалдыру")
-        )
-        "closeout_ready" -> supplierDashboardJoinedMessage(
-          listOf("□ Archive closeout note\n□ Keep residual shortage visible\n□ Release safe dispatch quantity\n□ Confirm next follow-up is set"),
-          listOf("□ Архивировать заметку закрытия\n□ Оставить остаточную недопоставку видимой\n□ Выпустить безопасное количество\n□ Проверить следующий контроль"),
-          listOf("□ Жабу жазбасын архивтеу\n□ Қалдық жетіспеуді көрінетін қалдыру\n□ Қауіпсіз санды жөнелту\n□ Келесі бақылаудың қойылғанын растау")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("□ Watch seal and release\n□ Keep owner visible\n□ Refresh proof after answer\n□ Avoid silent close"),
-          listOf("□ Наблюдать штамп и выпуск\n□ Держать ответственного видимым\n□ Обновить доказательство после ответа\n□ Не закрывать тихо"),
-          listOf("□ Мөр мен шығаруды бақылау\n□ Жауаптыны көрінетін ұстау\n□ Жауаптан кейін дәлелді жаңарту\n□ Үнсіз жаппау")
-        )
-      }
-      val recoveryCloseoutPathMain = when (recoveryCloseoutLane) {
-        "closeout_blocked" -> "blocked closeout"
-        "closeout_store_notice" -> "store notice before close"
-        "closeout_source_trace" -> "source trace before close"
-        "closeout_split_leftover" -> "split leftover kept open"
-        "closeout_ready" -> "proof-backed closeout ready"
-        else -> "closeout watch"
-      }
-      val recoveryCloseoutPathRu = when (recoveryCloseoutLane) {
-        "closeout_blocked" -> "закрытие заблокировано"
-        "closeout_store_notice" -> "уведомление магазина до закрытия"
-        "closeout_source_trace" -> "след поиска до закрытия"
-        "closeout_split_leftover" -> "остаток разделения остаётся открытым"
-        "closeout_ready" -> "закрытие готово с доказательством"
-        else -> "наблюдение закрытия"
-      }
-      val recoveryCloseoutPathKk = when (recoveryCloseoutLane) {
-        "closeout_blocked" -> "жабу бөгелген"
-        "closeout_store_notice" -> "жабуға дейін дүкен хабарламасы"
-        "closeout_source_trace" -> "жабуға дейін іздеу ізі"
-        "closeout_split_leftover" -> "бөлінген қалдық ашық қалады"
-        "closeout_ready" -> "дәлелмен жабуға дайын"
-        else -> "жабуды бақылау"
-      }
-      val recoveryCloseoutScript = supplierDashboardJoinedMessage(
-        listOf(
-          "AITA closeout guard: $recoveryContactGoodsName.",
-          "Closeout path: $recoveryCloseoutPathMain.",
-          "Closeout score $recoveryCloseoutScore/100; seal $recoverySealScore/100; release $recoveryReleaseScore/100; ledger $recoveryLedgerScore/100.",
-          "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()}. Close only verified quantity and keep store names private outside AITA."
-        ),
-        listOf(
-          "AITA защита закрытия: $recoveryContactGoodsName.",
-          "Путь закрытия: $recoveryCloseoutPathRu.",
-          "Оценка закрытия $recoveryCloseoutScore/100; штамп $recoverySealScore/100; выпуск $recoveryReleaseScore/100; журнал $recoveryLedgerScore/100.",
-          "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()}. Закрывайте только проверенное количество и держите названия магазинов приватными вне AITA."
-        ),
-        listOf(
-          "AITA жабу қорғаны: $recoveryContactGoodsName.",
-          "Жабу жолы: $recoveryCloseoutPathKk.",
-          "Жабу ұпайы $recoveryCloseoutScore/100; мөр $recoverySealScore/100; шығару $recoveryReleaseScore/100; журнал $recoveryLedgerScore/100.",
-          "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()}. Тек тексерілген санды жауып, AITA сыртында дүкен атауларын құпия ұстаңыз."
-        )
-      )
-
-
-      val recoveryReopenAtMillis = listOfNotNull(
-        recoveryFollowUpAtMillis?.takeIf { followUpAt -> followUpAt > now },
-        recoveryCommitByMillis?.takeIf { commitAt -> commitAt > now },
-        recoveryCheckpointAtMillis?.takeIf { checkpointAt -> checkpointAt > now },
-        earliestDueAtMillis?.takeIf { dueAt -> dueAt > now }
-      ).minOrNull()
-      val recoveryReopenScore = (
-        recoveryCloseoutScore / 3 +
-          recoverySealScore / 5 +
-          recoveryReleaseScore / 6 +
-          recoveryVerificationScore / 7 +
-          recoveryApprovalScore / 8 +
-          recoveryRiskScore / 8 +
+        }
+        val closeoutPressure = supplierDashboardChunk {
           when (recoveryCloseoutLane) {
-            "closeout_blocked" -> 25
-            "closeout_store_notice" -> 16
-            "closeout_source_trace" -> 14
-            "closeout_split_leftover" -> 12
-            "closeout_ready" -> -10
-            else -> 3
-          } +
-          when (recoveryFollowUpLane) {
-            "follow_up_now" -> 14
-            "same_day_check" -> 8
-            "before_pack_check" -> 6
+            "closeout_blocked" -> 19
+            "closeout_store_notice" -> 12
+            "closeout_source_trace" -> 10
+            "closeout_split_leftover" -> 8
+            "closeout_ready" -> -8
             else -> 1
-          } +
-          when (recoveryCommitLane) {
-            "commit_blocked" -> 13
-            "commit_store_today" -> 10
-            "commit_source_eta" -> 8
-            "commit_split_eta" -> 6
-            "commit_ready" -> -5
-            else -> 1
-          } +
-          when (recoveryPromiseShieldLane) {
-            "promise_at_risk" -> 12
-            "store_answer_needed" -> 9
-            "source_before_promise" -> 7
-            "split_promise" -> 5
-            "promise_safe" -> -5
-            else -> 1
-          } +
-          when {
-            fullyShortLineCount > 0 -> 8
-            partialLineCount > 0 -> 5
-            else -> 0
-          } +
-          affectedOrderCount.coerceAtMost(6) * 2
-        ).coerceIn(0, 100)
-      val recoveryReopenLane = when {
-        recoveryCloseoutLane == "closeout_blocked" || recoverySealLane == "seal_blocked" || recoveryReleaseLane == "release_blocked" || recoveryExecutionLane == "execution_blocked" -> "reopen_blocked"
-        recoveryCloseoutLane == "closeout_store_notice" || recoveryApprovalLane == "approval_store_ack" || recoveryVerificationLane == "verify_store_answer" || recoveryPromiseShieldLane == "store_answer_needed" -> "reopen_after_answer"
-        recoveryFollowUpLane == "follow_up_now" || recoveryCommitLane == "commit_store_today" || recoveryPromiseShieldLane == "promise_at_risk" || recoveryReopenScore >= 78 -> "reopen_if_promise_slips"
-        recoveryCloseoutLane == "closeout_split_leftover" || recoveryAllocationLane == "fair_split_needed" || recoveryAllocationLane == "priority_allocation" || (acceptedStockCanBeSplit && partialLineCount > 0) -> "reopen_split_leftover"
-        recoveryCloseoutLane == "closeout_ready" && recoverySealLane == "seal_ready" && recoveryReleaseLane == "release_ready" && recoveryReopenScore <= 42 -> "reopen_safe"
-        else -> "reopen_watch"
-      }
-      val recoveryReopenHint = when (recoveryReopenLane) {
-        "reopen_blocked" -> supplierDashboardJoinedMessage(
-          listOf("Reopen guard: closeout is blocked. Keep this shortage visible until seal, release, execution, and closeout blockers are cleared."),
-          listOf("Защита переоткрытия: закрытие заблокировано. Держите недопоставку видимой, пока штамп, выпуск, выполнение и закрытие не очищены."),
-          listOf("Қайта ашу қорғаны: жабу бөгелген. Мөр, шығару, орындау және жабу бөгеттері тазаланғанша жетіспеуді көрінетін ұстаңыз.")
-        )
-        "reopen_after_answer" -> supplierDashboardJoinedMessage(
-          listOf("Reopen guard: close only after the store/source answer is recorded. Reopen immediately if the answer changes quantity, substitute, or ETA."),
-          listOf("Защита переоткрытия: закрывайте только после записи ответа магазина/поиска. Переоткройте сразу, если ответ меняет количество, замену или срок."),
-          listOf("Қайта ашу қорғаны: дүкен/іздеу жауабы жазылғаннан кейін ғана жабыңыз. Жауап санды, ауыстыруды немесе мерзімді өзгертсе бірден қайта ашыңыз.")
-        )
-        "reopen_if_promise_slips" -> supplierDashboardJoinedMessage(
-          listOf("Reopen guard: promise is fragile. Keep a reopen checkpoint so a missed follow-up or slipped ETA brings the shortage back to the desk."),
-          listOf("Защита переоткрытия: обещание хрупкое. Оставьте контроль переоткрытия, чтобы пропущенный контроль или сдвиг срока вернул недопоставку на пульт."),
-          listOf("Қайта ашу қорғаны: уәде нәзік. Бақылау өткізіп алынса немесе мерзім сырғыса жетіспеу пультке қайтуы үшін қайта ашу бақылауын қалдырыңыз.")
-        )
-        "reopen_split_leftover" -> supplierDashboardJoinedMessage(
-          listOf("Reopen guard: split leftover remains. Close only shipped/verified quantity and reopen the shortage when second-drop stock arrives or fails."),
-          listOf("Защита переоткрытия: остался разделённый остаток. Закрывайте только отправленное/проверенное количество и переоткройте недопоставку при приходе или срыве второй поставки."),
-          listOf("Қайта ашу қорғаны: бөлінген қалдық бар. Тек жөнелтілген/тексерілген санды жауып, екінші жеткізу келсе немесе үзілсе жетіспеуді қайта ашыңыз.")
-        )
-        "reopen_safe" -> supplierDashboardJoinedMessage(
-          listOf("Reopen guard: closeout looks safe. Seal the note, but keep the reopen checkpoint visible until the next promise/follow-up passes."),
-          listOf("Защита переоткрытия: закрытие выглядит безопасным. Зафиксируйте заметку, но оставьте контроль переоткрытия видимым до следующего обещания/контроля."),
-          listOf("Қайта ашу қорғаны: жабу қауіпсіз көрінеді. Жазбаны бекітіңіз, бірақ келесі уәде/бақылау өткенше қайта ашу бақылауын көрінетін қалдырыңыз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Reopen guard: keep watch. If owner, ETA, proof, or accepted quantity changes, return this shortage to active recovery."),
-          listOf("Защита переоткрытия: наблюдайте. Если ответственный, срок, доказательство или принятое количество меняются, верните недопоставку в активное восстановление."),
-          listOf("Қайта ашу қорғаны: бақылаңыз. Жауапты, мерзім, дәлел немесе қабылданған сан өзгерсе жетіспеуді белсенді қалпына келтіруге қайтарыңыз.")
-        )
-      }
-      val recoveryReopenChecklist = when (recoveryReopenLane) {
-        "reopen_blocked" -> supplierDashboardJoinedMessage(
-          listOf("□ Keep shortage visible\n□ Do not archive blocked closeout\n□ Clear seal/release blockers\n□ Set reopen checkpoint"),
-          listOf("□ Держать недопоставку видимой\n□ Не архивировать заблокированное закрытие\n□ Очистить блокеры штампа/выпуска\n□ Поставить контроль переоткрытия"),
-          listOf("□ Жетіспеуді көрінетін ұстау\n□ Бөгелген жабуды архивтемеу\n□ Мөр/шығару бөгеттерін тазалау\n□ Қайта ашу бақылауын қою")
-        )
-        "reopen_after_answer" -> supplierDashboardJoinedMessage(
-          listOf("□ Save answer source\n□ Confirm quantity/ETA/substitute\n□ Re-score promise shield\n□ Reopen if answer changes"),
-          listOf("□ Сохранить источник ответа\n□ Подтвердить количество/срок/замену\n□ Пересчитать щит обещания\n□ Переоткрыть при изменении ответа"),
-          listOf("□ Жауап көзін сақтау\n□ Сан/мерзім/ауыстыруды растау\n□ Уәде қалқанын қайта бағалау\n□ Жауап өзгерсе қайта ашу")
-        )
-        "reopen_if_promise_slips" -> supplierDashboardJoinedMessage(
-          listOf("□ Keep next checkpoint\n□ Watch promise drift\n□ Notify owner before close\n□ Reopen on missed ETA"),
-          listOf("□ Оставить следующий контроль\n□ Следить за сдвигом обещания\n□ Сообщить ответственному до закрытия\n□ Переоткрыть при срыве срока"),
-          listOf("□ Келесі бақылауды қалдыру\n□ Уәде сырғуын бақылау\n□ Жабуға дейін жауаптыны хабарлау\n□ Мерзім үзілсе қайта ашу")
-        )
-        "reopen_split_leftover" -> supplierDashboardJoinedMessage(
-          listOf("□ Close shipped quantity only\n□ Keep leftover visible\n□ Date second drop\n□ Reopen if second drop fails"),
-          listOf("□ Закрыть только отправленное количество\n□ Оставить остаток видимым\n□ Поставить дату второй поставки\n□ Переоткрыть при срыве второй поставки"),
-          listOf("□ Тек жөнелтілген санды жабу\n□ Қалдықты көрінетін қалдыру\n□ Екінші жеткізу күнін қою\n□ Екінші жеткізу үзілсе қайта ашу")
-        )
-        "reopen_safe" -> supplierDashboardJoinedMessage(
-          listOf("□ Seal closeout note\n□ Keep reopen checkpoint\n□ Verify no leftover promise\n□ Archive after checkpoint clears"),
-          listOf("□ Зафиксировать заметку закрытия\n□ Оставить контроль переоткрытия\n□ Проверить отсутствие остаточного обещания\n□ Архивировать после прохождения контроля"),
-          listOf("□ Жабу жазбасын бекіту\n□ Қайта ашу бақылауын қалдыру\n□ Қалған уәде жоқтығын тексеру\n□ Бақылау өткен соң архивтеу")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("□ Watch owner/ETA/proof\n□ Keep missing qty visible\n□ Reopen on any mismatch"),
-          listOf("□ Следить за ответственным/сроком/доказательством\n□ Держать недостачу видимой\n□ Переоткрыть при любом расхождении"),
-          listOf("□ Жауапты/мерзім/дәлелді бақылау\n□ Жетіспейтін санды көрінетін ұстау\n□ Кез келген сәйкессіздікте қайта ашу")
-        )
-      }
-
-      val recoveryReopenPathMain = when (recoveryReopenLane) {
-        "reopen_blocked" -> "blocked from closeout"
-        "reopen_after_answer" -> "reopen after changed answer"
-        "reopen_if_promise_slips" -> "reopen on promise slip"
-        "reopen_split_leftover" -> "split leftover stays reopenable"
-        "reopen_safe" -> "safe with reopen checkpoint"
-        else -> "watch for mismatch"
-      }
-      val recoveryReopenPathRu = when (recoveryReopenLane) {
-        "reopen_blocked" -> "заблокировано для закрытия"
-        "reopen_after_answer" -> "переоткрыть после изменения ответа"
-        "reopen_if_promise_slips" -> "переоткрыть при срыве обещания"
-        "reopen_split_leftover" -> "разделённый остаток остаётся переоткрываемым"
-        "reopen_safe" -> "безопасно с контролем переоткрытия"
-        else -> "наблюдать расхождения"
-      }
-      val recoveryReopenPathKk = when (recoveryReopenLane) {
-        "reopen_blocked" -> "жабуға бөгелген"
-        "reopen_after_answer" -> "жауап өзгерсе қайта ашу"
-        "reopen_if_promise_slips" -> "уәде бұзылса қайта ашу"
-        "reopen_split_leftover" -> "бөлінген қалдық қайта ашылатын күйде"
-        "reopen_safe" -> "қайта ашу бақылауымен қауіпсіз"
-        else -> "сәйкессіздікті бақылау"
-      }
-      val recoveryReopenScript = supplierDashboardJoinedMessage(
-        listOf(
-          "AITA reopen guard: $recoveryContactGoodsName.",
-          "Reopen path: $recoveryReopenPathMain; score $recoveryReopenScore/100.",
-          "Next checkpoint ${recoveryReopenAtMillis?.let { reopenAt -> supplierDashboardCopyDateTime(reopenAt) } ?: "not set"}; closeout ${recoveryCloseoutLane.ifBlank { "closeout_watch" }}; promise ${recoveryPromiseShieldLane.ifBlank { "promise_watch" }}.",
-          "Close verified quantity only and reopen if owner, ETA, proof, or accepted quantity changes. Keep store names private outside AITA."
-        ),
-        listOf(
-          "AITA защита переоткрытия: $recoveryContactGoodsName.",
-          "Путь переоткрытия: $recoveryReopenPathRu; оценка $recoveryReopenScore/100.",
-          "Следующий контроль ${recoveryReopenAtMillis?.let { reopenAt -> supplierDashboardCopyDateTime(reopenAt) } ?: "не задан"}; закрытие ${recoveryCloseoutLane.ifBlank { "closeout_watch" }}; обещание ${recoveryPromiseShieldLane.ifBlank { "promise_watch" }}.",
-          "Закрывайте только проверенное количество и переоткрывайте при изменении ответственного, срока, доказательства или принятого количества. Названия магазинов держите приватными вне AITA."
-        ),
-        listOf(
-          "AITA қайта ашу қорғаны: $recoveryContactGoodsName.",
-          "Қайта ашу жолы: $recoveryReopenPathKk; ұпай $recoveryReopenScore/100.",
-          "Келесі бақылау ${recoveryReopenAtMillis?.let { reopenAt -> supplierDashboardCopyDateTime(reopenAt) } ?: "қойылмаған"}; жабу ${recoveryCloseoutLane.ifBlank { "closeout_watch" }}; уәде ${recoveryPromiseShieldLane.ifBlank { "promise_watch" }}.",
-          "Тек тексерілген санды жауып, жауапты, мерзім, дәлел немесе қабылданған сан өзгерсе қайта ашыңыз. AITA сыртында дүкен атауларын құпия ұстаңыз."
-        )
-      )
-
-      val recoveryReconciliationScore = (
-        recoveryReopenScore / 3 +
-          recoveryCloseoutScore / 4 +
-          recoverySealScore / 5 +
+          }
+        }
+        val reopenPressure = supplierDashboardChunk {
           when (recoveryReopenLane) {
             "reopen_blocked" -> 20
             "reopen_after_answer" -> 13
             "reopen_if_promise_slips" -> 12
             "reopen_split_leftover" -> 9
             "reopen_safe" -> -8
-            else -> 2
-          } +
-          when (recoveryCloseoutLane) {
-            "closeout_blocked" -> 13
-            "closeout_store_notice" -> 8
-            "closeout_source_trace" -> 7
-            "closeout_split_leftover" -> 6
-            "closeout_ready" -> -6
-            else -> 2
-          } +
-          when (recoveryAllocationLane) {
-            "fair_split_needed" -> 10
-            "priority_allocation" -> 8
-            "single_store_allocation" -> 4
-            "allocation_ready" -> -4
             else -> 1
-          } +
-          when {
-            requestCoveragePercent <= 0 -> 11
-            requestCoveragePercent < 60 -> 8
-            requestCoveragePercent < 100 -> 5
-            else -> -3
-          } +
-          (fullyShortLineCount * 4) +
-          (partialLineCount * 2) +
-          if (affectedStoreCount > 1) 4 else 0
-        ).coerceIn(0, 100)
-      val recoveryReconciliationLane = when {
-        recoveryReopenLane == "reopen_blocked" || recoveryCloseoutLane == "closeout_blocked" || recoverySealLane == "seal_blocked" || recoveryReleaseLane == "release_blocked" -> "reconcile_blocked"
-        recoveryReopenLane == "reopen_after_answer" || recoveryApprovalLane == "approval_store_ack" || recoveryVerificationLane == "verify_store_answer" || recoveryCloseoutLane == "closeout_store_notice" -> "reconcile_store_delta"
-        recoveryReopenLane == "reopen_if_promise_slips" || recoveryCommitLane == "commit_source_eta" || recoveryReleaseLane == "release_source_eta" || recoveryCloseoutLane == "closeout_source_trace" -> "reconcile_source_delta"
-        recoveryReopenLane == "reopen_split_leftover" || recoveryCloseoutLane == "closeout_split_leftover" || recoverySealLane == "seal_split_manifest" || recoveryAllocationLane == "fair_split_needed" || recoveryAllocationLane == "priority_allocation" -> "reconcile_split_delta"
-        recoveryReopenLane == "reopen_safe" && recoveryCloseoutLane == "closeout_ready" && recoverySealLane == "seal_ready" && recoveryReconciliationScore <= 42 -> "reconcile_ready"
-        else -> "reconcile_watch"
-      }
-      val recoveryReconciliationHint = when (recoveryReconciliationLane) {
-        "reconcile_blocked" -> supplierDashboardJoinedMessage(
-          listOf("Reconciliation guard: do not close or dispatch-seal this shortage until blocked reopen, closeout, release, and seal gates agree."),
-          listOf("Защита сверки: не закрывайте и не штампуйте отправку, пока заблокированные переоткрытие, закрытие, выпуск и штамп не согласованы."),
-          listOf("Салыстыру қорғаны: бөгелген қайта ашу, жабу, шығару және мөр келісілгенше жетіспеуді жаппаңыз және жөнелтуді мөрлемеңіз.")
-        )
-        "reconcile_store_delta" -> supplierDashboardJoinedMessage(
-          listOf("Reconciliation guard: store-facing answer can change promised quantity, substitute, or ETA. Save the answer before final close."),
-          listOf("Защита сверки: ответ для магазина может изменить обещанное количество, замену или срок. Сохраните ответ до финального закрытия."),
-          listOf("Салыстыру қорғаны: дүкен жауабы уәде санын, ауыстыруды немесе мерзімді өзгерте алады. Соңғы жабуға дейін жауапты сақтаңыз.")
-        )
-        "reconcile_source_delta" -> supplierDashboardJoinedMessage(
-          listOf("Reconciliation guard: upstream/source ETA can still move. Reconcile source proof with the active promise before closeout."),
-          listOf("Защита сверки: срок поиска/верхней цепочки ещё может измениться. Сверьте доказательство поиска с активным обещанием до закрытия."),
-          listOf("Салыстыру қорғаны: жоғары арна/іздеу мерзімі әлі өзгеруі мүмкін. Жабуға дейін іздеу дәлелін белсенді уәдемен салыстырыңыз.")
-        )
-        "reconcile_split_delta" -> supplierDashboardJoinedMessage(
-          listOf("Reconciliation guard: accepted and missing quantities are split. Reconcile shipped quantity, leftover quantity, and second-drop promise."),
-          listOf("Защита сверки: принятое и недостающее количество разделены. Сверьте отправленное количество, остаток и обещание второй поставки."),
-          listOf("Салыстыру қорғаны: қабылданған және жетіспейтін сан бөлінген. Жөнелтілген санды, қалдықты және екінші жеткізу уәдесін салыстырыңыз.")
-        )
-        "reconcile_ready" -> supplierDashboardJoinedMessage(
-          listOf("Reconciliation guard: closeout is aligned. Seal the reconciled note and keep reopen watch until the next checkpoint passes."),
-          listOf("Защита сверки: закрытие согласовано. Штампуйте сверенную заметку и держите переоткрытие под наблюдением до следующего контроля."),
-          listOf("Салыстыру қорғаны: жабу сәйкестенді. Салыстырылған жазбаны мөрлеп, келесі бақылауға дейін қайта ашуды қадағалаңыз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Reconciliation guard: watch quantity, answer, source proof, split leftover, and reopen checkpoint for any mismatch."),
-          listOf("Защита сверки: наблюдайте количество, ответ, доказательство поиска, остаток разделения и контроль переоткрытия на любые расхождения."),
-          listOf("Салыстыру қорғаны: сан, жауап, іздеу дәлелі, бөлінген қалдық және қайта ашу бақылауын сәйкессіздікке қадағалаңыз.")
-        )
-      }
-      val recoveryReconciliationChecklist = when (recoveryReconciliationLane) {
-        "reconcile_blocked" -> supplierDashboardJoinedMessage(
-          listOf("□ Keep shortage open\n□ Block silent dispatch seal\n□ Match closeout/reopen gates\n□ Assign owner before close"),
-          listOf("□ Оставить недостачу открытой\n□ Заблокировать тихий штамп отправки\n□ Сверить закрытие/переоткрытие\n□ Назначить ответственного до закрытия"),
-          listOf("□ Жетіспеуді ашық қалдыру\n□ Үнсіз жөнелту мөрін тоқтату\n□ Жабу/қайта ашу қақпаларын салыстыру\n□ Жабуға дейін жауапты қою")
-        )
-        "reconcile_store_delta" -> supplierDashboardJoinedMessage(
-          listOf("□ Save store answer\n□ Reconcile promised quantity\n□ Update substitute/ETA\n□ Keep names private outside AITA"),
-          listOf("□ Сохранить ответ магазина\n□ Сверить обещанное количество\n□ Обновить замену/срок\n□ Держать названия приватными вне AITA"),
-          listOf("□ Дүкен жауабын сақтау\n□ Уәде санын салыстыру\n□ Ауыстыру/мерзімді жаңарту\n□ AITA сыртында атауларды құпия ұстау")
-        )
-        "reconcile_source_delta" -> supplierDashboardJoinedMessage(
-          listOf("□ Save upstream proof\n□ Compare ETA with promise\n□ Refresh commit guard\n□ Reopen if source slips"),
-          listOf("□ Сохранить доказательство поиска\n□ Сравнить срок с обещанием\n□ Обновить защиту обязательства\n□ Переоткрыть при срыве поиска"),
-          listOf("□ Жоғары арна дәлелін сақтау\n□ Мерзімді уәдемен салыстыру\n□ Міндеттеме қорғанын жаңарту\n□ Іздеу сырғыса қайта ашу")
-        )
-        "reconcile_split_delta" -> supplierDashboardJoinedMessage(
-          listOf("□ Reconcile shipped qty\n□ Reconcile leftover qty\n□ Date second drop\n□ Keep split manifest attached"),
-          listOf("□ Сверить отправленное количество\n□ Сверить остаток\n□ Поставить дату второй поставки\n□ Оставить ведомость разделения"),
-          listOf("□ Жөнелтілген санды салыстыру\n□ Қалдық санды салыстыру\n□ Екінші жеткізу күнін қою\n□ Бөлу ведомосын қалдыру")
-        )
-        "reconcile_ready" -> supplierDashboardJoinedMessage(
-          listOf("□ Seal reconciled note\n□ Close completed step only\n□ Keep reopen checkpoint\n□ Refresh if promise changes"),
-          listOf("□ Штамповать сверенную заметку\n□ Закрыть только выполненный шаг\n□ Оставить контроль переоткрытия\n□ Обновить при изменении обещания"),
-          listOf("□ Салыстырылған жазбаны мөрлеу\n□ Тек орындалған қадамды жабу\n□ Қайта ашу бақылауын қалдыру\n□ Уәде өзгерсе жаңарту")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("□ Watch quantity delta\n□ Watch answer/proof\n□ Keep shortage visible\n□ Re-score after change"),
-          listOf("□ Следить за разницей количества\n□ Следить за ответом/доказательством\n□ Держать недостачу видимой\n□ Пересчитать после изменения"),
-          listOf("□ Сан айырмасын бақылау\n□ Жауап/дәлелді бақылау\n□ Жетіспеуді көрінетін ұстау\n□ Өзгерістен кейін қайта бағалау")
-        )
-      }
-      val recoveryReconciliationPathMain = when (recoveryReconciliationLane) {
-        "reconcile_blocked" -> "blocked reconciliation; keep shortage open"
-        "reconcile_store_delta" -> "reconcile store-facing answer"
-        "reconcile_source_delta" -> "reconcile upstream/source proof"
-        "reconcile_split_delta" -> "reconcile shipped and leftover quantities"
-        "reconcile_ready" -> "reconciled and ready with reopen watch"
-        else -> "watch reconciliation drift"
-      }
-      val recoveryReconciliationPathRu = when (recoveryReconciliationLane) {
-        "reconcile_blocked" -> "сверка заблокирована; держать недостачу открытой"
-        "reconcile_store_delta" -> "сверить ответ для магазина"
-        "reconcile_source_delta" -> "сверить доказательство поиска"
-        "reconcile_split_delta" -> "сверить отправленное и остаток"
-        "reconcile_ready" -> "сверено и готово с наблюдением переоткрытия"
-        else -> "наблюдать дрейф сверки"
-      }
-      val recoveryReconciliationPathKk = when (recoveryReconciliationLane) {
-        "reconcile_blocked" -> "салыстыру бөгелген; жетіспеуді ашық ұстау"
-        "reconcile_store_delta" -> "дүкен жауабын салыстыру"
-        "reconcile_source_delta" -> "іздеу дәлелін салыстыру"
-        "reconcile_split_delta" -> "жөнелтілген және қалған санды салыстыру"
-        "reconcile_ready" -> "салыстырылды және қайта ашу бақылауымен дайын"
-        else -> "салыстыру ауытқуын бақылау"
-      }
-      val recoveryReconciliationScript = supplierDashboardJoinedMessage(
-        listOf(
-          "AITA reconciliation guard: $recoveryContactGoodsName.",
-          "Reconciliation path: $recoveryReconciliationPathMain; score $recoveryReconciliationScore/100.",
-          "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()}; coverage $requestCoveragePercent%.",
-          "Reopen ${recoveryReopenLane.ifBlank { "reopen_watch" }}; closeout ${recoveryCloseoutLane.ifBlank { "closeout_watch" }}. Keep store names private outside AITA."
-        ),
-        listOf(
-          "AITA защита сверки: $recoveryContactGoodsName.",
-          "Путь сверки: $recoveryReconciliationPathRu; оценка $recoveryReconciliationScore/100.",
-          "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()}; покрытие $requestCoveragePercent%.",
-          "Переоткрытие ${recoveryReopenLane.ifBlank { "reopen_watch" }}; закрытие ${recoveryCloseoutLane.ifBlank { "closeout_watch" }}. Названия магазинов держите приватными вне AITA."
-        ),
-        listOf(
-          "AITA салыстыру қорғаны: $recoveryContactGoodsName.",
-          "Салыстыру жолы: $recoveryReconciliationPathKk; ұпай $recoveryReconciliationScore/100.",
-          "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()}; қамту $requestCoveragePercent%.",
-          "Қайта ашу ${recoveryReopenLane.ifBlank { "reopen_watch" }}; жабу ${recoveryCloseoutLane.ifBlank { "closeout_watch" }}. AITA сыртында дүкен атауларын құпия ұстаңыз."
-        )
-      )
-
-      val recoveryAuditScore = (
-        recoveryReconciliationScore / 2 +
-          recoveryReopenScore / 5 +
-          recoveryCloseoutScore / 6 +
-          recoverySealScore / 7 +
-          when (recoveryReconciliationLane) {
-            "reconcile_blocked" -> 24
-            "reconcile_store_delta" -> 15
-            "reconcile_source_delta" -> 14
-            "reconcile_split_delta" -> 13
-            "reconcile_ready" -> -10
-            else -> 2
-          } +
-          when (recoveryCloseoutLane) {
-            "closeout_blocked" -> 16
-            "closeout_store_notice" -> 10
-            "closeout_source_trace" -> 9
-            "closeout_split_leftover" -> 8
-            "closeout_ready" -> -6
-            else -> 1
-          } +
-          when (recoverySealLane) {
-            "seal_blocked" -> 14
-            "seal_store_notice" -> 9
-            "seal_source_trace" -> 8
-            "seal_split_manifest" -> 8
-            "seal_ready" -> -5
-            else -> 1
-          } +
-          when (recoveryProofLane) {
-            "store_ack_required" -> 7
-            "sourcing_note_required" -> 7
-            "pack_guard_proof" -> 6
-            else -> 0
-          } +
-          when {
-            fullyShortLineCount > 0 -> 7
-            partialLineCount > 0 -> 5
-            else -> 0
-          } +
-          affectedOrderCount.coerceAtMost(6) * 2 +
-          affectedStoreCount.coerceAtMost(5) * 2 +
-          ((100 - requestCoveragePercent).coerceAtLeast(0) / 8)
-        ).coerceIn(0, 100)
-      val recoveryAuditLane = when {
-        recoveryReconciliationLane == "reconcile_blocked" ||
-          recoveryCloseoutLane == "closeout_blocked" ||
-          recoverySealLane == "seal_blocked" ||
-          recoveryReleaseLane == "release_blocked" ||
-          recoveryExecutionLane == "execution_blocked" -> "audit_blocked"
-        recoveryReconciliationLane == "reconcile_split_delta" ||
-          (acceptedQuantityTotal > 0.000001 && (partialLineCount > 0 || missingQuantityTotal > acceptedQuantityTotal)) -> "audit_quantity_gap"
-        recoveryReconciliationLane == "reconcile_source_delta" ||
-          recoveryProofLane == "sourcing_note_required" ||
-          recoveryVerificationLane == "verify_source_proof" ||
-          recoverySealLane == "seal_source_trace" -> "audit_evidence_gap"
-        recoveryReconciliationLane == "reconcile_store_delta" ||
-          recoveryPromiseShieldLane == "store_answer_needed" ||
-          recoveryContactLane == "store_call" ||
-          recoveryReopenLane == "reopen_after_answer" -> "audit_store_note_gap"
-        recoveryReconciliationLane == "reconcile_ready" &&
-          (recoveryCloseoutLane == "closeout_ready" || recoverySealLane == "seal_ready") &&
-          recoveryAuditScore <= 46 -> "audit_ready"
-        else -> "audit_watch"
-      }
-      val recoveryAuditHint = when (recoveryAuditLane) {
-        "audit_blocked" -> supplierDashboardJoinedMessage(
-          listOf("Audit guard: stop closure until blocked gates, reconciliation, seal, and dispatch-safe quantity all agree."),
-          listOf("Защита аудита: остановите закрытие, пока заблокированные ворота, сверка, штамп и безопасное к отправке количество не совпадут."),
-          listOf("Аудит қорғаны: бөгелген қақпалар, салыстыру, мөр және жөнелтуге қауіпсіз сан келіскенше жабуды тоқтатыңыз.")
-        )
-        "audit_quantity_gap" -> supplierDashboardJoinedMessage(
-          listOf("Audit guard: quantity math still needs a paper trail. Match requested, accepted, shipped, and leftover quantities before close."),
-          listOf("Защита аудита: математике количества ещё нужен след. Сведите запрошенное, принятое, отправленное и остаток до закрытия."),
-          listOf("Аудит қорғаны: сан есебіне әлі із керек. Жабуға дейін сұралған, қабылданған, жөнелтілген және қалған санды сәйкестендіріңіз.")
-        )
-        "audit_evidence_gap" -> supplierDashboardJoinedMessage(
-          listOf("Audit guard: evidence is thin. Attach source proof, no-stock answer, ETA, or pack proof before this item leaves the watch desk."),
-          listOf("Защита аудита: доказательств мало. Приложите подтверждение поиска, ответ нет товара, срок или доказательство сборки до выхода из наблюдения."),
-          listOf("Аудит қорғаны: дәлел жұқа. Бұл позиция бақылаудан шықпай тұрып іздеу дәлелін, қор жоқ жауабын, мерзімді немесе жинау дәлелін тіркеңіз.")
-        )
-        "audit_store_note_gap" -> supplierDashboardJoinedMessage(
-          listOf("Audit guard: store-facing note is the last gap. Save the answer that explains delay, substitute, split, or cancel path."),
-          listOf("Защита аудита: последняя дырка — заметка для магазина. Сохраните ответ про задержку, замену, разделение или отмену."),
-          listOf("Аудит қорғаны: соңғы бос орын — дүкенге арналған жазба. Кідіріс, ауыстыру, бөлу немесе бас тарту жолын түсіндіретін жауапты сақтаңыз.")
-        )
-        "audit_ready" -> supplierDashboardJoinedMessage(
-          listOf("Audit guard: trail is clean. Close only the safe quantity, keep residual shortage visible, and archive the audit note."),
-          listOf("Защита аудита: след чистый. Закройте только безопасное количество, оставьте остаточную недостачу видимой и архивируйте заметку аудита."),
-          listOf("Аудит қорғаны: із таза. Тек қауіпсіз санды жабыңыз, қалған жетіспеуді көрінетін қалдырып, аудит жазбасын архивтеңіз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Audit guard: watch quietly. Recalculate if quantity, proof, answer, ETA, or reopen checkpoint changes."),
-          listOf("Защита аудита: спокойно наблюдайте. Пересчитайте, если изменится количество, доказательство, ответ, срок или контроль переоткрытия."),
-          listOf("Аудит қорғаны: тыныш бақылаңыз. Сан, дәлел, жауап, мерзім немесе қайта ашу бақылауы өзгерсе қайта есептеңіз.")
-        )
-      }
-      val recoveryAuditChecklist = when (recoveryAuditLane) {
-        "audit_blocked" -> supplierDashboardJoinedMessage(
-          listOf("□ Keep shortage visible\n□ Clear blocked gate\n□ Re-run reconciliation\n□ Save audit note"),
-          listOf("□ Оставить недостачу видимой\n□ Очистить заблокированные ворота\n□ Перезапустить сверку\n□ Сохранить заметку аудита"),
-          listOf("□ Жетіспеуді көрінетін ұстау\n□ Бөгелген қақпаны тазарту\n□ Салыстыруды қайта жүргізу\n□ Аудит жазбасын сақтау")
-        )
-        "audit_quantity_gap" -> supplierDashboardJoinedMessage(
-          listOf("□ Match requested vs accepted\n□ Mark shipped quantity\n□ Keep leftover quantity open\n□ Save quantity trail"),
-          listOf("□ Свести запрошено и принято\n□ Отметить отправленное количество\n□ Оставить остаток открытым\n□ Сохранить след количества"),
-          listOf("□ Сұралған мен қабылданғанды салыстыру\n□ Жөнелтілген санды белгілеу\n□ Қалған санды ашық қалдыру\n□ Сан ізін сақтау")
-        )
-        "audit_evidence_gap" -> supplierDashboardJoinedMessage(
-          listOf("□ Attach source/pack proof\n□ Save ETA or no-stock answer\n□ Link proof to promise\n□ Recheck score"),
-          listOf("□ Приложить доказательство поиска/сборки\n□ Сохранить срок или ответ нет товара\n□ Связать доказательство с обещанием\n□ Перепроверить оценку"),
-          listOf("□ Іздеу/жинау дәлелін тіркеу\n□ Мерзімді немесе қор жоқ жауабын сақтау\n□ Дәлелді уәдеге байлау\n□ Ұпайды қайта тексеру")
-        )
-        "audit_store_note_gap" -> supplierDashboardJoinedMessage(
-          listOf("□ Write store-safe note\n□ Confirm delay/substitute/split/cancel\n□ Keep private store names out\n□ Save copied answer"),
-          listOf("□ Написать безопасную заметку магазину\n□ Подтвердить задержку/замену/разделение/отмену\n□ Не выносить приватные названия\n□ Сохранить скопированный ответ"),
-          listOf("□ Дүкенге қауіпсіз жазба жазу\n□ Кідіріс/ауыстыру/бөлу/бас тартуды бекіту\n□ Жеке атауларды шығармау\n□ Көшірілген жауапты сақтау")
-        )
-        "audit_ready" -> supplierDashboardJoinedMessage(
-          listOf("□ Close safe quantity only\n□ Archive audit note\n□ Keep residual shortage open\n□ Leave reopen checkpoint"),
-          listOf("□ Закрыть только безопасное количество\n□ Архивировать заметку аудита\n□ Оставить остаточную недостачу открытой\n□ Оставить контроль переоткрытия"),
-          listOf("□ Тек қауіпсіз санды жабу\n□ Аудит жазбасын архивтеу\n□ Қалған жетіспеуді ашық қалдыру\n□ Қайта ашу бақылауын қалдыру")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("□ Watch quantity\n□ Watch proof\n□ Watch ETA/answer\n□ Refresh on change"),
-          listOf("□ Следить за количеством\n□ Следить за доказательством\n□ Следить за сроком/ответом\n□ Обновить при изменении"),
-          listOf("□ Санды бақылау\n□ Дәлелді бақылау\n□ Мерзім/жауапты бақылау\n□ Өзгерсе жаңарту")
-        )
-      }
-      val recoveryAuditPathMain = when (recoveryAuditLane) {
-        "audit_blocked" -> "clear blocked audit gates before closure"
-        "audit_quantity_gap" -> "match requested, accepted, shipped, and leftover quantities"
-        "audit_evidence_gap" -> "attach evidence before leaving recovery desk"
-        "audit_store_note_gap" -> "save store-safe answer before closeout"
-        "audit_ready" -> "audit-ready safe closeout"
-        else -> "watch audit trail and refresh on change"
-      }
-      val recoveryAuditPathRu = when (recoveryAuditLane) {
-        "audit_blocked" -> "очистить заблокированные ворота аудита до закрытия"
-        "audit_quantity_gap" -> "свести запрошенное, принятое, отправленное и остаток"
-        "audit_evidence_gap" -> "приложить доказательство до выхода из восстановления"
-        "audit_store_note_gap" -> "сохранить безопасный ответ магазину до закрытия"
-        "audit_ready" -> "безопасное закрытие после аудита"
-        else -> "наблюдать след аудита и обновлять при изменении"
-      }
-      val recoveryAuditPathKk = when (recoveryAuditLane) {
-        "audit_blocked" -> "жабуға дейін бөгелген аудит қақпаларын тазарту"
-        "audit_quantity_gap" -> "сұралған, қабылданған, жөнелтілген және қалған санды сәйкестендіру"
-        "audit_evidence_gap" -> "қалпына келтіруден шықпай тұрып дәлел тіркеу"
-        "audit_store_note_gap" -> "жабуға дейін дүкенге қауіпсіз жауапты сақтау"
-        "audit_ready" -> "аудиттен кейін қауіпсіз жабу"
-        else -> "аудит ізін бақылап, өзгерсе жаңарту"
-      }
-      val recoveryAuditScript = supplierDashboardJoinedMessage(
-        listOf(
-          "AITA audit guard: $recoveryContactGoodsName.",
-          "Audit path: $recoveryAuditPathMain; score $recoveryAuditScore/100.",
-          "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()}; reconcile ${recoveryReconciliationLane.ifBlank { "reconcile_watch" }}.",
-          "Closeout ${recoveryCloseoutLane.ifBlank { "closeout_watch" }}; seal ${recoverySealLane.ifBlank { "seal_watch" }}; reopen ${recoveryReopenLane.ifBlank { "reopen_watch" }}. Keep store names private outside AITA."
-        ),
-        listOf(
-          "AITA защита аудита: $recoveryContactGoodsName.",
-          "Путь аудита: $recoveryAuditPathRu; оценка $recoveryAuditScore/100.",
-          "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()}; сверка ${recoveryReconciliationLane.ifBlank { "reconcile_watch" }}.",
-          "Закрытие ${recoveryCloseoutLane.ifBlank { "closeout_watch" }}; штамп ${recoverySealLane.ifBlank { "seal_watch" }}; переоткрытие ${recoveryReopenLane.ifBlank { "reopen_watch" }}. Названия магазинов держите приватными вне AITA."
-        ),
-        listOf(
-          "AITA аудит қорғаны: $recoveryContactGoodsName.",
-          "Аудит жолы: $recoveryAuditPathKk; ұпай $recoveryAuditScore/100.",
-          "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()}; салыстыру ${recoveryReconciliationLane.ifBlank { "reconcile_watch" }}.",
-          "Жабу ${recoveryCloseoutLane.ifBlank { "closeout_watch" }}; мөр ${recoverySealLane.ifBlank { "seal_watch" }}; қайта ашу ${recoveryReopenLane.ifBlank { "reopen_watch" }}. AITA сыртында дүкен атауларын құпия ұстаңыз."
-        )
-      )
-
-      val nextRecoveryStep = when {
-        recoveryUrgencyLane == "overdue" -> supplierDashboardJoinedMessage(
-          listOf("Contact the store and freeze a new recovery promise before dispatch."),
-          listOf("Свяжитесь с магазином и зафиксируйте новое обещание восстановления до отправки."),
-          listOf("Жөнелту алдында дүкенмен байланысып, жаңа қалпына келтіру уәдесін бекітіңіз.")
-        )
-        recoveryLane == "split_delivery" -> supplierDashboardJoinedMessage(
-          listOf("Split the delivery: ship accepted stock now and schedule the remaining quantity."),
-          listOf("Разделите поставку: отправьте принятое наличие сейчас и запланируйте остаток."),
-          listOf("Жеткізуді бөліңіз: қабылданған қорды қазір жіберіп, қалған санды жоспарлаңыз.")
-        )
-        recoveryLane == "split_source" -> supplierDashboardJoinedMessage(
-          listOf("Reserve accepted stock, then source or substitute fully short lines."),
-          listOf("Зарезервируйте принятое наличие, затем найдите или замените полностью недостающие строки."),
-          listOf("Қабылданған қорды резервтеп, толық жетіспейтін жолдарды табыңыз немесе ауыстырыңыз.")
-        )
-        recoveryLane == "source_or_cancel" -> supplierDashboardJoinedMessage(
-          listOf("Ask upstream for stock, then agree substitute/cancel if sourcing fails."),
-          listOf("Запросите товар выше по цепочке, затем согласуйте замену/отмену, если найти не получится."),
-          listOf("Жоғары арнадан қор сұрап, табылмаса ауыстыру/бас тартуды келісіңіз.")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("Keep monitoring until the shortage has a clear owner."),
-          listOf("Продолжайте наблюдать, пока у недопоставки не появится ответственный."),
-          listOf("Жетіспеудің нақты иесі анықталғанша бақылауды жалғастырыңыз.")
-        )
-      }
-      val recoveryChecklist = when (recoveryLane) {
-        "split_delivery" -> supplierDashboardJoinedMessage(
-          listOf("1. Reserve accepted stock\n2. Notify the store about the short quantity\n3. Add a second-drop promise before dispatch"),
-          listOf("1. Зарезервируйте принятое наличие\n2. Сообщите магазину недостающее количество\n3. Добавьте обещание второй поставки до отправки"),
-          listOf("1. Қабылданған қорды резервтеңіз\n2. Дүкенге жетіспейтін санды хабарлаңыз\n3. Жөнелтуге дейін екінші жеткізу уәдесін қосыңыз")
-        )
-        "split_source" -> supplierDashboardJoinedMessage(
-          listOf("1. Ship or reserve accepted stock\n2. Open upstream sourcing for fully short lines\n3. Confirm substitute/cancel decisions with the store"),
-          listOf("1. Отправьте или зарезервируйте принятое наличие\n2. Откройте поиск выше по цепочке для полностью недостающих строк\n3. Согласуйте замену/отмену с магазином"),
-          listOf("1. Қабылданған қорды жіберіңіз немесе резервтеңіз\n2. Толық жетіспейтін жолдар үшін жоғары арнадан іздеуді бастаңыз\n3. Дүкенмен ауыстыру/бас тарту шешімін бекітіңіз")
-        )
-        "source_or_cancel" -> supplierDashboardJoinedMessage(
-          listOf("1. Check upstream availability\n2. Offer substitute or cancellation\n3. Keep the order out of packing until the answer is agreed"),
-          listOf("1. Проверьте наличие выше по цепочке\n2. Предложите замену или отмену\n3. Не отправляйте заказ в сборку, пока ответ не согласован"),
-          listOf("1. Жоғары арнадағы қолжетімділікті тексеріңіз\n2. Ауыстыру немесе бас тартуды ұсыныңыз\n3. Жауап келісілгенше тапсырысты жинауға жібермеңіз")
-        )
-        else -> supplierDashboardJoinedMessage(
-          listOf("1. Watch accepted-vs-requested gap\n2. Assign owner\n3. Close after second-drop, substitute, or cancellation"),
-          listOf("1. Следите за разницей принято/запрошено\n2. Назначьте ответственного\n3. Закройте после второй поставки, замены или отмены"),
-          listOf("1. Қабылданған/сұралған айырмасын бақылаңыз\n2. Жауаптыны тағайындаңыз\n3. Екінші жеткізу, ауыстыру немесе бас тартудан кейін жабыңыз")
-        )
-      }
-      val suggestedAction = when (recoveryLane) {
-        "source_or_cancel" -> "negotiate"
-        "split_source" -> "source"
-        "split_delivery" -> if (relatedOrders.any { order -> order.status == SupplierOrderStatusDataModel.Confirmed }) "source" else "watch"
-        else -> "watch"
-      }
-      val ownerPressure = when (recoveryOwnerLane) {
-        "store_contact" -> 10
-        "upstream_sourcing" -> 6
-        "pack_lead" -> 4
-        else -> 1
-      }
-      val slaPressure = when (recoverySlaLane) {
-        "call_now" -> 14
-        "commit_today" -> 8
-        "before_pack" -> 5
-        else -> 1
-      }
-      val outcomePressure = when (recoveryOutcomeLane) {
-        "cancel_review" -> 9
-        "substitute_offer" -> 7
-        "second_drop" -> 5
-        "ship_now_guard" -> 3
-        else -> 1
-      }
-      val packGuardPressure = when (recoveryPackGuardLane) {
-        "block_pack" -> 10
-        "split_pack_only" -> 6
-        "proof_before_pack" -> 4
-        else -> 0
-      }
-      val contactPressure = when (recoveryContactLane) {
-        "store_call" -> 8
-        "substitute_answer" -> 6
-        "upstream_request" -> 5
-        "pack_lead_note" -> 3
-        else -> 0
-      }
-      val riskPressure = when (recoveryRiskLane) {
-        "critical_recovery" -> 12
-        "decision_pressure" -> 8
-        "pack_sourcing_watch" -> 5
-        else -> 1
-      }
-      val confidencePressure = when (recoveryConfidenceLane) {
-        "blocked_until_decision" -> 9
-        "needs_confirmation" -> 6
-        "watch_confidence" -> 3
-        else -> 0
-      }
-      val handoffPressure = when (recoveryHandoffLane) {
-        "store_handoff" -> 7
-        "sourcing_handoff" -> 6
-        "pack_handoff" -> 5
-        else -> 1
-      }
-      val closurePressure = when (recoveryClosureLane) {
-        "blocked_open" -> 9
-        "needs_close_note" -> 6
-        "ready_with_guard" -> 2
-        else -> 1
-      }
-      val ledgerPressure = when (recoveryLedgerLane) {
-        "audit_blocker" -> 9
-        "decision_record" -> 7
-        "pack_record" -> 5
-        "watch_record" -> 2
-        else -> 0
-      }
-      val triagePressure = when (recoveryTriageLane) {
-        "triage_now" -> 12
-        "decision_lane" -> 8
-        "pack_split_lane" -> 6
-        "sourcing_lane" -> 5
-        "watch_lane" -> 2
-        else -> 0
-      }
-      val commandPressure = when (recoveryCommandLane) {
-        "stop_pack" -> 14
-        "call_store" -> 10
-        "source_now" -> 8
-        "split_and_ship" -> 6
-        "monitor_promise" -> 2
-        else -> 1
-      }
-      val promiseShieldPressure = when (recoveryPromiseShieldLane) {
-        "promise_at_risk" -> 13
-        "store_answer_needed" -> 9
-        "source_before_promise" -> 8
-        "split_promise" -> 5
-        "promise_watch" -> 2
-        else -> 0
-      }
-      val wavePressure = when (recoveryWaveLane) {
-        "wave_command" -> 12
-        "wave_contact" -> 8
-        "wave_source" -> 7
-        "wave_split" -> 5
-        "wave_watch" -> 2
-        else -> 0
-      }
-      val agingPressure = when (recoveryAgingLane) {
-        "stale_blocker" -> 12
-        "touch_today" -> 7
-        "age_watch" -> 2
-        else -> 0
-      }
-      val bottleneckPressure = when (recoveryBottleneckLane) {
-        "pack_bottleneck" -> 11
-        "decision_bottleneck" -> 10
-        "sourcing_bottleneck" -> 9
-        "contact_bottleneck" -> 8
-        "proof_bottleneck" -> 7
-        "aging_bottleneck" -> 6
-        "watch_bottleneck" -> 2
-        else -> 0
-      }
-      val loadPressure = when (recoveryLoadLane) {
-        "heavy_load" -> 12
-        "multi_store_load" -> 8
-        "pack_load" -> 6
-        "ready_load" -> 2
-        "watch_load" -> 1
-        else -> 0
-      }
-      val impactPressure = when (recoveryImpactLane) {
-        "customer_promise_impact" -> 13
-        "multi_store_impact" -> 9
-        "store_replenishment_impact" -> 8
-        "impact_watch" -> 2
-        else -> 0
-      }
-      val commitPressure = when (recoveryCommitLane) {
-        "commit_blocked" -> 13
-        "commit_store_today" -> 10
-        "commit_source_eta" -> 8
-        "commit_split_eta" -> 6
-        "commit_watch" -> 2
-        else -> 0
-      }
-      val allocationPressure = when (recoveryAllocationLane) {
-        "fair_split_needed" -> 11
-        "priority_allocation" -> 9
-        "single_store_allocation" -> 5
-        "allocation_watch" -> 2
-        else -> 0
-      }
-      val exceptionPressure = when (recoveryExceptionLane) {
-        "exception_stop_pack" -> 15
-        "exception_cancel_review" -> 12
-        "exception_substitute" -> 9
-        "exception_sourcing" -> 8
-        "exception_allocation" -> 7
-        "exception_ready" -> -5
-        else -> 1
-      }
-      val causePressure = when (recoveryCauseLane) {
-        "zero_acceptance_cause" -> 13
-        "exception_cause" -> 11
-        "promise_conflict_cause" -> 9
-        "allocation_cause" -> 7
-        "partial_capacity_cause" -> 6
-        "cause_ready" -> -4
-        else -> 1
-      }
-      val verificationPressure = when (recoveryVerificationLane) {
-        "verify_blocked" -> 14
-        "verify_cause_record" -> 11
-        "verify_store_answer" -> 8
-        "verify_source_proof" -> 7
-        "verify_pack_split" -> 6
-        "verify_ready" -> -4
-        else -> 1
-      }
-      val approvalPressure = when (recoveryApprovalLane) {
-        "approval_blocked" -> 15
-        "approval_manager_review" -> 12
-        "approval_store_ack" -> 9
-        "approval_source_ack" -> 8
-        "approval_pack_lead" -> 7
-        "approval_ready" -> -5
-        else -> 1
-      }
-      val executionPressure = when (recoveryExecutionLane) {
-        "execution_blocked" -> 16
-        "execute_store_call" -> 10
-        "execute_source_eta" -> 9
-        "execute_split_pack" -> 8
-        "execute_ship_ready" -> -6
-        else -> 1
-      }
-      val releasePressure = when (recoveryReleaseLane) {
-        "release_blocked" -> 17
-        "release_store_update" -> 11
-        "release_source_eta" -> 10
-        "release_split_dispatch" -> 8
-        "release_ready" -> -6
-        else -> 1
-      }
-      val sealPressure = when (recoverySealLane) {
-        "seal_blocked" -> 18
-        "seal_store_notice" -> 12
-        "seal_source_trace" -> 10
-        "seal_split_manifest" -> 8
-        "seal_ready" -> -7
-        else -> 1
-      }
-      val closeoutPressure = when (recoveryCloseoutLane) {
-        "closeout_blocked" -> 19
-        "closeout_store_notice" -> 12
-        "closeout_source_trace" -> 10
-        "closeout_split_leftover" -> 8
-        "closeout_ready" -> -8
-        else -> 1
-      }
-      val reopenPressure = when (recoveryReopenLane) {
-        "reopen_blocked" -> 20
-        "reopen_after_answer" -> 13
-        "reopen_if_promise_slips" -> 12
-        "reopen_split_leftover" -> 9
-        "reopen_safe" -> -8
-        else -> 1
-      }
-      val reconciliationPressure = when (recoveryReconciliationLane) {
-        "reconcile_blocked" -> 21
-        "reconcile_store_delta" -> 13
-        "reconcile_source_delta" -> 12
-        "reconcile_split_delta" -> 10
-        "reconcile_ready" -> -8
-        else -> 1
-      }
-      val auditPressure = when (recoveryAuditLane) {
-        "audit_blocked" -> 23
-        "audit_quantity_gap" -> 14
-        "audit_evidence_gap" -> 13
-        "audit_store_note_gap" -> 11
-        "audit_ready" -> -9
-        else -> 1
-      }
-      val priorityScore = (
-        relatedOrders.size * 12 +
-           itemLines.size * 5 +
-           declinedLineCount * 8 +
-           missingQuantityTotal.coerceAtMost(999.0).toInt() +
-           duePressure +
-           ownerPressure +
-           slaPressure +
-           outcomePressure +
-           packGuardPressure +
-           contactPressure +
-           riskPressure +
-           confidencePressure +
-           followUpPressure +
-           handoffPressure +
-           closurePressure +
-           ledgerPressure +
-           triagePressure +
-           commandPressure +
-           promiseShieldPressure +
-           wavePressure +
-           agingPressure +
-           bottleneckPressure +
-           loadPressure +
-           impactPressure +
-           commitPressure +
-           allocationPressure +
-           exceptionPressure +
-           causePressure +
-           verificationPressure +
-           approvalPressure +
-           executionPressure +
-           releasePressure +
-           sealPressure +
-           closeoutPressure +
-           reopenPressure +
-           reconciliationPressure +
-           auditPressure
-        ).coerceAtLeast(0)
-
-      SupplierDashboardBackorderDataModel(
-        backorderId = "backorder_${goodsItemId}_${relatedOrders.joinToString("-") { it.id.take(8) }}",
-        goodsItemId = goodsItemId,
-        goodsItemNameSnapshot = if (sampleUsesSubstitute) sampleLine.substituteGoodsItemNameSnapshot else sampleLine.goodsItemNameSnapshot,
-        barcodeSnapshots = if (sampleUsesSubstitute) sampleLine.substituteGoodsItemBarcodeSnapshots else sampleLine.goodsItemBarcodeSnapshots,
-        measurementUnitIdSnapshot = if (sampleUsesSubstitute) sampleLine.substituteGoodsItemMeasurementUnitIdSnapshot else sampleLine.goodsItemMeasurementUnitIdSnapshot,
-        affectedOrderIds = relatedOrders.map { order -> order.id },
-        storePreview = storePreview.takeIf { it.isNotBlank() }?.let { listOf(LocalizedStringDataModel("main", it)) }.orEmpty(),
-        requestedQuantityTotal = requestedQuantityTotal,
-        acceptedQuantityTotal = acceptedQuantityTotal,
-        missingQuantityTotal = missingQuantityTotal,
-        missingLineCount = itemLines.size,
-        declinedLineCount = declinedLineCount,
-        partialLineCount = partialLineCount,
-        fullyShortLineCount = fullyShortLineCount,
-        recoveryLane = recoveryLane,
-        recoveryHint = recoveryHint,
-        recoveryUrgencyLane = recoveryUrgencyLane,
-        recoveryUrgencyHint = recoveryUrgencyHint,
-        recoveryOwnerLane = recoveryOwnerLane,
-        recoveryOwnerHint = recoveryOwnerHint,
-        recoverySlaLane = recoverySlaLane,
-        recoverySlaHint = recoverySlaHint,
-        recoveryCheckpointAtMillis = recoveryCheckpointAtMillis,
-        recoveryEscalationLane = recoveryEscalationLane,
-        recoveryEscalationHint = recoveryEscalationHint,
-        recoveryProofLane = recoveryProofLane,
-        recoveryProofHint = recoveryProofHint,
-        recoveryOutcomeLane = recoveryOutcomeLane,
-        recoveryOutcomeHint = recoveryOutcomeHint,
-        recoveryPackGuardLane = recoveryPackGuardLane,
-        recoveryPackGuardHint = recoveryPackGuardHint,
-        recoveryContactLane = recoveryContactLane,
-        recoveryContactHint = recoveryContactHint,
-        recoveryContactScript = recoveryContactScript,
-        recoveryRiskLane = recoveryRiskLane,
-        recoveryRiskHint = recoveryRiskHint,
-        recoveryRiskScore = recoveryRiskScore,
-        recoveryRiskReasons = recoveryRiskReasons,
-        recoveryConfidenceLane = recoveryConfidenceLane,
-        recoveryConfidenceHint = recoveryConfidenceHint,
-        recoveryConfidenceScore = recoveryConfidenceScore,
-        recoveryConfidenceChecklist = recoveryConfidenceChecklist,
-        recoveryFollowUpLane = recoveryFollowUpLane,
-        recoveryFollowUpHint = recoveryFollowUpHint,
-        recoveryFollowUpAtMillis = recoveryFollowUpAtMillis,
-        recoveryFollowUpScript = recoveryFollowUpScript,
-        recoveryHandoffLane = recoveryHandoffLane,
-        recoveryHandoffHint = recoveryHandoffHint,
-        recoveryHandoffChecklist = recoveryHandoffChecklist,
-        recoveryHandoffScript = recoveryHandoffScript,
-        recoveryClosureLane = recoveryClosureLane,
-        recoveryClosureHint = recoveryClosureHint,
-        recoveryClosureScore = recoveryClosureScore,
-        recoveryClosureChecklist = recoveryClosureChecklist,
-        recoveryClosureScript = recoveryClosureScript,
-        recoveryLedgerLane = recoveryLedgerLane,
-        recoveryLedgerHint = recoveryLedgerHint,
-        recoveryLedgerScore = recoveryLedgerScore,
-        recoveryLedgerChecklist = recoveryLedgerChecklist,
-        recoveryLedgerScript = recoveryLedgerScript,
-        recoveryTriageLane = recoveryTriageLane,
-        recoveryTriageHint = recoveryTriageHint,
-        recoveryTriageScore = recoveryTriageScore,
-        recoveryTriageChecklist = recoveryTriageChecklist,
-        recoveryTriageScript = recoveryTriageScript,
-        recoveryCommandLane = recoveryCommandLane,
-        recoveryCommandHint = recoveryCommandHint,
-        recoveryCommandScore = recoveryCommandScore,
-        recoveryCommandChecklist = recoveryCommandChecklist,
-        recoveryCommandScript = recoveryCommandScript,
-        recoveryPromiseShieldLane = recoveryPromiseShieldLane,
-        recoveryPromiseShieldHint = recoveryPromiseShieldHint,
-        recoveryPromiseShieldScore = recoveryPromiseShieldScore,
-        recoveryPromiseShieldChecklist = recoveryPromiseShieldChecklist,
-        recoveryPromiseShieldScript = recoveryPromiseShieldScript,
-        recoveryWaveLane = recoveryWaveLane,
-        recoveryWaveHint = recoveryWaveHint,
-        recoveryWaveScore = recoveryWaveScore,
-        recoveryAgingLane = recoveryAgingLane,
-        recoveryAgingHint = recoveryAgingHint,
-        recoveryAgingScore = recoveryAgingScore,
-        recoveryAgingStartedAtMillis = recoveryAgingStartedAtMillis,
-        recoveryAgingHours = recoveryAgingHours,
-        recoveryAgingChecklist = recoveryAgingChecklist,
-        recoveryAgingScript = recoveryAgingScript,
-        recoveryBottleneckLane = recoveryBottleneckLane,
-        recoveryBottleneckHint = recoveryBottleneckHint,
-        recoveryBottleneckScore = recoveryBottleneckScore,
-        recoveryBottleneckChecklist = recoveryBottleneckChecklist,
-        recoveryBottleneckScript = recoveryBottleneckScript,
-        recoveryLoadLane = recoveryLoadLane,
-        recoveryLoadHint = recoveryLoadHint,
-        recoveryLoadScore = recoveryLoadScore,
-        recoveryLoadChecklist = recoveryLoadChecklist,
-        recoveryLoadScript = recoveryLoadScript,
-        recoveryImpactLane = recoveryImpactLane,
-        recoveryImpactHint = recoveryImpactHint,
-        recoveryImpactScore = recoveryImpactScore,
-        recoveryImpactChecklist = recoveryImpactChecklist,
-        recoveryImpactScript = recoveryImpactScript,
-        recoveryCommitLane = recoveryCommitLane,
-        recoveryCommitHint = recoveryCommitHint,
-        recoveryCommitScore = recoveryCommitScore,
-        recoveryCommitByMillis = recoveryCommitByMillis,
-        recoveryCommitChecklist = recoveryCommitChecklist,
-        recoveryCommitScript = recoveryCommitScript,
-        recoveryAllocationLane = recoveryAllocationLane,
-        recoveryAllocationHint = recoveryAllocationHint,
-        recoveryAllocationScore = recoveryAllocationScore,
-        recoveryAllocationChecklist = recoveryAllocationChecklist,
-        recoveryAllocationScript = recoveryAllocationScript,
-        recoveryExceptionLane = recoveryExceptionLane,
-        recoveryExceptionHint = recoveryExceptionHint,
-        recoveryExceptionScore = recoveryExceptionScore,
-        recoveryExceptionChecklist = recoveryExceptionChecklist,
-        recoveryExceptionScript = recoveryExceptionScript,
-        recoveryCauseLane = recoveryCauseLane,
-        recoveryCauseHint = recoveryCauseHint,
-        recoveryCauseScore = recoveryCauseScore,
-        recoveryCauseChecklist = recoveryCauseChecklist,
-        recoveryCauseScript = recoveryCauseScript,
-        recoveryVerificationLane = recoveryVerificationLane,
-        recoveryVerificationHint = recoveryVerificationHint,
-        recoveryVerificationScore = recoveryVerificationScore,
-        recoveryVerificationChecklist = recoveryVerificationChecklist,
-        recoveryVerificationScript = recoveryVerificationScript,
-        recoveryApprovalLane = recoveryApprovalLane,
-        recoveryApprovalHint = recoveryApprovalHint,
-        recoveryApprovalScore = recoveryApprovalScore,
-        recoveryApprovalChecklist = recoveryApprovalChecklist,
-        recoveryApprovalScript = recoveryApprovalScript,
-        recoveryExecutionLane = recoveryExecutionLane,
-        recoveryExecutionHint = recoveryExecutionHint,
-        recoveryExecutionScore = recoveryExecutionScore,
-        recoveryExecutionChecklist = recoveryExecutionChecklist,
-        recoveryExecutionScript = recoveryExecutionScript,
-        recoveryReleaseLane = recoveryReleaseLane,
-        recoveryReleaseHint = recoveryReleaseHint,
-        recoveryReleaseScore = recoveryReleaseScore,
-        recoveryReleaseChecklist = recoveryReleaseChecklist,
-        recoveryReleaseScript = recoveryReleaseScript,
-        recoverySealLane = recoverySealLane,
-        recoverySealHint = recoverySealHint,
-        recoverySealScore = recoverySealScore,
-        recoverySealChecklist = recoverySealChecklist,
-        recoverySealScript = recoverySealScript,
-        recoveryCloseoutLane = recoveryCloseoutLane,
-        recoveryCloseoutHint = recoveryCloseoutHint,
-        recoveryCloseoutScore = recoveryCloseoutScore,
-        recoveryCloseoutChecklist = recoveryCloseoutChecklist,
-        recoveryCloseoutScript = recoveryCloseoutScript,
-        recoveryReopenLane = recoveryReopenLane,
-        recoveryReopenHint = recoveryReopenHint,
-        recoveryReopenScore = recoveryReopenScore,
-        recoveryReopenAtMillis = recoveryReopenAtMillis,
-        recoveryReopenChecklist = recoveryReopenChecklist,
-        recoveryReopenScript = recoveryReopenScript,
-        recoveryReconciliationLane = recoveryReconciliationLane,
-        recoveryReconciliationHint = recoveryReconciliationHint,
-        recoveryReconciliationScore = recoveryReconciliationScore,
-        recoveryReconciliationChecklist = recoveryReconciliationChecklist,
-        recoveryReconciliationScript = recoveryReconciliationScript,
-        recoveryAuditLane = recoveryAuditLane,
-        recoveryAuditHint = recoveryAuditHint,
-        recoveryAuditScore = recoveryAuditScore,
-        recoveryAuditChecklist = recoveryAuditChecklist,
-        recoveryAuditScript = recoveryAuditScript,
-        nextRecoveryStep = nextRecoveryStep,
-        recoveryChecklist = recoveryChecklist,
-        affectedOrderCount = affectedOrderCount,
-        affectedStoreCount = affectedStoreCount,
-        earliestDueAtMillis = earliestDueAtMillis,
-        latestActivityMillis = latestActivityMillis,
-        priorityScore = priorityScore,
-        suggestedAction = suggestedAction,
-        attentionSummary = supplierDashboardJoinedMessage(shortageMain, shortageRu, shortageKk)
-      )
-    }
-    .sortedWith(
-      compareByDescending<SupplierDashboardBackorderDataModel> { it.priorityScore }
-        .thenBy { it.earliestDueAtMillis ?: Long.MAX_VALUE }
-        .thenByDescending { it.latestActivityMillis }
-    )
-
-  val backorderWatch = backorderWatchAll.take(16)
-
-  val recoveryDesk = run {
-    val recoveryDeskItems = backorderWatchAll
-    val shortageCount = recoveryDeskItems.size
-    val urgentCount = recoveryDeskItems.count { item ->
-      item.recoveryUrgencyLane == "overdue" ||
-        item.recoveryUrgencyLane == "today" ||
-        item.recoverySlaLane == "call_now" ||
-        item.recoveryFollowUpLane == "follow_up_now" ||
-        (item.recoveryFollowUpAtMillis?.let { it <= now } == true)
-    }
-    val stopPackCount = recoveryDeskItems.count { item ->
-      item.recoveryCommandLane == "stop_pack" ||
-        item.recoveryPackGuardLane == "block_pack" ||
-        item.recoveryClosureLane == "blocked_open" ||
-        item.recoveryExecutionLane == "execution_blocked" ||
-        item.recoveryReleaseLane == "release_blocked" ||
-        item.recoverySealLane == "seal_blocked" ||
-        item.recoveryCloseoutLane == "closeout_blocked" ||
-        item.recoveryReopenLane == "reopen_blocked" ||
-        item.recoveryReconciliationLane == "reconcile_blocked" ||
-        item.recoveryAuditLane == "audit_blocked"
-    }
-    val storeContactCount = recoveryDeskItems.count { item ->
-      item.recoveryOwnerLane == "store_contact" ||
-        item.recoveryContactLane == "store_call" ||
-        item.recoveryContactLane == "substitute_answer" ||
-        item.recoveryPromiseShieldLane == "store_answer_needed"
-    }
-    val sourcingCount = recoveryDeskItems.count { item ->
-      item.recoveryOwnerLane == "upstream_sourcing" ||
-        item.recoveryContactLane == "upstream_request" ||
-        item.recoveryCommandLane == "source_now" ||
-        item.recoveryPromiseShieldLane == "source_before_promise"
-    }
-    val splitShipCount = recoveryDeskItems.count { item ->
-      item.recoveryCommandLane == "split_and_ship" ||
-        item.recoveryLane == "split_delivery" ||
-        item.recoveryPromiseShieldLane == "split_promise"
-    }
-    val promiseRiskCount = recoveryDeskItems.count { item ->
-      item.recoveryPromiseShieldLane == "promise_at_risk" ||
-        item.recoveryPromiseShieldScore >= 78 ||
-        item.recoveryRiskLane == "critical_recovery"
-    }
-    val readyCount = recoveryDeskItems.count { item ->
-      item.recoveryPromiseShieldLane == "promise_safe" ||
-        item.recoveryCommandLane == "ready_with_note" ||
-        item.recoveryTriageLane == "ready_lane" ||
-        item.recoveryConfidenceLane == "ready_to_recover" ||
-        item.recoveryCommitLane == "commit_ready" ||
-        item.recoveryExecutionLane == "execute_ship_ready" ||
-        item.recoveryReleaseLane == "release_ready" ||
-        item.recoverySealLane == "seal_ready" ||
-        item.recoveryCloseoutLane == "closeout_ready" ||
-        item.recoveryReopenLane == "reopen_safe" ||
-        item.recoveryReconciliationLane == "reconcile_ready" ||
-        item.recoveryAuditLane == "audit_ready"
-    }
-    val staleRecoveryCount = recoveryDeskItems.count { item -> item.recoveryAgingLane == "stale_blocker" || item.recoveryAgingScore >= 75 }
-    val touchTodayRecoveryCount = recoveryDeskItems.count { item -> item.recoveryAgingLane == "touch_today" || item.recoveryAgingLane == "stale_blocker" }
-    val freshRecoveryCount = recoveryDeskItems.count { item -> item.recoveryAgingLane == "fresh_recovery" }
-    val oldestRecoveryAgeHours = recoveryDeskItems.maxOfOrNull { item -> item.recoveryAgingHours } ?: 0
-    val averageRecoveryAgeHours = recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
-      items.sumOf { item -> item.recoveryAgingHours }.coerceAtLeast(0) / items.size
-    } ?: 0
-    val decisionBottleneckCount = recoveryDeskItems.count { item -> item.recoveryBottleneckLane == "decision_bottleneck" }
-    val contactBottleneckCount = recoveryDeskItems.count { item -> item.recoveryBottleneckLane == "contact_bottleneck" }
-    val sourcingBottleneckCount = recoveryDeskItems.count { item -> item.recoveryBottleneckLane == "sourcing_bottleneck" }
-    val packBottleneckCount = recoveryDeskItems.count { item -> item.recoveryBottleneckLane == "pack_bottleneck" }
-    val proofBottleneckCount = recoveryDeskItems.count { item -> item.recoveryBottleneckLane == "proof_bottleneck" }
-    val agingBottleneckCount = recoveryDeskItems.count { item -> item.recoveryBottleneckLane == "aging_bottleneck" }
-    val readyBottleneckCount = recoveryDeskItems.count { item -> item.recoveryBottleneckLane == "ready_bottleneck" }
-    val heavyLoadCount = recoveryDeskItems.count { item -> item.recoveryLoadLane == "heavy_load" || item.recoveryLoadScore >= 78 }
-    val multiStoreLoadCount = recoveryDeskItems.count { item -> item.recoveryLoadLane == "multi_store_load" }
-    val packLoadCount = recoveryDeskItems.count { item -> item.recoveryLoadLane == "pack_load" }
-    val readyLoadCount = recoveryDeskItems.count { item -> item.recoveryLoadLane == "ready_load" }
-    val averageLoadScore = recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
-      items.sumOf { item -> item.recoveryLoadScore }.coerceAtLeast(0) / items.size
-    } ?: 0
-    val topLoadLane = listOf(
-      "heavy_load",
-      "multi_store_load",
-      "pack_load",
-      "ready_load",
-      "watch_load"
-    ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoveryLoadLane == lane } }
-      .filter { candidate -> candidate.second > 0 }
-      .maxByOrNull { candidate -> candidate.second }
-      ?.first
-      .orEmpty()
-    val highImpactCount = recoveryDeskItems.count { item -> item.recoveryImpactLane == "customer_promise_impact" || item.recoveryImpactScore >= 72 }
-    val promiseImpactCount = recoveryDeskItems.count { item -> item.recoveryImpactLane == "customer_promise_impact" }
-    val multiStoreImpactCount = recoveryDeskItems.count { item -> item.recoveryImpactLane == "multi_store_impact" }
-    val replenishmentImpactCount = recoveryDeskItems.count { item -> item.recoveryImpactLane == "store_replenishment_impact" }
-    val controlledImpactCount = recoveryDeskItems.count { item -> item.recoveryImpactLane == "controlled_impact" }
-    val averageImpactScore = recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
-      items.sumOf { item -> item.recoveryImpactScore }.coerceAtLeast(0) / items.size
-    } ?: 0
-    val maxImpactScore = recoveryDeskItems.maxOfOrNull { item -> item.recoveryImpactScore } ?: 0
-    val blockedCommitCount = recoveryDeskItems.count { item -> item.recoveryCommitLane == "commit_blocked" || item.recoveryCommitScore >= 78 }
-    val dueCommitCount = recoveryDeskItems.count { item ->
-      item.recoveryCommitLane == "commit_store_today" || item.recoveryCommitByMillis?.let { commitAt -> commitAt <= now + AITA_SUPPLIER_DAY_MILLIS } == true
-    }
-    val sourceCommitCount = recoveryDeskItems.count { item -> item.recoveryCommitLane == "commit_source_eta" }
-    val splitCommitCount = recoveryDeskItems.count { item -> item.recoveryCommitLane == "commit_split_eta" }
-    val readyCommitCount = recoveryDeskItems.count { item -> item.recoveryCommitLane == "commit_ready" }
-    val averageCommitScore = recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
-      items.sumOf { item -> item.recoveryCommitScore }.coerceAtLeast(0) / items.size
-    } ?: 0
-    val nextCommitAtMillis = recoveryDeskItems
-      .mapNotNull { item -> item.recoveryCommitByMillis }
-      .filter { commitAt -> commitAt > now }
-      .minOrNull()
-    val topCommitLane = listOf(
-      "commit_blocked",
-      "commit_store_today",
-      "commit_source_eta",
-      "commit_split_eta",
-      "commit_ready",
-      "commit_watch"
-    ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoveryCommitLane == lane } }
-      .filter { candidate -> candidate.second > 0 }
-      .maxByOrNull { candidate -> candidate.second }
-      ?.first
-      .orEmpty()
-    val allocationPressureCount = recoveryDeskItems.count { item ->
-      item.recoveryAllocationLane == "fair_split_needed" ||
-        item.recoveryAllocationLane == "priority_allocation" ||
-        item.recoveryAllocationScore >= 68
-    }
-    val fairSplitAllocationCount = recoveryDeskItems.count { item -> item.recoveryAllocationLane == "fair_split_needed" }
-    val priorityAllocationCount = recoveryDeskItems.count { item -> item.recoveryAllocationLane == "priority_allocation" }
-    val allocationReadyCount = recoveryDeskItems.count { item -> item.recoveryAllocationLane == "allocation_ready" }
-    val averageAllocationScore = recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
-      items.sumOf { item -> item.recoveryAllocationScore }.coerceAtLeast(0) / items.size
-    } ?: 0
-    val maxAllocationScore = recoveryDeskItems.maxOfOrNull { item -> item.recoveryAllocationScore } ?: 0
-    val topAllocationLane = listOf(
-      "fair_split_needed",
-      "priority_allocation",
-      "single_store_allocation",
-      "allocation_ready",
-      "allocation_watch"
-    ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoveryAllocationLane == lane } }
-      .filter { candidate -> candidate.second > 0 }
-      .maxByOrNull { candidate -> candidate.second }
-      ?.first
-      .orEmpty()
-    val exceptionPressureCount = recoveryDeskItems.count { item ->
-      item.recoveryExceptionLane == "exception_stop_pack" ||
-        item.recoveryExceptionLane == "exception_cancel_review" ||
-        item.recoveryExceptionLane == "exception_substitute" ||
-        item.recoveryExceptionLane == "exception_sourcing" ||
-        item.recoveryExceptionLane == "exception_allocation" ||
-        item.recoveryExceptionScore >= 70
-    }
-    val stopPackExceptionCount = recoveryDeskItems.count { item -> item.recoveryExceptionLane == "exception_stop_pack" }
-    val cancelReviewExceptionCount = recoveryDeskItems.count { item -> item.recoveryExceptionLane == "exception_cancel_review" }
-    val substituteExceptionCount = recoveryDeskItems.count { item -> item.recoveryExceptionLane == "exception_substitute" }
-    val sourcingExceptionCount = recoveryDeskItems.count { item -> item.recoveryExceptionLane == "exception_sourcing" }
-    val allocationExceptionCount = recoveryDeskItems.count { item -> item.recoveryExceptionLane == "exception_allocation" }
-    val exceptionReadyCount = recoveryDeskItems.count { item -> item.recoveryExceptionLane == "exception_ready" }
-    val averageExceptionScore = recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
-      items.sumOf { item -> item.recoveryExceptionScore }.coerceAtLeast(0) / items.size
-    } ?: 0
-    val maxExceptionScore = recoveryDeskItems.maxOfOrNull { item -> item.recoveryExceptionScore } ?: 0
-    val topExceptionLane = listOf(
-      "exception_stop_pack",
-      "exception_cancel_review",
-      "exception_substitute",
-      "exception_sourcing",
-      "exception_allocation",
-      "exception_ready",
-      "exception_watch"
-    ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoveryExceptionLane == lane } }
-      .filter { candidate -> candidate.second > 0 }
-      .maxByOrNull { candidate -> candidate.second }
-      ?.first
-      .orEmpty()
-    val causePressureCount = recoveryDeskItems.count { item ->
-      item.recoveryCauseLane == "zero_acceptance_cause" ||
-        item.recoveryCauseLane == "exception_cause" ||
-        item.recoveryCauseLane == "promise_conflict_cause" ||
-        item.recoveryCauseLane == "allocation_cause" ||
-        item.recoveryCauseLane == "partial_capacity_cause" ||
-        item.recoveryCauseScore >= 68
-    }
-    val zeroAcceptanceCauseCount = recoveryDeskItems.count { item -> item.recoveryCauseLane == "zero_acceptance_cause" }
-    val partialCapacityCauseCount = recoveryDeskItems.count { item -> item.recoveryCauseLane == "partial_capacity_cause" }
-    val promiseConflictCauseCount = recoveryDeskItems.count { item -> item.recoveryCauseLane == "promise_conflict_cause" }
-    val allocationCauseCount = recoveryDeskItems.count { item -> item.recoveryCauseLane == "allocation_cause" }
-    val exceptionCauseCount = recoveryDeskItems.count { item -> item.recoveryCauseLane == "exception_cause" }
-    val causeReadyCount = recoveryDeskItems.count { item -> item.recoveryCauseLane == "cause_ready" }
-    val averageCauseScore = recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
-      items.sumOf { item -> item.recoveryCauseScore }.coerceAtLeast(0) / items.size
-    } ?: 0
-    val maxCauseScore = recoveryDeskItems.maxOfOrNull { item -> item.recoveryCauseScore } ?: 0
-    val topCauseLane = listOf(
-      "zero_acceptance_cause",
-      "exception_cause",
-      "promise_conflict_cause",
-      "allocation_cause",
-      "partial_capacity_cause",
-      "cause_ready",
-      "cause_watch"
-    ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoveryCauseLane == lane } }
-      .filter { candidate -> candidate.second > 0 }
-      .maxByOrNull { candidate -> candidate.second }
-      ?.first
-      .orEmpty()
-    val verificationBlockerCount = recoveryDeskItems.count { item -> item.recoveryVerificationLane == "verify_blocked" || item.recoveryVerificationScore >= 76 }
-    val storeVerificationCount = recoveryDeskItems.count { item -> item.recoveryVerificationLane == "verify_store_answer" }
-    val sourceVerificationCount = recoveryDeskItems.count { item -> item.recoveryVerificationLane == "verify_source_proof" }
-    val packVerificationCount = recoveryDeskItems.count { item -> item.recoveryVerificationLane == "verify_pack_split" }
-    val causeVerificationCount = recoveryDeskItems.count { item -> item.recoveryVerificationLane == "verify_cause_record" }
-    val verificationReadyCount = recoveryDeskItems.count { item -> item.recoveryVerificationLane == "verify_ready" }
-    val averageVerificationScore = recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
-      items.sumOf { item -> item.recoveryVerificationScore }.coerceAtLeast(0) / items.size
-    } ?: 0
-    val maxVerificationScore = recoveryDeskItems.maxOfOrNull { item -> item.recoveryVerificationScore } ?: 0
-    val topVerificationLane = listOf(
-      "verify_blocked",
-      "verify_cause_record",
-      "verify_store_answer",
-      "verify_source_proof",
-      "verify_pack_split",
-      "verify_ready",
-      "verify_watch"
-    ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoveryVerificationLane == lane } }
-      .filter { candidate -> candidate.second > 0 }
-      .maxByOrNull { candidate -> candidate.second }
-      ?.first
-      .orEmpty()
-    val approvalBlockerCount = recoveryDeskItems.count { item -> item.recoveryApprovalLane == "approval_blocked" || item.recoveryApprovalScore >= 78 }
-    val managerApprovalCount = recoveryDeskItems.count { item -> item.recoveryApprovalLane == "approval_manager_review" }
-    val storeApprovalCount = recoveryDeskItems.count { item -> item.recoveryApprovalLane == "approval_store_ack" }
-    val sourceApprovalCount = recoveryDeskItems.count { item -> item.recoveryApprovalLane == "approval_source_ack" }
-    val packApprovalCount = recoveryDeskItems.count { item -> item.recoveryApprovalLane == "approval_pack_lead" }
-    val approvalReadyCount = recoveryDeskItems.count { item -> item.recoveryApprovalLane == "approval_ready" }
-    val averageApprovalScore = recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
-      items.sumOf { item -> item.recoveryApprovalScore }.coerceAtLeast(0) / items.size
-    } ?: 0
-    val maxApprovalScore = recoveryDeskItems.maxOfOrNull { item -> item.recoveryApprovalScore } ?: 0
-    val topApprovalLane = listOf(
-      "approval_blocked",
-      "approval_manager_review",
-      "approval_store_ack",
-      "approval_source_ack",
-      "approval_pack_lead",
-      "approval_ready",
-      "approval_watch"
-    ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoveryApprovalLane == lane } }
-      .filter { candidate -> candidate.second > 0 }
-      .maxByOrNull { candidate -> candidate.second }
-      ?.first
-      .orEmpty()
-    val executionBlockerCount = recoveryDeskItems.count { item -> item.recoveryExecutionLane == "execution_blocked" || item.recoveryExecutionScore >= 80 }
-    val storeExecutionCount = recoveryDeskItems.count { item -> item.recoveryExecutionLane == "execute_store_call" }
-    val sourceExecutionCount = recoveryDeskItems.count { item -> item.recoveryExecutionLane == "execute_source_eta" }
-    val splitExecutionCount = recoveryDeskItems.count { item -> item.recoveryExecutionLane == "execute_split_pack" }
-    val readyExecutionCount = recoveryDeskItems.count { item -> item.recoveryExecutionLane == "execute_ship_ready" }
-    val averageExecutionScore = recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
-      items.sumOf { item -> item.recoveryExecutionScore }.coerceAtLeast(0) / items.size
-    } ?: 0
-    val maxExecutionScore = recoveryDeskItems.maxOfOrNull { item -> item.recoveryExecutionScore } ?: 0
-    val topExecutionLane = listOf(
-      "execution_blocked",
-      "execute_store_call",
-      "execute_source_eta",
-      "execute_split_pack",
-      "execute_ship_ready",
-      "execution_watch"
-    ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoveryExecutionLane == lane } }
-      .filter { candidate -> candidate.second > 0 }
-      .maxByOrNull { candidate -> candidate.second }
-      ?.first
-      .orEmpty()
-    val releaseBlockerCount = recoveryDeskItems.count { item -> item.recoveryReleaseLane == "release_blocked" || item.recoveryReleaseScore >= 82 }
-    val storeReleaseCount = recoveryDeskItems.count { item -> item.recoveryReleaseLane == "release_store_update" }
-    val sourceReleaseCount = recoveryDeskItems.count { item -> item.recoveryReleaseLane == "release_source_eta" }
-    val splitReleaseCount = recoveryDeskItems.count { item -> item.recoveryReleaseLane == "release_split_dispatch" }
-    val readyReleaseCount = recoveryDeskItems.count { item -> item.recoveryReleaseLane == "release_ready" }
-    val averageReleaseScore = recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
-      items.sumOf { item -> item.recoveryReleaseScore }.coerceAtLeast(0) / items.size
-    } ?: 0
-    val maxReleaseScore = recoveryDeskItems.maxOfOrNull { item -> item.recoveryReleaseScore } ?: 0
-    val topReleaseLane = listOf(
-      "release_blocked",
-      "release_store_update",
-      "release_source_eta",
-      "release_split_dispatch",
-      "release_ready",
-      "release_watch"
-    ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoveryReleaseLane == lane } }
-      .filter { candidate -> candidate.second > 0 }
-      .maxByOrNull { candidate -> candidate.second }
-      ?.first
-      .orEmpty()
-    val sealBlockerCount = recoveryDeskItems.count { item -> item.recoverySealLane == "seal_blocked" || item.recoverySealScore >= 84 }
-    val storeSealCount = recoveryDeskItems.count { item -> item.recoverySealLane == "seal_store_notice" }
-    val sourceSealCount = recoveryDeskItems.count { item -> item.recoverySealLane == "seal_source_trace" }
-    val splitSealCount = recoveryDeskItems.count { item -> item.recoverySealLane == "seal_split_manifest" }
-    val readySealCount = recoveryDeskItems.count { item -> item.recoverySealLane == "seal_ready" }
-    val averageSealScore = recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
-      items.sumOf { item -> item.recoverySealScore }.coerceAtLeast(0) / items.size
-    } ?: 0
-    val maxSealScore = recoveryDeskItems.maxOfOrNull { item -> item.recoverySealScore } ?: 0
-    val topSealLane = listOf(
-      "seal_blocked",
-      "seal_store_notice",
-      "seal_source_trace",
-      "seal_split_manifest",
-      "seal_ready",
-      "seal_watch"
-    ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoverySealLane == lane } }
-      .filter { candidate -> candidate.second > 0 }
-      .maxByOrNull { candidate -> candidate.second }
-      ?.first
-      .orEmpty()
-    val closeoutBlockerCount = recoveryDeskItems.count { item -> item.recoveryCloseoutLane == "closeout_blocked" || item.recoveryCloseoutScore >= 86 }
-    val storeCloseoutCount = recoveryDeskItems.count { item -> item.recoveryCloseoutLane == "closeout_store_notice" }
-    val sourceCloseoutCount = recoveryDeskItems.count { item -> item.recoveryCloseoutLane == "closeout_source_trace" }
-    val splitCloseoutCount = recoveryDeskItems.count { item -> item.recoveryCloseoutLane == "closeout_split_leftover" }
-    val readyCloseoutCount = recoveryDeskItems.count { item -> item.recoveryCloseoutLane == "closeout_ready" }
-    val averageCloseoutScore = recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
-      items.sumOf { item -> item.recoveryCloseoutScore }.coerceAtLeast(0) / items.size
-    } ?: 0
-    val maxCloseoutScore = recoveryDeskItems.maxOfOrNull { item -> item.recoveryCloseoutScore } ?: 0
-    val topCloseoutLane = listOf(
-      "closeout_blocked",
-      "closeout_store_notice",
-      "closeout_source_trace",
-      "closeout_split_leftover",
-      "closeout_ready",
-      "closeout_watch"
-    ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoveryCloseoutLane == lane } }
-      .filter { candidate -> candidate.second > 0 }
-      .maxByOrNull { candidate -> candidate.second }
-      ?.first
-      .orEmpty()
-    val reopenBlockerCount = recoveryDeskItems.count { item -> item.recoveryReopenLane == "reopen_blocked" || item.recoveryReopenScore >= 86 }
-    val reopenAnswerCount = recoveryDeskItems.count { item -> item.recoveryReopenLane == "reopen_after_answer" }
-    val reopenPromiseCount = recoveryDeskItems.count { item -> item.recoveryReopenLane == "reopen_if_promise_slips" }
-    val reopenSplitCount = recoveryDeskItems.count { item -> item.recoveryReopenLane == "reopen_split_leftover" }
-    val reopenReadyCount = recoveryDeskItems.count { item -> item.recoveryReopenLane == "reopen_safe" }
-    val averageReopenScore = recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
-      items.sumOf { item -> item.recoveryReopenScore }.coerceAtLeast(0) / items.size
-    } ?: 0
-    val maxReopenScore = recoveryDeskItems.maxOfOrNull { item -> item.recoveryReopenScore } ?: 0
-    val nextReopenAtMillis = recoveryDeskItems
-      .mapNotNull { item -> item.recoveryReopenAtMillis }
-      .filter { reopenAt -> reopenAt > now }
-      .minOrNull()
-    val topReopenLane = listOf(
-      "reopen_blocked",
-      "reopen_after_answer",
-      "reopen_if_promise_slips",
-      "reopen_split_leftover",
-      "reopen_safe",
-      "reopen_watch"
-    ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoveryReopenLane == lane } }
-      .filter { candidate -> candidate.second > 0 }
-      .maxByOrNull { candidate -> candidate.second }
-      ?.first
-      .orEmpty()
-    val reconciliationBlockerCount = recoveryDeskItems.count { item -> item.recoveryReconciliationLane == "reconcile_blocked" || item.recoveryReconciliationScore >= 86 }
-    val reconciliationStoreCount = recoveryDeskItems.count { item -> item.recoveryReconciliationLane == "reconcile_store_delta" }
-    val reconciliationSourceCount = recoveryDeskItems.count { item -> item.recoveryReconciliationLane == "reconcile_source_delta" }
-    val reconciliationSplitCount = recoveryDeskItems.count { item -> item.recoveryReconciliationLane == "reconcile_split_delta" }
-    val reconciliationReadyCount = recoveryDeskItems.count { item -> item.recoveryReconciliationLane == "reconcile_ready" }
-    val averageReconciliationScore = recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
-      items.sumOf { item -> item.recoveryReconciliationScore }.coerceAtLeast(0) / items.size
-    } ?: 0
-    val maxReconciliationScore = recoveryDeskItems.maxOfOrNull { item -> item.recoveryReconciliationScore } ?: 0
-    val topReconciliationLane = listOf(
-      "reconcile_blocked",
-      "reconcile_store_delta",
-      "reconcile_source_delta",
-      "reconcile_split_delta",
-      "reconcile_ready",
-      "reconcile_watch"
-    ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoveryReconciliationLane == lane } }
-      .filter { candidate -> candidate.second > 0 }
-      .maxByOrNull { candidate -> candidate.second }
-      ?.first
-      .orEmpty()
-    val auditBlockerCount = recoveryDeskItems.count { item -> item.recoveryAuditLane == "audit_blocked" || item.recoveryAuditScore >= 86 }
-    val auditQuantityGapCount = recoveryDeskItems.count { item -> item.recoveryAuditLane == "audit_quantity_gap" }
-    val auditEvidenceGapCount = recoveryDeskItems.count { item -> item.recoveryAuditLane == "audit_evidence_gap" }
-    val auditStoreNoteGapCount = recoveryDeskItems.count { item -> item.recoveryAuditLane == "audit_store_note_gap" }
-    val auditReadyCount = recoveryDeskItems.count { item -> item.recoveryAuditLane == "audit_ready" }
-    val averageAuditScore = recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
-      items.sumOf { item -> item.recoveryAuditScore }.coerceAtLeast(0) / items.size
-    } ?: 0
-    val maxAuditScore = recoveryDeskItems.maxOfOrNull { item -> item.recoveryAuditScore } ?: 0
-    val topAuditLane = listOf(
-      "audit_blocked",
-      "audit_quantity_gap",
-      "audit_evidence_gap",
-      "audit_store_note_gap",
-      "audit_ready",
-      "audit_watch"
-    ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoveryAuditLane == lane } }
-      .filter { candidate -> candidate.second > 0 }
-      .maxByOrNull { candidate -> candidate.second }
-      ?.first
-      .orEmpty()
-    val topImpactLane = listOf(
-      "customer_promise_impact",
-      "multi_store_impact",
-      "store_replenishment_impact",
-      "controlled_impact",
-      "impact_watch"
-    ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoveryImpactLane == lane } }
-      .filter { candidate -> candidate.second > 0 }
-      .maxByOrNull { candidate -> candidate.second }
-      ?.first
-      .orEmpty()
-    val topBottleneckLane = listOf(
-      "decision_bottleneck",
-      "contact_bottleneck",
-      "sourcing_bottleneck",
-      "pack_bottleneck",
-      "proof_bottleneck",
-      "aging_bottleneck",
-      "ready_bottleneck",
-      "watch_bottleneck"
-    ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoveryBottleneckLane == lane } }
-      .filter { candidate -> candidate.second > 0 }
-      .maxByOrNull { candidate -> candidate.second }
-      ?.first
-      .orEmpty()
-    val averageRiskScore = recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
-      items.sumOf { it.recoveryRiskScore }.coerceAtLeast(0) / items.size
-    } ?: 0
-    val maxPriorityScore = recoveryDeskItems.maxOfOrNull { it.priorityScore } ?: 0
-    val nextFollowUpAtMillis = recoveryDeskItems
-      .mapNotNull { it.recoveryFollowUpAtMillis }
-      .filter { it > now }
-      .minOrNull()
-    val topItem = recoveryDeskItems.firstOrNull()
-    val recoveryDeskLane = when {
-      shortageCount <= 0 -> "desk_clear"
-      stopPackCount > 0 || promiseRiskCount > 0 || blockedCommitCount > 0 || exceptionPressureCount > 0 || causePressureCount > 0 || verificationBlockerCount > 0 || approvalBlockerCount > 0 || executionBlockerCount > 0 || releaseBlockerCount > 0 || sealBlockerCount > 0 || closeoutBlockerCount > 0 || reopenBlockerCount > 0 || reconciliationBlockerCount > 0 || auditBlockerCount > 0 || managerApprovalCount > 0 || causeVerificationCount > 0 || zeroAcceptanceCauseCount > 0 || exceptionCauseCount > 0 || promiseConflictCauseCount > 0 || stopPackExceptionCount > 0 || cancelReviewExceptionCount > 0 || priorityAllocationCount > 0 || highImpactCount > 0 || urgentCount >= 3 || staleRecoveryCount > 0 || heavyLoadCount > 0 || packBottleneckCount > 0 || decisionBottleneckCount > 0 || agingBottleneckCount > 0 -> "desk_command"
-      fairSplitAllocationCount > 0 || allocationCauseCount > 0 || substituteExceptionCount > 0 || allocationExceptionCount > 0 || storeVerificationCount > 0 || storeApprovalCount > 0 || storeExecutionCount > 0 || storeReleaseCount > 0 || storeSealCount > 0 || storeCloseoutCount > 0 || reopenAnswerCount > 0 || reopenPromiseCount > 0 || reconciliationStoreCount > 0 || auditStoreNoteGapCount > 0 || dueCommitCount > 0 || multiStoreLoadCount > 0 || multiStoreImpactCount > 0 || replenishmentImpactCount > 0 || contactBottleneckCount > 0 || storeContactCount > 0 -> "desk_contact"
-      sourceCommitCount > 0 || partialCapacityCauseCount > 0 || sourcingExceptionCount > 0 || sourceVerificationCount > 0 || sourceApprovalCount > 0 || sourceExecutionCount > 0 || sourceReleaseCount > 0 || sourceSealCount > 0 || sourceCloseoutCount > 0 || reconciliationSourceCount > 0 || auditEvidenceGapCount > 0 || sourcingBottleneckCount > 0 || sourcingCount > 0 -> "desk_source"
-      splitCommitCount > 0 || packVerificationCount > 0 || packApprovalCount > 0 || splitExecutionCount > 0 || splitReleaseCount > 0 || splitSealCount > 0 || splitCloseoutCount > 0 || reopenSplitCount > 0 || reconciliationSplitCount > 0 || auditQuantityGapCount > 0 || splitShipCount > 0 -> "desk_split"
-      auditReadyCount > 0 || reconciliationReadyCount > 0 || reopenReadyCount > 0 || readyCloseoutCount > 0 || readySealCount > 0 || readyReleaseCount > 0 || readyExecutionCount > 0 || approvalReadyCount > 0 || verificationReadyCount > 0 || causeReadyCount > 0 || exceptionReadyCount > 0 || allocationReadyCount > 0 || readyCommitCount > 0 || readyCount > 0 -> "desk_ready"
-      allocationPressureCount > 0 -> "desk_watch"
-      else -> "desk_watch"
-    }
-    val recoveryDeskHint = when (recoveryDeskLane) {
-      "desk_clear" -> supplierDashboardJoinedMessage(
-        listOf("Recovery desk is calm: no answered shortages are pressuring supplier mode right now."),
-        listOf("Пульт восстановления спокоен: сейчас нет отвеченных недопоставок, давящих на режим поставщика."),
-        listOf("Қалпына келтіру пульті тыныш: қазір жеткізуші режиміне қысым жасайтын жауапталған жетіспеулер жоқ.")
-      )
-      "desk_command" -> supplierDashboardJoinedMessage(
-        listOf("Recovery desk: lead with command blockers first, freeze unsafe promises, then assign store/sourcing owners."),
-        listOf("Пульт восстановления: сначала разберите командные блокеры, заморозьте небезопасные обещания, затем назначьте ответственных магазина/поиска."),
-        listOf("Қалпына келтіру пульті: алдымен командалық бөгеттерді шешіңіз, қауіпсіз емес уәделерді тоқтатыңыз, кейін дүкен/іздеу жауаптыларын қойыңыз.")
-      )
-      "desk_contact" -> supplierDashboardJoinedMessage(
-        listOf("Recovery desk: batch store and buyer calls so substitutes, delays, and cancels are answered before packflow moves."),
-        listOf("Пульт восстановления: объедините звонки магазинам и покупателям, чтобы ответы по заменам, задержкам и отменам были до движения сборки."),
-        listOf("Қалпына келтіру пульті: ауыстыру, кідіріс және бас тарту жауаптары жинау жүрмей тұрып келуі үшін дүкен/сатып алушы қоңырауларын топтаңыз.")
-      )
-      "desk_source" -> supplierDashboardJoinedMessage(
-        listOf("Recovery desk: run an upstream sourcing wave and record reserve, ETA, substitute, or no-stock proof before promises change."),
-        listOf("Пульт восстановления: запустите волну поиска выше по цепочке и запишите резерв, срок, замену или отсутствие товара до изменения обещаний."),
-        listOf("Қалпына келтіру пульті: жоғары арна іздеу толқынын жүргізіп, уәде өзгермей тұрып резерв, мерзім, ауыстыру немесе қор жоқ дәлелін жазыңыз.")
-      )
-      "desk_split" -> supplierDashboardJoinedMessage(
-        listOf("Recovery desk: split accepted stock from missing stock, ship guarded quantity, and keep the second-drop promise visible."),
-        listOf("Пульт восстановления: отделите принятое наличие от недостачи, отправьте защищённое количество и оставьте обещание второй поставки видимым."),
-        listOf("Қалпына келтіру пульті: қабылданған қорды жетіспейтіннен бөліп, қорғалған санды жіберіңіз және екінші жеткізу уәдесін көрінетін қалдырыңыз.")
-      )
-      "desk_ready" -> supplierDashboardJoinedMessage(
-        listOf("Recovery desk: ready items can move, but close only the guarded worker step and keep remaining promises visible."),
-        listOf("Пульт восстановления: готовые позиции можно двигать, но закрывайте только защищённый рабочий шаг и оставляйте оставшиеся обещания видимыми."),
-        listOf("Қалпына келтіру пульті: дайын позициялар қозғала алады, бірақ тек қорғалған жұмыс қадамын жауып, қалған уәделерді көрінетін қалдырыңыз.")
-      )
-      else -> supplierDashboardJoinedMessage(
-        listOf("Recovery desk: keep watch sorted by priority, follow-up time, and promise shield so quiet shortages do not drift."),
-        listOf("Пульт восстановления: держите наблюдение по приоритету, времени контроля и щиту обещания, чтобы тихие недопоставки не уплыли."),
-        listOf("Қалпына келтіру пульті: тыныш жетіспеулер жоғалмас үшін бақылауды басымдық, бақылау уақыты және уәде қалқаны бойынша ұстаңыз.")
-      )
-    }
-    val recoveryDeskChecklist = when (recoveryDeskLane) {
-      "desk_command" -> supplierDashboardJoinedMessage(
-        listOf("□ Freeze risky promises\n□ Stop blocked packflow\n□ Name owner per SKU\n□ Re-score after answer"),
-        listOf("□ Заморозить рискованные обещания\n□ Остановить заблокированную сборку\n□ Назначить ответственного по SKU\n□ Пересчитать после ответа"),
-        listOf("□ Тәуекел уәделерді тоқтату\n□ Бөгелген жинауды тоқтату\n□ Әр SKU жауаптысын атау\n□ Жауаптан кейін қайта бағалау")
-      )
-      "desk_contact" -> supplierDashboardJoinedMessage(
-        listOf("□ Batch store calls\n□ Capture substitute/delay/cancel answers\n□ Update follow-up times\n□ Keep store names private outside AITA"),
-        listOf("□ Сгруппировать звонки магазинам\n□ Записать ответы замена/задержка/отмена\n□ Обновить сроки контроля\n□ Держать названия магазинов приватными вне AITA"),
-        listOf("□ Дүкен қоңырауларын топтау\n□ Ауыстыру/кідіріс/бас тарту жауаптарын жазу\n□ Бақылау уақытын жаңарту\n□ AITA сыртында дүкен атауларын құпия ұстау")
-      )
-      "desk_source" -> supplierDashboardJoinedMessage(
-        listOf("□ Ask upstream for reserve/ETA\n□ Attach no-stock or substitute proof\n□ Mirror safe answer to store\n□ Keep shortage ledger open"),
-        listOf("□ Запросить резерв/срок выше\n□ Приложить отсутствие или замену\n□ Передать безопасный ответ магазину\n□ Оставить журнал недопоставки открытым"),
-        listOf("□ Жоғары арнадан резерв/мерзім сұрау\n□ Қор жоқ немесе ауыстыру дәлелін тіркеу\n□ Қауіпсіз жауапты дүкенге жеткізу\n□ Жетіспеу журналын ашық қалдыру")
-      )
-      "desk_split" -> supplierDashboardJoinedMessage(
-        listOf("□ Pack accepted quantity only\n□ Keep short quantity separate\n□ Date the second drop\n□ Check proof before dispatch"),
-        listOf("□ Собрать только принятое количество\n□ Держать недостачу отдельно\n□ Поставить дату второй поставки\n□ Проверить доказательство до отправки"),
-        listOf("□ Тек қабылданған санды жинау\n□ Жетіспейтін санды бөлек ұстау\n□ Екінші жеткізу күнін қою\n□ Жөнелтуден бұрын дәлелді тексеру")
-      )
-      "desk_ready" -> supplierDashboardJoinedMessage(
-        listOf("□ Move ready recoveries\n□ Close completed step only\n□ Preserve promise note\n□ Reopen if promise changes"),
-        listOf("□ Двигать готовые восстановления\n□ Закрыть только выполненный шаг\n□ Сохранить заметку обещания\n□ Открыть снова при изменении обещания"),
-        listOf("□ Дайын қалпына келтірулерді қозғау\n□ Тек орындалған қадамды жабу\n□ Уәде жазбасын сақтау\n□ Уәде өзгерсе қайта ашу")
-      )
-      else -> supplierDashboardJoinedMessage(
-        listOf("□ Watch top priority\n□ Check next follow-up\n□ Keep missing qty visible\n□ Refresh after every answer"),
-        listOf("□ Следить за верхним приоритетом\n□ Проверить следующий контроль\n□ Держать недостачу видимой\n□ Обновлять после каждого ответа"),
-        listOf("□ Ең жоғары басымдықты бақылау\n□ Келесі бақылауды тексеру\n□ Жетіспейтін санды көрінетін ұстау\n□ Әр жауаптан кейін жаңарту")
-      )
-    }
-    val deskPathMain = when (recoveryDeskLane) {
-      "desk_clear" -> "no active shortage recovery wave"
-      "desk_command" -> "command blockers and unsafe promises first"
-      "desk_contact" -> "batch store and buyer answers"
-      "desk_source" -> "source upstream reserve or proof"
-      "desk_split" -> "split accepted stock from missing stock"
-      "desk_ready" -> "move guarded ready recoveries"
-      else -> "watch priority and follow-up"
-    }
-    val deskPathRu = when (recoveryDeskLane) {
-      "desk_clear" -> "нет активной волны восстановления"
-      "desk_command" -> "сначала командные блокеры и небезопасные обещания"
-      "desk_contact" -> "сгруппировать ответы магазинов и покупателей"
-      "desk_source" -> "найти резерв или доказательство выше по цепочке"
-      "desk_split" -> "отделить принятое наличие от недостачи"
-      "desk_ready" -> "двигать защищённые готовые восстановления"
-      else -> "наблюдать приоритет и контроль"
-    }
-    val deskPathKk = when (recoveryDeskLane) {
-      "desk_clear" -> "белсенді қалпына келтіру толқыны жоқ"
-      "desk_command" -> "алдымен командалық бөгеттер мен қауіпсіз емес уәделер"
-      "desk_contact" -> "дүкен және сатып алушы жауаптарын топтау"
-      "desk_source" -> "жоғары арнадан резерв немесе дәлел табу"
-      "desk_split" -> "қабылданған қорды жетіспейтін қордан бөлу"
-      "desk_ready" -> "қорғалған дайын қалпына келтірулерді қозғау"
-      else -> "басымдық пен бақылауды қадағалау"
-    }
-    val topGoodsNameMain = topItem?.goodsItemNameSnapshot?.firstOrNull { it.language == "main" }?.value
-      ?: topItem?.goodsItemNameSnapshot?.firstOrNull()?.value
-      ?: topItem?.goodsItemId?.take(8)
-      ?: "none"
-    val recoveryDeskScript = supplierDashboardJoinedMessage(
-      listOf(
-        "AITA recovery desk: $deskPathMain.",
-        "Shortages $shortageCount; urgent $urgentCount; stop-pack $stopPackCount; promise-risk $promiseRiskCount; ready $readyCount.",
-        "Average risk $averageRiskScore/100; max priority $maxPriorityScore; top item $topGoodsNameMain.",
-        "Top bottleneck ${topBottleneckLane.ifBlank { "watch_bottleneck" }}; decision $decisionBottleneckCount; contact $contactBottleneckCount; source $sourcingBottleneckCount; pack $packBottleneckCount.",
-        "Top load ${topLoadLane.ifBlank { "watch_load" }}; heavy $heavyLoadCount; multi-store $multiStoreLoadCount; pack load $packLoadCount; average load $averageLoadScore/100.",
-        "Impact ${topImpactLane.ifBlank { "impact_watch" }}; high $highImpactCount; promise $promiseImpactCount; multi-store $multiStoreImpactCount; average impact $averageImpactScore/100.",
-        "Commit ${topCommitLane.ifBlank { "commit_watch" }}; blocked $blockedCommitCount; due $dueCommitCount; source ETA $sourceCommitCount; split ETA $splitCommitCount; ready $readyCommitCount; next ${nextCommitAtMillis?.let { java.time.Instant.ofEpochMilli(it).toString() } ?: "none"}.",
-        "Allocation ${topAllocationLane.ifBlank { "allocation_watch" }}; pressure $allocationPressureCount; fair split $fairSplitAllocationCount; priority $priorityAllocationCount; ready $allocationReadyCount; average $averageAllocationScore/100.",
-        "Exception ${topExceptionLane.ifBlank { "exception_watch" }}; pressure $exceptionPressureCount; stop-pack $stopPackExceptionCount; cancel $cancelReviewExceptionCount; substitute $substituteExceptionCount; source $sourcingExceptionCount; allocation $allocationExceptionCount; ready $exceptionReadyCount; max $maxExceptionScore/100.",
-        "Cause ${topCauseLane.ifBlank { "cause_watch" }}; pressure $causePressureCount; zero $zeroAcceptanceCauseCount; partial capacity $partialCapacityCauseCount; promise conflict $promiseConflictCauseCount; allocation $allocationCauseCount; exception $exceptionCauseCount; ready $causeReadyCount; average $averageCauseScore/100; max $maxCauseScore/100.",
-        "Verification ${topVerificationLane.ifBlank { "verify_watch" }}; blockers $verificationBlockerCount; cause $causeVerificationCount; store $storeVerificationCount; source $sourceVerificationCount; pack $packVerificationCount; ready $verificationReadyCount; max $maxVerificationScore/100.",
-        "Approval ${topApprovalLane.ifBlank { "approval_watch" }}; blockers $approvalBlockerCount; manager $managerApprovalCount; store $storeApprovalCount; source $sourceApprovalCount; pack $packApprovalCount; ready $approvalReadyCount; max $maxApprovalScore/100.",
-        "Execution ${topExecutionLane.ifBlank { "execution_watch" }}; blockers $executionBlockerCount; store $storeExecutionCount; source $sourceExecutionCount; split $splitExecutionCount; ready $readyExecutionCount; max $maxExecutionScore/100.",
-        "Release ${topReleaseLane.ifBlank { "release_watch" }}; blockers $releaseBlockerCount; store $storeReleaseCount; source $sourceReleaseCount; split $splitReleaseCount; ready $readyReleaseCount; max $maxReleaseScore/100.",
-        "Seal ${topSealLane.ifBlank { "seal_watch" }}; blockers $sealBlockerCount; store $storeSealCount; source $sourceSealCount; split $splitSealCount; ready $readySealCount; max $maxSealScore/100.",
-        "Closeout ${topCloseoutLane.ifBlank { "closeout_watch" }}; blockers $closeoutBlockerCount; store $storeCloseoutCount; source $sourceCloseoutCount; split $splitCloseoutCount; ready $readyCloseoutCount; max $maxCloseoutScore/100.",
-        "Reopen ${topReopenLane.ifBlank { "reopen_watch" }}; blockers $reopenBlockerCount; answer $reopenAnswerCount; promise $reopenPromiseCount; split $reopenSplitCount; ready $reopenReadyCount; max $maxReopenScore/100; next ${nextReopenAtMillis?.let { java.time.Instant.ofEpochMilli(it).toString() } ?: "none"}.",
-        "Reconciliation ${topReconciliationLane.ifBlank { "reconcile_watch" }}; blockers $reconciliationBlockerCount; store $reconciliationStoreCount; source $reconciliationSourceCount; split $reconciliationSplitCount; ready $reconciliationReadyCount; max $maxReconciliationScore/100.",
-        "Audit ${topAuditLane.ifBlank { "audit_watch" }}; blockers $auditBlockerCount; quantity $auditQuantityGapCount; evidence $auditEvidenceGapCount; store note $auditStoreNoteGapCount; ready $auditReadyCount; max $maxAuditScore/100.",
-        "Keep store names private outside AITA."
-      ),
-      listOf(
-        "AITA пульт восстановления: $deskPathRu.",
-        "Недопоставок $shortageCount; срочных $urgentCount; стоп-сборка $stopPackCount; риск обещания $promiseRiskCount; готово $readyCount.",
-        "Средний риск $averageRiskScore/100; максимум приоритета $maxPriorityScore; верхняя позиция $topGoodsNameMain.",
-        "Главное узкое место ${topBottleneckLane.ifBlank { "watch_bottleneck" }}; решение $decisionBottleneckCount; контакт $contactBottleneckCount; поиск $sourcingBottleneckCount; сборка $packBottleneckCount.",
-        "Главная нагрузка ${topLoadLane.ifBlank { "watch_load" }}; тяжёлых $heavyLoadCount; мульти-магазинов $multiStoreLoadCount; нагрузка сборки $packLoadCount; средняя нагрузка $averageLoadScore/100.",
-        "Влияние ${topImpactLane.ifBlank { "impact_watch" }}; высоких $highImpactCount; обещаний $promiseImpactCount; несколько магазинов $multiStoreImpactCount; среднее влияние $averageImpactScore/100.",
-        "Обязательство ${topCommitLane.ifBlank { "commit_watch" }}; заблокировано $blockedCommitCount; срочно $dueCommitCount; срок поиска $sourceCommitCount; срок разделения $splitCommitCount; готово $readyCommitCount; следующее ${nextCommitAtMillis?.let { java.time.Instant.ofEpochMilli(it).toString() } ?: "нет"}.",
-        "Распределение ${topAllocationLane.ifBlank { "allocation_watch" }}; давление $allocationPressureCount; справедливое $fairSplitAllocationCount; приоритет $priorityAllocationCount; готово $allocationReadyCount; среднее $averageAllocationScore/100.",
-        "Исключение ${topExceptionLane.ifBlank { "exception_watch" }}; давление $exceptionPressureCount; стоп-сборка $stopPackExceptionCount; отмена $cancelReviewExceptionCount; замена $substituteExceptionCount; поиск $sourcingExceptionCount; распределение $allocationExceptionCount; готово $exceptionReadyCount; максимум $maxExceptionScore/100.",
-        "Причина ${topCauseLane.ifBlank { "cause_watch" }}; давление $causePressureCount; ноль $zeroAcceptanceCauseCount; частичная мощность $partialCapacityCauseCount; конфликт обещания $promiseConflictCauseCount; распределение $allocationCauseCount; исключение $exceptionCauseCount; готово $causeReadyCount; среднее $averageCauseScore/100; максимум $maxCauseScore/100.",
-        "Проверка ${topVerificationLane.ifBlank { "verify_watch" }}; блокеров $verificationBlockerCount; причин $causeVerificationCount; магазин $storeVerificationCount; поиск $sourceVerificationCount; сборка $packVerificationCount; готово $verificationReadyCount; максимум $maxVerificationScore/100.",
-        "Согласование ${topApprovalLane.ifBlank { "approval_watch" }}; блокеров $approvalBlockerCount; руководитель $managerApprovalCount; магазин $storeApprovalCount; поиск $sourceApprovalCount; сборка $packApprovalCount; готово $approvalReadyCount; максимум $maxApprovalScore/100.",
-        "Выполнение ${topExecutionLane.ifBlank { "execution_watch" }}; блокеров $executionBlockerCount; магазин $storeExecutionCount; поиск $sourceExecutionCount; разделение $splitExecutionCount; готово $readyExecutionCount; максимум $maxExecutionScore/100.",
-        "Выпуск ${topReleaseLane.ifBlank { "release_watch" }}; блокеров $releaseBlockerCount; магазин $storeReleaseCount; поиск $sourceReleaseCount; разделение $splitReleaseCount; готово $readyReleaseCount; максимум $maxReleaseScore/100.",
-        "Штамп ${topSealLane.ifBlank { "seal_watch" }}; блокеров $sealBlockerCount; магазин $storeSealCount; поиск $sourceSealCount; разделение $splitSealCount; готово $readySealCount; максимум $maxSealScore/100.",
-        "Закрытие ${topCloseoutLane.ifBlank { "closeout_watch" }}; блокеров $closeoutBlockerCount; магазин $storeCloseoutCount; поиск $sourceCloseoutCount; разделение $splitCloseoutCount; готово $readyCloseoutCount; максимум $maxCloseoutScore/100.",
-        "Переоткрытие ${topReopenLane.ifBlank { "reopen_watch" }}; блокеров $reopenBlockerCount; ответы $reopenAnswerCount; обещания $reopenPromiseCount; разделение $reopenSplitCount; готово $reopenReadyCount; максимум $maxReopenScore/100; следующее ${nextReopenAtMillis?.let { java.time.Instant.ofEpochMilli(it).toString() } ?: "нет"}.",
-        "Сверка ${topReconciliationLane.ifBlank { "reconcile_watch" }}; блокеров $reconciliationBlockerCount; магазин $reconciliationStoreCount; поиск $reconciliationSourceCount; разделение $reconciliationSplitCount; готово $reconciliationReadyCount; максимум $maxReconciliationScore/100.",
-        "Аудит ${topAuditLane.ifBlank { "audit_watch" }}; блокеров $auditBlockerCount; количество $auditQuantityGapCount; доказательства $auditEvidenceGapCount; заметки магазина $auditStoreNoteGapCount; готово $auditReadyCount; максимум $maxAuditScore/100.",
-        "Названия магазинов держите приватными вне AITA."
-      ),
-      listOf(
-        "AITA қалпына келтіру пульті: $deskPathKk.",
-        "Жетіспеу $shortageCount; шұғыл $urgentCount; жинауды тоқтату $stopPackCount; уәде тәуекелі $promiseRiskCount; дайын $readyCount.",
-        "Орташа тәуекел $averageRiskScore/100; ең жоғары басымдық $maxPriorityScore; жоғарғы позиция $topGoodsNameMain.",
-        "Негізгі тар орын ${topBottleneckLane.ifBlank { "watch_bottleneck" }}; шешім $decisionBottleneckCount; байланыс $contactBottleneckCount; іздеу $sourcingBottleneckCount; жинау $packBottleneckCount.",
-        "Негізгі жүктеме ${topLoadLane.ifBlank { "watch_load" }}; ауыр $heavyLoadCount; көп дүкен $multiStoreLoadCount; жинау жүктемесі $packLoadCount; орташа жүктеме $averageLoadScore/100.",
-        "Әсер ${topImpactLane.ifBlank { "impact_watch" }}; жоғары $highImpactCount; уәде $promiseImpactCount; көп дүкен $multiStoreImpactCount; орташа әсер $averageImpactScore/100.",
-        "Міндеттеме ${topCommitLane.ifBlank { "commit_watch" }}; бөгелген $blockedCommitCount; мерзімді $dueCommitCount; іздеу мерзімі $sourceCommitCount; бөлу мерзімі $splitCommitCount; дайын $readyCommitCount; келесі ${nextCommitAtMillis?.let { java.time.Instant.ofEpochMilli(it).toString() } ?: "жоқ"}.",
-        "Бөлу ${topAllocationLane.ifBlank { "allocation_watch" }}; қысым $allocationPressureCount; әділ $fairSplitAllocationCount; басым $priorityAllocationCount; дайын $allocationReadyCount; орташа $averageAllocationScore/100.",
-        "Ерекше ${topExceptionLane.ifBlank { "exception_watch" }}; қысым $exceptionPressureCount; жинауды тоқтату $stopPackExceptionCount; бас тарту $cancelReviewExceptionCount; ауыстыру $substituteExceptionCount; іздеу $sourcingExceptionCount; бөлу $allocationExceptionCount; дайын $exceptionReadyCount; ең жоғары $maxExceptionScore/100.",
-        "Себеп ${topCauseLane.ifBlank { "cause_watch" }}; қысым $causePressureCount; нөл $zeroAcceptanceCauseCount; жартылай қуат $partialCapacityCauseCount; уәде қақтығысы $promiseConflictCauseCount; бөлу $allocationCauseCount; ерекше $exceptionCauseCount; дайын $causeReadyCount; орташа $averageCauseScore/100; ең жоғары $maxCauseScore/100.",
-        "Тексеру ${topVerificationLane.ifBlank { "verify_watch" }}; бөгет $verificationBlockerCount; себеп $causeVerificationCount; дүкен $storeVerificationCount; іздеу $sourceVerificationCount; жинау $packVerificationCount; дайын $verificationReadyCount; ең жоғары $maxVerificationScore/100.",
-        "Бекіту ${topApprovalLane.ifBlank { "approval_watch" }}; бөгет $approvalBlockerCount; басқарушы $managerApprovalCount; дүкен $storeApprovalCount; іздеу $sourceApprovalCount; жинау $packApprovalCount; дайын $approvalReadyCount; ең жоғары $maxApprovalScore/100.",
-        "Орындау ${topExecutionLane.ifBlank { "execution_watch" }}; бөгет $executionBlockerCount; дүкен $storeExecutionCount; іздеу $sourceExecutionCount; бөлу $splitExecutionCount; дайын $readyExecutionCount; ең жоғары $maxExecutionScore/100.",
-        "Шығару ${topReleaseLane.ifBlank { "release_watch" }}; бөгет $releaseBlockerCount; дүкен $storeReleaseCount; іздеу $sourceReleaseCount; бөлу $splitReleaseCount; дайын $readyReleaseCount; ең жоғары $maxReleaseScore/100.",
-        "Мөр ${topSealLane.ifBlank { "seal_watch" }}; бөгет $sealBlockerCount; дүкен $storeSealCount; іздеу $sourceSealCount; бөлу $splitSealCount; дайын $readySealCount; ең жоғары $maxSealScore/100.",
-        "Жабу ${topCloseoutLane.ifBlank { "closeout_watch" }}; бөгет $closeoutBlockerCount; дүкен $storeCloseoutCount; іздеу $sourceCloseoutCount; бөлу $splitCloseoutCount; дайын $readyCloseoutCount; ең жоғары $maxCloseoutScore/100.",
-        "Қайта ашу ${topReopenLane.ifBlank { "reopen_watch" }}; бөгет $reopenBlockerCount; жауап $reopenAnswerCount; уәде $reopenPromiseCount; бөлу $reopenSplitCount; дайын $reopenReadyCount; ең жоғары $maxReopenScore/100; келесі ${nextReopenAtMillis?.let { java.time.Instant.ofEpochMilli(it).toString() } ?: "жоқ"}.",
-        "Салыстыру ${topReconciliationLane.ifBlank { "reconcile_watch" }}; бөгет $reconciliationBlockerCount; дүкен $reconciliationStoreCount; іздеу $reconciliationSourceCount; бөлу $reconciliationSplitCount; дайын $reconciliationReadyCount; ең жоғары $maxReconciliationScore/100.",
-        "Аудит ${topAuditLane.ifBlank { "audit_watch" }}; бөгет $auditBlockerCount; сан $auditQuantityGapCount; дәлел $auditEvidenceGapCount; дүкен жазбасы $auditStoreNoteGapCount; дайын $auditReadyCount; ең жоғары $maxAuditScore/100.",
-        "AITA сыртында дүкен атауларын құпия ұстаңыз."
-      )
-    )
-    fun recoveryWavePathMain(lane: String): String = when (lane) {
-      "wave_command" -> "command blockers"
-      "wave_contact" -> "store and buyer contact"
-      "wave_source" -> "upstream sourcing"
-      "wave_split" -> "split accepted from missing"
-      "wave_ready" -> "guarded ready recovery"
-      else -> "watch and follow-up"
-    }
-    fun recoveryWavePathRu(lane: String): String = when (lane) {
-      "wave_command" -> "командные блокеры"
-      "wave_contact" -> "связь с магазином и покупателем"
-      "wave_source" -> "поиск выше по цепочке"
-      "wave_split" -> "разделение принятого и недостачи"
-      "wave_ready" -> "защищённое готовое восстановление"
-      else -> "наблюдение и контроль"
-    }
-    fun recoveryWavePathKk(lane: String): String = when (lane) {
-      "wave_command" -> "командалық бөгеттер"
-      "wave_contact" -> "дүкен және сатып алушы байланысы"
-      "wave_source" -> "жоғары арнадан іздеу"
-      "wave_split" -> "қабылданғанды жетіспейтіннен бөлу"
-      "wave_ready" -> "қорғалған дайын қалпына келтіру"
-      else -> "бақылау және қайта тексеру"
-    }
-    fun recoveryWaveChecklist(lane: String): List<LocalizedStringDataModel> = when (lane) {
-      "wave_command" -> supplierDashboardJoinedMessage(
-        listOf("□ Freeze unsafe promises\n□ Stop blocked packflow\n□ Assign SKU owner\n□ Re-score after owner answer"),
-        listOf("□ Заморозить небезопасные обещания\n□ Остановить заблокированную сборку\n□ Назначить ответственного SKU\n□ Пересчитать после ответа"),
-        listOf("□ Қауіпсіз емес уәделерді тоқтату\n□ Бөгелген жинауды тоқтату\n□ SKU жауаптысын қою\n□ Жауаптан кейін қайта бағалау")
-      )
-      "wave_contact" -> supplierDashboardJoinedMessage(
-        listOf("□ Batch contact scripts\n□ Save substitute/delay/cancel answer\n□ Refresh promise shield\n□ Set follow-up time"),
-        listOf("□ Сгруппировать скрипты связи\n□ Сохранить ответ замена/задержка/отмена\n□ Обновить щит обещания\n□ Назначить контроль"),
-        listOf("□ Байланыс скриптерін топтау\n□ Ауыстыру/кідіріс/бас тарту жауабын сақтау\n□ Уәде қалқанын жаңарту\n□ Бақылау уақытын қою")
-      )
-      "wave_source" -> supplierDashboardJoinedMessage(
-        listOf("□ Ask upstream reserve/ETA\n□ Save no-stock proof\n□ Offer substitute if needed\n□ Mirror safe answer to store"),
-        listOf("□ Запросить резерв/срок выше\n□ Сохранить доказательство отсутствия\n□ Предложить замену при необходимости\n□ Передать безопасный ответ магазину"),
-        listOf("□ Жоғарыдан резерв/мерзім сұрау\n□ Қор жоқ дәлелін сақтау\n□ Керек болса ауыстыру ұсыну\n□ Қауіпсіз жауапты дүкенге жеткізу")
-      )
-      "wave_split" -> supplierDashboardJoinedMessage(
-        listOf("□ Pack accepted quantity only\n□ Keep missing quantity open\n□ Date second drop\n□ Check proof before dispatch"),
-        listOf("□ Собрать только принятое количество\n□ Оставить недостачу открытой\n□ Поставить дату второй поставки\n□ Проверить доказательство до отправки"),
-        listOf("□ Тек қабылданған санды жинау\n□ Жетіспеуді ашық қалдыру\n□ Екінші жеткізу күнін қою\n□ Жөнелтуден бұрын дәлелді тексеру")
-      )
-      "wave_ready" -> supplierDashboardJoinedMessage(
-        listOf("□ Move guarded recovery\n□ Close completed worker step only\n□ Keep residual promise visible\n□ Reopen if promise changes"),
-        listOf("□ Двигать защищённое восстановление\n□ Закрыть только выполненный шаг\n□ Оставить остаточное обещание видимым\n□ Открыть снова при изменении обещания"),
-        listOf("□ Қорғалған қалпына келтіруді қозғау\n□ Тек орындалған қадамды жабу\n□ Қалған уәдені көрінетін ұстау\n□ Уәде өзгерсе қайта ашу")
-      )
-      else -> supplierDashboardJoinedMessage(
-        listOf("□ Keep owner visible\n□ Check next follow-up\n□ Preserve missing quantity\n□ Refresh after answer"),
-        listOf("□ Держать ответственного видимым\n□ Проверить следующий контроль\n□ Сохранить видимую недостачу\n□ Обновить после ответа"),
-        listOf("□ Жауаптыны көрінетін ұстау\n□ Келесі бақылауды тексеру\n□ Жетіспейтін санды сақтау\n□ Жауаптан кейін жаңарту")
-      )
-    }
-    val recoveryWaves = listOf("wave_command", "wave_contact", "wave_source", "wave_split", "wave_ready", "wave_watch")
-      .mapNotNull { waveLane ->
-        val waveItems = recoveryDeskItems.filter { item -> item.recoveryWaveLane == waveLane }
-        if (waveItems.isEmpty()) {
-          null
-        } else {
-          val waveTopItem = waveItems.maxWithOrNull(
-            compareBy<SupplierDashboardBackorderDataModel> { it.priorityScore }
-              .thenBy { it.recoveryRiskScore }
-              .thenBy { it.recoveryWaveScore }
-          )
-          val waveTopGoodsName = waveTopItem?.goodsItemNameSnapshot?.firstOrNull { it.language == "main" }?.value
-            ?: waveTopItem?.goodsItemNameSnapshot?.firstOrNull()?.value
-            ?: waveTopItem?.goodsItemId?.take(8)
-            ?: "none"
-          val waveShortQuantityTotal = waveItems.sumOf { item -> item.missingQuantityTotal }.roundMoney()
-          val waveUrgentCount = waveItems.count { item ->
-            item.recoveryUrgencyLane == "overdue" ||
-              item.recoveryUrgencyLane == "today" ||
-              item.recoveryFollowUpLane == "follow_up_now" ||
-              (item.recoveryFollowUpAtMillis?.let { it <= now } == true)
           }
-          val waveStopPackCount = waveItems.count { item -> item.recoveryCommandLane == "stop_pack" || item.recoveryPackGuardLane == "block_pack" }
-          val wavePromiseRiskCount = waveItems.count { item -> item.recoveryPromiseShieldLane == "promise_at_risk" || item.recoveryPromiseShieldScore >= 78 }
-          val waveReadyCount = waveItems.count { item -> item.recoveryConfidenceLane == "ready_to_recover" || item.recoveryCommandLane == "ready_with_note" }
-          val waveMaxRiskScore = waveItems.maxOfOrNull { item -> item.recoveryRiskScore } ?: 0
-          val waveMaxPriorityScore = waveItems.maxOfOrNull { item -> item.priorityScore } ?: 0
-          val waveNextFollowUpAtMillis = waveItems
-            .mapNotNull { item -> item.recoveryFollowUpAtMillis }
-            .filter { it > now }
-            .minOrNull()
-          val recoveryWaveHint = waveItems.firstOrNull { item -> item.recoveryWaveHint.isNotEmpty() }?.recoveryWaveHint.orEmpty()
-          val wavePathMain = recoveryWavePathMain(waveLane)
-          val wavePathRu = recoveryWavePathRu(waveLane)
-          val wavePathKk = recoveryWavePathKk(waveLane)
-          val recoveryWaveScript = supplierDashboardJoinedMessage(
-            listOf(
-              "AITA recovery wave: $wavePathMain.",
-              "Shortages ${waveItems.size}; short quantity ${waveShortQuantityTotal.toStockMoneyText()}; urgent $waveUrgentCount; stop-pack $waveStopPackCount; promise-risk $wavePromiseRiskCount; ready $waveReadyCount.",
-              "Max risk $waveMaxRiskScore/100; max priority $waveMaxPriorityScore; top item $waveTopGoodsName.",
-              "Keep store names private outside AITA and update the wave after every answer."
-            ),
-            listOf(
-              "AITA волна восстановления: $wavePathRu.",
-              "Недопоставок ${waveItems.size}; недостача ${waveShortQuantityTotal.toStockMoneyText()}; срочных $waveUrgentCount; стоп-сборка $waveStopPackCount; риск обещания $wavePromiseRiskCount; готово $waveReadyCount.",
-              "Максимум риска $waveMaxRiskScore/100; максимум приоритета $waveMaxPriorityScore; верхняя позиция $waveTopGoodsName.",
-              "Названия магазинов держите приватными вне AITA и обновляйте волну после каждого ответа."
-            ),
-            listOf(
-              "AITA қалпына келтіру толқыны: $wavePathKk.",
-              "Жетіспеу ${waveItems.size}; жетіспейтін сан ${waveShortQuantityTotal.toStockMoneyText()}; шұғыл $waveUrgentCount; жинауды тоқтату $waveStopPackCount; уәде тәуекелі $wavePromiseRiskCount; дайын $waveReadyCount.",
-              "Ең жоғары тәуекел $waveMaxRiskScore/100; ең жоғары басымдық $waveMaxPriorityScore; жоғарғы позиция $waveTopGoodsName.",
-              "AITA сыртында дүкен атауларын құпия ұстаңыз және әр жауаптан кейін толқынды жаңартыңыз."
-            )
-          )
-          SupplierDashboardRecoveryWaveDataModel(
-            recoveryWaveLane = waveLane,
+        }
+        val reconciliationPressure = supplierDashboardChunk {
+          when (recoveryReconciliationLane) {
+            "reconcile_blocked" -> 21
+            "reconcile_store_delta" -> 13
+            "reconcile_source_delta" -> 12
+            "reconcile_split_delta" -> 10
+            "reconcile_ready" -> -8
+            else -> 1
+          }
+        }
+        val auditPressure = supplierDashboardChunk {
+          when (recoveryAuditLane) {
+            "audit_blocked" -> 23
+            "audit_quantity_gap" -> 14
+            "audit_evidence_gap" -> 13
+            "audit_store_note_gap" -> 11
+            "audit_ready" -> -9
+            else -> 1
+          }
+        }
+        val priorityScore = supplierDashboardChunk {
+          (
+            relatedOrders.size * 12 +
+               itemLines.size * 5 +
+               declinedLineCount * 8 +
+               missingQuantityTotal.coerceAtMost(999.0).toInt() +
+               duePressure +
+               ownerPressure +
+               slaPressure +
+               outcomePressure +
+               packGuardPressure +
+               contactPressure +
+               riskPressure +
+               confidencePressure +
+               followUpPressure +
+               handoffPressure +
+               closurePressure +
+               ledgerPressure +
+               triagePressure +
+               commandPressure +
+               promiseShieldPressure +
+               wavePressure +
+               agingPressure +
+               bottleneckPressure +
+               loadPressure +
+               impactPressure +
+               commitPressure +
+               allocationPressure +
+               exceptionPressure +
+               causePressure +
+               verificationPressure +
+               approvalPressure +
+               executionPressure +
+               releasePressure +
+               sealPressure +
+               closeoutPressure +
+               reopenPressure +
+               reconciliationPressure +
+               auditPressure
+            ).coerceAtLeast(0)
+        }
+  
+        supplierDashboardChunk {
+          SupplierDashboardBackorderDataModel(
+            backorderId = "backorder_${goodsItemId}_${relatedOrders.joinToString("-") { it.id.take(8) }}",
+            goodsItemId = goodsItemId,
+            goodsItemNameSnapshot = if (sampleUsesSubstitute) sampleLine.substituteGoodsItemNameSnapshot else sampleLine.goodsItemNameSnapshot,
+            barcodeSnapshots = if (sampleUsesSubstitute) sampleLine.substituteGoodsItemBarcodeSnapshots else sampleLine.goodsItemBarcodeSnapshots,
+            measurementUnitIdSnapshot = if (sampleUsesSubstitute) sampleLine.substituteGoodsItemMeasurementUnitIdSnapshot else sampleLine.goodsItemMeasurementUnitIdSnapshot,
+            affectedOrderIds = relatedOrders.map { order -> order.id },
+            storePreview = storePreview.takeIf { it.isNotBlank() }?.let { listOf(LocalizedStringDataModel("main", it)) }.orEmpty(),
+            requestedQuantityTotal = requestedQuantityTotal,
+            acceptedQuantityTotal = acceptedQuantityTotal,
+            missingQuantityTotal = missingQuantityTotal,
+            missingLineCount = itemLines.size,
+            declinedLineCount = declinedLineCount,
+            partialLineCount = partialLineCount,
+            fullyShortLineCount = fullyShortLineCount,
+            recoveryLane = recoveryLane,
+            recoveryHint = recoveryHint,
+            recoveryUrgencyLane = recoveryUrgencyLane,
+            recoveryUrgencyHint = recoveryUrgencyHint,
+            recoveryOwnerLane = recoveryOwnerLane,
+            recoveryOwnerHint = recoveryOwnerHint,
+            recoverySlaLane = recoverySlaLane,
+            recoverySlaHint = recoverySlaHint,
+            recoveryCheckpointAtMillis = recoveryCheckpointAtMillis,
+            recoveryEscalationLane = recoveryEscalationLane,
+            recoveryEscalationHint = recoveryEscalationHint,
+            recoveryProofLane = recoveryProofLane,
+            recoveryProofHint = recoveryProofHint,
+            recoveryOutcomeLane = recoveryOutcomeLane,
+            recoveryOutcomeHint = recoveryOutcomeHint,
+            recoveryPackGuardLane = recoveryPackGuardLane,
+            recoveryPackGuardHint = recoveryPackGuardHint,
+            recoveryContactLane = recoveryContactLane,
+            recoveryContactHint = recoveryContactHint,
+            recoveryContactScript = recoveryContactScript,
+            recoveryRiskLane = recoveryRiskLane,
+            recoveryRiskHint = recoveryRiskHint,
+            recoveryRiskScore = recoveryRiskScore,
+            recoveryRiskReasons = recoveryRiskReasons,
+            recoveryConfidenceLane = recoveryConfidenceLane,
+            recoveryConfidenceHint = recoveryConfidenceHint,
+            recoveryConfidenceScore = recoveryConfidenceScore,
+            recoveryConfidenceChecklist = recoveryConfidenceChecklist,
+            recoveryFollowUpLane = recoveryFollowUpLane,
+            recoveryFollowUpHint = recoveryFollowUpHint,
+            recoveryFollowUpAtMillis = recoveryFollowUpAtMillis,
+            recoveryFollowUpScript = recoveryFollowUpScript,
+            recoveryHandoffLane = recoveryHandoffLane,
+            recoveryHandoffHint = recoveryHandoffHint,
+            recoveryHandoffChecklist = recoveryHandoffChecklist,
+            recoveryHandoffScript = recoveryHandoffScript,
+            recoveryClosureLane = recoveryClosureLane,
+            recoveryClosureHint = recoveryClosureHint,
+            recoveryClosureScore = recoveryClosureScore,
+            recoveryClosureChecklist = recoveryClosureChecklist,
+            recoveryClosureScript = recoveryClosureScript,
+            recoveryLedgerLane = recoveryLedgerLane,
+            recoveryLedgerHint = recoveryLedgerHint,
+            recoveryLedgerScore = recoveryLedgerScore,
+            recoveryLedgerChecklist = recoveryLedgerChecklist,
+            recoveryLedgerScript = recoveryLedgerScript,
+            recoveryTriageLane = recoveryTriageLane,
+            recoveryTriageHint = recoveryTriageHint,
+            recoveryTriageScore = recoveryTriageScore,
+            recoveryTriageChecklist = recoveryTriageChecklist,
+            recoveryTriageScript = recoveryTriageScript,
+            recoveryCommandLane = recoveryCommandLane,
+            recoveryCommandHint = recoveryCommandHint,
+            recoveryCommandScore = recoveryCommandScore,
+            recoveryCommandChecklist = recoveryCommandChecklist,
+            recoveryCommandScript = recoveryCommandScript,
+            recoveryPromiseShieldLane = recoveryPromiseShieldLane,
+            recoveryPromiseShieldHint = recoveryPromiseShieldHint,
+            recoveryPromiseShieldScore = recoveryPromiseShieldScore,
+            recoveryPromiseShieldChecklist = recoveryPromiseShieldChecklist,
+            recoveryPromiseShieldScript = recoveryPromiseShieldScript,
+            recoveryWaveLane = recoveryWaveLane,
             recoveryWaveHint = recoveryWaveHint,
-            recoveryWaveChecklist = recoveryWaveChecklist(waveLane),
-            recoveryWaveScript = recoveryWaveScript,
-            shortageCount = waveItems.size,
-            shortQuantityTotal = waveShortQuantityTotal,
-            urgentCount = waveUrgentCount,
-            stopPackCount = waveStopPackCount,
-            promiseRiskCount = wavePromiseRiskCount,
-            readyCount = waveReadyCount,
-            maxRiskScore = waveMaxRiskScore,
-            maxPriorityScore = waveMaxPriorityScore,
-            nextFollowUpAtMillis = waveNextFollowUpAtMillis,
-            topBackorderId = waveTopItem?.backorderId.orEmpty(),
-            topGoodsItemId = waveTopItem?.goodsItemId.orEmpty(),
-            topGoodsItemNameSnapshot = waveTopItem?.goodsItemNameSnapshot.orEmpty()
+            recoveryWaveScore = recoveryWaveScore,
+            recoveryAgingLane = recoveryAgingLane,
+            recoveryAgingHint = recoveryAgingHint,
+            recoveryAgingScore = recoveryAgingScore,
+            recoveryAgingStartedAtMillis = recoveryAgingStartedAtMillis,
+            recoveryAgingHours = recoveryAgingHours,
+            recoveryAgingChecklist = recoveryAgingChecklist,
+            recoveryAgingScript = recoveryAgingScript,
+            recoveryBottleneckLane = recoveryBottleneckLane,
+            recoveryBottleneckHint = recoveryBottleneckHint,
+            recoveryBottleneckScore = recoveryBottleneckScore,
+            recoveryBottleneckChecklist = recoveryBottleneckChecklist,
+            recoveryBottleneckScript = recoveryBottleneckScript,
+            recoveryLoadLane = recoveryLoadLane,
+            recoveryLoadHint = recoveryLoadHint,
+            recoveryLoadScore = recoveryLoadScore,
+            recoveryLoadChecklist = recoveryLoadChecklist,
+            recoveryLoadScript = recoveryLoadScript,
+            recoveryImpactLane = recoveryImpactLane,
+            recoveryImpactHint = recoveryImpactHint,
+            recoveryImpactScore = recoveryImpactScore,
+            recoveryImpactChecklist = recoveryImpactChecklist,
+            recoveryImpactScript = recoveryImpactScript,
+            recoveryCommitLane = recoveryCommitLane,
+            recoveryCommitHint = recoveryCommitHint,
+            recoveryCommitScore = recoveryCommitScore,
+            recoveryCommitByMillis = recoveryCommitByMillis,
+            recoveryCommitChecklist = recoveryCommitChecklist,
+            recoveryCommitScript = recoveryCommitScript,
+            recoveryAllocationLane = recoveryAllocationLane,
+            recoveryAllocationHint = recoveryAllocationHint,
+            recoveryAllocationScore = recoveryAllocationScore,
+            recoveryAllocationChecklist = recoveryAllocationChecklist,
+            recoveryAllocationScript = recoveryAllocationScript,
+            recoveryExceptionLane = recoveryExceptionLane,
+            recoveryExceptionHint = recoveryExceptionHint,
+            recoveryExceptionScore = recoveryExceptionScore,
+            recoveryExceptionChecklist = recoveryExceptionChecklist,
+            recoveryExceptionScript = recoveryExceptionScript,
+            recoveryCauseLane = recoveryCauseLane,
+            recoveryCauseHint = recoveryCauseHint,
+            recoveryCauseScore = recoveryCauseScore,
+            recoveryCauseChecklist = recoveryCauseChecklist,
+            recoveryCauseScript = recoveryCauseScript,
+            recoveryVerificationLane = recoveryVerificationLane,
+            recoveryVerificationHint = recoveryVerificationHint,
+            recoveryVerificationScore = recoveryVerificationScore,
+            recoveryVerificationChecklist = recoveryVerificationChecklist,
+            recoveryVerificationScript = recoveryVerificationScript,
+            recoveryApprovalLane = recoveryApprovalLane,
+            recoveryApprovalHint = recoveryApprovalHint,
+            recoveryApprovalScore = recoveryApprovalScore,
+            recoveryApprovalChecklist = recoveryApprovalChecklist,
+            recoveryApprovalScript = recoveryApprovalScript,
+            recoveryExecutionLane = recoveryExecutionLane,
+            recoveryExecutionHint = recoveryExecutionHint,
+            recoveryExecutionScore = recoveryExecutionScore,
+            recoveryExecutionChecklist = recoveryExecutionChecklist,
+            recoveryExecutionScript = recoveryExecutionScript,
+            recoveryReleaseLane = recoveryReleaseLane,
+            recoveryReleaseHint = recoveryReleaseHint,
+            recoveryReleaseScore = recoveryReleaseScore,
+            recoveryReleaseChecklist = recoveryReleaseChecklist,
+            recoveryReleaseScript = recoveryReleaseScript,
+            recoverySealLane = recoverySealLane,
+            recoverySealHint = recoverySealHint,
+            recoverySealScore = recoverySealScore,
+            recoverySealChecklist = recoverySealChecklist,
+            recoverySealScript = recoverySealScript,
+            recoveryCloseoutLane = recoveryCloseoutLane,
+            recoveryCloseoutHint = recoveryCloseoutHint,
+            recoveryCloseoutScore = recoveryCloseoutScore,
+            recoveryCloseoutChecklist = recoveryCloseoutChecklist,
+            recoveryCloseoutScript = recoveryCloseoutScript,
+            recoveryReopenLane = recoveryReopenLane,
+            recoveryReopenHint = recoveryReopenHint,
+            recoveryReopenScore = recoveryReopenScore,
+            recoveryReopenAtMillis = recoveryReopenAtMillis,
+            recoveryReopenChecklist = recoveryReopenChecklist,
+            recoveryReopenScript = recoveryReopenScript,
+            recoveryReconciliationLane = recoveryReconciliationLane,
+            recoveryReconciliationHint = recoveryReconciliationHint,
+            recoveryReconciliationScore = recoveryReconciliationScore,
+            recoveryReconciliationChecklist = recoveryReconciliationChecklist,
+            recoveryReconciliationScript = recoveryReconciliationScript,
+            recoveryAuditLane = recoveryAuditLane,
+            recoveryAuditHint = recoveryAuditHint,
+            recoveryAuditScore = recoveryAuditScore,
+            recoveryAuditChecklist = recoveryAuditChecklist,
+            recoveryAuditScript = recoveryAuditScript,
+            nextRecoveryStep = nextRecoveryStep,
+            recoveryChecklist = recoveryChecklist,
+            affectedOrderCount = affectedOrderCount,
+            affectedStoreCount = affectedStoreCount,
+            earliestDueAtMillis = earliestDueAtMillis,
+            latestActivityMillis = latestActivityMillis,
+            priorityScore = priorityScore,
+            suggestedAction = suggestedAction,
+            attentionSummary = supplierDashboardJoinedMessage(shortageMain, shortageRu, shortageKk)
           )
         }
       }
       .sortedWith(
-        compareByDescending<SupplierDashboardRecoveryWaveDataModel> { it.maxPriorityScore }
-          .thenByDescending { it.maxRiskScore }
-          .thenByDescending { it.shortageCount }
+        compareByDescending<SupplierDashboardBackorderDataModel> { it.priorityScore }
+          .thenBy { it.earliestDueAtMillis ?: Long.MAX_VALUE }
+          .thenByDescending { it.latestActivityMillis }
       )
-
-    SupplierDashboardRecoveryDeskDataModel(
-      recoveryDeskLane = recoveryDeskLane,
-      recoveryDeskHint = recoveryDeskHint,
-      recoveryDeskChecklist = recoveryDeskChecklist,
-      recoveryDeskScript = recoveryDeskScript,
-      shortageCount = shortageCount,
-      urgentCount = urgentCount,
-      stopPackCount = stopPackCount,
-      storeContactCount = storeContactCount,
-      sourcingCount = sourcingCount,
-      splitShipCount = splitShipCount,
-      promiseRiskCount = promiseRiskCount,
-      readyCount = readyCount,
-      staleRecoveryCount = staleRecoveryCount,
-      touchTodayRecoveryCount = touchTodayRecoveryCount,
-      freshRecoveryCount = freshRecoveryCount,
-      oldestRecoveryAgeHours = oldestRecoveryAgeHours,
-      averageRecoveryAgeHours = averageRecoveryAgeHours,
-      topBottleneckLane = topBottleneckLane,
-      decisionBottleneckCount = decisionBottleneckCount,
-      contactBottleneckCount = contactBottleneckCount,
-      sourcingBottleneckCount = sourcingBottleneckCount,
-      packBottleneckCount = packBottleneckCount,
-      proofBottleneckCount = proofBottleneckCount,
-      agingBottleneckCount = agingBottleneckCount,
-      readyBottleneckCount = readyBottleneckCount,
-      topLoadLane = topLoadLane,
-      heavyLoadCount = heavyLoadCount,
-      multiStoreLoadCount = multiStoreLoadCount,
-      packLoadCount = packLoadCount,
-      readyLoadCount = readyLoadCount,
-      averageLoadScore = averageLoadScore,
-      topImpactLane = topImpactLane,
-      highImpactCount = highImpactCount,
-      promiseImpactCount = promiseImpactCount,
-      multiStoreImpactCount = multiStoreImpactCount,
-      replenishmentImpactCount = replenishmentImpactCount,
-      controlledImpactCount = controlledImpactCount,
-      averageImpactScore = averageImpactScore,
-      maxImpactScore = maxImpactScore,
-      topCommitLane = topCommitLane,
-      blockedCommitCount = blockedCommitCount,
-      dueCommitCount = dueCommitCount,
-      sourceCommitCount = sourceCommitCount,
-      splitCommitCount = splitCommitCount,
-      readyCommitCount = readyCommitCount,
-      averageCommitScore = averageCommitScore,
-      nextCommitAtMillis = nextCommitAtMillis,
-      topAllocationLane = topAllocationLane,
-      allocationPressureCount = allocationPressureCount,
-      fairSplitAllocationCount = fairSplitAllocationCount,
-      priorityAllocationCount = priorityAllocationCount,
-      allocationReadyCount = allocationReadyCount,
-      averageAllocationScore = averageAllocationScore,
-      maxAllocationScore = maxAllocationScore,
-      topExceptionLane = topExceptionLane,
-      exceptionPressureCount = exceptionPressureCount,
-      stopPackExceptionCount = stopPackExceptionCount,
-      cancelReviewExceptionCount = cancelReviewExceptionCount,
-      substituteExceptionCount = substituteExceptionCount,
-      sourcingExceptionCount = sourcingExceptionCount,
-      allocationExceptionCount = allocationExceptionCount,
-      exceptionReadyCount = exceptionReadyCount,
-      averageExceptionScore = averageExceptionScore,
-      maxExceptionScore = maxExceptionScore,
-      topCauseLane = topCauseLane,
-      causePressureCount = causePressureCount,
-      zeroAcceptanceCauseCount = zeroAcceptanceCauseCount,
-      partialCapacityCauseCount = partialCapacityCauseCount,
-      promiseConflictCauseCount = promiseConflictCauseCount,
-      allocationCauseCount = allocationCauseCount,
-      exceptionCauseCount = exceptionCauseCount,
-      causeReadyCount = causeReadyCount,
-      averageCauseScore = averageCauseScore,
-      maxCauseScore = maxCauseScore,
-      topVerificationLane = topVerificationLane,
-      verificationBlockerCount = verificationBlockerCount,
-      storeVerificationCount = storeVerificationCount,
-      sourceVerificationCount = sourceVerificationCount,
-      packVerificationCount = packVerificationCount,
-      causeVerificationCount = causeVerificationCount,
-      verificationReadyCount = verificationReadyCount,
-      averageVerificationScore = averageVerificationScore,
-      maxVerificationScore = maxVerificationScore,
-      topApprovalLane = topApprovalLane,
-      approvalBlockerCount = approvalBlockerCount,
-      managerApprovalCount = managerApprovalCount,
-      storeApprovalCount = storeApprovalCount,
-      sourceApprovalCount = sourceApprovalCount,
-      packApprovalCount = packApprovalCount,
-      approvalReadyCount = approvalReadyCount,
-      averageApprovalScore = averageApprovalScore,
-      maxApprovalScore = maxApprovalScore,
-      topExecutionLane = topExecutionLane,
-      executionBlockerCount = executionBlockerCount,
-      storeExecutionCount = storeExecutionCount,
-      sourceExecutionCount = sourceExecutionCount,
-      splitExecutionCount = splitExecutionCount,
-      readyExecutionCount = readyExecutionCount,
-      averageExecutionScore = averageExecutionScore,
-      maxExecutionScore = maxExecutionScore,
-      topReleaseLane = topReleaseLane,
-      releaseBlockerCount = releaseBlockerCount,
-      storeReleaseCount = storeReleaseCount,
-      sourceReleaseCount = sourceReleaseCount,
-      splitReleaseCount = splitReleaseCount,
-      readyReleaseCount = readyReleaseCount,
-      averageReleaseScore = averageReleaseScore,
-      maxReleaseScore = maxReleaseScore,
-      topSealLane = topSealLane,
-      sealBlockerCount = sealBlockerCount,
-      storeSealCount = storeSealCount,
-      sourceSealCount = sourceSealCount,
-      splitSealCount = splitSealCount,
-      readySealCount = readySealCount,
-      averageSealScore = averageSealScore,
-      maxSealScore = maxSealScore,
-      topCloseoutLane = topCloseoutLane,
-      closeoutBlockerCount = closeoutBlockerCount,
-      storeCloseoutCount = storeCloseoutCount,
-      sourceCloseoutCount = sourceCloseoutCount,
-      splitCloseoutCount = splitCloseoutCount,
-      readyCloseoutCount = readyCloseoutCount,
-      averageCloseoutScore = averageCloseoutScore,
-      maxCloseoutScore = maxCloseoutScore,
-      topReopenLane = topReopenLane,
-      reopenBlockerCount = reopenBlockerCount,
-      reopenAnswerCount = reopenAnswerCount,
-      reopenPromiseCount = reopenPromiseCount,
-      reopenSplitCount = reopenSplitCount,
-      reopenReadyCount = reopenReadyCount,
-      averageReopenScore = averageReopenScore,
-      maxReopenScore = maxReopenScore,
-      nextReopenAtMillis = nextReopenAtMillis,
-      topReconciliationLane = topReconciliationLane,
-      reconciliationBlockerCount = reconciliationBlockerCount,
-      reconciliationStoreCount = reconciliationStoreCount,
-      reconciliationSourceCount = reconciliationSourceCount,
-      reconciliationSplitCount = reconciliationSplitCount,
-      reconciliationReadyCount = reconciliationReadyCount,
-      averageReconciliationScore = averageReconciliationScore,
-      maxReconciliationScore = maxReconciliationScore,
-      topAuditLane = topAuditLane,
-      auditBlockerCount = auditBlockerCount,
-      auditQuantityGapCount = auditQuantityGapCount,
-      auditEvidenceGapCount = auditEvidenceGapCount,
-      auditStoreNoteGapCount = auditStoreNoteGapCount,
-      auditReadyCount = auditReadyCount,
-      averageAuditScore = averageAuditScore,
-      maxAuditScore = maxAuditScore,
-      averageRiskScore = averageRiskScore,
-      maxPriorityScore = maxPriorityScore,
-      nextFollowUpAtMillis = nextFollowUpAtMillis,
-      recoveryWaves = recoveryWaves,
-      topBackorderId = topItem?.backorderId.orEmpty(),
-      topGoodsItemId = topItem?.goodsItemId.orEmpty(),
-      topGoodsItemNameSnapshot = topItem?.goodsItemNameSnapshot.orEmpty()
-    )
   }
 
-  val dashboardProfiles = supplierProfiles.map { supplier ->
-    val profileOrders = orders.filter { it.supplierId == supplier.id }
-    val profileOrderIds = profileOrders.map { it.id }.toSet()
-    val profileLines = lines.filter { it.orderId in profileOrderIds }
-    val profilePriceBookGoodsItemIds = supplierPriceRows
-      .filter { it.supplierId == supplier.id }
-      .map { it.goodsItemId }
-      .filter { it.isNotBlank() }
-    SupplierDashboardProfileDataModel(
-      supplierId = supplier.id,
-      name = supplier.name,
-      phoneNumbers = supplier.phoneNumbers.orEmpty(),
-      emails = supplier.emails.orEmpty(),
-      orderCount = profileOrders.size,
-      openOrderCount = profileOrders.count { !it.status.isClosedForSupplierDashboard() },
-      actionRequiredOrderCount = bundles.count { bundle ->
-        bundle.order.supplierId == supplier.id && bundle.needsSupplierDashboardAction()
-      },
-      catalogSkuCount = (profileLines.map { it.goodsItemId } + profilePriceBookGoodsItemIds).filter { it.isNotBlank() }.distinct().size,
-      partnerCount = (profileOrders.map { it.storeId } + supplierPriceRows.filter { it.supplierId == supplier.id }.map { it.storeId }).filter { it.isNotBlank() }.distinct().size,
-      latestActivityMillis = profileOrders
-        .map { it.updatedAtMillis.takeIf { value -> value > 0L } ?: it.orderedAtMillis }
-        .maxOrNull() ?: supplier.addedAt
+  val backorderWatch = supplierDashboardChunk {
+    backorderWatchAll.take(16)
+  }
+
+  val recoveryDesk = supplierDashboardChunk {
+    run {
+      val recoveryDeskItems = supplierDashboardChunk {
+        backorderWatchAll
+      }
+      val shortageCount = supplierDashboardChunk {
+        recoveryDeskItems.size
+      }
+      val urgentCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item ->
+          item.recoveryUrgencyLane == "overdue" ||
+            item.recoveryUrgencyLane == "today" ||
+            item.recoverySlaLane == "call_now" ||
+            item.recoveryFollowUpLane == "follow_up_now" ||
+            (item.recoveryFollowUpAtMillis?.let { it <= now } == true)
+        }
+      }
+      val stopPackCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item ->
+          item.recoveryCommandLane == "stop_pack" ||
+            item.recoveryPackGuardLane == "block_pack" ||
+            item.recoveryClosureLane == "blocked_open" ||
+            item.recoveryExecutionLane == "execution_blocked" ||
+            item.recoveryReleaseLane == "release_blocked" ||
+            item.recoverySealLane == "seal_blocked" ||
+            item.recoveryCloseoutLane == "closeout_blocked" ||
+            item.recoveryReopenLane == "reopen_blocked" ||
+            item.recoveryReconciliationLane == "reconcile_blocked" ||
+            item.recoveryAuditLane == "audit_blocked"
+        }
+      }
+      val storeContactCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item ->
+          item.recoveryOwnerLane == "store_contact" ||
+            item.recoveryContactLane == "store_call" ||
+            item.recoveryContactLane == "substitute_answer" ||
+            item.recoveryPromiseShieldLane == "store_answer_needed"
+        }
+      }
+      val sourcingCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item ->
+          item.recoveryOwnerLane == "upstream_sourcing" ||
+            item.recoveryContactLane == "upstream_request" ||
+            item.recoveryCommandLane == "source_now" ||
+            item.recoveryPromiseShieldLane == "source_before_promise"
+        }
+      }
+      val splitShipCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item ->
+          item.recoveryCommandLane == "split_and_ship" ||
+            item.recoveryLane == "split_delivery" ||
+            item.recoveryPromiseShieldLane == "split_promise"
+        }
+      }
+      val promiseRiskCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item ->
+          item.recoveryPromiseShieldLane == "promise_at_risk" ||
+            item.recoveryPromiseShieldScore >= 78 ||
+            item.recoveryRiskLane == "critical_recovery"
+        }
+      }
+      val readyCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item ->
+          item.recoveryPromiseShieldLane == "promise_safe" ||
+            item.recoveryCommandLane == "ready_with_note" ||
+            item.recoveryTriageLane == "ready_lane" ||
+            item.recoveryConfidenceLane == "ready_to_recover" ||
+            item.recoveryCommitLane == "commit_ready" ||
+            item.recoveryExecutionLane == "execute_ship_ready" ||
+            item.recoveryReleaseLane == "release_ready" ||
+            item.recoverySealLane == "seal_ready" ||
+            item.recoveryCloseoutLane == "closeout_ready" ||
+            item.recoveryReopenLane == "reopen_safe" ||
+            item.recoveryReconciliationLane == "reconcile_ready" ||
+            item.recoveryAuditLane == "audit_ready"
+        }
+      }
+      val staleRecoveryCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryAgingLane == "stale_blocker" || item.recoveryAgingScore >= 75 }
+      }
+      val touchTodayRecoveryCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryAgingLane == "touch_today" || item.recoveryAgingLane == "stale_blocker" }
+      }
+      val freshRecoveryCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryAgingLane == "fresh_recovery" }
+      }
+      val oldestRecoveryAgeHours = supplierDashboardChunk {
+        recoveryDeskItems.maxOfOrNull { item -> item.recoveryAgingHours } ?: 0
+      }
+      val averageRecoveryAgeHours = supplierDashboardChunk {
+        recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
+          items.sumOf { item -> item.recoveryAgingHours }.coerceAtLeast(0) / items.size
+        } ?: 0
+      }
+      val decisionBottleneckCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryBottleneckLane == "decision_bottleneck" }
+      }
+      val contactBottleneckCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryBottleneckLane == "contact_bottleneck" }
+      }
+      val sourcingBottleneckCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryBottleneckLane == "sourcing_bottleneck" }
+      }
+      val packBottleneckCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryBottleneckLane == "pack_bottleneck" }
+      }
+      val proofBottleneckCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryBottleneckLane == "proof_bottleneck" }
+      }
+      val agingBottleneckCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryBottleneckLane == "aging_bottleneck" }
+      }
+      val readyBottleneckCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryBottleneckLane == "ready_bottleneck" }
+      }
+      val heavyLoadCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryLoadLane == "heavy_load" || item.recoveryLoadScore >= 78 }
+      }
+      val multiStoreLoadCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryLoadLane == "multi_store_load" }
+      }
+      val packLoadCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryLoadLane == "pack_load" }
+      }
+      val readyLoadCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryLoadLane == "ready_load" }
+      }
+      val averageLoadScore = supplierDashboardChunk {
+        recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
+          items.sumOf { item -> item.recoveryLoadScore }.coerceAtLeast(0) / items.size
+        } ?: 0
+      }
+      val topLoadLane = supplierDashboardChunk {
+        listOf(
+          "heavy_load",
+          "multi_store_load",
+          "pack_load",
+          "ready_load",
+          "watch_load"
+        ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoveryLoadLane == lane } }
+          .filter { candidate -> candidate.second > 0 }
+          .maxByOrNull { candidate -> candidate.second }
+          ?.first
+          .orEmpty()
+      }
+      val highImpactCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryImpactLane == "customer_promise_impact" || item.recoveryImpactScore >= 72 }
+      }
+      val promiseImpactCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryImpactLane == "customer_promise_impact" }
+      }
+      val multiStoreImpactCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryImpactLane == "multi_store_impact" }
+      }
+      val replenishmentImpactCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryImpactLane == "store_replenishment_impact" }
+      }
+      val controlledImpactCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryImpactLane == "controlled_impact" }
+      }
+      val averageImpactScore = supplierDashboardChunk {
+        recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
+          items.sumOf { item -> item.recoveryImpactScore }.coerceAtLeast(0) / items.size
+        } ?: 0
+      }
+      val maxImpactScore = supplierDashboardChunk {
+        recoveryDeskItems.maxOfOrNull { item -> item.recoveryImpactScore } ?: 0
+      }
+      val blockedCommitCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryCommitLane == "commit_blocked" || item.recoveryCommitScore >= 78 }
+      }
+      val dueCommitCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item ->
+          item.recoveryCommitLane == "commit_store_today" || item.recoveryCommitByMillis?.let { commitAt -> commitAt <= now + AITA_SUPPLIER_DAY_MILLIS } == true
+        }
+      }
+      val sourceCommitCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryCommitLane == "commit_source_eta" }
+      }
+      val splitCommitCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryCommitLane == "commit_split_eta" }
+      }
+      val readyCommitCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryCommitLane == "commit_ready" }
+      }
+      val averageCommitScore = supplierDashboardChunk {
+        recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
+          items.sumOf { item -> item.recoveryCommitScore }.coerceAtLeast(0) / items.size
+        } ?: 0
+      }
+      val nextCommitAtMillis = supplierDashboardChunk {
+        recoveryDeskItems
+          .mapNotNull { item -> item.recoveryCommitByMillis }
+          .filter { commitAt -> commitAt > now }
+          .minOrNull()
+      }
+      val topCommitLane = supplierDashboardChunk {
+        listOf(
+          "commit_blocked",
+          "commit_store_today",
+          "commit_source_eta",
+          "commit_split_eta",
+          "commit_ready",
+          "commit_watch"
+        ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoveryCommitLane == lane } }
+          .filter { candidate -> candidate.second > 0 }
+          .maxByOrNull { candidate -> candidate.second }
+          ?.first
+          .orEmpty()
+      }
+      val allocationPressureCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item ->
+          item.recoveryAllocationLane == "fair_split_needed" ||
+            item.recoveryAllocationLane == "priority_allocation" ||
+            item.recoveryAllocationScore >= 68
+        }
+      }
+      val fairSplitAllocationCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryAllocationLane == "fair_split_needed" }
+      }
+      val priorityAllocationCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryAllocationLane == "priority_allocation" }
+      }
+      val allocationReadyCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryAllocationLane == "allocation_ready" }
+      }
+      val averageAllocationScore = supplierDashboardChunk {
+        recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
+          items.sumOf { item -> item.recoveryAllocationScore }.coerceAtLeast(0) / items.size
+        } ?: 0
+      }
+      val maxAllocationScore = supplierDashboardChunk {
+        recoveryDeskItems.maxOfOrNull { item -> item.recoveryAllocationScore } ?: 0
+      }
+      val topAllocationLane = supplierDashboardChunk {
+        listOf(
+          "fair_split_needed",
+          "priority_allocation",
+          "single_store_allocation",
+          "allocation_ready",
+          "allocation_watch"
+        ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoveryAllocationLane == lane } }
+          .filter { candidate -> candidate.second > 0 }
+          .maxByOrNull { candidate -> candidate.second }
+          ?.first
+          .orEmpty()
+      }
+      val exceptionPressureCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item ->
+          item.recoveryExceptionLane == "exception_stop_pack" ||
+            item.recoveryExceptionLane == "exception_cancel_review" ||
+            item.recoveryExceptionLane == "exception_substitute" ||
+            item.recoveryExceptionLane == "exception_sourcing" ||
+            item.recoveryExceptionLane == "exception_allocation" ||
+            item.recoveryExceptionScore >= 70
+        }
+      }
+      val stopPackExceptionCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryExceptionLane == "exception_stop_pack" }
+      }
+      val cancelReviewExceptionCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryExceptionLane == "exception_cancel_review" }
+      }
+      val substituteExceptionCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryExceptionLane == "exception_substitute" }
+      }
+      val sourcingExceptionCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryExceptionLane == "exception_sourcing" }
+      }
+      val allocationExceptionCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryExceptionLane == "exception_allocation" }
+      }
+      val exceptionReadyCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryExceptionLane == "exception_ready" }
+      }
+      val averageExceptionScore = supplierDashboardChunk {
+        recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
+          items.sumOf { item -> item.recoveryExceptionScore }.coerceAtLeast(0) / items.size
+        } ?: 0
+      }
+      val maxExceptionScore = supplierDashboardChunk {
+        recoveryDeskItems.maxOfOrNull { item -> item.recoveryExceptionScore } ?: 0
+      }
+      val topExceptionLane = supplierDashboardChunk {
+        listOf(
+          "exception_stop_pack",
+          "exception_cancel_review",
+          "exception_substitute",
+          "exception_sourcing",
+          "exception_allocation",
+          "exception_ready",
+          "exception_watch"
+        ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoveryExceptionLane == lane } }
+          .filter { candidate -> candidate.second > 0 }
+          .maxByOrNull { candidate -> candidate.second }
+          ?.first
+          .orEmpty()
+      }
+      val causePressureCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item ->
+          item.recoveryCauseLane == "zero_acceptance_cause" ||
+            item.recoveryCauseLane == "exception_cause" ||
+            item.recoveryCauseLane == "promise_conflict_cause" ||
+            item.recoveryCauseLane == "allocation_cause" ||
+            item.recoveryCauseLane == "partial_capacity_cause" ||
+            item.recoveryCauseScore >= 68
+        }
+      }
+      val zeroAcceptanceCauseCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryCauseLane == "zero_acceptance_cause" }
+      }
+      val partialCapacityCauseCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryCauseLane == "partial_capacity_cause" }
+      }
+      val promiseConflictCauseCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryCauseLane == "promise_conflict_cause" }
+      }
+      val allocationCauseCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryCauseLane == "allocation_cause" }
+      }
+      val exceptionCauseCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryCauseLane == "exception_cause" }
+      }
+      val causeReadyCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryCauseLane == "cause_ready" }
+      }
+      val averageCauseScore = supplierDashboardChunk {
+        recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
+          items.sumOf { item -> item.recoveryCauseScore }.coerceAtLeast(0) / items.size
+        } ?: 0
+      }
+      val maxCauseScore = supplierDashboardChunk {
+        recoveryDeskItems.maxOfOrNull { item -> item.recoveryCauseScore } ?: 0
+      }
+      val topCauseLane = supplierDashboardChunk {
+        listOf(
+          "zero_acceptance_cause",
+          "exception_cause",
+          "promise_conflict_cause",
+          "allocation_cause",
+          "partial_capacity_cause",
+          "cause_ready",
+          "cause_watch"
+        ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoveryCauseLane == lane } }
+          .filter { candidate -> candidate.second > 0 }
+          .maxByOrNull { candidate -> candidate.second }
+          ?.first
+          .orEmpty()
+      }
+      val verificationBlockerCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryVerificationLane == "verify_blocked" || item.recoveryVerificationScore >= 76 }
+      }
+      val storeVerificationCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryVerificationLane == "verify_store_answer" }
+      }
+      val sourceVerificationCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryVerificationLane == "verify_source_proof" }
+      }
+      val packVerificationCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryVerificationLane == "verify_pack_split" }
+      }
+      val causeVerificationCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryVerificationLane == "verify_cause_record" }
+      }
+      val verificationReadyCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryVerificationLane == "verify_ready" }
+      }
+      val averageVerificationScore = supplierDashboardChunk {
+        recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
+          items.sumOf { item -> item.recoveryVerificationScore }.coerceAtLeast(0) / items.size
+        } ?: 0
+      }
+      val maxVerificationScore = supplierDashboardChunk {
+        recoveryDeskItems.maxOfOrNull { item -> item.recoveryVerificationScore } ?: 0
+      }
+      val topVerificationLane = supplierDashboardChunk {
+        listOf(
+          "verify_blocked",
+          "verify_cause_record",
+          "verify_store_answer",
+          "verify_source_proof",
+          "verify_pack_split",
+          "verify_ready",
+          "verify_watch"
+        ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoveryVerificationLane == lane } }
+          .filter { candidate -> candidate.second > 0 }
+          .maxByOrNull { candidate -> candidate.second }
+          ?.first
+          .orEmpty()
+      }
+      val approvalBlockerCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryApprovalLane == "approval_blocked" || item.recoveryApprovalScore >= 78 }
+      }
+      val managerApprovalCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryApprovalLane == "approval_manager_review" }
+      }
+      val storeApprovalCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryApprovalLane == "approval_store_ack" }
+      }
+      val sourceApprovalCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryApprovalLane == "approval_source_ack" }
+      }
+      val packApprovalCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryApprovalLane == "approval_pack_lead" }
+      }
+      val approvalReadyCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryApprovalLane == "approval_ready" }
+      }
+      val averageApprovalScore = supplierDashboardChunk {
+        recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
+          items.sumOf { item -> item.recoveryApprovalScore }.coerceAtLeast(0) / items.size
+        } ?: 0
+      }
+      val maxApprovalScore = supplierDashboardChunk {
+        recoveryDeskItems.maxOfOrNull { item -> item.recoveryApprovalScore } ?: 0
+      }
+      val topApprovalLane = supplierDashboardChunk {
+        listOf(
+          "approval_blocked",
+          "approval_manager_review",
+          "approval_store_ack",
+          "approval_source_ack",
+          "approval_pack_lead",
+          "approval_ready",
+          "approval_watch"
+        ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoveryApprovalLane == lane } }
+          .filter { candidate -> candidate.second > 0 }
+          .maxByOrNull { candidate -> candidate.second }
+          ?.first
+          .orEmpty()
+      }
+      val executionBlockerCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryExecutionLane == "execution_blocked" || item.recoveryExecutionScore >= 80 }
+      }
+      val storeExecutionCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryExecutionLane == "execute_store_call" }
+      }
+      val sourceExecutionCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryExecutionLane == "execute_source_eta" }
+      }
+      val splitExecutionCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryExecutionLane == "execute_split_pack" }
+      }
+      val readyExecutionCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryExecutionLane == "execute_ship_ready" }
+      }
+      val averageExecutionScore = supplierDashboardChunk {
+        recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
+          items.sumOf { item -> item.recoveryExecutionScore }.coerceAtLeast(0) / items.size
+        } ?: 0
+      }
+      val maxExecutionScore = supplierDashboardChunk {
+        recoveryDeskItems.maxOfOrNull { item -> item.recoveryExecutionScore } ?: 0
+      }
+      val topExecutionLane = supplierDashboardChunk {
+        listOf(
+          "execution_blocked",
+          "execute_store_call",
+          "execute_source_eta",
+          "execute_split_pack",
+          "execute_ship_ready",
+          "execution_watch"
+        ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoveryExecutionLane == lane } }
+          .filter { candidate -> candidate.second > 0 }
+          .maxByOrNull { candidate -> candidate.second }
+          ?.first
+          .orEmpty()
+      }
+      val releaseBlockerCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryReleaseLane == "release_blocked" || item.recoveryReleaseScore >= 82 }
+      }
+      val storeReleaseCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryReleaseLane == "release_store_update" }
+      }
+      val sourceReleaseCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryReleaseLane == "release_source_eta" }
+      }
+      val splitReleaseCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryReleaseLane == "release_split_dispatch" }
+      }
+      val readyReleaseCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryReleaseLane == "release_ready" }
+      }
+      val averageReleaseScore = supplierDashboardChunk {
+        recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
+          items.sumOf { item -> item.recoveryReleaseScore }.coerceAtLeast(0) / items.size
+        } ?: 0
+      }
+      val maxReleaseScore = supplierDashboardChunk {
+        recoveryDeskItems.maxOfOrNull { item -> item.recoveryReleaseScore } ?: 0
+      }
+      val topReleaseLane = supplierDashboardChunk {
+        listOf(
+          "release_blocked",
+          "release_store_update",
+          "release_source_eta",
+          "release_split_dispatch",
+          "release_ready",
+          "release_watch"
+        ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoveryReleaseLane == lane } }
+          .filter { candidate -> candidate.second > 0 }
+          .maxByOrNull { candidate -> candidate.second }
+          ?.first
+          .orEmpty()
+      }
+      val sealBlockerCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoverySealLane == "seal_blocked" || item.recoverySealScore >= 84 }
+      }
+      val storeSealCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoverySealLane == "seal_store_notice" }
+      }
+      val sourceSealCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoverySealLane == "seal_source_trace" }
+      }
+      val splitSealCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoverySealLane == "seal_split_manifest" }
+      }
+      val readySealCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoverySealLane == "seal_ready" }
+      }
+      val averageSealScore = supplierDashboardChunk {
+        recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
+          items.sumOf { item -> item.recoverySealScore }.coerceAtLeast(0) / items.size
+        } ?: 0
+      }
+      val maxSealScore = supplierDashboardChunk {
+        recoveryDeskItems.maxOfOrNull { item -> item.recoverySealScore } ?: 0
+      }
+      val topSealLane = supplierDashboardChunk {
+        listOf(
+          "seal_blocked",
+          "seal_store_notice",
+          "seal_source_trace",
+          "seal_split_manifest",
+          "seal_ready",
+          "seal_watch"
+        ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoverySealLane == lane } }
+          .filter { candidate -> candidate.second > 0 }
+          .maxByOrNull { candidate -> candidate.second }
+          ?.first
+          .orEmpty()
+      }
+      val closeoutBlockerCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryCloseoutLane == "closeout_blocked" || item.recoveryCloseoutScore >= 86 }
+      }
+      val storeCloseoutCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryCloseoutLane == "closeout_store_notice" }
+      }
+      val sourceCloseoutCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryCloseoutLane == "closeout_source_trace" }
+      }
+      val splitCloseoutCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryCloseoutLane == "closeout_split_leftover" }
+      }
+      val readyCloseoutCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryCloseoutLane == "closeout_ready" }
+      }
+      val averageCloseoutScore = supplierDashboardChunk {
+        recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
+          items.sumOf { item -> item.recoveryCloseoutScore }.coerceAtLeast(0) / items.size
+        } ?: 0
+      }
+      val maxCloseoutScore = supplierDashboardChunk {
+        recoveryDeskItems.maxOfOrNull { item -> item.recoveryCloseoutScore } ?: 0
+      }
+      val topCloseoutLane = supplierDashboardChunk {
+        listOf(
+          "closeout_blocked",
+          "closeout_store_notice",
+          "closeout_source_trace",
+          "closeout_split_leftover",
+          "closeout_ready",
+          "closeout_watch"
+        ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoveryCloseoutLane == lane } }
+          .filter { candidate -> candidate.second > 0 }
+          .maxByOrNull { candidate -> candidate.second }
+          ?.first
+          .orEmpty()
+      }
+      val reopenBlockerCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryReopenLane == "reopen_blocked" || item.recoveryReopenScore >= 86 }
+      }
+      val reopenAnswerCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryReopenLane == "reopen_after_answer" }
+      }
+      val reopenPromiseCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryReopenLane == "reopen_if_promise_slips" }
+      }
+      val reopenSplitCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryReopenLane == "reopen_split_leftover" }
+      }
+      val reopenReadyCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryReopenLane == "reopen_safe" }
+      }
+      val averageReopenScore = supplierDashboardChunk {
+        recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
+          items.sumOf { item -> item.recoveryReopenScore }.coerceAtLeast(0) / items.size
+        } ?: 0
+      }
+      val maxReopenScore = supplierDashboardChunk {
+        recoveryDeskItems.maxOfOrNull { item -> item.recoveryReopenScore } ?: 0
+      }
+      val nextReopenAtMillis = supplierDashboardChunk {
+        recoveryDeskItems
+          .mapNotNull { item -> item.recoveryReopenAtMillis }
+          .filter { reopenAt -> reopenAt > now }
+          .minOrNull()
+      }
+      val topReopenLane = supplierDashboardChunk {
+        listOf(
+          "reopen_blocked",
+          "reopen_after_answer",
+          "reopen_if_promise_slips",
+          "reopen_split_leftover",
+          "reopen_safe",
+          "reopen_watch"
+        ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoveryReopenLane == lane } }
+          .filter { candidate -> candidate.second > 0 }
+          .maxByOrNull { candidate -> candidate.second }
+          ?.first
+          .orEmpty()
+      }
+      val reconciliationBlockerCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryReconciliationLane == "reconcile_blocked" || item.recoveryReconciliationScore >= 86 }
+      }
+      val reconciliationStoreCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryReconciliationLane == "reconcile_store_delta" }
+      }
+      val reconciliationSourceCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryReconciliationLane == "reconcile_source_delta" }
+      }
+      val reconciliationSplitCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryReconciliationLane == "reconcile_split_delta" }
+      }
+      val reconciliationReadyCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryReconciliationLane == "reconcile_ready" }
+      }
+      val averageReconciliationScore = supplierDashboardChunk {
+        recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
+          items.sumOf { item -> item.recoveryReconciliationScore }.coerceAtLeast(0) / items.size
+        } ?: 0
+      }
+      val maxReconciliationScore = supplierDashboardChunk {
+        recoveryDeskItems.maxOfOrNull { item -> item.recoveryReconciliationScore } ?: 0
+      }
+      val topReconciliationLane = supplierDashboardChunk {
+        listOf(
+          "reconcile_blocked",
+          "reconcile_store_delta",
+          "reconcile_source_delta",
+          "reconcile_split_delta",
+          "reconcile_ready",
+          "reconcile_watch"
+        ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoveryReconciliationLane == lane } }
+          .filter { candidate -> candidate.second > 0 }
+          .maxByOrNull { candidate -> candidate.second }
+          ?.first
+          .orEmpty()
+      }
+      val auditBlockerCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryAuditLane == "audit_blocked" || item.recoveryAuditScore >= 86 }
+      }
+      val auditQuantityGapCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryAuditLane == "audit_quantity_gap" }
+      }
+      val auditEvidenceGapCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryAuditLane == "audit_evidence_gap" }
+      }
+      val auditStoreNoteGapCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryAuditLane == "audit_store_note_gap" }
+      }
+      val auditReadyCount = supplierDashboardChunk {
+        recoveryDeskItems.count { item -> item.recoveryAuditLane == "audit_ready" }
+      }
+      val averageAuditScore = supplierDashboardChunk {
+        recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
+          items.sumOf { item -> item.recoveryAuditScore }.coerceAtLeast(0) / items.size
+        } ?: 0
+      }
+      val maxAuditScore = supplierDashboardChunk {
+        recoveryDeskItems.maxOfOrNull { item -> item.recoveryAuditScore } ?: 0
+      }
+      val topAuditLane = supplierDashboardChunk {
+        listOf(
+          "audit_blocked",
+          "audit_quantity_gap",
+          "audit_evidence_gap",
+          "audit_store_note_gap",
+          "audit_ready",
+          "audit_watch"
+        ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoveryAuditLane == lane } }
+          .filter { candidate -> candidate.second > 0 }
+          .maxByOrNull { candidate -> candidate.second }
+          ?.first
+          .orEmpty()
+      }
+      val topImpactLane = supplierDashboardChunk {
+        listOf(
+          "customer_promise_impact",
+          "multi_store_impact",
+          "store_replenishment_impact",
+          "controlled_impact",
+          "impact_watch"
+        ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoveryImpactLane == lane } }
+          .filter { candidate -> candidate.second > 0 }
+          .maxByOrNull { candidate -> candidate.second }
+          ?.first
+          .orEmpty()
+      }
+      val topBottleneckLane = supplierDashboardChunk {
+        listOf(
+          "decision_bottleneck",
+          "contact_bottleneck",
+          "sourcing_bottleneck",
+          "pack_bottleneck",
+          "proof_bottleneck",
+          "aging_bottleneck",
+          "ready_bottleneck",
+          "watch_bottleneck"
+        ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoveryBottleneckLane == lane } }
+          .filter { candidate -> candidate.second > 0 }
+          .maxByOrNull { candidate -> candidate.second }
+          ?.first
+          .orEmpty()
+      }
+      val averageRiskScore = supplierDashboardChunk {
+        recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
+          items.sumOf { it.recoveryRiskScore }.coerceAtLeast(0) / items.size
+        } ?: 0
+      }
+      val maxPriorityScore = supplierDashboardChunk {
+        recoveryDeskItems.maxOfOrNull { it.priorityScore } ?: 0
+      }
+      val nextFollowUpAtMillis = supplierDashboardChunk {
+        recoveryDeskItems
+          .mapNotNull { it.recoveryFollowUpAtMillis }
+          .filter { it > now }
+          .minOrNull()
+      }
+      val topItem = supplierDashboardChunk {
+        recoveryDeskItems.firstOrNull()
+      }
+      val recoveryDeskLane = supplierDashboardChunk {
+        when {
+          shortageCount <= 0 -> "desk_clear"
+          stopPackCount > 0 || promiseRiskCount > 0 || blockedCommitCount > 0 || exceptionPressureCount > 0 || causePressureCount > 0 || verificationBlockerCount > 0 || approvalBlockerCount > 0 || executionBlockerCount > 0 || releaseBlockerCount > 0 || sealBlockerCount > 0 || closeoutBlockerCount > 0 || reopenBlockerCount > 0 || reconciliationBlockerCount > 0 || auditBlockerCount > 0 || managerApprovalCount > 0 || causeVerificationCount > 0 || zeroAcceptanceCauseCount > 0 || exceptionCauseCount > 0 || promiseConflictCauseCount > 0 || stopPackExceptionCount > 0 || cancelReviewExceptionCount > 0 || priorityAllocationCount > 0 || highImpactCount > 0 || urgentCount >= 3 || staleRecoveryCount > 0 || heavyLoadCount > 0 || packBottleneckCount > 0 || decisionBottleneckCount > 0 || agingBottleneckCount > 0 -> "desk_command"
+          fairSplitAllocationCount > 0 || allocationCauseCount > 0 || substituteExceptionCount > 0 || allocationExceptionCount > 0 || storeVerificationCount > 0 || storeApprovalCount > 0 || storeExecutionCount > 0 || storeReleaseCount > 0 || storeSealCount > 0 || storeCloseoutCount > 0 || reopenAnswerCount > 0 || reopenPromiseCount > 0 || reconciliationStoreCount > 0 || auditStoreNoteGapCount > 0 || dueCommitCount > 0 || multiStoreLoadCount > 0 || multiStoreImpactCount > 0 || replenishmentImpactCount > 0 || contactBottleneckCount > 0 || storeContactCount > 0 -> "desk_contact"
+          sourceCommitCount > 0 || partialCapacityCauseCount > 0 || sourcingExceptionCount > 0 || sourceVerificationCount > 0 || sourceApprovalCount > 0 || sourceExecutionCount > 0 || sourceReleaseCount > 0 || sourceSealCount > 0 || sourceCloseoutCount > 0 || reconciliationSourceCount > 0 || auditEvidenceGapCount > 0 || sourcingBottleneckCount > 0 || sourcingCount > 0 -> "desk_source"
+          splitCommitCount > 0 || packVerificationCount > 0 || packApprovalCount > 0 || splitExecutionCount > 0 || splitReleaseCount > 0 || splitSealCount > 0 || splitCloseoutCount > 0 || reopenSplitCount > 0 || reconciliationSplitCount > 0 || auditQuantityGapCount > 0 || splitShipCount > 0 -> "desk_split"
+          auditReadyCount > 0 || reconciliationReadyCount > 0 || reopenReadyCount > 0 || readyCloseoutCount > 0 || readySealCount > 0 || readyReleaseCount > 0 || readyExecutionCount > 0 || approvalReadyCount > 0 || verificationReadyCount > 0 || causeReadyCount > 0 || exceptionReadyCount > 0 || allocationReadyCount > 0 || readyCommitCount > 0 || readyCount > 0 -> "desk_ready"
+          allocationPressureCount > 0 -> "desk_watch"
+          else -> "desk_watch"
+        }
+      }
+      val recoveryDeskHint = supplierDashboardChunk {
+        when (recoveryDeskLane) {
+          "desk_clear" -> supplierDashboardJoinedMessage(
+            listOf("Recovery desk is calm: no answered shortages are pressuring supplier mode right now."),
+            listOf("Пульт восстановления спокоен: сейчас нет отвеченных недопоставок, давящих на режим поставщика."),
+            listOf("Қалпына келтіру пульті тыныш: қазір жеткізуші режиміне қысым жасайтын жауапталған жетіспеулер жоқ.")
+          )
+          "desk_command" -> supplierDashboardJoinedMessage(
+            listOf("Recovery desk: lead with command blockers first, freeze unsafe promises, then assign store/sourcing owners."),
+            listOf("Пульт восстановления: сначала разберите командные блокеры, заморозьте небезопасные обещания, затем назначьте ответственных магазина/поиска."),
+            listOf("Қалпына келтіру пульті: алдымен командалық бөгеттерді шешіңіз, қауіпсіз емес уәделерді тоқтатыңыз, кейін дүкен/іздеу жауаптыларын қойыңыз.")
+          )
+          "desk_contact" -> supplierDashboardJoinedMessage(
+            listOf("Recovery desk: batch store and buyer calls so substitutes, delays, and cancels are answered before packflow moves."),
+            listOf("Пульт восстановления: объедините звонки магазинам и покупателям, чтобы ответы по заменам, задержкам и отменам были до движения сборки."),
+            listOf("Қалпына келтіру пульті: ауыстыру, кідіріс және бас тарту жауаптары жинау жүрмей тұрып келуі үшін дүкен/сатып алушы қоңырауларын топтаңыз.")
+          )
+          "desk_source" -> supplierDashboardJoinedMessage(
+            listOf("Recovery desk: run an upstream sourcing wave and record reserve, ETA, substitute, or no-stock proof before promises change."),
+            listOf("Пульт восстановления: запустите волну поиска выше по цепочке и запишите резерв, срок, замену или отсутствие товара до изменения обещаний."),
+            listOf("Қалпына келтіру пульті: жоғары арна іздеу толқынын жүргізіп, уәде өзгермей тұрып резерв, мерзім, ауыстыру немесе қор жоқ дәлелін жазыңыз.")
+          )
+          "desk_split" -> supplierDashboardJoinedMessage(
+            listOf("Recovery desk: split accepted stock from missing stock, ship guarded quantity, and keep the second-drop promise visible."),
+            listOf("Пульт восстановления: отделите принятое наличие от недостачи, отправьте защищённое количество и оставьте обещание второй поставки видимым."),
+            listOf("Қалпына келтіру пульті: қабылданған қорды жетіспейтіннен бөліп, қорғалған санды жіберіңіз және екінші жеткізу уәдесін көрінетін қалдырыңыз.")
+          )
+          "desk_ready" -> supplierDashboardJoinedMessage(
+            listOf("Recovery desk: ready items can move, but close only the guarded worker step and keep remaining promises visible."),
+            listOf("Пульт восстановления: готовые позиции можно двигать, но закрывайте только защищённый рабочий шаг и оставляйте оставшиеся обещания видимыми."),
+            listOf("Қалпына келтіру пульті: дайын позициялар қозғала алады, бірақ тек қорғалған жұмыс қадамын жауып, қалған уәделерді көрінетін қалдырыңыз.")
+          )
+          else -> supplierDashboardJoinedMessage(
+            listOf("Recovery desk: keep watch sorted by priority, follow-up time, and promise shield so quiet shortages do not drift."),
+            listOf("Пульт восстановления: держите наблюдение по приоритету, времени контроля и щиту обещания, чтобы тихие недопоставки не уплыли."),
+            listOf("Қалпына келтіру пульті: тыныш жетіспеулер жоғалмас үшін бақылауды басымдық, бақылау уақыты және уәде қалқаны бойынша ұстаңыз.")
+          )
+        }
+      }
+      val recoveryDeskChecklist = supplierDashboardChunk {
+        when (recoveryDeskLane) {
+          "desk_command" -> supplierDashboardJoinedMessage(
+            listOf("□ Freeze risky promises\n□ Stop blocked packflow\n□ Name owner per SKU\n□ Re-score after answer"),
+            listOf("□ Заморозить рискованные обещания\n□ Остановить заблокированную сборку\n□ Назначить ответственного по SKU\n□ Пересчитать после ответа"),
+            listOf("□ Тәуекел уәделерді тоқтату\n□ Бөгелген жинауды тоқтату\n□ Әр SKU жауаптысын атау\n□ Жауаптан кейін қайта бағалау")
+          )
+          "desk_contact" -> supplierDashboardJoinedMessage(
+            listOf("□ Batch store calls\n□ Capture substitute/delay/cancel answers\n□ Update follow-up times\n□ Keep store names private outside AITA"),
+            listOf("□ Сгруппировать звонки магазинам\n□ Записать ответы замена/задержка/отмена\n□ Обновить сроки контроля\n□ Держать названия магазинов приватными вне AITA"),
+            listOf("□ Дүкен қоңырауларын топтау\n□ Ауыстыру/кідіріс/бас тарту жауаптарын жазу\n□ Бақылау уақытын жаңарту\n□ AITA сыртында дүкен атауларын құпия ұстау")
+          )
+          "desk_source" -> supplierDashboardJoinedMessage(
+            listOf("□ Ask upstream for reserve/ETA\n□ Attach no-stock or substitute proof\n□ Mirror safe answer to store\n□ Keep shortage ledger open"),
+            listOf("□ Запросить резерв/срок выше\n□ Приложить отсутствие или замену\n□ Передать безопасный ответ магазину\n□ Оставить журнал недопоставки открытым"),
+            listOf("□ Жоғары арнадан резерв/мерзім сұрау\n□ Қор жоқ немесе ауыстыру дәлелін тіркеу\n□ Қауіпсіз жауапты дүкенге жеткізу\n□ Жетіспеу журналын ашық қалдыру")
+          )
+          "desk_split" -> supplierDashboardJoinedMessage(
+            listOf("□ Pack accepted quantity only\n□ Keep short quantity separate\n□ Date the second drop\n□ Check proof before dispatch"),
+            listOf("□ Собрать только принятое количество\n□ Держать недостачу отдельно\n□ Поставить дату второй поставки\n□ Проверить доказательство до отправки"),
+            listOf("□ Тек қабылданған санды жинау\n□ Жетіспейтін санды бөлек ұстау\n□ Екінші жеткізу күнін қою\n□ Жөнелтуден бұрын дәлелді тексеру")
+          )
+          "desk_ready" -> supplierDashboardJoinedMessage(
+            listOf("□ Move ready recoveries\n□ Close completed step only\n□ Preserve promise note\n□ Reopen if promise changes"),
+            listOf("□ Двигать готовые восстановления\n□ Закрыть только выполненный шаг\n□ Сохранить заметку обещания\n□ Открыть снова при изменении обещания"),
+            listOf("□ Дайын қалпына келтірулерді қозғау\n□ Тек орындалған қадамды жабу\n□ Уәде жазбасын сақтау\n□ Уәде өзгерсе қайта ашу")
+          )
+          else -> supplierDashboardJoinedMessage(
+            listOf("□ Watch top priority\n□ Check next follow-up\n□ Keep missing qty visible\n□ Refresh after every answer"),
+            listOf("□ Следить за верхним приоритетом\n□ Проверить следующий контроль\n□ Держать недостачу видимой\n□ Обновлять после каждого ответа"),
+            listOf("□ Ең жоғары басымдықты бақылау\n□ Келесі бақылауды тексеру\n□ Жетіспейтін санды көрінетін ұстау\n□ Әр жауаптан кейін жаңарту")
+          )
+        }
+      }
+      val deskPathMain = supplierDashboardChunk {
+        when (recoveryDeskLane) {
+          "desk_clear" -> "no active shortage recovery wave"
+          "desk_command" -> "command blockers and unsafe promises first"
+          "desk_contact" -> "batch store and buyer answers"
+          "desk_source" -> "source upstream reserve or proof"
+          "desk_split" -> "split accepted stock from missing stock"
+          "desk_ready" -> "move guarded ready recoveries"
+          else -> "watch priority and follow-up"
+        }
+      }
+      val deskPathRu = supplierDashboardChunk {
+        when (recoveryDeskLane) {
+          "desk_clear" -> "нет активной волны восстановления"
+          "desk_command" -> "сначала командные блокеры и небезопасные обещания"
+          "desk_contact" -> "сгруппировать ответы магазинов и покупателей"
+          "desk_source" -> "найти резерв или доказательство выше по цепочке"
+          "desk_split" -> "отделить принятое наличие от недостачи"
+          "desk_ready" -> "двигать защищённые готовые восстановления"
+          else -> "наблюдать приоритет и контроль"
+        }
+      }
+      val deskPathKk = supplierDashboardChunk {
+        when (recoveryDeskLane) {
+          "desk_clear" -> "белсенді қалпына келтіру толқыны жоқ"
+          "desk_command" -> "алдымен командалық бөгеттер мен қауіпсіз емес уәделер"
+          "desk_contact" -> "дүкен және сатып алушы жауаптарын топтау"
+          "desk_source" -> "жоғары арнадан резерв немесе дәлел табу"
+          "desk_split" -> "қабылданған қорды жетіспейтін қордан бөлу"
+          "desk_ready" -> "қорғалған дайын қалпына келтірулерді қозғау"
+          else -> "басымдық пен бақылауды қадағалау"
+        }
+      }
+      val topGoodsNameMain = supplierDashboardChunk {
+        topItem?.goodsItemNameSnapshot?.firstOrNull { it.language == "main" }?.value
+          ?: topItem?.goodsItemNameSnapshot?.firstOrNull()?.value
+          ?: topItem?.goodsItemId?.take(8)
+          ?: "none"
+      }
+      val recoveryDeskScript = supplierDashboardChunk {
+        supplierDashboardJoinedMessage(
+          listOf(
+            "AITA recovery desk: $deskPathMain.",
+            "Shortages $shortageCount; urgent $urgentCount; stop-pack $stopPackCount; promise-risk $promiseRiskCount; ready $readyCount.",
+            "Average risk $averageRiskScore/100; max priority $maxPriorityScore; top item $topGoodsNameMain.",
+            "Top bottleneck ${topBottleneckLane.ifBlank { "watch_bottleneck" }}; decision $decisionBottleneckCount; contact $contactBottleneckCount; source $sourcingBottleneckCount; pack $packBottleneckCount.",
+            "Top load ${topLoadLane.ifBlank { "watch_load" }}; heavy $heavyLoadCount; multi-store $multiStoreLoadCount; pack load $packLoadCount; average load $averageLoadScore/100.",
+            "Impact ${topImpactLane.ifBlank { "impact_watch" }}; high $highImpactCount; promise $promiseImpactCount; multi-store $multiStoreImpactCount; average impact $averageImpactScore/100.",
+            "Commit ${topCommitLane.ifBlank { "commit_watch" }}; blocked $blockedCommitCount; due $dueCommitCount; source ETA $sourceCommitCount; split ETA $splitCommitCount; ready $readyCommitCount; next ${nextCommitAtMillis?.let { java.time.Instant.ofEpochMilli(it).toString() } ?: "none"}.",
+            "Allocation ${topAllocationLane.ifBlank { "allocation_watch" }}; pressure $allocationPressureCount; fair split $fairSplitAllocationCount; priority $priorityAllocationCount; ready $allocationReadyCount; average $averageAllocationScore/100.",
+            "Exception ${topExceptionLane.ifBlank { "exception_watch" }}; pressure $exceptionPressureCount; stop-pack $stopPackExceptionCount; cancel $cancelReviewExceptionCount; substitute $substituteExceptionCount; source $sourcingExceptionCount; allocation $allocationExceptionCount; ready $exceptionReadyCount; max $maxExceptionScore/100.",
+            "Cause ${topCauseLane.ifBlank { "cause_watch" }}; pressure $causePressureCount; zero $zeroAcceptanceCauseCount; partial capacity $partialCapacityCauseCount; promise conflict $promiseConflictCauseCount; allocation $allocationCauseCount; exception $exceptionCauseCount; ready $causeReadyCount; average $averageCauseScore/100; max $maxCauseScore/100.",
+            "Verification ${topVerificationLane.ifBlank { "verify_watch" }}; blockers $verificationBlockerCount; cause $causeVerificationCount; store $storeVerificationCount; source $sourceVerificationCount; pack $packVerificationCount; ready $verificationReadyCount; max $maxVerificationScore/100.",
+            "Approval ${topApprovalLane.ifBlank { "approval_watch" }}; blockers $approvalBlockerCount; manager $managerApprovalCount; store $storeApprovalCount; source $sourceApprovalCount; pack $packApprovalCount; ready $approvalReadyCount; max $maxApprovalScore/100.",
+            "Execution ${topExecutionLane.ifBlank { "execution_watch" }}; blockers $executionBlockerCount; store $storeExecutionCount; source $sourceExecutionCount; split $splitExecutionCount; ready $readyExecutionCount; max $maxExecutionScore/100.",
+            "Release ${topReleaseLane.ifBlank { "release_watch" }}; blockers $releaseBlockerCount; store $storeReleaseCount; source $sourceReleaseCount; split $splitReleaseCount; ready $readyReleaseCount; max $maxReleaseScore/100.",
+            "Seal ${topSealLane.ifBlank { "seal_watch" }}; blockers $sealBlockerCount; store $storeSealCount; source $sourceSealCount; split $splitSealCount; ready $readySealCount; max $maxSealScore/100.",
+            "Closeout ${topCloseoutLane.ifBlank { "closeout_watch" }}; blockers $closeoutBlockerCount; store $storeCloseoutCount; source $sourceCloseoutCount; split $splitCloseoutCount; ready $readyCloseoutCount; max $maxCloseoutScore/100.",
+            "Reopen ${topReopenLane.ifBlank { "reopen_watch" }}; blockers $reopenBlockerCount; answer $reopenAnswerCount; promise $reopenPromiseCount; split $reopenSplitCount; ready $reopenReadyCount; max $maxReopenScore/100; next ${nextReopenAtMillis?.let { java.time.Instant.ofEpochMilli(it).toString() } ?: "none"}.",
+            "Reconciliation ${topReconciliationLane.ifBlank { "reconcile_watch" }}; blockers $reconciliationBlockerCount; store $reconciliationStoreCount; source $reconciliationSourceCount; split $reconciliationSplitCount; ready $reconciliationReadyCount; max $maxReconciliationScore/100.",
+            "Audit ${topAuditLane.ifBlank { "audit_watch" }}; blockers $auditBlockerCount; quantity $auditQuantityGapCount; evidence $auditEvidenceGapCount; store note $auditStoreNoteGapCount; ready $auditReadyCount; max $maxAuditScore/100.",
+            "Keep store names private outside AITA."
+          ),
+          listOf(
+            "AITA пульт восстановления: $deskPathRu.",
+            "Недопоставок $shortageCount; срочных $urgentCount; стоп-сборка $stopPackCount; риск обещания $promiseRiskCount; готово $readyCount.",
+            "Средний риск $averageRiskScore/100; максимум приоритета $maxPriorityScore; верхняя позиция $topGoodsNameMain.",
+            "Главное узкое место ${topBottleneckLane.ifBlank { "watch_bottleneck" }}; решение $decisionBottleneckCount; контакт $contactBottleneckCount; поиск $sourcingBottleneckCount; сборка $packBottleneckCount.",
+            "Главная нагрузка ${topLoadLane.ifBlank { "watch_load" }}; тяжёлых $heavyLoadCount; мульти-магазинов $multiStoreLoadCount; нагрузка сборки $packLoadCount; средняя нагрузка $averageLoadScore/100.",
+            "Влияние ${topImpactLane.ifBlank { "impact_watch" }}; высоких $highImpactCount; обещаний $promiseImpactCount; несколько магазинов $multiStoreImpactCount; среднее влияние $averageImpactScore/100.",
+            "Обязательство ${topCommitLane.ifBlank { "commit_watch" }}; заблокировано $blockedCommitCount; срочно $dueCommitCount; срок поиска $sourceCommitCount; срок разделения $splitCommitCount; готово $readyCommitCount; следующее ${nextCommitAtMillis?.let { java.time.Instant.ofEpochMilli(it).toString() } ?: "нет"}.",
+            "Распределение ${topAllocationLane.ifBlank { "allocation_watch" }}; давление $allocationPressureCount; справедливое $fairSplitAllocationCount; приоритет $priorityAllocationCount; готово $allocationReadyCount; среднее $averageAllocationScore/100.",
+            "Исключение ${topExceptionLane.ifBlank { "exception_watch" }}; давление $exceptionPressureCount; стоп-сборка $stopPackExceptionCount; отмена $cancelReviewExceptionCount; замена $substituteExceptionCount; поиск $sourcingExceptionCount; распределение $allocationExceptionCount; готово $exceptionReadyCount; максимум $maxExceptionScore/100.",
+            "Причина ${topCauseLane.ifBlank { "cause_watch" }}; давление $causePressureCount; ноль $zeroAcceptanceCauseCount; частичная мощность $partialCapacityCauseCount; конфликт обещания $promiseConflictCauseCount; распределение $allocationCauseCount; исключение $exceptionCauseCount; готово $causeReadyCount; среднее $averageCauseScore/100; максимум $maxCauseScore/100.",
+            "Проверка ${topVerificationLane.ifBlank { "verify_watch" }}; блокеров $verificationBlockerCount; причин $causeVerificationCount; магазин $storeVerificationCount; поиск $sourceVerificationCount; сборка $packVerificationCount; готово $verificationReadyCount; максимум $maxVerificationScore/100.",
+            "Согласование ${topApprovalLane.ifBlank { "approval_watch" }}; блокеров $approvalBlockerCount; руководитель $managerApprovalCount; магазин $storeApprovalCount; поиск $sourceApprovalCount; сборка $packApprovalCount; готово $approvalReadyCount; максимум $maxApprovalScore/100.",
+            "Выполнение ${topExecutionLane.ifBlank { "execution_watch" }}; блокеров $executionBlockerCount; магазин $storeExecutionCount; поиск $sourceExecutionCount; разделение $splitExecutionCount; готово $readyExecutionCount; максимум $maxExecutionScore/100.",
+            "Выпуск ${topReleaseLane.ifBlank { "release_watch" }}; блокеров $releaseBlockerCount; магазин $storeReleaseCount; поиск $sourceReleaseCount; разделение $splitReleaseCount; готово $readyReleaseCount; максимум $maxReleaseScore/100.",
+            "Штамп ${topSealLane.ifBlank { "seal_watch" }}; блокеров $sealBlockerCount; магазин $storeSealCount; поиск $sourceSealCount; разделение $splitSealCount; готово $readySealCount; максимум $maxSealScore/100.",
+            "Закрытие ${topCloseoutLane.ifBlank { "closeout_watch" }}; блокеров $closeoutBlockerCount; магазин $storeCloseoutCount; поиск $sourceCloseoutCount; разделение $splitCloseoutCount; готово $readyCloseoutCount; максимум $maxCloseoutScore/100.",
+            "Переоткрытие ${topReopenLane.ifBlank { "reopen_watch" }}; блокеров $reopenBlockerCount; ответы $reopenAnswerCount; обещания $reopenPromiseCount; разделение $reopenSplitCount; готово $reopenReadyCount; максимум $maxReopenScore/100; следующее ${nextReopenAtMillis?.let { java.time.Instant.ofEpochMilli(it).toString() } ?: "нет"}.",
+            "Сверка ${topReconciliationLane.ifBlank { "reconcile_watch" }}; блокеров $reconciliationBlockerCount; магазин $reconciliationStoreCount; поиск $reconciliationSourceCount; разделение $reconciliationSplitCount; готово $reconciliationReadyCount; максимум $maxReconciliationScore/100.",
+            "Аудит ${topAuditLane.ifBlank { "audit_watch" }}; блокеров $auditBlockerCount; количество $auditQuantityGapCount; доказательства $auditEvidenceGapCount; заметки магазина $auditStoreNoteGapCount; готово $auditReadyCount; максимум $maxAuditScore/100.",
+            "Названия магазинов держите приватными вне AITA."
+          ),
+          listOf(
+            "AITA қалпына келтіру пульті: $deskPathKk.",
+            "Жетіспеу $shortageCount; шұғыл $urgentCount; жинауды тоқтату $stopPackCount; уәде тәуекелі $promiseRiskCount; дайын $readyCount.",
+            "Орташа тәуекел $averageRiskScore/100; ең жоғары басымдық $maxPriorityScore; жоғарғы позиция $topGoodsNameMain.",
+            "Негізгі тар орын ${topBottleneckLane.ifBlank { "watch_bottleneck" }}; шешім $decisionBottleneckCount; байланыс $contactBottleneckCount; іздеу $sourcingBottleneckCount; жинау $packBottleneckCount.",
+            "Негізгі жүктеме ${topLoadLane.ifBlank { "watch_load" }}; ауыр $heavyLoadCount; көп дүкен $multiStoreLoadCount; жинау жүктемесі $packLoadCount; орташа жүктеме $averageLoadScore/100.",
+            "Әсер ${topImpactLane.ifBlank { "impact_watch" }}; жоғары $highImpactCount; уәде $promiseImpactCount; көп дүкен $multiStoreImpactCount; орташа әсер $averageImpactScore/100.",
+            "Міндеттеме ${topCommitLane.ifBlank { "commit_watch" }}; бөгелген $blockedCommitCount; мерзімді $dueCommitCount; іздеу мерзімі $sourceCommitCount; бөлу мерзімі $splitCommitCount; дайын $readyCommitCount; келесі ${nextCommitAtMillis?.let { java.time.Instant.ofEpochMilli(it).toString() } ?: "жоқ"}.",
+            "Бөлу ${topAllocationLane.ifBlank { "allocation_watch" }}; қысым $allocationPressureCount; әділ $fairSplitAllocationCount; басым $priorityAllocationCount; дайын $allocationReadyCount; орташа $averageAllocationScore/100.",
+            "Ерекше ${topExceptionLane.ifBlank { "exception_watch" }}; қысым $exceptionPressureCount; жинауды тоқтату $stopPackExceptionCount; бас тарту $cancelReviewExceptionCount; ауыстыру $substituteExceptionCount; іздеу $sourcingExceptionCount; бөлу $allocationExceptionCount; дайын $exceptionReadyCount; ең жоғары $maxExceptionScore/100.",
+            "Себеп ${topCauseLane.ifBlank { "cause_watch" }}; қысым $causePressureCount; нөл $zeroAcceptanceCauseCount; жартылай қуат $partialCapacityCauseCount; уәде қақтығысы $promiseConflictCauseCount; бөлу $allocationCauseCount; ерекше $exceptionCauseCount; дайын $causeReadyCount; орташа $averageCauseScore/100; ең жоғары $maxCauseScore/100.",
+            "Тексеру ${topVerificationLane.ifBlank { "verify_watch" }}; бөгет $verificationBlockerCount; себеп $causeVerificationCount; дүкен $storeVerificationCount; іздеу $sourceVerificationCount; жинау $packVerificationCount; дайын $verificationReadyCount; ең жоғары $maxVerificationScore/100.",
+            "Бекіту ${topApprovalLane.ifBlank { "approval_watch" }}; бөгет $approvalBlockerCount; басқарушы $managerApprovalCount; дүкен $storeApprovalCount; іздеу $sourceApprovalCount; жинау $packApprovalCount; дайын $approvalReadyCount; ең жоғары $maxApprovalScore/100.",
+            "Орындау ${topExecutionLane.ifBlank { "execution_watch" }}; бөгет $executionBlockerCount; дүкен $storeExecutionCount; іздеу $sourceExecutionCount; бөлу $splitExecutionCount; дайын $readyExecutionCount; ең жоғары $maxExecutionScore/100.",
+            "Шығару ${topReleaseLane.ifBlank { "release_watch" }}; бөгет $releaseBlockerCount; дүкен $storeReleaseCount; іздеу $sourceReleaseCount; бөлу $splitReleaseCount; дайын $readyReleaseCount; ең жоғары $maxReleaseScore/100.",
+            "Мөр ${topSealLane.ifBlank { "seal_watch" }}; бөгет $sealBlockerCount; дүкен $storeSealCount; іздеу $sourceSealCount; бөлу $splitSealCount; дайын $readySealCount; ең жоғары $maxSealScore/100.",
+            "Жабу ${topCloseoutLane.ifBlank { "closeout_watch" }}; бөгет $closeoutBlockerCount; дүкен $storeCloseoutCount; іздеу $sourceCloseoutCount; бөлу $splitCloseoutCount; дайын $readyCloseoutCount; ең жоғары $maxCloseoutScore/100.",
+            "Қайта ашу ${topReopenLane.ifBlank { "reopen_watch" }}; бөгет $reopenBlockerCount; жауап $reopenAnswerCount; уәде $reopenPromiseCount; бөлу $reopenSplitCount; дайын $reopenReadyCount; ең жоғары $maxReopenScore/100; келесі ${nextReopenAtMillis?.let { java.time.Instant.ofEpochMilli(it).toString() } ?: "жоқ"}.",
+            "Салыстыру ${topReconciliationLane.ifBlank { "reconcile_watch" }}; бөгет $reconciliationBlockerCount; дүкен $reconciliationStoreCount; іздеу $reconciliationSourceCount; бөлу $reconciliationSplitCount; дайын $reconciliationReadyCount; ең жоғары $maxReconciliationScore/100.",
+            "Аудит ${topAuditLane.ifBlank { "audit_watch" }}; бөгет $auditBlockerCount; сан $auditQuantityGapCount; дәлел $auditEvidenceGapCount; дүкен жазбасы $auditStoreNoteGapCount; дайын $auditReadyCount; ең жоғары $maxAuditScore/100.",
+            "AITA сыртында дүкен атауларын құпия ұстаңыз."
+          )
+        )
+      }
+      fun recoveryWavePathMain(lane: String): String = when (lane) {
+        "wave_command" -> "command blockers"
+        "wave_contact" -> "store and buyer contact"
+        "wave_source" -> "upstream sourcing"
+        "wave_split" -> "split accepted from missing"
+        "wave_ready" -> "guarded ready recovery"
+        else -> "watch and follow-up"
+      }
+      fun recoveryWavePathRu(lane: String): String = when (lane) {
+        "wave_command" -> "командные блокеры"
+        "wave_contact" -> "связь с магазином и покупателем"
+        "wave_source" -> "поиск выше по цепочке"
+        "wave_split" -> "разделение принятого и недостачи"
+        "wave_ready" -> "защищённое готовое восстановление"
+        else -> "наблюдение и контроль"
+      }
+      fun recoveryWavePathKk(lane: String): String = when (lane) {
+        "wave_command" -> "командалық бөгеттер"
+        "wave_contact" -> "дүкен және сатып алушы байланысы"
+        "wave_source" -> "жоғары арнадан іздеу"
+        "wave_split" -> "қабылданғанды жетіспейтіннен бөлу"
+        "wave_ready" -> "қорғалған дайын қалпына келтіру"
+        else -> "бақылау және қайта тексеру"
+      }
+      fun recoveryWaveChecklist(lane: String): List<LocalizedStringDataModel> = when (lane) {
+        "wave_command" -> supplierDashboardJoinedMessage(
+          listOf("□ Freeze unsafe promises\n□ Stop blocked packflow\n□ Assign SKU owner\n□ Re-score after owner answer"),
+          listOf("□ Заморозить небезопасные обещания\n□ Остановить заблокированную сборку\n□ Назначить ответственного SKU\n□ Пересчитать после ответа"),
+          listOf("□ Қауіпсіз емес уәделерді тоқтату\n□ Бөгелген жинауды тоқтату\n□ SKU жауаптысын қою\n□ Жауаптан кейін қайта бағалау")
+        )
+        "wave_contact" -> supplierDashboardJoinedMessage(
+          listOf("□ Batch contact scripts\n□ Save substitute/delay/cancel answer\n□ Refresh promise shield\n□ Set follow-up time"),
+          listOf("□ Сгруппировать скрипты связи\n□ Сохранить ответ замена/задержка/отмена\n□ Обновить щит обещания\n□ Назначить контроль"),
+          listOf("□ Байланыс скриптерін топтау\n□ Ауыстыру/кідіріс/бас тарту жауабын сақтау\n□ Уәде қалқанын жаңарту\n□ Бақылау уақытын қою")
+        )
+        "wave_source" -> supplierDashboardJoinedMessage(
+          listOf("□ Ask upstream reserve/ETA\n□ Save no-stock proof\n□ Offer substitute if needed\n□ Mirror safe answer to store"),
+          listOf("□ Запросить резерв/срок выше\n□ Сохранить доказательство отсутствия\n□ Предложить замену при необходимости\n□ Передать безопасный ответ магазину"),
+          listOf("□ Жоғарыдан резерв/мерзім сұрау\n□ Қор жоқ дәлелін сақтау\n□ Керек болса ауыстыру ұсыну\n□ Қауіпсіз жауапты дүкенге жеткізу")
+        )
+        "wave_split" -> supplierDashboardJoinedMessage(
+          listOf("□ Pack accepted quantity only\n□ Keep missing quantity open\n□ Date second drop\n□ Check proof before dispatch"),
+          listOf("□ Собрать только принятое количество\n□ Оставить недостачу открытой\n□ Поставить дату второй поставки\n□ Проверить доказательство до отправки"),
+          listOf("□ Тек қабылданған санды жинау\n□ Жетіспеуді ашық қалдыру\n□ Екінші жеткізу күнін қою\n□ Жөнелтуден бұрын дәлелді тексеру")
+        )
+        "wave_ready" -> supplierDashboardJoinedMessage(
+          listOf("□ Move guarded recovery\n□ Close completed worker step only\n□ Keep residual promise visible\n□ Reopen if promise changes"),
+          listOf("□ Двигать защищённое восстановление\n□ Закрыть только выполненный шаг\n□ Оставить остаточное обещание видимым\n□ Открыть снова при изменении обещания"),
+          listOf("□ Қорғалған қалпына келтіруді қозғау\n□ Тек орындалған қадамды жабу\n□ Қалған уәдені көрінетін ұстау\n□ Уәде өзгерсе қайта ашу")
+        )
+        else -> supplierDashboardJoinedMessage(
+          listOf("□ Keep owner visible\n□ Check next follow-up\n□ Preserve missing quantity\n□ Refresh after answer"),
+          listOf("□ Держать ответственного видимым\n□ Проверить следующий контроль\n□ Сохранить видимую недостачу\n□ Обновить после ответа"),
+          listOf("□ Жауаптыны көрінетін ұстау\n□ Келесі бақылауды тексеру\n□ Жетіспейтін санды сақтау\n□ Жауаптан кейін жаңарту")
+        )
+      }
+      val recoveryWaves = supplierDashboardChunk {
+        listOf("wave_command", "wave_contact", "wave_source", "wave_split", "wave_ready", "wave_watch")
+          .mapNotNull { waveLane ->
+            val waveItems = recoveryDeskItems.filter { item -> item.recoveryWaveLane == waveLane }
+            if (waveItems.isEmpty()) {
+              null
+            } else {
+              val waveTopItem = waveItems.maxWithOrNull(
+                compareBy<SupplierDashboardBackorderDataModel> { it.priorityScore }
+                  .thenBy { it.recoveryRiskScore }
+                  .thenBy { it.recoveryWaveScore }
+              )
+              val waveTopGoodsName = waveTopItem?.goodsItemNameSnapshot?.firstOrNull { it.language == "main" }?.value
+                ?: waveTopItem?.goodsItemNameSnapshot?.firstOrNull()?.value
+                ?: waveTopItem?.goodsItemId?.take(8)
+                ?: "none"
+              val waveShortQuantityTotal = waveItems.sumOf { item -> item.missingQuantityTotal }.roundMoney()
+              val waveUrgentCount = waveItems.count { item ->
+                item.recoveryUrgencyLane == "overdue" ||
+                  item.recoveryUrgencyLane == "today" ||
+                  item.recoveryFollowUpLane == "follow_up_now" ||
+                  (item.recoveryFollowUpAtMillis?.let { it <= now } == true)
+              }
+              val waveStopPackCount = waveItems.count { item -> item.recoveryCommandLane == "stop_pack" || item.recoveryPackGuardLane == "block_pack" }
+              val wavePromiseRiskCount = waveItems.count { item -> item.recoveryPromiseShieldLane == "promise_at_risk" || item.recoveryPromiseShieldScore >= 78 }
+              val waveReadyCount = waveItems.count { item -> item.recoveryConfidenceLane == "ready_to_recover" || item.recoveryCommandLane == "ready_with_note" }
+              val waveMaxRiskScore = waveItems.maxOfOrNull { item -> item.recoveryRiskScore } ?: 0
+              val waveMaxPriorityScore = waveItems.maxOfOrNull { item -> item.priorityScore } ?: 0
+              val waveNextFollowUpAtMillis = waveItems
+                .mapNotNull { item -> item.recoveryFollowUpAtMillis }
+                .filter { it > now }
+                .minOrNull()
+              val recoveryWaveHint = waveItems.firstOrNull { item -> item.recoveryWaveHint.isNotEmpty() }?.recoveryWaveHint.orEmpty()
+              val wavePathMain = recoveryWavePathMain(waveLane)
+              val wavePathRu = recoveryWavePathRu(waveLane)
+              val wavePathKk = recoveryWavePathKk(waveLane)
+              val recoveryWaveScript = supplierDashboardJoinedMessage(
+                listOf(
+                  "AITA recovery wave: $wavePathMain.",
+                  "Shortages ${waveItems.size}; short quantity ${waveShortQuantityTotal.toStockMoneyText()}; urgent $waveUrgentCount; stop-pack $waveStopPackCount; promise-risk $wavePromiseRiskCount; ready $waveReadyCount.",
+                  "Max risk $waveMaxRiskScore/100; max priority $waveMaxPriorityScore; top item $waveTopGoodsName.",
+                  "Keep store names private outside AITA and update the wave after every answer."
+                ),
+                listOf(
+                  "AITA волна восстановления: $wavePathRu.",
+                  "Недопоставок ${waveItems.size}; недостача ${waveShortQuantityTotal.toStockMoneyText()}; срочных $waveUrgentCount; стоп-сборка $waveStopPackCount; риск обещания $wavePromiseRiskCount; готово $waveReadyCount.",
+                  "Максимум риска $waveMaxRiskScore/100; максимум приоритета $waveMaxPriorityScore; верхняя позиция $waveTopGoodsName.",
+                  "Названия магазинов держите приватными вне AITA и обновляйте волну после каждого ответа."
+                ),
+                listOf(
+                  "AITA қалпына келтіру толқыны: $wavePathKk.",
+                  "Жетіспеу ${waveItems.size}; жетіспейтін сан ${waveShortQuantityTotal.toStockMoneyText()}; шұғыл $waveUrgentCount; жинауды тоқтату $waveStopPackCount; уәде тәуекелі $wavePromiseRiskCount; дайын $waveReadyCount.",
+                  "Ең жоғары тәуекел $waveMaxRiskScore/100; ең жоғары басымдық $waveMaxPriorityScore; жоғарғы позиция $waveTopGoodsName.",
+                  "AITA сыртында дүкен атауларын құпия ұстаңыз және әр жауаптан кейін толқынды жаңартыңыз."
+                )
+              )
+              SupplierDashboardRecoveryWaveDataModel(
+                recoveryWaveLane = waveLane,
+                recoveryWaveHint = recoveryWaveHint,
+                recoveryWaveChecklist = recoveryWaveChecklist(waveLane),
+                recoveryWaveScript = recoveryWaveScript,
+                shortageCount = waveItems.size,
+                shortQuantityTotal = waveShortQuantityTotal,
+                urgentCount = waveUrgentCount,
+                stopPackCount = waveStopPackCount,
+                promiseRiskCount = wavePromiseRiskCount,
+                readyCount = waveReadyCount,
+                maxRiskScore = waveMaxRiskScore,
+                maxPriorityScore = waveMaxPriorityScore,
+                nextFollowUpAtMillis = waveNextFollowUpAtMillis,
+                topBackorderId = waveTopItem?.backorderId.orEmpty(),
+                topGoodsItemId = waveTopItem?.goodsItemId.orEmpty(),
+                topGoodsItemNameSnapshot = waveTopItem?.goodsItemNameSnapshot.orEmpty()
+              )
+            }
+          }
+          .sortedWith(
+            compareByDescending<SupplierDashboardRecoveryWaveDataModel> { it.maxPriorityScore }
+              .thenByDescending { it.maxRiskScore }
+              .thenByDescending { it.shortageCount }
+          )
+      }
+  
+      supplierDashboardChunk {
+        SupplierDashboardRecoveryDeskDataModel(
+          recoveryDeskLane = recoveryDeskLane,
+          recoveryDeskHint = recoveryDeskHint,
+          recoveryDeskChecklist = recoveryDeskChecklist,
+          recoveryDeskScript = recoveryDeskScript,
+          shortageCount = shortageCount,
+          urgentCount = urgentCount,
+          stopPackCount = stopPackCount,
+          storeContactCount = storeContactCount,
+          sourcingCount = sourcingCount,
+          splitShipCount = splitShipCount,
+          promiseRiskCount = promiseRiskCount,
+          readyCount = readyCount,
+          staleRecoveryCount = staleRecoveryCount,
+          touchTodayRecoveryCount = touchTodayRecoveryCount,
+          freshRecoveryCount = freshRecoveryCount,
+          oldestRecoveryAgeHours = oldestRecoveryAgeHours,
+          averageRecoveryAgeHours = averageRecoveryAgeHours,
+          topBottleneckLane = topBottleneckLane,
+          decisionBottleneckCount = decisionBottleneckCount,
+          contactBottleneckCount = contactBottleneckCount,
+          sourcingBottleneckCount = sourcingBottleneckCount,
+          packBottleneckCount = packBottleneckCount,
+          proofBottleneckCount = proofBottleneckCount,
+          agingBottleneckCount = agingBottleneckCount,
+          readyBottleneckCount = readyBottleneckCount,
+          topLoadLane = topLoadLane,
+          heavyLoadCount = heavyLoadCount,
+          multiStoreLoadCount = multiStoreLoadCount,
+          packLoadCount = packLoadCount,
+          readyLoadCount = readyLoadCount,
+          averageLoadScore = averageLoadScore,
+          topImpactLane = topImpactLane,
+          highImpactCount = highImpactCount,
+          promiseImpactCount = promiseImpactCount,
+          multiStoreImpactCount = multiStoreImpactCount,
+          replenishmentImpactCount = replenishmentImpactCount,
+          controlledImpactCount = controlledImpactCount,
+          averageImpactScore = averageImpactScore,
+          maxImpactScore = maxImpactScore,
+          topCommitLane = topCommitLane,
+          blockedCommitCount = blockedCommitCount,
+          dueCommitCount = dueCommitCount,
+          sourceCommitCount = sourceCommitCount,
+          splitCommitCount = splitCommitCount,
+          readyCommitCount = readyCommitCount,
+          averageCommitScore = averageCommitScore,
+          nextCommitAtMillis = nextCommitAtMillis,
+          topAllocationLane = topAllocationLane,
+          allocationPressureCount = allocationPressureCount,
+          fairSplitAllocationCount = fairSplitAllocationCount,
+          priorityAllocationCount = priorityAllocationCount,
+          allocationReadyCount = allocationReadyCount,
+          averageAllocationScore = averageAllocationScore,
+          maxAllocationScore = maxAllocationScore,
+          topExceptionLane = topExceptionLane,
+          exceptionPressureCount = exceptionPressureCount,
+          stopPackExceptionCount = stopPackExceptionCount,
+          cancelReviewExceptionCount = cancelReviewExceptionCount,
+          substituteExceptionCount = substituteExceptionCount,
+          sourcingExceptionCount = sourcingExceptionCount,
+          allocationExceptionCount = allocationExceptionCount,
+          exceptionReadyCount = exceptionReadyCount,
+          averageExceptionScore = averageExceptionScore,
+          maxExceptionScore = maxExceptionScore,
+          topCauseLane = topCauseLane,
+          causePressureCount = causePressureCount,
+          zeroAcceptanceCauseCount = zeroAcceptanceCauseCount,
+          partialCapacityCauseCount = partialCapacityCauseCount,
+          promiseConflictCauseCount = promiseConflictCauseCount,
+          allocationCauseCount = allocationCauseCount,
+          exceptionCauseCount = exceptionCauseCount,
+          causeReadyCount = causeReadyCount,
+          averageCauseScore = averageCauseScore,
+          maxCauseScore = maxCauseScore,
+          topVerificationLane = topVerificationLane,
+          verificationBlockerCount = verificationBlockerCount,
+          storeVerificationCount = storeVerificationCount,
+          sourceVerificationCount = sourceVerificationCount,
+          packVerificationCount = packVerificationCount,
+          causeVerificationCount = causeVerificationCount,
+          verificationReadyCount = verificationReadyCount,
+          averageVerificationScore = averageVerificationScore,
+          maxVerificationScore = maxVerificationScore,
+          topApprovalLane = topApprovalLane,
+          approvalBlockerCount = approvalBlockerCount,
+          managerApprovalCount = managerApprovalCount,
+          storeApprovalCount = storeApprovalCount,
+          sourceApprovalCount = sourceApprovalCount,
+          packApprovalCount = packApprovalCount,
+          approvalReadyCount = approvalReadyCount,
+          averageApprovalScore = averageApprovalScore,
+          maxApprovalScore = maxApprovalScore,
+          topExecutionLane = topExecutionLane,
+          executionBlockerCount = executionBlockerCount,
+          storeExecutionCount = storeExecutionCount,
+          sourceExecutionCount = sourceExecutionCount,
+          splitExecutionCount = splitExecutionCount,
+          readyExecutionCount = readyExecutionCount,
+          averageExecutionScore = averageExecutionScore,
+          maxExecutionScore = maxExecutionScore,
+          topReleaseLane = topReleaseLane,
+          releaseBlockerCount = releaseBlockerCount,
+          storeReleaseCount = storeReleaseCount,
+          sourceReleaseCount = sourceReleaseCount,
+          splitReleaseCount = splitReleaseCount,
+          readyReleaseCount = readyReleaseCount,
+          averageReleaseScore = averageReleaseScore,
+          maxReleaseScore = maxReleaseScore,
+          topSealLane = topSealLane,
+          sealBlockerCount = sealBlockerCount,
+          storeSealCount = storeSealCount,
+          sourceSealCount = sourceSealCount,
+          splitSealCount = splitSealCount,
+          readySealCount = readySealCount,
+          averageSealScore = averageSealScore,
+          maxSealScore = maxSealScore,
+          topCloseoutLane = topCloseoutLane,
+          closeoutBlockerCount = closeoutBlockerCount,
+          storeCloseoutCount = storeCloseoutCount,
+          sourceCloseoutCount = sourceCloseoutCount,
+          splitCloseoutCount = splitCloseoutCount,
+          readyCloseoutCount = readyCloseoutCount,
+          averageCloseoutScore = averageCloseoutScore,
+          maxCloseoutScore = maxCloseoutScore,
+          topReopenLane = topReopenLane,
+          reopenBlockerCount = reopenBlockerCount,
+          reopenAnswerCount = reopenAnswerCount,
+          reopenPromiseCount = reopenPromiseCount,
+          reopenSplitCount = reopenSplitCount,
+          reopenReadyCount = reopenReadyCount,
+          averageReopenScore = averageReopenScore,
+          maxReopenScore = maxReopenScore,
+          nextReopenAtMillis = nextReopenAtMillis,
+          topReconciliationLane = topReconciliationLane,
+          reconciliationBlockerCount = reconciliationBlockerCount,
+          reconciliationStoreCount = reconciliationStoreCount,
+          reconciliationSourceCount = reconciliationSourceCount,
+          reconciliationSplitCount = reconciliationSplitCount,
+          reconciliationReadyCount = reconciliationReadyCount,
+          averageReconciliationScore = averageReconciliationScore,
+          maxReconciliationScore = maxReconciliationScore,
+          topAuditLane = topAuditLane,
+          auditBlockerCount = auditBlockerCount,
+          auditQuantityGapCount = auditQuantityGapCount,
+          auditEvidenceGapCount = auditEvidenceGapCount,
+          auditStoreNoteGapCount = auditStoreNoteGapCount,
+          auditReadyCount = auditReadyCount,
+          averageAuditScore = averageAuditScore,
+          maxAuditScore = maxAuditScore,
+          averageRiskScore = averageRiskScore,
+          maxPriorityScore = maxPriorityScore,
+          nextFollowUpAtMillis = nextFollowUpAtMillis,
+          recoveryWaves = recoveryWaves,
+          topBackorderId = topItem?.backorderId.orEmpty(),
+          topGoodsItemId = topItem?.goodsItemId.orEmpty(),
+          topGoodsItemNameSnapshot = topItem?.goodsItemNameSnapshot.orEmpty()
+        )
+      }
+    }
+  }
+
+  val dashboardProfiles = supplierDashboardChunk {
+    supplierProfiles.map { supplier ->
+      val profileOrders = orders.filter { it.supplierId == supplier.id }
+      val profileOrderIds = profileOrders.map { it.id }.toSet()
+      val profileLines = lines.filter { it.orderId in profileOrderIds }
+      val profilePriceBookGoodsItemIds = supplierPriceRows
+        .filter { it.supplierId == supplier.id }
+        .map { it.goodsItemId }
+        .filter { it.isNotBlank() }
+      SupplierDashboardProfileDataModel(
+        supplierId = supplier.id,
+        name = supplier.name,
+        phoneNumbers = supplier.phoneNumbers.orEmpty(),
+        emails = supplier.emails.orEmpty(),
+        orderCount = profileOrders.size,
+        openOrderCount = profileOrders.count { !it.status.isClosedForSupplierDashboard() },
+        actionRequiredOrderCount = bundles.count { bundle ->
+          bundle.order.supplierId == supplier.id && bundle.needsSupplierDashboardAction()
+        },
+        catalogSkuCount = (profileLines.map { it.goodsItemId } + profilePriceBookGoodsItemIds).filter { it.isNotBlank() }.distinct().size,
+        partnerCount = (profileOrders.map { it.storeId } + supplierPriceRows.filter { it.supplierId == supplier.id }.map { it.storeId }).filter { it.isNotBlank() }.distinct().size,
+        latestActivityMillis = profileOrders
+          .map { it.updatedAtMillis.takeIf { value -> value > 0L } ?: it.orderedAtMillis }
+          .maxOrNull() ?: supplier.addedAt
+      )
+    }.sortedWith(
+      compareByDescending<SupplierDashboardProfileDataModel> { it.openOrderCount }
+        .thenByDescending { it.actionRequiredOrderCount }
+        .thenByDescending { it.latestActivityMillis }
     )
-  }.sortedWith(
-    compareByDescending<SupplierDashboardProfileDataModel> { it.openOrderCount }
-      .thenByDescending { it.actionRequiredOrderCount }
-      .thenByDescending { it.latestActivityMillis }
-  )
+  }
 
   return SupplierModeDashboardDataModel(
     supplierIds = supplierIds.map { it.toString() },
