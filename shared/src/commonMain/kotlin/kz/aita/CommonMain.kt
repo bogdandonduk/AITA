@@ -5317,6 +5317,154 @@ data class SupplierDashboardBackorderDataModel(
     val fullyShortLineCount: Int = 0,
     val recoveryLane: String = "",
     val recoveryHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryUrgencyLane: String = "",
+    val recoveryUrgencyHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryOwnerLane: String = "",
+    val recoveryOwnerHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoverySlaLane: String = "",
+    val recoverySlaHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryCheckpointAtMillis: Long? = null,
+    val recoveryEscalationLane: String = "",
+    val recoveryEscalationHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryProofLane: String = "",
+    val recoveryProofHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryOutcomeLane: String = "",
+    val recoveryOutcomeHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryPackGuardLane: String = "",
+    val recoveryPackGuardHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryContactLane: String = "",
+    val recoveryContactHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryContactScript: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryRiskLane: String = "",
+    val recoveryRiskHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryRiskScore: Int = 0,
+    val recoveryRiskReasons: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryConfidenceLane: String = "",
+    val recoveryConfidenceHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryConfidenceScore: Int = 0,
+    val recoveryConfidenceChecklist: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryFollowUpLane: String = "",
+    val recoveryFollowUpHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryFollowUpAtMillis: Long? = null,
+    val recoveryFollowUpScript: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryHandoffLane: String = "",
+    val recoveryHandoffHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryHandoffChecklist: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryHandoffScript: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryClosureLane: String = "",
+    val recoveryClosureHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryClosureScore: Int = 0,
+    val recoveryClosureChecklist: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryClosureScript: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryLedgerLane: String = "",
+    val recoveryLedgerHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryLedgerScore: Int = 0,
+    val recoveryLedgerChecklist: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryLedgerScript: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryTriageLane: String = "",
+    val recoveryTriageHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryTriageScore: Int = 0,
+    val recoveryTriageChecklist: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryTriageScript: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryCommandLane: String = "",
+    val recoveryCommandHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryCommandScore: Int = 0,
+    val recoveryCommandChecklist: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryCommandScript: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryPromiseShieldLane: String = "",
+    val recoveryPromiseShieldHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryPromiseShieldScore: Int = 0,
+    val recoveryPromiseShieldChecklist: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryPromiseShieldScript: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryWaveLane: String = "",
+    val recoveryWaveHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryWaveScore: Int = 0,
+    val recoveryAgingLane: String = "",
+    val recoveryAgingHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryAgingScore: Int = 0,
+    val recoveryAgingStartedAtMillis: Long? = null,
+    val recoveryAgingHours: Int = 0,
+    val recoveryAgingChecklist: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryAgingScript: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryBottleneckLane: String = "",
+    val recoveryBottleneckHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryBottleneckScore: Int = 0,
+    val recoveryBottleneckChecklist: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryBottleneckScript: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryLoadLane: String = "",
+    val recoveryLoadHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryLoadScore: Int = 0,
+    val recoveryLoadChecklist: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryLoadScript: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryImpactLane: String = "",
+    val recoveryImpactHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryImpactScore: Int = 0,
+    val recoveryImpactChecklist: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryImpactScript: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryCommitLane: String = "",
+    val recoveryCommitHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryCommitScore: Int = 0,
+    val recoveryCommitByMillis: Long? = null,
+    val recoveryCommitChecklist: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryCommitScript: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryAllocationLane: String = "",
+    val recoveryAllocationHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryAllocationScore: Int = 0,
+    val recoveryAllocationChecklist: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryAllocationScript: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryExceptionLane: String = "",
+    val recoveryExceptionHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryExceptionScore: Int = 0,
+    val recoveryExceptionChecklist: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryExceptionScript: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryCauseLane: String = "",
+    val recoveryCauseHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryCauseScore: Int = 0,
+    val recoveryCauseChecklist: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryCauseScript: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryVerificationLane: String = "",
+    val recoveryVerificationHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryVerificationScore: Int = 0,
+    val recoveryVerificationChecklist: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryVerificationScript: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryApprovalLane: String = "",
+    val recoveryApprovalHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryApprovalScore: Int = 0,
+    val recoveryApprovalChecklist: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryApprovalScript: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryExecutionLane: String = "",
+    val recoveryExecutionHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryExecutionScore: Int = 0,
+    val recoveryExecutionChecklist: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryExecutionScript: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryReleaseLane: String = "",
+    val recoveryReleaseHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryReleaseScore: Int = 0,
+    val recoveryReleaseChecklist: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryReleaseScript: List<LocalizedStringDataModel> = emptyList(),
+    val recoverySealLane: String = "",
+    val recoverySealHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoverySealScore: Int = 0,
+    val recoverySealChecklist: List<LocalizedStringDataModel> = emptyList(),
+    val recoverySealScript: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryCloseoutLane: String = "",
+    val recoveryCloseoutHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryCloseoutScore: Int = 0,
+    val recoveryCloseoutChecklist: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryCloseoutScript: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryReopenLane: String = "",
+    val recoveryReopenHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryReopenScore: Int = 0,
+    val recoveryReopenAtMillis: Long? = null,
+    val recoveryReopenChecklist: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryReopenScript: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryReconciliationLane: String = "",
+    val recoveryReconciliationHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryReconciliationScore: Int = 0,
+    val recoveryReconciliationChecklist: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryReconciliationScript: List<LocalizedStringDataModel> = emptyList(),
+    val nextRecoveryStep: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryChecklist: List<LocalizedStringDataModel> = emptyList(),
     val affectedOrderCount: Int = 0,
     val affectedStoreCount: Int = 0,
     val earliestDueAtMillis: Long? = null,
@@ -5324,6 +5472,178 @@ data class SupplierDashboardBackorderDataModel(
     val priorityScore: Int = 0,
     val suggestedAction: String = "",
     val attentionSummary: List<LocalizedStringDataModel> = emptyList()
+)
+
+@kotlinx.serialization.Serializable
+data class SupplierDashboardRecoveryWaveDataModel(
+    val recoveryWaveLane: String = "",
+    val recoveryWaveHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryWaveChecklist: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryWaveScript: List<LocalizedStringDataModel> = emptyList(),
+    val shortageCount: Int = 0,
+    val shortQuantityTotal: Double = 0.0,
+    val urgentCount: Int = 0,
+    val stopPackCount: Int = 0,
+    val promiseRiskCount: Int = 0,
+    val readyCount: Int = 0,
+    val maxRiskScore: Int = 0,
+    val maxPriorityScore: Int = 0,
+    val nextFollowUpAtMillis: Long? = null,
+    val topBackorderId: String = "",
+    val topGoodsItemId: String = "",
+    val topGoodsItemNameSnapshot: List<LocalizedStringDataModel> = emptyList()
+)
+
+@kotlinx.serialization.Serializable
+data class SupplierDashboardRecoveryDeskDataModel(
+    val recoveryDeskLane: String = "",
+    val recoveryDeskHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryDeskChecklist: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryDeskScript: List<LocalizedStringDataModel> = emptyList(),
+    val shortageCount: Int = 0,
+    val urgentCount: Int = 0,
+    val stopPackCount: Int = 0,
+    val storeContactCount: Int = 0,
+    val sourcingCount: Int = 0,
+    val splitShipCount: Int = 0,
+    val promiseRiskCount: Int = 0,
+    val readyCount: Int = 0,
+    val staleRecoveryCount: Int = 0,
+    val touchTodayRecoveryCount: Int = 0,
+    val freshRecoveryCount: Int = 0,
+    val oldestRecoveryAgeHours: Int = 0,
+    val averageRecoveryAgeHours: Int = 0,
+    val topBottleneckLane: String = "",
+    val decisionBottleneckCount: Int = 0,
+    val contactBottleneckCount: Int = 0,
+    val sourcingBottleneckCount: Int = 0,
+    val packBottleneckCount: Int = 0,
+    val proofBottleneckCount: Int = 0,
+    val agingBottleneckCount: Int = 0,
+    val readyBottleneckCount: Int = 0,
+    val topLoadLane: String = "",
+    val heavyLoadCount: Int = 0,
+    val multiStoreLoadCount: Int = 0,
+    val packLoadCount: Int = 0,
+    val readyLoadCount: Int = 0,
+    val averageLoadScore: Int = 0,
+    val topImpactLane: String = "",
+    val highImpactCount: Int = 0,
+    val promiseImpactCount: Int = 0,
+    val multiStoreImpactCount: Int = 0,
+    val replenishmentImpactCount: Int = 0,
+    val controlledImpactCount: Int = 0,
+    val averageImpactScore: Int = 0,
+    val maxImpactScore: Int = 0,
+    val topCommitLane: String = "",
+    val blockedCommitCount: Int = 0,
+    val dueCommitCount: Int = 0,
+    val sourceCommitCount: Int = 0,
+    val splitCommitCount: Int = 0,
+    val readyCommitCount: Int = 0,
+    val averageCommitScore: Int = 0,
+    val nextCommitAtMillis: Long? = null,
+    val topAllocationLane: String = "",
+    val allocationPressureCount: Int = 0,
+    val fairSplitAllocationCount: Int = 0,
+    val priorityAllocationCount: Int = 0,
+    val allocationReadyCount: Int = 0,
+    val averageAllocationScore: Int = 0,
+    val maxAllocationScore: Int = 0,
+    val topExceptionLane: String = "",
+    val exceptionPressureCount: Int = 0,
+    val stopPackExceptionCount: Int = 0,
+    val cancelReviewExceptionCount: Int = 0,
+    val substituteExceptionCount: Int = 0,
+    val sourcingExceptionCount: Int = 0,
+    val allocationExceptionCount: Int = 0,
+    val exceptionReadyCount: Int = 0,
+    val averageExceptionScore: Int = 0,
+    val maxExceptionScore: Int = 0,
+    val topCauseLane: String = "",
+    val causePressureCount: Int = 0,
+    val zeroAcceptanceCauseCount: Int = 0,
+    val partialCapacityCauseCount: Int = 0,
+    val promiseConflictCauseCount: Int = 0,
+    val allocationCauseCount: Int = 0,
+    val exceptionCauseCount: Int = 0,
+    val causeReadyCount: Int = 0,
+    val averageCauseScore: Int = 0,
+    val maxCauseScore: Int = 0,
+    val topVerificationLane: String = "",
+    val verificationBlockerCount: Int = 0,
+    val storeVerificationCount: Int = 0,
+    val sourceVerificationCount: Int = 0,
+    val packVerificationCount: Int = 0,
+    val causeVerificationCount: Int = 0,
+    val verificationReadyCount: Int = 0,
+    val averageVerificationScore: Int = 0,
+    val maxVerificationScore: Int = 0,
+    val topApprovalLane: String = "",
+    val approvalBlockerCount: Int = 0,
+    val managerApprovalCount: Int = 0,
+    val storeApprovalCount: Int = 0,
+    val sourceApprovalCount: Int = 0,
+    val packApprovalCount: Int = 0,
+    val approvalReadyCount: Int = 0,
+    val averageApprovalScore: Int = 0,
+    val maxApprovalScore: Int = 0,
+    val topExecutionLane: String = "",
+    val executionBlockerCount: Int = 0,
+    val storeExecutionCount: Int = 0,
+    val sourceExecutionCount: Int = 0,
+    val splitExecutionCount: Int = 0,
+    val readyExecutionCount: Int = 0,
+    val averageExecutionScore: Int = 0,
+    val maxExecutionScore: Int = 0,
+    val topReleaseLane: String = "",
+    val releaseBlockerCount: Int = 0,
+    val storeReleaseCount: Int = 0,
+    val sourceReleaseCount: Int = 0,
+    val splitReleaseCount: Int = 0,
+    val readyReleaseCount: Int = 0,
+    val averageReleaseScore: Int = 0,
+    val maxReleaseScore: Int = 0,
+    val topSealLane: String = "",
+    val sealBlockerCount: Int = 0,
+    val storeSealCount: Int = 0,
+    val sourceSealCount: Int = 0,
+    val splitSealCount: Int = 0,
+    val readySealCount: Int = 0,
+    val averageSealScore: Int = 0,
+    val maxSealScore: Int = 0,
+    val topCloseoutLane: String = "",
+    val closeoutBlockerCount: Int = 0,
+    val storeCloseoutCount: Int = 0,
+    val sourceCloseoutCount: Int = 0,
+    val splitCloseoutCount: Int = 0,
+    val readyCloseoutCount: Int = 0,
+    val averageCloseoutScore: Int = 0,
+    val maxCloseoutScore: Int = 0,
+    val topReopenLane: String = "",
+    val reopenBlockerCount: Int = 0,
+    val reopenAnswerCount: Int = 0,
+    val reopenPromiseCount: Int = 0,
+    val reopenSplitCount: Int = 0,
+    val reopenReadyCount: Int = 0,
+    val averageReopenScore: Int = 0,
+    val maxReopenScore: Int = 0,
+    val nextReopenAtMillis: Long? = null,
+    val topReconciliationLane: String = "",
+    val reconciliationBlockerCount: Int = 0,
+    val reconciliationStoreCount: Int = 0,
+    val reconciliationSourceCount: Int = 0,
+    val reconciliationSplitCount: Int = 0,
+    val reconciliationReadyCount: Int = 0,
+    val averageReconciliationScore: Int = 0,
+    val maxReconciliationScore: Int = 0,
+    val averageRiskScore: Int = 0,
+    val maxPriorityScore: Int = 0,
+    val nextFollowUpAtMillis: Long? = null,
+    val recoveryWaves: List<SupplierDashboardRecoveryWaveDataModel> = emptyList(),
+    val topBackorderId: String = "",
+    val topGoodsItemId: String = "",
+    val topGoodsItemNameSnapshot: List<LocalizedStringDataModel> = emptyList()
 )
 
 @kotlinx.serialization.Serializable
@@ -5354,7 +5674,8 @@ data class SupplierModeDashboardDataModel(
     val dispatchRuns: List<SupplierDashboardDispatchRunDataModel> = emptyList(),
     val readiness: SupplierDashboardReadinessDataModel = SupplierDashboardReadinessDataModel(),
     val manufacturerBridge: List<SupplierDashboardManufacturerBridgeDataModel> = emptyList(),
-    val backorderWatch: List<SupplierDashboardBackorderDataModel> = emptyList()
+    val backorderWatch: List<SupplierDashboardBackorderDataModel> = emptyList(),
+    val recoveryDesk: SupplierDashboardRecoveryDeskDataModel = SupplierDashboardRecoveryDeskDataModel()
 )
 
 fun getSupplierOrders(
@@ -6610,6 +6931,39 @@ val drawablePathIconSupplierCatalogState = MutableStateFlow("svg/72_0.svg")
 val drawablePathIconSupplierContractsState = MutableStateFlow("svg/76_0.svg")
 val drawablePathIconSupplierPartnersState = MutableStateFlow("svg/75_0.svg")
 val drawablePathIconSupplierDemandRadarState = MutableStateFlow("svg/77_0.svg")
+val drawablePathIconSupplierBackorderRecoveryState = MutableStateFlow("svg/91_0.svg")
+val drawablePathIconSupplierRecoveryOwnerState = MutableStateFlow("svg/92_0.svg")
+val drawablePathIconSupplierRecoveryClockState = MutableStateFlow("svg/93_0.svg")
+val drawablePathIconSupplierRecoveryProofState = MutableStateFlow("svg/94_0.svg")
+val drawablePathIconSupplierRecoveryResolutionState = MutableStateFlow("svg/95_0.svg")
+val drawablePathIconSupplierRecoveryContactState = MutableStateFlow("svg/96_0.svg")
+val drawablePathIconSupplierRecoveryRiskState = MutableStateFlow("svg/97_0.svg")
+val drawablePathIconSupplierRecoveryConfidenceState = MutableStateFlow("svg/98_0.svg")
+val drawablePathIconSupplierRecoveryFollowUpState = MutableStateFlow("svg/99_0.svg")
+val drawablePathIconSupplierRecoveryHandoffState = MutableStateFlow("svg/100_0.svg")
+val drawablePathIconSupplierRecoveryClosureState = MutableStateFlow("svg/101_0.svg")
+val drawablePathIconSupplierRecoveryLedgerState = MutableStateFlow("svg/102_0.svg")
+val drawablePathIconSupplierRecoveryTriageState = MutableStateFlow("svg/103_0.svg")
+val drawablePathIconSupplierRecoveryCommandState = MutableStateFlow("svg/104_0.svg")
+val drawablePathIconSupplierRecoveryPromiseShieldState = MutableStateFlow("svg/105_0.svg")
+val drawablePathIconSupplierRecoveryDeskState = MutableStateFlow("svg/106_0.svg")
+val drawablePathIconSupplierRecoveryWaveState = MutableStateFlow("svg/107_0.svg")
+val drawablePathIconSupplierRecoveryAgingState = MutableStateFlow("svg/108_0.svg")
+val drawablePathIconSupplierRecoveryBottleneckState = MutableStateFlow("svg/109_0.svg")
+val drawablePathIconSupplierRecoveryLoadState = MutableStateFlow("svg/110_0.svg")
+val drawablePathIconSupplierRecoveryImpactState = MutableStateFlow("svg/111_0.svg")
+val drawablePathIconSupplierRecoveryCommitState = MutableStateFlow("svg/112_0.svg")
+val drawablePathIconSupplierRecoveryAllocationState = MutableStateFlow("svg/113_0.svg")
+val drawablePathIconSupplierRecoveryExceptionState = MutableStateFlow("svg/114_0.svg")
+val drawablePathIconSupplierRecoveryCauseState = MutableStateFlow("svg/115_0.svg")
+val drawablePathIconSupplierRecoveryVerificationState = MutableStateFlow("svg/116_0.svg")
+val drawablePathIconSupplierRecoveryApprovalState = MutableStateFlow("svg/117_0.svg")
+val drawablePathIconSupplierRecoveryExecutionState = MutableStateFlow("svg/118_0.svg")
+val drawablePathIconSupplierRecoveryReleaseState = MutableStateFlow("svg/119_0.svg")
+val drawablePathIconSupplierRecoverySealState = MutableStateFlow("svg/120_0.svg")
+val drawablePathIconSupplierRecoveryCloseoutState = MutableStateFlow("svg/121_0.svg")
+val drawablePathIconSupplierRecoveryReopenState = MutableStateFlow("svg/122_0.svg")
+val drawablePathIconSupplierRecoveryReconciliationState = MutableStateFlow("svg/123_0.svg")
 val drawablePathIconSupplierDispatchState = MutableStateFlow("svg/78_0.svg")
 val drawablePathIconSupplierTermsGuardState = MutableStateFlow("svg/89_0.svg")
 val drawablePathIconBuyerAgeRestrictionState = MutableStateFlow("svg/73_0.svg")
@@ -8724,6 +9078,105 @@ fun updateDrawables(
         )
         drawablePathIconSupplierDemandRadarState.emit(
             drawablePath(77L)
+        )
+        drawablePathIconSupplierBackorderRecoveryState.emit(
+            drawablePath(91L)
+        )
+        drawablePathIconSupplierRecoveryOwnerState.emit(
+            drawablePath(92L)
+        )
+        drawablePathIconSupplierRecoveryClockState.emit(
+            drawablePath(93L)
+        )
+        drawablePathIconSupplierRecoveryProofState.emit(
+            drawablePath(94L)
+        )
+        drawablePathIconSupplierRecoveryResolutionState.emit(
+            drawablePath(95L)
+        )
+        drawablePathIconSupplierRecoveryContactState.emit(
+            drawablePath(96L)
+        )
+        drawablePathIconSupplierRecoveryRiskState.emit(
+            drawablePath(97L)
+        )
+        drawablePathIconSupplierRecoveryConfidenceState.emit(
+            drawablePath(98L)
+        )
+        drawablePathIconSupplierRecoveryFollowUpState.emit(
+            drawablePath(99L)
+        )
+        drawablePathIconSupplierRecoveryHandoffState.emit(
+            drawablePath(100L)
+        )
+        drawablePathIconSupplierRecoveryClosureState.emit(
+            drawablePath(101L)
+        )
+        drawablePathIconSupplierRecoveryLedgerState.emit(
+            drawablePath(102L)
+        )
+        drawablePathIconSupplierRecoveryTriageState.emit(
+            drawablePath(103L)
+        )
+        drawablePathIconSupplierRecoveryCommandState.emit(
+            drawablePath(104L)
+        )
+        drawablePathIconSupplierRecoveryPromiseShieldState.emit(
+            drawablePath(105L)
+        )
+        drawablePathIconSupplierRecoveryDeskState.emit(
+            drawablePath(106L)
+        )
+        drawablePathIconSupplierRecoveryWaveState.emit(
+            drawablePath(107L)
+        )
+        drawablePathIconSupplierRecoveryAgingState.emit(
+            drawablePath(108L)
+        )
+        drawablePathIconSupplierRecoveryBottleneckState.emit(
+            drawablePath(109L)
+        )
+        drawablePathIconSupplierRecoveryLoadState.emit(
+            drawablePath(110L)
+        )
+        drawablePathIconSupplierRecoveryImpactState.emit(
+            drawablePath(111L)
+        )
+        drawablePathIconSupplierRecoveryCommitState.emit(
+            drawablePath(112L)
+        )
+        drawablePathIconSupplierRecoveryAllocationState.emit(
+            drawablePath(113L)
+        )
+        drawablePathIconSupplierRecoveryExceptionState.emit(
+            drawablePath(114L)
+        )
+        drawablePathIconSupplierRecoveryCauseState.emit(
+            drawablePath(115L)
+        )
+        drawablePathIconSupplierRecoveryVerificationState.emit(
+            drawablePath(116L)
+        )
+        drawablePathIconSupplierRecoveryApprovalState.emit(
+            drawablePath(117L)
+        )
+        drawablePathIconSupplierRecoveryExecutionState.emit(
+            drawablePath(118L)
+        )
+        drawablePathIconSupplierRecoveryReleaseState.emit(
+            drawablePath(119L)
+        )
+        drawablePathIconSupplierRecoverySealState.emit(
+            drawablePath(120L)
+        )
+        drawablePathIconSupplierRecoveryCloseoutState.emit(
+            drawablePath(121L)
+        )
+        drawablePathIconSupplierRecoveryReopenState.emit(
+            drawablePath(122L)
+        )
+        drawablePathIconSupplierRecoveryReconciliationState.emit(
+            drawablePath(123L)
         )
         drawablePathIconSupplierDispatchState.emit(
             drawablePath(78L)

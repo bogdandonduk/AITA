@@ -1248,7 +1248,480 @@ private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallb
     put(1806L, mapOf("main" to "Partial lines", "en" to "Partial lines", "ru" to "Частичные строки", "kk" to "Ішінара жолдар"))
     put(1807L, mapOf("main" to "Fully short lines", "en" to "Fully short lines", "ru" to "Полностью недостающие строки", "kk" to "Толық жетіспейтін жолдар"))
     put(1808L, mapOf("main" to "Store names are omitted from this copied shortage brief.", "en" to "Store names are omitted from this copied shortage brief.", "ru" to "Названия магазинов не попадают в скопированную сводку недопоставки.", "kk" to "Көшірілген жетіспеу мәліметінен дүкен атаулары алынып тасталады."))
+    put(1809L, mapOf("main" to "Recovery urgency", "en" to "Recovery urgency", "ru" to "Срочность восстановления", "kk" to "Қалпына келтіру шұғылдығы"))
+    put(1810L, mapOf("main" to "Overdue", "en" to "Overdue", "ru" to "Просрочено", "kk" to "Мерзімі өтті"))
+    put(1811L, mapOf("main" to "Due today", "en" to "Due today", "ru" to "Срок сегодня", "kk" to "Мерзімі бүгін"))
+    put(1812L, mapOf("main" to "Due soon", "en" to "Due soon", "ru" to "Скоро срок", "kk" to "Мерзімі жақын"))
+    put(1813L, mapOf("main" to "Flexible", "en" to "Flexible", "ru" to "Гибко", "kk" to "Икемді"))
+    put(1814L, mapOf("main" to "Next recovery step", "en" to "Next recovery step", "ru" to "Следующий шаг восстановления", "kk" to "Қалпына келтірудің келесі қадамы"))
+    put(1815L, mapOf("main" to "Recovery checklist", "en" to "Recovery checklist", "ru" to "Чек-лист восстановления", "kk" to "Қалпына келтіру чек-парағы"))
+    put(1816L, mapOf("main" to "Backorder recovery", "en" to "Backorder recovery", "ru" to "Восстановление недопоставки", "kk" to "Жетіспеуді қалпына келтіру"))
+    put(1817L, mapOf("main" to "Recovery owner", "en" to "Recovery owner", "ru" to "Ответственный за восстановление", "kk" to "Қалпына келтіру жауаптысы"))
+    put(1818L, mapOf("main" to "Store contact", "en" to "Store contact", "ru" to "Связь с магазином", "kk" to "Дүкенмен байланыс"))
+    put(1819L, mapOf("main" to "Upstream sourcing", "en" to "Upstream sourcing", "ru" to "Поиск выше по цепочке", "kk" to "Жоғары арнадан іздеу"))
+    put(1820L, mapOf("main" to "Pack lead", "en" to "Pack lead", "ru" to "Старший сборки", "kk" to "Жинау жетекшісі"))
+    put(1821L, mapOf("main" to "Watch desk", "en" to "Watch desk", "ru" to "Пульт наблюдения", "kk" to "Бақылау пульті"))
+    put(1822L, mapOf("main" to "Recovery checkpoint", "en" to "Recovery checkpoint", "ru" to "Контрольная точка восстановления", "kk" to "Қалпына келтіру бақылау нүктесі"))
+    put(1823L, mapOf("main" to "Promise clock", "en" to "Promise clock", "ru" to "Часы обещания", "kk" to "Уәде сағаты"))
+    put(1824L, mapOf("main" to "Call now", "en" to "Call now", "ru" to "Позвонить сейчас", "kk" to "Қазір қоңырау шалу"))
+    put(1825L, mapOf("main" to "Commit today", "en" to "Commit today", "ru" to "Зафиксировать сегодня", "kk" to "Бүгін бекіту"))
+    put(1826L, mapOf("main" to "Before packing", "en" to "Before packing", "ru" to "До сборки", "kk" to "Жинауға дейін"))
+    put(1827L, mapOf("main" to "Monitor", "en" to "Monitor", "ru" to "Наблюдать", "kk" to "Бақылау"))
+    put(1828L, mapOf("main" to "Escalation lane", "en" to "Escalation lane", "ru" to "Линия эскалации", "kk" to "Көтеру арнасы"))
+    put(1829L, mapOf("main" to "Store escalation", "en" to "Store escalation", "ru" to "Эскалация магазина", "kk" to "Дүкен арқылы көтеру"))
+    put(1830L, mapOf("main" to "Sourcing escalation", "en" to "Sourcing escalation", "ru" to "Эскалация поиска", "kk" to "Іздеуді көтеру"))
+    put(1831L, mapOf("main" to "Pack hold", "en" to "Pack hold", "ru" to "Стоп сборки", "kk" to "Жинауды ұстау"))
+    put(1832L, mapOf("main" to "Watch only", "en" to "Watch only", "ru" to "Только наблюдение", "kk" to "Тек бақылау"))
+    put(1833L, mapOf("main" to "Recovery proof", "en" to "Recovery proof", "ru" to "Доказательство восстановления", "kk" to "Қалпына келтіру дәлелі"))
+    put(1834L, mapOf("main" to "Store ack needed", "en" to "Store ack needed", "ru" to "Нужно согласие магазина", "kk" to "Дүкен келісімі керек"))
+    put(1835L, mapOf("main" to "Sourcing note needed", "en" to "Sourcing note needed", "ru" to "Нужна заметка поиска", "kk" to "Іздеу жазбасы керек"))
+    put(1836L, mapOf("main" to "Pack guard proof", "en" to "Pack guard proof", "ru" to "Доказательство стоп-сборки", "kk" to "Жинау күзеті дәлелі"))
+    put(1837L, mapOf("main" to "Watch note", "en" to "Watch note", "ru" to "Заметка наблюдения", "kk" to "Бақылау жазбасы"))
+    put(1838L, mapOf("main" to "Proof needed", "en" to "Proof needed", "ru" to "Нужно подтверждение", "kk" to "Дәлел керек"))
+    put(1839L, mapOf("main" to "Resolution path", "en" to "Resolution path", "ru" to "Путь решения", "kk" to "Шешім жолы"))
+    put(1840L, mapOf("main" to "Second drop", "en" to "Second drop", "ru" to "Вторая поставка", "kk" to "Екінші жеткізу"))
+    put(1841L, mapOf("main" to "Substitute offer", "en" to "Substitute offer", "ru" to "Предложить замену", "kk" to "Ауыстыру ұсыну"))
+    put(1842L, mapOf("main" to "Cancel review", "en" to "Cancel review", "ru" to "Проверка отмены", "kk" to "Бас тартуды қарау"))
+    put(1843L, mapOf("main" to "Ship-now guard", "en" to "Ship-now guard", "ru" to "Защита отправки сейчас", "kk" to "Қазір жөнелту күзеті"))
+    put(1844L, mapOf("main" to "Watch to close", "en" to "Watch to close", "ru" to "Наблюдать до закрытия", "kk" to "Жабылғанша бақылау"))
+    put(1845L, mapOf("main" to "Pack guard", "en" to "Pack guard", "ru" to "Защита сборки", "kk" to "Жинау күзеті"))
+    put(1846L, mapOf("main" to "Block packing", "en" to "Block packing", "ru" to "Заблокировать сборку", "kk" to "Жинауды бұғаттау"))
+    put(1847L, mapOf("main" to "Split pack only", "en" to "Split pack only", "ru" to "Только разделённая сборка", "kk" to "Тек бөлінген жинау"))
+    put(1848L, mapOf("main" to "Proof before pack", "en" to "Proof before pack", "ru" to "Подтверждение до сборки", "kk" to "Жинауға дейін дәлел"))
+    put(1849L, mapOf("main" to "Safe to pack", "en" to "Safe to pack", "ru" to "Можно собирать", "kk" to "Жинауға қауіпсіз"))
+    put(1850L, mapOf("main" to "Decision needed", "en" to "Decision needed", "ru" to "Нужно решение", "kk" to "Шешім керек"))
+    put(1851L, mapOf("main" to "Contact lane", "en" to "Contact lane", "ru" to "Канал связи", "kk" to "Байланыс арнасы"))
+    put(1852L, mapOf("main" to "Store call", "en" to "Store call", "ru" to "Звонок магазину", "kk" to "Дүкенге қоңырау"))
+    put(1853L, mapOf("main" to "Upstream request", "en" to "Upstream request", "ru" to "Запрос выше", "kk" to "Жоғары сұраныс"))
+    put(1854L, mapOf("main" to "Pack note", "en" to "Pack note", "ru" to "Заметка сборке", "kk" to "Жинау жазбасы"))
+    put(1855L, mapOf("main" to "Contact now", "en" to "Contact now", "ru" to "Связаться сейчас", "kk" to "Қазір байланысу"))
+    put(1856L, mapOf("main" to "Copy contact script", "en" to "Copy contact script", "ru" to "Скопировать скрипт связи", "kk" to "Байланыс мәтінін көшіру"))
+    put(1857L, mapOf("main" to "Contact script", "en" to "Contact script", "ru" to "Скрипт связи", "kk" to "Байланыс мәтіні"))
+    put(1858L, mapOf("main" to "Substitute answer", "en" to "Substitute answer", "ru" to "Ответ по замене", "kk" to "Ауыстыру жауабы"))
+    put(1859L, mapOf("main" to "Recovery risk", "en" to "Recovery risk", "ru" to "Риск восстановления", "kk" to "Қалпына келтіру тәуекелі"))
+    put(1860L, mapOf("main" to "Critical recovery", "en" to "Critical recovery", "ru" to "Критическое восстановление", "kk" to "Маңызды қалпына келтіру"))
+    put(1861L, mapOf("main" to "Decision pressure", "en" to "Decision pressure", "ru" to "Давление решения", "kk" to "Шешім қысымы"))
+    put(1862L, mapOf("main" to "Pack/sourcing risk", "en" to "Pack/sourcing risk", "ru" to "Риск сборки/поиска", "kk" to "Жинау/іздеу тәуекелі"))
+    put(1863L, mapOf("main" to "Steady watch", "en" to "Steady watch", "ru" to "Спокойное наблюдение", "kk" to "Тұрақты бақылау"))
+    put(1864L, mapOf("main" to "Risk score", "en" to "Risk score", "ru" to "Оценка риска", "kk" to "Тәуекел ұпайы"))
+    put(1865L, mapOf("main" to "Risk reasons", "en" to "Risk reasons", "ru" to "Причины риска", "kk" to "Тәуекел себептері"))
+    put(1866L, mapOf("main" to "High risk", "en" to "High risk", "ru" to "Высокий риск", "kk" to "Жоғары тәуекел"))
+    put(1867L, mapOf("main" to "Copy risk note", "en" to "Copy risk note", "ru" to "Скопировать заметку риска", "kk" to "Тәуекел жазбасын көшіру"))
+    put(1868L, mapOf("main" to "Recovery confidence", "en" to "Recovery confidence", "ru" to "Уверенность восстановления", "kk" to "Қалпына келтіру сенімділігі"))
+    put(1869L, mapOf("main" to "Blocked until decision", "en" to "Blocked until decision", "ru" to "Блок до решения", "kk" to "Шешімге дейін бұғат"))
+    put(1870L, mapOf("main" to "Needs confirmation", "en" to "Needs confirmation", "ru" to "Нужно подтверждение", "kk" to "Растау керек"))
+    put(1871L, mapOf("main" to "Ready to recover", "en" to "Ready to recover", "ru" to "Готово к восстановлению", "kk" to "Қалпына келтіруге дайын"))
+    put(1872L, mapOf("main" to "Watch confidence", "en" to "Watch confidence", "ru" to "Уверенность наблюдения", "kk" to "Бақылау сенімділігі"))
+    put(1873L, mapOf("main" to "Confidence score", "en" to "Confidence score", "ru" to "Оценка уверенности", "kk" to "Сенімділік ұпайы"))
+    put(1874L, mapOf("main" to "Confidence checklist", "en" to "Confidence checklist", "ru" to "Чек-лист уверенности", "kk" to "Сенімділік чек-парағы"))
+    put(1875L, mapOf("main" to "Low confidence", "en" to "Low confidence", "ru" to "Низкая уверенность", "kk" to "Сенімділік төмен"))
+    put(1876L, mapOf("main" to "Copy confidence note", "en" to "Copy confidence note", "ru" to "Скопировать заметку уверенности", "kk" to "Сенімділік жазбасын көшіру"))
+    put(1877L, mapOf("main" to "Follow-up cadence", "en" to "Follow-up cadence", "ru" to "Ритм контроля", "kk" to "Бақылау ырғағы"))
+    put(1878L, mapOf("main" to "Follow up now", "en" to "Follow up now", "ru" to "Проверить сейчас", "kk" to "Қазір тексеру"))
+    put(1879L, mapOf("main" to "Same-day check", "en" to "Same-day check", "ru" to "Проверка сегодня", "kk" to "Бүгінгі тексеру"))
+    put(1880L, mapOf("main" to "Before-pack check", "en" to "Before-pack check", "ru" to "Проверка до сборки", "kk" to "Жинауға дейін тексеру"))
+    put(1881L, mapOf("main" to "Watch later", "en" to "Watch later", "ru" to "Посмотреть позже", "kk" to "Кейін бақылау"))
+    put(1882L, mapOf("main" to "Next follow-up", "en" to "Next follow-up", "ru" to "Следующий контроль", "kk" to "Келесі бақылау"))
+    put(1883L, mapOf("main" to "Copy follow-up note", "en" to "Copy follow-up note", "ru" to "Скопировать заметку контроля", "kk" to "Бақылау жазбасын көшіру"))
+    put(1884L, mapOf("main" to "Follow-up script", "en" to "Follow-up script", "ru" to "Скрипт контроля", "kk" to "Бақылау мәтіні"))
+    put(1885L, mapOf("main" to "Due for follow-up", "en" to "Due for follow-up", "ru" to "Пора проверить", "kk" to "Тексеру уақыты"))
+    put(1886L, mapOf("main" to "Recovery handoff", "en" to "Recovery handoff", "ru" to "Передача восстановления", "kk" to "Қалпына келтіруді тапсыру"))
+    put(1887L, mapOf("main" to "Store handoff", "en" to "Store handoff", "ru" to "Передача магазину", "kk" to "Дүкенге тапсыру"))
+    put(1888L, mapOf("main" to "Sourcing handoff", "en" to "Sourcing handoff", "ru" to "Передача поиску", "kk" to "Іздеуге тапсыру"))
+    put(1889L, mapOf("main" to "Pack handoff", "en" to "Pack handoff", "ru" to "Передача сборке", "kk" to "Жинауға тапсыру"))
+    put(1890L, mapOf("main" to "Watch handoff", "en" to "Watch handoff", "ru" to "Передача наблюдению", "kk" to "Бақылауға тапсыру"))
+    put(1891L, mapOf("main" to "Handoff checklist", "en" to "Handoff checklist", "ru" to "Чек-лист передачи", "kk" to "Тапсыру чек-парағы"))
+    put(1892L, mapOf("main" to "Copy handoff note", "en" to "Copy handoff note", "ru" to "Скопировать заметку передачи", "kk" to "Тапсыру жазбасын көшіру"))
+    put(1893L, mapOf("main" to "Handoff needed", "en" to "Handoff needed", "ru" to "Нужна передача", "kk" to "Тапсыру керек"))
+    put(1894L, mapOf("main" to "Pack handoff", "en" to "Pack handoff", "ru" to "Передача сборке", "kk" to "Жинауға тапсыру"))
+    put(1895L, mapOf("main" to "Handoff script", "en" to "Handoff script", "ru" to "Скрипт передачи", "kk" to "Тапсыру мәтіні"))
+    put(1896L, mapOf("main" to "Close gate", "en" to "Close gate", "ru" to "Ворота закрытия", "kk" to "Жабу қақпасы"))
+    put(1897L, mapOf("main" to "Blocked open", "en" to "Blocked open", "ru" to "Оставить открытым", "kk" to "Ашық қалдыру"))
+    put(1898L, mapOf("main" to "Needs close note", "en" to "Needs close note", "ru" to "Нужна заметка закрытия", "kk" to "Жабу жазбасы керек"))
+    put(1899L, mapOf("main" to "Ready with guard", "en" to "Ready with guard", "ru" to "Готово с защитой", "kk" to "Қорғанмен дайын"))
+    put(1900L, mapOf("main" to "Watch until clear", "en" to "Watch until clear", "ru" to "Наблюдать до ясности", "kk" to "Анық болғанша бақылау"))
+    put(1901L, mapOf("main" to "Closure score", "en" to "Closure score", "ru" to "Оценка закрытия", "kk" to "Жабу ұпайы"))
+    put(1902L, mapOf("main" to "Closure checklist", "en" to "Closure checklist", "ru" to "Чек-лист закрытия", "kk" to "Жабу чек-парағы"))
+    put(1903L, mapOf("main" to "Copy close-gate note", "en" to "Copy close-gate note", "ru" to "Скопировать заметку ворот", "kk" to "Жабу қақпасы жазбасын көшіру"))
+    put(1904L, mapOf("main" to "Close blockers", "en" to "Close blockers", "ru" to "Блокеры закрытия", "kk" to "Жабу бөгеттері"))
+    put(1905L, mapOf("main" to "Guard-ready", "en" to "Guard-ready", "ru" to "Готово под защитой", "kk" to "Қорғанмен дайын"))
+    put(1906L, mapOf("main" to "Close-gate script", "en" to "Close-gate script", "ru" to "Скрипт ворот закрытия", "kk" to "Жабу қақпасы мәтіні"))
+    put(1907L, mapOf("main" to "Recovery ledger", "en" to "Recovery ledger", "ru" to "Журнал восстановления", "kk" to "Қалпына келтіру журналы"))
+    put(1908L, mapOf("main" to "Audit blocker", "en" to "Audit blocker", "ru" to "Блокер журнала", "kk" to "Журнал бөгеті"))
+    put(1909L, mapOf("main" to "Decision record", "en" to "Decision record", "ru" to "Запись решения", "kk" to "Шешім жазбасы"))
+    put(1910L, mapOf("main" to "Pack record", "en" to "Pack record", "ru" to "Запись сборки", "kk" to "Жинау жазбасы"))
+    put(1911L, mapOf("main" to "Ledger ready", "en" to "Ledger ready", "ru" to "Журнал готов", "kk" to "Журнал дайын"))
+    put(1912L, mapOf("main" to "Watch record", "en" to "Watch record", "ru" to "Запись наблюдения", "kk" to "Бақылау жазбасы"))
+    put(1913L, mapOf("main" to "Ledger score", "en" to "Ledger score", "ru" to "Оценка журнала", "kk" to "Журнал ұпайы"))
+    put(1914L, mapOf("main" to "Ledger checklist", "en" to "Ledger checklist", "ru" to "Чек-лист журнала", "kk" to "Журнал чек-парағы"))
+    put(1915L, mapOf("main" to "Copy ledger note", "en" to "Copy ledger note", "ru" to "Скопировать заметку журнала", "kk" to "Журнал жазбасын көшіру"))
+    put(1916L, mapOf("main" to "Ledger gaps", "en" to "Ledger gaps", "ru" to "Пробелы журнала", "kk" to "Журнал бос орындары"))
+    put(1917L, mapOf("main" to "Ledger-ready", "en" to "Ledger-ready", "ru" to "Готово по журналу", "kk" to "Журнал бойынша дайын"))
+    put(1918L, mapOf("main" to "Ledger script", "en" to "Ledger script", "ru" to "Скрипт журнала", "kk" to "Журнал мәтіні"))
+    put(1919L, mapOf("main" to "Triage desk", "en" to "Triage desk", "ru" to "Пульт сортировки", "kk" to "Іріктеу пульті"))
+    put(1920L, mapOf("main" to "Triage now", "en" to "Triage now", "ru" to "Разобрать сейчас", "kk" to "Қазір іріктеу"))
+    put(1921L, mapOf("main" to "Decision lane", "en" to "Decision lane", "ru" to "Линия решения", "kk" to "Шешім арнасы"))
+    put(1922L, mapOf("main" to "Pack split lane", "en" to "Pack split lane", "ru" to "Линия разделения сборки", "kk" to "Жинауды бөлу арнасы"))
+    put(1923L, mapOf("main" to "Sourcing lane", "en" to "Sourcing lane", "ru" to "Линия поиска", "kk" to "Іздеу арнасы"))
+    put(1924L, mapOf("main" to "Ready lane", "en" to "Ready lane", "ru" to "Готовая линия", "kk" to "Дайын арна"))
+    put(1925L, mapOf("main" to "Watch lane", "en" to "Watch lane", "ru" to "Линия наблюдения", "kk" to "Бақылау арнасы"))
+    put(1926L, mapOf("main" to "Triage score", "en" to "Triage score", "ru" to "Оценка сортировки", "kk" to "Іріктеу ұпайы"))
+    put(1927L, mapOf("main" to "Triage checklist", "en" to "Triage checklist", "ru" to "Чек-лист сортировки", "kk" to "Іріктеу чек-парағы"))
+    put(1928L, mapOf("main" to "Copy triage note", "en" to "Copy triage note", "ru" to "Скопировать заметку сортировки", "kk" to "Іріктеу жазбасын көшіру"))
+    put(1929L, mapOf("main" to "Triage-now", "en" to "Triage-now", "ru" to "Сейчас в разбор", "kk" to "Қазір іріктеу"))
+    put(1930L, mapOf("main" to "Ready triage", "en" to "Ready triage", "ru" to "Готово после сортировки", "kk" to "Іріктеуден дайын"))
+    put(1931L, mapOf("main" to "Triage script", "en" to "Triage script", "ru" to "Скрипт сортировки", "kk" to "Іріктеу мәтіні"))
+    put(1932L, mapOf("main" to "Recovery command", "en" to "Recovery command", "ru" to "Команда восстановления", "kk" to "Қалпына келтіру командасы"))
+    put(1933L, mapOf("main" to "Stop pack", "en" to "Stop pack", "ru" to "Остановить сборку", "kk" to "Жинауды тоқтату"))
+    put(1934L, mapOf("main" to "Call store", "en" to "Call store", "ru" to "Связаться с магазином", "kk" to "Дүкенге хабарласу"))
+    put(1935L, mapOf("main" to "Source now", "en" to "Source now", "ru" to "Искать сейчас", "kk" to "Қазір табу"))
+    put(1936L, mapOf("main" to "Split and ship", "en" to "Split and ship", "ru" to "Разделить и отправить", "kk" to "Бөліп жіберу"))
+    put(1937L, mapOf("main" to "Ready with note", "en" to "Ready with note", "ru" to "Готово с заметкой", "kk" to "Жазбамен дайын"))
+    put(1938L, mapOf("main" to "Monitor promise", "en" to "Monitor promise", "ru" to "Следить за обещанием", "kk" to "Уәдені бақылау"))
+    put(1939L, mapOf("main" to "Command score", "en" to "Command score", "ru" to "Оценка команды", "kk" to "Команда ұпайы"))
+    put(1940L, mapOf("main" to "Command checklist", "en" to "Command checklist", "ru" to "Чек-лист команды", "kk" to "Команда чек-парағы"))
+    put(1941L, mapOf("main" to "Copy command note", "en" to "Copy command note", "ru" to "Скопировать команду", "kk" to "Команданы көшіру"))
+    put(1942L, mapOf("main" to "Command stops", "en" to "Command stops", "ru" to "Команда стоп", "kk" to "Тоқтату командасы"))
+    put(1943L, mapOf("main" to "Command ready", "en" to "Command ready", "ru" to "Команда готова", "kk" to "Команда дайын"))
+    put(1944L, mapOf("main" to "Command script", "en" to "Command script", "ru" to "Скрипт команды", "kk" to "Команда мәтіні"))
+    put(1945L, mapOf("main" to "Promise shield", "en" to "Promise shield", "ru" to "Щит обещания", "kk" to "Уәде қалқаны"))
+    put(1946L, mapOf("main" to "Promise at risk", "en" to "Promise at risk", "ru" to "Обещание под риском", "kk" to "Уәде тәуекелде"))
+    put(1947L, mapOf("main" to "Store answer needed", "en" to "Store answer needed", "ru" to "Нужен ответ магазина", "kk" to "Дүкен жауабы керек"))
+    put(1948L, mapOf("main" to "Source before promise", "en" to "Source before promise", "ru" to "Поиск до обещания", "kk" to "Уәдеге дейін табу"))
+    put(1949L, mapOf("main" to "Split promise", "en" to "Split promise", "ru" to "Разделённое обещание", "kk" to "Бөлінген уәде"))
+    put(1950L, mapOf("main" to "Promise safe", "en" to "Promise safe", "ru" to "Обещание безопасно", "kk" to "Уәде қауіпсіз"))
+    put(1951L, mapOf("main" to "Promise watch", "en" to "Promise watch", "ru" to "Наблюдать обещание", "kk" to "Уәдені бақылау"))
+    put(1952L, mapOf("main" to "Promise score", "en" to "Promise score", "ru" to "Оценка обещания", "kk" to "Уәде ұпайы"))
+    put(1953L, mapOf("main" to "Promise checklist", "en" to "Promise checklist", "ru" to "Чек-лист обещания", "kk" to "Уәде чек-парағы"))
+    put(1954L, mapOf("main" to "Copy promise note", "en" to "Copy promise note", "ru" to "Скопировать обещание", "kk" to "Уәде жазбасын көшіру"))
+    put(1955L, mapOf("main" to "Promise risks", "en" to "Promise risks", "ru" to "Риски обещания", "kk" to "Уәде тәуекелдері"))
+    put(1956L, mapOf("main" to "Promise ready", "en" to "Promise ready", "ru" to "Обещание готово", "kk" to "Уәде дайын"))
+    put(1957L, mapOf("main" to "Promise script", "en" to "Promise script", "ru" to "Скрипт обещания", "kk" to "Уәде мәтіні"))
+    put(1958L, mapOf("main" to "Recovery desk", "en" to "Recovery desk", "ru" to "Пульт восстановления", "kk" to "Қалпына келтіру пульті"))
+    put(1959L, mapOf("main" to "Command room", "en" to "Command room", "ru" to "Командный пульт", "kk" to "Команда бөлмесі"))
+    put(1960L, mapOf("main" to "Contact wave", "en" to "Contact wave", "ru" to "Волна контактов", "kk" to "Байланыс толқыны"))
+    put(1961L, mapOf("main" to "Source wave", "en" to "Source wave", "ru" to "Волна поиска", "kk" to "Іздеу толқыны"))
+    put(1962L, mapOf("main" to "Split wave", "en" to "Split wave", "ru" to "Волна разделения", "kk" to "Бөлу толқыны"))
+    put(1963L, mapOf("main" to "Ready wave", "en" to "Ready wave", "ru" to "Готовая волна", "kk" to "Дайын толқын"))
+    put(1964L, mapOf("main" to "Watch wave", "en" to "Watch wave", "ru" to "Волна наблюдения", "kk" to "Бақылау толқыны"))
+    put(1965L, mapOf("main" to "Desk clear", "en" to "Desk clear", "ru" to "Пульт чист", "kk" to "Пульт таза"))
+    put(1966L, mapOf("main" to "Desk checklist", "en" to "Desk checklist", "ru" to "Чек-лист пульта", "kk" to "Пульт чек-парағы"))
+    put(1967L, mapOf("main" to "Copy desk note", "en" to "Copy desk note", "ru" to "Скопировать заметку пульта", "kk" to "Пульт жазбасын көшіру"))
+    put(1968L, mapOf("main" to "Urgent desk", "en" to "Urgent desk", "ru" to "Срочно на пульте", "kk" to "Пультте шұғыл"))
+    put(1969L, mapOf("main" to "Stop-pack desk", "en" to "Stop-pack desk", "ru" to "Стоп-сборка на пульте", "kk" to "Пультте жинау тоқтатылды"))
+    put(1970L, mapOf("main" to "Top recovery", "en" to "Top recovery", "ru" to "Главное восстановление", "kk" to "Негізгі қалпына келтіру"))
+    put(1971L, mapOf("main" to "Desk script", "en" to "Desk script", "ru" to "Скрипт пульта", "kk" to "Пульт мәтіні"))
+    put(1972L, mapOf("main" to "Next desk follow-up", "en" to "Next desk follow-up", "ru" to "Следующий контроль пульта", "kk" to "Пульттің келесі бақылауы"))
+    put(1973L, mapOf("main" to "Recovery wave", "en" to "Recovery wave", "ru" to "Волна восстановления", "kk" to "Қалпына келтіру толқыны"))
+    put(1974L, mapOf("main" to "Wave board", "en" to "Wave board", "ru" to "Доска волн", "kk" to "Толқын тақтасы"))
+    put(1975L, mapOf("main" to "Wave score", "en" to "Wave score", "ru" to "Оценка волны", "kk" to "Толқын ұпайы"))
+    put(1976L, mapOf("main" to "Wave checklist", "en" to "Wave checklist", "ru" to "Чек-лист волны", "kk" to "Толқын чек-парағы"))
+    put(1977L, mapOf("main" to "Wave script", "en" to "Wave script", "ru" to "Скрипт волны", "kk" to "Толқын мәтіні"))
+    put(1978L, mapOf("main" to "Copy wave note", "en" to "Copy wave note", "ru" to "Скопировать заметку волны", "kk" to "Толқын жазбасын көшіру"))
+    put(1979L, mapOf("main" to "All waves", "en" to "All waves", "ru" to "Все волны", "kk" to "Барлық толқындар"))
+    put(1980L, mapOf("main" to "Active waves", "en" to "Active waves", "ru" to "Активные волны", "kk" to "Белсенді толқындар"))
+    put(1981L, mapOf("main" to "Top wave item", "en" to "Top wave item", "ru" to "Главная позиция волны", "kk" to "Толқынның негізгі позициясы"))
+    put(1982L, mapOf("main" to "Max risk", "en" to "Max risk", "ru" to "Максимальный риск", "kk" to "Ең жоғары тәуекел"))
+    put(1983L, mapOf("main" to "Max priority", "en" to "Max priority", "ru" to "Максимальный приоритет", "kk" to "Ең жоғары басымдық"))
+    put(1985L, mapOf("main" to "Recovery aging", "en" to "Recovery aging", "ru" to "Старение восстановления", "kk" to "Қалпына келтіру ескіруі"))
+    put(1986L, mapOf("main" to "Stale blocker", "en" to "Stale blocker", "ru" to "Застойный блокер", "kk" to "Ескірген бөгет"))
+    put(1987L, mapOf("main" to "Touch today", "en" to "Touch today", "ru" to "Связаться сегодня", "kk" to "Бүгін қозғау"))
+    put(1988L, mapOf("main" to "Fresh recovery", "en" to "Fresh recovery", "ru" to "Свежее восстановление", "kk" to "Жаңа қалпына келтіру"))
+    put(1989L, mapOf("main" to "Age watch", "en" to "Age watch", "ru" to "Наблюдать старение", "kk" to "Ескіруді бақылау"))
+    put(1990L, mapOf("main" to "Aging score", "en" to "Aging score", "ru" to "Оценка старения", "kk" to "Ескіру ұпайы"))
+    put(1991L, mapOf("main" to "Aging checklist", "en" to "Aging checklist", "ru" to "Чек-лист старения", "kk" to "Ескіру чек-парағы"))
+    put(1992L, mapOf("main" to "Copy aging note", "en" to "Copy aging note", "ru" to "Скопировать заметку старения", "kk" to "Ескіру жазбасын көшіру"))
+    put(1993L, mapOf("main" to "Stale age", "en" to "Stale age", "ru" to "Застойный возраст", "kk" to "Ескірген жас"))
+    put(1994L, mapOf("main" to "Fresh touches", "en" to "Fresh touches", "ru" to "Свежие касания", "kk" to "Жаңа байланыстар"))
+    put(1995L, mapOf("main" to "Aging script", "en" to "Aging script", "ru" to "Скрипт старения", "kk" to "Ескіру мәтіні"))
+    put(1996L, mapOf("main" to "Oldest age", "en" to "Oldest age", "ru" to "Самый старый", "kk" to "Ең ескі"))
+    put(1997L, mapOf("main" to "Average age", "en" to "Average age", "ru" to "Средний возраст", "kk" to "Орташа жас"))
+    put(1998L, mapOf("main" to "Recovery bottleneck", "en" to "Recovery bottleneck", "ru" to "Узкое место восстановления", "kk" to "Қалпына келтіру тар орны"))
+    put(1999L, mapOf("main" to "Decision bottleneck", "en" to "Decision bottleneck", "ru" to "Узкое место решения", "kk" to "Шешім тар орны"))
+    put(2000L, mapOf("main" to "Contact bottleneck", "en" to "Contact bottleneck", "ru" to "Узкое место контакта", "kk" to "Байланыс тар орны"))
+    put(2001L, mapOf("main" to "Sourcing bottleneck", "en" to "Sourcing bottleneck", "ru" to "Узкое место поиска", "kk" to "Іздеу тар орны"))
+    put(2002L, mapOf("main" to "Pack bottleneck", "en" to "Pack bottleneck", "ru" to "Узкое место сборки", "kk" to "Жинау тар орны"))
+    put(2003L, mapOf("main" to "Proof bottleneck", "en" to "Proof bottleneck", "ru" to "Узкое место доказательства", "kk" to "Дәлел тар орны"))
+    put(2004L, mapOf("main" to "Aging bottleneck", "en" to "Aging bottleneck", "ru" to "Узкое место старения", "kk" to "Ескіру тар орны"))
+    put(2005L, mapOf("main" to "Ready bottleneck", "en" to "Ready bottleneck", "ru" to "Готово после узкого места", "kk" to "Тар орыннан кейін дайын"))
+    put(2006L, mapOf("main" to "Watch bottleneck", "en" to "Watch bottleneck", "ru" to "Наблюдать узкое место", "kk" to "Тар орынды бақылау"))
+    put(2007L, mapOf("main" to "Bottleneck score", "en" to "Bottleneck score", "ru" to "Оценка узкого места", "kk" to "Тар орын ұпайы"))
+    put(2008L, mapOf("main" to "Bottleneck checklist", "en" to "Bottleneck checklist", "ru" to "Чек-лист узкого места", "kk" to "Тар орын чек-парағы"))
+    put(2009L, mapOf("main" to "Copy bottleneck note", "en" to "Copy bottleneck note", "ru" to "Скопировать узкое место", "kk" to "Тар орын жазбасын көшіру"))
+    put(2010L, mapOf("main" to "Top bottleneck", "en" to "Top bottleneck", "ru" to "Главное узкое место", "kk" to "Негізгі тар орын"))
+    put(2011L, mapOf("main" to "Bottleneck script", "en" to "Bottleneck script", "ru" to "Скрипт узкого места", "kk" to "Тар орын мәтіні"))
+    put(2012L, mapOf("main" to "Bottleneck map", "en" to "Bottleneck map", "ru" to "Карта узких мест", "kk" to "Тар орын картасы"))
+    put(2013L, mapOf("main" to "Recovery load", "en" to "Recovery load", "ru" to "Нагрузка восстановления", "kk" to "Қалпына келтіру жүктемесі"))
+    put(2014L, mapOf("main" to "Heavy load", "en" to "Heavy load", "ru" to "Тяжёлая нагрузка", "kk" to "Ауыр жүктеме"))
+    put(2015L, mapOf("main" to "Multi-store load", "en" to "Multi-store load", "ru" to "Нагрузка нескольких магазинов", "kk" to "Көп дүкен жүктемесі"))
+    put(2016L, mapOf("main" to "Pack load", "en" to "Pack load", "ru" to "Нагрузка сборки", "kk" to "Жинау жүктемесі"))
+    put(2017L, mapOf("main" to "Ready load", "en" to "Ready load", "ru" to "Готовая нагрузка", "kk" to "Дайын жүктеме"))
+    put(2018L, mapOf("main" to "Watch load", "en" to "Watch load", "ru" to "Наблюдать нагрузку", "kk" to "Жүктемені бақылау"))
+    put(2019L, mapOf("main" to "Load score", "en" to "Load score", "ru" to "Оценка нагрузки", "kk" to "Жүктеме ұпайы"))
+    put(2020L, mapOf("main" to "Load checklist", "en" to "Load checklist", "ru" to "Чек-лист нагрузки", "kk" to "Жүктеме чек-парағы"))
+    put(2021L, mapOf("main" to "Copy load note", "en" to "Copy load note", "ru" to "Скопировать нагрузку", "kk" to "Жүктеме жазбасын көшіру"))
+    put(2022L, mapOf("main" to "Top load", "en" to "Top load", "ru" to "Главная нагрузка", "kk" to "Негізгі жүктеме"))
+    put(2023L, mapOf("main" to "Load script", "en" to "Load script", "ru" to "Скрипт нагрузки", "kk" to "Жүктеме мәтіні"))
+    put(2024L, mapOf("main" to "Heavy loads", "en" to "Heavy loads", "ru" to "Тяжёлые нагрузки", "kk" to "Ауыр жүктемелер"))
+    put(2025L, mapOf("main" to "Multi-store loads", "en" to "Multi-store loads", "ru" to "Мульти-магазин нагрузки", "kk" to "Көп дүкен жүктемелері"))
+    put(2026L, mapOf("main" to "Pack loads", "en" to "Pack loads", "ru" to "Нагрузки сборки", "kk" to "Жинау жүктемелері"))
+    put(2027L, mapOf("main" to "Ready loads", "en" to "Ready loads", "ru" to "Готовые нагрузки", "kk" to "Дайын жүктемелер"))
+    put(2028L, mapOf("main" to "Average load", "en" to "Average load", "ru" to "Средняя нагрузка", "kk" to "Орташа жүктеме"))
+    put(2029L, mapOf("main" to "Recovery impact", "en" to "Recovery impact", "ru" to "Влияние восстановления", "kk" to "Қалпына келтіру әсері"))
+    put(2030L, mapOf("main" to "Customer promise impact", "en" to "Customer promise impact", "ru" to "Влияние на обещание клиенту", "kk" to "Клиент уәдесіне әсер"))
+    put(2031L, mapOf("main" to "Multi-store impact", "en" to "Multi-store impact", "ru" to "Влияние на несколько магазинов", "kk" to "Көп дүкен әсері"))
+    put(2032L, mapOf("main" to "Store replenishment impact", "en" to "Store replenishment impact", "ru" to "Влияние на пополнение магазина", "kk" to "Дүкен толықтыруына әсер"))
+    put(2033L, mapOf("main" to "Controlled impact", "en" to "Controlled impact", "ru" to "Влияние под контролем", "kk" to "Әсер бақылауда"))
+    put(2034L, mapOf("main" to "Impact watch", "en" to "Impact watch", "ru" to "Наблюдать влияние", "kk" to "Әсерді бақылау"))
+    put(2035L, mapOf("main" to "Impact score", "en" to "Impact score", "ru" to "Оценка влияния", "kk" to "Әсер ұпайы"))
+    put(2036L, mapOf("main" to "Impact checklist", "en" to "Impact checklist", "ru" to "Чек-лист влияния", "kk" to "Әсер чек-парағы"))
+    put(2037L, mapOf("main" to "Copy impact note", "en" to "Copy impact note", "ru" to "Скопировать влияние", "kk" to "Әсер жазбасын көшіру"))
+    put(2038L, mapOf("main" to "Impact script", "en" to "Impact script", "ru" to "Скрипт влияния", "kk" to "Әсер мәтіні"))
+    put(2039L, mapOf("main" to "High impact", "en" to "High impact", "ru" to "Высокое влияние", "kk" to "Жоғары әсер"))
+    put(2040L, mapOf("main" to "Promise impact", "en" to "Promise impact", "ru" to "Влияние обещаний", "kk" to "Уәде әсері"))
+    put(2041L, mapOf("main" to "Top impact", "en" to "Top impact", "ru" to "Главное влияние", "kk" to "Негізгі әсер"))
+    put(2042L, mapOf("main" to "Impact average", "en" to "Impact average", "ru" to "Среднее влияние", "kk" to "Орташа әсер"))
+    put(2043L, mapOf("main" to "Impact max", "en" to "Impact max", "ru" to "Макс. влияние", "kk" to "Ең жоғары әсер"))
+    put(2044L, mapOf("main" to "Recovery commit", "en" to "Recovery commit", "ru" to "Обязательство восстановления", "kk" to "Қалпына келтіру міндеттемесі"))
+    put(2045L, mapOf("main" to "Commit blocked", "en" to "Commit blocked", "ru" to "Обязательство заблокировано", "kk" to "Міндеттеме бөгелді"))
+    put(2046L, mapOf("main" to "Store commit due", "en" to "Store commit due", "ru" to "Ответ магазину нужен", "kk" to "Дүкен міндеттемесі керек"))
+    put(2047L, mapOf("main" to "Source ETA commit", "en" to "Source ETA commit", "ru" to "Срок поставщика", "kk" to "Іздеу мерзімі"))
+    put(2048L, mapOf("main" to "Split ETA commit", "en" to "Split ETA commit", "ru" to "Срок разделения", "kk" to "Бөлу мерзімі"))
+    put(2049L, mapOf("main" to "Commit ready", "en" to "Commit ready", "ru" to "Обязательство готово", "kk" to "Міндеттеме дайын"))
+    put(2050L, mapOf("main" to "Commit watch", "en" to "Commit watch", "ru" to "Наблюдать обязательство", "kk" to "Міндеттемені бақылау"))
+    put(2051L, mapOf("main" to "Commit score", "en" to "Commit score", "ru" to "Оценка обязательства", "kk" to "Міндеттеме ұпайы"))
+    put(2052L, mapOf("main" to "Commit checklist", "en" to "Commit checklist", "ru" to "Чек-лист обязательства", "kk" to "Міндеттеме чек-парағы"))
+    put(2053L, mapOf("main" to "Commit by", "en" to "Commit by", "ru" to "Обещать до", "kk" to "Міндеттеме уақыты"))
+    put(2054L, mapOf("main" to "Copy commit note", "en" to "Copy commit note", "ru" to "Скопировать обязательство", "kk" to "Міндеттеме жазбасын көшіру"))
+    put(2055L, mapOf("main" to "Commit script", "en" to "Commit script", "ru" to "Скрипт обязательства", "kk" to "Міндеттеме мәтіні"))
+    put(2056L, mapOf("main" to "Top commit", "en" to "Top commit", "ru" to "Главное обязательство", "kk" to "Негізгі міндеттеме"))
+    put(2057L, mapOf("main" to "Blocked commits", "en" to "Blocked commits", "ru" to "Заблокированные обязательства", "kk" to "Бөгелген міндеттемелер"))
+    put(2058L, mapOf("main" to "Due commits", "en" to "Due commits", "ru" to "Срочные обязательства", "kk" to "Мерзімді міндеттемелер"))
+    put(2059L, mapOf("main" to "Ready commits", "en" to "Ready commits", "ru" to "Готовые обязательства", "kk" to "Дайын міндеттемелер"))
+    put(2060L, mapOf("main" to "Average commit", "en" to "Average commit", "ru" to "Среднее обязательство", "kk" to "Орташа міндеттеме"))
+    put(2061L, mapOf("main" to "Next commit", "en" to "Next commit", "ru" to "Следующее обязательство", "kk" to "Келесі міндеттеме"))
+    put(2062L, mapOf("main" to "Recovery allocation", "en" to "Recovery allocation", "ru" to "Распределение восстановления", "kk" to "Қалпына келтіру бөлуі"))
+    put(2063L, mapOf("main" to "Fair split needed", "en" to "Fair split needed", "ru" to "Нужно справедливое разделение", "kk" to "Әділ бөлу керек"))
+    put(2064L, mapOf("main" to "Priority allocation", "en" to "Priority allocation", "ru" to "Приоритетное распределение", "kk" to "Басым бөлу"))
+    put(2065L, mapOf("main" to "Single-store allocation", "en" to "Single-store allocation", "ru" to "Распределение одному магазину", "kk" to "Бір дүкенге бөлу"))
+    put(2066L, mapOf("main" to "Allocation ready", "en" to "Allocation ready", "ru" to "Распределение готово", "kk" to "Бөлу дайын"))
+    put(2067L, mapOf("main" to "Allocation watch", "en" to "Allocation watch", "ru" to "Наблюдать распределение", "kk" to "Бөлуді бақылау"))
+    put(2068L, mapOf("main" to "Allocation score", "en" to "Allocation score", "ru" to "Оценка распределения", "kk" to "Бөлу ұпайы"))
+    put(2069L, mapOf("main" to "Allocation checklist", "en" to "Allocation checklist", "ru" to "Чек-лист распределения", "kk" to "Бөлу чек-парағы"))
+    put(2070L, mapOf("main" to "Copy allocation note", "en" to "Copy allocation note", "ru" to "Скопировать распределение", "kk" to "Бөлу жазбасын көшіру"))
+    put(2071L, mapOf("main" to "Allocation script", "en" to "Allocation script", "ru" to "Скрипт распределения", "kk" to "Бөлу мәтіні"))
+    put(2072L, mapOf("main" to "Top allocation", "en" to "Top allocation", "ru" to "Главное распределение", "kk" to "Негізгі бөлу"))
+    put(2073L, mapOf("main" to "Allocation pressure", "en" to "Allocation pressure", "ru" to "Давление распределения", "kk" to "Бөлу қысымы"))
+    put(2074L, mapOf("main" to "Fair splits", "en" to "Fair splits", "ru" to "Справедливые разделения", "kk" to "Әділ бөлулер"))
+    put(2075L, mapOf("main" to "Priority allocations", "en" to "Priority allocations", "ru" to "Приоритетные распределения", "kk" to "Басым бөлулер"))
+    put(2076L, mapOf("main" to "Ready allocations", "en" to "Ready allocations", "ru" to "Готовые распределения", "kk" to "Дайын бөлулер"))
+    put(2077L, mapOf("main" to "Allocation average", "en" to "Allocation average", "ru" to "Среднее распределение", "kk" to "Орташа бөлу"))
+    put(2078L, mapOf("main" to "Allocation max", "en" to "Allocation max", "ru" to "Макс. распределение", "kk" to "Ең жоғары бөлу"))
+    put(2079L, mapOf("main" to "Recovery exception", "en" to "Recovery exception", "ru" to "Исключение восстановления", "kk" to "Қалпына келтіру ерекшесі"))
+    put(2080L, mapOf("main" to "Stop-pack exception", "en" to "Stop-pack exception", "ru" to "Исключение стоп-сборки", "kk" to "Жинауды тоқтату ерекшесі"))
+    put(2081L, mapOf("main" to "Cancel review exception", "en" to "Cancel review exception", "ru" to "Исключение проверки отмены", "kk" to "Бас тарту тексеру ерекшесі"))
+    put(2082L, mapOf("main" to "Substitute exception", "en" to "Substitute exception", "ru" to "Исключение замены", "kk" to "Ауыстыру ерекшесі"))
+    put(2083L, mapOf("main" to "Sourcing exception", "en" to "Sourcing exception", "ru" to "Исключение поиска", "kk" to "Іздеу ерекшесі"))
+    put(2084L, mapOf("main" to "Allocation exception", "en" to "Allocation exception", "ru" to "Исключение распределения", "kk" to "Бөлу ерекшесі"))
+    put(2085L, mapOf("main" to "Exception ready", "en" to "Exception ready", "ru" to "Исключение готово", "kk" to "Ерекше жағдай дайын"))
+    put(2086L, mapOf("main" to "Exception watch", "en" to "Exception watch", "ru" to "Наблюдать исключение", "kk" to "Ерекше жағдайды бақылау"))
+    put(2087L, mapOf("main" to "Exception score", "en" to "Exception score", "ru" to "Оценка исключения", "kk" to "Ерекше ұпай"))
+    put(2088L, mapOf("main" to "Exception checklist", "en" to "Exception checklist", "ru" to "Чек-лист исключения", "kk" to "Ерекше чек-парақ"))
+    put(2089L, mapOf("main" to "Copy exception note", "en" to "Copy exception note", "ru" to "Скопировать исключение", "kk" to "Ерекше жазбаны көшіру"))
+    put(2090L, mapOf("main" to "Exception script", "en" to "Exception script", "ru" to "Скрипт исключения", "kk" to "Ерекше мәтін"))
+    put(2091L, mapOf("main" to "Top exception", "en" to "Top exception", "ru" to "Главное исключение", "kk" to "Негізгі ерекше жағдай"))
+    put(2092L, mapOf("main" to "Exception pressure", "en" to "Exception pressure", "ru" to "Давление исключений", "kk" to "Ерекше қысым"))
+    put(2093L, mapOf("main" to "Stop-pack exceptions", "en" to "Stop-pack exceptions", "ru" to "Стоп-сборка исключения", "kk" to "Жинауды тоқтату ерекшелері"))
+    put(2094L, mapOf("main" to "Cancel exceptions", "en" to "Cancel exceptions", "ru" to "Исключения отмены", "kk" to "Бас тарту ерекшелері"))
+    put(2095L, mapOf("main" to "Substitute exceptions", "en" to "Substitute exceptions", "ru" to "Исключения замены", "kk" to "Ауыстыру ерекшелері"))
+    put(2096L, mapOf("main" to "Sourcing exceptions", "en" to "Sourcing exceptions", "ru" to "Исключения поиска", "kk" to "Іздеу ерекшелері"))
+    put(2097L, mapOf("main" to "Allocation exceptions", "en" to "Allocation exceptions", "ru" to "Исключения распределения", "kk" to "Бөлу ерекшелері"))
+    put(2098L, mapOf("main" to "Ready exceptions", "en" to "Ready exceptions", "ru" to "Готовые исключения", "kk" to "Дайын ерекшелер"))
+    put(2099L, mapOf("main" to "Exception average", "en" to "Exception average", "ru" to "Среднее исключение", "kk" to "Орташа ерекше"))
+    put(2100L, mapOf("main" to "Exception max", "en" to "Exception max", "ru" to "Макс. исключение", "kk" to "Ең жоғары ерекше"))
+    put(2101L, mapOf("main" to "Recovery cause", "en" to "Recovery cause", "ru" to "Причина восстановления", "kk" to "Қалпына келтіру себебі"))
+    put(2102L, mapOf("main" to "Zero accepted cause", "en" to "Zero accepted cause", "ru" to "Причина: принято ноль", "kk" to "Себеп: нөл қабылданды"))
+    put(2103L, mapOf("main" to "Exception cause", "en" to "Exception cause", "ru" to "Причина-исключение", "kk" to "Ерекше себеп"))
+    put(2104L, mapOf("main" to "Promise conflict cause", "en" to "Promise conflict cause", "ru" to "Конфликт обещания", "kk" to "Уәде қақтығысы"))
+    put(2105L, mapOf("main" to "Allocation cause", "en" to "Allocation cause", "ru" to "Причина распределения", "kk" to "Бөлу себебі"))
+    put(2106L, mapOf("main" to "Partial capacity cause", "en" to "Partial capacity cause", "ru" to "Частичная мощность", "kk" to "Жартылай қуат себебі"))
+    put(2107L, mapOf("main" to "Cause ready", "en" to "Cause ready", "ru" to "Причина готова", "kk" to "Себеп дайын"))
+    put(2108L, mapOf("main" to "Cause watch", "en" to "Cause watch", "ru" to "Наблюдать причину", "kk" to "Себепті бақылау"))
+    put(2109L, mapOf("main" to "Cause score", "en" to "Cause score", "ru" to "Оценка причины", "kk" to "Себеп ұпайы"))
+    put(2110L, mapOf("main" to "Cause checklist", "en" to "Cause checklist", "ru" to "Чек-лист причины", "kk" to "Себеп чек-парағы"))
+    put(2111L, mapOf("main" to "Copy cause note", "en" to "Copy cause note", "ru" to "Скопировать причину", "kk" to "Себеп жазбасын көшіру"))
+    put(2112L, mapOf("main" to "Cause script", "en" to "Cause script", "ru" to "Скрипт причины", "kk" to "Себеп мәтіні"))
+    put(2113L, mapOf("main" to "Top cause", "en" to "Top cause", "ru" to "Главная причина", "kk" to "Негізгі себеп"))
+    put(2114L, mapOf("main" to "Cause pressure", "en" to "Cause pressure", "ru" to "Давление причины", "kk" to "Себеп қысымы"))
+    put(2115L, mapOf("main" to "Zero causes", "en" to "Zero causes", "ru" to "Нулевые причины", "kk" to "Нөл себептері"))
+    put(2116L, mapOf("main" to "Capacity causes", "en" to "Capacity causes", "ru" to "Причины мощности", "kk" to "Қуат себептері"))
+    put(2117L, mapOf("main" to "Promise causes", "en" to "Promise causes", "ru" to "Причины обещаний", "kk" to "Уәде себептері"))
+    put(2118L, mapOf("main" to "Ready causes", "en" to "Ready causes", "ru" to "Готовые причины", "kk" to "Дайын себептер"))
+    put(2119L, mapOf("main" to "Cause max", "en" to "Cause max", "ru" to "Макс. причина", "kk" to "Ең жоғары себеп"))
+    put(2120L, mapOf("main" to "Recovery verification", "en" to "Recovery verification", "ru" to "Проверка восстановления", "kk" to "Қалпына келтіруді тексеру"))
+    put(2121L, mapOf("main" to "Verify blocked", "en" to "Verify blocked", "ru" to "Проверка заблокирована", "kk" to "Тексеру бөгелді"))
+    put(2122L, mapOf("main" to "Store answer verify", "en" to "Store answer verify", "ru" to "Проверить ответ магазина", "kk" to "Дүкен жауабын тексеру"))
+    put(2123L, mapOf("main" to "Source proof verify", "en" to "Source proof verify", "ru" to "Проверить доказательство поиска", "kk" to "Іздеу дәлелін тексеру"))
+    put(2124L, mapOf("main" to "Pack split verify", "en" to "Pack split verify", "ru" to "Проверить разделение сборки", "kk" to "Жинау бөлінуін тексеру"))
+    put(2125L, mapOf("main" to "Cause record verify", "en" to "Cause record verify", "ru" to "Проверить запись причины", "kk" to "Себеп жазбасын тексеру"))
+    put(2126L, mapOf("main" to "Verification ready", "en" to "Verification ready", "ru" to "Проверка готова", "kk" to "Тексеру дайын"))
+    put(2127L, mapOf("main" to "Verify watch", "en" to "Verify watch", "ru" to "Наблюдать проверку", "kk" to "Тексеруді бақылау"))
+    put(2128L, mapOf("main" to "Verification score", "en" to "Verification score", "ru" to "Оценка проверки", "kk" to "Тексеру ұпайы"))
+    put(2129L, mapOf("main" to "Verification checklist", "en" to "Verification checklist", "ru" to "Чек-лист проверки", "kk" to "Тексеру чек-парағы"))
+    put(2130L, mapOf("main" to "Copy verification note", "en" to "Copy verification note", "ru" to "Скопировать проверку", "kk" to "Тексеру жазбасын көшіру"))
+    put(2131L, mapOf("main" to "Verification script", "en" to "Verification script", "ru" to "Скрипт проверки", "kk" to "Тексеру мәтіні"))
+    put(2132L, mapOf("main" to "Top verification", "en" to "Top verification", "ru" to "Главная проверка", "kk" to "Негізгі тексеру"))
+    put(2133L, mapOf("main" to "Verification blockers", "en" to "Verification blockers", "ru" to "Блокеры проверки", "kk" to "Тексеру бөгеттері"))
+    put(2134L, mapOf("main" to "Store verifications", "en" to "Store verifications", "ru" to "Проверки магазина", "kk" to "Дүкен тексерулері"))
+    put(2135L, mapOf("main" to "Source verifications", "en" to "Source verifications", "ru" to "Проверки поиска", "kk" to "Іздеу тексерулері"))
+    put(2136L, mapOf("main" to "Pack verifications", "en" to "Pack verifications", "ru" to "Проверки сборки", "kk" to "Жинау тексерулері"))
+    put(2137L, mapOf("main" to "Cause verifications", "en" to "Cause verifications", "ru" to "Проверки причины", "kk" to "Себеп тексерулері"))
+    put(2138L, mapOf("main" to "Ready verifications", "en" to "Ready verifications", "ru" to "Готовые проверки", "kk" to "Дайын тексерулер"))
+    put(2139L, mapOf("main" to "Verification max", "en" to "Verification max", "ru" to "Макс. проверка", "kk" to "Ең жоғары тексеру"))
+    put(2140L, mapOf("main" to "Verification average", "en" to "Verification average", "ru" to "Средняя проверка", "kk" to "Орташа тексеру"))
+    put(2141L, mapOf("main" to "Recovery approval", "en" to "Recovery approval", "ru" to "Согласование восстановления", "kk" to "Қалпына келтіруді бекіту"))
+    put(2142L, mapOf("main" to "Approval blocked", "en" to "Approval blocked", "ru" to "Согласование заблокировано", "kk" to "Бекіту бөгелді"))
+    put(2143L, mapOf("main" to "Manager review", "en" to "Manager review", "ru" to "Обзор руководителя", "kk" to "Басқарушы қарауы"))
+    put(2144L, mapOf("main" to "Store ack approval", "en" to "Store ack approval", "ru" to "Согласование магазина", "kk" to "Дүкен растауы"))
+    put(2145L, mapOf("main" to "Source ack approval", "en" to "Source ack approval", "ru" to "Согласование поиска", "kk" to "Іздеу растауы"))
+    put(2146L, mapOf("main" to "Pack lead approval", "en" to "Pack lead approval", "ru" to "Согласование сборки", "kk" to "Жинау бекітуі"))
+    put(2147L, mapOf("main" to "Approval ready", "en" to "Approval ready", "ru" to "Согласование готово", "kk" to "Бекіту дайын"))
+    put(2148L, mapOf("main" to "Approval watch", "en" to "Approval watch", "ru" to "Наблюдать согласование", "kk" to "Бекітуді бақылау"))
+    put(2149L, mapOf("main" to "Approval score", "en" to "Approval score", "ru" to "Оценка согласования", "kk" to "Бекіту ұпайы"))
+    put(2150L, mapOf("main" to "Approval checklist", "en" to "Approval checklist", "ru" to "Чек-лист согласования", "kk" to "Бекіту чек-парағы"))
+    put(2151L, mapOf("main" to "Copy approval note", "en" to "Copy approval note", "ru" to "Скопировать согласование", "kk" to "Бекіту жазбасын көшіру"))
+    put(2152L, mapOf("main" to "Approval script", "en" to "Approval script", "ru" to "Скрипт согласования", "kk" to "Бекіту мәтіні"))
+    put(2153L, mapOf("main" to "Top approval", "en" to "Top approval", "ru" to "Главное согласование", "kk" to "Негізгі бекіту"))
+    put(2154L, mapOf("main" to "Approval blockers", "en" to "Approval blockers", "ru" to "Блокеры согласования", "kk" to "Бекіту бөгеттері"))
+    put(2155L, mapOf("main" to "Manager approvals", "en" to "Manager approvals", "ru" to "Согласования руководителя", "kk" to "Басқарушы бекітулері"))
+    put(2156L, mapOf("main" to "Store approvals", "en" to "Store approvals", "ru" to "Согласования магазина", "kk" to "Дүкен бекітулері"))
+    put(2157L, mapOf("main" to "Source approvals", "en" to "Source approvals", "ru" to "Согласования поиска", "kk" to "Іздеу бекітулері"))
+    put(2158L, mapOf("main" to "Pack approvals", "en" to "Pack approvals", "ru" to "Согласования сборки", "kk" to "Жинау бекітулері"))
+    put(2159L, mapOf("main" to "Ready approvals", "en" to "Ready approvals", "ru" to "Готовые согласования", "kk" to "Дайын бекітулер"))
+    put(2160L, mapOf("main" to "Approval max", "en" to "Approval max", "ru" to "Макс. согласование", "kk" to "Ең жоғары бекіту"))
+    put(2161L, mapOf("main" to "Approval average", "en" to "Approval average", "ru" to "Среднее согласование", "kk" to "Орташа бекіту"))
+    put(2162L, mapOf("main" to "Recovery execution", "en" to "Recovery execution", "ru" to "Выполнение восстановления", "kk" to "Қалпына келтіруді орындау"))
+    put(2163L, mapOf("main" to "Execution blocked", "en" to "Execution blocked", "ru" to "Выполнение заблокировано", "kk" to "Орындау бөгелді"))
+    put(2164L, mapOf("main" to "Execute store call", "en" to "Execute store call", "ru" to "Выполнить звонок магазину", "kk" to "Дүкен қоңырауын орындау"))
+    put(2165L, mapOf("main" to "Execute source ETA", "en" to "Execute source ETA", "ru" to "Выполнить срок поиска", "kk" to "Іздеу мерзімін орындау"))
+    put(2166L, mapOf("main" to "Execute split pack", "en" to "Execute split pack", "ru" to "Выполнить разделение сборки", "kk" to "Бөлінген жинауды орындау"))
+    put(2167L, mapOf("main" to "Execute ship-ready", "en" to "Execute ship-ready", "ru" to "Выполнить готовую отправку", "kk" to "Дайын жөнелтуді орындау"))
+    put(2168L, mapOf("main" to "Execution watch", "en" to "Execution watch", "ru" to "Наблюдать выполнение", "kk" to "Орындауды бақылау"))
+    put(2169L, mapOf("main" to "Execution score", "en" to "Execution score", "ru" to "Оценка выполнения", "kk" to "Орындау ұпайы"))
+    put(2170L, mapOf("main" to "Execution checklist", "en" to "Execution checklist", "ru" to "Чек-лист выполнения", "kk" to "Орындау чек-парағы"))
+    put(2171L, mapOf("main" to "Copy execution note", "en" to "Copy execution note", "ru" to "Скопировать выполнение", "kk" to "Орындау жазбасын көшіру"))
+    put(2172L, mapOf("main" to "Execution script", "en" to "Execution script", "ru" to "Скрипт выполнения", "kk" to "Орындау мәтіні"))
+    put(2173L, mapOf("main" to "Top execution", "en" to "Top execution", "ru" to "Главное выполнение", "kk" to "Негізгі орындау"))
+    put(2174L, mapOf("main" to "Execution blockers", "en" to "Execution blockers", "ru" to "Блокеры выполнения", "kk" to "Орындау бөгеттері"))
+    put(2175L, mapOf("main" to "Store executions", "en" to "Store executions", "ru" to "Действия магазина", "kk" to "Дүкен әрекеттері"))
+    put(2176L, mapOf("main" to "Source executions", "en" to "Source executions", "ru" to "Действия поиска", "kk" to "Іздеу әрекеттері"))
+    put(2177L, mapOf("main" to "Split executions", "en" to "Split executions", "ru" to "Действия разделения", "kk" to "Бөлу әрекеттері"))
+    put(2178L, mapOf("main" to "Ready executions", "en" to "Ready executions", "ru" to "Готовые действия", "kk" to "Дайын әрекеттер"))
+    put(2179L, mapOf("main" to "Execution max", "en" to "Execution max", "ru" to "Макс. выполнение", "kk" to "Ең жоғары орындау"))
+    put(2180L, mapOf("main" to "Execution average", "en" to "Execution average", "ru" to "Среднее выполнение", "kk" to "Орташа орындау"))
+    put(2181L, mapOf("main" to "Recovery release", "en" to "Recovery release", "ru" to "Выпуск восстановления", "kk" to "Қалпына келтіруді шығару"))
+    put(2182L, mapOf("main" to "Release blocked", "en" to "Release blocked", "ru" to "Выпуск заблокирован", "kk" to "Шығару бөгелді"))
+    put(2183L, mapOf("main" to "Release store update", "en" to "Release store update", "ru" to "Обновить магазин перед выпуском", "kk" to "Шығаруға дейін дүкенді жаңарту"))
+    put(2184L, mapOf("main" to "Release source ETA", "en" to "Release source ETA", "ru" to "Срок поиска для выпуска", "kk" to "Шығару үшін іздеу мерзімі"))
+    put(2185L, mapOf("main" to "Release split dispatch", "en" to "Release split dispatch", "ru" to "Выпустить разделённую отправку", "kk" to "Бөлінген жөнелтуді шығару"))
+    put(2186L, mapOf("main" to "Release ready", "en" to "Release ready", "ru" to "Готово к выпуску", "kk" to "Шығаруға дайын"))
+    put(2187L, mapOf("main" to "Release watch", "en" to "Release watch", "ru" to "Наблюдать выпуск", "kk" to "Шығаруды бақылау"))
+    put(2188L, mapOf("main" to "Release score", "en" to "Release score", "ru" to "Оценка выпуска", "kk" to "Шығару ұпайы"))
+    put(2189L, mapOf("main" to "Release checklist", "en" to "Release checklist", "ru" to "Чек-лист выпуска", "kk" to "Шығару чек-парағы"))
+    put(2190L, mapOf("main" to "Release guard", "en" to "Release guard", "ru" to "Защита выпуска", "kk" to "Шығару қорғанысы"))
+    put(2191L, mapOf("main" to "Release script", "en" to "Release script", "ru" to "Скрипт выпуска", "kk" to "Шығару мәтіні"))
+    put(2192L, mapOf("main" to "Copy release note", "en" to "Copy release note", "ru" to "Скопировать выпуск", "kk" to "Шығару жазбасын көшіру"))
+    put(2193L, mapOf("main" to "Top release", "en" to "Top release", "ru" to "Главный выпуск", "kk" to "Негізгі шығару"))
+    put(2194L, mapOf("main" to "Release blockers", "en" to "Release blockers", "ru" to "Блокеры выпуска", "kk" to "Шығару бөгеттері"))
+    put(2195L, mapOf("main" to "Ready releases", "en" to "Ready releases", "ru" to "Готовые выпуски", "kk" to "Дайын шығарулар"))
+    put(2196L, mapOf("main" to "Store releases", "en" to "Store releases", "ru" to "Выпуски магазина", "kk" to "Дүкен шығарулары"))
+    put(2197L, mapOf("main" to "Source releases", "en" to "Source releases", "ru" to "Выпуски поиска", "kk" to "Іздеу шығарулары"))
+    put(2198L, mapOf("main" to "Split releases", "en" to "Split releases", "ru" to "Разделённые выпуски", "kk" to "Бөлінген шығарулар"))
+    put(2199L, mapOf("main" to "Release average", "en" to "Release average", "ru" to "Средний выпуск", "kk" to "Орташа шығару"))
+    put(2200L, mapOf("main" to "Release max", "en" to "Release max", "ru" to "Макс. выпуск", "kk" to "Ең жоғары шығару"))
+    put(2201L, mapOf("main" to "Recovery seal", "en" to "Recovery seal", "ru" to "Штамп восстановления", "kk" to "Қалпына келтіру мөрі"))
+    put(2202L, mapOf("main" to "Seal blocked", "en" to "Seal blocked", "ru" to "Штамп заблокирован", "kk" to "Мөр бөгелген"))
+    put(2203L, mapOf("main" to "Seal store notice", "en" to "Seal store notice", "ru" to "Штамп уведомления магазина", "kk" to "Дүкен хабарлама мөрі"))
+    put(2204L, mapOf("main" to "Seal source trace", "en" to "Seal source trace", "ru" to "Штамп следа поиска", "kk" to "Іздеу ізі мөрі"))
+    put(2205L, mapOf("main" to "Seal split manifest", "en" to "Seal split manifest", "ru" to "Штамп разделённой ведомости", "kk" to "Бөлінген ведомость мөрі"))
+    put(2206L, mapOf("main" to "Seal ready", "en" to "Seal ready", "ru" to "Штамп готов", "kk" to "Мөр дайын"))
+    put(2207L, mapOf("main" to "Seal watch", "en" to "Seal watch", "ru" to "Наблюдение штампа", "kk" to "Мөрді бақылау"))
+    put(2208L, mapOf("main" to "Seal score", "en" to "Seal score", "ru" to "Оценка штампа", "kk" to "Мөр ұпайы"))
+    put(2209L, mapOf("main" to "Seal checklist", "en" to "Seal checklist", "ru" to "Чеклист штампа", "kk" to "Мөр чеклисті"))
+    put(2210L, mapOf("main" to "Seal guard", "en" to "Seal guard", "ru" to "Защита штампа", "kk" to "Мөр қорғанысы"))
+    put(2211L, mapOf("main" to "Copy seal note", "en" to "Copy seal note", "ru" to "Копировать заметку штампа", "kk" to "Мөр жазбасын көшіру"))
+    put(2212L, mapOf("main" to "Seal script", "en" to "Seal script", "ru" to "Скрипт штампа", "kk" to "Мөр скрипті"))
+    put(2213L, mapOf("main" to "Top seal", "en" to "Top seal", "ru" to "Главный штамп", "kk" to "Негізгі мөр"))
+    put(2214L, mapOf("main" to "Seal blockers", "en" to "Seal blockers", "ru" to "Блокеры штампа", "kk" to "Мөр бөгеттері"))
+    put(2215L, mapOf("main" to "Ready seals", "en" to "Ready seals", "ru" to "Готовые штампы", "kk" to "Дайын мөрлер"))
+    put(2216L, mapOf("main" to "Store seals", "en" to "Store seals", "ru" to "Штампы магазина", "kk" to "Дүкен мөрлері"))
+    put(2217L, mapOf("main" to "Source seals", "en" to "Source seals", "ru" to "Штампы поиска", "kk" to "Іздеу мөрлері"))
+    put(2218L, mapOf("main" to "Split seals", "en" to "Split seals", "ru" to "Разделённые штампы", "kk" to "Бөлінген мөрлер"))
+    put(2219L, mapOf("main" to "Seal average", "en" to "Seal average", "ru" to "Средний штамп", "kk" to "Орташа мөр"))
+    put(2220L, mapOf("main" to "Seal max", "en" to "Seal max", "ru" to "Макс. штамп", "kk" to "Ең жоғары мөр"))
+    put(2221L, mapOf("main" to "Recovery closeout", "en" to "Recovery closeout", "ru" to "Закрытие восстановления", "kk" to "Қалпына келтіруді жабу"))
+    put(2222L, mapOf("main" to "Closeout blocked", "en" to "Closeout blocked", "ru" to "Закрытие заблокировано", "kk" to "Жабу бөгелген"))
+    put(2223L, mapOf("main" to "Closeout store notice", "en" to "Closeout store notice", "ru" to "Уведомление магазина для закрытия", "kk" to "Жабуға дүкен хабарламасы"))
+    put(2224L, mapOf("main" to "Closeout source trace", "en" to "Closeout source trace", "ru" to "След поиска для закрытия", "kk" to "Жабуға іздеу ізі"))
+    put(2225L, mapOf("main" to "Closeout split leftover", "en" to "Closeout split leftover", "ru" to "Остаток разделения для закрытия", "kk" to "Жабуға бөлінген қалдық"))
+    put(2226L, mapOf("main" to "Closeout ready", "en" to "Closeout ready", "ru" to "Закрытие готово", "kk" to "Жабу дайын"))
+    put(2227L, mapOf("main" to "Closeout watch", "en" to "Closeout watch", "ru" to "Наблюдение закрытия", "kk" to "Жабуды бақылау"))
+    put(2228L, mapOf("main" to "Closeout score", "en" to "Closeout score", "ru" to "Оценка закрытия", "kk" to "Жабу ұпайы"))
+    put(2229L, mapOf("main" to "Closeout checklist", "en" to "Closeout checklist", "ru" to "Чеклист закрытия", "kk" to "Жабу чеклисті"))
+    put(2230L, mapOf("main" to "Closeout guard", "en" to "Closeout guard", "ru" to "Защита закрытия", "kk" to "Жабу қорғанысы"))
+    put(2231L, mapOf("main" to "Copy closeout note", "en" to "Copy closeout note", "ru" to "Копировать заметку закрытия", "kk" to "Жабу жазбасын көшіру"))
+    put(2232L, mapOf("main" to "Closeout script", "en" to "Closeout script", "ru" to "Скрипт закрытия", "kk" to "Жабу скрипті"))
+    put(2233L, mapOf("main" to "Top closeout", "en" to "Top closeout", "ru" to "Главное закрытие", "kk" to "Негізгі жабу"))
+    put(2234L, mapOf("main" to "Closeout blockers", "en" to "Closeout blockers", "ru" to "Блокеры закрытия", "kk" to "Жабу бөгеттері"))
+    put(2235L, mapOf("main" to "Ready closeouts", "en" to "Ready closeouts", "ru" to "Готовые закрытия", "kk" to "Дайын жабулар"))
+    put(2236L, mapOf("main" to "Store closeouts", "en" to "Store closeouts", "ru" to "Закрытия магазина", "kk" to "Дүкен жабулары"))
+    put(2237L, mapOf("main" to "Source closeouts", "en" to "Source closeouts", "ru" to "Закрытия поиска", "kk" to "Іздеу жабулары"))
+    put(2238L, mapOf("main" to "Split closeouts", "en" to "Split closeouts", "ru" to "Разделённые закрытия", "kk" to "Бөлінген жабулар"))
+    put(2239L, mapOf("main" to "Closeout average", "en" to "Closeout average", "ru" to "Среднее закрытие", "kk" to "Орташа жабу"))
+    put(2240L, mapOf("main" to "Closeout max", "en" to "Closeout max", "ru" to "Макс. закрытие", "kk" to "Ең жоғары жабу"))
+    put(2241L, mapOf("main" to "Recovery reopen", "en" to "Recovery reopen", "ru" to "Переоткрытие восстановления", "kk" to "Қалпына келтіруді қайта ашу"))
+    put(2242L, mapOf("main" to "Reopen blocked", "en" to "Reopen blocked", "ru" to "Переоткрытие заблокировано", "kk" to "Қайта ашу бөгелген"))
+    put(2243L, mapOf("main" to "Reopen after answer", "en" to "Reopen after answer", "ru" to "Переоткрыть после ответа", "kk" to "Жауаптан кейін қайта ашу"))
+    put(2244L, mapOf("main" to "Reopen if promise slips", "en" to "Reopen if promise slips", "ru" to "Переоткрыть при срыве обещания", "kk" to "Уәде сырғыса қайта ашу"))
+    put(2245L, mapOf("main" to "Reopen split leftover", "en" to "Reopen split leftover", "ru" to "Переоткрыть остаток разделения", "kk" to "Бөлінген қалдықты қайта ашу"))
+    put(2246L, mapOf("main" to "Reopen safe", "en" to "Reopen safe", "ru" to "Переоткрытие безопасно", "kk" to "Қайта ашу қауіпсіз"))
+    put(2247L, mapOf("main" to "Reopen watch", "en" to "Reopen watch", "ru" to "Наблюдение переоткрытия", "kk" to "Қайта ашуды бақылау"))
+    put(2248L, mapOf("main" to "Reopen score", "en" to "Reopen score", "ru" to "Оценка переоткрытия", "kk" to "Қайта ашу ұпайы"))
+    put(2249L, mapOf("main" to "Reopen checkpoint", "en" to "Reopen checkpoint", "ru" to "Контроль переоткрытия", "kk" to "Қайта ашу бақылауы"))
+    put(2250L, mapOf("main" to "Reopen checklist", "en" to "Reopen checklist", "ru" to "Чеклист переоткрытия", "kk" to "Қайта ашу чеклисті"))
+    put(2251L, mapOf("main" to "Reopen guard", "en" to "Reopen guard", "ru" to "Защита переоткрытия", "kk" to "Қайта ашу қорғанысы"))
+    put(2252L, mapOf("main" to "Copy reopen note", "en" to "Copy reopen note", "ru" to "Копировать заметку переоткрытия", "kk" to "Қайта ашу жазбасын көшіру"))
+    put(2253L, mapOf("main" to "Reopen script", "en" to "Reopen script", "ru" to "Скрипт переоткрытия", "kk" to "Қайта ашу скрипті"))
+    put(2254L, mapOf("main" to "Top reopen", "en" to "Top reopen", "ru" to "Главное переоткрытие", "kk" to "Негізгі қайта ашу"))
+    put(2255L, mapOf("main" to "Reopen blockers", "en" to "Reopen blockers", "ru" to "Блокеры переоткрытия", "kk" to "Қайта ашу бөгеттері"))
+    put(2256L, mapOf("main" to "Answer reopens", "en" to "Answer reopens", "ru" to "Переоткрытия ответов", "kk" to "Жауап қайта ашулары"))
+    put(2257L, mapOf("main" to "Promise reopens", "en" to "Promise reopens", "ru" to "Переоткрытия обещаний", "kk" to "Уәде қайта ашулары"))
+    put(2258L, mapOf("main" to "Split reopens", "en" to "Split reopens", "ru" to "Переоткрытия разделения", "kk" to "Бөлу қайта ашулары"))
+    put(2259L, mapOf("main" to "Ready reopens", "en" to "Ready reopens", "ru" to "Готовые переоткрытия", "kk" to "Дайын қайта ашулар"))
+    put(2260L, mapOf("main" to "Reopen average", "en" to "Reopen average", "ru" to "Среднее переоткрытие", "kk" to "Орташа қайта ашу"))
+    put(2261L, mapOf("main" to "Reopen max", "en" to "Reopen max", "ru" to "Макс. переоткрытие", "kk" to "Ең жоғары қайта ашу"))
+    put(2262L, mapOf("main" to "Recovery reconciliation", "en" to "Recovery reconciliation", "ru" to "Сверка восстановления", "kk" to "Қалпына келтіруді салыстыру"))
+    put(2263L, mapOf("main" to "Reconcile blocked", "en" to "Reconcile blocked", "ru" to "Сверка заблокирована", "kk" to "Салыстыру бөгелген"))
+    put(2264L, mapOf("main" to "Reconcile store delta", "en" to "Reconcile store delta", "ru" to "Сверить изменение магазина", "kk" to "Дүкен өзгерісін салыстыру"))
+    put(2265L, mapOf("main" to "Reconcile source delta", "en" to "Reconcile source delta", "ru" to "Сверить изменение поиска", "kk" to "Іздеу өзгерісін салыстыру"))
+    put(2266L, mapOf("main" to "Reconcile split delta", "en" to "Reconcile split delta", "ru" to "Сверить разделённый остаток", "kk" to "Бөлінген қалдықты салыстыру"))
+    put(2267L, mapOf("main" to "Reconcile ready", "en" to "Reconcile ready", "ru" to "Сверка готова", "kk" to "Салыстыру дайын"))
+    put(2268L, mapOf("main" to "Reconcile watch", "en" to "Reconcile watch", "ru" to "Наблюдение сверки", "kk" to "Салыстыруды бақылау"))
+    put(2269L, mapOf("main" to "Reconcile score", "en" to "Reconcile score", "ru" to "Оценка сверки", "kk" to "Салыстыру ұпайы"))
+    put(2270L, mapOf("main" to "Reconcile checklist", "en" to "Reconcile checklist", "ru" to "Чеклист сверки", "kk" to "Салыстыру чеклисті"))
+    put(2271L, mapOf("main" to "Reconcile guard", "en" to "Reconcile guard", "ru" to "Защита сверки", "kk" to "Салыстыру қорғанысы"))
+    put(2272L, mapOf("main" to "Copy reconcile note", "en" to "Copy reconcile note", "ru" to "Копировать заметку сверки", "kk" to "Салыстыру жазбасын көшіру"))
+    put(2273L, mapOf("main" to "Reconcile script", "en" to "Reconcile script", "ru" to "Скрипт сверки", "kk" to "Салыстыру скрипті"))
+    put(2274L, mapOf("main" to "Top reconcile", "en" to "Top reconcile", "ru" to "Главная сверка", "kk" to "Негізгі салыстыру"))
+    put(2275L, mapOf("main" to "Reconcile blockers", "en" to "Reconcile blockers", "ru" to "Блокеры сверки", "kk" to "Салыстыру бөгеттері"))
+    put(2276L, mapOf("main" to "Store reconciles", "en" to "Store reconciles", "ru" to "Сверки магазина", "kk" to "Дүкен салыстырулары"))
+    put(2277L, mapOf("main" to "Source reconciles", "en" to "Source reconciles", "ru" to "Сверки поиска", "kk" to "Іздеу салыстырулары"))
+    put(2278L, mapOf("main" to "Split reconciles", "en" to "Split reconciles", "ru" to "Разделённые сверки", "kk" to "Бөлінген салыстырулар"))
+    put(2279L, mapOf("main" to "Ready reconciles", "en" to "Ready reconciles", "ru" to "Готовые сверки", "kk" to "Дайын салыстырулар"))
+    put(2280L, mapOf("main" to "Reconcile max", "en" to "Reconcile max", "ru" to "Макс. сверка", "kk" to "Ең жоғары салыстыру"))
+    put(1984L, mapOf("main" to "Filter by wave", "en" to "Filter by wave", "ru" to "Фильтр по волне", "kk" to "Толқын бойынша сүзу"))
 }
+
 
 
 
@@ -2778,7 +3251,8 @@ fun AppConfiguration.UserAuthSignUpScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            if (stateValues.isNarrowScreen) {
+
+        if (stateValues.isNarrowScreen) {
                 val drawableResAITALogo by stateValues.drawableResAITALogo.collectAsState()
 
                 LargeIconWithTitleWidget(
@@ -20277,7 +20751,7 @@ private fun AppConfiguration.SupplierActionQueueItem(action: SupplierDashboardAc
             if (action.actionType == "contract") {
                 Navigation.goMain(NavigationScreenModel.Supplier.Contracts.Main)
             } else {
-                NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to searchSeed)
+                seedSupplierOrdersInboxNavigation(searchQuery = searchSeed)
                 Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
             }
         }
@@ -20582,9 +21056,18 @@ private fun AppConfiguration.SupplierReadinessBoardCard(
 
 
 private const val SUPPLIER_ORDER_DUE_FILTER_STATE_KEY: String = "supplier_order_due_filter"
+private const val SUPPLIER_ORDER_STATUS_FILTER_STATE_KEY: String = "supplier_order_status_filter"
 private const val AITA_SUPPLIER_UI_DAY_MILLIS: Long = 24L * 60L * 60L * 1000L
 
-private fun supplierUiDayStartMillis(now: Long): Long = now - (now % AITA_SUPPLIER_UI_DAY_MILLIS)
+private fun supplierUiDayStartMillis(now: Long): Long = runCatching {
+    val timezone = TimeZone.currentSystemDefault()
+    Instant
+        .fromEpochMilliseconds(now)
+        .toLocalDateTime(timezone)
+        .date
+        .atStartOfDayIn(timezone)
+        .toEpochMilliseconds()
+}.getOrDefault(now - (now % AITA_SUPPLIER_UI_DAY_MILLIS))
 
 private fun SupplierOrderDataModel.supplierDueAtMillis(): Long? = confirmedDeliveryTimeMillis ?: desiredDeliveryTimeMillis
 
@@ -20600,13 +21083,31 @@ private fun supplierUiDeliveryBucketId(now: Long, dueAtMillis: Long?): String {
     }
 }
 
+private fun supplierDueFilterMatchesBucket(dueFilter: String, bucketId: String): Boolean = when (dueFilter) {
+    "all" -> true
+    "soon" -> bucketId == "tomorrow" || bucketId == "week"
+    else -> bucketId == dueFilter
+}
+
 private fun SupplierOrderDataModel.matchesSupplierDueFilter(dueFilter: String, now: Long): Boolean =
-    dueFilter == "all" || supplierUiDeliveryBucketId(now, supplierDueAtMillis()) == dueFilter
+    supplierDueFilterMatchesBucket(dueFilter.ifBlank { "all" }, supplierUiDeliveryBucketId(now, supplierDueAtMillis()))
+
+private suspend fun seedSupplierOrdersInboxNavigation(
+    searchQuery: String = "",
+    dueFilter: String = "all",
+    statusFilter: String = if (searchQuery.isBlank()) "open" else "all"
+) {
+    val safeSearchQuery = searchQuery.trim()
+    NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to safeSearchQuery)
+    NavigationScreenModel.Supplier.Orders.Main.setState(SUPPLIER_ORDER_DUE_FILTER_STATE_KEY to dueFilter.ifBlank { "all" })
+    NavigationScreenModel.Supplier.Orders.Main.setState(SUPPLIER_ORDER_STATUS_FILTER_STATE_KEY to statusFilter.ifBlank { if (safeSearchQuery.isBlank()) "open" else "all" })
+}
 
 private fun AppConfiguration.supplierDeliveryBucketTitle(bucketId: String): String = when (bucketId) {
     "overdue" -> localizedStringResource(1664, "Overdue promises")
     "today" -> localizedStringResource(1665, "Due today")
     "tomorrow" -> localizedStringResource(1666, "Due tomorrow")
+    "soon" -> localizedStringResource(1812, "Due soon")
     "week" -> localizedStringResource(1668, "This week")
     "later" -> localizedStringResource(1669, "Later")
     "all" -> localizedStringResource(1378, "All")
@@ -20643,7 +21144,7 @@ private fun AppConfiguration.supplierDeliveryBucketSubtitle(bucket: SupplierDash
 private fun AppConfiguration.supplierDueFilterOptionsFromDashboard(
     dashboard: SupplierModeDashboardDataModel?
 ): List<DropdownOption> {
-    val knownBuckets = listOf("overdue", "today", "tomorrow", "week", "later", "unscheduled")
+    val knownBuckets = listOf("overdue", "today", "soon", "tomorrow", "week", "later", "unscheduled")
     val dashboardBuckets = dashboard?.deliveryBuckets.orEmpty().map { it.bucketId }.filter { it.isNotBlank() }
     return listOf(DropdownOption("all", localizedStringResource(1378, "All"))) +
             (dashboardBuckets + knownBuckets)
@@ -21357,7 +21858,7 @@ private fun AppConfiguration.SupplierCatalogItemCard(item: SupplierCatalogItemUi
                     confirmationRequired = false,
                     onClick = {
                         coroutineScope.launch {
-                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.goodsItemId.ifBlank { item.title })
+                            seedSupplierOrdersInboxNavigation(searchQuery = item.goodsItemId.ifBlank { item.title })
                             Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
                         }
                     }
@@ -21384,7 +21885,7 @@ private fun AppConfiguration.SupplierCatalogItemCard(item: SupplierCatalogItemUi
                     confirmationRequired = false,
                     onClick = {
                         coroutineScope.launch {
-                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.goodsItemId.ifBlank { item.title })
+                            seedSupplierOrdersInboxNavigation(searchQuery = item.goodsItemId.ifBlank { item.title })
                             Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
                         }
                     }
@@ -21910,7 +22411,7 @@ private fun AppConfiguration.SupplierPartnerCard(partner: SupplierPartnerUiModel
                     confirmationRequired = false,
                     onClick = {
                         coroutineScope.launch {
-                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to partner.storeKey.ifBlank { partner.title })
+                            seedSupplierOrdersInboxNavigation(searchQuery = partner.storeKey.ifBlank { partner.title })
                             Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
                         }
                     }
@@ -21940,7 +22441,7 @@ private fun AppConfiguration.SupplierPartnerCard(partner: SupplierPartnerUiModel
                     confirmationRequired = false,
                     onClick = {
                         coroutineScope.launch {
-                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to partner.storeKey.ifBlank { partner.title })
+                            seedSupplierOrdersInboxNavigation(searchQuery = partner.storeKey.ifBlank { partner.title })
                             Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
                         }
                     }
@@ -23515,8 +24016,11 @@ private fun AppConfiguration.SupplierOrdersInboxScreen() {
     val supplierOrderNavigationState by NavigationScreenModel.Supplier.Orders.Main.state.collectAsState()
     val supplierOrderSearchSeed = supplierOrderNavigationState[NavigationScreenModel.KEY_STATE_SEARCH_QUERY].orEmpty()
     val supplierOrderDueFilterSeed = supplierOrderNavigationState[SUPPLIER_ORDER_DUE_FILTER_STATE_KEY].orEmpty()
+    val supplierOrderStatusFilterSeed = supplierOrderNavigationState[SUPPLIER_ORDER_STATUS_FILTER_STATE_KEY].orEmpty()
     var searchQuery by rememberSaveable(supplierOrderSearchSeed) { mutableStateOf(supplierOrderSearchSeed) }
-    var statusFilter by rememberSaveable(supplierOrderSearchSeed) { mutableStateOf(if (supplierOrderSearchSeed.isBlank()) "open" else "all") }
+    var statusFilter by rememberSaveable(supplierOrderSearchSeed, supplierOrderStatusFilterSeed) {
+        mutableStateOf(supplierOrderStatusFilterSeed.ifBlank { if (supplierOrderSearchSeed.isBlank()) "open" else "all" })
+    }
     var dueFilter by rememberSaveable(supplierOrderDueFilterSeed) { mutableStateOf(supplierOrderDueFilterSeed.ifBlank { "all" }) }
 
     LaunchedEffect(stateValues.userAccount?.id) {
@@ -23574,6 +24078,7 @@ private fun AppConfiguration.SupplierOrdersInboxScreen() {
     val manufacturerBridgePriority = supplierDashboard?.manufacturerBridge?.maxOfOrNull { it.priorityScore } ?: 0
     val backorderWatchCount = supplierDashboard?.backorderWatch?.size ?: 0
     val backorderShortQuantity = supplierDashboard?.backorderWatch?.sumOf { it.missingQuantityTotal }?.roundMoney() ?: 0.0
+    val recoveryDesk = supplierDashboard?.recoveryDesk ?: SupplierDashboardRecoveryDeskDataModel()
     val supplierStatusMixText = supplierDashboard?.statusBuckets
         ?.take(4)
         ?.joinToString(" • ") { bucket -> "${supplierOrderStatusTitle(bucket.status)} ${bucket.orderCount}" }
@@ -23706,6 +24211,9 @@ private fun AppConfiguration.SupplierOrdersInboxScreen() {
                         }
                         if (backorderWatchCount > 0) {
                             StockCardInfoLine(localizedStringResource(1794, "Backorder watch"), "$backorderWatchCount • ${backorderShortQuantity.toStockMoneyText()}", stateValues.TextColor)
+                        }
+                        recoveryDesk.recoveryDeskLane.takeIf { it.isNotBlank() }?.let { lane ->
+                            StockCardInfoLine(localizedStringResource(1958, "Recovery desk"), supplierBackorderRecoveryDeskTitle(lane), stateValues.TextColor)
                         }
                         supplierDashboard?.generatedAtMillis?.takeIf { it > 0L }?.let { generatedAt ->
                             StockCardInfoLine(localizedStringResource(1617, "Server pulse"), receiptUiDateTime(generatedAt), stateValues.TextColor)
@@ -24948,7 +25456,7 @@ private fun AppConfiguration.SupplierDispatchLaneCard(lane: SupplierDispatchLane
                     confirmationRequired = false,
                     onClick = {
                         coroutineScope.launch {
-                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to lane.storeKey.ifBlank { lane.storeTitle })
+                            seedSupplierOrdersInboxNavigation(searchQuery = lane.storeKey.ifBlank { lane.storeTitle })
                             Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
                         }
                     }
@@ -24998,7 +25506,7 @@ private fun AppConfiguration.SupplierDispatchLaneCard(lane: SupplierDispatchLane
                     confirmationRequired = false,
                     onClick = {
                         coroutineScope.launch {
-                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to lane.storeKey.ifBlank { lane.storeTitle })
+                            seedSupplierOrdersInboxNavigation(searchQuery = lane.storeKey.ifBlank { lane.storeTitle })
                             Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
                         }
                     }
@@ -25182,8 +25690,8 @@ private fun AppConfiguration.SupplierServerDispatchRunCard(
 
     fun openRunOrders() {
         coroutineScope.launch {
-            NavigationScreenModel.Supplier.Orders.Main.setState(
-                NavigationScreenModel.KEY_STATE_SEARCH_QUERY to run.storeId
+            seedSupplierOrdersInboxNavigation(
+                searchQuery = run.storeId
                     .ifBlank { run.storePublicIdSnapshot }
                     .ifBlank { title }
             )
@@ -26083,7 +26591,7 @@ private fun AppConfiguration.SupplierDemandRadarCard(item: SupplierDemandRadarUi
             confirmationRequired = false,
             onClick = {
                 coroutineScope.launch {
-                    NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.goodsItemId)
+                    seedSupplierOrdersInboxNavigation(searchQuery = item.goodsItemId)
                     Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
                 }
             }
@@ -26345,7 +26853,7 @@ private fun AppConfiguration.SupplierTermsGuardCard(item: SupplierTermsGuardUiMo
                     confirmationRequired = false,
                     onClick = {
                         coroutineScope.launch {
-                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.orderSearchQuery)
+                            seedSupplierOrdersInboxNavigation(searchQuery = item.orderSearchQuery)
                             Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
                         }
                     }
@@ -26383,7 +26891,7 @@ private fun AppConfiguration.SupplierTermsGuardCard(item: SupplierTermsGuardUiMo
                     confirmationRequired = false,
                     onClick = {
                         coroutineScope.launch {
-                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.orderSearchQuery)
+                            seedSupplierOrdersInboxNavigation(searchQuery = item.orderSearchQuery)
                             Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
                         }
                     }
@@ -26648,7 +27156,7 @@ private fun AppConfiguration.SupplierManufacturerBridgeCard(item: SupplierDashbo
                     confirmationRequired = false,
                     onClick = {
                         coroutineScope.launch {
-                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.goodsItemId)
+                            seedSupplierOrdersInboxNavigation(searchQuery = item.goodsItemId)
                             Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
                         }
                     }
@@ -26676,7 +27184,7 @@ private fun AppConfiguration.SupplierManufacturerBridgeCard(item: SupplierDashbo
                     confirmationRequired = false,
                     onClick = {
                         coroutineScope.launch {
-                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.goodsItemId)
+                            seedSupplierOrdersInboxNavigation(searchQuery = item.goodsItemId)
                             Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
                         }
                     }
@@ -26703,7 +27211,7 @@ private fun AppConfiguration.supplierBackorderTitle(item: SupplierDashboardBacko
 
 private fun AppConfiguration.supplierBackorderActionTitle(action: String): String = when (action) {
     "negotiate" -> localizedStringResource(1801, "Store negotiation")
-    "source" -> localizedStringResource(1717, "Produce / reserve")
+    "source" -> localizedStringResource(1804, "Source more stock")
     else -> localizedStringResource(1720, "Watch backorder")
 }
 
@@ -26712,6 +27220,1144 @@ private fun AppConfiguration.supplierBackorderRecoveryLaneTitle(lane: String): S
     "split_source" -> localizedStringResource(1804, "Source more stock")
     "source_or_cancel" -> localizedStringResource(1805, "Source or cancel")
     else -> localizedStringResource(1720, "Watch backorder")
+}
+
+private fun AppConfiguration.supplierBackorderRecoveryUrgencyTitle(lane: String): String = when (lane) {
+    "overdue" -> localizedStringResource(1810, "Overdue")
+    "today" -> localizedStringResource(1811, "Due today")
+    "soon" -> localizedStringResource(1812, "Due soon")
+    else -> localizedStringResource(1813, "Flexible")
+}
+
+private fun AppConfiguration.supplierBackorderRecoveryOwnerTitle(lane: String): String = when (lane) {
+    "store_contact" -> localizedStringResource(1818, "Store contact")
+    "upstream_sourcing" -> localizedStringResource(1819, "Upstream sourcing")
+    "pack_lead" -> localizedStringResource(1820, "Pack lead")
+    else -> localizedStringResource(1821, "Watch desk")
+}
+
+private fun AppConfiguration.supplierBackorderRecoverySlaTitle(lane: String): String = when (lane) {
+    "call_now" -> localizedStringResource(1824, "Call now")
+    "commit_today" -> localizedStringResource(1825, "Commit today")
+    "before_pack" -> localizedStringResource(1826, "Before packing")
+    else -> localizedStringResource(1827, "Monitor")
+}
+
+private fun AppConfiguration.supplierBackorderRecoveryEscalationTitle(lane: String): String = when (lane) {
+    "store_escalation" -> localizedStringResource(1829, "Store escalation")
+    "sourcing_escalation" -> localizedStringResource(1830, "Sourcing escalation")
+    "pack_hold" -> localizedStringResource(1831, "Pack hold")
+    else -> localizedStringResource(1832, "Watch only")
+}
+
+private fun AppConfiguration.supplierBackorderRecoveryProofTitle(lane: String): String = when (lane) {
+    "store_ack_required" -> localizedStringResource(1834, "Store ack needed")
+    "sourcing_note_required" -> localizedStringResource(1835, "Sourcing note needed")
+    "pack_guard_proof" -> localizedStringResource(1836, "Pack guard proof")
+    else -> localizedStringResource(1837, "Watch note")
+}
+
+private fun AppConfiguration.supplierBackorderRecoveryOutcomeTitle(lane: String): String = when (lane) {
+    "second_drop" -> localizedStringResource(1840, "Second drop")
+    "substitute_offer" -> localizedStringResource(1841, "Substitute offer")
+    "cancel_review" -> localizedStringResource(1842, "Cancel review")
+    "ship_now_guard" -> localizedStringResource(1843, "Ship-now guard")
+    else -> localizedStringResource(1844, "Watch to close")
+}
+
+private fun AppConfiguration.supplierBackorderRecoveryPackGuardTitle(lane: String): String = when (lane) {
+    "block_pack" -> localizedStringResource(1846, "Block packing")
+    "split_pack_only" -> localizedStringResource(1847, "Split pack only")
+    "proof_before_pack" -> localizedStringResource(1848, "Proof before pack")
+    else -> localizedStringResource(1849, "Safe to pack")
+}
+
+private fun AppConfiguration.supplierBackorderRecoveryContactTitle(lane: String): String = when (lane) {
+    "store_call" -> localizedStringResource(1852, "Store call")
+    "upstream_request" -> localizedStringResource(1853, "Upstream request")
+    "pack_lead_note" -> localizedStringResource(1854, "Pack note")
+    "substitute_answer" -> localizedStringResource(1858, "Substitute answer")
+    else -> localizedStringResource(1837, "Watch note")
+}
+
+private fun AppConfiguration.supplierBackorderRecoveryRiskTitle(lane: String): String = when (lane) {
+    "critical_recovery" -> localizedStringResource(1860, "Critical recovery")
+    "decision_pressure" -> localizedStringResource(1861, "Decision pressure")
+    "pack_sourcing_watch" -> localizedStringResource(1862, "Pack/sourcing risk")
+    else -> localizedStringResource(1863, "Steady watch")
+}
+
+private fun AppConfiguration.supplierBackorderRecoveryConfidenceTitle(lane: String): String = when (lane) {
+    "blocked_until_decision" -> localizedStringResource(1869, "Blocked until decision")
+    "needs_confirmation" -> localizedStringResource(1870, "Needs confirmation")
+    "ready_to_recover" -> localizedStringResource(1871, "Ready to recover")
+    else -> localizedStringResource(1872, "Watch confidence")
+}
+
+private fun AppConfiguration.supplierBackorderRecoveryFollowUpTitle(lane: String): String = when (lane) {
+    "follow_up_now" -> localizedStringResource(1878, "Follow up now")
+    "same_day_check" -> localizedStringResource(1879, "Same-day check")
+    "before_pack_check" -> localizedStringResource(1880, "Before-pack check")
+    else -> localizedStringResource(1881, "Watch later")
+}
+
+private fun AppConfiguration.supplierBackorderRecoveryHandoffTitle(lane: String): String = when (lane) {
+    "store_handoff" -> localizedStringResource(1887, "Store handoff")
+    "sourcing_handoff" -> localizedStringResource(1888, "Sourcing handoff")
+    "pack_handoff" -> localizedStringResource(1889, "Pack handoff")
+    else -> localizedStringResource(1890, "Watch handoff")
+}
+
+private fun AppConfiguration.supplierBackorderRecoveryClosureTitle(lane: String): String = when (lane) {
+    "blocked_open" -> localizedStringResource(1897, "Blocked open")
+    "needs_close_note" -> localizedStringResource(1898, "Needs close note")
+    "ready_with_guard" -> localizedStringResource(1899, "Ready with guard")
+    else -> localizedStringResource(1900, "Watch until clear")
+}
+
+private fun AppConfiguration.supplierBackorderRecoveryLedgerTitle(lane: String): String = when (lane) {
+    "audit_blocker" -> localizedStringResource(1908, "Audit blocker")
+    "decision_record" -> localizedStringResource(1909, "Decision record")
+    "pack_record" -> localizedStringResource(1910, "Pack record")
+    "ledger_ready" -> localizedStringResource(1911, "Ledger ready")
+    else -> localizedStringResource(1912, "Watch record")
+}
+
+private fun AppConfiguration.supplierBackorderRecoveryTriageTitle(lane: String): String = when (lane) {
+    "triage_now" -> localizedStringResource(1920, "Triage now")
+    "decision_lane" -> localizedStringResource(1921, "Decision lane")
+    "pack_split_lane" -> localizedStringResource(1922, "Pack split lane")
+    "sourcing_lane" -> localizedStringResource(1923, "Sourcing lane")
+    "ready_lane" -> localizedStringResource(1924, "Ready lane")
+    else -> localizedStringResource(1925, "Watch lane")
+}
+
+private fun AppConfiguration.supplierBackorderRecoveryCommandTitle(lane: String): String = when (lane) {
+    "stop_pack" -> localizedStringResource(1933, "Stop pack")
+    "call_store" -> localizedStringResource(1934, "Call store")
+    "source_now" -> localizedStringResource(1935, "Source now")
+    "split_and_ship" -> localizedStringResource(1936, "Split and ship")
+    "ready_with_note" -> localizedStringResource(1937, "Ready with note")
+    else -> localizedStringResource(1938, "Monitor promise")
+}
+
+private fun AppConfiguration.supplierBackorderRecoveryPromiseShieldTitle(lane: String): String = when (lane) {
+    "promise_at_risk" -> localizedStringResource(1946, "Promise at risk")
+    "store_answer_needed" -> localizedStringResource(1947, "Store answer needed")
+    "source_before_promise" -> localizedStringResource(1948, "Source before promise")
+    "split_promise" -> localizedStringResource(1949, "Split promise")
+    "promise_safe" -> localizedStringResource(1950, "Promise safe")
+    else -> localizedStringResource(1951, "Promise watch")
+}
+
+private fun AppConfiguration.supplierBackorderRecoveryDeskTitle(lane: String): String = when (lane) {
+    "desk_command" -> localizedStringResource(1959, "Command room")
+    "desk_contact" -> localizedStringResource(1960, "Contact wave")
+    "desk_source" -> localizedStringResource(1961, "Source wave")
+    "desk_split" -> localizedStringResource(1962, "Split wave")
+    "desk_ready" -> localizedStringResource(1963, "Ready wave")
+    "desk_clear" -> localizedStringResource(1965, "Desk clear")
+    else -> localizedStringResource(1964, "Watch wave")
+}
+
+private fun AppConfiguration.supplierBackorderRecoveryWaveTitle(lane: String): String = when (lane) {
+    "wave_command" -> localizedStringResource(1959, "Command room")
+    "wave_contact" -> localizedStringResource(1960, "Contact wave")
+    "wave_source" -> localizedStringResource(1961, "Source wave")
+    "wave_split" -> localizedStringResource(1962, "Split wave")
+    "wave_ready" -> localizedStringResource(1963, "Ready wave")
+    else -> localizedStringResource(1964, "Watch wave")
+}
+private fun AppConfiguration.supplierBackorderRecoveryAgingTitle(lane: String): String = when (lane) {
+    "stale_blocker" -> localizedStringResource(1986, "Stale blocker")
+    "touch_today" -> localizedStringResource(1987, "Touch today")
+    "fresh_recovery" -> localizedStringResource(1988, "Fresh recovery")
+    else -> localizedStringResource(1989, "Age watch")
+}
+
+private fun AppConfiguration.supplierBackorderRecoveryBottleneckTitle(lane: String): String = when (lane) {
+    "decision_bottleneck" -> localizedStringResource(1999, "Decision bottleneck")
+    "contact_bottleneck" -> localizedStringResource(2000, "Contact bottleneck")
+    "sourcing_bottleneck" -> localizedStringResource(2001, "Sourcing bottleneck")
+    "pack_bottleneck" -> localizedStringResource(2002, "Pack bottleneck")
+    "proof_bottleneck" -> localizedStringResource(2003, "Proof bottleneck")
+    "aging_bottleneck" -> localizedStringResource(2004, "Aging bottleneck")
+    "ready_bottleneck" -> localizedStringResource(2005, "Ready bottleneck")
+    else -> localizedStringResource(2006, "Watch bottleneck")
+}
+
+private fun AppConfiguration.supplierBackorderRecoveryLoadTitle(lane: String): String = when (lane) {
+    "heavy_load" -> localizedStringResource(2014, "Heavy load")
+    "multi_store_load" -> localizedStringResource(2015, "Multi-store load")
+    "pack_load" -> localizedStringResource(2016, "Pack load")
+    "ready_load" -> localizedStringResource(2017, "Ready load")
+    else -> localizedStringResource(2018, "Watch load")
+}
+
+private fun AppConfiguration.supplierBackorderRecoveryImpactTitle(lane: String): String = when (lane) {
+    "customer_promise_impact" -> localizedStringResource(2030, "Customer promise impact")
+    "multi_store_impact" -> localizedStringResource(2031, "Multi-store impact")
+    "store_replenishment_impact" -> localizedStringResource(2032, "Store replenishment impact")
+    "controlled_impact" -> localizedStringResource(2033, "Controlled impact")
+    else -> localizedStringResource(2034, "Impact watch")
+}
+
+private fun AppConfiguration.supplierBackorderRecoveryCommitTitle(lane: String): String = when (lane) {
+    "commit_blocked" -> localizedStringResource(2045, "Commit blocked")
+    "commit_store_today" -> localizedStringResource(2046, "Store commit due")
+    "commit_source_eta" -> localizedStringResource(2047, "Source ETA commit")
+    "commit_split_eta" -> localizedStringResource(2048, "Split ETA commit")
+    "commit_ready" -> localizedStringResource(2049, "Commit ready")
+    else -> localizedStringResource(2050, "Commit watch")
+}
+
+private fun AppConfiguration.supplierBackorderRecoveryAllocationTitle(lane: String): String = when (lane) {
+    "fair_split_needed" -> localizedStringResource(2063, "Fair split needed")
+    "priority_allocation" -> localizedStringResource(2064, "Priority allocation")
+    "single_store_allocation" -> localizedStringResource(2065, "Single-store allocation")
+    "allocation_ready" -> localizedStringResource(2066, "Allocation ready")
+    else -> localizedStringResource(2067, "Allocation watch")
+}
+
+private fun AppConfiguration.supplierBackorderRecoveryExceptionTitle(lane: String): String = when (lane) {
+    "exception_stop_pack" -> localizedStringResource(2080, "Stop-pack exception")
+    "exception_cancel_review" -> localizedStringResource(2081, "Cancel review exception")
+    "exception_substitute" -> localizedStringResource(2082, "Substitute exception")
+    "exception_sourcing" -> localizedStringResource(2083, "Sourcing exception")
+    "exception_allocation" -> localizedStringResource(2084, "Allocation exception")
+    "exception_ready" -> localizedStringResource(2085, "Exception ready")
+    else -> localizedStringResource(2086, "Exception watch")
+}
+
+private fun AppConfiguration.supplierBackorderRecoveryCauseTitle(lane: String): String = when (lane) {
+    "zero_acceptance_cause" -> localizedStringResource(2102, "Zero accepted cause")
+    "exception_cause" -> localizedStringResource(2103, "Exception cause")
+    "promise_conflict_cause" -> localizedStringResource(2104, "Promise conflict cause")
+    "allocation_cause" -> localizedStringResource(2105, "Allocation cause")
+    "partial_capacity_cause" -> localizedStringResource(2106, "Partial capacity cause")
+    "cause_ready" -> localizedStringResource(2107, "Cause ready")
+    else -> localizedStringResource(2108, "Cause watch")
+}
+
+private fun AppConfiguration.supplierBackorderRecoveryVerificationTitle(lane: String): String = when (lane) {
+    "verify_blocked" -> localizedStringResource(2121, "Verify blocked")
+    "verify_store_answer" -> localizedStringResource(2122, "Store answer verify")
+    "verify_source_proof" -> localizedStringResource(2123, "Source proof verify")
+    "verify_pack_split" -> localizedStringResource(2124, "Pack split verify")
+    "verify_cause_record" -> localizedStringResource(2125, "Cause record verify")
+    "verify_ready" -> localizedStringResource(2126, "Verification ready")
+    else -> localizedStringResource(2127, "Verify watch")
+}
+
+private fun AppConfiguration.supplierBackorderRecoveryApprovalTitle(lane: String): String = when (lane) {
+    "approval_blocked" -> localizedStringResource(2142, "Approval blocked")
+    "approval_manager_review" -> localizedStringResource(2143, "Manager review")
+    "approval_store_ack" -> localizedStringResource(2144, "Store ack approval")
+    "approval_source_ack" -> localizedStringResource(2145, "Source ack approval")
+    "approval_pack_lead" -> localizedStringResource(2146, "Pack lead approval")
+    "approval_ready" -> localizedStringResource(2147, "Approval ready")
+    else -> localizedStringResource(2148, "Approval watch")
+}
+
+private fun AppConfiguration.supplierBackorderRecoveryExecutionTitle(lane: String): String = when (lane) {
+    "execution_blocked" -> localizedStringResource(2163, "Execution blocked")
+    "execute_store_call" -> localizedStringResource(2164, "Execute store call")
+    "execute_source_eta" -> localizedStringResource(2165, "Execute source ETA")
+    "execute_split_pack" -> localizedStringResource(2166, "Execute split pack")
+    "execute_ship_ready" -> localizedStringResource(2167, "Execute ship-ready")
+    else -> localizedStringResource(2168, "Execution watch")
+}
+
+private fun AppConfiguration.supplierBackorderRecoveryReleaseTitle(lane: String): String = when (lane) {
+    "release_blocked" -> localizedStringResource(2182, "Release blocked")
+    "release_store_update" -> localizedStringResource(2183, "Release store update")
+    "release_source_eta" -> localizedStringResource(2184, "Release source ETA")
+    "release_split_dispatch" -> localizedStringResource(2185, "Release split dispatch")
+    "release_ready" -> localizedStringResource(2186, "Release ready")
+    else -> localizedStringResource(2187, "Release watch")
+}
+
+
+private fun AppConfiguration.supplierBackorderRecoverySealTitle(lane: String): String = when (lane) {
+    "seal_blocked" -> localizedStringResource(2202, "Seal blocked")
+    "seal_store_notice" -> localizedStringResource(2203, "Seal store notice")
+    "seal_source_trace" -> localizedStringResource(2204, "Seal source trace")
+    "seal_split_manifest" -> localizedStringResource(2205, "Seal split manifest")
+    "seal_ready" -> localizedStringResource(2206, "Seal ready")
+    else -> localizedStringResource(2207, "Seal watch")
+}
+
+private fun AppConfiguration.supplierBackorderRecoveryCloseoutTitle(lane: String): String = when (lane) {
+    "closeout_blocked" -> localizedStringResource(2222, "Closeout blocked")
+    "closeout_store_notice" -> localizedStringResource(2223, "Closeout store notice")
+    "closeout_source_trace" -> localizedStringResource(2224, "Closeout source trace")
+    "closeout_split_leftover" -> localizedStringResource(2225, "Closeout split leftover")
+    "closeout_ready" -> localizedStringResource(2226, "Closeout ready")
+    else -> localizedStringResource(2227, "Closeout watch")
+}
+
+
+private fun AppConfiguration.supplierBackorderRecoveryReopenTitle(lane: String): String = when (lane) {
+    "reopen_blocked" -> localizedStringResource(2242, "Reopen blocked")
+    "reopen_after_answer" -> localizedStringResource(2243, "Reopen after answer")
+    "reopen_if_promise_slips" -> localizedStringResource(2244, "Reopen if promise slips")
+    "reopen_split_leftover" -> localizedStringResource(2245, "Reopen split leftover")
+    "reopen_safe" -> localizedStringResource(2246, "Reopen safe")
+    else -> localizedStringResource(2247, "Reopen watch")
+}
+
+private fun AppConfiguration.supplierBackorderRecoveryReconciliationTitle(lane: String): String = when (lane) {
+    "reconcile_blocked" -> localizedStringResource(2263, "Reconcile blocked")
+    "reconcile_store_delta" -> localizedStringResource(2264, "Reconcile store delta")
+    "reconcile_source_delta" -> localizedStringResource(2265, "Reconcile source delta")
+    "reconcile_split_delta" -> localizedStringResource(2266, "Reconcile split delta")
+    "reconcile_ready" -> localizedStringResource(2267, "Reconcile ready")
+    else -> localizedStringResource(2268, "Reconcile watch")
+}
+
+private fun AppConfiguration.supplierRecoveryWaveTopTitle(wave: SupplierDashboardRecoveryWaveDataModel): String =
+    wave.topGoodsItemNameSnapshot.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { wave.topGoodsItemNameSnapshot.visibleLocalizedString("main", "") }
+        .ifBlank { wave.topGoodsItemId.take(8) }
+        .ifBlank { localizedStringResource(1663, "No promised date") }
+
+private fun AppConfiguration.supplierRecoveryWaveNote(wave: SupplierDashboardRecoveryWaveDataModel): String = buildString {
+    append(localizedStringResource(1973, "Recovery wave")).append('\n')
+    append(supplierBackorderRecoveryWaveTitle(wave.recoveryWaveLane)).append('\n')
+    append(localizedStringResource(1794, "Backorder watch")).append(": ").append(wave.shortageCount).append('\n')
+    append(localizedStringResource(1796, "Short qty")).append(": ").append(wave.shortQuantityTotal.toStockMoneyText()).append('\n')
+    append(localizedStringResource(1968, "Urgent desk")).append(": ").append(wave.urgentCount).append('\n')
+    append(localizedStringResource(1969, "Stop-pack desk")).append(": ").append(wave.stopPackCount).append('\n')
+    append(localizedStringResource(1955, "Promise risks")).append(": ").append(wave.promiseRiskCount).append('\n')
+    append(localizedStringResource(1871, "Ready to recover")).append(": ").append(wave.readyCount).append('\n')
+    append(localizedStringResource(1982, "Max risk")).append(": ").append(wave.maxRiskScore).append("/100").append('\n')
+    append(localizedStringResource(1983, "Max priority")).append(": ").append(wave.maxPriorityScore).append('\n')
+    wave.nextFollowUpAtMillis?.takeIf { it > 0L }?.let { followUp ->
+        append(localizedStringResource(1882, "Next follow-up")).append(": ").append(receiptUiDateTime(followUp)).append('\n')
+    }
+    wave.topGoodsItemId.takeIf { it.isNotBlank() }?.let {
+        append(localizedStringResource(1981, "Top wave item")).append(": ").append(supplierRecoveryWaveTopTitle(wave)).append('\n')
+    }
+    wave.recoveryWaveHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { wave.recoveryWaveHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1973, "Recovery wave")).append(": ").append(hint).append('\n') }
+    wave.recoveryWaveChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { wave.recoveryWaveChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(1976, "Wave checklist")).append(":\n").append(checklist).append('\n') }
+    wave.recoveryWaveScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { wave.recoveryWaveScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(1977, "Wave script")).append(":\n").append(script).append('\n') }
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief."))
+}
+
+private fun AppConfiguration.supplierBackorderWaveNote(item: SupplierDashboardBackorderDataModel): String = buildString {
+    append(localizedStringResource(1973, "Recovery wave")).append('\n')
+    append(supplierBackorderTitle(item)).append('\n')
+    append(localizedStringResource(1973, "Recovery wave")).append(": ").append(supplierBackorderRecoveryWaveTitle(item.recoveryWaveLane)).append('\n')
+    append(localizedStringResource(1975, "Wave score")).append(": ").append(item.recoveryWaveScore).append("/100").append('\n')
+    append(localizedStringResource(1932, "Recovery command")).append(": ").append(supplierBackorderRecoveryCommandTitle(item.recoveryCommandLane)).append(" • ").append(localizedStringResource(1939, "Command score")).append(" ").append(item.recoveryCommandScore).append("/100").append('\n')
+    append(localizedStringResource(1945, "Promise shield")).append(": ").append(supplierBackorderRecoveryPromiseShieldTitle(item.recoveryPromiseShieldLane)).append(" • ").append(localizedStringResource(1952, "Promise score")).append(" ").append(item.recoveryPromiseShieldScore).append("/100").append('\n')
+    append(localizedStringResource(1859, "Recovery risk")).append(": ").append(supplierBackorderRecoveryRiskTitle(item.recoveryRiskLane)).append(" • ").append(localizedStringResource(1864, "Risk score")).append(" ").append(item.recoveryRiskScore).append("/100").append('\n')
+    item.recoveryWaveHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryWaveHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1973, "Recovery wave")).append(": ").append(hint).append('\n') }
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief."))
+}
+
+private fun AppConfiguration.supplierRecoveryDeskTopTitle(desk: SupplierDashboardRecoveryDeskDataModel): String =
+    desk.topGoodsItemNameSnapshot.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { desk.topGoodsItemNameSnapshot.visibleLocalizedString("main", "") }
+        .ifBlank { desk.topGoodsItemId.take(8) }
+        .ifBlank { localizedStringResource(1663, "No promised date") }
+
+private fun AppConfiguration.supplierBackorderAgingNote(item: SupplierDashboardBackorderDataModel): String = buildString {
+    append(localizedStringResource(1985, "Recovery aging")).append('\n')
+    append(supplierBackorderTitle(item)).append('\n')
+    append(localizedStringResource(1985, "Recovery aging")).append(": ").append(supplierBackorderRecoveryAgingTitle(item.recoveryAgingLane)).append('\n')
+    append(localizedStringResource(1990, "Aging score")).append(": ").append(item.recoveryAgingScore).append("/100").append('\n')
+    append(localizedStringResource(1996, "Oldest age")).append(": ").append(item.recoveryAgingHours).append("h").append('\n')
+    item.recoveryAgingStartedAtMillis?.takeIf { it > 0L }?.let { startedAt ->
+        append(localizedStringResource(1822, "Recovery checkpoint")).append(": ").append(receiptUiDateTime(startedAt)).append('\n')
+    }
+    append(localizedStringResource(1973, "Recovery wave")).append(": ").append(supplierBackorderRecoveryWaveTitle(item.recoveryWaveLane)).append(" • ").append(localizedStringResource(1975, "Wave score")).append(" ").append(item.recoveryWaveScore).append("/100").append('\n')
+    append(localizedStringResource(1859, "Recovery risk")).append(": ").append(supplierBackorderRecoveryRiskTitle(item.recoveryRiskLane)).append(" • ").append(localizedStringResource(1864, "Risk score")).append(" ").append(item.recoveryRiskScore).append("/100").append('\n')
+    append(localizedStringResource(1882, "Next follow-up")).append(": ").append(item.recoveryFollowUpAtMillis?.takeIf { it > 0L }?.let { receiptUiDateTime(it) } ?: localizedStringResource(1663, "No promised date")).append('\n')
+    item.recoveryAgingHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryAgingHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1985, "Recovery aging")).append(": ").append(hint).append('\n') }
+    item.recoveryAgingChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryAgingChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(1991, "Aging checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryAgingScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryAgingScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(1995, "Aging script")).append(":\n").append(script).append('\n') }
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief."))
+}
+
+
+private fun AppConfiguration.supplierBackorderBottleneckNote(item: SupplierDashboardBackorderDataModel): String = buildString {
+    append(localizedStringResource(1998, "Recovery bottleneck")).append('\n')
+    append(supplierBackorderTitle(item)).append('\n')
+    append(localizedStringResource(1998, "Recovery bottleneck")).append(": ").append(supplierBackorderRecoveryBottleneckTitle(item.recoveryBottleneckLane)).append('\n')
+    append(localizedStringResource(2007, "Bottleneck score")).append(": ").append(item.recoveryBottleneckScore).append("/100").append('\n')
+    append(localizedStringResource(1973, "Recovery wave")).append(": ").append(supplierBackorderRecoveryWaveTitle(item.recoveryWaveLane)).append(" • ").append(localizedStringResource(1975, "Wave score")).append(" ").append(item.recoveryWaveScore).append("/100").append('\n')
+    append(localizedStringResource(1985, "Recovery aging")).append(": ").append(supplierBackorderRecoveryAgingTitle(item.recoveryAgingLane)).append(" • ").append(item.recoveryAgingHours).append("h").append('\n')
+    append(localizedStringResource(1932, "Recovery command")).append(": ").append(supplierBackorderRecoveryCommandTitle(item.recoveryCommandLane)).append(" • ").append(localizedStringResource(1939, "Command score")).append(" ").append(item.recoveryCommandScore).append("/100").append('\n')
+    append(localizedStringResource(1859, "Recovery risk")).append(": ").append(supplierBackorderRecoveryRiskTitle(item.recoveryRiskLane)).append(" • ").append(localizedStringResource(1864, "Risk score")).append(" ").append(item.recoveryRiskScore).append("/100").append('\n')
+    item.recoveryBottleneckHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryBottleneckHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1998, "Recovery bottleneck")).append(": ").append(hint).append('\n') }
+    item.recoveryBottleneckChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryBottleneckChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(2008, "Bottleneck checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryBottleneckScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryBottleneckScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(2011, "Bottleneck script")).append(":\n").append(script).append('\n') }
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief."))
+}
+
+private fun AppConfiguration.supplierBackorderLoadNote(item: SupplierDashboardBackorderDataModel): String = buildString {
+    append(localizedStringResource(2013, "Recovery load")).append('\n')
+    append(supplierBackorderTitle(item)).append('\n')
+    append(localizedStringResource(2013, "Recovery load")).append(": ").append(supplierBackorderRecoveryLoadTitle(item.recoveryLoadLane)).append('\n')
+    append(localizedStringResource(2019, "Load score")).append(": ").append(item.recoveryLoadScore).append("/100").append('\n')
+    append(localizedStringResource(1798, "Affected orders")).append(": ").append(item.affectedOrderCount).append('\n')
+    append(localizedStringResource(1799, "Affected stores")).append(": ").append(item.affectedStoreCount).append('\n')
+    append(localizedStringResource(1998, "Recovery bottleneck")).append(": ").append(supplierBackorderRecoveryBottleneckTitle(item.recoveryBottleneckLane)).append(" • ").append(localizedStringResource(2007, "Bottleneck score")).append(" ").append(item.recoveryBottleneckScore).append("/100").append('\n')
+    append(localizedStringResource(1973, "Recovery wave")).append(": ").append(supplierBackorderRecoveryWaveTitle(item.recoveryWaveLane)).append(" • ").append(localizedStringResource(1975, "Wave score")).append(" ").append(item.recoveryWaveScore).append("/100").append('\n')
+    item.recoveryLoadHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryLoadHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(2013, "Recovery load")).append(": ").append(hint).append('\n') }
+    item.recoveryLoadChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryLoadChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(2020, "Load checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryLoadScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryLoadScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(2023, "Load script")).append(":\n").append(script).append('\n') }
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief."))
+}
+
+private fun AppConfiguration.supplierBackorderImpactNote(item: SupplierDashboardBackorderDataModel): String = buildString {
+    append(localizedStringResource(2029, "Recovery impact")).append('\n')
+    append(supplierBackorderTitle(item)).append('\n')
+    append(localizedStringResource(2029, "Recovery impact")).append(": ").append(supplierBackorderRecoveryImpactTitle(item.recoveryImpactLane)).append('\n')
+    append(localizedStringResource(2035, "Impact score")).append(": ").append(item.recoveryImpactScore).append("/100").append('\n')
+    append(localizedStringResource(1798, "Affected orders")).append(": ").append(item.affectedOrderCount).append('\n')
+    append(localizedStringResource(1799, "Affected stores")).append(": ").append(item.affectedStoreCount).append('\n')
+    append(localizedStringResource(1945, "Promise shield")).append(": ").append(supplierBackorderRecoveryPromiseShieldTitle(item.recoveryPromiseShieldLane)).append(" • ").append(localizedStringResource(1952, "Promise score")).append(" ").append(item.recoveryPromiseShieldScore).append("/100").append('\n')
+    append(localizedStringResource(2013, "Recovery load")).append(": ").append(supplierBackorderRecoveryLoadTitle(item.recoveryLoadLane)).append(" • ").append(localizedStringResource(2019, "Load score")).append(" ").append(item.recoveryLoadScore).append("/100").append('\n')
+    item.recoveryImpactHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryImpactHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(2029, "Recovery impact")).append(": ").append(hint).append('\n') }
+    item.recoveryImpactChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryImpactChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(2036, "Impact checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryImpactScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryImpactScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(2038, "Impact script")).append(":\n").append(script).append('\n') }
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief."))
+}
+
+
+private fun AppConfiguration.supplierBackorderCommitNote(item: SupplierDashboardBackorderDataModel): String = buildString {
+    append(localizedStringResource(2044, "Recovery commit")).append('\n')
+    append(supplierBackorderTitle(item)).append('\n')
+    append(localizedStringResource(2044, "Recovery commit")).append(": ").append(supplierBackorderRecoveryCommitTitle(item.recoveryCommitLane)).append('\n')
+    append(localizedStringResource(2051, "Commit score")).append(": ").append(item.recoveryCommitScore).append("/100").append('\n')
+    item.recoveryCommitByMillis?.takeIf { it > 0L }?.let { commitAt ->
+        append(localizedStringResource(2053, "Commit by")).append(": ").append(receiptUiDateTime(commitAt)).append('\n')
+    }
+    append(localizedStringResource(2029, "Recovery impact")).append(": ").append(supplierBackorderRecoveryImpactTitle(item.recoveryImpactLane)).append(" • ").append(localizedStringResource(2035, "Impact score")).append(" ").append(item.recoveryImpactScore).append("/100").append('\n')
+    append(localizedStringResource(1945, "Promise shield")).append(": ").append(supplierBackorderRecoveryPromiseShieldTitle(item.recoveryPromiseShieldLane)).append(" • ").append(localizedStringResource(1952, "Promise score")).append(" ").append(item.recoveryPromiseShieldScore).append("/100").append('\n')
+    item.recoveryCommitHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCommitHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(2044, "Recovery commit")).append(": ").append(hint).append('\n') }
+    item.recoveryCommitChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCommitChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(2052, "Commit checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryCommitScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCommitScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(2055, "Commit script")).append(":\n").append(script).append('\n') }
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief."))
+}
+
+private fun AppConfiguration.supplierBackorderAllocationNote(item: SupplierDashboardBackorderDataModel): String = buildString {
+    append(localizedStringResource(2062, "Recovery allocation")).append('\n')
+    append(supplierBackorderTitle(item)).append('\n')
+    append(localizedStringResource(2062, "Recovery allocation")).append(": ").append(supplierBackorderRecoveryAllocationTitle(item.recoveryAllocationLane)).append('\n')
+    append(localizedStringResource(2068, "Allocation score")).append(": ").append(item.recoveryAllocationScore).append("/100").append('\n')
+    append(localizedStringResource(1798, "Affected orders")).append(": ").append(item.affectedOrderCount).append('\n')
+    append(localizedStringResource(1799, "Affected stores")).append(": ").append(item.affectedStoreCount).append('\n')
+    append(localizedStringResource(1796, "Short qty")).append(": ").append(item.missingQuantityTotal.toStockMoneyText()).append('\n')
+    append(localizedStringResource(2044, "Recovery commit")).append(": ").append(supplierBackorderRecoveryCommitTitle(item.recoveryCommitLane)).append(" • ").append(localizedStringResource(2051, "Commit score")).append(" ").append(item.recoveryCommitScore).append("/100").append('\n')
+    append(localizedStringResource(2029, "Recovery impact")).append(": ").append(supplierBackorderRecoveryImpactTitle(item.recoveryImpactLane)).append(" • ").append(localizedStringResource(2035, "Impact score")).append(" ").append(item.recoveryImpactScore).append("/100").append('\n')
+    item.recoveryAllocationHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryAllocationHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(2062, "Recovery allocation")).append(": ").append(hint).append('\n') }
+    item.recoveryAllocationChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryAllocationChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(2069, "Allocation checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryAllocationScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryAllocationScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(2071, "Allocation script")).append(":\n").append(script).append('\n') }
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief."))
+}
+
+
+private fun AppConfiguration.supplierBackorderExceptionNote(item: SupplierDashboardBackorderDataModel): String = buildString {
+    append(localizedStringResource(2079, "Recovery exception")).append('\n')
+    append(supplierBackorderTitle(item)).append('\n')
+    append(localizedStringResource(2079, "Recovery exception")).append(": ").append(supplierBackorderRecoveryExceptionTitle(item.recoveryExceptionLane)).append('\n')
+    append(localizedStringResource(2087, "Exception score")).append(": ").append(item.recoveryExceptionScore).append("/100").append('\n')
+    append(localizedStringResource(2062, "Recovery allocation")).append(": ").append(supplierBackorderRecoveryAllocationTitle(item.recoveryAllocationLane)).append(" • ").append(localizedStringResource(2068, "Allocation score")).append(" ").append(item.recoveryAllocationScore).append("/100").append('\n')
+    append(localizedStringResource(2044, "Recovery commit")).append(": ").append(supplierBackorderRecoveryCommitTitle(item.recoveryCommitLane)).append(" • ").append(localizedStringResource(2051, "Commit score")).append(" ").append(item.recoveryCommitScore).append("/100").append('\n')
+    append(localizedStringResource(1798, "Affected orders")).append(": ").append(item.affectedOrderCount).append('\n')
+    append(localizedStringResource(1799, "Affected stores")).append(": ").append(item.affectedStoreCount).append('\n')
+    append(localizedStringResource(1796, "Short qty")).append(": ").append(item.missingQuantityTotal.toStockMoneyText()).append('\n')
+    item.recoveryExceptionHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryExceptionHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(2079, "Recovery exception")).append(": ").append(hint).append('\n') }
+    item.recoveryExceptionChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryExceptionChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(2088, "Exception checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryExceptionScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryExceptionScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(2090, "Exception script")).append(":\n").append(script).append('\n') }
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief."))
+}
+
+
+private fun AppConfiguration.supplierBackorderCauseNote(item: SupplierDashboardBackorderDataModel): String = buildString {
+    append(localizedStringResource(2101, "Recovery cause")).append('\n')
+    append(supplierBackorderTitle(item)).append('\n')
+    append(localizedStringResource(2101, "Recovery cause")).append(": ").append(supplierBackorderRecoveryCauseTitle(item.recoveryCauseLane)).append('\n')
+    append(localizedStringResource(2109, "Cause score")).append(": ").append(item.recoveryCauseScore).append("/100").append('\n')
+    append(localizedStringResource(2079, "Recovery exception")).append(": ").append(supplierBackorderRecoveryExceptionTitle(item.recoveryExceptionLane)).append(" • ").append(localizedStringResource(2087, "Exception score")).append(" ").append(item.recoveryExceptionScore).append("/100").append('\n')
+    append(localizedStringResource(2062, "Recovery allocation")).append(": ").append(supplierBackorderRecoveryAllocationTitle(item.recoveryAllocationLane)).append(" • ").append(localizedStringResource(2068, "Allocation score")).append(" ").append(item.recoveryAllocationScore).append("/100").append('\n')
+    append(localizedStringResource(2044, "Recovery commit")).append(": ").append(supplierBackorderRecoveryCommitTitle(item.recoveryCommitLane)).append(" • ").append(localizedStringResource(2051, "Commit score")).append(" ").append(item.recoveryCommitScore).append("/100").append('\n')
+    append(localizedStringResource(1798, "Affected orders")).append(": ").append(item.affectedOrderCount).append('\n')
+    append(localizedStringResource(1799, "Affected stores")).append(": ").append(item.affectedStoreCount).append('\n')
+    append(localizedStringResource(1796, "Short qty")).append(": ").append(item.missingQuantityTotal.toStockMoneyText()).append('\n')
+    item.recoveryCauseHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCauseHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(2101, "Recovery cause")).append(": ").append(hint).append('\n') }
+    item.recoveryCauseChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCauseChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(2110, "Cause checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryCauseScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCauseScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(2112, "Cause script")).append(":\n").append(script).append('\n') }
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief."))
+}
+
+
+private fun AppConfiguration.supplierBackorderVerificationNote(item: SupplierDashboardBackorderDataModel): String = buildString {
+    append(localizedStringResource(2120, "Recovery verification")).append('\n')
+    append(supplierBackorderTitle(item)).append('\n')
+    append(localizedStringResource(2120, "Recovery verification")).append(": ").append(supplierBackorderRecoveryVerificationTitle(item.recoveryVerificationLane)).append('\n')
+    append(localizedStringResource(2128, "Verification score")).append(": ").append(item.recoveryVerificationScore).append("/100").append('\n')
+    append(localizedStringResource(2101, "Recovery cause")).append(": ").append(supplierBackorderRecoveryCauseTitle(item.recoveryCauseLane)).append(" • ").append(localizedStringResource(2109, "Cause score")).append(" ").append(item.recoveryCauseScore).append("/100").append('\n')
+    append(localizedStringResource(2079, "Recovery exception")).append(": ").append(supplierBackorderRecoveryExceptionTitle(item.recoveryExceptionLane)).append(" • ").append(localizedStringResource(2087, "Exception score")).append(" ").append(item.recoveryExceptionScore).append("/100").append('\n')
+    append(localizedStringResource(1907, "Recovery ledger")).append(": ").append(supplierBackorderRecoveryLedgerTitle(item.recoveryLedgerLane)).append(" • ").append(localizedStringResource(1913, "Ledger score")).append(" ").append(item.recoveryLedgerScore).append("/100").append('\n')
+    append(localizedStringResource(1868, "Recovery confidence")).append(": ").append(supplierBackorderRecoveryConfidenceTitle(item.recoveryConfidenceLane)).append(" • ").append(localizedStringResource(1873, "Confidence score")).append(" ").append(item.recoveryConfidenceScore).append("/100").append('\n')
+    append(localizedStringResource(1798, "Affected orders")).append(": ").append(item.affectedOrderCount).append('\n')
+    append(localizedStringResource(1799, "Affected stores")).append(": ").append(item.affectedStoreCount).append('\n')
+    append(localizedStringResource(1796, "Short qty")).append(": ").append(item.missingQuantityTotal.toStockMoneyText()).append('\n')
+    item.recoveryVerificationHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryVerificationHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(2120, "Recovery verification")).append(": ").append(hint).append('\n') }
+    item.recoveryVerificationChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryVerificationChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(2129, "Verification checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryVerificationScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryVerificationScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(2131, "Verification script")).append(":\n").append(script).append('\n') }
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief."))
+}
+
+private fun AppConfiguration.supplierBackorderApprovalNote(item: SupplierDashboardBackorderDataModel): String = buildString {
+    append(localizedStringResource(2141, "Recovery approval")).append('\n')
+    append(supplierBackorderTitle(item)).append('\n')
+    append(localizedStringResource(2141, "Recovery approval")).append(": ").append(supplierBackorderRecoveryApprovalTitle(item.recoveryApprovalLane)).append('\n')
+    append(localizedStringResource(2149, "Approval score")).append(": ").append(item.recoveryApprovalScore).append("/100").append('\n')
+    append(localizedStringResource(2120, "Recovery verification")).append(": ").append(supplierBackorderRecoveryVerificationTitle(item.recoveryVerificationLane)).append(" • ").append(localizedStringResource(2128, "Verification score")).append(" ").append(item.recoveryVerificationScore).append("/100").append('\n')
+    append(localizedStringResource(2079, "Recovery exception")).append(": ").append(supplierBackorderRecoveryExceptionTitle(item.recoveryExceptionLane)).append(" • ").append(localizedStringResource(2087, "Exception score")).append(" ").append(item.recoveryExceptionScore).append("/100").append('\n')
+    append(localizedStringResource(2044, "Recovery commit")).append(": ").append(supplierBackorderRecoveryCommitTitle(item.recoveryCommitLane)).append(" • ").append(localizedStringResource(2051, "Commit score")).append(" ").append(item.recoveryCommitScore).append("/100").append('\n')
+    append(localizedStringResource(1798, "Affected orders")).append(": ").append(item.affectedOrderCount).append('\n')
+    append(localizedStringResource(1799, "Affected stores")).append(": ").append(item.affectedStoreCount).append('\n')
+    append(localizedStringResource(1796, "Short qty")).append(": ").append(item.missingQuantityTotal.toStockMoneyText()).append('\n')
+    item.recoveryApprovalHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryApprovalHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(2141, "Recovery approval")).append(": ").append(hint).append('\n') }
+    item.recoveryApprovalChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryApprovalChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(2150, "Approval checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryApprovalScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryApprovalScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(2152, "Approval script")).append(":\n").append(script).append('\n') }
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief."))
+}
+
+private fun AppConfiguration.supplierBackorderExecutionNote(item: SupplierDashboardBackorderDataModel): String = buildString {
+    append(localizedStringResource(2162, "Recovery execution")).append('\n')
+    append(supplierBackorderTitle(item)).append('\n')
+    append(localizedStringResource(2162, "Recovery execution")).append(": ").append(supplierBackorderRecoveryExecutionTitle(item.recoveryExecutionLane)).append('\n')
+    append(localizedStringResource(2169, "Execution score")).append(": ").append(item.recoveryExecutionScore).append("/100").append('\n')
+    append(localizedStringResource(2141, "Recovery approval")).append(": ").append(supplierBackorderRecoveryApprovalTitle(item.recoveryApprovalLane)).append(" • ").append(localizedStringResource(2149, "Approval score")).append(" ").append(item.recoveryApprovalScore).append("/100").append('\n')
+    append(localizedStringResource(2120, "Recovery verification")).append(": ").append(supplierBackorderRecoveryVerificationTitle(item.recoveryVerificationLane)).append(" • ").append(localizedStringResource(2128, "Verification score")).append(" ").append(item.recoveryVerificationScore).append("/100").append('\n')
+    append(localizedStringResource(1932, "Recovery command")).append(": ").append(supplierBackorderRecoveryCommandTitle(item.recoveryCommandLane)).append(" • ").append(localizedStringResource(1939, "Command score")).append(" ").append(item.recoveryCommandScore).append("/100").append('\n')
+    append(localizedStringResource(1798, "Affected orders")).append(": ").append(item.affectedOrderCount).append('\n')
+    append(localizedStringResource(1799, "Affected stores")).append(": ").append(item.affectedStoreCount).append('\n')
+    append(localizedStringResource(1796, "Short qty")).append(": ").append(item.missingQuantityTotal.toStockMoneyText()).append('\n')
+    item.recoveryExecutionHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryExecutionHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(2162, "Recovery execution")).append(": ").append(hint).append('\n') }
+    item.recoveryExecutionChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryExecutionChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(2170, "Execution checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryExecutionScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryExecutionScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(2172, "Execution script")).append(":\n").append(script).append('\n') }
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief."))
+}
+
+
+private fun AppConfiguration.supplierBackorderReleaseNote(item: SupplierDashboardBackorderDataModel): String = buildString {
+    append(localizedStringResource(2181, "Recovery release")).append('\n')
+    append(supplierBackorderTitle(item)).append('\n')
+    append(localizedStringResource(2181, "Recovery release")).append(": ").append(supplierBackorderRecoveryReleaseTitle(item.recoveryReleaseLane)).append('\n')
+    append(localizedStringResource(2188, "Release score")).append(": ").append(item.recoveryReleaseScore).append("/100").append('\n')
+    append(localizedStringResource(2162, "Recovery execution")).append(": ").append(supplierBackorderRecoveryExecutionTitle(item.recoveryExecutionLane)).append(" • ").append(localizedStringResource(2169, "Execution score")).append(" ").append(item.recoveryExecutionScore).append("/100").append('\n')
+    append(localizedStringResource(2141, "Recovery approval")).append(": ").append(supplierBackorderRecoveryApprovalTitle(item.recoveryApprovalLane)).append(" • ").append(localizedStringResource(2149, "Approval score")).append(" ").append(item.recoveryApprovalScore).append("/100").append('\n')
+    append(localizedStringResource(1945, "Promise shield")).append(": ").append(supplierBackorderRecoveryPromiseShieldTitle(item.recoveryPromiseShieldLane)).append(" • ").append(localizedStringResource(1952, "Promise score")).append(" ").append(item.recoveryPromiseShieldScore).append("/100").append('\n')
+    append(localizedStringResource(1845, "Pack guard")).append(": ").append(supplierBackorderRecoveryPackGuardTitle(item.recoveryPackGuardLane)).append('\n')
+    append(localizedStringResource(1798, "Affected orders")).append(": ").append(item.affectedOrderCount).append('\n')
+    append(localizedStringResource(1799, "Affected stores")).append(": ").append(item.affectedStoreCount).append('\n')
+    append(localizedStringResource(1796, "Short qty")).append(": ").append(item.missingQuantityTotal.toStockMoneyText()).append('\n')
+    item.recoveryReleaseHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryReleaseHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(2181, "Recovery release")).append(": ").append(hint).append('\n') }
+    item.recoveryReleaseChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryReleaseChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(2189, "Release checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryReleaseScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryReleaseScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(2191, "Release script")).append(":\n").append(script).append('\n') }
+    item.recoverySealHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoverySealHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(2201, "Recovery seal")).append(": ").append(hint).append('\n') }
+    item.recoverySealChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoverySealChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(2209, "Seal checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoverySealScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoverySealScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(2212, "Seal script")).append(":\n").append(script).append('\n') }
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief."))
+}
+
+
+private fun AppConfiguration.supplierBackorderSealNote(item: SupplierDashboardBackorderDataModel): String = buildString {
+    append(localizedStringResource(2201, "Recovery seal")).append('\n')
+    append(supplierBackorderTitle(item)).append('\n')
+    append(localizedStringResource(2201, "Recovery seal")).append(": ").append(supplierBackorderRecoverySealTitle(item.recoverySealLane)).append('\n')
+    append(localizedStringResource(2208, "Seal score")).append(": ").append(item.recoverySealScore).append("/100").append('\n')
+    append(localizedStringResource(2181, "Recovery release")).append(": ").append(supplierBackorderRecoveryReleaseTitle(item.recoveryReleaseLane)).append(" • ").append(localizedStringResource(2188, "Release score")).append(" ").append(item.recoveryReleaseScore).append("/100").append('\n')
+    append(localizedStringResource(2162, "Recovery execution")).append(": ").append(supplierBackorderRecoveryExecutionTitle(item.recoveryExecutionLane)).append(" • ").append(localizedStringResource(2169, "Execution score")).append(" ").append(item.recoveryExecutionScore).append("/100").append('\n')
+    append(localizedStringResource(2120, "Recovery verification")).append(": ").append(supplierBackorderRecoveryVerificationTitle(item.recoveryVerificationLane)).append(" • ").append(localizedStringResource(2128, "Verification score")).append(" ").append(item.recoveryVerificationScore).append("/100").append('\n')
+    append(localizedStringResource(1798, "Affected orders")).append(": ").append(item.affectedOrderCount).append('\n')
+    append(localizedStringResource(1799, "Affected stores")).append(": ").append(item.affectedStoreCount).append('\n')
+    append(localizedStringResource(1796, "Short qty")).append(": ").append(item.missingQuantityTotal.toStockMoneyText()).append('\n')
+    item.recoverySealHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoverySealHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(2201, "Recovery seal")).append(": ").append(hint).append('\n') }
+    item.recoverySealChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoverySealChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(2209, "Seal checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoverySealScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoverySealScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(2212, "Seal script")).append(":\n").append(script).append('\n') }
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief."))
+}
+
+private fun AppConfiguration.supplierBackorderCloseoutNote(item: SupplierDashboardBackorderDataModel): String = buildString {
+    append(localizedStringResource(2221, "Recovery closeout")).append('\n')
+    append(supplierBackorderTitle(item)).append('\n')
+    append(localizedStringResource(2221, "Recovery closeout")).append(": ").append(supplierBackorderRecoveryCloseoutTitle(item.recoveryCloseoutLane)).append('\n')
+    append(localizedStringResource(2228, "Closeout score")).append(": ").append(item.recoveryCloseoutScore).append("/100").append('\n')
+    append(localizedStringResource(2201, "Recovery seal")).append(": ").append(supplierBackorderRecoverySealTitle(item.recoverySealLane)).append(" • ").append(localizedStringResource(2208, "Seal score")).append(" ").append(item.recoverySealScore).append("/100").append('\n')
+    append(localizedStringResource(2181, "Recovery release")).append(": ").append(supplierBackorderRecoveryReleaseTitle(item.recoveryReleaseLane)).append(" • ").append(localizedStringResource(2188, "Release score")).append(" ").append(item.recoveryReleaseScore).append("/100").append('\n')
+    append(localizedStringResource(1907, "Recovery ledger")).append(": ").append(supplierBackorderRecoveryLedgerTitle(item.recoveryLedgerLane)).append(" • ").append(localizedStringResource(1913, "Ledger score")).append(" ").append(item.recoveryLedgerScore).append("/100").append('\n')
+    append(localizedStringResource(1798, "Affected orders")).append(": ").append(item.affectedOrderCount).append('\n')
+    append(localizedStringResource(1799, "Affected stores")).append(": ").append(item.affectedStoreCount).append('\n')
+    append(localizedStringResource(1796, "Short qty")).append(": ").append(item.missingQuantityTotal.toStockMoneyText()).append('\n')
+    item.recoveryCloseoutHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCloseoutHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(2221, "Recovery closeout")).append(": ").append(hint).append('\n') }
+    item.recoveryCloseoutChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCloseoutChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(2229, "Closeout checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryCloseoutScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCloseoutScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(2232, "Closeout script")).append(":\n").append(script).append('\n') }
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief."))
+}
+
+
+private fun AppConfiguration.supplierBackorderReopenNote(item: SupplierDashboardBackorderDataModel): String = buildString {
+    append(localizedStringResource(2241, "Recovery reopen")).append('\n')
+    append(supplierBackorderTitle(item)).append('\n')
+    append(localizedStringResource(2241, "Recovery reopen")).append(": ").append(supplierBackorderRecoveryReopenTitle(item.recoveryReopenLane)).append('\n')
+    append(localizedStringResource(2248, "Reopen score")).append(": ").append(item.recoveryReopenScore).append("/100").append('\n')
+    item.recoveryReopenAtMillis?.takeIf { it > 0L }?.let { reopenAt ->
+        append(localizedStringResource(2249, "Reopen checkpoint")).append(": ").append(receiptUiDateTime(reopenAt)).append('\n')
+    }
+    append(localizedStringResource(2221, "Recovery closeout")).append(": ").append(supplierBackorderRecoveryCloseoutTitle(item.recoveryCloseoutLane)).append(" • ").append(localizedStringResource(2228, "Closeout score")).append(" ").append(item.recoveryCloseoutScore).append("/100").append('\n')
+    append(localizedStringResource(2201, "Recovery seal")).append(": ").append(supplierBackorderRecoverySealTitle(item.recoverySealLane)).append(" • ").append(localizedStringResource(2208, "Seal score")).append(" ").append(item.recoverySealScore).append("/100").append('\n')
+    append(localizedStringResource(2181, "Recovery release")).append(": ").append(supplierBackorderRecoveryReleaseTitle(item.recoveryReleaseLane)).append(" • ").append(localizedStringResource(2188, "Release score")).append(" ").append(item.recoveryReleaseScore).append("/100").append('\n')
+    item.recoveryReopenHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryReopenHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(2241, "Recovery reopen")).append(": ").append(hint).append('\n') }
+    item.recoveryReopenChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryReopenChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(2250, "Reopen checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryReopenScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryReopenScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(2253, "Reopen script")).append(":\n").append(script).append('\n') }
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief."))
+}
+
+private fun AppConfiguration.supplierBackorderReconciliationNote(item: SupplierDashboardBackorderDataModel): String = buildString {
+    append(localizedStringResource(2262, "Recovery reconciliation")).append('\n')
+    append(supplierBackorderTitle(item)).append('\n')
+    append(localizedStringResource(2262, "Recovery reconciliation")).append(": ").append(supplierBackorderRecoveryReconciliationTitle(item.recoveryReconciliationLane)).append('\n')
+    append(localizedStringResource(2269, "Reconcile score")).append(": ").append(item.recoveryReconciliationScore).append("/100").append('\n')
+    append(localizedStringResource(2241, "Recovery reopen")).append(": ").append(supplierBackorderRecoveryReopenTitle(item.recoveryReopenLane)).append(" • ").append(localizedStringResource(2248, "Reopen score")).append(" ").append(item.recoveryReopenScore).append("/100").append('\n')
+    append(localizedStringResource(2221, "Recovery closeout")).append(": ").append(supplierBackorderRecoveryCloseoutTitle(item.recoveryCloseoutLane)).append(" • ").append(localizedStringResource(2228, "Closeout score")).append(" ").append(item.recoveryCloseoutScore).append("/100").append('\n')
+    item.recoveryReconciliationHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryReconciliationHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(2262, "Recovery reconciliation")).append(": ").append(hint).append('\n') }
+    item.recoveryReconciliationChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryReconciliationChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(2270, "Reconcile checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryReconciliationScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryReconciliationScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(2273, "Reconcile script")).append(":\n").append(script).append('\n') }
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief."))
+}
+
+private fun AppConfiguration.supplierRecoveryDeskNote(desk: SupplierDashboardRecoveryDeskDataModel): String = buildString {
+    append(localizedStringResource(1958, "Recovery desk")).append('\n')
+    append(supplierBackorderRecoveryDeskTitle(desk.recoveryDeskLane)).append('\n')
+    append(localizedStringResource(1794, "Backorder watch")).append(": ").append(desk.shortageCount).append('\n')
+    append(localizedStringResource(1968, "Urgent desk")).append(": ").append(desk.urgentCount).append('\n')
+    append(localizedStringResource(1969, "Stop-pack desk")).append(": ").append(desk.stopPackCount).append('\n')
+    append(localizedStringResource(1955, "Promise risks")).append(": ").append(desk.promiseRiskCount).append('\n')
+    append(localizedStringResource(1871, "Ready to recover")).append(": ").append(desk.readyCount).append('\n')
+    append(localizedStringResource(1993, "Stale age")).append(": ").append(desk.staleRecoveryCount).append('\n')
+    append(localizedStringResource(1987, "Touch today")).append(": ").append(desk.touchTodayRecoveryCount).append('\n')
+    append(localizedStringResource(1994, "Fresh touches")).append(": ").append(desk.freshRecoveryCount).append('\n')
+    append(localizedStringResource(1996, "Oldest age")).append(": ").append(desk.oldestRecoveryAgeHours).append("h").append('\n')
+    append(localizedStringResource(1997, "Average age")).append(": ").append(desk.averageRecoveryAgeHours).append("h").append('\n')
+    append(localizedStringResource(2010, "Top bottleneck")).append(": ").append(supplierBackorderRecoveryBottleneckTitle(desk.topBottleneckLane)).append('\n')
+    append(localizedStringResource(1999, "Decision bottleneck")).append(": ").append(desk.decisionBottleneckCount).append('\n')
+    append(localizedStringResource(2000, "Contact bottleneck")).append(": ").append(desk.contactBottleneckCount).append('\n')
+    append(localizedStringResource(2001, "Sourcing bottleneck")).append(": ").append(desk.sourcingBottleneckCount).append('\n')
+    append(localizedStringResource(2002, "Pack bottleneck")).append(": ").append(desk.packBottleneckCount).append('\n')
+    append(localizedStringResource(2003, "Proof bottleneck")).append(": ").append(desk.proofBottleneckCount).append('\n')
+    append(localizedStringResource(2004, "Aging bottleneck")).append(": ").append(desk.agingBottleneckCount).append('\n')
+    append(localizedStringResource(2005, "Ready bottleneck")).append(": ").append(desk.readyBottleneckCount).append('\n')
+    append(localizedStringResource(2022, "Top load")).append(": ").append(supplierBackorderRecoveryLoadTitle(desk.topLoadLane)).append('\n')
+    append(localizedStringResource(2024, "Heavy loads")).append(": ").append(desk.heavyLoadCount).append('\n')
+    append(localizedStringResource(2025, "Multi-store loads")).append(": ").append(desk.multiStoreLoadCount).append('\n')
+    append(localizedStringResource(2026, "Pack loads")).append(": ").append(desk.packLoadCount).append('\n')
+    append(localizedStringResource(2027, "Ready loads")).append(": ").append(desk.readyLoadCount).append('\n')
+    append(localizedStringResource(2028, "Average load")).append(": ").append(desk.averageLoadScore).append("/100").append('\n')
+    append(localizedStringResource(2041, "Top impact")).append(": ").append(supplierBackorderRecoveryImpactTitle(desk.topImpactLane)).append('\n')
+    append(localizedStringResource(2039, "High impact")).append(": ").append(desk.highImpactCount).append('\n')
+    append(localizedStringResource(2040, "Promise impact")).append(": ").append(desk.promiseImpactCount).append('\n')
+    append(localizedStringResource(2031, "Multi-store impact")).append(": ").append(desk.multiStoreImpactCount).append('\n')
+    append(localizedStringResource(2032, "Store replenishment impact")).append(": ").append(desk.replenishmentImpactCount).append('\n')
+    append(localizedStringResource(2033, "Controlled impact")).append(": ").append(desk.controlledImpactCount).append('\n')
+    append(localizedStringResource(2042, "Impact average")).append(": ").append(desk.averageImpactScore).append("/100").append('\n')
+    append(localizedStringResource(2043, "Impact max")).append(": ").append(desk.maxImpactScore).append("/100").append('\n')
+    append(localizedStringResource(2056, "Top commit")).append(": ").append(supplierBackorderRecoveryCommitTitle(desk.topCommitLane)).append('\n')
+    append(localizedStringResource(2057, "Blocked commits")).append(": ").append(desk.blockedCommitCount).append('\n')
+    append(localizedStringResource(2058, "Due commits")).append(": ").append(desk.dueCommitCount).append('\n')
+    append(localizedStringResource(2047, "Source ETA commit")).append(": ").append(desk.sourceCommitCount).append('\n')
+    append(localizedStringResource(2048, "Split ETA commit")).append(": ").append(desk.splitCommitCount).append('\n')
+    append(localizedStringResource(2059, "Ready commits")).append(": ").append(desk.readyCommitCount).append('\n')
+    append(localizedStringResource(2060, "Average commit")).append(": ").append(desk.averageCommitScore).append("/100").append('\n')
+    desk.nextCommitAtMillis?.takeIf { it > 0L }?.let { commitAt ->
+        append(localizedStringResource(2061, "Next commit")).append(": ").append(receiptUiDateTime(commitAt)).append('\n')
+    }
+    append(localizedStringResource(2072, "Top allocation")).append(": ").append(supplierBackorderRecoveryAllocationTitle(desk.topAllocationLane)).append('\n')
+    append(localizedStringResource(2073, "Allocation pressure")).append(": ").append(desk.allocationPressureCount).append('\n')
+    append(localizedStringResource(2074, "Fair splits")).append(": ").append(desk.fairSplitAllocationCount).append('\n')
+    append(localizedStringResource(2075, "Priority allocations")).append(": ").append(desk.priorityAllocationCount).append('\n')
+    append(localizedStringResource(2076, "Ready allocations")).append(": ").append(desk.allocationReadyCount).append('\n')
+    append(localizedStringResource(2077, "Allocation average")).append(": ").append(desk.averageAllocationScore).append("/100").append('\n')
+    append(localizedStringResource(2078, "Allocation max")).append(": ").append(desk.maxAllocationScore).append("/100").append('\n')
+    append(localizedStringResource(2091, "Top exception")).append(": ").append(supplierBackorderRecoveryExceptionTitle(desk.topExceptionLane)).append('\n')
+    append(localizedStringResource(2092, "Exception pressure")).append(": ").append(desk.exceptionPressureCount).append('\n')
+    append(localizedStringResource(2093, "Stop-pack exceptions")).append(": ").append(desk.stopPackExceptionCount).append('\n')
+    append(localizedStringResource(2094, "Cancel exceptions")).append(": ").append(desk.cancelReviewExceptionCount).append('\n')
+    append(localizedStringResource(2095, "Substitute exceptions")).append(": ").append(desk.substituteExceptionCount).append('\n')
+    append(localizedStringResource(2096, "Sourcing exceptions")).append(": ").append(desk.sourcingExceptionCount).append('\n')
+    append(localizedStringResource(2097, "Allocation exceptions")).append(": ").append(desk.allocationExceptionCount).append('\n')
+    append(localizedStringResource(2098, "Ready exceptions")).append(": ").append(desk.exceptionReadyCount).append('\n')
+    append(localizedStringResource(2099, "Exception average")).append(": ").append(desk.averageExceptionScore).append("/100").append('\n')
+    append(localizedStringResource(2100, "Exception max")).append(": ").append(desk.maxExceptionScore).append("/100").append('\n')
+    append(localizedStringResource(2113, "Top cause")).append(": ").append(supplierBackorderRecoveryCauseTitle(desk.topCauseLane)).append('\n')
+    append(localizedStringResource(2114, "Cause pressure")).append(": ").append(desk.causePressureCount).append('\n')
+    append(localizedStringResource(2115, "Zero causes")).append(": ").append(desk.zeroAcceptanceCauseCount).append('\n')
+    append(localizedStringResource(2116, "Capacity causes")).append(": ").append(desk.partialCapacityCauseCount).append('\n')
+    append(localizedStringResource(2117, "Promise causes")).append(": ").append(desk.promiseConflictCauseCount).append('\n')
+    append(localizedStringResource(2073, "Allocation pressure")).append(": ").append(desk.allocationCauseCount).append('\n')
+    append(localizedStringResource(2092, "Exception pressure")).append(": ").append(desk.exceptionCauseCount).append('\n')
+    append(localizedStringResource(2118, "Ready causes")).append(": ").append(desk.causeReadyCount).append('\n')
+    append(localizedStringResource(2119, "Cause max")).append(": ").append(desk.maxCauseScore).append("/100").append('\n')
+    append(localizedStringResource(2132, "Top verification")).append(": ").append(supplierBackorderRecoveryVerificationTitle(desk.topVerificationLane)).append('\n')
+    append(localizedStringResource(2133, "Verification blockers")).append(": ").append(desk.verificationBlockerCount).append('\n')
+    append(localizedStringResource(2137, "Cause verifications")).append(": ").append(desk.causeVerificationCount).append('\n')
+    append(localizedStringResource(2134, "Store verifications")).append(": ").append(desk.storeVerificationCount).append('\n')
+    append(localizedStringResource(2135, "Source verifications")).append(": ").append(desk.sourceVerificationCount).append('\n')
+    append(localizedStringResource(2136, "Pack verifications")).append(": ").append(desk.packVerificationCount).append('\n')
+    append(localizedStringResource(2138, "Ready verifications")).append(": ").append(desk.verificationReadyCount).append('\n')
+    append(localizedStringResource(2140, "Verification average")).append(": ").append(desk.averageVerificationScore).append("/100").append('\n')
+    append(localizedStringResource(2139, "Verification max")).append(": ").append(desk.maxVerificationScore).append("/100").append('\n')
+    append(localizedStringResource(2153, "Top approval")).append(": ").append(supplierBackorderRecoveryApprovalTitle(desk.topApprovalLane)).append('\n')
+    append(localizedStringResource(2154, "Approval blockers")).append(": ").append(desk.approvalBlockerCount).append('\n')
+    append(localizedStringResource(2155, "Manager approvals")).append(": ").append(desk.managerApprovalCount).append('\n')
+    append(localizedStringResource(2156, "Store approvals")).append(": ").append(desk.storeApprovalCount).append('\n')
+    append(localizedStringResource(2157, "Source approvals")).append(": ").append(desk.sourceApprovalCount).append('\n')
+    append(localizedStringResource(2158, "Pack approvals")).append(": ").append(desk.packApprovalCount).append('\n')
+    append(localizedStringResource(2159, "Ready approvals")).append(": ").append(desk.approvalReadyCount).append('\n')
+    append(localizedStringResource(2161, "Approval average")).append(": ").append(desk.averageApprovalScore).append("/100").append('\n')
+    append(localizedStringResource(2160, "Approval max")).append(": ").append(desk.maxApprovalScore).append("/100").append('\n')
+    append(localizedStringResource(2173, "Top execution")).append(": ").append(supplierBackorderRecoveryExecutionTitle(desk.topExecutionLane)).append('\n')
+    append(localizedStringResource(2174, "Execution blockers")).append(": ").append(desk.executionBlockerCount).append('\n')
+    append(localizedStringResource(2175, "Store executions")).append(": ").append(desk.storeExecutionCount).append('\n')
+    append(localizedStringResource(2176, "Source executions")).append(": ").append(desk.sourceExecutionCount).append('\n')
+    append(localizedStringResource(2177, "Split executions")).append(": ").append(desk.splitExecutionCount).append('\n')
+    append(localizedStringResource(2178, "Ready executions")).append(": ").append(desk.readyExecutionCount).append('\n')
+    append(localizedStringResource(2180, "Execution average")).append(": ").append(desk.averageExecutionScore).append("/100").append('\n')
+    append(localizedStringResource(2179, "Execution max")).append(": ").append(desk.maxExecutionScore).append("/100").append('\n')
+    append(localizedStringResource(2193, "Top release")).append(": ").append(supplierBackorderRecoveryReleaseTitle(desk.topReleaseLane)).append('\n')
+    append(localizedStringResource(2194, "Release blockers")).append(": ").append(desk.releaseBlockerCount).append('\n')
+    append(localizedStringResource(2196, "Store releases")).append(": ").append(desk.storeReleaseCount).append('\n')
+    append(localizedStringResource(2197, "Source releases")).append(": ").append(desk.sourceReleaseCount).append('\n')
+    append(localizedStringResource(2198, "Split releases")).append(": ").append(desk.splitReleaseCount).append('\n')
+    append(localizedStringResource(2195, "Ready releases")).append(": ").append(desk.readyReleaseCount).append('\n')
+    append(localizedStringResource(2199, "Release average")).append(": ").append(desk.averageReleaseScore).append("/100").append('\n')
+    append(localizedStringResource(2200, "Release max")).append(": ").append(desk.maxReleaseScore).append("/100").append('\n')
+    append(localizedStringResource(2213, "Top seal")).append(": ").append(supplierBackorderRecoverySealTitle(desk.topSealLane)).append('\n')
+    append(localizedStringResource(2214, "Seal blockers")).append(": ").append(desk.sealBlockerCount).append('\n')
+    append(localizedStringResource(2216, "Store seals")).append(": ").append(desk.storeSealCount).append('\n')
+    append(localizedStringResource(2217, "Source seals")).append(": ").append(desk.sourceSealCount).append('\n')
+    append(localizedStringResource(2218, "Split seals")).append(": ").append(desk.splitSealCount).append('\n')
+    append(localizedStringResource(2215, "Ready seals")).append(": ").append(desk.readySealCount).append('\n')
+    append(localizedStringResource(2219, "Seal average")).append(": ").append(desk.averageSealScore).append("/100").append('\n')
+    append(localizedStringResource(2220, "Seal max")).append(": ").append(desk.maxSealScore).append("/100").append('\n')
+    append(localizedStringResource(2233, "Top closeout")).append(": ").append(supplierBackorderRecoveryCloseoutTitle(desk.topCloseoutLane)).append('\n')
+    append(localizedStringResource(2234, "Closeout blockers")).append(": ").append(desk.closeoutBlockerCount).append('\n')
+    append(localizedStringResource(2236, "Store closeouts")).append(": ").append(desk.storeCloseoutCount).append('\n')
+    append(localizedStringResource(2237, "Source closeouts")).append(": ").append(desk.sourceCloseoutCount).append('\n')
+    append(localizedStringResource(2238, "Split closeouts")).append(": ").append(desk.splitCloseoutCount).append('\n')
+    append(localizedStringResource(2235, "Ready closeouts")).append(": ").append(desk.readyCloseoutCount).append('\n')
+    append(localizedStringResource(2239, "Closeout average")).append(": ").append(desk.averageCloseoutScore).append("/100").append('\n')
+    append(localizedStringResource(2240, "Closeout max")).append(": ").append(desk.maxCloseoutScore).append("/100").append('\n')
+    append(localizedStringResource(2254, "Top reopen")).append(": ").append(supplierBackorderRecoveryReopenTitle(desk.topReopenLane)).append('\n')
+    append(localizedStringResource(2255, "Reopen blockers")).append(": ").append(desk.reopenBlockerCount).append('\n')
+    append(localizedStringResource(2256, "Answer reopens")).append(": ").append(desk.reopenAnswerCount).append('\n')
+    append(localizedStringResource(2257, "Promise reopens")).append(": ").append(desk.reopenPromiseCount).append('\n')
+    append(localizedStringResource(2258, "Split reopens")).append(": ").append(desk.reopenSplitCount).append('\n')
+    append(localizedStringResource(2259, "Ready reopens")).append(": ").append(desk.reopenReadyCount).append('\n')
+    append(localizedStringResource(2260, "Reopen average")).append(": ").append(desk.averageReopenScore).append("/100").append('\n')
+    append(localizedStringResource(2261, "Reopen max")).append(": ").append(desk.maxReopenScore).append("/100").append('\n')
+    desk.nextReopenAtMillis?.takeIf { it > 0L }?.let { reopenAt ->
+        append(localizedStringResource(2249, "Reopen checkpoint")).append(": ").append(receiptUiDateTime(reopenAt)).append('\n')
+    }
+    append(localizedStringResource(2274, "Top reconcile")).append(": ").append(supplierBackorderRecoveryReconciliationTitle(desk.topReconciliationLane)).append('\n')
+    append(localizedStringResource(2275, "Reconcile blockers")).append(": ").append(desk.reconciliationBlockerCount).append('\n')
+    append(localizedStringResource(2276, "Store reconciles")).append(": ").append(desk.reconciliationStoreCount).append('\n')
+    append(localizedStringResource(2277, "Source reconciles")).append(": ").append(desk.reconciliationSourceCount).append('\n')
+    append(localizedStringResource(2278, "Split reconciles")).append(": ").append(desk.reconciliationSplitCount).append('\n')
+    append(localizedStringResource(2279, "Ready reconciles")).append(": ").append(desk.reconciliationReadyCount).append('\n')
+    append(localizedStringResource(2280, "Reconcile max")).append(": ").append(desk.maxReconciliationScore).append("/100").append('\n')
+    append(localizedStringResource(1864, "Risk score")).append(": ").append(desk.averageRiskScore).append("/100").append('\n')
+    append(localizedStringResource(1722, "Priority score")).append(": ").append(desk.maxPriorityScore).append('\n')
+    desk.nextFollowUpAtMillis?.takeIf { it > 0L }?.let { followUp ->
+        append(localizedStringResource(1972, "Next desk follow-up")).append(": ").append(receiptUiDateTime(followUp)).append('\n')
+    }
+    desk.topGoodsItemId.takeIf { it.isNotBlank() }?.let {
+        append(localizedStringResource(1970, "Top recovery")).append(": ").append(supplierRecoveryDeskTopTitle(desk)).append('\n')
+    }
+    desk.recoveryWaves.takeIf { it.isNotEmpty() }?.let { waves ->
+        append(localizedStringResource(1980, "Active waves")).append(": ")
+            .append(waves.joinToString(" • ") { wave -> "${supplierBackorderRecoveryWaveTitle(wave.recoveryWaveLane)} ${wave.shortageCount}" })
+            .append('\n')
+    }
+    desk.recoveryDeskHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { desk.recoveryDeskHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1958, "Recovery desk")).append(": ").append(hint).append('\n') }
+    desk.recoveryDeskChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { desk.recoveryDeskChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(1966, "Desk checklist")).append(":\n").append(checklist).append('\n') }
+    desk.recoveryDeskScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { desk.recoveryDeskScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(1971, "Desk script")).append(":\n").append(script).append('\n') }
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief."))
+}
+
+private fun AppConfiguration.supplierBackorderContactScript(item: SupplierDashboardBackorderDataModel): String =
+    item.recoveryContactScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryContactScript.visibleLocalizedString("main", "") }
+        .ifBlank { supplierBackorderBrief(item) }
+
+private fun AppConfiguration.supplierBackorderRiskNote(item: SupplierDashboardBackorderDataModel): String = buildString {
+    append(localizedStringResource(1859, "Recovery risk")).append('\n')
+    append(supplierBackorderTitle(item)).append('\n')
+    append(localizedStringResource(1864, "Risk score")).append(": ").append(item.recoveryRiskScore).append('\n')
+    append(localizedStringResource(1859, "Recovery risk")).append(": ").append(supplierBackorderRecoveryRiskTitle(item.recoveryRiskLane)).append('\n')
+    append(localizedStringResource(1796, "Short qty")).append(": ").append(supplierManufacturerBridgeQuantityText(item.missingQuantityTotal, item.measurementUnitIdSnapshot)).append('\n')
+    item.recoveryRiskHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryRiskHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1859, "Recovery risk")).append(": ").append(hint).append('\n') }
+    item.recoveryRiskReasons.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryRiskReasons.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { reasons -> append(localizedStringResource(1865, "Risk reasons")).append(": ").append(reasons).append('\n') }
+    append(localizedStringResource(1851, "Contact lane")).append(": ").append(supplierBackorderRecoveryContactTitle(item.recoveryContactLane)).append('\n')
+    append(localizedStringResource(1845, "Pack guard")).append(": ").append(supplierBackorderRecoveryPackGuardTitle(item.recoveryPackGuardLane)).append('\n')
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief."))
+}
+
+private fun AppConfiguration.supplierBackorderConfidenceNote(item: SupplierDashboardBackorderDataModel): String = buildString {
+    append(localizedStringResource(1868, "Recovery confidence")).append('\n')
+    append(supplierBackorderTitle(item)).append('\n')
+    append(localizedStringResource(1873, "Confidence score")).append(": ").append(item.recoveryConfidenceScore).append('\n')
+    append(localizedStringResource(1868, "Recovery confidence")).append(": ").append(supplierBackorderRecoveryConfidenceTitle(item.recoveryConfidenceLane)).append('\n')
+    append(localizedStringResource(1859, "Recovery risk")).append(": ").append(supplierBackorderRecoveryRiskTitle(item.recoveryRiskLane)).append(" • ").append(localizedStringResource(1864, "Risk score")).append(" ").append(item.recoveryRiskScore).append('\n')
+    append(localizedStringResource(1833, "Recovery proof")).append(": ").append(supplierBackorderRecoveryProofTitle(item.recoveryProofLane)).append('\n')
+    item.recoveryConfidenceHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryConfidenceHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1868, "Recovery confidence")).append(": ").append(hint).append('\n') }
+    item.recoveryConfidenceChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryConfidenceChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(1874, "Confidence checklist")).append(":\n").append(checklist).append('\n') }
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief."))
+}
+
+private fun AppConfiguration.supplierBackorderFollowUpNote(item: SupplierDashboardBackorderDataModel): String = buildString {
+    append(localizedStringResource(1877, "Follow-up cadence")).append('\n')
+    append(supplierBackorderTitle(item)).append('\n')
+    append(localizedStringResource(1877, "Follow-up cadence")).append(": ").append(supplierBackorderRecoveryFollowUpTitle(item.recoveryFollowUpLane)).append('\n')
+    item.recoveryFollowUpAtMillis?.takeIf { it > 0L }?.let { followUpAt ->
+        append(localizedStringResource(1882, "Next follow-up")).append(": ").append(receiptUiDateTime(followUpAt)).append('\n')
+    }
+    append(localizedStringResource(1859, "Recovery risk")).append(": ").append(supplierBackorderRecoveryRiskTitle(item.recoveryRiskLane)).append(" • ").append(localizedStringResource(1864, "Risk score")).append(" ").append(item.recoveryRiskScore).append('\n')
+    append(localizedStringResource(1868, "Recovery confidence")).append(": ").append(supplierBackorderRecoveryConfidenceTitle(item.recoveryConfidenceLane)).append(" • ").append(localizedStringResource(1873, "Confidence score")).append(" ").append(item.recoveryConfidenceScore).append('\n')
+    item.recoveryFollowUpHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryFollowUpHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1877, "Follow-up cadence")).append(": ").append(hint).append('\n') }
+    item.recoveryFollowUpScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryFollowUpScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(1884, "Follow-up script")).append(":\n").append(script).append('\n') }
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief."))
+}
+private fun AppConfiguration.supplierBackorderHandoffNote(item: SupplierDashboardBackorderDataModel): String = buildString {
+    append(localizedStringResource(1886, "Recovery handoff")).append('\n')
+    append(supplierBackorderTitle(item)).append('\n')
+    append(localizedStringResource(1886, "Recovery handoff")).append(": ").append(supplierBackorderRecoveryHandoffTitle(item.recoveryHandoffLane)).append('\n')
+    append(localizedStringResource(1877, "Follow-up cadence")).append(": ").append(supplierBackorderRecoveryFollowUpTitle(item.recoveryFollowUpLane)).append('\n')
+    append(localizedStringResource(1817, "Recovery owner")).append(": ").append(supplierBackorderRecoveryOwnerTitle(item.recoveryOwnerLane)).append('\n')
+    append(localizedStringResource(1845, "Pack guard")).append(": ").append(supplierBackorderRecoveryPackGuardTitle(item.recoveryPackGuardLane)).append('\n')
+    item.recoveryHandoffHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryHandoffHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1886, "Recovery handoff")).append(": ").append(hint).append('\n') }
+    item.recoveryHandoffChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryHandoffChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(1891, "Handoff checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryHandoffScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryHandoffScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(1895, "Handoff script")).append(":\n").append(script).append('\n') }
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief."))
+}
+
+private fun AppConfiguration.supplierBackorderClosureNote(item: SupplierDashboardBackorderDataModel): String = buildString {
+    append(localizedStringResource(1896, "Close gate")).append('\n')
+    append(supplierBackorderTitle(item)).append('\n')
+    append(localizedStringResource(1896, "Close gate")).append(": ").append(supplierBackorderRecoveryClosureTitle(item.recoveryClosureLane)).append('\n')
+    append(localizedStringResource(1901, "Closure score")).append(": ").append(item.recoveryClosureScore).append("/100").append('\n')
+    append(localizedStringResource(1886, "Recovery handoff")).append(": ").append(supplierBackorderRecoveryHandoffTitle(item.recoveryHandoffLane)).append('\n')
+    append(localizedStringResource(1868, "Recovery confidence")).append(": ").append(supplierBackorderRecoveryConfidenceTitle(item.recoveryConfidenceLane)).append(" • ").append(localizedStringResource(1873, "Confidence score")).append(" ").append(item.recoveryConfidenceScore).append('\n')
+    append(localizedStringResource(1859, "Recovery risk")).append(": ").append(supplierBackorderRecoveryRiskTitle(item.recoveryRiskLane)).append(" • ").append(localizedStringResource(1864, "Risk score")).append(" ").append(item.recoveryRiskScore).append('\n')
+    item.recoveryClosureHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryClosureHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1896, "Close gate")).append(": ").append(hint).append('\n') }
+    item.recoveryClosureChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryClosureChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(1902, "Closure checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryClosureScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryClosureScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(1906, "Close-gate script")).append(":\n").append(script).append('\n') }
+    item.recoveryLedgerHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryLedgerHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1907, "Recovery ledger")).append(": ").append(hint).append('\n') }
+    item.recoveryLedgerChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryLedgerChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(1914, "Ledger checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryLedgerScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryLedgerScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(1918, "Ledger script")).append(":\n").append(script).append('\n') }
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief."))
+}
+
+private fun AppConfiguration.supplierBackorderLedgerNote(item: SupplierDashboardBackorderDataModel): String = buildString {
+    append(localizedStringResource(1907, "Recovery ledger")).append('\n')
+    append(supplierBackorderTitle(item)).append('\n')
+    append(localizedStringResource(1907, "Recovery ledger")).append(": ").append(supplierBackorderRecoveryLedgerTitle(item.recoveryLedgerLane)).append('\n')
+    append(localizedStringResource(1913, "Ledger score")).append(": ").append(item.recoveryLedgerScore).append("/100").append('\n')
+    append(localizedStringResource(1896, "Close gate")).append(": ").append(supplierBackorderRecoveryClosureTitle(item.recoveryClosureLane)).append(" • ").append(localizedStringResource(1901, "Closure score")).append(" ").append(item.recoveryClosureScore).append("/100").append('\n')
+    append(localizedStringResource(1868, "Recovery confidence")).append(": ").append(supplierBackorderRecoveryConfidenceTitle(item.recoveryConfidenceLane)).append(" • ").append(localizedStringResource(1873, "Confidence score")).append(" ").append(item.recoveryConfidenceScore).append('\n')
+    append(localizedStringResource(1859, "Recovery risk")).append(": ").append(supplierBackorderRecoveryRiskTitle(item.recoveryRiskLane)).append(" • ").append(localizedStringResource(1864, "Risk score")).append(" ").append(item.recoveryRiskScore).append('\n')
+    item.recoveryLedgerHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryLedgerHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1907, "Recovery ledger")).append(": ").append(hint).append('\n') }
+    item.recoveryLedgerChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryLedgerChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(1914, "Ledger checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryLedgerScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryLedgerScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(1918, "Ledger script")).append(":\n").append(script).append('\n') }
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief."))
+}
+
+private fun AppConfiguration.supplierBackorderTriageNote(item: SupplierDashboardBackorderDataModel): String = buildString {
+    append(localizedStringResource(1919, "Triage desk")).append('\n')
+    append(supplierBackorderTitle(item)).append('\n')
+    append(localizedStringResource(1919, "Triage desk")).append(": ").append(supplierBackorderRecoveryTriageTitle(item.recoveryTriageLane)).append('\n')
+    append(localizedStringResource(1926, "Triage score")).append(": ").append(item.recoveryTriageScore).append("/100").append('\n')
+    append(localizedStringResource(1859, "Recovery risk")).append(": ").append(supplierBackorderRecoveryRiskTitle(item.recoveryRiskLane)).append(" • ").append(localizedStringResource(1864, "Risk score")).append(" ").append(item.recoveryRiskScore).append("/100").append('\n')
+    append(localizedStringResource(1868, "Recovery confidence")).append(": ").append(supplierBackorderRecoveryConfidenceTitle(item.recoveryConfidenceLane)).append(" • ").append(localizedStringResource(1873, "Confidence score")).append(" ").append(item.recoveryConfidenceScore).append("/100").append('\n')
+    append(localizedStringResource(1907, "Recovery ledger")).append(": ").append(supplierBackorderRecoveryLedgerTitle(item.recoveryLedgerLane)).append(" • ").append(localizedStringResource(1913, "Ledger score")).append(" ").append(item.recoveryLedgerScore).append("/100").append('\n')
+    item.recoveryTriageHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryTriageHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1919, "Triage desk")).append(": ").append(hint).append('\n') }
+    item.recoveryTriageChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryTriageChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(1927, "Triage checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryTriageScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryTriageScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(1931, "Triage script")).append(":\n").append(script).append('\n') }
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief."))
+}
+
+private fun AppConfiguration.supplierBackorderCommandNote(item: SupplierDashboardBackorderDataModel): String = buildString {
+    append(localizedStringResource(1932, "Recovery command")).append('\n')
+    append(supplierBackorderTitle(item)).append('\n')
+    append(localizedStringResource(1932, "Recovery command")).append(": ").append(supplierBackorderRecoveryCommandTitle(item.recoveryCommandLane)).append('\n')
+    append(localizedStringResource(1939, "Command score")).append(": ").append(item.recoveryCommandScore).append("/100").append('\n')
+    append(localizedStringResource(1919, "Triage desk")).append(": ").append(supplierBackorderRecoveryTriageTitle(item.recoveryTriageLane)).append(" • ").append(localizedStringResource(1926, "Triage score")).append(" ").append(item.recoveryTriageScore).append("/100").append('\n')
+    append(localizedStringResource(1859, "Recovery risk")).append(": ").append(supplierBackorderRecoveryRiskTitle(item.recoveryRiskLane)).append(" • ").append(localizedStringResource(1864, "Risk score")).append(" ").append(item.recoveryRiskScore).append("/100").append('\n')
+    item.recoveryCommandHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCommandHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1932, "Recovery command")).append(": ").append(hint).append('\n') }
+    item.recoveryCommandChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCommandChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(1940, "Command checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryCommandScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCommandScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(1944, "Command script")).append(":\n").append(script).append('\n') }
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief."))
+}
+
+private fun SupplierDashboardBackorderDataModel.supplierBackorderDueFilterSeed(): String = when (recoveryUrgencyLane) {
+    "overdue" -> "overdue"
+    "today" -> "today"
+    "soon" -> "soon"
+    else -> "all"
 }
 
 private fun AppConfiguration.supplierBackorderSearchKey(item: SupplierDashboardBackorderDataModel): String = buildString {
@@ -26726,14 +28372,303 @@ private fun AppConfiguration.supplierBackorderSearchKey(item: SupplierDashboardB
     append(item.attentionSummary.visibleLocalizedString("main", "")).append(' ')
     append(item.recoveryHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
     append(item.recoveryHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryUrgencyHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryUrgencyHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryOwnerHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryOwnerHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoverySlaHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoverySlaHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryEscalationHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryEscalationHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryProofHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryProofHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryOutcomeHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryOutcomeHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryPackGuardHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryPackGuardHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryContactHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryContactHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryContactScript.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryContactScript.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryRiskHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryRiskHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryRiskReasons.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryRiskReasons.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryConfidenceHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryConfidenceHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryConfidenceChecklist.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryConfidenceChecklist.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryFollowUpHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryFollowUpHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryFollowUpScript.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryFollowUpScript.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryHandoffHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryHandoffHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryHandoffChecklist.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryHandoffChecklist.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryHandoffScript.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryHandoffScript.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryClosureHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryClosureHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryClosureChecklist.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryClosureChecklist.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryClosureScript.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryClosureScript.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryLedgerHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryLedgerHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryLedgerChecklist.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryLedgerChecklist.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryLedgerScript.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryLedgerScript.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryTriageHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryTriageHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryTriageChecklist.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryTriageChecklist.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryTriageScript.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryTriageScript.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryCommandHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryCommandHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryCommandChecklist.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryCommandChecklist.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryCommandScript.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryCommandScript.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryPromiseShieldHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryPromiseShieldHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryPromiseShieldChecklist.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryPromiseShieldChecklist.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryPromiseShieldScript.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryPromiseShieldScript.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryWaveHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryWaveHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryAgingHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryAgingHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryAgingChecklist.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryAgingChecklist.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryAgingScript.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryAgingScript.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryBottleneckHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryBottleneckHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryBottleneckChecklist.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryBottleneckChecklist.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryBottleneckScript.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryBottleneckScript.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryLoadHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryLoadHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryLoadChecklist.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryLoadChecklist.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryLoadScript.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryLoadScript.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryImpactHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryImpactHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryImpactChecklist.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryImpactChecklist.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryImpactScript.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryImpactScript.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryCommitHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryCommitHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryCommitChecklist.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryCommitChecklist.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryCommitScript.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryCommitScript.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryAllocationHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryAllocationHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryAllocationChecklist.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryAllocationChecklist.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryAllocationScript.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryAllocationScript.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryExceptionHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryExceptionHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryExceptionChecklist.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryExceptionChecklist.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryExceptionScript.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryExceptionScript.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryCauseHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryCauseHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryCauseChecklist.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryCauseChecklist.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryCauseScript.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryCauseScript.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryVerificationHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryVerificationHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryVerificationChecklist.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryVerificationChecklist.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryVerificationScript.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryVerificationScript.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryApprovalHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryApprovalHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryApprovalChecklist.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryApprovalChecklist.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryApprovalScript.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryApprovalScript.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryExecutionHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryExecutionHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryExecutionChecklist.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryExecutionChecklist.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryExecutionScript.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryExecutionScript.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryReleaseHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryReleaseHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryReleaseChecklist.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryReleaseChecklist.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryReleaseScript.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryReleaseScript.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoverySealHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoverySealHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoverySealChecklist.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoverySealChecklist.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoverySealScript.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoverySealScript.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryCloseoutHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryCloseoutHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryCloseoutChecklist.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryCloseoutChecklist.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryCloseoutScript.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryCloseoutScript.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryReopenHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryReopenHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryReopenChecklist.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryReopenChecklist.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryReopenScript.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryReopenScript.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryReconciliationHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryReconciliationHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryReconciliationChecklist.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryReconciliationChecklist.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryReconciliationScript.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryReconciliationScript.visibleLocalizedString("main", "")).append(' ')
+    append(item.nextRecoveryStep.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.nextRecoveryStep.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryChecklist.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryChecklist.visibleLocalizedString("main", "")).append(' ')
     append(item.suggestedAction).append(' ')
     append(item.recoveryLane).append(' ')
+    append(item.recoveryUrgencyLane).append(' ')
+    append(item.recoveryOwnerLane).append(' ')
+    append(item.recoverySlaLane).append(' ')
+    append(item.recoveryEscalationLane).append(' ')
+    append(item.recoveryProofLane).append(' ')
+    append(item.recoveryOutcomeLane).append(' ')
+    append(item.recoveryPackGuardLane).append(' ')
+    append(item.recoveryContactLane).append(' ')
+    append(item.recoveryRiskLane).append(' ')
+    append(item.recoveryConfidenceLane).append(' ')
+    append(item.recoveryFollowUpLane).append(' ')
+    append(item.recoveryHandoffLane).append(' ')
+    append(item.recoveryClosureLane).append(' ')
+    append(item.recoveryLedgerLane).append(' ')
+    append(item.recoveryTriageLane).append(' ')
+    append(item.recoveryCommandLane).append(' ')
+    append(item.recoveryPromiseShieldLane).append(' ')
+    append(item.recoveryWaveLane).append(' ')
+    append(item.recoveryAgingLane).append(' ')
+    append(item.recoveryBottleneckLane).append(' ')
+    append(item.recoveryLoadLane).append(' ')
+    append(item.recoveryImpactLane).append(' ')
+    append(item.recoveryCommitLane).append(' ')
+    append(item.recoveryAllocationLane).append(' ')
+    append(item.recoveryExceptionLane).append(' ')
+    append(item.recoveryCauseLane).append(' ')
+    append(item.recoveryVerificationLane).append(' ')
+    append(item.recoveryApprovalLane).append(' ')
+    append(item.recoveryExecutionLane).append(' ')
+    append(item.recoveryReleaseLane).append(' ')
+    append(item.recoverySealLane).append(' ')
+    append(item.recoveryCloseoutLane).append(' ')
+    append(item.recoveryReopenLane).append(' ')
+    append(item.recoveryReconciliationLane).append(' ')
+    append(item.recoveryRiskScore).append(' ')
+    append(item.recoveryConfidenceScore).append(' ')
+    append(item.recoveryClosureScore).append(' ')
+    append(item.recoveryLedgerScore).append(' ')
+    append(item.recoveryTriageScore).append(' ')
+    append(item.recoveryCommandScore).append(' ')
+    append(item.recoveryPromiseShieldScore).append(' ')
+    append(item.recoveryWaveScore).append(' ')
+    append(item.recoveryAgingScore).append(' ')
+    append(item.recoveryBottleneckScore).append(' ')
+    append(item.recoveryLoadScore).append(' ')
+    append(item.recoveryImpactScore).append(' ')
+    append(item.recoveryCommitScore).append(' ')
+    append(item.recoveryAllocationScore).append(' ')
+    append(item.recoveryExceptionScore).append(' ')
+    append(item.recoveryCauseScore).append(' ')
+    append(item.recoveryVerificationScore).append(' ')
+    append(item.recoveryApprovalScore).append(' ')
+    append(item.recoveryExecutionScore).append(' ')
+    append(item.recoveryReleaseScore).append(' ')
+    append(item.recoverySealScore).append(' ')
+    append(item.recoveryCloseoutScore).append(' ')
+    append(item.recoveryReopenScore).append(' ')
+    append(item.recoveryReconciliationScore).append(' ')
+    append(item.recoveryAgingHours).append(' ')
+    append(item.recoveryAgingStartedAtMillis ?: 0L).append(' ')
+    append(item.recoveryCheckpointAtMillis ?: 0L).append(' ')
+    append(item.recoveryFollowUpAtMillis ?: 0L).append(' ')
+    append(item.recoveryCommitByMillis ?: 0L).append(' ')
+    append(item.recoveryReopenAtMillis ?: 0L).append(' ')
     append(supplierBackorderActionTitle(item.suggestedAction)).append(' ')
     append(supplierBackorderRecoveryLaneTitle(item.recoveryLane)).append(' ')
+    append(supplierBackorderRecoveryUrgencyTitle(item.recoveryUrgencyLane)).append(' ')
+    append(supplierBackorderRecoveryOwnerTitle(item.recoveryOwnerLane)).append(' ')
+    append(supplierBackorderRecoverySlaTitle(item.recoverySlaLane)).append(' ')
+    append(supplierBackorderRecoveryEscalationTitle(item.recoveryEscalationLane)).append(' ')
+    append(supplierBackorderRecoveryProofTitle(item.recoveryProofLane)).append(' ')
+    append(supplierBackorderRecoveryOutcomeTitle(item.recoveryOutcomeLane)).append(' ')
+    append(supplierBackorderRecoveryPackGuardTitle(item.recoveryPackGuardLane)).append(' ')
+    append(supplierBackorderRecoveryContactTitle(item.recoveryContactLane)).append(' ')
+    append(supplierBackorderRecoveryRiskTitle(item.recoveryRiskLane)).append(' ')
+    append(supplierBackorderRecoveryConfidenceTitle(item.recoveryConfidenceLane)).append(' ')
+    append(supplierBackorderRecoveryFollowUpTitle(item.recoveryFollowUpLane)).append(' ')
+    append(supplierBackorderRecoveryHandoffTitle(item.recoveryHandoffLane)).append(' ')
+    append(supplierBackorderRecoveryClosureTitle(item.recoveryClosureLane)).append(' ')
+    append(supplierBackorderRecoveryLedgerTitle(item.recoveryLedgerLane)).append(' ')
+    append(supplierBackorderRecoveryTriageTitle(item.recoveryTriageLane)).append(' ')
+    append(supplierBackorderRecoveryCommandTitle(item.recoveryCommandLane)).append(' ')
+    append(supplierBackorderRecoveryPromiseShieldTitle(item.recoveryPromiseShieldLane)).append(' ')
+    append(supplierBackorderRecoveryWaveTitle(item.recoveryWaveLane)).append(' ')
+    append(supplierBackorderRecoveryAgingTitle(item.recoveryAgingLane)).append(' ')
+    append(supplierBackorderRecoveryBottleneckTitle(item.recoveryBottleneckLane)).append(' ')
+    append(supplierBackorderRecoveryLoadTitle(item.recoveryLoadLane)).append(' ')
+    append(supplierBackorderRecoveryImpactTitle(item.recoveryImpactLane)).append(' ')
+    append(supplierBackorderRecoveryCommitTitle(item.recoveryCommitLane)).append(' ')
+    append(supplierBackorderRecoveryAllocationTitle(item.recoveryAllocationLane)).append(' ')
+    append(supplierBackorderRecoveryExceptionTitle(item.recoveryExceptionLane)).append(' ')
+    append(supplierBackorderRecoveryCauseTitle(item.recoveryCauseLane)).append(' ')
+    append(supplierBackorderRecoveryVerificationTitle(item.recoveryVerificationLane)).append(' ')
+    append(supplierBackorderRecoveryApprovalTitle(item.recoveryApprovalLane)).append(' ')
+    append(supplierBackorderRecoveryExecutionTitle(item.recoveryExecutionLane)).append(' ')
+    append(supplierBackorderRecoveryReleaseTitle(item.recoveryReleaseLane)).append(' ')
+    append(supplierBackorderRecoverySealTitle(item.recoverySealLane)).append(' ')
+    append(supplierBackorderRecoveryCloseoutTitle(item.recoveryCloseoutLane)).append(' ')
+    append(supplierBackorderRecoveryReopenTitle(item.recoveryReopenLane)).append(' ')
+    append(supplierBackorderRecoveryReconciliationTitle(item.recoveryReconciliationLane)).append(' ')
     append(item.requestedQuantityTotal).append(' ')
     append(item.acceptedQuantityTotal).append(' ')
     append(item.missingQuantityTotal)
 }.lowercase()
+
+private fun AppConfiguration.supplierBackorderPromiseShieldNote(item: SupplierDashboardBackorderDataModel): String = buildString {
+    append(localizedStringResource(1945, "Promise shield")).append('\n')
+    append(supplierBackorderTitle(item)).append('\n')
+    append(localizedStringResource(1945, "Promise shield")).append(": ").append(supplierBackorderRecoveryPromiseShieldTitle(item.recoveryPromiseShieldLane)).append('\n')
+    append(localizedStringResource(1952, "Promise score")).append(": ").append(item.recoveryPromiseShieldScore).append("/100").append('\n')
+    append(localizedStringResource(1932, "Recovery command")).append(": ").append(supplierBackorderRecoveryCommandTitle(item.recoveryCommandLane)).append(" • ").append(localizedStringResource(1939, "Command score")).append(" ").append(item.recoveryCommandScore).append("/100").append('\n')
+    append(localizedStringResource(1859, "Recovery risk")).append(": ").append(supplierBackorderRecoveryRiskTitle(item.recoveryRiskLane)).append(" • ").append(localizedStringResource(1864, "Risk score")).append(" ").append(item.recoveryRiskScore).append("/100").append('\n')
+    append(localizedStringResource(1868, "Recovery confidence")).append(": ").append(supplierBackorderRecoveryConfidenceTitle(item.recoveryConfidenceLane)).append(" • ").append(localizedStringResource(1873, "Confidence score")).append(" ").append(item.recoveryConfidenceScore).append("/100").append('\n')
+    item.recoveryPromiseShieldHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryPromiseShieldHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1945, "Promise shield")).append(": ").append(hint).append('\n') }
+    item.recoveryPromiseShieldChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryPromiseShieldChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(1953, "Promise checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryPromiseShieldScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryPromiseShieldScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(1957, "Promise script")).append(":\n").append(script).append('\n') }
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief."))
+}
 
 private fun AppConfiguration.supplierBackorderBrief(item: SupplierDashboardBackorderDataModel): String = buildString {
     append(localizedStringResource(1794, "Backorder watch")).append('\n')
@@ -26748,11 +28683,365 @@ private fun AppConfiguration.supplierBackorderBrief(item: SupplierDashboardBacko
     append(localizedStringResource(1806, "Partial lines")).append(": ").append(item.partialLineCount).append('\n')
     append(localizedStringResource(1807, "Fully short lines")).append(": ").append(item.fullyShortLineCount).append('\n')
     append(localizedStringResource(1802, "Recovery plan")).append(": ").append(supplierBackorderRecoveryLaneTitle(item.recoveryLane)).append('\n')
+    append(localizedStringResource(1809, "Recovery urgency")).append(": ").append(supplierBackorderRecoveryUrgencyTitle(item.recoveryUrgencyLane)).append('\n')
+    append(localizedStringResource(1817, "Recovery owner")).append(": ").append(supplierBackorderRecoveryOwnerTitle(item.recoveryOwnerLane)).append('\n')
+    append(localizedStringResource(1823, "Promise clock")).append(": ").append(supplierBackorderRecoverySlaTitle(item.recoverySlaLane)).append('\n')
+    item.recoveryCheckpointAtMillis?.takeIf { it > 0L }?.let { checkpoint ->
+        append(localizedStringResource(1822, "Recovery checkpoint")).append(": ").append(receiptUiDateTime(checkpoint)).append('\n')
+    }
+    append(localizedStringResource(1828, "Escalation lane")).append(": ").append(supplierBackorderRecoveryEscalationTitle(item.recoveryEscalationLane)).append('\n')
+    append(localizedStringResource(1833, "Recovery proof")).append(": ").append(supplierBackorderRecoveryProofTitle(item.recoveryProofLane)).append('\n')
+    append(localizedStringResource(1839, "Resolution path")).append(": ").append(supplierBackorderRecoveryOutcomeTitle(item.recoveryOutcomeLane)).append('\n')
+    append(localizedStringResource(1845, "Pack guard")).append(": ").append(supplierBackorderRecoveryPackGuardTitle(item.recoveryPackGuardLane)).append('\n')
+    append(localizedStringResource(1851, "Contact lane")).append(": ").append(supplierBackorderRecoveryContactTitle(item.recoveryContactLane)).append('\n')
+    append(localizedStringResource(1859, "Recovery risk")).append(": ").append(supplierBackorderRecoveryRiskTitle(item.recoveryRiskLane)).append(" • ").append(localizedStringResource(1864, "Risk score")).append(" ").append(item.recoveryRiskScore).append('\n')
+    append(localizedStringResource(1868, "Recovery confidence")).append(": ").append(supplierBackorderRecoveryConfidenceTitle(item.recoveryConfidenceLane)).append(" • ").append(localizedStringResource(1873, "Confidence score")).append(" ").append(item.recoveryConfidenceScore).append('\n')
+    append(localizedStringResource(1877, "Follow-up cadence")).append(": ").append(supplierBackorderRecoveryFollowUpTitle(item.recoveryFollowUpLane)).append('\n')
+    item.recoveryFollowUpAtMillis?.takeIf { it > 0L }?.let { followUpAt ->
+        append(localizedStringResource(1882, "Next follow-up")).append(": ").append(receiptUiDateTime(followUpAt)).append('\n')
+    }
+    append(localizedStringResource(1886, "Recovery handoff")).append(": ").append(supplierBackorderRecoveryHandoffTitle(item.recoveryHandoffLane)).append('\n')
+    append(localizedStringResource(1896, "Close gate")).append(": ").append(supplierBackorderRecoveryClosureTitle(item.recoveryClosureLane)).append(" • ").append(localizedStringResource(1901, "Closure score")).append(" ").append(item.recoveryClosureScore).append("/100").append('\n')
+    append(localizedStringResource(1907, "Recovery ledger")).append(": ").append(supplierBackorderRecoveryLedgerTitle(item.recoveryLedgerLane)).append(" • ").append(localizedStringResource(1913, "Ledger score")).append(" ").append(item.recoveryLedgerScore).append("/100").append('\n')
+    append(localizedStringResource(1919, "Triage desk")).append(": ").append(supplierBackorderRecoveryTriageTitle(item.recoveryTriageLane)).append(" • ").append(localizedStringResource(1926, "Triage score")).append(" ").append(item.recoveryTriageScore).append("/100").append('\n')
+    append(localizedStringResource(1932, "Recovery command")).append(": ").append(supplierBackorderRecoveryCommandTitle(item.recoveryCommandLane)).append(" • ").append(localizedStringResource(1939, "Command score")).append(" ").append(item.recoveryCommandScore).append("/100").append('\n')
+    append(localizedStringResource(1945, "Promise shield")).append(": ").append(supplierBackorderRecoveryPromiseShieldTitle(item.recoveryPromiseShieldLane)).append(" • ").append(localizedStringResource(1952, "Promise score")).append(" ").append(item.recoveryPromiseShieldScore).append("/100").append('\n')
+    append(localizedStringResource(1973, "Recovery wave")).append(": ").append(supplierBackorderRecoveryWaveTitle(item.recoveryWaveLane)).append(" • ").append(localizedStringResource(1975, "Wave score")).append(" ").append(item.recoveryWaveScore).append("/100").append('\n')
+    append(localizedStringResource(1985, "Recovery aging")).append(": ").append(supplierBackorderRecoveryAgingTitle(item.recoveryAgingLane)).append(" • ").append(localizedStringResource(1990, "Aging score")).append(" ").append(item.recoveryAgingScore).append("/100 • ").append(item.recoveryAgingHours).append("h").append('\n')
+    append(localizedStringResource(1998, "Recovery bottleneck")).append(": ").append(supplierBackorderRecoveryBottleneckTitle(item.recoveryBottleneckLane)).append(" • ").append(localizedStringResource(2007, "Bottleneck score")).append(" ").append(item.recoveryBottleneckScore).append("/100").append('\n')
+    append(localizedStringResource(2013, "Recovery load")).append(": ").append(supplierBackorderRecoveryLoadTitle(item.recoveryLoadLane)).append(" • ").append(localizedStringResource(2019, "Load score")).append(" ").append(item.recoveryLoadScore).append("/100").append('\n')
+    append(localizedStringResource(2029, "Recovery impact")).append(": ").append(supplierBackorderRecoveryImpactTitle(item.recoveryImpactLane)).append(" • ").append(localizedStringResource(2035, "Impact score")).append(" ").append(item.recoveryImpactScore).append("/100").append('\n')
+    append(localizedStringResource(2044, "Recovery commit")).append(": ").append(supplierBackorderRecoveryCommitTitle(item.recoveryCommitLane)).append(" • ").append(localizedStringResource(2051, "Commit score")).append(" ").append(item.recoveryCommitScore).append("/100").append('\n')
+    append(localizedStringResource(2062, "Recovery allocation")).append(": ").append(supplierBackorderRecoveryAllocationTitle(item.recoveryAllocationLane)).append(" • ").append(localizedStringResource(2068, "Allocation score")).append(" ").append(item.recoveryAllocationScore).append("/100").append('\n')
+    append(localizedStringResource(2079, "Recovery exception")).append(": ").append(supplierBackorderRecoveryExceptionTitle(item.recoveryExceptionLane)).append(" • ").append(localizedStringResource(2087, "Exception score")).append(" ").append(item.recoveryExceptionScore).append("/100").append('\n')
+    append(localizedStringResource(2101, "Root cause")).append(": ").append(supplierBackorderRecoveryCauseTitle(item.recoveryCauseLane)).append(" • ").append(localizedStringResource(2109, "Cause score")).append(" ").append(item.recoveryCauseScore).append("/100").append('\n')
+    append(localizedStringResource(2120, "Recovery verification")).append(": ").append(supplierBackorderRecoveryVerificationTitle(item.recoveryVerificationLane)).append(" • ").append(localizedStringResource(2128, "Verification score")).append(" ").append(item.recoveryVerificationScore).append("/100").append('\n')
+    append(localizedStringResource(2141, "Recovery approval")).append(": ").append(supplierBackorderRecoveryApprovalTitle(item.recoveryApprovalLane)).append(" • ").append(localizedStringResource(2149, "Approval score")).append(" ").append(item.recoveryApprovalScore).append("/100").append('\n')
+    append(localizedStringResource(2162, "Recovery execution")).append(": ").append(supplierBackorderRecoveryExecutionTitle(item.recoveryExecutionLane)).append(" • ").append(localizedStringResource(2169, "Execution score")).append(" ").append(item.recoveryExecutionScore).append("/100").append('\n')
+    append(localizedStringResource(2181, "Recovery release")).append(": ").append(supplierBackorderRecoveryReleaseTitle(item.recoveryReleaseLane)).append(" • ").append(localizedStringResource(2188, "Release score")).append(" ").append(item.recoveryReleaseScore).append("/100").append('\n')
+    append(localizedStringResource(2201, "Recovery seal")).append(": ").append(supplierBackorderRecoverySealTitle(item.recoverySealLane)).append(" • ").append(localizedStringResource(2208, "Seal score")).append(" ").append(item.recoverySealScore).append("/100").append('\n')
+    append(localizedStringResource(2221, "Recovery closeout")).append(": ").append(supplierBackorderRecoveryCloseoutTitle(item.recoveryCloseoutLane)).append(" • ").append(localizedStringResource(2228, "Closeout score")).append(" ").append(item.recoveryCloseoutScore).append("/100").append('\n')
+    append(localizedStringResource(2241, "Recovery reopen")).append(": ").append(supplierBackorderRecoveryReopenTitle(item.recoveryReopenLane)).append(" • ").append(localizedStringResource(2248, "Reopen score")).append(" ").append(item.recoveryReopenScore).append("/100").append('\n')
+    item.recoveryReopenAtMillis?.takeIf { it > 0L }?.let { reopenAt ->
+        append(localizedStringResource(2249, "Reopen checkpoint")).append(": ").append(receiptUiDateTime(reopenAt)).append('\n')
+    }
+    append(localizedStringResource(2262, "Recovery reconciliation")).append(": ").append(supplierBackorderRecoveryReconciliationTitle(item.recoveryReconciliationLane)).append(" • ").append(localizedStringResource(2269, "Reconcile score")).append(" ").append(item.recoveryReconciliationScore).append("/100").append('\n')
     append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief.")).append('\n')
     item.recoveryHint.visibleLocalizedString(stateValues.appLanguage, "")
         .ifBlank { item.recoveryHint.visibleLocalizedString("main", "") }
         .takeIf { it.isNotBlank() }
         ?.let { hint -> append(localizedStringResource(1802, "Recovery plan")).append(": ").append(hint).append('\n') }
+    item.recoveryUrgencyHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryUrgencyHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1809, "Recovery urgency")).append(": ").append(hint).append('\n') }
+    item.recoveryOwnerHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryOwnerHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1817, "Recovery owner")).append(": ").append(hint).append('\n') }
+    item.recoverySlaHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoverySlaHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1823, "Promise clock")).append(": ").append(hint).append('\n') }
+    item.recoveryEscalationHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryEscalationHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1828, "Escalation lane")).append(": ").append(hint).append('\n') }
+    item.recoveryProofHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryProofHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1833, "Recovery proof")).append(": ").append(hint).append('\n') }
+    item.recoveryOutcomeHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryOutcomeHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1839, "Resolution path")).append(": ").append(hint).append('\n') }
+    item.recoveryPackGuardHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryPackGuardHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1845, "Pack guard")).append(": ").append(hint).append('\n') }
+    item.recoveryContactHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryContactHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1851, "Contact lane")).append(": ").append(hint).append('\n') }
+    item.recoveryContactScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryContactScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(1857, "Contact script")).append(":\n").append(script).append('\n') }
+    item.recoveryRiskHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryRiskHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1859, "Recovery risk")).append(": ").append(hint).append('\n') }
+    item.recoveryRiskReasons.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryRiskReasons.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { reasons -> append(localizedStringResource(1865, "Risk reasons")).append(": ").append(reasons).append('\n') }
+    item.recoveryConfidenceHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryConfidenceHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1868, "Recovery confidence")).append(": ").append(hint).append('\n') }
+    item.recoveryConfidenceChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryConfidenceChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(1874, "Confidence checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryFollowUpHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryFollowUpHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1877, "Follow-up cadence")).append(": ").append(hint).append('\n') }
+    item.recoveryFollowUpScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryFollowUpScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(1884, "Follow-up script")).append(":\n").append(script).append('\n') }
+    item.recoveryHandoffHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryHandoffHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1886, "Recovery handoff")).append(": ").append(hint).append('\n') }
+    item.recoveryHandoffChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryHandoffChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(1891, "Handoff checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryHandoffScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryHandoffScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(1895, "Handoff script")).append(":\n").append(script).append('\n') }
+    item.recoveryClosureHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryClosureHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1896, "Close gate")).append(": ").append(hint).append('\n') }
+    item.recoveryClosureChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryClosureChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(1902, "Closure checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryClosureScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryClosureScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(1906, "Close-gate script")).append(":\n").append(script).append('\n') }
+    item.recoveryLedgerHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryLedgerHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1907, "Recovery ledger")).append(": ").append(hint).append('\n') }
+    item.recoveryLedgerChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryLedgerChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(1914, "Ledger checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryLedgerScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryLedgerScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(1918, "Ledger script")).append(":\n").append(script).append('\n') }
+    item.recoveryTriageHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryTriageHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1919, "Triage desk")).append(": ").append(hint).append('\n') }
+    item.recoveryTriageChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryTriageChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(1927, "Triage checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryTriageScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryTriageScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(1931, "Triage script")).append(":\n").append(script).append('\n') }
+    item.recoveryCommandHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCommandHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1932, "Recovery command")).append(": ").append(hint).append('\n') }
+    item.recoveryCommandChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCommandChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(1940, "Command checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryCommandScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCommandScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(1944, "Command script")).append(":\n").append(script).append('\n') }
+    item.recoveryPromiseShieldHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryPromiseShieldHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1945, "Promise shield")).append(": ").append(hint).append('\n') }
+    item.recoveryPromiseShieldChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryPromiseShieldChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(1953, "Promise checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryPromiseShieldScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryPromiseShieldScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(1957, "Promise script")).append(":\n").append(script).append('\n') }
+    item.recoveryWaveHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryWaveHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1973, "Recovery wave")).append(": ").append(hint).append('\n') }
+    item.recoveryBottleneckHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryBottleneckHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(1998, "Recovery bottleneck")).append(": ").append(hint).append('\n') }
+    item.recoveryBottleneckChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryBottleneckChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(2008, "Bottleneck checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryBottleneckScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryBottleneckScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(2011, "Bottleneck script")).append(":\n").append(script).append('\n') }
+    item.recoveryLoadHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryLoadHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(2013, "Recovery load")).append(": ").append(hint).append('\n') }
+    item.recoveryLoadChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryLoadChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(2020, "Load checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryLoadScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryLoadScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(2023, "Load script")).append(":\n").append(script).append('\n') }
+    item.recoveryImpactHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryImpactHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(2029, "Recovery impact")).append(": ").append(hint).append('\n') }
+    item.recoveryImpactChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryImpactChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(2036, "Impact checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryImpactScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryImpactScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(2038, "Impact script")).append(":\n").append(script).append('\n') }
+    append(localizedStringResource(2044, "Recovery commit")).append(": ").append(supplierBackorderRecoveryCommitTitle(item.recoveryCommitLane)).append(" • ").append(localizedStringResource(2051, "Commit score")).append(" ").append(item.recoveryCommitScore).append("/100").append('\n')
+    append(localizedStringResource(2062, "Recovery allocation")).append(": ").append(supplierBackorderRecoveryAllocationTitle(item.recoveryAllocationLane)).append(" • ").append(localizedStringResource(2068, "Allocation score")).append(" ").append(item.recoveryAllocationScore).append("/100").append('\n')
+    append(localizedStringResource(2079, "Recovery exception")).append(": ").append(supplierBackorderRecoveryExceptionTitle(item.recoveryExceptionLane)).append(" • ").append(localizedStringResource(2087, "Exception score")).append(" ").append(item.recoveryExceptionScore).append("/100").append('\n')
+    append(localizedStringResource(2101, "Recovery cause")).append(": ").append(supplierBackorderRecoveryCauseTitle(item.recoveryCauseLane)).append(" • ").append(localizedStringResource(2109, "Cause score")).append(" ").append(item.recoveryCauseScore).append("/100").append('\n')
+    append(localizedStringResource(2120, "Recovery verification")).append(": ").append(supplierBackorderRecoveryVerificationTitle(item.recoveryVerificationLane)).append(" • ").append(localizedStringResource(2128, "Verification score")).append(" ").append(item.recoveryVerificationScore).append("/100").append('\n')
+    append(localizedStringResource(2141, "Recovery approval")).append(": ").append(supplierBackorderRecoveryApprovalTitle(item.recoveryApprovalLane)).append(" • ").append(localizedStringResource(2149, "Approval score")).append(" ").append(item.recoveryApprovalScore).append("/100").append('\n')
+    append(localizedStringResource(2162, "Recovery execution")).append(": ").append(supplierBackorderRecoveryExecutionTitle(item.recoveryExecutionLane)).append(" • ").append(localizedStringResource(2169, "Execution score")).append(" ").append(item.recoveryExecutionScore).append("/100").append('\n')
+    append(localizedStringResource(2181, "Recovery release")).append(": ").append(supplierBackorderRecoveryReleaseTitle(item.recoveryReleaseLane)).append(" • ").append(localizedStringResource(2188, "Release score")).append(" ").append(item.recoveryReleaseScore).append("/100").append('\n')
+    item.recoveryCommitByMillis?.takeIf { it > 0L }?.let { commitAt ->
+        append(localizedStringResource(2053, "Commit by")).append(": ").append(receiptUiDateTime(commitAt)).append('\n')
+    }
+    item.recoveryCommitHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCommitHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(2044, "Recovery commit")).append(": ").append(hint).append('\n') }
+    item.recoveryCommitChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCommitChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(2052, "Commit checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryCommitScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCommitScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(2055, "Commit script")).append(":\n").append(script).append('\n') }
+    item.recoveryCauseHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCauseHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(2101, "Recovery cause")).append(": ").append(hint).append('\n') }
+    item.recoveryCauseChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCauseChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(2110, "Cause checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryCauseScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCauseScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(2112, "Cause script")).append(":\n").append(script).append('\n') }
+    item.recoveryVerificationHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryVerificationHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(2120, "Recovery verification")).append(": ").append(hint).append('\n') }
+    item.recoveryVerificationChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryVerificationChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(2129, "Verification checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryVerificationScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryVerificationScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(2131, "Verification script")).append(":\n").append(script).append('\n') }
+    item.recoveryApprovalHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryApprovalHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(2141, "Recovery approval")).append(": ").append(hint).append('\n') }
+    item.recoveryApprovalChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryApprovalChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(2150, "Approval checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryApprovalScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryApprovalScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(2152, "Approval script")).append(":\n").append(script).append('\n') }
+    item.recoveryExecutionHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryExecutionHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(2162, "Recovery execution")).append(": ").append(hint).append('\n') }
+    item.recoveryExecutionChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryExecutionChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(2170, "Execution checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryExecutionScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryExecutionScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(2172, "Execution script")).append(":\n").append(script).append('\n') }
+    item.recoveryReleaseHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryReleaseHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(2181, "Recovery release")).append(": ").append(hint).append('\n') }
+    item.recoveryReleaseChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryReleaseChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(2189, "Release checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryReleaseScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryReleaseScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(2191, "Release script")).append(":\n").append(script).append('\n') }
+    item.recoverySealHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoverySealHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(2201, "Recovery seal")).append(": ").append(hint).append('\n') }
+    item.recoverySealChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoverySealChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(2209, "Seal checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoverySealScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoverySealScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(2212, "Seal script")).append(":\n").append(script).append('\n') }
+    item.recoveryCloseoutHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCloseoutHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(2221, "Recovery closeout")).append(": ").append(hint).append('\n') }
+    item.recoveryCloseoutChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCloseoutChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(2229, "Closeout checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryCloseoutScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCloseoutScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(2232, "Closeout script")).append(":\n").append(script).append('\n') }
+    item.recoveryReopenHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryReopenHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(2241, "Recovery reopen")).append(": ").append(hint).append('\n') }
+    item.recoveryReopenChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryReopenChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(2250, "Reopen checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryReopenScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryReopenScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(2253, "Reopen script")).append(":\n").append(script).append('\n') }
+    item.recoveryReconciliationHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryReconciliationHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(2262, "Recovery reconciliation")).append(": ").append(hint).append('\n') }
+    item.recoveryReconciliationChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryReconciliationChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(2270, "Reconcile checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryReconciliationScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryReconciliationScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(2273, "Reconcile script")).append(":\n").append(script).append('\n') }
+    item.nextRecoveryStep.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.nextRecoveryStep.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { step -> append(localizedStringResource(1814, "Next recovery step")).append(": ").append(step).append('\n') }
+    item.recoveryChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(1815, "Recovery checklist")).append(":\n").append(checklist).append('\n') }
     item.attentionSummary.visibleLocalizedString(stateValues.appLanguage, "")
         .ifBlank { item.attentionSummary.visibleLocalizedString("main", "") }
         .takeIf { it.isNotBlank() }
@@ -26778,6 +29067,187 @@ private fun AppConfiguration.SupplierBackorderWatchCard(item: SupplierDashboardB
         .ifBlank { item.attentionSummary.visibleLocalizedString("main", "") }
     val recoveryHintText = item.recoveryHint.visibleLocalizedString(stateValues.appLanguage, "")
         .ifBlank { item.recoveryHint.visibleLocalizedString("main", "") }
+    val recoveryUrgencyHintText = item.recoveryUrgencyHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryUrgencyHint.visibleLocalizedString("main", "") }
+    val recoveryOwnerHintText = item.recoveryOwnerHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryOwnerHint.visibleLocalizedString("main", "") }
+    val recoverySlaHintText = item.recoverySlaHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoverySlaHint.visibleLocalizedString("main", "") }
+    val recoveryEscalationHintText = item.recoveryEscalationHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryEscalationHint.visibleLocalizedString("main", "") }
+    val recoveryProofHintText = item.recoveryProofHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryProofHint.visibleLocalizedString("main", "") }
+    val recoveryOutcomeHintText = item.recoveryOutcomeHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryOutcomeHint.visibleLocalizedString("main", "") }
+    val recoveryPackGuardHintText = item.recoveryPackGuardHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryPackGuardHint.visibleLocalizedString("main", "") }
+    val recoveryContactHintText = item.recoveryContactHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryContactHint.visibleLocalizedString("main", "") }
+    val recoveryContactScriptText = item.recoveryContactScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryContactScript.visibleLocalizedString("main", "") }
+    val recoveryRiskHintText = item.recoveryRiskHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryRiskHint.visibleLocalizedString("main", "") }
+    val recoveryRiskReasonsText = item.recoveryRiskReasons.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryRiskReasons.visibleLocalizedString("main", "") }
+    val recoveryConfidenceHintText = item.recoveryConfidenceHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryConfidenceHint.visibleLocalizedString("main", "") }
+    val recoveryConfidenceChecklistText = item.recoveryConfidenceChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryConfidenceChecklist.visibleLocalizedString("main", "") }
+    val recoveryFollowUpHintText = item.recoveryFollowUpHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryFollowUpHint.visibleLocalizedString("main", "") }
+    val recoveryFollowUpScriptText = item.recoveryFollowUpScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryFollowUpScript.visibleLocalizedString("main", "") }
+    val recoveryHandoffHintText = item.recoveryHandoffHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryHandoffHint.visibleLocalizedString("main", "") }
+    val recoveryHandoffChecklistText = item.recoveryHandoffChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryHandoffChecklist.visibleLocalizedString("main", "") }
+    val recoveryHandoffScriptText = item.recoveryHandoffScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryHandoffScript.visibleLocalizedString("main", "") }
+    val recoveryClosureHintText = item.recoveryClosureHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryClosureHint.visibleLocalizedString("main", "") }
+    val recoveryClosureChecklistText = item.recoveryClosureChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryClosureChecklist.visibleLocalizedString("main", "") }
+    val recoveryClosureScriptText = item.recoveryClosureScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryClosureScript.visibleLocalizedString("main", "") }
+    val recoveryLedgerHintText = item.recoveryLedgerHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryLedgerHint.visibleLocalizedString("main", "") }
+    val recoveryLedgerChecklistText = item.recoveryLedgerChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryLedgerChecklist.visibleLocalizedString("main", "") }
+    val recoveryLedgerScriptText = item.recoveryLedgerScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryLedgerScript.visibleLocalizedString("main", "") }
+    val recoveryTriageHintText = item.recoveryTriageHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryTriageHint.visibleLocalizedString("main", "") }
+    val recoveryTriageChecklistText = item.recoveryTriageChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryTriageChecklist.visibleLocalizedString("main", "") }
+    val recoveryTriageScriptText = item.recoveryTriageScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryTriageScript.visibleLocalizedString("main", "") }
+    val recoveryCommandHintText = item.recoveryCommandHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCommandHint.visibleLocalizedString("main", "") }
+    val recoveryCommandChecklistText = item.recoveryCommandChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCommandChecklist.visibleLocalizedString("main", "") }
+    val recoveryCommandScriptText = item.recoveryCommandScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCommandScript.visibleLocalizedString("main", "") }
+    val recoveryPromiseShieldHintText = item.recoveryPromiseShieldHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryPromiseShieldHint.visibleLocalizedString("main", "") }
+    val recoveryPromiseShieldChecklistText = item.recoveryPromiseShieldChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryPromiseShieldChecklist.visibleLocalizedString("main", "") }
+    val recoveryPromiseShieldScriptText = item.recoveryPromiseShieldScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryPromiseShieldScript.visibleLocalizedString("main", "") }
+    val recoveryWaveHintText = item.recoveryWaveHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryWaveHint.visibleLocalizedString("main", "") }
+    val recoveryAgingHintText = item.recoveryAgingHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryAgingHint.visibleLocalizedString("main", "") }
+    val recoveryAgingChecklistText = item.recoveryAgingChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryAgingChecklist.visibleLocalizedString("main", "") }
+    val recoveryAgingScriptText = item.recoveryAgingScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryAgingScript.visibleLocalizedString("main", "") }
+    val recoveryBottleneckHintText = item.recoveryBottleneckHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryBottleneckHint.visibleLocalizedString("main", "") }
+    val recoveryBottleneckChecklistText = item.recoveryBottleneckChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryBottleneckChecklist.visibleLocalizedString("main", "") }
+    val recoveryBottleneckScriptText = item.recoveryBottleneckScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryBottleneckScript.visibleLocalizedString("main", "") }
+    val recoveryLoadHintText = item.recoveryLoadHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryLoadHint.visibleLocalizedString("main", "") }
+    val recoveryLoadChecklistText = item.recoveryLoadChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryLoadChecklist.visibleLocalizedString("main", "") }
+    val recoveryLoadScriptText = item.recoveryLoadScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryLoadScript.visibleLocalizedString("main", "") }
+    val recoveryImpactHintText = item.recoveryImpactHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryImpactHint.visibleLocalizedString("main", "") }
+    val recoveryImpactChecklistText = item.recoveryImpactChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryImpactChecklist.visibleLocalizedString("main", "") }
+    val recoveryImpactScriptText = item.recoveryImpactScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryImpactScript.visibleLocalizedString("main", "") }
+    val recoveryCommitHintText = item.recoveryCommitHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCommitHint.visibleLocalizedString("main", "") }
+    val recoveryCommitChecklistText = item.recoveryCommitChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCommitChecklist.visibleLocalizedString("main", "") }
+    val recoveryCommitScriptText = item.recoveryCommitScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCommitScript.visibleLocalizedString("main", "") }
+    val recoveryCommitByText = item.recoveryCommitByMillis
+        ?.takeIf { it > 0L }
+        ?.let { receiptUiDateTime(it) }
+        .orEmpty()
+    val recoveryAllocationHintText = item.recoveryAllocationHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryAllocationHint.visibleLocalizedString("main", "") }
+    val recoveryAllocationChecklistText = item.recoveryAllocationChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryAllocationChecklist.visibleLocalizedString("main", "") }
+    val recoveryAllocationScriptText = item.recoveryAllocationScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryAllocationScript.visibleLocalizedString("main", "") }
+    val recoveryExceptionHintText = item.recoveryExceptionHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryExceptionHint.visibleLocalizedString("main", "") }
+    val recoveryExceptionChecklistText = item.recoveryExceptionChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryExceptionChecklist.visibleLocalizedString("main", "") }
+    val recoveryExceptionScriptText = item.recoveryExceptionScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryExceptionScript.visibleLocalizedString("main", "") }
+    val recoveryCauseHintText = item.recoveryCauseHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCauseHint.visibleLocalizedString("main", "") }
+    val recoveryCauseChecklistText = item.recoveryCauseChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCauseChecklist.visibleLocalizedString("main", "") }
+    val recoveryCauseScriptText = item.recoveryCauseScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCauseScript.visibleLocalizedString("main", "") }
+    val recoveryVerificationHintText = item.recoveryVerificationHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryVerificationHint.visibleLocalizedString("main", "") }
+    val recoveryVerificationChecklistText = item.recoveryVerificationChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryVerificationChecklist.visibleLocalizedString("main", "") }
+    val recoveryVerificationScriptText = item.recoveryVerificationScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryVerificationScript.visibleLocalizedString("main", "") }
+    val recoveryApprovalHintText = item.recoveryApprovalHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryApprovalHint.visibleLocalizedString("main", "") }
+    val recoveryApprovalChecklistText = item.recoveryApprovalChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryApprovalChecklist.visibleLocalizedString("main", "") }
+    val recoveryApprovalScriptText = item.recoveryApprovalScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryApprovalScript.visibleLocalizedString("main", "") }
+    val recoveryExecutionHintText = item.recoveryExecutionHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryExecutionHint.visibleLocalizedString("main", "") }
+    val recoveryExecutionChecklistText = item.recoveryExecutionChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryExecutionChecklist.visibleLocalizedString("main", "") }
+    val recoveryExecutionScriptText = item.recoveryExecutionScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryExecutionScript.visibleLocalizedString("main", "") }
+    val recoveryReleaseHintText = item.recoveryReleaseHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryReleaseHint.visibleLocalizedString("main", "") }
+    val recoveryReleaseChecklistText = item.recoveryReleaseChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryReleaseChecklist.visibleLocalizedString("main", "") }
+    val recoveryReleaseScriptText = item.recoveryReleaseScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryReleaseScript.visibleLocalizedString("main", "") }
+    val recoverySealHintText = item.recoverySealHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoverySealHint.visibleLocalizedString("main", "") }
+    val recoverySealChecklistText = item.recoverySealChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoverySealChecklist.visibleLocalizedString("main", "") }
+    val recoverySealScriptText = item.recoverySealScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoverySealScript.visibleLocalizedString("main", "") }
+    val recoveryCloseoutHintText = item.recoveryCloseoutHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCloseoutHint.visibleLocalizedString("main", "") }
+    val recoveryCloseoutChecklistText = item.recoveryCloseoutChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCloseoutChecklist.visibleLocalizedString("main", "") }
+    val recoveryCloseoutScriptText = item.recoveryCloseoutScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryCloseoutScript.visibleLocalizedString("main", "") }
+    val recoveryReopenHintText = item.recoveryReopenHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryReopenHint.visibleLocalizedString("main", "") }
+    val recoveryReopenChecklistText = item.recoveryReopenChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryReopenChecklist.visibleLocalizedString("main", "") }
+    val recoveryReopenScriptText = item.recoveryReopenScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryReopenScript.visibleLocalizedString("main", "") }
+    val recoveryReopenAtText = item.recoveryReopenAtMillis
+        ?.takeIf { it > 0L }
+        ?.let { receiptUiDateTime(it) }
+        .orEmpty()
+    val recoveryReconciliationHintText = item.recoveryReconciliationHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryReconciliationHint.visibleLocalizedString("main", "") }
+    val recoveryReconciliationChecklistText = item.recoveryReconciliationChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryReconciliationChecklist.visibleLocalizedString("main", "") }
+    val recoveryReconciliationScriptText = item.recoveryReconciliationScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryReconciliationScript.visibleLocalizedString("main", "") }
+    val recoveryFollowUpAtText = item.recoveryFollowUpAtMillis
+        ?.takeIf { it > 0L }
+        ?.let { receiptUiDateTime(it) }
+        .orEmpty()
+    val recoveryCheckpointText = item.recoveryCheckpointAtMillis?.takeIf { it > 0L }?.let { checkpoint -> receiptUiDateTime(checkpoint) }.orEmpty()
+    val nextRecoveryStepText = item.nextRecoveryStep.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.nextRecoveryStep.visibleLocalizedString("main", "") }
+    val recoveryChecklistText = item.recoveryChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryChecklist.visibleLocalizedString("main", "") }
 
     Column(
         modifier = Modifier
@@ -26803,9 +29273,9 @@ private fun AppConfiguration.SupplierBackorderWatchCard(item: SupplierDashboardB
             ) {
                 CpImage(
                     modifier = Modifier.size(32.dp),
-                    url = stateValues.drawablePathIconSupplierDemandRadar,
-                    fallbackRes = stateValues.drawableResIconSupplierDemandRadar.value,
-                    contentDescription = localizedStringResource(1794, "Backorder watch"),
+                    url = stateValues.drawablePathIconSupplierBackorderRecovery,
+                    fallbackRes = stateValues.drawableResIconSupplierBackorderRecovery.value,
+                    contentDescription = localizedStringResource(1816, "Backorder recovery"),
                     tintColor = stateValues.ErrorColor
                 )
             }
@@ -26860,6 +29330,1542 @@ private fun AppConfiguration.SupplierBackorderWatchCard(item: SupplierDashboardB
         StockCardInfoLine(localizedStringResource(1806, "Partial lines"), item.partialLineCount.toString(), stateValues.TextColor)
         StockCardInfoLine(localizedStringResource(1807, "Fully short lines"), item.fullyShortLineCount.toString(), stateValues.TextColor)
         StockCardInfoLine(localizedStringResource(1802, "Recovery plan"), supplierBackorderRecoveryLaneTitle(item.recoveryLane), stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1809, "Recovery urgency"), supplierBackorderRecoveryUrgencyTitle(item.recoveryUrgencyLane), stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1817, "Recovery owner"), supplierBackorderRecoveryOwnerTitle(item.recoveryOwnerLane), stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1823, "Promise clock"), supplierBackorderRecoverySlaTitle(item.recoverySlaLane), stateValues.TextColor)
+        if (recoveryCheckpointText.isNotBlank()) {
+            StockCardInfoLine(localizedStringResource(1822, "Recovery checkpoint"), recoveryCheckpointText, stateValues.TextColor)
+        }
+        StockCardInfoLine(localizedStringResource(1828, "Escalation lane"), supplierBackorderRecoveryEscalationTitle(item.recoveryEscalationLane), stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1833, "Recovery proof"), supplierBackorderRecoveryProofTitle(item.recoveryProofLane), stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1839, "Resolution path"), supplierBackorderRecoveryOutcomeTitle(item.recoveryOutcomeLane), stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1845, "Pack guard"), supplierBackorderRecoveryPackGuardTitle(item.recoveryPackGuardLane), stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1851, "Contact lane"), supplierBackorderRecoveryContactTitle(item.recoveryContactLane), stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1859, "Recovery risk"), "${supplierBackorderRecoveryRiskTitle(item.recoveryRiskLane)} • ${localizedStringResource(1864, "Risk score")} ${item.recoveryRiskScore}", stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1868, "Recovery confidence"), "${supplierBackorderRecoveryConfidenceTitle(item.recoveryConfidenceLane)} • ${localizedStringResource(1873, "Confidence score")} ${item.recoveryConfidenceScore}", stateValues.TextColor)
+        StockCardInfoLine(
+            localizedStringResource(1877, "Follow-up cadence"),
+            listOfNotNull(
+                supplierBackorderRecoveryFollowUpTitle(item.recoveryFollowUpLane),
+                recoveryFollowUpAtText.takeIf { it.isNotBlank() }?.let { "${localizedStringResource(1882, "Next follow-up")}: $it" }
+            ).joinToString(" • "),
+            stateValues.TextColor
+        )
+        StockCardInfoLine(localizedStringResource(1886, "Recovery handoff"), supplierBackorderRecoveryHandoffTitle(item.recoveryHandoffLane), stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1896, "Close gate"), "${supplierBackorderRecoveryClosureTitle(item.recoveryClosureLane)} • ${localizedStringResource(1901, "Closure score")} ${item.recoveryClosureScore}/100", stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1907, "Recovery ledger"), "${supplierBackorderRecoveryLedgerTitle(item.recoveryLedgerLane)} • ${localizedStringResource(1913, "Ledger score")} ${item.recoveryLedgerScore}/100", stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1919, "Triage desk"), "${supplierBackorderRecoveryTriageTitle(item.recoveryTriageLane)} • ${localizedStringResource(1926, "Triage score")} ${item.recoveryTriageScore}/100", stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1932, "Recovery command"), "${supplierBackorderRecoveryCommandTitle(item.recoveryCommandLane)} • ${localizedStringResource(1939, "Command score")} ${item.recoveryCommandScore}/100", stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1945, "Promise shield"), "${supplierBackorderRecoveryPromiseShieldTitle(item.recoveryPromiseShieldLane)} • ${localizedStringResource(1952, "Promise score")} ${item.recoveryPromiseShieldScore}/100", stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1973, "Recovery wave"), "${supplierBackorderRecoveryWaveTitle(item.recoveryWaveLane)} • ${localizedStringResource(1975, "Wave score")} ${item.recoveryWaveScore}/100", stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1985, "Recovery aging"), "${supplierBackorderRecoveryAgingTitle(item.recoveryAgingLane)} • ${localizedStringResource(1990, "Aging score")} ${item.recoveryAgingScore}/100 • ${item.recoveryAgingHours}h", stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(1998, "Recovery bottleneck"), "${supplierBackorderRecoveryBottleneckTitle(item.recoveryBottleneckLane)} • ${localizedStringResource(2007, "Bottleneck score")} ${item.recoveryBottleneckScore}/100", stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(2013, "Recovery load"), "${supplierBackorderRecoveryLoadTitle(item.recoveryLoadLane)} • ${localizedStringResource(2019, "Load score")} ${item.recoveryLoadScore}/100 • ${localizedStringResource(1798, "Affected orders")} ${item.affectedOrderCount}", stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(2029, "Recovery impact"), "${supplierBackorderRecoveryImpactTitle(item.recoveryImpactLane)} • ${localizedStringResource(2035, "Impact score")} ${item.recoveryImpactScore}/100", stateValues.TextColor)
+        StockCardInfoLine(
+            localizedStringResource(2044, "Recovery commit"),
+            listOfNotNull(
+                "${supplierBackorderRecoveryCommitTitle(item.recoveryCommitLane)} • ${localizedStringResource(2051, "Commit score")} ${item.recoveryCommitScore}/100",
+                recoveryCommitByText.takeIf { it.isNotBlank() }?.let { "${localizedStringResource(2053, "Commit by")}: $it" }
+            ).joinToString(" • "),
+            stateValues.TextColor
+        )
+        StockCardInfoLine(localizedStringResource(2062, "Recovery allocation"), "${supplierBackorderRecoveryAllocationTitle(item.recoveryAllocationLane)} • ${localizedStringResource(2068, "Allocation score")} ${item.recoveryAllocationScore}/100", stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(2079, "Recovery exception"), "${supplierBackorderRecoveryExceptionTitle(item.recoveryExceptionLane)} • ${localizedStringResource(2087, "Exception score")} ${item.recoveryExceptionScore}/100", stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(2101, "Recovery cause"), "${supplierBackorderRecoveryCauseTitle(item.recoveryCauseLane)} • ${localizedStringResource(2109, "Cause score")} ${item.recoveryCauseScore}/100", stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(2120, "Recovery verification"), "${supplierBackorderRecoveryVerificationTitle(item.recoveryVerificationLane)} • ${localizedStringResource(2128, "Verification score")} ${item.recoveryVerificationScore}/100", stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(2141, "Recovery approval"), "${supplierBackorderRecoveryApprovalTitle(item.recoveryApprovalLane)} • ${localizedStringResource(2149, "Approval score")} ${item.recoveryApprovalScore}/100", stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(2162, "Recovery execution"), "${supplierBackorderRecoveryExecutionTitle(item.recoveryExecutionLane)} • ${localizedStringResource(2169, "Execution score")} ${item.recoveryExecutionScore}/100", stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(2181, "Recovery release"), "${supplierBackorderRecoveryReleaseTitle(item.recoveryReleaseLane)} • ${localizedStringResource(2188, "Release score")} ${item.recoveryReleaseScore}/100", stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(2201, "Recovery seal"), "${supplierBackorderRecoverySealTitle(item.recoverySealLane)} • ${localizedStringResource(2208, "Seal score")} ${item.recoverySealScore}/100", stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(2221, "Recovery closeout"), "${supplierBackorderRecoveryCloseoutTitle(item.recoveryCloseoutLane)} • ${localizedStringResource(2228, "Closeout score")} ${item.recoveryCloseoutScore}/100", stateValues.TextColor)
+        StockCardInfoLine(
+            localizedStringResource(2241, "Recovery reopen"),
+            buildString {
+                append(supplierBackorderRecoveryReopenTitle(item.recoveryReopenLane))
+                append(" • ").append(localizedStringResource(2248, "Reopen score")).append(' ').append(item.recoveryReopenScore).append("/100")
+                if (recoveryReopenAtText.isNotBlank()) append(" • ").append(localizedStringResource(2249, "Reopen checkpoint")).append(' ').append(recoveryReopenAtText)
+            },
+            stateValues.TextColor
+        )
+        StockCardInfoLine(localizedStringResource(2262, "Recovery reconciliation"), "${supplierBackorderRecoveryReconciliationTitle(item.recoveryReconciliationLane)} • ${localizedStringResource(2269, "Reconcile score")} ${item.recoveryReconciliationScore}/100", stateValues.TextColor)
+        if (recoveryOwnerHintText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.07f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.24f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoveryOwner,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoveryOwner.value,
+                        contentDescription = localizedStringResource(1817, "Recovery owner"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = supplierBackorderRecoveryOwnerTitle(item.recoveryOwnerLane),
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Text(
+                    text = recoveryOwnerHintText,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.smallTextSize,
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        if (recoverySlaHintText.isNotBlank() || recoveryEscalationHintText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.08f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.30f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoveryClock,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoveryClock.value,
+                        contentDescription = localizedStringResource(1823, "Promise clock"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = localizedStringResource(1823, "Promise clock"),
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (recoverySlaHintText.isNotBlank()) {
+                    Text(
+                        text = recoverySlaHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryEscalationHintText.isNotBlank()) {
+                    Text(
+                        text = recoveryEscalationHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+        if (recoveryProofHintText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.07f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.26f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoveryProof,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoveryProof.value,
+                        contentDescription = localizedStringResource(1833, "Recovery proof"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = supplierBackorderRecoveryProofTitle(item.recoveryProofLane),
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Text(
+                    text = recoveryProofHintText,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.smallTextSize,
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        if (recoveryOutcomeHintText.isNotBlank() || recoveryPackGuardHintText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.07f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.28f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoveryResolution,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoveryResolution.value,
+                        contentDescription = localizedStringResource(1839, "Resolution path"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = supplierBackorderRecoveryOutcomeTitle(item.recoveryOutcomeLane),
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (recoveryOutcomeHintText.isNotBlank()) {
+                    Text(
+                        text = recoveryOutcomeHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryPackGuardHintText.isNotBlank()) {
+                    Text(
+                        text = recoveryPackGuardHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+        if (recoveryContactHintText.isNotBlank() || recoveryContactScriptText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.075f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.28f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoveryContact,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoveryContact.value,
+                        contentDescription = localizedStringResource(1851, "Contact lane"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = supplierBackorderRecoveryContactTitle(item.recoveryContactLane),
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (recoveryContactHintText.isNotBlank()) {
+                    Text(
+                        text = recoveryContactHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryContactScriptText.isNotBlank()) {
+                    Text(
+                        text = recoveryContactScriptText,
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+        if (recoveryRiskHintText.isNotBlank() || recoveryRiskReasonsText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.ErrorColor.copy(alpha = 0.055f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.ErrorColor.copy(alpha = 0.24f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoveryRisk,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoveryRisk.value,
+                        contentDescription = localizedStringResource(1859, "Recovery risk"),
+                        tintColor = stateValues.ErrorColor
+                    )
+                    Text(
+                        text = "${supplierBackorderRecoveryRiskTitle(item.recoveryRiskLane)} • ${localizedStringResource(1864, "Risk score")} ${item.recoveryRiskScore}",
+                        color = stateValues.ErrorColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (recoveryRiskHintText.isNotBlank()) {
+                    Text(
+                        text = recoveryRiskHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryRiskReasonsText.isNotBlank()) {
+                    Text(
+                        text = recoveryRiskReasonsText,
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+        if (recoveryConfidenceHintText.isNotBlank() || recoveryConfidenceChecklistText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.07f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.26f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoveryConfidence,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoveryConfidence.value,
+                        contentDescription = localizedStringResource(1868, "Recovery confidence"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = "${supplierBackorderRecoveryConfidenceTitle(item.recoveryConfidenceLane)} • ${localizedStringResource(1873, "Confidence score")} ${item.recoveryConfidenceScore}",
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (recoveryConfidenceHintText.isNotBlank()) {
+                    Text(
+                        text = recoveryConfidenceHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryConfidenceChecklistText.isNotBlank()) {
+                    Text(
+                        text = recoveryConfidenceChecklistText,
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+        if (recoveryFollowUpHintText.isNotBlank() || recoveryFollowUpScriptText.isNotBlank() || recoveryFollowUpAtText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.PlaceholderTextColor.copy(alpha = 0.055f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.22f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoveryFollowUp,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoveryFollowUp.value,
+                        contentDescription = localizedStringResource(1877, "Follow-up cadence"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = listOfNotNull(
+                            supplierBackorderRecoveryFollowUpTitle(item.recoveryFollowUpLane),
+                            recoveryFollowUpAtText.takeIf { it.isNotBlank() }?.let { "${localizedStringResource(1882, "Next follow-up")}: $it" }
+                        ).joinToString(" • "),
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (recoveryFollowUpHintText.isNotBlank()) {
+                    Text(
+                        text = recoveryFollowUpHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryFollowUpScriptText.isNotBlank()) {
+                    Text(
+                        text = recoveryFollowUpScriptText,
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+        if (recoveryHandoffHintText.isNotBlank() || recoveryHandoffChecklistText.isNotBlank() || recoveryHandoffScriptText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.065f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.24f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoveryHandoff,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoveryHandoff.value,
+                        contentDescription = localizedStringResource(1886, "Recovery handoff"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = supplierBackorderRecoveryHandoffTitle(item.recoveryHandoffLane),
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (recoveryHandoffHintText.isNotBlank()) {
+                    Text(
+                        text = recoveryHandoffHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryHandoffChecklistText.isNotBlank()) {
+                    Text(
+                        text = recoveryHandoffChecklistText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryHandoffScriptText.isNotBlank()) {
+                    Text(
+                        text = recoveryHandoffScriptText,
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+
+        if (recoveryClosureHintText.isNotBlank() || recoveryClosureChecklistText.isNotBlank() || recoveryClosureScriptText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.075f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.26f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoveryClosure,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoveryClosure.value,
+                        contentDescription = localizedStringResource(1896, "Close gate"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = "${supplierBackorderRecoveryClosureTitle(item.recoveryClosureLane)} • ${localizedStringResource(1901, "Closure score")} ${item.recoveryClosureScore}/100",
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (recoveryClosureHintText.isNotBlank()) {
+                    Text(
+                        text = recoveryClosureHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryClosureChecklistText.isNotBlank()) {
+                    Text(
+                        text = recoveryClosureChecklistText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryClosureScriptText.isNotBlank()) {
+                    Text(
+                        text = recoveryClosureScriptText,
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+
+        if (recoveryLedgerHintText.isNotBlank() || recoveryLedgerChecklistText.isNotBlank() || recoveryLedgerScriptText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.07f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.25f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoveryLedger,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoveryLedger.value,
+                        contentDescription = localizedStringResource(1907, "Recovery ledger"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = "${supplierBackorderRecoveryLedgerTitle(item.recoveryLedgerLane)} • ${localizedStringResource(1913, "Ledger score")} ${item.recoveryLedgerScore}/100",
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (recoveryLedgerHintText.isNotBlank()) {
+                    Text(
+                        text = recoveryLedgerHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryLedgerChecklistText.isNotBlank()) {
+                    Text(
+                        text = recoveryLedgerChecklistText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryLedgerScriptText.isNotBlank()) {
+                    Text(
+                        text = recoveryLedgerScriptText,
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+
+        if (recoveryTriageHintText.isNotBlank() || recoveryTriageChecklistText.isNotBlank() || recoveryTriageScriptText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.085f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.30f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoveryTriage,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoveryTriage.value,
+                        contentDescription = localizedStringResource(1919, "Triage desk"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = "${supplierBackorderRecoveryTriageTitle(item.recoveryTriageLane)} • ${localizedStringResource(1926, "Triage score")} ${item.recoveryTriageScore}/100",
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (recoveryTriageHintText.isNotBlank()) {
+                    Text(
+                        text = recoveryTriageHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryTriageChecklistText.isNotBlank()) {
+                    Text(
+                        text = recoveryTriageChecklistText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryTriageScriptText.isNotBlank()) {
+                    Text(
+                        text = recoveryTriageScriptText,
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+
+
+        if (recoveryCommandHintText.isNotBlank() || recoveryCommandChecklistText.isNotBlank() || recoveryCommandScriptText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.095f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.34f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoveryCommand,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoveryCommand.value,
+                        contentDescription = localizedStringResource(1932, "Recovery command"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = "${supplierBackorderRecoveryCommandTitle(item.recoveryCommandLane)} • ${localizedStringResource(1939, "Command score")} ${item.recoveryCommandScore}/100",
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (recoveryCommandHintText.isNotBlank()) {
+                    Text(
+                        text = recoveryCommandHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryCommandChecklistText.isNotBlank()) {
+                    Text(
+                        text = recoveryCommandChecklistText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryCommandScriptText.isNotBlank()) {
+                    Text(
+                        text = recoveryCommandScriptText,
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+
+
+        if (recoveryPromiseShieldHintText.isNotBlank() || recoveryPromiseShieldChecklistText.isNotBlank() || recoveryPromiseShieldScriptText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.10f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.36f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoveryPromiseShield,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoveryPromiseShield.value,
+                        contentDescription = localizedStringResource(1945, "Promise shield"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = "${supplierBackorderRecoveryPromiseShieldTitle(item.recoveryPromiseShieldLane)} • ${localizedStringResource(1952, "Promise score")} ${item.recoveryPromiseShieldScore}/100",
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (recoveryPromiseShieldHintText.isNotBlank()) {
+                    Text(
+                        text = recoveryPromiseShieldHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryPromiseShieldChecklistText.isNotBlank()) {
+                    Text(
+                        text = recoveryPromiseShieldChecklistText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryPromiseShieldScriptText.isNotBlank()) {
+                    Text(
+                        text = recoveryPromiseShieldScriptText,
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+
+        if (recoveryWaveHintText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.105f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.38f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoveryWave,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoveryWave.value,
+                        contentDescription = localizedStringResource(1973, "Recovery wave"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = "${supplierBackorderRecoveryWaveTitle(item.recoveryWaveLane)} • ${localizedStringResource(1975, "Wave score")} ${item.recoveryWaveScore}/100",
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Text(
+                    text = recoveryWaveHintText,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.smallTextSize,
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        if (recoveryAgingHintText.isNotBlank() || recoveryAgingChecklistText.isNotBlank() || recoveryAgingScriptText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.06f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.24f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoveryAging,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoveryAging.value,
+                        contentDescription = localizedStringResource(1985, "Recovery aging"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = "${supplierBackorderRecoveryAgingTitle(item.recoveryAgingLane)} • ${localizedStringResource(1990, "Aging score")} ${item.recoveryAgingScore}/100 • ${item.recoveryAgingHours}h",
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (recoveryAgingHintText.isNotBlank()) {
+                    Text(
+                        text = recoveryAgingHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryAgingChecklistText.isNotBlank()) {
+                    Text(
+                        text = recoveryAgingChecklistText,
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryAgingScriptText.isNotBlank()) {
+                    Text(
+                        text = recoveryAgingScriptText,
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+        if (recoveryBottleneckHintText.isNotBlank() || recoveryBottleneckChecklistText.isNotBlank() || recoveryBottleneckScriptText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.11f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.38f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoveryBottleneck,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoveryBottleneck.value,
+                        contentDescription = localizedStringResource(2012, "Bottleneck map"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = "${supplierBackorderRecoveryBottleneckTitle(item.recoveryBottleneckLane)} • ${localizedStringResource(2007, "Bottleneck score")} ${item.recoveryBottleneckScore}/100",
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (recoveryBottleneckHintText.isNotBlank()) {
+                    Text(
+                        text = recoveryBottleneckHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryBottleneckChecklistText.isNotBlank()) {
+                    Text(
+                        text = recoveryBottleneckChecklistText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryBottleneckScriptText.isNotBlank()) {
+                    Text(
+                        text = recoveryBottleneckScriptText,
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+        if (recoveryLoadHintText.isNotBlank() || recoveryLoadChecklistText.isNotBlank() || recoveryLoadScriptText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.10f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.34f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoveryLoad,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoveryLoad.value,
+                        contentDescription = localizedStringResource(2013, "Recovery load"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = "${supplierBackorderRecoveryLoadTitle(item.recoveryLoadLane)} • ${localizedStringResource(2019, "Load score")} ${item.recoveryLoadScore}/100",
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (recoveryLoadHintText.isNotBlank()) {
+                    Text(
+                        text = recoveryLoadHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryLoadChecklistText.isNotBlank()) {
+                    Text(
+                        text = recoveryLoadChecklistText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryLoadScriptText.isNotBlank()) {
+                    Text(
+                        text = recoveryLoadScriptText,
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+        if (recoveryImpactHintText.isNotBlank() || recoveryImpactChecklistText.isNotBlank() || recoveryImpactScriptText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.09f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.34f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoveryImpact,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoveryImpact.value,
+                        contentDescription = localizedStringResource(2029, "Recovery impact"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = "${supplierBackorderRecoveryImpactTitle(item.recoveryImpactLane)} • ${localizedStringResource(2035, "Impact score")} ${item.recoveryImpactScore}/100",
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (recoveryImpactHintText.isNotBlank()) {
+                    Text(
+                        text = recoveryImpactHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryImpactChecklistText.isNotBlank()) {
+                    Text(
+                        text = recoveryImpactChecklistText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryImpactScriptText.isNotBlank()) {
+                    Text(
+                        text = recoveryImpactScriptText,
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+        if (recoveryCommitHintText.isNotBlank() || recoveryCommitChecklistText.isNotBlank() || recoveryCommitScriptText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.10f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.36f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoveryCommit,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoveryCommit.value,
+                        contentDescription = localizedStringResource(2044, "Recovery commit"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = listOfNotNull(
+                            "${supplierBackorderRecoveryCommitTitle(item.recoveryCommitLane)} • ${localizedStringResource(2051, "Commit score")} ${item.recoveryCommitScore}/100",
+                            recoveryCommitByText.takeIf { it.isNotBlank() }?.let { "${localizedStringResource(2053, "Commit by")}: $it" }
+                        ).joinToString(" • "),
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (recoveryCommitHintText.isNotBlank()) {
+                    Text(
+                        text = recoveryCommitHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryCommitChecklistText.isNotBlank()) {
+                    Text(
+                        text = recoveryCommitChecklistText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryCommitScriptText.isNotBlank()) {
+                    Text(
+                        text = recoveryCommitScriptText,
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+        if (recoveryAllocationHintText.isNotBlank() || recoveryAllocationChecklistText.isNotBlank() || recoveryAllocationScriptText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.10f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.36f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoveryAllocation,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoveryAllocation.value,
+                        contentDescription = localizedStringResource(2062, "Recovery allocation"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = "${supplierBackorderRecoveryAllocationTitle(item.recoveryAllocationLane)} • ${localizedStringResource(2068, "Allocation score")} ${item.recoveryAllocationScore}/100",
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (recoveryAllocationHintText.isNotBlank()) {
+                    Text(
+                        text = recoveryAllocationHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryAllocationChecklistText.isNotBlank()) {
+                    Text(
+                        text = recoveryAllocationChecklistText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryAllocationScriptText.isNotBlank()) {
+                    Text(
+                        text = recoveryAllocationScriptText,
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+
+        if (recoveryExceptionHintText.isNotBlank() || recoveryExceptionChecklistText.isNotBlank() || recoveryExceptionScriptText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.11f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.38f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoveryException,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoveryException.value,
+                        contentDescription = localizedStringResource(2079, "Recovery exception"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = "${supplierBackorderRecoveryExceptionTitle(item.recoveryExceptionLane)} • ${localizedStringResource(2087, "Exception score")} ${item.recoveryExceptionScore}/100",
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (recoveryExceptionHintText.isNotBlank()) {
+                    Text(
+                        text = recoveryExceptionHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryExceptionChecklistText.isNotBlank()) {
+                    Text(
+                        text = recoveryExceptionChecklistText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryExceptionScriptText.isNotBlank()) {
+                    Text(
+                        text = recoveryExceptionScriptText,
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+
+
+        if (recoveryCauseHintText.isNotBlank() || recoveryCauseChecklistText.isNotBlank() || recoveryCauseScriptText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.080f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.30f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoveryCause,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoveryCause.value,
+                        contentDescription = localizedStringResource(2101, "Recovery cause"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = "${supplierBackorderRecoveryCauseTitle(item.recoveryCauseLane)} • ${localizedStringResource(2109, "Cause score")} ${item.recoveryCauseScore}/100",
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (recoveryCauseHintText.isNotBlank()) {
+                    Text(
+                        text = recoveryCauseHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryCauseChecklistText.isNotBlank()) {
+                    Text(
+                        text = recoveryCauseChecklistText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryCauseScriptText.isNotBlank()) {
+                    Text(
+                        text = recoveryCauseScriptText,
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+
+        if (recoveryVerificationHintText.isNotBlank() || recoveryVerificationChecklistText.isNotBlank() || recoveryVerificationScriptText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.065f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.26f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoveryVerification,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoveryVerification.value,
+                        contentDescription = localizedStringResource(2120, "Recovery verification"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = "${supplierBackorderRecoveryVerificationTitle(item.recoveryVerificationLane)} • ${localizedStringResource(2128, "Verification score")} ${item.recoveryVerificationScore}/100",
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (recoveryVerificationHintText.isNotBlank()) {
+                    Text(
+                        text = recoveryVerificationHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryVerificationChecklistText.isNotBlank()) {
+                    Text(
+                        text = recoveryVerificationChecklistText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryVerificationScriptText.isNotBlank()) {
+                    Text(
+                        text = recoveryVerificationScriptText,
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+
+
+        if (recoveryApprovalHintText.isNotBlank() || recoveryApprovalChecklistText.isNotBlank() || recoveryApprovalScriptText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.070f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.28f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoveryApproval,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoveryApproval.value,
+                        contentDescription = localizedStringResource(2141, "Recovery approval"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = "${supplierBackorderRecoveryApprovalTitle(item.recoveryApprovalLane)} • ${localizedStringResource(2149, "Approval score")} ${item.recoveryApprovalScore}/100",
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (recoveryApprovalHintText.isNotBlank()) {
+                    Text(
+                        text = recoveryApprovalHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryApprovalChecklistText.isNotBlank()) {
+                    Text(
+                        text = recoveryApprovalChecklistText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryApprovalScriptText.isNotBlank()) {
+                    Text(
+                        text = recoveryApprovalScriptText,
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+
+        if (recoveryExecutionHintText.isNotBlank() || recoveryExecutionChecklistText.isNotBlank() || recoveryExecutionScriptText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.075f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.30f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoveryExecution,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoveryExecution.value,
+                        contentDescription = localizedStringResource(2162, "Recovery execution"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = "${supplierBackorderRecoveryExecutionTitle(item.recoveryExecutionLane)} • ${localizedStringResource(2169, "Execution score")} ${item.recoveryExecutionScore}/100",
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (recoveryExecutionHintText.isNotBlank()) {
+                    Text(
+                        text = recoveryExecutionHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryExecutionChecklistText.isNotBlank()) {
+                    Text(
+                        text = recoveryExecutionChecklistText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryExecutionScriptText.isNotBlank()) {
+                    Text(
+                        text = recoveryExecutionScriptText,
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+        if (recoveryReleaseHintText.isNotBlank() || recoveryReleaseChecklistText.isNotBlank() || recoveryReleaseScriptText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.075f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.30f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoveryRelease,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoveryRelease.value,
+                        contentDescription = localizedStringResource(2181, "Recovery release"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = "${supplierBackorderRecoveryReleaseTitle(item.recoveryReleaseLane)} • ${localizedStringResource(2188, "Release score")} ${item.recoveryReleaseScore}/100",
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (recoveryReleaseHintText.isNotBlank()) {
+                    Text(
+                        text = recoveryReleaseHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryReleaseChecklistText.isNotBlank()) {
+                    Text(
+                        text = recoveryReleaseChecklistText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryReleaseScriptText.isNotBlank()) {
+                    Text(
+                        text = recoveryReleaseScriptText,
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+        nextRecoveryStepText.takeIf { it.isNotBlank() }?.let { step ->
+            StockCardInfoLine(localizedStringResource(1814, "Next recovery step"), step, stateValues.TextColor)
+        }
         storePreviewText.takeIf { it.isNotBlank() }?.let { preview ->
             StockCardInfoLine(localizedStringResource(1789, "Internal stores"), preview, stateValues.TextColor)
         }
@@ -26868,7 +30874,7 @@ private fun AppConfiguration.SupplierBackorderWatchCard(item: SupplierDashboardB
         }
         StockCardInfoLine(localizedStringResource(1722, "Priority score"), item.priorityScore.toString(), stateValues.TextColor)
 
-        if (recoveryHintText.isNotBlank()) {
+        if (recoveryHintText.isNotBlank() || recoveryUrgencyHintText.isNotBlank() || recoveryChecklistText.isNotBlank()) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -26876,21 +30882,54 @@ private fun AppConfiguration.SupplierBackorderWatchCard(item: SupplierDashboardB
                     .background(stateValues.AccentColor.copy(alpha = 0.08f))
                     .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.30f), RoundedCornerShape(stateValues.cornerRadius))
                     .padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(3.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Text(
-                    text = localizedStringResource(1802, "Recovery plan"),
-                    color = stateValues.AccentColor,
-                    fontSize = stateValues.smallTextSize,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = recoveryHintText,
-                    color = stateValues.TextColor,
-                    fontSize = stateValues.smallTextSize,
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierBackorderRecovery,
+                        fallbackRes = stateValues.drawableResIconSupplierBackorderRecovery.value,
+                        contentDescription = localizedStringResource(1815, "Recovery checklist"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = localizedStringResource(1815, "Recovery checklist"),
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (recoveryHintText.isNotBlank()) {
+                    Text(
+                        text = recoveryHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryUrgencyHintText.isNotBlank()) {
+                    Text(
+                        text = recoveryUrgencyHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryChecklistText.isNotBlank()) {
+                    Text(
+                        text = recoveryChecklistText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 6,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
 
@@ -26920,6 +30959,246 @@ private fun AppConfiguration.SupplierBackorderWatchCard(item: SupplierDashboardB
             }
         }
 
+        if (recoverySealHintText.isNotBlank() || recoverySealChecklistText.isNotBlank() || recoverySealScriptText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.08f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.30f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoverySeal,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoverySeal.value,
+                        contentDescription = localizedStringResource(2201, "Recovery seal"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = "${supplierBackorderRecoverySealTitle(item.recoverySealLane)} • ${localizedStringResource(2208, "Seal score")} ${item.recoverySealScore}/100",
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (recoverySealHintText.isNotBlank()) {
+                    Text(
+                        text = recoverySealHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoverySealChecklistText.isNotBlank()) {
+                    Text(
+                        text = recoverySealChecklistText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 6,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoverySealScriptText.isNotBlank()) {
+                    Text(
+                        text = recoverySealScriptText,
+                        color = stateValues.TextGray,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+
+        if (recoveryCloseoutHintText.isNotBlank() || recoveryCloseoutChecklistText.isNotBlank() || recoveryCloseoutScriptText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.08f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.30f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoveryCloseout,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoveryCloseout.value,
+                        contentDescription = localizedStringResource(2221, "Recovery closeout"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = "${supplierBackorderRecoveryCloseoutTitle(item.recoveryCloseoutLane)} • ${localizedStringResource(2228, "Closeout score")} ${item.recoveryCloseoutScore}/100",
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (recoveryCloseoutHintText.isNotBlank()) {
+                    Text(
+                        text = recoveryCloseoutHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryCloseoutChecklistText.isNotBlank()) {
+                    Text(
+                        text = recoveryCloseoutChecklistText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 6,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryCloseoutScriptText.isNotBlank()) {
+                    Text(
+                        text = recoveryCloseoutScriptText,
+                        color = stateValues.TextGray,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+
+        if (recoveryReopenHintText.isNotBlank() || recoveryReopenChecklistText.isNotBlank() || recoveryReopenScriptText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.08f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.30f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoveryReopen,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoveryReopen.value,
+                        contentDescription = localizedStringResource(2241, "Recovery reopen"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = buildString {
+                            append(supplierBackorderRecoveryReopenTitle(item.recoveryReopenLane))
+                            append(" • ").append(localizedStringResource(2248, "Reopen score")).append(' ').append(item.recoveryReopenScore).append("/100")
+                            if (recoveryReopenAtText.isNotBlank()) append(" • ").append(localizedStringResource(2249, "Reopen checkpoint")).append(' ').append(recoveryReopenAtText)
+                        },
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (recoveryReopenHintText.isNotBlank()) {
+                    Text(
+                        text = recoveryReopenHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryReopenChecklistText.isNotBlank()) {
+                    Text(
+                        text = recoveryReopenChecklistText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 6,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryReopenScriptText.isNotBlank()) {
+                    Text(
+                        text = recoveryReopenScriptText,
+                        color = stateValues.TextGray,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+
+        if (recoveryReconciliationHintText.isNotBlank() || recoveryReconciliationChecklistText.isNotBlank() || recoveryReconciliationScriptText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.08f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.30f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoveryReconciliation,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoveryReconciliation.value,
+                        contentDescription = localizedStringResource(2262, "Recovery reconciliation"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = "${supplierBackorderRecoveryReconciliationTitle(item.recoveryReconciliationLane)} • ${localizedStringResource(2269, "Reconcile score")} ${item.recoveryReconciliationScore}/100",
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (recoveryReconciliationHintText.isNotBlank()) {
+                    Text(
+                        text = recoveryReconciliationHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryReconciliationChecklistText.isNotBlank()) {
+                    Text(
+                        text = recoveryReconciliationChecklistText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 6,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryReconciliationScriptText.isNotBlank()) {
+                    Text(
+                        text = recoveryReconciliationScriptText,
+                        color = stateValues.TextGray,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+
         if (stateValues.isNarrowScreen) {
             Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
                 actionButton(
@@ -26930,7 +31209,11 @@ private fun AppConfiguration.SupplierBackorderWatchCard(item: SupplierDashboardB
                     confirmationRequired = false,
                     onClick = {
                         coroutineScope.launch {
-                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.goodsItemId)
+                            seedSupplierOrdersInboxNavigation(
+                                searchQuery = item.goodsItemId,
+                                dueFilter = item.supplierBackorderDueFilterSeed(),
+                                statusFilter = "open"
+                            )
                             Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
                         }
                     }
@@ -26943,35 +31226,540 @@ private fun AppConfiguration.SupplierBackorderWatchCard(item: SupplierDashboardB
                     confirmationRequired = false,
                     onClick = { copyTextToClipboard(supplierBackorderBrief(item)) }
                 )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1856, "Copy contact script"),
+                    iconPath = stateValues.drawablePathIconSupplierRecoveryContact,
+                    iconRes = stateValues.drawableResIconSupplierRecoveryContact.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(supplierBackorderContactScript(item)) }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1867, "Copy risk note"),
+                    iconPath = stateValues.drawablePathIconSupplierRecoveryRisk,
+                    iconRes = stateValues.drawableResIconSupplierRecoveryRisk.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(supplierBackorderRiskNote(item)) }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1876, "Copy confidence note"),
+                    iconPath = stateValues.drawablePathIconSupplierRecoveryConfidence,
+                    iconRes = stateValues.drawableResIconSupplierRecoveryConfidence.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(supplierBackorderConfidenceNote(item)) }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1883, "Copy follow-up note"),
+                    iconPath = stateValues.drawablePathIconSupplierRecoveryFollowUp,
+                    iconRes = stateValues.drawableResIconSupplierRecoveryFollowUp.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(supplierBackorderFollowUpNote(item)) }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1892, "Copy handoff note"),
+                    iconPath = stateValues.drawablePathIconSupplierRecoveryHandoff,
+                    iconRes = stateValues.drawableResIconSupplierRecoveryHandoff.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(supplierBackorderHandoffNote(item)) }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1903, "Copy close-gate note"),
+                    iconPath = stateValues.drawablePathIconSupplierRecoveryClosure,
+                    iconRes = stateValues.drawableResIconSupplierRecoveryClosure.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(supplierBackorderClosureNote(item)) }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1915, "Copy ledger note"),
+                    iconPath = stateValues.drawablePathIconSupplierRecoveryLedger,
+                    iconRes = stateValues.drawableResIconSupplierRecoveryLedger.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(supplierBackorderLedgerNote(item)) }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1928, "Copy triage note"),
+                    iconPath = stateValues.drawablePathIconSupplierRecoveryTriage,
+                    iconRes = stateValues.drawableResIconSupplierRecoveryTriage.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(supplierBackorderTriageNote(item)) }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1941, "Copy command note"),
+                    iconPath = stateValues.drawablePathIconSupplierRecoveryCommand,
+                    iconRes = stateValues.drawableResIconSupplierRecoveryCommand.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(supplierBackorderCommandNote(item)) }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1954, "Copy promise note"),
+                    iconPath = stateValues.drawablePathIconSupplierRecoveryPromiseShield,
+                    iconRes = stateValues.drawableResIconSupplierRecoveryPromiseShield.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(supplierBackorderPromiseShieldNote(item)) }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1978, "Copy wave note"),
+                    iconPath = stateValues.drawablePathIconSupplierRecoveryWave,
+                    iconRes = stateValues.drawableResIconSupplierRecoveryWave.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(supplierBackorderWaveNote(item)) }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1992, "Copy aging note"),
+                    iconPath = stateValues.drawablePathIconSupplierRecoveryAging,
+                    iconRes = stateValues.drawableResIconSupplierRecoveryAging.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(supplierBackorderAgingNote(item)) }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(2009, "Copy bottleneck note"),
+                    iconPath = stateValues.drawablePathIconSupplierRecoveryBottleneck,
+                    iconRes = stateValues.drawableResIconSupplierRecoveryBottleneck.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(supplierBackorderBottleneckNote(item)) }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(2021, "Copy load note"),
+                    iconPath = stateValues.drawablePathIconSupplierRecoveryLoad,
+                    iconRes = stateValues.drawableResIconSupplierRecoveryLoad.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(supplierBackorderLoadNote(item)) }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(2037, "Copy impact note"),
+                    iconPath = stateValues.drawablePathIconSupplierRecoveryImpact,
+                    iconRes = stateValues.drawableResIconSupplierRecoveryImpact.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(supplierBackorderImpactNote(item)) }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(2054, "Copy commit note"),
+                    iconPath = stateValues.drawablePathIconSupplierRecoveryCommit,
+                    iconRes = stateValues.drawableResIconSupplierRecoveryCommit.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(supplierBackorderCommitNote(item)) }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(2070, "Copy allocation note"),
+                    iconPath = stateValues.drawablePathIconSupplierRecoveryAllocation,
+                    iconRes = stateValues.drawableResIconSupplierRecoveryAllocation.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(supplierBackorderAllocationNote(item)) }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(2089, "Copy exception note"),
+                    iconPath = stateValues.drawablePathIconSupplierRecoveryException,
+                    iconRes = stateValues.drawableResIconSupplierRecoveryException.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(supplierBackorderExceptionNote(item)) }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(2111, "Copy cause note"),
+                    iconPath = stateValues.drawablePathIconSupplierRecoveryCause,
+                    iconRes = stateValues.drawableResIconSupplierRecoveryCause.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(supplierBackorderCauseNote(item)) }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(2130, "Copy verification note"),
+                    iconPath = stateValues.drawablePathIconSupplierRecoveryVerification,
+                    iconRes = stateValues.drawableResIconSupplierRecoveryVerification.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(supplierBackorderVerificationNote(item)) }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(2151, "Copy approval note"),
+                    iconPath = stateValues.drawablePathIconSupplierRecoveryApproval,
+                    iconRes = stateValues.drawableResIconSupplierRecoveryApproval.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(supplierBackorderApprovalNote(item)) }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(2171, "Copy execution note"),
+                    iconPath = stateValues.drawablePathIconSupplierRecoveryExecution,
+                    iconRes = stateValues.drawableResIconSupplierRecoveryExecution.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(supplierBackorderExecutionNote(item)) }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(2192, "Copy release note"),
+                    iconPath = stateValues.drawablePathIconSupplierRecoveryRelease,
+                    iconRes = stateValues.drawableResIconSupplierRecoveryRelease.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(supplierBackorderReleaseNote(item)) }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(2211, "Copy seal note"),
+                    iconPath = stateValues.drawablePathIconSupplierRecoverySeal,
+                    iconRes = stateValues.drawableResIconSupplierRecoverySeal.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(supplierBackorderSealNote(item)) }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(2231, "Copy closeout note"),
+                    iconPath = stateValues.drawablePathIconSupplierRecoveryCloseout,
+                    iconRes = stateValues.drawableResIconSupplierRecoveryCloseout.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(supplierBackorderCloseoutNote(item)) }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(2252, "Copy reopen note"),
+                    iconPath = stateValues.drawablePathIconSupplierRecoveryReopen,
+                    iconRes = stateValues.drawableResIconSupplierRecoveryReopen.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(supplierBackorderReopenNote(item)) }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(2272, "Copy reconcile note"),
+                    iconPath = stateValues.drawablePathIconSupplierRecoveryReconciliation,
+                    iconRes = stateValues.drawableResIconSupplierRecoveryReconciliation.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(supplierBackorderReconciliationNote(item)) }
+                )
             }
         } else {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
-            ) {
-                actionButton(
-                    modifier = Modifier.weight(1f),
-                    text = localizedStringResource(1800, "Open shortage orders"),
-                    iconPath = stateValues.drawablePathIconAppModeSupplier,
-                    iconRes = stateValues.drawableResIconAppModeSupplier.value,
-                    textSize = stateValues.smallTextSize,
-                    confirmationRequired = false,
-                    onClick = {
-                        coroutineScope.launch {
-                            NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to item.goodsItemId)
-                            Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
+            Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                ) {
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(1800, "Open shortage orders"),
+                        iconPath = stateValues.drawablePathIconAppModeSupplier,
+                        iconRes = stateValues.drawableResIconAppModeSupplier.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = {
+                            coroutineScope.launch {
+                                seedSupplierOrdersInboxNavigation(
+                                    searchQuery = item.goodsItemId,
+                                    dueFilter = item.supplierBackorderDueFilterSeed(),
+                                    statusFilter = "open"
+                                )
+                                Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
+                            }
                         }
-                    }
-                )
-                actionButton(
-                    modifier = Modifier.weight(1f),
-                    text = localizedStringResource(1798, "Copy shortage brief"),
-                    iconPath = stateValues.drawablePathIconClipboard,
-                    iconRes = stateValues.drawableResIconClipboard.value,
-                    textSize = stateValues.smallTextSize,
-                    confirmationRequired = false,
-                    onClick = { copyTextToClipboard(supplierBackorderBrief(item)) }
-                )
+                    )
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(1798, "Copy shortage brief"),
+                        iconPath = stateValues.drawablePathIconClipboard,
+                        iconRes = stateValues.drawableResIconClipboard.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = { copyTextToClipboard(supplierBackorderBrief(item)) }
+                    )
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(1856, "Copy contact script"),
+                        iconPath = stateValues.drawablePathIconSupplierRecoveryContact,
+                        iconRes = stateValues.drawableResIconSupplierRecoveryContact.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = { copyTextToClipboard(supplierBackorderContactScript(item)) }
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                ) {
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(1867, "Copy risk note"),
+                        iconPath = stateValues.drawablePathIconSupplierRecoveryRisk,
+                        iconRes = stateValues.drawableResIconSupplierRecoveryRisk.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = { copyTextToClipboard(supplierBackorderRiskNote(item)) }
+                    )
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(1876, "Copy confidence note"),
+                        iconPath = stateValues.drawablePathIconSupplierRecoveryConfidence,
+                        iconRes = stateValues.drawableResIconSupplierRecoveryConfidence.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = { copyTextToClipboard(supplierBackorderConfidenceNote(item)) }
+                    )
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(1883, "Copy follow-up note"),
+                        iconPath = stateValues.drawablePathIconSupplierRecoveryFollowUp,
+                        iconRes = stateValues.drawableResIconSupplierRecoveryFollowUp.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = { copyTextToClipboard(supplierBackorderFollowUpNote(item)) }
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                ) {
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(1892, "Copy handoff note"),
+                        iconPath = stateValues.drawablePathIconSupplierRecoveryHandoff,
+                        iconRes = stateValues.drawableResIconSupplierRecoveryHandoff.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = { copyTextToClipboard(supplierBackorderHandoffNote(item)) }
+                    )
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(1903, "Copy close-gate note"),
+                        iconPath = stateValues.drawablePathIconSupplierRecoveryClosure,
+                        iconRes = stateValues.drawableResIconSupplierRecoveryClosure.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = { copyTextToClipboard(supplierBackorderClosureNote(item)) }
+                    )
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(1915, "Copy ledger note"),
+                        iconPath = stateValues.drawablePathIconSupplierRecoveryLedger,
+                        iconRes = stateValues.drawableResIconSupplierRecoveryLedger.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = { copyTextToClipboard(supplierBackorderLedgerNote(item)) }
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                ) {
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(1928, "Copy triage note"),
+                        iconPath = stateValues.drawablePathIconSupplierRecoveryTriage,
+                        iconRes = stateValues.drawableResIconSupplierRecoveryTriage.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = { copyTextToClipboard(supplierBackorderTriageNote(item)) }
+                    )
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(1941, "Copy command note"),
+                        iconPath = stateValues.drawablePathIconSupplierRecoveryCommand,
+                        iconRes = stateValues.drawableResIconSupplierRecoveryCommand.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = { copyTextToClipboard(supplierBackorderCommandNote(item)) }
+                    )
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(1954, "Copy promise note"),
+                        iconPath = stateValues.drawablePathIconSupplierRecoveryPromiseShield,
+                        iconRes = stateValues.drawableResIconSupplierRecoveryPromiseShield.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = { copyTextToClipboard(supplierBackorderPromiseShieldNote(item)) }
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                ) {
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(1978, "Copy wave note"),
+                        iconPath = stateValues.drawablePathIconSupplierRecoveryWave,
+                        iconRes = stateValues.drawableResIconSupplierRecoveryWave.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = { copyTextToClipboard(supplierBackorderWaveNote(item)) }
+                    )
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(1992, "Copy aging note"),
+                        iconPath = stateValues.drawablePathIconSupplierRecoveryAging,
+                        iconRes = stateValues.drawableResIconSupplierRecoveryAging.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = { copyTextToClipboard(supplierBackorderAgingNote(item)) }
+                    )
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(2009, "Copy bottleneck note"),
+                        iconPath = stateValues.drawablePathIconSupplierRecoveryBottleneck,
+                        iconRes = stateValues.drawableResIconSupplierRecoveryBottleneck.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = { copyTextToClipboard(supplierBackorderBottleneckNote(item)) }
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                ) {
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(2021, "Copy load note"),
+                        iconPath = stateValues.drawablePathIconSupplierRecoveryLoad,
+                        iconRes = stateValues.drawableResIconSupplierRecoveryLoad.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = { copyTextToClipboard(supplierBackorderLoadNote(item)) }
+                    )
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(2037, "Copy impact note"),
+                        iconPath = stateValues.drawablePathIconSupplierRecoveryImpact,
+                        iconRes = stateValues.drawableResIconSupplierRecoveryImpact.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = { copyTextToClipboard(supplierBackorderImpactNote(item)) }
+                    )
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(2054, "Copy commit note"),
+                        iconPath = stateValues.drawablePathIconSupplierRecoveryCommit,
+                        iconRes = stateValues.drawableResIconSupplierRecoveryCommit.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = { copyTextToClipboard(supplierBackorderCommitNote(item)) }
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                ) {
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(2070, "Copy allocation note"),
+                        iconPath = stateValues.drawablePathIconSupplierRecoveryAllocation,
+                        iconRes = stateValues.drawableResIconSupplierRecoveryAllocation.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = { copyTextToClipboard(supplierBackorderAllocationNote(item)) }
+                    )
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(2089, "Copy exception note"),
+                        iconPath = stateValues.drawablePathIconSupplierRecoveryException,
+                        iconRes = stateValues.drawableResIconSupplierRecoveryException.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = { copyTextToClipboard(supplierBackorderExceptionNote(item)) }
+                    )
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(2111, "Copy cause note"),
+                        iconPath = stateValues.drawablePathIconSupplierRecoveryCause,
+                        iconRes = stateValues.drawableResIconSupplierRecoveryCause.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = { copyTextToClipboard(supplierBackorderCauseNote(item)) }
+                    )
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(2130, "Copy verification note"),
+                        iconPath = stateValues.drawablePathIconSupplierRecoveryVerification,
+                        iconRes = stateValues.drawableResIconSupplierRecoveryVerification.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = { copyTextToClipboard(supplierBackorderVerificationNote(item)) }
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                ) {
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(2151, "Copy approval note"),
+                        iconPath = stateValues.drawablePathIconSupplierRecoveryApproval,
+                        iconRes = stateValues.drawableResIconSupplierRecoveryApproval.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = { copyTextToClipboard(supplierBackorderApprovalNote(item)) }
+                    )
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(2171, "Copy execution note"),
+                        iconPath = stateValues.drawablePathIconSupplierRecoveryExecution,
+                        iconRes = stateValues.drawableResIconSupplierRecoveryExecution.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = { copyTextToClipboard(supplierBackorderExecutionNote(item)) }
+                    )
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(2192, "Copy release note"),
+                        iconPath = stateValues.drawablePathIconSupplierRecoveryRelease,
+                        iconRes = stateValues.drawableResIconSupplierRecoveryRelease.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = { copyTextToClipboard(supplierBackorderReleaseNote(item)) }
+                    )
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(2211, "Copy seal note"),
+                        iconPath = stateValues.drawablePathIconSupplierRecoverySeal,
+                        iconRes = stateValues.drawableResIconSupplierRecoverySeal.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = { copyTextToClipboard(supplierBackorderSealNote(item)) }
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                ) {
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(2231, "Copy closeout note"),
+                        iconPath = stateValues.drawablePathIconSupplierRecoveryCloseout,
+                        iconRes = stateValues.drawableResIconSupplierRecoveryCloseout.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = { copyTextToClipboard(supplierBackorderCloseoutNote(item)) }
+                    )
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(2252, "Copy reopen note"),
+                        iconPath = stateValues.drawablePathIconSupplierRecoveryReopen,
+                        iconRes = stateValues.drawableResIconSupplierRecoveryReopen.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = { copyTextToClipboard(supplierBackorderReopenNote(item)) }
+                    )
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(2272, "Copy reconcile note"),
+                        iconPath = stateValues.drawablePathIconSupplierRecoveryReconciliation,
+                        iconRes = stateValues.drawableResIconSupplierRecoveryReconciliation.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = { copyTextToClipboard(supplierBackorderReconciliationNote(item)) }
+                    )
+                }
             }
         }
     }
@@ -26984,6 +31772,7 @@ private fun AppConfiguration.SupplierInsightsScreen() {
     val contracts by supplierPartnershipContractsState.payload.collectAsState()
     val supplierDashboard by supplierModeDashboardState.payload.collectAsState()
     var searchQuery by rememberSaveable { mutableStateOf("") }
+    var backorderWaveFilter by rememberSaveable { mutableStateOf("all") }
     val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(stateValues.userAccount?.id) {
@@ -27022,9 +31811,17 @@ private fun AppConfiguration.SupplierInsightsScreen() {
     val backorderWatchItems = remember(supplierDashboard, stateValues.appLanguage) {
         supplierDashboard?.backorderWatch.orEmpty()
     }
-    val visibleBackorderWatchItems = remember(backorderWatchItems, normalizedSearch, stateValues.appLanguage) {
+    val recoveryDesk = supplierDashboard?.recoveryDesk ?: SupplierDashboardRecoveryDeskDataModel()
+    val recoveryWaves = recoveryDesk.recoveryWaves
+    LaunchedEffect(backorderWaveFilter, recoveryWaves) {
+        if (backorderWaveFilter != "all" && recoveryWaves.none { it.recoveryWaveLane == backorderWaveFilter }) {
+            backorderWaveFilter = "all"
+        }
+    }
+    val visibleBackorderWatchItems = remember(backorderWatchItems, normalizedSearch, backorderWaveFilter, stateValues.appLanguage) {
         backorderWatchItems.filter { item ->
-            normalizedSearch.isBlank() || supplierBackorderSearchKey(item).contains(normalizedSearch)
+            val waveMatches = backorderWaveFilter == "all" || item.recoveryWaveLane == backorderWaveFilter
+            waveMatches && (normalizedSearch.isBlank() || supplierBackorderSearchKey(item).contains(normalizedSearch))
         }
     }
     val openOrdersCount = supplierDashboard?.openOrderCount ?: activeOrders.count { !it.status.isSupplierOrderClosed() }
@@ -27037,6 +31834,327 @@ private fun AppConfiguration.SupplierInsightsScreen() {
     val manufacturerBridgePriority = manufacturerBridgeItems.maxOfOrNull { it.priorityScore } ?: 0
     val backorderWatchCount = backorderWatchItems.size
     val backorderShortQuantity = backorderWatchItems.sumOf { it.missingQuantityTotal }.roundMoney()
+    val backorderStoreContactCount = backorderWatchItems.count { it.recoveryOwnerLane == "store_contact" }
+    val backorderUpstreamSourcingCount = backorderWatchItems.count { it.recoveryOwnerLane == "upstream_sourcing" }
+    val backorderPromiseClockCount = backorderWatchItems.count { it.recoverySlaLane == "call_now" || it.recoverySlaLane == "commit_today" }
+    val backorderPackHoldCount = backorderWatchItems.count { it.recoveryEscalationLane == "pack_hold" }
+    val backorderProofNeededCount = backorderWatchItems.count { it.recoveryProofLane != "watch_note" }
+    val backorderDecisionNeededCount = backorderWatchItems.count { it.recoveryOutcomeLane == "substitute_offer" || it.recoveryOutcomeLane == "cancel_review" }
+    val backorderPackGuardCount = backorderWatchItems.count { it.recoveryPackGuardLane != "safe_to_pack" }
+    val backorderContactNowCount = backorderWatchItems.count { it.recoveryContactLane == "store_call" || it.recoveryContactLane == "substitute_answer" }
+    val backorderUpstreamRequestCount = backorderWatchItems.count { it.recoveryContactLane == "upstream_request" }
+    val backorderHighRiskCount = backorderWatchItems.count { it.recoveryRiskLane == "critical_recovery" || it.recoveryRiskScore >= 78 }
+    val backorderAverageRiskScore = backorderWatchItems.takeIf { it.isNotEmpty() }?.let { items -> items.sumOf { it.recoveryRiskScore } / items.size } ?: 0
+    val supplierBackorderNow = supplierDashboard?.generatedAtMillis?.takeIf { it > 0L } ?: getCurrentTimeMillis()
+    val backorderLowConfidenceCount = backorderWatchItems.count { it.recoveryConfidenceLane == "blocked_until_decision" || it.recoveryConfidenceScore < 45 }
+    val backorderReadyRecoveryCount = backorderWatchItems.count { it.recoveryConfidenceLane == "ready_to_recover" }
+    val backorderHandoffNeededCount = backorderWatchItems.count { it.recoveryHandoffLane.isNotBlank() && it.recoveryHandoffLane != "watch_handoff" }
+    val backorderPackHandoffCount = backorderWatchItems.count { it.recoveryHandoffLane == "pack_handoff" }
+    val backorderCloseBlockerCount = backorderWatchItems.count { it.recoveryClosureLane == "blocked_open" || it.recoveryClosureLane == "needs_close_note" }
+    val backorderGuardReadyCount = backorderWatchItems.count { it.recoveryClosureLane == "ready_with_guard" }
+    val backorderLedgerGapCount = backorderWatchItems.count { it.recoveryLedgerLane == "audit_blocker" || it.recoveryLedgerScore < 55 }
+    val backorderLedgerReadyCount = backorderWatchItems.count { it.recoveryLedgerLane == "ledger_ready" }
+    val backorderTriageNowCount = backorderWatchItems.count { it.recoveryTriageLane == "triage_now" || it.recoveryTriageScore >= 70 }
+    val backorderReadyTriageCount = backorderWatchItems.count { it.recoveryTriageLane == "ready_lane" }
+    val backorderCommandStopCount = backorderWatchItems.count { it.recoveryCommandLane == "stop_pack" || it.recoveryCommandScore >= 78 }
+    val backorderCommandReadyCount = backorderWatchItems.count { it.recoveryCommandLane == "ready_with_note" }
+    val backorderPromiseRiskCount = backorderWatchItems.count { it.recoveryPromiseShieldLane == "promise_at_risk" || it.recoveryPromiseShieldScore >= 78 }
+    val backorderPromiseReadyCount = backorderWatchItems.count { it.recoveryPromiseShieldLane == "promise_safe" }
+    val backorderActiveWaveCount = recoveryWaves.count { it.shortageCount > 0 }
+    val backorderCommandWaveCount = recoveryWaves.firstOrNull { it.recoveryWaveLane == "wave_command" }?.shortageCount ?: 0
+    val backorderReadyWaveCount = recoveryWaves.firstOrNull { it.recoveryWaveLane == "wave_ready" }?.shortageCount ?: 0
+    val backorderStaleAgingCount = backorderWatchItems.count { it.recoveryAgingLane == "stale_blocker" || it.recoveryAgingScore >= 75 }
+    val backorderFreshAgingCount = backorderWatchItems.count { it.recoveryAgingLane == "fresh_recovery" }
+    val backorderOldestAgingHours = recoveryDesk.oldestRecoveryAgeHours.takeIf { it > 0 } ?: (backorderWatchItems.maxOfOrNull { it.recoveryAgingHours } ?: 0)
+    val backorderDecisionBottleneckCount = recoveryDesk.decisionBottleneckCount.takeIf { it > 0 } ?: backorderWatchItems.count { it.recoveryBottleneckLane == "decision_bottleneck" }
+    val backorderContactBottleneckCount = recoveryDesk.contactBottleneckCount.takeIf { it > 0 } ?: backorderWatchItems.count { it.recoveryBottleneckLane == "contact_bottleneck" }
+    val backorderSourcingBottleneckCount = recoveryDesk.sourcingBottleneckCount.takeIf { it > 0 } ?: backorderWatchItems.count { it.recoveryBottleneckLane == "sourcing_bottleneck" }
+    val backorderPackBottleneckCount = recoveryDesk.packBottleneckCount.takeIf { it > 0 } ?: backorderWatchItems.count { it.recoveryBottleneckLane == "pack_bottleneck" }
+    val backorderProofBottleneckCount = recoveryDesk.proofBottleneckCount.takeIf { it > 0 } ?: backorderWatchItems.count { it.recoveryBottleneckLane == "proof_bottleneck" }
+    val backorderAgingBottleneckCount = recoveryDesk.agingBottleneckCount.takeIf { it > 0 } ?: backorderWatchItems.count { it.recoveryBottleneckLane == "aging_bottleneck" }
+    val backorderReadyBottleneckCount = recoveryDesk.readyBottleneckCount.takeIf { it > 0 } ?: backorderWatchItems.count { it.recoveryBottleneckLane == "ready_bottleneck" }
+    val backorderTopBottleneckLane = recoveryDesk.topBottleneckLane.ifBlank {
+        backorderWatchItems
+            .groupingBy { it.recoveryBottleneckLane.ifBlank { "watch_bottleneck" } }
+            .eachCount()
+            .maxByOrNull { it.value }
+            ?.key
+            .orEmpty()
+    }
+    val backorderHeavyLoadCount = recoveryDesk.heavyLoadCount.takeIf { it > 0 } ?: backorderWatchItems.count { it.recoveryLoadLane == "heavy_load" || it.recoveryLoadScore >= 78 }
+    val backorderMultiStoreLoadCount = recoveryDesk.multiStoreLoadCount.takeIf { it > 0 } ?: backorderWatchItems.count { it.recoveryLoadLane == "multi_store_load" }
+    val backorderPackLoadCount = recoveryDesk.packLoadCount.takeIf { it > 0 } ?: backorderWatchItems.count { it.recoveryLoadLane == "pack_load" }
+    val backorderReadyLoadCount = recoveryDesk.readyLoadCount.takeIf { it > 0 } ?: backorderWatchItems.count { it.recoveryLoadLane == "ready_load" }
+    val backorderAverageLoadScore = recoveryDesk.averageLoadScore.takeIf { it > 0 } ?: (backorderWatchItems.takeIf { it.isNotEmpty() }?.let { items -> items.sumOf { it.recoveryLoadScore } / items.size } ?: 0)
+    val backorderTopLoadLane = recoveryDesk.topLoadLane.ifBlank {
+        backorderWatchItems
+            .groupingBy { it.recoveryLoadLane.ifBlank { "watch_load" } }
+            .eachCount()
+            .maxByOrNull { it.value }
+            ?.key
+            .orEmpty()
+    }
+    val backorderHighImpactCount = recoveryDesk.highImpactCount.takeIf { it > 0 } ?: backorderWatchItems.count { it.recoveryImpactLane == "customer_promise_impact" || it.recoveryImpactScore >= 72 }
+    val backorderPromiseImpactCount = recoveryDesk.promiseImpactCount.takeIf { it > 0 } ?: backorderWatchItems.count { it.recoveryImpactLane == "customer_promise_impact" }
+    val backorderMultiStoreImpactCount = recoveryDesk.multiStoreImpactCount.takeIf { it > 0 } ?: backorderWatchItems.count { it.recoveryImpactLane == "multi_store_impact" }
+    val backorderReplenishmentImpactCount = recoveryDesk.replenishmentImpactCount.takeIf { it > 0 } ?: backorderWatchItems.count { it.recoveryImpactLane == "store_replenishment_impact" }
+    val backorderControlledImpactCount = recoveryDesk.controlledImpactCount.takeIf { it > 0 } ?: backorderWatchItems.count { it.recoveryImpactLane == "controlled_impact" }
+    val backorderAverageImpactScore = recoveryDesk.averageImpactScore.takeIf { it > 0 } ?: (backorderWatchItems.takeIf { it.isNotEmpty() }?.let { items -> items.sumOf { it.recoveryImpactScore } / items.size } ?: 0)
+    val backorderMaxImpactScore = recoveryDesk.maxImpactScore.takeIf { it > 0 } ?: (backorderWatchItems.maxOfOrNull { it.recoveryImpactScore } ?: 0)
+    val backorderTopImpactLane = recoveryDesk.topImpactLane.ifBlank {
+        backorderWatchItems
+            .groupingBy { it.recoveryImpactLane.ifBlank { "impact_watch" } }
+            .eachCount()
+            .maxByOrNull { it.value }
+            ?.key
+            .orEmpty()
+    }
+    val backorderBlockedCommitCount = recoveryDesk.blockedCommitCount.takeIf { it > 0 } ?: backorderWatchItems.count { it.recoveryCommitLane == "commit_blocked" || it.recoveryCommitScore >= 78 }
+    val backorderDueCommitCount = recoveryDesk.dueCommitCount.takeIf { it > 0 } ?: backorderWatchItems.count { item ->
+        item.recoveryCommitLane == "commit_store_today" || (item.recoveryCommitByMillis?.let { commitAt -> commitAt <= supplierBackorderNow + AITA_SUPPLIER_UI_DAY_MILLIS } == true)
+    }
+    val backorderSourceCommitCount = recoveryDesk.sourceCommitCount.takeIf { it > 0 } ?: backorderWatchItems.count { it.recoveryCommitLane == "commit_source_eta" }
+    val backorderSplitCommitCount = recoveryDesk.splitCommitCount.takeIf { it > 0 } ?: backorderWatchItems.count { it.recoveryCommitLane == "commit_split_eta" }
+    val backorderReadyCommitCount = recoveryDesk.readyCommitCount.takeIf { it > 0 } ?: backorderWatchItems.count { it.recoveryCommitLane == "commit_ready" }
+    val backorderAverageCommitScore = recoveryDesk.averageCommitScore.takeIf { it > 0 } ?: (backorderWatchItems.takeIf { it.isNotEmpty() }?.let { items -> items.sumOf { it.recoveryCommitScore } / items.size } ?: 0)
+    val backorderTopCommitLane = recoveryDesk.topCommitLane.ifBlank {
+        backorderWatchItems
+            .groupingBy { it.recoveryCommitLane.ifBlank { "commit_watch" } }
+            .eachCount()
+            .maxByOrNull { it.value }
+            ?.key
+            .orEmpty()
+    }
+    val backorderNextCommitText = (
+        recoveryDesk.nextCommitAtMillis
+            ?.takeIf { it > 0L }
+            ?.let { receiptUiDateTime(it) }
+            ?: backorderWatchItems
+                .mapNotNull { it.recoveryCommitByMillis }
+                .filter { it > supplierBackorderNow }
+                .minOrNull()
+                ?.let { receiptUiDateTime(it) }
+    ).orEmpty()
+    val backorderAllocationPressureCount = recoveryDesk.allocationPressureCount.takeIf { it > 0 } ?: backorderWatchItems.count { item ->
+        item.recoveryAllocationLane == "fair_split_needed" ||
+            item.recoveryAllocationLane == "priority_allocation" ||
+            item.recoveryAllocationScore >= 68
+    }
+    val backorderFairSplitAllocationCount = recoveryDesk.fairSplitAllocationCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryAllocationLane == "fair_split_needed" }
+    val backorderAllocationReadyCount = recoveryDesk.allocationReadyCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryAllocationLane == "allocation_ready" }
+    val backorderTopAllocationLane = recoveryDesk.topAllocationLane.ifBlank {
+        backorderWatchItems
+            .groupingBy { item -> item.recoveryAllocationLane.ifBlank { "allocation_watch" } }
+            .eachCount()
+            .maxByOrNull { entry -> entry.value }
+            ?.key
+            .orEmpty()
+    }
+    val backorderMaxAllocationScore = recoveryDesk.maxAllocationScore.takeIf { it > 0 } ?: (backorderWatchItems.maxOfOrNull { item -> item.recoveryAllocationScore } ?: 0)
+    val backorderExceptionPressureCount = recoveryDesk.exceptionPressureCount.takeIf { it > 0 } ?: backorderWatchItems.count { item ->
+        item.recoveryExceptionLane == "exception_stop_pack" ||
+            item.recoveryExceptionLane == "exception_cancel_review" ||
+            item.recoveryExceptionLane == "exception_substitute" ||
+            item.recoveryExceptionLane == "exception_sourcing" ||
+            item.recoveryExceptionLane == "exception_allocation" ||
+            item.recoveryExceptionScore >= 70
+    }
+    val backorderStopPackExceptionCount = recoveryDesk.stopPackExceptionCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryExceptionLane == "exception_stop_pack" }
+    val backorderCancelExceptionCount = recoveryDesk.cancelReviewExceptionCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryExceptionLane == "exception_cancel_review" }
+    val backorderSubstituteExceptionCount = recoveryDesk.substituteExceptionCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryExceptionLane == "exception_substitute" }
+    val backorderSourcingExceptionCount = recoveryDesk.sourcingExceptionCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryExceptionLane == "exception_sourcing" }
+    val backorderAllocationExceptionCount = recoveryDesk.allocationExceptionCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryExceptionLane == "exception_allocation" }
+    val backorderExceptionReadyCount = recoveryDesk.exceptionReadyCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryExceptionLane == "exception_ready" }
+    val backorderAverageExceptionScore = recoveryDesk.averageExceptionScore.takeIf { it > 0 } ?: (backorderWatchItems.takeIf { it.isNotEmpty() }?.let { items -> items.sumOf { item -> item.recoveryExceptionScore } / items.size } ?: 0)
+    val backorderMaxExceptionScore = recoveryDesk.maxExceptionScore.takeIf { it > 0 } ?: (backorderWatchItems.maxOfOrNull { item -> item.recoveryExceptionScore } ?: 0)
+    val backorderTopExceptionLane = recoveryDesk.topExceptionLane.ifBlank {
+        backorderWatchItems
+            .groupingBy { item -> item.recoveryExceptionLane.ifBlank { "exception_watch" } }
+            .eachCount()
+            .maxByOrNull { entry -> entry.value }
+            ?.key
+            .orEmpty()
+    }
+    val backorderCausePressureCount = recoveryDesk.causePressureCount.takeIf { it > 0 } ?: backorderWatchItems.count { item ->
+        item.recoveryCauseLane == "zero_acceptance_cause" ||
+            item.recoveryCauseLane == "exception_cause" ||
+            item.recoveryCauseLane == "promise_conflict_cause" ||
+            item.recoveryCauseLane == "allocation_cause" ||
+            item.recoveryCauseLane == "partial_capacity_cause" ||
+            item.recoveryCauseScore >= 68
+    }
+    val backorderZeroCauseCount = recoveryDesk.zeroAcceptanceCauseCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryCauseLane == "zero_acceptance_cause" }
+    val backorderCapacityCauseCount = recoveryDesk.partialCapacityCauseCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryCauseLane == "partial_capacity_cause" }
+    val backorderPromiseCauseCount = recoveryDesk.promiseConflictCauseCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryCauseLane == "promise_conflict_cause" }
+    val backorderCauseReadyCount = recoveryDesk.causeReadyCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryCauseLane == "cause_ready" }
+    val backorderMaxCauseScore = recoveryDesk.maxCauseScore.takeIf { it > 0 } ?: (backorderWatchItems.maxOfOrNull { item -> item.recoveryCauseScore } ?: 0)
+    val backorderTopCauseLane = recoveryDesk.topCauseLane.ifBlank {
+        backorderWatchItems
+            .groupingBy { item -> item.recoveryCauseLane.ifBlank { "cause_watch" } }
+            .eachCount()
+            .maxByOrNull { entry -> entry.value }
+            ?.key
+            .orEmpty()
+    }
+    val backorderVerificationBlockerCount = recoveryDesk.verificationBlockerCount.takeIf { it > 0 } ?: backorderWatchItems.count { item ->
+        item.recoveryVerificationLane == "verify_blocked" || item.recoveryVerificationScore >= 76
+    }
+    val backorderStoreVerificationCount = recoveryDesk.storeVerificationCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryVerificationLane == "verify_store_answer" }
+    val backorderSourceVerificationCount = recoveryDesk.sourceVerificationCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryVerificationLane == "verify_source_proof" }
+    val backorderPackVerificationCount = recoveryDesk.packVerificationCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryVerificationLane == "verify_pack_split" }
+    val backorderCauseVerificationCount = recoveryDesk.causeVerificationCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryVerificationLane == "verify_cause_record" }
+    val backorderVerificationReadyCount = recoveryDesk.verificationReadyCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryVerificationLane == "verify_ready" }
+    val backorderAverageVerificationScore = recoveryDesk.averageVerificationScore.takeIf { it > 0 } ?: (backorderWatchItems.takeIf { it.isNotEmpty() }?.let { items -> items.sumOf { item -> item.recoveryVerificationScore } / items.size } ?: 0)
+    val backorderMaxVerificationScore = recoveryDesk.maxVerificationScore.takeIf { it > 0 } ?: (backorderWatchItems.maxOfOrNull { item -> item.recoveryVerificationScore } ?: 0)
+    val backorderTopVerificationLane = recoveryDesk.topVerificationLane.ifBlank {
+        backorderWatchItems
+            .groupingBy { item -> item.recoveryVerificationLane.ifBlank { "verify_watch" } }
+            .eachCount()
+            .maxByOrNull { entry -> entry.value }
+            ?.key
+            .orEmpty()
+    }
+    val backorderApprovalBlockerCount = recoveryDesk.approvalBlockerCount.takeIf { it > 0 } ?: backorderWatchItems.count { item ->
+        item.recoveryApprovalLane == "approval_blocked" || item.recoveryApprovalScore >= 78
+    }
+    val backorderManagerApprovalCount = recoveryDesk.managerApprovalCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryApprovalLane == "approval_manager_review" }
+    val backorderStoreApprovalCount = recoveryDesk.storeApprovalCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryApprovalLane == "approval_store_ack" }
+    val backorderSourceApprovalCount = recoveryDesk.sourceApprovalCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryApprovalLane == "approval_source_ack" }
+    val backorderPackApprovalCount = recoveryDesk.packApprovalCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryApprovalLane == "approval_pack_lead" }
+    val backorderApprovalReadyCount = recoveryDesk.approvalReadyCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryApprovalLane == "approval_ready" }
+    val backorderAverageApprovalScore = recoveryDesk.averageApprovalScore.takeIf { it > 0 } ?: (backorderWatchItems.takeIf { it.isNotEmpty() }?.let { items -> items.sumOf { item -> item.recoveryApprovalScore } / items.size } ?: 0)
+    val backorderMaxApprovalScore = recoveryDesk.maxApprovalScore.takeIf { it > 0 } ?: (backorderWatchItems.maxOfOrNull { item -> item.recoveryApprovalScore } ?: 0)
+    val backorderTopApprovalLane = recoveryDesk.topApprovalLane.ifBlank {
+        backorderWatchItems
+            .groupingBy { item -> item.recoveryApprovalLane.ifBlank { "approval_watch" } }
+            .eachCount()
+            .maxByOrNull { entry -> entry.value }
+            ?.key
+            .orEmpty()
+    }
+    val backorderExecutionBlockerCount = recoveryDesk.executionBlockerCount.takeIf { it > 0 } ?: backorderWatchItems.count { item ->
+        item.recoveryExecutionLane == "execution_blocked" || item.recoveryExecutionScore >= 80
+    }
+    val backorderStoreExecutionCount = recoveryDesk.storeExecutionCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryExecutionLane == "execute_store_call" }
+    val backorderSourceExecutionCount = recoveryDesk.sourceExecutionCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryExecutionLane == "execute_source_eta" }
+    val backorderSplitExecutionCount = recoveryDesk.splitExecutionCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryExecutionLane == "execute_split_pack" }
+    val backorderReadyExecutionCount = recoveryDesk.readyExecutionCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryExecutionLane == "execute_ship_ready" }
+    val backorderAverageExecutionScore = recoveryDesk.averageExecutionScore.takeIf { it > 0 } ?: (backorderWatchItems.takeIf { it.isNotEmpty() }?.let { items -> items.sumOf { item -> item.recoveryExecutionScore } / items.size } ?: 0)
+    val backorderMaxExecutionScore = recoveryDesk.maxExecutionScore.takeIf { it > 0 } ?: (backorderWatchItems.maxOfOrNull { item -> item.recoveryExecutionScore } ?: 0)
+    val backorderTopExecutionLane = recoveryDesk.topExecutionLane.ifBlank {
+        backorderWatchItems
+            .groupingBy { item -> item.recoveryExecutionLane.ifBlank { "execution_watch" } }
+            .eachCount()
+            .maxByOrNull { entry -> entry.value }
+            ?.key
+            .orEmpty()
+    }
+    val backorderReleaseBlockerCount = recoveryDesk.releaseBlockerCount.takeIf { it > 0 } ?: backorderWatchItems.count { item ->
+        item.recoveryReleaseLane == "release_blocked" || item.recoveryReleaseScore >= 82
+    }
+    val backorderStoreReleaseCount = recoveryDesk.storeReleaseCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryReleaseLane == "release_store_update" }
+    val backorderSourceReleaseCount = recoveryDesk.sourceReleaseCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryReleaseLane == "release_source_eta" }
+    val backorderSplitReleaseCount = recoveryDesk.splitReleaseCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryReleaseLane == "release_split_dispatch" }
+    val backorderReadyReleaseCount = recoveryDesk.readyReleaseCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryReleaseLane == "release_ready" }
+    val backorderAverageReleaseScore = recoveryDesk.averageReleaseScore.takeIf { it > 0 } ?: (backorderWatchItems.takeIf { it.isNotEmpty() }?.let { items -> items.sumOf { item -> item.recoveryReleaseScore } / items.size } ?: 0)
+    val backorderMaxReleaseScore = recoveryDesk.maxReleaseScore.takeIf { it > 0 } ?: (backorderWatchItems.maxOfOrNull { item -> item.recoveryReleaseScore } ?: 0)
+    val backorderTopReleaseLane = recoveryDesk.topReleaseLane.ifBlank {
+        backorderWatchItems
+            .groupingBy { item -> item.recoveryReleaseLane.ifBlank { "release_watch" } }
+            .eachCount()
+            .maxByOrNull { entry -> entry.value }
+            ?.key
+            .orEmpty()
+    }
+    val backorderSealBlockerCount = recoveryDesk.sealBlockerCount.takeIf { it > 0 } ?: backorderWatchItems.count { item ->
+        item.recoverySealLane == "seal_blocked" || item.recoverySealScore >= 84
+    }
+    val backorderStoreSealCount = recoveryDesk.storeSealCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoverySealLane == "seal_store_notice" }
+    val backorderSourceSealCount = recoveryDesk.sourceSealCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoverySealLane == "seal_source_trace" }
+    val backorderSplitSealCount = recoveryDesk.splitSealCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoverySealLane == "seal_split_manifest" }
+    val backorderReadySealCount = recoveryDesk.readySealCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoverySealLane == "seal_ready" }
+    val backorderAverageSealScore = recoveryDesk.averageSealScore.takeIf { it > 0 } ?: (backorderWatchItems.takeIf { it.isNotEmpty() }?.let { items -> items.sumOf { item -> item.recoverySealScore } / items.size } ?: 0)
+    val backorderMaxSealScore = recoveryDesk.maxSealScore.takeIf { it > 0 } ?: (backorderWatchItems.maxOfOrNull { item -> item.recoverySealScore } ?: 0)
+    val backorderTopSealLane = recoveryDesk.topSealLane.ifBlank {
+        backorderWatchItems
+            .groupingBy { item -> item.recoverySealLane.ifBlank { "seal_watch" } }
+            .eachCount()
+            .maxByOrNull { entry -> entry.value }
+            ?.key
+            .orEmpty()
+    }
+    val backorderCloseoutBlockerCount = recoveryDesk.closeoutBlockerCount.takeIf { it > 0 } ?: backorderWatchItems.count { item ->
+        item.recoveryCloseoutLane == "closeout_blocked" || item.recoveryCloseoutScore >= 86
+    }
+    val backorderStoreCloseoutCount = recoveryDesk.storeCloseoutCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryCloseoutLane == "closeout_store_notice" }
+    val backorderSourceCloseoutCount = recoveryDesk.sourceCloseoutCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryCloseoutLane == "closeout_source_trace" }
+    val backorderSplitCloseoutCount = recoveryDesk.splitCloseoutCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryCloseoutLane == "closeout_split_leftover" }
+    val backorderReadyCloseoutCount = recoveryDesk.readyCloseoutCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryCloseoutLane == "closeout_ready" }
+    val backorderAverageCloseoutScore = recoveryDesk.averageCloseoutScore.takeIf { it > 0 } ?: (backorderWatchItems.takeIf { it.isNotEmpty() }?.let { items -> items.sumOf { item -> item.recoveryCloseoutScore } / items.size } ?: 0)
+    val backorderMaxCloseoutScore = recoveryDesk.maxCloseoutScore.takeIf { it > 0 } ?: (backorderWatchItems.maxOfOrNull { item -> item.recoveryCloseoutScore } ?: 0)
+    val backorderTopCloseoutLane = recoveryDesk.topCloseoutLane.ifBlank {
+        backorderWatchItems
+            .groupingBy { item -> item.recoveryCloseoutLane.ifBlank { "closeout_watch" } }
+            .eachCount()
+            .maxByOrNull { entry -> entry.value }
+            ?.key
+            .orEmpty()
+    }
+    val backorderReopenBlockerCount = recoveryDesk.reopenBlockerCount.takeIf { it > 0 } ?: backorderWatchItems.count { item ->
+        item.recoveryReopenLane == "reopen_blocked" || item.recoveryReopenScore >= 86
+    }
+    val backorderReopenAnswerCount = recoveryDesk.reopenAnswerCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryReopenLane == "reopen_after_answer" }
+    val backorderReopenPromiseCount = recoveryDesk.reopenPromiseCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryReopenLane == "reopen_if_promise_slips" }
+    val backorderReopenSplitCount = recoveryDesk.reopenSplitCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryReopenLane == "reopen_split_leftover" }
+    val backorderReopenReadyCount = recoveryDesk.reopenReadyCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryReopenLane == "reopen_safe" }
+    val backorderAverageReopenScore = recoveryDesk.averageReopenScore.takeIf { it > 0 } ?: (backorderWatchItems.takeIf { it.isNotEmpty() }?.let { items -> items.sumOf { item -> item.recoveryReopenScore } / items.size } ?: 0)
+    val backorderMaxReopenScore = recoveryDesk.maxReopenScore.takeIf { it > 0 } ?: (backorderWatchItems.maxOfOrNull { item -> item.recoveryReopenScore } ?: 0)
+    val backorderReconciliationBlockerCount = recoveryDesk.reconciliationBlockerCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryReconciliationLane == "reconcile_blocked" || item.recoveryReconciliationScore >= 86 }
+    val backorderReconciliationStoreCount = recoveryDesk.reconciliationStoreCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryReconciliationLane == "reconcile_store_delta" }
+    val backorderReconciliationSourceCount = recoveryDesk.reconciliationSourceCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryReconciliationLane == "reconcile_source_delta" }
+    val backorderReconciliationSplitCount = recoveryDesk.reconciliationSplitCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryReconciliationLane == "reconcile_split_delta" }
+    val backorderReconciliationReadyCount = recoveryDesk.reconciliationReadyCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryReconciliationLane == "reconcile_ready" }
+    val backorderMaxReconciliationScore = recoveryDesk.maxReconciliationScore.takeIf { it > 0 } ?: (backorderWatchItems.maxOfOrNull { item -> item.recoveryReconciliationScore } ?: 0)
+    val backorderTopReconciliationLane = recoveryDesk.topReconciliationLane.ifBlank {
+        backorderWatchItems
+            .groupingBy { item -> item.recoveryReconciliationLane.ifBlank { "reconcile_watch" } }
+            .eachCount()
+            .maxByOrNull { entry -> entry.value }
+            ?.key
+            .orEmpty()
+    }
+    val backorderNextReopenText = recoveryDesk.nextReopenAtMillis
+        ?.takeIf { it > 0L }
+        ?.let { receiptUiDateTime(it) }
+        .orEmpty()
+    val backorderTopReopenLane = recoveryDesk.topReopenLane.ifBlank {
+        backorderWatchItems
+            .groupingBy { item -> item.recoveryReopenLane.ifBlank { "reopen_watch" } }
+            .eachCount()
+            .maxByOrNull { entry -> entry.value }
+            ?.key
+            .orEmpty()
+    }
+    val backorderFollowUpNowCount = backorderWatchItems.count { item ->
+        item.recoveryFollowUpLane == "follow_up_now" || (item.recoveryFollowUpAtMillis?.let { it <= supplierBackorderNow } == true)
+    }
+    val backorderNextFollowUpText = backorderWatchItems
+        .mapNotNull { it.recoveryFollowUpAtMillis }
+        .filter { it > supplierBackorderNow }
+        .minOrNull()
+        ?.let { receiptUiDateTime(it) }
+        .orEmpty()
+    val recoveryDeskHintText = recoveryDesk.recoveryDeskHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { recoveryDesk.recoveryDeskHint.visibleLocalizedString("main", "") }
+    val recoveryDeskChecklistText = recoveryDesk.recoveryDeskChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { recoveryDesk.recoveryDeskChecklist.visibleLocalizedString("main", "") }
+    val recoveryDeskScriptText = recoveryDesk.recoveryDeskScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { recoveryDesk.recoveryDeskScript.visibleLocalizedString("main", "") }
+    val recoveryDeskNextFollowUpText = recoveryDesk.nextFollowUpAtMillis
+        ?.takeIf { it > 0L }
+        ?.let { receiptUiDateTime(it) }
+        .orEmpty()
+    val recoveryDeskTopText = supplierRecoveryDeskTopTitle(recoveryDesk)
     val supplierStatusMixText = supplierDashboard?.statusBuckets
         ?.take(4)
         ?.joinToString(" • ") { bucket -> "${supplierOrderStatusTitle(bucket.status)} ${bucket.orderCount}" }
@@ -27207,7 +32325,7 @@ private fun AppConfiguration.SupplierInsightsScreen() {
                                 confirmationRequired = false,
                                 onClick = {
                                     coroutineScope.launch {
-                                        NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to SupplierOrderStatusDataModel.Sent.name)
+                                        seedSupplierOrdersInboxNavigation(statusFilter = SupplierOrderStatusDataModel.Sent.name)
                                         Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
                                     }
                                 }
@@ -27242,7 +32360,7 @@ private fun AppConfiguration.SupplierInsightsScreen() {
                                 confirmationRequired = false,
                                 onClick = {
                                     coroutineScope.launch {
-                                        NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to SupplierOrderStatusDataModel.Sent.name)
+                                        seedSupplierOrdersInboxNavigation(statusFilter = SupplierOrderStatusDataModel.Sent.name)
                                         Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
                                     }
                                 }
@@ -27382,9 +32500,9 @@ private fun AppConfiguration.SupplierInsightsScreen() {
                     ) {
                         CpImage(
                             modifier = Modifier.size(40.dp),
-                            url = stateValues.drawablePathIconSupplierDemandRadar,
-                            fallbackRes = stateValues.drawableResIconSupplierDemandRadar.value,
-                            contentDescription = localizedStringResource(1794, "Backorder watch"),
+                            url = stateValues.drawablePathIconSupplierBackorderRecovery,
+                            fallbackRes = stateValues.drawableResIconSupplierBackorderRecovery.value,
+                            contentDescription = localizedStringResource(1816, "Backorder recovery"),
                             tintColor = stateValues.ErrorColor
                         )
                         Column(modifier = Modifier.weight(1f)) {
@@ -27401,12 +32519,878 @@ private fun AppConfiguration.SupplierInsightsScreen() {
                             )
                         }
                     }
+                    if (recoveryDesk.shortageCount > 0 || recoveryDesk.recoveryDeskLane.isNotBlank()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(stateValues.cornerRadius))
+                                .background(stateValues.AccentColor.copy(alpha = 0.10f))
+                                .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.42f), RoundedCornerShape(stateValues.cornerRadius))
+                                .padding(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                CpImage(
+                                    modifier = Modifier.size(30.dp),
+                                    url = stateValues.drawablePathIconSupplierRecoveryDesk,
+                                    fallbackRes = stateValues.drawableResIconSupplierRecoveryDesk.value,
+                                    contentDescription = localizedStringResource(1958, "Recovery desk"),
+                                    tintColor = stateValues.AccentColor
+                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "${localizedStringResource(1958, "Recovery desk")} • ${supplierBackorderRecoveryDeskTitle(recoveryDesk.recoveryDeskLane)}",
+                                        color = stateValues.TextColor,
+                                        fontSize = stateValues.mainTextSize,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "${localizedStringResource(1794, "Backorder watch")} ${recoveryDesk.shortageCount} • ${localizedStringResource(1864, "Risk score")} ${recoveryDesk.averageRiskScore}/100",
+                                        color = stateValues.PlaceholderTextColor,
+                                        fontSize = stateValues.smallTextSize
+                                    )
+                                }
+                            }
+                            if (recoveryDeskHintText.isNotBlank()) {
+                                Text(
+                                    text = recoveryDeskHintText,
+                                    color = stateValues.TextColor,
+                                    fontSize = stateValues.smallTextSize,
+                                    maxLines = 4,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1968, "Urgent desk")}: ${recoveryDesk.urgentCount}") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1969, "Stop-pack desk")}: ${recoveryDesk.stopPackCount}") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1955, "Promise risks")}: ${recoveryDesk.promiseRiskCount}") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1871, "Ready to recover")}: ${recoveryDesk.readyCount}") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1818, "Store contact")}: ${recoveryDesk.storeContactCount}") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1819, "Upstream sourcing")}: ${recoveryDesk.sourcingCount}") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1962, "Split wave")}: ${recoveryDesk.splitShipCount}") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1722, "Priority score")}: ${recoveryDesk.maxPriorityScore}") }
+                            }
+                            if (recoveryDesk.topGoodsItemId.isNotBlank()) {
+                                StockCardInfoLine(localizedStringResource(1970, "Top recovery"), recoveryDeskTopText, stateValues.TextColor)
+                            }
+                            if (recoveryDeskNextFollowUpText.isNotBlank()) {
+                                StockCardInfoLine(localizedStringResource(1972, "Next desk follow-up"), recoveryDeskNextFollowUpText, stateValues.TextColor)
+                            }
+                            if (recoveryDeskChecklistText.isNotBlank()) {
+                                Text(
+                                    text = recoveryDeskChecklistText,
+                                    color = stateValues.TextColor,
+                                    fontSize = stateValues.smallTextSize,
+                                    maxLines = 5,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            if (recoveryDeskScriptText.isNotBlank()) {
+                                Text(
+                                    text = recoveryDeskScriptText,
+                                    color = stateValues.PlaceholderTextColor,
+                                    fontSize = stateValues.smallTextSize,
+                                    maxLines = 4,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1993, "Stale age")}: ${recoveryDesk.staleRecoveryCount}") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1994, "Fresh touches")}: ${recoveryDesk.freshRecoveryCount}") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1996, "Oldest age")}: ${backorderOldestAgingHours}h") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1997, "Average age")}: ${recoveryDesk.averageRecoveryAgeHours}h") }
+                            }
+                            StockCardInfoLine(localizedStringResource(2010, "Top bottleneck"), supplierBackorderRecoveryBottleneckTitle(backorderTopBottleneckLane), stateValues.TextColor)
+                            StockCardInfoLine(localizedStringResource(2022, "Top load"), supplierBackorderRecoveryLoadTitle(backorderTopLoadLane), stateValues.TextColor)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2024, "Heavy loads")}: $backorderHeavyLoadCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2028, "Average load")}: $backorderAverageLoadScore/100") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2025, "Multi-store loads")}: $backorderMultiStoreLoadCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2026, "Pack loads")}: $backorderPackLoadCount") }
+                            }
+                            StockCardInfoLine(localizedStringResource(2041, "Top impact"), supplierBackorderRecoveryImpactTitle(backorderTopImpactLane), stateValues.TextColor)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2039, "High impact")}: $backorderHighImpactCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2040, "Promise impact")}: $backorderPromiseImpactCount") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2031, "Multi-store impact")}: $backorderMultiStoreImpactCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2032, "Store replenishment impact")}: $backorderReplenishmentImpactCount") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2033, "Controlled impact")}: $backorderControlledImpactCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2043, "Impact max")}: $backorderMaxImpactScore/100") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2042, "Impact average")}: $backorderAverageImpactScore/100") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2043, "Impact max")}: $backorderMaxImpactScore/100") }
+                            }
+                            StockCardInfoLine(localizedStringResource(2056, "Top commit"), supplierBackorderRecoveryCommitTitle(backorderTopCommitLane), stateValues.TextColor)
+                            if (backorderNextCommitText.isNotBlank()) {
+                                StockCardInfoLine(localizedStringResource(2061, "Next commit"), backorderNextCommitText, stateValues.TextColor)
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2057, "Blocked commits")}: $backorderBlockedCommitCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2058, "Due commits")}: $backorderDueCommitCount") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2047, "Source ETA commit")}: $backorderSourceCommitCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2048, "Split ETA commit")}: $backorderSplitCommitCount") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2059, "Ready commits")}: $backorderReadyCommitCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2060, "Average commit")}: $backorderAverageCommitScore/100") }
+                            }
+                            StockCardInfoLine(localizedStringResource(2072, "Top allocation"), supplierBackorderRecoveryAllocationTitle(backorderTopAllocationLane), stateValues.TextColor)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2073, "Allocation pressure")}: $backorderAllocationPressureCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2074, "Fair splits")}: $backorderFairSplitAllocationCount") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2076, "Ready allocations")}: $backorderAllocationReadyCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2078, "Allocation max")}: $backorderMaxAllocationScore/100") }
+                            }
+                            StockCardInfoLine(localizedStringResource(2091, "Top exception"), supplierBackorderRecoveryExceptionTitle(backorderTopExceptionLane), stateValues.TextColor)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2092, "Exception pressure")}: $backorderExceptionPressureCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2100, "Exception max")}: $backorderMaxExceptionScore/100") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2093, "Stop-pack exceptions")}: $backorderStopPackExceptionCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2094, "Cancel exceptions")}: $backorderCancelExceptionCount") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2095, "Substitute exceptions")}: $backorderSubstituteExceptionCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2098, "Ready exceptions")}: $backorderExceptionReadyCount") }
+                            }
+                            StockCardInfoLine(localizedStringResource(2113, "Top cause"), supplierBackorderRecoveryCauseTitle(backorderTopCauseLane), stateValues.TextColor)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2114, "Cause pressure")}: $backorderCausePressureCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2119, "Cause max")}: $backorderMaxCauseScore/100") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2115, "Zero causes")}: $backorderZeroCauseCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2116, "Capacity causes")}: $backorderCapacityCauseCount") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2117, "Promise causes")}: $backorderPromiseCauseCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2118, "Ready causes")}: $backorderCauseReadyCount") }
+                            }
+                            StockCardInfoLine(localizedStringResource(2132, "Top verification"), supplierBackorderRecoveryVerificationTitle(backorderTopVerificationLane), stateValues.TextColor)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2133, "Verification blockers")}: $backorderVerificationBlockerCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2139, "Verification max")}: $backorderMaxVerificationScore/100") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2137, "Cause verifications")}: $backorderCauseVerificationCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2138, "Ready verifications")}: $backorderVerificationReadyCount") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2134, "Store verifications")}: $backorderStoreVerificationCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2135, "Source verifications")}: $backorderSourceVerificationCount") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2136, "Pack verifications")}: $backorderPackVerificationCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2140, "Verification average")}: $backorderAverageVerificationScore/100") }
+                            }
+                            StockCardInfoLine(localizedStringResource(2153, "Top approval"), supplierBackorderRecoveryApprovalTitle(backorderTopApprovalLane), stateValues.TextColor)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2154, "Approval blockers")}: $backorderApprovalBlockerCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2160, "Approval max")}: $backorderMaxApprovalScore/100") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2155, "Manager approvals")}: $backorderManagerApprovalCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2159, "Ready approvals")}: $backorderApprovalReadyCount") }
+                            }
+                            StockCardInfoLine(localizedStringResource(2173, "Top execution"), supplierBackorderRecoveryExecutionTitle(backorderTopExecutionLane), stateValues.TextColor)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2174, "Execution blockers")}: $backorderExecutionBlockerCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2179, "Execution max")}: $backorderMaxExecutionScore/100") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2175, "Store executions")}: $backorderStoreExecutionCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2178, "Ready executions")}: $backorderReadyExecutionCount") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2176, "Source executions")}: $backorderSourceExecutionCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2177, "Split executions")}: $backorderSplitExecutionCount") }
+                            }
+                            StockCardInfoLine(localizedStringResource(2193, "Top release"), supplierBackorderRecoveryReleaseTitle(backorderTopReleaseLane), stateValues.TextColor)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2194, "Release blockers")}: $backorderReleaseBlockerCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2200, "Release max")}: $backorderMaxReleaseScore/100") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2197, "Source releases")}: $backorderSourceReleaseCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2195, "Ready releases")}: $backorderReadyReleaseCount") }
+                            }
+                            StockCardInfoLine(localizedStringResource(2213, "Top seal"), supplierBackorderRecoverySealTitle(backorderTopSealLane), stateValues.TextColor)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2214, "Seal blockers")}: $backorderSealBlockerCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2220, "Seal max")}: $backorderMaxSealScore/100") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2217, "Source seals")}: $backorderSourceSealCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2215, "Ready seals")}: $backorderReadySealCount") }
+                            }
+                            StockCardInfoLine(localizedStringResource(2233, "Top closeout"), supplierBackorderRecoveryCloseoutTitle(backorderTopCloseoutLane), stateValues.TextColor)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2234, "Closeout blockers")}: $backorderCloseoutBlockerCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2240, "Closeout max")}: $backorderMaxCloseoutScore/100") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2238, "Split closeouts")}: $backorderSplitCloseoutCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2235, "Ready closeouts")}: $backorderReadyCloseoutCount") }
+                            }
+                            StockCardInfoLine(localizedStringResource(2254, "Top reopen"), supplierBackorderRecoveryReopenTitle(backorderTopReopenLane), stateValues.TextColor)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2255, "Reopen blockers")}: $backorderReopenBlockerCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2261, "Reopen max")}: $backorderMaxReopenScore/100") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2257, "Promise reopens")}: $backorderReopenPromiseCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2259, "Ready reopens")}: $backorderReopenReadyCount") }
+                            }
+                            if (backorderNextReopenText.isNotBlank()) {
+                                SupplierCatalogChip(text = "${localizedStringResource(2249, "Reopen checkpoint")}: $backorderNextReopenText")
+                            }
+                            StockCardInfoLine(localizedStringResource(2274, "Top reconcile"), supplierBackorderRecoveryReconciliationTitle(backorderTopReconciliationLane), stateValues.TextColor)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2275, "Reconcile blockers")}: $backorderReconciliationBlockerCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2280, "Reconcile max")}: $backorderMaxReconciliationScore/100") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2276, "Store reconciles")}: $backorderReconciliationStoreCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2277, "Source reconciles")}: $backorderReconciliationSourceCount") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2278, "Split reconciles")}: $backorderReconciliationSplitCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2279, "Ready reconciles")}: $backorderReconciliationReadyCount") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1999, "Decision bottleneck")}: $backorderDecisionBottleneckCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2000, "Contact bottleneck")}: $backorderContactBottleneckCount") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2001, "Sourcing bottleneck")}: $backorderSourcingBottleneckCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2002, "Pack bottleneck")}: $backorderPackBottleneckCount") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2003, "Proof bottleneck")}: $backorderProofBottleneckCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2004, "Aging bottleneck")}: $backorderAgingBottleneckCount") }
+                            }
+                            if (recoveryWaves.isNotEmpty()) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(stateValues.cornerRadius))
+                                        .background(stateValues.BackgroundColor.copy(alpha = 0.78f))
+                                        .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.30f), RoundedCornerShape(stateValues.cornerRadius))
+                                        .padding(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        CpImage(
+                                            modifier = Modifier.size(24.dp),
+                                            url = stateValues.drawablePathIconSupplierRecoveryWave,
+                                            fallbackRes = stateValues.drawableResIconSupplierRecoveryWave.value,
+                                            contentDescription = localizedStringResource(1974, "Wave board"),
+                                            tintColor = stateValues.AccentColor
+                                        )
+                                        Text(
+                                            text = localizedStringResource(1974, "Wave board"),
+                                            color = stateValues.AccentColor,
+                                            fontSize = stateValues.mainTextSize,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    recoveryWaves.take(4).forEach { wave ->
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(stateValues.cornerRadius))
+                                                .background(stateValues.AccentColor.copy(alpha = 0.055f))
+                                                .padding(8.dp),
+                                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Text(
+                                                text = "${supplierBackorderRecoveryWaveTitle(wave.recoveryWaveLane)} • ${wave.shortageCount}",
+                                                color = stateValues.TextColor,
+                                                fontSize = stateValues.smallTextSize,
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1796, "Short qty")}: ${wave.shortQuantityTotal.roundMoney().toStockMoneyText()}") }
+                                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1982, "Max risk")}: ${wave.maxRiskScore}") }
+                                            }
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1983, "Max priority")}: ${wave.maxPriorityScore}") }
+                                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1871, "Ready to recover")}: ${wave.readyCount}") }
+                                            }
+                                            if (wave.topGoodsItemId.isNotBlank()) {
+                                                StockCardInfoLine(localizedStringResource(1981, "Top wave item"), supplierRecoveryWaveTopTitle(wave), stateValues.TextColor)
+                                            }
+                                            wave.nextFollowUpAtMillis?.takeIf { it > 0L }?.let { followUp ->
+                                                StockCardInfoLine(localizedStringResource(1882, "Next follow-up"), receiptUiDateTime(followUp), stateValues.TextColor)
+                                            }
+                                            wave.recoveryWaveHint.visibleLocalizedString(stateValues.appLanguage, "")
+                                                .ifBlank { wave.recoveryWaveHint.visibleLocalizedString("main", "") }
+                                                .takeIf { it.isNotBlank() }
+                                                ?.let { hint ->
+                                                    Text(
+                                                        text = hint,
+                                                        color = stateValues.PlaceholderTextColor,
+                                                        fontSize = stateValues.smallTextSize,
+                                                        maxLines = 3,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                }
+                                            actionButton(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                text = localizedStringResource(1978, "Copy wave note"),
+                                                iconPath = stateValues.drawablePathIconSupplierRecoveryWave,
+                                                iconRes = stateValues.drawableResIconSupplierRecoveryWave.value,
+                                                confirmationRequired = false,
+                                                onClick = { copyTextToClipboard(supplierRecoveryWaveNote(wave)) }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            actionButton(
+                                modifier = Modifier.fillMaxWidth(),
+                                text = localizedStringResource(1967, "Copy desk note"),
+                                iconPath = stateValues.drawablePathIconSupplierRecoveryDesk,
+                                iconRes = stateValues.drawableResIconSupplierRecoveryDesk.value,
+                                confirmationRequired = false,
+                                onClick = { copyTextToClipboard(supplierRecoveryDeskNote(recoveryDesk)) }
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1993, "Stale age")}: $backorderStaleAgingCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1994, "Fresh touches")}: $backorderFreshAgingCount") }
+                    }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1797, "Affected orders")}: ${backorderWatchItems.sumOf { it.affectedOrderCount }}") }
                         Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1796, "Short qty")}: ${backorderShortQuantity.toStockMoneyText()}") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1818, "Store contact")}: $backorderStoreContactCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1819, "Upstream sourcing")}: $backorderUpstreamSourcingCount") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1823, "Promise clock")}: $backorderPromiseClockCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1831, "Pack hold")}: $backorderPackHoldCount") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1838, "Proof needed")}: $backorderProofNeededCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1812, "Due soon")}: ${backorderWatchItems.count { it.recoveryUrgencyLane == "soon" }}") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1850, "Decision needed")}: $backorderDecisionNeededCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1845, "Pack guard")}: $backorderPackGuardCount") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1855, "Contact now")}: $backorderContactNowCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1853, "Upstream request")}: $backorderUpstreamRequestCount") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1866, "High risk")}: $backorderHighRiskCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1864, "Risk score")}: $backorderAverageRiskScore") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1875, "Low confidence")}: $backorderLowConfidenceCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1871, "Ready to recover")}: $backorderReadyRecoveryCount") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1885, "Due for follow-up")}: $backorderFollowUpNowCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1882, "Next follow-up")}: ${backorderNextFollowUpText.ifBlank { localizedStringResource(1663, "No promised date") }}") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1893, "Handoff needed")}: $backorderHandoffNeededCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1894, "Pack handoff")}: $backorderPackHandoffCount") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1904, "Close blockers")}: $backorderCloseBlockerCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1905, "Guard-ready")}: $backorderGuardReadyCount") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1916, "Ledger gaps")}: $backorderLedgerGapCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1917, "Ledger-ready")}: $backorderLedgerReadyCount") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1929, "Triage-now")}: $backorderTriageNowCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1930, "Ready triage")}: $backorderReadyTriageCount") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1942, "Command stops")}: $backorderCommandStopCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1943, "Command ready")}: $backorderCommandReadyCount") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1955, "Promise risks")}: $backorderPromiseRiskCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1956, "Promise ready")}: $backorderPromiseReadyCount") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1980, "Active waves")}: $backorderActiveWaveCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1974, "Wave board")}: $backorderCommandWaveCount/${backorderReadyWaveCount}") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2010, "Top bottleneck")}: ${supplierBackorderRecoveryBottleneckTitle(backorderTopBottleneckLane)}") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2005, "Ready bottleneck")}: $backorderReadyBottleneckCount") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2022, "Top load")}: ${supplierBackorderRecoveryLoadTitle(backorderTopLoadLane)}") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2028, "Average load")}: $backorderAverageLoadScore/100") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2024, "Heavy loads")}: $backorderHeavyLoadCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2027, "Ready loads")}: $backorderReadyLoadCount") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2039, "High impact")}: $backorderHighImpactCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2040, "Promise impact")}: $backorderPromiseImpactCount") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2032, "Store replenishment impact")}: $backorderReplenishmentImpactCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2043, "Impact max")}: $backorderMaxImpactScore/100") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2056, "Top commit")}: ${supplierBackorderRecoveryCommitTitle(backorderTopCommitLane)}") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2060, "Average commit")}: $backorderAverageCommitScore/100") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2057, "Blocked commits")}: $backorderBlockedCommitCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2059, "Ready commits")}: $backorderReadyCommitCount") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2091, "Top exception")}: ${supplierBackorderRecoveryExceptionTitle(backorderTopExceptionLane)}") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2100, "Exception max")}: $backorderMaxExceptionScore/100") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2093, "Stop-pack exceptions")}: $backorderStopPackExceptionCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2098, "Ready exceptions")}: $backorderExceptionReadyCount") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2113, "Top cause")}: ${supplierBackorderRecoveryCauseTitle(backorderTopCauseLane)}") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2119, "Cause max")}: $backorderMaxCauseScore/100") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2115, "Zero causes")}: $backorderZeroCauseCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2118, "Ready causes")}: $backorderCauseReadyCount") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2116, "Capacity causes")}: $backorderCapacityCauseCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2117, "Promise causes")}: $backorderPromiseCauseCount") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2132, "Top verification")}: ${supplierBackorderRecoveryVerificationTitle(backorderTopVerificationLane)}") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2133, "Verification blockers")}: $backorderVerificationBlockerCount") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2137, "Cause verifications")}: $backorderCauseVerificationCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2139, "Verification max")}: $backorderMaxVerificationScore/100") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2153, "Top approval")}: ${supplierBackorderRecoveryApprovalTitle(backorderTopApprovalLane)}") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2154, "Approval blockers")}: $backorderApprovalBlockerCount") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2157, "Source approvals")}: $backorderSourceApprovalCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2160, "Approval max")}: $backorderMaxApprovalScore/100") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2173, "Top execution")}: ${supplierBackorderRecoveryExecutionTitle(backorderTopExecutionLane)}") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2174, "Execution blockers")}: $backorderExecutionBlockerCount") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2176, "Source executions")}: $backorderSourceExecutionCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2179, "Execution max")}: $backorderMaxExecutionScore/100") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2193, "Top release")}: ${supplierBackorderRecoveryReleaseTitle(backorderTopReleaseLane)}") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2194, "Release blockers")}: $backorderReleaseBlockerCount") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2197, "Source releases")}: $backorderSourceReleaseCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2200, "Release max")}: $backorderMaxReleaseScore/100") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2213, "Top seal")}: ${supplierBackorderRecoverySealTitle(backorderTopSealLane)}") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2214, "Seal blockers")}: $backorderSealBlockerCount") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2217, "Source seals")}: $backorderSourceSealCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2220, "Seal max")}: $backorderMaxSealScore/100") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2233, "Top closeout")}: ${supplierBackorderRecoveryCloseoutTitle(backorderTopCloseoutLane)}") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2234, "Closeout blockers")}: $backorderCloseoutBlockerCount") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2238, "Split closeouts")}: $backorderSplitCloseoutCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2240, "Closeout max")}: $backorderMaxCloseoutScore/100") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2254, "Top reopen")}: ${supplierBackorderRecoveryReopenTitle(backorderTopReopenLane)}") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2255, "Reopen blockers")}: $backorderReopenBlockerCount") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2257, "Promise reopens")}: $backorderReopenPromiseCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2261, "Reopen max")}: $backorderMaxReopenScore/100") }
+                    }
+                    if (backorderNextReopenText.isNotBlank()) {
+                        SupplierCatalogChip(text = "${localizedStringResource(2249, "Reopen checkpoint")}: $backorderNextReopenText")
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2274, "Top reconcile")}: ${supplierBackorderRecoveryReconciliationTitle(backorderTopReconciliationLane)}") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2275, "Reconcile blockers")}: $backorderReconciliationBlockerCount") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2278, "Split reconciles")}: $backorderReconciliationSplitCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2280, "Reconcile max")}: $backorderMaxReconciliationScore/100") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(1999, "Decision bottleneck")}: $backorderDecisionBottleneckCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2002, "Pack bottleneck")}: $backorderPackBottleneckCount") }
+                    }
+                }
+            }
+
+            if (recoveryWaves.isNotEmpty()) {
+                item {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = localizedStringResource(1984, "Filter by wave"),
+                            color = stateValues.TextColor,
+                            fontSize = stateValues.smallTextSize,
+                            fontWeight = FontWeight.Bold
+                        )
+                        LazyRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            item {
+                                TransactionHistoryFilterChip(
+                                    text = localizedStringResource(1979, "All waves"),
+                                    selected = backorderWaveFilter == "all",
+                                    onClick = { backorderWaveFilter = "all" }
+                                )
+                            }
+                            items(recoveryWaves, key = { it.recoveryWaveLane }) { wave ->
+                                TransactionHistoryFilterChip(
+                                    text = "${supplierBackorderRecoveryWaveTitle(wave.recoveryWaveLane)} ${wave.shortageCount}",
+                                    selected = backorderWaveFilter == wave.recoveryWaveLane,
+                                    onClick = { backorderWaveFilter = wave.recoveryWaveLane }
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -46903,6 +52887,68 @@ private fun localDrawableResourceForPath(
         "89_1" -> Res.drawable._89_1
         "90_0" -> Res.drawable._90_0
         "90_1" -> Res.drawable._90_1
+        "91_0" -> Res.drawable._91_0
+        "91_1" -> Res.drawable._91_1
+        "92_0" -> Res.drawable._92_0
+        "92_1" -> Res.drawable._92_1
+        "93_0" -> Res.drawable._93_0
+        "93_1" -> Res.drawable._93_1
+        "94_0" -> Res.drawable._94_0
+        "94_1" -> Res.drawable._94_1
+        "95_0" -> Res.drawable._95_0
+        "95_1" -> Res.drawable._95_1
+        "96_0" -> Res.drawable._96_0
+        "96_1" -> Res.drawable._96_1
+        "97_0" -> Res.drawable._97_0
+        "97_1" -> Res.drawable._97_1
+        "98_0" -> Res.drawable._98_0
+        "98_1" -> Res.drawable._98_1
+        "99_0" -> Res.drawable._99_0
+        "99_1" -> Res.drawable._99_1
+        "100_0" -> Res.drawable._100_0
+        "100_1" -> Res.drawable._100_1
+        "101_0" -> Res.drawable._101_0
+        "101_1" -> Res.drawable._101_1
+        "102_0" -> Res.drawable._102_0
+        "102_1" -> Res.drawable._102_1
+        "103_0" -> Res.drawable._103_0
+        "103_1" -> Res.drawable._103_1
+        "104_0" -> Res.drawable._104_0
+        "104_1" -> Res.drawable._104_1
+        "105_0" -> Res.drawable._105_0
+        "105_1" -> Res.drawable._105_1
+        "106_0" -> Res.drawable._106_0
+        "106_1" -> Res.drawable._106_1
+        "107_0" -> Res.drawable._107_0
+        "107_1" -> Res.drawable._107_1
+        "108_0" -> Res.drawable._108_0
+        "108_1" -> Res.drawable._108_1
+        "109_0" -> Res.drawable._109_0
+        "109_1" -> Res.drawable._109_1
+        "110_0" -> Res.drawable._110_0
+        "110_1" -> Res.drawable._110_1
+        "111_0" -> Res.drawable._111_0
+        "111_1" -> Res.drawable._111_1
+        "112_0" -> Res.drawable._112_0
+        "112_1" -> Res.drawable._112_1
+        "113_0" -> Res.drawable._113_0
+        "113_1" -> Res.drawable._113_1
+        "114_0" -> Res.drawable._114_0
+        "114_1" -> Res.drawable._114_1
+        "115_0" -> Res.drawable._115_0
+        "115_1" -> Res.drawable._115_1
+        "116_0" -> Res.drawable._116_0
+        "116_1" -> Res.drawable._116_1
+        "117_0" -> Res.drawable._117_0
+        "117_1" -> Res.drawable._117_1
+        "118_0" -> Res.drawable._118_0
+        "118_1" -> Res.drawable._118_1
+        "119_0" -> Res.drawable._119_0
+        "119_1" -> Res.drawable._119_1
+        "120_0" -> Res.drawable._120_0
+        "120_1" -> Res.drawable._120_1
+        "121_0" -> Res.drawable._121_0
+        "121_1" -> Res.drawable._121_1
         else -> fallbackRes
     }
 }
@@ -50454,6 +56500,90 @@ object AppConfiguration {
         val drawablePathIconSupplierDemandRadar: String
         val drawableResIconSupplierDemandRadar: StateFlow<DrawableResource>
 
+        val drawablePathIconSupplierBackorderRecovery: String
+        val drawableResIconSupplierBackorderRecovery: StateFlow<DrawableResource>
+
+        val drawablePathIconSupplierRecoveryOwner: String
+        val drawableResIconSupplierRecoveryOwner: StateFlow<DrawableResource>
+
+        val drawablePathIconSupplierRecoveryClock: String
+        val drawableResIconSupplierRecoveryClock: StateFlow<DrawableResource>
+
+        val drawablePathIconSupplierRecoveryProof: String
+        val drawableResIconSupplierRecoveryProof: StateFlow<DrawableResource>
+
+        val drawablePathIconSupplierRecoveryResolution: String
+        val drawableResIconSupplierRecoveryResolution: StateFlow<DrawableResource>
+
+        val drawablePathIconSupplierRecoveryContact: String
+        val drawableResIconSupplierRecoveryContact: StateFlow<DrawableResource>
+
+        val drawablePathIconSupplierRecoveryRisk: String
+        val drawableResIconSupplierRecoveryRisk: StateFlow<DrawableResource>
+
+        val drawablePathIconSupplierRecoveryConfidence: String
+        val drawableResIconSupplierRecoveryConfidence: StateFlow<DrawableResource>
+
+        val drawablePathIconSupplierRecoveryFollowUp: String
+        val drawableResIconSupplierRecoveryFollowUp: StateFlow<DrawableResource>
+
+        val drawablePathIconSupplierRecoveryHandoff: String
+        val drawableResIconSupplierRecoveryHandoff: StateFlow<DrawableResource>
+
+        val drawablePathIconSupplierRecoveryClosure: String
+        val drawableResIconSupplierRecoveryClosure: StateFlow<DrawableResource>
+
+        val drawablePathIconSupplierRecoveryLedger: String
+        val drawableResIconSupplierRecoveryLedger: StateFlow<DrawableResource>
+
+        val drawablePathIconSupplierRecoveryTriage: String
+        val drawableResIconSupplierRecoveryTriage: StateFlow<DrawableResource>
+
+        val drawablePathIconSupplierRecoveryCommand: String
+        val drawableResIconSupplierRecoveryCommand: StateFlow<DrawableResource>
+
+        val drawablePathIconSupplierRecoveryPromiseShield: String
+        val drawableResIconSupplierRecoveryPromiseShield: StateFlow<DrawableResource>
+
+        val drawablePathIconSupplierRecoveryDesk: String
+        val drawableResIconSupplierRecoveryDesk: StateFlow<DrawableResource>
+
+        val drawablePathIconSupplierRecoveryWave: String
+        val drawableResIconSupplierRecoveryWave: StateFlow<DrawableResource>
+        val drawablePathIconSupplierRecoveryAging: String
+        val drawableResIconSupplierRecoveryAging: StateFlow<DrawableResource>
+        val drawablePathIconSupplierRecoveryBottleneck: String
+        val drawableResIconSupplierRecoveryBottleneck: StateFlow<DrawableResource>
+        val drawablePathIconSupplierRecoveryLoad: String
+        val drawableResIconSupplierRecoveryLoad: StateFlow<DrawableResource>
+        val drawablePathIconSupplierRecoveryImpact: String
+        val drawableResIconSupplierRecoveryImpact: StateFlow<DrawableResource>
+        val drawablePathIconSupplierRecoveryCommit: String
+        val drawableResIconSupplierRecoveryCommit: StateFlow<DrawableResource>
+
+        val drawablePathIconSupplierRecoveryAllocation: String
+        val drawableResIconSupplierRecoveryAllocation: StateFlow<DrawableResource>
+        val drawablePathIconSupplierRecoveryException: String
+        val drawableResIconSupplierRecoveryException: StateFlow<DrawableResource>
+        val drawablePathIconSupplierRecoveryCause: String
+        val drawableResIconSupplierRecoveryCause: StateFlow<DrawableResource>
+        val drawablePathIconSupplierRecoveryVerification: String
+        val drawableResIconSupplierRecoveryVerification: StateFlow<DrawableResource>
+        val drawablePathIconSupplierRecoveryApproval: String
+        val drawableResIconSupplierRecoveryApproval: StateFlow<DrawableResource>
+        val drawablePathIconSupplierRecoveryExecution: String
+        val drawableResIconSupplierRecoveryExecution: StateFlow<DrawableResource>
+        val drawablePathIconSupplierRecoveryRelease: String
+        val drawableResIconSupplierRecoveryRelease: StateFlow<DrawableResource>
+        val drawablePathIconSupplierRecoverySeal: String
+        val drawableResIconSupplierRecoverySeal: StateFlow<DrawableResource>
+        val drawablePathIconSupplierRecoveryCloseout: String
+        val drawableResIconSupplierRecoveryCloseout: StateFlow<DrawableResource>
+        val drawablePathIconSupplierRecoveryReopen: String
+        val drawableResIconSupplierRecoveryReopen: StateFlow<DrawableResource>
+        val drawablePathIconSupplierRecoveryReconciliation: String
+        val drawableResIconSupplierRecoveryReconciliation: StateFlow<DrawableResource>
+
         val drawablePathIconSupplierDispatch: String
         val drawableResIconSupplierDispatch: StateFlow<DrawableResource>
 
@@ -51087,6 +57217,122 @@ object AppConfiguration {
             private val _drawableResIconSupplierDemandRadar = MutableStateFlow(Res.drawable._77_0)
             override val drawableResIconSupplierDemandRadar: StateFlow<DrawableResource> = _drawableResIconSupplierDemandRadar.asStateFlow()
 
+            override val drawablePathIconSupplierBackorderRecovery: String by drawablePathIconSupplierBackorderRecoveryState.collectAsState()
+            private val _drawableResIconSupplierBackorderRecovery = MutableStateFlow(Res.drawable._91_0)
+            override val drawableResIconSupplierBackorderRecovery: StateFlow<DrawableResource> = _drawableResIconSupplierBackorderRecovery.asStateFlow()
+
+            override val drawablePathIconSupplierRecoveryOwner: String by drawablePathIconSupplierRecoveryOwnerState.collectAsState()
+            private val _drawableResIconSupplierRecoveryOwner = MutableStateFlow(Res.drawable._92_0)
+            override val drawableResIconSupplierRecoveryOwner: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryOwner.asStateFlow()
+
+            override val drawablePathIconSupplierRecoveryClock: String by drawablePathIconSupplierRecoveryClockState.collectAsState()
+            private val _drawableResIconSupplierRecoveryClock = MutableStateFlow(Res.drawable._93_0)
+            override val drawableResIconSupplierRecoveryClock: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryClock.asStateFlow()
+
+            override val drawablePathIconSupplierRecoveryProof: String by drawablePathIconSupplierRecoveryProofState.collectAsState()
+            private val _drawableResIconSupplierRecoveryProof = MutableStateFlow(Res.drawable._94_0)
+            override val drawableResIconSupplierRecoveryProof: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryProof.asStateFlow()
+
+            override val drawablePathIconSupplierRecoveryResolution: String by drawablePathIconSupplierRecoveryResolutionState.collectAsState()
+            private val _drawableResIconSupplierRecoveryResolution = MutableStateFlow(Res.drawable._95_0)
+            override val drawableResIconSupplierRecoveryResolution: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryResolution.asStateFlow()
+
+            override val drawablePathIconSupplierRecoveryContact: String by drawablePathIconSupplierRecoveryContactState.collectAsState()
+            private val _drawableResIconSupplierRecoveryContact = MutableStateFlow(Res.drawable._96_0)
+            override val drawableResIconSupplierRecoveryContact: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryContact.asStateFlow()
+
+            override val drawablePathIconSupplierRecoveryRisk: String by drawablePathIconSupplierRecoveryRiskState.collectAsState()
+            private val _drawableResIconSupplierRecoveryRisk = MutableStateFlow(Res.drawable._97_0)
+            override val drawableResIconSupplierRecoveryRisk: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryRisk.asStateFlow()
+
+            override val drawablePathIconSupplierRecoveryConfidence: String by drawablePathIconSupplierRecoveryConfidenceState.collectAsState()
+            private val _drawableResIconSupplierRecoveryConfidence = MutableStateFlow(Res.drawable._98_0)
+            override val drawableResIconSupplierRecoveryConfidence: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryConfidence.asStateFlow()
+
+            override val drawablePathIconSupplierRecoveryFollowUp: String by drawablePathIconSupplierRecoveryFollowUpState.collectAsState()
+            private val _drawableResIconSupplierRecoveryFollowUp = MutableStateFlow(Res.drawable._99_0)
+            override val drawableResIconSupplierRecoveryFollowUp: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryFollowUp.asStateFlow()
+
+            override val drawablePathIconSupplierRecoveryHandoff: String by drawablePathIconSupplierRecoveryHandoffState.collectAsState()
+            private val _drawableResIconSupplierRecoveryHandoff = MutableStateFlow(Res.drawable._100_0)
+            override val drawableResIconSupplierRecoveryHandoff: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryHandoff.asStateFlow()
+
+            override val drawablePathIconSupplierRecoveryClosure: String by drawablePathIconSupplierRecoveryClosureState.collectAsState()
+            private val _drawableResIconSupplierRecoveryClosure = MutableStateFlow(Res.drawable._101_0)
+            override val drawableResIconSupplierRecoveryClosure: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryClosure.asStateFlow()
+
+            override val drawablePathIconSupplierRecoveryLedger: String by drawablePathIconSupplierRecoveryLedgerState.collectAsState()
+            private val _drawableResIconSupplierRecoveryLedger = MutableStateFlow(Res.drawable._102_0)
+            override val drawableResIconSupplierRecoveryLedger: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryLedger.asStateFlow()
+
+            override val drawablePathIconSupplierRecoveryTriage: String by drawablePathIconSupplierRecoveryTriageState.collectAsState()
+            private val _drawableResIconSupplierRecoveryTriage = MutableStateFlow(Res.drawable._103_0)
+            override val drawableResIconSupplierRecoveryTriage: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryTriage.asStateFlow()
+
+            override val drawablePathIconSupplierRecoveryCommand: String by drawablePathIconSupplierRecoveryCommandState.collectAsState()
+            private val _drawableResIconSupplierRecoveryCommand = MutableStateFlow(Res.drawable._104_0)
+            override val drawableResIconSupplierRecoveryCommand: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryCommand.asStateFlow()
+
+            override val drawablePathIconSupplierRecoveryPromiseShield: String by drawablePathIconSupplierRecoveryPromiseShieldState.collectAsState()
+            private val _drawableResIconSupplierRecoveryPromiseShield = MutableStateFlow(Res.drawable._105_0)
+            override val drawableResIconSupplierRecoveryPromiseShield: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryPromiseShield.asStateFlow()
+
+            override val drawablePathIconSupplierRecoveryDesk: String by drawablePathIconSupplierRecoveryDeskState.collectAsState()
+            private val _drawableResIconSupplierRecoveryDesk = MutableStateFlow(Res.drawable._106_0)
+            override val drawableResIconSupplierRecoveryDesk: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryDesk.asStateFlow()
+
+            override val drawablePathIconSupplierRecoveryWave: String by drawablePathIconSupplierRecoveryWaveState.collectAsState()
+            private val _drawableResIconSupplierRecoveryWave = MutableStateFlow(Res.drawable._107_0)
+            override val drawableResIconSupplierRecoveryWave: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryWave.asStateFlow()
+            override val drawablePathIconSupplierRecoveryAging: String by drawablePathIconSupplierRecoveryAgingState.collectAsState()
+            private val _drawableResIconSupplierRecoveryAging = MutableStateFlow(Res.drawable._108_0)
+            override val drawableResIconSupplierRecoveryAging: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryAging.asStateFlow()
+            override val drawablePathIconSupplierRecoveryBottleneck: String by drawablePathIconSupplierRecoveryBottleneckState.collectAsState()
+            private val _drawableResIconSupplierRecoveryBottleneck = MutableStateFlow(Res.drawable._109_0)
+            override val drawableResIconSupplierRecoveryBottleneck: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryBottleneck.asStateFlow()
+            override val drawablePathIconSupplierRecoveryLoad: String by drawablePathIconSupplierRecoveryLoadState.collectAsState()
+            private val _drawableResIconSupplierRecoveryLoad = MutableStateFlow(Res.drawable._110_0)
+            override val drawableResIconSupplierRecoveryLoad: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryLoad.asStateFlow()
+            override val drawablePathIconSupplierRecoveryImpact: String by drawablePathIconSupplierRecoveryImpactState.collectAsState()
+            private val _drawableResIconSupplierRecoveryImpact = MutableStateFlow(Res.drawable._111_0)
+            override val drawableResIconSupplierRecoveryImpact: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryImpact.asStateFlow()
+            override val drawablePathIconSupplierRecoveryCommit: String by drawablePathIconSupplierRecoveryCommitState.collectAsState()
+            private val _drawableResIconSupplierRecoveryCommit = MutableStateFlow(Res.drawable._112_0)
+            override val drawableResIconSupplierRecoveryCommit: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryCommit.asStateFlow()
+            override val drawablePathIconSupplierRecoveryAllocation: String by drawablePathIconSupplierRecoveryAllocationState.collectAsState()
+            private val _drawableResIconSupplierRecoveryAllocation = MutableStateFlow(Res.drawable._113_0)
+            override val drawableResIconSupplierRecoveryAllocation: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryAllocation.asStateFlow()
+            override val drawablePathIconSupplierRecoveryException: String by drawablePathIconSupplierRecoveryExceptionState.collectAsState()
+            private val _drawableResIconSupplierRecoveryException = MutableStateFlow(Res.drawable._114_0)
+            override val drawableResIconSupplierRecoveryException: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryException.asStateFlow()
+            override val drawablePathIconSupplierRecoveryCause: String by drawablePathIconSupplierRecoveryCauseState.collectAsState()
+            private val _drawableResIconSupplierRecoveryCause = MutableStateFlow(Res.drawable._115_0)
+            override val drawableResIconSupplierRecoveryCause: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryCause.asStateFlow()
+            override val drawablePathIconSupplierRecoveryVerification: String by drawablePathIconSupplierRecoveryVerificationState.collectAsState()
+            private val _drawableResIconSupplierRecoveryVerification = MutableStateFlow(Res.drawable._116_0)
+            override val drawableResIconSupplierRecoveryVerification: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryVerification.asStateFlow()
+            override val drawablePathIconSupplierRecoveryApproval: String by drawablePathIconSupplierRecoveryApprovalState.collectAsState()
+            private val _drawableResIconSupplierRecoveryApproval = MutableStateFlow(Res.drawable._117_0)
+            override val drawableResIconSupplierRecoveryApproval: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryApproval.asStateFlow()
+            override val drawablePathIconSupplierRecoveryExecution: String by drawablePathIconSupplierRecoveryExecutionState.collectAsState()
+            private val _drawableResIconSupplierRecoveryExecution = MutableStateFlow(Res.drawable._118_0)
+            override val drawableResIconSupplierRecoveryExecution: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryExecution.asStateFlow()
+            override val drawablePathIconSupplierRecoveryRelease: String by drawablePathIconSupplierRecoveryReleaseState.collectAsState()
+            private val _drawableResIconSupplierRecoveryRelease = MutableStateFlow(Res.drawable._119_0)
+            override val drawableResIconSupplierRecoveryRelease: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryRelease.asStateFlow()
+            override val drawablePathIconSupplierRecoverySeal: String by drawablePathIconSupplierRecoverySealState.collectAsState()
+            private val _drawableResIconSupplierRecoverySeal = MutableStateFlow(Res.drawable._120_0)
+            override val drawableResIconSupplierRecoverySeal: StateFlow<DrawableResource> = _drawableResIconSupplierRecoverySeal.asStateFlow()
+            override val drawablePathIconSupplierRecoveryCloseout: String by drawablePathIconSupplierRecoveryCloseoutState.collectAsState()
+            private val _drawableResIconSupplierRecoveryCloseout = MutableStateFlow(Res.drawable._121_0)
+            override val drawableResIconSupplierRecoveryCloseout: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryCloseout.asStateFlow()
+            override val drawablePathIconSupplierRecoveryReopen: String by drawablePathIconSupplierRecoveryReopenState.collectAsState()
+            private val _drawableResIconSupplierRecoveryReopen = MutableStateFlow(Res.drawable._122_0)
+            override val drawableResIconSupplierRecoveryReopen: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryReopen.asStateFlow()
+            override val drawablePathIconSupplierRecoveryReconciliation: String by drawablePathIconSupplierRecoveryReconciliationState.collectAsState()
+            private val _drawableResIconSupplierRecoveryReconciliation = MutableStateFlow(Res.drawable._123_0)
+            override val drawableResIconSupplierRecoveryReconciliation: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryReconciliation.asStateFlow()
+
             override val drawablePathIconSupplierDispatch: String by drawablePathIconSupplierDispatchState.collectAsState()
             private val _drawableResIconSupplierDispatch = MutableStateFlow(Res.drawable._78_0)
             override val drawableResIconSupplierDispatch: StateFlow<DrawableResource> = _drawableResIconSupplierDispatch.asStateFlow()
@@ -51304,6 +57550,39 @@ object AppConfiguration {
                 _drawableResIconSupplierContracts.emit(if (stateValues.appThemeId == 1L) Res.drawable._76_1 else Res.drawable._76_0)
                 _drawableResIconSupplierPartners.emit(if (stateValues.appThemeId == 1L) Res.drawable._75_1 else Res.drawable._75_0)
                 _drawableResIconSupplierDemandRadar.emit(if (stateValues.appThemeId == 1L) Res.drawable._77_1 else Res.drawable._77_0)
+                _drawableResIconSupplierBackorderRecovery.emit(if (stateValues.appThemeId == 1L) Res.drawable._91_1 else Res.drawable._91_0)
+                _drawableResIconSupplierRecoveryOwner.emit(if (stateValues.appThemeId == 1L) Res.drawable._92_1 else Res.drawable._92_0)
+                _drawableResIconSupplierRecoveryClock.emit(if (stateValues.appThemeId == 1L) Res.drawable._93_1 else Res.drawable._93_0)
+                _drawableResIconSupplierRecoveryProof.emit(if (stateValues.appThemeId == 1L) Res.drawable._94_1 else Res.drawable._94_0)
+                _drawableResIconSupplierRecoveryResolution.emit(if (stateValues.appThemeId == 1L) Res.drawable._95_1 else Res.drawable._95_0)
+                _drawableResIconSupplierRecoveryContact.emit(if (stateValues.appThemeId == 1L) Res.drawable._96_1 else Res.drawable._96_0)
+                _drawableResIconSupplierRecoveryRisk.emit(if (stateValues.appThemeId == 1L) Res.drawable._97_1 else Res.drawable._97_0)
+                _drawableResIconSupplierRecoveryConfidence.emit(if (stateValues.appThemeId == 1L) Res.drawable._98_1 else Res.drawable._98_0)
+                _drawableResIconSupplierRecoveryFollowUp.emit(if (stateValues.appThemeId == 1L) Res.drawable._99_1 else Res.drawable._99_0)
+                _drawableResIconSupplierRecoveryHandoff.emit(if (stateValues.appThemeId == 1L) Res.drawable._100_1 else Res.drawable._100_0)
+                _drawableResIconSupplierRecoveryClosure.emit(if (stateValues.appThemeId == 1L) Res.drawable._101_1 else Res.drawable._101_0)
+                _drawableResIconSupplierRecoveryLedger.emit(if (stateValues.appThemeId == 1L) Res.drawable._102_1 else Res.drawable._102_0)
+                _drawableResIconSupplierRecoveryTriage.emit(if (stateValues.appThemeId == 1L) Res.drawable._103_1 else Res.drawable._103_0)
+                _drawableResIconSupplierRecoveryCommand.emit(if (stateValues.appThemeId == 1L) Res.drawable._104_1 else Res.drawable._104_0)
+                _drawableResIconSupplierRecoveryPromiseShield.emit(if (stateValues.appThemeId == 1L) Res.drawable._105_1 else Res.drawable._105_0)
+                _drawableResIconSupplierRecoveryDesk.emit(if (stateValues.appThemeId == 1L) Res.drawable._106_1 else Res.drawable._106_0)
+                _drawableResIconSupplierRecoveryWave.emit(if (stateValues.appThemeId == 1L) Res.drawable._107_1 else Res.drawable._107_0)
+                _drawableResIconSupplierRecoveryAging.emit(if (stateValues.appThemeId == 1L) Res.drawable._108_1 else Res.drawable._108_0)
+                _drawableResIconSupplierRecoveryBottleneck.emit(if (stateValues.appThemeId == 1L) Res.drawable._109_1 else Res.drawable._109_0)
+                _drawableResIconSupplierRecoveryLoad.emit(if (stateValues.appThemeId == 1L) Res.drawable._110_1 else Res.drawable._110_0)
+                _drawableResIconSupplierRecoveryImpact.emit(if (stateValues.appThemeId == 1L) Res.drawable._111_1 else Res.drawable._111_0)
+                _drawableResIconSupplierRecoveryCommit.emit(if (stateValues.appThemeId == 1L) Res.drawable._112_1 else Res.drawable._112_0)
+                _drawableResIconSupplierRecoveryAllocation.emit(if (stateValues.appThemeId == 1L) Res.drawable._113_1 else Res.drawable._113_0)
+                _drawableResIconSupplierRecoveryException.emit(if (stateValues.appThemeId == 1L) Res.drawable._114_1 else Res.drawable._114_0)
+                _drawableResIconSupplierRecoveryCause.emit(if (stateValues.appThemeId == 1L) Res.drawable._115_1 else Res.drawable._115_0)
+                _drawableResIconSupplierRecoveryVerification.emit(if (stateValues.appThemeId == 1L) Res.drawable._116_1 else Res.drawable._116_0)
+                _drawableResIconSupplierRecoveryApproval.emit(if (stateValues.appThemeId == 1L) Res.drawable._117_1 else Res.drawable._117_0)
+                _drawableResIconSupplierRecoveryExecution.emit(if (stateValues.appThemeId == 1L) Res.drawable._118_1 else Res.drawable._118_0)
+                _drawableResIconSupplierRecoveryRelease.emit(if (stateValues.appThemeId == 1L) Res.drawable._119_1 else Res.drawable._119_0)
+                _drawableResIconSupplierRecoverySeal.emit(if (stateValues.appThemeId == 1L) Res.drawable._120_1 else Res.drawable._120_0)
+                _drawableResIconSupplierRecoveryCloseout.emit(if (stateValues.appThemeId == 1L) Res.drawable._121_1 else Res.drawable._121_0)
+                _drawableResIconSupplierRecoveryReopen.emit(if (stateValues.appThemeId == 1L) Res.drawable._122_1 else Res.drawable._122_0)
+                _drawableResIconSupplierRecoveryReconciliation.emit(if (stateValues.appThemeId == 1L) Res.drawable._123_1 else Res.drawable._123_0)
                 _drawableResIconSupplierDispatch.emit(if (stateValues.appThemeId == 1L) Res.drawable._78_1 else Res.drawable._78_0)
                 _drawableResIconSupplierTermsGuard.emit(if (stateValues.appThemeId == 1L) Res.drawable._89_1 else Res.drawable._89_0)
                 _drawableResIconBuyerAgeRestriction.emit(if (stateValues.appThemeId == 1L) Res.drawable._73_1 else Res.drawable._73_0)

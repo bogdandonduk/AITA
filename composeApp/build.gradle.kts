@@ -170,6 +170,52 @@ dependencies {
     debugImplementation(compose.uiTooling)
 }
 
+val removeMisplacedCommonAndroidVectorDrawablesAction: () -> Unit = {
+    val commonDrawableDir = layout.projectDirectory
+        .dir("src/commonMain/composeResources/drawable")
+        .asFile
+
+    commonDrawableDir
+        .listFiles { file ->
+            file.isFile &&
+                file.name.startsWith("ic_aita_") &&
+                file.extension.equals("xml", ignoreCase = true)
+        }
+        ?.forEach { file ->
+            if (!file.delete()) {
+                logger.warn("Unable to remove misplaced common Android vector drawable: ${file.path}")
+            }
+        }
+}
+
+// Run once during configuration too. Compose resource tasks can snapshot common resources
+// before ordinary task actions run, so the hygiene guard must clean old bad XMLs early.
+removeMisplacedCommonAndroidVectorDrawablesAction()
+
+val removeMisplacedCommonAndroidVectorDrawables by tasks.registering {
+    group = "resources"
+    description = "Removes Android vector XML drawables that accidentally landed in common Compose resources."
+
+    doLast {
+        removeMisplacedCommonAndroidVectorDrawablesAction()
+    }
+}
+
+
+tasks.configureEach {
+    val lowerTaskName = name.lowercase()
+    if (
+        name != removeMisplacedCommonAndroidVectorDrawables.name &&
+        (
+            lowerTaskName.contains("processresources") ||
+                lowerTaskName.contains("composeresources") ||
+                lowerTaskName.contains("resourceaccessors")
+        )
+    ) {
+        dependsOn(removeMisplacedCommonAndroidVectorDrawables)
+    }
+}
+
 compose.desktop {
     application {
         mainClass = "kz.aita.JvmMainComposeKt"
@@ -225,6 +271,14 @@ afterEvaluate {
     }
     // Also the common res class task used by compose-resources
     val composeRes = tasks.matching { it.name == "generateComposeResClass" }
+    val resourcePackaging = tasks.matching { task ->
+        task.name.contains("resource", ignoreCase = true) ||
+            task.name.contains("resclass", ignoreCase = true)
+    }
+
+    resourceGen.configureEach { dependsOn(removeMisplacedCommonAndroidVectorDrawables) }
+    composeRes.configureEach { dependsOn(removeMisplacedCommonAndroidVectorDrawables) }
+    resourcePackaging.configureEach { dependsOn(removeMisplacedCommonAndroidVectorDrawables) }
 
     // Apply to *all* Android KSP tasks (debug/release, etc.)
     tasks.matching { it.name.startsWith("ksp") && it.name.endsWith("KotlinAndroid") }
