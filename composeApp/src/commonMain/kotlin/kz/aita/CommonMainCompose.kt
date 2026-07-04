@@ -452,7 +452,30 @@ private fun buildBundledLocalizedStringFallbacks(): Map<Long, Map<String, String
         putBundledLocalizedStringFallbacksPart46()
         putBundledLocalizedStringFallbacksPart47()
         putBundledLocalizedStringFallbacksPart48()
+        putBundledLocalizedStringFallbacksPart49()
     }
+
+private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallbacksPart49() {
+    put(2281L, mapOf("main" to "Recovery audit", "en" to "Recovery audit", "ru" to "Аудит восстановления", "kk" to "Қалпына келтіру аудиті"))
+    put(2282L, mapOf("main" to "Audit blocked", "en" to "Audit blocked", "ru" to "Аудит заблокирован", "kk" to "Аудит бөгелген"))
+    put(2283L, mapOf("main" to "Audit quantity gap", "en" to "Audit quantity gap", "ru" to "Разрыв количества аудита", "kk" to "Аудит санының айырмасы"))
+    put(2284L, mapOf("main" to "Audit evidence gap", "en" to "Audit evidence gap", "ru" to "Разрыв доказательств аудита", "kk" to "Аудит дәлелі жетіспейді"))
+    put(2285L, mapOf("main" to "Audit store note gap", "en" to "Audit store note gap", "ru" to "Разрыв заметки магазина", "kk" to "Дүкен жазбасы жетіспейді"))
+    put(2286L, mapOf("main" to "Audit ready", "en" to "Audit ready", "ru" to "Аудит готов", "kk" to "Аудит дайын"))
+    put(2287L, mapOf("main" to "Audit watch", "en" to "Audit watch", "ru" to "Наблюдение аудита", "kk" to "Аудит бақылауы"))
+    put(2288L, mapOf("main" to "Audit score", "en" to "Audit score", "ru" to "Оценка аудита", "kk" to "Аудит ұпайы"))
+    put(2289L, mapOf("main" to "Audit checklist", "en" to "Audit checklist", "ru" to "Чеклист аудита", "kk" to "Аудит чеклисті"))
+    put(2290L, mapOf("main" to "Audit script", "en" to "Audit script", "ru" to "Скрипт аудита", "kk" to "Аудит скрипті"))
+    put(2291L, mapOf("main" to "Copy audit note", "en" to "Copy audit note", "ru" to "Копировать заметку аудита", "kk" to "Аудит жазбасын көшіру"))
+    put(2292L, mapOf("main" to "Top audit", "en" to "Top audit", "ru" to "Главный аудит", "kk" to "Негізгі аудит"))
+    put(2293L, mapOf("main" to "Audit blockers", "en" to "Audit blockers", "ru" to "Блокеры аудита", "kk" to "Аудит бөгеттері"))
+    put(2294L, mapOf("main" to "Audit quantity gaps", "en" to "Audit quantity gaps", "ru" to "Разрывы количества", "kk" to "Сан айырмалары"))
+    put(2295L, mapOf("main" to "Audit evidence gaps", "en" to "Audit evidence gaps", "ru" to "Разрывы доказательств", "kk" to "Дәлел айырмалары"))
+    put(2296L, mapOf("main" to "Audit store note gaps", "en" to "Audit store note gaps", "ru" to "Разрывы заметок магазина", "kk" to "Дүкен жазбасы айырмалары"))
+    put(2297L, mapOf("main" to "Ready audits", "en" to "Ready audits", "ru" to "Готовые аудиты", "kk" to "Дайын аудиттер"))
+    put(2298L, mapOf("main" to "Audit average", "en" to "Audit average", "ru" to "Средний аудит", "kk" to "Орташа аудит"))
+    put(2299L, mapOf("main" to "Audit max", "en" to "Audit max", "ru" to "Макс. аудит", "kk" to "Ең жоғары аудит"))
+}
 
 private fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFallbacksPart47() {
     put(1002L, mapOf("main" to "Voice input", "en" to "Voice input", "ru" to "Голосовой ввод", "kk" to "Дауыспен енгізу"))
@@ -27515,6 +27538,15 @@ private fun AppConfiguration.supplierBackorderRecoveryReconciliationTitle(lane: 
     else -> localizedStringResource(2268, "Reconcile watch")
 }
 
+private fun AppConfiguration.supplierBackorderRecoveryAuditTitle(lane: String): String = when (lane) {
+    "audit_blocked" -> localizedStringResource(2282, "Audit blocked")
+    "audit_quantity_gap" -> localizedStringResource(2283, "Audit quantity gap")
+    "audit_evidence_gap" -> localizedStringResource(2284, "Audit evidence gap")
+    "audit_store_note_gap" -> localizedStringResource(2285, "Audit store note gap")
+    "audit_ready" -> localizedStringResource(2286, "Audit ready")
+    else -> localizedStringResource(2287, "Audit watch")
+}
+
 private fun AppConfiguration.supplierRecoveryWaveTopTitle(wave: SupplierDashboardRecoveryWaveDataModel): String =
     wave.topGoodsItemNameSnapshot.visibleLocalizedString(stateValues.appLanguage, "")
         .ifBlank { wave.topGoodsItemNameSnapshot.visibleLocalizedString("main", "") }
@@ -27997,6 +28029,32 @@ private fun AppConfiguration.supplierBackorderReconciliationNote(item: SupplierD
         .ifBlank { item.recoveryReconciliationScript.visibleLocalizedString("main", "") }
         .takeIf { it.isNotBlank() }
         ?.let { script -> append(localizedStringResource(2273, "Reconcile script")).append(":\n").append(script).append('\n') }
+    append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief."))
+}
+
+private fun AppConfiguration.supplierBackorderAuditNote(item: SupplierDashboardBackorderDataModel): String = buildString {
+    append(localizedStringResource(2281, "Recovery audit")).append('\n')
+    append(supplierBackorderTitle(item)).append('\n')
+    append(localizedStringResource(2281, "Recovery audit")).append(": ").append(supplierBackorderRecoveryAuditTitle(item.recoveryAuditLane)).append('\n')
+    append(localizedStringResource(2288, "Audit score")).append(": ").append(item.recoveryAuditScore).append("/100").append('\n')
+    append(localizedStringResource(2262, "Recovery reconciliation")).append(": ").append(supplierBackorderRecoveryReconciliationTitle(item.recoveryReconciliationLane)).append(" • ").append(localizedStringResource(2269, "Reconcile score")).append(" ").append(item.recoveryReconciliationScore).append("/100").append('\n')
+    append(localizedStringResource(2221, "Recovery closeout")).append(": ").append(supplierBackorderRecoveryCloseoutTitle(item.recoveryCloseoutLane)).append(" • ").append(localizedStringResource(2228, "Closeout score")).append(" ").append(item.recoveryCloseoutScore).append("/100").append('\n')
+    append(localizedStringResource(2201, "Recovery seal")).append(": ").append(supplierBackorderRecoverySealTitle(item.recoverySealLane)).append(" • ").append(localizedStringResource(2208, "Seal score")).append(" ").append(item.recoverySealScore).append("/100").append('\n')
+    append(localizedStringResource(1798, "Affected orders")).append(": ").append(item.affectedOrderCount).append('\n')
+    append(localizedStringResource(1799, "Affected stores")).append(": ").append(item.affectedStoreCount).append('\n')
+    append(localizedStringResource(1796, "Short qty")).append(": ").append(supplierManufacturerBridgeQuantityText(item.missingQuantityTotal, item.measurementUnitIdSnapshot)).append('\n')
+    item.recoveryAuditHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryAuditHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(2281, "Recovery audit")).append(": ").append(hint).append('\n') }
+    item.recoveryAuditChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryAuditChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(2289, "Audit checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryAuditScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryAuditScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(2290, "Audit script")).append(":\n").append(script).append('\n') }
     append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief."))
 }
 
@@ -28536,6 +28594,12 @@ private fun AppConfiguration.supplierBackorderSearchKey(item: SupplierDashboardB
     append(item.recoveryReconciliationChecklist.visibleLocalizedString("main", "")).append(' ')
     append(item.recoveryReconciliationScript.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
     append(item.recoveryReconciliationScript.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryAuditHint.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryAuditHint.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryAuditChecklist.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryAuditChecklist.visibleLocalizedString("main", "")).append(' ')
+    append(item.recoveryAuditScript.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
+    append(item.recoveryAuditScript.visibleLocalizedString("main", "")).append(' ')
     append(item.nextRecoveryStep.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
     append(item.nextRecoveryStep.visibleLocalizedString("main", "")).append(' ')
     append(item.recoveryChecklist.visibleLocalizedString(stateValues.appLanguage, "")).append(' ')
@@ -28576,6 +28640,7 @@ private fun AppConfiguration.supplierBackorderSearchKey(item: SupplierDashboardB
     append(item.recoveryCloseoutLane).append(' ')
     append(item.recoveryReopenLane).append(' ')
     append(item.recoveryReconciliationLane).append(' ')
+    append(item.recoveryAuditLane).append(' ')
     append(item.recoveryRiskScore).append(' ')
     append(item.recoveryConfidenceScore).append(' ')
     append(item.recoveryClosureScore).append(' ')
@@ -28600,6 +28665,7 @@ private fun AppConfiguration.supplierBackorderSearchKey(item: SupplierDashboardB
     append(item.recoveryCloseoutScore).append(' ')
     append(item.recoveryReopenScore).append(' ')
     append(item.recoveryReconciliationScore).append(' ')
+    append(item.recoveryAuditScore).append(' ')
     append(item.recoveryAgingHours).append(' ')
     append(item.recoveryAgingStartedAtMillis ?: 0L).append(' ')
     append(item.recoveryCheckpointAtMillis ?: 0L).append(' ')
@@ -28642,6 +28708,7 @@ private fun AppConfiguration.supplierBackorderSearchKey(item: SupplierDashboardB
     append(supplierBackorderRecoveryCloseoutTitle(item.recoveryCloseoutLane)).append(' ')
     append(supplierBackorderRecoveryReopenTitle(item.recoveryReopenLane)).append(' ')
     append(supplierBackorderRecoveryReconciliationTitle(item.recoveryReconciliationLane)).append(' ')
+    append(supplierBackorderRecoveryAuditTitle(item.recoveryAuditLane)).append(' ')
     append(item.requestedQuantityTotal).append(' ')
     append(item.acceptedQuantityTotal).append(' ')
     append(item.missingQuantityTotal)
@@ -28726,6 +28793,7 @@ private fun AppConfiguration.supplierBackorderBrief(item: SupplierDashboardBacko
         append(localizedStringResource(2249, "Reopen checkpoint")).append(": ").append(receiptUiDateTime(reopenAt)).append('\n')
     }
     append(localizedStringResource(2262, "Recovery reconciliation")).append(": ").append(supplierBackorderRecoveryReconciliationTitle(item.recoveryReconciliationLane)).append(" • ").append(localizedStringResource(2269, "Reconcile score")).append(" ").append(item.recoveryReconciliationScore).append("/100").append('\n')
+    append(localizedStringResource(2281, "Recovery audit")).append(": ").append(supplierBackorderRecoveryAuditTitle(item.recoveryAuditLane)).append(" • ").append(localizedStringResource(2288, "Audit score")).append(" ").append(item.recoveryAuditScore).append("/100").append('\n')
     append(localizedStringResource(1787, "Upstream privacy")).append(": ").append(localizedStringResource(1808, "Store names are omitted from this copied shortage brief.")).append('\n')
     item.recoveryHint.visibleLocalizedString(stateValues.appLanguage, "")
         .ifBlank { item.recoveryHint.visibleLocalizedString("main", "") }
@@ -29034,6 +29102,18 @@ private fun AppConfiguration.supplierBackorderBrief(item: SupplierDashboardBacko
         .ifBlank { item.recoveryReconciliationScript.visibleLocalizedString("main", "") }
         .takeIf { it.isNotBlank() }
         ?.let { script -> append(localizedStringResource(2273, "Reconcile script")).append(":\n").append(script).append('\n') }
+    item.recoveryAuditHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryAuditHint.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { hint -> append(localizedStringResource(2281, "Recovery audit")).append(": ").append(hint).append('\n') }
+    item.recoveryAuditChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryAuditChecklist.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { checklist -> append(localizedStringResource(2289, "Audit checklist")).append(":\n").append(checklist).append('\n') }
+    item.recoveryAuditScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryAuditScript.visibleLocalizedString("main", "") }
+        .takeIf { it.isNotBlank() }
+        ?.let { script -> append(localizedStringResource(2290, "Audit script")).append(":\n").append(script).append('\n') }
     item.nextRecoveryStep.visibleLocalizedString(stateValues.appLanguage, "")
         .ifBlank { item.nextRecoveryStep.visibleLocalizedString("main", "") }
         .takeIf { it.isNotBlank() }
@@ -29239,6 +29319,12 @@ private fun AppConfiguration.SupplierBackorderWatchCard(item: SupplierDashboardB
         .ifBlank { item.recoveryReconciliationChecklist.visibleLocalizedString("main", "") }
     val recoveryReconciliationScriptText = item.recoveryReconciliationScript.visibleLocalizedString(stateValues.appLanguage, "")
         .ifBlank { item.recoveryReconciliationScript.visibleLocalizedString("main", "") }
+    val recoveryAuditHintText = item.recoveryAuditHint.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryAuditHint.visibleLocalizedString("main", "") }
+    val recoveryAuditChecklistText = item.recoveryAuditChecklist.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryAuditChecklist.visibleLocalizedString("main", "") }
+    val recoveryAuditScriptText = item.recoveryAuditScript.visibleLocalizedString(stateValues.appLanguage, "")
+        .ifBlank { item.recoveryAuditScript.visibleLocalizedString("main", "") }
     val recoveryFollowUpAtText = item.recoveryFollowUpAtMillis
         ?.takeIf { it > 0L }
         ?.let { receiptUiDateTime(it) }
@@ -29389,6 +29475,7 @@ private fun AppConfiguration.SupplierBackorderWatchCard(item: SupplierDashboardB
             stateValues.TextColor
         )
         StockCardInfoLine(localizedStringResource(2262, "Recovery reconciliation"), "${supplierBackorderRecoveryReconciliationTitle(item.recoveryReconciliationLane)} • ${localizedStringResource(2269, "Reconcile score")} ${item.recoveryReconciliationScore}/100", stateValues.TextColor)
+        StockCardInfoLine(localizedStringResource(2281, "Recovery audit"), "${supplierBackorderRecoveryAuditTitle(item.recoveryAuditLane)} • ${localizedStringResource(2288, "Audit score")} ${item.recoveryAuditScore}/100", stateValues.TextColor)
         if (recoveryOwnerHintText.isNotBlank()) {
             Column(
                 modifier = Modifier
@@ -31009,7 +31096,7 @@ private fun AppConfiguration.SupplierBackorderWatchCard(item: SupplierDashboardB
                 if (recoverySealScriptText.isNotBlank()) {
                     Text(
                         text = recoverySealScriptText,
-                        color = stateValues.TextGray,
+                        color = stateValues.PlaceholderTextColor,
                         fontSize = stateValues.smallTextSize,
                         maxLines = 5,
                         overflow = TextOverflow.Ellipsis
@@ -31068,7 +31155,7 @@ private fun AppConfiguration.SupplierBackorderWatchCard(item: SupplierDashboardB
                 if (recoveryCloseoutScriptText.isNotBlank()) {
                     Text(
                         text = recoveryCloseoutScriptText,
-                        color = stateValues.TextGray,
+                        color = stateValues.PlaceholderTextColor,
                         fontSize = stateValues.smallTextSize,
                         maxLines = 5,
                         overflow = TextOverflow.Ellipsis
@@ -31131,7 +31218,7 @@ private fun AppConfiguration.SupplierBackorderWatchCard(item: SupplierDashboardB
                 if (recoveryReopenScriptText.isNotBlank()) {
                     Text(
                         text = recoveryReopenScriptText,
-                        color = stateValues.TextGray,
+                        color = stateValues.PlaceholderTextColor,
                         fontSize = stateValues.smallTextSize,
                         maxLines = 5,
                         overflow = TextOverflow.Ellipsis
@@ -31190,7 +31277,66 @@ private fun AppConfiguration.SupplierBackorderWatchCard(item: SupplierDashboardB
                 if (recoveryReconciliationScriptText.isNotBlank()) {
                     Text(
                         text = recoveryReconciliationScriptText,
-                        color = stateValues.TextGray,
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+
+        if (recoveryAuditHintText.isNotBlank() || recoveryAuditChecklistText.isNotBlank() || recoveryAuditScriptText.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.08f))
+                    .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.30f), RoundedCornerShape(stateValues.cornerRadius))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(24.dp),
+                        url = stateValues.drawablePathIconSupplierRecoveryAudit,
+                        fallbackRes = stateValues.drawableResIconSupplierRecoveryAudit.value,
+                        contentDescription = localizedStringResource(2281, "Recovery audit"),
+                        tintColor = stateValues.AccentColor
+                    )
+                    Text(
+                        text = "${supplierBackorderRecoveryAuditTitle(item.recoveryAuditLane)} • ${localizedStringResource(2288, "Audit score")} ${item.recoveryAuditScore}/100",
+                        color = stateValues.AccentColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (recoveryAuditHintText.isNotBlank()) {
+                    Text(
+                        text = recoveryAuditHintText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryAuditChecklistText.isNotBlank()) {
+                    Text(
+                        text = recoveryAuditChecklistText,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 6,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (recoveryAuditScriptText.isNotBlank()) {
+                    Text(
+                        text = recoveryAuditScriptText,
+                        color = stateValues.PlaceholderTextColor,
                         fontSize = stateValues.smallTextSize,
                         maxLines = 5,
                         overflow = TextOverflow.Ellipsis
@@ -31441,6 +31587,14 @@ private fun AppConfiguration.SupplierBackorderWatchCard(item: SupplierDashboardB
                     iconRes = stateValues.drawableResIconSupplierRecoveryReconciliation.value,
                     confirmationRequired = false,
                     onClick = { copyTextToClipboard(supplierBackorderReconciliationNote(item)) }
+                )
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(2291, "Copy audit note"),
+                    iconPath = stateValues.drawablePathIconSupplierRecoveryAudit,
+                    iconRes = stateValues.drawableResIconSupplierRecoveryAudit.value,
+                    confirmationRequired = false,
+                    onClick = { copyTextToClipboard(supplierBackorderAuditNote(item)) }
                 )
             }
         } else {
@@ -31758,6 +31912,15 @@ private fun AppConfiguration.SupplierBackorderWatchCard(item: SupplierDashboardB
                         textSize = stateValues.smallTextSize,
                         confirmationRequired = false,
                         onClick = { copyTextToClipboard(supplierBackorderReconciliationNote(item)) }
+                    )
+                    actionButton(
+                        modifier = Modifier.weight(1f),
+                        text = localizedStringResource(2291, "Copy audit note"),
+                        iconPath = stateValues.drawablePathIconSupplierRecoveryAudit,
+                        iconRes = stateValues.drawableResIconSupplierRecoveryAudit.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        onClick = { copyTextToClipboard(supplierBackorderAuditNote(item)) }
                     )
                 }
             }
@@ -32118,6 +32281,21 @@ private fun AppConfiguration.SupplierInsightsScreen() {
     val backorderTopReconciliationLane = recoveryDesk.topReconciliationLane.ifBlank {
         backorderWatchItems
             .groupingBy { item -> item.recoveryReconciliationLane.ifBlank { "reconcile_watch" } }
+            .eachCount()
+            .maxByOrNull { entry -> entry.value }
+            ?.key
+            .orEmpty()
+    }
+    val backorderAuditBlockerCount = recoveryDesk.auditBlockerCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryAuditLane == "audit_blocked" || item.recoveryAuditScore >= 86 }
+    val backorderAuditQuantityGapCount = recoveryDesk.auditQuantityGapCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryAuditLane == "audit_quantity_gap" }
+    val backorderAuditEvidenceGapCount = recoveryDesk.auditEvidenceGapCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryAuditLane == "audit_evidence_gap" }
+    val backorderAuditStoreNoteGapCount = recoveryDesk.auditStoreNoteGapCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryAuditLane == "audit_store_note_gap" }
+    val backorderAuditReadyCount = recoveryDesk.auditReadyCount.takeIf { it > 0 } ?: backorderWatchItems.count { item -> item.recoveryAuditLane == "audit_ready" }
+    val backorderAverageAuditScore = recoveryDesk.averageAuditScore.takeIf { it > 0 } ?: (backorderWatchItems.takeIf { it.isNotEmpty() }?.let { items -> items.sumOf { item -> item.recoveryAuditScore } / items.size } ?: 0)
+    val backorderMaxAuditScore = recoveryDesk.maxAuditScore.takeIf { it > 0 } ?: (backorderWatchItems.maxOfOrNull { item -> item.recoveryAuditScore } ?: 0)
+    val backorderTopAuditLane = recoveryDesk.topAuditLane.ifBlank {
+        backorderWatchItems
+            .groupingBy { item -> item.recoveryAuditLane.ifBlank { "audit_watch" } }
             .eachCount()
             .maxByOrNull { entry -> entry.value }
             ?.key
@@ -32545,7 +32723,7 @@ private fun AppConfiguration.SupplierInsightsScreen() {
                                     Text(
                                         text = "${localizedStringResource(1958, "Recovery desk")} • ${supplierBackorderRecoveryDeskTitle(recoveryDesk.recoveryDeskLane)}",
                                         color = stateValues.TextColor,
-                                        fontSize = stateValues.mainTextSize,
+                                        fontSize = stateValues.textSize,
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
@@ -32910,6 +33088,28 @@ private fun AppConfiguration.SupplierInsightsScreen() {
                                 Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2278, "Split reconciles")}: $backorderReconciliationSplitCount") }
                                 Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2279, "Ready reconciles")}: $backorderReconciliationReadyCount") }
                             }
+                            StockCardInfoLine(localizedStringResource(2292, "Top audit"), supplierBackorderRecoveryAuditTitle(backorderTopAuditLane), stateValues.TextColor)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2293, "Audit blockers")}: $backorderAuditBlockerCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2298, "Audit average")}: $backorderAverageAuditScore/100") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2294, "Audit quantity gaps")}: $backorderAuditQuantityGapCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2295, "Audit evidence gaps")}: $backorderAuditEvidenceGapCount") }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2296, "Audit store note gaps")}: $backorderAuditStoreNoteGapCount") }
+                                Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2297, "Ready audits")}: $backorderAuditReadyCount") }
+                            }
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -32956,7 +33156,7 @@ private fun AppConfiguration.SupplierInsightsScreen() {
                                         Text(
                                             text = localizedStringResource(1974, "Wave board"),
                                             color = stateValues.AccentColor,
-                                            fontSize = stateValues.mainTextSize,
+                                            fontSize = stateValues.textSize,
                                             fontWeight = FontWeight.Bold
                                         )
                                     }
@@ -33349,6 +33549,20 @@ private fun AppConfiguration.SupplierInsightsScreen() {
                     ) {
                         Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2278, "Split reconciles")}: $backorderReconciliationSplitCount") }
                         Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2280, "Reconcile max")}: $backorderMaxReconciliationScore/100") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2292, "Top audit")}: ${supplierBackorderRecoveryAuditTitle(backorderTopAuditLane)}") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2293, "Audit blockers")}: $backorderAuditBlockerCount") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2294, "Audit quantity gaps")}: $backorderAuditQuantityGapCount") }
+                        Box(modifier = Modifier.weight(1f)) { SupplierCatalogChip(text = "${localizedStringResource(2299, "Audit max")}: $backorderMaxAuditScore/100") }
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -56583,6 +56797,8 @@ object AppConfiguration {
         val drawableResIconSupplierRecoveryReopen: StateFlow<DrawableResource>
         val drawablePathIconSupplierRecoveryReconciliation: String
         val drawableResIconSupplierRecoveryReconciliation: StateFlow<DrawableResource>
+        val drawablePathIconSupplierRecoveryAudit: String
+        val drawableResIconSupplierRecoveryAudit: StateFlow<DrawableResource>
 
         val drawablePathIconSupplierDispatch: String
         val drawableResIconSupplierDispatch: StateFlow<DrawableResource>
@@ -57332,6 +57548,9 @@ object AppConfiguration {
             override val drawablePathIconSupplierRecoveryReconciliation: String by drawablePathIconSupplierRecoveryReconciliationState.collectAsState()
             private val _drawableResIconSupplierRecoveryReconciliation = MutableStateFlow(Res.drawable._123_0)
             override val drawableResIconSupplierRecoveryReconciliation: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryReconciliation.asStateFlow()
+            override val drawablePathIconSupplierRecoveryAudit: String by drawablePathIconSupplierRecoveryAuditState.collectAsState()
+            private val _drawableResIconSupplierRecoveryAudit = MutableStateFlow(Res.drawable._124_0)
+            override val drawableResIconSupplierRecoveryAudit: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryAudit.asStateFlow()
 
             override val drawablePathIconSupplierDispatch: String by drawablePathIconSupplierDispatchState.collectAsState()
             private val _drawableResIconSupplierDispatch = MutableStateFlow(Res.drawable._78_0)
@@ -57583,6 +57802,7 @@ object AppConfiguration {
                 _drawableResIconSupplierRecoveryCloseout.emit(if (stateValues.appThemeId == 1L) Res.drawable._121_1 else Res.drawable._121_0)
                 _drawableResIconSupplierRecoveryReopen.emit(if (stateValues.appThemeId == 1L) Res.drawable._122_1 else Res.drawable._122_0)
                 _drawableResIconSupplierRecoveryReconciliation.emit(if (stateValues.appThemeId == 1L) Res.drawable._123_1 else Res.drawable._123_0)
+                _drawableResIconSupplierRecoveryAudit.emit(if (stateValues.appThemeId == 1L) Res.drawable._124_1 else Res.drawable._124_0)
                 _drawableResIconSupplierDispatch.emit(if (stateValues.appThemeId == 1L) Res.drawable._78_1 else Res.drawable._78_0)
                 _drawableResIconSupplierTermsGuard.emit(if (stateValues.appThemeId == 1L) Res.drawable._89_1 else Res.drawable._89_0)
                 _drawableResIconBuyerAgeRestriction.emit(if (stateValues.appThemeId == 1L) Res.drawable._73_1 else Res.drawable._73_0)

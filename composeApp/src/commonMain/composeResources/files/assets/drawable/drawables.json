@@ -1613,6 +1613,19 @@
           "path": "svg/123_1.svg"
         }
       ]
+    },
+    {
+      "id": 124,
+      "values": [
+        {
+          "themeId": 0,
+          "path": "svg/124_0.svg"
+        },
+        {
+          "themeId": 1,
+          "path": "svg/124_1.svg"
+        }
+      ]
     }
   ]
 }

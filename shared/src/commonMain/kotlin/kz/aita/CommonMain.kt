@@ -5463,6 +5463,11 @@ data class SupplierDashboardBackorderDataModel(
     val recoveryReconciliationScore: Int = 0,
     val recoveryReconciliationChecklist: List<LocalizedStringDataModel> = emptyList(),
     val recoveryReconciliationScript: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryAuditLane: String = "",
+    val recoveryAuditHint: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryAuditScore: Int = 0,
+    val recoveryAuditChecklist: List<LocalizedStringDataModel> = emptyList(),
+    val recoveryAuditScript: List<LocalizedStringDataModel> = emptyList(),
     val nextRecoveryStep: List<LocalizedStringDataModel> = emptyList(),
     val recoveryChecklist: List<LocalizedStringDataModel> = emptyList(),
     val affectedOrderCount: Int = 0,
@@ -5637,6 +5642,14 @@ data class SupplierDashboardRecoveryDeskDataModel(
     val reconciliationReadyCount: Int = 0,
     val averageReconciliationScore: Int = 0,
     val maxReconciliationScore: Int = 0,
+    val topAuditLane: String = "",
+    val auditBlockerCount: Int = 0,
+    val auditQuantityGapCount: Int = 0,
+    val auditEvidenceGapCount: Int = 0,
+    val auditStoreNoteGapCount: Int = 0,
+    val auditReadyCount: Int = 0,
+    val averageAuditScore: Int = 0,
+    val maxAuditScore: Int = 0,
     val averageRiskScore: Int = 0,
     val maxPriorityScore: Int = 0,
     val nextFollowUpAtMillis: Long? = null,
@@ -6263,7 +6276,7 @@ const val CLOUD_TRANSPORT_STATUS_UNAVAILABLE = -1
 @PublishedApi
 internal const val REALTIME_ACCESS_TOKEN_REFRESH_SKEW_MILLIS = 60_000L
 
-private const val DEFAULT_AITA_SERVER_URL = "http://10.202.5.34:8080"
+private const val DEFAULT_AITA_SERVER_URL = "http://10.202.5.33:8080"
 private val DEFAULT_AITA_SERVER_URL_PAIR = Pair(DEFAULT_AITA_SERVER_URL, "1")
 @Volatile
 private var runtimeClientServerUrlOverride: String? = null
@@ -6964,6 +6977,7 @@ val drawablePathIconSupplierRecoverySealState = MutableStateFlow("svg/120_0.svg"
 val drawablePathIconSupplierRecoveryCloseoutState = MutableStateFlow("svg/121_0.svg")
 val drawablePathIconSupplierRecoveryReopenState = MutableStateFlow("svg/122_0.svg")
 val drawablePathIconSupplierRecoveryReconciliationState = MutableStateFlow("svg/123_0.svg")
+val drawablePathIconSupplierRecoveryAuditState = MutableStateFlow("svg/124_0.svg")
 val drawablePathIconSupplierDispatchState = MutableStateFlow("svg/78_0.svg")
 val drawablePathIconSupplierTermsGuardState = MutableStateFlow("svg/89_0.svg")
 val drawablePathIconBuyerAgeRestrictionState = MutableStateFlow("svg/73_0.svg")
@@ -9177,6 +9191,9 @@ fun updateDrawables(
         )
         drawablePathIconSupplierRecoveryReconciliationState.emit(
             drawablePath(123L)
+        )
+        drawablePathIconSupplierRecoveryAuditState.emit(
+            drawablePath(124L)
         )
         drawablePathIconSupplierDispatchState.emit(
             drawablePath(78L)

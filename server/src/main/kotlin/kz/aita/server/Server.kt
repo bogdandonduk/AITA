@@ -6970,6 +6970,18 @@ private fun supplierDashboardDayStartMillis(now: Long): Long = runCatching {
     .toEpochMilli()
 }.getOrDefault(now - (now % AITA_SUPPLIER_DAY_MILLIS))
 
+private fun supplierDashboardCopyDateTime(timeMillis: Long): String = runCatching {
+  val zoned = Instant.ofEpochMilli(timeMillis).atZone(ZoneId.systemDefault())
+  "%04d-%02d-%02d %02d:%02d".format(
+    Locale.US,
+    zoned.year,
+    zoned.monthValue,
+    zoned.dayOfMonth,
+    zoned.hour,
+    zoned.minute
+  )
+}.getOrElse { Instant.ofEpochMilli(timeMillis).toString() }
+
 private fun supplierDashboardDeliveryBucketId(now: Long, dueAtMillis: Long?): String {
   val todayStart = supplierDashboardDayStartMillis(now)
   val safeDue = dueAtMillis ?: return "unscheduled"
@@ -12176,6 +12188,180 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
         )
       )
 
+      val recoveryAuditScore = (
+        recoveryReconciliationScore / 2 +
+          recoveryReopenScore / 5 +
+          recoveryCloseoutScore / 6 +
+          recoverySealScore / 7 +
+          when (recoveryReconciliationLane) {
+            "reconcile_blocked" -> 24
+            "reconcile_store_delta" -> 15
+            "reconcile_source_delta" -> 14
+            "reconcile_split_delta" -> 13
+            "reconcile_ready" -> -10
+            else -> 2
+          } +
+          when (recoveryCloseoutLane) {
+            "closeout_blocked" -> 16
+            "closeout_store_notice" -> 10
+            "closeout_source_trace" -> 9
+            "closeout_split_leftover" -> 8
+            "closeout_ready" -> -6
+            else -> 1
+          } +
+          when (recoverySealLane) {
+            "seal_blocked" -> 14
+            "seal_store_notice" -> 9
+            "seal_source_trace" -> 8
+            "seal_split_manifest" -> 8
+            "seal_ready" -> -5
+            else -> 1
+          } +
+          when (recoveryProofLane) {
+            "store_ack_required" -> 7
+            "sourcing_note_required" -> 7
+            "pack_guard_proof" -> 6
+            else -> 0
+          } +
+          when {
+            fullyShortLineCount > 0 -> 7
+            partialLineCount > 0 -> 5
+            else -> 0
+          } +
+          affectedOrderCount.coerceAtMost(6) * 2 +
+          affectedStoreCount.coerceAtMost(5) * 2 +
+          ((100 - requestCoveragePercent).coerceAtLeast(0) / 8)
+        ).coerceIn(0, 100)
+      val recoveryAuditLane = when {
+        recoveryReconciliationLane == "reconcile_blocked" ||
+          recoveryCloseoutLane == "closeout_blocked" ||
+          recoverySealLane == "seal_blocked" ||
+          recoveryReleaseLane == "release_blocked" ||
+          recoveryExecutionLane == "execution_blocked" -> "audit_blocked"
+        recoveryReconciliationLane == "reconcile_split_delta" ||
+          (acceptedQuantityTotal > 0.000001 && (partialLineCount > 0 || missingQuantityTotal > acceptedQuantityTotal)) -> "audit_quantity_gap"
+        recoveryReconciliationLane == "reconcile_source_delta" ||
+          recoveryProofLane == "sourcing_note_required" ||
+          recoveryVerificationLane == "verify_source_proof" ||
+          recoverySealLane == "seal_source_trace" -> "audit_evidence_gap"
+        recoveryReconciliationLane == "reconcile_store_delta" ||
+          recoveryPromiseShieldLane == "store_answer_needed" ||
+          recoveryContactLane == "store_call" ||
+          recoveryReopenLane == "reopen_after_answer" -> "audit_store_note_gap"
+        recoveryReconciliationLane == "reconcile_ready" &&
+          (recoveryCloseoutLane == "closeout_ready" || recoverySealLane == "seal_ready") &&
+          recoveryAuditScore <= 46 -> "audit_ready"
+        else -> "audit_watch"
+      }
+      val recoveryAuditHint = when (recoveryAuditLane) {
+        "audit_blocked" -> supplierDashboardJoinedMessage(
+          listOf("Audit guard: stop closure until blocked gates, reconciliation, seal, and dispatch-safe quantity all agree."),
+          listOf("Защита аудита: остановите закрытие, пока заблокированные ворота, сверка, штамп и безопасное к отправке количество не совпадут."),
+          listOf("Аудит қорғаны: бөгелген қақпалар, салыстыру, мөр және жөнелтуге қауіпсіз сан келіскенше жабуды тоқтатыңыз.")
+        )
+        "audit_quantity_gap" -> supplierDashboardJoinedMessage(
+          listOf("Audit guard: quantity math still needs a paper trail. Match requested, accepted, shipped, and leftover quantities before close."),
+          listOf("Защита аудита: математике количества ещё нужен след. Сведите запрошенное, принятое, отправленное и остаток до закрытия."),
+          listOf("Аудит қорғаны: сан есебіне әлі із керек. Жабуға дейін сұралған, қабылданған, жөнелтілген және қалған санды сәйкестендіріңіз.")
+        )
+        "audit_evidence_gap" -> supplierDashboardJoinedMessage(
+          listOf("Audit guard: evidence is thin. Attach source proof, no-stock answer, ETA, or pack proof before this item leaves the watch desk."),
+          listOf("Защита аудита: доказательств мало. Приложите подтверждение поиска, ответ нет товара, срок или доказательство сборки до выхода из наблюдения."),
+          listOf("Аудит қорғаны: дәлел жұқа. Бұл позиция бақылаудан шықпай тұрып іздеу дәлелін, қор жоқ жауабын, мерзімді немесе жинау дәлелін тіркеңіз.")
+        )
+        "audit_store_note_gap" -> supplierDashboardJoinedMessage(
+          listOf("Audit guard: store-facing note is the last gap. Save the answer that explains delay, substitute, split, or cancel path."),
+          listOf("Защита аудита: последняя дырка — заметка для магазина. Сохраните ответ про задержку, замену, разделение или отмену."),
+          listOf("Аудит қорғаны: соңғы бос орын — дүкенге арналған жазба. Кідіріс, ауыстыру, бөлу немесе бас тарту жолын түсіндіретін жауапты сақтаңыз.")
+        )
+        "audit_ready" -> supplierDashboardJoinedMessage(
+          listOf("Audit guard: trail is clean. Close only the safe quantity, keep residual shortage visible, and archive the audit note."),
+          listOf("Защита аудита: след чистый. Закройте только безопасное количество, оставьте остаточную недостачу видимой и архивируйте заметку аудита."),
+          listOf("Аудит қорғаны: із таза. Тек қауіпсіз санды жабыңыз, қалған жетіспеуді көрінетін қалдырып, аудит жазбасын архивтеңіз.")
+        )
+        else -> supplierDashboardJoinedMessage(
+          listOf("Audit guard: watch quietly. Recalculate if quantity, proof, answer, ETA, or reopen checkpoint changes."),
+          listOf("Защита аудита: спокойно наблюдайте. Пересчитайте, если изменится количество, доказательство, ответ, срок или контроль переоткрытия."),
+          listOf("Аудит қорғаны: тыныш бақылаңыз. Сан, дәлел, жауап, мерзім немесе қайта ашу бақылауы өзгерсе қайта есептеңіз.")
+        )
+      }
+      val recoveryAuditChecklist = when (recoveryAuditLane) {
+        "audit_blocked" -> supplierDashboardJoinedMessage(
+          listOf("□ Keep shortage visible\n□ Clear blocked gate\n□ Re-run reconciliation\n□ Save audit note"),
+          listOf("□ Оставить недостачу видимой\n□ Очистить заблокированные ворота\n□ Перезапустить сверку\n□ Сохранить заметку аудита"),
+          listOf("□ Жетіспеуді көрінетін ұстау\n□ Бөгелген қақпаны тазарту\n□ Салыстыруды қайта жүргізу\n□ Аудит жазбасын сақтау")
+        )
+        "audit_quantity_gap" -> supplierDashboardJoinedMessage(
+          listOf("□ Match requested vs accepted\n□ Mark shipped quantity\n□ Keep leftover quantity open\n□ Save quantity trail"),
+          listOf("□ Свести запрошено и принято\n□ Отметить отправленное количество\n□ Оставить остаток открытым\n□ Сохранить след количества"),
+          listOf("□ Сұралған мен қабылданғанды салыстыру\n□ Жөнелтілген санды белгілеу\n□ Қалған санды ашық қалдыру\n□ Сан ізін сақтау")
+        )
+        "audit_evidence_gap" -> supplierDashboardJoinedMessage(
+          listOf("□ Attach source/pack proof\n□ Save ETA or no-stock answer\n□ Link proof to promise\n□ Recheck score"),
+          listOf("□ Приложить доказательство поиска/сборки\n□ Сохранить срок или ответ нет товара\n□ Связать доказательство с обещанием\n□ Перепроверить оценку"),
+          listOf("□ Іздеу/жинау дәлелін тіркеу\n□ Мерзімді немесе қор жоқ жауабын сақтау\n□ Дәлелді уәдеге байлау\n□ Ұпайды қайта тексеру")
+        )
+        "audit_store_note_gap" -> supplierDashboardJoinedMessage(
+          listOf("□ Write store-safe note\n□ Confirm delay/substitute/split/cancel\n□ Keep private store names out\n□ Save copied answer"),
+          listOf("□ Написать безопасную заметку магазину\n□ Подтвердить задержку/замену/разделение/отмену\n□ Не выносить приватные названия\n□ Сохранить скопированный ответ"),
+          listOf("□ Дүкенге қауіпсіз жазба жазу\n□ Кідіріс/ауыстыру/бөлу/бас тартуды бекіту\n□ Жеке атауларды шығармау\n□ Көшірілген жауапты сақтау")
+        )
+        "audit_ready" -> supplierDashboardJoinedMessage(
+          listOf("□ Close safe quantity only\n□ Archive audit note\n□ Keep residual shortage open\n□ Leave reopen checkpoint"),
+          listOf("□ Закрыть только безопасное количество\n□ Архивировать заметку аудита\n□ Оставить остаточную недостачу открытой\n□ Оставить контроль переоткрытия"),
+          listOf("□ Тек қауіпсіз санды жабу\n□ Аудит жазбасын архивтеу\n□ Қалған жетіспеуді ашық қалдыру\n□ Қайта ашу бақылауын қалдыру")
+        )
+        else -> supplierDashboardJoinedMessage(
+          listOf("□ Watch quantity\n□ Watch proof\n□ Watch ETA/answer\n□ Refresh on change"),
+          listOf("□ Следить за количеством\n□ Следить за доказательством\n□ Следить за сроком/ответом\n□ Обновить при изменении"),
+          listOf("□ Санды бақылау\n□ Дәлелді бақылау\n□ Мерзім/жауапты бақылау\n□ Өзгерсе жаңарту")
+        )
+      }
+      val recoveryAuditPathMain = when (recoveryAuditLane) {
+        "audit_blocked" -> "clear blocked audit gates before closure"
+        "audit_quantity_gap" -> "match requested, accepted, shipped, and leftover quantities"
+        "audit_evidence_gap" -> "attach evidence before leaving recovery desk"
+        "audit_store_note_gap" -> "save store-safe answer before closeout"
+        "audit_ready" -> "audit-ready safe closeout"
+        else -> "watch audit trail and refresh on change"
+      }
+      val recoveryAuditPathRu = when (recoveryAuditLane) {
+        "audit_blocked" -> "очистить заблокированные ворота аудита до закрытия"
+        "audit_quantity_gap" -> "свести запрошенное, принятое, отправленное и остаток"
+        "audit_evidence_gap" -> "приложить доказательство до выхода из восстановления"
+        "audit_store_note_gap" -> "сохранить безопасный ответ магазину до закрытия"
+        "audit_ready" -> "безопасное закрытие после аудита"
+        else -> "наблюдать след аудита и обновлять при изменении"
+      }
+      val recoveryAuditPathKk = when (recoveryAuditLane) {
+        "audit_blocked" -> "жабуға дейін бөгелген аудит қақпаларын тазарту"
+        "audit_quantity_gap" -> "сұралған, қабылданған, жөнелтілген және қалған санды сәйкестендіру"
+        "audit_evidence_gap" -> "қалпына келтіруден шықпай тұрып дәлел тіркеу"
+        "audit_store_note_gap" -> "жабуға дейін дүкенге қауіпсіз жауапты сақтау"
+        "audit_ready" -> "аудиттен кейін қауіпсіз жабу"
+        else -> "аудит ізін бақылап, өзгерсе жаңарту"
+      }
+      val recoveryAuditScript = supplierDashboardJoinedMessage(
+        listOf(
+          "AITA audit guard: $recoveryContactGoodsName.",
+          "Audit path: $recoveryAuditPathMain; score $recoveryAuditScore/100.",
+          "Requested ${requestedQuantityTotal.toStockMoneyText()}, accepted ${acceptedQuantityTotal.toStockMoneyText()}, short ${missingQuantityTotal.toStockMoneyText()}; reconcile ${recoveryReconciliationLane.ifBlank { "reconcile_watch" }}.",
+          "Closeout ${recoveryCloseoutLane.ifBlank { "closeout_watch" }}; seal ${recoverySealLane.ifBlank { "seal_watch" }}; reopen ${recoveryReopenLane.ifBlank { "reopen_watch" }}. Keep store names private outside AITA."
+        ),
+        listOf(
+          "AITA защита аудита: $recoveryContactGoodsName.",
+          "Путь аудита: $recoveryAuditPathRu; оценка $recoveryAuditScore/100.",
+          "Запрошено ${requestedQuantityTotal.toStockMoneyText()}, принято ${acceptedQuantityTotal.toStockMoneyText()}, не хватает ${missingQuantityTotal.toStockMoneyText()}; сверка ${recoveryReconciliationLane.ifBlank { "reconcile_watch" }}.",
+          "Закрытие ${recoveryCloseoutLane.ifBlank { "closeout_watch" }}; штамп ${recoverySealLane.ifBlank { "seal_watch" }}; переоткрытие ${recoveryReopenLane.ifBlank { "reopen_watch" }}. Названия магазинов держите приватными вне AITA."
+        ),
+        listOf(
+          "AITA аудит қорғаны: $recoveryContactGoodsName.",
+          "Аудит жолы: $recoveryAuditPathKk; ұпай $recoveryAuditScore/100.",
+          "Сұралды ${requestedQuantityTotal.toStockMoneyText()}, қабылданды ${acceptedQuantityTotal.toStockMoneyText()}, жетіспейді ${missingQuantityTotal.toStockMoneyText()}; салыстыру ${recoveryReconciliationLane.ifBlank { "reconcile_watch" }}.",
+          "Жабу ${recoveryCloseoutLane.ifBlank { "closeout_watch" }}; мөр ${recoverySealLane.ifBlank { "seal_watch" }}; қайта ашу ${recoveryReopenLane.ifBlank { "reopen_watch" }}. AITA сыртында дүкен атауларын құпия ұстаңыз."
+        )
+      )
+
       val nextRecoveryStep = when {
         recoveryUrgencyLane == "overdue" -> supplierDashboardJoinedMessage(
           listOf("Contact the store and freeze a new recovery promise before dispatch."),
@@ -12456,6 +12642,14 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
         "reconcile_ready" -> -8
         else -> 1
       }
+      val auditPressure = when (recoveryAuditLane) {
+        "audit_blocked" -> 23
+        "audit_quantity_gap" -> 14
+        "audit_evidence_gap" -> 13
+        "audit_store_note_gap" -> 11
+        "audit_ready" -> -9
+        else -> 1
+      }
       val priorityScore = (
         relatedOrders.size * 12 +
            itemLines.size * 5 +
@@ -12492,7 +12686,8 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
            sealPressure +
            closeoutPressure +
            reopenPressure +
-           reconciliationPressure
+           reconciliationPressure +
+           auditPressure
         ).coerceAtLeast(0)
 
       SupplierDashboardBackorderDataModel(
@@ -12658,6 +12853,11 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
         recoveryReconciliationScore = recoveryReconciliationScore,
         recoveryReconciliationChecklist = recoveryReconciliationChecklist,
         recoveryReconciliationScript = recoveryReconciliationScript,
+        recoveryAuditLane = recoveryAuditLane,
+        recoveryAuditHint = recoveryAuditHint,
+        recoveryAuditScore = recoveryAuditScore,
+        recoveryAuditChecklist = recoveryAuditChecklist,
+        recoveryAuditScript = recoveryAuditScript,
         nextRecoveryStep = nextRecoveryStep,
         recoveryChecklist = recoveryChecklist,
         affectedOrderCount = affectedOrderCount,
@@ -12696,7 +12896,8 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
         item.recoverySealLane == "seal_blocked" ||
         item.recoveryCloseoutLane == "closeout_blocked" ||
         item.recoveryReopenLane == "reopen_blocked" ||
-        item.recoveryReconciliationLane == "reconcile_blocked"
+        item.recoveryReconciliationLane == "reconcile_blocked" ||
+        item.recoveryAuditLane == "audit_blocked"
     }
     val storeContactCount = recoveryDeskItems.count { item ->
       item.recoveryOwnerLane == "store_contact" ||
@@ -12731,7 +12932,8 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
         item.recoverySealLane == "seal_ready" ||
         item.recoveryCloseoutLane == "closeout_ready" ||
         item.recoveryReopenLane == "reopen_safe" ||
-        item.recoveryReconciliationLane == "reconcile_ready"
+        item.recoveryReconciliationLane == "reconcile_ready" ||
+        item.recoveryAuditLane == "audit_ready"
     }
     val staleRecoveryCount = recoveryDeskItems.count { item -> item.recoveryAgingLane == "stale_blocker" || item.recoveryAgingScore >= 75 }
     val touchTodayRecoveryCount = recoveryDeskItems.count { item -> item.recoveryAgingLane == "touch_today" || item.recoveryAgingLane == "stale_blocker" }
@@ -13061,6 +13263,27 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
       .maxByOrNull { candidate -> candidate.second }
       ?.first
       .orEmpty()
+    val auditBlockerCount = recoveryDeskItems.count { item -> item.recoveryAuditLane == "audit_blocked" || item.recoveryAuditScore >= 86 }
+    val auditQuantityGapCount = recoveryDeskItems.count { item -> item.recoveryAuditLane == "audit_quantity_gap" }
+    val auditEvidenceGapCount = recoveryDeskItems.count { item -> item.recoveryAuditLane == "audit_evidence_gap" }
+    val auditStoreNoteGapCount = recoveryDeskItems.count { item -> item.recoveryAuditLane == "audit_store_note_gap" }
+    val auditReadyCount = recoveryDeskItems.count { item -> item.recoveryAuditLane == "audit_ready" }
+    val averageAuditScore = recoveryDeskItems.takeIf { it.isNotEmpty() }?.let { items ->
+      items.sumOf { item -> item.recoveryAuditScore }.coerceAtLeast(0) / items.size
+    } ?: 0
+    val maxAuditScore = recoveryDeskItems.maxOfOrNull { item -> item.recoveryAuditScore } ?: 0
+    val topAuditLane = listOf(
+      "audit_blocked",
+      "audit_quantity_gap",
+      "audit_evidence_gap",
+      "audit_store_note_gap",
+      "audit_ready",
+      "audit_watch"
+    ).map { lane -> lane to recoveryDeskItems.count { item -> item.recoveryAuditLane == lane } }
+      .filter { candidate -> candidate.second > 0 }
+      .maxByOrNull { candidate -> candidate.second }
+      ?.first
+      .orEmpty()
     val topImpactLane = listOf(
       "customer_promise_impact",
       "multi_store_impact",
@@ -13097,11 +13320,11 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
     val topItem = recoveryDeskItems.firstOrNull()
     val recoveryDeskLane = when {
       shortageCount <= 0 -> "desk_clear"
-      stopPackCount > 0 || promiseRiskCount > 0 || blockedCommitCount > 0 || exceptionPressureCount > 0 || causePressureCount > 0 || verificationBlockerCount > 0 || approvalBlockerCount > 0 || executionBlockerCount > 0 || releaseBlockerCount > 0 || sealBlockerCount > 0 || closeoutBlockerCount > 0 || reopenBlockerCount > 0 || reconciliationBlockerCount > 0 || managerApprovalCount > 0 || causeVerificationCount > 0 || zeroAcceptanceCauseCount > 0 || exceptionCauseCount > 0 || promiseConflictCauseCount > 0 || stopPackExceptionCount > 0 || cancelReviewExceptionCount > 0 || priorityAllocationCount > 0 || highImpactCount > 0 || urgentCount >= 3 || staleRecoveryCount > 0 || heavyLoadCount > 0 || packBottleneckCount > 0 || decisionBottleneckCount > 0 || agingBottleneckCount > 0 -> "desk_command"
-      fairSplitAllocationCount > 0 || allocationCauseCount > 0 || substituteExceptionCount > 0 || allocationExceptionCount > 0 || storeVerificationCount > 0 || storeApprovalCount > 0 || storeExecutionCount > 0 || storeReleaseCount > 0 || storeSealCount > 0 || storeCloseoutCount > 0 || reopenAnswerCount > 0 || reopenPromiseCount > 0 || reconciliationStoreCount > 0 || dueCommitCount > 0 || multiStoreLoadCount > 0 || multiStoreImpactCount > 0 || replenishmentImpactCount > 0 || contactBottleneckCount > 0 || storeContactCount > 0 -> "desk_contact"
-      sourceCommitCount > 0 || partialCapacityCauseCount > 0 || sourcingExceptionCount > 0 || sourceVerificationCount > 0 || sourceApprovalCount > 0 || sourceExecutionCount > 0 || sourceReleaseCount > 0 || sourceSealCount > 0 || sourceCloseoutCount > 0 || reconciliationSourceCount > 0 || sourcingBottleneckCount > 0 || sourcingCount > 0 -> "desk_source"
-      splitCommitCount > 0 || packVerificationCount > 0 || packApprovalCount > 0 || splitExecutionCount > 0 || splitReleaseCount > 0 || splitSealCount > 0 || splitCloseoutCount > 0 || reopenSplitCount > 0 || reconciliationSplitCount > 0 || splitShipCount > 0 -> "desk_split"
-      reconciliationReadyCount > 0 || reopenReadyCount > 0 || readyCloseoutCount > 0 || readySealCount > 0 || readyReleaseCount > 0 || readyExecutionCount > 0 || approvalReadyCount > 0 || verificationReadyCount > 0 || causeReadyCount > 0 || exceptionReadyCount > 0 || allocationReadyCount > 0 || readyCommitCount > 0 || readyCount > 0 -> "desk_ready"
+      stopPackCount > 0 || promiseRiskCount > 0 || blockedCommitCount > 0 || exceptionPressureCount > 0 || causePressureCount > 0 || verificationBlockerCount > 0 || approvalBlockerCount > 0 || executionBlockerCount > 0 || releaseBlockerCount > 0 || sealBlockerCount > 0 || closeoutBlockerCount > 0 || reopenBlockerCount > 0 || reconciliationBlockerCount > 0 || auditBlockerCount > 0 || managerApprovalCount > 0 || causeVerificationCount > 0 || zeroAcceptanceCauseCount > 0 || exceptionCauseCount > 0 || promiseConflictCauseCount > 0 || stopPackExceptionCount > 0 || cancelReviewExceptionCount > 0 || priorityAllocationCount > 0 || highImpactCount > 0 || urgentCount >= 3 || staleRecoveryCount > 0 || heavyLoadCount > 0 || packBottleneckCount > 0 || decisionBottleneckCount > 0 || agingBottleneckCount > 0 -> "desk_command"
+      fairSplitAllocationCount > 0 || allocationCauseCount > 0 || substituteExceptionCount > 0 || allocationExceptionCount > 0 || storeVerificationCount > 0 || storeApprovalCount > 0 || storeExecutionCount > 0 || storeReleaseCount > 0 || storeSealCount > 0 || storeCloseoutCount > 0 || reopenAnswerCount > 0 || reopenPromiseCount > 0 || reconciliationStoreCount > 0 || auditStoreNoteGapCount > 0 || dueCommitCount > 0 || multiStoreLoadCount > 0 || multiStoreImpactCount > 0 || replenishmentImpactCount > 0 || contactBottleneckCount > 0 || storeContactCount > 0 -> "desk_contact"
+      sourceCommitCount > 0 || partialCapacityCauseCount > 0 || sourcingExceptionCount > 0 || sourceVerificationCount > 0 || sourceApprovalCount > 0 || sourceExecutionCount > 0 || sourceReleaseCount > 0 || sourceSealCount > 0 || sourceCloseoutCount > 0 || reconciliationSourceCount > 0 || auditEvidenceGapCount > 0 || sourcingBottleneckCount > 0 || sourcingCount > 0 -> "desk_source"
+      splitCommitCount > 0 || packVerificationCount > 0 || packApprovalCount > 0 || splitExecutionCount > 0 || splitReleaseCount > 0 || splitSealCount > 0 || splitCloseoutCount > 0 || reopenSplitCount > 0 || reconciliationSplitCount > 0 || auditQuantityGapCount > 0 || splitShipCount > 0 -> "desk_split"
+      auditReadyCount > 0 || reconciliationReadyCount > 0 || reopenReadyCount > 0 || readyCloseoutCount > 0 || readySealCount > 0 || readyReleaseCount > 0 || readyExecutionCount > 0 || approvalReadyCount > 0 || verificationReadyCount > 0 || causeReadyCount > 0 || exceptionReadyCount > 0 || allocationReadyCount > 0 || readyCommitCount > 0 || readyCount > 0 -> "desk_ready"
       allocationPressureCount > 0 -> "desk_watch"
       else -> "desk_watch"
     }
@@ -13225,6 +13448,7 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
         "Closeout ${topCloseoutLane.ifBlank { "closeout_watch" }}; blockers $closeoutBlockerCount; store $storeCloseoutCount; source $sourceCloseoutCount; split $splitCloseoutCount; ready $readyCloseoutCount; max $maxCloseoutScore/100.",
         "Reopen ${topReopenLane.ifBlank { "reopen_watch" }}; blockers $reopenBlockerCount; answer $reopenAnswerCount; promise $reopenPromiseCount; split $reopenSplitCount; ready $reopenReadyCount; max $maxReopenScore/100; next ${nextReopenAtMillis?.let { java.time.Instant.ofEpochMilli(it).toString() } ?: "none"}.",
         "Reconciliation ${topReconciliationLane.ifBlank { "reconcile_watch" }}; blockers $reconciliationBlockerCount; store $reconciliationStoreCount; source $reconciliationSourceCount; split $reconciliationSplitCount; ready $reconciliationReadyCount; max $maxReconciliationScore/100.",
+        "Audit ${topAuditLane.ifBlank { "audit_watch" }}; blockers $auditBlockerCount; quantity $auditQuantityGapCount; evidence $auditEvidenceGapCount; store note $auditStoreNoteGapCount; ready $auditReadyCount; max $maxAuditScore/100.",
         "Keep store names private outside AITA."
       ),
       listOf(
@@ -13246,6 +13470,7 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
         "Закрытие ${topCloseoutLane.ifBlank { "closeout_watch" }}; блокеров $closeoutBlockerCount; магазин $storeCloseoutCount; поиск $sourceCloseoutCount; разделение $splitCloseoutCount; готово $readyCloseoutCount; максимум $maxCloseoutScore/100.",
         "Переоткрытие ${topReopenLane.ifBlank { "reopen_watch" }}; блокеров $reopenBlockerCount; ответы $reopenAnswerCount; обещания $reopenPromiseCount; разделение $reopenSplitCount; готово $reopenReadyCount; максимум $maxReopenScore/100; следующее ${nextReopenAtMillis?.let { java.time.Instant.ofEpochMilli(it).toString() } ?: "нет"}.",
         "Сверка ${topReconciliationLane.ifBlank { "reconcile_watch" }}; блокеров $reconciliationBlockerCount; магазин $reconciliationStoreCount; поиск $reconciliationSourceCount; разделение $reconciliationSplitCount; готово $reconciliationReadyCount; максимум $maxReconciliationScore/100.",
+        "Аудит ${topAuditLane.ifBlank { "audit_watch" }}; блокеров $auditBlockerCount; количество $auditQuantityGapCount; доказательства $auditEvidenceGapCount; заметки магазина $auditStoreNoteGapCount; готово $auditReadyCount; максимум $maxAuditScore/100.",
         "Названия магазинов держите приватными вне AITA."
       ),
       listOf(
@@ -13267,6 +13492,7 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
         "Жабу ${topCloseoutLane.ifBlank { "closeout_watch" }}; бөгет $closeoutBlockerCount; дүкен $storeCloseoutCount; іздеу $sourceCloseoutCount; бөлу $splitCloseoutCount; дайын $readyCloseoutCount; ең жоғары $maxCloseoutScore/100.",
         "Қайта ашу ${topReopenLane.ifBlank { "reopen_watch" }}; бөгет $reopenBlockerCount; жауап $reopenAnswerCount; уәде $reopenPromiseCount; бөлу $reopenSplitCount; дайын $reopenReadyCount; ең жоғары $maxReopenScore/100; келесі ${nextReopenAtMillis?.let { java.time.Instant.ofEpochMilli(it).toString() } ?: "жоқ"}.",
         "Салыстыру ${topReconciliationLane.ifBlank { "reconcile_watch" }}; бөгет $reconciliationBlockerCount; дүкен $reconciliationStoreCount; іздеу $reconciliationSourceCount; бөлу $reconciliationSplitCount; дайын $reconciliationReadyCount; ең жоғары $maxReconciliationScore/100.",
+        "Аудит ${topAuditLane.ifBlank { "audit_watch" }}; бөгет $auditBlockerCount; сан $auditQuantityGapCount; дәлел $auditEvidenceGapCount; дүкен жазбасы $auditStoreNoteGapCount; дайын $auditReadyCount; ең жоғары $maxAuditScore/100.",
         "AITA сыртында дүкен атауларын құпия ұстаңыз."
       )
     )
@@ -13549,6 +13775,14 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
       reconciliationReadyCount = reconciliationReadyCount,
       averageReconciliationScore = averageReconciliationScore,
       maxReconciliationScore = maxReconciliationScore,
+      topAuditLane = topAuditLane,
+      auditBlockerCount = auditBlockerCount,
+      auditQuantityGapCount = auditQuantityGapCount,
+      auditEvidenceGapCount = auditEvidenceGapCount,
+      auditStoreNoteGapCount = auditStoreNoteGapCount,
+      auditReadyCount = auditReadyCount,
+      averageAuditScore = averageAuditScore,
+      maxAuditScore = maxAuditScore,
       averageRiskScore = averageRiskScore,
       maxPriorityScore = maxPriorityScore,
       nextFollowUpAtMillis = nextFollowUpAtMillis,
