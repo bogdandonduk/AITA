@@ -6276,7 +6276,7 @@ const val CLOUD_TRANSPORT_STATUS_UNAVAILABLE = -1
 @PublishedApi
 internal const val REALTIME_ACCESS_TOKEN_REFRESH_SKEW_MILLIS = 60_000L
 
-private const val DEFAULT_AITA_SERVER_URL = "http://10.202.5.33:8080"
+private const val DEFAULT_AITA_SERVER_URL = "http://172.22.12.63:8080"
 private val DEFAULT_AITA_SERVER_URL_PAIR = Pair(DEFAULT_AITA_SERVER_URL, "1")
 @Volatile
 private var runtimeClientServerUrlOverride: String? = null
