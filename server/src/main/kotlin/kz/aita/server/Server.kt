@@ -18290,11 +18290,17 @@ fun Application.module() {
 
     get("/config/server") {
       val publicUrlForThisCall = call.application.publicServerUrl() ?: call.inferredPublicServerUrl()
+      call.response.header(HttpHeaders.CacheControl, "no-store, max-age=0")
+      call.response.header(HttpHeaders.Pragma, "no-cache")
+      call.response.header(HttpHeaders.AccessControlAllowOrigin, "*")
       call.respond(HttpStatusCode.OK, call.application.buildServerBootstrapData(publicUrlForThisCall))
     }
 
     get("/.well-known/aita-server.json") {
       val publicUrlForThisCall = call.application.publicServerUrl() ?: call.inferredPublicServerUrl()
+      call.response.header(HttpHeaders.CacheControl, "no-store, max-age=0")
+      call.response.header(HttpHeaders.Pragma, "no-cache")
+      call.response.header(HttpHeaders.AccessControlAllowOrigin, "*")
       call.respond(HttpStatusCode.OK, call.application.buildServerBootstrapData(publicUrlForThisCall))
     }
 

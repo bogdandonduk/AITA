@@ -1098,11 +1098,11 @@ private fun labelPrinterSafeText(value: String, maxLength: Int): String = value
     .trim()
     .take(maxLength.coerceAtLeast(1))
 
-private fun String.tsplQuoted(): String = labelPrinterSafeText(this, 80).replace("\"", "'")
+private fun String.tsplQuoted(): String = labelPrinterSafeText(this, 80).replace(""", "'")
 private fun String.zplText(): String = labelPrinterSafeText(this, 80)
     .replace("^", " ")
     .replace("~", " ")
-    .replace("\\", " ")
+    .replace("\", " ")
 private fun String.cpclText(): String = labelPrinterSafeText(this, 80)
 
 private fun buildStockItemLabelTsplBytes(label: StockItemLabelDataModel): ByteArray {
@@ -1117,12 +1117,12 @@ private fun buildStockItemLabelTsplBytes(label: StockItemLabelDataModel): ByteAr
         append("DIRECTION 1\r\n")
         append("CODEPAGE UTF-8\r\n")
         append("CLS\r\n")
-        label.storeName.takeIf { it.isNotBlank() }?.let { append("TEXT 24,12,\"0\",0,1,1,\"${it.tsplQuoted()}\"\r\n") }
-        append("TEXT 24,44,\"0\",0,2,2,\"${label.itemName.tsplQuoted()}\"\r\n")
-        append("TEXT 24,88,\"0\",0,2,2,\"${priceLine.tsplQuoted()}\"\r\n")
-        unitLine?.let { append("TEXT 24,126,\"0\",0,1,1,\"${it.tsplQuoted()}\"\r\n") }
-        append("BARCODE 24,154,\"128\",78,1,0,2,2,\"${barcode.tsplQuoted()}\"\r\n")
-        noteLine?.let { append("TEXT 24,244,\"0\",0,1,1,\"${it.tsplQuoted()}\"\r\n") }
+        label.storeName.takeIf { it.isNotBlank() }?.let { append("TEXT 24,12,"0",0,1,1,"${it.tsplQuoted()}"\r\n") }
+        append("TEXT 24,44,"0",0,2,2,"${label.itemName.tsplQuoted()}"\r\n")
+        append("TEXT 24,88,"0",0,2,2,"${priceLine.tsplQuoted()}"\r\n")
+        unitLine?.let { append("TEXT 24,126,"0",0,1,1,"${it.tsplQuoted()}"\r\n") }
+        append("BARCODE 24,154,"128",78,1,0,2,2,"${barcode.tsplQuoted()}"\r\n")
+        noteLine?.let { append("TEXT 24,244,"0",0,1,1,"${it.tsplQuoted()}"\r\n") }
         append("PRINT ${label.copies.coerceIn(1,99)},1\r\n")
     }
     return commands.encodeToByteArray()
@@ -1181,7 +1181,7 @@ private fun htmlEscape(value: String): String = value
     .replace("&", "&amp;")
     .replace("<", "&lt;")
     .replace(">", "&gt;")
-    .replace("\"", "&quot;")
+    .replace(""", "&quot;")
     .replace("'", "&#39;")
 
 private fun BarcodeLineRenderDataModel.stickyTagHumanText(): String =
@@ -1258,14 +1258,14 @@ private fun BarcodeLineRenderDataModel.htmlBarcodeSvg(): String {
 
             val start = index
             while (index < modules.size && modules[index]) index++
-            append("<rect x=\"")
+            append("<rect x="")
             append(start)
-            append("\" y=\"0\" width=\"")
+            append("" y="0" width="")
             append(index - start)
-            append("\" height=\"100\"/>")
+            append("" height="100"/>")
         }
     }
-    return "<svg class=\"barcodeSvg\" viewBox=\"0 0 $width 100\" preserveAspectRatio=\"none\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\">$rects</svg>"
+    return "<svg class="barcodeSvg" viewBox="0 0 $width 100" preserveAspectRatio="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">$rects</svg>"
 }
 
 fun StockItemLabelDataModel.buildStockItemLabelHtml(): String {
@@ -1286,7 +1286,7 @@ fun StockItemLabelDataModel.buildStockItemLabelHtml(): String {
           <div class="priceTitle">${htmlEscape(label.priceLabel)}</div>
           <div class="priceBox"><div class="price">${htmlEscape(priceForTag)}</div></div>
         </section>
-        """ + if (copyIndex == label.copies) "" else "<div class=\"pageBreak\"></div>"
+        """ + if (copyIndex == label.copies) "" else "<div class="pageBreak"></div>"
     }
     return """
 <!doctype html>
@@ -1594,7 +1594,7 @@ private fun cp866ByteForCyrillic(ch: Char): Int? = when (ch) {
 private fun escPosFallbackAscii(ch: Char): String = when (ch) {
     '\u00A0' -> " "
     '—', '–', '−' -> "-"
-    '“', '”', '«', '»' -> "\""
+    '“', '”', '«', '»' -> """
     '‘', '’' -> "'"
     '₸' -> "KZT"
     '₽' -> "RUB"
@@ -1881,7 +1881,7 @@ fun TransactionReceiptSnapshotDataModel.buildReceiptPlainText(language: String, 
 
 private fun pdfEscape(value: String): String {
     return value
-        .replace("\\", "\\\\")
+        .replace("\", "\\\")
         .replace("(", "\\(")
         .replace(")", "\\)")
         .map { ch -> if (ch.code in 32..126) ch else '?' }
@@ -6277,9 +6277,23 @@ const val CLOUD_TRANSPORT_STATUS_UNAVAILABLE = -1
 internal const val REALTIME_ACCESS_TOKEN_REFRESH_SKEW_MILLIS = 60_000L
 
 private const val DEFAULT_AITA_SERVER_URL = "https://api.aita.kz"
+private const val DEFAULT_AITA_BOOTSTRAP_URLS = "https://bootstrap.aita.kz/.well-known/aita-server.json,https://api.aita.kz/.well-known/aita-server.json"
+private const val AITA_BOOTSTRAP_SERVER_URL_REFRESH_INTERVAL_MILLIS = 300_000L
+private const val AITA_BOOTSTRAP_SERVER_URL_FAILURE_BACKOFF_MILLIS = 45_000L
+private const val AITA_BOOTSTRAP_SERVER_URL_CACHE_MAX_AGE_MILLIS = 1_209_600_000L
+private const val AITA_BOOTSTRAP_HTTP_TIMEOUT_MILLIS = 2_500L
 private val DEFAULT_AITA_SERVER_URL_PAIR = Pair(DEFAULT_AITA_SERVER_URL, "1")
 @Volatile
 private var runtimeClientServerUrlOverride: String? = null
+@Volatile
+private var runtimeClientBootstrapUrlsOverride: List<String>? = null
+@Volatile
+private var bootstrapServerUrlMemory: String? = null
+@Volatile
+private var bootstrapServerUrlFetchedAtMillis: Long = 0L
+@Volatile
+private var bootstrapServerUrlLastFailureAtMillis: Long = 0L
+private val bootstrapServerUrlMutex = Mutex()
 @Volatile
 private var currentNetworkRequestCandidateServerUrlsMemory: List<String> = emptyList()
 
@@ -9331,6 +9345,7 @@ fun observeLocalKv(key: String): Flow<String?> =
 
 private const val CACHE_PREFIX = "cache_json:"
 private const val CACHE_GLOBAL_CONFIG = "global_config"
+private const val CACHE_BOOTSTRAP_SERVER_URL = "bootstrap_server_url"
 private const val CACHE_STRINGS = "strings"
 private const val CACHE_DIMENSIONS = "dimensions"
 private const val CACHE_COLORS = "colors"
@@ -9371,22 +9386,21 @@ internal suspend fun ensureCachedGlobalConfigurationPrimedForNetwork() {
 
         getJsonCache<GlobalAppConfigurationDataModel>(CACHE_GLOBAL_CONFIG)?.let { cachedConfiguration ->
             val currentConfiguration = globalAppConfigurationState.payloadValue
-            // Cached global configuration is still useful for paths/resource IDs, but not for the
-            // server URL while clientVisibleServerUrlFilesOnly is enabled. This prevents an old
-            // local SQLite cache from silently winning over CommonMain.kt/global.json.
+            val cachedBootstrapServerUrl = cachedBootstrapServerUrlOrNull()
+            val runtimeOverrideNormalized = normalizedHttpServerUrlOrNull(runtimeClientServerUrlOverride)
+            // Cached global configuration is still useful for paths/resource IDs. The server URL is
+            // only allowed to come from explicit runtime override, the stable bootstrap resolver, or
+            // the visible CommonMain.kt/global.json configuration unless hidden fallback resolution is
+            // intentionally enabled.
             val cachedConfigurationForThisInstall = cachedConfiguration.copy(
-                serverUrl = if (clientVisibleServerUrlFilesOnly) {
-                    currentConfiguration.serverUrl
-                } else {
-                    val runtimeOverrideNormalized = normalizedHttpServerUrlOrNull(runtimeClientServerUrlOverride)
-                    if (runtimeOverrideNormalized != null) {
-                        Pair(runtimeOverrideNormalized, currentConfiguration.serverUrl.second)
-                    } else {
-                        chooseClientServerUrlPair(
-                            current = currentConfiguration.serverUrl,
-                            incoming = cachedConfiguration.serverUrl
-                        )
-                    }
+                serverUrl = when {
+                    runtimeOverrideNormalized != null -> Pair(runtimeOverrideNormalized, currentConfiguration.serverUrl.second)
+                    cachedBootstrapServerUrl != null -> Pair(cachedBootstrapServerUrl, currentConfiguration.serverUrl.second)
+                    clientVisibleServerUrlFilesOnly -> currentConfiguration.serverUrl
+                    else -> chooseClientServerUrlPair(
+                        current = currentConfiguration.serverUrl,
+                        incoming = cachedConfiguration.serverUrl
+                    )
                 }
             )
             globalAppConfigurationState.emit(DataState.Success(cachedConfigurationForThisInstall, cacheMessage()))
@@ -9402,6 +9416,7 @@ private val AITA_SERVER_ENDPOINT_ROOT_SEGMENTS = setOf(
     "balance",
     "cashregister",
     "config",
+    ".well-known",
     "debtors",
     "finance",
     "generic",
@@ -9538,6 +9553,197 @@ fun normalizedClientServerUrlOverride(raw: String?, currentRaw: String?): String
     return normalized.takeIf { it != currentNormalized }
 }
 
+private fun normalizedHttpAbsoluteUrlOrNull(raw: String?): String? {
+    val trimmed = raw
+        ?.trim()
+        ?.trimEnd('/')
+        ?.takeIf { it.isNotBlank() }
+        ?: return null
+
+    val hadExplicitHttpScheme = trimmed.startsWith("http://", ignoreCase = true) ||
+            trimmed.startsWith("https://", ignoreCase = true)
+    val hadExplicitWebSocketScheme = trimmed.startsWith("ws://", ignoreCase = true) ||
+            trimmed.startsWith("wss://", ignoreCase = true)
+
+    val withHttpScheme = when {
+        hadExplicitHttpScheme -> trimmed
+        trimmed.startsWith("ws://", ignoreCase = true) -> "http://" + trimmed.substringAfter("://")
+        trimmed.startsWith("wss://", ignoreCase = true) -> "https://" + trimmed.substringAfter("://")
+        hadExplicitWebSocketScheme -> return null
+        "://" in trimmed -> return null
+        else -> {
+            val authorityCandidate = trimmed
+                .substringBefore('/')
+                .substringBefore('?')
+                .substringBefore('#')
+            val inferredScheme = if (looksLikeLocalDevelopmentHostWithoutPort(authorityCandidate)) "http" else "https"
+            "$inferredScheme://$trimmed"
+        }
+    }
+
+    return runCatching {
+        val url = Url(withHttpScheme)
+        val protocol = url.protocol.name.lowercase()
+        if (protocol == "http" || protocol == "https") withHttpScheme else null
+    }.getOrNull()
+}
+
+private fun parseClientBootstrapUrls(raw: String?): List<String> = raw
+    ?.split(Regex("[,\n\r\t ]+"))
+    .orEmpty()
+    .mapNotNull(::normalizedHttpAbsoluteUrlOrNull)
+    .distinct()
+
+private fun configuredClientBootstrapUrls(): List<String> =
+    runtimeClientBootstrapUrlsOverride ?: parseClientBootstrapUrls(DEFAULT_AITA_BOOTSTRAP_URLS)
+
+fun setRuntimeClientBootstrapUrlsOverride(raw: String?) {
+    val urls = parseClientBootstrapUrls(raw)
+    runtimeClientBootstrapUrlsOverride = urls.takeIf { it.isNotEmpty() }
+    bootstrapServerUrlMemory = null
+    bootstrapServerUrlFetchedAtMillis = 0L
+    bootstrapServerUrlLastFailureAtMillis = 0L
+    if (urls.isNotEmpty()) {
+        logNetworkAttempt("bootstrap URL resolver endpoints = ${urls.joinToString()}")
+    }
+}
+
+fun currentRuntimeClientBootstrapUrlsOverride(): List<String> = runtimeClientBootstrapUrlsOverride.orEmpty()
+
+private fun JsonElement.jsonObjectOrNull(): JsonObject? = runCatching { jsonObject }.getOrNull()
+
+private fun JsonElement.jsonStringOrNull(): String? = runCatching { jsonPrimitive.contentOrNull }.getOrNull()
+
+private fun JsonElement.bootstrapServerUrlOrNull(): String? {
+    val directText = jsonStringOrNull()?.takeIf { it.startsWith("http://") || it.startsWith("https://") }
+    if (!directText.isNullOrBlank()) return directText
+
+    val obj = jsonObjectOrNull() ?: return null
+    obj["serverUrl"]?.let { element ->
+        element.jsonStringOrNull()?.takeIf { it.isNotBlank() }?.let { return it }
+        element.jsonObjectOrNull()?.get("first")?.jsonStringOrNull()?.takeIf { it.isNotBlank() }?.let { return it }
+    }
+    obj["currentServerUrl"]?.jsonStringOrNull()?.takeIf { it.isNotBlank() }?.let { return it }
+    obj["url"]?.jsonStringOrNull()?.takeIf { it.isNotBlank() }?.let { return it }
+
+    obj["payload"]?.let { payload ->
+        payload.bootstrapServerUrlOrNull()?.let { return it }
+        val payloadText = payload.jsonStringOrNull()?.trim().orEmpty()
+        if (payloadText.startsWith("{") || payloadText.startsWith("[")) {
+            decodeBootstrapServerUrlOrNull(payloadText)?.let { return it }
+        }
+    }
+
+    return null
+}
+
+private fun decodeBootstrapServerUrlOrNull(rawBody: String): String? = runCatching {
+    jsonBase.parseToJsonElement(rawBody).bootstrapServerUrlOrNull()
+}.getOrNull()
+
+private fun applyBootstrapResolvedServerUrl(normalized: String) {
+    val currentConfiguration = globalAppConfigurationState.payloadValue
+    val currentNormalized = normalizedHttpServerUrlOrNull(currentConfiguration.serverUrl.first)
+    if (currentNormalized == normalized) return
+
+    globalAppConfigurationState.emit(
+        DataState.Success(
+            currentConfiguration.copy(serverUrl = Pair(normalized, currentConfiguration.serverUrl.second)),
+            cacheMessage()
+        )
+    )
+}
+
+private suspend fun cachedBootstrapServerUrlOrNull(nowMillis: Long = getCurrentTimeMillis()): String? =
+    getJsonCache<AitaServerBootstrapCacheDataModel>(CACHE_BOOTSTRAP_SERVER_URL)
+        ?.takeIf { cache ->
+            cache.serverUrl.isNotBlank() &&
+                    cache.fetchedAtMillis > 0L &&
+                    nowMillis - cache.fetchedAtMillis <= AITA_BOOTSTRAP_SERVER_URL_CACHE_MAX_AGE_MILLIS
+        }
+        ?.serverUrl
+        ?.let(::normalizedHttpServerUrlOrNull)
+
+private suspend fun resolveCurrentServerUrlFromBootstrapIfConfigured(force: Boolean = false): String? {
+    val bootstrapUrls = configuredClientBootstrapUrls()
+    if (bootstrapUrls.isEmpty()) return null
+
+    val now = getCurrentTimeMillis()
+    val memory = bootstrapServerUrlMemory
+    if (!force && memory != null && now - bootstrapServerUrlFetchedAtMillis <= AITA_BOOTSTRAP_SERVER_URL_REFRESH_INTERVAL_MILLIS) {
+        return memory
+    }
+
+    if (!force && now - bootstrapServerUrlLastFailureAtMillis <= AITA_BOOTSTRAP_SERVER_URL_FAILURE_BACKOFF_MILLIS) {
+        return memory ?: cachedBootstrapServerUrlOrNull(now)
+    }
+
+    return bootstrapServerUrlMutex.withLock {
+        val lockedNow = getCurrentTimeMillis()
+        val lockedMemory = bootstrapServerUrlMemory
+        if (!force && lockedMemory != null && lockedNow - bootstrapServerUrlFetchedAtMillis <= AITA_BOOTSTRAP_SERVER_URL_REFRESH_INTERVAL_MILLIS) {
+            return@withLock lockedMemory
+        }
+
+        val bootstrapHttpClient = HttpClient(getHttpClientEngine()) {
+            install(ContentNegotiation) {
+                json(jsonBase)
+            }
+            install(HttpTimeout) {
+                requestTimeoutMillis = AITA_BOOTSTRAP_HTTP_TIMEOUT_MILLIS
+                connectTimeoutMillis = AITA_BOOTSTRAP_HTTP_TIMEOUT_MILLIS
+                socketTimeoutMillis = AITA_BOOTSTRAP_HTTP_TIMEOUT_MILLIS
+            }
+            expectSuccess = false
+        }
+
+        try {
+            for (bootstrapUrl in bootstrapUrls) {
+                try {
+                    logNetworkAttempt("BOOTSTRAP TRY $bootstrapUrl")
+                    val response = bootstrapHttpClient.get(bootstrapUrl) {
+                        header(HttpHeaders.CacheControl, "no-cache")
+                        header(HttpHeaders.Pragma, "no-cache")
+                        currentClientDeviceInfoHeaders().forEach { (key, value) ->
+                            safeHttpHeaderValueOrNull(value)?.let { safeValue -> header(key, safeValue) }
+                        }
+                    }
+                    val rawBody = response.bodyAsText()
+                    val normalizedServerUrl = decodeBootstrapServerUrlOrNull(rawBody)
+                        ?.let(::normalizedHttpServerUrlOrNull)
+
+                    if (response.status.isSuccess() && normalizedServerUrl != null) {
+                        bootstrapServerUrlMemory = normalizedServerUrl
+                        bootstrapServerUrlFetchedAtMillis = getCurrentTimeMillis()
+                        bootstrapServerUrlLastFailureAtMillis = 0L
+                        putJsonCache(
+                            CACHE_BOOTSTRAP_SERVER_URL,
+                            AitaServerBootstrapCacheDataModel(
+                                serverUrl = normalizedServerUrl,
+                                bootstrapUrl = bootstrapUrl,
+                                fetchedAtMillis = bootstrapServerUrlFetchedAtMillis
+                            )
+                        )
+                        applyBootstrapResolvedServerUrl(normalizedServerUrl)
+                        logNetworkAttempt("BOOTSTRAP RESULT $bootstrapUrl -> $normalizedServerUrl")
+                        return@withLock normalizedServerUrl
+                    }
+
+                    logNetworkAttempt("BOOTSTRAP MISS $bootstrapUrl HTTP ${response.status.value}")
+                } catch (throwable: Throwable) {
+                    if (throwable is CancellationException) throw throwable
+                    logNetworkAttempt("BOOTSTRAP FAILED $bootstrapUrl ${networkFailureSummary(throwable)}")
+                }
+            }
+        } finally {
+            bootstrapHttpClient.close()
+        }
+
+        bootstrapServerUrlLastFailureAtMillis = getCurrentTimeMillis()
+        lockedMemory ?: cachedBootstrapServerUrlOrNull(bootstrapServerUrlLastFailureAtMillis)
+    }
+}
+
 fun setRuntimeClientServerUrlOverride(raw: String?) {
     val normalized = normalizedHttpServerUrlOrNull(raw)
     runtimeClientServerUrlOverride = normalized
@@ -9625,33 +9831,39 @@ internal suspend fun resolvedServerUrlCandidates(explicitServerUrl: String? = nu
     val explicitNormalized = normalizedHttpServerUrlOrNull(explicitServerUrl)
     val currentConfiguredNormalized = normalizedHttpServerUrlOrNull(globalAppConfigurationState.payloadValue.serverUrl.first)
     val defaultNormalized = normalizedHttpServerUrlOrNull(DEFAULT_AITA_SERVER_URL)
-
-    val selected = if (clientVisibleServerUrlFilesOnly) {
-        explicitNormalized
-            ?: currentConfiguredNormalized
-            ?: defaultNormalized
-            ?: DEFAULT_AITA_SERVER_URL
+    val runtimeOverrideNormalized = normalizedHttpServerUrlOrNull(runtimeClientServerUrlOverride)
+    val bootstrapNormalized = if (explicitNormalized == null) {
+        resolveCurrentServerUrlFromBootstrapIfConfigured()
     } else {
-        val runtimeOverrideNormalized = normalizedHttpServerUrlOrNull(runtimeClientServerUrlOverride)
-        val cachedConfiguredNormalized = runCatching {
+        null
+    }
+    val cachedBootstrapNormalized = if (bootstrapNormalized == null) cachedBootstrapServerUrlOrNull() else null
+    val cachedConfiguredNormalized = if (!clientVisibleServerUrlFilesOnly) {
+        runCatching {
             getJsonCache<GlobalAppConfigurationDataModel>(CACHE_GLOBAL_CONFIG)?.serverUrl?.first
         }.getOrNull()?.let { normalizedHttpServerUrlOrNull(it) }
-        val cachedNonDefault = cachedConfiguredNormalized?.takeIf { it != defaultNormalized }
-        val currentCandidate = currentConfiguredNormalized?.takeUnless { it == defaultNormalized && cachedNonDefault != null }
-
-        explicitNormalized
-            ?: runtimeOverrideNormalized
-            ?: currentCandidate
-            ?: cachedNonDefault
-            ?: currentConfiguredNormalized
-            ?: cachedConfiguredNormalized
-            ?: defaultNormalized
-            ?: DEFAULT_AITA_SERVER_URL
+    } else {
+        null
     }
+    val cachedNonDefault = cachedConfiguredNormalized?.takeIf { it != defaultNormalized }
+    val currentCandidate = currentConfiguredNormalized?.takeUnless { it == defaultNormalized && cachedNonDefault != null }
 
-    val normalizedCandidates = listOf(selected).distinct()
+    val candidates = buildList {
+        explicitNormalized?.let(::add)
+        runtimeOverrideNormalized?.let(::add)
+        bootstrapNormalized?.let(::add)
+        currentCandidate?.let(::add)
+        cachedBootstrapNormalized?.let(::add)
+        if (!clientVisibleServerUrlFilesOnly) cachedNonDefault?.let(::add)
+        currentConfiguredNormalized?.let(::add)
+        cachedConfiguredNormalized?.let(::add)
+        defaultNormalized?.let(::add)
+        add(DEFAULT_AITA_SERVER_URL)
+    }.distinct()
+
+    val normalizedCandidates = candidates.ifEmpty { listOf(DEFAULT_AITA_SERVER_URL) }
     currentNetworkRequestCandidateServerUrlsMemory = normalizedCandidates
-    logNetworkAttempt("server URL = ${normalizedCandidates.firstOrNull().orEmpty()}")
+    logNetworkAttempt("server URL candidates = ${normalizedCandidates.joinToString()}")
     return normalizedCandidates
 }
 
@@ -9693,7 +9905,7 @@ internal fun rawBodyLooksLikeJson(rawBody: String): Boolean {
 
     return trimmed.startsWith("{") ||
             trimmed.startsWith("[") ||
-            trimmed.startsWith("\"") ||
+            trimmed.startsWith(""") ||
             trimmed == "null" ||
             trimmed == "true" ||
             trimmed == "false" ||
@@ -9714,6 +9926,11 @@ internal fun rawBodyLooksLikeAitaServerResponse(rawBody: String): Boolean {
     if (trimmed.startsWith("{") &&
         trimmed.contains("\"serverUrl\"") &&
         trimmed.contains("\"globalAppConfigurationPath\"")
+    ) return true
+
+    if (trimmed.startsWith("{") &&
+        trimmed.contains("\"serverUrl\"") &&
+        trimmed.contains("\"globalConfigPath\"")
     ) return true
 
     return runCatching {
@@ -9797,7 +10014,7 @@ internal fun <Response> ResponseDataModel<Response>.withAitaTransportFailureFrom
 @PublishedApi
 internal fun cloudEndpointIsPublicReachabilityOnly(endpointUrl: String): Boolean {
     val endpoint = endpointUrl.trim('/').lowercase()
-    return endpoint.startsWith("config/") || endpoint.startsWith("res/")
+    return endpoint.startsWith("config/") || endpoint.startsWith("res/") || endpoint.startsWith(".well-known/")
 }
 
 @PublishedApi
@@ -11681,10 +11898,13 @@ private suspend fun loadCachedStoreScopedData(storeId: String) {
 private suspend fun loadCachedApplicationData() {
     getJsonCache<GlobalAppConfigurationDataModel>(CACHE_GLOBAL_CONFIG)?.let {
         val currentConfiguration = globalAppConfigurationState.payloadValue
-        val anchoredServerUrl = if (clientVisibleServerUrlFilesOnly) {
-            currentConfiguration.serverUrl
-        } else {
-            chooseClientServerUrlPair(currentConfiguration.serverUrl, it.serverUrl)
+        val cachedBootstrapServerUrl = cachedBootstrapServerUrlOrNull()
+        val runtimeOverrideNormalized = normalizedHttpServerUrlOrNull(runtimeClientServerUrlOverride)
+        val anchoredServerUrl = when {
+            runtimeOverrideNormalized != null -> Pair(runtimeOverrideNormalized, currentConfiguration.serverUrl.second)
+            cachedBootstrapServerUrl != null -> Pair(cachedBootstrapServerUrl, currentConfiguration.serverUrl.second)
+            clientVisibleServerUrlFilesOnly -> currentConfiguration.serverUrl
+            else -> chooseClientServerUrlPair(currentConfiguration.serverUrl, it.serverUrl)
         }
         globalAppConfigurationState.emit(
             DataState.Success(
@@ -14477,7 +14697,8 @@ suspend inline fun <reified Response, reified Body> networkRequest(
                 val endpointForAuthPreflight = endpointUrl.trim('/').lowercase()
                 val publicEndpointForAuthPreflight = endpointForAuthPreflight.startsWith("auth/") ||
                         endpointForAuthPreflight.startsWith("config/") ||
-                        endpointForAuthPreflight.startsWith("res/")
+                        endpointForAuthPreflight.startsWith("res/") ||
+                        endpointForAuthPreflight.startsWith(".well-known/")
                 val tokensForAuthPreflight = getStoredUserAuthTokens?.invoke()
 
                 if (!publicEndpointForAuthPreflight &&
@@ -14608,7 +14829,8 @@ suspend inline fun <reified Response, reified Body> networkRequest(
                     val endpointForReachability = endpointUrl.trim('/').lowercase()
                     val publicEndpointForReachability = endpointForReachability.startsWith("auth/") ||
                             endpointForReachability.startsWith("config/") ||
-                            endpointForReachability.startsWith("res/")
+                            endpointForReachability.startsWith("res/") ||
+                            endpointForReachability.startsWith(".well-known/")
                     val canMarkReachable = cloudResponseCanMarkReachable(endpointUrl, response.status)
                     if (canMarkReachable) {
                         rememberReachableServerUrl(resolvedServerUrl)
@@ -16672,6 +16894,23 @@ data class GenericResponseDataModel(
 
 
 @kotlinx.serialization.Serializable
+data class AitaServerBootstrapDataModel(
+    val serverUrl: String,
+    val globalConfigPath: String = "config/global",
+    val globalConfigUrl: String = "",
+    val environment: String = "",
+    val version: String = "",
+    val updatedAtMillis: Long = 0L
+)
+
+@kotlinx.serialization.Serializable
+data class AitaServerBootstrapCacheDataModel(
+    val serverUrl: String,
+    val bootstrapUrl: String = "",
+    val fetchedAtMillis: Long = 0L
+)
+
+@kotlinx.serialization.Serializable
 data class GlobalAppConfigurationDataModel(
     val realtimeUpdatesPath: String,
     val appName: Pair<String, String>,
@@ -17737,7 +17976,7 @@ private fun decodeJwtBase64UrlPayload(segment: String): String? = runCatching {
 private fun jwtAccessExpiryMillis(accessToken: String): Long? = runCatching {
     val payloadSegment = accessToken.split('.').getOrNull(1) ?: return@runCatching null
     val payload = decodeJwtBase64UrlPayload(payloadSegment) ?: return@runCatching null
-    val expSeconds = Regex("""\"exp\"\s*:\s*(\d+)""")
+    val expSeconds = Regex(""""exp"\s*:\s*(\d+)""")
         .find(payload)
         ?.groupValues
         ?.getOrNull(1)
