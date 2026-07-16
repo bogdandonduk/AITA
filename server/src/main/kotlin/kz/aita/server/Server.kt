@@ -567,6 +567,27 @@ private fun Application.buildGlobalConfigurationJson(publicUrlOverride: String? 
   }
 }
 
+private fun publicUrlWithEndpoint(publicUrl: String, endpointPath: String): String =
+  "${publicUrl.trimEnd('/')}/${endpointPath.trimStart('/')}"
+
+private fun Application.buildServerBootstrapData(publicUrlOverride: String? = null): JsonObject {
+  val publicUrl = normalizePublicServerUrlCandidate(publicUrlOverride)
+    ?: publicServerUrl()
+    ?: "http://localhost:8080"
+  val globalConfigPath = "config/global"
+
+  return JsonObject(
+    mapOf(
+      "serverUrl" to JsonPrimitive(publicUrl),
+      "globalConfigPath" to JsonPrimitive(globalConfigPath),
+      "globalConfigUrl" to JsonPrimitive(publicUrlWithEndpoint(publicUrl, globalConfigPath)),
+      "environment" to JsonPrimitive(envOrSystem("AITA_ENV") ?: environment.config.optionalString("app.environment").orEmpty()),
+      "version" to JsonPrimitive(envOrSystem("AITA_RELEASE_VERSION") ?: environment.config.optionalString("app.version").orEmpty()),
+      "updatedAtMillis" to JsonPrimitive(System.currentTimeMillis())
+    )
+  )
+}
+
 private suspend fun ApplicationCall.respondStaticJsonFile(path: Path, vararg resourceFallbacks: String) {
   val normalizedPath = path.normalizedAbsolute()
   if (Files.isRegularFile(normalizedPath)) {
@@ -3969,6 +3990,12 @@ fun main(args: Array<String>) {
   configureKtorDeploymentPortForCloudRuntime()
   stabilizeServerRuntimeClassLoader("main")
   Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+    System.err.println(
+      "AITA server fatal uncaught failure thread=${thread.name} " +
+         "threadLoader=${classLoaderDebugName(thread.contextClassLoader)} anchor=${classLoaderDebugName(aitaServerRuntimeClassLoader)}"
+    )
+    throwable.printStackTrace(System.err)
+
     if (throwable.isClassLoadingFailure()) {
       System.err.println(
         "AITA server classloader: uncaught classloading failure thread=${thread.name} " +
@@ -3977,7 +4004,16 @@ fun main(args: Array<String>) {
     }
   }
   prewarmSharedRuntimeSerializers()
-  EngineMain.main(args)
+
+  try {
+    EngineMain.main(args)
+  } catch (throwable: Throwable) {
+    System.err.println(
+      "AITA server fatal startup failure before listen phase: ${throwable::class.qualifiedName}: ${throwable.message.orEmpty()}"
+    )
+    throwable.printStackTrace(System.err)
+    throw throwable
+  }
 }
 
 private object RealtimeServerBus {
@@ -18250,6 +18286,16 @@ fun Application.module() {
         contentType = ContentType.Application.Json,
         status = HttpStatusCode.OK
       )
+    }
+
+    get("/config/server") {
+      val publicUrlForThisCall = call.application.publicServerUrl() ?: call.inferredPublicServerUrl()
+      call.respond(HttpStatusCode.OK, call.application.buildServerBootstrapData(publicUrlForThisCall))
+    }
+
+    get("/.well-known/aita-server.json") {
+      val publicUrlForThisCall = call.application.publicServerUrl() ?: call.inferredPublicServerUrl()
+      call.respond(HttpStatusCode.OK, call.application.buildServerBootstrapData(publicUrlForThisCall))
     }
 
     get("/res/string") {
