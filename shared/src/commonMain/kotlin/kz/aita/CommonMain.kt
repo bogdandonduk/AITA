@@ -6277,7 +6277,7 @@ const val CLOUD_TRANSPORT_STATUS_UNAVAILABLE = -1
 internal const val REALTIME_ACCESS_TOKEN_REFRESH_SKEW_MILLIS = 60_000L
 
 private const val DEFAULT_AITA_SERVER_URL = "https://api.aita.kz"
-private const val DEFAULT_AITA_BOOTSTRAP_URLS = "https://bootstrap.aita.kz/.well-known/aita-server.json,https://api.aita.kz/.well-known/aita-server.json"
+private const val DEFAULT_AITA_BOOTSTRAP_URLS = "https://bootstrap.aita.kz/.well-known/aita-server.json"
 private const val AITA_BOOTSTRAP_SERVER_URL_REFRESH_INTERVAL_MILLIS = 300_000L
 private const val AITA_BOOTSTRAP_SERVER_URL_FAILURE_BACKOFF_MILLIS = 45_000L
 private const val AITA_BOOTSTRAP_SERVER_URL_CACHE_MAX_AGE_MILLIS = 1_209_600_000L
