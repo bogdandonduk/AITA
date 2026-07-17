@@ -1098,11 +1098,11 @@ private fun labelPrinterSafeText(value: String, maxLength: Int): String = value
     .trim()
     .take(maxLength.coerceAtLeast(1))
 
-private fun String.tsplQuoted(): String = labelPrinterSafeText(this, 80).replace(""", "'")
+private fun String.tsplQuoted(): String = labelPrinterSafeText(this, 80).replace("\"", "'")
 private fun String.zplText(): String = labelPrinterSafeText(this, 80)
     .replace("^", " ")
     .replace("~", " ")
-    .replace("\", " ")
+    .replace("\\", " ")
 private fun String.cpclText(): String = labelPrinterSafeText(this, 80)
 
 private fun buildStockItemLabelTsplBytes(label: StockItemLabelDataModel): ByteArray {
@@ -1117,12 +1117,12 @@ private fun buildStockItemLabelTsplBytes(label: StockItemLabelDataModel): ByteAr
         append("DIRECTION 1\r\n")
         append("CODEPAGE UTF-8\r\n")
         append("CLS\r\n")
-        label.storeName.takeIf { it.isNotBlank() }?.let { append("TEXT 24,12,"0",0,1,1,"${it.tsplQuoted()}"\r\n") }
-        append("TEXT 24,44,"0",0,2,2,"${label.itemName.tsplQuoted()}"\r\n")
-        append("TEXT 24,88,"0",0,2,2,"${priceLine.tsplQuoted()}"\r\n")
-        unitLine?.let { append("TEXT 24,126,"0",0,1,1,"${it.tsplQuoted()}"\r\n") }
-        append("BARCODE 24,154,"128",78,1,0,2,2,"${barcode.tsplQuoted()}"\r\n")
-        noteLine?.let { append("TEXT 24,244,"0",0,1,1,"${it.tsplQuoted()}"\r\n") }
+        label.storeName.takeIf { it.isNotBlank() }?.let { append("TEXT 24,12,\"0\",0,1,1,\"${it.tsplQuoted()}\"\r\n") }
+        append("TEXT 24,44,\"0\",0,2,2,\"${label.itemName.tsplQuoted()}\"\r\n")
+        append("TEXT 24,88,\"0\",0,2,2,\"${priceLine.tsplQuoted()}\"\r\n")
+        unitLine?.let { append("TEXT 24,126,\"0\",0,1,1,\"${it.tsplQuoted()}\"\r\n") }
+        append("BARCODE 24,154,\"128\",78,1,0,2,2,\"${barcode.tsplQuoted()}\"\r\n")
+        noteLine?.let { append("TEXT 24,244,\"0\",0,1,1,\"${it.tsplQuoted()}\"\r\n") }
         append("PRINT ${label.copies.coerceIn(1,99)},1\r\n")
     }
     return commands.encodeToByteArray()
@@ -1181,7 +1181,7 @@ private fun htmlEscape(value: String): String = value
     .replace("&", "&amp;")
     .replace("<", "&lt;")
     .replace(">", "&gt;")
-    .replace(""", "&quot;")
+    .replace("\"", "&quot;")
     .replace("'", "&#39;")
 
 private fun BarcodeLineRenderDataModel.stickyTagHumanText(): String =
@@ -1258,14 +1258,14 @@ private fun BarcodeLineRenderDataModel.htmlBarcodeSvg(): String {
 
             val start = index
             while (index < modules.size && modules[index]) index++
-            append("<rect x="")
+            append("<rect x=\"")
             append(start)
-            append("" y="0" width="")
+            append("\" y=\"0\" width=\"")
             append(index - start)
-            append("" height="100"/>")
+            append("\" height=\"100\"/>")
         }
     }
-    return "<svg class="barcodeSvg" viewBox="0 0 $width 100" preserveAspectRatio="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">$rects</svg>"
+    return "<svg class=\"barcodeSvg\" viewBox=\"0 0 $width 100\" preserveAspectRatio=\"none\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\">$rects</svg>"
 }
 
 fun StockItemLabelDataModel.buildStockItemLabelHtml(): String {
@@ -1286,7 +1286,7 @@ fun StockItemLabelDataModel.buildStockItemLabelHtml(): String {
           <div class="priceTitle">${htmlEscape(label.priceLabel)}</div>
           <div class="priceBox"><div class="price">${htmlEscape(priceForTag)}</div></div>
         </section>
-        """ + if (copyIndex == label.copies) "" else "<div class="pageBreak"></div>"
+        """ + if (copyIndex == label.copies) "" else "<div class=\"pageBreak\"></div>"
     }
     return """
 <!doctype html>
@@ -1594,7 +1594,7 @@ private fun cp866ByteForCyrillic(ch: Char): Int? = when (ch) {
 private fun escPosFallbackAscii(ch: Char): String = when (ch) {
     '\u00A0' -> " "
     '—', '–', '−' -> "-"
-    '“', '”', '«', '»' -> """
+    '“', '”', '«', '»' -> "\""
     '‘', '’' -> "'"
     '₸' -> "KZT"
     '₽' -> "RUB"
@@ -1881,7 +1881,7 @@ fun TransactionReceiptSnapshotDataModel.buildReceiptPlainText(language: String, 
 
 private fun pdfEscape(value: String): String {
     return value
-        .replace("\", "\\\")
+        .replace("\\", "\\\\")
         .replace("(", "\\(")
         .replace(")", "\\)")
         .map { ch -> if (ch.code in 32..126) ch else '?' }
@@ -9905,7 +9905,7 @@ internal fun rawBodyLooksLikeJson(rawBody: String): Boolean {
 
     return trimmed.startsWith("{") ||
             trimmed.startsWith("[") ||
-            trimmed.startsWith(""") ||
+            trimmed.startsWith("\"") ||
             trimmed == "null" ||
             trimmed == "true" ||
             trimmed == "false" ||
@@ -17976,7 +17976,7 @@ private fun decodeJwtBase64UrlPayload(segment: String): String? = runCatching {
 private fun jwtAccessExpiryMillis(accessToken: String): Long? = runCatching {
     val payloadSegment = accessToken.split('.').getOrNull(1) ?: return@runCatching null
     val payload = decodeJwtBase64UrlPayload(payloadSegment) ?: return@runCatching null
-    val expSeconds = Regex(""""exp"\s*:\s*(\d+)""")
+    val expSeconds = Regex("""\"exp\"\s*:\s*(\d+)""")
         .find(payload)
         ?.groupValues
         ?.getOrNull(1)
