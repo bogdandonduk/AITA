@@ -620,7 +620,7 @@ internal fun AppConfiguration.StockBatchShelfPreviewCard(
                     }
                 )
             }
-            .clickable(
+            .aitaClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(color = stateValues.AccentColor)
             ) {
@@ -835,15 +835,24 @@ fun AppConfiguration.GoodsItemInStockWidget(
     }
 
     val cardShape = RoundedCornerShape(stateValues.cornerRadius)
-    val cardBorderColor = when {
+    val targetCardBorderColor = when {
         selected -> stateValues.AccentColor
         selectionMode -> stateValues.PlaceholderTextColor.copy(alpha = 0.55f)
         else -> stateValues.PlaceholderTextColor
     }
-    val cardBackgroundColor = when {
-        selected -> stateValues.AccentColor.copy(alpha = 0.14f)
-        else -> stateValues.BackgroundColor
-    }
+    val cardBorderColor by animateColorAsState(
+        targetValue = targetCardBorderColor,
+        animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS),
+        label = "goodsCardBorder"
+    )
+    val cardBackgroundColor by animateColorAsState(
+        targetValue = if (selected) stateValues.AccentColor.copy(alpha = 0.14f) else stateValues.BackgroundColor,
+        animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS),
+        label = "goodsCardBackground"
+    )
+
+    val cardInteractionSource = remember { MutableInteractionSource() }
+    val cardInteractionEnabled = onClick != null || onLongPress != null || onSelectionToggle != null
 
     Row(
         modifier
@@ -860,9 +869,13 @@ fun AppConfiguration.GoodsItemInStockWidget(
                 cardBorderColor,
                 cardShape
             )
+            .aitaInteractiveMotion(
+                interactionSource = cardInteractionSource,
+                enabled = cardInteractionEnabled
+            )
             .combinedClickable(
-                enabled = onClick != null || onLongPress != null || onSelectionToggle != null,
-                interactionSource = remember { MutableInteractionSource() },
+                enabled = cardInteractionEnabled,
+                interactionSource = cardInteractionSource,
                 indication = ripple(color = if (selected || selectionMode) stateValues.AccentColor else textColor),
                 onLongClick = { onLongPress?.invoke(goodsItem) },
                 onClick = {
@@ -2124,7 +2137,7 @@ fun AppConfiguration.genericTextField(
                                                     color = animatedVoiceBorderColor,
                                                     shape = RoundedCornerShape(cornerRadius)
                                                 )
-                                                .clickable(
+                                                .aitaClickable(
                                                     interactionSource = remember { MutableInteractionSource() },
                                                     indication = ripple(color = textColor, radius = cornerRadius),
                                                     onClick = {
@@ -2167,7 +2180,7 @@ fun AppConfiguration.genericTextField(
                                                 modifier = Modifier
                                                     .fillMaxHeight()
                                                     .width(stateValues.textFieldHeight)
-                                                    .clickable(
+                                                    .aitaClickable(
                                                         interactionSource = remember { MutableInteractionSource() },
                                                         indication = ripple(color = textColor, radius = cornerRadius),
                                                         onClick = {
@@ -2193,7 +2206,7 @@ fun AppConfiguration.genericTextField(
                                                 modifier = Modifier
                                                     .fillMaxHeight()
                                                     .width(stateValues.textFieldHeight)
-                                                    .clickable(
+                                                    .aitaClickable(
                                                         interactionSource = remember { MutableInteractionSource() },
                                                         indication = ripple(color = textColor, radius = cornerRadius),
                                                         onClick = {
@@ -2220,7 +2233,7 @@ fun AppConfiguration.genericTextField(
                                             modifier = Modifier
                                                 .fillMaxHeight()
                                                 .width(stateValues.textFieldHeight)
-                                                .clickable(
+                                                .aitaClickable(
                                                     interactionSource = remember {
                                                         MutableInteractionSource()
                                                     },
@@ -3157,7 +3170,7 @@ fun AppConfiguration.domainSelectionTextField(
                         modifier = Modifier
                             .padding(2.dp)
                             .size(stateValues.iconSize)
-                            .clickable(
+                            .aitaClickable(
                                 interactionSource = remember {
                                     MutableInteractionSource()
                                 },
@@ -5446,7 +5459,7 @@ fun AppConfiguration.AppSizeModeSettingsItemWidget(
         modifier = Modifier
             .heightIn(min = stateValues.textFieldHeight * 1.15f)
             .fillMaxWidth()
-            .clickable(
+            .aitaClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(color = stateValues.TextColor),
                 onClick = {
@@ -5513,7 +5526,7 @@ fun AppConfiguration.AppThemeSettingsItemWidget(
         modifier = Modifier
             .height(42.dp)
             .fillMaxWidth()
-            .clickable(
+            .aitaClickable(
                 interactionSource = remember {
                     MutableInteractionSource()
                 },
@@ -5589,7 +5602,7 @@ fun AppConfiguration.AppLanguageSettingsItemWidget(
         modifier = Modifier
             .height(42.dp)
             .fillMaxWidth()
-            .clickable(
+            .aitaClickable(
                 interactionSource = remember {
                     MutableInteractionSource()
                 },
@@ -5824,7 +5837,7 @@ fun AppConfiguration.actionButton(
             .background(backgroundColor)
             .run {
                 if (visuallyEnabled)
-                    clickable(
+                    aitaClickable(
                         onClick = {
                             if (actionNeedsConfirmation)
                                 confirmationDialogShown = true
@@ -5840,7 +5853,7 @@ fun AppConfiguration.actionButton(
                     )
                 else if (!effectiveLoading)
                     onDisabledClick?.let { disabledClick ->
-                        clickable(
+                        aitaClickable(
                             onClick = disabledClick,
                             interactionSource = remember { MutableInteractionSource() },
                             indication = ripple(color = stateValues.ErrorColor)
@@ -5866,23 +5879,34 @@ fun AppConfiguration.actionButton(
     ) {
         @Composable
         fun ActionButtonIconSlot() {
-            if (effectiveLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier
-                        .size(iconSize),
-                    color = textColor,
-                    strokeWidth = 2.dp
-                )
-            } else {
-                icon?.invoke() ?: inferredIconPath?.run {
-                    CpImage(
-                        modifier = Modifier
-                            .size(iconSize),
-                        url = this,
-                        fallbackRes = resolvedIconRes,
-                        contentDescription = iconContentDescription,
-                        tintColor = iconTintColor
+            AnimatedContent(
+                targetState = effectiveLoading,
+                transitionSpec = {
+                    (fadeIn(animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS)) +
+                            scaleIn(initialScale = 0.68f, animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS)))
+                        .togetherWith(
+                            fadeOut(animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS)) +
+                                    scaleOut(targetScale = 0.76f, animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS))
+                        )
+                },
+                label = "actionButtonIconState"
+            ) { showLoading ->
+                if (showLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(iconSize),
+                        color = textColor,
+                        strokeWidth = 2.dp
                     )
+                } else {
+                    icon?.invoke() ?: inferredIconPath?.run {
+                        CpImage(
+                            modifier = Modifier.size(iconSize),
+                            url = this,
+                            fallbackRes = resolvedIconRes,
+                            contentDescription = iconContentDescription,
+                            tintColor = iconTintColor
+                        )
+                    }
                 }
             }
         }
@@ -5905,18 +5929,41 @@ fun AppConfiguration.actionButton(
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = displayedText,
-                    color = textColor,
-                    fontWeight = accentTextWeight(textColor, stateValues.AccentColor, FontWeight.Bold),
-                    fontSize = textSize,
-                    style = TextStyle(shadow = accentTextShadow(textColor, stateValues.AccentColor)),
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                AnimatedContent(
+                    targetState = displayedText,
+                    transitionSpec = {
+                        (fadeIn(animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS)) +
+                                slideInVertically(
+                                    animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS),
+                                    initialOffsetY = { height -> height / 3 }
+                                ))
+                            .togetherWith(
+                                fadeOut(animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS)) +
+                                        slideOutVertically(
+                                            animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS),
+                                            targetOffsetY = { height -> -height / 3 }
+                                        )
+                            )
+                    },
+                    label = "actionButtonTextState"
+                ) { animatedText ->
+                    Text(
+                        text = animatedText,
+                        color = textColor,
+                        fontWeight = accentTextWeight(textColor, stateValues.AccentColor, FontWeight.Bold),
+                        fontSize = textSize,
+                        style = TextStyle(shadow = accentTextShadow(textColor, stateValues.AccentColor)),
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
 
-                if (subTextPresent) {
+                AnimatedVisibility(
+                    visible = subTextPresent,
+                    enter = aitaVisibilityEnter(),
+                    exit = aitaVisibilityExit()
+                ) {
                     Text(
                         text = subText,
                         color = subTextColor,

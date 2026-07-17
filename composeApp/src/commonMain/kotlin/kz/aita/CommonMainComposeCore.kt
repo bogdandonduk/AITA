@@ -5,14 +5,18 @@ package kz.aita
 import aita.composeapp.generated.resources.*
 import androidx.compose.animation.*
 import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -40,6 +44,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.SoftwareKeyboardController
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.*
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -145,11 +150,178 @@ var openPlatformAppSettings: (suspend (PlatformPermissionKind) -> ReceiptPlatfor
 
 var forceHidePlatformSoftKeyboard: (() -> Unit)? = null
 
-internal const val AITA_MOTION_FAST_MILLIS = 140
-internal const val AITA_MOTION_NORMAL_MILLIS = 190
+internal const val AITA_MOTION_FAST_MILLIS = 125
+internal const val AITA_MOTION_NORMAL_MILLIS = 205
+internal const val AITA_MOTION_EMPHASIZED_MILLIS = 275
+internal const val AITA_PRESS_SCALE = 0.972f
+internal const val AITA_HOVER_SCALE = 1.006f
 
 internal fun Modifier.aitaContentMotion(): Modifier =
     animateContentSize(animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS))
+
+@Composable
+internal fun Modifier.aitaInteractiveMotion(
+    interactionSource: MutableInteractionSource,
+    enabled: Boolean = true,
+    pressScale: Float = AITA_PRESS_SCALE
+): Modifier {
+    val pressed by interactionSource.collectIsPressedAsState()
+    val hovered by interactionSource.collectIsHoveredAsState()
+    val targetScale = when {
+        enabled && pressed -> pressScale
+        enabled && hovered -> AITA_HOVER_SCALE
+        else -> 1f
+    }
+    val scale by animateFloatAsState(
+        targetValue = targetScale,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "aitaInteractiveScale"
+    )
+    val alpha by animateFloatAsState(
+        targetValue = if (enabled && pressed) 0.94f else 1f,
+        animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS),
+        label = "aitaInteractiveAlpha"
+    )
+
+    return Modifier
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+            this.alpha = alpha
+        }
+        .then(this)
+}
+
+@Composable
+internal fun Modifier.aitaClickable(
+    enabled: Boolean = true,
+    onClickLabel: String? = null,
+    role: Role? = null,
+    interactionSource: MutableInteractionSource? = null,
+    indication: Indication? = null,
+    pressScale: Float = AITA_PRESS_SCALE,
+    onClick: () -> Unit
+): Modifier {
+    val resolvedInteractionSource = interactionSource ?: remember { MutableInteractionSource() }
+    return aitaInteractiveMotion(
+        interactionSource = resolvedInteractionSource,
+        enabled = enabled,
+        pressScale = pressScale
+    ).clickable(
+        enabled = enabled,
+        onClickLabel = onClickLabel,
+        role = role,
+        interactionSource = resolvedInteractionSource,
+        indication = indication ?: LocalIndication.current,
+        onClick = onClick
+    )
+}
+
+@Composable
+internal fun Modifier.aitaSelectionMotion(
+    selected: Boolean,
+    selectedScale: Float = 1.045f
+): Modifier {
+    val scale by animateFloatAsState(
+        targetValue = if (selected) selectedScale else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "aitaSelectionScale"
+    )
+    return Modifier
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
+        .then(this)
+}
+
+@Composable
+internal fun Modifier.aitaDialogEntrance(): Modifier {
+    var entered by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { entered = true }
+    val initialOffsetPx = with(LocalDensity.current) { 18.dp.toPx() }
+    val scale by animateFloatAsState(
+        targetValue = if (entered) 1f else 0.94f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "aitaDialogScale"
+    )
+    val offsetY by animateFloatAsState(
+        targetValue = if (entered) 0f else initialOffsetPx,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "aitaDialogOffset"
+    )
+    val alpha by animateFloatAsState(
+        targetValue = if (entered) 1f else 0f,
+        animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS),
+        label = "aitaDialogAlpha"
+    )
+    return Modifier
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+            this.alpha = alpha
+            translationY = offsetY
+        }
+        .then(this)
+}
+
+@Composable
+internal fun Modifier.aitaBottomSheetEntrance(): Modifier {
+    var entered by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { entered = true }
+    val offsetPx = with(LocalDensity.current) { 72.dp.toPx() }
+    val progress by animateFloatAsState(
+        targetValue = if (entered) 1f else 0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "aitaBottomSheetProgress"
+    )
+    return Modifier
+        .graphicsLayer {
+            translationY = (1f - progress) * offsetPx
+            scaleX = 0.985f + (0.015f * progress)
+            scaleY = 0.985f + (0.015f * progress)
+            alpha = progress
+        }
+        .then(this)
+}
+
+internal fun <T> AnimatedContentTransitionScope<List<T>>.aitaStackContentTransform(): ContentTransform {
+    val depthChange = targetState.size - initialState.size
+    if (depthChange == 0) {
+        return (fadeIn(animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS)) +
+                scaleIn(initialScale = 0.992f, animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS)))
+            .togetherWith(
+                fadeOut(animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS)) +
+                        scaleOut(targetScale = 0.996f, animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS))
+            )
+    }
+
+    val movingForward = depthChange > 0
+    val enter = slideInHorizontally(
+        animationSpec = tween(durationMillis = AITA_MOTION_EMPHASIZED_MILLIS),
+        initialOffsetX = { fullWidth -> if (movingForward) fullWidth / 9 else -fullWidth / 9 }
+    ) + fadeIn(animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS))
+    val exit = slideOutHorizontally(
+        animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS),
+        targetOffsetX = { fullWidth -> if (movingForward) -fullWidth / 14 else fullWidth / 14 }
+    ) + fadeOut(animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS))
+    return enter.togetherWith(exit)
+}
 
 internal fun aitaVisibilityEnter(): EnterTransition =
     fadeIn(animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS)) +

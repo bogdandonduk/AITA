@@ -3400,7 +3400,7 @@ internal fun AppConfiguration.SupplierContractEditorCard(
                                 .clip(RoundedCornerShape(stateValues.cornerRadius))
                                 .background(stateValues.BackgroundColor)
                                 .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor.copy(alpha = 0.45f), RoundedCornerShape(stateValues.cornerRadius))
-                                .clickable(
+                                .aitaClickable(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = ripple(color = stateValues.AccentColor)
                                 ) {

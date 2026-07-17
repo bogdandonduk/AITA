@@ -1265,7 +1265,7 @@ internal fun AppConfiguration.StockBatchMoveDialog(
                                 if (selected) stateValues.AccentColor else stateValues.PlaceholderTextColor,
                                 RoundedCornerShape(stateValues.cornerRadius)
                             )
-                            .clickable(
+                            .aitaClickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = ripple(color = if (selected) stateValues.AccentTextColor else stateValues.AccentColor)
                             ) { selectedDestinationId = location.storeId }
@@ -2388,8 +2388,8 @@ fun AppConfiguration.StockSupplierPricesPage(
                             )
                             .run {
                                 if (canManageSupplierPrices) {
-                                    clickable(
-                                        interactionSource = MutableInteractionSource(),
+                                    aitaClickable(
+                                        interactionSource = remember { MutableInteractionSource() },
                                         indication = ripple(color = stateValues.AccentColor)
                                     ) {
                                         selectedSupplierId = supplierPrice.supplierId
@@ -2698,7 +2698,7 @@ fun AppConfiguration.StockSinglePriceEditor(
                                 RoundedCornerShape(stateValues.cornerRadius)
                             )
                             .background(stateValues.BackgroundColor)
-                            .clickable(
+                            .aitaClickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = ripple(color = stateValues.AccentColor)
                             ) {
@@ -3285,7 +3285,7 @@ internal fun AppConfiguration.StockAddEditTabs(
                         shape = shape
                     )
                     .alpha(if (tab.enabled) 1f else 0.55f)
-                    .clickable(
+                    .aitaClickable(
                         enabled = tab.enabled,
                         interactionSource = remember { MutableInteractionSource() },
                         indication = ripple(color = if (selected) stateValues.AccentTextColor else stateValues.TextColor),
@@ -3461,7 +3461,7 @@ internal fun AppConfiguration.GlobalGoodsSuggestionCard(
                 if (barcodeMatched) stateValues.AccentColor else stateValues.PlaceholderTextColor,
                 RoundedCornerShape(stateValues.cornerRadius)
             )
-            .clickable(
+            .aitaClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(color = stateValues.AccentColor),
                 onClick = onApply
@@ -3584,7 +3584,7 @@ internal fun AppConfiguration.GlobalGoodsSuggestionsPanel(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(RoundedCornerShape(999.dp))
-                    .clickable(
+                    .aitaClickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = ripple(color = stateValues.AccentColor),
                         onClick = onRefresh
@@ -3750,7 +3750,7 @@ internal fun AppConfiguration.GlobalGoodsPickerItemCard(
                 if (matchingCategoryCount != null) stateValues.AccentColor else stateValues.PlaceholderTextColor,
                 RoundedCornerShape(stateValues.cornerRadius)
             )
-            .clickable(
+            .aitaClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(color = stateValues.AccentColor),
                 onClick = onApply
@@ -3901,7 +3901,7 @@ internal fun AppConfiguration.ParentStoreStockPickerItemCard(
                 if (barcodeMatched) stateValues.AccentColor else stateValues.PlaceholderTextColor,
                 RoundedCornerShape(stateValues.cornerRadius)
             )
-            .clickable(
+            .aitaClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(color = stateValues.AccentColor),
                 onClick = onApply
@@ -4625,7 +4625,7 @@ internal fun AppConfiguration.StockAddEditInfoTab(
                         RoundedCornerShape(stateValues.cornerRadius)
                     )
                     .background(stateValues.BackgroundColor)
-                    .clickable(
+                    .aitaClickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = ripple(color = stateValues.AccentColor),
                         onClick = {
@@ -5453,7 +5453,7 @@ internal fun AppConfiguration.SupplierActionQueueItem(action: SupplierDashboardA
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(
+                .aitaClickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = ripple(color = stateValues.AccentColor),
                     onClick = { openOrderFromQueue() }
@@ -5901,7 +5901,7 @@ internal fun AppConfiguration.SupplierDeliveryPromiseRadarCard(
                         if (selected) stateValues.AccentColor else stateValues.AccentColor.copy(alpha = 0.28f),
                         RoundedCornerShape(stateValues.cornerRadius)
                     )
-                    .clickable(
+                    .aitaClickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = ripple(color = stateValues.AccentColor)
                     ) { onBucketSelected(bucket.bucketId) }

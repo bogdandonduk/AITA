@@ -5,8 +5,10 @@ package kz.aita
 import aita.composeapp.generated.resources.*
 import androidx.compose.animation.*
 import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -148,15 +150,26 @@ internal fun AppConfiguration.AitaRoundCheckbox(
     circleSize: Dp = 20.dp
 ) {
     val shape = RoundedCornerShape(999.dp)
-    val effectiveBorderColor = borderColor ?: when {
+    val targetBorderColor = borderColor ?: when {
         blocked -> stateValues.ErrorColor
         checked -> stateValues.AccentColor
         else -> stateValues.PlaceholderTextColor
     }
+    val animatedBorderColor by animateColorAsState(
+        targetValue = targetBorderColor,
+        animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS),
+        label = "aitaCheckboxBorder"
+    )
+    val animatedContainerColor by animateColorAsState(
+        targetValue = if (checked) stateValues.AccentColor else Color.Transparent,
+        animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS),
+        label = "aitaCheckboxContainer"
+    )
     val clickModifier = if (enabled && onCheckedChange != null) {
-        Modifier.clickable(
+        Modifier.aitaClickable(
             interactionSource = remember { MutableInteractionSource() },
-            indication = ripple(color = if (checked) stateValues.AccentColor else effectiveBorderColor),
+            indication = ripple(color = if (checked) stateValues.AccentColor else animatedBorderColor),
+            pressScale = 0.91f,
             onClick = { onCheckedChange(!checked) }
         )
     } else {
@@ -173,27 +186,47 @@ internal fun AppConfiguration.AitaRoundCheckbox(
         Box(
             modifier = Modifier
                 .size(circleSize)
+                .aitaSelectionMotion(selected = checked, selectedScale = 1.13f)
                 .clip(shape)
-                .background(if (checked) stateValues.AccentColor else Color.Transparent)
-                .border(stateValues.unfocusedBorderWidth, effectiveBorderColor, shape),
+                .background(animatedContainerColor)
+                .border(stateValues.unfocusedBorderWidth, animatedBorderColor, shape),
             contentAlignment = Alignment.Center
         ) {
-            when {
-                checked -> Text(
-                    text = "✓",
-                    color = stateValues.AccentTextColor,
-                    fontSize = stateValues.smallTextSize,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
+            AnimatedContent(
+                targetState = when {
+                    checked -> "checked"
+                    blocked -> "blocked"
+                    else -> "empty"
+                },
+                transitionSpec = {
+                    (fadeIn(animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS)) +
+                            scaleIn(initialScale = 0.62f, animationSpec = spring(stiffness = Spring.StiffnessMedium)))
+                        .togetherWith(
+                            fadeOut(animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS)) +
+                                    scaleOut(targetScale = 0.72f, animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS))
+                        )
+                },
+                label = "aitaCheckboxMark"
+            ) { markState ->
+                when (markState) {
+                    "checked" -> Text(
+                        text = "✓",
+                        color = stateValues.AccentTextColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
 
-                blocked -> Text(
-                    text = "!",
-                    color = stateValues.ErrorColor,
-                    fontSize = stateValues.smallTextSize,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
+                    "blocked" -> Text(
+                        text = "!",
+                        color = stateValues.ErrorColor,
+                        fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+
+                    else -> Spacer(modifier = Modifier.size(1.dp))
+                }
             }
         }
     }
@@ -259,7 +292,7 @@ internal fun AppConfiguration.AuthTinyChoiceChip(
             .clip(RoundedCornerShape(stateValues.cornerRadius))
             .background(backgroundColor)
             .border(stateValues.unfocusedBorderWidth, borderColor, RoundedCornerShape(stateValues.cornerRadius))
-            .clickable(
+            .aitaClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(color = stateValues.AccentColor),
                 onClick = onClick
@@ -656,8 +689,11 @@ fun AppConfiguration.UserAuthScreen() {
             item {
                 if (stateValues.isNarrowScreen) {
                     AnimatedContent(
-                        targetState = stateValues.navigationScreensUserAuthLeft.last()
-                    ) { model ->
+                        targetState = stateValues.navigationScreensUserAuthLeft,
+                        transitionSpec = { aitaStackContentTransform() },
+                        label = "userAuthNavigationNarrow"
+                    ) { navigationStack ->
+                        val model = navigationStack.last()
                         when (model) {
                             is NavigationScreenModel.UserAuth.LogIn -> {
                                 UserAuthLogInScreen()
@@ -691,8 +727,11 @@ fun AppConfiguration.UserAuthScreen() {
                         AnimatedContent(
                             modifier = Modifier
                                 .weight(1f),
-                            targetState = stateValues.navigationScreensUserAuthLeft.last()
-                        ) { model ->
+                            targetState = stateValues.navigationScreensUserAuthLeft,
+                            transitionSpec = { aitaStackContentTransform() },
+                            label = "userAuthNavigationLeft"
+                        ) { navigationStack ->
+                            val model = navigationStack.last()
                             when (model) {
                                 is NavigationScreenModel.UserAuth.LogIn -> {
                                     UserAuthLogInScreen()
@@ -707,8 +746,11 @@ fun AppConfiguration.UserAuthScreen() {
                         AnimatedContent(
                             modifier = Modifier
                                 .weight(1f),
-                            targetState = stateValues.navigationScreensUserAuthRight.last()
-                        ) { model ->
+                            targetState = stateValues.navigationScreensUserAuthRight,
+                            transitionSpec = { aitaStackContentTransform() },
+                            label = "userAuthNavigationRight"
+                        ) { navigationStack ->
+                            val model = navigationStack.last()
                             when (model) {
                                 is NavigationScreenModel.UserAuth.SignUp -> {
                                     UserAuthSignUpScreen()
@@ -2429,7 +2471,7 @@ fun AppConfiguration.TransactionScreen() {
                                 )
                             )
                             .background(if (clientId == index) stateValues.AccentColor else stateValues.BackgroundColor)
-                            .clickable(
+                            .aitaClickable(
                                 interactionSource = remember {
                                     MutableInteractionSource()
                                 },
@@ -2492,7 +2534,7 @@ fun AppConfiguration.TransactionScreen() {
                                     modifier = Modifier
                                         .size(24.dp)
                                         .clip(RoundedCornerShape(999.dp))
-                                        .clickable(
+                                        .aitaClickable(
                                             interactionSource = remember { MutableInteractionSource() },
                                             indication = ripple(color = if (clientId == index) stateValues.AccentTextColor else stateValues.TextColor),
                                             onClick = { clearCartClientIdToConfirm = index }
@@ -3079,7 +3121,7 @@ internal fun AppConfiguration.StockQuantityQuickFillButtons(
                         RoundedCornerShape(stateValues.cornerRadius)
                     )
                     .background(stateValues.BackgroundColor)
-                    .clickable(
+                    .aitaClickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = ripple(color = stateValues.AccentColor)
                     ) {
@@ -3747,7 +3789,7 @@ internal fun AppConfiguration.TransactionPaymentOptionButton(
                 RoundedCornerShape(stateValues.cornerRadius)
             )
             .background(if (selected) stateValues.AccentColor else stateValues.BackgroundColor)
-            .clickable(
+            .aitaClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(
                     color = if (selected) stateValues.AccentTextColor else stateValues.TextColor
@@ -4055,7 +4097,7 @@ internal fun AppConfiguration.TransactionQuickAmountButtons(
                         RoundedCornerShape(stateValues.cornerRadius)
                     )
                     .background(stateValues.BackgroundColor)
-                    .clickable(
+                    .aitaClickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = ripple(color = stateValues.AccentColor)
                     ) {
@@ -4174,7 +4216,7 @@ internal fun AppConfiguration.StoreContactQuickFillButtons(
                         RoundedCornerShape(stateValues.cornerRadius)
                     )
                     .background(stateValues.BackgroundColor)
-                    .clickable(
+                    .aitaClickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = ripple(color = stateValues.AccentColor)
                     ) {
@@ -4814,7 +4856,7 @@ internal fun AppConfiguration.CartReturnPriceBatchBottomSheet(
                                         if (selected) stateValues.AccentColor else stateValues.PlaceholderTextColor,
                                         RoundedCornerShape(stateValues.cornerRadius)
                                     )
-                                    .clickable(
+                                    .aitaClickable(
                                         interactionSource = remember { MutableInteractionSource() },
                                         indication = ripple(color = stateValues.AccentColor)
                                     ) { selectedBatchId = batch.id }
@@ -4938,7 +4980,7 @@ internal fun AppConfiguration.TransactionNumpad(
                                 RoundedCornerShape(stateValues.cornerRadius)
                             )
                             .background(if (token == "⌫" || !tokenEnabled) stateValues.DisabledColor else stateValues.BackgroundColor)
-                            .clickable(
+                            .aitaClickable(
                                 enabled = tokenEnabled,
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = ripple(color = stateValues.TextColor)
@@ -5051,7 +5093,7 @@ internal fun AppConfiguration.DebtPercentQuickButtons(
                         .clip(RoundedCornerShape(stateValues.cornerRadius))
                         .background(stateValues.BackgroundColor)
                         .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
-                        .clickable(
+                        .aitaClickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = ripple(color = stateValues.AccentColor)
                         ) { onSelected(amount) }
@@ -5086,6 +5128,7 @@ internal fun AppConfiguration.DebtReceiptDialog(
     Dialog(onDismissRequest = onDismiss) {
         LazyColumn(
             modifier = Modifier
+                .aitaDialogEntrance()
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 0.94f else 0.56f)
                 .foregroundTactileShadow(stateValues.cornerRadius, elevated = true)
                 .clip(RoundedCornerShape(stateValues.cornerRadius))
@@ -5167,7 +5210,7 @@ internal fun AppConfiguration.DebtorPaymentCard(
                 if (selected) stateValues.AccentColor else if (overdue) stateValues.ErrorColor else stateValues.PlaceholderTextColor,
                 RoundedCornerShape(stateValues.cornerRadius)
             )
-            .clickable(
+            .aitaClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(color = if (selected) stateValues.AccentTextColor else stateValues.TextColor),
                 onClick = onClick
@@ -6334,7 +6377,7 @@ fun AppConfiguration.TransactionPaymentScreen() {
 //                        ),
 //                      )
 //                      .background(if (selectedCashlessPaymentMethodId == item.id) stateValues.AccentColor else Color.Transparent)
-//                      .clickable(
+//                      .aitaClickable(
 //                        interactionSource = remember {
 //                          MutableInteractionSource()
 //                        },

@@ -1115,14 +1115,30 @@ internal fun AppConfiguration.SupportFaqCard(entry: SupportFaqEntry) {
     val answer = localizedStringResource(entry.answerId, entry.answerFallback)
     val category = localizedStringResource(entry.categoryId, "General")
 
+    val cardBorderColor by animateColorAsState(
+        targetValue = if (expanded) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+        animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS),
+        label = "supportFaqBorder"
+    )
+    val cardBackgroundColor by animateColorAsState(
+        targetValue = if (expanded) stateValues.AccentColor.copy(alpha = 0.055f) else stateValues.BackgroundColor,
+        animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS),
+        label = "supportFaqBackground"
+    )
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
             .clip(RoundedCornerShape(stateValues.cornerRadius))
-            .background(stateValues.BackgroundColor)
-            .border(stateValues.unfocusedBorderWidth, if (expanded) stateValues.AccentColor else stateValues.PlaceholderTextColor, RoundedCornerShape(stateValues.cornerRadius))
-            .clickable { expanded = !expanded }
+            .background(cardBackgroundColor)
+            .border(
+                stateValues.unfocusedBorderWidth,
+                cardBorderColor,
+                RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .aitaClickable { expanded = !expanded }
+            .aitaContentMotion()
             .padding(stateValues.marginTextFieldGroup)
     ) {
         Text(
@@ -1685,6 +1701,7 @@ fun AppConfiguration.MenuDebtorsScreen() {
             Dialog(onDismissRequest = { pendingDeleteId = null }) {
                 Column(
                     modifier = Modifier
+                        .aitaDialogEntrance()
                         .foregroundTactileShadow(stateValues.cornerRadius, elevated = true)
                         .clip(RoundedCornerShape(stateValues.cornerRadius))
                         .background(stateValues.BackgroundColor)
@@ -2247,7 +2264,7 @@ internal fun AppConfiguration.AppModeSelectionCard(
                 if (selected) stateValues.AccentColor else stateValues.PlaceholderTextColor,
                 RoundedCornerShape(stateValues.cornerRadius)
             )
-            .clickable(
+            .aitaClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(color = if (selected) stateValues.AccentColor else stateValues.TextColor)
             ) { onClick() }
@@ -4194,7 +4211,7 @@ internal fun AppConfiguration.AnalyticsPill(
             .background(
                 if (selected) stateValues.AccentColor else stateValues.BackgroundColor
             )
-            .clickable(
+            .aitaClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(
                     color = if (selected) stateValues.AccentTextColor else stateValues.TextColor
@@ -5352,8 +5369,11 @@ internal fun AppConfiguration.markExplicitLocalAppPreferences(
 
 @Composable
 internal fun AppConfiguration.LocalAppPreferencesPriorityEffect() {
-    LaunchedEffect(stateValues.realtimeUpdatesConnected, stateValues.userAccount?.id) {
-        if (!stateValues.realtimeUpdatesConnected || stateValues.userAccount == null) return@LaunchedEffect
+    val userAccountId = stateValues.userAccount?.id
+    val serverGroundedReachable = stateValues.cloudTransportStatus == CLOUD_TRANSPORT_STATUS_REACHABLE
+
+    LaunchedEffect(serverGroundedReachable, userAccountId) {
+        if (!serverGroundedReachable || userAccountId == null) return@LaunchedEffect
         val snapshot = getPersistentUiDraftValue
             ?.invoke(LOCAL_APP_PREFERENCES_DIRTY_DRAFT_KEY)
             .toLocalAppPreferencesSnapshotOrNull()
@@ -5386,7 +5406,6 @@ internal fun AppConfiguration.LocalAppPreferencesPriorityEffect() {
 @Composable
 internal fun AppConfiguration.CloudConnectionStatusBanner() {
     val userAccount = stateValues.userAccount
-    val connectedToRealtime = stateValues.realtimeUpdatesConnected
     val manualRefreshInProgress = stateValues.cloudConnectionManualRefreshInProgress
     val refreshIconRes by stateValues.drawableResIconRefresh.collectAsState()
     val transportStatus = stateValues.cloudTransportStatus
@@ -5394,105 +5413,135 @@ internal fun AppConfiguration.CloudConnectionStatusBanner() {
     val authRefreshRequired = transportStatus == CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED
     val transportUnavailable = transportStatus == CLOUD_TRANSPORT_STATUS_UNAVAILABLE
     val localNetwork = stateValues.localNetworkState
-    val connected = !authRefreshRequired && !transportUnavailable && (connectedToRealtime || transportReachable)
-    val localMode = userAccount != null && localNetwork.enabled && !connected && !authRefreshRequired
+    val localMode = userAccount != null && localNetwork.enabled &&
+            !transportReachable && !authRefreshRequired && !transportUnavailable
 
+    // The banner represents confirmed HTTP/server reachability, not the WebSocket's momentary
+    // reconnect cycle. Manual probes keep the grounded status visible and animate only the icon.
     val rawStatusKey = when {
         transportUnavailable -> "unavailable"
         authRefreshRequired -> "auth_refresh"
-        connectedToRealtime -> "realtime"
-        transportReachable -> "reachable"
+        transportReachable -> "connected"
         localMode -> "local"
-        manualRefreshInProgress -> "checking"
         else -> "checking"
     }
-    var displayedStatusKey by rememberSaveable { mutableStateOf(rawStatusKey) }
+    var displayedStatusKey by remember { mutableStateOf(rawStatusKey) }
+
     LaunchedEffect(rawStatusKey) {
         if (rawStatusKey == displayedStatusKey) return@LaunchedEffect
-        val delayMillis = when {
-            rawStatusKey == "auth_refresh" || rawStatusKey == "realtime" || rawStatusKey == "reachable" || rawStatusKey == "unavailable" -> 0L
-            displayedStatusKey == "auth_refresh" && rawStatusKey == "checking" -> 3_000L
-            rawStatusKey == "checking" -> 1_200L
-            else -> 900L
+
+        val settleDelayMillis = when {
+            rawStatusKey == "unavailable" || rawStatusKey == "auth_refresh" || rawStatusKey == "connected" -> 0L
+            displayedStatusKey == "connected" && rawStatusKey == "checking" -> 12_000L
+            displayedStatusKey == "connected" && rawStatusKey == "local" -> 3_000L
+            rawStatusKey == "checking" -> 1_500L
+            rawStatusKey == "local" -> 800L
+            else -> 350L
         }
-        if (delayMillis > 0L) delay(delayMillis)
+        if (settleDelayMillis > 0L) delay(settleDelayMillis)
         displayedStatusKey = rawStatusKey
     }
 
-    val text = when (displayedStatusKey) {
-        "auth_refresh" -> localizedStringResource(91, "Cloud session needs refresh. You remain signed in locally.")
-        "checking" -> localizedStringResource(1139, "Checking server connection…")
-        "realtime" -> localizedStringResource(573, "Live updates connected")
-        "local" -> localizedStringResource(914, "Server is not connected. Branch local network mode is active.")
-        "reachable" -> localizedStringResource(1138, "Server connected.")
-        "unavailable" -> localizedStringResource(1140, "Can’t reach AITA server. Check Wi‑Fi or server address.")
-        else -> localizedStringResource(1139, "Checking server connection…")
-    }
-
     val targetColor = when (displayedStatusKey) {
-        "auth_refresh" -> stateValues.AccentColor
-        "checking" -> stateValues.AccentColor
-        "realtime" -> stateValues.OkayColor
-        "local" -> stateValues.AccentColor
-        "reachable" -> stateValues.OkayColor
+        "connected" -> stateValues.OkayColor
         "unavailable" -> stateValues.ErrorColor
         else -> stateValues.AccentColor
     }
-
     val backgroundColor by animateColorAsState(
         targetValue = targetColor,
-        animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS),
+        animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS),
         label = "cloudConnectionStatusColor"
     )
+    val refreshInteractionSource = remember { MutableInteractionSource() }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(backgroundColor)
+            .aitaContentMotion()
             .padding(horizontal = 12.dp, vertical = 0.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
         Spacer(modifier = Modifier.width(28.dp))
 
-        Text(
-            text = text,
+        AnimatedContent(
+            targetState = displayedStatusKey,
             modifier = Modifier.weight(1f),
-            color = stateValues.AccentTextColor,
-            fontSize = stateValues.smallTextSize,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
+            transitionSpec = {
+                (fadeIn(animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS)) +
+                        slideInVertically(
+                            animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS),
+                            initialOffsetY = { height -> height / 3 }
+                        ))
+                    .togetherWith(
+                        fadeOut(animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS)) +
+                                slideOutVertically(
+                                    animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS),
+                                    targetOffsetY = { height -> -height / 3 }
+                                )
+                    )
+            },
+            contentAlignment = Alignment.Center,
+            label = "cloudConnectionStatusText"
+        ) { statusKey ->
+            Text(
+                text = when (statusKey) {
+                    "auth_refresh" -> localizedStringResource(91, "Cloud session needs refresh. You remain signed in locally.")
+                    "connected" -> localizedStringResource(1138, "Server connected.")
+                    "local" -> localizedStringResource(914, "Server is not connected. Branch local network mode is active.")
+                    "unavailable" -> localizedStringResource(1140, "Can’t reach AITA server. Check Wi‑Fi or server address.")
+                    else -> localizedStringResource(1139, "Checking server connection…")
+                },
+                color = stateValues.AccentTextColor,
+                fontSize = stateValues.smallTextSize,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
 
         Box(
             modifier = Modifier
                 .padding(start = 4.dp)
                 .size(28.dp)
                 .clip(RoundedCornerShape(14.dp))
-                .clickable(
+                .aitaClickable(
                     enabled = !manualRefreshInProgress,
-                    interactionSource = remember { MutableInteractionSource() },
+                    interactionSource = refreshInteractionSource,
                     indication = ripple(color = stateValues.AccentTextColor, radius = 14.dp),
                     onClick = { refreshCloudConnectionManually() }
                 ),
             contentAlignment = Alignment.Center
         ) {
-            if (manualRefreshInProgress) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(16.dp),
-                    strokeWidth = 2.dp,
-                    color = stateValues.AccentTextColor
-                )
-            } else {
-                CpImage(
-                    modifier = Modifier.size(18.dp),
-                    url = stateValues.drawablePathIconRefresh,
-                    fallbackRes = refreshIconRes,
-                    contentDescription = localizedStringResource(237, "Refresh"),
-                    tintColor = stateValues.AccentTextColor
-                )
+            AnimatedContent(
+                targetState = manualRefreshInProgress,
+                transitionSpec = {
+                    (fadeIn(animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS)) +
+                            scaleIn(initialScale = 0.72f, animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS)))
+                        .togetherWith(
+                            fadeOut(animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS)) +
+                                    scaleOut(targetScale = 0.82f, animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS))
+                        )
+                },
+                label = "cloudConnectionRefreshState"
+            ) { refreshing ->
+                if (refreshing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = stateValues.AccentTextColor
+                    )
+                } else {
+                    CpImage(
+                        modifier = Modifier.size(18.dp),
+                        url = stateValues.drawablePathIconRefresh,
+                        fallbackRes = refreshIconRes,
+                        contentDescription = localizedStringResource(237, "Refresh"),
+                        tintColor = stateValues.AccentTextColor
+                    )
+                }
             }
         }
     }
@@ -5643,7 +5692,7 @@ internal fun NotificationDataModel.isConnectionStatusPopupNoise(): Boolean {
     val combined = listOf(title, message, category, source)
         .joinToString(" ")
         .normalizedNotificationPopupKey()
-    return combined.isServerUnavailablePopupText() || combined.isSessionRefreshPopupText()
+    return combined.isServerUnavailablePopupText() || combined.isServerRecoveryPopupText()
 }
 
 internal fun List<NotificationDataModel>.compactForPopupDisplay(): List<NotificationDataModel> {
@@ -5657,7 +5706,12 @@ fun AppConfiguration.MainScreen() {
         this !is NavigationScreenModel.Splash && this !is NavigationScreenModel.UserAuth
     }
 
-    val activeNotifications = stateValues.activeNotifications.compactForPopupDisplay()
+    // The grounded connection banner is the single visual source of truth for automatic
+    // disconnect/recovery state. Keeping those transient status events out of popup cards avoids
+    // duplicate flashes and notification fatigue while preserving actionable notifications.
+    val activeNotifications = stateValues.activeNotifications
+        .filterNot { it.isConnectionStatusPopupNoise() }
+        .compactForPopupDisplay()
     val visibleNotifications = activeNotifications.take(if (stateValues.isNarrowScreen) 1 else 5)
     val workshiftStartDialogVisible by workshiftStartDialogVisibleState.collectAsState()
     val activeWorkshiftForGate by activeWorkshiftState.payload.collectAsState()
@@ -5744,13 +5798,10 @@ fun AppConfiguration.MainScreen() {
         ) {
             AnimatedContent(
                 targetState = stateValues.navigationScreensMain,
-                transitionSpec = {
-                    (fadeIn(animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS)) + scaleIn(initialScale = 0.985f, animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS)))
-                        .togetherWith(fadeOut(animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS)) + scaleOut(targetScale = 1.01f, animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS)))
-                },
+                transitionSpec = { aitaStackContentTransform() },
                 label = "mainNavigation"
-            ) {
-                when (stateValues.navigationScreensMain.last()) {
+            ) { navigationStack ->
+                when (navigationStack.last()) {
                     is NavigationScreenModel.Splash -> SplashScreen()
                     is NavigationScreenModel.UserAuth -> UserAuthScreen()
                     is NavigationScreenModel.Notifications -> NotificationsScreen()
@@ -5871,30 +5922,41 @@ fun AppConfiguration.MainScreen() {
 
                     val iconTintColor by animateColorAsState(
                         targetValue = if (isSelected) stateValues.AccentColor else stateValues.IconTintColor,
-                        label = "",
+                        animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS),
+                        label = "bottomNavigationTint"
+                    )
+                    val itemContainerColor by animateColorAsState(
+                        targetValue = if (isSelected) stateValues.AccentColor.copy(alpha = 0.11f) else Color.Transparent,
+                        animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS),
+                        label = "bottomNavigationContainer"
                     )
 
                     Column(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()
-                            .clickable(
+                            .padding(horizontal = 2.dp, vertical = 3.dp)
+                            .clip(RoundedCornerShape(stateValues.cornerRadius))
+                            .background(itemContainerColor)
+                            .aitaClickable(
                                 onClick = {
                                     if (stateValues.appModeId != APP_MODE_STORE || model in filteredMainBottomDestinations()) {
                                         coroutineScope.launch { Navigation.goMain(model) }
                                     } else {
                                         postInAppNotification(currentUserPermissionDeniedMessage(), NotificationType.Negative)
                                     }
-                                }, interactionSource = remember {
-                                    MutableInteractionSource()
-                                }, indication = ripple(color = stateValues.TextColor)
+                                },
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = ripple(color = stateValues.TextColor)
                             )
-                            .padding(horizontal = 2.dp, vertical = 4.dp),
+                            .padding(horizontal = 2.dp, vertical = 1.dp),
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         CpImage(
-                            modifier = Modifier.requiredSize(bottomNavigationIconSize),
+                            modifier = Modifier
+                                .requiredSize(bottomNavigationIconSize)
+                                .aitaSelectionMotion(selected = isSelected, selectedScale = 1.11f),
                             url = model.iconPath,
                             fallbackRes = model.iconRes,
                             contentDescription = model.name,
@@ -5954,7 +6016,7 @@ internal fun AppConfiguration.WorkshiftGateOverlay(
         modifier = Modifier
             .fillMaxSize()
             .background(stateValues.BackgroundColor.copy(alpha = 0.94f))
-            .clickable(enabled = false) {}
+            .aitaClickable(enabled = false) {}
             .padding(stateValues.marginTextFieldGroup),
         contentAlignment = Alignment.Center
     ) {
@@ -6093,7 +6155,7 @@ internal fun AppConfiguration.NotificationPopupCard(
                 color,
                 RoundedCornerShape(stateValues.cornerRadius)
             )
-            .clickable(
+            .aitaClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(color = color)
             ) { onOpenHistory() }
@@ -6143,7 +6205,7 @@ internal fun AppConfiguration.NotificationPopupCard(
                 .size(36.dp)
                 .clip(RoundedCornerShape(stateValues.cornerRadius))
                 .background(color)
-                .clickable(
+                .aitaClickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = ripple(color = stateValues.AccentTextColor)
                 ) { onDismiss() },
@@ -6410,7 +6472,7 @@ internal fun AppConfiguration.NotificationHistoryCard(notification: Notification
                 color,
                 RoundedCornerShape(stateValues.cornerRadius)
             )
-            .clickable(
+            .aitaClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(color = color)
             ) {

@@ -35,7 +35,6 @@ import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -589,7 +588,7 @@ private fun AppConfiguration.CameraScannerOverlayIconButton(
             .clip(shape)
             .background(Color.Black.copy(alpha = 0.20f))
             .border(1.dp, Color.White.copy(alpha = if (enabled) 0.78f else 0.28f), shape)
-            .clickable(enabled = enabled, onClick = onClick)
+            .aitaClickable(enabled = enabled, onClick = onClick)
             .padding(9.dp),
         contentAlignment = Alignment.Center
     ) {

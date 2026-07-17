@@ -295,7 +295,7 @@ fun AppConfiguration.GoodsItemInCartWidget(
             )
             .run {
                 onClick?.run {
-                    clickable(
+                    aitaClickable(
                         interactionSource = remember {
                             MutableInteractionSource()
                         },
@@ -377,7 +377,7 @@ fun AppConfiguration.GoodsItemInCartWidget(
                                     if (selected) stateValues.AccentColor else if (wholesaleAllowed) stateValues.PlaceholderTextColor else stateValues.ErrorColor,
                                     RoundedCornerShape(stateValues.cornerRadius)
                                 )
-                                .clickable(
+                                .aitaClickable(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = ripple(color = stateValues.AccentColor)
                                 ) {
@@ -506,7 +506,7 @@ fun AppConfiguration.GoodsItemInCartWidget(
                         .clip(RoundedCornerShape(stateValues.cornerRadius))
                         .background(stateValues.BackgroundColor)
                         .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
-                        .clickable(
+                        .aitaClickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = ripple(color = stateValues.AccentColor)
                         ) { showReturnPriceBottomSheet = true }
@@ -673,7 +673,7 @@ fun AppConfiguration.GoodsItemInCartWidget(
                                 borderColor,
                                 RoundedCornerShape(stateValues.cornerRadius)
                             )
-                            .clickable(
+                            .aitaClickable(
                                 enabled = condition.requiresManualConfirmation && condition.automaticallySatisfied,
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = ripple(color = if (checked) stateValues.AccentColor else stateValues.ErrorColor)
@@ -736,7 +736,7 @@ fun AppConfiguration.GoodsItemInCartWidget(
                             .clip(RoundedCornerShape(stateValues.cornerRadius))
                             .background(stateValues.BackgroundColor)
                             .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
-                            .clickable(
+                            .aitaClickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = ripple(color = stateValues.AccentColor)
                             ) {
@@ -781,7 +781,7 @@ fun AppConfiguration.GoodsItemInCartWidget(
                             .clip(RoundedCornerShape(stateValues.cornerRadius))
                             .background(stateValues.BackgroundColor)
                             .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor, RoundedCornerShape(stateValues.cornerRadius))
-                            .clickable(
+                            .aitaClickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = ripple(color = stateValues.AccentColor)
                             ) {
@@ -1664,7 +1664,7 @@ fun AppConfiguration.tabRowWidget(
                     Box(
                         modifier = tabItemModifier
                             .background(containerColor)
-                            .clickable(
+                            .aitaClickable(
                                 interactionSource = remember {
                                     MutableInteractionSource()
                                 },
@@ -1746,7 +1746,7 @@ fun AppConfiguration.StoreWidget(
             .background(stateValues.BackgroundColor)
             .run {
                 if (onEdit != null) {
-                    clickable(
+                    aitaClickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = ripple(color = stateValues.AccentColor)
                     ) { onEdit(store) }
@@ -2440,7 +2440,7 @@ internal fun AppConfiguration.StockWarehouseMetricPill(
             .border(stateValues.unfocusedBorderWidth, borderColor.copy(alpha = if (selected || warning) 0.9f else 0.45f), shape)
             .then(
                 if (enabled && filterId != null) {
-                    Modifier.clickable(
+                    Modifier.aitaClickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = ripple(color = stateValues.AccentColor),
                         onClick = { onFilterSelected(filterId) }
@@ -3179,8 +3179,11 @@ fun AppConfiguration.StockScreen() {
                 AnimatedContent(
                     modifier = Modifier
                         .weight(1f),
-                    targetState = stateValues.navigationScreensStockLeft.last()
-                ) { model ->
+                    targetState = stateValues.navigationScreensStockLeft,
+                    transitionSpec = { aitaStackContentTransform() },
+                    label = "stockNavigationNarrow"
+                ) { navigationStack ->
+                    val model = navigationStack.last()
                     when (model) {
                         is NavigationScreenModel.Stock.Warehouse -> {
                             StockWarehouseScreen()
@@ -3199,8 +3202,11 @@ fun AppConfiguration.StockScreen() {
                     AnimatedContent(
                         modifier = Modifier
                             .weight(1f),
-                        targetState = stateValues.navigationScreensStockLeft.last()
-                    ) { model ->
+                        targetState = stateValues.navigationScreensStockLeft,
+                        transitionSpec = { aitaStackContentTransform() },
+                        label = "stockNavigationLeft"
+                    ) { navigationStack ->
+                        val model = navigationStack.last()
                         when (model) {
                             is NavigationScreenModel.Stock.Warehouse -> {
                                 StockWarehouseScreen()
@@ -3215,8 +3221,11 @@ fun AppConfiguration.StockScreen() {
                     AnimatedContent(
                         modifier = Modifier
                             .weight(1f),
-                        targetState = stateValues.navigationScreensStockRight.last()
-                    ) { model ->
+                        targetState = stateValues.navigationScreensStockRight,
+                        transitionSpec = { aitaStackContentTransform() },
+                        label = "stockNavigationRight"
+                    ) { navigationStack ->
+                        val model = navigationStack.last()
                         when (model) {
                             is NavigationScreenModel.Stock.Warehouse -> {
                                 StockWarehouseScreen()
@@ -4383,6 +4392,7 @@ internal fun AppConfiguration.AitaBottomSheet(
         ) {
             Column(
                 modifier = Modifier
+                    .aitaBottomSheetEntrance()
                     .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.78f)
                     .heightIn(min = stateValues.screenHeight * 0.38f, max = (stateValues.screenHeight * 0.92f - bottomNavReserve).coerceAtLeast(stateValues.screenHeight * 0.50f))
                     .foregroundTactileShadow(stateValues.cornerRadius, elevated = true)
@@ -5101,7 +5111,7 @@ internal fun AppConfiguration.TransactionSupplySupplierBanner(
                 if (selectedSupplierId != null) stateValues.AccentColor else stateValues.PlaceholderTextColor,
                 RoundedCornerShape(stateValues.cornerRadius)
             )
-            .clickable(
+            .aitaClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(color = stateValues.AccentColor),
                 onClick = onSelectSupplier
@@ -5354,7 +5364,7 @@ internal fun AppConfiguration.StockConditionCard(
                     .padding(start = 8.dp)
                     .size(stateValues.iconSize)
                     .clip(RoundedCornerShape(stateValues.cornerRadius))
-                    .clickable(
+                    .aitaClickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = ripple(color = stateValues.ErrorColor),
                         onClick = onDelete

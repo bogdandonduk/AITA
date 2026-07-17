@@ -105,6 +105,7 @@ fun AppConfiguration.ModalDialogWidget(
     ) {
         Column(
             modifier = Modifier
+                .aitaDialogEntrance()
                 .widthIn(min = 300.dp, max = 460.dp)
                 .foregroundTactileShadow(cornerRadius = cornerRadius, elevated = true)
                 .clip(RoundedCornerShape(cornerRadius))
@@ -504,6 +505,7 @@ internal fun AppConfiguration.WorkerDecisionNoteDialog(
     ) {
         Column(
             modifier = Modifier
+                .aitaDialogEntrance()
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 0.92f else 0.52f)
                 .widthIn(max = 520.dp)
                 .foregroundTactileShadow(stateValues.cornerRadius, elevated = true)
@@ -760,7 +762,7 @@ internal fun AppConfiguration.WorkerPermissionEditor(
                                 modifier = Modifier
                                     .weight(1f)
                                     .clip(RoundedCornerShape(stateValues.cornerRadius))
-                                    .clickable(
+                                    .aitaClickable(
                                         interactionSource = remember { MutableInteractionSource() },
                                         indication = ripple(color = stateValues.AccentColor),
                                         onClick = {
@@ -814,7 +816,7 @@ internal fun AppConfiguration.ResetPermissionsText(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(stateValues.cornerRadius))
-            .clickable(
+            .aitaClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(color = stateValues.AccentColor),
                 onClick = { onReset(defaultAssignablePermissionsForWorkerRole(roleId, assignablePermissions, templates)) }
@@ -2990,7 +2992,7 @@ internal fun AppConfiguration.TransactionHistoryFilterChip(
                 if (selected) stateValues.AccentColor else stateValues.PlaceholderTextColor,
                 RoundedCornerShape(stateValues.cornerRadius)
             )
-            .clickable(
+            .aitaClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(color = if (selected) stateValues.AccentTextColor else stateValues.AccentColor),
                 onClick = onClick
@@ -3035,7 +3037,7 @@ internal fun AppConfiguration.TransactionHistoryDateButton(
                 .clip(RoundedCornerShape(stateValues.cornerRadius))
                 .background(stateValues.BackgroundColor)
                 .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor, RoundedCornerShape(stateValues.cornerRadius))
-                .clickable(
+                .aitaClickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = ripple(color = stateValues.AccentColor),
                     onClick = onClick
@@ -3094,6 +3096,7 @@ internal fun AppConfiguration.TransactionHistoryCalendarDialog(
     Dialog(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
+                .aitaDialogEntrance()
                 .fillMaxWidth()
                 .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
                 .clip(RoundedCornerShape(stateValues.cornerRadius))
@@ -3144,7 +3147,7 @@ internal fun AppConfiguration.TransactionHistoryCalendarDialog(
                             if (showMonthYearPicker) stateValues.AccentColor else stateValues.PlaceholderTextColor,
                             RoundedCornerShape(stateValues.cornerRadius)
                         )
-                        .clickable(
+                        .aitaClickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = ripple(color = if (showMonthYearPicker) stateValues.AccentTextColor else stateValues.AccentColor),
                             onClick = { showMonthYearPicker = !showMonthYearPicker }
@@ -3306,7 +3309,7 @@ internal fun AppConfiguration.TransactionHistoryCalendarDialog(
                                         if (selected) stateValues.AccentColor else stateValues.PlaceholderTextColor,
                                         RoundedCornerShape(stateValues.cornerRadius)
                                     )
-                                    .clickable(
+                                    .aitaClickable(
                                         interactionSource = remember { MutableInteractionSource() },
                                         indication = ripple(color = if (selected) stateValues.AccentTextColor else stateValues.AccentColor),
                                         onClick = {
@@ -3396,7 +3399,7 @@ internal fun AppConfiguration.TransactionHistoryCard(
             .clip(RoundedCornerShape(stateValues.cornerRadius))
             .background(stateValues.BackgroundColor)
             .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor, RoundedCornerShape(stateValues.cornerRadius))
-            .clickable(
+            .aitaClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(color = stateValues.AccentColor),
                 onClick = onClick
@@ -3980,7 +3983,7 @@ internal fun AppConfiguration.ClipboardCopyButton(
             .clip(RoundedCornerShape(17.dp))
             .background(if (copied) stateValues.OkayColor.copy(alpha = 0.10f) else stateValues.BackgroundColor)
             .border(stateValues.unfocusedBorderWidth, borderColor, RoundedCornerShape(17.dp))
-            .clickable(
+            .aitaClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(color = stateValues.AccentColor),
                 onClick = {
@@ -4034,13 +4037,13 @@ internal fun AppConfiguration.SupplierCard(
             .run {
                 when {
                     editable -> {
-                        clickable(
+                        aitaClickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = ripple(color = stateValues.AccentColor)
                         ) { onEdit() }
                     }
                     onSelect != null -> {
-                        clickable(
+                        aitaClickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = ripple(color = stateValues.AccentColor)
                         ) { onSelect.invoke() }
@@ -4895,8 +4898,11 @@ fun AppConfiguration.MenuScreen() {
             AnimatedContent(
                 modifier = Modifier
                     .weight(1f),
-                targetState = stateValues.navigationScreensMenuLeft.last()
-            ) { model ->
+                targetState = stateValues.navigationScreensMenuLeft,
+                transitionSpec = { aitaStackContentTransform() },
+                label = "menuNavigationNarrow"
+            ) { navigationStack ->
+                val model = navigationStack.last()
                 when (model) {
                     is NavigationScreenModel.Menu.List -> {
                         MenuListScreen()
@@ -4993,8 +4999,11 @@ fun AppConfiguration.MenuScreen() {
                 AnimatedContent(
                     modifier = Modifier
                         .weight(0.2f),
-                    targetState = stateValues.navigationScreensMenuLeft.last()
-                ) { model ->
+                    targetState = stateValues.navigationScreensMenuLeft,
+                    transitionSpec = { aitaStackContentTransform() },
+                    label = "menuNavigationLeft"
+                ) { navigationStack ->
+                    val model = navigationStack.last()
                     when (model) {
                         is NavigationScreenModel.Menu.List -> {
                             MenuListScreen()
@@ -5087,8 +5096,11 @@ fun AppConfiguration.MenuScreen() {
                 AnimatedContent(
                     modifier = Modifier
                         .weight(1f),
-                    targetState = stateValues.navigationScreensMenuRight.last()
-                ) { model ->
+                    targetState = stateValues.navigationScreensMenuRight,
+                    transitionSpec = { aitaStackContentTransform() },
+                    label = "menuNavigationRight"
+                ) { navigationStack ->
+                    val model = navigationStack.last()
                     when (model) {
                         is NavigationScreenModel.Menu.List -> {
                             MenuListScreen()
@@ -5211,6 +5223,7 @@ internal fun AppConfiguration.canOpenMenuDestination(model: NavigationScreenMode
     val activeStoreId = stateValues.activeStoreId
     val activeOwnerFallback = currentUserOwnsActiveStoreForUi()
     return when (model) {
+        NavigationScreenModel.Menu.AppMode -> false
         NavigationScreenModel.Menu.TransactionHistory -> activeOwnerFallback || currentUserCanViewTransactionHistory(activeStoreId)
         NavigationScreenModel.Menu.OperationLogs -> activeOwnerFallback || currentUserCanViewLogs(activeStoreId)
         NavigationScreenModel.Menu.Analytics -> activeOwnerFallback || currentUserCanViewAnalytics(activeStoreId)
@@ -5252,7 +5265,9 @@ internal fun AppConfiguration.menuDestinationsForCurrentMode(): List<NavigationS
 }
 
 internal fun AppConfiguration.filteredMenuDestinations(): List<NavigationScreenModel.Menu> {
-    return menuDestinationsForCurrentMode().filter { canOpenMenuDestination(it) }
+    return menuDestinationsForCurrentMode()
+        .filterNot { it.isTemporarilyHiddenFromUi() }
+        .filter { canOpenMenuDestination(it) }
 }
 
 internal fun AppConfiguration.filteredMainBottomDestinations(): List<NavigationScreenModel> {
@@ -5622,7 +5637,7 @@ internal fun AppConfiguration.SupplierWorkspaceMenuTile() {
                                 if (active) stateValues.AccentColor else stateValues.PlaceholderTextColor.copy(alpha = 0.55f),
                                 RoundedCornerShape(stateValues.cornerRadius)
                             )
-                            .clickable(
+                            .aitaClickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = ripple(color = stateValues.AccentColor)
                             ) {
@@ -5692,7 +5707,7 @@ fun AppConfiguration.MenuListScreen() {
                     modifier = Modifier
                         .fillMaxWidth()
                         .defaultMinSize(minHeight = stateValues.textFieldHeight)
-                        .clickable(
+                        .aitaClickable(
                             interactionSource = remember {
                                 MutableInteractionSource()
                             },

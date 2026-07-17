@@ -7048,10 +7048,10 @@ val cacheMaxAgeSec = 30 * 24 * 3600
 val tokenRefreshMutex = Mutex()
 private val manualCloudConnectionRefreshMutex = Mutex()
 private const val AUTH_REFRESH_NON_AUTH_FAILURE_GRACE_MILLIS = 5_000L
-private const val CLOUD_CONNECTION_HEALTH_CHECK_REACHABLE_INTERVAL_MILLIS = 5_000L
-private const val CLOUD_CONNECTION_HEALTH_CHECK_UNKNOWN_INTERVAL_MILLIS = 4_000L
-private const val CLOUD_CONNECTION_HEALTH_CHECK_UNAVAILABLE_INTERVAL_MILLIS = 3_000L
-private const val CLOUD_CONNECTION_HEALTH_CHECK_TIMEOUT_MILLIS = 3_500L
+private const val CLOUD_CONNECTION_HEALTH_CHECK_REACHABLE_INTERVAL_MILLIS = 8_000L
+private const val CLOUD_CONNECTION_HEALTH_CHECK_UNKNOWN_INTERVAL_MILLIS = 5_000L
+private const val CLOUD_CONNECTION_HEALTH_CHECK_UNAVAILABLE_INTERVAL_MILLIS = 4_000L
+private const val CLOUD_CONNECTION_HEALTH_CHECK_TIMEOUT_MILLIS = 5_500L
 private const val CLOUD_CONNECTION_AUTH_REFRESH_SUPPRESSION_AFTER_TRANSPORT_FAILURE_MILLIS = 15_000L
 @Volatile
 private var cloudTransportLastUnavailableAtMillis: Long = 0L
@@ -12396,11 +12396,22 @@ fun startCloudConnectionHealthMonitor() {
             )
 
             if (serverAvailable) {
-                realtimeOfflineNoticePosted = false
-                markCloudTransportReachableForNotifications(
+                val hadConfirmedOfflineNotice = realtimeOfflineNoticePosted
+                val recoveryConfirmed = markCloudTransportReachableForNotifications(
                     authenticated = getStoredUserAuthTokens?.invoke() != null,
                     authRefreshRequired = false
                 )
+
+                if (recoveryConfirmed) {
+                    realtimeOfflineNoticePosted = false
+                    if (hadConfirmedOfflineNotice) {
+                        postInAppNotificationNow(
+                            realtimeConnectedMessage(),
+                            NotificationType.Positive,
+                            transient = true
+                        )
+                    }
+                }
 
                 if (getStoredUserAuthTokens?.invoke() != null) {
                     if (realtimeUpdatesJob?.isActive != true) {
@@ -12514,21 +12525,29 @@ fun startRealtimeUpdates() {
 
                         try {
                             rememberReachableServerUrl(realtimeBaseUrl)
-                            val becameConnected = !realtimeUpdatesConnectedState.value
-                            val recoveredFromOffline = realtimeOfflineNoticePosted
-                            markCloudTransportReachableForNotifications(authenticated = true)
+                            val hadConfirmedOfflineNotice = realtimeOfflineNoticePosted
+                            val recoveryConfirmed = markCloudTransportReachableForNotifications(authenticated = true)
                             realtimeUpdatesConnectedState.emit(true)
-                            realtimeOfflineNoticePosted = false
                             reconnectDelayMillis = 1_000L
 
-                            if (becameConnected || recoveredFromOffline) {
-                                postInAppNotification(realtimeConnectedMessage(), NotificationType.Positive)
-                                GlobalScope.launch(Dispatchers.ourIo) {
-                                    syncPendingSessionCleanupsToServerNow()
-                                    syncPendingNotificationsToServerNow()
-                                    syncLocalNetworkOperationsToCloudNow()
-                                    scheduleRealtimeRefresh(reason = "connected", entity = "all")
+                            if (recoveryConfirmed) {
+                                realtimeOfflineNoticePosted = false
+                                if (hadConfirmedOfflineNotice) {
+                                    postInAppNotification(
+                                        realtimeConnectedMessage(),
+                                        NotificationType.Positive,
+                                        transient = true
+                                    )
                                 }
+                            }
+
+                            // Reconcile anything missed while the socket was reconnecting, but do not turn
+                            // an ordinary WebSocket reconnect into a user-visible connection-state event.
+                            GlobalScope.launch(Dispatchers.ourIo) {
+                                syncPendingSessionCleanupsToServerNow()
+                                syncPendingNotificationsToServerNow()
+                                syncLocalNetworkOperationsToCloudNow()
+                                scheduleRealtimeRefresh(reason = "connected", entity = "all")
                             }
 
                             session.outgoing.send(
@@ -12615,7 +12634,21 @@ fun startRealtimeUpdates() {
                         postInAppNotification(realtimeDisconnectedMessage(), NotificationType.Neutral, transient = true)
                     }
                 } else {
-                    realtimeOfflineNoticePosted = false
+                    val hadConfirmedOfflineNotice = realtimeOfflineNoticePosted
+                    val recoveryConfirmed = markCloudTransportReachableForNotifications(
+                        authenticated = getStoredUserAuthTokens?.invoke() != null,
+                        authRefreshRequired = false
+                    )
+                    if (recoveryConfirmed) {
+                        realtimeOfflineNoticePosted = false
+                        if (hadConfirmedOfflineNotice) {
+                            postInAppNotification(
+                                realtimeConnectedMessage(),
+                                NotificationType.Positive,
+                                transient = true
+                            )
+                        }
+                    }
                 }
 
                 delay(if (serverReachable) reconnectDelayMillis.coerceAtLeast(5_000L) else reconnectDelayMillis)
@@ -12641,7 +12674,7 @@ fun refreshCloudConnectionManually() {
 
                 if (response.negative) {
                     cancelRealtimeUpdatesSocketAfterReachabilityFailure()
-                    markCloudTransportUnavailableForNotifications()
+                    markCloudTransportUnavailableForNotifications(forceConfirmation = true)
                     postInAppNotification(
                         response.message ?: localizedStringResourceMessage(
                             id = 1140,
@@ -12712,7 +12745,12 @@ fun refreshCloudConnectionManually() {
                     }
                 }
 
-                markCloudTransportReachableForNotifications(authenticated = authenticatedReady, authRefreshRequired = false)
+                markCloudTransportReachableForNotifications(
+                    authenticated = authenticatedReady,
+                    authRefreshRequired = false,
+                    forceRecovery = true
+                )
+                realtimeOfflineNoticePosted = false
                 syncPendingSessionCleanupsToServerNow()
 
                 if (hasLocalAccount) {
@@ -12736,7 +12774,7 @@ fun refreshCloudConnectionManually() {
                 if (throwable is CancellationException) throw throwable
                 logCloudConnectionDiagnostic("manual refresh failed ${throwable.message ?: throwable.toString()}")
                 cancelRealtimeUpdatesSocketAfterReachabilityFailure()
-                markCloudTransportUnavailableForNotifications()
+                markCloudTransportUnavailableForNotifications(forceConfirmation = true)
                 postInAppNotification(
                     localizedStringResourceMessage(
                         id = 1140,
@@ -12878,15 +12916,22 @@ private var cloudSessionRefreshRequiredForNotifications = false
 private var cloudSessionRefreshNotificationPostedForCurrentRequirement = false
 
 private const val CLOUD_TRANSPORT_FAILURE_CONFIRMATION_MIN_SIGNALS = 2
-private const val CLOUD_TRANSPORT_FAILURE_CONFIRMATION_MIN_SIGNALS_WHILE_REALTIME_CONNECTED = 4
+private const val CLOUD_TRANSPORT_FAILURE_CONFIRMATION_MIN_SIGNALS_WHILE_HEALTHY = 3
 private const val CLOUD_TRANSPORT_FAILURE_CONFIRMATION_WINDOW_MILLIS = 7_000L
-private const val CLOUD_TRANSPORT_FAILURE_CONFIRMATION_WINDOW_WHILE_REALTIME_CONNECTED_MILLIS = 14_000L
-private const val CLOUD_TRANSPORT_FAILURE_SIGNAL_RESET_MILLIS = 20_000L
+private const val CLOUD_TRANSPORT_FAILURE_CONFIRMATION_WINDOW_WHILE_HEALTHY_MILLIS = 12_000L
+private const val CLOUD_TRANSPORT_FAILURE_SIGNAL_RESET_MILLIS = 30_000L
+private const val CLOUD_TRANSPORT_RECOVERY_CONFIRMATION_MIN_SIGNALS = 2
+private const val CLOUD_TRANSPORT_RECOVERY_CONFIRMATION_WINDOW_MILLIS = 2_500L
+private const val CLOUD_TRANSPORT_RECOVERY_SIGNAL_RESET_MILLIS = 12_000L
 
 @Volatile
 private var cloudTransportFailureSignalCount = 0
 @Volatile
 private var cloudTransportFirstFailureSignalAtMillis = 0L
+@Volatile
+private var cloudTransportRecoverySignalCount = 0
+@Volatile
+private var cloudTransportFirstRecoverySignalAtMillis = 0L
 
 private fun String.normalizedNotificationText(): String =
     trim()
@@ -13150,7 +13195,14 @@ private fun clearCloudTransportFailureSignalsForNotifications() {
     cloudTransportFirstFailureSignalAtMillis = 0L
 }
 
+private fun clearCloudTransportRecoverySignalsForNotifications() {
+    cloudTransportRecoverySignalCount = 0
+    cloudTransportFirstRecoverySignalAtMillis = 0L
+}
+
 private fun recordCloudTransportFailureSignalForNotifications(reason: String = "transport_failure"): Boolean {
+    clearCloudTransportRecoverySignalsForNotifications()
+
     val now = getCurrentTimeMillis()
     val firstSignalAt = cloudTransportFirstFailureSignalAtMillis
 
@@ -13161,19 +13213,23 @@ private fun recordCloudTransportFailureSignalForNotifications(reason: String = "
         cloudTransportFailureSignalCount = (cloudTransportFailureSignalCount + 1).coerceAtMost(1000)
     }
 
-    val realtimeLooksHealthy = realtimeUpdatesConnectedState.value || cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_REACHABLE
-    val requiredSignals = if (realtimeLooksHealthy) {
-        CLOUD_TRANSPORT_FAILURE_CONFIRMATION_MIN_SIGNALS_WHILE_REALTIME_CONNECTED
+    val transportWasGroundedHealthy = realtimeUpdatesConnectedState.value ||
+            cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_REACHABLE
+    val requiredSignals = if (transportWasGroundedHealthy) {
+        CLOUD_TRANSPORT_FAILURE_CONFIRMATION_MIN_SIGNALS_WHILE_HEALTHY
     } else {
         CLOUD_TRANSPORT_FAILURE_CONFIRMATION_MIN_SIGNALS
     }
-    val requiredWindow = if (realtimeLooksHealthy) {
-        CLOUD_TRANSPORT_FAILURE_CONFIRMATION_WINDOW_WHILE_REALTIME_CONNECTED_MILLIS
+    val requiredWindow = if (transportWasGroundedHealthy) {
+        CLOUD_TRANSPORT_FAILURE_CONFIRMATION_WINDOW_WHILE_HEALTHY_MILLIS
     } else {
         CLOUD_TRANSPORT_FAILURE_CONFIRMATION_WINDOW_MILLIS
     }
     val elapsed = now - cloudTransportFirstFailureSignalAtMillis
-    val confirmed = cloudTransportFailureSignalCount >= requiredSignals || elapsed >= requiredWindow
+
+    // Count and time are both required. A burst of concurrent requests failing during one short
+    // Cloudflare/network wobble must not instantly flip the whole app into offline mode.
+    val confirmed = cloudTransportFailureSignalCount >= requiredSignals && elapsed >= requiredWindow
 
     if (!confirmed) {
         logCloudConnectionDiagnostic(
@@ -13186,12 +13242,50 @@ private fun recordCloudTransportFailureSignalForNotifications(reason: String = "
     return confirmed
 }
 
+private fun recordCloudTransportRecoverySignalForNotifications(reason: String = "transport_recovery"): Boolean {
+    val now = getCurrentTimeMillis()
+    val firstSignalAt = cloudTransportFirstRecoverySignalAtMillis
+
+    if (firstSignalAt <= 0L || now - firstSignalAt > CLOUD_TRANSPORT_RECOVERY_SIGNAL_RESET_MILLIS) {
+        cloudTransportFirstRecoverySignalAtMillis = now
+        cloudTransportRecoverySignalCount = 1
+    } else {
+        cloudTransportRecoverySignalCount = (cloudTransportRecoverySignalCount + 1).coerceAtMost(1000)
+    }
+
+    val elapsed = now - cloudTransportFirstRecoverySignalAtMillis
+    val confirmed = cloudTransportRecoverySignalCount >= CLOUD_TRANSPORT_RECOVERY_CONFIRMATION_MIN_SIGNALS &&
+            elapsed >= CLOUD_TRANSPORT_RECOVERY_CONFIRMATION_WINDOW_MILLIS
+
+    if (!confirmed) {
+        logCloudConnectionDiagnostic(
+            "transport recovery signal held for confirmation reason=$reason " +
+                    "signals=$cloudTransportRecoverySignalCount/$CLOUD_TRANSPORT_RECOVERY_CONFIRMATION_MIN_SIGNALS " +
+                    "elapsed=${elapsed}ms/${CLOUD_TRANSPORT_RECOVERY_CONFIRMATION_WINDOW_MILLIS}ms"
+        )
+    }
+
+    return confirmed
+}
+
 @PublishedApi
-internal fun markCloudTransportUnavailableForNotifications(): Boolean {
+internal fun markCloudTransportUnavailableForNotifications(
+    forceConfirmation: Boolean = false
+): Boolean {
     val now = getCurrentTimeMillis()
     cloudTransportLastUnavailableAtMillis = now
+    clearCloudTransportRecoverySignalsForNotifications()
 
-    if (!recordCloudTransportFailureSignalForNotifications()) {
+    if (
+        cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_UNAVAILABLE &&
+        !cloudTransportReachableForNotifications
+    ) {
+        return true
+    }
+
+    if (forceConfirmation) {
+        clearCloudTransportFailureSignalsForNotifications()
+    } else if (!recordCloudTransportFailureSignalForNotifications()) {
         return false
     }
 
@@ -13216,12 +13310,20 @@ internal fun markCloudTransportUnavailableForNotifications(): Boolean {
 @PublishedApi
 internal fun markCloudTransportReachableForNotifications(
     authenticated: Boolean = false,
-    authRefreshRequired: Boolean? = null
-) {
-    clearCloudTransportFailureSignalsForNotifications()
-    cloudTransportLastReachableAtMillis = getCurrentTimeMillis()
+    authRefreshRequired: Boolean? = null,
+    forceRecovery: Boolean = false
+): Boolean {
     val wasUnavailable = !cloudTransportReachableForNotifications ||
             cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_UNAVAILABLE
+
+    if (wasUnavailable && !forceRecovery && !recordCloudTransportRecoverySignalForNotifications()) {
+        return false
+    }
+
+    clearCloudTransportRecoverySignalsForNotifications()
+    clearCloudTransportFailureSignalsForNotifications()
+    cloudTransportLastReachableAtMillis = getCurrentTimeMillis()
+
     val hadVisibleOutage = cloudTransportFailureNoticePostedForCurrentOutage
     val hasStoredTokens = getStoredUserAuthTokens?.invoke() != null
     when {
@@ -13239,12 +13341,16 @@ internal fun markCloudTransportReachableForNotifications(
 
     setCloudTransportStatusForDiagnostics(
         nextStatus,
-        "transport_reachable authenticated=$authenticated authRefreshRequired=$authRefreshRequired"
+        "transport_reachable authenticated=$authenticated authRefreshRequired=$authRefreshRequired forceRecovery=$forceRecovery"
     )
     cloudTransportReachableForNotifications = true
     cloudTransportFailureNotificationPending = false
     cloudTransportFailureNoticePostedForCurrentOutage = false
-    cloudTransportRecoveryNotificationPending = wasUnavailable && hadVisibleOutage && nextStatus == CLOUD_TRANSPORT_STATUS_REACHABLE
+    if (wasUnavailable) {
+        cloudTransportRecoveryNotificationPending = hadVisibleOutage &&
+                nextStatus == CLOUD_TRANSPORT_STATUS_REACHABLE
+    }
+    return true
 }
 
 @PublishedApi
@@ -13472,6 +13578,12 @@ private suspend fun pushInAppNotificationNow(notification: NotificationDataModel
     notificationPopupMutex.withLock {
         pruneDismissedNotificationPopupKeys(now)
         if (!shouldPostNotificationConsideringCloudTransport(preparedNotification)) return@withLock
+
+        // The persistent grounded banner is the single source of truth for connection loss and
+        // recovery. Do not let connection-status events occupy popup slots, flash over the UI,
+        // or displace actionable notifications; session-refresh notices remain independently visible.
+        if (preparedNotification.isConnectionStatusNotification()) return@withLock
+
         if ((dismissedNotificationPopupKeysUntil[key] ?: 0L) > now) return@withLock
 
         val duplicateActive = activeInAppNotificationsState.value.firstOrNull { existing ->

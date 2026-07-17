@@ -1755,7 +1755,7 @@ fun AppConfiguration.SimpleDropdownField(
                     dropdownBorderColor,
                     RoundedCornerShape(stateValues.cornerRadius)
                 )
-                .clickable(
+                .aitaClickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = ripple(color = stateValues.AccentColor)
                 ) {
@@ -1828,7 +1828,7 @@ fun AppConfiguration.SimpleDropdownField(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .heightIn(min = 38.dp)
-                                .clickable(
+                                .aitaClickable(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = ripple(color = stateValues.AccentColor)
                                 ) {
@@ -1925,7 +1925,7 @@ fun AppConfiguration.selectableDomainWidget(
             .height(stateValues.textFieldHeight)
             .run {
                 onClick?.let {
-                    clickable(
+                    aitaClickable(
                         interactionSource = remember {
                             MutableInteractionSource()
                         },
@@ -2130,7 +2130,7 @@ fun AppConfiguration.ScreenAppBarWidget(
                         .padding(vertical = 4.dp)
                         .size(40.dp)
                         .clip(RoundedCornerShape(cornerRadius))
-                        .clickable(
+                        .aitaClickable(
                             interactionSource = remember {
                                 MutableInteractionSource()
                             },
@@ -3307,9 +3307,13 @@ internal fun List<String>?.toPersistentStockStack(defaultFirst: NavigationScreen
     }
 }
 
+internal fun NavigationScreenModel.Menu.isTemporarilyHiddenFromUi(): Boolean =
+    this is NavigationScreenModel.Menu.AppMode
+
 internal fun List<String>?.toPersistentMenuStack(defaultFirst: NavigationScreenModel.Menu): List<NavigationScreenModel.Menu> {
     val restoredCurrent = orEmpty()
         .mapNotNull { persistentAppRouteToScreen(it) as? NavigationScreenModel.Menu }
+        .filterNot { it.isTemporarilyHiddenFromUi() }
         .lastOrNull()
         ?: defaultFirst
 
@@ -6162,8 +6166,14 @@ object Navigation {
 
         internal fun persistentSnapshot(): PersistedSplitNavigationStackDataModel =
             PersistedSplitNavigationStackDataModel(
-                left = Left.value.toCompactPersistentRoutes(NavigationScreenModel.Menu.List),
-                right = Right.value.toCompactPersistentRoutes(NavigationScreenModel.Menu.UserAccount)
+                left = Left.value
+                    .filterNot { it.isTemporarilyHiddenFromUi() }
+                    .ifEmpty { listOf(NavigationScreenModel.Menu.List) }
+                    .toCompactPersistentRoutes(NavigationScreenModel.Menu.List),
+                right = Right.value
+                    .filterNot { it.isTemporarilyHiddenFromUi() }
+                    .ifEmpty { listOf(NavigationScreenModel.Menu.UserAccount) }
+                    .toCompactPersistentRoutes(NavigationScreenModel.Menu.UserAccount)
             )
 
         internal suspend fun restorePersistentSnapshot(snapshot: PersistedSplitNavigationStackDataModel) {
@@ -6177,6 +6187,7 @@ object Navigation {
             remove: Boolean = false,
             forceSecond: Boolean = false
         ) {
+            if (model.isTemporarilyHiddenFromUi()) return
             if (isNarrowScreen)
                 goLeft(model, remove, forceSecond)
             else
@@ -6195,6 +6206,7 @@ object Navigation {
             remove: Boolean = false,
             forceSecond: Boolean = false
         ) {
+            if (model.isTemporarilyHiddenFromUi()) return
             if (model::class != _Left.value.last()::class || forceSecond)
                 _Left.emit(
                     _Left
@@ -6233,9 +6245,9 @@ object Navigation {
         }
 
         suspend fun clearLeft(model: NavigationScreenModel.Menu = NavigationScreenModel.Menu.List) {
-            _Left.emit(
-                listOf(model)
-            )
+            val visibleModel = model.takeUnless { it.isTemporarilyHiddenFromUi() }
+                ?: NavigationScreenModel.Menu.List
+            _Left.emit(listOf(visibleModel))
         }
 
         suspend fun goRight(
@@ -6243,6 +6255,7 @@ object Navigation {
             remove: Boolean = false,
             forceSecond: Boolean = false
         ) {
+            if (model.isTemporarilyHiddenFromUi()) return
             if (model::class != _Right.value.last()::class || forceSecond)
                 _Right.emit(
                     _Right
@@ -6278,9 +6291,9 @@ object Navigation {
         }
 
         suspend fun clearRight(model: NavigationScreenModel.Menu = NavigationScreenModel.Menu.UserAccount) {
-            _Right.emit(
-                listOf(model)
-            )
+            val visibleModel = model.takeUnless { it.isTemporarilyHiddenFromUi() }
+                ?: NavigationScreenModel.Menu.UserAccount
+            _Right.emit(listOf(visibleModel))
         }
 
         suspend fun init(isNarrowScreen: Boolean) {
@@ -6290,7 +6303,11 @@ object Navigation {
                         _Left.emit(
                             mutableListOf<NavigationScreenModel.Menu>().apply {
                                 add(NavigationScreenModel.Menu.List)
-                                addAll(Right.value.subList(1, Right.value.size))
+                                addAll(
+                                    Right.value
+                                        .drop(1)
+                                        .filterNot { it.isTemporarilyHiddenFromUi() }
+                                )
                             }
                         )
                     }
@@ -6300,7 +6317,11 @@ object Navigation {
                         _Right.emit(
                             mutableListOf<NavigationScreenModel.Menu>().apply {
                                 add(NavigationScreenModel.Menu.UserAccount)
-                                addAll(_Left.value.subList(1, _Left.value.size))
+                                addAll(
+                                    _Left.value
+                                        .drop(1)
+                                        .filterNot { it.isTemporarilyHiddenFromUi() }
+                                )
                             }
                         )
                     }
