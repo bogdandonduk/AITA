@@ -355,6 +355,32 @@ internal fun localDrawableResourceForPath(
         "120_1" -> Res.drawable._120_1
         "121_0" -> Res.drawable._121_0
         "121_1" -> Res.drawable._121_1
+        "122_0" -> Res.drawable._122_0
+        "122_1" -> Res.drawable._122_1
+        "123_0" -> Res.drawable._123_0
+        "123_1" -> Res.drawable._123_1
+        "124_0" -> Res.drawable._124_0
+        "124_1" -> Res.drawable._124_1
+        "125_0" -> Res.drawable._125_0
+        "125_1" -> Res.drawable._125_1
+        "126_0" -> Res.drawable._126_0
+        "126_1" -> Res.drawable._126_1
+        "127_0" -> Res.drawable._127_0
+        "127_1" -> Res.drawable._127_1
+        "128_0" -> Res.drawable._128_0
+        "128_1" -> Res.drawable._128_1
+        "129_0" -> Res.drawable._129_0
+        "129_1" -> Res.drawable._129_1
+        "130_0" -> Res.drawable._130_0
+        "130_1" -> Res.drawable._130_1
+        "131_0" -> Res.drawable._131_0
+        "131_1" -> Res.drawable._131_1
+        "132_0" -> Res.drawable._132_0
+        "132_1" -> Res.drawable._132_1
+        "133_0" -> Res.drawable._133_0
+        "133_1" -> Res.drawable._133_1
+        "134_0" -> Res.drawable._134_0
+        "134_1" -> Res.drawable._134_1
         else -> fallbackRes
     }
 }
@@ -4172,7 +4198,7 @@ object AppConfiguration {
             override val notificationsState: DataState<List<NotificationDataModel>> by kz.aita.notificationsState.value.collectAsState()
             override val notifications: List<NotificationDataModel>? by kz.aita.notificationsState.payload.collectAsState()
             override val realtimeUpdatesConnected: Boolean by realtimeUpdatesConnectedState.collectAsState()
-            override val cloudTransportStatus: Int by cloudTransportStatusState.collectAsState()
+            override val cloudTransportStatus: Int by cloudConnectionPresentationStatusState.collectAsState()
             override val cloudConnectionManualRefreshInProgress: Boolean by cloudConnectionManualRefreshInProgressState.collectAsState()
             override val localNetworkState: LocalNetworkStateDataModel by kz.aita.localNetworkState.collectAsState()
             override val logInInProgress: Boolean by logInInProgressState.collectAsState()
@@ -5692,7 +5718,7 @@ fun AppConfiguration.actionButton(
     iconPath: String? = null,
     iconRes: DrawableResource? = null,
     iconContentDescription: String = text,
-    iconTintColor: Color = textColor,
+    iconTintColor: Color? = textColor,
 
     confirmationRequired: Boolean? = null,
 

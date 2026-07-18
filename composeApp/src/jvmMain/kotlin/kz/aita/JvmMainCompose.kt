@@ -6,6 +6,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import com.github.javakeyring.Keyring
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.awt.Desktop
@@ -627,6 +628,22 @@ private fun installDesktopPlatformActionsJvm() {
         }
     }
 
+    suspend fun printReceiptBytesOnDesktop(printerBytes: ByteArray): ReceiptPlatformActionResult =
+        withContext(Dispatchers.IO) {
+            try {
+                if (ReceiptPlatformJvmBridge.writeEscPosBytesToConfiguredPrinter(printerBytes)) {
+                    // RAW spooler success means Windows accepted the complete ESC/POS job. The
+                    // physical printer may still need a moment to drain its USB/serial buffer.
+                    ReceiptPlatformActionResult(true, "Receipt queued for printer")
+                } else {
+                    ReceiptPlatformActionResult(false, "Desktop ESC/POS receipt printer is not configured")
+                }
+            } catch (throwable: Throwable) {
+                if (throwable is CancellationException) throw throwable
+                ReceiptPlatformActionResult(false, throwable.message ?: "Could not print receipt")
+            }
+        }
+
     listPlatformReceiptPrinterDevicesAction = {
         withContext(Dispatchers.IO) {
             ReceiptPlatformJvmBridge.listConfiguredAndDetectedPrinters()
@@ -643,31 +660,11 @@ private fun installDesktopPlatformActionsJvm() {
 
 
     printReceiptPlatformAction = { _, _, printerBytes ->
-        withContext(Dispatchers.IO) {
-            runCatching {
-                if (ReceiptPlatformJvmBridge.writeEscPosBytesToConfiguredPrinter(printerBytes)) {
-                    ReceiptPlatformActionResult(true, "Receipt sent to printer")
-                } else {
-                    ReceiptPlatformActionResult(false, "Desktop ESC/POS receipt printer is not configured")
-                }
-            }.getOrElse {
-                ReceiptPlatformActionResult(false, it.message ?: "Could not print receipt")
-            }
-        }
+        printReceiptBytesOnDesktop(printerBytes)
     }
 
     printReceiptEscPosBytes = { printerBytes ->
-        withContext(Dispatchers.IO) {
-            runCatching {
-                if (ReceiptPlatformJvmBridge.writeEscPosBytesToConfiguredPrinter(printerBytes)) {
-                    ReceiptPlatformActionResult(true, "Receipt sent to printer")
-                } else {
-                    ReceiptPlatformActionResult(false, "Desktop ESC/POS receipt printer is not configured")
-                }
-            }.getOrElse {
-                ReceiptPlatformActionResult(false, it.message ?: "Could not print receipt")
-            }
-        }
+        printReceiptBytesOnDesktop(printerBytes)
     }
 
     listPlatformLabelPrinterDevicesAction = {

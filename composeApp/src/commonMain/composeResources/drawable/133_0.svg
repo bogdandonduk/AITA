@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
+  <path d="M 13.000 49.000 C 13.000 30.222 28.222 15.000 47.000 15.000 C 65.778 15.000 81.000 30.222 81.000 49.000 C 81.000 67.778 65.778 83.000 47.000 83.000 C 28.222 83.000 13.000 67.778 13.000 49.000 Z" fill="#F1F7FA" stroke="#26343D" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M47 23 V49 L63 59" fill="none" stroke="#2B87B8" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 42.000 49.000 C 42.000 46.239 44.239 44.000 47.000 44.000 C 49.761 44.000 52.000 46.239 52.000 49.000 C 52.000 51.761 49.761 54.000 47.000 54.000 C 44.239 54.000 42.000 51.761 42.000 49.000 Z" fill="#F2A62B"/>
+  <path d="M22 31 C28 20 38 15 49 15" fill="none" stroke="#F2A62B" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M72 65 C66 76 56 82 45 83" fill="none" stroke="#30AE7D" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 15.000 31.000 C 15.000 27.686 17.686 25.000 21.000 25.000 C 24.314 25.000 27.000 27.686 27.000 31.000 C 27.000 34.314 24.314 37.000 21.000 37.000 C 17.686 37.000 15.000 34.314 15.000 31.000 Z" fill="#F2A62B" stroke="#26343D" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 67.000 65.000 C 67.000 61.686 69.686 59.000 73.000 59.000 C 76.314 59.000 79.000 61.686 79.000 65.000 C 79.000 68.314 76.314 71.000 73.000 71.000 C 69.686 71.000 67.000 68.314 67.000 65.000 Z" fill="#30AE7D" stroke="#26343D" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M47 11 V17 M47 81 V87 M9 49 H15 M79 49 H85" fill="none" stroke="#80929D" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

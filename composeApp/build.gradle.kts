@@ -1,4 +1,5 @@
 // THIS IS build.gradle of composeApp module
+import org.gradle.api.tasks.Delete
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
@@ -170,37 +171,17 @@ dependencies {
     debugImplementation(compose.uiTooling)
 }
 
-val removeMisplacedCommonAndroidVectorDrawablesAction: () -> Unit = {
-    val commonDrawableDir = layout.projectDirectory
-        .dir("src/commonMain/composeResources/drawable")
-        .asFile
-
-    commonDrawableDir
-        .listFiles { file ->
-            file.isFile &&
-                file.name.startsWith("ic_aita_") &&
-                file.extension.equals("xml", ignoreCase = true)
-        }
-        ?.forEach { file ->
-            if (!file.delete()) {
-                logger.warn("Unable to remove misplaced common Android vector drawable: ${file.path}")
-            }
-        }
+val misplacedCommonAndroidVectorDrawables = fileTree(
+    layout.projectDirectory.dir("src/commonMain/composeResources/drawable")
+) {
+    include("ic_aita_*.xml")
 }
 
-// Run once during configuration too. Compose resource tasks can snapshot common resources
-// before ordinary task actions run, so the hygiene guard must clean old bad XMLs early.
-removeMisplacedCommonAndroidVectorDrawablesAction()
-
-val removeMisplacedCommonAndroidVectorDrawables by tasks.registering {
+val removeMisplacedCommonAndroidVectorDrawables by tasks.registering(Delete::class) {
     group = "resources"
     description = "Removes Android vector XML drawables that accidentally landed in common Compose resources."
-
-    doLast {
-        removeMisplacedCommonAndroidVectorDrawablesAction()
-    }
+    delete(misplacedCommonAndroidVectorDrawables)
 }
-
 
 tasks.configureEach {
     val lowerTaskName = name.lowercase()
@@ -237,9 +218,15 @@ compose.desktop {
                 // Use a proper .ico; path must exist:
                 iconFile.set(project.file("src/jvmMain/resources/drawable/app_icon.ico"))
                 // Optional but nice:
-                console = true
+                console = false
                 // perUserInstall = true
                 // upgradeUuid = "YOUR-STABLE-GUID-HERE" // keep stable across releases
+            }
+            macOS {
+                iconFile.set(project.file("src/jvmMain/resources/drawable/app_icon.icns"))
+            }
+            linux {
+                iconFile.set(project.file("src/jvmMain/resources/drawable/app_icon.png"))
             }
         }
 
@@ -252,7 +239,7 @@ compose.desktop {
 //        // shortcut = true
 //        // menu = true
 //        // menuGroup = "AITA"
-//        // console = true  // see section 2 below
+//        // console = false  // see section 2 below
 //      }
 //      macOS {
 //        iconFile.set(project.file("src/jvmMain/resources/drawable/app_icon.png"))

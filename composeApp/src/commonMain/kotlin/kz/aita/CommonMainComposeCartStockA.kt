@@ -5531,6 +5531,15 @@ internal fun AppConfiguration.StockConditionListEditor(
     var conditions by remember {
         mutableStateOf(values.map { it.toStockConditionDataModel().normalizedStockCondition() }.filter { visibleStockConditionText(it).isNotBlank() || it.kind != STOCK_CONDITION_KIND_CUSTOM_TEXT })
     }
+    val darkConditionIcons = stateValues.appThemeId == 1L
+    val manualConditionIconPath = if (darkConditionIcons) "svg/131_1.svg" else "svg/131_0.svg"
+    val manualConditionIconRes = if (darkConditionIcons) Res.drawable._131_1 else Res.drawable._131_0
+    val buyerAgeConditionIconPath = if (darkConditionIcons) "svg/132_1.svg" else "svg/132_0.svg"
+    val buyerAgeConditionIconRes = if (darkConditionIcons) Res.drawable._132_1 else Res.drawable._132_0
+    val timeConditionIconPath = if (darkConditionIcons) "svg/133_1.svg" else "svg/133_0.svg"
+    val timeConditionIconRes = if (darkConditionIcons) Res.drawable._133_1 else Res.drawable._133_0
+    val marginConditionIconPath = if (darkConditionIcons) "svg/134_1.svg" else "svg/134_0.svg"
+    val marginConditionIconRes = if (darkConditionIcons) Res.drawable._134_1 else Res.drawable._134_0
 
     fun storedCustomConditionProjection(items: List<StockConditionDataModel>): List<String> {
         return items
@@ -5619,7 +5628,9 @@ internal fun AppConfiguration.StockConditionListEditor(
                 actionButton(
                     modifier = Modifier.weight(1f),
                     text = localizedStringResource(1018, "Manual"),
-                    iconPath = stateValues.drawablePathIconAdd,
+                    iconPath = manualConditionIconPath,
+                    iconRes = manualConditionIconRes,
+                    iconTintColor = null,
                     textSize = stateValues.smallTextSize,
                     confirmationRequired = false,
                     onClick = { emit(conditions + defaultCustomStockCondition()) }
@@ -5628,7 +5639,9 @@ internal fun AppConfiguration.StockConditionListEditor(
                 actionButton(
                     modifier = Modifier.weight(1f),
                     text = localizedStringResource(1012, "Buyer age"),
-                    iconPath = stateValues.drawablePathIconUserAccount,
+                    iconPath = buyerAgeConditionIconPath,
+                    iconRes = buyerAgeConditionIconRes,
+                    iconTintColor = null,
                     textSize = stateValues.smallTextSize,
                     confirmationRequired = false,
                     onClick = { emit(conditions + defaultBuyerMinimumAgeStockCondition()) }
@@ -5642,7 +5655,9 @@ internal fun AppConfiguration.StockConditionListEditor(
                 actionButton(
                     modifier = Modifier.weight(1f),
                     text = localizedStringResource(1013, "Time"),
-                    iconPath = stateValues.drawablePathIconWorkers,
+                    iconPath = timeConditionIconPath,
+                    iconRes = timeConditionIconRes,
+                    iconTintColor = null,
                     textSize = stateValues.smallTextSize,
                     confirmationRequired = false,
                     onClick = { emit(conditions + defaultTransactionTimeWindowStockCondition()) }
@@ -5651,7 +5666,9 @@ internal fun AppConfiguration.StockConditionListEditor(
                 actionButton(
                     modifier = Modifier.weight(1f),
                     text = localizedStringResource(1499, "Margin"),
-                    iconPath = stateValues.drawablePathIconFinances,
+                    iconPath = marginConditionIconPath,
+                    iconRes = marginConditionIconRes,
+                    iconTintColor = null,
                     textSize = stateValues.smallTextSize,
                     confirmationRequired = false,
                     onClick = { emit(conditions + defaultMarginLimitStockCondition()) }

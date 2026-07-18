@@ -111,7 +111,7 @@ internal fun AppConfiguration.SecuritySessionInfoLine(
             fontSize = stateValues.smallTextSize,
             fontWeight = if (accent) FontWeight.Bold else FontWeight.Normal,
             textAlign = TextAlign.End,
-            maxLines = 2,
+            maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
@@ -5410,97 +5410,53 @@ internal fun AppConfiguration.CloudConnectionStatusBanner() {
     val refreshIconRes by stateValues.drawableResIconRefresh.collectAsState()
     val transportStatus = stateValues.cloudTransportStatus
     val transportReachable = transportStatus == CLOUD_TRANSPORT_STATUS_REACHABLE
-    val authRefreshRequired = transportStatus == CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED
     val transportUnavailable = transportStatus == CLOUD_TRANSPORT_STATUS_UNAVAILABLE
     val localNetwork = stateValues.localNetworkState
     val localMode = userAccount != null && localNetwork.enabled &&
-            !transportReachable && !authRefreshRequired && !transportUnavailable
+            !transportReachable && !transportUnavailable
 
-    // The banner represents confirmed HTTP/server reachability, not the WebSocket's momentary
-    // reconnect cycle. Manual probes keep the grounded status visible and animate only the icon.
-    val rawStatusKey = when {
+    // cloudTransportStatus is already a presentation-grade, hysteresis-controlled state. Keep the
+    // banner itself deliberately still: no crossfade, slide, size motion or color interpolation can
+    // turn a legitimate status transition into visual flicker.
+    val displayedStatusKey = when {
         transportUnavailable -> "unavailable"
-        authRefreshRequired -> "auth_refresh"
         transportReachable -> "connected"
         localMode -> "local"
         else -> "checking"
     }
-    var displayedStatusKey by remember { mutableStateOf(rawStatusKey) }
-
-    LaunchedEffect(rawStatusKey) {
-        if (rawStatusKey == displayedStatusKey) return@LaunchedEffect
-
-        val settleDelayMillis = when {
-            rawStatusKey == "unavailable" || rawStatusKey == "auth_refresh" || rawStatusKey == "connected" -> 0L
-            displayedStatusKey == "connected" && rawStatusKey == "checking" -> 12_000L
-            displayedStatusKey == "connected" && rawStatusKey == "local" -> 3_000L
-            rawStatusKey == "checking" -> 1_500L
-            rawStatusKey == "local" -> 800L
-            else -> 350L
-        }
-        if (settleDelayMillis > 0L) delay(settleDelayMillis)
-        displayedStatusKey = rawStatusKey
-    }
-
-    val targetColor = when (displayedStatusKey) {
+    val backgroundColor = when (displayedStatusKey) {
         "connected" -> stateValues.OkayColor
         "unavailable" -> stateValues.ErrorColor
         else -> stateValues.AccentColor
     }
-    val backgroundColor by animateColorAsState(
-        targetValue = targetColor,
-        animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS),
-        label = "cloudConnectionStatusColor"
-    )
     val refreshInteractionSource = remember { MutableInteractionSource() }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .height(32.dp)
             .background(backgroundColor)
-            .aitaContentMotion()
-            .padding(horizontal = 12.dp, vertical = 0.dp),
+            .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
         Spacer(modifier = Modifier.width(28.dp))
 
-        AnimatedContent(
-            targetState = displayedStatusKey,
+        Text(
             modifier = Modifier.weight(1f),
-            transitionSpec = {
-                (fadeIn(animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS)) +
-                        slideInVertically(
-                            animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS),
-                            initialOffsetY = { height -> height / 3 }
-                        ))
-                    .togetherWith(
-                        fadeOut(animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS)) +
-                                slideOutVertically(
-                                    animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS),
-                                    targetOffsetY = { height -> -height / 3 }
-                                )
-                    )
+            text = when (displayedStatusKey) {
+                "connected" -> localizedStringResource(1138, "Server connected.")
+                "local" -> localizedStringResource(914, "Server is not connected. Branch local network mode is active.")
+                "unavailable" -> localizedStringResource(1140, "Can’t reach AITA server. Check Wi‑Fi or server address.")
+                else -> localizedStringResource(1139, "Checking server connection…")
             },
-            contentAlignment = Alignment.Center,
-            label = "cloudConnectionStatusText"
-        ) { statusKey ->
-            Text(
-                text = when (statusKey) {
-                    "auth_refresh" -> localizedStringResource(91, "Cloud session needs refresh. You remain signed in locally.")
-                    "connected" -> localizedStringResource(1138, "Server connected.")
-                    "local" -> localizedStringResource(914, "Server is not connected. Branch local network mode is active.")
-                    "unavailable" -> localizedStringResource(1140, "Can’t reach AITA server. Check Wi‑Fi or server address.")
-                    else -> localizedStringResource(1139, "Checking server connection…")
-                },
-                color = stateValues.AccentTextColor,
-                fontSize = stateValues.smallTextSize,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
+            color = stateValues.AccentTextColor,
+            fontSize = stateValues.smallTextSize,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
 
         Box(
             modifier = Modifier
@@ -5546,7 +5502,6 @@ internal fun AppConfiguration.CloudConnectionStatusBanner() {
         }
     }
 }
-
 
 internal fun String.normalizedNotificationPopupKey(): String =
     trim()
@@ -5599,12 +5554,24 @@ internal fun String.isServerUnavailablePopupText(): Boolean {
         "connection timeout",
         "connect_timeout",
         "connecttimeoutexception",
+        "connectexception",
         "sockettimeoutexception",
         "timeout has expired",
+        "server request failed. please check the server connection",
+        "network request failed",
         "connection refused",
+        "connection reset",
+        "connection aborted",
+        "connection closed prematurely",
+        "broken pipe",
+        "unexpected end of stream",
+        "eofexception",
         "failed to connect",
         "network unreachable",
         "host unreachable",
+        "temporary failure in name resolution",
+        "unable to resolve host",
+        "no address associated with hostname",
         "unknownhostexception",
         "unresolvedaddress",
         "socketexception",
@@ -5624,12 +5591,18 @@ internal fun String.isServerUnavailablePopupText(): Boolean {
         "пробовали https://",
         "таймаут подключения",
         "ошибка подключения",
+        "запрос к серверу не выполнен",
+        "проверьте соединение с сервером",
+        "соединение сброшено",
         "остаётесь в аккаунте офлайн",
         "сеансы безопасности обновятся",
         "aita сервері қолжетімсіз",
         "сервер қолжетімсіз",
         "сервер офлайн",
         "сервер қосылмаған",
+        "серверге сұрау орындалмады",
+        "сервер байланысын тексеріп",
+        "қосылым үзілді",
         "қосылу уақыты",
         "қосылым қатесі"
     ).any { marker -> normalized.contains(marker) }
@@ -5689,6 +5662,10 @@ internal fun NotificationDataModel.popupDeduplicationKey(): String {
 }
 
 internal fun NotificationDataModel.isConnectionStatusPopupNoise(): Boolean {
+    val normalizedCategory = category.normalizedNotificationPopupKey()
+    val normalizedSource = source.normalizedNotificationPopupKey()
+    if (normalizedCategory == "connection" || normalizedSource == "connection") return true
+
     val combined = listOf(title, message, category, source)
         .joinToString(" ")
         .normalizedNotificationPopupKey()

@@ -3154,6 +3154,20 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
         modifier = Modifier.fillMaxSize()
     ) {
         val context = rememberTransactionContext()
+        var printingReceipt by remember { mutableStateOf(false) }
+        val darkActionIcons = stateValues.appThemeId == 1L
+        val completeReceiptIconPath = if (darkActionIcons) "svg/125_1.svg" else "svg/125_0.svg"
+        val completeReceiptIconRes = if (darkActionIcons) Res.drawable._125_1 else Res.drawable._125_0
+        val savePdfIconPath = if (darkActionIcons) "svg/126_1.svg" else "svg/126_0.svg"
+        val savePdfIconRes = if (darkActionIcons) Res.drawable._126_1 else Res.drawable._126_0
+        val shareReceiptIconPath = if (darkActionIcons) "svg/127_1.svg" else "svg/127_0.svg"
+        val shareReceiptIconRes = if (darkActionIcons) Res.drawable._127_1 else Res.drawable._127_0
+        val whatsappReceiptIconPath = if (darkActionIcons) "svg/128_1.svg" else "svg/128_0.svg"
+        val whatsappReceiptIconRes = if (darkActionIcons) Res.drawable._128_1 else Res.drawable._128_0
+        val printReceiptIconPath = if (darkActionIcons) "svg/129_1.svg" else "svg/129_0.svg"
+        val printReceiptIconRes = if (darkActionIcons) Res.drawable._129_1 else Res.drawable._129_0
+        val finishReceiptIconPath = if (darkActionIcons) "svg/130_1.svg" else "svg/130_0.svg"
+        val finishReceiptIconRes = if (darkActionIcons) Res.drawable._130_1 else Res.drawable._130_0
 
         ScreenAppBarWidget(
             title = stateValues.stringReceipt,
@@ -3356,7 +3370,9 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
                     loading = stateValues.completeTransactionInProgress,
                     loadingText = localizedStringResource(224, "Completing transaction"),
                     enabled = snapshotForScreen.lines.isNotEmpty() && !stateValues.completeTransactionInProgress && stateValues.latestNotification == null && invalidWholesaleReceiptItems.isEmpty(),
-                    iconPath = stateValues.drawablePathIconCheck,
+                    iconPath = completeReceiptIconPath,
+                    iconRes = completeReceiptIconRes,
+                    iconTintColor = null,
                     onClick = {
                         completeTransaction(
                             transaction = currentTransaction,
@@ -3393,7 +3409,9 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
                     actionButton(
                         modifier = Modifier.weight(1f),
                         text = stateValues.stringPdf,
-                        iconPath = stateValues.drawablePathIconReceipt,
+                        iconPath = savePdfIconPath,
+                        iconRes = savePdfIconRes,
+                        iconTintColor = null,
                         onClick = {
                             coroutineScope.launch {
                                 receiptActionNotification(
@@ -3407,7 +3425,9 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
                     actionButton(
                         modifier = Modifier.weight(1f),
                         text = stateValues.stringShare,
-                        iconPath = stateValues.drawablePathIconSwitch,
+                        iconPath = shareReceiptIconPath,
+                        iconRes = shareReceiptIconRes,
+                        iconTintColor = null,
                         onClick = {
                             coroutineScope.launch {
                                 receiptActionNotification(
@@ -3421,7 +3441,9 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
                     actionButton(
                         modifier = Modifier.weight(1f),
                         text = stateValues.stringWhatsApp,
-                        iconPath = stateValues.drawablePathIconSwitch,
+                        iconPath = whatsappReceiptIconPath,
+                        iconRes = whatsappReceiptIconRes,
+                        iconTintColor = null,
                         onClick = {
                             coroutineScope.launch {
                                 receiptActionNotification(
@@ -3442,13 +3464,29 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
                     actionButton(
                         modifier = Modifier.weight(1f),
                         text = stateValues.stringPrint,
-                        iconPath = stateValues.drawablePathIconDevices,
+                        loading = printingReceipt,
+                        loadingText = localizedStringResource(2298, "Printing receipt…"),
+                        enabled = !printingReceipt,
+                        autoLoading = false,
+                        iconPath = printReceiptIconPath,
+                        iconRes = printReceiptIconRes,
+                        iconTintColor = null,
                         onClick = {
+                            printingReceipt = true
                             coroutineScope.launch {
-                                receiptActionNotification(
-                                    printReceipt(fileName, pdfBytes, snapshotForScreen.buildReceiptEscPosBytes(stateValues.appLanguage, labels), labels),
-                                    stateValues.stringReceiptSentToPrinter
-                                )
+                                try {
+                                    receiptActionNotification(
+                                        printReceipt(
+                                            fileName,
+                                            pdfBytes,
+                                            snapshotForScreen.buildReceiptEscPosBytes(stateValues.appLanguage, labels),
+                                            labels
+                                        ),
+                                        stateValues.stringReceiptSentToPrinter
+                                    )
+                                } finally {
+                                    printingReceipt = false
+                                }
                             }
                         }
                     )
@@ -3457,7 +3495,9 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
                         modifier = Modifier.weight(1f),
                         text = stateValues.stringQuit,
                         enabledColor = stateValues.DisabledColor,
-                        iconPath = stateValues.drawablePathIconExit,
+                        iconPath = finishReceiptIconPath,
+                        iconRes = finishReceiptIconRes,
+                        iconTintColor = null,
                         onClick = {
                             coroutineScope.launch {
                                 latestTransactionReceiptSnapshotState.emit(null)
