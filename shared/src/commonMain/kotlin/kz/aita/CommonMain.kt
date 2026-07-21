@@ -522,8 +522,7 @@ fun addDebtor(
     debtor: DebtorDataModel,
     onCompleted: ((DataState<DebtorDataModel>) -> Unit)? = null
 ) {
-    if (!addDebtorMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             addDebtorMutex.withLock {
                 val response = networkRequest<DebtorDataModel, DebtorDataModel>(
                     method = HttpMethod.Post,
@@ -554,8 +553,7 @@ fun updateDebtor(
     debtor: DebtorDataModel,
     onCompleted: ((DataState<DebtorDataModel>) -> Unit)? = null
 ) {
-    if (!updateDebtorMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             updateDebtorMutex.withLock {
                 val response = networkRequest<DebtorDataModel, DebtorDataModel>(
                     method = HttpMethod.Put,
@@ -586,8 +584,7 @@ fun deleteDebtor(
     debtorId: String,
     onCompleted: ((DataState<String>) -> Unit)? = null
 ) {
-    if (!deleteDebtorMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             deleteDebtorMutex.withLock {
                 val response = networkRequest<String, String>(
                     method = HttpMethod.Delete,
@@ -617,8 +614,7 @@ fun payDebtorDebt(
     request: DebtPaymentRequestDataModel,
     onCompleted: ((DataState<DebtorDataModel>) -> Unit)? = null
 ) {
-    if (!payDebtorDebtMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             payDebtorDebtMutex.withLock {
                 val response = networkRequest<DebtorDataModel, DebtPaymentRequestDataModel>(
                     method = HttpMethod.Post,
@@ -3289,8 +3285,7 @@ fun createTopUpPayment(
     request: TopUpCreateRequestDataModel,
     onCompleted: ((DataState<TopUpPaymentIntentDataModel>) -> Unit)? = null
 ) {
-    if (!createTopUpPaymentMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             createTopUpPaymentMutex.withLock {
                 val response = networkRequest<TopUpPaymentIntentDataModel, TopUpCreateRequestDataModel>(
                     method = HttpMethod.Post,
@@ -3319,8 +3314,7 @@ fun confirmDevelopmentTopUpPayment(
     paymentIntentId: String,
     onCompleted: ((DataState<UserFinanceDashboardDataModel>) -> Unit)? = null
 ) {
-    if (!confirmDevelopmentTopUpMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             confirmDevelopmentTopUpMutex.withLock {
                 val response = networkRequest<UserFinanceDashboardDataModel, TopUpConfirmDevelopmentRequestDataModel>(
                     method = HttpMethod.Post,
@@ -3392,8 +3386,7 @@ fun updateStoreSubscription(
     request: StoreSubscriptionUpdateRequestDataModel,
     onCompleted: ((DataState<SubscriptionDashboardDataModel>) -> Unit)? = null
 ) {
-    if (!updateStoreSubscriptionMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             updateStoreSubscriptionMutex.withLock {
                 val response = networkRequest<SubscriptionDashboardDataModel, StoreSubscriptionUpdateRequestDataModel>(
                     method = HttpMethod.Post,
@@ -3462,8 +3455,7 @@ fun extractCashRegister(
     request: CashRegisterExtractionRequestDataModel,
     onCompleted: ((DataState<StoreCashRegisterDataModel>) -> Unit)? = null
 ) {
-    if (!extractCashRegisterMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             extractCashRegisterMutex.withLock {
                 val response = networkRequest<CashRegisterStateDataModel, CashRegisterExtractionRequestDataModel>(
                     method = HttpMethod.Post,
@@ -3620,8 +3612,7 @@ fun upsertStoreWorkerRoleTemplate(
         return
     }
 
-    if (!upsertStoreWorkerRoleTemplateMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             upsertStoreWorkerRoleTemplateMutex.withLock {
                 val response = networkRequest<StoreWorkerRoleTemplateDataModel, StoreWorkerRoleTemplateUpsertRequestDataModel>(
                     method = HttpMethod.Post,
@@ -3666,8 +3657,7 @@ fun deleteStoreWorkerRoleTemplate(
         return
     }
 
-    if (!deleteStoreWorkerRoleTemplateMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             deleteStoreWorkerRoleTemplateMutex.withLock {
                 val response = networkRequest<StoreWorkerRoleTemplateDataModel, StoreWorkerRoleTemplateDeleteRequestDataModel>(
                     method = HttpMethod.Post,
@@ -3699,8 +3689,7 @@ fun requestStoreEmployment(
     note: String? = null,
     onCompleted: ((DataState<StoreWorkerRequestDataModel>) -> Unit)? = null
 ) {
-    if (!requestStoreEmploymentMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             requestStoreEmploymentMutex.withLock {
                 val cleanNote = note?.trim()?.takeIf { it.isNotBlank() }
                 val response = networkRequest<StoreWorkerRequestDataModel, WorkerEmploymentRequestCreateDataModel>(
@@ -3744,8 +3733,7 @@ fun inviteStoreWorker(
     workerPassword: String? = null,
     onCompleted: ((DataState<StoreWorkerRequestDataModel>) -> Unit)? = null
 ) {
-    if (!inviteStoreWorkerMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             inviteStoreWorkerMutex.withLock {
                 val cleanNote = note?.trim()?.takeIf { it.isNotBlank() }
                 val response = networkRequest<StoreWorkerRequestDataModel, WorkerStoreInviteCreateDataModel>(
@@ -3789,8 +3777,7 @@ fun acceptMyStoreWorkerInvitation(
     note: String? = null,
     onCompleted: ((DataState<StoreWorkerDataModel>) -> Unit)? = null
 ) {
-    if (!decideStoreEmploymentMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             decideStoreEmploymentMutex.withLock {
                 val response = networkRequest<StoreWorkerDataModel, WorkerStoreInvitationDecisionDataModel>(
                     method = HttpMethod.Post,
@@ -3829,8 +3816,7 @@ fun declineMyStoreWorkerInvitation(
     note: String? = null,
     onCompleted: ((DataState<StoreWorkerRequestDataModel>) -> Unit)? = null
 ) {
-    if (!decideStoreEmploymentMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             decideStoreEmploymentMutex.withLock {
                 val response = networkRequest<StoreWorkerRequestDataModel, WorkerStoreInvitationDecisionDataModel>(
                     method = HttpMethod.Post,
@@ -3869,8 +3855,7 @@ fun acceptStoreEmploymentRequest(
     workerPassword: String? = null,
     onCompleted: ((DataState<StoreWorkerRequestDataModel>) -> Unit)? = null
 ) {
-    if (!decideStoreEmploymentMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             decideStoreEmploymentMutex.withLock {
                 val response = networkRequest<StoreWorkerRequestDataModel, WorkerEmploymentDecisionRequestDataModel>(
                     method = HttpMethod.Post,
@@ -3922,8 +3907,7 @@ fun declineStoreEmploymentRequest(
     note: String? = null,
     onCompleted: ((DataState<StoreWorkerRequestDataModel>) -> Unit)? = null
 ) {
-    if (!decideStoreEmploymentMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             decideStoreEmploymentMutex.withLock {
                 val response = networkRequest<StoreWorkerRequestDataModel, WorkerEmploymentDecisionRequestDataModel>(
                     method = HttpMethod.Post,
@@ -3971,8 +3955,7 @@ fun updateStoreWorkerPermissions(
     workerPassword: String? = null,
     onCompleted: ((DataState<StoreWorkerDataModel>) -> Unit)? = null
 ) {
-    if (!updateStoreWorkerPermissionsMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             updateStoreWorkerPermissionsMutex.withLock {
                 val response = networkRequest<StoreWorkerDataModel, WorkerPermissionsUpdateRequestDataModel>(
                     method = HttpMethod.Post,
@@ -4026,8 +4009,7 @@ fun removeStoreWorker(
         return
     }
 
-    if (!removeStoreWorkerMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             removeStoreWorkerMutex.withLock {
                 val cleanNote = note?.trim()?.takeIf { it.isNotBlank() }
                 val response = networkRequest<StoreWorkerRequestDataModel, WorkerRemovalRequestDataModel>(
@@ -4078,8 +4060,7 @@ fun acceptMyStoreWorkerRemovalRequest(
         return
     }
 
-    if (!decideStoreWorkerRemovalMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             decideStoreWorkerRemovalMutex.withLock {
                 val cleanNote = note?.trim()?.takeIf { it.isNotBlank() }
                 val response = networkRequest<StoreWorkerDataModel, WorkerRemovalDecisionRequestDataModel>(
@@ -4143,8 +4124,7 @@ fun declineMyStoreWorkerRemovalRequest(
         return
     }
 
-    if (!decideStoreWorkerRemovalMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             decideStoreWorkerRemovalMutex.withLock {
                 val response = networkRequest<StoreWorkerRequestDataModel, WorkerRemovalDecisionRequestDataModel>(
                     method = HttpMethod.Post,
@@ -4424,8 +4404,7 @@ fun startWorkshift(
     password: String,
     onCompleted: ((DataState<WorkshiftDataModel>) -> Unit)? = null
 ) {
-    if (!startWorkshiftMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             startWorkshiftMutex.withLock {
                 workshiftLoginInProgressState.emit(true)
                 try {
@@ -4459,8 +4438,7 @@ fun endCurrentWorkshift(
     onCompleted: ((DataState<WorkshiftDataModel>) -> Unit)? = null
 ) {
     val id = storeId?.takeIf { it.isNotBlank() } ?: return
-    if (!endWorkshiftMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             endWorkshiftMutex.withLock {
                 val activeWorkshift = activeWorkshiftState.payloadValue
                     ?.takeIf { it.storeId == id && it.isActive && it.endedAtMillis == null }
@@ -4680,8 +4658,7 @@ fun completeTransaction(
     receiptSnapshot: TransactionReceiptSnapshotDataModel,
     onCompleted: (() -> Unit)? = null
 ) {
-    if (!completeTransactionMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             completeTransactionInProgressState.emit(true)
             try {
                 completeTransactionMutex.withLock {
@@ -4976,8 +4953,7 @@ fun upsertSupplierGoodsPrice(
     price: SupplierGoodsPriceDataModel,
     onCompleted: ((DataState<SupplierGoodsPriceDataModel>) -> Unit)? = null
 ) {
-    if (!upsertSupplierGoodsPriceMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             upsertSupplierGoodsPriceMutex.withLock {
                 val response = networkRequest<SupplierGoodsPriceDataModel, SupplierGoodsPriceDataModel>(
                     method = HttpMethod.Post,
@@ -5817,8 +5793,7 @@ fun addSupplierOrder(
     orderWithLines: SupplierOrderWithLinesDataModel,
     onCompleted: ((DataState<SupplierOrderWithLinesDataModel>) -> Unit)? = null
 ) {
-    if (!addSupplierOrderMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             addSupplierOrderMutex.withLock {
                 val response = networkRequest<SupplierOrderWithLinesDataModel, SupplierOrderWithLinesDataModel>(
                     method = HttpMethod.Post,
@@ -5858,8 +5833,7 @@ fun updateSupplierOrder(
     orderWithLines: SupplierOrderWithLinesDataModel,
     onCompleted: ((DataState<SupplierOrderWithLinesDataModel>) -> Unit)? = null
 ) {
-    if (!updateSupplierOrderMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             updateSupplierOrderMutex.withLock {
                 val response = networkRequest<SupplierOrderWithLinesDataModel, SupplierOrderWithLinesDataModel>(
                     method = HttpMethod.Put,
@@ -5995,8 +5969,7 @@ fun deleteSupplierOrder(
     orderId: String,
     onCompleted: ((DataState<String>) -> Unit)? = null
 ) {
-    if (!deleteSupplierOrderMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             deleteSupplierOrderMutex.withLock {
                 val response = networkRequest<String, String>(
                     method = HttpMethod.Delete,
@@ -6032,8 +6005,7 @@ fun receiveSupplierOrder(
     request: ReceiveSupplierOrderRequestDataModel,
     onCompleted: ((DataState<SupplierOrderWithLinesDataModel>) -> Unit)? = null
 ) {
-    if (!receiveSupplierOrderMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             receiveSupplierOrderMutex.withLock {
                 val response = networkRequest<SupplierOrderWithLinesDataModel, ReceiveSupplierOrderRequestDataModel>(
                     method = HttpMethod.Post,
@@ -6101,8 +6073,7 @@ fun upsertSupplierContract(
     contract: SupplierPartnershipContractDataModel,
     onCompleted: ((DataState<SupplierPartnershipContractDataModel>) -> Unit)? = null
 ) {
-    if (!upsertSupplierContractMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             upsertSupplierContractMutex.withLock {
                 val response = networkRequest<SupplierPartnershipContractDataModel, SupplierPartnershipContractDataModel>(
                     method = HttpMethod.Post,
@@ -6132,8 +6103,7 @@ fun acceptSupplierContract(
     contractId: String,
     onCompleted: ((DataState<SupplierPartnershipContractDataModel>) -> Unit)? = null
 ) {
-    if (!acceptSupplierContractMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             acceptSupplierContractMutex.withLock {
                 val response = networkRequest<SupplierPartnershipContractDataModel, String>(
                     method = HttpMethod.Post,
@@ -6163,8 +6133,7 @@ fun declineSupplierContract(
     contractId: String,
     onCompleted: ((DataState<SupplierPartnershipContractDataModel>) -> Unit)? = null
 ) {
-    if (!declineSupplierContractMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             declineSupplierContractMutex.withLock {
                 val response = networkRequest<SupplierPartnershipContractDataModel, String>(
                     method = HttpMethod.Post,
@@ -6194,8 +6163,7 @@ fun archiveSupplierContract(
     contractId: String,
     onCompleted: ((DataState<String>) -> Unit)? = null
 ) {
-    if (!archiveSupplierContractMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             archiveSupplierContractMutex.withLock {
                 val response = networkRequest<String, String>(
                     method = HttpMethod.Post,
@@ -7283,6 +7251,9 @@ val getStockBatchesMutex = Mutex()
 val addGoodsItemMutex = Mutex()
 val updateGoodsItemMutex = Mutex()
 val deleteGoodsItemMutex = Mutex()
+val addGoodsBatchMutex = Mutex()
+val updateGoodsBatchMutex = Mutex()
+val deleteGoodsBatchMutex = Mutex()
 private const val STOCK_ITEM_DELETE_TOMBSTONE_TTL_MILLIS = 2L * 60L * 1000L
 private val recentlyDeletedStockItemIds = mutableMapOf<String, Long>()
 private val recentlyDeletedStockItemIdsMutex = Mutex()
@@ -14149,8 +14120,7 @@ fun createSupportTicket(
     onCompleted: ((DataState<SupportTicketDataModel>) -> Unit)? = null
 ) {
     if (request.initialMessage.isBlank()) return
-    if (!createSupportTicketMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             createSupportTicketMutex.withLock {
                 supportMessageSendingState.emit(true)
                 val response = networkRequest<SupportTicketDataModel, SupportTicketCreateRequestDataModel>(
@@ -14220,8 +14190,7 @@ fun sendSupportMessage(
     onCompleted: ((DataState<SupportMessageDataModel>) -> Unit)? = null
 ) {
     if (request.ticketId.isBlank() || request.body.isBlank()) return
-    if (!sendSupportMessageMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             sendSupportMessageMutex.withLock {
                 supportMessageSendingState.emit(true)
                 val response = networkRequest<SupportMessageDataModel, SupportMessageSendRequestDataModel>(
@@ -14246,8 +14215,7 @@ fun sendSupportMessage(
 
 fun closeSupportTicket(ticketId: String, onCompleted: ((DataState<SupportTicketDataModel>) -> Unit)? = null) {
     if (ticketId.isBlank()) return
-    if (!closeSupportTicketMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             closeSupportTicketMutex.withLock {
                 val response = networkRequest<SupportTicketDataModel, SupportTicketActionRequestDataModel>(
                     method = HttpMethod.Post,
@@ -14269,8 +14237,7 @@ fun closeSupportTicket(ticketId: String, onCompleted: ((DataState<SupportTicketD
 
 fun reopenSupportTicket(ticketId: String, onCompleted: ((DataState<SupportTicketDataModel>) -> Unit)? = null) {
     if (ticketId.isBlank()) return
-    if (!reopenSupportTicketMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             reopenSupportTicketMutex.withLock {
                 val response = networkRequest<SupportTicketDataModel, SupportTicketActionRequestDataModel>(
                     method = HttpMethod.Post,
@@ -14292,8 +14259,7 @@ fun reopenSupportTicket(ticketId: String, onCompleted: ((DataState<SupportTicket
 
 fun markSupportMessagesRead(ticketId: String) {
     if (ticketId.isBlank()) return
-    if (!markSupportMessagesReadMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             markSupportMessagesReadMutex.withLock {
                 networkRequest<List<SupportMessageDataModel>, SupportMessagesReadRequestDataModel>(
                     method = HttpMethod.Post,
@@ -14371,8 +14337,7 @@ fun revokeSecuritySession(
 ) {
     if (sessionId.isBlank()) return
 
-    if (!revokeSecuritySessionMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             revokeSecuritySessionMutex.withLock {
                 val response = networkRequest<List<SecuritySessionDataModel>, SecuritySessionRevokeRequestDataModel>(
                     method = HttpMethod.Post,
@@ -14399,8 +14364,7 @@ fun revokeSecuritySession(
 }
 
 fun revokeOtherSecuritySessions(onCompleted: ((DataState<List<SecuritySessionDataModel>>) -> Unit)? = null) {
-    if (!revokeOtherSecuritySessionsMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             revokeOtherSecuritySessionsMutex.withLock {
                 val response = networkRequest<List<SecuritySessionDataModel>, Unit>(
                     method = HttpMethod.Post,
@@ -14426,8 +14390,7 @@ fun revokeOtherSecuritySessions(onCompleted: ((DataState<List<SecuritySessionDat
 }
 
 fun logInUser(userAuthLogIn: UserAuthLogInDataModel, serverUrlOverride: String? = null) {
-    if (!logInMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             logInMutex.withLock {
                 logInInProgressState.emit(true)
                 try {
@@ -14519,8 +14482,7 @@ fun logInUser(userAuthLogIn: UserAuthLogInDataModel, serverUrlOverride: String? 
 }
 
 fun signUpUser(userAuthSignUp: UserAuthSignUpDataModel, serverUrlOverride: String? = null) {
-    if (!signUpUserMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             signUpInProgressState.emit(true)
 
             try {
@@ -14589,8 +14551,7 @@ fun signUpUser(userAuthSignUp: UserAuthSignUpDataModel, serverUrlOverride: Strin
 }
 
 fun logOutUser() {
-    if (!logOutUserMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             logOutUserMutex.withLock {
                 val tokenSnapshot = getStoredUserAuthTokens?.invoke()
                 val refreshToken = tokenSnapshot?.refreshToken
@@ -14768,8 +14729,7 @@ fun getUser(forceLogOut: Boolean = true, applyServerActiveStore: Boolean = true)
 fun updateUser(
     userAccountUpdate: UserAccountUpdateDataModel
 ) {
-    if (!updateUserMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             updateUserMutex.withLock {
                 val response = networkRequest<UserAccountDataModel, UserAccountUpdateDataModel>(
                     HttpMethod.Put,
@@ -15421,8 +15381,7 @@ fun getStores() {
 }
 
 fun addStore(store: StoreDataModel, onCompleted: ((DataState<StoreDataModel>) -> Unit)?) {
-    if (!addStoreMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             addStoreMutex.withLock {
                 val response = networkRequest<StoreDataModel, StoreDataModel>(
                     HttpMethod.Post,
@@ -15461,8 +15420,7 @@ fun addStore(store: StoreDataModel, onCompleted: ((DataState<StoreDataModel>) ->
 }
 
 fun updateStore(store: StoreDataModel, onCompleted: ((DataState<StoreDataModel>) -> Unit)?) {
-    if (!updateStoreMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             updateStoreMutex.withLock {
                 val response = networkRequest<StoreDataModel, StoreDataModel>(
                     HttpMethod.Put,
@@ -15499,8 +15457,7 @@ fun updateStore(store: StoreDataModel, onCompleted: ((DataState<StoreDataModel>)
 }
 
 fun deleteStore(store: StoreDataModel, onCompleted: ((DataState<Unit>) -> Unit)? = null) {
-    if (!deleteStoreMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             deleteStoreMutex.withLock {
                 val response = networkRequest<Unit, String>(
                     HttpMethod.Delete,
@@ -15601,8 +15558,7 @@ fun addSupplier(
     supplier: SupplierDataModel,
     onCompleted: ((DataState<SupplierDataModel>) -> Unit)? = null
 ) {
-    if (!addSupplierMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             addSupplierMutex.withLock {
                 val response = networkRequest<SupplierDataModel, SupplierDataModel>(
                     method = HttpMethod.Post,
@@ -15627,8 +15583,7 @@ fun updateSupplier(
     supplier: SupplierDataModel,
     onCompleted: ((DataState<SupplierDataModel>) -> Unit)? = null
 ) {
-    if (!updateSupplierMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             updateSupplierMutex.withLock {
                 val response = networkRequest<SupplierDataModel, SupplierDataModel>(
                     method = HttpMethod.Put,
@@ -15653,8 +15608,7 @@ fun deleteSupplier(
     supplierId: String,
     onCompleted: ((DataState<String>) -> Unit)? = null
 ) {
-    if (!deleteSupplierMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             deleteSupplierMutex.withLock {
                 val response = networkRequest<String, String>(
                     method = HttpMethod.Delete,
@@ -15883,17 +15837,15 @@ fun refreshParentStoreStock(
     offset: Int = 0,
     appendToSharedState: Boolean = false
 ) {
-    if (!getParentStoreStockMutex.isLocked) {
-        GlobalScope.launch(Dispatchers.ourIo) {
-            getParentStoreStock(
-                storeId = storeId,
-                query = query,
-                limit = limit,
-                offset = offset,
-                updateSharedState = true,
-                appendToSharedState = appendToSharedState
-            ).collect()
-        }
+    GlobalScope.launch(Dispatchers.ourIo) {
+        getParentStoreStock(
+            storeId = storeId,
+            query = query,
+            limit = limit,
+            offset = offset,
+            updateSharedState = true,
+            appendToSharedState = appendToSharedState
+        ).collect()
     }
 }
 
@@ -15901,8 +15853,7 @@ fun updateGoodsItem(
     goodsItem: GoodsItemDataModel,
     onCompleted: ((DataState<GoodsItemDataModel>) -> Unit)?
 ) {
-    if (!updateGoodsItemMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             updateGoodsItemMutex.withLock {
                 val response = networkRequest<GoodsItemDataModel, GoodsItemDataModel>(
                     HttpMethod.Put,
@@ -15946,8 +15897,7 @@ fun updateGoodsItem(
 }
 
 fun addGoodsItem(goodsItem: GoodsItemDataModel, onCompleted: ((DataState<GoodsItemDataModel>) -> Unit)?) {
-    if (!addGoodsItemMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             addGoodsItemMutex.withLock {
                 val response = networkRequest<GoodsItemDataModel, GoodsItemDataModel>(
                     HttpMethod.Post,
@@ -15986,8 +15936,7 @@ fun addGoodsItem(goodsItem: GoodsItemDataModel, onCompleted: ((DataState<GoodsIt
 }
 
 fun deleteGoodsItem(id: String, storeId: String, onCompleted: (() -> Unit)?) {
-    if (!deleteGoodsItemMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             deleteGoodsItemMutex.withLock {
                 val response = networkRequest<String, String>(
                     HttpMethod.Delete,
@@ -16074,8 +16023,7 @@ fun moveStockBatchBetweenStores(
     request: StockBatchMoveRequestDataModel,
     onCompleted: ((DataState<StockBatchMoveResultDataModel>) -> Unit)? = null
 ) {
-    if (!moveStockBatchMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             moveStockBatchMutex.withLock {
                 val response = networkRequest<StockBatchMoveResultDataModel, StockBatchMoveRequestDataModel>(
                     method = HttpMethod.Post,
@@ -16108,8 +16056,7 @@ fun decideStockBatchMove(
     request: StockBatchMoveDecisionRequestDataModel,
     onCompleted: ((DataState<StockBatchMoveResultDataModel>) -> Unit)? = null
 ) {
-    if (!moveStockBatchMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
+    GlobalScope.launch(Dispatchers.ourIo) {
             moveStockBatchMutex.withLock {
                 val response = networkRequest<StockBatchMoveResultDataModel, StockBatchMoveDecisionRequestDataModel>(
                     method = HttpMethod.Post,
@@ -16142,9 +16089,8 @@ fun updateGoodsBatches(
     goodsBatches: List<GoodsBatchDataModel>,
     onCompleted: ((DataState<List<GoodsBatchDataModel>>) -> Unit)?
 ) {
-    if (!updateGoodsItemMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
-            updateGoodsItemMutex.withLock {
+    GlobalScope.launch(Dispatchers.ourIo) {
+        updateGoodsBatchMutex.withLock {
                 val response = networkRequest<List<GoodsBatchDataModel>, List<GoodsBatchDataModel>>(
                     HttpMethod.Put,
                     endpointUrl = globalAppConfigurationState.payloadValue.updateStockBatchPath.first,
@@ -16188,9 +16134,8 @@ fun addGoodsBatches(
     goodsBatches: List<GoodsBatchDataModel>,
     onCompleted: ((DataState<List<GoodsBatchDataModel>>) -> Unit)?
 ) {
-    if (!addGoodsItemMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
-            addGoodsItemMutex.withLock {
+    GlobalScope.launch(Dispatchers.ourIo) {
+        addGoodsBatchMutex.withLock {
                 val response = networkRequest<List<GoodsBatchDataModel>, List<GoodsBatchDataModel>>(
                     HttpMethod.Post,
                     endpointUrl = globalAppConfigurationState.payloadValue.addStockBatchPath.first,
@@ -16223,9 +16168,8 @@ fun addGoodsBatches(
 }
 
 fun deleteGoodsBatches(ids: List<String>, storeId: String, onCompleted: (() -> Unit)?) {
-    if (!deleteGoodsItemMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
-            deleteGoodsItemMutex.withLock {
+    GlobalScope.launch(Dispatchers.ourIo) {
+        deleteGoodsBatchMutex.withLock {
                 val response = networkRequest<List<String>, List<String>>(
                     HttpMethod.Delete,
                     endpointUrl = globalAppConfigurationState.payloadValue.deleteStockBatchPath.first,

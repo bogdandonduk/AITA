@@ -477,6 +477,7 @@ fun AppConfiguration.StockBatchEditor(
     var showSupplierAddSheet by rememberSaveable(goodsItem.id, existingBatch?.id) { mutableStateOf(false) }
     var applyPromotionsToSameSupplier by rememberSaveable(goodsItem.id, existingBatch?.id) { mutableStateOf(false) }
     var isSavingBatch by rememberSaveable(goodsItem.id, existingBatch?.id ?: "new", draftStateKey ?: "batch") { mutableStateOf(false) }
+    var saveError by rememberSaveable(goodsItem.id, existingBatch?.id ?: "new", draftStateKey ?: "batch") { mutableStateOf<String?>(null) }
     var returnPriceOverrideManuallyEdited by rememberSaveable(goodsItem.id, existingBatch?.id ?: "new") {
         mutableStateOf(
             existingBatch?.let { batch ->
@@ -753,6 +754,15 @@ fun AppConfiguration.StockBatchEditor(
                 onClick = onCancel
             )
 
+            saveError?.let { error ->
+                Text(
+                    text = error,
+                    color = stateValues.ErrorColor,
+                    fontSize = stateValues.smallTextSize,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
             actionButton(
                 modifier = Modifier.weight(1f),
                 text = stateValues.stringConfirm,
@@ -761,6 +771,7 @@ fun AppConfiguration.StockBatchEditor(
                         draft.supplyPrice.price.toDoubleOrNull()?.let { it >= 0.0 } == true,
                 onClick = {
                     if (!isSavingBatch) {
+                        saveError = null
                         isSavingBatch = true
 
                         val now = getCurrentTimeMillis()
@@ -826,6 +837,7 @@ fun AppConfiguration.StockBatchEditor(
                                         onSaved()
                                     }
                                 } else {
+                                    saveError = state.message.takeIf { it.isNotBlank() } ?: localizedStringResource(13, "Could not save batch")
                                     isSavingBatch = false
                                 }
                             }
@@ -834,6 +846,7 @@ fun AppConfiguration.StockBatchEditor(
                                 if (updateState is DataState.Success) {
                                     onSaved()
                                 } else {
+                                    saveError = updateState.message.takeIf { it.isNotBlank() } ?: localizedStringResource(13, "Could not save batch")
                                     isSavingBatch = false
                                 }
                             }
@@ -3988,6 +4001,7 @@ internal fun AppConfiguration.ParentStoreStockSelectionBottomSheet(
     var serverLoadedItems by remember(activeStoreId) { mutableStateOf<List<GoodsItemDataModel>>(emptyList()) }
     var serverEndReached by rememberSaveable(activeStoreId) { mutableStateOf(false) }
     var loading by remember(activeStoreId) { mutableStateOf(false) }
+    var loadError by remember(activeStoreId) { mutableStateOf<String?>(null) }
 
     val activeStore = stateValues.stores.findStoreOrBranchForUi(activeStoreId)
     val parentStoreId = activeStore?.parentStoreId?.takeIf { it.isNotBlank() }
@@ -4038,6 +4052,7 @@ internal fun AppConfiguration.ParentStoreStockSelectionBottomSheet(
             serverLoadedItems = emptyList()
             serverEndReached = false
             loading = true
+            loadError = null
             try {
                 delay(220)
                 getParentStoreStock(
@@ -4049,8 +4064,12 @@ internal fun AppConfiguration.ParentStoreStockSelectionBottomSheet(
                     appendToSharedState = false
                 ).collect { state ->
                     val payload = (state as? DataState.Success)?.payload.orEmpty()
-                    serverLoadedItems = payload
-                    serverEndReached = state is DataState.Empty || payload.size < pickerPageSize
+                    if (state is DataState.Success) {
+                        serverLoadedItems = payload
+                        serverEndReached = payload.size < pickerPageSize
+                    } else {
+                        loadError = state.message.takeIf { it.isNotBlank() } ?: localizedStringResource(13, "Could not load parent stock")
+                    }
                 }
             } finally {
                 loading = false
@@ -4110,14 +4129,6 @@ internal fun AppConfiguration.ParentStoreStockSelectionBottomSheet(
             contentPadding = PaddingValues(bottom = stateValues.screenHeight / 8)
         ) {
             when {
-                parentStoreId == null -> item {
-                    MessageText(
-                        modifier = Modifier.fillParentMaxSize().fillMaxWidth(),
-                        text = localizedStringResource(1219, "This active store has no parent store"),
-                        textSize = stateValues.textSize
-                    )
-                }
-
                 displayItems.isEmpty() && (loading || pageWaitingForServer) -> item {
                     MessageText(
                         modifier = Modifier.fillParentMaxSize().fillMaxWidth(),
@@ -4127,10 +4138,31 @@ internal fun AppConfiguration.ParentStoreStockSelectionBottomSheet(
                     )
                 }
 
+                displayItems.isEmpty() && loadError != null -> item {
+                    Column(
+                        modifier = Modifier.fillParentMaxSize().fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        MessageText(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = loadError.orEmpty(),
+                            textSize = stateValues.textSize,
+                            textColor = stateValues.ErrorColor
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        actionButton(
+                            text = localizedStringResource(158, "Retry"),
+                            iconPath = stateValues.drawablePathIconRefresh,
+                            onClick = { pickerPage = pickerPage }
+                        )
+                    }
+                }
+
                 displayItems.isEmpty() -> item {
                     MessageText(
                         modifier = Modifier.fillParentMaxSize().fillMaxWidth(),
-                        text = localizedStringResource(1215, "No parent store items match these filters"),
+                        text = if (parentStoreId == null) localizedStringResource(1219, "No parent inventory is available for this store") else localizedStringResource(1215, "No parent store items match these filters"),
                         textSize = stateValues.textSize
                     )
                 }

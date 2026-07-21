@@ -2069,6 +2069,7 @@ object StockBatchMovements: Table("stock_batch_movements") {
   val note = text("note").nullable()
   val movedAtMillis = long("moved_at_millis")
   val status = text("status").default(StockBatchMovementStatusDataModel.Accepted.name)
+  val sourceStatusBeforeMove = text("source_status_before_move").default(StockBatchStatusDataModel.Delivered.name)
   val acceptedByUserId = uuid("accepted_by_user_id").nullable()
   val acceptedAtMillis = long("accepted_at_millis").nullable()
   val decisionNote = text("decision_note").nullable()
@@ -18394,12 +18395,12 @@ fun Application.module() {
             if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_READ, requireWorkshift = false))
               return@newSuspendedTransaction null
 
-            val parentStoreId = Stores
-              .select(Stores.parentStoreId)
-              .where { Stores.id eq storeId }
-              .singleOrNull()
-              ?.get(Stores.parentStoreId)
-              ?: return@newSuspendedTransaction emptyList<GoodsItemDataModel>()
+            val rootStoreId = rootStoreIdForAccessInsideTransaction(storeId)
+            val parentStoreId = if (rootStoreId == storeId) {
+              return@newSuspendedTransaction emptyList<GoodsItemDataModel>()
+            } else {
+              rootStoreId
+            }
 
             StockItems
               .selectAll()
@@ -19116,6 +19117,7 @@ fun Application.module() {
               it[StockBatchMovements.note] = request.note?.takeIf { note -> note.isNotBlank() }
               it[StockBatchMovements.movedAtMillis] = now
               it[StockBatchMovements.status] = if (requiresAcceptance) StockBatchMovementStatusDataModel.PendingAcceptance.name else StockBatchMovementStatusDataModel.Accepted.name
+              it[StockBatchMovements.sourceStatusBeforeMove] = sourceStatus
               it[StockBatchMovements.acceptedByUserId] = if (requiresAcceptance) null else userId
               it[StockBatchMovements.acceptedAtMillis] = if (requiresAcceptance) null else now
               it[StockBatchMovements.decisionNote] = null
@@ -19311,11 +19313,9 @@ fun Application.module() {
                 val restoredQuantity = sourceQuantity.copy(
                   total = sourceQuantity.withTotalValue(sourceQuantity.total + movedQuantity.total).total
                 )
-                val restoredStatus = when (sourceBatchRow[StockBatchesV2.status]) {
-                  StockBatchStatusDataModel.SoldOut.name,
-                  StockBatchStatusDataModel.Deleted.name -> StockBatchStatusDataModel.Delivered.name
-                  else -> sourceBatchRow[StockBatchesV2.status]
-                }
+                val restoredStatus = movementRow[StockBatchMovements.sourceStatusBeforeMove]
+                  .takeIf { status -> status != StockBatchStatusDataModel.Deleted.name }
+                  ?: StockBatchStatusDataModel.Delivered.name
                 StockBatchesV2.update({ StockBatchesV2.id eq sourceBatchId }) {
                   it[StockBatchesV2.quantity] = restoredQuantity
                   it[StockBatchesV2.status] = restoredStatus
@@ -19681,6 +19681,16 @@ fun Application.module() {
                 .singleOrNull()
                 ?: return@newSuspendedTransaction null
 
+              val hasPendingMovement = StockBatchMovements
+                .select(StockBatchMovements.id)
+                .where {
+                  (StockBatchMovements.status eq StockBatchMovementStatusDataModel.PendingAcceptance.name) and
+                     ((StockBatchMovements.sourceBatchId eq id) or (StockBatchMovements.destinationBatchId eq id))
+                }
+                .empty()
+                .not()
+              if (hasPendingMovement) return@newSuspendedTransaction null
+
               val changedBatchFields = batchChangedFieldsInsideTransaction(
                 previousRow = previousBatchRow,
                 goodsItemId = goodsItemId,
@@ -19817,6 +19827,16 @@ fun Application.module() {
                 }
                 .singleOrNull()
                 ?: continue
+
+              val hasPendingMovement = StockBatchMovements
+                .select(StockBatchMovements.id)
+                .where {
+                  (StockBatchMovements.status eq StockBatchMovementStatusDataModel.PendingAcceptance.name) and
+                     ((StockBatchMovements.sourceBatchId eq id) or (StockBatchMovements.destinationBatchId eq id))
+                }
+                .empty()
+                .not()
+              if (hasPendingMovement) continue
 
               val affected = StockBatchesV2.update({
                 (StockBatchesV2.id eq id) and

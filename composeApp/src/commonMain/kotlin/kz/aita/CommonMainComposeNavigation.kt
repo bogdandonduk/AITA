@@ -279,7 +279,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
 
     val canPopStockScreen = !Navigation.Stock.isVeryFirstScreen(stateValues.isNarrowScreen)
     val activeStoreForParentStock = stateValues.stores.findStoreOrBranchForUi(stateValues.activeStoreId)
-    val canPullFromParentStoreStock = !stateValues.activeStoreId.isNullOrBlank() && !activeStoreForParentStock?.parentStoreId.isNullOrBlank()
+    val canPullFromParentStoreStock = !stateValues.activeStoreId.isNullOrBlank() && existing == null
     val stockAddEditGoodsItemIdForCounts = existing?.id.orEmpty()
     val stockAddEditBatchesCount = stateValues.stockBatches.orEmpty()
         .count { it.goodsItemId == stockAddEditGoodsItemIdForCounts && it.isActive }
