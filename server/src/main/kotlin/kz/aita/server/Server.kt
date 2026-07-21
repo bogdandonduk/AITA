@@ -204,6 +204,20 @@ private fun runtimeEnvironmentName(): String =
 private fun isProductionRuntime(): Boolean =
   runtimeEnvironmentName() in setOf("prod", "production", "stage", "staging", "cloud")
 
+private fun String.isAitaSecretPlaceholder(): Boolean {
+  val normalized = trim().lowercase(Locale.ROOT)
+  return normalized.isBlank() || listOf(
+    "change_me",
+    "changeme",
+    "replace_with",
+    "replace-me",
+    "placeholder",
+    "example_secret",
+    "your_secret",
+    "secret_here"
+  ).any { marker -> normalized.contains(marker) }
+}
+
 private fun Path.normalizedAbsolute(): Path = toAbsolutePath().normalize()
 
 private fun resolveServerFilesRootPath(): Path {
@@ -2990,20 +3004,43 @@ object Refresh {
   private val b64urlDec = Base64.getUrlDecoder()
 
   private val HEX = "0123456789abcdef".toCharArray()
+  private const val LOCAL_DEVELOPMENT_PEPPER =
+    "aita-local-dev-refresh-pepper-change-this-before-production-2026"
 
-  private val hmacKey: SecretKeySpec by lazy {
-    val pepper = envOrSystem("AITA_REFRESH_PEPPER")
-      ?: if (isProductionRuntime()) {
-        error("AITA_REFRESH_PEPPER must be configured in production")
-      } else {
-        "aita-local-dev-refresh-pepper-change-this-before-production-2026"
-      }
-
-    if (isProductionRuntime() && pepper.length < 64) {
-      error("AITA_REFRESH_PEPPER must be at least 64 characters in production")
+  private fun resolvedPepper(productionMode: Boolean): String {
+    val configured = envOrSystem("AITA_REFRESH_PEPPER")
+    val pepper = configured ?: if (productionMode) {
+      error("AITA_REFRESH_PEPPER must be configured in production")
+    } else {
+      LOCAL_DEVELOPMENT_PEPPER
     }
 
-    SecretKeySpec(pepper.toByteArray(StandardCharsets.UTF_8), "HmacSHA256")
+    if (productionMode) {
+      require(pepper.length >= 64) {
+        "AITA_REFRESH_PEPPER must be at least 64 characters in production"
+      }
+      require(!pepper.isAitaSecretPlaceholder()) {
+        "AITA_REFRESH_PEPPER still contains a placeholder value"
+      }
+    }
+
+    return pepper
+  }
+
+  private val hmacKey: SecretKeySpec by lazy {
+    SecretKeySpec(
+      resolvedPepper(productionMode = isProductionRuntime()).toByteArray(StandardCharsets.UTF_8),
+      "HmacSHA256"
+    )
+  }
+
+  fun validateConfiguration(productionMode: Boolean, jwtSecret: String? = null) {
+    val pepper = resolvedPepper(productionMode)
+    if (productionMode && jwtSecret != null) {
+      require(pepper != jwtSecret) {
+        "AITA_REFRESH_PEPPER must be different from AITA_JWT_SECRET"
+      }
+    }
   }
 
   fun newPlainToken(): String {
@@ -3015,7 +3052,9 @@ object Refresh {
   fun hash(token: String): String {
     val mac = Mac.getInstance("HmacSHA256")
     mac.init(hmacKey)
-    val msg = try { b64urlDec.decode(token) } catch (_: Exception) {
+    val msg = try {
+      b64urlDec.decode(token)
+    } catch (_: Exception) {
       token.toByteArray(StandardCharsets.UTF_8)
     }
     return mac.doFinal(msg).toHexLower()
@@ -3055,12 +3094,18 @@ fun Application.jwtConfig(): JwtConfig {
   val issuer = c.optionalString("issuer") ?: envOrSystem("AITA_JWT_ISSUER").orEmpty()
   val audience = c.optionalString("audience") ?: envOrSystem("AITA_JWT_AUDIENCE").orEmpty()
   val realm = c.optionalString("realm") ?: "AITA API"
-  val secret = c.optionalString("secret") ?: envOrSystem("AITA_JWT_SECRET") ?: if (isProductionMode()) "" else "aita-local-dev-jwt-secret-change-this-before-production-2026-very-long-local-secret"
+  val productionMode = isProductionMode()
+  val secret = c.optionalString("secret") ?: envOrSystem("AITA_JWT_SECRET") ?: if (productionMode) {
+    ""
+  } else {
+    "aita-local-dev-jwt-secret-change-this-before-production-2026-very-long-local-secret"
+  }
 
-  if (isProductionMode()) {
+  if (productionMode) {
     require(issuer.isNotBlank()) { "AITA_JWT_ISSUER must be configured in production" }
     require(audience.isNotBlank()) { "AITA_JWT_AUDIENCE must be configured in production" }
     require(secret.length >= 64) { "AITA_JWT_SECRET must be at least 64 characters in production" }
+    require(!secret.isAitaSecretPlaceholder()) { "AITA_JWT_SECRET still contains a placeholder value" }
   }
 
   return JwtConfig(
@@ -16843,6 +16888,18 @@ private fun applyTransactionStockMutationInsideTransaction(
 }
 
 fun Application.module() {
+  val productionMode = isProductionMode()
+  try {
+    val validatedJwtConfig = jwtConfig()
+    Refresh.validateConfiguration(
+      productionMode = productionMode,
+      jwtSecret = validatedJwtConfig.secret
+    )
+  } catch (throwable: Throwable) {
+    logStartupFailure("security configuration", throwable)
+    throw throwable
+  }
+
   stabilizeServerRuntimeClassLoader("module")
   prewarmSharedRuntimeSerializers()
   environment.log.info("AITA server classloader: module anchored to ${classLoaderDebugName(aitaServerRuntimeClassLoader)}")
@@ -16874,23 +16931,27 @@ fun Application.module() {
   }
   install(ConditionalHeaders) // adds ETag/Last-Modified when possible
   install(CachingHeaders) {
-    options { _, outgoing ->
-      when (outgoing.contentType?.withoutParameters()) {
-        ContentType.parse("image/svg+xml"),
-        ContentType.Image.PNG,
-        ContentType.Image.JPEG,
-        ContentType("image", "webp") ->
-          CachingOptions(
-            CacheControl.MaxAge(
-              maxAgeSeconds = 30 * 24 * 3600
-            )
+    options { call, outgoing ->
+      val requestPath = call.request.path()
+      when {
+        requestPath == "/config/global" || requestPath.startsWith("/res/") ->
+          CachingOptions(CacheControl.NoCache(null))
+
+        outgoing.contentType?.withoutParameters() in setOf(
+          ContentType.parse("image/svg+xml"),
+          ContentType.Image.PNG,
+          ContentType.Image.JPEG,
+          ContentType("image", "webp")
+        ) -> CachingOptions(
+          CacheControl.MaxAge(
+            maxAgeSeconds = 30 * 24 * 3600
           )
+        )
 
         else -> CachingOptions(CacheControl.NoCache(null))
       }
     }
   }
-  val productionMode = isProductionMode()
   val configuredCorsOrigins = parseAllowedCorsOrigins(
     environment.config.optionalString("cors.allowedOrigins") ?: envOrSystem("AITA_CORS_ALLOWED_ORIGINS").orEmpty()
   )

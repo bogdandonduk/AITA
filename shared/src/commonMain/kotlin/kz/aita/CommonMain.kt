@@ -4659,111 +4659,119 @@ fun completeTransaction(
     onCompleted: (() -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
+        if (!completeTransactionMutex.tryLock()) {
+            postInAppNotification(
+                localizedStringResourceMessage(
+                    id = 224,
+                    main = "Completing transaction",
+                    ru = "Завершение операции",
+                    kk = "Операция аяқталуда"
+                ),
+                NotificationType.Neutral,
+                transient = true
+            )
+            return@launch
+        }
+
+        try {
             completeTransactionInProgressState.emit(true)
-            try {
-                completeTransactionMutex.withLock {
-                    val transactionWithOperationId = transaction.withClientOperationId()
-                    postInAppNotification(
-                        localizedStringResourceMessage(
-                            id = 224,
-                            main = "Completing transaction",
-                            ru = "Завершение операции",
-                            kk = "Операция аяқталуда"
-                        ),
-                        NotificationType.Neutral,
-                        transient = true
-                    )
+            val transactionWithOperationId = transaction.withClientOperationId()
+            postInAppNotification(
+                localizedStringResourceMessage(
+                    id = 224,
+                    main = "Completing transaction",
+                    ru = "Завершение операции",
+                    kk = "Операция аяқталуда"
+                ),
+                NotificationType.Neutral,
+                transient = true
+            )
 
-                    val response = networkRequest<TransactionDataModel, TransactionDataModel>(
-                        method = HttpMethod.Post,
-                        endpointUrl = globalAppConfigurationState.payloadValue.completeTransactionPath.first,
-                        headers = transactionWithOperationId.storeId.takeIf { it.isNotBlank() }?.let { mapOf("store_id" to it) } ?: emptyMap(),
-                        body = transactionWithOperationId
-                    )
+            val response = networkRequest<TransactionDataModel, TransactionDataModel>(
+                method = HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.completeTransactionPath.first,
+                headers = transactionWithOperationId.storeId.takeIf { it.isNotBlank() }
+                    ?.let { mapOf("store_id" to it) }
+                    ?: emptyMap(),
+                body = transactionWithOperationId
+            )
 
-                    if (response.negative || response.payload == null) {
-                        val shouldQueueForCloudRetry = response.transportFailure ||
-                                response.httpStatusCode == HttpStatusCode.Unauthorized.value ||
-                                response.httpStatusCode == HttpStatusCode.ServiceUnavailable.value ||
-                                (response.httpStatusCode ?: 0) >= 500
+            if (response.negative || response.payload == null) {
+                val shouldQueueForCloudRetry = response.transportFailure ||
+                        response.httpStatusCode == HttpStatusCode.Unauthorized.value ||
+                        response.httpStatusCode == HttpStatusCode.ServiceUnavailable.value ||
+                        (response.httpStatusCode ?: 0) >= 500
 
-                        if (shouldQueueForCloudRetry) {
-                            val localCompleted = queueTransactionThroughLocalNetwork(transactionWithOperationId)
-                            if (localCompleted != null) {
-                                latestTransactionReceiptSnapshotState.emit(receiptSnapshot.copy(transaction = localCompleted))
-                                deleteCart(transactionTypeIndex, clientId)
-                                clearTransactionPaymentDraft(transactionTypeIndex, clientId)
-                                postInAppNotification(
-                                    localNetworkMessage(
-                                        id = 733,
-                                        main = "Queued locally for cloud sync",
-                                        ru = "Сохранено локально для синхронизации",
-                                        kk = "Бұлтпен синхрондау үшін жергілікті сақталды"
-                                    ),
-                                    NotificationType.Positive
-                                )
-                                onCompleted?.invoke()
-                                return@withLock
-                            }
-                        }
-
-                        postInAppNotification(response.message, NotificationType.Negative)
-                        return@withLock
-                    }
-
-                    val completed = response.payload
-
-                    latestTransactionReceiptSnapshotState.emit(
-                        receiptSnapshot.copy(transaction = completed)
-                    )
-
-                    transactionsState.emit(
-                        DataState.Success(
-                            mutableListOf<TransactionDataModel>().apply {
-                                transactionsState.payloadValue?.let { addAll(it) }
-                                add(completed)
-                            }.distinctBy { transactionItem -> transactionItem.clientOperationId.ifBlank { transactionItem.id } },
-                            response.message
+                if (shouldQueueForCloudRetry) {
+                    val localCompleted = queueTransactionThroughLocalNetwork(transactionWithOperationId)
+                    if (localCompleted != null) {
+                        latestTransactionReceiptSnapshotState.emit(receiptSnapshot.copy(transaction = localCompleted))
+                        deleteCart(transactionTypeIndex, clientId)
+                        clearTransactionPaymentDraft(transactionTypeIndex, clientId)
+                        postInAppNotification(
+                            localNetworkMessage(
+                                id = 733,
+                                main = "Queued locally for cloud sync",
+                                ru = "Сохранено локально для синхронизации",
+                                kk = "Бұлтпен синхрондау үшін жергілікті сақталды"
+                            ),
+                            NotificationType.Positive
                         )
-                    )
-
-                    completed.debtor?.let { debtor ->
-                        debtorsState.emit(
-                            DataState.Success(
-                                debtorsState.payloadValue.orEmpty().upsertDebtor(debtor),
-                                response.message
-                            )
-                        )
+                        onCompleted?.invoke()
+                        return@launch
                     }
-
-                    deleteCart(transactionTypeIndex, clientId)
-                    clearTransactionPaymentDraft(transactionTypeIndex, clientId)
-
-                    activeStoreIdState.value?.let {
-                        getStock(it)
-                        getStockBatches(it)
-                        getTransactions(it)
-                        getCashRegister(it)
-                    }
-
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke()
                 }
-            } finally {
+
+                postInAppNotification(response.message, NotificationType.Negative)
+                return@launch
+            }
+
+            val completed = response.payload
+
+            latestTransactionReceiptSnapshotState.emit(
+                receiptSnapshot.copy(transaction = completed)
+            )
+
+            transactionsState.emit(
+                DataState.Success(
+                    mutableListOf<TransactionDataModel>().apply {
+                        transactionsState.payloadValue?.let { addAll(it) }
+                        add(completed)
+                    }.distinctBy { transactionItem ->
+                        transactionItem.clientOperationId.ifBlank { transactionItem.id }
+                    },
+                    response.message
+                )
+            )
+
+            completed.debtor?.let { debtor ->
+                debtorsState.emit(
+                    DataState.Success(
+                        debtorsState.payloadValue.orEmpty().upsertDebtor(debtor),
+                        response.message
+                    )
+                )
+            }
+
+            deleteCart(transactionTypeIndex, clientId)
+            clearTransactionPaymentDraft(transactionTypeIndex, clientId)
+
+            activeStoreIdState.value?.let {
+                getStock(it)
+                getStockBatches(it)
+                getTransactions(it)
+                getCashRegister(it)
+            }
+
+            postInAppNotification(response.message, NotificationType.Positive)
+            onCompleted?.invoke()
+        } finally {
+            withContext(NonCancellable) {
                 completeTransactionInProgressState.emit(false)
+                completeTransactionMutex.unlock()
             }
         }
-    else
-        postInAppNotification(
-            localizedStringResourceMessage(
-                id = 224,
-                main = "Completing transaction",
-                ru = "Завершение операции",
-                kk = "Операция аяқталуда"
-            ),
-            NotificationType.Neutral,
-            transient = true
-        )
+    }
 }
 
 expect val Dispatchers.ourIo: CoroutineDispatcher
@@ -7332,11 +7340,10 @@ val supportMessagesState = MutableDataStateFlow<List<SupportMessageDataModel>>(G
 val activeSupportTicketIdState = MutableStateFlow<String?>(null)
 val supportMessageSendingState = MutableStateFlow(false)
 val getSupportTicketsMutex = Mutex()
-val createSupportTicketMutex = Mutex()
+private val supportMessageMutationMutex = Mutex()
 val closeSupportTicketMutex = Mutex()
 val reopenSupportTicketMutex = Mutex()
 val getSupportMessagesMutex = Mutex()
-val sendSupportMessageMutex = Mutex()
 val markSupportMessagesReadMutex = Mutex()
 
 val cashRegisterExtractionsState =
@@ -14121,8 +14128,9 @@ fun createSupportTicket(
 ) {
     if (request.initialMessage.isBlank()) return
     GlobalScope.launch(Dispatchers.ourIo) {
-            createSupportTicketMutex.withLock {
-                supportMessageSendingState.emit(true)
+        supportMessageMutationMutex.withLock {
+            supportMessageSendingState.emit(true)
+            try {
                 val response = networkRequest<SupportTicketDataModel, SupportTicketCreateRequestDataModel>(
                     method = HttpMethod.Post,
                     endpointUrl = globalAppConfigurationState.payloadValue.createSupportTicketPath.first,
@@ -14131,21 +14139,33 @@ fun createSupportTicket(
                         initialMessage = request.initialMessage.trim()
                     )
                 )
-                supportMessageSendingState.emit(false)
 
                 if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, if (response.transportFailure) NotificationType.Neutral else NotificationType.Negative)
+                    postInAppNotification(
+                        response.message,
+                        if (response.transportFailure) NotificationType.Neutral else NotificationType.Negative
+                    )
                     onCompleted?.invoke(DataState.Empty(response.message))
                 } else {
                     val ticket = response.payload
-                    supportTicketsState.emit(DataState.Success(supportTicketsState.payloadValue.orEmpty().upsertSupportTicket(ticket), response.message))
+                    supportTicketsState.emit(
+                        DataState.Success(
+                            supportTicketsState.payloadValue.orEmpty().upsertSupportTicket(ticket),
+                            response.message
+                        )
+                    )
                     activeSupportTicketIdState.emit(ticket.id)
                     getSupportMessages(ticket.id, markRead = true)
                     postInAppNotification(response.message, NotificationType.Positive)
                     onCompleted?.invoke(DataState.Success(ticket, response.message))
                 }
+            } finally {
+                withContext(NonCancellable) {
+                    supportMessageSendingState.emit(false)
+                }
             }
         }
+    }
 }
 
 fun getSupportMessages(
@@ -14191,26 +14211,39 @@ fun sendSupportMessage(
 ) {
     if (request.ticketId.isBlank() || request.body.isBlank()) return
     GlobalScope.launch(Dispatchers.ourIo) {
-            sendSupportMessageMutex.withLock {
-                supportMessageSendingState.emit(true)
+        supportMessageMutationMutex.withLock {
+            supportMessageSendingState.emit(true)
+            try {
                 val response = networkRequest<SupportMessageDataModel, SupportMessageSendRequestDataModel>(
                     method = HttpMethod.Post,
                     endpointUrl = globalAppConfigurationState.payloadValue.sendSupportMessagePath.first,
                     body = request.copy(body = request.body.trim())
                 )
-                supportMessageSendingState.emit(false)
 
                 if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, if (response.transportFailure) NotificationType.Neutral else NotificationType.Negative)
+                    postInAppNotification(
+                        response.message,
+                        if (response.transportFailure) NotificationType.Neutral else NotificationType.Negative
+                    )
                     onCompleted?.invoke(DataState.Empty(response.message))
                 } else {
                     val message = response.payload
-                    supportMessagesState.emit(DataState.Success(supportMessagesState.payloadValue.orEmpty().upsertSupportMessage(message), response.message))
+                    supportMessagesState.emit(
+                        DataState.Success(
+                            supportMessagesState.payloadValue.orEmpty().upsertSupportMessage(message),
+                            response.message
+                        )
+                    )
                     getSupportTickets()
                     onCompleted?.invoke(DataState.Success(message, response.message))
                 }
+            } finally {
+                withContext(NonCancellable) {
+                    supportMessageSendingState.emit(false)
+                }
             }
         }
+    }
 }
 
 fun closeSupportTicket(ticketId: String, onCompleted: ((DataState<SupportTicketDataModel>) -> Unit)? = null) {
@@ -14391,274 +14424,313 @@ fun revokeOtherSecuritySessions(onCompleted: ((DataState<List<SecuritySessionDat
 
 fun logInUser(userAuthLogIn: UserAuthLogInDataModel, serverUrlOverride: String? = null) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            logInMutex.withLock {
-                logInInProgressState.emit(true)
-                try {
-                    postInAppNotificationNow(stringLoggingInState.value, NotificationType.Neutral, transient = true)
+        if (!logInMutex.tryLock()) {
+            postInAppNotification(
+                localizedStringResourceMessage(
+                    id = 219,
+                    main = "Login is already in progress",
+                    ru = "Вход уже выполняется",
+                    kk = "Кіру қазірдің өзінде орындалып жатыр"
+                ),
+                NotificationType.Neutral,
+                transient = true
+            )
+            return@launch
+        }
 
-                    // Keep existing offline credentials until a new token pair is actually received.
-                    // This prevents a temporary LAN/server outage during login retry from locally signing the user out.
-                    httpClient.authProvider<BearerAuthProvider>()?.clearToken()
+        try {
+            logInInProgressState.emit(true)
+            postInAppNotificationNow(stringLoggingInState.value, NotificationType.Neutral, transient = true)
 
-                    val logInRequest = userAuthLogIn.copy(deviceInfo = buildCurrentClientDeviceInfo())
+            // Keep existing offline credentials until a new token pair is actually received.
+            // This prevents a temporary LAN/server outage during login retry from locally signing the user out.
+            httpClient.authProvider<BearerAuthProvider>()?.clearToken()
 
-                    val response = networkRequest<TokenPair, UserAuthLogInDataModel>(
-                        HttpMethod.Post,
-                        serverUrl = serverUrlOverride,
-                        endpointUrl = globalAppConfigurationState.payloadValue.logInPath.first,
-                        body = logInRequest
+            val logInRequest = userAuthLogIn.copy(deviceInfo = buildCurrentClientDeviceInfo())
+
+            val response = networkRequest<TokenPair, UserAuthLogInDataModel>(
+                HttpMethod.Post,
+                serverUrl = serverUrlOverride,
+                endpointUrl = globalAppConfigurationState.payloadValue.logInPath.first,
+                body = logInRequest
+            )
+
+            if (response.negative || response.payload == null) {
+                val fallbackMessage = if (response.transportFailure) {
+                    localizedStringResourceMessage(
+                        id = 1140,
+                        main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
+                        ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
+                        kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
                     )
-
-                    if (response.negative || response.payload == null) {
-                        val fallbackMessage = if (response.transportFailure) {
-                            localizedStringResourceMessage(
-                                id = 1140,
-                                main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
-                                ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
-                                kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
-                            )
-                        } else {
-                            localizedStringResourceMessage(
-                                id = 222,
-                                main = "Login failed: empty token response",
-                                ru = "Не удалось войти: сервер не вернул токены",
-                                kk = "Кіру орындалмады: сервер токендерді қайтармады"
-                            )
-                        }
-                        clearTransientOrNeutralInAppNotifications()
-                        postInAppNotificationNow(
-                            response.message ?: fallbackMessage,
-                            NotificationType.Negative,
-                            transient = false
-                        )
-                    } else {
-                        setStoredUserAuthTokens?.invoke(response.payload)
-                        clearCloudSessionRefreshRequirementForNotifications(CLOUD_TRANSPORT_STATUS_REACHABLE)
-                        markCloudTransportReachableForNotifications(authenticated = true)
-                        httpClient.authProvider<BearerAuthProvider>()?.clearToken()
-                        clearTransientOrNeutralInAppNotifications()
-                        postInAppNotificationNow(
-                            localizedStringResourceMessage(
-                                id = 1156,
-                                main = "Logged in",
-                                ru = "Вход выполнен",
-                                kk = "Кіру орындалды"
-                            ),
-                            NotificationType.Positive,
-                            transient = false
-                        )
-                        syncPendingSessionCleanupsToServer()
-                        getUser(forceLogOut = false)
-                    }
-                } catch (throwable: Throwable) {
-                    if (throwable is CancellationException) throw throwable
-                    clearTransientOrNeutralInAppNotifications()
-                    postInAppNotificationNow(
-                        localizedStringResourceMessage(
-                            id = 1140,
-                            main = "Login failed. Check server connection and try again.",
-                            ru = "Не удалось войти. Проверьте соединение с сервером и попробуйте ещё раз.",
-                            kk = "Кіру орындалмады. Сервермен байланысты тексеріп, қайталап көріңіз."
-                        ),
-                        NotificationType.Negative,
-                        transient = false
+                } else {
+                    localizedStringResourceMessage(
+                        id = 222,
+                        main = "Login failed: empty token response",
+                        ru = "Не удалось войти: сервер не вернул токены",
+                        kk = "Кіру орындалмады: сервер токендерді қайтармады"
                     )
-                } finally {
-                    logInInProgressState.emit(false)
                 }
+                clearTransientOrNeutralInAppNotifications()
+                postInAppNotificationNow(
+                    response.message ?: fallbackMessage,
+                    NotificationType.Negative,
+                    transient = false
+                )
+            } else {
+                setStoredUserAuthTokens?.invoke(response.payload)
+                clearCloudSessionRefreshRequirementForNotifications(CLOUD_TRANSPORT_STATUS_REACHABLE)
+                markCloudTransportReachableForNotifications(authenticated = true)
+                httpClient.authProvider<BearerAuthProvider>()?.clearToken()
+                clearTransientOrNeutralInAppNotifications()
+                postInAppNotificationNow(
+                    localizedStringResourceMessage(
+                        id = 1156,
+                        main = "Logged in",
+                        ru = "Вход выполнен",
+                        kk = "Кіру орындалды"
+                    ),
+                    NotificationType.Positive,
+                    transient = false
+                )
+                syncPendingSessionCleanupsToServer()
+                getUser(forceLogOut = false)
+            }
+        } catch (throwable: Throwable) {
+            if (throwable is CancellationException) throw throwable
+            clearTransientOrNeutralInAppNotifications()
+            postInAppNotificationNow(
+                localizedStringResourceMessage(
+                    id = 1140,
+                    main = "Login failed. Check server connection and try again.",
+                    ru = "Не удалось войти. Проверьте соединение с сервером и попробуйте ещё раз.",
+                    kk = "Кіру орындалмады. Сервермен байланысты тексеріп, қайталап көріңіз."
+                ),
+                NotificationType.Negative,
+                transient = false
+            )
+        } finally {
+            withContext(NonCancellable) {
+                logInInProgressState.emit(false)
+                logInMutex.unlock()
             }
         }
-    else
-        postInAppNotification(
-            localizedStringResourceMessage(
-                id = 219,
-                main = "Login is already in progress",
-                ru = "Вход уже выполняется",
-                kk = "Кіру қазірдің өзінде орындалып жатыр"
-            ),
-            NotificationType.Neutral,
-            transient = true
-        )
+    }
 }
 
 fun signUpUser(userAuthSignUp: UserAuthSignUpDataModel, serverUrlOverride: String? = null) {
     GlobalScope.launch(Dispatchers.ourIo) {
+        if (!signUpUserMutex.tryLock()) {
+            postInAppNotification(
+                localizedStringResourceMessage(
+                    id = 1220,
+                    main = "Sign-up is already in progress",
+                    ru = "Регистрация уже выполняется",
+                    kk = "Тіркелу қазірдің өзінде орындалып жатыр"
+                ),
+                NotificationType.Neutral,
+                transient = true
+            )
+            return@launch
+        }
+
+        try {
             signUpInProgressState.emit(true)
+            postInAppNotificationNow(stringSigningUpState.value, NotificationType.Neutral, transient = true)
 
-            try {
-                signUpUserMutex.withLock {
-                    postInAppNotificationNow(stringSigningUpState.value, NotificationType.Neutral, transient = true)
+            val signUpRequest = userAuthSignUp.copy(deviceInfo = buildCurrentClientDeviceInfo())
 
-                    val signUpRequest = userAuthSignUp.copy(deviceInfo = buildCurrentClientDeviceInfo())
+            val response = networkRequest<TokenPair, UserAuthSignUpDataModel>(
+                HttpMethod.Post,
+                serverUrl = serverUrlOverride,
+                endpointUrl = globalAppConfigurationState.payloadValue.signUpPath.first,
+                body = signUpRequest
+            )
 
-                    val response = networkRequest<TokenPair, UserAuthSignUpDataModel>(
-                        HttpMethod.Post,
-                        serverUrl = serverUrlOverride,
-                        endpointUrl = globalAppConfigurationState.payloadValue.signUpPath.first,
-                        body = signUpRequest
-                    )
-
-                    if (response.negative || response.payload == null) {
-                        clearTransientOrNeutralInAppNotifications()
-                        postInAppNotificationNow(
-                            response.message ?: localizedStringResourceMessage(
-                                id = 3,
-                                main = "Internal server error",
-                                ru = "Внутренняя ошибка сервера",
-                                kk = "Сервердің ішкі қатесі"
-                            ),
-                            NotificationType.Negative,
-                            transient = false
-                        )
-                    } else {
-                        setStoredUserAuthTokens?.invoke(response.payload)
-                        clearCloudSessionRefreshRequirementForNotifications(CLOUD_TRANSPORT_STATUS_REACHABLE)
-                        markCloudTransportReachableForNotifications(authenticated = true)
-                        httpClient.authProvider<BearerAuthProvider>()?.clearToken()
-                        clearTransientOrNeutralInAppNotifications()
-                        postInAppNotificationNow(
-                            localizedStringResourceMessage(
-                                id = 1157,
-                                main = "Signed up",
-                                ru = "Регистрация выполнена",
-                                kk = "Тіркелу орындалды"
-                            ),
-                            NotificationType.Positive,
-                            transient = false
-                        )
-                        syncPendingSessionCleanupsToServer()
-
-                        getUser(forceLogOut = false)
-                    }
-                }
-            } catch (throwable: Throwable) {
-                if (throwable is CancellationException) throw throwable
+            if (response.negative || response.payload == null) {
                 clearTransientOrNeutralInAppNotifications()
                 postInAppNotificationNow(
-                    localizedStringResourceMessage(
+                    response.message ?: localizedStringResourceMessage(
                         id = 3,
-                        main = "Sign-up failed. Check server connection and try again.",
-                        ru = "Не удалось зарегистрироваться. Проверьте соединение с сервером и попробуйте ещё раз.",
-                        kk = "Тіркелу орындалмады. Сервермен байланысты тексеріп, қайталап көріңіз."
+                        main = "Internal server error",
+                        ru = "Внутренняя ошибка сервера",
+                        kk = "Сервердің ішкі қатесі"
                     ),
                     NotificationType.Negative,
                     transient = false
                 )
-            } finally {
+            } else {
+                setStoredUserAuthTokens?.invoke(response.payload)
+                clearCloudSessionRefreshRequirementForNotifications(CLOUD_TRANSPORT_STATUS_REACHABLE)
+                markCloudTransportReachableForNotifications(authenticated = true)
+                httpClient.authProvider<BearerAuthProvider>()?.clearToken()
+                clearTransientOrNeutralInAppNotifications()
+                postInAppNotificationNow(
+                    localizedStringResourceMessage(
+                        id = 1157,
+                        main = "Signed up",
+                        ru = "Регистрация выполнена",
+                        kk = "Тіркелу орындалды"
+                    ),
+                    NotificationType.Positive,
+                    transient = false
+                )
+                syncPendingSessionCleanupsToServer()
+                getUser(forceLogOut = false)
+            }
+        } catch (throwable: Throwable) {
+            if (throwable is CancellationException) throw throwable
+            clearTransientOrNeutralInAppNotifications()
+            postInAppNotificationNow(
+                localizedStringResourceMessage(
+                    id = 3,
+                    main = "Sign-up failed. Check server connection and try again.",
+                    ru = "Не удалось зарегистрироваться. Проверьте соединение с сервером и попробуйте ещё раз.",
+                    kk = "Тіркелу орындалмады. Сервермен байланысты тексеріп, қайталап көріңіз."
+                ),
+                NotificationType.Negative,
+                transient = false
+            )
+        } finally {
+            withContext(NonCancellable) {
                 signUpInProgressState.emit(false)
+                signUpUserMutex.unlock()
             }
         }
+    }
 }
 
 fun logOutUser() {
     GlobalScope.launch(Dispatchers.ourIo) {
-            logOutUserMutex.withLock {
-                val tokenSnapshot = getStoredUserAuthTokens?.invoke()
-                val refreshToken = tokenSnapshot?.refreshToken
-                val activeWorkshiftBeforeLogout = activeWorkshiftState.payloadValue
-                    ?.takeIf { it.isActive && it.endedAtMillis == null }
-                var logoutWorkshiftEndRequest: WorkshiftEndRequestDataModel? = null
-                var logoutWorkshiftStoreId: String? = null
+        if (!logOutUserMutex.tryLock()) {
+            postInAppNotification(
+                localizedStringResourceMessage(
+                    id = 1221,
+                    main = "Sign-out is already in progress",
+                    ru = "Выход уже выполняется",
+                    kk = "Шығу қазірдің өзінде орындалып жатыр"
+                ),
+                NotificationType.Neutral,
+                transient = true
+            )
+            return@launch
+        }
 
-                if (activeWorkshiftBeforeLogout != null) {
-                    val endedAtMillis = getCurrentTimeMillis()
-                    val operationId = createClientOperationId(
-                        prefix = "wse",
-                        seed = listOf(activeWorkshiftBeforeLogout.id, activeWorkshiftBeforeLogout.storeId, endedAtMillis.toString()).joinToString(":")
-                    )
-                    logoutWorkshiftEndRequest = WorkshiftEndRequestDataModel(
-                        workshiftId = activeWorkshiftBeforeLogout.id,
-                        endedAtMillis = endedAtMillis,
-                        clientOperationId = operationId,
-                        deviceInfo = buildCurrentClientDeviceInfo()
-                    )
-                    logoutWorkshiftStoreId = activeWorkshiftBeforeLogout.storeId
-                    endWorkshiftLocallyAndQueue(
-                        workshift = activeWorkshiftBeforeLogout,
-                        endedAtMillis = endedAtMillis,
-                        postNotification = false,
-                        clientOperationId = operationId
-                    )
-                }
+        try {
+            val tokenSnapshot = getStoredUserAuthTokens?.invoke()
+            val refreshToken = tokenSnapshot?.refreshToken
+            val activeWorkshiftBeforeLogout = activeWorkshiftState.payloadValue
+                ?.takeIf { it.isActive && it.endedAtMillis == null }
+            var logoutWorkshiftEndRequest: WorkshiftEndRequestDataModel? = null
+            var logoutWorkshiftStoreId: String? = null
 
-                // Logout must never trap the cashier inside account screen. Local logout is immediate;
-                // server refresh-session revoke is best-effort and can fail silently when the server token is already expired.
-                stopRealtimeUpdates()
-                setStoredUserAuthTokens?.invoke(null)
-                setStoredUserAccountDataModel?.invoke(null)
-                setActiveStoreId(null, syncServer = false)
-                clearCloudSessionRefreshRequirementForNotifications(CLOUD_TRANSPORT_STATUS_UNKNOWN)
-                httpClient.authProvider<BearerAuthProvider>()?.clearToken()
+            if (activeWorkshiftBeforeLogout != null) {
+                val endedAtMillis = getCurrentTimeMillis()
+                val operationId = createClientOperationId(
+                    prefix = "wse",
+                    seed = listOf(
+                        activeWorkshiftBeforeLogout.id,
+                        activeWorkshiftBeforeLogout.storeId,
+                        endedAtMillis.toString()
+                    ).joinToString(":")
+                )
+                logoutWorkshiftEndRequest = WorkshiftEndRequestDataModel(
+                    workshiftId = activeWorkshiftBeforeLogout.id,
+                    endedAtMillis = endedAtMillis,
+                    clientOperationId = operationId,
+                    deviceInfo = buildCurrentClientDeviceInfo()
+                )
+                logoutWorkshiftStoreId = activeWorkshiftBeforeLogout.storeId
+                endWorkshiftLocallyAndQueue(
+                    workshift = activeWorkshiftBeforeLogout,
+                    endedAtMillis = endedAtMillis,
+                    postNotification = false,
+                    clientOperationId = operationId
+                )
+            }
 
-                if (!refreshToken.isNullOrBlank()) {
-                    enqueuePendingSessionCleanup(
+            // Logout must never trap the cashier inside account screen. Local logout is immediate;
+            // server refresh-session revoke is best-effort and can fail silently when the server token is already expired.
+            stopRealtimeUpdates()
+            setStoredUserAuthTokens?.invoke(null)
+            setStoredUserAccountDataModel?.invoke(null)
+            setActiveStoreId(null, syncServer = false)
+            clearCloudSessionRefreshRequirementForNotifications(CLOUD_TRANSPORT_STATUS_UNKNOWN)
+            httpClient.authProvider<BearerAuthProvider>()?.clearToken()
+
+            if (!refreshToken.isNullOrBlank()) {
+                enqueuePendingSessionCleanup(
+                    refreshToken = refreshToken,
+                    reason = "local_logout",
+                    workshiftEnd = logoutWorkshiftEndRequest,
+                    workshiftStoreId = logoutWorkshiftStoreId
+                )
+            }
+
+            userAccountState.emit(DataState.Empty())
+            storesState.emit(DataState.Empty())
+            activeStoreIdState.emit(null)
+            stockState.emit(DataState.Empty())
+            stockBatchesState.emit(DataState.Empty())
+            transactionsState.emit(DataState.Empty())
+            securitySessionsState.emit(DataState.Empty())
+            securitySessionHistoryState.emit(DataState.Empty())
+            activeWorkshiftState.emit(DataState.Empty())
+            supportTicketsState.emit(DataState.Empty())
+            supportMessagesState.emit(DataState.Empty())
+            activeSupportTicketIdState.emit(null)
+            supportMessageSendingState.emit(false)
+            latestInAppNotificationState.emit(null)
+            activeInAppNotificationsState.emit(emptyList())
+
+            val response = if (!refreshToken.isNullOrBlank()) {
+                val revokeResponse = networkRequest<Unit, LogoutCleanupRequestDataModel>(
+                    HttpMethod.Delete,
+                    endpointUrl = globalAppConfigurationState.payloadValue.logOutPath.first,
+                    body = LogoutCleanupRequestDataModel(
                         refreshToken = refreshToken,
+                        queuedAtMillis = getCurrentTimeMillis(),
                         reason = "local_logout",
+                        deviceInfo = buildCurrentClientDeviceInfo(),
                         workshiftEnd = logoutWorkshiftEndRequest,
                         workshiftStoreId = logoutWorkshiftStoreId
                     )
+                )
+                if (!revokeResponse.negative) {
+                    dropPendingSessionCleanup(refreshToken)
+                    logoutWorkshiftEndRequest?.clientOperationId?.let { dropPendingWorkshiftEnd(it) }
                 }
-
-                userAccountState.emit(DataState.Empty())
-                storesState.emit(DataState.Empty())
-                activeStoreIdState.emit(null)
-                stockState.emit(DataState.Empty())
-                stockBatchesState.emit(DataState.Empty())
-                transactionsState.emit(DataState.Empty())
-                securitySessionsState.emit(DataState.Empty())
-                securitySessionHistoryState.emit(DataState.Empty())
-                activeWorkshiftState.emit(DataState.Empty())
-                supportTicketsState.emit(DataState.Empty())
-                supportMessagesState.emit(DataState.Empty())
-                activeSupportTicketIdState.emit(null)
-                supportMessageSendingState.emit(false)
-                latestInAppNotificationState.emit(null)
-                activeInAppNotificationsState.emit(emptyList())
-
-                val response = if (!refreshToken.isNullOrBlank()) {
-                    val revokeResponse = networkRequest<Unit, LogoutCleanupRequestDataModel>(
-                        HttpMethod.Delete,
-                        endpointUrl = globalAppConfigurationState.payloadValue.logOutPath.first,
-                        body = LogoutCleanupRequestDataModel(
-                            refreshToken = refreshToken,
-                            queuedAtMillis = getCurrentTimeMillis(),
-                            reason = "local_logout",
-                            deviceInfo = buildCurrentClientDeviceInfo(),
-                            workshiftEnd = logoutWorkshiftEndRequest,
-                            workshiftStoreId = logoutWorkshiftStoreId
-                        )
-                    )
-                    if (!revokeResponse.negative) {
-                        dropPendingSessionCleanup(refreshToken)
-                        logoutWorkshiftEndRequest?.clientOperationId?.let { dropPendingWorkshiftEnd(it) }
-                    }
-                    revokeResponse
-                } else {
-                    ResponseDataModel<Unit>(
-                        message = localizedStringResourceMessage(
-                            id = 220,
-                            main = "Logged out locally",
-                            ru = "Выход выполнен локально",
-                            kk = "Жергілікті түрде шығу орындалды"
-                        ),
-                        payload = null,
-                        negative = false
-                    )
-                }
-
-                postInAppNotification(
-                    if (response.negative)
-                        localizedStringResourceMessage(
-                            id = 1148,
-                            main = "Logged out locally; server session cleanup is queued",
-                            ru = "Выход выполнен локально; завершение серверного сеанса поставлено в очередь",
-                            kk = "Жергілікті түрде шығу орындалды; сервердегі сеансты аяқтау кезекке қойылды"
-                        )
-                    else response.message,
-                    if (response.negative) NotificationType.Neutral else NotificationType.Positive
+                revokeResponse
+            } else {
+                ResponseDataModel<Unit>(
+                    message = localizedStringResourceMessage(
+                        id = 220,
+                        main = "Logged out locally",
+                        ru = "Выход выполнен локально",
+                        kk = "Жергілікті түрде шығу орындалды"
+                    ),
+                    payload = null,
+                    negative = false
                 )
             }
+
+            postInAppNotification(
+                if (response.negative) {
+                    localizedStringResourceMessage(
+                        id = 1148,
+                        main = "Logged out locally; server session cleanup is queued",
+                        ru = "Выход выполнен локально; завершение серверного сеанса поставлено в очередь",
+                        kk = "Жергілікті түрде шығу орындалды; сервердегі сеансты аяқтау кезекке қойылды"
+                    )
+                } else {
+                    response.message
+                },
+                if (response.negative) NotificationType.Neutral else NotificationType.Positive
+            )
+        } finally {
+            logOutUserMutex.unlock()
         }
+    }
 }
 
 fun getUser(forceLogOut: Boolean = true, applyServerActiveStore: Boolean = true) {

@@ -4002,6 +4002,7 @@ internal fun AppConfiguration.ParentStoreStockSelectionBottomSheet(
     var serverEndReached by rememberSaveable(activeStoreId) { mutableStateOf(false) }
     var loading by remember(activeStoreId) { mutableStateOf(false) }
     var loadError by remember(activeStoreId) { mutableStateOf<String?>(null) }
+    var retryNonce by rememberSaveable(activeStoreId) { mutableStateOf(0) }
 
     val activeStore = stateValues.stores.findStoreOrBranchForUi(activeStoreId)
     val parentStoreId = activeStore?.parentStoreId?.takeIf { it.isNotBlank() }
@@ -4047,7 +4048,7 @@ internal fun AppConfiguration.ParentStoreStockSelectionBottomSheet(
         )
         val cleanQuery = searchTextFieldContent.value.text.trim()
 
-        LaunchedEffect(activeStoreId, cleanQuery) {
+        LaunchedEffect(activeStoreId, cleanQuery, retryNonce) {
             pickerPage = 0
             serverLoadedItems = emptyList()
             serverEndReached = false
@@ -4154,7 +4155,7 @@ internal fun AppConfiguration.ParentStoreStockSelectionBottomSheet(
                         actionButton(
                             text = localizedStringResource(158, "Retry"),
                             iconPath = stateValues.drawablePathIconRefresh,
-                            onClick = { pickerPage = pickerPage }
+                            onClick = { retryNonce += 1 }
                         )
                     }
                 }
