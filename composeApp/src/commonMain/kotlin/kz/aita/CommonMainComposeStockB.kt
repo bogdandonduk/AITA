@@ -830,14 +830,29 @@ fun AppConfiguration.StockBatchEditor(
                                             if (updateState is DataState.Success) {
                                                 onSaved()
                                             } else {
-                                                isSavingBatch = false
+                                                postInAppNotification(
+                                                    updateState.message ?: localizedStringResourceMessage(
+                                                        id = 13,
+                                                        main = "Batch saved, but promotions could not be copied to the other supplier batches",
+                                                        ru = "Партия сохранена, но акции не удалось скопировать в другие партии этого поставщика",
+                                                        kk = "Партия сақталды, бірақ акцияларды осы жеткізушінің басқа партияларына көшіру мүмкін болмады"
+                                                    ),
+                                                    NotificationType.Neutral,
+                                                    transient = true
+                                                )
+                                                onSaved()
                                             }
                                         }
                                     } else {
                                         onSaved()
                                     }
                                 } else {
-                                    saveError = state.message.takeIf { it.isNotBlank() } ?: localizedStringResource(13, "Could not save batch")
+                                    val fallbackMessage = localizedStringResource(13, "Could not save batch")
+                                    saveError = state.message
+                                        ?.extractLocalizedString(stateValues.appLanguage)
+                                        ?.trim()
+                                        ?.takeIf { it.isNotBlank() }
+                                        ?: fallbackMessage
                                     isSavingBatch = false
                                 }
                             }
@@ -846,7 +861,12 @@ fun AppConfiguration.StockBatchEditor(
                                 if (updateState is DataState.Success) {
                                     onSaved()
                                 } else {
-                                    saveError = updateState.message.takeIf { it.isNotBlank() } ?: localizedStringResource(13, "Could not save batch")
+                                    val fallbackMessage = localizedStringResource(13, "Could not save batch")
+                                    saveError = updateState.message
+                                        ?.extractLocalizedString(stateValues.appLanguage)
+                                        ?.trim()
+                                        ?.takeIf { it.isNotBlank() }
+                                        ?: fallbackMessage
                                     isSavingBatch = false
                                 }
                             }
@@ -4069,7 +4089,12 @@ internal fun AppConfiguration.ParentStoreStockSelectionBottomSheet(
                         serverLoadedItems = payload
                         serverEndReached = payload.size < pickerPageSize
                     } else {
-                        loadError = state.message.takeIf { it.isNotBlank() } ?: localizedStringResource(13, "Could not load parent stock")
+                        val fallbackMessage = localizedStringResource(13, "Could not load parent stock")
+                        loadError = state.message
+                            ?.extractLocalizedString(stateValues.appLanguage)
+                            ?.trim()
+                            ?.takeIf { it.isNotBlank() }
+                            ?: fallbackMessage
                     }
                 }
             } finally {

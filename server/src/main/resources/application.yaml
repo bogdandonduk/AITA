@@ -1,7 +1,7 @@
 ktor:
   development: false
   deployment:
-    host: "0.0.0.0"
+    host: ${?AITA_HOST}
     port: ${?AITA_PORT}
     watch: []
   application:

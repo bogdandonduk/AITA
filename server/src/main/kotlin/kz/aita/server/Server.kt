@@ -4013,7 +4013,7 @@ private val AitaRuntimeClassLoaderPlugin = createApplicationPlugin(name = "AitaR
   }
 }
 
-private fun configureKtorDeploymentPortForCloudRuntime() {
+private fun configureKtorDeploymentForRuntime() {
   val cleanPort = listOfNotNull(
     envOrSystem("ktor.deployment.port"),
     envOrSystem("AITA_PORT"),
@@ -4021,19 +4021,34 @@ private fun configureKtorDeploymentPortForCloudRuntime() {
     "8080"
   ).firstNotNullOfOrNull { rawPort ->
     rawPort.toIntOrNull()?.takeIf { it in 1..65_535 }?.toString()
-  } ?: return
+  } ?: "8080"
+
+  val cleanHost = listOfNotNull(
+    envOrSystem("ktor.deployment.host"),
+    envOrSystem("AITA_HOST"),
+    "0.0.0.0"
+  ).firstNotNullOfOrNull { rawHost ->
+    rawHost.trim().takeIf { host ->
+      host.isNotBlank() && host.none { character -> character.isWhitespace() || character == '/' || character == '\\' }
+    }
+  } ?: "0.0.0.0"
 
   if (System.getProperty("AITA_PORT").isNullOrBlank()) {
     System.setProperty("AITA_PORT", cleanPort)
   }
-
   if (System.getProperty("ktor.deployment.port").isNullOrBlank()) {
     System.setProperty("ktor.deployment.port", cleanPort)
+  }
+  if (System.getProperty("AITA_HOST").isNullOrBlank()) {
+    System.setProperty("AITA_HOST", cleanHost)
+  }
+  if (System.getProperty("ktor.deployment.host").isNullOrBlank()) {
+    System.setProperty("ktor.deployment.host", cleanHost)
   }
 }
 
 fun main(args: Array<String>) {
-  configureKtorDeploymentPortForCloudRuntime()
+  configureKtorDeploymentForRuntime()
   stabilizeServerRuntimeClassLoader("main")
   Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
     System.err.println(
