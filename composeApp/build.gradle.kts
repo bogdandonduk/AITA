@@ -125,7 +125,7 @@ kotlin {
             implementation(libs.kotlinx.browser)
         }
         jvmMain.dependencies {
-            implementation(libs.java.keyring.v103)
+            implementation(libs.java.keyring)
 
             implementation(libs.kamel.decoder.svg.batik)
 
@@ -204,7 +204,19 @@ compose.desktop {
         nativeDistributions {
             // Only the formats you need:
             targetFormats(TargetFormat.Msi, TargetFormat.Exe, TargetFormat.Deb, TargetFormat.Dmg)
-            modules("java.sql", "java.logging", "java.xml", "java.desktop", "java.datatransfer", "jdk.crypto.ec", "jdk.charsets")
+            modules(
+                "java.sql",
+                "java.logging",
+                "java.xml",
+                "java.desktop",
+                "java.datatransfer",
+                "java.prefs",
+                "java.management",
+                "java.naming",
+                "jdk.crypto.ec",
+                "jdk.charsets",
+                "jdk.unsupported"
+            )
             // MSI requires a 3-part numeric version:
             packageVersion = "1.0.0"
 

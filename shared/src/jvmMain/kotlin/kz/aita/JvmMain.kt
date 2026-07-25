@@ -11,6 +11,7 @@ import com.fazecast.jSerialComm.SerialPort
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.Cache
 import okhttp3.OkHttpClient
@@ -33,7 +34,6 @@ import javax.print.attribute.standard.PrinterState
 import javax.print.attribute.standard.PrinterStateReason
 import javax.print.attribute.standard.PrinterStateReasons
 import javax.print.attribute.standard.QueuedJobCount
-import kotlin.io.path.Path
 
 actual fun getCurrentTimeMillis(): Long = System.currentTimeMillis()
 actual var getStoredUserAuthTokens: (() -> TokenPair?)? = null
@@ -42,35 +42,92 @@ actual var setStoredUserAuthTokens: ((TokenPair?) -> Unit)? = null
 actual var getStoredUserAccountDataModel: (() -> UserAccountDataModel?)? = null
 actual var setStoredUserAccountDataModel: ((UserAccountDataModel?) -> Unit)? = null
 
+/**
+ * Durable JVM application data. Compose's desktop launcher initializes this separately from
+ * [cacheDirPath] so SQLDelight state, UI drafts and printer selections are not lost when an OS or
+ * cleanup tool clears the desktop cache directory. Tests and embedders that do not initialize it
+ * retain the old behaviour by falling back to [cacheDirPath].
+ */
+@Volatile
+var jvmPersistentDataDirPath: String = ""
+
+private fun jvmPersistentDataRoot(): File {
+    val configured = jvmPersistentDataDirPath.trim().ifBlank { cacheDirPath.trim() }
+    val fallback = File(System.getProperty("java.io.tmpdir"), "aita-jvm-data").absolutePath
+    return File(configured.ifBlank { fallback }).apply {
+        if (!exists() && !mkdirs() && !exists()) {
+            error("Could not create AITA desktop data directory '$absolutePath'")
+        }
+        if (!isDirectory) error("AITA desktop data path '$absolutePath' is not a directory")
+    }
+}
+
+private val persistentUiDraftMutex = Mutex()
+
 private fun persistentUiDraftFileForKey(key: String): File {
     val safeName = key
         .map { char -> if (char.isLetterOrDigit() || char == '-' || char == '_') char else '_' }
         .joinToString("")
         .let { if (it.length <= 140) it else it.take(96) + "_" + key.hashCode().toUInt().toString(16) }
-    val dir = File(cacheDirPath.ifBlank { System.getProperty("java.io.tmpdir") }, "ui_drafts")
-    return File(dir, "$safeName.txt")
+    return File(File(jvmPersistentDataRoot(), "ui_drafts"), "$safeName.txt")
+}
+
+private fun writeTextAtomically(file: File, value: String) {
+    val parent = file.parentFile ?: error("AITA file '${file.absolutePath}' has no parent directory")
+    if (!parent.exists() && !parent.mkdirs() && !parent.exists()) {
+        error("Could not create AITA directory '${parent.absolutePath}'")
+    }
+    val temporary = File(parent, ".${file.name}.${UUID.randomUUID()}.tmp")
+    try {
+        temporary.writeText(value, Charsets.UTF_8)
+        try {
+            Files.move(
+                temporary.toPath(),
+                file.toPath(),
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING
+            )
+        } catch (atomicMoveFailure: IOException) {
+            try {
+                Files.move(
+                    temporary.toPath(),
+                    file.toPath(),
+                    StandardCopyOption.REPLACE_EXISTING
+                )
+            } catch (fallbackMoveFailure: IOException) {
+                fallbackMoveFailure.addSuppressed(atomicMoveFailure)
+                throw fallbackMoveFailure
+            }
+        }
+    } finally {
+        runCatching { temporary.delete() }
+    }
 }
 
 actual var getPersistentUiDraftValue: (suspend (String) -> String?)? = { key ->
-    runCatching {
-        val file = persistentUiDraftFileForKey(key)
-        if (file.exists()) file.readText() else null
-    }.getOrNull()
+    persistentUiDraftMutex.withLock {
+        runCatching {
+            val file = persistentUiDraftFileForKey(key)
+            if (file.isFile) file.readText(Charsets.UTF_8) else null
+        }.getOrNull()
+    }
 }
 
 actual var setPersistentUiDraftValue: (suspend (String, String?) -> Unit)? = { key, value ->
-    runCatching {
-        val file = persistentUiDraftFileForKey(key)
-        file.parentFile?.mkdirs()
-        if (value == null) {
-            file.delete()
-        } else {
-            val tmp = File(file.parentFile, file.name + ".tmp")
-            tmp.writeText(value)
-            tmp.renameTo(file) || run { file.writeText(value); true }
+    persistentUiDraftMutex.withLock {
+        runCatching {
+            val file = persistentUiDraftFileForKey(key)
+            if (value == null) {
+                if (file.exists() && !file.delete()) {
+                    error("Could not delete persistent AITA UI draft '${file.absolutePath}'")
+                }
+            } else {
+                writeTextAtomically(file, value)
+            }
+        }.onFailure { throwable ->
+            System.err.println("AITA persistent UI draft write failed for key '$key': ${throwable.message}")
         }
     }
-    Unit
 }
 
 actual var cacheDirPath: String = ""
@@ -87,6 +144,8 @@ private fun buildAitaOkHttpClient(): OkHttpClient {
                 val httpCacheDirectory = File(basePath, "http").apply { mkdirs() }
                 builder.cache(Cache(httpCacheDirectory, cacheSize))
             }
+    }.onFailure { throwable ->
+        System.err.println("AITA desktop HTTP cache initialization failed: ${throwable.message}")
     }
     return builder.build()
 }
@@ -98,49 +157,64 @@ actual var getHttpClientEngine: () -> HttpClientEngine = {
 }
 
 actual var getSystemLocaleLanguage: () -> String = {
-    Locale.getDefault()?.language ?: "ru"
+    Locale.getDefault().language.takeIf { it.isNotBlank() } ?: "ru"
+}
+
+private fun currentJvmDesktopPlatformName(): String {
+    val osName = System.getProperty("os.name").orEmpty().lowercase(Locale.ROOT)
+    return when {
+        osName.contains("linux") -> "jvm-linux"
+        osName.contains("mac") || osName.contains("darwin") -> "jvm-macos"
+        osName.contains("win") -> "jvm-windows"
+        else -> "jvm"
+    }
 }
 
 actual var getPlatformName: () -> String = {
-    "jvm"
+    currentJvmDesktopPlatformName()
 }
 
 actual var getSqlDelightDriver: (() -> SqlDriver?)? = {
-    Unit.run {
-        val dir = Path(cacheDirPath)
-        val dbPath = dir.resolve("app_database.db").toAbsolutePath()
+    val dataDirectory = jvmPersistentDataRoot().toPath()
+    Files.createDirectories(dataDirectory)
+    val dbPath = dataDirectory.resolve("app_database.db").toAbsolutePath()
+    val firstRun = !Files.exists(dbPath) || runCatching { Files.size(dbPath) == 0L }.getOrDefault(false)
+    val driver: SqlDriver = JdbcSqliteDriver("jdbc:sqlite:$dbPath")
 
-        val url = "jdbc:sqlite:$dbPath"
-        val firstRun = !Files.exists(dbPath)
-
-        val driver: SqlDriver = JdbcSqliteDriver(url)
+    try {
+        // These are per-connection protections. They keep foreign-key integrity enabled and avoid
+        // transient "database is locked" failures during short concurrent desktop operations.
+        driver.execute(null, "PRAGMA foreign_keys = ON", 0)
+        driver.execute(null, "PRAGMA busy_timeout = 5000", 0)
 
         val schema = AppDatabase.Schema.synchronous()
         if (firstRun) {
             schema.create(driver)
         } else {
-            val cursor = driver
-                .executeQuery(
-                    identifier = null,
-                    sql = "PRAGMA user_version",
-                    parameters = 0,
-                    mapper = { cursor: SqlCursor ->
-                        QueryResult.Value(
-                            if (cursor.next().value)
-                                cursor.getLong(0)?.toInt() ?: 0
-                            else
-                                0
-                        )
-                    }
-                )
+            val cursor = driver.executeQuery(
+                identifier = null,
+                sql = "PRAGMA user_version",
+                parameters = 0,
+                mapper = { sqlCursor: SqlCursor ->
+                    QueryResult.Value(
+                        if (sqlCursor.next().value) sqlCursor.getLong(0)?.toInt() ?: 0 else 0
+                    )
+                }
+            )
             val currentVersion = cursor.value
             val targetVersion = AppDatabase.Schema.version.toInt()
-            if (currentVersion < targetVersion) {
-                schema.migrate(driver, currentVersion.toLong(), schema.version)
+            when {
+                currentVersion < targetVersion -> schema.migrate(driver, currentVersion.toLong(), schema.version)
+                currentVersion > targetVersion -> error(
+                    "AITA local database version $currentVersion is newer than this app supports ($targetVersion)"
+                )
             }
         }
 
         driver
+    } catch (throwable: Throwable) {
+        runCatching { driver.close() }
+        throw throwable
     }
 }
 
@@ -186,7 +260,7 @@ object ReceiptPlatformJvmBridge {
     private val receiptPrinterWriteMutex = Mutex()
 
     private fun receiptPrinterDevicePreferenceFile(): File {
-        return File(cacheDirPath.ifBlank { System.getProperty("java.io.tmpdir") }, RECEIPT_PRINTER_DEVICE_FILE_NAME)
+        return File(jvmPersistentDataRoot(), RECEIPT_PRINTER_DEVICE_FILE_NAME)
     }
 
     private fun currentOsName(): String = System.getProperty("os.name").orEmpty().lowercase(Locale.ROOT)
@@ -220,8 +294,8 @@ object ReceiptPlatformJvmBridge {
 
         val cleanFailure = output
             .lineSequence()
-            .map(String::trim)
-            .filter(String::isNotBlank)
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
             .filterNot { line ->
                 line.startsWith(WINDOWS_RAW_PRINT_JOB_STARTED_MARKER) ||
                         line.startsWith(WINDOWS_RAW_PRINT_SUCCESS_MARKER)
@@ -645,15 +719,23 @@ object ReceiptPlatformJvmBridge {
                 val clean = rawPath.trim().let { path ->
                     if (path.startsWith(FILE_PREFIX, ignoreCase = true)) path.substring(FILE_PREFIX.length) else path
                 }.trim().takeIf { it.isNotBlank() } ?: return@mapNotNull null
-                val exists = runCatching { File(normalizedDevicePath(clean)).exists() }.getOrDefault(false)
-                val isConfigured = configured.equals(clean, ignoreCase = true) || configured.equals(FILE_PREFIX + clean, ignoreCase = true)
+                val deviceFile = File(normalizedDevicePath(clean))
+                val exists = runCatching { deviceFile.exists() }.getOrDefault(false)
+                val writable = exists && !deviceFile.isDirectory && deviceFile.canWrite()
+                val isConfigured = configured.equals(clean, ignoreCase = true) ||
+                    configured.equals(FILE_PREFIX + clean, ignoreCase = true)
                 if (!isConfigured && !exists) return@mapNotNull null
                 PlatformReceiptPrinterDataModel(
                     id = clean,
                     name = clean.substringAfterLast('/').substringAfterLast('\\').ifBlank { clean },
-                    subtitle = if (isConfigured) "Raw ESC/POS device path • selected" else "Detected raw ESC/POS device path",
+                    subtitle = when {
+                        !exists -> "Saved raw ESC/POS device path is not connected"
+                        !writable -> "Device exists but is not writable; check printer/serial group permissions"
+                        isConfigured -> "Raw ESC/POS device path • selected"
+                        else -> "Detected raw ESC/POS device path"
+                    },
                     configured = isConfigured,
-                    available = exists || isConfigured
+                    available = writable
                 )
             }
     }
@@ -1253,131 +1335,320 @@ finally {
 
 
 actual object LocalAitaLanTransport {
+    private const val MAX_LAN_MESSAGE_BYTES = 2 * 1024 * 1024
+    private val lifecycleLock = Any()
     private val running = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val activeTcpClientSlots = java.util.concurrent.Semaphore(24)
+
+    @Volatile
     private var tcpServer: java.net.ServerSocket? = null
+
+    @Volatile
     private var udpSocket: java.net.DatagramSocket? = null
+
+    @Volatile
     private var tcpThread: Thread? = null
+
+    @Volatile
     private var udpThread: Thread? = null
+
+    private fun readBoundedUtf8(input: java.io.InputStream): String {
+        val output = java.io.ByteArrayOutputStream()
+        val buffer = ByteArray(8 * 1024)
+        while (true) {
+            val count = input.read(buffer)
+            if (count < 0) break
+            if (count == 0) continue
+            if (output.size() + count > MAX_LAN_MESSAGE_BYTES) {
+                error("AITA LAN message exceeds $MAX_LAN_MESSAGE_BYTES bytes")
+            }
+            output.write(buffer, 0, count)
+        }
+        return output.toByteArray().toString(Charsets.UTF_8)
+    }
 
     actual fun start(
         deviceId: String,
         tcpPort: Int,
         discoveryPort: Int,
         onMessage: suspend (message: String, senderHost: String) -> String
-    ): Boolean {
-        if (running.get()) return true
-        running.set(true)
+    ): Boolean = synchronized(lifecycleLock) {
+        if (running.get()) {
+            val samePorts = tcpServer?.localPort == tcpPort && udpSocket?.localPort == discoveryPort
+            if (!samePorts) {
+                System.err.println(
+                    "AITA LAN transport is already running on tcp=${tcpServer?.localPort} " +
+                        "discovery=${udpSocket?.localPort}; refusing a second configuration"
+                )
+            }
+            return@synchronized samePorts
+        }
+        if (tcpPort !in 1..65535 || discoveryPort !in 1..65535) return@synchronized false
 
-        return runCatching {
-            tcpThread = kotlin.concurrent.thread(name = "AITA-LAN-TCP-$deviceId", isDaemon = true) {
-                runCatching {
-                    val server = java.net.ServerSocket().apply {
-                        reuseAddress = true
-                        bind(java.net.InetSocketAddress(tcpPort))
+        val preparedTcpServer = java.net.ServerSocket()
+        val preparedUdpSocket = java.net.DatagramSocket(null)
+        try {
+            preparedTcpServer.reuseAddress = true
+            preparedTcpServer.bind(java.net.InetSocketAddress(tcpPort))
+
+            preparedUdpSocket.reuseAddress = true
+            preparedUdpSocket.broadcast = true
+            preparedUdpSocket.bind(java.net.InetSocketAddress(discoveryPort))
+
+            tcpServer = preparedTcpServer
+            udpSocket = preparedUdpSocket
+            running.set(true)
+
+            tcpThread = kotlin.concurrent.thread(
+                name = "AITA-LAN-TCP-$deviceId",
+                isDaemon = true
+            ) {
+                while (running.get()) {
+                    val client = try {
+                        preparedTcpServer.accept()
+                    } catch (throwable: Throwable) {
+                        if (running.get() && !preparedTcpServer.isClosed) {
+                            System.err.println("AITA LAN TCP accept failed: ${throwable.message}")
+                        }
+                        break
                     }
-                    tcpServer = server
-                    while (running.get()) {
-                        val socket = runCatching { server.accept() }.getOrNull() ?: continue
+
+                    if (!activeTcpClientSlots.tryAcquire()) {
+                        runCatching { client.close() }
+                        System.err.println("AITA LAN TCP connection rejected: too many simultaneous clients")
+                        continue
+                    }
+                    try {
                         kotlin.concurrent.thread(name = "AITA-LAN-TCP-CLIENT", isDaemon = true) {
-                            socket.use { client ->
-                                runCatching {
-                                    client.soTimeout = 5000
-                                    val message = client.getInputStream().readBytes().toString(Charsets.UTF_8)
-                                    val response = kotlinx.coroutines.runBlocking { onMessage(message, client.inetAddress?.hostAddress.orEmpty()) }
-                                    if (response.isNotBlank()) {
-                                        client.getOutputStream().write(response.toByteArray(Charsets.UTF_8))
-                                        client.getOutputStream().flush()
+                            try {
+                                client.use { socket ->
+                                    runCatching {
+                                        socket.soTimeout = 5_000
+                                        val message = readBoundedUtf8(socket.getInputStream())
+                                        val response = kotlinx.coroutines.runBlocking {
+                                            onMessage(message, socket.inetAddress?.hostAddress.orEmpty())
+                                        }
+                                        if (response.isNotBlank()) {
+                                            val responseBytes = response.toByteArray(Charsets.UTF_8)
+                                            if (responseBytes.size > MAX_LAN_MESSAGE_BYTES) {
+                                                error("AITA LAN response exceeds $MAX_LAN_MESSAGE_BYTES bytes")
+                                            }
+                                            socket.getOutputStream().apply {
+                                                write(responseBytes)
+                                                flush()
+                                            }
+                                        }
+                                    }.onFailure { throwable ->
+                                        if (running.get()) {
+                                            System.err.println("AITA LAN TCP client failed: ${throwable.message}")
+                                        }
                                     }
                                 }
+                            } finally {
+                                activeTcpClientSlots.release()
                             }
                         }
+                    } catch (threadFailure: Throwable) {
+                        activeTcpClientSlots.release()
+                        runCatching { client.close() }
+                        if (running.get()) {
+                            System.err.println("AITA LAN TCP client thread could not start: ${threadFailure.message}")
+                        }
                     }
-                }.onFailure { running.set(false) }
+                }
             }
 
-            udpThread = kotlin.concurrent.thread(name = "AITA-LAN-UDP-$deviceId", isDaemon = true) {
-                runCatching {
-                    val socket = java.net.DatagramSocket(null).apply {
-                        reuseAddress = true
-                        broadcast = true
-                        bind(java.net.InetSocketAddress(discoveryPort))
+            udpThread = kotlin.concurrent.thread(
+                name = "AITA-LAN-UDP-$deviceId",
+                isDaemon = true
+            ) {
+                val buffer = ByteArray(65_507)
+                while (running.get()) {
+                    val packet = java.net.DatagramPacket(buffer, buffer.size)
+                    try {
+                        preparedUdpSocket.receive(packet)
+                    } catch (throwable: Throwable) {
+                        if (running.get() && !preparedUdpSocket.isClosed) {
+                            System.err.println("AITA LAN UDP receive failed: ${throwable.message}")
+                        }
+                        break
                     }
-                    udpSocket = socket
-                    val buffer = ByteArray(65507)
-                    while (running.get()) {
-                        val packet = java.net.DatagramPacket(buffer, buffer.size)
-                        runCatching { socket.receive(packet) }.getOrNull() ?: continue
-                        val message = packet.data.copyOfRange(packet.offset, packet.offset + packet.length).toString(Charsets.UTF_8)
-                        val response = kotlinx.coroutines.runBlocking { onMessage(message, packet.address?.hostAddress.orEmpty()) }
+
+                    runCatching {
+                        val message = packet.data
+                            .copyOfRange(packet.offset, packet.offset + packet.length)
+                            .toString(Charsets.UTF_8)
+                        val response = kotlinx.coroutines.runBlocking {
+                            onMessage(message, packet.address?.hostAddress.orEmpty())
+                        }
                         if (response.isNotBlank()) {
-                            val bytes = response.toByteArray(Charsets.UTF_8)
-                            socket.send(java.net.DatagramPacket(bytes, bytes.size, packet.address, packet.port))
+                            val responseBytes = response.toByteArray(Charsets.UTF_8)
+                            if (responseBytes.size <= 65_507) {
+                                preparedUdpSocket.send(
+                                    java.net.DatagramPacket(
+                                        responseBytes,
+                                        responseBytes.size,
+                                        packet.address,
+                                        packet.port
+                                    )
+                                )
+                            }
+                        }
+                    }.onFailure { throwable ->
+                        if (running.get()) {
+                            System.err.println("AITA LAN UDP message failed: ${throwable.message}")
                         }
                     }
                 }
             }
             true
-        }.getOrElse {
+        } catch (throwable: Throwable) {
             running.set(false)
-            stop()
+            runCatching { preparedTcpServer.close() }
+            runCatching { preparedUdpSocket.close() }
+            tcpServer = null
+            udpSocket = null
+            tcpThread = null
+            udpThread = null
+            System.err.println(
+                "AITA LAN transport could not bind tcp=$tcpPort discovery=$discoveryPort: ${throwable.message}"
+            )
             false
         }
     }
 
     actual fun stop() {
-        running.set(false)
-        runCatching { tcpServer?.close() }
-        runCatching { udpSocket?.close() }
-        tcpServer = null
-        udpSocket = null
-        tcpThread = null
-        udpThread = null
+        synchronized(lifecycleLock) {
+            running.set(false)
+            val oldTcpThread = tcpThread
+            val oldUdpThread = udpThread
+            runCatching { tcpServer?.close() }
+            runCatching { udpSocket?.close() }
+            tcpServer = null
+            udpSocket = null
+            tcpThread = null
+            udpThread = null
+            runCatching { oldTcpThread?.interrupt() }
+            runCatching { oldUdpThread?.interrupt() }
+        }
+    }
+
+    private fun broadcastAddresses(): List<java.net.InetAddress> {
+        val addresses = linkedSetOf<java.net.InetAddress>()
+        runCatching { addresses += java.net.InetAddress.getByName("255.255.255.255") }
+        runCatching {
+            val interfaces = java.net.NetworkInterface.getNetworkInterfaces()
+                ?.let { java.util.Collections.list(it) }
+                .orEmpty()
+            interfaces
+                .filter { networkInterface ->
+                    runCatching {
+                        networkInterface.isUp &&
+                            !networkInterface.isLoopback &&
+                            !networkInterface.isVirtual
+                    }.getOrDefault(false)
+                }
+                .flatMap { it.interfaceAddresses.orEmpty() }
+                .mapNotNullTo(addresses) { it.broadcast }
+        }
+        return addresses.toList()
     }
 
     actual fun broadcast(message: String, discoveryPort: Int) {
+        if (discoveryPort !in 1..65535) return
+        val bytes = message.toByteArray(Charsets.UTF_8)
+        if (bytes.isEmpty() || bytes.size > 65_507) return
         runCatching {
             java.net.DatagramSocket().use { socket ->
                 socket.broadcast = true
-                val bytes = message.toByteArray(Charsets.UTF_8)
-                val packet = java.net.DatagramPacket(
-                    bytes,
-                    bytes.size,
-                    java.net.InetAddress.getByName("255.255.255.255"),
-                    discoveryPort
-                )
-                socket.send(packet)
-            }
-        }
-    }
-
-    actual suspend fun send(host: String, port: Int, message: String, timeoutMillis: Int): String? =
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            runCatching {
-                java.net.Socket().use { socket ->
-                    socket.soTimeout = timeoutMillis
-                    socket.connect(java.net.InetSocketAddress(host, port), timeoutMillis)
-                    socket.getOutputStream().write(message.toByteArray(Charsets.UTF_8))
-                    socket.getOutputStream().flush()
-                    runCatching { socket.shutdownOutput() }
-                    socket.getInputStream().readBytes().toString(Charsets.UTF_8).ifBlank { null }
-                }
-            }.getOrNull()
-        }
-
-    actual fun localHostAddress(): String {
-        return runCatching {
-            val interfaces = java.net.NetworkInterface.getNetworkInterfaces()
-            while (interfaces.hasMoreElements()) {
-                val networkInterface = interfaces.nextElement()
-                val addresses = networkInterface.inetAddresses
-                while (addresses.hasMoreElements()) {
-                    val address = addresses.nextElement()
-                    if (!address.isLoopbackAddress && address is java.net.Inet4Address) {
-                        return@runCatching address.hostAddress
+                broadcastAddresses().forEach { address ->
+                    runCatching {
+                        socket.send(java.net.DatagramPacket(bytes, bytes.size, address, discoveryPort))
                     }
                 }
             }
-            java.net.InetAddress.getLocalHost().hostAddress ?: "127.0.0.1"
+        }.onFailure { throwable ->
+            System.err.println("AITA LAN broadcast failed: ${throwable.message}")
+        }
+    }
+
+    actual suspend fun send(
+        host: String,
+        port: Int,
+        message: String,
+        timeoutMillis: Int
+    ): String? = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val cleanHost = host.trim()
+        if (cleanHost.isBlank() || port !in 1..65535) return@withContext null
+        val stableTimeout = timeoutMillis.coerceIn(250, 60_000)
+        val requestBytes = message.toByteArray(Charsets.UTF_8)
+        if (requestBytes.size > MAX_LAN_MESSAGE_BYTES) return@withContext null
+
+        runCatching {
+            java.net.Socket().use { socket ->
+                socket.soTimeout = stableTimeout
+                socket.connect(java.net.InetSocketAddress(cleanHost, port), stableTimeout)
+                socket.getOutputStream().apply {
+                    write(requestBytes)
+                    flush()
+                }
+                runCatching { socket.shutdownOutput() }
+                readBoundedUtf8(socket.getInputStream()).ifBlank { null }
+            }
+        }.getOrNull()
+    }
+
+    private fun routeSelectedIpv4Address(): String? = runCatching {
+        java.net.DatagramSocket().use { socket ->
+            socket.connect(java.net.InetSocketAddress("1.1.1.1", 53))
+            (socket.localAddress as? java.net.Inet4Address)
+                ?.takeUnless { it.isLoopbackAddress || it.isAnyLocalAddress }
+                ?.hostAddress
+        }
+    }.getOrNull()
+
+    actual fun localHostAddress(): String {
+        routeSelectedIpv4Address()?.let { return it }
+
+        return runCatching {
+            data class Candidate(val score: Int, val address: String)
+
+            val ignoredInterfacePrefixes = listOf(
+                "docker", "veth", "br-", "virbr", "vmnet", "vboxnet", "tun", "tap", "tailscale", "zt"
+            )
+            val preferredInterfacePrefixes = listOf("en", "eth", "wl", "wlan")
+
+            java.net.NetworkInterface.getNetworkInterfaces()
+                ?.let { java.util.Collections.list(it) }
+                .orEmpty()
+                .filter { networkInterface ->
+                    runCatching {
+                        networkInterface.isUp &&
+                            !networkInterface.isLoopback &&
+                            !networkInterface.isVirtual &&
+                            ignoredInterfacePrefixes.none {
+                                prefix -> networkInterface.name.orEmpty().lowercase(Locale.ROOT).startsWith(prefix)
+                            }
+                    }.getOrDefault(false)
+                }
+                .flatMap { networkInterface ->
+                    val interfaceName = networkInterface.name.orEmpty().lowercase(Locale.ROOT)
+                    java.util.Collections.list(networkInterface.inetAddresses).mapNotNull { address ->
+                        val ipv4 = address as? java.net.Inet4Address ?: return@mapNotNull null
+                        if (ipv4.isLoopbackAddress || ipv4.isAnyLocalAddress || ipv4.isLinkLocalAddress) {
+                            return@mapNotNull null
+                        }
+                        val score =
+                            (if (ipv4.isSiteLocalAddress) 100 else 0) +
+                            (if (preferredInterfacePrefixes.any { interfaceName.startsWith(it) }) 40 else 0) +
+                            (if (runCatching { networkInterface.supportsMulticast() }.getOrDefault(false)) 10 else 0)
+                        Candidate(score, ipv4.hostAddress)
+                    }
+                }
+                .maxByOrNull { it.score }
+                ?.address
+                ?: java.net.InetAddress.getLocalHost().hostAddress
+                ?: "127.0.0.1"
         }.getOrDefault("127.0.0.1")
     }
 }

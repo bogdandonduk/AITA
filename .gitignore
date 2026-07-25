@@ -16,3 +16,15 @@ captures
 !*.xcodeproj/project.xcworkspace/
 !*.xcworkspace/contents.xcworkspacedata
 **/xcshareddata/WorkspaceSettings.xcsettings
+
+# AITA runtime secrets and machine-local production configuration
+aita-backup-private-key.txt
+*aita*backup*private*key*
+**/aita-prod.env
+**/rclone.conf
+**/cloudflare-tunnel-token.txt
+**/aita-backup-age.key
+*.p12
+*.pfx
+*.jks
+*.keystore

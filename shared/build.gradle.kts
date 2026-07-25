@@ -125,7 +125,6 @@ kotlin {
             implementation("io.ktor:ktor-client-android:${property("ktor.version")}")
         }
         jvmMain.dependencies {
-            implementation(libs.java.keyring)
             implementation(libs.jserialcomm)
 
             implementation(libs.sqlDelightJvmDriver)

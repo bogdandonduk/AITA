@@ -5,11 +5,31 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/aita-linux-common.sh"
 
 install_packages=false
+desktop_host_mode="auto"
+desktop_mode_argument=""
 while (($#)); do
   case "$1" in
     --install-packages) install_packages=true ;;
+    --desktop-host)
+      [[ -z "$desktop_mode_argument" ]] || aita_die "Use only one of --desktop-host or --server-only"
+      desktop_mode_argument="desktop"
+      desktop_host_mode="true"
+      ;;
+    --server-only)
+      [[ -z "$desktop_mode_argument" ]] || aita_die "Use only one of --desktop-host or --server-only"
+      desktop_mode_argument="server"
+      desktop_host_mode="false"
+      ;;
     -h|--help)
-      echo "Usage: sudo $0 [--install-packages]"
+      cat <<EOF
+Usage: sudo $0 [--install-packages] [--desktop-host|--server-only]
+
+  --desktop-host  Install the complete Java 21/AWT and Linux desktop runtime needed
+                  to run the Compose desktop client on the same Ubuntu machine.
+  --server-only   Keep the minimal headless Java runtime for a dedicated server.
+
+Without either mode, Ubuntu desktop sessions are detected automatically.
+EOF
       exit 0
       ;;
     *) aita_die "Unknown argument: $1" ;;
@@ -19,12 +39,36 @@ done
 
 ((EUID == 0)) || aita_die "Run this installer with sudo"
 
+if [[ "$desktop_host_mode" == "auto" ]]; then
+  if [[ -d /usr/share/xsessions || -d /usr/share/wayland-sessions ]] ||
+     dpkg-query -W -f='${Status}' ubuntu-desktop 2>/dev/null | grep -q 'install ok installed'; then
+    desktop_host_mode="true"
+  else
+    desktop_host_mode="false"
+  fi
+fi
+
 if $install_packages; then
   export DEBIAN_FRONTEND=noninteractive
   apt-get update
-  apt-get install -y \
-    openjdk-21-jdk-headless curl ca-certificates jq rsync unzip \
+
+  packages=(
+    curl ca-certificates jq rsync unzip
     postgresql-client age rclone smartmontools ufw
+  )
+  if [[ "$desktop_host_mode" == "true" ]]; then
+    packages+=(
+      openjdk-21-jdk xwayland xdg-utils xdg-user-dirs libsecret-1-0 gnome-keyring cups-client
+      wl-clipboard xclip xsel
+      libx11-6 libxext6 libxrender1 libxtst6 libxi6 libxrandr2
+      libfreetype6 fontconfig libgl1
+    )
+    aita_info "Desktop host detected: installing the complete Java 21/AWT runtime"
+  else
+    packages+=(openjdk-21-jdk-headless)
+    aita_info "Dedicated server mode: installing the headless Java 21 runtime"
+  fi
+  apt-get install -y "${packages[@]}"
 fi
 
 if ! getent group aita >/dev/null; then

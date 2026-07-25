@@ -19,7 +19,6 @@ flywayCore = "12.9.0"
 hikaricp = "7.0.2"
 javaJwt = "4.5.0"
 javaKeyring = "1.0.4"
-javaKeyringVersion = "1.0.3"
 jserialcomm = "2.11.4"
 junit = "4.13.2"
 
@@ -57,7 +56,6 @@ flyway-database-postgresql = { module = "org.flywaydb:flyway-database-postgresql
 hikaricp = { module = "com.zaxxer:HikariCP", version.ref = "hikaricp" }
 java-jwt = { module = "com.auth0:java-jwt", version.ref = "javaJwt" }
 java-keyring = { module = "com.github.javakeyring:java-keyring", version.ref = "javaKeyring" }
-java-keyring-v103 = { module = "com.github.javakeyring:java-keyring", version.ref = "javaKeyringVersion" }
 jserialcomm = { module = "com.fazecast:jSerialComm", version.ref = "jserialcomm" }
 kamel-decoder-animated-image = { module = "media.kamel:kamel-decoder-animated-image", version.ref = "kamelImage" }
 kamel-decoder-image-bitmap = { module = "media.kamel:kamel-decoder-image-bitmap", version.ref = "kamelImage" }
