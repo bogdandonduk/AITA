@@ -75,6 +75,56 @@ if $service_preflight; then
   exit 0
 fi
 
+has_real_address_value() {
+  local value="${1-}"
+  [[ -n "$value" ]] && ! aita_is_placeholder "$value"
+}
+
+address_shared_key="${AITA_YANDEX_MAPS_API_KEY-}"
+address_suggest_key="${AITA_YANDEX_GEOSUGGEST_API_KEY:-$address_shared_key}"
+address_geocoder_key="${AITA_YANDEX_GEOCODER_API_KEY:-$address_shared_key}"
+address_static_key="${AITA_YANDEX_STATIC_MAPS_API_KEY:-$address_shared_key}"
+address_signing_secret="${AITA_ADDRESS_MAP_SIGNING_SECRET-}"
+
+if has_real_address_value "$address_suggest_key"; then
+  pass "Yandex address suggestions are configured"
+else
+  warn "Yandex Geosuggest key is missing; verified address selection will be unavailable"
+fi
+if has_real_address_value "$address_geocoder_key"; then
+  pass "Yandex address resolution is configured"
+else
+  warn "Yandex Geocoder key is missing; stores cannot save newly verified addresses"
+fi
+if has_real_address_value "$address_static_key" &&
+   has_real_address_value "$address_signing_secret" &&
+   ((${#address_signing_secret} >= 32)); then
+  pass "signed Yandex map previews are configured"
+else
+  warn "Static Maps key or a 32+ character address-map signing secret is missing; map previews will be unavailable"
+fi
+
+backup_remote="${AITA_BACKUP_RCLONE_REMOTE-}"
+if [[ -z "$backup_remote" ]]; then
+  warn "AITA_BACKUP_RCLONE_REMOTE is empty; encrypted backups currently remain local only"
+elif ! command -v rclone >/dev/null 2>&1; then
+  warn "AITA_BACKUP_RCLONE_REMOTE is set but rclone is not installed"
+else
+  backup_remote_name="${backup_remote%%:*}"
+  if [[ -z "$backup_remote_name" || "$backup_remote" != *:* ]]; then
+    warn "AITA_BACKUP_RCLONE_REMOTE is malformed: expected remote:path"
+  elif ((EUID == 0)) && command -v runuser >/dev/null 2>&1; then
+    if runuser -u aita -- env HOME=/var/lib/aita rclone listremotes 2>/dev/null |
+       grep -qx "${backup_remote_name}:"; then
+      pass "rclone backup remote is available to the aita service user: ${backup_remote_name}:"
+    else
+      warn "rclone remote ${backup_remote_name}: is not configured for the aita service user"
+    fi
+  else
+    pass "rclone backup destination is declared: $backup_remote"
+  fi
+fi
+
 if systemctl is-enabled --quiet aita-server.service 2>/dev/null; then pass "aita-server.service is enabled"; else warn "aita-server.service is not enabled"; fi
 if systemctl is-active --quiet cloudflared.service 2>/dev/null; then pass "cloudflared.service is active"; else warn "cloudflared.service is not active yet"; fi
 

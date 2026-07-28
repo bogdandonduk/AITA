@@ -770,6 +770,22 @@ object LabelPrinterAndroidBridge {
 
 fun installReceiptPlatformAndroid(context: Context) {
     val appContext = context.applicationContext
+    openExternalUrlPlatformAction = { rawUrl ->
+        withContext(Dispatchers.Main) {
+            runCatching {
+                val uri = Uri.parse(rawUrl.trim())
+                require(uri.scheme?.lowercase() in setOf("http", "https", "geo")) { "Unsupported link" }
+                appContext.startActivity(
+                    Intent(Intent.ACTION_VIEW, uri).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                )
+                ReceiptPlatformActionResult(true, "Opened map")
+            }.getOrElse { throwable ->
+                ReceiptPlatformActionResult(false, throwable.message ?: "Could not open the link")
+            }
+        }
+    }
     val receiptPrinterPreferences = appContext.getSharedPreferences("aita_receipt_printer", Context.MODE_PRIVATE)
     val labelPrinterPreferences = appContext.getSharedPreferences("aita_label_printer", Context.MODE_PRIVATE)
     ReceiptPlatformAndroidBridge.configureBluetoothPrinter(receiptPrinterPreferences.getString("bluetooth_printer_mac_address", null))
