@@ -7213,6 +7213,8 @@ val getStoresMutex = Mutex()
 val addStoreMutex = Mutex()
 val updateStoreMutex = Mutex()
 val deleteStoreMutex = Mutex()
+private val refreshStoreAddressesMutex = Mutex()
+@Volatile private var lastStoreAddressRefreshRequestMillis: Long = 0L
 
 const val KEY_ACTIVE_STORE_ID = "key_activeStoreId"
 const val KEY_ACTIVE_STORE_EXPLICIT_NONE = "key_activeStoreExplicitNone"
@@ -15424,6 +15426,109 @@ internal fun <Response> unreadableNetworkResponseDataModel(
     )
 }
 
+suspend fun suggestStoreAddresses(
+    query: String,
+    language: String,
+    countryCodes: List<String> = emptyList(),
+    userLatitude: Double? = null,
+    userLongitude: Double? = null,
+    limit: Int = 8
+): ResponseDataModel<List<AddressSuggestionDataModel>> = networkRequest(
+    method = HttpMethod.Post,
+    endpointUrl = "geo/address/suggest",
+    body = AddressSuggestRequestDataModel(
+        query = query.trim(),
+        language = normalizeAppLanguagePreference(language).takeUnless { it == "system" } ?: DEFAULT_APP_LANGUAGE,
+        countryCodes = countryCodes.map { it.trim().uppercase() }.filter { it.length == 2 }.distinct(),
+        userLatitude = userLatitude?.takeIf { it.isFinite() && it in -90.0..90.0 },
+        userLongitude = userLongitude?.takeIf { it.isFinite() && it in -180.0..180.0 },
+        limit = limit.coerceIn(1, 10)
+    )
+)
+
+suspend fun resolveStoreAddressSuggestion(
+    suggestion: AddressSuggestionDataModel,
+    language: String
+): ResponseDataModel<LocationDataModel> = networkRequest(
+    method = HttpMethod.Post,
+    endpointUrl = "geo/address/resolve",
+    body = AddressResolveRequestDataModel(
+        provider = suggestion.provider,
+        providerObjectId = suggestion.providerObjectId,
+        query = suggestion.formattedAddress.ifBlank { listOf(suggestion.title, suggestion.subtitle).filter { it.isNotBlank() }.joinToString(", ") },
+        language = normalizeAppLanguagePreference(language).takeUnless { it == "system" } ?: DEFAULT_APP_LANGUAGE,
+        countryCode = suggestion.countryCode
+    )
+)
+
+suspend fun requestStoreAddressMapPreview(
+    location: LocationDataModel,
+    language: String,
+    darkTheme: Boolean,
+    width: Int = 650,
+    height: Int = 360,
+    zoom: Int = 16
+): ResponseDataModel<AddressMapPreviewDataModel> = networkRequest(
+    method = HttpMethod.Post,
+    endpointUrl = "geo/address/mapPreview",
+    body = AddressMapPreviewRequestDataModel(
+        location = location,
+        language = normalizeAppLanguagePreference(language).takeUnless { it == "system" } ?: DEFAULT_APP_LANGUAGE,
+        darkTheme = darkTheme,
+        width = width.coerceIn(320, 650),
+        height = height.coerceIn(180, 450),
+        zoom = zoom.coerceIn(10, 18)
+    )
+)
+
+private fun List<StoreDataModel>.mergeRefreshedStores(
+    refreshedStores: List<StoreDataModel>
+): List<StoreDataModel> {
+    if (refreshedStores.isEmpty()) return this
+    val refreshedById = refreshedStores.associateBy { it.id }
+
+    fun merge(store: StoreDataModel): StoreDataModel {
+        val refreshed = refreshedById[store.id]
+        val base = refreshed ?: store
+        return base.copy(branches = store.branches.map(::merge))
+    }
+
+    return map(::merge)
+}
+
+fun refreshStoreAddressLocalizations(
+    force: Boolean = false,
+    storeIds: List<String> = storesState.payloadValue.orEmpty().flattenStoresWithBranches().map { it.id }
+) {
+    val cleanIds = storeIds.map(String::trim).filter(String::isNotBlank).distinct().take(40)
+    if (cleanIds.isEmpty() || refreshStoreAddressesMutex.isLocked) return
+
+    val now = getCurrentTimeMillis()
+    if (!force && now - lastStoreAddressRefreshRequestMillis < AITA_ADDRESS_CLIENT_REFRESH_COOLDOWN_MILLIS) return
+
+    GlobalScope.launch(Dispatchers.ourIo) {
+        refreshStoreAddressesMutex.withLock {
+            val requestStartedAt = getCurrentTimeMillis()
+            if (!force && requestStartedAt - lastStoreAddressRefreshRequestMillis < AITA_ADDRESS_CLIENT_REFRESH_COOLDOWN_MILLIS) {
+                return@withLock
+            }
+            lastStoreAddressRefreshRequestMillis = requestStartedAt
+
+            val response = networkRequest<StoreAddressRefreshResultDataModel, StoreAddressRefreshRequestDataModel>(
+                method = HttpMethod.Post,
+                endpointUrl = "geo/address/refreshStores",
+                body = StoreAddressRefreshRequestDataModel(storeIds = cleanIds, force = force)
+            )
+
+            val refreshed = response.payload?.stores.orEmpty()
+            if (!response.negative && refreshed.isNotEmpty()) {
+                val current = storesState.payloadValue.orEmpty()
+                storesState.emit(DataState.Success(current.mergeRefreshedStores(refreshed), response.message))
+            }
+        }
+    }
+}
+
 fun getStores() {
     if (!getStoresMutex.isLocked)
         GlobalScope.launch(Dispatchers.ourIo) {
@@ -15436,6 +15541,11 @@ fun getStores() {
                 if (!response.negative) {
                     val stores = response.payload!!
                     storesState.emit(DataState.Success(stores, response.message))
+                    refreshStoreAddressLocalizations(
+                        storeIds = stores.flattenStoresWithBranches()
+                            .filter { it.location.isResolvedAddress() }
+                            .map { it.id }
+                    )
 
                     val activeStore = stores.findStoreOrBranch(activeStoreIdState.value)
                     when {
@@ -17595,13 +17705,132 @@ data class LocalizedStringGroupDataModel(
     val values: List<LocalizedStringDataModel>
 )
 
+const val AITA_ADDRESS_PROVIDER_YANDEX = "yandex"
+const val AITA_ADDRESS_REFRESH_INTERVAL_MILLIS = 7L * 24L * 60L * 60L * 1000L
+const val AITA_ADDRESS_CLIENT_REFRESH_COOLDOWN_MILLIS = 60L * 60L * 1000L
+
 @kotlinx.serialization.Serializable
 data class LocationDataModel(
-    val name: String,
-    val postalIndex: String,
-    val latitude: Double,
-    val longitude: Double
+    val name: String = "",
+    val postalIndex: String = "",
+    val latitude: Double = 0.0,
+    val longitude: Double = 0.0,
+    val provider: String = "",
+    val providerObjectId: String = "",
+    val kind: String = "",
+    val countryCode: String = "",
+    val primaryLanguage: String = "",
+    val localizedNames: List<LocalizedStringDataModel> = emptyList(),
+    val localizedAddresses: List<LocalizedStringDataModel> = emptyList(),
+    val fallbackAddress: String = "",
+    val resolvedAtMillis: Long = 0L,
+    val lastCheckedAtMillis: Long = 0L,
+    val providerRevision: String = ""
 )
+
+@kotlinx.serialization.Serializable
+data class AddressSuggestionDataModel(
+    val provider: String = AITA_ADDRESS_PROVIDER_YANDEX,
+    val providerObjectId: String,
+    val title: String,
+    val subtitle: String = "",
+    val formattedAddress: String = "",
+    val kind: String = "",
+    val countryCode: String = "",
+    val distanceMeters: Double? = null
+)
+
+@kotlinx.serialization.Serializable
+data class AddressSuggestRequestDataModel(
+    val query: String,
+    val language: String = DEFAULT_APP_LANGUAGE,
+    val countryCodes: List<String> = emptyList(),
+    val userLatitude: Double? = null,
+    val userLongitude: Double? = null,
+    val limit: Int = 8
+)
+
+@kotlinx.serialization.Serializable
+data class AddressResolveRequestDataModel(
+    val provider: String = AITA_ADDRESS_PROVIDER_YANDEX,
+    val providerObjectId: String,
+    val query: String = "",
+    val language: String = DEFAULT_APP_LANGUAGE,
+    val countryCode: String = ""
+)
+
+@kotlinx.serialization.Serializable
+data class AddressMapPreviewRequestDataModel(
+    val location: LocationDataModel,
+    val language: String = DEFAULT_APP_LANGUAGE,
+    val darkTheme: Boolean = false,
+    val width: Int = 650,
+    val height: Int = 360,
+    val zoom: Int = 16
+)
+
+@kotlinx.serialization.Serializable
+data class AddressMapPreviewDataModel(
+    val url: String,
+    val openMapUrl: String,
+    val expiresAtMillis: Long,
+    val attribution: String = "© Yandex Maps"
+)
+
+@kotlinx.serialization.Serializable
+data class StoreAddressRefreshRequestDataModel(
+    val storeIds: List<String> = emptyList(),
+    val force: Boolean = false
+)
+
+@kotlinx.serialization.Serializable
+data class StoreAddressRefreshResultDataModel(
+    val stores: List<StoreDataModel> = emptyList(),
+    val refreshedCount: Int = 0,
+    val changedCount: Int = 0
+)
+
+fun LocationDataModel.hasValidCoordinates(): Boolean =
+    latitude.isFinite() && longitude.isFinite() &&
+        latitude in -90.0..90.0 && longitude in -180.0..180.0 &&
+        !(latitude == 0.0 && longitude == 0.0)
+
+fun LocationDataModel.displayName(language: String): String =
+    localizedNames.extractLocalizedString(language)
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+        ?: name.trim()
+
+fun LocationDataModel.displayAddress(language: String): String =
+    localizedAddresses.extractLocalizedString(language)
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+        ?: fallbackAddress.trim().takeIf { it.isNotBlank() }
+        ?: name.trim()
+
+fun LocationDataModel.isResolvedAddress(): Boolean =
+    provider.equals(AITA_ADDRESS_PROVIDER_YANDEX, ignoreCase = true) &&
+        providerObjectId.isNotBlank() &&
+        hasValidCoordinates() &&
+        displayAddress(primaryLanguage.ifBlank { DEFAULT_APP_LANGUAGE }).isNotBlank()
+
+fun LocationDataModel.needsProviderRefresh(nowMillis: Long = getCurrentTimeMillis()): Boolean =
+    isResolvedAddress() &&
+        (lastCheckedAtMillis <= 0L || nowMillis - lastCheckedAtMillis >= AITA_ADDRESS_REFRESH_INTERVAL_MILLIS)
+
+fun LocationDataModel.matchesDisplayedAddress(rawText: String, language: String): Boolean {
+    val normalized = rawText.trim().replace(Regex("\\s+"), " ")
+    if (normalized.isBlank()) return false
+    return buildList {
+        add(displayAddress(language))
+        add(displayAddress(primaryLanguage))
+        add(fallbackAddress)
+        add(name)
+        addAll(localizedAddresses.map { it.value })
+    }.any { candidate ->
+        candidate.trim().replace(Regex("\\s+"), " ").equals(normalized, ignoreCase = true)
+    }
+}
 
 @kotlinx.serialization.Serializable
 data class ManufacturerDataModel(
@@ -18010,6 +18239,9 @@ data class StoreDataModel(
                     }
 
                     add(location.name)
+                    add(location.fallbackAddress)
+                    location.localizedNames.forEach { add(it.value) }
+                    location.localizedAddresses.forEach { add(it.value) }
                     add(address)
                     add(legalIdTypeId)
                     add(legalId)
@@ -18017,6 +18249,10 @@ data class StoreDataModel(
                         add(branch.id)
                         add(branch.publicId)
                         add(branch.address)
+                        add(branch.location.name)
+                        add(branch.location.fallbackAddress)
+                        branch.location.localizedNames.forEach { add(it.value) }
+                        branch.location.localizedAddresses.forEach { add(it.value) }
                         branch.name.forEach { add(it.value) }
                     }
                     add(location.postalIndex)
@@ -18047,6 +18283,9 @@ data class StoreDataModel(
                     }
 
                     add(location.name)
+                    add(location.fallbackAddress)
+                    location.localizedNames.forEach { add(it.value) }
+                    location.localizedAddresses.forEach { add(it.value) }
                     add(address)
                     add(legalIdTypeId)
                     add(legalId)
@@ -18076,7 +18315,13 @@ fun StoreDataModel.rootStoreId(): String = parentStoreId?.takeIf { it.isNotBlank
 
 fun StoreDataModel.canBeSelectedAsActiveStore(): Boolean = true
 
-fun StoreDataModel.displayAddress(): String = address.ifBlank { location.name }
+fun StoreDataModel.displayAddress(language: String): String =
+    location.displayAddress(language)
+        .ifBlank { address.trim() }
+        .ifBlank { location.name.trim() }
+
+fun StoreDataModel.displayAddress(): String =
+    address.trim().ifBlank { location.displayAddress(DEFAULT_APP_LANGUAGE) }
 
 fun List<StoreDataModel>.flattenStoresWithBranches(): List<StoreDataModel> {
     val result = linkedMapOf<String, StoreDataModel>()

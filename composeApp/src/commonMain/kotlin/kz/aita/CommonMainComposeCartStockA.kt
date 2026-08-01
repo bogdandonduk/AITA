@@ -1856,7 +1856,7 @@ fun AppConfiguration.StoreWidget(
                 }
 
                 Text(
-                    text = store.displayAddress(),
+                    text = store.displayAddress(stateValues.appLanguage),
                     fontSize = stateValues.textSize,
                     fontWeight = FontWeight.Bold,
                     color = textColor

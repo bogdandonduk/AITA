@@ -1158,6 +1158,23 @@ private fun installDesktopPlatformActionsJvm() {
         }
     }
 
+    openExternalUrlPlatformAction = { rawUrl ->
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val uri = URI(rawUrl.trim())
+                if (uri.scheme?.lowercase() !in setOf("http", "https", "geo")) {
+                    ReceiptPlatformActionResult(false, "Unsupported link")
+                } else if (browseDesktopUri(uri)) {
+                    ReceiptPlatformActionResult(true, "Opened map")
+                } else {
+                    ReceiptPlatformActionResult(false, "Could not open the link")
+                }
+            }.getOrElse { throwable ->
+                ReceiptPlatformActionResult(false, throwable.message ?: "Could not open the link")
+            }
+        }
+    }
+
     fun printOrOpenDesktopFile(file: File): ReceiptPlatformActionResult {
         val desktop = desktop()
         if (desktop != null && runCatching { desktop.isSupported(Desktop.Action.PRINT) }.getOrDefault(false)) {

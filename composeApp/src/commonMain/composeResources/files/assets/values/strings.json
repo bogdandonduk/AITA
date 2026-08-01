@@ -34525,6 +34525,258 @@
           "value": "Фабрика сомасы"
         }
       ]
+    },
+    {
+      "id": 2300,
+      "values": [
+        {
+          "language": "main",
+          "value": "Verified address"
+        },
+        {
+          "language": "en",
+          "value": "Verified address"
+        },
+        {
+          "language": "ru",
+          "value": "Проверенный адрес"
+        },
+        {
+          "language": "kk",
+          "value": "Тексерілген мекенжай"
+        }
+      ]
+    },
+    {
+      "id": 2301,
+      "values": [
+        {
+          "language": "main",
+          "value": "Address map preview"
+        },
+        {
+          "language": "en",
+          "value": "Address map preview"
+        },
+        {
+          "language": "ru",
+          "value": "Адрес на карте"
+        },
+        {
+          "language": "kk",
+          "value": "Мекенжайдың картадағы көрінісі"
+        }
+      ]
+    },
+    {
+      "id": 2302,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open on map"
+        },
+        {
+          "language": "en",
+          "value": "Open on map"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть на карте"
+        },
+        {
+          "language": "kk",
+          "value": "Картадан ашу"
+        }
+      ]
+    },
+    {
+      "id": 2303,
+      "values": [
+        {
+          "language": "main",
+          "value": "Map preview is temporarily unavailable. The verified coordinates are still saved."
+        },
+        {
+          "language": "en",
+          "value": "Map preview is temporarily unavailable. The verified coordinates are still saved."
+        },
+        {
+          "language": "ru",
+          "value": "Предпросмотр карты временно недоступен. Проверенные координаты всё равно будут сохранены."
+        },
+        {
+          "language": "kk",
+          "value": "Картаны алдын ала көру уақытша қолжетімсіз. Тексерілген координаттар бәрібір сақталады."
+        }
+      ]
+    },
+    {
+      "id": 2304,
+      "values": [
+        {
+          "language": "main",
+          "value": "Start typing and select a verified address"
+        },
+        {
+          "language": "en",
+          "value": "Start typing and select a verified address"
+        },
+        {
+          "language": "ru",
+          "value": "Начните вводить и выберите проверенный адрес"
+        },
+        {
+          "language": "kk",
+          "value": "Теруді бастап, тексерілген мекенжайды таңдаңыз"
+        }
+      ]
+    },
+    {
+      "id": 2305,
+      "values": [
+        {
+          "language": "main",
+          "value": "Select an address from suggestions"
+        },
+        {
+          "language": "en",
+          "value": "Select an address from suggestions"
+        },
+        {
+          "language": "ru",
+          "value": "Выберите адрес из подсказок"
+        },
+        {
+          "language": "kk",
+          "value": "Мекенжайды ұсыныстардан таңдаңыз"
+        }
+      ]
+    },
+    {
+      "id": 2306,
+      "values": [
+        {
+          "language": "main",
+          "value": "Could not load address suggestions"
+        },
+        {
+          "language": "en",
+          "value": "Could not load address suggestions"
+        },
+        {
+          "language": "ru",
+          "value": "Не удалось загрузить подсказки адресов"
+        },
+        {
+          "language": "kk",
+          "value": "Мекенжай ұсыныстарын жүктеу мүмкін болмады"
+        }
+      ]
+    },
+    {
+      "id": 2307,
+      "values": [
+        {
+          "language": "main",
+          "value": "No matching addresses found"
+        },
+        {
+          "language": "en",
+          "value": "No matching addresses found"
+        },
+        {
+          "language": "ru",
+          "value": "Подходящие адреса не найдены"
+        },
+        {
+          "language": "kk",
+          "value": "Сәйкес мекенжайлар табылмады"
+        }
+      ]
+    },
+    {
+      "id": 2308,
+      "values": [
+        {
+          "language": "main",
+          "value": "Could not verify this address. Select another suggestion or try again."
+        },
+        {
+          "language": "en",
+          "value": "Could not verify this address. Select another suggestion or try again."
+        },
+        {
+          "language": "ru",
+          "value": "Не удалось проверить этот адрес. Выберите другую подсказку или повторите попытку."
+        },
+        {
+          "language": "kk",
+          "value": "Бұл мекенжайды тексеру мүмкін болмады. Басқа ұсынысты таңдаңыз немесе қайталап көріңіз."
+        }
+      ]
+    },
+    {
+      "id": 2309,
+      "values": [
+        {
+          "language": "main",
+          "value": "Opening maps is unavailable on this device"
+        },
+        {
+          "language": "en",
+          "value": "Opening maps is unavailable on this device"
+        },
+        {
+          "language": "ru",
+          "value": "Открытие карты недоступно на этом устройстве"
+        },
+        {
+          "language": "kk",
+          "value": "Бұл құрылғыда картаны ашу қолжетімсіз"
+        }
+      ]
+    },
+    {
+      "id": 2310,
+      "values": [
+        {
+          "language": "main",
+          "value": "Choose one of the verified address suggestions before saving"
+        },
+        {
+          "language": "en",
+          "value": "Choose one of the verified address suggestions before saving"
+        },
+        {
+          "language": "ru",
+          "value": "Перед сохранением выберите один из проверенных вариантов адреса"
+        },
+        {
+          "language": "kk",
+          "value": "Сақтамас бұрын тексерілген мекенжай нұсқаларының бірін таңдаңыз"
+        }
+      ]
+    },
+    {
+      "id": 2311,
+      "values": [
+        {
+          "language": "main",
+          "value": "The country changed. Select the address again."
+        },
+        {
+          "language": "en",
+          "value": "The country changed. Select the address again."
+        },
+        {
+          "language": "ru",
+          "value": "Страна изменилась. Выберите адрес заново."
+        },
+        {
+          "language": "kk",
+          "value": "Ел өзгерді. Мекенжайды қайта таңдаңыз."
+        }
+      ]
     }
   ]
 }

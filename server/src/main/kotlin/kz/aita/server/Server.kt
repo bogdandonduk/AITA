@@ -3658,6 +3658,13 @@ private fun prewarmSharedRuntimeSerializers() {
   touch("GoodsItemInTransactionDataModel") { GoodsItemInTransactionDataModel.serializer() }
   touch("LocalizedStringDataModel") { LocalizedStringDataModel.serializer() }
   touch("LocationDataModel") { LocationDataModel.serializer() }
+  touch("AddressSuggestionDataModel") { AddressSuggestionDataModel.serializer() }
+  touch("AddressSuggestRequestDataModel") { AddressSuggestRequestDataModel.serializer() }
+  touch("AddressResolveRequestDataModel") { AddressResolveRequestDataModel.serializer() }
+  touch("AddressMapPreviewRequestDataModel") { AddressMapPreviewRequestDataModel.serializer() }
+  touch("AddressMapPreviewDataModel") { AddressMapPreviewDataModel.serializer() }
+  touch("StoreAddressRefreshRequestDataModel") { StoreAddressRefreshRequestDataModel.serializer() }
+  touch("StoreAddressRefreshResultDataModel") { StoreAddressRefreshResultDataModel.serializer() }
   touch("NotificationDataModel") { NotificationDataModel.serializer() }
   touch("PriceDataModel") { PriceDataModel.serializer() }
   touch("QuantityDataModel") { QuantityDataModel.serializer() }
@@ -3911,6 +3918,13 @@ private fun prewarmSharedRuntimeSerializers() {
     "kz.aita.LocalizedStringDataModel",
     "kz.aita.LocalizedStringGroupDataModel",
     "kz.aita.LocationDataModel",
+    "kz.aita.AddressSuggestionDataModel",
+    "kz.aita.AddressSuggestRequestDataModel",
+    "kz.aita.AddressResolveRequestDataModel",
+    "kz.aita.AddressMapPreviewRequestDataModel",
+    "kz.aita.AddressMapPreviewDataModel",
+    "kz.aita.StoreAddressRefreshRequestDataModel",
+    "kz.aita.StoreAddressRefreshResultDataModel",
     "kz.aita.ManufacturerDataModel",
     "kz.aita.NotificationDataModel",
     "kz.aita.SupportTicketDataModel",
@@ -5666,7 +5680,66 @@ private fun validateStoreLegalId(body: StoreDataModel): Boolean {
   return body.legalId.matchesLegalIdFormat(format)
 }
 
-private fun validateStoreAddress(body: StoreDataModel): Boolean = body.address.trim().isNotEmpty()
+private fun validateStoreAddress(body: StoreDataModel): Boolean = body.location.isResolvedAddress()
+
+private suspend fun canonicalizeStoreAddress(
+  body: StoreDataModel,
+  existingLocation: LocationDataModel? = null
+): Result<LocationDataModel> = runCatching {
+  val incoming = body.location
+  require(incoming.isResolvedAddress()) {
+    "Select an address suggestion before saving"
+  }
+  val resolved = YandexAddressService.resolve(
+    provider = incoming.provider,
+    providerObjectId = incoming.providerObjectId,
+    query = incoming.displayAddress(incoming.primaryLanguage.ifBlank { DEFAULT_APP_LANGUAGE }),
+    language = incoming.primaryLanguage.ifBlank { DEFAULT_APP_LANGUAGE },
+    existing = existingLocation,
+    countryCodeHint = incoming.countryCode
+  )
+  val selectedCountry = body.countryLocales.firstOrNull()
+    ?.trim()
+    ?.uppercase(Locale.ROOT)
+    ?.takeIf { it.length == 2 }
+  if (selectedCountry != null && resolved.countryCode.isNotBlank() &&
+    !resolved.countryCode.equals(selectedCountry, ignoreCase = true)) {
+    throw AddressProviderException(
+      "The selected address belongs to another country",
+      retryable = false,
+      clientFault = true
+    )
+  }
+  resolved
+}
+
+private fun addressProviderStatus(throwable: Throwable): HttpStatusCode =
+  if ((throwable as? AddressProviderException)?.clientFault == true) {
+    HttpStatusCode.BadRequest
+  } else {
+    HttpStatusCode.ServiceUnavailable
+  }
+
+private fun addressProviderMessage(throwable: Throwable): List<LocalizedStringDataModel> {
+  val clientFault = (throwable as? AddressProviderException)?.clientFault == true
+  return simpleMessage(
+    main = if (clientFault) {
+      throwable.message.orEmpty().ifBlank { "The selected address is invalid" }
+    } else {
+      "Address provider is temporarily unavailable. Please try again."
+    },
+    ru = if (clientFault) {
+      "Выбранный адрес недействителен. Выберите адрес из подсказок ещё раз."
+    } else {
+      "Сервис адресов временно недоступен. Попробуйте ещё раз."
+    },
+    kk = if (clientFault) {
+      "Таңдалған мекенжай жарамсыз. Мекенжайды ұсыныстардан қайта таңдаңыз."
+    } else {
+      "Мекенжай қызметі уақытша қолжетімсіз. Қайталап көріңіз."
+    }
+  )
+}
 
 private fun nextPublicId(prefix: String): String {
   return prefix + UUID.randomUUID().toString().replace("-", "").take(8).uppercase()
@@ -16902,6 +16975,86 @@ private fun applyTransactionStockMutationInsideTransaction(
   return true
 }
 
+private data class StoreAddressRefreshCandidate(
+  val store: StoreDataModel,
+  val location: LocationDataModel
+)
+
+private data class StoreAddressUpdateContext(
+  val location: LocationDataModel
+)
+
+private suspend fun refreshAccessibleStoreAddresses(
+  userId: UUID,
+  request: StoreAddressRefreshRequestDataModel
+): StoreAddressRefreshResultDataModel {
+  val requestedIds = request.storeIds
+    .take(100)
+    .mapNotNull { runCatching { UUID.fromString(it.trim()) }.getOrNull() }
+    .distinct()
+    .take(40)
+
+  if (requestedIds.isEmpty()) return StoreAddressRefreshResultDataModel()
+
+  val candidates = newSuspendedTransaction(aitaServerIoContext) {
+    requestedIds.mapNotNull { storeId ->
+      if (!userHasStoreAccessInsideTransaction(userId, storeId)) return@mapNotNull null
+      Stores.selectAll()
+        .where { (Stores.id eq storeId) and (Stores.isActive eq true) }
+        .singleOrNull()
+        ?.let { row -> StoreAddressRefreshCandidate(row.toStoreDataModel(), row[Stores.location]) }
+    }
+  }.filter { candidate ->
+    candidate.location.isResolvedAddress() &&
+      (request.force || candidate.location.needsProviderRefresh())
+  }.take(8)
+
+  if (candidates.isEmpty()) return StoreAddressRefreshResultDataModel()
+
+  val refreshedStores = mutableListOf<StoreDataModel>()
+  var changedCount = 0
+
+  for (candidate in candidates) {
+    val refreshed = runCatching {
+      YandexAddressService.resolve(
+        provider = candidate.location.provider,
+        providerObjectId = candidate.location.providerObjectId,
+        query = candidate.location.displayAddress(candidate.location.primaryLanguage.ifBlank { DEFAULT_APP_LANGUAGE }),
+        language = candidate.location.primaryLanguage.ifBlank { DEFAULT_APP_LANGUAGE },
+        existing = candidate.location,
+        countryCodeHint = candidate.location.countryCode
+      )
+    }.getOrNull() ?: continue
+
+    val changed = refreshed.providerRevision != candidate.location.providerRevision ||
+      refreshed.localizedAddresses != candidate.location.localizedAddresses ||
+      refreshed.localizedNames != candidate.location.localizedNames ||
+      refreshed.latitude != candidate.location.latitude ||
+      refreshed.longitude != candidate.location.longitude
+    if (changed) changedCount++
+
+    val canonicalAddress = refreshed.displayAddress("main")
+    val storeId = UUID.fromString(candidate.store.id)
+    newSuspendedTransaction(aitaServerIoContext) {
+      Stores.update({ Stores.id eq storeId }) {
+        it[Stores.location] = refreshed
+        it[Stores.address] = canonicalAddress
+        it[Stores.updatedAt] = Instant.now()
+      }
+    }
+    refreshedStores += candidate.store.copy(
+      location = refreshed,
+      address = canonicalAddress
+    )
+  }
+
+  return StoreAddressRefreshResultDataModel(
+    stores = refreshedStores,
+    refreshedCount = refreshedStores.size,
+    changedCount = changedCount
+  )
+}
+
 fun Application.module() {
   val productionMode = isProductionMode()
   try {
@@ -16918,6 +17071,7 @@ fun Application.module() {
   stabilizeServerRuntimeClassLoader("module")
   prewarmSharedRuntimeSerializers()
   environment.log.info("AITA server classloader: module anchored to ${classLoaderDebugName(aitaServerRuntimeClassLoader)}")
+  environment.log.info("AITA address provider configuration: ${YandexAddressService.configurationSummary()}")
   install(AitaRuntimeClassLoaderPlugin)
   intercept(ApplicationCallPipeline.Setup) {
     val pipelineContext = this
@@ -17314,6 +17468,153 @@ fun Application.module() {
         contentType = ContentType.Application.Json,
         status = if (ready) HttpStatusCode.OK else HttpStatusCode.ServiceUnavailable
       )
+    }
+
+    get("/geo/address/map") {
+      val parameters = call.request.queryParameters
+      val request = SignedAddressMapRequest(
+        latitude = parameters["lat"]?.toDoubleOrNull() ?: return@get call.respondText(
+          "Invalid latitude",
+          status = HttpStatusCode.BadRequest
+        ),
+        longitude = parameters["lon"]?.toDoubleOrNull() ?: return@get call.respondText(
+          "Invalid longitude",
+          status = HttpStatusCode.BadRequest
+        ),
+        expiresAtMillis = parameters["expires"]?.toLongOrNull() ?: return@get call.respondText(
+          "Invalid expiry",
+          status = HttpStatusCode.BadRequest
+        ),
+        width = parameters["w"]?.toIntOrNull()?.coerceIn(320, 650) ?: 650,
+        height = parameters["h"]?.toIntOrNull()?.coerceIn(180, 450) ?: 360,
+        zoom = parameters["z"]?.toIntOrNull()?.coerceIn(10, 18) ?: 16,
+        language = parameters["lang"].orEmpty(),
+        darkTheme = parameters["dark"] == "1" || parameters["dark"].equals("true", ignoreCase = true),
+        signature = parameters["sig"].orEmpty()
+      )
+
+      if (!YandexAddressService.verifySignedMapRequest(request)) {
+        return@get call.respondText("Address map link is invalid or expired", status = HttpStatusCode.Forbidden)
+      }
+
+      runCatching { YandexAddressService.fetchStaticMap(request) }
+        .onSuccess { (contentType, bytes) ->
+          call.response.header(HttpHeaders.CacheControl, "public, max-age=600")
+          call.respondBytes(bytes, ContentType.parse(contentType), HttpStatusCode.OK)
+        }
+        .onFailure { throwable ->
+          call.application.environment.log.warn("Address map proxy failed: ${throwable.message}")
+          call.respondText("Address map is temporarily unavailable", status = HttpStatusCode.ServiceUnavailable)
+        }
+    }
+
+    route("/geo/address") {
+      authenticate("auth-jwt") {
+        post("/suggest") {
+          call.checkPrincipal() ?: return@post
+          val body = call.receiveAita<AddressSuggestRequestDataModel>()
+          val cleanQuery = body.query.trim().replace(Regex("\\s+"), " ")
+          if (cleanQuery.length < 3) {
+            return@post call.genericResponse(HttpStatusCode.OK, emptyList<AddressSuggestionDataModel>())
+          }
+
+          runCatching {
+            YandexAddressService.suggest(
+              query = cleanQuery,
+              language = body.language,
+              countryCodes = body.countryCodes,
+              userLatitude = body.userLatitude,
+              userLongitude = body.userLongitude,
+              limit = body.limit
+            )
+          }.onSuccess { suggestions ->
+            call.genericResponse(HttpStatusCode.OK, suggestions)
+          }.onFailure { throwable ->
+            call.application.environment.log.warn("Address suggestion request failed: ${throwable.message}")
+            call.genericResponseNoPayload(
+              addressProviderStatus(throwable),
+              addressProviderMessage(throwable)
+            )
+          }
+        }
+
+        post("/resolve") {
+          call.checkPrincipal() ?: return@post
+          val body = call.receiveAita<AddressResolveRequestDataModel>()
+          runCatching {
+            YandexAddressService.resolve(
+              provider = body.provider,
+              providerObjectId = body.providerObjectId,
+              query = body.query,
+              language = body.language,
+              countryCodeHint = body.countryCode
+            )
+          }.onSuccess { location ->
+            call.genericResponse(HttpStatusCode.OK, location)
+          }.onFailure { throwable ->
+            call.application.environment.log.warn("Address resolve request failed: ${throwable.message}")
+            call.genericResponseNoPayload(
+              addressProviderStatus(throwable),
+              addressProviderMessage(throwable)
+            )
+          }
+        }
+
+        post("/mapPreview") {
+          call.checkPrincipal() ?: return@post
+          val body = call.receiveAita<AddressMapPreviewRequestDataModel>()
+          if (!body.location.isResolvedAddress()) {
+            return@post call.genericResponseNoPayload(
+              HttpStatusCode.BadRequest,
+              simpleMessage(
+                main = "Select a verified address before opening the map",
+                ru = "Перед открытием карты выберите проверенный адрес",
+                kk = "Картаны ашпас бұрын тексерілген мекенжайды таңдаңыз"
+              )
+            )
+          }
+          val inferredUrl = call.inferredPublicServerUrl()
+          val inferredHost = inferredUrl?.let { runCatching { URI(it).host.orEmpty() }.getOrDefault("") }.orEmpty()
+          val publicUrl = if (publicServerUrlShouldDefaultToHttp(inferredHost)) {
+            inferredUrl
+          } else {
+            call.application.publicServerUrl() ?: inferredUrl
+          } ?: "http://127.0.0.1:8080"
+          runCatching {
+            YandexAddressService.createMapPreview(
+              location = body.location,
+              language = body.language,
+              darkTheme = body.darkTheme,
+              width = body.width,
+              height = body.height,
+              zoom = body.zoom,
+              publicServerUrl = publicUrl
+            )
+          }.onSuccess { preview ->
+            call.genericResponse(HttpStatusCode.OK, preview)
+          }.onFailure { throwable ->
+            call.genericResponseNoPayload(
+              addressProviderStatus(throwable),
+              addressProviderMessage(throwable)
+            )
+          }
+        }
+
+        post("/refreshStores") {
+          val userId = call.checkPrincipal() ?: return@post
+          val body = call.receiveAita<StoreAddressRefreshRequestDataModel>()
+          val result = refreshAccessibleStoreAddresses(userId, body)
+          call.genericResponse(
+            HttpStatusCode.OK,
+            result,
+            simpleMessage(
+              main = if (result.changedCount > 0) "Store addresses refreshed" else "Store addresses are current",
+              ru = if (result.changedCount > 0) "Адреса магазинов обновлены" else "Адреса магазинов актуальны",
+              kk = if (result.changedCount > 0) "Дүкен мекенжайлары жаңартылды" else "Дүкен мекенжайлары өзекті"
+            )
+          )
+        }
+      }
     }
 
     authenticate("auth-jwt") {
@@ -20394,20 +20695,20 @@ fun Application.module() {
 
           if (noUser) return@post call.respondAitaUnauthorized()
 
-          val body = call.receiveAita<StoreDataModel>()
+          val submittedBody = call.receiveAita<StoreDataModel>()
 
-          if (!validateStoreAddress(body)) {
+          if (!validateStoreAddress(submittedBody)) {
             return@post call.genericResponseNoPayload(
               HttpStatusCode.BadRequest,
               message = simpleMessage(
-                main = "Address is required",
-                ru = "Адрес обязателен",
-                kk = "Мекенжай қажет"
+                main = "Select an address from suggestions before saving",
+                ru = "Перед сохранением выберите адрес из подсказок",
+                kk = "Сақтамас бұрын мекенжайды ұсыныстардан таңдаңыз"
               )
             )
           }
 
-          if (!validateStoreLegalId(body)) {
+          if (!validateStoreLegalId(submittedBody)) {
             return@post call.genericResponseNoPayload(
               HttpStatusCode.BadRequest,
               message = simpleMessage(
@@ -20418,25 +20719,48 @@ fun Application.module() {
             )
           }
 
-          val parentStoreIdForBranch = body.parentStoreId
+          val parentStoreIdForBranch = submittedBody.parentStoreId
             ?.takeIf { it.isNotBlank() }
             ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
 
-          if (body.parentStoreId != null && parentStoreIdForBranch == null) {
+          if (submittedBody.parentStoreId != null && parentStoreIdForBranch == null) {
             return@post call.respondAitaUnauthorized()
           }
 
           val parentAccessOk = newSuspendedTransaction(aitaServerIoContext) {
             parentStoreIdForBranch?.let { parentId ->
-              val canManageBranches = userCanUseStoreActionInsideTransaction(userId, parentId, STORE_PERMISSION_BRANCHES_MANAGE, requireWorkshift = false) ||
-                 userCanUseStoreActionInsideTransaction(userId, parentId, STORE_PERMISSION_STORE_MANAGE, requireWorkshift = false)
+              val canManageBranches = userCanUseStoreActionInsideTransaction(
+                userId,
+                parentId,
+                STORE_PERMISSION_BRANCHES_MANAGE,
+                requireWorkshift = false
+              ) || userCanUseStoreActionInsideTransaction(
+                userId,
+                parentId,
+                STORE_PERMISSION_STORE_MANAGE,
+                requireWorkshift = false
+              )
 
               canManageBranches &&
-                 Stores.select(Stores.parentStoreId).where { Stores.id eq parentId }.singleOrNull()?.get(Stores.parentStoreId) == null
+                Stores.select(Stores.parentStoreId)
+                  .where { Stores.id eq parentId }
+                  .singleOrNull()
+                  ?.get(Stores.parentStoreId) == null
             } ?: true
           }
 
           if (!parentAccessOk) return@post call.respondAitaUnauthorized()
+
+          val canonicalLocation = canonicalizeStoreAddress(submittedBody).getOrElse { throwable ->
+            return@post call.genericResponseNoPayload(
+              addressProviderStatus(throwable),
+              addressProviderMessage(throwable)
+            )
+          }
+          val body = submittedBody.copy(
+            location = canonicalLocation,
+            address = canonicalLocation.displayAddress("main")
+          )
 
           var state23505Reached: Boolean
 
@@ -20525,18 +20849,75 @@ fun Application.module() {
         put("/update") {
           val userId = call.checkPrincipal() ?: return@put
 
-          val body = call.receiveAita<StoreDataModel>()
+          val submittedBody = call.receiveAita<StoreDataModel>()
 
-          if (!validateStoreAddress(body)) {
+          if (!validateStoreAddress(submittedBody)) {
             return@put call.genericResponseNoPayload(
               HttpStatusCode.BadRequest,
               message = simpleMessage(
-                main = "Address is required",
-                ru = "Адрес обязателен",
-                kk = "Мекенжай қажет"
+                main = "Select an address from suggestions before saving",
+                ru = "Перед сохранением выберите адрес из подсказок",
+                kk = "Сақтамас бұрын мекенжайды ұсыныстардан таңдаңыз"
               )
             )
           }
+
+          val submittedStoreId = runCatching { UUID.fromString(submittedBody.id) }.getOrNull()
+            ?: return@put call.respondAitaUnauthorized()
+          val addressUpdateContext = newSuspendedTransaction(aitaServerIoContext) {
+            val row = Stores
+              .select(Stores.location, Stores.parentStoreId)
+              .where { Stores.id eq submittedStoreId }
+              .singleOrNull()
+              ?: return@newSuspendedTransaction null
+            val currentParentStoreId = row[Stores.parentStoreId]
+            val canUpdateStore = if (currentParentStoreId == null) {
+              userCanUseStoreActionInsideTransaction(
+                userId,
+                submittedStoreId,
+                STORE_PERMISSION_STORE_MANAGE,
+                requireWorkshift = false
+              )
+            } else {
+              userCanUseStoreActionInsideTransaction(
+                userId,
+                currentParentStoreId,
+                STORE_PERMISSION_BRANCHES_MANAGE,
+                requireWorkshift = false
+              ) || userCanUseStoreActionInsideTransaction(
+                userId,
+                currentParentStoreId,
+                STORE_PERMISSION_STORE_MANAGE,
+                requireWorkshift = false
+              )
+            }
+            if (!canUpdateStore) return@newSuspendedTransaction null
+            StoreAddressUpdateContext(
+              location = row[Stores.location]
+            )
+          } ?: return@put call.respondAitaUnauthorized()
+          val existingLocation = addressUpdateContext.location
+
+          val canonicalLocationResult = canonicalizeStoreAddress(submittedBody, existingLocation)
+          val canonicalLocation = canonicalLocationResult.getOrElse { throwable ->
+            val providerError = throwable as? AddressProviderException
+            if (
+              providerError?.clientFault != true &&
+              existingLocation.isResolvedAddress() &&
+              existingLocation.providerObjectId == submittedBody.location.providerObjectId
+            ) {
+              existingLocation
+            } else {
+              return@put call.genericResponseNoPayload(
+                addressProviderStatus(throwable),
+                addressProviderMessage(throwable)
+              )
+            }
+          }
+          val body = submittedBody.copy(
+            location = canonicalLocation,
+            address = canonicalLocation.displayAddress("main")
+          )
 
           if (!validateStoreLegalId(body)) {
             return@put call.genericResponseNoPayload(

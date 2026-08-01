@@ -1158,6 +1158,18 @@ internal fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFall
     put(999L, mapOf("main" to "Invitation", "en" to "Invitation", "ru" to "Приглашение", "kk" to "Шақыру"))
     put(1000L, mapOf("main" to "Movement", "en" to "Movement", "ru" to "Перемещение", "kk" to "Жылжыту"))
     put(1001L, mapOf("main" to "Handheld barcode scanner", "en" to "Handheld barcode scanner", "ru" to "Ручной сканер штрих-кодов", "kk" to "Қол штрих-код сканері"))
+    put(2300L, mapOf("main" to "Verified address", "en" to "Verified address", "ru" to "Проверенный адрес", "kk" to "Тексерілген мекенжай"))
+    put(2301L, mapOf("main" to "Address map preview", "en" to "Address map preview", "ru" to "Адрес на карте", "kk" to "Мекенжайдың картадағы көрінісі"))
+    put(2302L, mapOf("main" to "Open on map", "en" to "Open on map", "ru" to "Открыть на карте", "kk" to "Картадан ашу"))
+    put(2303L, mapOf("main" to "Map preview is temporarily unavailable. The verified coordinates are still saved.", "en" to "Map preview is temporarily unavailable. The verified coordinates are still saved.", "ru" to "Предпросмотр карты временно недоступен. Проверенные координаты всё равно будут сохранены.", "kk" to "Картаны алдын ала көру уақытша қолжетімсіз. Тексерілген координаттар бәрібір сақталады."))
+    put(2304L, mapOf("main" to "Start typing and select a verified address", "en" to "Start typing and select a verified address", "ru" to "Начните вводить и выберите проверенный адрес", "kk" to "Теруді бастап, тексерілген мекенжайды таңдаңыз"))
+    put(2305L, mapOf("main" to "Select an address from suggestions", "en" to "Select an address from suggestions", "ru" to "Выберите адрес из подсказок", "kk" to "Мекенжайды ұсыныстардан таңдаңыз"))
+    put(2306L, mapOf("main" to "Could not load address suggestions", "en" to "Could not load address suggestions", "ru" to "Не удалось загрузить подсказки адресов", "kk" to "Мекенжай ұсыныстарын жүктеу мүмкін болмады"))
+    put(2307L, mapOf("main" to "No matching addresses found", "en" to "No matching addresses found", "ru" to "Подходящие адреса не найдены", "kk" to "Сәйкес мекенжайлар табылмады"))
+    put(2308L, mapOf("main" to "Could not verify this address. Select another suggestion or try again.", "en" to "Could not verify this address. Select another suggestion or try again.", "ru" to "Не удалось проверить этот адрес. Выберите другую подсказку или повторите попытку.", "kk" to "Бұл мекенжайды тексеру мүмкін болмады. Басқа ұсынысты таңдаңыз немесе қайталап көріңіз."))
+    put(2309L, mapOf("main" to "Opening maps is unavailable on this device", "en" to "Opening maps is unavailable on this device", "ru" to "Открытие карты недоступно на этом устройстве", "kk" to "Бұл құрылғыда картаны ашу қолжетімсіз"))
+    put(2310L, mapOf("main" to "Choose one of the verified address suggestions before saving", "en" to "Choose one of the verified address suggestions before saving", "ru" to "Перед сохранением выберите один из проверенных вариантов адреса", "kk" to "Сақтамас бұрын тексерілген мекенжай нұсқаларының бірін таңдаңыз"))
+    put(2311L, mapOf("main" to "The country changed. Select the address again.", "en" to "The country changed. Select the address again.", "ru" to "Страна изменилась. Выберите адрес заново.", "kk" to "Ел өзгерді. Мекенжайды қайта таңдаңыз."))
 }
 
 fun AppConfiguration.localizedStringResource(

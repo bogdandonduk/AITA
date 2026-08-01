@@ -13,6 +13,27 @@ private fun installWasmComposePlatformBridges() {
         runCatching { window.prompt("Copy", text) }
     }
 
+    openExternalUrlPlatformAction = { rawUrl ->
+        runCatching {
+            val cleanUrl = rawUrl.trim()
+            val allowed = cleanUrl.startsWith("https://", ignoreCase = true) ||
+                cleanUrl.startsWith("http://", ignoreCase = true) ||
+                cleanUrl.startsWith("geo:", ignoreCase = true)
+            if (!allowed) {
+                ReceiptPlatformActionResult(false, "Unsupported link")
+            } else {
+                val opened = window.open(cleanUrl, "_blank")
+                if (opened != null) {
+                    ReceiptPlatformActionResult(true, "Opened map")
+                } else {
+                    ReceiptPlatformActionResult(false, "The browser blocked the new tab")
+                }
+            }
+        }.getOrElse { throwable ->
+            ReceiptPlatformActionResult(false, throwable.message ?: "Could not open the link")
+        }
+    }
+
     openPlatformAppSettings = { _ ->
         ReceiptPlatformActionResult(false, "Browser app permissions are controlled by the browser and operating system")
     }

@@ -147,6 +147,7 @@ var stopPlatformVoiceInput: (() -> Unit)? = null
 var getVoiceInputPermissionState: (suspend () -> PlatformPermissionState)? = null
 var isPlatformVoiceInputAvailable: (() -> Boolean)? = null
 var openPlatformAppSettings: (suspend (PlatformPermissionKind) -> ReceiptPlatformActionResult)? = null
+var openExternalUrlPlatformAction: (suspend (String) -> ReceiptPlatformActionResult)? = null
 
 var forceHidePlatformSoftKeyboard: (() -> Unit)? = null
 

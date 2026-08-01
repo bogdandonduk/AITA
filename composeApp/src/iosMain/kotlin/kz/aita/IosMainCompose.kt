@@ -155,6 +155,18 @@ private fun installIosVoiceInput() {
 private fun installIosComposePlatformBridges() {
     setClipboardText = { text -> UIPasteboard.generalPasteboard.string = text }
 
+    openExternalUrlPlatformAction = { rawUrl ->
+        withContext(Dispatchers.Main) {
+            val url = NSURL.URLWithString(rawUrl.trim())
+            if (url != null && UIApplication.sharedApplication.canOpenURL(url)) {
+                UIApplication.sharedApplication.openURL(url)
+                ReceiptPlatformActionResult(true, "Opened map")
+            } else {
+                ReceiptPlatformActionResult(false, "Could not open the link")
+            }
+        }
+    }
+
     openPlatformAppSettings = { _ ->
         openIosApplicationSettingsNow()
     }

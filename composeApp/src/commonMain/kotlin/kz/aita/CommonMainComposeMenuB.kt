@@ -4890,6 +4890,12 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
         val parentStore = stateValues.stores.findStoreOrBranchForUi(parentStoreIdFromState ?: editedStore?.parentStoreId)
         val isBranchEditor = parentStore != null || editedStore?.isBranchStore() == true
 
+        LaunchedEffect(editedStore?.id, parentStore?.id) {
+            listOfNotNull(editedStore?.id, parentStore?.id)
+                .takeIf { it.isNotEmpty() }
+                ?.let { refreshStoreAddressLocalizations(storeIds = it) }
+        }
+
         fun clearStoreEditorState() {
             coroutineScope.launch {
                 NavigationScreenModel.Menu.AddEditStore.removeState(NavigationScreenModel.Menu.AddEditStore.KEY_STATE_EDITED_STORE_ID)
@@ -4987,19 +4993,6 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
 
                 Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
-                val addressTextFieldContent = genericTextField(
-                    titleText = localizedStringResource(520, "Address"),
-                    placeholderText = localizedStringResource(521, "Enter address"),
-                    valueInitial = editedStore?.address?.ifBlank { editedStore.location.name },
-                    stateHost = NavigationScreenModel.Menu.AddEditStore,
-                    stateKey = NavigationScreenModel.Menu.AddEditStore.KEY_STATE_ADDRESS,
-                    leadingIconPath = stateValues.drawablePathIconStores,
-                    contentInvalidText = localizedStringResource(522, "Address is required"),
-                    onContentValidityCheck = { it.trim().isNotEmpty() }
-                )
-
-                Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-
                 val phoneNumberTextFieldContent = countrySelectionPhoneNumberTextField(
                     valueInitial = editedStore?.phoneNumbers?.takeIf { it.isNotEmpty() }?.first(),
                     stateHost = NavigationScreenModel.Menu.AddEditStore,
@@ -5060,6 +5053,19 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                     countryByPhoneSelection(phoneNumberTextFieldContent.selectedSecondaryId) ?: first()
                 }
 
+                val addressPickerContent = storeVerifiedAddressPicker(
+                    initialLocation = editedStore?.location,
+                    initialAddress = editedStore?.displayAddress(stateValues.appLanguage).orEmpty(),
+                    countryCode = selectedCountry.locale
+                )
+                val addressTextFieldContent = addressPickerContent.textField
+                val addressSelectionRequiredText = localizedStringResource(
+                    2310,
+                    "Choose one of the verified address suggestions before saving"
+                )
+
+                Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
                 val companyFormDropdownListContent = if (!isBranchEditor) {
                     dropdownListWidget(
                         titleText = stateValues.stringCompanyForm,
@@ -5112,16 +5118,8 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
 
                     Spacer(modifier = Modifier.height(outerSpace))
 
-                    fun buildStoreModel(): StoreDataModel {
-                        val address = addressTextFieldContent.value.text.trim()
-                        val location = selectedCountry.cities.firstOrNull()?.run {
-                            LocationDataModel(
-                                name = address.ifBlank { name.extractLocalizedString(stateValues.appLanguage) ?: "" },
-                                postalIndex = "",
-                                latitude = centerLatitude,
-                                longitude = centerLongitude
-                            )
-                        } ?: LocationDataModel(address, "", 0.0, 0.0)
+                    fun buildStoreModel(location: LocationDataModel): StoreDataModel {
+                        val address = location.displayAddress(stateValues.appLanguage)
 
                         val companyForm = stateValues.globalAppConfiguration.companyForms
                             .find { it.id == companyFormDropdownListContent?.selectedId }
@@ -5155,6 +5153,8 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                         )
                     }
 
+                    StoreAddressInlineValidationMessage(addressPickerContent.state)
+
                     actionButton(
                         text = if (editedStore != null) stateValues.stringEditStore else stateValues.stringAddStore,
                         enabled = stateValues.latestNotification == null
@@ -5171,8 +5171,16 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                             return@actionButton
                         }
 
+                        val verifiedLocation = addressPickerContent.locationForSave(stateValues.appLanguage)
+                        if (verifiedLocation == null) {
+                            addressPickerContent.state.requireSuggestionSelection(addressSelectionRequiredText)
+                            addressTextFieldContent.checkContentValidity()
+                            return@actionButton
+                        }
+                        addressPickerContent.state.clearValidation()
+
                         if (addressTextFieldContent.isContentValid && phoneNumberTextFieldContent.isContentValid && emailTextFieldContent.isContentValid && legalIdTextFieldContent.isContentValid) {
-                            val body = buildStoreModel()
+                            val body = buildStoreModel(verifiedLocation)
                             if (editedStore != null) {
                                 updateStore(body) {
                                     coroutineScope.launch {
@@ -5193,16 +5201,8 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                 } else {
                     Spacer(modifier = Modifier.height(outerSpace))
 
-                    fun buildBranchModel(): StoreDataModel {
-                        val address = addressTextFieldContent.value.text.trim()
-                        val location = selectedCountry.cities.firstOrNull()?.run {
-                            LocationDataModel(
-                                name = address.ifBlank { name.extractLocalizedString(stateValues.appLanguage) ?: "" },
-                                postalIndex = "",
-                                latitude = centerLatitude,
-                                longitude = centerLongitude
-                            )
-                        } ?: LocationDataModel(address, "", 0.0, 0.0)
+                    fun buildBranchModel(location: LocationDataModel): StoreDataModel {
+                        val address = location.displayAddress(stateValues.appLanguage)
 
                         return StoreDataModel(
                             id = editedStore?.id.orEmpty(),
@@ -5232,6 +5232,8 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                         )
                     }
 
+                    StoreAddressInlineValidationMessage(addressPickerContent.state)
+
                     actionButton(
                         text = if (editedStore != null) localizedStringResource(534, "Edit branch") else localizedStringResource(533, "Add branch"),
                         enabled = stateValues.latestNotification == null
@@ -5247,8 +5249,16 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                             return@actionButton
                         }
 
+                        val verifiedLocation = addressPickerContent.locationForSave(stateValues.appLanguage)
+                        if (verifiedLocation == null) {
+                            addressPickerContent.state.requireSuggestionSelection(addressSelectionRequiredText)
+                            addressTextFieldContent.checkContentValidity()
+                            return@actionButton
+                        }
+                        addressPickerContent.state.clearValidation()
+
                         if (addressTextFieldContent.isContentValid && phoneNumberTextFieldContent.isContentValid && emailTextFieldContent.isContentValid) {
-                            val body = buildBranchModel()
+                            val body = buildBranchModel(verifiedLocation)
                             if (editedStore != null) {
                                 updateStore(body) {
                                     coroutineScope.launch {
