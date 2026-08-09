@@ -11,8 +11,10 @@
     }
   ],
   "vars": {
-    "AITA_CURRENT_SERVER_URL": "https://api.aita.kz",
-    "AITA_RELEASE_VERSION": ""
+    "AITA_CURRENT_SERVER_URL": "https://aita-api.bogdan-dond.uk.workers.dev",
+    "AITA_RELEASE_VERSION": "",
+    "AITA_LEGACY_SERVER_URL": "https://api.aita.kz",
+    "AITA_BOOTSTRAP_SEQUENCE": "1"
   },
   "observability": {
     "enabled": true

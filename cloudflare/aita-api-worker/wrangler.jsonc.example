@@ -1,0 +1,23 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "aita-api",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-01",
+  "workers_dev": true,
+  "preview_urls": false,
+  "vpc_services": [
+    {
+      "binding": "AITA_ORIGIN",
+      "service_id": "REPLACE_WITH_YOUR_EXISTING_VPC_SERVICE_ID",
+      "remote": true
+    }
+  ],
+  "vars": {
+    "AITA_LEGACY_SERVER_URL": "https://api.aita.kz",
+    "AITA_BOOTSTRAP_SEQUENCE": "1",
+    "AITA_RELEASE_VERSION": ""
+  },
+  "observability": {
+    "enabled": true
+  }
+}

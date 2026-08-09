@@ -3,7 +3,7 @@ param(
     [string]$FieldRoot = 'C:\AITA_FIELD',
     [string]$ProjectRoot = '',
     [string]$LocalUrl = 'http://127.0.0.1:8080',
-    [string]$PublicUrl = 'https://api.aita.kz',
+    [string]$PublicUrl = 'https://aita-api.bogdan-dond.uk.workers.dev',
     [ValidateRange(2, 120)]
     [int]$TimeoutSeconds = 15,
     [switch]$CheckEndpoints

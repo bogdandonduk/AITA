@@ -10,7 +10,7 @@ usage() {
 Usage: $0 [--project-root PATH] [--local-server | --server-url URL] [--keep-daemon]
 
 Launches the Compose desktop client from an interactive Linux graphical session.
-Use --local-server while api.aita.kz DNS/Tunnel routing is being repaired.
+The default build uses the domain-independent workers.dev bootstrap; use --local-server only for origin troubleshooting.
 USAGE
 }
 

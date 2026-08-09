@@ -16,6 +16,9 @@ known_paths=(
   "aita-prod.env"
   "rclone.conf"
   "cloudflare-tunnel-token.txt"
+  ".dev.vars"
+  "wrangler.local.jsonc"
+  "cloudflare-api-token.txt"
 )
 
 for relative in "${known_paths[@]}"; do
@@ -23,10 +26,18 @@ for relative in "${known_paths[@]}"; do
     report "sensitive file must not be stored in the repository: ${candidate#"$ROOT"/}"
   done < <(
     find "$ROOT" \
-      \( -path "$ROOT/.git" -o -path "$ROOT/.gradle" -o -path '*/build' -o -path '*/.idea' \) -prune -o \
+      \( -path "$ROOT/.git" -o -path "$ROOT/.gradle" -o -path '*/build' -o -path '*/node_modules' -o -path '*/.idea' \) -prune -o \
       -type f -name "$(basename "$relative")" -print0
   )
 done
+
+while IFS= read -r -d '' candidate; do
+  report "machine-local Cloudflare environment file must not be stored in the repository: ${candidate#"$ROOT"/}"
+done < <(
+  find "$ROOT" \
+    \( -path "$ROOT/.git" -o -path "$ROOT/.gradle" -o -path '*/build' -o -path '*/node_modules' -o -path '*/.idea' \) -prune -o \
+    -type f \( -name '.dev.vars' -o -name '.dev.vars.*' -o -name 'wrangler.local.jsonc' -o -name '.env.local' \) -print0
+)
 
 # Build the marker in pieces so this checker does not match its own source.
 age_marker='AGE-SECRET-''KEY-'
@@ -39,7 +50,7 @@ while IFS= read -r -d '' candidate; do
   fi
 done < <(
   find "$ROOT" \
-    \( -path "$ROOT/.git" -o -path "$ROOT/.gradle" -o -path '*/build' -o -path '*/.idea' \) -prune -o \
+    \( -path "$ROOT/.git" -o -path "$ROOT/.gradle" -o -path '*/build' -o -path '*/node_modules' -o -path '*/.idea' \) -prune -o \
     -type f -size -5M -print0
 )
 
