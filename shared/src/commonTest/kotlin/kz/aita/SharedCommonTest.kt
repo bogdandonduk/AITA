@@ -1,5 +1,7 @@
 package kz.aita
 
+import io.ktor.http.HttpMethod
+import io.ktor.http.HttpStatusCode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -58,5 +60,117 @@ class SharedCommonTest {
         assertEquals("Legacy address text", legacy.displayAddress("en"))
         assertFalse(legacy.isResolvedAddress())
         assertFalse(legacy.hasValidCoordinates())
+    }
+
+    @Test
+    fun bootstrapDecoderAcceptsPrimaryPairAndMixedCandidateShapes() {
+        val decoded = decodeBootstrapServerUrlCandidates(
+            """
+            {
+              "serverUrl": {
+                "first": "https://aita-api.bogdan-dond.uk.workers.dev/",
+                "second": "1"
+              },
+              "serverCandidates": [
+                {
+                  "url": "https://aita-api.bogdan-dond.uk.workers.dev",
+                  "priority": 100,
+                  "supportsRealtime": true,
+                  "role": "primary-domainless"
+                },
+                "https://api.aita.kz/",
+                {
+                  "serverUrl": "https://secondary.example.com/healthz"
+                }
+              ]
+            }
+            """.trimIndent()
+        )
+
+        assertEquals(
+            listOf(
+                "https://aita-api.bogdan-dond.uk.workers.dev",
+                "https://api.aita.kz",
+                "https://secondary.example.com"
+            ),
+            decoded
+        )
+    }
+
+    @Test
+    fun bootstrapDecoderAcceptsJsonEncodedPayloadCandidates() {
+        val decoded = decodeBootstrapServerUrlCandidates(
+            """
+            {
+              "message": null,
+              "payload": "{\"serverCandidates\":[\"https://one.example\",{\"url\":\"https://two.example/config/global\"}]}"
+            }
+            """.trimIndent()
+        )
+
+        assertEquals(
+            listOf("https://one.example", "https://two.example"),
+            decoded
+        )
+    }
+
+    @Test
+    fun serverPublishedLegacyAliasCannotDisplaceAnchoredPrimary() {
+        val primary = Pair("https://aita-api.bogdan-dond.uk.workers.dev", "1")
+        val legacy = Pair("https://api.aita.kz", "2")
+
+        assertEquals(primary, chooseClientServerUrlPair(primary, legacy))
+        assertEquals(legacy, chooseClientServerUrlPair(Pair("", "1"), legacy))
+    }
+
+    @Test
+    fun onlyReadOnlyHttpMethodsMayFailOverAcrossAliases() {
+        assertTrue(HttpMethod.Get.canRetryAcrossAitaServerAliases())
+        assertTrue(HttpMethod.Head.canRetryAcrossAitaServerAliases())
+        assertTrue(HttpMethod.Options.canRetryAcrossAitaServerAliases())
+        assertFalse(HttpMethod.Post.canRetryAcrossAitaServerAliases())
+        assertFalse(HttpMethod.Put.canRetryAcrossAitaServerAliases())
+        assertFalse(HttpMethod.Patch.canRetryAcrossAitaServerAliases())
+        assertFalse(HttpMethod.Delete.canRetryAcrossAitaServerAliases())
+    }
+
+    @Test
+    fun aliasRetryRequiresReadOnlyMethodAndTransportLikeFailure() {
+        assertTrue(
+            shouldRetryNetworkRequestOnNextServerUrl(
+                method = HttpMethod.Get,
+                endpointUrl = "healthz",
+                status = HttpStatusCode.ServiceUnavailable,
+                rawBody = "{\"transportFailure\":true}",
+                aitaServerResponse = true
+            )
+        )
+        assertTrue(
+            shouldRetryNetworkRequestOnNextServerUrl(
+                method = HttpMethod.Get,
+                endpointUrl = "config/global",
+                status = HttpStatusCode.OK,
+                rawBody = "<html>not AITA</html>",
+                aitaServerResponse = false
+            )
+        )
+        assertFalse(
+            shouldRetryNetworkRequestOnNextServerUrl(
+                method = HttpMethod.Post,
+                endpointUrl = "transactions/add",
+                status = HttpStatusCode.ServiceUnavailable,
+                rawBody = "{\"transportFailure\":true}",
+                aitaServerResponse = true
+            )
+        )
+        assertFalse(
+            shouldRetryNetworkRequestOnNextServerUrl(
+                method = HttpMethod.Get,
+                endpointUrl = "user/get",
+                status = HttpStatusCode.Unauthorized,
+                rawBody = "{\"negative\":true}",
+                aitaServerResponse = true
+            )
+        )
     }
 }

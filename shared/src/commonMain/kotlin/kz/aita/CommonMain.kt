@@ -6252,30 +6252,40 @@ const val CLOUD_TRANSPORT_STATUS_UNAVAILABLE = -1
 @PublishedApi
 internal const val REALTIME_ACCESS_TOKEN_REFRESH_SKEW_MILLIS = 60_000L
 
-private const val DEFAULT_AITA_SERVER_URL = "https://api.aita.kz"
-private const val DEFAULT_AITA_BOOTSTRAP_URLS = "https://bootstrap.aita.kz/.well-known/aita-server.json"
+private const val DEFAULT_AITA_SERVER_URL = "https://aita-api.bogdan-dond.uk.workers.dev"
+private const val DEFAULT_AITA_FALLBACK_SERVER_URLS = "https://api.aita.kz"
+private const val DEFAULT_AITA_BOOTSTRAP_URLS = "https://aita-api.bogdan-dond.uk.workers.dev/.well-known/aita-server.json,https://bootstrap.aita.kz/.well-known/aita-server.json,https://api.aita.kz/.well-known/aita-server.json"
 private const val AITA_BOOTSTRAP_SERVER_URL_REFRESH_INTERVAL_MILLIS = 300_000L
 private const val AITA_BOOTSTRAP_SERVER_URL_FAILURE_BACKOFF_MILLIS = 45_000L
 private const val AITA_BOOTSTRAP_SERVER_URL_CACHE_MAX_AGE_MILLIS = 1_209_600_000L
-private const val AITA_BOOTSTRAP_HTTP_TIMEOUT_MILLIS = 2_500L
+private const val AITA_LAST_KNOWN_GOOD_SERVER_URL_CACHE_MAX_AGE_MILLIS = 2_592_000_000L
+private const val AITA_NON_REPLAYABLE_MUTATION_PROOF_MAX_AGE_MILLIS = 30_000L
+private const val AITA_BOOTSTRAP_HTTP_TIMEOUT_MILLIS = 8_000L
 private val DEFAULT_AITA_SERVER_URL_PAIR = Pair(DEFAULT_AITA_SERVER_URL, "1")
 @Volatile
 private var runtimeClientServerUrlOverride: String? = null
 @Volatile
 private var runtimeClientBootstrapUrlsOverride: List<String>? = null
 @Volatile
-private var bootstrapServerUrlMemory: String? = null
+private var bootstrapServerUrlCandidatesMemory: List<String> = emptyList()
 @Volatile
 private var bootstrapServerUrlFetchedAtMillis: Long = 0L
 @Volatile
 private var bootstrapServerUrlLastFailureAtMillis: Long = 0L
 private val bootstrapServerUrlMutex = Mutex()
 @Volatile
+private var lastKnownGoodServerUrlMemory: String? = null
+@Volatile
+private var lastKnownGoodServerUrlVerifiedAtMillis: Long = 0L
+@Volatile
+private var lastKnownGoodServerUrlPersistedAtMillis: Long = 0L
+private val lastKnownGoodServerUrlMutex = Mutex()
+@Volatile
 private var currentNetworkRequestCandidateServerUrlsMemory: List<String> = emptyList()
 
-// Keep the production/development server address visible again while the app is still moving fast:
-// CommonMain.kt provides the bootstrap URL, and server/config/app/global.json provides the server-published URL.
-// Cached, remembered, and environment-derived addresses are intentionally not used for default URL selection here.
+// CommonMain.kt and server/config/app/global.json remain the visible source of truth. Bootstrap and
+// last-known-good memory may select another verified public alias of the same AITA origin, but stale
+// cached/server-published addresses are never allowed to displace the checked-in primary by themselves.
 @Volatile
 private var clientVisibleServerUrlFilesOnly: Boolean = true
 
@@ -9353,6 +9363,7 @@ fun observeLocalKv(key: String): Flow<String?> =
 private const val CACHE_PREFIX = "cache_json:"
 private const val CACHE_GLOBAL_CONFIG = "global_config"
 private const val CACHE_BOOTSTRAP_SERVER_URL = "bootstrap_server_url"
+private const val CACHE_LAST_KNOWN_GOOD_SERVER_URL = "last_known_good_server_url"
 private const val CACHE_STRINGS = "strings"
 private const val CACHE_DIMENSIONS = "dimensions"
 private const val CACHE_COLORS = "colors"
@@ -9393,16 +9404,15 @@ internal suspend fun ensureCachedGlobalConfigurationPrimedForNetwork() {
 
         getJsonCache<GlobalAppConfigurationDataModel>(CACHE_GLOBAL_CONFIG)?.let { cachedConfiguration ->
             val currentConfiguration = globalAppConfigurationState.payloadValue
-            val cachedBootstrapServerUrl = cachedBootstrapServerUrlOrNull()
+            val cachedLastKnownGoodServerUrl = cachedLastKnownGoodServerUrlOrNull()
             val runtimeOverrideNormalized = normalizedHttpServerUrlOrNull(runtimeClientServerUrlOverride)
-            // Cached global configuration is still useful for paths/resource IDs. The server URL is
-            // only allowed to come from explicit runtime override, the stable bootstrap resolver, or
-            // the visible CommonMain.kt/global.json configuration unless hidden fallback resolution is
-            // intentionally enabled.
+            // Cached global configuration is still useful for paths and resource IDs. Its embedded server
+            // URL is not authoritative: only an explicit runtime override, a recently verified alias, or
+            // the checked-in visible configuration may anchor this installation.
             val cachedConfigurationForThisInstall = cachedConfiguration.copy(
                 serverUrl = when {
                     runtimeOverrideNormalized != null -> Pair(runtimeOverrideNormalized, currentConfiguration.serverUrl.second)
-                    cachedBootstrapServerUrl != null -> Pair(cachedBootstrapServerUrl, currentConfiguration.serverUrl.second)
+                    cachedLastKnownGoodServerUrl != null -> Pair(cachedLastKnownGoodServerUrl, currentConfiguration.serverUrl.second)
                     clientVisibleServerUrlFilesOnly -> currentConfiguration.serverUrl
                     else -> chooseClientServerUrlPair(
                         current = currentConfiguration.serverUrl,
@@ -9601,13 +9611,22 @@ private fun parseClientBootstrapUrls(raw: String?): List<String> = raw
     .mapNotNull(::normalizedHttpAbsoluteUrlOrNull)
     .distinct()
 
+private fun parseClientServerUrls(raw: String?): List<String> = raw
+    ?.split(Regex("[,\n\r\t ]+"))
+    .orEmpty()
+    .mapNotNull(::normalizedHttpServerUrlOrNull)
+    .distinct()
+
 private fun configuredClientBootstrapUrls(): List<String> =
     runtimeClientBootstrapUrlsOverride ?: parseClientBootstrapUrls(DEFAULT_AITA_BOOTSTRAP_URLS)
+
+private fun configuredClientFallbackServerUrls(): List<String> =
+    parseClientServerUrls(DEFAULT_AITA_FALLBACK_SERVER_URLS)
 
 fun setRuntimeClientBootstrapUrlsOverride(raw: String?) {
     val urls = parseClientBootstrapUrls(raw)
     runtimeClientBootstrapUrlsOverride = urls.takeIf { it.isNotEmpty() }
-    bootstrapServerUrlMemory = null
+    bootstrapServerUrlCandidatesMemory = emptyList()
     bootstrapServerUrlFetchedAtMillis = 0L
     bootstrapServerUrlLastFailureAtMillis = 0L
     if (urls.isNotEmpty()) {
@@ -9619,76 +9638,174 @@ fun currentRuntimeClientBootstrapUrlsOverride(): List<String> = runtimeClientBoo
 
 private fun JsonElement.jsonObjectOrNull(): JsonObject? = runCatching { jsonObject }.getOrNull()
 
+private fun JsonElement.jsonArrayOrNull(): JsonArray? = runCatching { jsonArray }.getOrNull()
+
 private fun JsonElement.jsonStringOrNull(): String? = runCatching { jsonPrimitive.contentOrNull }.getOrNull()
 
-private fun JsonElement.bootstrapServerUrlOrNull(): String? {
-    val directText = jsonStringOrNull()?.takeIf { it.startsWith("http://") || it.startsWith("https://") }
-    if (!directText.isNullOrBlank()) return directText
-
-    val obj = jsonObjectOrNull() ?: return null
-    obj["serverUrl"]?.let { element ->
-        element.jsonStringOrNull()?.takeIf { it.isNotBlank() }?.let { return it }
-        element.jsonObjectOrNull()?.get("first")?.jsonStringOrNull()?.takeIf { it.isNotBlank() }?.let { return it }
-    }
-    obj["currentServerUrl"]?.jsonStringOrNull()?.takeIf { it.isNotBlank() }?.let { return it }
-    obj["url"]?.jsonStringOrNull()?.takeIf { it.isNotBlank() }?.let { return it }
-
-    obj["payload"]?.let { payload ->
-        payload.bootstrapServerUrlOrNull()?.let { return it }
-        val payloadText = payload.jsonStringOrNull()?.trim().orEmpty()
-        if (payloadText.startsWith("{") || payloadText.startsWith("[")) {
-            decodeBootstrapServerUrlOrNull(payloadText)?.let { return it }
-        }
-    }
-
-    return null
+private fun bootstrapServerAddressOrNull(raw: String?): String? {
+    val value = raw?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val looksLikeAddress = value.startsWith("http://", ignoreCase = true) ||
+            value.startsWith("https://", ignoreCase = true) ||
+            value.startsWith("ws://", ignoreCase = true) ||
+            value.startsWith("wss://", ignoreCase = true) ||
+            (value.none { it.isWhitespace() } && ('.' in value || value.startsWith("localhost", ignoreCase = true)))
+    return value.takeIf { looksLikeAddress }?.let(::normalizedHttpServerUrlOrNull)
 }
 
-private fun decodeBootstrapServerUrlOrNull(rawBody: String): String? = runCatching {
-    jsonBase.parseToJsonElement(rawBody).bootstrapServerUrlOrNull()
-}.getOrNull()
+private fun JsonElement.bootstrapUrlValueCandidates(depth: Int): List<String> {
+    if (depth > 6) return emptyList()
+
+    jsonStringOrNull()?.trim()?.let { text ->
+        if (text.startsWith("{") || text.startsWith("[")) {
+            return runCatching {
+                jsonBase.parseToJsonElement(text).bootstrapServerUrlCandidates(depth + 1)
+            }.getOrDefault(emptyList())
+        }
+        bootstrapServerAddressOrNull(text)?.let { return listOf(it) }
+    }
+
+    jsonArrayOrNull()?.let { array ->
+        return array.flatMap { it.bootstrapUrlValueCandidates(depth + 1) }.distinct()
+    }
+
+    val obj = jsonObjectOrNull() ?: return emptyList()
+    val values = mutableListOf<String>()
+    obj["first"]?.bootstrapUrlValueCandidates(depth + 1)?.let(values::addAll)
+    values += obj.bootstrapServerUrlCandidates(depth + 1)
+    return values.distinct()
+}
+
+private fun JsonElement.bootstrapServerUrlCandidates(depth: Int = 0): List<String> {
+    if (depth > 6) return emptyList()
+
+    jsonStringOrNull()?.trim()?.let { text ->
+        if (text.startsWith("{") || text.startsWith("[")) {
+            return runCatching {
+                jsonBase.parseToJsonElement(text).bootstrapServerUrlCandidates(depth + 1)
+            }.getOrDefault(emptyList())
+        }
+        bootstrapServerAddressOrNull(text)?.let { return listOf(it) }
+    }
+
+    jsonArrayOrNull()?.let { array ->
+        return array.flatMap { it.bootstrapUrlValueCandidates(depth + 1) }.distinct()
+    }
+
+    val obj = jsonObjectOrNull() ?: return emptyList()
+    val candidates = mutableListOf<String>()
+
+    listOf("serverUrl", "currentServerUrl", "url").forEach { key ->
+        obj[key]?.bootstrapUrlValueCandidates(depth + 1)?.let(candidates::addAll)
+    }
+    listOf("serverCandidates", "servers", "fallbackServerUrls").forEach { key ->
+        obj[key]?.bootstrapUrlValueCandidates(depth + 1)?.let(candidates::addAll)
+    }
+    obj["payload"]?.bootstrapUrlValueCandidates(depth + 1)?.let(candidates::addAll)
+
+    return candidates.distinct()
+}
+
+@PublishedApi
+internal fun decodeBootstrapServerUrlCandidates(rawBody: String): List<String> = runCatching {
+    jsonBase.parseToJsonElement(rawBody).bootstrapServerUrlCandidates()
+}.getOrDefault(emptyList())
 
 private fun applyBootstrapResolvedServerUrl(normalized: String) {
     val currentConfiguration = globalAppConfigurationState.payloadValue
-    val currentNormalized = normalizedHttpServerUrlOrNull(currentConfiguration.serverUrl.first)
-    if (currentNormalized == normalized) return
+    val anchoredPair = chooseClientServerUrlPair(
+        current = currentConfiguration.serverUrl,
+        incoming = Pair(normalized, currentConfiguration.serverUrl.second)
+    )
+    if (anchoredPair == currentConfiguration.serverUrl) return
 
     globalAppConfigurationState.emit(
         DataState.Success(
-            currentConfiguration.copy(serverUrl = Pair(normalized, currentConfiguration.serverUrl.second)),
+            currentConfiguration.copy(serverUrl = anchoredPair),
             cacheMessage()
         )
     )
 }
 
-private suspend fun cachedBootstrapServerUrlOrNull(nowMillis: Long = getCurrentTimeMillis()): String? =
-    getJsonCache<AitaServerBootstrapCacheDataModel>(CACHE_BOOTSTRAP_SERVER_URL)
-        ?.takeIf { cache ->
-            cache.serverUrl.isNotBlank() &&
-                    cache.fetchedAtMillis > 0L &&
-                    nowMillis - cache.fetchedAtMillis <= AITA_BOOTSTRAP_SERVER_URL_CACHE_MAX_AGE_MILLIS
-        }
-        ?.serverUrl
-        ?.let(::normalizedHttpServerUrlOrNull)
+private suspend fun cachedBootstrapServerUrlCandidatesOrEmpty(
+    nowMillis: Long = getCurrentTimeMillis()
+): List<String> {
+    val cache = getJsonCache<AitaServerBootstrapCacheDataModel>(CACHE_BOOTSTRAP_SERVER_URL)
+        ?: return emptyList()
+    val ageMillis = nowMillis - cache.fetchedAtMillis
+    if (cache.fetchedAtMillis <= 0L || ageMillis !in 0L..AITA_BOOTSTRAP_SERVER_URL_CACHE_MAX_AGE_MILLIS) {
+        deleteJsonCache(CACHE_BOOTSTRAP_SERVER_URL)
+        return emptyList()
+    }
 
-private suspend fun resolveCurrentServerUrlFromBootstrapIfConfigured(force: Boolean = false): String? {
-    val bootstrapUrls = configuredClientBootstrapUrls()
-    if (bootstrapUrls.isEmpty()) return null
+    return (listOf(cache.serverUrl) + cache.serverCandidates)
+        .mapNotNull(::normalizedHttpServerUrlOrNull)
+        .distinct()
+}
 
-    val now = getCurrentTimeMillis()
-    val memory = bootstrapServerUrlMemory
-    if (!force && memory != null && now - bootstrapServerUrlFetchedAtMillis <= AITA_BOOTSTRAP_SERVER_URL_REFRESH_INTERVAL_MILLIS) {
+private suspend fun cachedLastKnownGoodServerUrlOrNull(
+    nowMillis: Long = getCurrentTimeMillis()
+): String? {
+    val memory = lastKnownGoodServerUrlMemory
+    val memoryAgeMillis = nowMillis - lastKnownGoodServerUrlVerifiedAtMillis
+    if (memory != null && lastKnownGoodServerUrlVerifiedAtMillis > 0L &&
+        memoryAgeMillis in 0L..AITA_LAST_KNOWN_GOOD_SERVER_URL_CACHE_MAX_AGE_MILLIS
+    ) {
         return memory
     }
 
-    if (!force && now - bootstrapServerUrlLastFailureAtMillis <= AITA_BOOTSTRAP_SERVER_URL_FAILURE_BACKOFF_MILLIS) {
-        return memory ?: cachedBootstrapServerUrlOrNull(now)
+    return lastKnownGoodServerUrlMutex.withLock {
+        val lockedMemory = lastKnownGoodServerUrlMemory
+        val lockedMemoryAgeMillis = nowMillis - lastKnownGoodServerUrlVerifiedAtMillis
+        if (lockedMemory != null && lastKnownGoodServerUrlVerifiedAtMillis > 0L &&
+            lockedMemoryAgeMillis in 0L..AITA_LAST_KNOWN_GOOD_SERVER_URL_CACHE_MAX_AGE_MILLIS
+        ) {
+            return@withLock lockedMemory
+        }
+
+        val cache = getJsonCache<AitaLastKnownGoodServerUrlCacheDataModel>(CACHE_LAST_KNOWN_GOOD_SERVER_URL)
+        val normalized = cache?.serverUrl?.let(::normalizedHttpServerUrlOrNull)
+        val cacheAgeMillis = nowMillis - (cache?.verifiedAtMillis ?: 0L)
+        if (normalized == null || cache == null || cache.verifiedAtMillis <= 0L ||
+            cacheAgeMillis !in 0L..AITA_LAST_KNOWN_GOOD_SERVER_URL_CACHE_MAX_AGE_MILLIS
+        ) {
+            lastKnownGoodServerUrlMemory = null
+            lastKnownGoodServerUrlVerifiedAtMillis = 0L
+            lastKnownGoodServerUrlPersistedAtMillis = 0L
+            if (cache != null) deleteJsonCache(CACHE_LAST_KNOWN_GOOD_SERVER_URL)
+            return@withLock null
+        }
+
+        lastKnownGoodServerUrlMemory = normalized
+        lastKnownGoodServerUrlVerifiedAtMillis = cache.verifiedAtMillis
+        lastKnownGoodServerUrlPersistedAtMillis = cache.verifiedAtMillis
+        normalized
+    }
+}
+
+private suspend fun resolveCurrentServerUrlCandidatesFromBootstrapIfConfigured(
+    force: Boolean = false
+): List<String> {
+    val bootstrapUrls = configuredClientBootstrapUrls()
+    if (bootstrapUrls.isEmpty()) return emptyList()
+
+    val now = getCurrentTimeMillis()
+    val memory = bootstrapServerUrlCandidatesMemory
+    if (!force && memory.isNotEmpty() &&
+        now - bootstrapServerUrlFetchedAtMillis in 0L..AITA_BOOTSTRAP_SERVER_URL_REFRESH_INTERVAL_MILLIS
+    ) {
+        return memory
+    }
+
+    if (!force && now - bootstrapServerUrlLastFailureAtMillis in 0L..AITA_BOOTSTRAP_SERVER_URL_FAILURE_BACKOFF_MILLIS) {
+        return memory.ifEmpty { cachedBootstrapServerUrlCandidatesOrEmpty(now) }
     }
 
     return bootstrapServerUrlMutex.withLock {
         val lockedNow = getCurrentTimeMillis()
-        val lockedMemory = bootstrapServerUrlMemory
-        if (!force && lockedMemory != null && lockedNow - bootstrapServerUrlFetchedAtMillis <= AITA_BOOTSTRAP_SERVER_URL_REFRESH_INTERVAL_MILLIS) {
+        val lockedMemory = bootstrapServerUrlCandidatesMemory
+        if (!force && lockedMemory.isNotEmpty() &&
+            lockedNow - bootstrapServerUrlFetchedAtMillis in 0L..AITA_BOOTSTRAP_SERVER_URL_REFRESH_INTERVAL_MILLIS
+        ) {
             return@withLock lockedMemory
         }
 
@@ -9716,24 +9833,24 @@ private suspend fun resolveCurrentServerUrlFromBootstrapIfConfigured(force: Bool
                         }
                     }
                     val rawBody = response.bodyAsText()
-                    val normalizedServerUrl = decodeBootstrapServerUrlOrNull(rawBody)
-                        ?.let(::normalizedHttpServerUrlOrNull)
+                    val normalizedServerUrls = decodeBootstrapServerUrlCandidates(rawBody)
 
-                    if (response.status.isSuccess() && normalizedServerUrl != null) {
-                        bootstrapServerUrlMemory = normalizedServerUrl
+                    if (response.status.isSuccess() && normalizedServerUrls.isNotEmpty()) {
+                        bootstrapServerUrlCandidatesMemory = normalizedServerUrls
                         bootstrapServerUrlFetchedAtMillis = getCurrentTimeMillis()
                         bootstrapServerUrlLastFailureAtMillis = 0L
                         putJsonCache(
                             CACHE_BOOTSTRAP_SERVER_URL,
                             AitaServerBootstrapCacheDataModel(
-                                serverUrl = normalizedServerUrl,
+                                serverUrl = normalizedServerUrls.first(),
+                                serverCandidates = normalizedServerUrls,
                                 bootstrapUrl = bootstrapUrl,
                                 fetchedAtMillis = bootstrapServerUrlFetchedAtMillis
                             )
                         )
-                        applyBootstrapResolvedServerUrl(normalizedServerUrl)
-                        logNetworkAttempt("BOOTSTRAP RESULT $bootstrapUrl -> $normalizedServerUrl")
-                        return@withLock normalizedServerUrl
+                        applyBootstrapResolvedServerUrl(normalizedServerUrls.first())
+                        logNetworkAttempt("BOOTSTRAP RESULT $bootstrapUrl -> ${normalizedServerUrls.joinToString()}")
+                        return@withLock normalizedServerUrls
                     }
 
                     logNetworkAttempt("BOOTSTRAP MISS $bootstrapUrl HTTP ${response.status.value}")
@@ -9747,7 +9864,7 @@ private suspend fun resolveCurrentServerUrlFromBootstrapIfConfigured(force: Bool
         }
 
         bootstrapServerUrlLastFailureAtMillis = getCurrentTimeMillis()
-        lockedMemory ?: cachedBootstrapServerUrlOrNull(bootstrapServerUrlLastFailureAtMillis)
+        lockedMemory.ifEmpty { cachedBootstrapServerUrlCandidatesOrEmpty(bootstrapServerUrlLastFailureAtMillis) }
     }
 }
 
@@ -9821,13 +9938,10 @@ internal fun chooseClientServerUrlPair(
 ): Pair<String, String> {
     val currentNormalized = normalizedHttpServerUrlOrNull(current.first)
     val incomingNormalized = normalizedHttpServerUrlOrNull(incoming.first) ?: return current
-    val defaultNormalized = normalizedHttpServerUrlOrNull(DEFAULT_AITA_SERVER_URL)
-
     return when {
         currentNormalized == null -> Pair(incomingNormalized, incoming.second)
-        currentNormalized == defaultNormalized && incomingNormalized != defaultNormalized -> Pair(incomingNormalized, incoming.second)
         currentNormalized == incomingNormalized -> current
-        else -> Pair(currentNormalized, current.second)
+        else -> current
     }
 }
 
@@ -9836,39 +9950,63 @@ internal suspend fun resolvedServerUrlCandidates(explicitServerUrl: String? = nu
     ensureCachedGlobalConfigurationPrimedForNetwork()
 
     val explicitNormalized = normalizedHttpServerUrlOrNull(explicitServerUrl)
-    val currentConfiguredNormalized = normalizedHttpServerUrlOrNull(globalAppConfigurationState.payloadValue.serverUrl.first)
-    val defaultNormalized = normalizedHttpServerUrlOrNull(DEFAULT_AITA_SERVER_URL)
-    val runtimeOverrideNormalized = normalizedHttpServerUrlOrNull(runtimeClientServerUrlOverride)
-    val bootstrapNormalized = if (explicitNormalized == null) {
-        resolveCurrentServerUrlFromBootstrapIfConfigured()
-    } else {
-        null
+    if (explicitNormalized != null) {
+        currentNetworkRequestCandidateServerUrlsMemory = listOf(explicitNormalized)
+        return listOf(explicitNormalized)
     }
-    val cachedBootstrapNormalized = if (bootstrapNormalized == null) cachedBootstrapServerUrlOrNull() else null
+
+    val runtimeOverrideNormalized = normalizedHttpServerUrlOrNull(runtimeClientServerUrlOverride)
+    if (runtimeOverrideNormalized != null) {
+        currentNetworkRequestCandidateServerUrlsMemory = listOf(runtimeOverrideNormalized)
+        return listOf(runtimeOverrideNormalized)
+    }
+
+    val automaticAliasBeforeLookup = lastKnownGoodServerUrlMemory?.let(::normalizedHttpServerUrlOrNull)
+    val lastKnownGood = cachedLastKnownGoodServerUrlOrNull()
+    // A recent proven alias should make normal requests immediate. Discovery is fetched synchronously
+    // only when no working alias is known; if that alias later fails it is removed and the next request
+    // re-enters the full bootstrap chain.
+    val bootstrapCandidates = if (lastKnownGood != null) {
+        bootstrapServerUrlCandidatesMemory.ifEmpty { cachedBootstrapServerUrlCandidatesOrEmpty() }
+    } else {
+        resolveCurrentServerUrlCandidatesFromBootstrapIfConfigured()
+    }
+    val cachedBootstrapCandidates = if (bootstrapCandidates.isEmpty()) {
+        cachedBootstrapServerUrlCandidatesOrEmpty()
+    } else {
+        emptyList()
+    }
+    val defaultNormalized = normalizedHttpServerUrlOrNull(DEFAULT_AITA_SERVER_URL)
+    val fallbackCandidates = configuredClientFallbackServerUrls()
+    val currentConfiguredNormalized = normalizedHttpServerUrlOrNull(globalAppConfigurationState.payloadValue.serverUrl.first)
+    val automaticAdoptedAlias = lastKnownGood ?: automaticAliasBeforeLookup
+    val currentCustomCandidate = currentConfiguredNormalized?.takeIf { current ->
+        current != defaultNormalized && current != automaticAdoptedAlias
+    }
     val cachedConfiguredNormalized = if (!clientVisibleServerUrlFilesOnly) {
         runCatching {
             getJsonCache<GlobalAppConfigurationDataModel>(CACHE_GLOBAL_CONFIG)?.serverUrl?.first
-        }.getOrNull()?.let { normalizedHttpServerUrlOrNull(it) }
+        }.getOrNull()?.let(::normalizedHttpServerUrlOrNull)
     } else {
         null
     }
-    val cachedNonDefault = cachedConfiguredNormalized?.takeIf { it != defaultNormalized }
-    val currentCandidate = currentConfiguredNormalized?.takeUnless { it == defaultNormalized && cachedNonDefault != null }
 
-    val candidates = buildList {
-        explicitNormalized?.let(::add)
-        runtimeOverrideNormalized?.let(::add)
-        bootstrapNormalized?.let(::add)
-        currentCandidate?.let(::add)
-        cachedBootstrapNormalized?.let(::add)
-        if (!clientVisibleServerUrlFilesOnly) cachedNonDefault?.let(::add)
-        currentConfiguredNormalized?.let(::add)
-        cachedConfiguredNormalized?.let(::add)
+    val normalizedCandidates = buildList {
+        // A deliberate in-app server choice must outrank older automatic reachability memory.
+        currentCustomCandidate?.let(::add)
+        lastKnownGood?.let(::add)
+        addAll(bootstrapCandidates)
         defaultNormalized?.let(::add)
+        currentConfiguredNormalized?.let(::add)
+        addAll(cachedBootstrapCandidates)
+        cachedConfiguredNormalized?.let(::add)
+        addAll(fallbackCandidates)
         add(DEFAULT_AITA_SERVER_URL)
-    }.distinct()
+    }
+        .mapNotNull(::normalizedHttpServerUrlOrNull)
+        .distinct()
+        .ifEmpty { listOf(DEFAULT_AITA_SERVER_URL) }
 
-    val normalizedCandidates = candidates.ifEmpty { listOf(DEFAULT_AITA_SERVER_URL) }
     currentNetworkRequestCandidateServerUrlsMemory = normalizedCandidates
     logNetworkAttempt("server URL candidates = ${normalizedCandidates.joinToString()}")
     return normalizedCandidates
@@ -9877,18 +10015,33 @@ internal suspend fun resolvedServerUrlCandidates(explicitServerUrl: String? = nu
 @PublishedApi
 internal suspend fun rememberReachableServerUrl(serverUrl: String) {
     val normalized = normalizedHttpServerUrlOrNull(serverUrl) ?: return
-    currentNetworkRequestCandidateServerUrlsMemory = listOf(normalized)
+    val now = getCurrentTimeMillis()
+    currentNetworkRequestCandidateServerUrlsMemory =
+        (listOf(normalized) + currentNetworkRequestCandidateServerUrlsMemory).distinct()
 
-    if (clientVisibleServerUrlFilesOnly) {
-        return
+    lastKnownGoodServerUrlMutex.withLock {
+        val shouldPersist = lastKnownGoodServerUrlMemory != normalized ||
+                now - lastKnownGoodServerUrlPersistedAtMillis !in 0L..AITA_BOOTSTRAP_SERVER_URL_REFRESH_INTERVAL_MILLIS
+        lastKnownGoodServerUrlMemory = normalized
+        lastKnownGoodServerUrlVerifiedAtMillis = now
+        if (shouldPersist) {
+            lastKnownGoodServerUrlPersistedAtMillis = now
+            putJsonCache(
+                CACHE_LAST_KNOWN_GOOD_SERVER_URL,
+                AitaLastKnownGoodServerUrlCacheDataModel(
+                    serverUrl = normalized,
+                    verifiedAtMillis = now
+                )
+            )
+        }
     }
+
+    val runtimeOverrideNormalized = normalizedHttpServerUrlOrNull(runtimeClientServerUrlOverride)
+    if (runtimeOverrideNormalized != null && runtimeOverrideNormalized != normalized) return
 
     val currentConfiguration = globalAppConfigurationState.payloadValue
     val currentNormalized = normalizedHttpServerUrlOrNull(currentConfiguration.serverUrl.first)
-    val defaultNormalized = normalizedHttpServerUrlOrNull(DEFAULT_AITA_SERVER_URL)
-    val shouldRemember = currentNormalized == null ||
-            (currentNormalized == defaultNormalized && normalized != defaultNormalized)
-    if (shouldRemember) {
+    if (currentNormalized != normalized) {
         globalAppConfigurationState.emit(
             DataState.Success(
                 currentConfiguration.copy(serverUrl = Pair(normalized, currentConfiguration.serverUrl.second)),
@@ -9898,13 +10051,38 @@ internal suspend fun rememberReachableServerUrl(serverUrl: String) {
     }
 }
 
-@Suppress("UNUSED_PARAMETER")
 @PublishedApi
 internal suspend fun forgetReachableServerUrlCandidate(serverUrl: String) {
-    // No alternate/fallback server URLs are kept anymore. A failed configured address should stay visible
-    // to the user instead of being silently replaced by another local address.
-}
+    val normalized = normalizedHttpServerUrlOrNull(serverUrl) ?: return
+    currentNetworkRequestCandidateServerUrlsMemory =
+        currentNetworkRequestCandidateServerUrlsMemory.filterNot { normalizedHttpServerUrlOrNull(it) == normalized }
 
+    var removedRememberedAlias = false
+    lastKnownGoodServerUrlMutex.withLock {
+        val cached = getJsonCache<AitaLastKnownGoodServerUrlCacheDataModel>(CACHE_LAST_KNOWN_GOOD_SERVER_URL)
+        val cachedNormalized = cached?.serverUrl?.let(::normalizedHttpServerUrlOrNull)
+        if (lastKnownGoodServerUrlMemory == normalized || cachedNormalized == normalized) {
+            lastKnownGoodServerUrlMemory = null
+            lastKnownGoodServerUrlVerifiedAtMillis = 0L
+            lastKnownGoodServerUrlPersistedAtMillis = 0L
+            deleteJsonCache(CACHE_LAST_KNOWN_GOOD_SERVER_URL)
+            removedRememberedAlias = true
+        }
+    }
+
+    if (removedRememberedAlias && normalizedHttpServerUrlOrNull(runtimeClientServerUrlOverride) == null) {
+        val defaultNormalized = normalizedHttpServerUrlOrNull(DEFAULT_AITA_SERVER_URL) ?: return
+        val currentConfiguration = globalAppConfigurationState.payloadValue
+        if (normalizedHttpServerUrlOrNull(currentConfiguration.serverUrl.first) == normalized && normalized != defaultNormalized) {
+            globalAppConfigurationState.emit(
+                DataState.Success(
+                    currentConfiguration.copy(serverUrl = Pair(defaultNormalized, currentConfiguration.serverUrl.second)),
+                    cacheMessage()
+                )
+            )
+        }
+    }
+}
 @PublishedApi
 internal fun rawBodyLooksLikeJson(rawBody: String): Boolean {
     val trimmed = rawBody.trim()
@@ -10124,6 +10302,10 @@ internal fun <Response> authRefreshFailureResponseForNetworkRequest(
     )
 }
 
+@PublishedApi
+internal fun HttpMethod.canRetryAcrossAitaServerAliases(): Boolean =
+    this == HttpMethod.Get || this == HttpMethod.Head || this == HttpMethod.Options
+
 @Suppress("UNUSED_PARAMETER")
 @PublishedApi
 internal fun shouldRetryNetworkRequestOnNextServerUrl(
@@ -10132,16 +10314,161 @@ internal fun shouldRetryNetworkRequestOnNextServerUrl(
     status: HttpStatusCode,
     rawBody: String,
     aitaServerResponse: Boolean = false
-): Boolean = false
+): Boolean {
+    if (!method.canRetryAcrossAitaServerAliases()) return false
+    if (!aitaServerResponse) return true
+    if (status == HttpStatusCode.RequestTimeout || status.isAitaServerUnhealthyForClientBanner()) return true
+
+    val compactBody = rawBody.filterNot { it.isWhitespace() }.lowercase()
+    return compactBody.contains("\"transportfailure\":true")
+}
+
+private data class AitaServerProbeSelection(
+    val serverUrl: String?,
+    val response: ResponseDataModel<Unit>
+)
+
+private suspend fun probeReachableAitaServerUrl(
+    probeHttpClient: HttpClient,
+    serverUrlCandidates: List<String>,
+    endpointUrl: String,
+    reason: String
+): AitaServerProbeSelection {
+    var lastFailure: ResponseDataModel<Unit>? = null
+
+    for (resolvedServerUrl in serverUrlCandidates.distinct()) {
+        val requestUrl = networkTargetUrl(resolvedServerUrl, endpointUrl)
+        try {
+            logNetworkAttempt("TRY ${HttpMethod.Get.value} $requestUrl probe=$reason")
+            val response = probeHttpClient.request(requestUrl) {
+                method = HttpMethod.Get
+                timeout {
+                    requestTimeoutMillis = AITA_BOOTSTRAP_HTTP_TIMEOUT_MILLIS
+                    connectTimeoutMillis = AITA_BOOTSTRAP_HTTP_TIMEOUT_MILLIS
+                    socketTimeoutMillis = AITA_BOOTSTRAP_HTTP_TIMEOUT_MILLIS
+                }
+                header(AITA_CONNECTION_PROBE_HEADER, "1")
+                header(HttpHeaders.CacheControl, "no-cache")
+                header(HttpHeaders.Pragma, "no-cache")
+                parameter("silent", "true")
+                parameter("probe_reason", reason.take(80))
+                currentClientDeviceInfoHeaders().forEach { (key, value) ->
+                    safeHttpHeaderValueOrNull(value)?.let { safeValue -> header(key, safeValue) }
+                }
+            }
+            val rawBody = response.bodyAsText()
+            val aitaServerResponse = response.isAitaServerResponse(rawBody)
+            logNetworkAttempt(
+                "RESULT ${HttpMethod.Get.value} $requestUrl HTTP ${response.status.value} " +
+                        "aita=$aitaServerResponse probe=$reason"
+            )
+
+            if (!aitaServerResponse) {
+                lastFailure = nonAitaHttpResponseDataModel(response.status, rawBody, resolvedServerUrl)
+                forgetReachableServerUrlCandidate(resolvedServerUrl)
+                continue
+            }
+
+            if (response.status.isSuccess()) {
+                rememberReachableServerUrl(resolvedServerUrl)
+                return AitaServerProbeSelection(
+                    serverUrl = resolvedServerUrl,
+                    response = ResponseDataModel(
+                        message = null,
+                        payload = Unit,
+                        negative = false,
+                        httpStatusCode = response.status.value,
+                        transportFailure = false
+                    )
+                )
+            }
+
+            val decodedFailure = decodeNetworkResponseDataModel<Unit>(rawBody, response.status)
+                .withAitaTransportFailureFromStatus(response.status)
+            lastFailure = decodedFailure
+            if (decodedFailure.transportFailure) {
+                forgetReachableServerUrlCandidate(resolvedServerUrl)
+            }
+        } catch (throwable: Throwable) {
+            if (throwable is CancellationException) throw throwable
+            logNetworkAttempt(
+                "FAILED ${HttpMethod.Get.value} $requestUrl probe=$reason ${networkFailureSummary(throwable)}"
+            )
+            forgetReachableServerUrlCandidate(resolvedServerUrl)
+            lastFailure = ResponseDataModel(
+                message = networkTransportFailureMessage(resolvedServerUrl, endpointUrl, throwable),
+                payload = null,
+                negative = true,
+                httpStatusCode = null,
+                transportFailure = true
+            )
+        }
+    }
+
+    return AitaServerProbeSelection(
+        serverUrl = null,
+        response = lastFailure ?: ResponseDataModel(
+            message = localizedStringResourceMessage(
+                id = 1140,
+                main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
+                ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
+                kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
+            ),
+            payload = null,
+            negative = true,
+            httpStatusCode = null,
+            transportFailure = true
+        )
+    )
+}
+
+@PublishedApi
+internal suspend fun selectServerUrlForNonReplayableRequest(
+    serverUrlCandidates: List<String>,
+    reason: String
+): ResponseDataModel<String> {
+    val normalizedCandidates = serverUrlCandidates.mapNotNull(::normalizedHttpServerUrlOrNull).distinct()
+    val recentlyVerified = lastKnownGoodServerUrlMemory
+        ?.let(::normalizedHttpServerUrlOrNull)
+        ?.takeIf { candidate ->
+            candidate in normalizedCandidates &&
+                    getCurrentTimeMillis() - lastKnownGoodServerUrlVerifiedAtMillis in
+                    0L..AITA_NON_REPLAYABLE_MUTATION_PROOF_MAX_AGE_MILLIS
+        }
+    if (recentlyVerified != null) {
+        return ResponseDataModel(
+            message = null,
+            payload = recentlyVerified,
+            negative = false,
+            httpStatusCode = HttpStatusCode.OK.value,
+            transportFailure = false
+        )
+    }
+
+    val probeEndpoint = globalAppConfigurationState.payloadValue.connectionCheckPath.first.trimStart('/')
+    val probe = probeReachableAitaServerUrl(
+        probeHttpClient = httpClient,
+        serverUrlCandidates = normalizedCandidates,
+        endpointUrl = probeEndpoint,
+        reason = reason
+    )
+    return ResponseDataModel(
+        message = probe.response.message,
+        payload = probe.serverUrl,
+        negative = probe.serverUrl == null,
+        httpStatusCode = probe.response.httpStatusCode,
+        transportFailure = probe.serverUrl == null
+    )
+}
 
 @PublishedApi
 internal suspend fun refreshAuthTokensWithServerFallback(refreshToken: String): ResponseDataModel<TokenPair> {
     ensureCachedGlobalConfigurationPrimedForNetwork()
 
-    val refreshEndpoint = globalAppConfigurationState.payloadValue.refreshPath.first.trimStart('/')
+    val currentConfiguration = globalAppConfigurationState.payloadValue
+    val refreshEndpoint = currentConfiguration.refreshPath.first.trimStart('/')
+    val probeEndpoint = currentConfiguration.connectionCheckPath.first.trimStart('/')
     val serverUrlCandidates = resolvedServerUrlCandidates(null)
-    var lastServerErrorResponse: ResponseDataModel<TokenPair>? = null
-    var lastTransportFailureMessage: List<LocalizedStringDataModel>? = null
 
     val refreshHttpClient = HttpClient(getHttpClientEngine()) {
         install(ContentNegotiation) {
@@ -10156,121 +10483,129 @@ internal suspend fun refreshAuthTokensWithServerFallback(refreshToken: String): 
     }
 
     return try {
-        for ((index, resolvedServerUrl) in serverUrlCandidates.withIndex()) {
-            try {
-                val requestUrl = networkTargetUrl(resolvedServerUrl, refreshEndpoint)
-                logNetworkAttempt("TRY ${HttpMethod.Post.value} $requestUrl")
-                val httpResponse = refreshHttpClient.request(requestUrl) {
-                    method = HttpMethod.Post
-                    contentType(ContentType.Application.Json)
-                    header(HttpHeaders.CacheControl, "no-cache")
-                    header(HttpHeaders.Pragma, "no-cache")
-                    currentClientDeviceInfoHeaders().forEach { (key, value) ->
-                        safeHttpHeaderValueOrNull(value)?.let { safeValue -> header(key, safeValue) }
-                    }
-                    setBody(refreshToken)
-                }
-
-                val rawBody = httpResponse.bodyAsText()
-                val aitaServerResponse = httpResponse.isAitaServerResponse(rawBody)
-                logNetworkAttempt("RESULT ${HttpMethod.Post.value} $requestUrl HTTP ${httpResponse.status.value} aita=$aitaServerResponse")
-                val shouldRetryCandidate = index < serverUrlCandidates.lastIndex &&
-                        shouldRetryNetworkRequestOnNextServerUrl(
-                            method = HttpMethod.Post,
-                            endpointUrl = refreshEndpoint,
-                            status = httpResponse.status,
-                            rawBody = rawBody,
-                            aitaServerResponse = aitaServerResponse
-                        )
-
-                if (!aitaServerResponse) {
-                    val nonAitaResponse = nonAitaHttpResponseDataModel<TokenPair>(httpResponse.status, rawBody, resolvedServerUrl)
-                    lastTransportFailureMessage = nonAitaResponse.message
-                    forgetReachableServerUrlCandidate(resolvedServerUrl)
-                    markCloudTransportUnavailableForNotifications()
-                    if (shouldRetryCandidate) continue
-                    rememberAuthRefreshNonAuthFailure(nonAitaResponse.message, transportFailure = true)
-                    return nonAitaResponse
-                }
-
-                val decodedRefreshResponse = decodeNetworkResponseDataModel<TokenPair>(rawBody, httpResponse.status)
-                    .withAitaTransportFailureFromStatus(httpResponse.status)
-
-                if (httpResponse.status.isAitaServerUnhealthyForClientBanner() || decodedRefreshResponse.transportFailure) {
-                    val failureResponse = decodedRefreshResponse.copy(transportFailure = true)
-                    lastServerErrorResponse = failureResponse
-                    markCloudTransportUnavailableForNotifications()
-                    rememberAuthRefreshNonAuthFailure(failureResponse.message, transportFailure = true)
-                    logCloudConnectionDiagnostic(
-                        "auth refresh response treated as unavailable http=${httpResponse.status.value} " +
-                                "aita=$aitaServerResponse negative=${failureResponse.negative}"
-                    )
-                    if (shouldRetryCandidate) continue
-                    return failureResponse
-                }
-
-                if (shouldRetryCandidate) {
-                    lastServerErrorResponse = decodedRefreshResponse
-                    continue
-                }
-
-                val canMarkReachable = cloudResponseCanMarkReachable(refreshEndpoint, httpResponse.status)
-                if (canMarkReachable) {
-                    rememberReachableServerUrl(resolvedServerUrl)
-                    markCloudTransportReachableForNotifications(
-                        authenticated = httpResponse.status.value in 200..299,
-                        authRefreshRequired = httpResponse.status == HttpStatusCode.Unauthorized
-                    )
-                } else {
-                    logCloudConnectionDiagnostic(
-                        "auth refresh reachable mark suppressed http=${httpResponse.status.value} " +
-                                "status=${cloudTransportStatusName(cloudTransportStatusState.value)}"
-                    )
-                    if (httpResponse.status.value >= 500) {
-                        markCloudTransportUnavailableForNotifications()
-                    }
-                }
-
-                if (httpResponse.status == HttpStatusCode.Unauthorized) {
-                    return ResponseDataModel(
-                        message = localizedStringResourceMessage(
-                            id = 91,
-                            main = "Cloud session needs refresh. You remain signed in locally.",
-                            ru = "Облачный сеанс нужно обновить. Вы остаётесь в аккаунте локально.",
-                            kk = "Бұлттық сеансты жаңарту қажет. Сіз жергілікті түрде аккаунтта қаласыз."
-                        ),
-                        payload = null,
-                        negative = true,
-                        httpStatusCode = httpResponse.status.value,
-                        transportFailure = false
-                    )
-                }
-
-                return decodedRefreshResponse
-            } catch (throwable: Throwable) {
-                if (throwable is CancellationException) throw throwable
-                markCloudTransportUnavailableForNotifications()
-                lastTransportFailureMessage = networkTransportFailureMessage(resolvedServerUrl, refreshEndpoint, throwable)
-                logNetworkAttempt("FAILED ${networkTargetUrl(resolvedServerUrl, refreshEndpoint)} ${networkFailureSummary(throwable)}")
-            }
+        // A refresh token may rotate when used. Probe aliases with a harmless GET first, then send the
+        // refresh POST exactly once to one proven AITA endpoint.
+        val probe = probeReachableAitaServerUrl(
+            probeHttpClient = refreshHttpClient,
+            serverUrlCandidates = serverUrlCandidates,
+            endpointUrl = probeEndpoint,
+            reason = "auth_refresh"
+        )
+        val resolvedServerUrl = probe.serverUrl
+        if (resolvedServerUrl == null) {
+            markCloudTransportUnavailableForNotifications()
+            val failure = ResponseDataModel<TokenPair>(
+                message = probe.response.message,
+                payload = null,
+                negative = true,
+                httpStatusCode = probe.response.httpStatusCode,
+                transportFailure = true
+            )
+            rememberAuthRefreshNonAuthFailure(failure.message, transportFailure = true)
+            return failure
         }
 
-        lastServerErrorResponse ?: ResponseDataModel(
-            message = lastTransportFailureMessage ?: localizedStringResourceMessage(
-                id = 214,
-                main = "Cannot reach server. Keeping you signed in offline.",
-                ru = "Сервер недоступен. Вы остаётесь в аккаунте офлайн.",
-                kk = "Сервер қолжетімсіз. Сіз офлайн режимде аккаунтта қаласыз."
-            ),
-            payload = null,
-            negative = true,
-            transportFailure = true
-        )
+        try {
+            val requestUrl = networkTargetUrl(resolvedServerUrl, refreshEndpoint)
+            logNetworkAttempt("TRY ${HttpMethod.Post.value} $requestUrl")
+            val httpResponse = refreshHttpClient.request(requestUrl) {
+                method = HttpMethod.Post
+                contentType(ContentType.Application.Json)
+                header(HttpHeaders.CacheControl, "no-cache")
+                header(HttpHeaders.Pragma, "no-cache")
+                currentClientDeviceInfoHeaders().forEach { (key, value) ->
+                    safeHttpHeaderValueOrNull(value)?.let { safeValue -> header(key, safeValue) }
+                }
+                setBody(refreshToken)
+            }
+
+            val rawBody = httpResponse.bodyAsText()
+            val aitaServerResponse = httpResponse.isAitaServerResponse(rawBody)
+            logNetworkAttempt(
+                "RESULT ${HttpMethod.Post.value} $requestUrl HTTP ${httpResponse.status.value} aita=$aitaServerResponse"
+            )
+
+            if (!aitaServerResponse) {
+                val nonAitaResponse = nonAitaHttpResponseDataModel<TokenPair>(
+                    httpResponse.status,
+                    rawBody,
+                    resolvedServerUrl
+                )
+                forgetReachableServerUrlCandidate(resolvedServerUrl)
+                markCloudTransportUnavailableForNotifications()
+                rememberAuthRefreshNonAuthFailure(nonAitaResponse.message, transportFailure = true)
+                return nonAitaResponse
+            }
+
+            val decodedRefreshResponse = decodeNetworkResponseDataModel<TokenPair>(rawBody, httpResponse.status)
+                .withAitaTransportFailureFromStatus(httpResponse.status)
+
+            if (httpResponse.status.isAitaServerUnhealthyForClientBanner() || decodedRefreshResponse.transportFailure) {
+                val failureResponse = decodedRefreshResponse.copy(transportFailure = true)
+                forgetReachableServerUrlCandidate(resolvedServerUrl)
+                markCloudTransportUnavailableForNotifications()
+                rememberAuthRefreshNonAuthFailure(failureResponse.message, transportFailure = true)
+                logCloudConnectionDiagnostic(
+                    "auth refresh response treated as unavailable http=${httpResponse.status.value} " +
+                            "aita=$aitaServerResponse negative=${failureResponse.negative}"
+                )
+                return failureResponse
+            }
+
+            val canMarkReachable = cloudResponseCanMarkReachable(refreshEndpoint, httpResponse.status)
+            if (canMarkReachable) {
+                rememberReachableServerUrl(resolvedServerUrl)
+                markCloudTransportReachableForNotifications(
+                    authenticated = httpResponse.status.value in 200..299,
+                    authRefreshRequired = httpResponse.status == HttpStatusCode.Unauthorized
+                )
+            } else {
+                logCloudConnectionDiagnostic(
+                    "auth refresh reachable mark suppressed http=${httpResponse.status.value} " +
+                            "status=${cloudTransportStatusName(cloudTransportStatusState.value)}"
+                )
+                if (httpResponse.status.value >= 500) {
+                    markCloudTransportUnavailableForNotifications()
+                }
+            }
+
+            if (httpResponse.status == HttpStatusCode.Unauthorized) {
+                return ResponseDataModel(
+                    message = localizedStringResourceMessage(
+                        id = 91,
+                        main = "Cloud session needs refresh. You remain signed in locally.",
+                        ru = "Облачный сеанс нужно обновить. Вы остаётесь в аккаунте локально.",
+                        kk = "Бұлттық сеансты жаңарту қажет. Сіз жергілікті түрде аккаунтта қаласыз."
+                    ),
+                    payload = null,
+                    negative = true,
+                    httpStatusCode = httpResponse.status.value,
+                    transportFailure = false
+                )
+            }
+
+            decodedRefreshResponse
+        } catch (throwable: Throwable) {
+            if (throwable is CancellationException) throw throwable
+            forgetReachableServerUrlCandidate(resolvedServerUrl)
+            markCloudTransportUnavailableForNotifications()
+            val failure = ResponseDataModel<TokenPair>(
+                message = networkTransportFailureMessage(resolvedServerUrl, refreshEndpoint, throwable),
+                payload = null,
+                negative = true,
+                httpStatusCode = null,
+                transportFailure = true
+            )
+            rememberAuthRefreshNonAuthFailure(failure.message, transportFailure = true)
+            logNetworkAttempt(
+                "FAILED ${networkTargetUrl(resolvedServerUrl, refreshEndpoint)} ${networkFailureSummary(throwable)}"
+            )
+            failure
+        }
     } finally {
         refreshHttpClient.close()
     }
 }
-
 @PublishedApi
 internal suspend fun refreshStoredAuthTokensOnceForNetworkRetry(postNotification: Boolean = true): Boolean = tokenRefreshMutex.withLock {
     val current = getStoredUserAuthTokens?.invoke() ?: return@withLock false
@@ -10336,6 +10671,13 @@ private suspend inline fun <reified T> getJsonCache(key: String): T? {
         getLocalKv(CACHE_PREFIX + key)?.let { jsonBase.decodeFromString<T>(it) }
     } catch (_: Throwable) {
         null
+    }
+}
+
+private suspend fun deleteJsonCache(key: String) {
+    try {
+        deleteLocalKv(CACHE_PREFIX + key)
+    } catch (_: Throwable) {
     }
 }
 
@@ -11904,11 +12246,11 @@ private suspend fun loadCachedStoreScopedData(storeId: String) {
 private suspend fun loadCachedApplicationData() {
     getJsonCache<GlobalAppConfigurationDataModel>(CACHE_GLOBAL_CONFIG)?.let {
         val currentConfiguration = globalAppConfigurationState.payloadValue
-        val cachedBootstrapServerUrl = cachedBootstrapServerUrlOrNull()
+        val cachedLastKnownGoodServerUrl = cachedLastKnownGoodServerUrlOrNull()
         val runtimeOverrideNormalized = normalizedHttpServerUrlOrNull(runtimeClientServerUrlOverride)
         val anchoredServerUrl = when {
             runtimeOverrideNormalized != null -> Pair(runtimeOverrideNormalized, currentConfiguration.serverUrl.second)
-            cachedBootstrapServerUrl != null -> Pair(cachedBootstrapServerUrl, currentConfiguration.serverUrl.second)
+            cachedLastKnownGoodServerUrl != null -> Pair(cachedLastKnownGoodServerUrl, currentConfiguration.serverUrl.second)
             clientVisibleServerUrlFilesOnly -> currentConfiguration.serverUrl
             else -> chooseClientServerUrlPair(currentConfiguration.serverUrl, it.serverUrl)
         }
@@ -12293,9 +12635,9 @@ private suspend fun scheduleRealtimeRefresh(
 private suspend fun cloudConnectionProbeRequest(reason: String): ResponseDataModel<Unit> {
     ensureCachedGlobalConfigurationPrimedForNetwork()
     val endpointUrl = globalAppConfigurationState.payloadValue.connectionCheckPath.first
-    val configuredServerUrl = globalAppConfigurationState.payloadValue.serverUrl.first
-    val resolvedServerUrl = normalizedHttpServerUrlOrNull(configuredServerUrl)
-        ?: return ResponseDataModel(
+    val serverUrlCandidates = resolvedServerUrlCandidates(null)
+    if (serverUrlCandidates.isEmpty()) {
+        return ResponseDataModel(
             message = localizedStringResourceMessage(
                 id = 1140,
                 main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
@@ -12307,50 +12649,14 @@ private suspend fun cloudConnectionProbeRequest(reason: String): ResponseDataMod
             httpStatusCode = null,
             transportFailure = true
         )
-
-    val requestUrl = networkTargetUrl(resolvedServerUrl, endpointUrl)
-    return try {
-        logNetworkAttempt("TRY ${HttpMethod.Get.value} $requestUrl probe=$reason")
-        val response = httpClient.request(requestUrl) {
-            method = HttpMethod.Get
-            header(AITA_CONNECTION_PROBE_HEADER, "1")
-            header(HttpHeaders.CacheControl, "no-cache")
-            header(HttpHeaders.Pragma, "no-cache")
-            parameter("silent", "true")
-            parameter(reason, "true")
-            currentClientDeviceInfoHeaders().forEach { (key, value) ->
-                safeHttpHeaderValueOrNull(value)?.let { safeValue -> header(key, safeValue) }
-            }
-        }
-        val rawBody = response.bodyAsText()
-        val aitaServerResponse = response.isAitaServerResponse(rawBody)
-        logNetworkAttempt("RESULT ${HttpMethod.Get.value} $requestUrl HTTP ${response.status.value} aita=$aitaServerResponse probe=$reason")
-
-        if (!aitaServerResponse) {
-            nonAitaHttpResponseDataModel(response.status, rawBody, resolvedServerUrl)
-        } else if (response.status.isSuccess()) {
-            rememberReachableServerUrl(resolvedServerUrl)
-            ResponseDataModel(
-                message = null,
-                payload = Unit,
-                negative = false,
-                httpStatusCode = response.status.value,
-                transportFailure = false
-            )
-        } else {
-            decodeNetworkResponseDataModel<Unit>(rawBody, response.status)
-        }
-    } catch (throwable: Throwable) {
-        if (throwable is CancellationException) throw throwable
-        logNetworkAttempt("FAILED ${HttpMethod.Get.value} $requestUrl probe=$reason ${networkFailureSummary(throwable)}")
-        ResponseDataModel(
-            message = networkTransportFailureMessage(resolvedServerUrl, endpointUrl, throwable),
-            payload = null,
-            negative = true,
-            httpStatusCode = null,
-            transportFailure = true
-        )
     }
+
+    return probeReachableAitaServerUrl(
+        probeHttpClient = httpClient,
+        serverUrlCandidates = serverUrlCandidates,
+        endpointUrl = endpointUrl,
+        reason = reason
+    ).response
 }
 
 private suspend fun probeCloudServerReachableForRealtimeFallback(): Boolean =
@@ -14976,11 +15282,39 @@ suspend inline fun <reified Response, reified Body> networkRequest(
 
     return try {
         ensureCachedGlobalConfigurationPrimedForNetwork()
-        val serverUrlCandidates = resolvedServerUrlCandidates(serverUrl)
+        val allServerUrlCandidates = resolvedServerUrlCandidates(serverUrl)
+        val serverUrlCandidates = if (method.canRetryAcrossAitaServerAliases()) {
+            allServerUrlCandidates
+        } else {
+            // Select an alias with a harmless readiness GET before sending a non-replayable mutation.
+            // The actual POST/PUT/PATCH/DELETE is still emitted exactly once.
+            val selection = selectServerUrlForNonReplayableRequest(
+                serverUrlCandidates = allServerUrlCandidates,
+                reason = "mutation_${method.value.lowercase()}"
+            )
+            val selectedServerUrl = selection.payload
+            if (selectedServerUrl == null) {
+                markCloudTransportUnavailableForNotifications()
+                return ResponseDataModel<Response>(
+                    message = selection.message,
+                    payload = null,
+                    negative = true,
+                    httpStatusCode = selection.httpStatusCode,
+                    transportFailure = true
+                )
+            }
+            listOf(selectedServerUrl)
+        }
+        if (!method.canRetryAcrossAitaServerAliases() && allServerUrlCandidates.size > 1) {
+            logNetworkAttempt(
+                "alias replay disabled for ${method.value}; selected ${serverUrlCandidates.firstOrNull().orEmpty()}"
+            )
+        }
         var lastServerErrorResponse: ResponseDataModel<Response>? = null
         var lastTransportFailureMessage: List<LocalizedStringDataModel>? = null
 
-        for ((index, resolvedServerUrl) in serverUrlCandidates.withIndex()) {
+        for ((index, candidateServerUrl) in serverUrlCandidates.withIndex()) {
+            var resolvedServerUrl = candidateServerUrl
             var authRetryUsedForCandidate = false
             val requestHeaders = currentClientDeviceInfoHeaders() + headers
 
@@ -15000,6 +15334,12 @@ suspend inline fun <reified Response, reified Body> networkRequest(
                     val refreshed = refreshStoredAuthTokensOnceForNetworkRetry(postNotification = false)
                     if (refreshed) {
                         httpClient.authProvider<BearerAuthProvider>()?.clearToken()
+                        if (!method.canRetryAcrossAitaServerAliases()) {
+                            selectServerUrlForNonReplayableRequest(
+                                serverUrlCandidates = allServerUrlCandidates,
+                                reason = "mutation_after_auth_refresh"
+                            ).payload?.let { provenServerUrl -> resolvedServerUrl = provenServerUrl }
+                        }
                     } else if (!tokensForAuthPreflight.accessTokenIsStillUsableForNetwork()) {
                         recentAuthRefreshNonAuthFailureMessage()?.let { refreshFailureMessage ->
                             return authRefreshFailureResponseForNetworkRequest(refreshFailureMessage)
@@ -15101,6 +15441,7 @@ suspend inline fun <reified Response, reified Body> networkRequest(
                     if (response.status.isAitaServerUnhealthyForClientBanner() || decodedResponse.transportFailure) {
                         val failureResponse = decodedResponse.copy(transportFailure = true)
                         lastServerErrorResponse = failureResponse
+                        forgetReachableServerUrlCandidate(resolvedServerUrl)
                         markCloudTransportUnavailableForNotifications()
                         logCloudConnectionDiagnostic(
                             "server response treated as unavailable method=${method.value} endpoint=${endpointUrl.trim('/')} " +
@@ -15238,6 +15579,7 @@ suspend inline fun <reified Response, reified Body> networkRequest(
                         )
                     }
 
+                    forgetReachableServerUrlCandidate(resolvedServerUrl)
                     markCloudTransportUnavailableForNotifications()
                     lastTransportFailureMessage = networkTransportFailureMessage(resolvedServerUrl, endpointUrl, throwable)
                     logNetworkAttempt("FAILED ${method.value} ${networkTargetUrl(resolvedServerUrl, endpointUrl)} ${networkFailureSummary(throwable)}")
@@ -17277,8 +17619,17 @@ data class GenericResponseDataModel(
 
 
 @kotlinx.serialization.Serializable
+data class AitaServerBootstrapCandidateDataModel(
+    val url: String,
+    val priority: Int = 0,
+    val supportsRealtime: Boolean = true,
+    val role: String = ""
+)
+
+@kotlinx.serialization.Serializable
 data class AitaServerBootstrapDataModel(
     val serverUrl: String,
+    val serverCandidates: List<AitaServerBootstrapCandidateDataModel> = emptyList(),
     val globalConfigPath: String = "config/global",
     val globalConfigUrl: String = "",
     val environment: String = "",
@@ -17289,8 +17640,15 @@ data class AitaServerBootstrapDataModel(
 @kotlinx.serialization.Serializable
 data class AitaServerBootstrapCacheDataModel(
     val serverUrl: String,
+    val serverCandidates: List<String> = emptyList(),
     val bootstrapUrl: String = "",
     val fetchedAtMillis: Long = 0L
+)
+
+@kotlinx.serialization.Serializable
+data class AitaLastKnownGoodServerUrlCacheDataModel(
+    val serverUrl: String,
+    val verifiedAtMillis: Long = 0L
 )
 
 @kotlinx.serialization.Serializable
