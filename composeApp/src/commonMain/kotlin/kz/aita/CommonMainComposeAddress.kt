@@ -335,7 +335,7 @@ internal fun AppConfiguration.storeVerifiedAddressPicker(
             val response = requestStoreAddressMapPreview(
                 location = location,
                 language = stateValues.appLanguage,
-                darkTheme = normalizeAppThemePreference(stateValues.appThemeId) == 1
+                darkTheme = normalizeAppThemePreference(stateValues.appThemeId) == 1L
             )
             state.mapPreview = response.payload
             state.mapPreviewFailed = response.negative || response.payload == null
