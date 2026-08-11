@@ -84,6 +84,11 @@ import kotlin.random.Random
 import kotlin.text.equals
 import kotlin.time.ExperimentalTime
 
+internal fun shouldShowStockAddEditBack(
+    isVeryFirstScreen: Boolean,
+    editedGoodsItemId: String?
+): Boolean = !isVeryFirstScreen || !editedGoodsItemId.isNullOrBlank()
+
 @Composable
 fun AppConfiguration.StockAddEditGoodsItemScreen() {
     val addEditState by NavigationScreenModel.Stock.AddEditGoodsItem.state.collectAsState()
@@ -93,6 +98,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
     ]
 
     val existing = stateValues.stock.orEmpty().find { it.id == editedId }
+    val isEditingStockItem = !editedId.isNullOrBlank()
 
     val defaultCurrency = stateValues.globalAppConfiguration
         .countries
@@ -246,13 +252,11 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
         }
     }
 
-    fun clearPersistentStockAddEditDraft() {
-        coroutineScope.launch {
-            setPersistentUiDraftValue?.invoke(draftStorageKey, null)
-            localizedGroupEditorPersistentKey("$draftStorageKey:name")?.let { setPersistentUiDraftValue?.invoke(it, null) }
-            localizedGroupEditorPersistentKey("$draftStorageKey:description")?.let { setPersistentUiDraftValue?.invoke(it, null) }
-            localizedGroupEditorPersistentKey("$draftStorageKey:note")?.let { setPersistentUiDraftValue?.invoke(it, null) }
-        }
+    suspend fun clearPersistentStockAddEditDraft() {
+        setPersistentUiDraftValue?.invoke(draftStorageKey, null)
+        localizedGroupEditorPersistentKey("$draftStorageKey:name")?.let { setPersistentUiDraftValue?.invoke(it, null) }
+        localizedGroupEditorPersistentKey("$draftStorageKey:description")?.let { setPersistentUiDraftValue?.invoke(it, null) }
+        localizedGroupEditorPersistentKey("$draftStorageKey:note")?.let { setPersistentUiDraftValue?.invoke(it, null) }
     }
 
     var selectedTabId by rememberSaveable(existing?.id ?: "new_stock_item:$addStockItemSessionId") {
@@ -278,6 +282,60 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
     }
 
     val canPopStockScreen = !Navigation.Stock.isVeryFirstScreen(stateValues.isNarrowScreen)
+    val showStockEditorBack = shouldShowStockAddEditBack(
+        isVeryFirstScreen = !canPopStockScreen,
+        editedGoodsItemId = editedId
+    )
+    // A process-restored request is no longer running, so loading state must never be persisted.
+    var isSavingStockItem by remember(stockAddEditDraftIdentity) { mutableStateOf(false) }
+    var stockSaveError by rememberSaveable(stockAddEditDraftIdentity) { mutableStateOf<String?>(null) }
+
+    suspend fun resetStockEditorToFreshAdd(clearCurrentDraft: Boolean) {
+        // Stop the persistence effect before rotating the editor identity. Otherwise a recomposition can
+        // briefly write the just-cleared edit draft back under the old item key.
+        persistentDraftLoaded = false
+        if (clearCurrentDraft) clearPersistentStockAddEditDraft()
+        NavigationScreenModel.Stock.AddEditGoodsItem.removeState(
+            NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_EDITED_GOODS_ITEM_ID
+        )
+        NavigationScreenModel.Stock.AddEditGoodsItem.removeState("stock_add_edit_global_template")
+        NavigationScreenModel.Stock.AddEditGoodsItem.removeState("stock_add_edit_start_add_batch")
+        NavigationScreenModel.Stock.AddEditGoodsItem.setState("stock_add_edit_selected_tab" to "info")
+        NavigationScreenModel.Stock.AddEditGoodsItem.setState(
+            "stock_add_edit_add_session_id" to
+                    "${getCurrentTimeMillis()}_${Random.nextInt(0, Int.MAX_VALUE)}"
+        )
+        selectedTabId = "info"
+        draft = newDraft()
+        stockAddEditUndoDraft = null
+        stockSaveError = null
+        isSavingStockItem = false
+    }
+
+    suspend fun leaveStockEditor() {
+        if (canPopStockScreen) {
+            Navigation.Stock.pop(stateValues.isNarrowScreen)
+            NavigationScreenModel.Stock.AddEditGoodsItem.removeState(
+                NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_EDITED_GOODS_ITEM_ID
+            )
+        } else if (isEditingStockItem) {
+            // Desktop keeps Add/Edit as the canonical right-pane root. A restored edit therefore
+            // cannot be popped; turn that root back into a brand-new Add session instead.
+            resetStockEditorToFreshAdd(clearCurrentDraft = true)
+        }
+    }
+
+    fun stockSaveFailureText(state: DataState<GoodsItemDataModel>): String =
+        state.message
+            ?.extractLocalizedString(stateValues.appLanguage)
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?: when (stateValues.appLanguage.lowercase()) {
+                "ru" -> "Не удалось сохранить товар"
+                "kk" -> "Тауарды сақтау мүмкін болмады"
+                else -> "Could not save stock item"
+            }
+
     val activeStoreForParentStock = stateValues.stores.findStoreOrBranchForUi(stateValues.activeStoreId)
     val canPullFromParentStoreStock = !stateValues.activeStoreId.isNullOrBlank() && existing == null
     val stockAddEditGoodsItemIdForCounts = existing?.id.orEmpty()
@@ -505,16 +563,13 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         ScreenAppBarWidget(
-            title = if (existing == null) stateValues.stringAddGoodsItem else stateValues.stringEditGoodsItem,
-            iconPath = if (existing == null) stateValues.drawablePathIconAdd else stateValues.drawablePathIconEdit,
+            title = if (isEditingStockItem) stateValues.stringEditGoodsItem else stateValues.stringAddGoodsItem,
+            iconPath = if (isEditingStockItem) stateValues.drawablePathIconEdit else stateValues.drawablePathIconAdd,
             trailingIcons = stockAddEditTrailingIcons,
-            onBack = if (canPopStockScreen) {
+            onBack = if (showStockEditorBack) {
                 {
                     coroutineScope.launch {
-                        Navigation.Stock.pop(stateValues.isNarrowScreen)
-                        NavigationScreenModel.Stock.AddEditGoodsItem.removeState(
-                            NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_EDITED_GOODS_ITEM_ID
-                        )
+                        leaveStockEditor()
                     }
                 }
             } else null
@@ -638,44 +693,67 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
         }
 
         if (visibleSelectedTabId == "info" || visibleSelectedTabId == "conditions" || visibleSelectedTabId == "prices" || visibleSelectedTabId == "promos") {
+            stockSaveError?.let { error ->
+                Text(
+                    text = error,
+                    color = stateValues.ErrorColor,
+                    fontSize = stateValues.smallTextSize,
+                    modifier = Modifier
+                        .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.92f)
+                        .padding(horizontal = 12.dp, vertical = 2.dp)
+                )
+            }
+
             actionButton(
                 modifier = Modifier
                     .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.92f)
                     .padding(8.dp),
                 text = stateValues.stringConfirm,
-                enabled = canSaveVisibleStockDraft &&
+                loading = isSavingStockItem,
+                loadingText = localizedStringResource(1141, "Please wait…"),
+                enabled = !isSavingStockItem &&
+                        canSaveVisibleStockDraft &&
+                        (!isEditingStockItem || existing != null) &&
                         draft.isValidStockDraft(stateValues.globalAppConfiguration) &&
-                        stateValues.activeStoreId != null &&
-                        stateValues.latestNotification == null,
+                        stateValues.activeStoreId != null,
                 onClick = {
+                    if (isSavingStockItem) return@actionButton
                     if (!canSaveVisibleStockDraft) {
                         postInAppNotification(currentUserPermissionDeniedMessage(), NotificationType.Negative, transient = true)
                         return@actionButton
                     }
                     val storeId = stateValues.activeStoreId ?: return@actionButton
                     val goodsItem = draft.toGoodsItem(storeId, stateValues.globalAppConfiguration, existing)
+                    stockSaveError = null
+                    isSavingStockItem = true
 
-                    if (existing == null) {
-                        addGoodsItem(goodsItem) {
-                            if (it is DataState.Success) {
+                    val onSaved: (DataState<GoodsItemDataModel>) -> Unit = { state ->
+                        coroutineScope.launch {
+                            if (state is DataState.Success) {
                                 clearPersistentStockAddEditDraft()
-                                coroutineScope.launch {
-                                    Navigation.Stock.pop(stateValues.isNarrowScreen)
-                                }
-                            }
-                        }
-                    } else {
-                        updateGoodsItem(goodsItem) {
-                            if (it is DataState.Success) {
-                                clearPersistentStockAddEditDraft()
-                                coroutineScope.launch {
+                                isSavingStockItem = false
+                                stockSaveError = null
+                                if (canPopStockScreen) {
                                     Navigation.Stock.pop(stateValues.isNarrowScreen)
                                     NavigationScreenModel.Stock.AddEditGoodsItem.removeState(
                                         NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_EDITED_GOODS_ITEM_ID
                                     )
+                                } else {
+                                    // The canonical wide-screen Add/Edit pane cannot pop itself. Rotate its
+                                    // session key so the successful save visibly becomes a clean Add form.
+                                    resetStockEditorToFreshAdd(clearCurrentDraft = false)
                                 }
+                            } else {
+                                stockSaveError = stockSaveFailureText(state)
+                                isSavingStockItem = false
                             }
                         }
+                    }
+
+                    if (existing == null) {
+                        addGoodsItem(goodsItem, onSaved)
+                    } else {
+                        updateGoodsItem(goodsItem, onSaved)
                     }
                 }
             )

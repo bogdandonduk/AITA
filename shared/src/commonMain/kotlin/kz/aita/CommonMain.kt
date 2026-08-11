@@ -6816,7 +6816,7 @@ val stringConfirmationPasswordState = MutableStateFlow("Confirmation password")
 val stringRequiredToEditAccountState = MutableStateFlow("Required to edit account")
 val stringAccountSuccessfullyUpdatedState = MutableStateFlow("Account successfully updated")
 val stringLoggingOutState = MutableStateFlow("Logging out")
-val stringSessionTimeExpiredLoggingOutState = MutableStateFlow("Cloud session needs refresh")
+val stringSessionTimeExpiredLoggingOutState = MutableStateFlow("Cloud sign-in expired")
 val stringAliasState = MutableStateFlow("Alias")
 val stringDescriptionState = MutableStateFlow("Description")
 val stringEnterAliasState = MutableStateFlow("Enter alias")
@@ -7032,12 +7032,18 @@ val cacheSize = 4000L * 1024 * 1024
 val cacheMaxAgeSec = 30 * 24 * 3600
 
 val tokenRefreshMutex = Mutex()
+private val authRefreshNetworkMutex = Mutex()
+private val cloudSessionValidationMutex = Mutex()
 private val manualCloudConnectionRefreshMutex = Mutex()
 private const val AUTH_REFRESH_NON_AUTH_FAILURE_GRACE_MILLIS = 5_000L
-private const val CLOUD_CONNECTION_HEALTH_CHECK_REACHABLE_INTERVAL_MILLIS = 10_000L
-private const val CLOUD_CONNECTION_HEALTH_CHECK_UNKNOWN_INTERVAL_MILLIS = 8_000L
-private const val CLOUD_CONNECTION_HEALTH_CHECK_UNAVAILABLE_INTERVAL_MILLIS = 6_000L
-private const val CLOUD_CONNECTION_HEALTH_CHECK_BUSY_DEFER_MILLIS = 5_000L
+private const val AUTH_REFRESH_SUCCESS_CACHE_MILLIS = 30_000L
+private const val CLOUD_SESSION_VALIDATION_FAILURE_CACHE_MILLIS = 10_000L
+private const val CLOUD_CONNECTION_HEALTH_CHECK_REACHABLE_INTERVAL_MILLIS = 30_000L
+private const val CLOUD_CONNECTION_HEALTH_CHECK_REALTIME_CONNECTED_INTERVAL_MILLIS = 60_000L
+private const val CLOUD_CONNECTION_HEALTH_CHECK_AUTH_REQUIRED_INTERVAL_MILLIS = 60_000L
+private const val CLOUD_CONNECTION_HEALTH_CHECK_UNKNOWN_INTERVAL_MILLIS = 10_000L
+private const val CLOUD_CONNECTION_HEALTH_CHECK_UNAVAILABLE_INTERVAL_MILLIS = 15_000L
+private const val CLOUD_CONNECTION_HEALTH_CHECK_BUSY_DEFER_MILLIS = 10_000L
 private const val CLOUD_CONNECTION_HEALTH_CHECK_TIMEOUT_MILLIS = 20_000L
 private const val CLOUD_CONNECTION_AUTH_REFRESH_SUPPRESSION_AFTER_TRANSPORT_FAILURE_MILLIS = 15_000L
 private const val CLOUD_CONNECTION_PRESENTATION_OFFLINE_SETTLE_MILLIS = 45_000L
@@ -7053,6 +7059,29 @@ private var lastAuthRefreshNonAuthFailureAtMillis: Long = 0L
 private var lastAuthRefreshNonAuthFailureMessage: List<LocalizedStringDataModel>? = null
 @Volatile
 private var lastAuthRefreshNonAuthFailureWasTransportFailure: Boolean = false
+@Volatile
+private var rejectedAuthRefreshTokenMemory: String? = null
+@Volatile
+private var rejectedAuthRefreshMessageMemory: List<LocalizedStringDataModel>? = null
+@Volatile
+private var validatedCloudAccessTokenMemory: String? = null
+@Volatile
+private var cloudSessionValidationFailureMemory: CloudSessionValidationFailureMemory? = null
+@Volatile
+private var successfulAuthRefreshMemory: SuccessfulAuthRefreshMemory? = null
+
+private data class CloudSessionValidationFailureMemory(
+    val accessToken: String,
+    val recordedAtMillis: Long,
+    val response: ResponseDataModel<Unit>
+)
+
+private data class SuccessfulAuthRefreshMemory(
+    val inputRefreshToken: String,
+    val recordedAtMillis: Long,
+    val response: ResponseDataModel<TokenPair>
+)
+
 val activeNetworkOperationsState = MutableStateFlow(0)
 val cloudTransportStatusState = MutableStateFlow(CLOUD_TRANSPORT_STATUS_UNKNOWN)
 
@@ -7168,43 +7197,38 @@ var httpClient =
                     withContext(Dispatchers.ourIo) {
                         tokenRefreshMutex.withLock {
                             val current = getStoredUserAuthTokens?.invoke() ?: return@withLock null
+                            if (rejectedAuthRefreshTokenMatches(current.refreshToken)) {
+                                markCloudSessionNeedsRefreshForNotifications()
+                                return@withLock null
+                            }
 
                             val refreshResponse = refreshAuthTokensWithServerFallback(current.refreshToken)
-
+                            val refreshedTokens = refreshResponse.payload
                             when {
-                                refreshResponse.payload != null -> {
+                                refreshedTokens != null -> {
                                     clearAuthRefreshNonAuthFailure()
-                                    setStoredUserAuthTokens?.invoke(refreshResponse.payload)
+                                    setStoredUserAuthTokens?.invoke(refreshedTokens)
+                                    markCloudAccessTokenValidated(refreshedTokens.accessToken)
                                     markCloudTransportReachableForNotifications(authenticated = true, authRefreshRequired = false)
-                                    BearerTokens(refreshResponse.payload.accessToken, refreshResponse.payload.refreshToken)
+                                    BearerTokens(refreshedTokens.accessToken, refreshedTokens.refreshToken)
                                 }
 
                                 refreshResponse.transportFailure -> {
-                                    // The persistent connection banner represents server outage; keep the user signed in locally.
-                                    BearerTokens(current.accessToken, current.refreshToken)
+                                    // Never retry the rejected request with the same expired access token.
+                                    // The original 401 is returned to networkRequest, while the grounded
+                                    // transport state remains responsible for offline presentation.
+                                    null
                                 }
 
                                 refreshResponse.httpStatusCode == HttpStatusCode.Unauthorized.value -> {
-                                    clearAuthRefreshNonAuthFailure()
-                                    markCloudSessionNeedsRefreshForNotifications()
-                                    postInAppNotification(
-                                        refreshResponse.message ?: localizedStringResourceMessage(
-                                            id = 91,
-                                            main = "Cloud session needs refresh. You remain signed in locally.",
-                                            ru = "Облачный сеанс нужно обновить. Вы остаётесь в аккаунте локально.",
-                                            kk = "Бұлттық сеансты жаңарту қажет. Сіз жергілікті түрде аккаунтта қаласыз."
-                                        ),
-                                        NotificationType.Neutral
-                                    )
+                                    rememberRejectedAuthRefreshToken(current.refreshToken, refreshResponse.message)
                                     null
                                 }
 
                                 else -> {
-                                    // Reachable AITA server + non-401 error means the session is not proven invalid.
-                                    // Keep local auth and stop showing the auth-refresh banner.
                                     rememberAuthRefreshNonAuthFailure(refreshResponse.message)
-                                    markCloudTransportReachableForNotifications(authenticated = false, authRefreshRequired = false)
-                                    BearerTokens(current.accessToken, current.refreshToken)
+                                    markCloudTransportReachableForNotifications(authenticated = false, authRefreshRequired = null)
+                                    null
                                 }
                             }
                         }
@@ -10007,8 +10031,11 @@ internal suspend fun resolvedServerUrlCandidates(explicitServerUrl: String? = nu
         .distinct()
         .ifEmpty { listOf(DEFAULT_AITA_SERVER_URL) }
 
+    val previousCandidates = currentNetworkRequestCandidateServerUrlsMemory
     currentNetworkRequestCandidateServerUrlsMemory = normalizedCandidates
-    logNetworkAttempt("server URL candidates = ${normalizedCandidates.joinToString()}")
+    if (previousCandidates != normalizedCandidates) {
+        logNetworkAttempt("server URL candidates = ${normalizedCandidates.joinToString()}")
+    }
     return normalizedCandidates
 }
 
@@ -10228,6 +10255,164 @@ internal fun logNetworkAttempt(message: String) {
 }
 
 @PublishedApi
+internal fun cloudEndpointRequiresAuthentication(endpointUrl: String): Boolean {
+    val endpoint = endpointUrl.trim('/').lowercase()
+    if (endpoint.isBlank()) return false
+
+    return when {
+        endpoint == "auth/session" -> true
+        endpoint.startsWith("auth/") -> false
+        endpoint.startsWith("config/") -> false
+        endpoint.startsWith("res/") -> false
+        endpoint.startsWith(".well-known/") -> false
+        endpoint == "healthz" || endpoint == "readyz" -> false
+        else -> true
+    }
+}
+
+@PublishedApi
+internal fun cloudSessionExpiredMessage(): List<LocalizedStringDataModel> = listOf(
+    LocalizedStringDataModel(
+        language = "main",
+        value = "Cloud sign-in expired. Sign in again to sync. Your local data stays available."
+    ),
+    LocalizedStringDataModel(
+        language = "en",
+        value = "Cloud sign-in expired. Sign in again to sync. Your local data stays available."
+    ),
+    LocalizedStringDataModel(
+        language = "ru",
+        value = "Срок облачного входа истёк. Войдите снова для синхронизации. Локальные данные останутся доступны."
+    ),
+    LocalizedStringDataModel(
+        language = "kk",
+        value = "Бұлттық кіру мерзімі аяқталды. Синхрондау үшін қайта кіріңіз. Жергілікті деректер қолжетімді болып қалады."
+    )
+)
+
+@PublishedApi
+internal fun <Response> cloudSessionExpiredResponse(
+    message: List<LocalizedStringDataModel>? = rejectedAuthRefreshMessageMemory
+): ResponseDataModel<Response> = ResponseDataModel(
+    message = message ?: cloudSessionExpiredMessage(),
+    payload = null,
+    negative = true,
+    httpStatusCode = HttpStatusCode.Unauthorized.value,
+    transportFailure = false
+)
+
+@PublishedApi
+internal fun rejectedAuthRefreshTokenMatches(refreshToken: String): Boolean =
+    refreshToken.isNotBlank() && rejectedAuthRefreshTokenMemory == refreshToken
+
+private fun recentSuccessfulAuthRefreshResponse(
+    refreshToken: String,
+    nowMillis: Long = getCurrentTimeMillis()
+): ResponseDataModel<TokenPair>? {
+    val memory = successfulAuthRefreshMemory ?: return null
+    if (memory.inputRefreshToken != refreshToken) return null
+
+    val ageMillis = nowMillis - memory.recordedAtMillis
+    if (ageMillis !in 0L..AUTH_REFRESH_SUCCESS_CACHE_MILLIS) {
+        if (successfulAuthRefreshMemory === memory) {
+            successfulAuthRefreshMemory = null
+        }
+        return null
+    }
+    return memory.response
+}
+
+@PublishedApi
+internal fun markCloudAccessTokenValidated(accessToken: String) {
+    if (accessToken.isBlank()) return
+    validatedCloudAccessTokenMemory = accessToken
+    cloudSessionValidationFailureMemory = null
+
+    val current = getStoredUserAuthTokens?.invoke()
+    if (current?.accessToken == accessToken && rejectedAuthRefreshTokenMatches(current.refreshToken)) {
+        rejectedAuthRefreshTokenMemory = null
+        rejectedAuthRefreshMessageMemory = null
+    }
+}
+
+@PublishedApi
+internal fun invalidateCloudAccessTokenValidation(accessToken: String? = null) {
+    if (accessToken == null || validatedCloudAccessTokenMemory == accessToken) {
+        validatedCloudAccessTokenMemory = null
+    }
+    val validationFailure = cloudSessionValidationFailureMemory
+    if (accessToken == null || validationFailure?.accessToken == accessToken) {
+        cloudSessionValidationFailureMemory = null
+    }
+}
+
+@PublishedApi
+internal fun clearCloudAuthRequestMemory(tokens: TokenPair? = null) {
+    rejectedAuthRefreshTokenMemory = null
+    rejectedAuthRefreshMessageMemory = null
+    successfulAuthRefreshMemory = null
+    cloudSessionValidationFailureMemory = null
+    validatedCloudAccessTokenMemory = tokens?.accessToken?.takeIf { it.isNotBlank() }
+}
+
+@PublishedApi
+internal fun rememberRejectedAuthRefreshToken(
+    refreshToken: String,
+    message: List<LocalizedStringDataModel>? = null
+) {
+    if (refreshToken.isBlank()) return
+    rejectedAuthRefreshTokenMemory = refreshToken
+    rejectedAuthRefreshMessageMemory = message ?: cloudSessionExpiredMessage()
+    validatedCloudAccessTokenMemory = null
+    cloudSessionValidationFailureMemory = null
+    clearAuthRefreshNonAuthFailure()
+    markCloudSessionNeedsRefreshForNotifications()
+}
+
+@PublishedApi
+internal fun currentCloudSessionIsReadyForBackgroundSync(): Boolean {
+    val tokens = getStoredUserAuthTokens?.invoke() ?: return false
+    return tokens.accessToken.isNotBlank() &&
+            validatedCloudAccessTokenMemory == tokens.accessToken &&
+            tokens.accessTokenIsStillUsableForNetwork()
+}
+
+@PublishedApi
+internal fun recentCloudSessionValidationFailure(accessToken: String): ResponseDataModel<Unit>? {
+    val remembered = cloudSessionValidationFailureMemory ?: return null
+    if (remembered.accessToken != accessToken) return null
+    if (getCurrentTimeMillis() - remembered.recordedAtMillis !in 0L..CLOUD_SESSION_VALIDATION_FAILURE_CACHE_MILLIS) {
+        cloudSessionValidationFailureMemory = null
+        return null
+    }
+    return remembered.response
+}
+
+@PublishedApi
+internal fun rememberCloudSessionValidationFailure(
+    accessToken: String,
+    response: ResponseDataModel<Unit>
+) {
+    if (accessToken.isBlank()) return
+    cloudSessionValidationFailureMemory = CloudSessionValidationFailureMemory(
+        accessToken = accessToken,
+        recordedAtMillis = getCurrentTimeMillis(),
+        response = response
+    )
+}
+
+@PublishedApi
+internal fun <Response> cloudSessionValidationFailureForNetworkRequest(
+    response: ResponseDataModel<Unit>
+): ResponseDataModel<Response> = ResponseDataModel(
+    message = response.message,
+    payload = null,
+    negative = true,
+    httpStatusCode = response.httpStatusCode,
+    transportFailure = response.transportFailure
+)
+
+@PublishedApi
 internal fun rememberAuthRefreshNonAuthFailure(
     message: List<LocalizedStringDataModel>?,
     transportFailure: Boolean = false
@@ -10290,7 +10475,7 @@ internal fun <Response> authRefreshFailureResponseForNetworkRequest(
     if (transportFailure) {
         markCloudTransportUnavailableForNotifications()
     } else {
-        markCloudTransportReachableForNotifications(authenticated = false, authRefreshRequired = false)
+        markCloudTransportReachableForNotifications(authenticated = false, authRefreshRequired = null)
     }
 
     return ResponseDataModel(
@@ -10425,7 +10610,8 @@ private suspend fun probeReachableAitaServerUrl(
 @PublishedApi
 internal suspend fun selectServerUrlForNonReplayableRequest(
     serverUrlCandidates: List<String>,
-    reason: String
+    reason: String,
+    probeHttpClient: HttpClient = httpClient
 ): ResponseDataModel<String> {
     val normalizedCandidates = serverUrlCandidates.mapNotNull(::normalizedHttpServerUrlOrNull).distinct()
     val recentlyVerified = lastKnownGoodServerUrlMemory
@@ -10447,7 +10633,7 @@ internal suspend fun selectServerUrlForNonReplayableRequest(
 
     val probeEndpoint = globalAppConfigurationState.payloadValue.connectionCheckPath.first.trimStart('/')
     val probe = probeReachableAitaServerUrl(
-        probeHttpClient = httpClient,
+        probeHttpClient = probeHttpClient,
         serverUrlCandidates = normalizedCandidates,
         endpointUrl = probeEndpoint,
         reason = reason
@@ -10461,13 +10647,13 @@ internal suspend fun selectServerUrlForNonReplayableRequest(
     )
 }
 
-@PublishedApi
-internal suspend fun refreshAuthTokensWithServerFallback(refreshToken: String): ResponseDataModel<TokenPair> {
+private suspend fun performAuthTokenRefreshNetworkRequest(
+    refreshToken: String
+): ResponseDataModel<TokenPair> {
     ensureCachedGlobalConfigurationPrimedForNetwork()
 
     val currentConfiguration = globalAppConfigurationState.payloadValue
     val refreshEndpoint = currentConfiguration.refreshPath.first.trimStart('/')
-    val probeEndpoint = currentConfiguration.connectionCheckPath.first.trimStart('/')
     val serverUrlCandidates = resolvedServerUrlCandidates(null)
 
     val refreshHttpClient = HttpClient(getHttpClientEngine()) {
@@ -10483,22 +10669,21 @@ internal suspend fun refreshAuthTokensWithServerFallback(refreshToken: String): 
     }
 
     return try {
-        // A refresh token may rotate when used. Probe aliases with a harmless GET first, then send the
-        // refresh POST exactly once to one proven AITA endpoint.
-        val probe = probeReachableAitaServerUrl(
-            probeHttpClient = refreshHttpClient,
+        // A refresh token rotates when used. Select one proven alias with a harmless GET only when
+        // there is no recent last-known-good endpoint, then emit the refresh POST exactly once.
+        val selection = selectServerUrlForNonReplayableRequest(
             serverUrlCandidates = serverUrlCandidates,
-            endpointUrl = probeEndpoint,
-            reason = "auth_refresh"
+            reason = "auth_refresh",
+            probeHttpClient = refreshHttpClient
         )
-        val resolvedServerUrl = probe.serverUrl
+        val resolvedServerUrl = selection.payload
         if (resolvedServerUrl == null) {
-            markCloudTransportUnavailableForNotifications()
+            markCloudTransportUnavailableForNotifications(reason = "auth_refresh_alias_selection")
             val failure = ResponseDataModel<TokenPair>(
-                message = probe.response.message,
+                message = selection.message,
                 payload = null,
                 negative = true,
-                httpStatusCode = probe.response.httpStatusCode,
+                httpStatusCode = selection.httpStatusCode,
                 transportFailure = true
             )
             rememberAuthRefreshNonAuthFailure(failure.message, transportFailure = true)
@@ -10532,7 +10717,7 @@ internal suspend fun refreshAuthTokensWithServerFallback(refreshToken: String): 
                     resolvedServerUrl
                 )
                 forgetReachableServerUrlCandidate(resolvedServerUrl)
-                markCloudTransportUnavailableForNotifications()
+                markCloudTransportUnavailableForNotifications(reason = "auth_refresh_non_aita_response")
                 rememberAuthRefreshNonAuthFailure(nonAitaResponse.message, transportFailure = true)
                 return nonAitaResponse
             }
@@ -10543,7 +10728,7 @@ internal suspend fun refreshAuthTokensWithServerFallback(refreshToken: String): 
             if (httpResponse.status.isAitaServerUnhealthyForClientBanner() || decodedRefreshResponse.transportFailure) {
                 val failureResponse = decodedRefreshResponse.copy(transportFailure = true)
                 forgetReachableServerUrlCandidate(resolvedServerUrl)
-                markCloudTransportUnavailableForNotifications()
+                markCloudTransportUnavailableForNotifications(reason = "auth_refresh_server_unhealthy")
                 rememberAuthRefreshNonAuthFailure(failureResponse.message, transportFailure = true)
                 logCloudConnectionDiagnostic(
                     "auth refresh response treated as unavailable http=${httpResponse.status.value} " +
@@ -10552,43 +10737,27 @@ internal suspend fun refreshAuthTokensWithServerFallback(refreshToken: String): 
                 return failureResponse
             }
 
-            val canMarkReachable = cloudResponseCanMarkReachable(refreshEndpoint, httpResponse.status)
-            if (canMarkReachable) {
+            if (cloudResponseCanMarkReachable(refreshEndpoint, httpResponse.status)) {
                 rememberReachableServerUrl(resolvedServerUrl)
                 markCloudTransportReachableForNotifications(
-                    authenticated = httpResponse.status.value in 200..299,
-                    authRefreshRequired = httpResponse.status == HttpStatusCode.Unauthorized
+                    authenticated = httpResponse.status.isSuccess(),
+                    authRefreshRequired = when {
+                        httpResponse.status.isSuccess() -> false
+                        httpResponse.status == HttpStatusCode.Unauthorized -> null
+                        else -> null
+                    }
                 )
-            } else {
-                logCloudConnectionDiagnostic(
-                    "auth refresh reachable mark suppressed http=${httpResponse.status.value} " +
-                            "status=${cloudTransportStatusName(cloudTransportStatusState.value)}"
-                )
-                if (httpResponse.status.value >= 500) {
-                    markCloudTransportUnavailableForNotifications()
-                }
             }
 
             if (httpResponse.status == HttpStatusCode.Unauthorized) {
-                return ResponseDataModel(
-                    message = localizedStringResourceMessage(
-                        id = 91,
-                        main = "Cloud session needs refresh. You remain signed in locally.",
-                        ru = "Облачный сеанс нужно обновить. Вы остаётесь в аккаунте локально.",
-                        kk = "Бұлттық сеансты жаңарту қажет. Сіз жергілікті түрде аккаунтта қаласыз."
-                    ),
-                    payload = null,
-                    negative = true,
-                    httpStatusCode = httpResponse.status.value,
-                    transportFailure = false
-                )
+                return cloudSessionExpiredResponse()
             }
 
             decodedRefreshResponse
         } catch (throwable: Throwable) {
             if (throwable is CancellationException) throw throwable
             forgetReachableServerUrlCandidate(resolvedServerUrl)
-            markCloudTransportUnavailableForNotifications()
+            markCloudTransportUnavailableForNotifications(reason = "auth_refresh_transport_failure")
             val failure = ResponseDataModel<TokenPair>(
                 message = networkTransportFailureMessage(resolvedServerUrl, refreshEndpoint, throwable),
                 payload = null,
@@ -10606,14 +10775,79 @@ internal suspend fun refreshAuthTokensWithServerFallback(refreshToken: String): 
         refreshHttpClient.close()
     }
 }
+
 @PublishedApi
-internal suspend fun refreshStoredAuthTokensOnceForNetworkRetry(postNotification: Boolean = true): Boolean = tokenRefreshMutex.withLock {
+internal suspend fun refreshAuthTokensWithServerFallback(
+    refreshToken: String,
+    forceRejectedRetry: Boolean = false
+): ResponseDataModel<TokenPair> {
+    if (refreshToken.isBlank()) return cloudSessionExpiredResponse()
+
+    recentSuccessfulAuthRefreshResponse(refreshToken)?.let { return it }
+
+    if (!forceRejectedRetry && rejectedAuthRefreshTokenMatches(refreshToken)) {
+        return cloudSessionExpiredResponse()
+    }
+
+    return authRefreshNetworkMutex.withLock {
+        recentSuccessfulAuthRefreshResponse(refreshToken)?.let { return@withLock it }
+
+        if (!forceRejectedRetry && rejectedAuthRefreshTokenMatches(refreshToken)) {
+            return@withLock cloudSessionExpiredResponse()
+        }
+
+        val response = performAuthTokenRefreshNetworkRequest(refreshToken)
+        val refreshedTokens = response.payload
+        when {
+            refreshedTokens != null -> {
+                clearAuthRefreshNonAuthFailure()
+                rejectedAuthRefreshTokenMemory = null
+                rejectedAuthRefreshMessageMemory = null
+                cloudSessionValidationFailureMemory = null
+                markCloudAccessTokenValidated(refreshedTokens.accessToken)
+                clearCloudSessionRefreshRequirementForNotifications(CLOUD_TRANSPORT_STATUS_REACHABLE)
+                successfulAuthRefreshMemory = SuccessfulAuthRefreshMemory(
+                    inputRefreshToken = refreshToken,
+                    recordedAtMillis = getCurrentTimeMillis(),
+                    response = response
+                )
+            }
+
+            response.httpStatusCode == HttpStatusCode.Unauthorized.value -> {
+                rememberRejectedAuthRefreshToken(refreshToken, response.message)
+            }
+        }
+        response
+    }
+}
+
+@PublishedApi
+internal suspend fun refreshStoredAuthTokensOnceForNetworkRetry(
+    postNotification: Boolean = true,
+    forceRejectedRetry: Boolean = false
+): Boolean = tokenRefreshMutex.withLock {
     val current = getStoredUserAuthTokens?.invoke() ?: return@withLock false
-    val refreshResponse = refreshAuthTokensWithServerFallback(current.refreshToken)
+
+    if (!forceRejectedRetry && rejectedAuthRefreshTokenMatches(current.refreshToken)) {
+        markCloudSessionNeedsRefreshForNotifications()
+        if (postNotification) {
+            postInAppNotification(
+                rejectedAuthRefreshMessageMemory ?: cloudSessionExpiredMessage(),
+                NotificationType.Neutral
+            )
+        }
+        return@withLock false
+    }
+
+    val refreshResponse = refreshAuthTokensWithServerFallback(
+        refreshToken = current.refreshToken,
+        forceRejectedRetry = forceRejectedRetry
+    )
 
     refreshResponse.payload?.let { refreshedTokens ->
         clearAuthRefreshNonAuthFailure()
         setStoredUserAuthTokens?.invoke(refreshedTokens)
+        markCloudAccessTokenValidated(refreshedTokens.accessToken)
         httpClient.authProvider<BearerAuthProvider>()?.clearToken()
         markCloudTransportReachableForNotifications(authenticated = true, authRefreshRequired = false)
         return@withLock true
@@ -10622,36 +10856,271 @@ internal suspend fun refreshStoredAuthTokensOnceForNetworkRetry(postNotification
     when {
         refreshResponse.transportFailure -> {
             rememberAuthRefreshNonAuthFailure(refreshResponse.message, transportFailure = true)
-            markCloudTransportUnavailableForNotifications()
+            markCloudTransportUnavailableForNotifications(reason = "stored_auth_refresh_transport_failure")
         }
 
         refreshResponse.httpStatusCode == HttpStatusCode.Unauthorized.value -> {
-            clearAuthRefreshNonAuthFailure()
-            markCloudSessionNeedsRefreshForNotifications()
+            rememberRejectedAuthRefreshToken(current.refreshToken, refreshResponse.message)
             if (postNotification) {
                 postInAppNotification(
-                    refreshResponse.message ?: localizedStringResourceMessage(
-                        id = 91,
-                        main = "Cloud session needs refresh. You remain signed in locally.",
-                        ru = "Облачный сеанс нужно обновить. Вы остаётесь в аккаунте локально.",
-                        kk = "Бұлттық сеансты жаңарту қажет. Сіз жергілікті түрде аккаунтта қаласыз."
-                    ),
+                    refreshResponse.message ?: cloudSessionExpiredMessage(),
                     NotificationType.Neutral
                 )
             }
         }
 
         else -> {
-            // The server answered, but the refresh endpoint failed for a non-auth reason (for example 500).
-            // Do not convert that into an auth/logout problem.
+            // Reachability and authentication are independent. A reachable 500/409 from refresh
+            // must not erase a previously grounded session-expired state.
             rememberAuthRefreshNonAuthFailure(refreshResponse.message)
-            markCloudTransportReachableForNotifications(authenticated = false, authRefreshRequired = false)
+            markCloudTransportReachableForNotifications(authenticated = false, authRefreshRequired = null)
         }
     }
 
     false
 }
 
+private fun successfulCloudSessionValidationResponse(): ResponseDataModel<Unit> = ResponseDataModel(
+    message = null,
+    payload = Unit,
+    negative = false,
+    httpStatusCode = HttpStatusCode.OK.value,
+    transportFailure = false
+)
+
+private suspend fun performCloudAccessTokenValidation(
+    accessToken: String
+): ResponseDataModel<Unit> {
+    ensureCachedGlobalConfigurationPrimedForNetwork()
+    val endpoint = "auth/session"
+    val candidates = resolvedServerUrlCandidates(null)
+    if (candidates.isEmpty()) {
+        return ResponseDataModel(
+            message = networkTransportFailureMessage("", endpoint),
+            payload = null,
+            negative = true,
+            httpStatusCode = null,
+            transportFailure = true
+        )
+    }
+
+    val validationHttpClient = HttpClient(getHttpClientEngine()) {
+        install(HttpTimeout) {
+            requestTimeoutMillis = 15_000L
+            connectTimeoutMillis = 8_000L
+            socketTimeoutMillis = 15_000L
+        }
+        expectSuccess = false
+    }
+
+    var lastFailure: ResponseDataModel<Unit>? = null
+    return try {
+        for ((index, serverUrl) in candidates.withIndex()) {
+            val requestUrl = networkTargetUrl(serverUrl, endpoint)
+            try {
+                logNetworkAttempt("TRY ${HttpMethod.Get.value} $requestUrl probe=auth_session")
+                val response = validationHttpClient.request(requestUrl) {
+                    method = HttpMethod.Get
+                    header(HttpHeaders.Authorization, "Bearer $accessToken")
+                    header(HttpHeaders.CacheControl, "no-cache")
+                    header(HttpHeaders.Pragma, "no-cache")
+                    currentClientDeviceInfoHeaders().forEach { (key, value) ->
+                        safeHttpHeaderValueOrNull(value)?.let { safeValue -> header(key, safeValue) }
+                    }
+                }
+                val rawBody = response.bodyAsText()
+                val aitaServerResponse = response.isAitaServerResponse(rawBody)
+                logNetworkAttempt(
+                    "RESULT ${HttpMethod.Get.value} $requestUrl HTTP ${response.status.value} " +
+                            "aita=$aitaServerResponse probe=auth_session"
+                )
+
+                if (!aitaServerResponse) {
+                    lastFailure = nonAitaHttpResponseDataModel(response.status, rawBody, serverUrl)
+                    forgetReachableServerUrlCandidate(serverUrl)
+                    if (index < candidates.lastIndex) continue
+                    return lastFailure ?: ResponseDataModel(
+                        message = networkTransportFailureMessage(serverUrl, endpoint),
+                        payload = null,
+                        negative = true,
+                        transportFailure = true
+                    )
+                }
+
+                val decoded = decodeNetworkResponseDataModel<Unit>(rawBody, response.status)
+                    .withAitaTransportFailureFromStatus(response.status)
+                if (response.status.isAitaServerUnhealthyForClientBanner() || decoded.transportFailure) {
+                    lastFailure = decoded.copy(transportFailure = true)
+                    forgetReachableServerUrlCandidate(serverUrl)
+                    markCloudTransportUnavailableForNotifications(reason = "auth_session_server_unhealthy")
+                    if (index < candidates.lastIndex) continue
+                    return lastFailure ?: decoded
+                }
+
+                rememberReachableServerUrl(serverUrl)
+                return when {
+                    response.status.isSuccess() -> {
+                        markCloudTransportReachableForNotifications(authenticated = true, authRefreshRequired = false)
+                        ResponseDataModel(
+                            message = decoded.message,
+                            payload = Unit,
+                            negative = false,
+                            httpStatusCode = response.status.value,
+                            transportFailure = false
+                        )
+                    }
+
+                    response.status == HttpStatusCode.Unauthorized -> {
+                        // Do not publish a session warning yet. The caller gets exactly one chance to
+                        // rotate the refresh token first; only a rejected refresh grounds that state.
+                        markCloudTransportReachableForNotifications(authenticated = false, authRefreshRequired = null)
+                        cloudSessionExpiredResponse()
+                    }
+
+                    else -> {
+                        markCloudTransportReachableForNotifications(authenticated = false, authRefreshRequired = null)
+                        decoded
+                    }
+                }
+            } catch (throwable: Throwable) {
+                if (throwable is CancellationException) throw throwable
+                forgetReachableServerUrlCandidate(serverUrl)
+                lastFailure = ResponseDataModel(
+                    message = networkTransportFailureMessage(serverUrl, endpoint, throwable),
+                    payload = null,
+                    negative = true,
+                    httpStatusCode = null,
+                    transportFailure = true
+                )
+                logNetworkAttempt(
+                    "FAILED ${HttpMethod.Get.value} $requestUrl probe=auth_session ${networkFailureSummary(throwable)}"
+                )
+            }
+        }
+
+        markCloudTransportUnavailableForNotifications(reason = "auth_session_transport_failure")
+        lastFailure ?: ResponseDataModel(
+            message = networkTransportFailureMessage(candidates.firstOrNull().orEmpty(), endpoint),
+            payload = null,
+            negative = true,
+            httpStatusCode = null,
+            transportFailure = true
+        )
+    } finally {
+        validationHttpClient.close()
+    }
+}
+
+private fun currentCloudSessionFailureResponse(): ResponseDataModel<Unit> {
+    val current = getStoredUserAuthTokens?.invoke()
+    if (current != null && rejectedAuthRefreshTokenMatches(current.refreshToken)) {
+        return cloudSessionExpiredResponse()
+    }
+
+    recentAuthRefreshNonAuthFailureMessage()?.let { message ->
+        val transportFailure = recentAuthRefreshNonAuthFailureWasTransport()
+        return ResponseDataModel(
+            message = message,
+            payload = null,
+            negative = true,
+            httpStatusCode = HttpStatusCode.ServiceUnavailable.value,
+            transportFailure = transportFailure
+        )
+    }
+
+    if (cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_UNAVAILABLE) {
+        return ResponseDataModel(
+            message = localizedStringResourceMessage(
+                id = 214,
+                main = "Cannot reach server. Keeping you signed in offline.",
+                ru = "Сервер недоступен. Вы остаётесь в аккаунте офлайн.",
+                kk = "Сервер қолжетімсіз. Сіз офлайн режимде аккаунтта қаласыз."
+            ),
+            payload = null,
+            negative = true,
+            httpStatusCode = HttpStatusCode.ServiceUnavailable.value,
+            transportFailure = true
+        )
+    }
+
+    return cloudSessionExpiredResponse()
+}
+
+@PublishedApi
+internal suspend fun ensureCloudSessionReadyForProtectedRequest(
+    forceRejectedRefreshRetry: Boolean = false
+): ResponseDataModel<Unit> {
+    val initialTokens = getStoredUserAuthTokens?.invoke() ?: return cloudSessionExpiredResponse()
+    if (!forceRejectedRefreshRetry && rejectedAuthRefreshTokenMatches(initialTokens.refreshToken)) {
+        return cloudSessionExpiredResponse()
+    }
+    val initialAccessToken = initialTokens.accessToken
+    if (initialAccessToken.isNotBlank() &&
+        validatedCloudAccessTokenMemory == initialAccessToken &&
+        initialTokens.accessTokenIsStillUsableForNetwork()
+    ) {
+        return successfulCloudSessionValidationResponse()
+    }
+    recentCloudSessionValidationFailure(initialAccessToken)?.let { return it }
+
+    return cloudSessionValidationMutex.withLock {
+        var current = getStoredUserAuthTokens?.invoke() ?: return@withLock cloudSessionExpiredResponse()
+        if (!forceRejectedRefreshRetry && rejectedAuthRefreshTokenMatches(current.refreshToken)) {
+            return@withLock cloudSessionExpiredResponse()
+        }
+
+        if (current.accessToken.isNotBlank() &&
+            validatedCloudAccessTokenMemory == current.accessToken &&
+            current.accessTokenIsStillUsableForNetwork()
+        ) {
+            return@withLock successfulCloudSessionValidationResponse()
+        }
+        recentCloudSessionValidationFailure(current.accessToken)?.let { return@withLock it }
+
+        // Refresh is mandatory only after the access token is actually unusable. Refreshing merely
+        // because a valid token is near its expiry created a fan-out at startup and made an otherwise
+        // usable local/cloud session look broken when the refresh token had already been revoked.
+        if (current.accessToken.isBlank() || !current.accessTokenIsStillUsableForNetwork()) {
+            if (!forceRejectedRefreshRetry && rejectedAuthRefreshTokenMatches(current.refreshToken)) {
+                return@withLock cloudSessionExpiredResponse()
+            }
+
+            val refreshed = refreshStoredAuthTokensOnceForNetworkRetry(
+                postNotification = false,
+                forceRejectedRetry = forceRejectedRefreshRetry
+            )
+            if (!refreshed) return@withLock currentCloudSessionFailureResponse()
+            current = getStoredUserAuthTokens?.invoke() ?: return@withLock cloudSessionExpiredResponse()
+            if (validatedCloudAccessTokenMemory == current.accessToken && current.accessTokenIsStillUsableForNetwork()) {
+                return@withLock successfulCloudSessionValidationResponse()
+            }
+        }
+
+        val validation = performCloudAccessTokenValidation(current.accessToken)
+        if (!validation.negative && validation.httpStatusCode?.let { it in 200..299 } == true) {
+            markCloudAccessTokenValidated(current.accessToken)
+            clearCloudSessionRefreshRequirementForNotifications(CLOUD_TRANSPORT_STATUS_REACHABLE)
+            return@withLock successfulCloudSessionValidationResponse()
+        }
+
+        if (validation.httpStatusCode == HttpStatusCode.Unauthorized.value) {
+            invalidateCloudAccessTokenValidation(current.accessToken)
+            if (!forceRejectedRefreshRetry && rejectedAuthRefreshTokenMatches(current.refreshToken)) {
+                return@withLock cloudSessionExpiredResponse()
+            }
+
+            val refreshed = refreshStoredAuthTokensOnceForNetworkRetry(
+                postNotification = false,
+                forceRejectedRetry = forceRejectedRefreshRetry
+            )
+            if (refreshed) return@withLock successfulCloudSessionValidationResponse()
+            return@withLock currentCloudSessionFailureResponse()
+        }
+
+        rememberCloudSessionValidationFailure(current.accessToken, validation)
+        validation
+    }
+}
 
 private const val LOCAL_NETWORK_DEFAULT_TCP_PORT = 45720
 private const val LOCAL_NETWORK_DEFAULT_DISCOVERY_PORT = 45721
@@ -10998,9 +11467,9 @@ suspend fun syncPendingWorkshiftEndsToServerNow(): Int {
                 pending,
                 localizedStringResourceText(
                     id = 91,
-                    main = "Cloud session needs refresh. You remain signed in locally.",
-                    ru = "Облачный сеанс нужно обновить. Вы остаётесь в аккаунте локально.",
-                    kk = "Бұлттық сеансты жаңарту қажет. Сіз жергілікті түрде аккаунтта қаласыз."
+                    main = "Cloud sign-in expired. Sign in again to sync. Your local data stays available.",
+                    ru = "Срок облачного входа истёк. Войдите снова для синхронизации. Локальные данные останутся доступны.",
+                    kk = "Бұлттық кіру мерзімі аяқталды. Синхрондау үшін қайта кіріңіз. Жергілікті деректер қолжетімді болып қалады."
                 )
             )
             break
@@ -11954,6 +12423,7 @@ private suspend fun updateQueuedLocalNetworkOperation(
 
 suspend fun syncLocalNetworkOperationsToCloudNow(): Int {
     if (localNetworkCloudSyncMutex.isLocked) return 0
+    if (!currentCloudSessionIsReadyForBackgroundSync()) return 0
 
     return localNetworkCloudSyncMutex.withLock {
         val pending = localNetworkQueuedOperationsState.value
@@ -12659,9 +13129,6 @@ private suspend fun cloudConnectionProbeRequest(reason: String): ResponseDataMod
     ).response
 }
 
-private suspend fun probeCloudServerReachableForRealtimeFallback(): Boolean =
-    !cloudConnectionProbeRequest("realtime_fallback").negative
-
 private fun cancelRealtimeUpdatesSocketAfterReachabilityFailure() {
     if (realtimeUpdatesConnectedState.value || realtimeUpdatesJob != null) {
         logCloudConnectionDiagnostic("realtime socket cancelled because health probe/server request says unreachable")
@@ -12683,6 +13150,18 @@ fun startCloudConnectionHealthMonitor() {
 
             if (!hasConfiguredServerUrl) {
                 delay(CLOUD_CONNECTION_HEALTH_CHECK_UNKNOWN_INTERVAL_MILLIS)
+                continue
+            }
+
+            if (realtimeUpdatesConnectedState.value) {
+                // An open authenticated WebSocket is stronger and cheaper reachability evidence than
+                // a synthetic /auth/ping. Do not poll in parallel with a healthy realtime channel.
+                getStoredUserAuthTokens?.invoke()?.accessToken?.let(::markCloudAccessTokenValidated)
+                markCloudTransportReachableForNotifications(
+                    authenticated = true,
+                    authRefreshRequired = false
+                )
+                delay(CLOUD_CONNECTION_HEALTH_CHECK_REALTIME_CONNECTED_INTERVAL_MILLIS)
                 continue
             }
 
@@ -12723,18 +13202,22 @@ fun startCloudConnectionHealthMonitor() {
             )
 
             if (serverAvailable) {
+                // /auth/ping is deliberately public: it proves only that the AITA transport is alive.
+                // It must never clear a grounded expired-session state merely because local tokens exist.
                 markCloudTransportReachableForNotifications(
-                    authenticated = hasLocalAccount,
-                    authRefreshRequired = false
+                    authenticated = false,
+                    authRefreshRequired = null
                 )
 
                 if (hasLocalAccount) {
                     if (realtimeUpdatesJob?.isActive != true) {
                         startRealtimeUpdates()
                     }
-                    syncPendingSessionCleanupsToServerNow()
-                    syncPendingNotificationsToServerNow()
-                    syncLocalNetworkOperationsToCloudNow()
+                    if (currentCloudSessionIsReadyForBackgroundSync()) {
+                        syncPendingSessionCleanupsToServerNow()
+                        syncPendingNotificationsToServerNow()
+                        syncLocalNetworkOperationsToCloudNow()
+                    }
                 }
             } else if (markCloudTransportUnavailableForNotifications(reason = "health_probe")) {
                 // A confirmed outage is represented by the persistent grounded banner only.
@@ -12745,7 +13228,7 @@ fun startCloudConnectionHealthMonitor() {
 
             val delayMillis = when (cloudTransportStatusState.value) {
                 CLOUD_TRANSPORT_STATUS_REACHABLE -> CLOUD_CONNECTION_HEALTH_CHECK_REACHABLE_INTERVAL_MILLIS
-                CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED -> CLOUD_CONNECTION_HEALTH_CHECK_UNAVAILABLE_INTERVAL_MILLIS
+                CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED -> CLOUD_CONNECTION_HEALTH_CHECK_AUTH_REQUIRED_INTERVAL_MILLIS
                 CLOUD_TRANSPORT_STATUS_UNAVAILABLE -> CLOUD_CONNECTION_HEALTH_CHECK_UNAVAILABLE_INTERVAL_MILLIS
                 else -> CLOUD_CONNECTION_HEALTH_CHECK_UNKNOWN_INTERVAL_MILLIS
             }
@@ -12766,15 +13249,18 @@ fun restartRealtimeUpdates() {
 }
 
 private suspend fun currentRealtimeAccessTokenOrNull(): String? {
-    val current = getStoredUserAuthTokens?.invoke() ?: return null
-    if (current.accessTokenNeedsRefreshForNetwork()) {
-        refreshStoredAuthTokensOnceForNetworkRetry(postNotification = false)
-    }
+    val validation = ensureCloudSessionReadyForProtectedRequest()
+    if (validation.negative) return null
 
     val latest = getStoredUserAuthTokens?.invoke() ?: return null
     if (!latest.accessTokenIsStillUsableForNetwork()) return null
-
     return latest.accessToken.takeIf { it.isNotBlank() }
+}
+
+private fun Throwable.isRealtimeUnauthorizedFailure(): Boolean {
+    if ((this as? ResponseException)?.response?.status == HttpStatusCode.Unauthorized) return true
+    val summary = toString().lowercase()
+    return "401" in summary && ("unauthorized" in summary || "websocket" in summary || "handshake" in summary)
 }
 
 fun startRealtimeUpdates() {
@@ -12790,16 +13276,22 @@ fun startRealtimeUpdates() {
 
             if (accessToken.isNullOrBlank()) {
                 realtimeUpdatesConnectedState.emit(false)
-                delay(if (cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED) 30_000L else 2_000L)
+                val retryDelay = when (cloudTransportStatusState.value) {
+                    CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED -> CLOUD_CONNECTION_HEALTH_CHECK_AUTH_REQUIRED_INTERVAL_MILLIS
+                    CLOUD_TRANSPORT_STATUS_UNAVAILABLE -> CLOUD_CONNECTION_HEALTH_CHECK_UNAVAILABLE_INTERVAL_MILLIS
+                    else -> 5_000L
+                }
+                delay(retryDelay)
                 continue
             }
 
             var openedRealtimeSession = false
             var openedRealtimeSessionAtMillis = 0L
+            var authenticationUnavailable = false
             val serverUrlCandidates = resolvedServerUrlCandidates(null)
 
             candidateLoop@ for (realtimeBaseUrl in serverUrlCandidates) {
-                var retriedAfterTokenRefresh = false
+                var retriedAfterAuthRecovery = false
 
                 while (isActive) {
                     val realtimeUrl = realtimeBaseUrl.toRealtimeWebSocketUrl(
@@ -12822,17 +13314,24 @@ fun startRealtimeUpdates() {
 
                         try {
                             rememberReachableServerUrl(realtimeBaseUrl)
-                            markCloudTransportReachableForNotifications(authenticated = true)
+                            markCloudAccessTokenValidated(accessToken.orEmpty())
+                            markCloudTransportReachableForNotifications(
+                                authenticated = true,
+                                authRefreshRequired = false
+                            )
                             realtimeUpdatesConnectedState.emit(true)
                             reconnectDelayMillis = 1_000L
 
-                            // Reconcile anything missed while the socket was reconnecting, but do not turn
-                            // an ordinary WebSocket reconnect into a user-visible connection-state event.
+                            // Reconcile anything missed while the socket was reconnecting. The session
+                            // gate above has already validated this exact access token, so these jobs do
+                            // not each trigger their own ping/refresh sequence.
                             GlobalScope.launch(Dispatchers.ourIo) {
-                                syncPendingSessionCleanupsToServerNow()
-                                syncPendingNotificationsToServerNow()
-                                syncLocalNetworkOperationsToCloudNow()
-                                scheduleRealtimeRefresh(reason = "connected", entity = "all")
+                                if (currentCloudSessionIsReadyForBackgroundSync()) {
+                                    syncPendingSessionCleanupsToServerNow()
+                                    syncPendingNotificationsToServerNow()
+                                    syncLocalNetworkOperationsToCloudNow()
+                                    scheduleRealtimeRefresh(reason = "connected", entity = "all")
+                                }
                             }
 
                             session.outgoing.send(
@@ -12850,7 +13349,9 @@ fun startRealtimeUpdates() {
 
                             for (frame in session.incoming) {
                                 val text = (frame as? Frame.Text)?.readText() ?: continue
-                                val update = runCatching { jsonBase.decodeFromString<RealtimeUpdateDataModel>(text) }.getOrNull()
+                                val update = runCatching {
+                                    jsonBase.decodeFromString<RealtimeUpdateDataModel>(text)
+                                }.getOrNull()
                                 if (update != null && update.type != "connected") {
                                     scheduleRealtimeRefresh(
                                         reason = update.reason ?: update.entity,
@@ -12869,20 +13370,29 @@ fun startRealtimeUpdates() {
                         break@candidateLoop
                     } catch (throwable: Throwable) {
                         if (throwable is CancellationException) throw throwable
+                        logCloudConnectionDiagnostic(
+                            "realtime connect failed base=$realtimeBaseUrl unauthorized=${throwable.isRealtimeUnauthorizedFailure()} " +
+                                    networkFailureSummary(throwable)
+                        )
 
-                        if (!retriedAfterTokenRefresh && getStoredUserAuthTokens?.invoke() != null) {
-                            retriedAfterTokenRefresh = true
-                            if (refreshStoredAuthTokensOnceForNetworkRetry()) {
-                                accessToken = getStoredUserAuthTokens?.invoke()?.accessToken
-                                if (!accessToken.isNullOrBlank()) {
-                                    continue
+                        if (throwable.isRealtimeUnauthorizedFailure()) {
+                            invalidateCloudAccessTokenValidation(accessToken)
+                            if (!retriedAfterAuthRecovery) {
+                                retriedAfterAuthRecovery = true
+                                val validation = ensureCloudSessionReadyForProtectedRequest()
+                                if (!validation.negative) {
+                                    accessToken = getStoredUserAuthTokens?.invoke()?.accessToken
+                                    if (!accessToken.isNullOrBlank()) continue
                                 }
-                            } else if (cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED) {
-                                accessToken = null
-                                break@candidateLoop
                             }
+
+                            authenticationUnavailable = true
+                            accessToken = null
+                            break@candidateLoop
                         }
 
+                        // DNS, tunnel, timeout and ordinary WebSocket failures are transport failures,
+                        // not evidence that the refresh token should be rotated. Try the next alias once.
                         break
                     }
                 }
@@ -12891,10 +13401,14 @@ fun startRealtimeUpdates() {
             if (isActive) {
                 realtimeUpdatesConnectedState.emit(false)
 
+                if (authenticationUnavailable) {
+                    delay(CLOUD_CONNECTION_HEALTH_CHECK_AUTH_REQUIRED_INTERVAL_MILLIS)
+                    continue
+                }
+
                 if (openedRealtimeSession) {
-                    // The HTTP server may still be reachable while only the WebSocket dropped.
-                    // Do not run the expensive REST fallback probe every time a socket closes; just reconnect
-                    // with a small backoff. Otherwise a short WebSocket timeout can look like an endless data-pull loop.
+                    // The HTTP server may still be reachable while only the WebSocket dropped. Do not
+                    // add a REST ping after every normal socket close; reconnect with bounded backoff.
                     val livedMillis = (getCurrentTimeMillis() - openedRealtimeSessionAtMillis).coerceAtLeast(0L)
                     val delayMillis = if (livedMillis < REALTIME_AFTER_WEBSOCKET_CLOSE_MIN_DELAY_MILLIS) {
                         REALTIME_AFTER_WEBSOCKET_CLOSE_MIN_DELAY_MILLIS
@@ -12906,24 +13420,20 @@ fun startRealtimeUpdates() {
                     continue
                 }
 
-                val serverReachable = probeCloudServerReachableForRealtimeFallback()
-
-                if (!serverReachable) {
-                    markCloudTransportUnavailableForNotifications(reason = "realtime_fallback")
-                } else {
-                    markCloudTransportReachableForNotifications(
-                        authenticated = getStoredUserAuthTokens?.invoke() != null,
-                        authRefreshRequired = false
-                    )
+                // A failed WebSocket handshake is not enough evidence to launch another REST ping:
+                // the single health-monitor loop already owns transport probing. Keeping those duties
+                // separate prevents realtime reconnects from multiplying /auth/ping traffic.
+                val retryDelayMillis = when (cloudTransportStatusState.value) {
+                    CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED -> CLOUD_CONNECTION_HEALTH_CHECK_AUTH_REQUIRED_INTERVAL_MILLIS
+                    CLOUD_TRANSPORT_STATUS_UNAVAILABLE -> CLOUD_CONNECTION_HEALTH_CHECK_UNAVAILABLE_INTERVAL_MILLIS
+                    else -> reconnectDelayMillis.coerceAtLeast(5_000L)
                 }
-
-                delay(if (serverReachable) reconnectDelayMillis.coerceAtLeast(5_000L) else reconnectDelayMillis)
+                delay(retryDelayMillis)
                 reconnectDelayMillis = (reconnectDelayMillis * 2).coerceAtMost(30_000L)
             }
         }
     }
 }
-
 fun refreshCloudConnectionManually() {
     if (manualCloudConnectionRefreshMutex.isLocked) return
 
@@ -12932,15 +13442,21 @@ fun refreshCloudConnectionManually() {
             cloudConnectionManualRefreshInProgressState.emit(true)
 
             try {
-                logCloudConnectionDiagnostic("manual refresh start server=${globalAppConfigurationState.payloadValue.serverUrl.first}")
+                logCloudConnectionDiagnostic(
+                    "manual refresh start server=${globalAppConfigurationState.payloadValue.serverUrl.first}"
+                )
                 val response = cloudConnectionProbeRequest("manual")
                 logCloudConnectionDiagnostic(
-                    "manual refresh ping result negative=${response.negative} http=${response.httpStatusCode} transportFailure=${response.transportFailure}"
+                    "manual refresh ping result negative=${response.negative} http=${response.httpStatusCode} " +
+                            "transportFailure=${response.transportFailure}"
                 )
 
                 if (response.negative) {
                     cancelRealtimeUpdatesSocketAfterReachabilityFailure()
-                    markCloudTransportUnavailableForNotifications(forceConfirmation = true)
+                    markCloudTransportUnavailableForNotifications(
+                        forceConfirmation = true,
+                        reason = "manual_probe"
+                    )
                     postInAppNotification(
                         response.message ?: localizedStringResourceMessage(
                             id = 1140,
@@ -12954,76 +13470,61 @@ fun refreshCloudConnectionManually() {
                     return@withLock
                 }
 
-                val storedTokens = getStoredUserAuthTokens?.invoke()
-                val hasLocalAccount = storedTokens != null
+                // The public probe established transport only. For a local account, deliberately run
+                // one authenticated validation and allow one manual retry of a previously rejected
+                // refresh token. No background caller gets this force-retry privilege.
+                markCloudTransportReachableForNotifications(
+                    authenticated = false,
+                    authRefreshRequired = null,
+                    forceRecovery = true
+                )
 
-                var authenticatedReady = hasLocalAccount
-                if (storedTokens != null) {
-                    val needsRefresh = storedTokens.accessTokenNeedsRefreshForNetwork()
-                    authenticatedReady = if (needsRefresh) {
-                        refreshStoredAuthTokensOnceForNetworkRetry(postNotification = false)
-                    } else {
-                        storedTokens.accessTokenIsStillUsableForNetwork()
-                    }
-
-                    if (!authenticatedReady) {
-                        val refreshFailureMessage = recentAuthRefreshNonAuthFailureMessage()
-                        when {
-                            cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_UNAVAILABLE -> {
-                                postInAppNotification(
-                                    refreshFailureMessage ?: localizedStringResourceMessage(
-                                        id = 1140,
-                                        main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
-                                        ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
-                                        kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
-                                    ),
-                                    NotificationType.Negative,
-                                    transient = true
-                                )
-                            }
-
-                            cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED && refreshFailureMessage == null -> {
-                                postInAppNotification(
-                                    localizedStringResourceMessage(
-                                        id = 91,
-                                        main = "Cloud session needs refresh. You remain signed in locally.",
-                                        ru = "Облачный сеанс нужно обновить. Вы остаётесь в аккаунте локально.",
-                                        kk = "Бұлттық сеансты жаңарту қажет. Сіз жергілікті түрде аккаунтта қаласыз."
-                                    ),
-                                    NotificationType.Neutral
-                                )
-                            }
-
-                            else -> {
-                                postInAppNotification(
-                                    refreshFailureMessage ?: localizedStringResourceMessage(
-                                        id = 1149,
-                                        main = "Server could not refresh session. Keeping local login active.",
-                                        ru = "Сервер не смог обновить сеанс. Локальный вход сохранён.",
-                                        kk = "Сервер сеансты жаңарта алмады. Жергілікті кіру сақталды."
-                                    ),
-                                    NotificationType.Negative,
-                                    transient = false
-                                )
-                            }
+                val hasLocalAccount = getStoredUserAuthTokens?.invoke() != null
+                if (hasLocalAccount) {
+                    val validation = ensureCloudSessionReadyForProtectedRequest(
+                        forceRejectedRefreshRetry = true
+                    )
+                    if (validation.negative) {
+                        if (validation.transportFailure) {
+                            cancelRealtimeUpdatesSocketAfterReachabilityFailure()
+                            markCloudTransportUnavailableForNotifications(
+                                forceConfirmation = true,
+                                reason = "manual_auth_validation_transport"
+                            )
                         }
+                        postInAppNotification(
+                            validation.message ?: if (validation.transportFailure) {
+                                localizedStringResourceMessage(
+                                    id = 1140,
+                                    main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
+                                    ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
+                                    kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
+                                )
+                            } else {
+                                cloudSessionExpiredMessage()
+                            },
+                            if (validation.transportFailure) NotificationType.Negative else NotificationType.Neutral,
+                            transient = validation.transportFailure
+                        )
                         return@withLock
                     }
                 }
 
                 markCloudTransportReachableForNotifications(
-                    authenticated = authenticatedReady,
-                    authRefreshRequired = false,
+                    authenticated = hasLocalAccount,
+                    authRefreshRequired = if (hasLocalAccount) false else null,
                     forceRecovery = true
                 )
                 syncPendingSessionCleanupsToServerNow()
 
                 if (hasLocalAccount) {
                     getUser(forceLogOut = false, applyServerActiveStore = false)
-                    syncPendingNotificationsToServerNow()
-                    syncLocalNetworkOperationsToCloudNow()
-                    scheduleRealtimeRefresh(reason = "manual_reconnect", entity = "all", force = true)
-                    restartRealtimeUpdates()
+                    if (currentCloudSessionIsReadyForBackgroundSync()) {
+                        syncPendingNotificationsToServerNow()
+                        syncLocalNetworkOperationsToCloudNow()
+                        scheduleRealtimeRefresh(reason = "manual_reconnect", entity = "all", force = true)
+                        restartRealtimeUpdates()
+                    }
                 }
 
                 postInAppNotification(
@@ -13037,9 +13538,14 @@ fun refreshCloudConnectionManually() {
                 )
             } catch (throwable: Throwable) {
                 if (throwable is CancellationException) throw throwable
-                logCloudConnectionDiagnostic("manual refresh failed ${throwable.message ?: throwable.toString()}")
+                logCloudConnectionDiagnostic(
+                    "manual refresh failed ${throwable.message ?: throwable.toString()}"
+                )
                 cancelRealtimeUpdatesSocketAfterReachabilityFailure()
-                markCloudTransportUnavailableForNotifications(forceConfirmation = true)
+                markCloudTransportUnavailableForNotifications(
+                    forceConfirmation = true,
+                    reason = "manual_refresh_exception"
+                )
                 postInAppNotification(
                     localizedStringResourceMessage(
                         id = 1140,
@@ -13051,13 +13557,15 @@ fun refreshCloudConnectionManually() {
                     transient = true
                 )
             } finally {
-                logCloudConnectionDiagnostic("manual refresh finish status=${cloudTransportStatusName(cloudTransportStatusState.value)} realtime=${realtimeUpdatesConnectedState.value}")
+                logCloudConnectionDiagnostic(
+                    "manual refresh finish status=${cloudTransportStatusName(cloudTransportStatusState.value)} " +
+                            "realtime=${realtimeUpdatesConnectedState.value}"
+                )
                 cloudConnectionManualRefreshInProgressState.emit(false)
             }
         }
     }
 }
-
 fun upsertCart(
     id: String,
     transactionTypeIndex: Int,
@@ -13211,17 +13719,33 @@ private fun String.isCloudSessionRefreshNotificationText(): Boolean {
     val normalized = normalizedNotificationText()
     if (normalized.isBlank()) return false
 
-    return listOf(
+    val preciseMarkers = listOf(
+        // Current precise wording.
+        "cloud sign-in expired",
+        "sign in again to sync",
+        "local data stays available",
+        "срок облачного входа истёк",
+        "войдите снова для синхронизации",
+        "локальные данные останутся доступны",
+        "бұлттық кіру мерзімі аяқталды",
+        "синхрондау үшін қайта кіріңіз",
+        "жергілікті деректер қолжетімді болып қалады",
+        // Legacy wording remains recognized so old persisted notices are canonicalized and deduped.
         "cloud session needs refresh",
         "session needs refresh",
         "you remain signed in locally",
-        "облачный сеанс",
-        "сеанс нужно обновить",
         "остаётесь в аккаунте локально",
-        "бұлттық сеанс",
-        "сеансты жаңарту",
         "жергілікті түрде аккаунтта",
-    ).any { marker -> normalized.contains(marker) }
+    )
+    if (preciseMarkers.any { marker -> normalized.contains(marker) }) return true
+
+    // Do not classify positive text such as "Cloud session active" as an expiry warning merely
+    // because it contains the generic words "cloud session".
+    val legacyRussian = normalized.contains("облачный сеанс") &&
+            normalized.contains("сеанс нужно обновить")
+    val legacyKazakh = normalized.contains("бұлттық сеанс") &&
+            normalized.contains("сеансты жаңарту")
+    return legacyRussian || legacyKazakh
 }
 
 private fun String.isUnreadableServerResponseNotificationText(): Boolean {
@@ -13369,9 +13893,9 @@ private fun localizedCloudTransportRecoveryNotificationText(): String = localize
 
 private fun localizedCloudSessionRefreshNotificationText(): String = localizedStringResourceText(
     id = 91,
-    main = "Cloud session needs refresh. You remain signed in locally.",
-    ru = "Облачный сеанс нужно обновить. Вы остаётесь в аккаунте локально.",
-    kk = "Бұлттық сеансты жаңарту қажет. Сіз жергілікті түрде аккаунтта қаласыз."
+    main = "Cloud sign-in expired. Sign in again to sync. Your local data stays available.",
+    ru = "Срок облачного входа истёк. Войдите снова для синхронизации. Локальные данные останутся доступны.",
+    kk = "Бұлттық кіру мерзімі аяқталды. Синхрондау үшін қайта кіріңіз. Жергілікті деректер қолжетімді болып қалады."
 )
 
 private fun String.humanFriendlyNotificationMessage(): String {
@@ -13718,10 +14242,9 @@ internal fun markCloudTransportUnavailableForNotifications(
     cloudTransportLastUnavailableAtMillis = getCurrentTimeMillis()
     val nextStatus = CLOUD_TRANSPORT_STATUS_UNAVAILABLE
 
-    // A real transport failure is stronger evidence than an old or speculative auth-refresh state.
-    // When the device cannot reach the server, the user needs a connection banner, not a session banner.
-    cloudSessionRefreshRequiredForNotifications = false
-    cloudSessionRefreshNotificationPostedForCurrentRequirement = false
+    // Transport and authentication are orthogonal. While offline the connection banner takes visual
+    // precedence, but a refresh token that was already rejected must remain remembered so a later
+    // public ping cannot incorrectly turn the app green and restart the same refresh loop.
 
     if (cloudTransportReachableForNotifications || cloudTransportStatusState.value != nextStatus) {
         cloudTransportFailureNotificationPending = true
@@ -13789,13 +14312,15 @@ internal fun markCloudTransportReachableForNotifications(
 
 @PublishedApi
 internal fun markCloudSessionNeedsRefreshForNotifications() {
+    // Remember the grounded auth failure even if an active transport outage temporarily owns the
+    // visible banner. Once reachability returns, markCloudTransportReachable... will reveal this state.
+    cloudSessionRefreshRequiredForNotifications = true
     if (recentCloudTransportFailureIsDominant()) {
-        logCloudConnectionDiagnostic("session-refresh signal suppressed because transport is currently unavailable")
-        setCloudTransportStatusForDiagnostics(CLOUD_TRANSPORT_STATUS_UNAVAILABLE, "auth_refresh_suppressed_by_transport_failure")
+        logCloudConnectionDiagnostic("session-refresh signal hidden while transport is unavailable")
+        setCloudTransportStatusForDiagnostics(CLOUD_TRANSPORT_STATUS_UNAVAILABLE, "auth_refresh_hidden_by_transport_failure")
         return
     }
 
-    cloudSessionRefreshRequiredForNotifications = true
     cloudTransportRecoveryNotificationPending = false
     setCloudTransportStatusForDiagnostics(CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED, "auth_refresh_required")
 }
@@ -14197,6 +14722,7 @@ private suspend fun saveNotificationToServerNow(notification: NotificationDataMo
     if (notification.isLocalOnlyNotification()) return
     if (getStoredUserAuthTokens?.invoke() == null) return
     if (userAccountState.payloadValue == null) return
+    if (!currentCloudSessionIsReadyForBackgroundSync()) return
 
     saveNotificationMutex.withLock {
         val response = networkRequest<NotificationDataModel, NotificationDataModel>(
@@ -14226,6 +14752,7 @@ suspend fun syncPendingNotificationsToServerNow(): Int {
     if (syncPendingNotificationsMutex.isLocked) return 0
     if (getStoredUserAuthTokens?.invoke() == null) return 0
     if (userAccountState.payloadValue == null) return 0
+    if (!currentCloudSessionIsReadyForBackgroundSync()) return 0
 
     return syncPendingNotificationsMutex.withLock {
         val pending = notificationsState.payloadValue.orEmpty()
@@ -14787,6 +15314,8 @@ fun logInUser(userAuthLogIn: UserAuthLogInDataModel, serverUrlOverride: String? 
                 )
             } else {
                 setStoredUserAuthTokens?.invoke(response.payload)
+                clearCloudAuthRequestMemory(response.payload)
+                markCloudAccessTokenValidated(response.payload.accessToken)
                 clearCloudSessionRefreshRequirementForNotifications(CLOUD_TRANSPORT_STATUS_REACHABLE)
                 markCloudTransportReachableForNotifications(authenticated = true)
                 httpClient.authProvider<BearerAuthProvider>()?.clearToken()
@@ -14869,6 +15398,8 @@ fun signUpUser(userAuthSignUp: UserAuthSignUpDataModel, serverUrlOverride: Strin
                 )
             } else {
                 setStoredUserAuthTokens?.invoke(response.payload)
+                clearCloudAuthRequestMemory(response.payload)
+                markCloudAccessTokenValidated(response.payload.accessToken)
                 clearCloudSessionRefreshRequirementForNotifications(CLOUD_TRANSPORT_STATUS_REACHABLE)
                 markCloudTransportReachableForNotifications(authenticated = true)
                 httpClient.authProvider<BearerAuthProvider>()?.clearToken()
@@ -14961,6 +15492,7 @@ fun logOutUser() {
             // server refresh-session revoke is best-effort and can fail silently when the server token is already expired.
             stopRealtimeUpdates()
             setStoredUserAuthTokens?.invoke(null)
+            clearCloudAuthRequestMemory(null)
             setStoredUserAccountDataModel?.invoke(null)
             setActiveStoreId(null, syncServer = false)
             clearCloudSessionRefreshRequirementForNotifications(CLOUD_TRANSPORT_STATUS_UNKNOWN)
@@ -15223,6 +15755,7 @@ fun forceLogOutUser(
     GlobalScope.launch(Dispatchers.ourIo) {
         stopRealtimeUpdates()
         setStoredUserAuthTokens?.invoke(null)
+        clearCloudAuthRequestMemory(null)
         setStoredUserAccountDataModel?.invoke(null)
         setActiveStoreId(null, syncServer = false)
         clearCloudSessionRefreshRequirementForNotifications(CLOUD_TRANSPORT_STATUS_UNKNOWN)
@@ -15258,9 +15791,9 @@ fun forceLogOutUser(
             postInAppNotification(
                 message ?: localizedStringResourceMessage(
                     id = 91,
-                    main = "Cloud session needs refresh. You remain signed in locally.",
-                    ru = "Облачный сеанс нужно обновить. Вы остаётесь в аккаунте локально.",
-                    kk = "Бұлттық сеансты жаңарту қажет. Сіз жергілікті түрде аккаунтта қаласыз."
+                    main = "Cloud sign-in expired. Sign in again to sync. Your local data stays available.",
+                    ru = "Срок облачного входа истёк. Войдите снова для синхронизации. Локальные данные останутся доступны.",
+                    kk = "Бұлттық кіру мерзімі аяқталды. Синхрондау үшін қайта кіріңіз. Жергілікті деректер қолжетімді болып қалады."
                 ),
                 NotificationType.Negative,
                 transient = true
@@ -15282,11 +15815,24 @@ suspend inline fun <reified Response, reified Body> networkRequest(
 
     return try {
         ensureCachedGlobalConfigurationPrimedForNetwork()
+
+        val protectedEndpoint = cloudEndpointRequiresAuthentication(endpointUrl)
+        if (protectedEndpoint) {
+            // All concurrent protected startup requests queue behind one authenticated session check.
+            // A rejected refresh token is remembered, so later requests fail locally instead of creating
+            // another /auth/ping -> /auth/refresh -> 401 storm.
+            val validation = ensureCloudSessionReadyForProtectedRequest()
+            if (validation.negative) {
+                return cloudSessionValidationFailureForNetworkRequest(validation)
+            }
+        }
+
         val allServerUrlCandidates = resolvedServerUrlCandidates(serverUrl)
         val serverUrlCandidates = if (method.canRetryAcrossAitaServerAliases()) {
             allServerUrlCandidates
         } else {
-            // Select an alias with a harmless readiness GET before sending a non-replayable mutation.
+            // The authenticated /auth/session check above has already proven and remembered an alias.
+            // If this is a public mutation, or that proof is stale, select one alias with a harmless GET.
             // The actual POST/PUT/PATCH/DELETE is still emitted exactly once.
             val selection = selectServerUrlForNonReplayableRequest(
                 serverUrlCandidates = allServerUrlCandidates,
@@ -15294,7 +15840,7 @@ suspend inline fun <reified Response, reified Body> networkRequest(
             )
             val selectedServerUrl = selection.payload
             if (selectedServerUrl == null) {
-                markCloudTransportUnavailableForNotifications()
+                markCloudTransportUnavailableForNotifications(reason = "mutation_alias_selection")
                 return ResponseDataModel<Response>(
                     message = selection.message,
                     payload = null,
@@ -15305,116 +15851,51 @@ suspend inline fun <reified Response, reified Body> networkRequest(
             }
             listOf(selectedServerUrl)
         }
+
         if (!method.canRetryAcrossAitaServerAliases() && allServerUrlCandidates.size > 1) {
             logNetworkAttempt(
                 "alias replay disabled for ${method.value}; selected ${serverUrlCandidates.firstOrNull().orEmpty()}"
             )
         }
+
         var lastServerErrorResponse: ResponseDataModel<Response>? = null
         var lastTransportFailureMessage: List<LocalizedStringDataModel>? = null
 
-        for ((index, candidateServerUrl) in serverUrlCandidates.withIndex()) {
-            var resolvedServerUrl = candidateServerUrl
+        for ((index, resolvedServerUrl) in serverUrlCandidates.withIndex()) {
             var authRetryUsedForCandidate = false
             val requestHeaders = currentClientDeviceInfoHeaders() + headers
 
             retrySameServer@ while (true) {
-                val endpointForAuthPreflight = endpointUrl.trim('/').lowercase()
-                val publicEndpointForAuthPreflight = endpointForAuthPreflight.startsWith("auth/") ||
-                        endpointForAuthPreflight.startsWith("config/") ||
-                        endpointForAuthPreflight.startsWith("res/") ||
-                        endpointForAuthPreflight.startsWith(".well-known/")
-                val tokensForAuthPreflight = getStoredUserAuthTokens?.invoke()
-
-                if (!publicEndpointForAuthPreflight &&
-                    !authRetryUsedForCandidate &&
-                    tokensForAuthPreflight != null &&
-                    tokensForAuthPreflight.accessTokenNeedsRefreshForNetwork()
-                ) {
-                    val refreshed = refreshStoredAuthTokensOnceForNetworkRetry(postNotification = false)
-                    if (refreshed) {
-                        httpClient.authProvider<BearerAuthProvider>()?.clearToken()
-                        if (!method.canRetryAcrossAitaServerAliases()) {
-                            selectServerUrlForNonReplayableRequest(
-                                serverUrlCandidates = allServerUrlCandidates,
-                                reason = "mutation_after_auth_refresh"
-                            ).payload?.let { provenServerUrl -> resolvedServerUrl = provenServerUrl }
-                        }
-                    } else if (!tokensForAuthPreflight.accessTokenIsStillUsableForNetwork()) {
-                        recentAuthRefreshNonAuthFailureMessage()?.let { refreshFailureMessage ->
-                            return authRefreshFailureResponseForNetworkRequest(refreshFailureMessage)
-                        }
-
-                        if (cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED) {
-                            clearAuthRefreshNonAuthFailure()
-                            val expiredMessage = localizedStringResourceMessage(
-                                id = 91,
-                                main = "Cloud session needs refresh. You remain signed in locally.",
-                                ru = "Облачный сеанс нужно обновить. Вы остаётесь в аккаунте локально.",
-                                kk = "Бұлттық сеансты жаңарту қажет. Сіз жергілікті түрде аккаунтта қаласыз."
-                            )
-                            markCloudSessionNeedsRefreshForNotifications()
-                            return ResponseDataModel<Response>(
-                                message = expiredMessage,
-                                payload = null,
-                                negative = true,
-                                httpStatusCode = HttpStatusCode.Unauthorized.value,
-                                transportFailure = false
-                            )
-                        }
-
-                        val offlineMessage = localizedStringResourceMessage(
-                            id = 214,
-                            main = "Cannot reach server. Keeping you signed in offline.",
-                            ru = "Сервер недоступен. Вы остаётесь в аккаунте офлайн.",
-                            kk = "Сервер қолжетімсіз. Сіз офлайн режимде аккаунтта қаласыз."
-                        )
-                        markCloudTransportUnavailableForNotifications()
-                        return ResponseDataModel<Response>(
-                            message = offlineMessage,
-                            payload = null,
-                            negative = true,
-                            httpStatusCode = HttpStatusCode.ServiceUnavailable.value,
-                            transportFailure = true
-                        )
-                    }
-                }
-
                 val tokensBeforeRequest = getStoredUserAuthTokens?.invoke()
                 try {
                     val requestUrl = networkTargetUrl(resolvedServerUrl, endpointUrl)
                     logNetworkAttempt("TRY ${method.value} $requestUrl")
-                    val response = httpClient
-                        .request(requestUrl) {
-                            this.method = method
+                    val response = httpClient.request(requestUrl) {
+                        this.method = method
+                        this.headers.append(HttpHeaders.CacheControl, "no-cache")
+                        this.headers.append(HttpHeaders.Pragma, "no-cache")
 
-                            this.headers.append(HttpHeaders.CacheControl, "no-cache")
-                            this.headers.append(HttpHeaders.Pragma, "no-cache")
-
-                            requestHeaders.forEach { (key, value) ->
-                                safeHttpHeaderValueOrNull(value)?.let { safeValue ->
-                                    this.headers.append(key, safeValue)
-                                }
-                            }
-
-                            query.forEach { (key, value) ->
-                                value?.let {
-                                    parameter(key, it)
-                                }
-                            }
-
-                            body?.let { body ->
-                                contentType?.let {
-                                    this.contentType(it)
-                                }
-
-                                setBody(body)
+                        requestHeaders.forEach { (key, value) ->
+                            safeHttpHeaderValueOrNull(value)?.let { safeValue ->
+                                this.headers.append(key, safeValue)
                             }
                         }
 
+                        query.forEach { (key, value) ->
+                            value?.let { parameter(key, it) }
+                        }
+
+                        body?.let { requestBody ->
+                            contentType?.let { this.contentType(it) }
+                            setBody(requestBody)
+                        }
+                    }
+
                     val rawBody = response.bodyAsText()
                     val aitaServerResponse = response.isAitaServerResponse(rawBody)
-                    logNetworkAttempt("RESULT ${method.value} $requestUrl HTTP ${response.status.value} aita=$aitaServerResponse")
+                    logNetworkAttempt(
+                        "RESULT ${method.value} $requestUrl HTTP ${response.status.value} aita=$aitaServerResponse"
+                    )
                     val shouldRetryCandidate = index < serverUrlCandidates.lastIndex &&
                             shouldRetryNetworkRequestOnNextServerUrl(
                                 method = method,
@@ -15425,13 +15906,15 @@ suspend inline fun <reified Response, reified Body> networkRequest(
                             )
 
                     if (!aitaServerResponse) {
-                        val nonAitaResponse = nonAitaHttpResponseDataModel<Response>(response.status, rawBody, resolvedServerUrl)
+                        val nonAitaResponse = nonAitaHttpResponseDataModel<Response>(
+                            response.status,
+                            rawBody,
+                            resolvedServerUrl
+                        )
                         lastTransportFailureMessage = nonAitaResponse.message
                         forgetReachableServerUrlCandidate(resolvedServerUrl)
-                        markCloudTransportUnavailableForNotifications()
-                        if (shouldRetryCandidate) {
-                            break@retrySameServer
-                        }
+                        markCloudTransportUnavailableForNotifications(reason = "non_aita_response")
+                        if (shouldRetryCandidate) break@retrySameServer
                         return nonAitaResponse
                     }
 
@@ -15442,39 +15925,38 @@ suspend inline fun <reified Response, reified Body> networkRequest(
                         val failureResponse = decodedResponse.copy(transportFailure = true)
                         lastServerErrorResponse = failureResponse
                         forgetReachableServerUrlCandidate(resolvedServerUrl)
-                        markCloudTransportUnavailableForNotifications()
+                        markCloudTransportUnavailableForNotifications(reason = "server_unhealthy_${response.status.value}")
                         logCloudConnectionDiagnostic(
                             "server response treated as unavailable method=${method.value} endpoint=${endpointUrl.trim('/')} " +
                                     "http=${response.status.value} aita=$aitaServerResponse negative=${failureResponse.negative}"
                         )
-                        if (shouldRetryCandidate) {
-                            break@retrySameServer
-                        }
+                        if (shouldRetryCandidate) break@retrySameServer
                         return failureResponse
                     }
 
                     if (shouldRetryCandidate) {
                         lastServerErrorResponse = decodedResponse
+                        forgetReachableServerUrlCandidate(resolvedServerUrl)
                         break@retrySameServer
                     }
 
-                    val endpointForReachability = endpointUrl.trim('/').lowercase()
-                    val publicEndpointForReachability = endpointForReachability.startsWith("auth/") ||
-                            endpointForReachability.startsWith("config/") ||
-                            endpointForReachability.startsWith("res/") ||
-                            endpointForReachability.startsWith(".well-known/")
                     val canMarkReachable = cloudResponseCanMarkReachable(endpointUrl, response.status)
                     if (canMarkReachable) {
                         rememberReachableServerUrl(resolvedServerUrl)
-                        val authenticatedReachableResponse = response.status != HttpStatusCode.Unauthorized &&
-                                getStoredUserAuthTokens?.invoke() != null &&
-                                !publicEndpointForReachability
+                        val authenticatedResponse = protectedEndpoint &&
+                                response.status != HttpStatusCode.Unauthorized &&
+                                response.status.value < 500 &&
+                                getStoredUserAuthTokens?.invoke() != null
+                        if (authenticatedResponse) {
+                            getStoredUserAuthTokens?.invoke()?.accessToken?.let(::markCloudAccessTokenValidated)
+                        }
                         markCloudTransportReachableForNotifications(
-                            authenticated = authenticatedReachableResponse,
-                            authRefreshRequired = if (!publicEndpointForReachability && getStoredUserAuthTokens?.invoke() != null) {
-                                response.status == HttpStatusCode.Unauthorized
-                            } else {
-                                null
+                            authenticated = authenticatedResponse,
+                            // A public ping proves transport only. A protected 401 also proves transport;
+                            // session-expired state is grounded only if the one refresh attempt is rejected.
+                            authRefreshRequired = when {
+                                authenticatedResponse -> false
+                                else -> null
                             }
                         )
                     } else {
@@ -15483,16 +15965,18 @@ suspend inline fun <reified Response, reified Body> networkRequest(
                                     "status=${cloudTransportStatusName(cloudTransportStatusState.value)}"
                         )
                         if (response.status.value >= 500) {
-                            markCloudTransportUnavailableForNotifications()
+                            markCloudTransportUnavailableForNotifications(reason = "suppressed_server_failure")
                         }
                     }
 
                     if (response.status == HttpStatusCode.Unauthorized) {
-                        if (publicEndpointForReachability) {
-                            return decodeNetworkResponseDataModel<Response>(rawBody, response.status)
-                        }
+                        if (!protectedEndpoint) return decodedResponse
 
+                        invalidateCloudAccessTokenValidation(tokensBeforeRequest?.accessToken)
                         val latestTokensAfterRequest = getStoredUserAuthTokens?.invoke()
+
+                        // Ktor's bearer plugin may already have rotated the token while handling this
+                        // response. Retry the original request once with that newly stored token.
                         if (!authRetryUsedForCandidate &&
                             tokensBeforeRequest != null &&
                             latestTokensAfterRequest != null &&
@@ -15503,7 +15987,16 @@ suspend inline fun <reified Response, reified Body> networkRequest(
                             continue@retrySameServer
                         }
 
-                        if (!authRetryUsedForCandidate && refreshStoredAuthTokensOnceForNetworkRetry()) {
+                        if (latestTokensAfterRequest != null &&
+                            rejectedAuthRefreshTokenMatches(latestTokensAfterRequest.refreshToken)
+                        ) {
+                            return cloudSessionExpiredResponse()
+                        }
+
+                        if (!authRetryUsedForCandidate &&
+                            refreshStoredAuthTokensOnceForNetworkRetry(postNotification = false)
+                        ) {
+                            httpClient.authProvider<BearerAuthProvider>()?.clearToken()
                             authRetryUsedForCandidate = true
                             continue@retrySameServer
                         }
@@ -15512,34 +16005,23 @@ suspend inline fun <reified Response, reified Body> networkRequest(
                             return authRefreshFailureResponseForNetworkRequest(refreshFailureMessage)
                         }
 
-                        clearAuthRefreshNonAuthFailure()
-                        val expiredMessage = localizedStringResourceMessage(
-                            id = 91,
-                            main = "Cloud session needs refresh. You remain signed in locally.",
-                            ru = "Облачный сеанс нужно обновить. Вы остаётесь в аккаунте локально.",
-                            kk = "Бұлттық сеансты жаңарту қажет. Сіз жергілікті түрде аккаунтта қаласыз."
-                        )
+                        val currentTokens = getStoredUserAuthTokens?.invoke()
+                        if (currentTokens != null && rejectedAuthRefreshTokenMatches(currentTokens.refreshToken)) {
+                            return cloudSessionExpiredResponse()
+                        }
 
-                        markCloudSessionNeedsRefreshForNotifications()
-                        // Do not destroy the local account on a single 401. The refresh token/session may be rotating,
-                        // the server may have just restarted, or the user may be temporarily offline. Local logout remains manual.
-                        return ResponseDataModel<Response>(
-                            message = expiredMessage,
-                            payload = null,
-                            negative = true,
-                            httpStatusCode = response.status.value,
-                            transportFailure = false
-                        )
+                        return cloudSessionExpiredResponse()
                     }
 
                     return decodedResponse
                 } catch (throwable: Throwable) {
                     if (throwable is CancellationException) throw throwable
-                    val responseException = throwable as? ResponseException
-                    val status = responseException?.response?.status
+                    val status = (throwable as? ResponseException)?.response?.status
 
-                    if (status == HttpStatusCode.Unauthorized) {
+                    if (status == HttpStatusCode.Unauthorized && protectedEndpoint) {
+                        invalidateCloudAccessTokenValidation(tokensBeforeRequest?.accessToken)
                         val latestTokensAfterException = getStoredUserAuthTokens?.invoke()
+
                         if (!authRetryUsedForCandidate &&
                             tokensBeforeRequest != null &&
                             latestTokensAfterException != null &&
@@ -15550,7 +16032,16 @@ suspend inline fun <reified Response, reified Body> networkRequest(
                             continue@retrySameServer
                         }
 
-                        if (!authRetryUsedForCandidate && refreshStoredAuthTokensOnceForNetworkRetry()) {
+                        if (latestTokensAfterException != null &&
+                            rejectedAuthRefreshTokenMatches(latestTokensAfterException.refreshToken)
+                        ) {
+                            return cloudSessionExpiredResponse()
+                        }
+
+                        if (!authRetryUsedForCandidate &&
+                            refreshStoredAuthTokensOnceForNetworkRetry(postNotification = false)
+                        ) {
+                            httpClient.authProvider<BearerAuthProvider>()?.clearToken()
                             authRetryUsedForCandidate = true
                             continue@retrySameServer
                         }
@@ -15558,31 +16049,20 @@ suspend inline fun <reified Response, reified Body> networkRequest(
                         recentAuthRefreshNonAuthFailureMessage()?.let { refreshFailureMessage ->
                             return authRefreshFailureResponseForNetworkRequest(refreshFailureMessage)
                         }
-
-                        clearAuthRefreshNonAuthFailure()
-                        val expiredMessage = localizedStringResourceMessage(
-                            id = 91,
-                            main = "Cloud session needs refresh. You remain signed in locally.",
-                            ru = "Облачный сеанс нужно обновить. Вы остаётесь в аккаунте локально.",
-                            kk = "Бұлттық сеансты жаңарту қажет. Сіз жергілікті түрде аккаунтта қаласыз."
-                        )
-
-                        markCloudSessionNeedsRefreshForNotifications()
-                        // Do not destroy the local account on a single 401. The refresh token/session may be rotating,
-                        // the server may have just restarted, or the user may be temporarily offline. Local logout remains manual.
-                        return ResponseDataModel<Response>(
-                            message = expiredMessage,
-                            payload = null,
-                            negative = true,
-                            httpStatusCode = status.value,
-                            transportFailure = false
-                        )
+                        return cloudSessionExpiredResponse()
                     }
 
                     forgetReachableServerUrlCandidate(resolvedServerUrl)
-                    markCloudTransportUnavailableForNotifications()
-                    lastTransportFailureMessage = networkTransportFailureMessage(resolvedServerUrl, endpointUrl, throwable)
-                    logNetworkAttempt("FAILED ${method.value} ${networkTargetUrl(resolvedServerUrl, endpointUrl)} ${networkFailureSummary(throwable)}")
+                    markCloudTransportUnavailableForNotifications(reason = "request_exception")
+                    lastTransportFailureMessage = networkTransportFailureMessage(
+                        resolvedServerUrl,
+                        endpointUrl,
+                        throwable
+                    )
+                    logNetworkAttempt(
+                        "FAILED ${method.value} ${networkTargetUrl(resolvedServerUrl, endpointUrl)} " +
+                                networkFailureSummary(throwable)
+                    )
                     break@retrySameServer
                 }
             }
@@ -16373,90 +16853,108 @@ fun refreshParentStoreStock(
     }
 }
 
+private fun stockItemSaveFailureMessage(): List<LocalizedStringDataModel> = listOf(
+    LocalizedStringDataModel("main", "Could not save stock item. Please try again."),
+    LocalizedStringDataModel("en", "Could not save stock item. Please try again."),
+    LocalizedStringDataModel("ru", "Не удалось сохранить товар. Попробуйте ещё раз."),
+    LocalizedStringDataModel("kk", "Тауарды сақтау мүмкін болмады. Қайталап көріңіз.")
+)
+
+private suspend fun applySavedGoodsItemToStockState(
+    savedGoodsItem: GoodsItemDataModel,
+    responseMessage: List<LocalizedStringDataModel>?
+) {
+    val current = stockState.payloadValue.orEmpty().toMutableList()
+    val existingIndex = current.indexOfFirst { it.id == savedGoodsItem.id }
+    if (existingIndex >= 0) {
+        current[existingIndex] = savedGoodsItem
+    } else {
+        current.add(savedGoodsItem)
+    }
+    stockState.emit(DataState.Success(current, responseMessage))
+
+    savedGoodsItem.storeId.takeIf { it.isNotBlank() }?.let { storeId ->
+        getStock(storeId)
+        refreshParentStoreStock(storeId, limit = 32, appendToSharedState = false)
+    }
+}
+
 fun updateGoodsItem(
     goodsItem: GoodsItemDataModel,
     onCompleted: ((DataState<GoodsItemDataModel>) -> Unit)?
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            updateGoodsItemMutex.withLock {
+        val completion: DataState<GoodsItemDataModel> = updateGoodsItemMutex.withLock {
+            try {
                 val response = networkRequest<GoodsItemDataModel, GoodsItemDataModel>(
                     HttpMethod.Put,
                     endpointUrl = globalAppConfigurationState.payloadValue.updateGoodsItemPath.first,
                     body = goodsItem
                 )
+                val savedGoodsItem = response.payload
 
-                if (response.negative) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-
-                    onCompleted?.invoke(DataState.Empty())
+                if (response.negative || savedGoodsItem == null) {
+                    val message = response.message ?: stockItemSaveFailureMessage()
+                    postInAppNotification(message, NotificationType.Negative)
+                    DataState.Empty(message)
                 } else {
                     postInAppNotification(response.message, NotificationType.Positive)
-
-                    stockState.emit(
-                        DataState.Success(
-                            mutableListOf<GoodsItemDataModel>().also { newList ->
-                                (stockState.value.value as? DataState.Success)?.payload?.run {
-                                    newList.addAll(this)
-                                }
-
-                                val existingIndex = newList.indexOfFirst { it.id == response.payload!!.id }
-                                if (existingIndex >= 0) {
-                                    newList[existingIndex] = response.payload!!
-                                } else {
-                                    newList.add(response.payload!!)
-                                }
-                            }
-                        )
+                    applySavedGoodsItemToStockState(
+                        savedGoodsItem = savedGoodsItem,
+                        responseMessage = response.message
                     )
-
-                    goodsItem.storeId.takeIf { it.isNotBlank() }?.let { storeId ->
-                        getStock(storeId)
-                        refreshParentStoreStock(storeId, limit = 32, appendToSharedState = false)
-                    }
-
-                    onCompleted?.invoke(DataState.Success(response.payload!!))
+                    DataState.Success(savedGoodsItem, response.message)
                 }
+            } catch (throwable: Throwable) {
+                if (throwable is CancellationException) throw throwable
+                val message = stockItemSaveFailureMessage()
+                logNetworkAttempt("FAILED stock item update ${networkFailureSummary(throwable)}")
+                postInAppNotification(message, NotificationType.Negative)
+                DataState.Empty(message)
             }
         }
+
+        onCompleted?.invoke(completion)
+    }
 }
 
-fun addGoodsItem(goodsItem: GoodsItemDataModel, onCompleted: ((DataState<GoodsItemDataModel>) -> Unit)?) {
+fun addGoodsItem(
+    goodsItem: GoodsItemDataModel,
+    onCompleted: ((DataState<GoodsItemDataModel>) -> Unit)?
+) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            addGoodsItemMutex.withLock {
+        val completion: DataState<GoodsItemDataModel> = addGoodsItemMutex.withLock {
+            try {
                 val response = networkRequest<GoodsItemDataModel, GoodsItemDataModel>(
                     HttpMethod.Post,
                     endpointUrl = globalAppConfigurationState.payloadValue.addGoodsItemPath.first,
                     body = goodsItem
                 )
+                val savedGoodsItem = response.payload
 
-                if (response.negative) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-
-                    onCompleted?.invoke(DataState.Empty())
+                if (response.negative || savedGoodsItem == null) {
+                    val message = response.message ?: stockItemSaveFailureMessage()
+                    postInAppNotification(message, NotificationType.Negative)
+                    DataState.Empty(message)
                 } else {
                     postInAppNotification(response.message, NotificationType.Positive)
-
-                    stockState.emit(
-                        DataState.Success(
-                            mutableListOf<GoodsItemDataModel>().also { newList ->
-                                (stockState.value.value as? DataState.Success)?.payload?.run {
-                                    newList.addAll(this)
-                                }
-
-                                newList.add(response.payload!!)
-                            }
-                        )
+                    applySavedGoodsItemToStockState(
+                        savedGoodsItem = savedGoodsItem,
+                        responseMessage = response.message
                     )
-
-                    goodsItem.storeId.takeIf { it.isNotBlank() }?.let { storeId ->
-                        getStock(storeId)
-                        refreshParentStoreStock(storeId, limit = 32, appendToSharedState = false)
-                    }
-
-                    onCompleted?.invoke(DataState.Success(response.payload!!))
+                    DataState.Success(savedGoodsItem, response.message)
                 }
+            } catch (throwable: Throwable) {
+                if (throwable is CancellationException) throw throwable
+                val message = stockItemSaveFailureMessage()
+                logNetworkAttempt("FAILED stock item add ${networkFailureSummary(throwable)}")
+                postInAppNotification(message, NotificationType.Negative)
+                DataState.Empty(message)
             }
         }
+
+        onCompleted?.invoke(completion)
+    }
 }
 
 fun deleteGoodsItem(id: String, storeId: String, onCompleted: (() -> Unit)?) {

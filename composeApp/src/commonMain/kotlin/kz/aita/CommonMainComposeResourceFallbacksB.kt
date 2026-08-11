@@ -188,7 +188,7 @@ internal fun MutableMap<Long, Map<String, String>>.putBundledLocalizedStringFall
     put(88L, mapOf("main" to "Required to edit account", "en" to "Required to edit account", "ru" to "Необходим для редактирования аккаунта", "kk" to "Есептік жазбаны өңдеу үшін қажет"))
     put(89L, mapOf("main" to "Account successfully updated", "en" to "Account successfully updated", "ru" to "Аккаунт успешно обновлен", "kk" to "Есептік жазба сәтті жаңартылды"))
     put(90L, mapOf("main" to "Logging out", "en" to "Logging out", "ru" to "Выполняется выход из аккаунта", "kk" to "Шығу орындалуда"))
-    put(91L, mapOf("main" to "Cloud session needs refresh. You remain signed in locally.", "en" to "Cloud session needs refresh. You remain signed in locally.", "ru" to "Облачный сеанс нужно обновить. Вы остаётесь в аккаунте локально.", "kk" to "Бұлттық сеансты жаңарту қажет. Сіз жергілікті түрде аккаунтта қаласыз."))
+    put(91L, mapOf("main" to "Cloud sign-in expired. Sign in again to sync. Your local data stays available.", "en" to "Cloud sign-in expired. Sign in again to sync. Your local data stays available.", "ru" to "Срок облачного входа истёк. Войдите снова для синхронизации. Локальные данные останутся доступны.", "kk" to "Бұлттық кіру мерзімі аяқталды. Синхрондау үшін қайта кіріңіз. Жергілікті деректер қолжетімді болып қалады."))
     put(92L, mapOf("main" to "Alias", "en" to "Alias", "ru" to "Дополнительное название", "kk" to "Қосымша атау"))
     put(93L, mapOf("main" to "Description", "en" to "Description", "ru" to "Описание", "kk" to "Сипаттама"))
     put(94L, mapOf("main" to "Enter alias", "en" to "Enter alias", "ru" to "Введите дополнительное название", "kk" to "Қосымша атау енгізіңіз"))

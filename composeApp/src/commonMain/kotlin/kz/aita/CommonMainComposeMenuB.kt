@@ -6373,7 +6373,7 @@ internal fun AppConfiguration.localizedNotificationMessage(message: String): Str
         return localizedStringResource(1138, "Server connected.")
     }
     if (notificationKey.isSessionRefreshPopupText()) {
-        return localizedStringResource(91, "Cloud session needs refresh. You remain signed in locally.")
+        return localizedStringResource(91, "Cloud sign-in expired. Sign in again to sync. Your local data stays available.")
     }
 
     return when (normalized) {

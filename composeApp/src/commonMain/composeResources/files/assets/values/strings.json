@@ -1918,19 +1918,19 @@
       "values": [
         {
           "language": "main",
-          "value": "Cloud session needs refresh. You remain signed in locally."
+          "value": "Cloud sign-in expired. Sign in again to sync. Your local data stays available."
         },
         {
           "language": "en",
-          "value": "Cloud session needs refresh. You remain signed in locally."
+          "value": "Cloud sign-in expired. Sign in again to sync. Your local data stays available."
         },
         {
           "language": "ru",
-          "value": "Облачный сеанс нужно обновить. Вы остаётесь в аккаунте локально."
+          "value": "Срок облачного входа истёк. Войдите снова для синхронизации. Локальные данные останутся доступны."
         },
         {
           "language": "kk",
-          "value": "Бұлттық сеансты жаңарту қажет. Сіз жергілікті түрде аккаунтта қаласыз."
+          "value": "Бұлттық кіру мерзімі аяқталды. Синхрондау үшін қайта кіріңіз. Жергілікті деректер қолжетімді болып қалады."
         }
       ]
     },

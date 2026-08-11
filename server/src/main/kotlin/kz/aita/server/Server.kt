@@ -17981,9 +17981,10 @@ fun Application.module() {
             call.genericResponseNoPayload(
               status = HttpStatusCode.Unauthorized,
               message = simpleMessage(
-                main = "Cloud session needs refresh. You remain signed in locally.",
-                ru = "Облачный сеанс нужно обновить. Вы остаётесь в аккаунте локально.",
-                kk = "Бұлттық сеансты жаңарту қажет. Сіз жергілікті түрде аккаунтта қаласыз."
+                main = "Cloud sign-in expired. Sign in again to sync. Your local data stays available.",
+                en = "Cloud sign-in expired. Sign in again to sync. Your local data stays available.",
+                ru = "Срок облачного входа истёк. Войдите снова для синхронизации. Локальные данные останутся доступны.",
+                kk = "Бұлттық кіру мерзімі аяқталды. Синхрондау үшін қайта кіріңіз. Жергілікті деректер қолжетімді болып қалады."
               )
             )
           } else {
@@ -18003,6 +18004,19 @@ fun Application.module() {
     }
 
     authenticate("auth-jwt") {
+      get("/auth/session") {
+        call.checkPrincipal() ?: return@get
+        call.genericResponseNoPayload(
+          status = HttpStatusCode.OK,
+          message = simpleMessage(
+            main = "Cloud session active",
+            en = "Cloud session active",
+            ru = "Облачный сеанс активен",
+            kk = "Бұлттық сеанс белсенді"
+          )
+        )
+      }
+
       route("/security/sessions") {
         get("/get") {
           val userId = call.checkPrincipal() ?: return@get

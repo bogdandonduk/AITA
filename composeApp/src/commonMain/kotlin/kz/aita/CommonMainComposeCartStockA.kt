@@ -3687,6 +3687,18 @@ data class StockAddEditDraft(
     val conditions: List<String> = emptyList()
 )
 
+/**
+ * Normalizes a draft only at creation/restoration boundaries.
+ *
+ * A user-created extra blank row must remain visible while editing, but an old persisted draft that
+ * contains only multiple blank rows should reopen as one clean initial barcode field.
+ */
+internal fun List<String>.normalizedInitialStockBarcodeRows(): List<String> = when {
+    isEmpty() -> listOf("")
+    all { it.isBlank() } -> listOf("")
+    else -> this
+}
+
 internal fun List<String>.alignedStockBarcodeTypes(barcodes: List<String>): List<String> {
     val targetBarcodes = barcodes.ifEmpty { listOf("") }
     return List(targetBarcodes.size.coerceAtLeast(1)) { index ->
@@ -3708,9 +3720,12 @@ internal const val STOCK_ADD_EDIT_DRAFT_SEPARATOR = "\u001E"
 internal fun String.cleanForStockAddEditDraftState(): String = replace(STOCK_ADD_EDIT_DRAFT_SEPARATOR, " ")
 
 internal fun StockAddEditDraft.toPersistentDraftStateString(): String {
+    val persistentBarcodes = barcodes.normalizedInitialStockBarcodeRows()
+    val persistentBarcodeTypes = barcodeTypes.alignedStockBarcodeTypes(persistentBarcodes)
+
     return STOCK_ADD_EDIT_DRAFT_STORAGE_PREFIX + listOf(
         id,
-        jsonBase.encodeToString(ListSerializer(String.serializer()), barcodes),
+        jsonBase.encodeToString(ListSerializer(String.serializer()), persistentBarcodes),
         jsonBase.encodeToString(ListSerializer(LocalizedStringDataModel.serializer()), name),
         jsonBase.encodeToString(ListSerializer(LocalizedStringDataModel.serializer()), description),
         measurementUnitId,
@@ -3726,7 +3741,7 @@ internal fun StockAddEditDraft.toPersistentDraftStateString(): String {
         note,
         jsonBase.encodeToString(ListSerializer(LocalizedStringDataModel.serializer()), noteLocalized),
         jsonBase.encodeToString(ListSerializer(String.serializer()), conditions),
-        jsonBase.encodeToString(ListSerializer(String.serializer()), visibleBarcodeTypes())
+        jsonBase.encodeToString(ListSerializer(String.serializer()), persistentBarcodeTypes)
     ).joinToString(STOCK_ADD_EDIT_DRAFT_SEPARATOR) { it.cleanForStockAddEditDraftState() }
 }
 
@@ -3737,7 +3752,9 @@ internal fun String.toPersistentStockAddEditDraftOrNull(): StockAddEditDraft? {
     if (values.size < 17) return null
 
     return runCatching {
-        val decodedBarcodes = jsonBase.decodeFromString(ListSerializer(String.serializer()), values[1]).ifEmpty { listOf("") }
+        val decodedBarcodes = jsonBase
+            .decodeFromString(ListSerializer(String.serializer()), values[1])
+            .normalizedInitialStockBarcodeRows()
         val decodedBarcodeTypes = values.getOrNull(17)
             ?.takeIf { it.isNotBlank() }
             ?.let { jsonBase.decodeFromString(ListSerializer(String.serializer()), it) }
@@ -3771,7 +3788,10 @@ internal fun String.toPersistentStockAddEditDraftOrNull(): StockAddEditDraft? {
 
 fun GoodsItemDataModel.toStockAddEditDraft(): StockAddEditDraft {
     val effectiveBarcodeModels = effectiveBarcodeModels()
-    val visibleBarcodeValues = effectiveBarcodeModels.toLegacyBarcodeStrings().ifEmpty { barcodes.ifEmpty { listOf("") } }
+    val visibleBarcodeValues = effectiveBarcodeModels
+        .toLegacyBarcodeStrings()
+        .ifEmpty { barcodes }
+        .normalizedInitialStockBarcodeRows()
     val visibleBarcodeTypes = effectiveBarcodeModels
         .map { it.type.normalizedGoodsItemBarcodeType(it.value) }
         .ifEmpty { visibleBarcodeValues.map { GOODS_ITEM_BARCODE_TYPE_STANDARD } }

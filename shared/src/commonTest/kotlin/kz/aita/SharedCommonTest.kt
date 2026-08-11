@@ -124,6 +124,26 @@ class SharedCommonTest {
     }
 
     @Test
+    fun onlyCloudDataEndpointsRequireAuthenticatedSessionGate() {
+        assertTrue(cloudEndpointRequiresAuthentication("auth/session"))
+        assertTrue(cloudEndpointRequiresAuthentication("stock/add"))
+        assertTrue(cloudEndpointRequiresAuthentication("notifications/add"))
+        assertFalse(cloudEndpointRequiresAuthentication("auth/ping"))
+        assertFalse(cloudEndpointRequiresAuthentication("auth/refresh"))
+        assertFalse(cloudEndpointRequiresAuthentication("config/global"))
+        assertFalse(cloudEndpointRequiresAuthentication("res/string"))
+        assertFalse(cloudEndpointRequiresAuthentication("readyz"))
+    }
+
+    @Test
+    fun expiredCloudSessionMessageIsActionableAndPreservesLocalDataMeaning() {
+        val message = cloudSessionExpiredMessage()
+        assertTrue(message.any { it.language == "en" && "Sign in again" in it.value && "local data" in it.value })
+        assertTrue(message.any { it.language == "ru" && "Войдите снова" in it.value && "Локальные данные" in it.value })
+        assertTrue(message.any { it.language == "kk" && "қайта кіріңіз" in it.value && "Жергілікті деректер" in it.value })
+    }
+
+    @Test
     fun onlyReadOnlyHttpMethodsMayFailOverAcrossAliases() {
         assertTrue(HttpMethod.Get.canRetryAcrossAitaServerAliases())
         assertTrue(HttpMethod.Head.canRetryAcrossAitaServerAliases())
