@@ -4393,10 +4393,6 @@ fun AppConfiguration.MenuSuppliersScreen() {
     val activeStoreId = stateValues.activeStoreId
     LaunchedEffect(activeStoreId) {
         getSuppliers()
-        activeStoreId?.let {
-            getSupplierOrders(it)
-            getSupplierContracts(storeId = it)
-        }
     }
 
     val suppliers by suppliersState.payload.collectAsState()
@@ -4408,13 +4404,30 @@ fun AppConfiguration.MenuSuppliersScreen() {
     var sortId by rememberSaveable { mutableStateOf("name") }
     var sortAscending by rememberSaveable { mutableStateOf(true) }
 
+    LaunchedEffect(selectedTab) {
+        if (selectedTab == "contracts") sortMenuExpanded = false
+    }
+
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         ScreenAppBarWidget(
-            title = stateValues.stringSuppliers,
-            iconPath = stateValues.drawablePathIconSuppliers,
+            title = if (selectedTab == "contracts") {
+                localizedStringResource(1479, "Supplier contracts")
+            } else {
+                stateValues.stringSuppliers
+            },
+            iconPath = if (selectedTab == "contracts") {
+                stateValues.drawablePathIconSupplierContracts
+            } else {
+                stateValues.drawablePathIconSuppliers
+            },
+            iconRes = if (selectedTab == "contracts") {
+                stateValues.drawableResIconSupplierContracts.value
+            } else {
+                stateValues.drawableResIconSuppliers.value
+            },
             trailingIcons = if (selectedTab == "contracts") emptyList() else listOf(
                 Triple(sortActionIconPath(), sortActionIconFallback()) {
                     sortMenuExpanded = !sortMenuExpanded
@@ -4433,7 +4446,7 @@ fun AppConfiguration.MenuSuppliersScreen() {
             }
         )
 
-        AnimatedVisibility(visible = sortMenuExpanded) {
+        AnimatedVisibility(visible = sortMenuExpanded && selectedTab != "contracts") {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -4487,22 +4500,34 @@ fun AppConfiguration.MenuSuppliersScreen() {
                 .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField),
             verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
         ) {
-            TransactionPlainTextField(
-                title = "",
-                value = search,
-                placeholder = stateValues.stringSearchByAnyData,
-                leadingIconPath = stateValues.drawablePathIconSearch,
-                stateHost = NavigationScreenModel.Menu.Suppliers,
-                stateKey = "menu_suppliers_search",
-                onValueChange = { search = it }
-            )
+            if (selectedTab != "contracts") {
+                TransactionPlainTextField(
+                    title = "",
+                    value = search,
+                    placeholder = stateValues.stringSearchByAnyData,
+                    leadingIconPath = stateValues.drawablePathIconSearch,
+                    stateHost = NavigationScreenModel.Menu.Suppliers,
+                    stateKey = "menu_suppliers_search",
+                    onValueChange = { search = it }
+                )
+            }
+
+            val cleanActiveStoreId = activeStoreId.orEmpty().trim()
+            val activeStoreContractCount = if (cleanActiveStoreId.isBlank()) {
+                0
+            } else {
+                supplierContracts.orEmpty().count { contract ->
+                    contract.isActive &&
+                            contract.storeId.trim().equals(cleanActiveStoreId, ignoreCase = true)
+                }
+            }
 
             tabRowWidget(
                 modifier = Modifier.fillMaxWidth(),
                 tabs = listOf(
                     TabContent("mine", tabLabelWithCount(localizedStringResource(629, "My suppliers"), mineSuppliers.count { supplierMatchesSearch(it) })) { selectedTab = it },
                     TabContent("generic", tabLabelWithCount(localizedStringResource(628, "Generic suppliers"), genericSuppliers.count { supplierMatchesSearch(it) })) { selectedTab = it },
-                    TabContent("contracts", tabLabelWithCount(localizedStringResource(1479, "Supplier contracts"), supplierContracts.orEmpty().count { it.isActive && (activeStoreId.isNullOrBlank() || it.storeId == activeStoreId) })) { selectedTab = it }
+                    TabContent("contracts", tabLabelWithCount(localizedStringResource(1479, "Supplier contracts"), activeStoreContractCount)) { selectedTab = it }
                 ),
                 selectedIndexInitial = selectedTab
             )
@@ -5223,7 +5248,7 @@ internal fun AppConfiguration.canOpenMenuDestination(model: NavigationScreenMode
     val activeStoreId = stateValues.activeStoreId
     val activeOwnerFallback = currentUserOwnsActiveStoreForUi()
     return when (model) {
-        NavigationScreenModel.Menu.AppMode -> false
+        NavigationScreenModel.Menu.AppMode -> true
         NavigationScreenModel.Menu.TransactionHistory -> activeOwnerFallback || currentUserCanViewTransactionHistory(activeStoreId)
         NavigationScreenModel.Menu.OperationLogs -> activeOwnerFallback || currentUserCanViewLogs(activeStoreId)
         NavigationScreenModel.Menu.Analytics -> activeOwnerFallback || currentUserCanViewAnalytics(activeStoreId)
@@ -5438,14 +5463,29 @@ internal fun AppConfiguration.ActiveWorkshiftMenuTile(workshift: WorkshiftDataMo
 @Composable
 internal fun AppConfiguration.SupplierWorkspaceMenuTile() {
     val destinations = (Navigation.bottomNavBarScreensSupplier.filterNot { it is NavigationScreenModel.Menu } +
-            NavigationScreenModel.Supplier.Analytics.Main)
+            listOf(
+                NavigationScreenModel.Supplier.Analytics.Main,
+                NavigationScreenModel.Supplier.Identity.Main
+            ))
         .distinctBy { it.route }
     val currentRoute = stateValues.navigationScreensMain.last().route
     val manufacturerMode = stateValues.appModeId == APP_MODE_MANUFACTURER
     val orders by supplierOrdersState.payload.collectAsState()
     val lines by supplierOrderLinesState.payload.collectAsState()
+    val supplierPrices by supplierGoodsPricesState.payload.collectAsState()
+    val supplierContracts by supplierPartnershipContractsState.payload.collectAsState()
     val supplierDashboard by supplierModeDashboardState.payload.collectAsState()
+    val activeSupplierProfileId by activeSupplierProfileIdState.collectAsState()
     val coroutineScope = rememberCoroutineScope()
+    val localProfiles = stateValues.suppliers.orEmpty()
+        .supplierProfilesOwnedBy(stateValues.userAccount?.id)
+    val focusedSupplierId = resolveSupplierProfileFocus(activeSupplierProfileId, localProfiles)
+    val identityPresentation = buildSupplierIdentityPresentation(
+        localProfiles = localProfiles,
+        dashboard = supplierDashboard,
+        activeSupplierId = focusedSupplierId,
+        localProfilesLoaded = stateValues.suppliers != null
+    )
 
     LaunchedEffect(stateValues.userAccount?.id, stateValues.appModeId) {
         if (stateValues.userAccount != null && (stateValues.appModeId == APP_MODE_SUPPLIER || stateValues.appModeId == APP_MODE_MANUFACTURER)) {
@@ -5453,29 +5493,104 @@ internal fun AppConfiguration.SupplierWorkspaceMenuTile() {
         }
     }
 
-    val activeOrders = remember(orders) { orders.orEmpty().filter { it.isActive && it.status != SupplierOrderStatusDataModel.Draft } }
+    val activeOrders = remember(orders, focusedSupplierId) {
+        orders.orEmpty()
+            .supplierOrdersForIdentity(focusedSupplierId)
+            .filter { order ->
+                order.isActive && order.status != SupplierOrderStatusDataModel.Draft
+            }
+    }
     val activeLines = remember(lines, activeOrders) {
         val activeOrderIds = activeOrders.map { it.id }.toSet()
         lines.orEmpty().filter { line -> line.isActive && line.orderId in activeOrderIds }
     }
-    val fallbackOpenOrdersCount = remember(activeOrders) { activeOrders.count { !it.status.isSupplierOrderClosed() } }
-    val fallbackPartnerCount = remember(activeOrders, stateValues.appLanguage) {
-        activeOrders.map { it.storeId.ifBlank { supplierDeskStoreTitle(it) } }.filter { it.isNotBlank() }.distinct().size
+    val activePrices = remember(supplierPrices, focusedSupplierId) {
+        supplierPrices.orEmpty()
+            .supplierPricesForIdentity(focusedSupplierId)
+            .normalizedSupplierGoodsPriceBook()
     }
-    val fallbackCatalogSkuCount = remember(activeLines) {
-        activeLines.map { line ->
-            line.goodsItemId.ifBlank { line.goodsItemBarcodeSnapshots.firstOrNull().orEmpty() }
-        }.filter { it.isNotBlank() }.distinct().size
+    val activeContracts = remember(supplierContracts, focusedSupplierId) {
+        supplierContracts.orEmpty()
+            .supplierContractsForIdentity(focusedSupplierId)
+            .filter { it.isActive }
     }
-    val openOrdersCount = supplierDashboard?.openOrderCount ?: fallbackOpenOrdersCount
-    val partnerCount = supplierDashboard?.partnerCount ?: fallbackPartnerCount
-    val catalogSkuCount = supplierDashboard?.catalogSkuCount ?: fallbackCatalogSkuCount
-    val supplierProfileCount = supplierDashboard?.supplierIds?.size
-        ?: stateValues.suppliers.orEmpty().supplierProfilesOwnedBy(stateValues.userAccount?.id).size
-    val actionQueueCount = supplierDashboard?.actionQueue?.size ?: activeOrders.count {
-        it.status == SupplierOrderStatusDataModel.Sent ||
-                it.status == SupplierOrderStatusDataModel.SeenBySupplier ||
-                it.status == SupplierOrderStatusDataModel.IssueReported
+    val linesByOrder = remember(activeLines) { activeLines.groupBy { it.orderId } }
+    val fallbackOpenOrdersCount = remember(activeOrders) {
+        activeOrders.count { !it.status.isClosedForSupplierDesk() }
+    }
+    val fallbackActionQueueCount = remember(activeOrders, linesByOrder) {
+        activeOrders.count { order ->
+            order.needsSupplierActionForSupplierDesk(linesByOrder[order.id].orEmpty())
+        }
+    }
+    val fallbackPartnerCount = remember(
+        activeOrders,
+        activeLines,
+        activePrices,
+        activeContracts,
+        stateValues.suppliers,
+        stateValues.stores,
+        stateValues.appLanguage
+    ) {
+        buildSupplierPartnerItems(
+            orders = activeOrders,
+            lines = activeLines,
+            supplierPrices = activePrices,
+            contracts = activeContracts,
+            dashboard = null
+        ).size
+    }
+    val fallbackCatalogSkuCount = remember(activeLines, activePrices, activeContracts) {
+        buildSet {
+            activeLines.forEach { line ->
+                line.goodsItemId.trim().lowercase().takeIf { it.isNotBlank() }?.let(::add)
+                line.substituteGoodsItemId
+                    ?.trim()
+                    ?.lowercase()
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let(::add)
+            }
+            activePrices.forEach { price ->
+                price.goodsItemId.trim().lowercase().takeIf { it.isNotBlank() }?.let(::add)
+            }
+            activeContracts.forEach { contract ->
+                contract.goodsItemIds
+                    .map { it.trim().lowercase() }
+                    .filter { it.isNotBlank() }
+                    .forEach(::add)
+                contract.priceTerms
+                    .map { it.goodsItemId.trim().lowercase() }
+                    .filter { it.isNotBlank() }
+                    .forEach(::add)
+            }
+        }.size
+    }
+    val openOrdersCount = if (orders != null) {
+        fallbackOpenOrdersCount
+    } else {
+        supplierDashboard?.openOrderCount ?: 0
+    }
+    val actionQueueCount = if (orders != null && lines != null) {
+        fallbackActionQueueCount
+    } else {
+        supplierDashboard?.actionRequiredOrderCount ?: fallbackActionQueueCount
+    }
+    val partnerDetailsLoaded = orders != null && supplierPrices != null && supplierContracts != null
+    val partnerCount = if (partnerDetailsLoaded) {
+        fallbackPartnerCount
+    } else {
+        supplierDashboard?.partnerCount ?: fallbackPartnerCount
+    }
+    val catalogDetailsLoaded = lines != null && supplierPrices != null && supplierContracts != null
+    val catalogSkuCount = if (catalogDetailsLoaded) {
+        fallbackCatalogSkuCount
+    } else {
+        supplierDashboard?.catalogSkuCount ?: fallbackCatalogSkuCount
+    }
+    val supplierProfileCount = if (focusedSupplierId.isNullOrBlank()) {
+        identityPresentation.profileCount
+    } else {
+        identityPresentation.profileCount.coerceAtMost(1)
     }
     val priceCoveragePercent = supplierDashboard?.readiness?.priceBookCoveragePercent
     val manufacturerBridgeCount = supplierDashboard?.manufacturerBridge?.size ?: 0
@@ -5525,6 +5640,22 @@ internal fun AppConfiguration.SupplierWorkspaceMenuTile() {
             }
         }
 
+        if (identityPresentation.profileCount > 1) {
+            SupplierIdentityFocusSelector(
+                presentation = identityPresentation,
+                onIdentitySelected = { supplierId ->
+                    coroutineScope.launch {
+                        setActiveSupplierProfileId(supplierId)
+                        postInAppNotification(
+                            localizedStringResource(2489, "Supplier identity changed"),
+                            NotificationType.Positive,
+                            transient = true
+                        )
+                    }
+                }
+            )
+        }
+
         val workspaceMetrics = listOf(
             Triple(
                 localizedStringResource(1619, "Supplier profiles"),
@@ -5557,7 +5688,7 @@ internal fun AppConfiguration.SupplierWorkspaceMenuTile() {
                 stateValues.drawablePathIconSupplierCatalog to stateValues.drawableResIconSupplierCatalog.value
             ),
             Triple(
-                localizedStringResource(1339, "Customers"),
+                localizedStringResource(1453, "Partner stores"),
                 partnerCount.toString(),
                 stateValues.drawablePathIconSupplierPartners to stateValues.drawableResIconSupplierPartners.value
             )
@@ -6081,4 +6212,3 @@ internal fun securitySessionDateTimeText(millis: Long): String {
         "${dt.dayOfMonth.toString().padStart(2, '0')}.${dt.monthNumber.toString().padStart(2, '0')}.${dt.year} ${dt.hour.toString().padStart(2, '0')}:${dt.minute.toString().padStart(2, '0')}"
     }.getOrElse { millis.toString() }
 }
-

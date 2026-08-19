@@ -26635,19 +26635,19 @@
       "values": [
         {
           "language": "main",
-          "value": "Store reliability scorecards"
+          "value": "Partner store overview"
         },
         {
           "language": "en",
-          "value": "Store reliability scorecards"
+          "value": "Partner store overview"
         },
         {
           "language": "ru",
-          "value": "Карточки надёжности магазинов"
+          "value": "Обзор магазинов-партнёров"
         },
         {
           "language": "kk",
-          "value": "Дүкен сенімділігі карталары"
+          "value": "Серіктес дүкендер шолуы"
         }
       ]
     },
@@ -26656,19 +26656,19 @@
       "values": [
         {
           "language": "main",
-          "value": "Know which stores pay on time, order predictably and need extra confirmation before dispatch."
+          "value": "See exact orders, deliveries, contracts and saved offers for every partner store."
         },
         {
           "language": "en",
-          "value": "Know which stores pay on time, order predictably and need extra confirmation before dispatch."
+          "value": "See exact orders, deliveries, contracts and saved offers for every partner store."
         },
         {
           "language": "ru",
-          "value": "Знайте, какие магазины платят вовремя, заказывают предсказуемо и требуют доподтверждения перед отгрузкой."
+          "value": "Смотрите точные данные о заказах, доставках, договорах и сохранённых предложениях для каждого магазина-партнёра."
         },
         {
           "language": "kk",
-          "value": "Қай дүкен уақытында төлейтінін, тұрақты тапсырыс беретінін және жөнелтуден бұрын қосымша растау керек екенін біліңіз."
+          "value": "Әр серіктес дүкен бойынша тапсырыстарды, жеткізулерді, келісімшарттарды және сақталған ұсыныстарды нақты көріңіз."
         }
       ]
     },
@@ -29302,19 +29302,19 @@
       "values": [
         {
           "language": "main",
-          "value": "Store reliability scorecards"
+          "value": "Partner store overview"
         },
         {
           "language": "en",
-          "value": "Store reliability scorecards"
+          "value": "Partner store overview"
         },
         {
           "language": "ru",
-          "value": "Карточки надёжности магазинов"
+          "value": "Обзор магазинов-партнёров"
         },
         {
           "language": "kk",
-          "value": "Дүкен сенімділігі карталары"
+          "value": "Серіктес дүкендер шолуы"
         }
       ]
     },
@@ -34775,6 +34775,3597 @@
         {
           "language": "kk",
           "value": "Ел өзгерді. Мекенжайды қайта таңдаңыз."
+        }
+      ]
+    },
+    {
+      "id": 2312,
+      "values": [
+        {
+          "language": "main",
+          "value": "Products"
+        },
+        {
+          "language": "en",
+          "value": "Products"
+        },
+        {
+          "language": "ru",
+          "value": "Товары"
+        },
+        {
+          "language": "kk",
+          "value": "Тауарлар"
+        }
+      ]
+    },
+    {
+      "id": 2313,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open demand"
+        },
+        {
+          "language": "en",
+          "value": "Open demand"
+        },
+        {
+          "language": "ru",
+          "value": "Открытый спрос"
+        },
+        {
+          "language": "kk",
+          "value": "Ашық сұраныс"
+        }
+      ]
+    },
+    {
+      "id": 2315,
+      "values": [
+        {
+          "language": "main",
+          "value": "Saved offers"
+        },
+        {
+          "language": "en",
+          "value": "Saved offers"
+        },
+        {
+          "language": "ru",
+          "value": "Сохранённые предложения"
+        },
+        {
+          "language": "kk",
+          "value": "Сақталған ұсыныстар"
+        }
+      ]
+    },
+    {
+      "id": 2316,
+      "values": [
+        {
+          "language": "main",
+          "value": "All products"
+        },
+        {
+          "language": "en",
+          "value": "All products"
+        },
+        {
+          "language": "ru",
+          "value": "Все товары"
+        },
+        {
+          "language": "kk",
+          "value": "Барлық тауарлар"
+        }
+      ]
+    },
+    {
+      "id": 2317,
+      "values": [
+        {
+          "language": "main",
+          "value": "Needs a price"
+        },
+        {
+          "language": "en",
+          "value": "Needs a price"
+        },
+        {
+          "language": "ru",
+          "value": "Нужна цена"
+        },
+        {
+          "language": "kk",
+          "value": "Баға қажет"
+        }
+      ]
+    },
+    {
+      "id": 2318,
+      "values": [
+        {
+          "language": "main",
+          "value": "Needs a reply"
+        },
+        {
+          "language": "en",
+          "value": "Needs a reply"
+        },
+        {
+          "language": "ru",
+          "value": "Нужен ответ"
+        },
+        {
+          "language": "kk",
+          "value": "Жауап қажет"
+        }
+      ]
+    },
+    {
+      "id": 2319,
+      "values": [
+        {
+          "language": "main",
+          "value": "Price book"
+        },
+        {
+          "language": "en",
+          "value": "Price book"
+        },
+        {
+          "language": "ru",
+          "value": "Прайс-лист"
+        },
+        {
+          "language": "kk",
+          "value": "Баға тізімі"
+        }
+      ]
+    },
+    {
+      "id": 2320,
+      "values": [
+        {
+          "language": "main",
+          "value": "Sort products"
+        },
+        {
+          "language": "en",
+          "value": "Sort products"
+        },
+        {
+          "language": "ru",
+          "value": "Сортировать товары"
+        },
+        {
+          "language": "kk",
+          "value": "Тауарларды сұрыптау"
+        }
+      ]
+    },
+    {
+      "id": 2321,
+      "values": [
+        {
+          "language": "main",
+          "value": "Action first"
+        },
+        {
+          "language": "en",
+          "value": "Action first"
+        },
+        {
+          "language": "ru",
+          "value": "Сначала требующие действий"
+        },
+        {
+          "language": "kk",
+          "value": "Алдымен әрекет қажеттері"
+        }
+      ]
+    },
+    {
+      "id": 2322,
+      "values": [
+        {
+          "language": "main",
+          "value": "Most recent"
+        },
+        {
+          "language": "en",
+          "value": "Most recent"
+        },
+        {
+          "language": "ru",
+          "value": "Сначала новые"
+        },
+        {
+          "language": "kk",
+          "value": "Алдымен жаңалары"
+        }
+      ]
+    },
+    {
+      "id": 2323,
+      "values": [
+        {
+          "language": "main",
+          "value": "Name A–Z"
+        },
+        {
+          "language": "en",
+          "value": "Name A–Z"
+        },
+        {
+          "language": "ru",
+          "value": "По названию А–Я"
+        },
+        {
+          "language": "kk",
+          "value": "Атауы бойынша А–Я"
+        }
+      ]
+    },
+    {
+      "id": 2325,
+      "values": [
+        {
+          "language": "main",
+          "value": "Store offers"
+        },
+        {
+          "language": "en",
+          "value": "Store offers"
+        },
+        {
+          "language": "ru",
+          "value": "Предложения для магазинов"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкендерге арналған ұсыныстар"
+        }
+      ]
+    },
+    {
+      "id": 2326,
+      "values": [
+        {
+          "language": "main",
+          "value": "Set a separate price and order terms for each store."
+        },
+        {
+          "language": "en",
+          "value": "Set a separate price and order terms for each store."
+        },
+        {
+          "language": "ru",
+          "value": "Укажите отдельную цену и условия заказа для каждого магазина."
+        },
+        {
+          "language": "kk",
+          "value": "Әр дүкенге бөлек баға мен тапсырыс шарттарын көрсетіңіз."
+        }
+      ]
+    },
+    {
+      "id": 2327,
+      "values": [
+        {
+          "language": "main",
+          "value": "Your product name"
+        },
+        {
+          "language": "en",
+          "value": "Your product name"
+        },
+        {
+          "language": "ru",
+          "value": "Ваше название товара"
+        },
+        {
+          "language": "kk",
+          "value": "Сіздегі тауар атауы"
+        }
+      ]
+    },
+    {
+      "id": 2328,
+      "values": [
+        {
+          "language": "main",
+          "value": "Your barcode"
+        },
+        {
+          "language": "en",
+          "value": "Your barcode"
+        },
+        {
+          "language": "ru",
+          "value": "Ваш штрихкод"
+        },
+        {
+          "language": "kk",
+          "value": "Сіздің штрихкодыңыз"
+        }
+      ]
+    },
+    {
+      "id": 2329,
+      "values": [
+        {
+          "language": "main",
+          "value": "No changes to save"
+        },
+        {
+          "language": "en",
+          "value": "No changes to save"
+        },
+        {
+          "language": "ru",
+          "value": "Нет изменений для сохранения"
+        },
+        {
+          "language": "kk",
+          "value": "Сақтайтын өзгеріс жоқ"
+        }
+      ]
+    },
+    {
+      "id": 2330,
+      "values": [
+        {
+          "language": "main",
+          "value": "Offer saved for this store"
+        },
+        {
+          "language": "en",
+          "value": "Offer saved for this store"
+        },
+        {
+          "language": "ru",
+          "value": "Предложение для этого магазина сохранено"
+        },
+        {
+          "language": "kk",
+          "value": "Осы дүкенге арналған ұсыныс сақталды"
+        }
+      ]
+    },
+    {
+      "id": 2331,
+      "values": [
+        {
+          "language": "main",
+          "value": "Could not save this offer"
+        },
+        {
+          "language": "en",
+          "value": "Could not save this offer"
+        },
+        {
+          "language": "ru",
+          "value": "Не удалось сохранить предложение"
+        },
+        {
+          "language": "kk",
+          "value": "Ұсынысты сақтау мүмкін болмады"
+        }
+      ]
+    },
+    {
+      "id": 2332,
+      "values": [
+        {
+          "language": "main",
+          "value": "This product has no valid store link yet"
+        },
+        {
+          "language": "en",
+          "value": "This product has no valid store link yet"
+        },
+        {
+          "language": "ru",
+          "value": "У этого товара пока нет действующей связи с магазином"
+        },
+        {
+          "language": "kk",
+          "value": "Бұл тауардың дүкенмен жарамды байланысы әзірге жоқ"
+        }
+      ]
+    },
+    {
+      "id": 2333,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open store orders"
+        },
+        {
+          "language": "en",
+          "value": "Open store orders"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть заказы магазинов"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен тапсырыстарын ашу"
+        }
+      ]
+    },
+    {
+      "id": 2334,
+      "values": [
+        {
+          "language": "main",
+          "value": "Copy product brief"
+        },
+        {
+          "language": "en",
+          "value": "Copy product brief"
+        },
+        {
+          "language": "ru",
+          "value": "Скопировать сводку по товару"
+        },
+        {
+          "language": "kk",
+          "value": "Тауар қорытындысын көшіру"
+        }
+      ]
+    },
+    {
+      "id": 2335,
+      "values": [
+        {
+          "language": "main",
+          "value": "Stores"
+        },
+        {
+          "language": "en",
+          "value": "Stores"
+        },
+        {
+          "language": "ru",
+          "value": "Магазины"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкендер"
+        }
+      ]
+    },
+    {
+      "id": 2336,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open requests"
+        },
+        {
+          "language": "en",
+          "value": "Open requests"
+        },
+        {
+          "language": "ru",
+          "value": "Открытые запросы"
+        },
+        {
+          "language": "kk",
+          "value": "Ашық сұраулар"
+        }
+      ]
+    },
+    {
+      "id": 2337,
+      "values": [
+        {
+          "language": "main",
+          "value": "Price missing"
+        },
+        {
+          "language": "en",
+          "value": "Price missing"
+        },
+        {
+          "language": "ru",
+          "value": "Цена не указана"
+        },
+        {
+          "language": "kk",
+          "value": "Баға көрсетілмеген"
+        }
+      ]
+    },
+    {
+      "id": 2338,
+      "values": [
+        {
+          "language": "main",
+          "value": "Offer ready"
+        },
+        {
+          "language": "en",
+          "value": "Offer ready"
+        },
+        {
+          "language": "ru",
+          "value": "Предложение готово"
+        },
+        {
+          "language": "kk",
+          "value": "Ұсыныс дайын"
+        }
+      ]
+    },
+    {
+      "id": 2343,
+      "values": [
+        {
+          "language": "main",
+          "value": "Results"
+        },
+        {
+          "language": "en",
+          "value": "Results"
+        },
+        {
+          "language": "ru",
+          "value": "Результаты"
+        },
+        {
+          "language": "kk",
+          "value": "Нәтижелер"
+        }
+      ]
+    },
+    {
+      "id": 2344,
+      "values": [
+        {
+          "language": "main",
+          "value": "Clear filters"
+        },
+        {
+          "language": "en",
+          "value": "Clear filters"
+        },
+        {
+          "language": "ru",
+          "value": "Сбросить фильтры"
+        },
+        {
+          "language": "kk",
+          "value": "Сүзгілерді тазалау"
+        }
+      ]
+    },
+    {
+      "id": 2346,
+      "values": [
+        {
+          "language": "main",
+          "value": "Expected by store"
+        },
+        {
+          "language": "en",
+          "value": "Expected by store"
+        },
+        {
+          "language": "ru",
+          "value": "Ожидаемая цена магазина"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен күткен баға"
+        }
+      ]
+    },
+    {
+      "id": 2347,
+      "values": [
+        {
+          "language": "main",
+          "value": "Last activity"
+        },
+        {
+          "language": "en",
+          "value": "Last activity"
+        },
+        {
+          "language": "ru",
+          "value": "Последняя активность"
+        },
+        {
+          "language": "kk",
+          "value": "Соңғы белсенділік"
+        }
+      ]
+    },
+    {
+      "id": 2350,
+      "values": [
+        {
+          "language": "main",
+          "value": "Minimum order and package size must be positive"
+        },
+        {
+          "language": "en",
+          "value": "Minimum order and package size must be positive"
+        },
+        {
+          "language": "ru",
+          "value": "Минимальный заказ и размер упаковки должны быть больше нуля"
+        },
+        {
+          "language": "kk",
+          "value": "Ең аз тапсырыс пен қаптама мөлшері нөлден жоғары болуы керек"
+        }
+      ]
+    },
+    {
+      "id": 2351,
+      "values": [
+        {
+          "language": "main",
+          "value": "Collapse"
+        },
+        {
+          "language": "en",
+          "value": "Collapse"
+        },
+        {
+          "language": "ru",
+          "value": "Свернуть"
+        },
+        {
+          "language": "kk",
+          "value": "Жию"
+        }
+      ]
+    },
+    {
+      "id": 2352,
+      "values": [
+        {
+          "language": "main",
+          "value": "Save offer"
+        },
+        {
+          "language": "en",
+          "value": "Save offer"
+        },
+        {
+          "language": "ru",
+          "value": "Сохранить предложение"
+        },
+        {
+          "language": "kk",
+          "value": "Ұсынысты сақтау"
+        }
+      ]
+    },
+    {
+      "id": 2358,
+      "values": [
+        {
+          "language": "main",
+          "value": "In progress"
+        },
+        {
+          "language": "en",
+          "value": "In progress"
+        },
+        {
+          "language": "ru",
+          "value": "В работе"
+        },
+        {
+          "language": "kk",
+          "value": "Орындалуда"
+        }
+      ]
+    },
+    {
+      "id": 2360,
+      "values": [
+        {
+          "language": "main",
+          "value": "Saved offers"
+        },
+        {
+          "language": "en",
+          "value": "Saved offers"
+        },
+        {
+          "language": "ru",
+          "value": "Сохранённые предложения"
+        },
+        {
+          "language": "kk",
+          "value": "Сақталған ұсыныстар"
+        }
+      ]
+    },
+    {
+      "id": 2364,
+      "values": [
+        {
+          "language": "main",
+          "value": "Needs a reply"
+        },
+        {
+          "language": "en",
+          "value": "Needs a reply"
+        },
+        {
+          "language": "ru",
+          "value": "Нужен ответ"
+        },
+        {
+          "language": "kk",
+          "value": "Жауап қажет"
+        }
+      ]
+    },
+    {
+      "id": 2366,
+      "values": [
+        {
+          "language": "main",
+          "value": "Sort partners"
+        },
+        {
+          "language": "en",
+          "value": "Sort partners"
+        },
+        {
+          "language": "ru",
+          "value": "Сортировка партнёров"
+        },
+        {
+          "language": "kk",
+          "value": "Серіктестерді сұрыптау"
+        }
+      ]
+    },
+    {
+      "id": 2367,
+      "values": [
+        {
+          "language": "main",
+          "value": "Action first"
+        },
+        {
+          "language": "en",
+          "value": "Action first"
+        },
+        {
+          "language": "ru",
+          "value": "Сначала требующие действий"
+        },
+        {
+          "language": "kk",
+          "value": "Алдымен әрекет қажеттері"
+        }
+      ]
+    },
+    {
+      "id": 2368,
+      "values": [
+        {
+          "language": "main",
+          "value": "Most recent"
+        },
+        {
+          "language": "en",
+          "value": "Most recent"
+        },
+        {
+          "language": "ru",
+          "value": "Сначала недавние"
+        },
+        {
+          "language": "kk",
+          "value": "Алдымен соңғылары"
+        }
+      ]
+    },
+    {
+      "id": 2369,
+      "values": [
+        {
+          "language": "main",
+          "value": "Most orders"
+        },
+        {
+          "language": "en",
+          "value": "Most orders"
+        },
+        {
+          "language": "ru",
+          "value": "Больше всего заказов"
+        },
+        {
+          "language": "kk",
+          "value": "Тапсырысы көбі"
+        }
+      ]
+    },
+    {
+      "id": 2370,
+      "values": [
+        {
+          "language": "main",
+          "value": "Name A–Z"
+        },
+        {
+          "language": "en",
+          "value": "Name A–Z"
+        },
+        {
+          "language": "ru",
+          "value": "По имени А–Я"
+        },
+        {
+          "language": "kk",
+          "value": "Атау бойынша А–Я"
+        }
+      ]
+    },
+    {
+      "id": 2371,
+      "values": [
+        {
+          "language": "main",
+          "value": "All partners"
+        },
+        {
+          "language": "en",
+          "value": "All partners"
+        },
+        {
+          "language": "ru",
+          "value": "Все партнёры"
+        },
+        {
+          "language": "kk",
+          "value": "Барлық серіктестер"
+        }
+      ]
+    },
+    {
+      "id": 2373,
+      "values": [
+        {
+          "language": "main",
+          "value": "With contracts"
+        },
+        {
+          "language": "en",
+          "value": "With contracts"
+        },
+        {
+          "language": "ru",
+          "value": "С договорами"
+        },
+        {
+          "language": "kk",
+          "value": "Келісімшарттары бар"
+        }
+      ]
+    },
+    {
+      "id": 2374,
+      "values": [
+        {
+          "language": "main",
+          "value": "Without complete offers"
+        },
+        {
+          "language": "en",
+          "value": "Without complete offers"
+        },
+        {
+          "language": "ru",
+          "value": "Без готовых предложений"
+        },
+        {
+          "language": "kk",
+          "value": "Толық ұсынысы жоқ"
+        }
+      ]
+    },
+    {
+      "id": 2375,
+      "values": [
+        {
+          "language": "main",
+          "value": "Partner overview"
+        },
+        {
+          "language": "en",
+          "value": "Partner overview"
+        },
+        {
+          "language": "ru",
+          "value": "Обзор партнёра"
+        },
+        {
+          "language": "kk",
+          "value": "Серіктес шолуы"
+        }
+      ]
+    },
+    {
+      "id": 2376,
+      "values": [
+        {
+          "language": "main",
+          "value": "Commercial relationship"
+        },
+        {
+          "language": "en",
+          "value": "Commercial relationship"
+        },
+        {
+          "language": "ru",
+          "value": "Коммерческие условия"
+        },
+        {
+          "language": "kk",
+          "value": "Коммерциялық қатынас"
+        }
+      ]
+    },
+    {
+      "id": 2377,
+      "values": [
+        {
+          "language": "main",
+          "value": "Order activity"
+        },
+        {
+          "language": "en",
+          "value": "Order activity"
+        },
+        {
+          "language": "ru",
+          "value": "Активность заказов"
+        },
+        {
+          "language": "kk",
+          "value": "Тапсырыстар белсенділігі"
+        }
+      ]
+    },
+    {
+      "id": 2379,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open in catalog"
+        },
+        {
+          "language": "en",
+          "value": "Open in catalog"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть в каталоге"
+        },
+        {
+          "language": "kk",
+          "value": "Каталогта ашу"
+        }
+      ]
+    },
+    {
+      "id": 2380,
+      "values": [
+        {
+          "language": "main",
+          "value": "Review contracts"
+        },
+        {
+          "language": "en",
+          "value": "Review contracts"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть договоры"
+        },
+        {
+          "language": "kk",
+          "value": "Келісімшарттарды ашу"
+        }
+      ]
+    },
+    {
+      "id": 2381,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open dispatch"
+        },
+        {
+          "language": "en",
+          "value": "Open dispatch"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть доставку"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуді ашу"
+        }
+      ]
+    },
+    {
+      "id": 2382,
+      "values": [
+        {
+          "language": "main",
+          "value": "No open work"
+        },
+        {
+          "language": "en",
+          "value": "No open work"
+        },
+        {
+          "language": "ru",
+          "value": "Нет открытых задач"
+        },
+        {
+          "language": "kk",
+          "value": "Ашық жұмыс жоқ"
+        }
+      ]
+    },
+    {
+      "id": 2384,
+      "values": [
+        {
+          "language": "main",
+          "value": "No contract yet"
+        },
+        {
+          "language": "en",
+          "value": "No contract yet"
+        },
+        {
+          "language": "ru",
+          "value": "Договора пока нет"
+        },
+        {
+          "language": "kk",
+          "value": "Әзірге келісімшарт жоқ"
+        }
+      ]
+    },
+    {
+      "id": 2386,
+      "values": [
+        {
+          "language": "main",
+          "value": "Store relationship copied"
+        },
+        {
+          "language": "en",
+          "value": "Store relationship copied"
+        },
+        {
+          "language": "ru",
+          "value": "Сводка по магазину скопирована"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен байланысы көшірілді"
+        }
+      ]
+    },
+    {
+      "id": 2387,
+      "values": [
+        {
+          "language": "main",
+          "value": "No partner matches these filters"
+        },
+        {
+          "language": "en",
+          "value": "No partner matches these filters"
+        },
+        {
+          "language": "ru",
+          "value": "Нет партнёров с такими фильтрами"
+        },
+        {
+          "language": "kk",
+          "value": "Бұл сүзгілерге сай серіктес жоқ"
+        }
+      ]
+    },
+    {
+      "id": 2388,
+      "values": [
+        {
+          "language": "main",
+          "value": "No store partners yet"
+        },
+        {
+          "language": "en",
+          "value": "No store partners yet"
+        },
+        {
+          "language": "ru",
+          "value": "Пока нет магазинов-партнёров"
+        },
+        {
+          "language": "kk",
+          "value": "Әзірге серіктес дүкендер жоқ"
+        }
+      ]
+    },
+    {
+      "id": 2389,
+      "values": [
+        {
+          "language": "main",
+          "value": "A store appears here after an order, saved offer, or contract connects it to one of your supplier profiles."
+        },
+        {
+          "language": "en",
+          "value": "A store appears here after an order, saved offer, or contract connects it to one of your supplier profiles."
+        },
+        {
+          "language": "ru",
+          "value": "Магазин появится здесь, когда заказ, сохранённое предложение или договор свяжет его с одним из ваших профилей поставщика."
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен тапсырыс, сақталған ұсыныс немесе келісімшарт арқылы жеткізуші профильдеріңіздің бірімен байланысқаннан кейін осында көрінеді."
+        }
+      ]
+    },
+    {
+      "id": 2390,
+      "values": [
+        {
+          "language": "main",
+          "value": "No recent orders"
+        },
+        {
+          "language": "en",
+          "value": "No recent orders"
+        },
+        {
+          "language": "ru",
+          "value": "Недавних заказов нет"
+        },
+        {
+          "language": "kk",
+          "value": "Соңғы тапсырыстар жоқ"
+        }
+      ]
+    },
+    {
+      "id": 2391,
+      "values": [
+        {
+          "language": "main",
+          "value": "No saved offers yet"
+        },
+        {
+          "language": "en",
+          "value": "No saved offers yet"
+        },
+        {
+          "language": "ru",
+          "value": "Сохранённых предложений пока нет"
+        },
+        {
+          "language": "kk",
+          "value": "Әзірге сақталған ұсыныстар жоқ"
+        }
+      ]
+    },
+    {
+      "id": 2392,
+      "values": [
+        {
+          "language": "main",
+          "value": "Store partner"
+        },
+        {
+          "language": "en",
+          "value": "Store partner"
+        },
+        {
+          "language": "ru",
+          "value": "Магазин-партнёр"
+        },
+        {
+          "language": "kk",
+          "value": "Серіктес дүкен"
+        }
+      ]
+    },
+    {
+      "id": 2393,
+      "values": [
+        {
+          "language": "main",
+          "value": "Connected products"
+        },
+        {
+          "language": "en",
+          "value": "Connected products"
+        },
+        {
+          "language": "ru",
+          "value": "Связанные товары"
+        },
+        {
+          "language": "kk",
+          "value": "Байланысты тауарлар"
+        }
+      ]
+    },
+    {
+      "id": 2394,
+      "values": [
+        {
+          "language": "main",
+          "value": "Delivery overdue"
+        },
+        {
+          "language": "en",
+          "value": "Delivery overdue"
+        },
+        {
+          "language": "ru",
+          "value": "Доставка просрочена"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізу мерзімі өтті"
+        }
+      ]
+    },
+    {
+      "id": 2395,
+      "values": [
+        {
+          "language": "main",
+          "value": "Current work"
+        },
+        {
+          "language": "en",
+          "value": "Current work"
+        },
+        {
+          "language": "ru",
+          "value": "Текущая работа"
+        },
+        {
+          "language": "kk",
+          "value": "Ағымдағы жұмыс"
+        }
+      ]
+    },
+    {
+      "id": 2396,
+      "values": [
+        {
+          "language": "main",
+          "value": "Packing & delivery"
+        },
+        {
+          "language": "en",
+          "value": "Packing & delivery"
+        },
+        {
+          "language": "ru",
+          "value": "Сборка и доставка"
+        },
+        {
+          "language": "kk",
+          "value": "Жинау және жеткізу"
+        }
+      ]
+    },
+    {
+      "id": 2397,
+      "values": [
+        {
+          "language": "main",
+          "value": "Relationship active"
+        },
+        {
+          "language": "en",
+          "value": "Relationship active"
+        },
+        {
+          "language": "ru",
+          "value": "Партнёрство активно"
+        },
+        {
+          "language": "kk",
+          "value": "Серіктестік белсенді"
+        }
+      ]
+    },
+    {
+      "id": 2398,
+      "values": [
+        {
+          "language": "main",
+          "value": "All agreements"
+        },
+        {
+          "language": "en",
+          "value": "All agreements"
+        },
+        {
+          "language": "ru",
+          "value": "Все договоры"
+        },
+        {
+          "language": "kk",
+          "value": "Барлық келісімдер"
+        }
+      ]
+    },
+    {
+      "id": 2399,
+      "values": [
+        {
+          "language": "main",
+          "value": "In negotiation"
+        },
+        {
+          "language": "en",
+          "value": "In negotiation"
+        },
+        {
+          "language": "ru",
+          "value": "На согласовании"
+        },
+        {
+          "language": "kk",
+          "value": "Келісу үстінде"
+        }
+      ]
+    },
+    {
+      "id": 2400,
+      "values": [
+        {
+          "language": "main",
+          "value": "Waiting for me"
+        },
+        {
+          "language": "en",
+          "value": "Waiting for me"
+        },
+        {
+          "language": "ru",
+          "value": "Ждут меня"
+        },
+        {
+          "language": "kk",
+          "value": "Менің жауабымды күтуде"
+        }
+      ]
+    },
+    {
+      "id": 2401,
+      "values": [
+        {
+          "language": "main",
+          "value": "Waiting for partner"
+        },
+        {
+          "language": "en",
+          "value": "Waiting for partner"
+        },
+        {
+          "language": "ru",
+          "value": "Ждут партнёра"
+        },
+        {
+          "language": "kk",
+          "value": "Серіктесті күтуде"
+        }
+      ]
+    },
+    {
+      "id": 2402,
+      "values": [
+        {
+          "language": "main",
+          "value": "Sort agreements"
+        },
+        {
+          "language": "en",
+          "value": "Sort agreements"
+        },
+        {
+          "language": "ru",
+          "value": "Сортировка договоров"
+        },
+        {
+          "language": "kk",
+          "value": "Келісімдерді сұрыптау"
+        }
+      ]
+    },
+    {
+      "id": 2403,
+      "values": [
+        {
+          "language": "main",
+          "value": "Partner A–Z"
+        },
+        {
+          "language": "en",
+          "value": "Partner A–Z"
+        },
+        {
+          "language": "ru",
+          "value": "Партнёр А–Я"
+        },
+        {
+          "language": "kk",
+          "value": "Серіктес А–Я"
+        }
+      ]
+    },
+    {
+      "id": 2404,
+      "values": [
+        {
+          "language": "main",
+          "value": "Newest revision"
+        },
+        {
+          "language": "en",
+          "value": "Newest revision"
+        },
+        {
+          "language": "ru",
+          "value": "Сначала новая редакция"
+        },
+        {
+          "language": "kk",
+          "value": "Алдымен жаңа нұсқа"
+        }
+      ]
+    },
+    {
+      "id": 2405,
+      "values": [
+        {
+          "language": "main",
+          "value": "Revision"
+        },
+        {
+          "language": "en",
+          "value": "Revision"
+        },
+        {
+          "language": "ru",
+          "value": "Редакция"
+        },
+        {
+          "language": "kk",
+          "value": "Нұсқа"
+        }
+      ]
+    },
+    {
+      "id": 2406,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open agreement"
+        },
+        {
+          "language": "en",
+          "value": "Open agreement"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть договор"
+        },
+        {
+          "language": "kk",
+          "value": "Келісімді ашу"
+        }
+      ]
+    },
+    {
+      "id": 2407,
+      "values": [
+        {
+          "language": "main",
+          "value": "Choose a partner before sending the proposal"
+        },
+        {
+          "language": "en",
+          "value": "Choose a partner before sending the proposal"
+        },
+        {
+          "language": "ru",
+          "value": "Перед отправкой предложения выберите партнёра"
+        },
+        {
+          "language": "kk",
+          "value": "Ұсынысты жібермес бұрын серіктесті таңдаңыз"
+        }
+      ]
+    },
+    {
+      "id": 2408,
+      "values": [
+        {
+          "language": "main",
+          "value": "Could not load supplier contracts"
+        },
+        {
+          "language": "en",
+          "value": "Could not load supplier contracts"
+        },
+        {
+          "language": "ru",
+          "value": "Не удалось загрузить договоры с поставщиками"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші келісімдерін жүктеу мүмкін болмады"
+        }
+      ]
+    },
+    {
+      "id": 2409,
+      "values": [
+        {
+          "language": "main",
+          "value": "Could not save supplier contract"
+        },
+        {
+          "language": "en",
+          "value": "Could not save supplier contract"
+        },
+        {
+          "language": "ru",
+          "value": "Не удалось сохранить договор с поставщиком"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші келісімін сақтау мүмкін болмады"
+        }
+      ]
+    },
+    {
+      "id": 2410,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier contract is missing"
+        },
+        {
+          "language": "en",
+          "value": "Supplier contract is missing"
+        },
+        {
+          "language": "ru",
+          "value": "Договор с поставщиком не найден"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші келісімі табылмады"
+        }
+      ]
+    },
+    {
+      "id": 2411,
+      "values": [
+        {
+          "language": "main",
+          "value": "Could not update supplier contract"
+        },
+        {
+          "language": "en",
+          "value": "Could not update supplier contract"
+        },
+        {
+          "language": "ru",
+          "value": "Не удалось обновить договор с поставщиком"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші келісімін жаңарту мүмкін болмады"
+        }
+      ]
+    },
+    {
+      "id": 2412,
+      "values": [
+        {
+          "language": "main",
+          "value": "Choose exactly one product for an item agreement"
+        },
+        {
+          "language": "en",
+          "value": "Choose exactly one product for an item agreement"
+        },
+        {
+          "language": "ru",
+          "value": "Для договора на один товар выберите ровно один товар"
+        },
+        {
+          "language": "kk",
+          "value": "Бір тауар келісімі үшін дәл бір тауарды таңдаңыз"
+        }
+      ]
+    },
+    {
+      "id": 2413,
+      "values": [
+        {
+          "language": "main",
+          "value": "Choose at least one product for a group agreement"
+        },
+        {
+          "language": "en",
+          "value": "Choose at least one product for a group agreement"
+        },
+        {
+          "language": "ru",
+          "value": "Для группового договора выберите хотя бы один товар"
+        },
+        {
+          "language": "kk",
+          "value": "Топтық келісім үшін кемінде бір тауарды таңдаңыз"
+        }
+      ]
+    },
+    {
+      "id": 2414,
+      "values": [
+        {
+          "language": "main",
+          "value": "Editing creates a new revision and asks the other side to accept it."
+        },
+        {
+          "language": "en",
+          "value": "Editing creates a new revision and asks the other side to accept it."
+        },
+        {
+          "language": "ru",
+          "value": "Изменения создают новую редакцию, которую должна принять другая сторона."
+        },
+        {
+          "language": "kk",
+          "value": "Өзгеріс жаңа нұсқа жасайды, оны екінші тарап қабылдауы керек."
+        }
+      ]
+    },
+    {
+      "id": 2415,
+      "values": [
+        {
+          "language": "main",
+          "value": "Applies to the whole Store–Supplier relationship"
+        },
+        {
+          "language": "en",
+          "value": "Applies to the whole Store–Supplier relationship"
+        },
+        {
+          "language": "ru",
+          "value": "Действует для всех отношений магазина и поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен мен жеткізушінің бүкіл қатынасына қолданылады"
+        }
+      ]
+    },
+    {
+      "id": 2416,
+      "values": [
+        {
+          "language": "main",
+          "value": "Applies to one selected product"
+        },
+        {
+          "language": "en",
+          "value": "Applies to one selected product"
+        },
+        {
+          "language": "ru",
+          "value": "Действует для одного выбранного товара"
+        },
+        {
+          "language": "kk",
+          "value": "Бір таңдалған тауарға қолданылады"
+        }
+      ]
+    },
+    {
+      "id": 2417,
+      "values": [
+        {
+          "language": "main",
+          "value": "Applies to several selected products"
+        },
+        {
+          "language": "en",
+          "value": "Applies to several selected products"
+        },
+        {
+          "language": "ru",
+          "value": "Действует для нескольких выбранных товаров"
+        },
+        {
+          "language": "kk",
+          "value": "Бірнеше таңдалған тауарға қолданылады"
+        }
+      ]
+    },
+    {
+      "id": 2418,
+      "values": [
+        {
+          "language": "main",
+          "value": "Products covered by this agreement"
+        },
+        {
+          "language": "en",
+          "value": "Products covered by this agreement"
+        },
+        {
+          "language": "ru",
+          "value": "Товары по этому договору"
+        },
+        {
+          "language": "kk",
+          "value": "Осы келісім қамтитын тауарлар"
+        }
+      ]
+    },
+    {
+      "id": 2419,
+      "values": [
+        {
+          "language": "main",
+          "value": "Selected"
+        },
+        {
+          "language": "en",
+          "value": "Selected"
+        },
+        {
+          "language": "ru",
+          "value": "Выбрано"
+        },
+        {
+          "language": "kk",
+          "value": "Таңдалды"
+        }
+      ]
+    },
+    {
+      "id": 2420,
+      "values": [
+        {
+          "language": "main",
+          "value": "No products are connected to this relationship yet. Add an order or a saved offer first."
+        },
+        {
+          "language": "en",
+          "value": "No products are connected to this relationship yet. Add an order or a saved offer first."
+        },
+        {
+          "language": "ru",
+          "value": "К этим отношениям пока не привязаны товары. Сначала добавьте заказ или сохранённое предложение."
+        },
+        {
+          "language": "kk",
+          "value": "Бұл қатынасқа әлі тауар байланыстырылмаған. Алдымен тапсырыс немесе сақталған ұсыныс қосыңыз."
+        }
+      ]
+    },
+    {
+      "id": 2421,
+      "values": [
+        {
+          "language": "main",
+          "value": "No product matches this search"
+        },
+        {
+          "language": "en",
+          "value": "No product matches this search"
+        },
+        {
+          "language": "ru",
+          "value": "По этому поиску товары не найдены"
+        },
+        {
+          "language": "kk",
+          "value": "Бұл іздеуге сай тауар жоқ"
+        }
+      ]
+    },
+    {
+      "id": 2422,
+      "values": [
+        {
+          "language": "main",
+          "value": "Existing product price lines will stay attached to this partnership agreement."
+        },
+        {
+          "language": "en",
+          "value": "Existing product price lines will stay attached to this partnership agreement."
+        },
+        {
+          "language": "ru",
+          "value": "Существующие строки цен останутся привязаны к общему договору."
+        },
+        {
+          "language": "kk",
+          "value": "Қолданыстағы тауар бағалары жалпы серіктестік келісімінде сақталады."
+        }
+      ]
+    },
+    {
+      "id": 2423,
+      "values": [
+        {
+          "language": "main",
+          "value": "Proposal sent"
+        },
+        {
+          "language": "en",
+          "value": "Proposal sent"
+        },
+        {
+          "language": "ru",
+          "value": "Предложение отправлено"
+        },
+        {
+          "language": "kk",
+          "value": "Ұсыныс жіберілді"
+        }
+      ]
+    },
+    {
+      "id": 2424,
+      "values": [
+        {
+          "language": "main",
+          "value": "Sending proposal…"
+        },
+        {
+          "language": "en",
+          "value": "Sending proposal…"
+        },
+        {
+          "language": "ru",
+          "value": "Отправляем предложение…"
+        },
+        {
+          "language": "kk",
+          "value": "Ұсыныс жіберілуде…"
+        }
+      ]
+    },
+    {
+      "id": 2425,
+      "values": [
+        {
+          "language": "main",
+          "value": "Agreement updated"
+        },
+        {
+          "language": "en",
+          "value": "Agreement updated"
+        },
+        {
+          "language": "ru",
+          "value": "Договор обновлён"
+        },
+        {
+          "language": "kk",
+          "value": "Келісім жаңартылды"
+        }
+      ]
+    },
+    {
+      "id": 2426,
+      "values": [
+        {
+          "language": "main",
+          "value": "No product-specific price lines"
+        },
+        {
+          "language": "en",
+          "value": "No product-specific price lines"
+        },
+        {
+          "language": "ru",
+          "value": "Нет отдельных строк цен для товаров"
+        },
+        {
+          "language": "kk",
+          "value": "Тауарларға арналған бөлек баға жолдары жоқ"
+        }
+      ]
+    },
+    {
+      "id": 2427,
+      "values": [
+        {
+          "language": "main",
+          "value": "Accepting agreement…"
+        },
+        {
+          "language": "en",
+          "value": "Accepting agreement…"
+        },
+        {
+          "language": "ru",
+          "value": "Принимаем договор…"
+        },
+        {
+          "language": "kk",
+          "value": "Келісім қабылдануда…"
+        }
+      ]
+    },
+    {
+      "id": 2428,
+      "values": [
+        {
+          "language": "main",
+          "value": "The partner must accept this exact revision before it becomes active."
+        },
+        {
+          "language": "en",
+          "value": "The partner must accept this exact revision before it becomes active."
+        },
+        {
+          "language": "ru",
+          "value": "Чтобы договор стал активным, партнёр должен принять именно эту редакцию."
+        },
+        {
+          "language": "kk",
+          "value": "Келісім белсенді болуы үшін серіктес дәл осы нұсқаны қабылдауы керек."
+        }
+      ]
+    },
+    {
+      "id": 2429,
+      "values": [
+        {
+          "language": "main",
+          "value": "Declining proposal…"
+        },
+        {
+          "language": "en",
+          "value": "Declining proposal…"
+        },
+        {
+          "language": "ru",
+          "value": "Отклоняем предложение…"
+        },
+        {
+          "language": "kk",
+          "value": "Ұсыныс қабылданбауда…"
+        }
+      ]
+    },
+    {
+      "id": 2430,
+      "values": [
+        {
+          "language": "main",
+          "value": "Archiving agreement…"
+        },
+        {
+          "language": "en",
+          "value": "Archiving agreement…"
+        },
+        {
+          "language": "ru",
+          "value": "Архивируем договор…"
+        },
+        {
+          "language": "kk",
+          "value": "Келісім мұрағатталуда…"
+        }
+      ]
+    },
+    {
+      "id": 2431,
+      "values": [
+        {
+          "language": "main",
+          "value": "Agreement archived"
+        },
+        {
+          "language": "en",
+          "value": "Agreement archived"
+        },
+        {
+          "language": "ru",
+          "value": "Договор отправлен в архив"
+        },
+        {
+          "language": "kk",
+          "value": "Келісім мұрағатталды"
+        }
+      ]
+    },
+    {
+      "id": 2432,
+      "values": [
+        {
+          "language": "main",
+          "value": "Last changed"
+        },
+        {
+          "language": "en",
+          "value": "Last changed"
+        },
+        {
+          "language": "ru",
+          "value": "Последнее изменение"
+        },
+        {
+          "language": "kk",
+          "value": "Соңғы өзгеріс"
+        }
+      ]
+    },
+    {
+      "id": 2433,
+      "values": [
+        {
+          "language": "main",
+          "value": "Acceptance progress"
+        },
+        {
+          "language": "en",
+          "value": "Acceptance progress"
+        },
+        {
+          "language": "ru",
+          "value": "Принятие договора"
+        },
+        {
+          "language": "kk",
+          "value": "Келісімді қабылдау барысы"
+        }
+      ]
+    },
+    {
+      "id": 2434,
+      "values": [
+        {
+          "language": "main",
+          "value": "Store acceptance"
+        },
+        {
+          "language": "en",
+          "value": "Store acceptance"
+        },
+        {
+          "language": "ru",
+          "value": "Принятие магазином"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкеннің қабылдауы"
+        }
+      ]
+    },
+    {
+      "id": 2435,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier acceptance"
+        },
+        {
+          "language": "en",
+          "value": "Supplier acceptance"
+        },
+        {
+          "language": "ru",
+          "value": "Принятие поставщиком"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізушінің қабылдауы"
+        }
+      ]
+    },
+    {
+      "id": 2436,
+      "values": [
+        {
+          "language": "main",
+          "value": "Accepted"
+        },
+        {
+          "language": "en",
+          "value": "Accepted"
+        },
+        {
+          "language": "ru",
+          "value": "Принято"
+        },
+        {
+          "language": "kk",
+          "value": "Қабылданды"
+        }
+      ]
+    },
+    {
+      "id": 2437,
+      "values": [
+        {
+          "language": "main",
+          "value": "Not accepted yet"
+        },
+        {
+          "language": "en",
+          "value": "Not accepted yet"
+        },
+        {
+          "language": "ru",
+          "value": "Пока не принято"
+        },
+        {
+          "language": "kk",
+          "value": "Әлі қабылданбады"
+        }
+      ]
+    },
+    {
+      "id": 2438,
+      "values": [
+        {
+          "language": "main",
+          "value": "Back to agreements"
+        },
+        {
+          "language": "en",
+          "value": "Back to agreements"
+        },
+        {
+          "language": "ru",
+          "value": "Назад к договорам"
+        },
+        {
+          "language": "kk",
+          "value": "Келісімдерге оралу"
+        }
+      ]
+    },
+    {
+      "id": 2439,
+      "values": [
+        {
+          "language": "main",
+          "value": "Create an agreement to keep accepted Store and Supplier terms in one shared workflow."
+        },
+        {
+          "language": "en",
+          "value": "Create an agreement to keep accepted Store and Supplier terms in one shared workflow."
+        },
+        {
+          "language": "ru",
+          "value": "Создайте договор, чтобы согласованные условия магазина и поставщика хранились в одном общем процессе."
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен мен жеткізуші келіскен шарттарды бір ортақ үдерісте сақтау үшін келісім жасаңыз."
+        }
+      ]
+    },
+    {
+      "id": 2440,
+      "values": [
+        {
+          "language": "main",
+          "value": "No agreement matches these filters"
+        },
+        {
+          "language": "en",
+          "value": "No agreement matches these filters"
+        },
+        {
+          "language": "ru",
+          "value": "Нет договоров с такими фильтрами"
+        },
+        {
+          "language": "kk",
+          "value": "Бұл сүзгілерге сай келісім жоқ"
+        }
+      ]
+    },
+    {
+      "id": 2441,
+      "values": [
+        {
+          "language": "main",
+          "value": "Continue this relationship"
+        },
+        {
+          "language": "en",
+          "value": "Continue this relationship"
+        },
+        {
+          "language": "ru",
+          "value": "Продолжить работу с партнёром"
+        },
+        {
+          "language": "kk",
+          "value": "Осы серіктестікпен жұмысты жалғастыру"
+        }
+      ]
+    },
+    {
+      "id": 2442,
+      "values": [
+        {
+          "language": "main",
+          "value": "Ready to dispatch"
+        },
+        {
+          "language": "en",
+          "value": "Ready to dispatch"
+        },
+        {
+          "language": "ru",
+          "value": "Готово к отправке"
+        },
+        {
+          "language": "kk",
+          "value": "Жөнелтуге дайын"
+        }
+      ]
+    },
+    {
+      "id": 2443,
+      "values": [
+        {
+          "language": "main",
+          "value": "Some selected orders were skipped"
+        },
+        {
+          "language": "en",
+          "value": "Some selected orders were skipped"
+        },
+        {
+          "language": "ru",
+          "value": "Некоторые выбранные заказы пропущены"
+        },
+        {
+          "language": "kk",
+          "value": "Кейбір таңдалған тапсырыстар өткізіліп жіберілді"
+        }
+      ]
+    },
+    {
+      "id": 2444,
+      "values": [
+        {
+          "language": "main",
+          "value": "No supplier orders were selected"
+        },
+        {
+          "language": "en",
+          "value": "No supplier orders were selected"
+        },
+        {
+          "language": "ru",
+          "value": "Заказы поставщику не выбраны"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші тапсырыстары таңдалмады"
+        }
+      ]
+    },
+    {
+      "id": 2445,
+      "values": [
+        {
+          "language": "main",
+          "value": "Could not update the selected delivery orders"
+        },
+        {
+          "language": "en",
+          "value": "Could not update the selected delivery orders"
+        },
+        {
+          "language": "ru",
+          "value": "Не удалось обновить выбранные заказы доставки"
+        },
+        {
+          "language": "kk",
+          "value": "Таңдалған жеткізу тапсырыстарын жаңарту мүмкін болмады"
+        }
+      ]
+    },
+    {
+      "id": 2448,
+      "values": [
+        {
+          "language": "main",
+          "value": "No delivery work yet"
+        },
+        {
+          "language": "en",
+          "value": "No delivery work yet"
+        },
+        {
+          "language": "ru",
+          "value": "Пока нет работы по доставке"
+        },
+        {
+          "language": "kk",
+          "value": "Әзірге жеткізу жұмысы жоқ"
+        }
+      ]
+    },
+    {
+      "id": 2449,
+      "values": [
+        {
+          "language": "main",
+          "value": "Confirmed, packed, and in-delivery orders will appear here as practical Store runs."
+        },
+        {
+          "language": "en",
+          "value": "Confirmed, packed, and in-delivery orders will appear here as practical Store runs."
+        },
+        {
+          "language": "ru",
+          "value": "Подтверждённые, собранные и доставляемые заказы появятся здесь в виде удобных маршрутов по магазинам."
+        },
+        {
+          "language": "kk",
+          "value": "Расталған, жиналған және жеткізіліп жатқан тапсырыстар мұнда дүкендер бойынша ыңғайлы бағыттар ретінде көрінеді."
+        }
+      ]
+    },
+    {
+      "id": 2450,
+      "values": [
+        {
+          "language": "main",
+          "value": "Sort delivery runs"
+        },
+        {
+          "language": "en",
+          "value": "Sort delivery runs"
+        },
+        {
+          "language": "ru",
+          "value": "Сортировка маршрутов доставки"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізу бағыттарын сұрыптау"
+        }
+      ]
+    },
+    {
+      "id": 2451,
+      "values": [
+        {
+          "language": "main",
+          "value": "Action first"
+        },
+        {
+          "language": "en",
+          "value": "Action first"
+        },
+        {
+          "language": "ru",
+          "value": "Сначала требующие действий"
+        },
+        {
+          "language": "kk",
+          "value": "Алдымен әрекет қажет"
+        }
+      ]
+    },
+    {
+      "id": 2452,
+      "values": [
+        {
+          "language": "main",
+          "value": "Earliest delivery"
+        },
+        {
+          "language": "en",
+          "value": "Earliest delivery"
+        },
+        {
+          "language": "ru",
+          "value": "Сначала ближайшая доставка"
+        },
+        {
+          "language": "kk",
+          "value": "Алдымен ең жақын жеткізу"
+        }
+      ]
+    },
+    {
+      "id": 2453,
+      "values": [
+        {
+          "language": "main",
+          "value": "Store A–Z"
+        },
+        {
+          "language": "en",
+          "value": "Store A–Z"
+        },
+        {
+          "language": "ru",
+          "value": "Магазин А–Я"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен А–Я"
+        }
+      ]
+    },
+    {
+      "id": 2454,
+      "values": [
+        {
+          "language": "main",
+          "value": "Most recent"
+        },
+        {
+          "language": "en",
+          "value": "Most recent"
+        },
+        {
+          "language": "ru",
+          "value": "Сначала недавние"
+        },
+        {
+          "language": "kk",
+          "value": "Алдымен соңғысы"
+        }
+      ]
+    },
+    {
+      "id": 2455,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open delivery run"
+        },
+        {
+          "language": "en",
+          "value": "Open delivery run"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть маршрут доставки"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізу бағытын ашу"
+        }
+      ]
+    },
+    {
+      "id": 2458,
+      "values": [
+        {
+          "language": "main",
+          "value": "Delivery work"
+        },
+        {
+          "language": "en",
+          "value": "Delivery work"
+        },
+        {
+          "language": "ru",
+          "value": "Работа по доставке"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізу жұмысы"
+        }
+      ]
+    },
+    {
+      "id": 2459,
+      "values": [
+        {
+          "language": "main",
+          "value": "No delivery run matches these filters"
+        },
+        {
+          "language": "en",
+          "value": "No delivery run matches these filters"
+        },
+        {
+          "language": "ru",
+          "value": "Нет маршрутов доставки с такими фильтрами"
+        },
+        {
+          "language": "kk",
+          "value": "Бұл сүзгілерге сай жеткізу бағыты жоқ"
+        }
+      ]
+    },
+    {
+      "id": 2460,
+      "values": [
+        {
+          "language": "main",
+          "value": "Updating orders…"
+        },
+        {
+          "language": "en",
+          "value": "Updating orders…"
+        },
+        {
+          "language": "ru",
+          "value": "Обновляем заказы…"
+        },
+        {
+          "language": "kk",
+          "value": "Тапсырыстар жаңартылуда…"
+        }
+      ]
+    },
+    {
+      "id": 2463,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open partner store"
+        },
+        {
+          "language": "en",
+          "value": "Open partner store"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть магазин-партнёр"
+        },
+        {
+          "language": "kk",
+          "value": "Серіктес дүкенді ашу"
+        }
+      ]
+    },
+    {
+      "id": 2464,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open agreements"
+        },
+        {
+          "language": "en",
+          "value": "Open agreements"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть договоры"
+        },
+        {
+          "language": "kk",
+          "value": "Келісімдерді ашу"
+        }
+      ]
+    },
+    {
+      "id": 2465,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open catalogue"
+        },
+        {
+          "language": "en",
+          "value": "Open catalogue"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть каталог"
+        },
+        {
+          "language": "kk",
+          "value": "Каталогті ашу"
+        }
+      ]
+    },
+    {
+      "id": 2466,
+      "values": [
+        {
+          "language": "main",
+          "value": "Run ready"
+        },
+        {
+          "language": "en",
+          "value": "Run ready"
+        },
+        {
+          "language": "ru",
+          "value": "Маршрут готов"
+        },
+        {
+          "language": "kk",
+          "value": "Бағыт дайын"
+        }
+      ]
+    },
+    {
+      "id": 2467,
+      "values": [
+        {
+          "language": "main",
+          "value": "Contract blocked"
+        },
+        {
+          "language": "en",
+          "value": "Contract blocked"
+        },
+        {
+          "language": "ru",
+          "value": "Заблокировано договором"
+        },
+        {
+          "language": "kk",
+          "value": "Келісіммен бұғатталған"
+        }
+      ]
+    },
+    {
+      "id": 2468,
+      "values": [
+        {
+          "language": "main",
+          "value": "Unscheduled"
+        },
+        {
+          "language": "en",
+          "value": "Unscheduled"
+        },
+        {
+          "language": "ru",
+          "value": "Без даты"
+        },
+        {
+          "language": "kk",
+          "value": "Күні белгіленбеген"
+        }
+      ]
+    },
+    {
+      "id": 2473,
+      "values": [
+        {
+          "language": "main",
+          "value": "Store runs"
+        },
+        {
+          "language": "en",
+          "value": "Store runs"
+        },
+        {
+          "language": "ru",
+          "value": "Маршруты по магазинам"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкен бағыттары"
+        }
+      ]
+    },
+    {
+      "id": 2475,
+      "values": [
+        {
+          "language": "main",
+          "value": "This run uses the current server plan and the latest locally loaded order state."
+        },
+        {
+          "language": "en",
+          "value": "This run uses the current server plan and the latest locally loaded order state."
+        },
+        {
+          "language": "ru",
+          "value": "Этот маршрут использует актуальный план сервера и последнее загруженное состояние заказов."
+        },
+        {
+          "language": "kk",
+          "value": "Бұл бағыт сервердің өзекті жоспарын және жергілікті жүктелген тапсырыстардың соңғы күйін пайдаланады."
+        }
+      ]
+    },
+    {
+      "id": 2476,
+      "values": [
+        {
+          "language": "main",
+          "value": "A locally reconstructed run is shown until the server dashboard includes it."
+        },
+        {
+          "language": "en",
+          "value": "A locally reconstructed run is shown until the server dashboard includes it."
+        },
+        {
+          "language": "ru",
+          "value": "Пока серверная панель не включит маршрут, показывается аккуратно восстановленный локальный вариант."
+        },
+        {
+          "language": "kk",
+          "value": "Сервер панелі бағытты қоспайынша, жергілікті түрде мұқият қалпына келтірілген нұсқа көрсетіледі."
+        }
+      ]
+    },
+    {
+      "id": 2477,
+      "values": [
+        {
+          "language": "main",
+          "value": "Store delivery run"
+        },
+        {
+          "language": "en",
+          "value": "Store delivery run"
+        },
+        {
+          "language": "ru",
+          "value": "Маршрут доставки в магазин"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкенге жеткізу бағыты"
+        }
+      ]
+    },
+    {
+      "id": 2478,
+      "values": [
+        {
+          "language": "main",
+          "value": "Orders in this run"
+        },
+        {
+          "language": "en",
+          "value": "Orders in this run"
+        },
+        {
+          "language": "ru",
+          "value": "Заказы в этом маршруте"
+        },
+        {
+          "language": "kk",
+          "value": "Осы бағыттағы тапсырыстар"
+        }
+      ]
+    },
+    {
+      "id": 2479,
+      "values": [
+        {
+          "language": "main",
+          "value": "Please wait while AITA checks agreements before packing or dispatching."
+        },
+        {
+          "language": "en",
+          "value": "Please wait while AITA checks agreements before packing or dispatching."
+        },
+        {
+          "language": "ru",
+          "value": "Подождите, пока AITA проверит договоры перед сборкой или отправкой заказов."
+        },
+        {
+          "language": "kk",
+          "value": "AITA тапсырыстарды жинау немесе жөнелту алдында келісімдерді тексергенше күтіңіз."
+        }
+      ]
+    },
+    {
+      "id": 2480,
+      "values": [
+        {
+          "language": "main",
+          "value": "All supplier identities"
+        },
+        {
+          "language": "en",
+          "value": "All supplier identities"
+        },
+        {
+          "language": "ru",
+          "value": "Все профили поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Барлық жеткізуші профильдері"
+        }
+      ]
+    },
+    {
+      "id": 2481,
+      "values": [
+        {
+          "language": "main",
+          "value": "Combined view across all supplier profiles"
+        },
+        {
+          "language": "en",
+          "value": "Combined view across all supplier profiles"
+        },
+        {
+          "language": "ru",
+          "value": "Общий обзор всех профилей поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Барлық жеткізуші профильдерінің ортақ көрінісі"
+        }
+      ]
+    },
+    {
+      "id": 2482,
+      "values": [
+        {
+          "language": "main",
+          "value": "Working identity"
+        },
+        {
+          "language": "en",
+          "value": "Working identity"
+        },
+        {
+          "language": "ru",
+          "value": "Рабочий профиль"
+        },
+        {
+          "language": "kk",
+          "value": "Жұмыс профилі"
+        }
+      ]
+    },
+    {
+      "id": 2484,
+      "values": [
+        {
+          "language": "main",
+          "value": "All profiles"
+        },
+        {
+          "language": "en",
+          "value": "All profiles"
+        },
+        {
+          "language": "ru",
+          "value": "Все профили"
+        },
+        {
+          "language": "kk",
+          "value": "Барлық профильдер"
+        }
+      ]
+    },
+    {
+      "id": 2485,
+      "values": [
+        {
+          "language": "main",
+          "value": "Focused profile"
+        },
+        {
+          "language": "en",
+          "value": "Focused profile"
+        },
+        {
+          "language": "ru",
+          "value": "Выбранный профиль"
+        },
+        {
+          "language": "kk",
+          "value": "Таңдалған профиль"
+        }
+      ]
+    },
+    {
+      "id": 2487,
+      "values": [
+        {
+          "language": "main",
+          "value": "This view combines all of your supplier profiles."
+        },
+        {
+          "language": "en",
+          "value": "This view combines all of your supplier profiles."
+        },
+        {
+          "language": "ru",
+          "value": "Здесь объединена работа всех ваших профилей поставщика."
+        },
+        {
+          "language": "kk",
+          "value": "Бұл көрініс барлық жеткізуші профильдеріңіздің жұмысын біріктіреді."
+        }
+      ]
+    },
+    {
+      "id": 2488,
+      "values": [
+        {
+          "language": "main",
+          "value": "Only this profile's orders, offers, partners, agreements, delivery work, and insights are shown."
+        },
+        {
+          "language": "en",
+          "value": "Only this profile's orders, offers, partners, agreements, delivery work, and insights are shown."
+        },
+        {
+          "language": "ru",
+          "value": "Показаны только заказы, предложения, партнёры, договоры, доставки и аналитика этого профиля."
+        },
+        {
+          "language": "kk",
+          "value": "Тек осы профильдің тапсырыстары, ұсыныстары, серіктестері, келісімдері, жеткізулері және талдауы көрсетіледі."
+        }
+      ]
+    },
+    {
+      "id": 2489,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier identity changed"
+        },
+        {
+          "language": "en",
+          "value": "Supplier identity changed"
+        },
+        {
+          "language": "ru",
+          "value": "Профиль поставщика изменён"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші профилі өзгертілді"
+        }
+      ]
+    },
+    {
+      "id": 2490,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier profiles"
+        },
+        {
+          "language": "en",
+          "value": "Supplier profiles"
+        },
+        {
+          "language": "ru",
+          "value": "Профили поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші профильдері"
+        }
+      ]
+    },
+    {
+      "id": 2491,
+      "values": [
+        {
+          "language": "main",
+          "value": "Manage the business identities stores order from. Each profile keeps its own orders, offers, partners, agreements, delivery work, and insights."
+        },
+        {
+          "language": "en",
+          "value": "Manage the business identities stores order from. Each profile keeps its own orders, offers, partners, agreements, delivery work, and insights."
+        },
+        {
+          "language": "ru",
+          "value": "Управляйте бизнес-профилями, у которых магазины делают заказы. У каждого профиля свои заказы, предложения, партнёры, договоры, доставки и аналитика."
+        },
+        {
+          "language": "kk",
+          "value": "Дүкендер тапсырыс беретін бизнес профильдерін басқарыңыз. Әр профильдің өз тапсырыстары, ұсыныстары, серіктестері, келісімдері, жеткізулері және талдауы бар."
+        }
+      ]
+    },
+    {
+      "id": 2492,
+      "values": [
+        {
+          "language": "main",
+          "value": "Add profile"
+        },
+        {
+          "language": "en",
+          "value": "Add profile"
+        },
+        {
+          "language": "ru",
+          "value": "Добавить профиль"
+        },
+        {
+          "language": "kk",
+          "value": "Профиль қосу"
+        }
+      ]
+    },
+    {
+      "id": 2493,
+      "values": [
+        {
+          "language": "main",
+          "value": "Profile ready"
+        },
+        {
+          "language": "en",
+          "value": "Profile ready"
+        },
+        {
+          "language": "ru",
+          "value": "Профиль готов"
+        },
+        {
+          "language": "kk",
+          "value": "Профиль дайын"
+        }
+      ]
+    },
+    {
+      "id": 2494,
+      "values": [
+        {
+          "language": "main",
+          "value": "Setup check"
+        },
+        {
+          "language": "en",
+          "value": "Setup check"
+        },
+        {
+          "language": "ru",
+          "value": "Нужно проверить"
+        },
+        {
+          "language": "kk",
+          "value": "Баптауды тексеру"
+        }
+      ]
+    },
+    {
+      "id": 2495,
+      "values": [
+        {
+          "language": "main",
+          "value": "Manage profiles"
+        },
+        {
+          "language": "en",
+          "value": "Manage profiles"
+        },
+        {
+          "language": "ru",
+          "value": "Управлять профилями"
+        },
+        {
+          "language": "kk",
+          "value": "Профильдерді басқару"
+        }
+      ]
+    },
+    {
+      "id": 2496,
+      "values": [
+        {
+          "language": "main",
+          "value": "Add a contact"
+        },
+        {
+          "language": "en",
+          "value": "Add a contact"
+        },
+        {
+          "language": "ru",
+          "value": "Добавьте контакт"
+        },
+        {
+          "language": "kk",
+          "value": "Байланыс қосыңыз"
+        }
+      ]
+    },
+    {
+      "id": 2497,
+      "values": [
+        {
+          "language": "main",
+          "value": "Duplicate phone"
+        },
+        {
+          "language": "en",
+          "value": "Duplicate phone"
+        },
+        {
+          "language": "ru",
+          "value": "Повтор номера"
+        },
+        {
+          "language": "kk",
+          "value": "Қайталанатын телефон"
+        }
+      ]
+    },
+    {
+      "id": 2498,
+      "values": [
+        {
+          "language": "main",
+          "value": "Duplicate email"
+        },
+        {
+          "language": "en",
+          "value": "Duplicate email"
+        },
+        {
+          "language": "ru",
+          "value": "Повтор email"
+        },
+        {
+          "language": "kk",
+          "value": "Қайталанатын email"
+        }
+      ]
+    },
+    {
+      "id": 2499,
+      "values": [
+        {
+          "language": "main",
+          "value": "Check email"
+        },
+        {
+          "language": "en",
+          "value": "Check email"
+        },
+        {
+          "language": "ru",
+          "value": "Проверьте email"
+        },
+        {
+          "language": "kk",
+          "value": "Email-ды тексеріңіз"
+        }
+      ]
+    },
+    {
+      "id": 2500,
+      "values": [
+        {
+          "language": "main",
+          "value": "Work as this profile"
+        },
+        {
+          "language": "en",
+          "value": "Work as this profile"
+        },
+        {
+          "language": "ru",
+          "value": "Работать от этого профиля"
+        },
+        {
+          "language": "kk",
+          "value": "Осы профильмен жұмыс істеу"
+        }
+      ]
+    },
+    {
+      "id": 2501,
+      "values": [
+        {
+          "language": "main",
+          "value": "Working profile"
+        },
+        {
+          "language": "en",
+          "value": "Working profile"
+        },
+        {
+          "language": "ru",
+          "value": "Рабочий профиль"
+        },
+        {
+          "language": "kk",
+          "value": "Жұмыс профилі"
+        }
+      ]
+    },
+    {
+      "id": 2502,
+      "values": [
+        {
+          "language": "main",
+          "value": "Edit profile"
+        },
+        {
+          "language": "en",
+          "value": "Edit profile"
+        },
+        {
+          "language": "ru",
+          "value": "Редактировать профиль"
+        },
+        {
+          "language": "kk",
+          "value": "Профильді өңдеу"
+        }
+      ]
+    },
+    {
+      "id": 2503,
+      "values": [
+        {
+          "language": "main",
+          "value": "Delete profile"
+        },
+        {
+          "language": "en",
+          "value": "Delete profile"
+        },
+        {
+          "language": "ru",
+          "value": "Удалить профиль"
+        },
+        {
+          "language": "kk",
+          "value": "Профильді жою"
+        }
+      ]
+    },
+    {
+      "id": 2504,
+      "values": [
+        {
+          "language": "main",
+          "value": "Only unused profiles can be deleted. Profiles with order, agreement, offer, or stock history are kept for audit."
+        },
+        {
+          "language": "en",
+          "value": "Only unused profiles can be deleted. Profiles with order, agreement, offer, or stock history are kept for audit."
+        },
+        {
+          "language": "ru",
+          "value": "Удалить можно только неиспользованный профиль. Профили с историей заказов, договоров, предложений или складских партий сохраняются для аудита."
+        },
+        {
+          "language": "kk",
+          "value": "Тек пайдаланылмаған профильді жоюға болады. Тапсырыс, келісім, ұсыныс немесе қойма партияларының тарихы бар профильдер аудит үшін сақталады."
+        }
+      ]
+    },
+    {
+      "id": 2505,
+      "values": [
+        {
+          "language": "main",
+          "value": "Store-facing supplier identity"
+        },
+        {
+          "language": "en",
+          "value": "Store-facing supplier identity"
+        },
+        {
+          "language": "ru",
+          "value": "Профиль поставщика для магазинов"
+        },
+        {
+          "language": "kk",
+          "value": "Дүкендерге көрінетін жеткізуші профилі"
+        }
+      ]
+    },
+    {
+      "id": 2506,
+      "values": [
+        {
+          "language": "main",
+          "value": "Stores use this name and contact information when ordering, confirming terms, and arranging delivery."
+        },
+        {
+          "language": "en",
+          "value": "Stores use this name and contact information when ordering, confirming terms, and arranging delivery."
+        },
+        {
+          "language": "ru",
+          "value": "Магазины используют это название и контакты при заказах, согласовании условий и организации доставки."
+        },
+        {
+          "language": "kk",
+          "value": "Дүкендер тапсырыс беру, шарттарды келісу және жеткізуді ұйымдастыру кезінде осы атау мен байланыстарды пайдаланады."
+        }
+      ]
+    },
+    {
+      "id": 2507,
+      "values": [
+        {
+          "language": "main",
+          "value": "Additional existing contacts are preserved when the primary contact changes."
+        },
+        {
+          "language": "en",
+          "value": "Additional existing contacts are preserved when the primary contact changes."
+        },
+        {
+          "language": "ru",
+          "value": "Дополнительные существующие контакты сохранятся при изменении основного контакта."
+        },
+        {
+          "language": "kk",
+          "value": "Негізгі байланыс өзгергенде бұрынғы қосымша байланыстар сақталады."
+        }
+      ]
+    },
+    {
+      "id": 2508,
+      "values": [
+        {
+          "language": "main",
+          "value": "Saving profile…"
+        },
+        {
+          "language": "en",
+          "value": "Saving profile…"
+        },
+        {
+          "language": "ru",
+          "value": "Сохраняем профиль…"
+        },
+        {
+          "language": "kk",
+          "value": "Профиль сақталуда…"
+        }
+      ]
+    },
+    {
+      "id": 2509,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier name is required"
+        },
+        {
+          "language": "en",
+          "value": "Supplier name is required"
+        },
+        {
+          "language": "ru",
+          "value": "Укажите название поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші атауын көрсетіңіз"
+        }
+      ]
+    },
+    {
+      "id": 2510,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier email is invalid"
+        },
+        {
+          "language": "en",
+          "value": "Supplier email is invalid"
+        },
+        {
+          "language": "ru",
+          "value": "Некорректный email поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізушінің email мекенжайы қате"
+        }
+      ]
+    },
+    {
+      "id": 2511,
+      "values": [
+        {
+          "language": "main",
+          "value": "Check the supplier profile fields"
+        },
+        {
+          "language": "en",
+          "value": "Check the supplier profile fields"
+        },
+        {
+          "language": "ru",
+          "value": "Проверьте поля профиля поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші профилінің өрістерін тексеріңіз"
+        }
+      ]
+    },
+    {
+      "id": 2512,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier profile saved"
+        },
+        {
+          "language": "en",
+          "value": "Supplier profile saved"
+        },
+        {
+          "language": "ru",
+          "value": "Профиль поставщика сохранён"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші профилі сақталды"
+        }
+      ]
+    },
+    {
+      "id": 2513,
+      "values": [
+        {
+          "language": "main",
+          "value": "That supplier profile is no longer available."
+        },
+        {
+          "language": "en",
+          "value": "That supplier profile is no longer available."
+        },
+        {
+          "language": "ru",
+          "value": "Этот профиль поставщика больше недоступен."
+        },
+        {
+          "language": "kk",
+          "value": "Бұл жеткізуші профилі енді қолжетімсіз."
+        }
+      ]
+    },
+    {
+      "id": 2514,
+      "values": [
+        {
+          "language": "main",
+          "value": "No supplier profiles yet. Create the identity stores will order from."
+        },
+        {
+          "language": "en",
+          "value": "No supplier profiles yet. Create the identity stores will order from."
+        },
+        {
+          "language": "ru",
+          "value": "Профилей поставщика пока нет. Создайте профиль, у которого магазины будут делать заказы."
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші профильдері әзірге жоқ. Дүкендер тапсырыс беретін профильді жасаңыз."
+        }
+      ]
+    },
+    {
+      "id": 2515,
+      "values": [
+        {
+          "language": "main",
+          "value": "Loading supplier profile…"
+        },
+        {
+          "language": "en",
+          "value": "Loading supplier profile…"
+        },
+        {
+          "language": "ru",
+          "value": "Загружаем профиль поставщика…"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші профилі жүктелуде…"
+        }
+      ]
+    },
+    {
+      "id": 2516,
+      "values": [
+        {
+          "language": "main",
+          "value": "Checking commercial history before delete…"
+        },
+        {
+          "language": "en",
+          "value": "Checking commercial history before delete…"
+        },
+        {
+          "language": "ru",
+          "value": "Проверяем коммерческую историю перед удалением…"
+        },
+        {
+          "language": "kk",
+          "value": "Жою алдында коммерциялық тарих тексерілуде…"
+        }
+      ]
+    },
+    {
+      "id": 2517,
+      "values": [
+        {
+          "language": "main",
+          "value": "Commercial history couldn’t be verified. Refresh before deleting."
+        },
+        {
+          "language": "en",
+          "value": "Commercial history couldn’t be verified. Refresh before deleting."
+        },
+        {
+          "language": "ru",
+          "value": "Не удалось проверить коммерческую историю. Обновите данные перед удалением."
+        },
+        {
+          "language": "kk",
+          "value": "Коммерциялық тарихты тексеру мүмкін болмады. Жою алдында деректерді жаңартыңыз."
+        }
+      ]
+    },
+    {
+      "id": 2518,
+      "values": [
+        {
+          "language": "main",
+          "value": "Deleting profile…"
+        },
+        {
+          "language": "en",
+          "value": "Deleting profile…"
+        },
+        {
+          "language": "ru",
+          "value": "Удаляем профиль…"
+        },
+        {
+          "language": "kk",
+          "value": "Профиль жойылуда…"
         }
       ]
     }

@@ -1,28 +1,9 @@
 const DEFAULT_SERVER_URL = "https://aita-api.bogdan-dond.uk.workers.dev";
-const DEFAULT_LEGACY_SERVER_URL = "https://api.aita.kz";
 const BOOTSTRAP_PATHS = new Set([
   "/.well-known/aita-server.json",
   "/config/server",
 ]);
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
-
-function normalizedServerUrl(rawValue, fallback) {
-  const candidate = String(rawValue || fallback || "").trim();
-
-  try {
-    const url = new URL(candidate);
-    if (url.protocol !== "https:" && url.protocol !== "http:") {
-      throw new Error("server URL must use http or https");
-    }
-    if (url.username || url.password || url.search || url.hash) {
-      throw new Error("server URL must not contain credentials, query, or fragment");
-    }
-    url.pathname = url.pathname.replace(/\/+$/, "") || "/";
-    return url.toString().replace(/\/$/, "");
-  } catch (error) {
-    throw new Error(`Invalid AITA server URL: ${error.message}`);
-  }
-}
 
 function commonHeaders(extra = {}) {
   return {
@@ -50,27 +31,15 @@ function jsonResponse(payload, status = 200, includeBody = true) {
 }
 
 function bootstrapPayload(env) {
-  const serverUrl = normalizedServerUrl(env.AITA_CURRENT_SERVER_URL, DEFAULT_SERVER_URL);
-  const legacyServerUrl = normalizedServerUrl(
-    env.AITA_LEGACY_SERVER_URL,
-    DEFAULT_LEGACY_SERVER_URL,
-  );
+  const serverUrl = DEFAULT_SERVER_URL;
   const serverCandidates = [
     {
       url: serverUrl,
       priority: 100,
       supportsRealtime: true,
-      role: "primary-domainless",
+      role: "canonical-workers-vpc",
     },
   ];
-  if (legacyServerUrl !== serverUrl) {
-    serverCandidates.push({
-      url: legacyServerUrl,
-      priority: 40,
-      supportsRealtime: true,
-      role: "legacy-domain",
-    });
-  }
 
   return {
     schemaVersion: 2,
@@ -111,7 +80,7 @@ function htmlResponse(env, method) {
   <main>
     <div class="mark">aita</div>
     <h1>AITA bootstrap is online</h1>
-    <p>This stable resolver directs AITA clients to the domain-independent production gateway, while retaining the paid domain only as a legacy fallback.</p>
+    <p>This compatibility resolver directs older AITA builds to the single domain-independent production gateway.</p>
     <a href="/.well-known/aita-server.json">Open bootstrap JSON</a>
     <code>${serverUrl}</code>
   </main>

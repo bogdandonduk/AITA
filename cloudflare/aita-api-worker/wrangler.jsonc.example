@@ -13,7 +13,6 @@
     }
   ],
   "vars": {
-    "AITA_LEGACY_SERVER_URL": "https://api.aita.kz",
     "AITA_BOOTSTRAP_SEQUENCE": "1",
     "AITA_RELEASE_VERSION": ""
   },

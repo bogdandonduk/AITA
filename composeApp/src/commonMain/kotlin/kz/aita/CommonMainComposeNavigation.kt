@@ -2787,7 +2787,7 @@ sealed class NavigationScreenModel(
         sealed class Customers(route: String): Supplier(route) {
             data object Main: Customers("SupplierCustomersMainNavigationScreenModelRoute") {
                 override val name: String
-                    get() = with(AppConfiguration) { localizedStringResource(1339, "Customers") }
+                    get() = with(AppConfiguration) { localizedStringResource(1453, "Partner stores") }
                 override val iconPath: String
                     get() = AppConfiguration.stateValues.drawablePathIconSupplierPartners
                 override val iconRes: DrawableResource
@@ -2814,6 +2814,17 @@ sealed class NavigationScreenModel(
                     get() = AppConfiguration.stateValues.drawablePathIconSupplierDemandRadar
                 override val iconRes: DrawableResource
                     get() = AppConfiguration.stateValues.drawableResIconSupplierDemandRadar.value
+            }
+        }
+
+        sealed class Identity(route: String): Supplier(route) {
+            data object Main: Identity("SupplierIdentityMainNavigationScreenModelRoute") {
+                override val name: String
+                    get() = with(AppConfiguration) { localizedStringResource(2490, "Supplier profiles") }
+                override val iconPath: String
+                    get() = AppConfiguration.stateValues.drawablePathIconSuppliers
+                override val iconRes: DrawableResource
+                    get() = AppConfiguration.stateValues.drawableResIconSuppliers.value
             }
         }
     }
@@ -3312,7 +3323,8 @@ internal fun persistentAppNavigationScreens(): List<NavigationScreenModel> = lis
     NavigationScreenModel.Supplier.Contracts.Main,
     NavigationScreenModel.Supplier.Dispatch.Main,
     NavigationScreenModel.Supplier.Customers.Main,
-    NavigationScreenModel.Supplier.Analytics.Main
+    NavigationScreenModel.Supplier.Analytics.Main,
+    NavigationScreenModel.Supplier.Identity.Main
 )
 
 internal fun persistentAppRouteToScreen(route: String): NavigationScreenModel? =
@@ -3385,8 +3397,7 @@ internal fun List<String>?.toPersistentStockStack(defaultFirst: NavigationScreen
     }
 }
 
-internal fun NavigationScreenModel.Menu.isTemporarilyHiddenFromUi(): Boolean =
-    this is NavigationScreenModel.Menu.AppMode
+internal fun NavigationScreenModel.Menu.isTemporarilyHiddenFromUi(): Boolean = false
 
 internal fun List<String>?.toPersistentMenuStack(defaultFirst: NavigationScreenModel.Menu): List<NavigationScreenModel.Menu> {
     val restoredCurrent = orEmpty()
@@ -6562,4 +6573,3 @@ object Navigation {
         }
     }
 }
-

@@ -4916,7 +4916,7 @@ internal fun AppConfiguration.supplierOrderStatusTitle(status: SupplierOrderStat
 }
 
 internal fun SupplierOrderStatusDataModel.isSupplierOrderClosed(): Boolean =
-    this == SupplierOrderStatusDataModel.Delivered || this == SupplierOrderStatusDataModel.Cancelled
+    isClosedForSupplierDesk()
 
 @Composable
 internal fun AppConfiguration.SupplierOrderCard(
@@ -5125,8 +5125,8 @@ internal fun AppConfiguration.supplierMarketWinningFeatures(): List<SupplierFeat
         implemented = true
     ),
     SupplierFeaturePlanUiModel(
-        title = localizedStringResource(1351, "Store reliability scorecards"),
-        subtitle = localizedStringResource(1352, "Know which stores pay on time, order predictably and need extra confirmation before dispatch."),
+        title = localizedStringResource(1351, "Partner store overview"),
+        subtitle = localizedStringResource(1352, "See exact orders, deliveries, contracts and saved offers for every partner store."),
         iconPath = stateValues.drawablePathIconSupplierPartners,
         iconRes = stateValues.drawableResIconSupplierPartners.value,
         implemented = true
@@ -5840,9 +5840,13 @@ internal suspend fun seedSupplierOrdersInboxNavigation(
     statusFilter: String = if (searchQuery.isBlank()) "open" else "all"
 ) {
     val safeSearchQuery = searchQuery.trim()
-    NavigationScreenModel.Supplier.Orders.Main.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to safeSearchQuery)
-    NavigationScreenModel.Supplier.Orders.Main.setState(SUPPLIER_ORDER_DUE_FILTER_STATE_KEY to dueFilter.ifBlank { "all" })
-    NavigationScreenModel.Supplier.Orders.Main.setState(SUPPLIER_ORDER_STATUS_FILTER_STATE_KEY to statusFilter.ifBlank { if (safeSearchQuery.isBlank()) "open" else "all" })
+    NavigationScreenModel.Supplier.Orders.Main.setStates(
+        NavigationScreenModel.KEY_STATE_SEARCH_QUERY to safeSearchQuery,
+        SUPPLIER_ORDER_DUE_FILTER_STATE_KEY to dueFilter.ifBlank { "all" },
+        SUPPLIER_ORDER_STATUS_FILTER_STATE_KEY to statusFilter.ifBlank {
+            if (safeSearchQuery.isBlank()) "open" else "all"
+        }
+    )
 }
 
 internal fun AppConfiguration.supplierDeliveryBucketTitle(bucketId: String): String = when (bucketId) {
@@ -6013,58 +6017,3 @@ internal fun AppConfiguration.SupplierDeliveryPromiseRadarCard(
         }
     }
 }
-
-
-internal data class SupplierCatalogItemUiModel(
-    val goodsItemId: String,
-    val title: String,
-    val barcodeText: String,
-    val totalQuantityText: String,
-    val expectedPriceText: String,
-    val savedPriceText: String,
-    val storeTitles: List<String>,
-    val priceBookStoreCount: Int,
-    val priceBookBacked: Boolean,
-    val openOrderCount: Int,
-    val orderCount: Int,
-    val lineCount: Int,
-    val lastActivityMillis: Long,
-    val latestStatus: SupplierOrderStatusDataModel,
-    val needsReply: Boolean,
-    val deliveredOnly: Boolean,
-    val searchKey: String,
-    val offerNote: String,
-    val storeId: String,
-    val supplierId: String,
-    val quantityTemplate: QuantityDataModel,
-    val currency: String,
-    val priceInputText: String,
-    val minOrderInputText: String,
-    val packageInputText: String,
-    val supplierGoodsName: String,
-    val supplierBarcode: String,
-    val canEditPriceBook: Boolean
-)
-
-internal fun AppConfiguration.supplierCatalogQuantityText(lines: List<SupplierOrderLineDataModel>): String {
-    val activeLines = lines.filter { it.isActive }
-    if (activeLines.isEmpty()) return ""
-
-    val unitKeys = activeLines.map { line ->
-        val quantity = line.requestedQuantity
-        quantity.id.ifBlank { quantity.immutableUnitName.visibleLocalizedString(stateValues.appLanguage, "") }
-    }.distinct()
-
-    return if (unitKeys.size == 1) {
-        val firstQuantity = activeLines.first().requestedQuantity
-        firstQuantity
-            .copy(total = activeLines.sumOf { it.requestedQuantity.total })
-            .quantityText(stateValues.appLanguage)
-    } else {
-        buildString {
-            append(activeLines.take(3).joinToString(" • ") { it.requestedQuantity.quantityText(stateValues.appLanguage) })
-            if (activeLines.size > 3) append(" +").append(activeLines.size - 3)
-        }
-    }
-}
-

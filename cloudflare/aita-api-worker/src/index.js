@@ -8,12 +8,8 @@ const FAVICON_PATHS = new Set(["/favicon.svg", "/favicon.ico"]);
 const ROBOTS_PATH = "/robots.txt";
 const BODYLESS_METHODS = new Set(["GET", "HEAD"]);
 const BOOTSTRAP_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
-const GATEWAY_VERSION = "2026-08-01";
-
-function normalizedPublicOrigin(request) {
-  const url = new URL(request.url);
-  return `${url.protocol}//${url.host}`;
-}
+const GATEWAY_VERSION = "2026-08-12";
+const CANONICAL_PUBLIC_ORIGIN = "https://aita-api.bogdan-dond.uk.workers.dev";
 
 function commonSecurityHeaders(extra = {}) {
   return {
@@ -190,32 +186,20 @@ function faviconResponse(includeBody = true) {
   });
 }
 
-function bootstrapPayload(request, env) {
-  const publicOrigin = normalizedPublicOrigin(request);
-  const legacyServerUrl = String(env.AITA_LEGACY_SERVER_URL || "https://api.aita.kz")
-    .trim()
-    .replace(/\/+$/, "");
-  const candidates = [
-    {
-      url: publicOrigin,
-      priority: 100,
-      supportsRealtime: true,
-      role: "primary-domainless",
-    },
-  ];
-  if (legacyServerUrl && legacyServerUrl !== publicOrigin) {
-    candidates.push({
-      url: legacyServerUrl,
-      priority: 40,
-      supportsRealtime: true,
-      role: "legacy-domain",
-    });
-  }
+function bootstrapPayload(env) {
+  const publicOrigin = CANONICAL_PUBLIC_ORIGIN;
   return {
     schemaVersion: 2,
     sequence: Number(env.AITA_BOOTSTRAP_SEQUENCE || 1),
     serverUrl: publicOrigin,
-    serverCandidates: candidates,
+    serverCandidates: [
+      {
+        url: publicOrigin,
+        priority: 100,
+        supportsRealtime: true,
+        role: "canonical-workers-vpc",
+      },
+    ],
     globalConfigPath: "config/global",
     globalConfigUrl: `${publicOrigin}/config/global`,
     environment: "workers-vpc",
@@ -271,7 +255,7 @@ export default {
           status: "ok",
           gateway: "aita-workers-vpc",
           version: GATEWAY_VERSION,
-          publicOrigin: requestUrl.origin,
+          publicOrigin: CANONICAL_PUBLIC_ORIGIN,
         },
         200,
         method !== "HEAD",
@@ -290,7 +274,7 @@ export default {
       if (method === "OPTIONS") {
         return new Response(null, { status: 204, headers: bootstrapCorsHeaders() });
       }
-      return bootstrapJsonResponse(bootstrapPayload(request, env), 200, method !== "HEAD");
+      return bootstrapJsonResponse(bootstrapPayload(env), 200, method !== "HEAD");
     }
 
     if (FAVICON_PATHS.has(requestUrl.pathname) && (method === "GET" || method === "HEAD")) {
@@ -311,9 +295,9 @@ export default {
           {
             service: "AITA domain-independent API gateway",
             status: "ok",
-            bootstrapUrl: `${requestUrl.origin}/.well-known/aita-server.json`,
-            healthUrl: `${requestUrl.origin}/healthz`,
-            readinessUrl: `${requestUrl.origin}/readyz`,
+            bootstrapUrl: `${CANONICAL_PUBLIC_ORIGIN}/.well-known/aita-server.json`,
+            healthUrl: `${CANONICAL_PUBLIC_ORIGIN}/healthz`,
+            readinessUrl: `${CANONICAL_PUBLIC_ORIGIN}/readyz`,
           },
           200,
           method !== "HEAD",
@@ -325,7 +309,7 @@ export default {
         probeOrigin(env, "/readyz"),
       ]);
       return new Response(
-        method === "HEAD" ? null : landingHtml({ publicOrigin: requestUrl.origin, health, readiness }),
+        method === "HEAD" ? null : landingHtml({ publicOrigin: CANONICAL_PUBLIC_ORIGIN, health, readiness }),
         {
           status: 200,
           headers: commonSecurityHeaders({

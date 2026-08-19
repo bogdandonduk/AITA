@@ -8,6 +8,11 @@ plugins {
 
 group = "kz.aita"
 version = "1.0.0"
+
+java {
+    toolchain { languageVersion.set(JavaLanguageVersion.of(21)) }
+}
+
 application {
     mainClass.set("kz.aita.server.ServerKt")
 

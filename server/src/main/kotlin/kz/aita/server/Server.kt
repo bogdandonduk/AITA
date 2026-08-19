@@ -4107,13 +4107,15 @@ private object RealtimeServerBus {
   suspend fun publish(
     entity: String = "all",
     storeId: String? = null,
+    userId: String? = null,
     reason: String? = null
   ) {
     val now = System.currentTimeMillis()
     val cleanEntity = entity.trim().ifBlank { "all" }
     val cleanStoreId = storeId?.trim()?.takeIf { it.isNotBlank() }
+    val cleanUserId = userId?.trim()?.takeIf { it.isNotBlank() }
     val cleanReason = reason?.trim()?.takeIf { it.isNotBlank() }
-    val coalescingKey = listOf(cleanEntity, cleanStoreId.orEmpty(), cleanReason.orEmpty()).joinToString("|")
+    val coalescingKey = listOf(cleanEntity, cleanStoreId.orEmpty(), cleanUserId.orEmpty(), cleanReason.orEmpty()).joinToString("|")
     val previous = recentPublishedAtByKey.put(coalescingKey, now)
     if (previous != null && now - previous < DUPLICATE_COALESCE_WINDOW_MILLIS) return
 
@@ -4126,6 +4128,7 @@ private object RealtimeServerBus {
       type = "changed",
       entity = cleanEntity,
       storeId = cleanStoreId,
+      userId = cleanUserId,
       reason = cleanReason,
       createdAtMillis = now
     )
@@ -4172,6 +4175,51 @@ private suspend fun publishStockRealtimeBundle(storeIds: Iterable<String?>, reas
       publishStockRealtimeBundle(storeId, reason)
     }
   }
+}
+
+private suspend fun publishSupplierContractRealtime(storeId: String?, reason: String) {
+  RealtimeServerBus.publish(
+    entity = "suppliercontracts",
+    storeId = storeId?.trim()?.takeIf { it.isNotBlank() },
+    reason = reason
+  )
+}
+
+private suspend fun publishSupplierOrderRealtime(
+  storeId: String?,
+  reason: String,
+  mutationId: String? = null
+) {
+  val eventReason = listOfNotNull(
+    reason.trim().takeIf { it.isNotBlank() },
+    mutationId?.trim()?.takeIf { it.isNotBlank() }
+  ).joinToString(":").ifBlank { "supplier_order_changed" }
+  RealtimeServerBus.publish(
+    entity = "supplierorders",
+    storeId = storeId?.trim()?.takeIf { it.isNotBlank() },
+    reason = eventReason
+  )
+}
+
+private suspend fun publishSupplierProfileRealtime(
+  userIds: Iterable<String>,
+  reason: String,
+  supplierId: String
+) {
+  val cleanSupplierId = supplierId.trim().takeIf { it.isNotBlank() } ?: return
+  val eventReason = listOf(reason.trim().ifBlank { "supplier_profile_changed" }, cleanSupplierId)
+    .joinToString(":")
+  userIds
+    .map { it.trim() }
+    .filter { it.isNotBlank() }
+    .distinctBy { it.lowercase() }
+    .forEach { targetUserId ->
+      RealtimeServerBus.publish(
+        entity = "suppliers/profiles",
+        userId = targetUserId,
+        reason = eventReason
+      )
+    }
 }
 
 private fun Throwable.isExpectedRealtimeDisconnect(): Boolean {
@@ -4630,6 +4678,62 @@ private fun RoutingCall.headerUuid(name: String): UUID? {
 private fun String?.optionalUuidOrNull(): UUID? {
   val clean = this?.trim()?.takeIf { it.isNotBlank() } ?: return null
   return runCatching { UUID.fromString(clean) }.getOrNull()
+}
+
+private data class ResolvedStockBatchSupplierLink(
+  val supplierId: UUID?,
+  val supplierOrderId: UUID?
+)
+
+private fun resolveStockBatchSupplierLinkInsideTransaction(
+  storeId: UUID,
+  rawSupplierId: String?,
+  rawSupplierOrderId: String?
+): ResolvedStockBatchSupplierLink? {
+  val cleanSupplierId = rawSupplierId?.trim().orEmpty()
+  val cleanSupplierOrderId = rawSupplierOrderId?.trim().orEmpty()
+  val requestedSupplierId = if (cleanSupplierId.isBlank()) {
+    null
+  } else {
+    runCatching { UUID.fromString(cleanSupplierId) }.getOrNull() ?: return null
+  }
+  val supplierOrderId = if (cleanSupplierOrderId.isBlank()) {
+    null
+  } else {
+    runCatching { UUID.fromString(cleanSupplierOrderId) }.getOrNull() ?: return null
+  }
+
+  val linkedOrder = if (supplierOrderId == null) {
+    null
+  } else {
+    SupplierOrders
+      .select(SupplierOrders.supplierId)
+      .where {
+        (SupplierOrders.id eq supplierOrderId) and
+          (SupplierOrders.storeId eq storeId)
+      }
+      .singleOrNull()
+      ?: return null
+  }
+  val orderSupplierId = linkedOrder?.get(SupplierOrders.supplierId)
+  if (requestedSupplierId != null && orderSupplierId != null && requestedSupplierId != orderSupplierId)
+    return null
+
+  val supplierId = requestedSupplierId ?: orderSupplierId
+  if (supplierId != null) {
+    lockSupplierProfileInsideTransaction(supplierId)
+    if (
+      Suppliers
+        .select(Suppliers.id)
+        .where { (Suppliers.id eq supplierId) and (Suppliers.isActive eq true) }
+        .empty()
+    ) return null
+  }
+
+  return ResolvedStockBatchSupplierLink(
+    supplierId = supplierId,
+    supplierOrderId = supplierOrderId
+  )
 }
 
 private fun RoutingCall.inventoryContextStoreId(): UUID? {
@@ -6888,7 +6992,7 @@ private fun SupplierOrderLineDataModel.cleanForStorage(orderId: UUID): SupplierO
   supplierOfferedSupplyPrice = supplierOfferedSupplyPrice
     ?.let { price ->
       price.price.toMoneyDouble()
-        .takeIf { amount -> amount > 0.0 }
+        .takeIf { amount -> amount.isFinite() && amount > 0.0 }
         ?.let { amount -> price.copy(price = amount.roundMoney().toStockMoneyText()) }
     },
   additionalNotes = additionalNotes?.trim()?.takeIf { it.isNotBlank() },
@@ -6915,13 +7019,16 @@ private fun supplierResponseAmountForStorage(
       ?: return@mapNotNull null
     acceptedQuantity to offeredPrice
   }
-  val totalAmount = amountLines.sumOf { (quantity, price) -> quantity * price.price.toMoneyDouble() }.roundMoney()
-  if (totalAmount <= 0.0) return null
-
-  val currency = amountLines
-    .firstNotNullOfOrNull { (_, price) -> price.currency.takeIf { it.isNotBlank() } }
-    ?: fallbackCurrency?.takeIf { it.isNotBlank() }
-    ?: "KZT"
+  val normalizedFallbackCurrency = fallbackCurrency?.trim()?.uppercase()?.takeIf { it.isNotBlank() } ?: "KZT"
+  val currencies = amountLines
+    .map { (_, price) -> price.currency.trim().uppercase().ifBlank { normalizedFallbackCurrency } }
+    .distinct()
+  val currency = currencies.singleOrNull() ?: return null
+  val totalAmount = amountLines
+    .sumOf { (quantity, price) -> quantity * price.price.toMoneyDouble() }
+    .takeIf { value -> value.isFinite() && value > 0.0 }
+    ?.roundMoney()
+    ?: return null
 
   return PriceDataModel(
     price = totalAmount.toStockMoneyText(),
@@ -6944,6 +7051,18 @@ private fun supplierOrderWithLinesInsideTransaction(orderId: UUID): SupplierOrde
     .map { it.toSupplierOrderLineDataModel() }
 
   return SupplierOrderWithLinesDataModel(order, lines)
+}
+
+private fun lockSupplierOrdersInsideTransaction(orderIds: Collection<UUID>) {
+  orderIds
+    .distinct()
+    .sortedBy { it.toString() }
+    .forEach { orderId ->
+      val lockIdentity = "supplier_order:$orderId"
+      org.jetbrains.exposed.sql.transactions.TransactionManager.current().exec(
+        "SELECT pg_advisory_xact_lock(hashtextextended('$lockIdentity', 0))"
+      )
+    }
 }
 
 private fun supplierOrderStatusAllowedFromSupplier(
@@ -7056,6 +7175,24 @@ private fun supplierOrderStatusSuccessMessage(updatedStatus: SupplierOrderStatus
   )
 }
 
+private fun supplierOrderStatusPartialSuccessMessage(
+  status: SupplierOrderStatusDataModel,
+  updatedCount: Int,
+  requestedCount: Int
+): List<LocalizedStringDataModel> {
+  val action = when (status) {
+    SupplierOrderStatusDataModel.SeenBySupplier -> Triple("marked as seen", "отмечены просмотренными", "қаралды деп белгіленді")
+    SupplierOrderStatusDataModel.Packed -> Triple("marked as packed", "отмечены собранными", "жиналды деп белгіленді")
+    SupplierOrderStatusDataModel.InDelivery -> Triple("moved into delivery", "переданы в доставку", "жеткізуге жіберілді")
+    else -> Triple("updated", "обновлены", "жаңартылды")
+  }
+  return simpleMessage(
+    main = "$updatedCount of $requestedCount selected orders were ${action.first}. The remaining orders were skipped because their current status, response, or agreement no longer permits this step.",
+    ru = "$updatedCount из $requestedCount выбранных заказов ${action.second}. Остальные пропущены: их текущий статус, ответ или договор уже не разрешает этот шаг.",
+    kk = "$requestedCount таңдалған тапсырыстың $updatedCount ${action.third}. Қалғандары өткізіліп жіберілді: олардың ағымдағы күйі, жауабы немесе келісімі бұл қадамға енді рұқсат бермейді."
+  )
+}
+
 private fun List<SupplierOrderWithLinesDataModel>.withSupplierDeskSnapshotsInsideTransaction(): List<SupplierOrderWithLinesDataModel> {
   if (isEmpty()) return this
 
@@ -7125,7 +7262,7 @@ private fun accessibleSupplierIdsForUserInsideTransaction(userId: UUID): List<UU
     .distinct()
 
 private fun SupplierOrderStatusDataModel.isClosedForSupplierDashboard(): Boolean =
-  this == SupplierOrderStatusDataModel.Delivered || this == SupplierOrderStatusDataModel.Cancelled
+  isClosedForSupplierDesk()
 
 private const val AITA_SUPPLIER_DAY_MILLIS: Long = 24L * 60L * 60L * 1000L
 
@@ -7364,9 +7501,15 @@ private fun supplierDashboardRunAttentionSummary(
 
 private fun <T> supplierDashboardChunk(block: () -> T): T = block()
 
-private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDashboardDataModel {
+private fun supplierModeDashboardInsideTransaction(
+  userId: UUID,
+  requestedSupplierId: UUID? = null
+): SupplierModeDashboardDataModel {
   val now = System.currentTimeMillis()
   val supplierProfiles = accessibleSupplierProfilesForUserInsideTransaction(userId)
+    .filter { supplier ->
+      requestedSupplierId == null || supplier.id.equals(requestedSupplierId.toString(), ignoreCase = true)
+    }
   val supplierIds = supplierProfiles
     .mapNotNull { supplier -> runCatching { UUID.fromString(supplier.id) }.getOrNull() }
     .distinct()
@@ -7394,8 +7537,9 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
       .map { it.toSupplierOrderLineDataModel() }
   }
 
+  val rawLinesByOrder = rawLines.groupBy { line -> line.orderId }
   val bundles = rawOrders.map { order ->
-    SupplierOrderWithLinesDataModel(order, rawLines.filter { it.orderId == order.id })
+    SupplierOrderWithLinesDataModel(order, rawLinesByOrder[order.id].orEmpty())
   }.withSupplierDeskSnapshotsInsideTransaction()
 
   val orders = bundles.map { it.order }
@@ -7408,15 +7552,39 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
     .where { (SupplierPartnershipContracts.supplierId inList supplierIds) and (SupplierPartnershipContracts.isActive eq true) }
     .map { it.toSupplierPartnershipContractDataModel() }
 
-  val supplierPriceRows = SupplierGoodsPrices
+  val allSupplierPriceRows = SupplierGoodsPrices
     .selectAll()
     .where { (SupplierGoodsPrices.supplierId inList supplierIds) and (SupplierGoodsPrices.isActive eq true) }
     .map { it.toSupplierGoodsPriceDataModel() }
+    .normalizedSupplierGoodsPriceBook()
 
-  val priceBookGoodsItemIds = supplierPriceRows
-    .map { it.goodsItemId }
-    .filter { it.isNotBlank() }
-    .distinct()
+  // A legacy zero-price row is still a real Store ↔ Supplier relationship and catalogue item, so
+  // it remains visible for repair. Only usable positive prices contribute to price coverage and
+  // operational readiness calculations.
+  val supplierPriceRows = allSupplierPriceRows
+    .filter { price -> price.supplyPrice.hasPositiveSupplierDeskPrice() }
+
+  val supplierCatalogGoodsItemIds = buildSet {
+    lines.forEach { line ->
+      line.goodsItemId.trim().lowercase().takeIf { it.isNotBlank() }?.let { add(it) }
+      line.substituteGoodsItemId
+        ?.trim()
+        ?.lowercase()
+        ?.takeIf { it.isNotBlank() }
+        ?.let { add(it) }
+    }
+    allSupplierPriceRows.forEach { price ->
+      price.goodsItemId.trim().lowercase().takeIf { it.isNotBlank() }?.let { add(it) }
+    }
+    contracts.forEach { contract ->
+      addAll(contract.goodsItemIds.map { it.trim().lowercase() }.filter { it.isNotBlank() })
+      addAll(
+        contract.priceTerms
+          .map { it.goodsItemId.trim().lowercase() }
+          .filter { it.isNotBlank() }
+      )
+    }
+  }
 
   val statusBuckets = supplierDashboardChunk {
     SupplierOrderStatusDataModel.entries.mapNotNull { status ->
@@ -7462,36 +7630,322 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
       .take(8)
   }
 
-  val contractsByStore = contracts.groupBy { it.storeId }
+  val contractsByStore = contracts.groupBy { it.storeId.trim().lowercase() }
+
+  val partnerStoreUuidIds = (
+      orders.map { it.storeId } +
+        contracts.map { it.storeId } +
+        allSupplierPriceRows.map { it.storeId }
+    )
+    .mapNotNull { value -> runCatching { UUID.fromString(value.trim()) }.getOrNull() }
+    .distinct()
+  val partnerStorePublicIds = (
+      orders.map { it.storePublicIdSnapshot } +
+        contracts.map { it.storePublicIdSnapshot } +
+        allSupplierPriceRows.mapNotNull { price ->
+          price.storeId
+            .trim()
+            .takeIf { value ->
+              value.isNotBlank() && runCatching { UUID.fromString(value) }.isFailure
+            }
+        }
+    )
+    .map { it.trim().uppercase() }
+    .filter { it.isNotBlank() }
+    .distinct()
+
+  val partnerStoreRowsById = if (partnerStoreUuidIds.isEmpty()) {
+    emptyList()
+  } else {
+    Stores
+      .selectAll()
+      .where { (Stores.id inList partnerStoreUuidIds) and (Stores.isActive eq true) }
+      .toList()
+  }
+  val partnerStoreRowsByPublicId = if (partnerStorePublicIds.isEmpty()) {
+    emptyList()
+  } else {
+    Stores
+      .selectAll()
+      .where { (Stores.publicId inList partnerStorePublicIds) and (Stores.isActive eq true) }
+      .toList()
+  }
+  val partnerStores = (partnerStoreRowsById + partnerStoreRowsByPublicId)
+    .distinctBy { row -> row[Stores.id] }
+    .map { row -> row.toStoreDataModel() }
+  val partnerStoresById = partnerStores.associateBy { store -> store.id.trim().lowercase() }
+  val partnerStoresByPublicId = partnerStores
+    .filter { store -> store.publicId.isNotBlank() }
+    .associateBy { store -> store.publicId.trim().uppercase() }
+
+  fun normalizedSupplierDashboardStoreUuid(value: String): String? =
+    runCatching { UUID.fromString(value.trim()).toString().lowercase() }.getOrNull()
+
+  fun supplierDashboardPartnerStoreKey(
+    storeId: String,
+    storePublicId: String = "",
+    fallback: String
+  ): String {
+    val normalizedStoreId = normalizedSupplierDashboardStoreUuid(storeId)
+    normalizedStoreId
+      ?.let { partnerStoresById[it]?.id }
+      ?.let(::normalizedSupplierDashboardStoreUuid)
+      ?.let { return it }
+
+    val cleanPublicId = storePublicId
+      .trim()
+      .ifBlank { if (normalizedStoreId == null) storeId.trim() else "" }
+      .uppercase()
+    partnerStoresByPublicId[cleanPublicId]
+      ?.id
+      ?.let(::normalizedSupplierDashboardStoreUuid)
+      ?.let { return it }
+
+    normalizedStoreId?.let { return it }
+    if (cleanPublicId.isNotBlank()) return "public:$cleanPublicId"
+    return "source:${fallback.trim().lowercase()}"
+  }
+
+  fun StoreDataModel.supplierDashboardAddressText(): String = address
+    .trim()
+    .ifBlank {
+      location.localizedAddresses
+        .firstOrNull { item -> item.language == "main" }
+        ?.value
+        .orEmpty()
+        .trim()
+    }
+    .ifBlank { location.fallbackAddress.trim() }
+    .ifBlank { location.name.trim() }
+
+  fun SupplierOrderDataModel.supplierDashboardActivityMillis(): Long =
+    updatedAtMillis.takeIf { value -> value > 0L } ?: orderedAtMillis
+
+  fun SupplierPartnershipContractDataModel.supplierDashboardActivityMillis(): Long =
+    maxOf(updatedAtMillis, createdAtMillis)
+
+  fun SupplierGoodsPriceDataModel.supplierDashboardActivityMillis(): Long =
+    maxOf(lastUsedAtMillis ?: 0L, updatedAtMillis, createdAtMillis)
+
+  fun SupplierOrderDataModel.supplierDashboardFallbackKey(index: Int): String = id.trim().ifBlank {
+    "order:$index:${supplierId.trim().lowercase()}:${supplierDashboardActivityMillis()}"
+  }
+
+  val ordersByPartnerStore = orders
+    .mapIndexed { index, order ->
+      supplierDashboardPartnerStoreKey(
+        storeId = order.storeId,
+        storePublicId = order.storePublicIdSnapshot,
+        fallback = order.supplierDashboardFallbackKey(index)
+      ) to order
+    }
+    .groupBy(keySelector = { it.first }, valueTransform = { it.second })
+  val contractsByPartnerStore = contracts
+    .mapIndexed { index, contract ->
+      supplierDashboardPartnerStoreKey(
+        storeId = contract.storeId,
+        storePublicId = contract.storePublicIdSnapshot,
+        fallback = contract.id.trim().ifBlank {
+          "contract:$index:${contract.supplierId.trim().lowercase()}:${contract.revision}:${contract.createdAtMillis}"
+        }
+      ) to contract
+    }
+    .groupBy(keySelector = { it.first }, valueTransform = { it.second })
+  val pricesByPartnerStore = allSupplierPriceRows
+    .mapIndexed { index, price ->
+      supplierDashboardPartnerStoreKey(
+        storeId = price.storeId,
+        fallback = price.id.trim().ifBlank { "${price.supplierPriceBookIdentity()}:$index" }
+      ) to price
+    }
+    .groupBy(keySelector = { it.first }, valueTransform = { it.second })
+  val bundlesByPartnerStore = bundles
+    .mapIndexed { index, bundle ->
+      supplierDashboardPartnerStoreKey(
+        storeId = bundle.order.storeId,
+        storePublicId = bundle.order.storePublicIdSnapshot,
+        fallback = bundle.order.supplierDashboardFallbackKey(index)
+      ) to bundle
+    }
+    .groupBy(keySelector = { it.first }, valueTransform = { it.second })
+  val partnerStoreKeys = (
+      ordersByPartnerStore.keys +
+        contractsByPartnerStore.keys +
+        pricesByPartnerStore.keys
+    ).distinct()
+
   val partnerHighlights = supplierDashboardChunk {
-    orders
-      .groupBy { it.storeId.ifBlank { it.storePublicIdSnapshot }.ifBlank { it.id } }
-      .map { (storeKey, storeOrdersRaw) ->
-        val storeOrders = storeOrdersRaw.sortedByDescending { it.updatedAtMillis.takeIf { value -> value > 0L } ?: it.orderedAtMillis }
-        val latest = storeOrders.firstOrNull()
-        val storeContracts = latest?.storeId?.let { contractsByStore[it].orEmpty() }.orEmpty()
+    partnerStoreKeys
+      .map { storeKey ->
+        val storeOrders = ordersByPartnerStore[storeKey].orEmpty()
+          .sortedByDescending { order -> order.supplierDashboardActivityMillis() }
+        val storeContracts = contractsByPartnerStore[storeKey].orEmpty()
+          .sortedByDescending { contract -> contract.supplierDashboardActivityMillis() }
+        val storePrices = pricesByPartnerStore[storeKey].orEmpty()
+          .sortedByDescending { price -> price.supplierDashboardActivityMillis() }
+        val latestOrder = storeOrders.firstOrNull()
+        val latestContract = storeContracts.firstOrNull()
+        val latestPrice = storePrices.firstOrNull()
+        val sourceStoreId = sequenceOf(
+          latestOrder?.storeId,
+          latestContract?.storeId,
+          latestPrice?.storeId
+        )
+          .mapNotNull { value -> value?.let(::normalizedSupplierDashboardStoreUuid) }
+          .firstOrNull()
+          .orEmpty()
+        val sourceStorePublicId = latestOrder?.storePublicIdSnapshot
+          .orEmpty()
+          .ifBlank { latestContract?.storePublicIdSnapshot.orEmpty() }
+          .ifBlank {
+            sequenceOf(latestOrder?.storeId, latestContract?.storeId, latestPrice?.storeId)
+              .map { it.orEmpty().trim() }
+              .firstOrNull { value ->
+                value.isNotBlank() && normalizedSupplierDashboardStoreUuid(value) == null
+              }
+              .orEmpty()
+          }
+          .trim()
+          .uppercase()
+        val store = partnerStoresById[storeKey]
+          ?: partnerStoresById[sourceStoreId]
+          ?: partnerStoresByPublicId[sourceStorePublicId]
+        val canonicalStoreId = store
+          ?.id
+          ?.let(::normalizedSupplierDashboardStoreUuid)
+          .orEmpty()
+          .ifBlank { sourceStoreId }
+        val latestActivityMillis = maxOf(
+          latestOrder?.supplierDashboardActivityMillis() ?: 0L,
+          latestContract?.supplierDashboardActivityMillis() ?: 0L,
+          latestPrice?.supplierDashboardActivityMillis() ?: 0L
+        )
+        val storeBundles = bundlesByPartnerStore[storeKey].orEmpty()
+        val openStoreOrders = storeOrders.filter { order ->
+          !order.status.isClosedForSupplierDashboard()
+        }
+        val catalogSkuIds = buildSet {
+          storeBundles.flatMap { bundle -> bundle.lines }.forEach { line ->
+            line.goodsItemId.trim().lowercase().takeIf { it.isNotBlank() }?.let { add(it) }
+            line.substituteGoodsItemId
+              ?.trim()
+              ?.lowercase()
+              ?.takeIf { it.isNotBlank() }
+              ?.let { add(it) }
+          }
+          storePrices.forEach { price ->
+            price.goodsItemId.trim().lowercase().takeIf { it.isNotBlank() }?.let { add(it) }
+          }
+          storeContracts.forEach { contract ->
+            addAll(contract.goodsItemIds.map { it.trim().lowercase() }.filter { it.isNotBlank() })
+            addAll(
+              contract.priceTerms
+                .map { it.goodsItemId.trim().lowercase() }
+                .filter { it.isNotBlank() }
+            )
+          }
+        }
+        val openStoreOrderIds = openStoreOrders.map { order -> order.id }.toSet()
+        val requiredOfferKeys = storeBundles
+          .asSequence()
+          .filter { bundle -> bundle.order.id in openStoreOrderIds }
+          .flatMap { bundle ->
+            bundle.lines
+              .asSequence()
+              .filter { line -> line.isActive }
+              .flatMap { line ->
+                sequenceOf(line.goodsItemId, line.substituteGoodsItemId.orEmpty())
+                  .mapNotNull { goodsItemId ->
+                    supplierGoodsOfferRelationshipKey(
+                      storeId = bundle.order.storeId.ifBlank { canonicalStoreId },
+                      supplierId = bundle.order.supplierId,
+                      goodsItemId = goodsItemId
+                    )
+                  }
+              }
+          }
+          .toSet()
+        val priceGapCount = supplierGoodsOfferPriceGapCount(
+          requiredRelationshipKeys = requiredOfferKeys,
+          prices = storePrices
+        )
+
         SupplierDashboardPartnerDataModel(
-          storeId = latest?.storeId ?: storeKey,
-          storeNameSnapshot = latest?.storeNameSnapshot.orEmpty(),
-          storePublicIdSnapshot = latest?.storePublicIdSnapshot.orEmpty(),
-          storeAddressTextSnapshot = latest?.storeAddressTextSnapshot.orEmpty(),
+          // Never place an internal grouping token or a public Store code into the Store-ID field.
+          // Consumers can safely treat this as a real Store UUID or as absent.
+          storeId = canonicalStoreId,
+          // A partner workspace represents the current commercial relationship, so prefer the
+          // live Store profile while retaining immutable order/contract snapshots as fallbacks.
+          storeNameSnapshot = store?.name
+            .orEmpty()
+            .ifEmpty { latestOrder?.storeNameSnapshot.orEmpty() }
+            .ifEmpty { latestContract?.storeNameSnapshot.orEmpty() },
+          storePublicIdSnapshot = store?.publicId
+            .orEmpty()
+            .ifBlank { latestOrder?.storePublicIdSnapshot.orEmpty() }
+            .ifBlank { latestContract?.storePublicIdSnapshot.orEmpty() },
+          storeAddressTextSnapshot = store
+            ?.supplierDashboardAddressText()
+            .orEmpty()
+            .ifBlank { latestOrder?.storeAddressTextSnapshot.orEmpty() },
           orderCount = storeOrders.size,
-          openOrderCount = storeOrders.count { !it.status.isClosedForSupplierDashboard() },
-          deliveredOrderCount = storeOrders.count { it.status == SupplierOrderStatusDataModel.Delivered || it.status == SupplierOrderStatusDataModel.PartiallyDelivered },
-          issueOrderCount = storeOrders.count { it.status == SupplierOrderStatusDataModel.IssueReported || it.status == SupplierOrderStatusDataModel.Cancelled },
-          latestStatus = latest?.status ?: SupplierOrderStatusDataModel.Draft,
-          latestActivityMillis = latest?.updatedAtMillis?.takeIf { it > 0L } ?: latest?.orderedAtMillis ?: 0L,
-          activeContractCount = storeContracts.count { it.status == SUPPLIER_CONTRACT_STATUS_ACTIVE },
-          pendingContractCount = storeContracts.count { it.status == SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER || it.status == SUPPLIER_CONTRACT_STATUS_PENDING_STORE }
+          openOrderCount = openStoreOrders.size,
+          actionRequiredOrderCount = storeBundles.count { bundle ->
+            bundle.needsSupplierActionForSupplierDesk()
+          },
+          readyToPackOrderCount = storeBundles.count { bundle ->
+            bundle.isSupplierReadyToPackForSupplierDesk()
+          },
+          packedOrderCount = storeOrders.count { order ->
+            order.status == SupplierOrderStatusDataModel.Packed
+          },
+          inDeliveryOrderCount = storeOrders.count { order ->
+            order.status == SupplierOrderStatusDataModel.InDelivery
+          },
+          partiallyDeliveredOrderCount = storeOrders.count { order ->
+            order.status == SupplierOrderStatusDataModel.PartiallyDelivered
+          },
+          overdueOrderCount = openStoreOrders.count { order ->
+            val dueAt = order.confirmedDeliveryTimeMillis ?: order.desiredDeliveryTimeMillis
+            dueAt != null && dueAt < now
+          },
+          deliveredOrderCount = storeOrders.count { order ->
+            order.status == SupplierOrderStatusDataModel.Delivered
+          },
+          issueOrderCount = storeOrders.count { order ->
+            order.status == SupplierOrderStatusDataModel.IssueReported
+          },
+          catalogSkuCount = catalogSkuIds.size,
+          savedOfferCount = storePrices.size,
+          validOfferCount = storePrices.count { price ->
+            price.supplyPrice.hasPositiveSupplierDeskPrice()
+          },
+          priceGapCount = priceGapCount,
+          latestStatus = latestOrder?.status ?: SupplierOrderStatusDataModel.Draft,
+          latestActivityMillis = latestActivityMillis,
+          activeContractCount = storeContracts.count { contract ->
+            contract.status == SUPPLIER_CONTRACT_STATUS_ACTIVE
+          },
+          pendingContractCount = storeContracts.count { contract ->
+            contract.status == SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER ||
+              contract.status == SUPPLIER_CONTRACT_STATUS_PENDING_STORE
+          }
         )
       }
       .sortedWith(
-        compareByDescending<SupplierDashboardPartnerDataModel> { it.openOrderCount }
-          .thenByDescending { it.issueOrderCount }
-          .thenByDescending { it.latestActivityMillis }
+        compareByDescending<SupplierDashboardPartnerDataModel> { partner ->
+          partner.actionRequiredOrderCount +
+            partner.issueOrderCount +
+            partner.overdueOrderCount +
+            partner.pendingContractCount +
+            partner.priceGapCount
+        }
+          .thenByDescending { partner -> partner.openOrderCount }
+          .thenByDescending { partner -> partner.latestActivityMillis }
       )
-      .take(8)
+      .take(24)
   }
+
 
   val responseReadyStatuses = setOf(
     SupplierOrderStatusDataModel.Sent,
@@ -7499,20 +7953,15 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
     SupplierOrderStatusDataModel.Confirmed
   )
   fun SupplierOrderWithLinesDataModel.needsSupplierDashboardAction(): Boolean =
-    order.isActive &&
-       !order.status.isClosedForSupplierDashboard() &&
-       (order.status == SupplierOrderStatusDataModel.Sent ||
-          order.status == SupplierOrderStatusDataModel.SeenBySupplier ||
-          order.status == SupplierOrderStatusDataModel.IssueReported ||
-          (order.status in responseReadyStatuses && hasSupplierResponseGapsForSupplierDesk()))
+    needsSupplierActionForSupplierDesk()
 
   fun supplierBridgeTargetGoodsItemId(line: SupplierOrderLineDataModel): String =
     line.substituteGoodsItemId?.takeIf { it.isNotBlank() } ?: line.goodsItemId
 
   fun SupplierOrderWithLinesDataModel.blockingSupplierContractsForDashboard(): List<SupplierPartnershipContractDataModel> {
-    val relatedContracts = contractsByStore[order.storeId].orEmpty().filter { contract ->
+    val relatedContracts = contractsByStore[order.storeId.trim().lowercase()].orEmpty().filter { contract ->
       contract.isActive &&
-         contract.supplierId == order.supplierId &&
+         contract.supplierId.trim().equals(order.supplierId.trim(), ignoreCase = true) &&
          contract.status != SUPPLIER_CONTRACT_STATUS_ACTIVE &&
          contract.status != SUPPLIER_CONTRACT_STATUS_ARCHIVED
     }
@@ -7524,12 +7973,8 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
       .map { line -> supplierBridgeTargetGoodsItemId(line) }
       .filter { goodsItemId -> goodsItemId.isNotBlank() }
       .toSet()
-    if (movingGoodsItemIds.isEmpty()) return emptyList()
-
     return relatedContracts.filter { contract ->
-      contract.scopeType == SUPPLIER_CONTRACT_SCOPE_PARTNERSHIP ||
-         contract.goodsItemIds.isEmpty() ||
-         contract.goodsItemIds.any { goodsItemId -> goodsItemId in movingGoodsItemIds }
+      contract.blocksSupplierSupplyForGoods(movingGoodsItemIds)
     }
   }
 
@@ -7659,7 +8104,7 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
               ?: line.goodsItemBarcodeSnapshots.firstOrNull()
               ?: line.goodsItemId.take(8)
           }
-  
+
         SupplierDashboardDeliveryBucketDataModel(
           bucketId = bucketId,
           title = supplierDashboardDeliveryBucketTitle(bucketId),
@@ -7669,7 +8114,7 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
           actionRequiredOrderCount = bucketBundles.count { bundle -> bundle.needsSupplierDashboardAction() },
           packedOrderCount = bucketOrders.count { it.status == SupplierOrderStatusDataModel.Packed },
           inDeliveryOrderCount = bucketOrders.count { it.status == SupplierOrderStatusDataModel.InDelivery },
-          issueOrderCount = bucketOrders.count { it.status == SupplierOrderStatusDataModel.IssueReported || it.status == SupplierOrderStatusDataModel.Cancelled },
+          issueOrderCount = bucketOrders.count { it.status == SupplierOrderStatusDataModel.IssueReported },
           earliestDueAtMillis = dueValues.minOrNull(),
           latestDueAtMillis = dueValues.maxOrNull(),
           goodsPreview = preview.takeIf { it.isNotBlank() }?.let { listOf(LocalizedStringDataModel("main", it)) }.orEmpty()
@@ -7690,12 +8135,16 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
   val responseCandidateBundles = openBundles.filter { bundle -> bundle.order.status in responseReadyStatuses }
   val responseCandidateLines = responseCandidateBundles.flatMap { bundle -> bundle.lines.filter { it.isActive } }
   val supplierPriceBookKeys = supplierPriceRows
-    .map { price -> "${price.storeId}|${price.supplierId}|${price.goodsItemId}" }
+    .mapNotNull { price -> price.supplierGoodsOfferRelationshipKey() }
     .toSet()
-  fun supplierPriceBookKeyFor(order: SupplierOrderDataModel, line: SupplierOrderLineDataModel): String {
-    val targetGoodsItemId = supplierBridgeTargetGoodsItemId(line)
-    return "${order.storeId}|${order.supplierId}|$targetGoodsItemId"
-  }
+  fun supplierPriceBookKeyFor(
+    order: SupplierOrderDataModel,
+    line: SupplierOrderLineDataModel
+  ): String? = supplierGoodsOfferRelationshipKey(
+    storeId = order.storeId,
+    supplierId = order.supplierId,
+    goodsItemId = supplierBridgeTargetGoodsItemId(line)
+  )
   val bulkSeenOrderIds = openBundles
     .filter { bundle -> bundle.order.status == SupplierOrderStatusDataModel.Sent }
     .map { bundle -> bundle.order.id }
@@ -7720,7 +8169,7 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
     .distinct()
   val priceBookCoveredLineCount = responseCandidateLines.count { line ->
     val order = ordersById[line.orderId] ?: return@count false
-    supplierPriceBookKeyFor(order, line) in supplierPriceBookKeys
+    supplierPriceBookKeyFor(order, line)?.let { key -> key in supplierPriceBookKeys } == true
   }
   val missingAcceptedQuantityLineCount = responseCandidateLines.count { it.supplierAcceptedQuantity == null }
   val missingOfferedPriceLineCount = responseCandidateLines.count { line ->
@@ -7747,13 +8196,18 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
        (line.supplierDeskAcceptedQuantityTotal() ?: 0.0) > 0.0 &&
        line.supplierOfferedSupplyPrice.hasPositiveSupplierDeskPrice()
   }
-  val readyAmountValue = readyAmountLines.sumOf { line ->
-    (line.supplierAcceptedQuantity?.total ?: 0.0).coerceAtLeast(0.0) *
-       (line.supplierOfferedSupplyPrice?.price?.toMoneyDouble() ?: 0.0)
-  }.roundMoney()
-  val readyAmountCurrency = readyAmountLines.firstNotNullOfOrNull { line ->
-    line.supplierOfferedSupplyPrice?.currency?.takeIf { it.isNotBlank() }
-  } ?: supplierPriceRows.firstOrNull()?.supplyPrice?.currency?.takeIf { it.isNotBlank() } ?: "KZT"
+  val readyAmountCurrencies = readyAmountLines
+    .mapNotNull { line -> line.supplierOfferedSupplyPrice?.currency?.trim()?.uppercase()?.ifBlank { "KZT" } }
+    .distinct()
+  val readyAmountCurrency = readyAmountCurrencies.singleOrNull().orEmpty()
+  val readyAmountValue = if (readyAmountCurrency.isBlank()) {
+    0.0
+  } else {
+    readyAmountLines.sumOf { line ->
+      (line.supplierAcceptedQuantity?.total ?: 0.0).coerceAtLeast(0.0) *
+         (line.supplierOfferedSupplyPrice?.price?.toMoneyDouble() ?: 0.0)
+    }.takeIf { value -> value.isFinite() && value > 0.0 }?.roundMoney() ?: 0.0
+  }
   val readiness = supplierDashboardChunk {
     SupplierDashboardReadinessDataModel(
       openOrderCount = openBundles.size,
@@ -7803,17 +8257,23 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
             .thenByDescending { bundle -> bundle.order.updatedAtMillis.takeIf { value -> value > 0L } ?: bundle.order.orderedAtMillis }
         )
         val runOrders = runBundles.map { it.order }.distinctBy { it.id }
-        val physicallyActionableOrderIds = runOrders
+        val manifestActionableOrderIds = runOrders
           .filter { order ->
             order.id in readyToPackOrderIds ||
-               order.status == SupplierOrderStatusDataModel.Packed ||
+               order.id in safeDispatchableOrderIds ||
                order.status == SupplierOrderStatusDataModel.InDelivery
+          }
+          .map { order -> order.id }
+          .toSet()
+        val packChecklistOrderIds = runOrders
+          .filter { order ->
+            order.id in readyToPackOrderIds || order.id in safeDispatchableOrderIds
           }
           .map { order -> order.id }
           .toSet()
         val runLines = runBundles.flatMap { bundle -> bundle.lines.filter { it.isActive } }
         val packLines = runLines.filter { line ->
-          line.orderId in physicallyActionableOrderIds && line.supplierDeskPhysicalQuantityTotal() > 0.0
+          line.orderId in packChecklistOrderIds && line.supplierDeskPhysicalQuantityTotal() > 0.0
         }
         val responseGapOrderIds = runBundles.filter { bundle ->
           bundle.order.status in responseReadyStatuses && bundle.hasSupplierResponseGapsForSupplierDesk()
@@ -7883,31 +8343,43 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
             }
           }
         val amountLines = runLines
-          .filter { line -> line.orderId in physicallyActionableOrderIds }
+          .filter { line -> line.orderId in manifestActionableOrderIds }
           .mapNotNull amountLine@{ line ->
           val order = ordersById[line.orderId] ?: return@amountLine null
           val targetGoodsItemId = supplierBridgeTargetGoodsItemId(line)
           val quantity = line.supplierDeskPhysicalQuantityTotal()
           if (quantity <= 0.0) return@amountLine null
-          val price = line.supplierOfferedSupplyPrice
-            ?: line.expectedSupplyPrice
+          val price = listOfNotNull(
+            line.supplierOfferedSupplyPrice,
+            line.expectedSupplyPrice
+          ).firstOrNull { candidate -> candidate.hasPositiveSupplierDeskPrice() }
             ?: supplierPriceRows
               .filter { price ->
                 price.isActive &&
                    price.storeId == order.storeId &&
                    price.supplierId == order.supplierId &&
-                   price.goodsItemId == targetGoodsItemId
+                   price.goodsItemId == targetGoodsItemId &&
+                   price.supplyPrice.hasPositiveSupplierDeskPrice()
               }
               .maxByOrNull { price -> price.lastUsedAtMillis ?: price.updatedAtMillis }
               ?.supplyPrice
             ?: return@amountLine null
           quantity to price
         }
-        val amountValue = amountLines.sumOf { (quantity, price) -> quantity * price.price.toMoneyDouble() }.roundMoney()
-        val amountCurrency = amountLines.firstOrNull()?.second?.currency?.takeIf { it.isNotBlank() }
-          ?: runOrders.firstNotNullOfOrNull { order -> order.amount?.currency?.takeIf { it.isNotBlank() } }
-          ?: supplierPriceRows.firstOrNull()?.supplyPrice?.currency?.takeIf { it.isNotBlank() }
-          ?: "KZT"
+        val amountCurrencies = amountLines
+          .map { (_, price) -> price.currency.trim().uppercase().ifBlank { "KZT" } }
+          .distinct()
+        // Never display one apparently precise total for a run that actually mixes currencies.
+        val amountCurrency = amountCurrencies.singleOrNull().orEmpty()
+        val amountValue = if (amountCurrency.isBlank()) {
+          0.0
+        } else {
+          amountLines
+            .sumOf { (quantity, price) -> quantity * price.price.toMoneyDouble() }
+            .takeIf { value -> value.isFinite() && value > 0.0 }
+            ?.roundMoney()
+            ?: 0.0
+        }
         val runGoodsItemIds = runLines
           .map { line -> supplierBridgeTargetGoodsItemId(line) }
           .filter { goodsItemId -> goodsItemId.isNotBlank() }
@@ -7917,13 +8389,10 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
              sampleOrder != null &&
              contract.storeId == sampleOrder.storeId &&
              contract.supplierId == sampleOrder.supplierId &&
-             (contract.scopeType == SUPPLIER_CONTRACT_SCOPE_PARTNERSHIP ||
-                contract.goodsItemIds.isEmpty() ||
-                contract.goodsItemIds.any { goodsItemId -> goodsItemId in runGoodsItemIds })
+             contract.coversSupplierSupplyGoods(runGoodsItemIds)
         }
         val runContractBlockers = relatedContracts.filter { contract ->
-          contract.status != SUPPLIER_CONTRACT_STATUS_ACTIVE &&
-             contract.status != SUPPLIER_CONTRACT_STATUS_ARCHIVED
+          contract.blocksSupplierSupplyForGoods(runGoodsItemIds)
         }
         val contractBlockedOrderIds = runBundles
           .filter { bundle -> bundle.hasSupplierDashboardContractBlocker() }
@@ -8045,7 +8514,7 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
           }
         }
         val driverHandoffChecklist = supplierDashboardJoinedMessage(handoffMain, handoffRu, handoffKk)
-  
+
         SupplierDashboardDispatchRunDataModel(
           runId = "dispatch_${runKey.take(96)}",
           supplierId = sampleOrder?.supplierId.orEmpty(),
@@ -8056,6 +8525,12 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
           orderIds = runOrders.map { it.id },
           packableOrderIds = packableOrderIds,
           dispatchableOrderIds = dispatchableOrderIds,
+          inDeliveryOrderIds = runOrders
+            .filter { order -> order.status == SupplierOrderStatusDataModel.InDelivery }
+            .map { order -> order.id },
+          issueOrderIds = runOrders
+            .filter { order -> order.status == SupplierOrderStatusDataModel.IssueReported }
+            .map { order -> order.id },
           attentionOrderIds = attentionOrderIds,
           contractBlockedOrderIds = contractBlockedOrderIds,
           statusMix = statusMix,
@@ -8100,7 +8575,7 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
           .filter { order -> !order.status.isClosedForSupplierDashboard() }
           .distinctBy { it.id }
         if (relatedOrders.isEmpty()) return@bridgeItem null
-  
+
         val sampleLine = itemLines
           .maxByOrNull { line -> ordersById[line.orderId]?.updatedAtMillis ?: 0L }
           ?: itemLines.firstOrNull()
@@ -8115,23 +8590,31 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
              order.status == SupplierOrderStatusDataModel.Packed ||
              order.status == SupplierOrderStatusDataModel.InDelivery
         }
-        val priceBookRowsForItem = supplierPriceRows.filter { price -> price.goodsItemId == goodsItemId }
+        val normalizedGoodsItemId = goodsItemId.trim().lowercase()
+        val priceBookRowsForItem = supplierPriceRows.filter { price ->
+          price.goodsItemId.trim().lowercase() == normalizedGoodsItemId
+        }
         val responseCoveredLineCount = itemLines.count { line ->
           line.supplierAcceptedQuantity != null &&
              (!line.hasPositiveSupplierDeskAcceptedQuantity() || line.supplierOfferedSupplyPrice.hasPositiveSupplierDeskPrice() || run {
                val order = ordersById[line.orderId]
-               order != null && supplierPriceBookKeyFor(order, line) in supplierPriceBookKeys
+               order != null && supplierPriceBookKeyFor(order, line)
+                 ?.let { key -> key in supplierPriceBookKeys } == true
              })
         }
         val amountLines = itemLines.mapNotNull lineAmount@{ line ->
           val order = ordersById[line.orderId] ?: return@lineAmount null
           val quantity = line.supplierAcceptedQuantity?.total?.coerceAtLeast(0.0) ?: return@lineAmount null
+          val relationshipKey = supplierGoodsOfferRelationshipKey(
+            storeId = order.storeId,
+            supplierId = order.supplierId,
+            goodsItemId = goodsItemId
+          )
           val price = line.supplierOfferedSupplyPrice ?: supplierPriceRows
             .filter { price ->
               price.isActive &&
-                 price.storeId == order.storeId &&
-                 price.supplierId == order.supplierId &&
-                 price.goodsItemId == goodsItemId
+                relationshipKey != null &&
+                price.supplierGoodsOfferRelationshipKey() == relationshipKey
             }
             .maxByOrNull { price -> price.lastUsedAtMillis ?: price.updatedAtMillis }
             ?.supplyPrice
@@ -8154,7 +8637,8 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
           if (line.supplierAcceptedQuantity == null) return true
           if (!line.isMissingSupplierDeskOfferedPriceForAcceptedQuantity()) return false
           val order = ordersById[line.orderId] ?: return true
-          return supplierPriceBookKeyFor(order, line) !in supplierPriceBookKeys
+          return supplierPriceBookKeyFor(order, line)
+            ?.let { key -> key in supplierPriceBookKeys } != true
         }
         val quoteNeededLines = itemLines.filter { line -> itemLineNeedsFactoryQuote(line) }
         val missingResponseLineCount = quoteNeededLines.size
@@ -8230,7 +8714,7 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
         }
         val priorityScore = (openOrderCount * 10 + confirmedOrderCount * 7 + missingResponseLineCount * 5 + duePressure + missingQuantityTotal.coerceAtMost(999.0).toInt())
           .coerceAtLeast(0)
-  
+
         SupplierDashboardManufacturerBridgeDataModel(
           bridgeId = "${goodsItemId}:${relatedOrders.joinToString("-") { it.id.take(8) }}",
           goodsItemId = goodsItemId,
@@ -10604,7 +11088,7 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
             )
           )
         }
-  
+
         val requestCoveragePercent = supplierDashboardChunk {
           if (requestedQuantityTotal > 0.000001) {
             ((acceptedQuantityTotal / requestedQuantityTotal) * 100.0).toInt().coerceIn(0, 100)
@@ -10779,8 +11263,8 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
             )
           )
         }
-  
-  
+
+
         val recoveryCommitByMillis = supplierDashboardChunk {
           when {
             recoveryCommandLane == "stop_pack" || recoveryPackGuardLane == "block_pack" -> recoveryFollowUpAtMillis ?: recoveryCheckpointAtMillis ?: earliestDueAtMillis
@@ -10972,7 +11456,7 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
             )
           )
         }
-  
+
         val acceptedStockCanBeSplit = supplierDashboardChunk {
           acceptedQuantityTotal > 0.000001 && missingQuantityTotal > 0.000001
         }
@@ -11152,8 +11636,8 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
             )
           )
         }
-  
-  
+
+
         val recoveryExceptionScore = supplierDashboardChunk {
           (
             recoveryAllocationScore / 4 +
@@ -11704,7 +12188,7 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
             )
           )
         }
-  
+
         val recoveryApprovalScore = supplierDashboardChunk {
           (
               recoveryVerificationScore / 3 +
@@ -12063,7 +12547,7 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
             )
           )
         }
-  
+
         val recoveryReleaseScore = supplierDashboardChunk {
           (
               recoveryExecutionScore / 3 +
@@ -12228,8 +12712,8 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
             )
           )
         }
-  
-  
+
+
         val recoverySealScore = supplierDashboardChunk {
           (
               recoveryReleaseScore / 3 +
@@ -12563,8 +13047,8 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
             )
           )
         }
-  
-  
+
+
         val recoveryReopenAtMillis = supplierDashboardChunk {
           listOfNotNull(
             recoveryFollowUpAtMillis?.takeIf { followUpAt -> followUpAt > now },
@@ -12697,7 +13181,7 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
             )
           }
         }
-  
+
         val recoveryReopenPathMain = supplierDashboardChunk {
           when (recoveryReopenLane) {
             "reopen_blocked" -> "blocked from closeout"
@@ -12750,7 +13234,7 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
             )
           )
         }
-  
+
         val recoveryReconciliationScore = supplierDashboardChunk {
           (
             recoveryReopenScore / 3 +
@@ -12920,7 +13404,7 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
             )
           )
         }
-  
+
         val recoveryAuditScore = supplierDashboardChunk {
           (
             recoveryReconciliationScore / 2 +
@@ -13110,7 +13594,7 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
             )
           )
         }
-  
+
         val nextRecoveryStep = supplierDashboardChunk {
           when {
             recoveryUrgencyLane == "overdue" -> supplierDashboardJoinedMessage(
@@ -13508,7 +13992,7 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
                auditPressure
             ).coerceAtLeast(0)
         }
-  
+
         supplierDashboardChunk {
           SupplierDashboardBackorderDataModel(
             backorderId = "backorder_${goodsItemId}_${relatedOrders.joinToString("-") { it.id.take(8) }}",
@@ -14775,7 +15259,7 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
               .thenByDescending { it.shortageCount }
           )
       }
-  
+
       supplierDashboardChunk {
         SupplierDashboardRecoveryDeskDataModel(
           recoveryDeskLane = recoveryDeskLane,
@@ -14944,10 +15428,71 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
       val profileOrders = orders.filter { it.supplierId == supplier.id }
       val profileOrderIds = profileOrders.map { it.id }.toSet()
       val profileLines = lines.filter { it.orderId in profileOrderIds }
-      val profilePriceBookGoodsItemIds = supplierPriceRows
-        .filter { it.supplierId == supplier.id }
-        .map { it.goodsItemId }
-        .filter { it.isNotBlank() }
+      val profilePriceRows = allSupplierPriceRows.filter { it.supplierId == supplier.id }
+      val profileContracts = contracts.filter { it.supplierId == supplier.id }
+      val profileCatalogGoodsItemIds = buildSet {
+        profileLines.forEach { line ->
+          line.goodsItemId.trim().lowercase().takeIf { it.isNotBlank() }?.let { add(it) }
+          line.substituteGoodsItemId
+            ?.trim()
+            ?.lowercase()
+            ?.takeIf { it.isNotBlank() }
+            ?.let { add(it) }
+        }
+        profilePriceRows.forEach { price ->
+          price.goodsItemId.trim().lowercase().takeIf { it.isNotBlank() }?.let { add(it) }
+        }
+        profileContracts.forEach { contract ->
+          addAll(contract.goodsItemIds.map { it.trim().lowercase() }.filter { it.isNotBlank() })
+          addAll(
+            contract.priceTerms
+              .map { it.goodsItemId.trim().lowercase() }
+              .filter { it.isNotBlank() }
+          )
+        }
+      }
+      val profilePartnerKeys = buildList {
+        profileOrders.forEach { order ->
+          add(
+            supplierDashboardPartnerStoreKey(
+              storeId = order.storeId,
+              storePublicId = order.storePublicIdSnapshot,
+              fallback = order.id
+            )
+          )
+        }
+        profilePriceRows.forEach { price ->
+          add(
+            supplierDashboardPartnerStoreKey(
+              storeId = price.storeId,
+              fallback = price.id.ifBlank { price.supplierPriceBookIdentity() }
+            )
+          )
+        }
+        profileContracts.forEach { contract ->
+          add(
+            supplierDashboardPartnerStoreKey(
+              storeId = contract.storeId,
+              storePublicId = contract.storePublicIdSnapshot,
+              fallback = contract.id
+            )
+          )
+        }
+      }.distinct()
+      val profileLatestActivityMillis = maxOf(
+        profileOrders
+          .maxOfOrNull { order -> order.supplierDashboardActivityMillis() }
+          ?: 0L,
+        profilePriceRows
+          .maxOfOrNull { price -> price.supplierDashboardActivityMillis() }
+          ?: 0L,
+        profileContracts
+          .maxOfOrNull { contract -> contract.supplierDashboardActivityMillis() }
+          ?: 0L,
+        supplier.addedAt
+      )
+      val profileSupplierUuid = UUID.fromString(supplier.id)
+      val profileHistory = supplierProfileCommercialHistoryCountsInsideTransaction(profileSupplierUuid)
       SupplierDashboardProfileDataModel(
         supplierId = supplier.id,
         name = supplier.name,
@@ -14958,11 +15503,17 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
         actionRequiredOrderCount = bundles.count { bundle ->
           bundle.order.supplierId == supplier.id && bundle.needsSupplierDashboardAction()
         },
-        catalogSkuCount = (profileLines.map { it.goodsItemId } + profilePriceBookGoodsItemIds).filter { it.isNotBlank() }.distinct().size,
-        partnerCount = (profileOrders.map { it.storeId } + supplierPriceRows.filter { it.supplierId == supplier.id }.map { it.storeId }).filter { it.isNotBlank() }.distinct().size,
-        latestActivityMillis = profileOrders
-          .map { it.updatedAtMillis.takeIf { value -> value > 0L } ?: it.orderedAtMillis }
-          .maxOrNull() ?: supplier.addedAt
+        catalogSkuCount = profileCatalogGoodsItemIds.size,
+        savedOfferCount = profilePriceRows.size,
+        stockBatchCount = profileHistory.stockBatches.supplierProfileCountAsInt(),
+        commercialHistoryCount = profileHistory.total.supplierProfileCountAsInt(),
+        partnerCount = profilePartnerKeys.size,
+        activeContractCount = profileContracts.count { it.status == SUPPLIER_CONTRACT_STATUS_ACTIVE },
+        pendingContractCount = profileContracts.count {
+          it.status == SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER ||
+            it.status == SUPPLIER_CONTRACT_STATUS_PENDING_STORE
+        },
+        latestActivityMillis = profileLatestActivityMillis
       )
     }.sortedWith(
       compareByDescending<SupplierDashboardProfileDataModel> { it.openOrderCount }
@@ -14980,11 +15531,11 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
     actionRequiredOrderCount = openBundles.count { bundle -> bundle.needsSupplierDashboardAction() },
     packedOrderCount = orders.count { it.status == SupplierOrderStatusDataModel.Packed },
     inDeliveryOrderCount = orders.count { it.status == SupplierOrderStatusDataModel.InDelivery },
-    deliveredOrderCount = orders.count { it.status == SupplierOrderStatusDataModel.Delivered || it.status == SupplierOrderStatusDataModel.PartiallyDelivered },
-    issueOrderCount = orders.count { it.status == SupplierOrderStatusDataModel.IssueReported || it.status == SupplierOrderStatusDataModel.Cancelled },
+    deliveredOrderCount = orders.count { it.status == SupplierOrderStatusDataModel.Delivered },
+    issueOrderCount = orders.count { it.status == SupplierOrderStatusDataModel.IssueReported },
     lineCount = lines.size,
-    catalogSkuCount = (lines.map { it.goodsItemId } + priceBookGoodsItemIds).filter { it.isNotBlank() }.distinct().size,
-    partnerCount = (orders.map { it.storeId } + supplierPriceRows.map { it.storeId }).filter { it.isNotBlank() }.distinct().size,
+    catalogSkuCount = supplierCatalogGoodsItemIds.size,
+    partnerCount = partnerStoreKeys.size,
     activeContractCount = contracts.count { it.status == SUPPLIER_CONTRACT_STATUS_ACTIVE },
     pendingContractCount = contracts.count { it.status == SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER || it.status == SUPPLIER_CONTRACT_STATUS_PENDING_STORE },
     statusBuckets = statusBuckets,
@@ -15003,6 +15554,31 @@ private fun supplierModeDashboardInsideTransaction(userId: UUID): SupplierModeDa
   )
 }
 
+
+private suspend fun RoutingCall.receiveSupplierContractRevisionActionOrNull(): SupplierContractRevisionActionRequestDataModel? {
+  val raw = runCatching { receiveTextAita().trim() }.getOrNull().orEmpty()
+  if (raw.isBlank()) return null
+
+  return runCatching {
+    jsonBase.decodeFromString<SupplierContractRevisionActionRequestDataModel>(raw)
+  }.getOrNull() ?: runCatching {
+    SupplierContractRevisionActionRequestDataModel(
+      contractId = jsonBase.decodeFromString<String>(raw),
+      revision = 0
+    )
+  }.getOrNull()
+}
+
+private fun supplierContractRevisionConflictMessage(): List<LocalizedStringDataModel> = simpleMessage(
+  main = "This contract changed. Refresh it before acting on this revision.",
+  ru = "Договор изменился. Обновите его перед действием с этой редакцией.",
+  kk = "Келісім өзгерді. Осы нұсқамен әрекет етпес бұрын оны жаңартыңыз."
+)
+
+private fun String.canonicalSupplierContractUuidOrNull(): String? =
+  trim().takeIf { it.isNotBlank() }?.let { value ->
+    runCatching { UUID.fromString(value).toString() }.getOrNull()
+  }
 
 private fun normalizeSupplierContractSide(side: String): String = when (side.trim().lowercase()) {
   SUPPLIER_CONTRACT_SIDE_STORE -> SUPPLIER_CONTRACT_SIDE_STORE
@@ -15023,14 +15599,141 @@ private fun normalizeSupplierContractStatus(status: String): String = when (stat
   else -> SUPPLIER_CONTRACT_STATUS_PENDING_STORE
 }
 
+
+private fun lockSupplierContractInsideTransaction(contractId: UUID) {
+  val lockIdentity = "supplier_contract:$contractId"
+  org.jetbrains.exposed.sql.transactions.TransactionManager.current().exec(
+    "SELECT pg_advisory_xact_lock(hashtextextended('$lockIdentity', 0))"
+  )
+}
+
+private fun PriceDataModel?.isInvalidProvidedSupplierContractPrice(): Boolean =
+  this != null && !hasPositiveSupplierDeskPrice()
+
+private fun QuantityDataModel?.isInvalidProvidedSupplierContractQuantity(): Boolean =
+  this != null && (!total.isFinite() || total <= 0.0 || !pricedAmount.isFinite() || pricedAmount <= 0.0)
+
+private fun SupplierPartnershipContractDataModel.validationFailureForSupplierContractInsideTransaction(
+  storeId: UUID
+): List<LocalizedStringDataModel>? {
+  val requestedScope = scopeType.trim().lowercase()
+  if (requestedScope !in setOf(
+      SUPPLIER_CONTRACT_SCOPE_PARTNERSHIP,
+      SUPPLIER_CONTRACT_SCOPE_GOODS_ITEM,
+      SUPPLIER_CONTRACT_SCOPE_GOODS_GROUP
+    )) {
+    return simpleMessage(
+      main = "Choose a valid contract scope",
+      ru = "Выберите корректную область договора",
+      kk = "Келісімнің дұрыс ауқымын таңдаңыз"
+    )
+  }
+
+  val rawSelectedGoodsIds = goodsItemIds
+    .map { it.trim() }
+    .filter { it.isNotBlank() }
+  val canonicalSelectedGoodsIds = rawSelectedGoodsIds.map { it.canonicalSupplierContractUuidOrNull() }
+  if (canonicalSelectedGoodsIds.any { it == null }) {
+    return simpleMessage(
+      main = "One or more contract goods are invalid",
+      ru = "Один или несколько товаров договора указаны неверно",
+      kk = "Келісімдегі бір немесе бірнеше тауар қате көрсетілген"
+    )
+  }
+  val selectedGoodsIds = canonicalSelectedGoodsIds.filterNotNull().distinct()
+
+  when (requestedScope) {
+    SUPPLIER_CONTRACT_SCOPE_GOODS_ITEM -> if (selectedGoodsIds.size != 1) {
+      return simpleMessage(
+        main = "Select exactly one goods item for an item contract",
+        ru = "Для договора на товар выберите ровно один товар",
+        kk = "Тауар келісімі үшін дәл бір тауарды таңдаңыз"
+      )
+    }
+    SUPPLIER_CONTRACT_SCOPE_GOODS_GROUP -> if (selectedGoodsIds.isEmpty()) {
+      return simpleMessage(
+        main = "Select at least one goods item for a goods-group contract",
+        ru = "Для договора на группу выберите хотя бы один товар",
+        kk = "Тауарлар тобының келісімі үшін кемінде бір тауарды таңдаңыз"
+      )
+    }
+  }
+
+  val activePriceTerms = priceTerms.filter { it.isActive }
+  val rawPriceTermGoodsIds = activePriceTerms.map { it.goodsItemId.trim() }
+  val priceTermGoodsIds = rawPriceTermGoodsIds.mapNotNull { it.canonicalSupplierContractUuidOrNull() }
+  if (
+    rawPriceTermGoodsIds.any { it.isBlank() } ||
+    priceTermGoodsIds.size != rawPriceTermGoodsIds.size
+  ) {
+    return simpleMessage(
+      main = "Every active price line must reference a valid goods item",
+      ru = "Каждая активная строка цены должна ссылаться на корректный товар",
+      kk = "Әр белсенді баға жолы дұрыс тауарға сілтеме жасауы керек"
+    )
+  }
+  if (
+    requestedScope != SUPPLIER_CONTRACT_SCOPE_PARTNERSHIP &&
+    priceTermGoodsIds.any { it !in selectedGoodsIds }
+  ) {
+    return simpleMessage(
+      main = "Contract price lines must belong to the selected goods",
+      ru = "Строки цен договора должны относиться к выбранным товарам",
+      kk = "Келісімнің баға жолдары таңдалған тауарларға тиесілі болуы керек"
+    )
+  }
+
+  if (priceTerms.any { term ->
+      term.supplyPrice.isInvalidProvidedSupplierContractPrice() ||
+        term.suggestedSalePrice.isInvalidProvidedSupplierContractPrice() ||
+        term.minOrderQuantity.isInvalidProvidedSupplierContractQuantity() ||
+        term.packageQuantity.isInvalidProvidedSupplierContractQuantity()
+    }) {
+    return simpleMessage(
+      main = "Contract prices and quantities must be finite positive values",
+      ru = "Цены и количества в договоре должны быть конечными положительными значениями",
+      kk = "Келісімдегі бағалар мен мөлшерлер шекті оң мәндер болуы керек"
+    )
+  }
+
+  val allGoodsUuids = (selectedGoodsIds + priceTermGoodsIds)
+    .distinct()
+    .mapNotNull { runCatching { UUID.fromString(it) }.getOrNull() }
+  if (allGoodsUuids.isNotEmpty()) {
+    val existingGoodsIds = StockItems
+      .select(StockItems.id)
+      .where {
+        (StockItems.storeId eq storeId) and
+          (StockItems.isActive eq true) and
+          (StockItems.id inList allGoodsUuids)
+      }
+      .map { it[StockItems.id] }
+      .toSet()
+    if (existingGoodsIds.size != allGoodsUuids.toSet().size) {
+      return simpleMessage(
+        main = "One or more contract goods are no longer available in this Store",
+        ru = "Один или несколько товаров договора больше недоступны в этом магазине",
+        kk = "Келісімдегі бір немесе бірнеше тауар бұл дүкенде енді қолжетімсіз"
+      )
+    }
+  }
+
+  return null
+}
+
 private fun List<LocalizedStringDataModel>.cleanContractLocalized(defaultValue: String = ""): List<LocalizedStringDataModel> =
-  map { it.copy(language = it.language.trim().ifBlank { "main" }, value = it.value.trim()) }
+  map {
+    it.copy(
+      language = it.language.trim().lowercase().ifBlank { "main" },
+      value = it.value.trim()
+    )
+  }
     .filter { it.value.isNotBlank() }
     .distinctBy { it.language }
     .ifEmpty { defaultValue.takeIf { it.isNotBlank() }?.let { listOf(LocalizedStringDataModel("main", it)) } ?: emptyList() }
 
 private fun SupplierContractPriceTermDataModel.cleanContractPriceTerm(validGoodsItemIds: Set<String>): SupplierContractPriceTermDataModel? {
-  val cleanGoodsItemId = goodsItemId.trim().takeIf { it.isNotBlank() }
+  val cleanGoodsItemId = goodsItemId.canonicalSupplierContractUuidOrNull()
   if (cleanGoodsItemId != null && cleanGoodsItemId !in validGoodsItemIds) return null
   return copy(
     id = id.trim().takeIf { it.isNotBlank() } ?: UUID.randomUUID().toString(),
@@ -15105,15 +15808,38 @@ private fun SupplierPartnershipContractDataModel.cleanForContractStorageInsideTr
     .where { (StockItems.storeId eq storeId) and (StockItems.isActive eq true) }
     .map { it[StockItems.id].toString() }
     .toSet()
-  val cleanGoodsItemIds = goodsItemIds.map { it.trim() }.filter { it in validGoodsIds }.distinct()
-  val cleanScope = normalizeSupplierContractScope(scopeType, cleanGoodsItemIds)
+  val selectedGoodsItemIds = goodsItemIds
+    .mapNotNull { it.canonicalSupplierContractUuidOrNull() }
+    .filter { it in validGoodsIds }
+    .distinct()
+  val cleanScope = normalizeSupplierContractScope(scopeType, selectedGoodsItemIds)
+  val cleanGoodsItemIds = if (cleanScope == SUPPLIER_CONTRACT_SCOPE_PARTNERSHIP) {
+    emptyList()
+  } else {
+    selectedGoodsItemIds
+  }
   val baseTitle = when (cleanScope) {
     SUPPLIER_CONTRACT_SCOPE_GOODS_ITEM -> "Goods item contract"
     SUPPLIER_CONTRACT_SCOPE_GOODS_GROUP -> "Goods group contract"
     else -> "Partnership contract"
   }
-  val cleanPriceTerms = priceTerms.mapNotNull { it.cleanContractPriceTerm(validGoodsIds) }
-    .distinctBy { it.id.ifBlank { it.goodsItemId } }
+  val cleanPriceTerms = priceTerms
+    .mapNotNull { it.cleanContractPriceTerm(validGoodsIds) }
+    .map { term ->
+      term.copy(
+        supplyPrice = term.supplyPrice?.copy(
+          price = term.supplyPrice.price.trim(),
+          currency = term.supplyPrice.currency.trim().uppercase().ifBlank { "KZT" },
+          supplierId = supplierId.toString()
+        ),
+        suggestedSalePrice = term.suggestedSalePrice?.copy(
+          price = term.suggestedSalePrice.price.trim(),
+          currency = term.suggestedSalePrice.currency.trim().uppercase().ifBlank { "KZT" },
+          supplierId = supplierId.toString()
+        )
+      )
+    }
+    .distinctBy { it.goodsItemId.ifBlank { it.id } }
   val supplierAcceptedAt = if (cleanActorSide == SUPPLIER_CONTRACT_SIDE_SUPPLIER) now else null
   val storeAcceptedAt = if (cleanActorSide == SUPPLIER_CONTRACT_SIDE_STORE) now else null
   val nextStatus = if (cleanActorSide == SUPPLIER_CONTRACT_SIDE_SUPPLIER) {
@@ -15216,23 +15942,16 @@ private fun supplierContractBlocksStoreSupplyInsideTransaction(
   supplierId: UUID,
   goodsItemIds: List<UUID>
 ): SupplierPartnershipContractDataModel? {
-  if (goodsItemIds.isEmpty()) return null
-  val goodsIdStrings = goodsItemIds.map { it.toString() }.toSet()
+  val goodsIdStrings = goodsItemIds.map { it.toString() }
   return SupplierPartnershipContracts
     .selectAll()
     .where {
       (SupplierPartnershipContracts.storeId eq storeId) and
          (SupplierPartnershipContracts.supplierId eq supplierId) and
-         (SupplierPartnershipContracts.status neq SUPPLIER_CONTRACT_STATUS_ARCHIVED) and
          (SupplierPartnershipContracts.isActive eq true)
     }
     .map { it.toSupplierPartnershipContractDataModel() }
-    .firstOrNull { contract ->
-      val scopeMatches = contract.scopeType == SUPPLIER_CONTRACT_SCOPE_PARTNERSHIP ||
-         contract.goodsItemIds.isEmpty() ||
-         contract.goodsItemIds.any { it in goodsIdStrings }
-      scopeMatches && contract.status != SUPPLIER_CONTRACT_STATUS_ACTIVE
-    }
+    .firstOrNull { contract -> contract.blocksSupplierSupplyForGoods(goodsIdStrings) }
 }
 
 private fun InsertStatement<Number>.setSupplierOrderColumns(
@@ -15306,7 +16025,11 @@ private fun InsertStatement<Number>.setSupplierOrderLineColumns(
   this[SupplierOrderLines.isActive] = clean.isActive
 }
 
-private fun UpdateBuilder<*>.setSupplierOrderLineUpdateColumns(clean: SupplierOrderLineDataModel) {
+private fun UpdateBuilder<*>.setSupplierOrderLineUpdateColumns(
+  clean: SupplierOrderLineDataModel,
+  goodsItemId: UUID? = null
+) {
+  goodsItemId?.let { this[SupplierOrderLines.goodsItemId] = it }
   this[SupplierOrderLines.requestedQuantity] = clean.requestedQuantity
   this[SupplierOrderLines.expectedSupplyPrice] = clean.expectedSupplyPrice
   this[SupplierOrderLines.desiredExpirationDateMillis] = clean.desiredExpirationDateMillis
@@ -15321,19 +16044,84 @@ private fun UpdateBuilder<*>.setSupplierOrderLineUpdateColumns(clean: SupplierOr
 }
 
 private fun SupplierDataModel.cleanedForStorage(ownerUserId: UUID? = null, existingUserIds: List<String> = emptyList()): SupplierDataModel {
-  val cleanUserIds = (existingUserIds + userIds + listOfNotNull(ownerUserId?.toString()))
+  val cleanUserIds = (existingUserIds + listOfNotNull(ownerUserId?.toString()))
     .map { it.trim() }
     .filter { it.isNotBlank() }
     .distinct()
-  return copy(
-    userIds = cleanUserIds,
-    name = name.map { it.copy(value = it.value.trim()) }.filter { it.value.isNotBlank() }.ifEmpty { listOf(LocalizedStringDataModel("main", "Supplier")) },
-    phoneNumbers = phoneNumbers.orEmpty().map { it.trim() }.filter { it.isNotBlank() }.distinct(),
-    emails = emails.orEmpty().map { it.trim().lowercase() }.filter { it.isNotBlank() }.distinct(),
-    categoryIds = categoryIds.map { it.trim() }.filter { it.isNotBlank() }.distinct(),
-    typeIds = typeIds.orEmpty().map { it.trim() }.filter { it.isNotBlank() }.distinct()
+  // Ownership is server-authoritative. A normal profile save must never be able to add arbitrary
+  // user IDs to a supplier identity; collaborator management, when introduced, needs its own
+  // permissioned endpoint and audit trail.
+  return normalizedSupplierProfileFields().copy(
+    userIds = cleanUserIds
   )
 }
+
+private fun supplierProfileValidationMessage(
+  issues: Set<SupplierProfileValidationIssue>
+): List<LocalizedStringDataModel>? = when {
+  SupplierProfileValidationIssue.MissingName in issues -> simpleMessage(
+    main = "Supplier name is required",
+    ru = "Укажите название поставщика",
+    kk = "Жеткізуші атауын көрсетіңіз"
+  )
+  SupplierProfileValidationIssue.InvalidEmail in issues -> simpleMessage(
+    main = "Supplier email address is invalid",
+    ru = "Некорректный email поставщика",
+    kk = "Жеткізушінің email мекенжайы қате"
+  )
+  SupplierProfileValidationIssue.TooManyNames in issues ||
+    SupplierProfileValidationIssue.TooManyPhones in issues ||
+    SupplierProfileValidationIssue.TooManyEmails in issues -> simpleMessage(
+      main = "Supplier profile contains too many contact or name values",
+      ru = "В профиле поставщика слишком много имён или контактов",
+      kk = "Жеткізуші профилінде атаулар немесе байланыстар тым көп"
+    )
+  SupplierProfileValidationIssue.NameTooLong in issues ||
+    SupplierProfileValidationIssue.PhoneTooLong in issues ||
+    SupplierProfileValidationIssue.EmailTooLong in issues -> simpleMessage(
+      main = "Supplier profile contains a value that is too long",
+      ru = "В профиле поставщика есть слишком длинное значение",
+      kk = "Жеткізуші профилінде тым ұзын мән бар"
+    )
+  else -> null
+}
+
+private fun lockSupplierProfileInsideTransaction(supplierId: UUID) {
+  val lockIdentity = "supplier-profile:$supplierId".replace("'", "''")
+  exec("SELECT pg_advisory_xact_lock(hashtextextended('$lockIdentity', 0))")
+}
+
+private data class SupplierProfileCommercialHistoryCounts(
+  val orders: Long,
+  val contracts: Long,
+  val offers: Long,
+  val stockBatches: Long
+) {
+  val total: Long get() = orders + contracts + offers + stockBatches
+}
+
+private fun supplierProfileCommercialHistoryCountsInsideTransaction(
+  supplierId: UUID
+): SupplierProfileCommercialHistoryCounts = SupplierProfileCommercialHistoryCounts(
+  orders = SupplierOrders
+    .select(SupplierOrders.id)
+    .where { SupplierOrders.supplierId eq supplierId }
+    .count(),
+  contracts = SupplierPartnershipContracts
+    .select(SupplierPartnershipContracts.id)
+    .where { SupplierPartnershipContracts.supplierId eq supplierId }
+    .count(),
+  offers = SupplierGoodsPrices
+    .select(SupplierGoodsPrices.id)
+    .where { SupplierGoodsPrices.supplierId eq supplierId }
+    .count(),
+  stockBatches = StockBatchesV2
+    .select(StockBatchesV2.id)
+    .where { StockBatchesV2.supplierId eq supplierId }
+    .count()
+)
+
+private fun Long.supplierProfileCountAsInt(): Int = coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
 
 private fun ResultRow.toGoodsBatchDataModel(): GoodsBatchDataModel {
   return GoodsBatchDataModel(
@@ -16005,17 +16793,27 @@ private fun supplierCanMaintainPriceBookInsideTransaction(
   if (relatedOrderLineExists) return true
 
   return SupplierPartnershipContracts
-    .select(SupplierPartnershipContracts.status, SupplierPartnershipContracts.goodsItemIds)
+    .select(
+      SupplierPartnershipContracts.status,
+      SupplierPartnershipContracts.scopeType,
+      SupplierPartnershipContracts.goodsItemIds
+    )
     .where {
       (SupplierPartnershipContracts.storeId eq storeId) and
          (SupplierPartnershipContracts.supplierId eq supplierId) and
          (SupplierPartnershipContracts.isActive eq true)
     }
-    .map { row -> row[SupplierPartnershipContracts.status] to row[SupplierPartnershipContracts.goodsItemIds] }
-    .any { (status, goodsItemIds) ->
+    .map { row ->
+      Triple(
+        row[SupplierPartnershipContracts.status],
+        row[SupplierPartnershipContracts.scopeType],
+        row[SupplierPartnershipContracts.goodsItemIds]
+      )
+    }
+    .any { (status, scopeType, goodsItemIds) ->
       status != SUPPLIER_CONTRACT_STATUS_DECLINED &&
          status != SUPPLIER_CONTRACT_STATUS_ARCHIVED &&
-         (goodsItemIds.isEmpty() || goodsItemId.toString() in goodsItemIds)
+         (scopeType == SUPPLIER_CONTRACT_SCOPE_PARTNERSHIP || goodsItemId.toString() in goodsItemIds)
     }
 }
 
@@ -16029,20 +16827,40 @@ private fun upsertSupplierGoodsPriceInsideTransaction(
   packageQuantity: QuantityDataModel? = null,
   supplierBarcode: String? = null,
   supplierGoodsName: String? = null,
+  replaceOptionalFields: Boolean = false,
   now: Long
-) {
-  val existing = SupplierGoodsPrices
+): UUID {
+  val lockIdentity = "supplier_goods_price:$storeId:$supplierId:$goodsItemId"
+  val escapedLockIdentity = lockIdentity.replace("'", "''")
+  org.jetbrains.exposed.sql.transactions.TransactionManager.current().exec(
+    "SELECT pg_advisory_xact_lock(hashtextextended('$escapedLockIdentity', 0))"
+  )
+
+  val existingRows = SupplierGoodsPrices
     .selectAll()
     .where {
       (SupplierGoodsPrices.storeId eq storeId) and
          (SupplierGoodsPrices.supplierId eq supplierId) and
          (SupplierGoodsPrices.goodsItemId eq goodsItemId)
     }
-    .singleOrNull()
+    .toList()
+    .sortedWith(
+      compareByDescending<ResultRow> { row ->
+        if (row[SupplierGoodsPrices.isActive]) 1 else 0
+      }
+        .thenByDescending { row -> row[SupplierGoodsPrices.updatedAtMillis] }
+        .thenByDescending { row -> row[SupplierGoodsPrices.createdAtMillis] }
+        .thenBy { row -> row[SupplierGoodsPrices.id].toString() }
+    )
 
-  if (existing == null) {
+  val canonicalRow = existingRows.firstOrNull()
+  val canonicalId = canonicalRow?.get(SupplierGoodsPrices.id) ?: UUID.randomUUID()
+  val cleanBarcode = supplierBarcode?.trim()?.takeIf { it.isNotBlank() }
+  val cleanGoodsName = supplierGoodsName?.trim()?.takeIf { it.isNotBlank() }
+
+  if (canonicalRow == null) {
     SupplierGoodsPrices.insert {
-      it[SupplierGoodsPrices.id] = UUID.randomUUID()
+      it[SupplierGoodsPrices.id] = canonicalId
       it[SupplierGoodsPrices.userId] = userId
       it[SupplierGoodsPrices.storeId] = storeId
       it[SupplierGoodsPrices.supplierId] = supplierId
@@ -16050,33 +16868,64 @@ private fun upsertSupplierGoodsPriceInsideTransaction(
       it[SupplierGoodsPrices.supplyPrice] = supplyPrice
       it[SupplierGoodsPrices.minOrderQuantity] = minOrderQuantity
       it[SupplierGoodsPrices.packageQuantity] = packageQuantity
-      it[SupplierGoodsPrices.supplierBarcode] = supplierBarcode?.takeIf { value -> value.isNotBlank() }
-      it[SupplierGoodsPrices.supplierGoodsName] = supplierGoodsName?.takeIf { value -> value.isNotBlank() }
+      it[SupplierGoodsPrices.supplierBarcode] = cleanBarcode
+      it[SupplierGoodsPrices.supplierGoodsName] = cleanGoodsName
       it[SupplierGoodsPrices.createdAtMillis] = now
       it[SupplierGoodsPrices.updatedAtMillis] = now
       it[SupplierGoodsPrices.lastUsedAtMillis] = now
       it[SupplierGoodsPrices.isActive] = true
     }
   } else {
-    SupplierGoodsPrices.update({
-      (SupplierGoodsPrices.storeId eq storeId) and
-         (SupplierGoodsPrices.supplierId eq supplierId) and
-         (SupplierGoodsPrices.goodsItemId eq goodsItemId)
-    }) {
+    SupplierGoodsPrices.update({ SupplierGoodsPrices.id eq canonicalId }) {
       it[SupplierGoodsPrices.supplyPrice] = supplyPrice
-      minOrderQuantity?.let { value -> it[SupplierGoodsPrices.minOrderQuantity] = value }
-      packageQuantity?.let { value -> it[SupplierGoodsPrices.packageQuantity] = value }
-      supplierBarcode?.takeIf { value -> value.isNotBlank() }?.let { value ->
-        it[SupplierGoodsPrices.supplierBarcode] = value
+
+      if (replaceOptionalFields) {
+        it[SupplierGoodsPrices.minOrderQuantity] = minOrderQuantity
+        it[SupplierGoodsPrices.packageQuantity] = packageQuantity
+        it[SupplierGoodsPrices.supplierBarcode] = cleanBarcode
+        it[SupplierGoodsPrices.supplierGoodsName] = cleanGoodsName
+      } else {
+        // Automatic learning from received batches/order responses may seed missing metadata, but it
+        // must never overwrite terms or naming that the supplier deliberately edited in Catalogue.
+        if (canonicalRow[SupplierGoodsPrices.minOrderQuantity] == null) {
+          minOrderQuantity?.let { value ->
+            it[SupplierGoodsPrices.minOrderQuantity] = value
+          }
+        }
+        if (canonicalRow[SupplierGoodsPrices.packageQuantity] == null) {
+          packageQuantity?.let { value ->
+            it[SupplierGoodsPrices.packageQuantity] = value
+          }
+        }
+        if (canonicalRow[SupplierGoodsPrices.supplierBarcode].isNullOrBlank()) {
+          cleanBarcode?.let { value ->
+            it[SupplierGoodsPrices.supplierBarcode] = value
+          }
+        }
+        if (canonicalRow[SupplierGoodsPrices.supplierGoodsName].isNullOrBlank()) {
+          cleanGoodsName?.let { value ->
+            it[SupplierGoodsPrices.supplierGoodsName] = value
+          }
+        }
       }
-      supplierGoodsName?.takeIf { value -> value.isNotBlank() }?.let { value ->
-        it[SupplierGoodsPrices.supplierGoodsName] = value
-      }
+
       it[SupplierGoodsPrices.updatedAtMillis] = now
       it[SupplierGoodsPrices.lastUsedAtMillis] = now
       it[SupplierGoodsPrices.isActive] = true
     }
   }
+
+  val duplicateIds = existingRows
+    .drop(1)
+    .map { row -> row[SupplierGoodsPrices.id] }
+  if (duplicateIds.isNotEmpty()) {
+    SupplierGoodsPrices.update({ SupplierGoodsPrices.id inList duplicateIds }) {
+      it[SupplierGoodsPrices.updatedAtMillis] = now
+      it[SupplierGoodsPrices.isActive] = false
+    }
+  }
+
+  return canonicalId
 }
 
 private fun learnSupplierPriceFromResponseLineInsideTransaction(
@@ -16087,9 +16936,10 @@ private fun learnSupplierPriceFromResponseLineInsideTransaction(
   now: Long
 ) {
   val offeredPrice = line.supplierOfferedSupplyPrice ?: return
-  if (offeredPrice.price.toMoneyDouble() <= 0.0) return
+  val numericOfferedPrice = offeredPrice.price.toMoneyDouble()
+  if (!numericOfferedPrice.isFinite() || numericOfferedPrice <= 0.0) return
   val acceptedQuantity = line.supplierAcceptedQuantity ?: return
-  if (acceptedQuantity.total <= 0.0) return
+  if (!acceptedQuantity.total.isFinite() || acceptedQuantity.total <= 0.0) return
 
   val effectiveGoodsItemId = (line.substituteGoodsItemId?.takeIf { it.isNotBlank() } ?: line.goodsItemId)
     .let { raw -> runCatching { UUID.fromString(raw) }.getOrNull() }
@@ -17383,8 +18233,7 @@ fun Application.module() {
     if (
       method in setOf(HttpMethod.Post, HttpMethod.Put, HttpMethod.Delete) &&
       !path.startsWith("/rt/") &&
-      !path.equals("/auth/refresh", ignoreCase = true) &&
-      !path.equals("/auth/logIn", ignoreCase = true) &&
+      !path.startsWith("/auth/", ignoreCase = true) &&
       (status == null || status in 200..299)
     ) {
       val storeId = call.request.header("store_id")
@@ -17393,11 +18242,21 @@ fun Application.module() {
 
       val entityPath = path.trim('/').ifBlank { "all" }
 
-      RealtimeServerBus.publish(
-        entity = entityPath,
-        storeId = storeId,
-        reason = "mutation"
-      )
+      // Supplier commercial routes publish one relationship-scoped event from the authoritative
+      // database result. Supplier profile mutations likewise publish one owner-targeted event. Their
+      // relationship/recipient identity lives in the body/database rather than necessarily in request
+      // headers, so a generic event here would duplicate refreshes and wake unrelated clients.
+      if (
+        !path.startsWith("/supplierContracts/", ignoreCase = true) &&
+        !path.startsWith("/supplierOrders/", ignoreCase = true) &&
+        !path.startsWith("/suppliers/", ignoreCase = true)
+      ) {
+        RealtimeServerBus.publish(
+          entity = entityPath,
+          storeId = storeId,
+          reason = "mutation"
+        )
+      }
 
       val actorUserId = runCatching { call.principal<JWTPrincipal>()?.subject?.let { UUID.fromString(it) } }.getOrNull()
       val logStoreId = storeId?.let { runCatching { UUID.fromString(it) }.getOrNull() }
@@ -17448,6 +18307,10 @@ fun Application.module() {
   val tokenService = TokenService(jwtConfig())
 
   routing {
+        // Store-scoped payment integration management and advanced account authentication.
+        installAitaPaymentManagementRoutes()
+        installAitaAdvancedAuthenticationRoutes(tokenService, backgroundScope)
+
     get("/healthz") {
       call.respondText(
         text = "{\"status\":\"ok\"}",
@@ -17647,7 +18510,10 @@ fun Application.module() {
           val collector = launch {
             RealtimeServerBus.sharedUpdates.collect { update ->
               try {
-                sendRealtimeUpdate(update)
+                val targetUserId = update.userId?.trim()?.takeIf { it.isNotBlank() }
+                if (targetUserId == null || targetUserId.equals(userId.toString(), ignoreCase = true)) {
+                  sendRealtimeUpdate(update)
+                }
               } catch (throwable: Throwable) {
                 if (throwable.isExpectedRealtimeDisconnect()) {
                   call.application.environment.log.debug(
@@ -17844,16 +18710,20 @@ fun Application.module() {
         try {
           val body = call.receiveAita<UserAuthLogInDataModel>()
 
-          val login = body.login.trim().lowercase()
-
           val invalidCredentialsMessage = simpleMessage(
             main = "Invalid login or password",
             ru = "Неверный логин или пароль",
             kk = "Логин немесе құпиясөз қате"
           )
 
+          val resolvedUserId = resolveAdvancedAuthUser(body.login)
+            ?: return@post call.genericResponseNoPayload(
+              status = HttpStatusCode.Unauthorized,
+              message = invalidCredentialsMessage
+            )
+
           val user = newSuspendedTransaction(aitaServerIoContext) {
-            Users.selectAll().where { (Users.phoneNumber eq login) or (Users.email eq login) }.singleOrNull()
+            Users.selectAll().where { Users.id eq resolvedUserId }.singleOrNull()
           } ?: return@post call.genericResponseNoPayload(
             status = HttpStatusCode.Unauthorized,
             message = invalidCredentialsMessage
@@ -17866,6 +18736,18 @@ fun Application.module() {
               status = HttpStatusCode.Unauthorized,
               message = invalidCredentialsMessage
             )
+
+          if (advancedAuthSecondFactorEnabled(user[Users.id])) {
+            return@post call.genericResponseNoPayload(
+              status = HttpStatusCode.PreconditionRequired,
+              message = simpleMessage(
+                main = "Two-factor authentication is enabled. Use the updated AITA login screen.",
+                en = "Two-factor authentication is enabled. Use the updated AITA login screen.",
+                ru = "Двухфакторная аутентификация включена. Используйте обновлённый экран входа AITA.",
+                kk = "Екі факторлы аутентификация қосылған. Жаңартылған AITA кіру экранын пайдаланыңыз."
+              )
+            )
+          }
 
           val tokenPair: TokenPair = tokenService.newPair(user[Users.id], metaFrom(call, body.deviceInfo))
 
@@ -19913,11 +20795,29 @@ fun Application.module() {
 
               val id = requestedBatchId ?: UUID.randomUUID()
 
-              val nextSupplierId = body.supplierId.optionalUuidOrNull()
-              val nextSupplierOrderId = body.supplierOrderId.optionalUuidOrNull()
+              val supplierLink = resolveStockBatchSupplierLinkInsideTransaction(
+                storeId = storeId,
+                rawSupplierId = body.supplierId,
+                rawSupplierOrderId = body.supplierOrderId
+              ) ?: return@newSuspendedTransaction null
+              val nextSupplierId = supplierLink.supplierId
+              val nextSupplierOrderId = supplierLink.supplierOrderId
+              val sanitizedSupplyPrice = body.supplyPrice.copy(
+                supplierId = nextSupplierId?.toString().orEmpty()
+              )
+
               val sanitizedPromotions = body.promotions.sanitizedStockPromotions()
               val sanitizedAdditionalNotes = cleanOptionalText(body.additionalNotes)
               val sanitizedAdditionalNotesLocalized = cleanLocalizedValues(body.additionalNotesLocalized)
+              val sanitizedBody = body.copy(
+                supplierId = nextSupplierId?.toString(),
+                supplierOrderId = nextSupplierOrderId?.toString(),
+                supplyPrice = sanitizedSupplyPrice,
+                promotions = sanitizedPromotions,
+                shelfPosition = cleanOptionalText(body.shelfPosition),
+                additionalNotes = sanitizedAdditionalNotes,
+                additionalNotesLocalized = sanitizedAdditionalNotesLocalized
+              )
 
               StockBatchesV2.insert {
                 it[StockBatchesV2.id] = id
@@ -19930,7 +20830,7 @@ fun Application.module() {
 
                 it[StockBatchesV2.quantity] = body.quantity
 
-                it[StockBatchesV2.supplyPrice] = body.supplyPrice
+                it[StockBatchesV2.supplyPrice] = sanitizedSupplyPrice
                 it[StockBatchesV2.salePriceOverride] = body.salePriceOverride
                 it[StockBatchesV2.returnPriceOverride] = body.returnPriceOverride
                 it[StockBatchesV2.wholesalePriceOverride] = body.wholesalePriceOverride
@@ -19968,22 +20868,24 @@ fun Application.module() {
                 }
               }
 
-              nextSupplierId?.let { supplierId ->
-                upsertSupplierGoodsPriceInsideTransaction(
-                  userId = userId,
-                  storeId = storeId,
-                  supplierId = supplierId,
-                  goodsItemId = goodsItemId,
-                  supplyPrice = body.supplyPrice,
-                  now = now
-                )
+              if (sanitizedSupplyPrice.hasPositiveSupplierDeskPrice()) {
+                nextSupplierId?.let { supplierId ->
+                  upsertSupplierGoodsPriceInsideTransaction(
+                    userId = userId,
+                    storeId = storeId,
+                    supplierId = supplierId,
+                    goodsItemId = goodsItemId,
+                    supplyPrice = sanitizedSupplyPrice,
+                    now = now
+                  )
+                }
               }
 
               val logText = stockBatchOperationLogTextInsideTransaction(
                 action = OPERATION_LOG_ACTION_CREATED,
                 batchId = id,
                 goodsItemId = goodsItemId,
-                batch = body.copy(id = id.toString())
+                batch = sanitizedBody.copy(id = id.toString())
               )
 
               insertOperationLogInsideTransaction(
@@ -19998,12 +20900,13 @@ fun Application.module() {
                 now = now
               )
 
-              result += body.copy(
+              result += sanitizedBody.copy(
                 id = id.toString(),
                 userId = userId.toString(),
                 storeId = storeId.toString(),
                 supplierId = nextSupplierId?.toString(),
                 supplierOrderId = nextSupplierOrderId?.toString(),
+                supplyPrice = sanitizedSupplyPrice,
                 deliveredAtMillis = body.deliveredAtMillis ?: now,
                 promotions = sanitizedPromotions,
                 shelfPosition = cleanOptionalText(body.shelfPosition),
@@ -20053,15 +20956,26 @@ fun Application.module() {
               if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_BATCH_EDIT, requireWorkshift = true))
                 return@newSuspendedTransaction null
 
-              val nextSupplierId = body.supplierId
-                ?.trim()
-                ?.takeIf { it.isNotBlank() }
-                ?.let { rawId -> runCatching { UUID.fromString(rawId) }.getOrNull() }
-              val nextSupplierOrderId = body.supplierOrderId
-                ?.trim()
-                ?.takeIf { it.isNotBlank() }
-                ?.let { rawId -> runCatching { UUID.fromString(rawId) }.getOrNull() }
+              val supplierLink = resolveStockBatchSupplierLinkInsideTransaction(
+                storeId = storeId,
+                rawSupplierId = body.supplierId,
+                rawSupplierOrderId = body.supplierOrderId
+              ) ?: return@newSuspendedTransaction null
+              val nextSupplierId = supplierLink.supplierId
+              val nextSupplierOrderId = supplierLink.supplierOrderId
+              val sanitizedSupplyPrice = body.supplyPrice.copy(
+                supplierId = nextSupplierId?.toString().orEmpty()
+              )
               val sanitizedPromotions = body.promotions.sanitizedStockPromotions()
+              val sanitizedBody = body.copy(
+                supplierId = nextSupplierId?.toString(),
+                supplierOrderId = nextSupplierOrderId?.toString(),
+                supplyPrice = sanitizedSupplyPrice,
+                promotions = sanitizedPromotions,
+                shelfPosition = cleanOptionalText(body.shelfPosition),
+                additionalNotes = cleanOptionalText(body.additionalNotes),
+                additionalNotesLocalized = cleanLocalizedValues(body.additionalNotesLocalized)
+              )
 
               val previousBatchRow = StockBatchesV2
                 .selectAll()
@@ -20088,7 +21002,7 @@ fun Application.module() {
                 nextSupplierId = nextSupplierId,
                 nextSupplierOrderId = nextSupplierOrderId,
                 sanitizedPromotions = sanitizedPromotions,
-                body = body
+                body = sanitizedBody
               )
               val meaningfulBatchContentChanged = changedBatchFields.isNotEmpty()
 
@@ -20103,7 +21017,7 @@ fun Application.module() {
 
                 it[StockBatchesV2.quantity] = body.quantity
 
-                it[StockBatchesV2.supplyPrice] = body.supplyPrice
+                it[StockBatchesV2.supplyPrice] = sanitizedSupplyPrice
                 it[StockBatchesV2.salePriceOverride] = body.salePriceOverride
                 it[StockBatchesV2.returnPriceOverride] = body.returnPriceOverride
                 it[StockBatchesV2.wholesalePriceOverride] = body.wholesalePriceOverride
@@ -20115,27 +21029,25 @@ fun Application.module() {
                 it[StockBatchesV2.discounts] = body.discounts
                 it[StockBatchesV2.promotions] = sanitizedPromotions
 
-                it[StockBatchesV2.shelfPosition] = body.shelfPosition
-                it[StockBatchesV2.shelfPriority] = body.shelfPriority
+                it[StockBatchesV2.shelfPosition] = sanitizedBody.shelfPosition
+                it[StockBatchesV2.shelfPriority] = sanitizedBody.shelfPriority
 
-                it[StockBatchesV2.status] = body.status.name
-                it[StockBatchesV2.additionalNotes] = body.additionalNotes
-                it[StockBatchesV2.additionalNotesLocalized] = body.additionalNotesLocalized
+                it[StockBatchesV2.status] = sanitizedBody.status.name
+                it[StockBatchesV2.additionalNotes] = sanitizedBody.additionalNotes
+                it[StockBatchesV2.additionalNotesLocalized] = sanitizedBody.additionalNotesLocalized
 
                 it[StockBatchesV2.updatedAtMillis] = now
                 it[StockBatchesV2.isActive] = body.isActive
               }
 
-              body.supplierId?.let { rawSupplierId ->
-                val supplierId = runCatching { UUID.fromString(rawSupplierId) }.getOrNull()
-
-                if (supplierId != null) {
+              if (sanitizedSupplyPrice.hasPositiveSupplierDeskPrice()) {
+                nextSupplierId?.let { supplierId ->
                   upsertSupplierGoodsPriceInsideTransaction(
                     userId = userId,
                     storeId = storeId,
                     supplierId = supplierId,
                     goodsItemId = goodsItemId,
-                    supplyPrice = body.supplyPrice,
+                    supplyPrice = sanitizedSupplyPrice,
                     now = now
                   )
                 }
@@ -20146,7 +21058,7 @@ fun Application.module() {
                   action = OPERATION_LOG_ACTION_UPDATED,
                   batchId = id,
                   goodsItemId = goodsItemId,
-                  batch = body.copy(id = id.toString())
+                  batch = sanitizedBody.copy(id = id.toString())
                 )
 
                 insertOperationLogInsideTransaction(
@@ -20162,10 +21074,9 @@ fun Application.module() {
                 )
               }
 
-              result += body.copy(
+              result += sanitizedBody.copy(
                 userId = userId.toString(),
                 storeId = storeId.toString(),
-                promotions = body.promotions.sanitizedStockPromotions(),
                 updatedAtMillis = now
               )
             }
@@ -20389,8 +21300,28 @@ fun Application.module() {
     route("/supplierGoodsPrices") {
       authenticate("auth-jwt") {
         suspend fun respondMySupplierGoodsPrices(call: RoutingCall, userId: UUID) {
+          val rawSupplierId = call.request.headers["supplier_id"]?.trim()
+          val requestedSupplierId = rawSupplierId
+            ?.takeIf { it.isNotBlank() }
+            ?.let { value -> runCatching { UUID.fromString(value) }.getOrNull() }
+          if (!rawSupplierId.isNullOrBlank() && requestedSupplierId == null) {
+            call.genericResponseNoPayload(
+              HttpStatusCode.BadRequest,
+              simpleMessage(
+                main = "Supplier identity is invalid",
+                ru = "Идентификатор поставщика недействителен",
+                kk = "Жеткізуші идентификаторы жарамсыз"
+              )
+            )
+            return
+          }
+
           val result = newSuspendedTransaction(aitaServerIoContext) {
-            val supplierIds = accessibleSupplierIdsForUserInsideTransaction(userId)
+            val accessibleSupplierIds = accessibleSupplierIdsForUserInsideTransaction(userId)
+            if (requestedSupplierId != null && requestedSupplierId !in accessibleSupplierIds) {
+              return@newSuspendedTransaction null
+            }
+            val supplierIds = if (requestedSupplierId != null) listOf(requestedSupplierId) else accessibleSupplierIds
             if (supplierIds.isEmpty()) {
               emptyList()
             } else {
@@ -20401,8 +21332,20 @@ fun Application.module() {
                      (SupplierGoodsPrices.isActive eq true)
                 }
                 .map { it.toSupplierGoodsPriceDataModel() }
-                .sortedByDescending { price -> price.lastUsedAtMillis ?: price.updatedAtMillis }
+                .normalizedSupplierGoodsPriceBook()
             }
+          }
+
+          if (result == null) {
+            call.genericResponseNoPayload(
+              HttpStatusCode.Forbidden,
+              simpleMessage(
+                main = "Supplier identity is not available to this account",
+                ru = "Профиль поставщика недоступен этому аккаунту",
+                kk = "Жеткізуші профилі бұл аккаунтқа қолжетімсіз"
+              )
+            )
+            return
           }
 
           call.genericResponse(
@@ -20429,7 +21372,14 @@ fun Application.module() {
         get("/get") {
           val userId = call.checkPrincipal() ?: return@get
           val storeId = call.headerUuid("store_id")
-            ?: return@get call.respondAitaUnauthorized()
+            ?: return@get call.genericResponseNoPayload(
+              HttpStatusCode.BadRequest,
+              simpleMessage(
+                main = "Store link is missing or invalid",
+                ru = "Связь с магазином отсутствует или недействительна",
+                kk = "Дүкен байланысы жоқ немесе жарамсыз"
+              )
+            )
 
           val result = newSuspendedTransaction(aitaServerIoContext) {
             if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_SUPPLIERS_VIEW, requireWorkshift = false))
@@ -20442,6 +21392,7 @@ fun Application.module() {
                    (SupplierGoodsPrices.isActive eq true)
               }
               .map { it.toSupplierGoodsPriceDataModel() }
+              .normalizedSupplierGoodsPriceBook()
           }
 
           result?.let {
@@ -20449,22 +21400,69 @@ fun Application.module() {
               status = HttpStatusCode.OK,
               payload = it
             )
-          } ?: call.respondAitaUnauthorized()
+          } ?: call.genericResponseNoPayload(
+            HttpStatusCode.Forbidden,
+            simpleMessage(
+              main = "You cannot view this supplier price book",
+              ru = "У вас нет доступа к этому прайс-листу поставщика",
+              kk = "Бұл жеткізуші баға тізімін көруге рұқсатыңыз жоқ"
+            )
+          )
         }
 
         post("/upsert") {
           val userId = call.checkPrincipal() ?: return@post
           val body = call.receiveAita<SupplierGoodsPriceDataModel>()
+          val numericPrice = body.supplyPrice.price.toMoneyDouble()
+          if (!numericPrice.isFinite() || numericPrice <= 0.0) {
+            return@post call.genericResponseNoPayload(
+              HttpStatusCode.BadRequest,
+              simpleMessage(
+                main = "Supplier price must be greater than zero",
+                ru = "Цена поставщика должна быть больше нуля",
+                kk = "Жеткізуші бағасы нөлден жоғары болуы керек"
+              )
+            )
+          }
+
+          val invalidOptionalQuantity = listOfNotNull(
+            body.minOrderQuantity,
+            body.packageQuantity
+          ).any { quantity ->
+            !quantity.total.isFinite() ||
+               quantity.total <= 0.0 ||
+               !quantity.pricedAmount.isFinite() ||
+               quantity.pricedAmount <= 0.0
+          }
+          if (invalidOptionalQuantity) {
+            return@post call.genericResponseNoPayload(
+              HttpStatusCode.BadRequest,
+              simpleMessage(
+                main = "Minimum order and package size must be greater than zero",
+                ru = "Минимальный заказ и размер упаковки должны быть больше нуля",
+                kk = "Ең аз тапсырыс пен қаптама мөлшері нөлден жоғары болуы керек"
+              )
+            )
+          }
+
+          val storeId = runCatching { UUID.fromString(body.storeId.trim()) }.getOrNull()
+          val supplierId = runCatching { UUID.fromString(body.supplierId.trim()) }.getOrNull()
+          val goodsItemId = runCatching { UUID.fromString(body.goodsItemId.trim()) }.getOrNull()
+          if (storeId == null || supplierId == null || goodsItemId == null) {
+            return@post call.genericResponseNoPayload(
+              HttpStatusCode.BadRequest,
+              simpleMessage(
+                main = "Store, supplier, or product link is invalid",
+                ru = "Связь с магазином, поставщиком или товаром недействительна",
+                kk = "Дүкен, жеткізуші немесе тауар байланысы жарамсыз"
+              )
+            )
+          }
 
           val result = newSuspendedTransaction(aitaServerIoContext) {
-            val storeId = runCatching { UUID.fromString(body.storeId) }.getOrNull()
-              ?: return@newSuspendedTransaction null
-
-            val supplierId = runCatching { UUID.fromString(body.supplierId) }.getOrNull()
-              ?: return@newSuspendedTransaction null
-
-            val goodsItemId = runCatching { UUID.fromString(body.goodsItemId) }.getOrNull()
-              ?: return@newSuspendedTransaction null
+            lockSupplierProfileInsideTransaction(supplierId)
+            if (Suppliers.select(Suppliers.id).where { (Suppliers.id eq supplierId) and (Suppliers.isActive eq true) }.empty())
+              return@newSuspendedTransaction null
 
             val canManageFromStore = userCanUseStoreActionInsideTransaction(
               userId = userId,
@@ -20483,25 +21481,29 @@ fun Application.module() {
 
             val now = System.currentTimeMillis()
 
-            upsertSupplierGoodsPriceInsideTransaction(
+            val priceBookRowId = upsertSupplierGoodsPriceInsideTransaction(
               userId = userId,
               storeId = storeId,
               supplierId = supplierId,
               goodsItemId = goodsItemId,
-              supplyPrice = body.supplyPrice,
+              supplyPrice = body.supplyPrice.copy(
+                price = numericPrice.toStockMoneyText(),
+                currency = body.supplyPrice.currency.trim().uppercase().ifBlank { "KZT" },
+                supplierId = supplierId.toString()
+              ),
               minOrderQuantity = body.minOrderQuantity,
               packageQuantity = body.packageQuantity,
               supplierBarcode = body.supplierBarcode,
               supplierGoodsName = body.supplierGoodsName,
+              replaceOptionalFields = true,
               now = now
             )
 
             SupplierGoodsPrices
               .selectAll()
               .where {
-                (SupplierGoodsPrices.storeId eq storeId) and
-                   (SupplierGoodsPrices.supplierId eq supplierId) and
-                   (SupplierGoodsPrices.goodsItemId eq goodsItemId)
+                (SupplierGoodsPrices.id eq priceBookRowId) and
+                   (SupplierGoodsPrices.isActive eq true)
               }
               .single()
               .toSupplierGoodsPriceDataModel()
@@ -20517,14 +21519,28 @@ fun Application.module() {
                 kk = "Жеткізуші бағасы сақталды"
               )
             )
-          } ?: call.respondAitaUnauthorized()
+          } ?: call.genericResponseNoPayload(
+            HttpStatusCode.Forbidden,
+            simpleMessage(
+              main = "You cannot edit this supplier offer",
+              ru = "У вас нет доступа к редактированию этого предложения",
+              kk = "Бұл жеткізуші ұсынысын өзгертуге рұқсатыңыз жоқ"
+            )
+          )
         }
 
         delete("/delete") {
           val userId = call.checkPrincipal() ?: return@delete
           val ids = call.receiveOneOrList<String>()
           val storeId = call.headerUuid("store_id")
-            ?: return@delete call.respondAitaUnauthorized()
+            ?: return@delete call.genericResponseNoPayload(
+              HttpStatusCode.BadRequest,
+              simpleMessage(
+                main = "Store link is missing or invalid",
+                ru = "Связь с магазином отсутствует или недействительна",
+                kk = "Дүкен байланысы жоқ немесе жарамсыз"
+              )
+            )
 
           val deleted = newSuspendedTransaction(aitaServerIoContext) {
             if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_SUPPLIER_PRICES_MANAGE, requireWorkshift = true))
@@ -20539,8 +21555,7 @@ fun Application.module() {
 
               val affected = SupplierGoodsPrices.update({
                 (SupplierGoodsPrices.id eq id) and
-                   (SupplierGoodsPrices.storeId eq storeId) and
-                   (SupplierGoodsPrices.userId eq userId)
+                   (SupplierGoodsPrices.storeId eq storeId)
               }) {
                 it[SupplierGoodsPrices.isActive] = false
                 it[SupplierGoodsPrices.updatedAtMillis] = now
@@ -20563,7 +21578,14 @@ fun Application.module() {
                 kk = "Жеткізуші бағалары өшірілді"
               )
             )
-          } ?: call.respondAitaUnauthorized()
+          } ?: call.genericResponseNoPayload(
+            HttpStatusCode.Forbidden,
+            simpleMessage(
+              main = "You cannot delete supplier offers for this store",
+              ru = "У вас нет доступа к удалению предложений поставщика для этого магазина",
+              kk = "Бұл дүкеннің жеткізуші ұсыныстарын өшіруге рұқсатыңыз жоқ"
+            )
+          )
         }
       }
     }
@@ -21092,13 +22114,17 @@ fun Application.module() {
         post("/add") {
           val userId = call.checkPrincipal() ?: return@post
           val body = call.receiveAita<SupplierDataModel>()
+          supplierProfileValidationMessage(body.supplierProfileValidationIssues())?.let { message ->
+            return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, message)
+          }
 
           val inserted = newSuspendedTransaction(aitaServerIoContext) {
             if (Users.select(Users.id).where { Users.id eq userId }.empty())
               return@newSuspendedTransaction null
 
-            val cleaned = body.cleanedForStorage(ownerUserId = userId)
+            val cleaned = body.cleanedForStorage(ownerUserId = userId).copy(isActive = true)
             val id = UUID.randomUUID()
+            lockSupplierProfileInsideTransaction(id)
 
             Suppliers.insert {
               it[Suppliers.id] = id
@@ -21114,65 +22140,175 @@ fun Application.module() {
             Suppliers.selectAll().where { Suppliers.id eq id }.single().toSupplierDataModel()
           }
 
-          inserted?.let {
-            call.genericResponse(HttpStatusCode.Created, payload = it, message = getResponse("83").message)
+          inserted?.let { supplier ->
+            publishSupplierProfileRealtime(
+              userIds = supplier.userIds,
+              reason = "supplier_profile_created",
+              supplierId = supplier.id
+            )
+            call.genericResponse(HttpStatusCode.Created, payload = supplier, message = getResponse("83").message)
           } ?: call.respondAitaUnauthorized()
         }
 
         put("/update") {
           val userId = call.checkPrincipal() ?: return@put
           val body = call.receiveAita<SupplierDataModel>()
-
-          val updated = newSuspendedTransaction(aitaServerIoContext) {
-            val id = runCatching { UUID.fromString(body.id) }.getOrNull()
-              ?: return@newSuspendedTransaction null
-            val row = Suppliers.selectAll().where { Suppliers.id eq id }.singleOrNull()
-              ?: return@newSuspendedTransaction null
-            val existing = row.toSupplierDataModel()
-            if (!existing.userIds.contains(userId.toString()))
-              return@newSuspendedTransaction null
-
-            val cleaned = body.cleanedForStorage(ownerUserId = userId, existingUserIds = existing.userIds)
-            Suppliers.update({ Suppliers.id eq id }) {
-              it[Suppliers.userIds] = jsonBase.encodeToString(cleaned.userIds)
-              it[Suppliers.typeIds] = cleaned.typeIds?.let { value -> jsonBase.encodeToString(value) }
-              it[Suppliers.categoryIds] = jsonBase.encodeToString(cleaned.categoryIds)
-              it[Suppliers.name] = jsonBase.encodeToString(cleaned.name)
-              it[Suppliers.phoneNumbers] = cleaned.phoneNumbers?.let { value -> jsonBase.encodeToString(value) }
-              it[Suppliers.emails] = cleaned.emails?.let { value -> jsonBase.encodeToString(value) }
-              it[Suppliers.isActive] = cleaned.isActive
-            }
-
-            Suppliers.selectAll().where { Suppliers.id eq id }.single().toSupplierDataModel()
+          val supplierId = runCatching { UUID.fromString(body.id.trim()) }.getOrNull()
+            ?: return@put call.genericResponseNoPayload(
+              HttpStatusCode.BadRequest,
+              simpleMessage(
+                main = "Supplier profile ID is invalid",
+                ru = "Некорректный идентификатор профиля поставщика",
+                kk = "Жеткізуші профилінің идентификаторы қате"
+              )
+            )
+          supplierProfileValidationMessage(body.supplierProfileValidationIssues())?.let { message ->
+            return@put call.genericResponseNoPayload(HttpStatusCode.BadRequest, message)
           }
 
-          updated?.let {
-            call.genericResponse(HttpStatusCode.OK, payload = it, message = getResponse("84").message)
-          } ?: call.respondAitaUnauthorized()
+          var failureStatus = HttpStatusCode.Forbidden
+          var failureMessage = simpleMessage(
+            main = "You cannot edit this supplier profile",
+            ru = "У вас нет права редактировать этот профиль поставщика",
+            kk = "Бұл жеткізуші профилін өңдеуге құқығыңыз жоқ"
+          )
+          var profileChanged = false
+          val updated = newSuspendedTransaction(aitaServerIoContext) {
+            lockSupplierProfileInsideTransaction(supplierId)
+            val row = Suppliers.selectAll().where { Suppliers.id eq supplierId }.singleOrNull()
+            if (row == null) {
+              failureStatus = HttpStatusCode.NotFound
+              failureMessage = simpleMessage(
+                main = "Supplier profile was not found",
+                ru = "Профиль поставщика не найден",
+                kk = "Жеткізуші профилі табылмады"
+              )
+              return@newSuspendedTransaction null
+            }
+            val existing = row.toSupplierDataModel()
+            if (!existing.userIds.contains(userId.toString())) return@newSuspendedTransaction null
+            if (!existing.isActive) {
+              failureStatus = HttpStatusCode.Conflict
+              failureMessage = simpleMessage(
+                main = "This supplier profile is inactive",
+                ru = "Этот профиль поставщика неактивен",
+                kk = "Бұл жеткізуші профилі белсенді емес"
+              )
+              return@newSuspendedTransaction null
+            }
+
+            val cleaned = body.cleanedForStorage(
+              ownerUserId = userId,
+              existingUserIds = existing.userIds
+            ).copy(isActive = true)
+            profileChanged =
+              existing.userIds != cleaned.userIds ||
+                existing.typeIds != cleaned.typeIds ||
+                existing.categoryIds != cleaned.categoryIds ||
+                existing.name != cleaned.name ||
+                existing.phoneNumbers.orEmpty() != cleaned.phoneNumbers.orEmpty() ||
+                existing.emails.orEmpty() != cleaned.emails.orEmpty() ||
+                !existing.isActive
+
+            if (profileChanged) {
+              Suppliers.update({ Suppliers.id eq supplierId }) {
+                it[Suppliers.userIds] = jsonBase.encodeToString(cleaned.userIds)
+                it[Suppliers.typeIds] = cleaned.typeIds?.let { value -> jsonBase.encodeToString(value) }
+                it[Suppliers.categoryIds] = jsonBase.encodeToString(cleaned.categoryIds)
+                it[Suppliers.name] = jsonBase.encodeToString(cleaned.name)
+                it[Suppliers.phoneNumbers] = cleaned.phoneNumbers?.let { value -> jsonBase.encodeToString(value) }
+                it[Suppliers.emails] = cleaned.emails?.let { value -> jsonBase.encodeToString(value) }
+                it[Suppliers.isActive] = true
+              }
+            }
+
+            Suppliers.selectAll().where { Suppliers.id eq supplierId }.single().toSupplierDataModel()
+          }
+
+          updated?.let { supplier ->
+            if (profileChanged) {
+              publishSupplierProfileRealtime(
+                userIds = supplier.userIds,
+                reason = "supplier_profile_updated",
+                supplierId = supplier.id
+              )
+            }
+            call.genericResponse(HttpStatusCode.OK, payload = supplier, message = getResponse("84").message)
+          } ?: call.genericResponseNoPayload(failureStatus, failureMessage)
         }
 
         delete("/delete") {
           val userId = call.checkPrincipal() ?: return@delete
-          val supplierId = call.receiveAita<String>().trim()
+          val rawSupplierId = call.receiveAita<String>().trim()
+          val supplierId = runCatching { UUID.fromString(rawSupplierId) }.getOrNull()
+            ?: return@delete call.genericResponseNoPayload(
+              HttpStatusCode.BadRequest,
+              simpleMessage(
+                main = "Supplier profile ID is invalid",
+                ru = "Некорректный идентификатор профиля поставщика",
+                kk = "Жеткізуші профилінің идентификаторы қате"
+              )
+            )
 
+          var failureStatus = HttpStatusCode.Forbidden
+          var failureMessage = simpleMessage(
+            main = "You cannot delete this supplier profile",
+            ru = "У вас нет права удалить этот профиль поставщика",
+            kk = "Бұл жеткізуші профилін жоюға құқығыңыз жоқ"
+          )
+          var profileChanged = false
+          var realtimeUserIds: List<String> = emptyList()
           val deleted = newSuspendedTransaction(aitaServerIoContext) {
-            val id = runCatching { UUID.fromString(supplierId) }.getOrNull()
-              ?: return@newSuspendedTransaction false
-            val row = Suppliers.selectAll().where { Suppliers.id eq id }.singleOrNull()
-              ?: return@newSuspendedTransaction false
-            val supplier = row.toSupplierDataModel()
-            if (!supplier.userIds.contains(userId.toString()))
+            lockSupplierProfileInsideTransaction(supplierId)
+            val row = Suppliers.selectAll().where { Suppliers.id eq supplierId }.singleOrNull()
+            if (row == null) {
+              failureStatus = HttpStatusCode.NotFound
+              failureMessage = simpleMessage(
+                main = "Supplier profile was not found",
+                ru = "Профиль поставщика не найден",
+                kk = "Жеткізуші профилі табылмады"
+              )
               return@newSuspendedTransaction false
+            }
+            val supplier = row.toSupplierDataModel()
+            if (!supplier.userIds.contains(userId.toString())) return@newSuspendedTransaction false
+            realtimeUserIds = supplier.userIds
+            if (!supplier.isActive) return@newSuspendedTransaction true
 
-            Suppliers.update({ Suppliers.id eq id }) {
+            // Commercial identities that have entered the audit trail are never hard-retired via
+            // the ordinary delete action. Keeping them active for now is preferable to making past
+            // orders inaccessible; a future archive workflow can expose historical identities
+            // explicitly without mixing them into current work.
+            val commercialHistory = supplierProfileCommercialHistoryCountsInsideTransaction(supplierId)
+
+            if (commercialHistory.total > 0L) {
+              failureStatus = HttpStatusCode.Conflict
+              failureMessage = simpleMessage(
+                main = "Only an unused supplier profile can be deleted; profiles with order, agreement, offer, or stock history are kept for audit",
+                ru = "Удалить можно только неиспользованный профиль; профили с историей заказов, договоров, предложений или складских партий сохраняются для аудита",
+                kk = "Тек пайдаланылмаған профильді жоюға болады; тапсырыс, келісім, ұсыныс немесе қойма партияларының тарихы бар профильдер аудит үшін сақталады"
+              )
+              return@newSuspendedTransaction false
+            }
+
+            val changedRows = Suppliers.update({ Suppliers.id eq supplierId }) {
               it[Suppliers.isActive] = false
-            } > 0
+            }
+            profileChanged = changedRows > 0
+            profileChanged
           }
 
           if (deleted) {
-            call.genericResponse(HttpStatusCode.OK, payload = supplierId, message = getResponse("85").message)
+            if (profileChanged) {
+              publishSupplierProfileRealtime(
+                userIds = realtimeUserIds,
+                reason = "supplier_profile_deleted",
+                supplierId = supplierId.toString()
+              )
+            }
+            call.genericResponse(HttpStatusCode.OK, payload = supplierId.toString(), message = getResponse("85").message)
           } else {
-            call.respondAitaUnauthorized()
+            call.genericResponseNoPayload(failureStatus, failureMessage)
           }
         }
       }
@@ -21182,23 +22318,71 @@ fun Application.module() {
       authenticate("auth-jwt") {
         get("/get") {
           val userId = call.checkPrincipal() ?: return@get
-          val storeId = call.headerUuid("store_id")
-          val supplierId = call.headerUuid("supplier_id")
+          val rawStoreId = call.request.headers["store_id"]?.trim().orEmpty()
+          val rawSupplierId = call.request.headers["supplier_id"]?.trim().orEmpty()
+          val storeId = rawStoreId.takeIf { it.isNotBlank() }?.let {
+            runCatching { UUID.fromString(it) }.getOrNull()
+              ?: return@get call.genericResponseNoPayload(
+                HttpStatusCode.BadRequest,
+                simpleMessage(
+                  main = "Store ID is invalid",
+                  ru = "Некорректный идентификатор магазина",
+                  kk = "Дүкен идентификаторы қате"
+                )
+              )
+          }
+          val supplierId = rawSupplierId.takeIf { it.isNotBlank() }?.let {
+            runCatching { UUID.fromString(it) }.getOrNull()
+              ?: return@get call.genericResponseNoPayload(
+                HttpStatusCode.BadRequest,
+                simpleMessage(
+                  main = "Supplier ID is invalid",
+                  ru = "Некорректный идентификатор поставщика",
+                  kk = "Жеткізуші идентификаторы қате"
+                )
+              )
+          }
+
+          var forbidden = false
           val result = newSuspendedTransaction(aitaServerIoContext) {
             val accessibleSupplierIds = if (storeId == null && supplierId == null) {
               Suppliers
                 .select(Suppliers.id, Suppliers.userIds)
                 .where { Suppliers.isActive eq true }
                 .mapNotNull { row ->
-                  row[Suppliers.id].takeIf { decodeSupplierStringList(row[Suppliers.userIds]).contains(userId.toString()) }
+                  row[Suppliers.id].takeIf {
+                    decodeSupplierStringList(row[Suppliers.userIds]).contains(userId.toString())
+                  }
                 }
             } else {
               emptyList()
             }
 
-            if (storeId != null && !userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_SUPPLIER_ORDERS_VIEW, requireWorkshift = false)) return@newSuspendedTransaction null
-            if (supplierId != null && !userHasSupplierAccessInsideTransaction(userId, supplierId) && storeId == null) return@newSuspendedTransaction null
-            if (storeId == null && supplierId == null && accessibleSupplierIds.isEmpty()) return@newSuspendedTransaction emptyList<SupplierPartnershipContractDataModel>()
+            val canViewStore = storeId?.let {
+              userCanUseStoreActionInsideTransaction(
+                userId,
+                it,
+                STORE_PERMISSION_SUPPLIER_ORDERS_VIEW,
+                requireWorkshift = false
+              )
+            } ?: false
+            val canViewSupplier = supplierId?.let {
+              userHasSupplierAccessInsideTransaction(userId, it)
+            } ?: false
+
+            val allowed = when {
+              storeId != null && supplierId != null -> canViewStore || canViewSupplier
+              storeId != null -> canViewStore
+              supplierId != null -> canViewSupplier
+              else -> true
+            }
+            if (!allowed) {
+              forbidden = true
+              return@newSuspendedTransaction null
+            }
+            if (storeId == null && supplierId == null && accessibleSupplierIds.isEmpty()) {
+              return@newSuspendedTransaction emptyList<SupplierPartnershipContractDataModel>()
+            }
 
             var filter: Op<Boolean> = SupplierPartnershipContracts.isActive eq true
             storeId?.let { filter = filter and (SupplierPartnershipContracts.storeId eq it) }
@@ -21211,37 +22395,115 @@ fun Application.module() {
               .selectAll()
               .where { filter }
               .map { it.toSupplierPartnershipContractDataModel() }
-              .sortedByDescending { it.updatedAtMillis }
+              .sortedByDescending { maxOf(it.updatedAtMillis, it.createdAtMillis) }
               .withSupplierContractSnapshotsInsideTransaction()
           }
 
-          result?.let {
-            call.genericListResponse(
+          when {
+            result != null -> call.genericListResponse(
               status = HttpStatusCode.OK,
-              payload = it,
+              payload = result,
               message = simpleMessage(
                 main = "Supplier contracts loaded",
                 ru = "Договоры с поставщиками загружены",
                 kk = "Жеткізуші келісімдері жүктелді"
               )
             )
-          } ?: call.respondAitaUnauthorized()
+            forbidden -> call.genericResponseNoPayload(
+              HttpStatusCode.Forbidden,
+              simpleMessage(
+                main = "You do not have access to these supplier contracts",
+                ru = "У вас нет доступа к этим договорам с поставщиками",
+                kk = "Бұл жеткізуші келісімдеріне қолжетімділігіңіз жоқ"
+              )
+            )
+            else -> call.genericResponseNoPayload(
+              HttpStatusCode.BadRequest,
+              simpleMessage(
+                main = "Could not load supplier contracts",
+                ru = "Не удалось загрузить договоры с поставщиками",
+                kk = "Жеткізуші келісімдерін жүктеу мүмкін болмады"
+              )
+            )
+          }
         }
 
         post("/upsert") {
           val userId = call.checkPrincipal() ?: return@post
           val body = call.receiveAita<SupplierPartnershipContractDataModel>()
+          val storeId = runCatching { UUID.fromString(body.storeId.trim()) }.getOrNull()
+            ?: return@post call.genericResponseNoPayload(
+              HttpStatusCode.BadRequest,
+              simpleMessage(
+                main = "Choose a valid partner Store",
+                ru = "Выберите корректный магазин-партнёр",
+                kk = "Дұрыс серіктес дүкенді таңдаңыз"
+              )
+            )
+          val supplierId = runCatching { UUID.fromString(body.supplierId.trim()) }.getOrNull()
+            ?: return@post call.genericResponseNoPayload(
+              HttpStatusCode.BadRequest,
+              simpleMessage(
+                main = "Choose a valid supplier profile",
+                ru = "Выберите корректный профиль поставщика",
+                kk = "Дұрыс жеткізуші профилін таңдаңыз"
+              )
+            )
 
+          var failureStatus = HttpStatusCode.BadRequest
+          var failureMessage: List<LocalizedStringDataModel> = simpleMessage(
+            main = "Cannot save supplier contract",
+            ru = "Не удалось сохранить договор с поставщиком",
+            kk = "Жеткізуші келісімін сақтау мүмкін болмады"
+          )
           val result = newSuspendedTransaction(aitaServerIoContext) {
-            val storeId = runCatching { UUID.fromString(body.storeId) }.getOrNull()
-              ?: return@newSuspendedTransaction null
-            val supplierId = runCatching { UUID.fromString(body.supplierId) }.getOrNull()
-              ?: return@newSuspendedTransaction null
-            if (Suppliers.select(Suppliers.id).where { (Suppliers.id eq supplierId) and (Suppliers.isActive eq true) }.empty()) return@newSuspendedTransaction null
+            if (Stores.select(Stores.id).where {
+                (Stores.id eq storeId) and (Stores.isActive eq true)
+              }.empty()
+            ) {
+              failureStatus = HttpStatusCode.NotFound
+              failureMessage = simpleMessage(
+                main = "Partner Store was not found",
+                ru = "Магазин-партнёр не найден",
+                kk = "Серіктес дүкен табылмады"
+              )
+              return@newSuspendedTransaction null
+            }
+            if (Suppliers.select(Suppliers.id).where {
+                (Suppliers.id eq supplierId) and (Suppliers.isActive eq true)
+              }.empty()
+            ) {
+              failureStatus = HttpStatusCode.NotFound
+              failureMessage = simpleMessage(
+                main = "Supplier profile was not found",
+                ru = "Профиль поставщика не найден",
+                kk = "Жеткізуші профилі табылмады"
+              )
+              return@newSuspendedTransaction null
+            }
 
-            val canStoreEdit = userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_SUPPLIER_ORDERS_MANAGE, requireWorkshift = false)
+            val canStoreEdit = userCanUseStoreActionInsideTransaction(
+              userId,
+              storeId,
+              STORE_PERMISSION_SUPPLIER_ORDERS_MANAGE,
+              requireWorkshift = false
+            )
             val canSupplierEdit = userHasSupplierAccessInsideTransaction(userId, supplierId)
-            if (!canStoreEdit && !canSupplierEdit) return@newSuspendedTransaction null
+            if (!canStoreEdit && !canSupplierEdit) {
+              failureStatus = HttpStatusCode.Forbidden
+              failureMessage = simpleMessage(
+                main = "You cannot edit this supplier contract",
+                ru = "У вас нет права редактировать этот договор",
+                kk = "Бұл жеткізуші келісімін өзгертуге құқығыңыз жоқ"
+              )
+              return@newSuspendedTransaction null
+            }
+
+            body.validationFailureForSupplierContractInsideTransaction(storeId)?.let { validationMessage ->
+              failureStatus = HttpStatusCode.BadRequest
+              failureMessage = validationMessage
+              return@newSuspendedTransaction null
+            }
 
             val requestedSide = normalizeSupplierContractSide(body.authorSide)
             val actorSide = when {
@@ -21252,18 +22514,79 @@ fun Application.module() {
             }
 
             val now = System.currentTimeMillis()
-            val requestedId = runCatching { UUID.fromString(body.id) }.getOrNull()
-            val existing = requestedId?.let { id ->
+            lockSupplierProfileInsideTransaction(supplierId)
+            if (Suppliers.select(Suppliers.id).where { (Suppliers.id eq supplierId) and (Suppliers.isActive eq true) }.empty()) {
+              failureStatus = HttpStatusCode.Conflict
+              failureMessage = simpleMessage(
+                main = "Supplier profile is no longer active",
+                ru = "Профиль поставщика больше не активен",
+                kk = "Жеткізуші профилі енді белсенді емес"
+              )
+              return@newSuspendedTransaction null
+            }
+            val requestedId = body.id.trim().takeIf { it.isNotBlank() }?.let {
+              runCatching { UUID.fromString(it) }.getOrNull()
+                ?: run {
+                  failureStatus = HttpStatusCode.BadRequest
+                  failureMessage = simpleMessage(
+                    main = "Supplier contract ID is invalid",
+                    ru = "Некорректный идентификатор договора",
+                    kk = "Жеткізуші келісімінің идентификаторы қате"
+                  )
+                  return@newSuspendedTransaction null
+                }
+            }
+            requestedId?.let(::lockSupplierContractInsideTransaction)
+            val rowWithRequestedId = requestedId?.let { id ->
               SupplierPartnershipContracts
                 .selectAll()
-                .where { (SupplierPartnershipContracts.id eq id) and (SupplierPartnershipContracts.storeId eq storeId) and (SupplierPartnershipContracts.supplierId eq supplierId) }
+                .where { SupplierPartnershipContracts.id eq id }
                 .singleOrNull()
             }
-            val contractId = requestedId ?: UUID.randomUUID()
-            val clean = body.cleanForContractStorageInsideTransaction(userId, storeId, supplierId, actorSide, now, existing)
+            if (rowWithRequestedId != null && (
+                rowWithRequestedId[SupplierPartnershipContracts.storeId] != storeId ||
+                  rowWithRequestedId[SupplierPartnershipContracts.supplierId] != supplierId
+              )) {
+              failureStatus = HttpStatusCode.Conflict
+              failureMessage = simpleMessage(
+                main = "This contract belongs to a different Store or supplier relationship",
+                ru = "Этот договор относится к другому магазину или поставщику",
+                kk = "Бұл келісім басқа дүкенге немесе жеткізушіге тиесілі"
+              )
+              return@newSuspendedTransaction null
+            }
+            if (rowWithRequestedId != null && !rowWithRequestedId[SupplierPartnershipContracts.isActive]) {
+              failureStatus = HttpStatusCode.Conflict
+              failureMessage = simpleMessage(
+                main = "Archived contract cannot be edited",
+                ru = "Архивный договор нельзя редактировать",
+                kk = "Мұрағатталған келісімді өзгертуге болмайды"
+              )
+              return@newSuspendedTransaction null
+            }
+            if (rowWithRequestedId != null) {
+              val currentRevision = rowWithRequestedId[SupplierPartnershipContracts.revision]
+              if (body.revision != currentRevision) {
+                failureStatus = HttpStatusCode.Conflict
+                failureMessage = supplierContractRevisionConflictMessage()
+                return@newSuspendedTransaction null
+              }
+            }
 
-            if (existing == null) {
-              SupplierPartnershipContracts.insert { it.setSupplierContractColumns(contractId, clean.copy(id = contractId.toString())) }
+            val contractId = requestedId ?: UUID.randomUUID()
+            val clean = body.cleanForContractStorageInsideTransaction(
+              userId = userId,
+              storeId = storeId,
+              supplierId = supplierId,
+              actorSide = actorSide,
+              now = now,
+              existing = rowWithRequestedId
+            )
+
+            if (rowWithRequestedId == null) {
+              SupplierPartnershipContracts.insert {
+                it.setSupplierContractColumns(contractId, clean.copy(id = contractId.toString()))
+              }
             } else {
               SupplierPartnershipContracts.update({ SupplierPartnershipContracts.id eq contractId }) {
                 it.setSupplierContractUpdateColumns(clean.copy(id = contractId.toString()))
@@ -21278,56 +22601,147 @@ fun Application.module() {
               .firstOrNull()
           }
 
-          result?.let {
+          result?.let { contract ->
+            publishSupplierContractRealtime(contract.storeId, "supplier_contract_proposal_saved")
             call.genericResponse(
               status = HttpStatusCode.OK,
-              payload = it,
+              payload = contract,
               message = simpleMessage(
                 main = "Contract proposal sent",
                 ru = "Предложение договора отправлено",
                 kk = "Келісім ұсынысы жіберілді"
               )
             )
-          } ?: call.genericResponseNoPayload(
-            HttpStatusCode.BadRequest,
-            simpleMessage(
-              main = "Cannot save supplier contract",
-              ru = "Не удалось сохранить договор с поставщиком",
-              kk = "Жеткізуші келісімін сақтау мүмкін болмады"
-            )
-          )
+          } ?: call.genericResponseNoPayload(failureStatus, failureMessage)
         }
 
         post("/accept") {
           val userId = call.checkPrincipal() ?: return@post
-          val contractId = runCatching { UUID.fromString(call.receiveAita<String>().trim()) }.getOrNull()
-            ?: return@post call.respondAitaUnauthorized()
+          val action = call.receiveSupplierContractRevisionActionOrNull()
+            ?: return@post call.genericResponseNoPayload(
+              HttpStatusCode.BadRequest,
+              simpleMessage(
+                main = "Supplier contract action is invalid",
+                ru = "Некорректное действие с договором",
+                kk = "Жеткізуші келісімімен әрекет қате"
+              )
+            )
+          val contractId = action.contractId.canonicalSupplierContractUuidOrNull()
+            ?.let { UUID.fromString(it) }
+            ?: return@post call.genericResponseNoPayload(
+              HttpStatusCode.BadRequest,
+              simpleMessage(
+                main = "Supplier contract ID is invalid",
+                ru = "Некорректный идентификатор договора",
+                kk = "Жеткізуші келісімінің идентификаторы қате"
+              )
+            )
 
+          var failureStatus = HttpStatusCode.Conflict
+          var failureMessage: List<LocalizedStringDataModel> = simpleMessage(
+            main = "This contract cannot be accepted now",
+            ru = "Сейчас этот договор нельзя принять",
+            kk = "Бұл келісімді қазір қабылдау мүмкін емес"
+          )
           val result = newSuspendedTransaction(aitaServerIoContext) {
-            val existing = SupplierPartnershipContracts.selectAll().where { SupplierPartnershipContracts.id eq contractId }.singleOrNull()
-              ?: return@newSuspendedTransaction null
+            lockSupplierContractInsideTransaction(contractId)
+            val existing = SupplierPartnershipContracts
+              .selectAll()
+              .where { SupplierPartnershipContracts.id eq contractId }
+              .singleOrNull()
+            if (existing == null) {
+              failureStatus = HttpStatusCode.NotFound
+              failureMessage = simpleMessage(
+                main = "Supplier contract was not found",
+                ru = "Договор с поставщиком не найден",
+                kk = "Жеткізуші келісімі табылмады"
+              )
+              return@newSuspendedTransaction null
+            }
+            if (
+              action.revision <= 0 ||
+              action.revision != existing[SupplierPartnershipContracts.revision]
+            ) {
+              failureStatus = HttpStatusCode.Conflict
+              failureMessage = supplierContractRevisionConflictMessage()
+              return@newSuspendedTransaction null
+            }
+            if (!existing[SupplierPartnershipContracts.isActive]) {
+              failureStatus = HttpStatusCode.Conflict
+              failureMessage = simpleMessage(
+                main = "Archived contract cannot be accepted",
+                ru = "Архивный договор нельзя принять",
+                kk = "Мұрағатталған келісімді қабылдауға болмайды"
+              )
+              return@newSuspendedTransaction null
+            }
+
+            val requiredSide = when (existing[SupplierPartnershipContracts.status]) {
+              SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER -> SUPPLIER_CONTRACT_SIDE_SUPPLIER
+              SUPPLIER_CONTRACT_STATUS_PENDING_STORE -> SUPPLIER_CONTRACT_SIDE_STORE
+              else -> {
+                failureStatus = HttpStatusCode.Conflict
+                failureMessage = simpleMessage(
+                  main = "This contract is not waiting for acceptance",
+                  ru = "Этот договор не ожидает принятия",
+                  kk = "Бұл келісім қабылдауды күтіп тұрған жоқ"
+                )
+                return@newSuspendedTransaction null
+              }
+            }
             val storeId = existing[SupplierPartnershipContracts.storeId]
             val supplierId = existing[SupplierPartnershipContracts.supplierId]
-            val canStoreAccept = userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_SUPPLIER_ORDERS_MANAGE, requireWorkshift = false)
-            val canSupplierAccept = userHasSupplierAccessInsideTransaction(userId, supplierId)
-            if (!canStoreAccept && !canSupplierAccept) return@newSuspendedTransaction null
-            val actorSide = when {
-              canSupplierAccept && existing[SupplierPartnershipContracts.status] == SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER -> SUPPLIER_CONTRACT_SIDE_SUPPLIER
-              canStoreAccept && existing[SupplierPartnershipContracts.status] == SUPPLIER_CONTRACT_STATUS_PENDING_STORE -> SUPPLIER_CONTRACT_SIDE_STORE
-              canSupplierAccept && !canStoreAccept -> SUPPLIER_CONTRACT_SIDE_SUPPLIER
-              else -> SUPPLIER_CONTRACT_SIDE_STORE
+            val permitted = if (requiredSide == SUPPLIER_CONTRACT_SIDE_SUPPLIER) {
+              userHasSupplierAccessInsideTransaction(userId, supplierId)
+            } else {
+              userCanUseStoreActionInsideTransaction(
+                userId,
+                storeId,
+                STORE_PERMISSION_SUPPLIER_ORDERS_MANAGE,
+                requireWorkshift = false
+              )
             }
+            if (!permitted) {
+              failureStatus = HttpStatusCode.Forbidden
+              failureMessage = simpleMessage(
+                main = "The other side must accept this contract",
+                ru = "Этот договор должна принять другая сторона",
+                kk = "Бұл келісімді екінші тарап қабылдауы керек"
+              )
+              return@newSuspendedTransaction null
+            }
+
             val now = System.currentTimeMillis()
-            val nextSupplierAcceptedAt = if (actorSide == SUPPLIER_CONTRACT_SIDE_SUPPLIER) now else existing[SupplierPartnershipContracts.supplierAcceptedAtMillis]
-            val nextStoreAcceptedAt = if (actorSide == SUPPLIER_CONTRACT_SIDE_STORE) now else existing[SupplierPartnershipContracts.storeAcceptedAtMillis]
-            val nextStatus = if (nextSupplierAcceptedAt != null && nextStoreAcceptedAt != null) SUPPLIER_CONTRACT_STATUS_ACTIVE else if (actorSide == SUPPLIER_CONTRACT_SIDE_SUPPLIER) SUPPLIER_CONTRACT_STATUS_PENDING_STORE else SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER
+            val nextSupplierAcceptedAt = if (requiredSide == SUPPLIER_CONTRACT_SIDE_SUPPLIER) {
+              now
+            } else {
+              existing[SupplierPartnershipContracts.supplierAcceptedAtMillis]
+            }
+            val nextStoreAcceptedAt = if (requiredSide == SUPPLIER_CONTRACT_SIDE_STORE) {
+              now
+            } else {
+              existing[SupplierPartnershipContracts.storeAcceptedAtMillis]
+            }
+            val nextStatus = if (nextSupplierAcceptedAt != null && nextStoreAcceptedAt != null) {
+              SUPPLIER_CONTRACT_STATUS_ACTIVE
+            } else if (requiredSide == SUPPLIER_CONTRACT_SIDE_SUPPLIER) {
+              SUPPLIER_CONTRACT_STATUS_PENDING_STORE
+            } else {
+              SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER
+            }
+            val nextRevision = existing[SupplierPartnershipContracts.revision] + 1
 
             SupplierPartnershipContracts.update({ SupplierPartnershipContracts.id eq contractId }) {
               it[SupplierPartnershipContracts.status] = nextStatus
+              it[SupplierPartnershipContracts.revision] = nextRevision
+              it[SupplierPartnershipContracts.lastEditorUserId] = userId
               it[SupplierPartnershipContracts.supplierAcceptedAtMillis] = nextSupplierAcceptedAt
               it[SupplierPartnershipContracts.storeAcceptedAtMillis] = nextStoreAcceptedAt
-              if (actorSide == SUPPLIER_CONTRACT_SIDE_SUPPLIER) it[SupplierPartnershipContracts.supplierAcceptedByUserId] = userId
-              if (actorSide == SUPPLIER_CONTRACT_SIDE_STORE) it[SupplierPartnershipContracts.storeAcceptedByUserId] = userId
+              if (requiredSide == SUPPLIER_CONTRACT_SIDE_SUPPLIER) {
+                it[SupplierPartnershipContracts.supplierAcceptedByUserId] = userId
+              } else {
+                it[SupplierPartnershipContracts.storeAcceptedByUserId] = userId
+              }
               it[SupplierPartnershipContracts.updatedAtMillis] = now
             }
 
@@ -21339,35 +22753,102 @@ fun Application.module() {
               .firstOrNull()
           }
 
-          result?.let {
+          result?.let { contract ->
+            publishSupplierContractRealtime(contract.storeId, "supplier_contract_accepted")
             call.genericResponse(
               status = HttpStatusCode.OK,
-              payload = it,
+              payload = contract,
               message = simpleMessage(
-                main = if (it.status == SUPPLIER_CONTRACT_STATUS_ACTIVE) "Contract is active" else "Contract accepted",
-                ru = if (it.status == SUPPLIER_CONTRACT_STATUS_ACTIVE) "Договор активен" else "Договор принят",
-                kk = if (it.status == SUPPLIER_CONTRACT_STATUS_ACTIVE) "Келісім белсенді" else "Келісім қабылданды"
+                main = if (contract.status == SUPPLIER_CONTRACT_STATUS_ACTIVE) "Contract is active" else "Contract accepted",
+                ru = if (contract.status == SUPPLIER_CONTRACT_STATUS_ACTIVE) "Договор активен" else "Договор принят",
+                kk = if (contract.status == SUPPLIER_CONTRACT_STATUS_ACTIVE) "Келісім белсенді" else "Келісім қабылданды"
               )
             )
-          } ?: call.respondAitaUnauthorized()
+          } ?: call.genericResponseNoPayload(failureStatus, failureMessage)
         }
 
         post("/decline") {
           val userId = call.checkPrincipal() ?: return@post
-          val contractId = runCatching { UUID.fromString(call.receiveAita<String>().trim()) }.getOrNull()
-            ?: return@post call.respondAitaUnauthorized()
+          val action = call.receiveSupplierContractRevisionActionOrNull()
+            ?: return@post call.genericResponseNoPayload(
+              HttpStatusCode.BadRequest,
+              simpleMessage(
+                main = "Supplier contract action is invalid",
+                ru = "Некорректное действие с договором",
+                kk = "Жеткізуші келісімімен әрекет қате"
+              )
+            )
+          val contractId = action.contractId.canonicalSupplierContractUuidOrNull()
+            ?.let { UUID.fromString(it) }
+            ?: return@post call.genericResponseNoPayload(
+              HttpStatusCode.BadRequest,
+              simpleMessage(
+                main = "Supplier contract ID is invalid",
+                ru = "Некорректный идентификатор договора",
+                kk = "Жеткізуші келісімінің идентификаторы қате"
+              )
+            )
 
+          var failureStatus = HttpStatusCode.Conflict
+          var failureMessage: List<LocalizedStringDataModel> = simpleMessage(
+            main = "Only a pending proposal can be declined",
+            ru = "Отклонить можно только ожидающее предложение",
+            kk = "Тек күтіп тұрған ұсыныстан бас тартуға болады"
+          )
           val result = newSuspendedTransaction(aitaServerIoContext) {
-            val existing = SupplierPartnershipContracts.selectAll().where { SupplierPartnershipContracts.id eq contractId }.singleOrNull()
-              ?: return@newSuspendedTransaction null
+            lockSupplierContractInsideTransaction(contractId)
+            val existing = SupplierPartnershipContracts
+              .selectAll()
+              .where { SupplierPartnershipContracts.id eq contractId }
+              .singleOrNull()
+            if (existing == null) {
+              failureStatus = HttpStatusCode.NotFound
+              failureMessage = simpleMessage(
+                main = "Supplier contract was not found",
+                ru = "Договор с поставщиком не найден",
+                kk = "Жеткізуші келісімі табылмады"
+              )
+              return@newSuspendedTransaction null
+            }
+            if (
+              action.revision <= 0 ||
+              action.revision != existing[SupplierPartnershipContracts.revision]
+            ) {
+              failureStatus = HttpStatusCode.Conflict
+              failureMessage = supplierContractRevisionConflictMessage()
+              return@newSuspendedTransaction null
+            }
+            if (!existing[SupplierPartnershipContracts.isActive] ||
+              !existing[SupplierPartnershipContracts.status].isPendingSupplierContractStatus()
+            ) {
+              return@newSuspendedTransaction null
+            }
+
             val storeId = existing[SupplierPartnershipContracts.storeId]
             val supplierId = existing[SupplierPartnershipContracts.supplierId]
-            val canStore = userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_SUPPLIER_ORDERS_MANAGE, requireWorkshift = false)
+            val canStore = userCanUseStoreActionInsideTransaction(
+              userId,
+              storeId,
+              STORE_PERMISSION_SUPPLIER_ORDERS_MANAGE,
+              requireWorkshift = false
+            )
             val canSupplier = userHasSupplierAccessInsideTransaction(userId, supplierId)
-            if (!canStore && !canSupplier) return@newSuspendedTransaction null
+            if (!canStore && !canSupplier) {
+              failureStatus = HttpStatusCode.Forbidden
+              failureMessage = simpleMessage(
+                main = "You cannot decline this supplier contract",
+                ru = "У вас нет права отклонить этот договор",
+                kk = "Бұл жеткізуші келісімінен бас тартуға құқығыңыз жоқ"
+              )
+              return@newSuspendedTransaction null
+            }
+
             val now = System.currentTimeMillis()
+            val nextRevision = existing[SupplierPartnershipContracts.revision] + 1
             SupplierPartnershipContracts.update({ SupplierPartnershipContracts.id eq contractId }) {
               it[SupplierPartnershipContracts.status] = SUPPLIER_CONTRACT_STATUS_DECLINED
+              it[SupplierPartnershipContracts.revision] = nextRevision
+              it[SupplierPartnershipContracts.lastEditorUserId] = userId
               it[SupplierPartnershipContracts.declinedAtMillis] = now
               it[SupplierPartnershipContracts.declinedByUserId] = userId
               it[SupplierPartnershipContracts.updatedAtMillis] = now
@@ -21380,40 +22861,119 @@ fun Application.module() {
               .firstOrNull()
           }
 
-          result?.let {
+          result?.let { contract ->
+            publishSupplierContractRealtime(contract.storeId, "supplier_contract_declined")
             call.genericResponse(
               status = HttpStatusCode.OK,
-              payload = it,
+              payload = contract,
               message = simpleMessage(
                 main = "Contract declined",
                 ru = "Договор отклонён",
                 kk = "Келісім қабылданбады"
               )
             )
-          } ?: call.respondAitaUnauthorized()
+          } ?: call.genericResponseNoPayload(failureStatus, failureMessage)
         }
 
         post("/archive") {
           val userId = call.checkPrincipal() ?: return@post
-          val contractId = runCatching { UUID.fromString(call.receiveAita<String>().trim()) }.getOrNull()
-            ?: return@post call.respondAitaUnauthorized()
+          val action = call.receiveSupplierContractRevisionActionOrNull()
+            ?: return@post call.genericResponseNoPayload(
+              HttpStatusCode.BadRequest,
+              simpleMessage(
+                main = "Supplier contract action is invalid",
+                ru = "Некорректное действие с договором",
+                kk = "Жеткізуші келісімімен әрекет қате"
+              )
+            )
+          val contractId = action.contractId.canonicalSupplierContractUuidOrNull()
+            ?.let { UUID.fromString(it) }
+            ?: return@post call.genericResponseNoPayload(
+              HttpStatusCode.BadRequest,
+              simpleMessage(
+                main = "Supplier contract ID is invalid",
+                ru = "Некорректный идентификатор договора",
+                kk = "Жеткізуші келісімінің идентификаторы қате"
+              )
+            )
 
+          var failureStatus = HttpStatusCode.Forbidden
+          var failureMessage: List<LocalizedStringDataModel> = simpleMessage(
+            main = "You cannot archive this supplier contract",
+            ru = "У вас нет права архивировать этот договор",
+            kk = "Бұл жеткізуші келісімін мұрағаттауға құқығыңыз жоқ"
+          )
+          var archivedStoreId: String? = null
+          var archiveChanged = false
           val archived = newSuspendedTransaction(aitaServerIoContext) {
-            val existing = SupplierPartnershipContracts.selectAll().where { SupplierPartnershipContracts.id eq contractId }.singleOrNull()
-              ?: return@newSuspendedTransaction false
+            lockSupplierContractInsideTransaction(contractId)
+            val existing = SupplierPartnershipContracts
+              .selectAll()
+              .where { SupplierPartnershipContracts.id eq contractId }
+              .singleOrNull()
+            if (existing == null) {
+              failureStatus = HttpStatusCode.NotFound
+              failureMessage = simpleMessage(
+                main = "Supplier contract was not found",
+                ru = "Договор с поставщиком не найден",
+                kk = "Жеткізуші келісімі табылмады"
+              )
+              return@newSuspendedTransaction false
+            }
             val storeId = existing[SupplierPartnershipContracts.storeId]
+            archivedStoreId = storeId.toString()
             val supplierId = existing[SupplierPartnershipContracts.supplierId]
-            val canStore = userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_SUPPLIER_ORDERS_MANAGE, requireWorkshift = false)
+            val canStore = userCanUseStoreActionInsideTransaction(
+              userId,
+              storeId,
+              STORE_PERMISSION_SUPPLIER_ORDERS_MANAGE,
+              requireWorkshift = false
+            )
             val canSupplier = userHasSupplierAccessInsideTransaction(userId, supplierId)
             if (!canStore && !canSupplier) return@newSuspendedTransaction false
-            SupplierPartnershipContracts.update({ SupplierPartnershipContracts.id eq contractId }) {
+
+            if (!existing[SupplierPartnershipContracts.isActive] ||
+              existing[SupplierPartnershipContracts.status] == SUPPLIER_CONTRACT_STATUS_ARCHIVED
+            ) {
+              return@newSuspendedTransaction true
+            }
+            if (
+              action.revision <= 0 ||
+              action.revision != existing[SupplierPartnershipContracts.revision]
+            ) {
+              failureStatus = HttpStatusCode.Conflict
+              failureMessage = supplierContractRevisionConflictMessage()
+              return@newSuspendedTransaction false
+            }
+            if (existing[SupplierPartnershipContracts.status] !in setOf(
+                SUPPLIER_CONTRACT_STATUS_ACTIVE,
+                SUPPLIER_CONTRACT_STATUS_DECLINED
+              )) {
+              failureStatus = HttpStatusCode.Conflict
+              failureMessage = simpleMessage(
+                main = "Decline a pending proposal before archiving it",
+                ru = "Перед архивацией отклоните ожидающее предложение",
+                kk = "Мұрағаттамас бұрын күтіп тұрған ұсыныстан бас тартыңыз"
+              )
+              return@newSuspendedTransaction false
+            }
+
+            val nextRevision = existing[SupplierPartnershipContracts.revision] + 1
+            val changed = SupplierPartnershipContracts.update({ SupplierPartnershipContracts.id eq contractId }) {
               it[SupplierPartnershipContracts.status] = SUPPLIER_CONTRACT_STATUS_ARCHIVED
+              it[SupplierPartnershipContracts.revision] = nextRevision
+              it[SupplierPartnershipContracts.lastEditorUserId] = userId
               it[SupplierPartnershipContracts.isActive] = false
               it[SupplierPartnershipContracts.updatedAtMillis] = System.currentTimeMillis()
             } > 0
+            archiveChanged = changed
+            changed
           }
 
           if (archived) {
+            if (archiveChanged) {
+              publishSupplierContractRealtime(archivedStoreId, "supplier_contract_archived")
+            }
             call.genericResponse(
               status = HttpStatusCode.OK,
               payload = contractId.toString(),
@@ -21424,7 +22984,7 @@ fun Application.module() {
               )
             )
           } else {
-            call.respondAitaUnauthorized()
+            call.genericResponseNoPayload(failureStatus, failureMessage)
           }
         }
       }
@@ -21434,8 +22994,40 @@ fun Application.module() {
       authenticate("auth-jwt") {
         get("/dashboard") {
           val userId = call.checkPrincipal() ?: return@get
+          val rawSupplierId = call.request.headers["supplier_id"]?.trim()
+          val requestedSupplierId = rawSupplierId
+            ?.takeIf { it.isNotBlank() }
+            ?.let { value -> runCatching { UUID.fromString(value) }.getOrNull() }
+          if (!rawSupplierId.isNullOrBlank() && requestedSupplierId == null) {
+            return@get call.genericResponseNoPayload(
+              HttpStatusCode.BadRequest,
+              simpleMessage(
+                main = "Supplier identity is invalid",
+                ru = "Идентификатор поставщика недействителен",
+                kk = "Жеткізуші идентификаторы жарамсыз"
+              )
+            )
+          }
+
           val dashboard = newSuspendedTransaction(aitaServerIoContext) {
-            supplierModeDashboardInsideTransaction(userId)
+            if (
+              requestedSupplierId != null &&
+              !userHasSupplierAccessInsideTransaction(userId, requestedSupplierId)
+            ) {
+              return@newSuspendedTransaction null
+            }
+            supplierModeDashboardInsideTransaction(userId, requestedSupplierId)
+          }
+
+          if (dashboard == null) {
+            return@get call.genericResponseNoPayload(
+              HttpStatusCode.Forbidden,
+              simpleMessage(
+                main = "Supplier identity is not available to this account",
+                ru = "Профиль поставщика недоступен этому аккаунту",
+                kk = "Жеткізуші профилі бұл аккаунтқа қолжетімсіз"
+              )
+            )
           }
 
           call.genericResponse(
@@ -21451,8 +23043,34 @@ fun Application.module() {
 
         get("/get") {
           val userId = call.checkPrincipal() ?: return@get
-          val storeId = call.headerUuid("store_id")
-          val supplierId = call.headerUuid("supplier_id")
+          val rawStoreId = call.request.headers["store_id"]?.trim()
+          val rawSupplierId = call.request.headers["supplier_id"]?.trim()
+          val storeId = rawStoreId
+            ?.takeIf { it.isNotBlank() }
+            ?.let { value -> runCatching { UUID.fromString(value) }.getOrNull() }
+          val supplierId = rawSupplierId
+            ?.takeIf { it.isNotBlank() }
+            ?.let { value -> runCatching { UUID.fromString(value) }.getOrNull() }
+          if (!rawStoreId.isNullOrBlank() && storeId == null) {
+            return@get call.genericResponseNoPayload(
+              HttpStatusCode.BadRequest,
+              simpleMessage(
+                main = "Store ID is invalid",
+                ru = "Некорректный идентификатор магазина",
+                kk = "Дүкен идентификаторы қате"
+              )
+            )
+          }
+          if (!rawSupplierId.isNullOrBlank() && supplierId == null) {
+            return@get call.genericResponseNoPayload(
+              HttpStatusCode.BadRequest,
+              simpleMessage(
+                main = "Supplier ID is invalid",
+                ru = "Некорректный идентификатор поставщика",
+                kk = "Жеткізуші идентификаторы қате"
+              )
+            )
+          }
           val shouldMarkSeen = call.request.headers["mark_seen"]
             ?.trim()
             ?.lowercase()
@@ -21538,7 +23156,14 @@ fun Application.module() {
                 kk = "Жеткізуші тапсырыстары жүктелді"
               )
             )
-          } ?: call.respondAitaUnauthorized()
+          } ?: call.genericResponseNoPayload(
+            HttpStatusCode.Forbidden,
+            simpleMessage(
+              main = "Supplier identity or Store is not available to this account",
+              ru = "Профиль поставщика или магазин недоступны этому аккаунту",
+              kk = "Жеткізуші профилі немесе дүкен бұл аккаунтқа қолжетімсіз"
+            )
+          )
         }
 
         post("/add") {
@@ -21553,6 +23178,7 @@ fun Application.module() {
               ?: return@newSuspendedTransaction null
 
             if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_SUPPLIER_ORDERS_MANAGE, requireWorkshift = true)) return@newSuspendedTransaction null
+            lockSupplierProfileInsideTransaction(supplierId)
             if (Suppliers.select(Suppliers.id).where { (Suppliers.id eq supplierId) and (Suppliers.isActive eq true) }.empty()) return@newSuspendedTransaction null
             val requestedGoodsItemIds = body.lines.mapNotNull { line -> runCatching { UUID.fromString(line.goodsItemId) }.getOrNull() }
             if (supplierContractBlocksStoreSupplyInsideTransaction(storeId, supplierId, requestedGoodsItemIds) != null) {
@@ -21593,6 +23219,11 @@ fun Application.module() {
           }
 
           result?.let {
+            publishSupplierOrderRealtime(
+              storeId = it.order.storeId,
+              reason = "supplier_order_created",
+              mutationId = it.order.id
+            )
             call.genericResponse(
               status = HttpStatusCode.Created,
               payload = it,
@@ -21620,6 +23251,7 @@ fun Application.module() {
           val result = newSuspendedTransaction(aitaServerIoContext) {
             val orderId = runCatching { UUID.fromString(body.order.id) }.getOrNull()
               ?: return@newSuspendedTransaction null
+            lockSupplierOrdersInsideTransaction(listOf(orderId))
             val existing = SupplierOrders.selectAll().where { SupplierOrders.id eq orderId }.singleOrNull()
               ?: return@newSuspendedTransaction null
             val storeId = existing[SupplierOrders.storeId]
@@ -21760,13 +23392,33 @@ fun Application.module() {
               }
               .filter { (line, _) -> line.requestedQuantity.total > 0.0 }
               .forEach { (line, goodsItemId) ->
-                val lineId = runCatching { UUID.fromString(line.id) }.getOrNull() ?: UUID.randomUUID()
-                val exists = SupplierOrderLines.select(SupplierOrderLines.id).where { SupplierOrderLines.id eq lineId }.empty().not()
-                if (exists) {
-                  SupplierOrderLines.update({ SupplierOrderLines.id eq lineId }) {
-                    it.setSupplierOrderLineUpdateColumns(line.copy(isActive = true))
+                val requestedLineId = runCatching { UUID.fromString(line.id) }.getOrNull() ?: UUID.randomUUID()
+                val belongsToCurrentOrder = SupplierOrderLines
+                  .select(SupplierOrderLines.id)
+                  .where {
+                    (SupplierOrderLines.id eq requestedLineId) and
+                       (SupplierOrderLines.orderId eq orderId)
+                  }
+                  .empty()
+                  .not()
+                if (belongsToCurrentOrder) {
+                  SupplierOrderLines.update({
+                    (SupplierOrderLines.id eq requestedLineId) and
+                       (SupplierOrderLines.orderId eq orderId)
+                  }) {
+                    it.setSupplierOrderLineUpdateColumns(
+                      clean = line.copy(isActive = true),
+                      goodsItemId = goodsItemId
+                    )
                   }
                 } else {
+                  // Never let a client-provided line ID overwrite a row from another order. A rare
+                  // cross-order ID collision becomes a fresh line in this order instead.
+                  val lineId = SupplierOrderLines
+                    .select(SupplierOrderLines.id)
+                    .where { SupplierOrderLines.id eq requestedLineId }
+                    .empty()
+                    .let { globallyUnused -> if (globallyUnused) requestedLineId else UUID.randomUUID() }
                   SupplierOrderLines.insert {
                     it.setSupplierOrderLineColumns(lineId, line.copy(isActive = true), orderId, goodsItemId)
                   }
@@ -21778,6 +23430,11 @@ fun Application.module() {
           }
 
           result?.let {
+            publishSupplierOrderRealtime(
+              storeId = it.order.storeId,
+              reason = "supplier_order_updated",
+              mutationId = it.order.id
+            )
             call.genericResponse(
               status = HttpStatusCode.OK,
               payload = it,
@@ -21800,12 +23457,13 @@ fun Application.module() {
         put("/status") {
           val userId = call.checkPrincipal() ?: return@put
           val request = call.receiveAita<SupplierOrderStatusUpdateRequestDataModel>()
-          val orderIds = request.orderIds
+          val validOrderIds = request.orderIds
             .asSequence()
             .mapNotNull { raw -> runCatching { UUID.fromString(raw.trim()) }.getOrNull() }
             .distinct()
-            .take(200)
             .toList()
+          val requestedOrderCount = validOrderIds.size
+          val orderIds = validOrderIds.take(200)
           if (orderIds.isEmpty()) {
             return@put call.genericResponseNoPayload(
               HttpStatusCode.BadRequest,
@@ -21819,6 +23477,7 @@ fun Application.module() {
 
           var failureMessage: List<LocalizedStringDataModel>? = null
           val updated = newSuspendedTransaction(aitaServerIoContext) {
+            lockSupplierOrdersInsideTransaction(orderIds)
             val rowsById = SupplierOrders
               .selectAll()
               .where { (SupplierOrders.id inList orderIds) and (SupplierOrders.isActive eq true) }
@@ -21915,11 +23574,40 @@ fun Application.module() {
                 kk = "Таңдалған жеткізуші тапсырыстарын жаңарту мүмкін болмады"
               )
             )
-            else -> call.genericListResponse(
-              status = HttpStatusCode.OK,
-              payload = updated,
-              message = supplierOrderStatusSuccessMessage(request.status)
-            )
+            else -> {
+              updated
+                .filter { bundle -> bundle.order.storeId.isNotBlank() }
+                .groupBy { bundle -> bundle.order.storeId.trim() }
+                .forEach { (storeId, storeBundles) ->
+                  val firstOrderId = storeBundles
+                    .map { bundle -> bundle.order.id.trim() }
+                    .filter { orderId -> orderId.isNotBlank() }
+                    .sorted()
+                    .firstOrNull()
+                  publishSupplierOrderRealtime(
+                    storeId = storeId,
+                    reason = "supplier_order_status_updated",
+                    mutationId = listOfNotNull(
+                      request.status.name.lowercase(),
+                      firstOrderId,
+                      storeBundles.size.toString()
+                    ).joinToString(":")
+                  )
+                }
+              call.genericListResponse(
+                status = HttpStatusCode.OK,
+                payload = updated,
+                message = if (updated.size < requestedOrderCount) {
+                  supplierOrderStatusPartialSuccessMessage(
+                    status = request.status,
+                    updatedCount = updated.size,
+                    requestedCount = requestedOrderCount
+                  )
+                } else {
+                  supplierOrderStatusSuccessMessage(request.status)
+                }
+              )
+            }
           }
         }
 
@@ -21928,18 +23616,26 @@ fun Application.module() {
           val orderId = runCatching { UUID.fromString(call.receiveAita<String>().trim()) }.getOrNull()
             ?: return@delete call.respondAitaUnauthorized()
 
-          val deleted = newSuspendedTransaction(aitaServerIoContext) {
+          val deletedStoreId = newSuspendedTransaction(aitaServerIoContext) {
+            lockSupplierOrdersInsideTransaction(listOf(orderId))
             val existing = SupplierOrders.selectAll().where { SupplierOrders.id eq orderId }.singleOrNull()
-              ?: return@newSuspendedTransaction false
-            if (!userCanUseStoreActionInsideTransaction(userId, existing[SupplierOrders.storeId], STORE_PERMISSION_SUPPLIER_ORDERS_MANAGE, requireWorkshift = true)) return@newSuspendedTransaction false
-            SupplierOrders.update({ SupplierOrders.id eq orderId }) {
+              ?: return@newSuspendedTransaction null
+            val storeId = existing[SupplierOrders.storeId]
+            if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_SUPPLIER_ORDERS_MANAGE, requireWorkshift = true)) return@newSuspendedTransaction null
+            val deleted = SupplierOrders.update({ SupplierOrders.id eq orderId }) {
               it[SupplierOrders.status] = SupplierOrderStatusDataModel.Cancelled.name
               it[SupplierOrders.isActive] = false
               it[SupplierOrders.updatedAtMillis] = System.currentTimeMillis()
             } > 0
+            storeId.toString().takeIf { deleted }
           }
 
-          if (deleted) {
+          if (deletedStoreId != null) {
+            publishSupplierOrderRealtime(
+              storeId = deletedStoreId,
+              reason = "supplier_order_cancelled",
+              mutationId = orderId.toString()
+            )
             call.genericResponse(
               status = HttpStatusCode.OK,
               payload = orderId.toString(),
@@ -21962,6 +23658,7 @@ fun Application.module() {
           val result = newSuspendedTransaction(aitaServerIoContext) {
             val orderId = runCatching { UUID.fromString(request.orderId) }.getOrNull()
               ?: return@newSuspendedTransaction null
+            lockSupplierOrdersInsideTransaction(listOf(orderId))
             val orderRow = SupplierOrders.selectAll().where { SupplierOrders.id eq orderId }.singleOrNull()
               ?: return@newSuspendedTransaction null
             val storeId = orderRow[SupplierOrders.storeId]
@@ -22049,6 +23746,11 @@ fun Application.module() {
           }
 
           result?.let {
+            publishSupplierOrderRealtime(
+              storeId = it.order.storeId,
+              reason = "supplier_order_received",
+              mutationId = it.order.id
+            )
             call.genericResponse(
               status = HttpStatusCode.OK,
               payload = it,

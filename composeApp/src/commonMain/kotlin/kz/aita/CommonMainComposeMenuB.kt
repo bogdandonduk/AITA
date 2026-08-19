@@ -332,6 +332,10 @@ fun AppConfiguration.MenuSecurityScreen() {
             verticalArrangement = Arrangement.spacedBy(stateValues.marginTextFieldGroup)
         ) {
             item {
+                AccountAuthenticationSettingsCard()
+            }
+
+            item {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -2187,7 +2191,7 @@ internal fun AppConfiguration.appModeOptions(): List<AppModeOptionUiModel> = lis
         iconPath = stateValues.drawablePathIconAppModeBuyer,
         iconRes = stateValues.drawableResIconAppModeBuyer.value,
         features = listOf(
-            localizedStringResource(216, "Search"),
+            stateValues.stringSearchByAnyData,
             stateValues.stringCart,
             localizedStringResource(254, "Orders"),
             localizedStringResource(177, "Notifications")
@@ -2203,7 +2207,7 @@ internal fun AppConfiguration.appModeOptions(): List<AppModeOptionUiModel> = lis
         features = listOf(
             localizedStringResource(1341, "Smart order inbox"),
             localizedStringResource(1338, "Catalog"),
-            localizedStringResource(1339, "Customers"),
+            localizedStringResource(1453, "Partner stores"),
             localizedStringResource(1340, "Insights")
         )
     ),
@@ -2222,6 +2226,14 @@ internal fun AppConfiguration.appModeOptions(): List<AppModeOptionUiModel> = lis
         )
     )
 )
+
+internal fun appModeIsAvailableInCurrentRelease(optionModeId: Int, currentModeId: Int): Boolean =
+    optionModeId == APP_MODE_STORE ||
+            optionModeId == APP_MODE_SUPPLIER ||
+            optionModeId == currentModeId
+
+internal fun AppConfiguration.availableAppModeOptions(currentModeId: Int): List<AppModeOptionUiModel> =
+    appModeOptions().filter { option -> appModeIsAvailableInCurrentRelease(option.modeId, currentModeId) }
 
 @Composable
 internal fun AppConfiguration.AppModeFeatureChip(
@@ -2358,7 +2370,17 @@ internal fun AppConfiguration.AppModeSelectionCard(
 
 @Composable
 fun AppConfiguration.MenuAppModeScreen() {
-    val options = appModeOptions()
+    val options = availableAppModeOptions(stateValues.appModeId)
+
+    fun selectAppMode(modeId: Int) {
+        if (stateValues.appModeId == modeId) return
+        setAppMode(modeId)
+        coroutineScope.launch {
+            Navigation.Menu.clearLeft()
+            Navigation.Menu.clearRight()
+            Navigation.goMain(defaultMainScreenForAppMode(modeId))
+        }
+    }
 
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -2413,12 +2435,6 @@ fun AppConfiguration.MenuAppModeScreen() {
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center
                     )
-                    Text(
-                        text = localizedStringResource(1398, "Each mode keeps the same account, but reshapes navigation, shortcuts and the first screen around the role: store, buyer, supplier or producer."),
-                        color = stateValues.PlaceholderTextColor,
-                        fontSize = stateValues.textSize,
-                        textAlign = TextAlign.Center
-                    )
                 }
             }
 
@@ -2433,10 +2449,7 @@ fun AppConfiguration.MenuAppModeScreen() {
                                 option = option,
                                 selected = stateValues.appModeId == option.modeId,
                                 modifier = Modifier.fillMaxWidth(),
-                                onClick = {
-                                    setAppMode(option.modeId)
-                                    coroutineScope.launch { Navigation.goMain(defaultMainScreenForAppMode(option.modeId)) }
-                                }
+                                onClick = { selectAppMode(option.modeId) }
                             )
                         }
                     }
@@ -2455,10 +2468,7 @@ fun AppConfiguration.MenuAppModeScreen() {
                                         option = option,
                                         selected = stateValues.appModeId == option.modeId,
                                         modifier = Modifier.weight(1f),
-                                        onClick = {
-                                            setAppMode(option.modeId)
-                                            coroutineScope.launch { Navigation.goMain(defaultMainScreenForAppMode(option.modeId)) }
-                                        }
+                                        onClick = { selectAppMode(option.modeId) }
                                     )
                                 }
                                 if (rowOptions.size == 1) Spacer(modifier = Modifier.weight(1f))
@@ -2468,15 +2478,6 @@ fun AppConfiguration.MenuAppModeScreen() {
                 }
             }
 
-            item {
-                Text(
-                    text = localizedStringResource(1399, "Supplier mode starts with the Smart order inbox: the foundation that connects store-side supplier orders to a supplier-side fulfillment desk."),
-                    color = stateValues.PlaceholderTextColor,
-                    fontSize = stateValues.smallTextSize,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
         }
     }
 }
@@ -4714,14 +4715,31 @@ fun AppConfiguration.MenuAddEditWorkerScreen() {
 @Composable
 fun AppConfiguration.MenuAddEditSupplierScreen() {
     val supplierState by NavigationScreenModel.Menu.AddEditSupplier.state.collectAsState()
+    val suppliers by suppliersState.payload.collectAsState()
     val editedSupplierId = supplierState["edited_supplier_id"].orEmpty()
-    val editedSupplier = stateValues.suppliers?.find { it.id == editedSupplierId }
-
-    var supplierName by rememberSaveable(editedSupplierId) {
-        mutableStateOf(editedSupplier?.name?.visibleLocalizedString(stateValues.appLanguage, "").orEmpty())
+    val editorSessionKey = remember(editedSupplierId) { getCurrentTimeMillis().toString() }
+    val editorPhoneStateKey = supplierProfileEditorPhoneStateKey(
+        editedSupplierId.takeIf { it.isNotBlank() },
+        editorSessionKey
+    )
+    val editedSupplier = editedSupplierId.takeIf { it.isNotBlank() }?.let { id ->
+        suppliers.orEmpty().firstOrNull { it.id.equals(id, ignoreCase = true) }
     }
-    var supplierEmail by rememberSaveable(editedSupplierId) {
-        mutableStateOf(editedSupplier?.emails.orEmpty().firstOrNull().orEmpty())
+
+    LaunchedEffect(editedSupplierId) {
+        if (suppliers == null) getSuppliers()
+    }
+
+    LaunchedEffect(editedSupplierId, suppliers) {
+        if (editedSupplierId.isNotBlank() && suppliers != null && editedSupplier == null) {
+            postInAppNotification(
+                localizedStringResource(2513, "That supplier profile is no longer available."),
+                NotificationType.Neutral,
+                transient = true
+            )
+            NavigationScreenModel.Menu.AddEditSupplier.removeState(editorPhoneStateKey)
+            Navigation.Menu.pop(stateValues.isNarrowScreen)
+        }
     }
 
     Column(
@@ -4729,9 +4747,14 @@ fun AppConfiguration.MenuAddEditSupplierScreen() {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         ScreenAppBarWidget(
-            title = if (editedSupplier == null) stateValues.stringAddSupplier else stateValues.stringEditSupplier,
+            title = if (editedSupplierId.isBlank()) stateValues.stringAddSupplier else stateValues.stringEditSupplier,
             iconPath = stateValues.drawablePathIconSuppliers,
-            onBack = { coroutineScope.launch { Navigation.Menu.pop(stateValues.isNarrowScreen) } }
+            onBack = {
+                coroutineScope.launch {
+                    NavigationScreenModel.Menu.AddEditSupplier.removeState(editorPhoneStateKey)
+                    Navigation.Menu.pop(stateValues.isNarrowScreen)
+                }
+            }
         )
 
         LazyColumn(
@@ -4742,91 +4765,28 @@ fun AppConfiguration.MenuAddEditSupplierScreen() {
                 .padding(stateValues.marginTextField),
             contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
         ) {
-            item {
-                MessageText(
-                    modifier = Modifier.fillMaxWidth(),
-                    text = localizedStringResource(630, "Supplier data")
-                )
-
-                Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-
-                genericTextField(
-                    titleText = stateValues.stringName,
-                    placeholderText = localizedStringResource(622, "Enter supplier name"),
-                    valueInitial = supplierName,
-                    onValueChange = { value, apply ->
-                        supplierName = value
-                        apply()
-                    }
-                )
-
-                Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-
-                val supplierPhoneTextFieldContent = countrySelectionPhoneNumberTextField(
-                    titleText = localizedStringResource(620, "Supplier phone number"),
-                    placeholderText = stateValues.stringEnterPhoneNumber,
-                    valueInitial = editedSupplier?.phoneNumbers.orEmpty().firstOrNull().orEmpty(),
-                    stateHost = NavigationScreenModel.Menu.AddEditSupplier,
-                    stateKey = "supplier_phone_number_$editedSupplierId"
-                )
-
-                Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-
-                genericTextField(
-                    titleText = localizedStringResource(621, "Supplier email"),
-                    placeholderText = stateValues.stringEnterEmailAddress,
-                    valueInitial = supplierEmail,
-                    keyboardType = KeyboardType.Email,
-                    onValueChange = { value, apply ->
-                        supplierEmail = value
-                        apply()
-                    }
-                )
-
-                Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-
-                actionButton(
-                    text = localizedStringResource(631, "Save supplier"),
-                    iconPath = stateValues.drawablePathIconCheck,
-                    enabled = supplierName.isNotBlank(),
-                    confirmationRequired = false,
-                    onClick = {
-                        val phoneLocal = supplierPhoneTextFieldContent.value.text.trim()
-                        val phoneNumber = if (phoneLocal.isBlank()) {
-                            ""
-                        } else {
-                            supplierPhoneTextFieldContent.checkContentValidity()
-                            if (!supplierPhoneTextFieldContent.isContentValid) {
-                                postInAppNotification(stateValues.stringPhoneNumberMustBe, NotificationType.Negative, transient = true)
-                                return@actionButton
+            if (editedSupplierId.isNotBlank() && suppliers == null) {
+                item {
+                    MessageText(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(2515, "Loading supplier profile…")
+                    )
+                }
+            } else if (editedSupplierId.isBlank() || editedSupplier != null) {
+                item {
+                    SupplierProfileEditorContent(
+                        editedSupplier = editedSupplier,
+                        stateHost = NavigationScreenModel.Menu.AddEditSupplier,
+                        editorSessionKey = editorSessionKey,
+                        onCancel = { coroutineScope.launch { Navigation.Menu.pop(stateValues.isNarrowScreen) } },
+                        onSaved = {
+                            coroutineScope.launch {
+                                NavigationScreenModel.Menu.AddEditSupplier.setState("edited_supplier_id" to "")
+                                Navigation.Menu.pop(stateValues.isNarrowScreen)
                             }
-                            supplierPhoneTextFieldContent.selectedSecondaryId.orEmpty().removePrefix("+") + phoneLocal
                         }
-
-                        val supplier = SupplierDataModel(
-                            id = editedSupplier?.id.orEmpty(),
-                            userIds = editedSupplier?.userIds.orEmpty(),
-                            typeIds = editedSupplier?.typeIds,
-                            categoryIds = editedSupplier?.categoryIds.orEmpty(),
-                            name = listOf(LocalizedStringDataModel("main", supplierName.trim())),
-                            phoneNumbers = listOf(phoneNumber).filter { it.isNotBlank() },
-                            emails = listOf(supplierEmail.trim().lowercase()).filter { it.isNotBlank() },
-                            addedAt = editedSupplier?.addedAt ?: getCurrentTimeMillis(),
-                            isActive = true
-                        )
-
-                        if (editedSupplier == null) {
-                            addSupplier(supplier)
-                        } else {
-                            updateSupplier(supplier)
-                        }
-
-                        coroutineScope.launch {
-                            delay(250)
-                            Navigation.Menu.pop(stateValues.isNarrowScreen)
-                        }
-                    }
-                )
+                    )
+                }
             }
         }
     }
@@ -6602,4 +6562,3 @@ fun AppConfiguration.LargeIconWithTitleWidget(
         }
     }
 }
-

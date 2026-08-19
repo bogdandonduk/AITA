@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Synchronize AITA's canonical public API/bootstrap URLs across the repository.
+"""Synchronize AITA's single canonical workers.dev API endpoint.
 
-The workers.dev API is the canonical registrar-independent endpoint. The paid
-aita.kz domain remains an ordered legacy fallback and optional vanity alias.
+Production clients are intentionally anchored to one registrar-independent
+Cloudflare Worker. Localhost/LAN addresses remain available only through
+explicit development overrides; no paid-domain API or bootstrap fallback is
+written by this script.
 """
 
 from __future__ import annotations
@@ -23,22 +25,28 @@ WINDOWS_ENV = Path("scripts/windows-field-server/aita-prod.env.example")
 WINDOWS_HEALTH = Path("scripts/windows-field-server/Watch-AitaHealth.ps1")
 WINDOWS_READINESS = Path("scripts/windows-field-server/Test-AitaWindowsReadiness.ps1")
 BOOTSTRAP_WORKER = Path("cloudflare/aita-bootstrap-worker.js")
+API_WORKER = Path("cloudflare/aita-api-worker/src/index.js")
 BOOTSTRAP_WRANGLER = Path("cloudflare/wrangler.aita-bootstrap.json")
 API_WORKER_EXAMPLE = Path("cloudflare/aita-api-worker/wrangler.jsonc.example")
 LINUX_DESKTOP = Path("scripts/linux-desktop/run-aita-desktop.sh")
 
 
-def normalized_http_url(raw: str, *, workers_dev_required: bool = False) -> str:
+def normalized_workers_dev_url(raw: str) -> str:
     value = raw.strip()
     parsed = urlsplit(value)
-    if parsed.scheme != "https" or not parsed.hostname:
+    hostname = (parsed.hostname or "").lower()
+    if parsed.scheme != "https" or not hostname:
         raise ValueError(f"Expected an absolute HTTPS URL, got {raw!r}")
     if parsed.username or parsed.password or parsed.query or parsed.fragment:
         raise ValueError("Public endpoint URLs must not contain credentials, query, or fragment")
-    if workers_dev_required and not parsed.hostname.endswith(".workers.dev"):
-        raise ValueError("The canonical domainless endpoint must use a workers.dev hostname")
+    if not hostname.endswith(".workers.dev"):
+        raise ValueError("The canonical AITA endpoint must use a workers.dev hostname")
+    if parsed.port not in (None, 443):
+        raise ValueError("The canonical workers.dev endpoint must use the default HTTPS port")
     path = parsed.path.rstrip("/")
-    return urlunsplit((parsed.scheme, parsed.netloc, path, "", ""))
+    if path:
+        raise ValueError("The canonical workers.dev endpoint must not contain a path")
+    return urlunsplit((parsed.scheme, parsed.netloc, "", "", ""))
 
 
 def atomic_write(path: Path, text: str) -> None:
@@ -59,36 +67,33 @@ def atomic_write(path: Path, text: str) -> None:
     os.replace(temporary_path, path)
 
 
-def replace_once(text: str, pattern: str, replacement: str, description: str) -> str:
+def replace_once(text: str, pattern: str, replacement, description: str) -> str:
     updated, count = re.subn(pattern, replacement, text, count=1, flags=re.MULTILINE)
     if count != 1:
         raise RuntimeError(f"Could not uniquely update {description}; matched {count} times")
     return updated
 
 
-def update_kotlin(path: Path, primary: str, legacy: str, legacy_bootstrap: str) -> None:
+def kotlin_string_replacement(value: str):
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return lambda match: f'{match.group(1)}"{escaped}"'
+
+
+def update_kotlin(path: Path, primary: str) -> None:
     text = path.read_text(encoding="utf-8")
-    bootstrap_urls = ",".join(
-        [
-            f"{primary}/.well-known/aita-server.json",
-            legacy_bootstrap,
-            f"{legacy}/.well-known/aita-server.json",
-        ]
-    )
+    hostname = urlsplit(primary).hostname or ""
     values = {
         "DEFAULT_AITA_SERVER_URL": primary,
-        "DEFAULT_AITA_FALLBACK_SERVER_URLS": legacy,
-        "DEFAULT_AITA_BOOTSTRAP_URLS": bootstrap_urls,
+        "CANONICAL_AITA_PUBLIC_SERVER_HOST": hostname,
+        "DEFAULT_AITA_FALLBACK_SERVER_URLS": "",
+        # Direct-only production mode avoids an extra discovery request. The Worker still exposes
+        # /.well-known/aita-server.json for old builds and diagnostics.
+        "DEFAULT_AITA_BOOTSTRAP_URLS": "",
     }
     for name, value in values.items():
         pattern = rf'^(private const val {re.escape(name)}\s*=\s*)"(?:\\.|[^"\\])*"\s*$'
-        text = replace_once(text, pattern, lambda_match_replacement(value), name)
+        text = replace_once(text, pattern, kotlin_string_replacement(value), name)
     atomic_write(path, text)
-
-
-def lambda_match_replacement(value: str):
-    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
-    return lambda match: f'{match.group(1)}"{escaped}"'
 
 
 def update_global_json(path: Path, primary: str) -> None:
@@ -101,16 +106,17 @@ def replace_env_value(text: str, key: str, value: str) -> str:
     return replace_once(text, rf'^{re.escape(key)}=.*$', f"{key}={value}", key)
 
 
-def update_env(path: Path, primary: str, legacy: str) -> None:
+def update_env(path: Path, primary: str) -> None:
     text = path.read_text(encoding="utf-8")
     origins = ",".join(
         [
             primary,
-            legacy,
             "https://aita.kz",
             "https://www.aita.kz",
             "http://127.0.0.1:8080",
             "http://localhost:8080",
+            "http://127.0.0.1:8090",
+            "http://localhost:8090",
         ]
     )
     text = replace_env_value(text, "AITA_PUBLIC_SERVER_URL", primary)
@@ -133,80 +139,92 @@ def update_powershell_default(path: Path, primary: str) -> None:
     atomic_write(path, text)
 
 
-def update_bootstrap_worker(path: Path, primary: str, legacy: str) -> None:
+def update_javascript_constant(path: Path, name: str, primary: str) -> None:
     text = path.read_text(encoding="utf-8")
     text = replace_once(
         text,
-        r'^(const DEFAULT_SERVER_URL\s*=\s*)"[^"]*";',
+        rf'^(const {re.escape(name)}\s*=\s*)"[^"]*";',
         lambda match: f'{match.group(1)}"{primary}";',
-        "bootstrap DEFAULT_SERVER_URL",
-    )
-    text = replace_once(
-        text,
-        r'^(const DEFAULT_LEGACY_SERVER_URL\s*=\s*)"[^"]*";',
-        lambda match: f'{match.group(1)}"{legacy}";',
-        "bootstrap DEFAULT_LEGACY_SERVER_URL",
+        f"{name} in {path.name}",
     )
     atomic_write(path, text)
 
 
-def update_json_var(path: Path, key: str, value: str) -> None:
+def update_bootstrap_worker(path: Path, primary: str) -> None:
+    update_javascript_constant(path, "DEFAULT_SERVER_URL", primary)
+
+
+def update_json_vars(
+    path: Path,
+    updates: dict[str, str],
+    removals: frozenset[str] = frozenset(),
+    *,
+    drop_custom_routes: bool = False,
+) -> None:
     data = json.loads(path.read_text(encoding="utf-8"))
-    data.setdefault("vars", {})[key] = value
+    variables = data.setdefault("vars", {})
+    for key in removals:
+        variables.pop(key, None)
+    variables.update(updates)
+    if drop_custom_routes:
+        data.pop("routes", None)
+        data["preview_urls"] = False
     atomic_write(path, json.dumps(data, ensure_ascii=False, indent=2) + "\n")
 
 
 def update_linux_desktop_help(path: Path) -> None:
     text = path.read_text(encoding="utf-8")
-    text = text.replace(
-        "Use --local-server while api.aita.kz DNS/Tunnel routing is being repaired.",
-        "The default build uses the domain-independent workers.dev bootstrap; use --local-server only for origin troubleshooting.",
-    )
+    replacements = {
+        "using CommonMain.kt, optional bootstrap resolver, and /config/global global.json.":
+            "using the single workers.dev production gateway and /config/global global.json.",
+        "The default build uses the domain-independent workers.dev bootstrap; use --local-server only for origin troubleshooting.":
+            "The default build uses the single domain-independent workers.dev gateway directly; use --local-server only for origin troubleshooting.",
+        '${SERVER_URL:-bootstrap/default}': '${SERVER_URL:-workers.dev/default}',
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
     atomic_write(path, text)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Synchronize AITA's workers.dev primary endpoint and legacy domain fallbacks."
+        description="Synchronize AITA's single canonical workers.dev endpoint."
     )
     parser.add_argument("primary_worker_url", help="Canonical aita-api workers.dev HTTPS origin")
-    parser.add_argument(
-        "--legacy-server-url",
-        default="https://api.aita.kz",
-        help="Optional legacy API fallback",
-    )
-    parser.add_argument(
-        "--legacy-bootstrap-url",
-        default="https://bootstrap.aita.kz/.well-known/aita-server.json",
-        help="Optional legacy bootstrap fallback",
-    )
     parser.add_argument("--project-root", type=Path, default=ROOT)
     args = parser.parse_args()
 
     try:
         root = args.project_root.expanduser().resolve()
-        primary = normalized_http_url(args.primary_worker_url, workers_dev_required=True)
-        legacy = normalized_http_url(args.legacy_server_url)
-        legacy_bootstrap = normalized_http_url(args.legacy_bootstrap_url)
+        primary = normalized_workers_dev_url(args.primary_worker_url)
 
-        update_kotlin(root / COMMON_MAIN, primary, legacy, legacy_bootstrap)
+        update_kotlin(root / COMMON_MAIN, primary)
         update_global_json(root / SERVER_GLOBAL, primary)
-        update_env(root / LINUX_ENV, primary, legacy)
-        update_env(root / WINDOWS_ENV, primary, legacy)
+        update_env(root / LINUX_ENV, primary)
+        update_env(root / WINDOWS_ENV, primary)
         update_powershell_default(root / WINDOWS_HEALTH, primary)
         update_powershell_default(root / WINDOWS_READINESS, primary)
-        update_bootstrap_worker(root / BOOTSTRAP_WORKER, primary, legacy)
-        update_json_var(root / BOOTSTRAP_WRANGLER, "AITA_CURRENT_SERVER_URL", primary)
-        update_json_var(root / BOOTSTRAP_WRANGLER, "AITA_LEGACY_SERVER_URL", legacy)
-        update_json_var(root / API_WORKER_EXAMPLE, "AITA_LEGACY_SERVER_URL", legacy)
+        update_bootstrap_worker(root / BOOTSTRAP_WORKER, primary)
+        update_javascript_constant(root / API_WORKER, "CANONICAL_PUBLIC_ORIGIN", primary)
+        update_json_vars(
+            root / BOOTSTRAP_WRANGLER,
+            {},
+            frozenset({"AITA_CURRENT_SERVER_URL", "AITA_LEGACY_SERVER_URL"}),
+            drop_custom_routes=True,
+        )
+        update_json_vars(
+            root / API_WORKER_EXAMPLE,
+            {},
+            frozenset({"AITA_LEGACY_SERVER_URL"}),
+        )
         update_linux_desktop_help(root / LINUX_DESKTOP)
     except (KeyError, OSError, RuntimeError, ValueError, json.JSONDecodeError) as error:
         parser.error(str(error))
 
     print("AITA public endpoint synchronization complete")
-    print(f"  primary API/bootstrap: {primary}")
-    print(f"  legacy API fallback:   {legacy}")
-    print(f"  legacy bootstrap:      {legacy_bootstrap}")
+    print(f"  canonical API: {primary}")
+    print("  automatic API fallbacks: disabled")
+    print("  automatic bootstrap requests: disabled")
     return 0
 
 

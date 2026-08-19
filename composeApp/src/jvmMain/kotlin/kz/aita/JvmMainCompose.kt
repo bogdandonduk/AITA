@@ -495,7 +495,7 @@ private fun configureClientServerUrlOverrideFromEnvironment() {
         ?.toJvmBooleanLenientOrNull()
         ?: false
     if (!envOverrideEnabled) {
-        println("AITA desktop server URL env override disabled; using CommonMain.kt, optional bootstrap resolver, and /config/global global.json.")
+        println("AITA desktop server URL env override disabled; using the single Cloudflare workers.dev production gateway and /config/global global.json.")
         return
     }
 

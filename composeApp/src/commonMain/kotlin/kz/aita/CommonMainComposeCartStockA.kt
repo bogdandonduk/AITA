@@ -4908,6 +4908,9 @@ internal fun AppConfiguration.QuickSupplierAddBottomSheet(
 ) {
     var supplierName by rememberSaveable { mutableStateOf("") }
     var supplierEmail by rememberSaveable { mutableStateOf("") }
+    var isSaving by rememberSaveable { mutableStateOf(false) }
+    val quickSupplierPhoneStateHost = remember { object : StateHost() {} }
+    val coroutineScope = rememberCoroutineScope()
 
     AitaBottomSheet(
         title = stateValues.stringAddSupplier,
@@ -4943,7 +4946,7 @@ internal fun AppConfiguration.QuickSupplierAddBottomSheet(
                 val supplierPhoneTextFieldContent = countrySelectionPhoneNumberTextField(
                     titleText = localizedStringResource(620, "Supplier phone number"),
                     placeholderText = stateValues.stringEnterPhoneNumber,
-                    stateHost = NavigationScreenModel.Transaction.Selection,
+                    stateHost = quickSupplierPhoneStateHost,
                     stateKey = "quick_supplier_phone_number"
                 )
 
@@ -4966,7 +4969,7 @@ internal fun AppConfiguration.QuickSupplierAddBottomSheet(
                     modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(631, "Save supplier"),
                     iconPath = stateValues.drawablePathIconCheck,
-                    enabled = supplierName.isNotBlank() && stateValues.latestNotification == null,
+                    enabled = supplierName.isNotBlank() && !isSaving,
                     confirmationRequired = false,
                     onClick = {
                         val phoneLocal = supplierPhoneTextFieldContent.value.text.trim()
@@ -4981,6 +4984,15 @@ internal fun AppConfiguration.QuickSupplierAddBottomSheet(
                             supplierPhoneTextFieldContent.selectedSecondaryId.orEmpty().removePrefix("+") + phoneLocal
                         }
 
+                        val cleanEmail = normalizeSupplierProfileEmail(supplierEmail)
+                        if (cleanEmail != null && !supplierProfileEmailLooksValid(cleanEmail)) {
+                            postInAppNotification(
+                                localizedStringResource(2510, "Supplier email is invalid"),
+                                NotificationType.Negative,
+                                transient = true
+                            )
+                            return@actionButton
+                        }
                         val supplier = SupplierDataModel(
                             id = "",
                             userIds = emptyList(),
@@ -4988,14 +5000,27 @@ internal fun AppConfiguration.QuickSupplierAddBottomSheet(
                             categoryIds = emptyList(),
                             name = listOf(LocalizedStringDataModel("main", supplierName.trim())),
                             phoneNumbers = listOf(phoneNumber).filter { it.isNotBlank() },
-                            emails = listOf(supplierEmail.trim().lowercase()).filter { it.isNotBlank() },
+                            emails = listOfNotNull(cleanEmail),
                             addedAt = getCurrentTimeMillis(),
                             isActive = true
-                        )
+                        ).normalizedSupplierProfileFields()
 
+                        if (supplier.supplierProfileValidationIssues().isNotEmpty()) {
+                            postInAppNotification(
+                                localizedStringResource(2511, "Check the supplier profile fields"),
+                                NotificationType.Negative,
+                                transient = true
+                            )
+                            return@actionButton
+                        }
+
+                        isSaving = true
                         addSupplier(supplier) { result ->
-                            if (result is DataState.Success) {
-                                onSaved(result.payload)
+                            coroutineScope.launch {
+                                isSaving = false
+                                if (result is DataState.Success) {
+                                    onSaved(result.payload)
+                                }
                             }
                         }
                     }
@@ -6346,4 +6371,3 @@ internal fun AppConfiguration.moveShelfBatch(
         toIndex = to
     )
 }
-

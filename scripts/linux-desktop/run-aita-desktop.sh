@@ -10,7 +10,7 @@ usage() {
 Usage: $0 [--project-root PATH] [--local-server | --server-url URL] [--keep-daemon]
 
 Launches the Compose desktop client from an interactive Linux graphical session.
-The default build uses the domain-independent workers.dev bootstrap; use --local-server only for origin troubleshooting.
+The default build uses the single domain-independent workers.dev gateway directly; use --local-server only for origin troubleshooting.
 USAGE
 }
 
@@ -37,7 +37,7 @@ done
 ((EUID != 0)) || { echo "Run the desktop client as your normal graphical user, not root/sudo." >&2; exit 1; }
 [[ -d "$PROJECT_ROOT" ]] || { echo "Project directory not found: $PROJECT_ROOT" >&2; exit 1; }
 PROJECT_ROOT="$(cd "$PROJECT_ROOT" && pwd)"
-[[ -x "$PROJECT_ROOT/gradlew" ]] || { echo "Gradle wrapper not found under: $PROJECT_ROOT" >&2; exit 1; }
+[[ -f "$PROJECT_ROOT/gradlew" ]] || { echo "Gradle wrapper not found under: $PROJECT_ROOT" >&2; exit 1; }
 
 if [[ -z "${DISPLAY-}" ]]; then
   cat >&2 <<'ERROR'
@@ -101,9 +101,9 @@ export JAVA_HOME="$java_home"
 export PATH="$JAVA_HOME/bin:$PATH"
 
 if $STOP_DAEMON; then
-  ./gradlew --stop >/dev/null 2>&1 || true
+  bash ./gradlew --stop >/dev/null 2>&1 || true
 fi
 
 printf 'AITA Linux desktop: DISPLAY=%s WAYLAND_DISPLAY=%s JAVA_HOME=%s SERVER=%s\n' \
-  "${DISPLAY-}" "${WAYLAND_DISPLAY-}" "$JAVA_HOME" "${SERVER_URL:-bootstrap/default}"
-exec ./gradlew --no-daemon -Dorg.gradle.java.home="$JAVA_HOME" :composeApp:run
+  "${DISPLAY-}" "${WAYLAND_DISPLAY-}" "$JAVA_HOME" "${SERVER_URL:-workers.dev/default}"
+exec bash ./gradlew --no-daemon -Dorg.gradle.java.home="$JAVA_HOME" :composeApp:run

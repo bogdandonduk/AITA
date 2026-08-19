@@ -4872,6 +4872,137 @@ expect object LocalAitaLanTransport {
     fun localHostAddress(): String
 }
 
+fun supplierGoodsOfferRelationshipKey(
+    storeId: String,
+    supplierId: String,
+    goodsItemId: String
+): String? {
+    val cleanStoreId = storeId.trim().lowercase()
+    val cleanSupplierId = supplierId.trim().lowercase()
+    val cleanGoodsItemId = goodsItemId.trim().lowercase()
+    if (cleanStoreId.isBlank() || cleanSupplierId.isBlank() || cleanGoodsItemId.isBlank()) {
+        return null
+    }
+    return listOf(cleanStoreId, cleanSupplierId, cleanGoodsItemId).joinToString("|")
+}
+
+fun SupplierGoodsPriceDataModel.supplierGoodsOfferRelationshipKey(): String? =
+    supplierGoodsOfferRelationshipKey(storeId, supplierId, goodsItemId)
+
+fun SupplierGoodsPriceDataModel.supplierPriceBookIdentity(): String {
+    supplierGoodsOfferRelationshipKey()?.let { return it }
+
+    val cleanStoreId = storeId.trim().lowercase()
+    val cleanSupplierId = supplierId.trim().lowercase()
+    val cleanGoodsItemId = goodsItemId.trim().lowercase()
+
+    val fallbackId = id.trim().lowercase().ifBlank {
+        listOf(
+            cleanStoreId,
+            cleanSupplierId,
+            cleanGoodsItemId,
+            supplyPrice.price.trim(),
+            supplyPrice.currency.trim().lowercase(),
+            supplyPrice.supplierId.trim().lowercase(),
+            minOrderQuantity?.let { "${it.id}:${it.total}:${it.pricedAmount}:${it.roundTotal}" }.orEmpty(),
+            packageQuantity?.let { "${it.id}:${it.total}:${it.pricedAmount}:${it.roundTotal}" }.orEmpty(),
+            supplierBarcode.orEmpty().trim().lowercase(),
+            supplierGoodsName.orEmpty().trim().lowercase(),
+            lastUsedAtMillis?.toString().orEmpty(),
+            createdAtMillis.toString(),
+            updatedAtMillis.toString()
+        ).joinToString("|")
+    }
+    return "id:$fallbackId"
+}
+
+private fun SupplierGoodsPriceDataModel.supplierPriceBookFreshnessMillis(): Long =
+    maxOf(lastUsedAtMillis ?: 0L, updatedAtMillis, createdAtMillis)
+
+fun List<SupplierGoodsPriceDataModel>.normalizedSupplierGoodsPriceBook(): List<SupplierGoodsPriceDataModel> =
+    asSequence()
+        .filter { it.isActive }
+        .groupBy { it.supplierPriceBookIdentity() }
+        .values
+        .mapNotNull { rows ->
+            rows.maxWithOrNull(
+                compareBy<SupplierGoodsPriceDataModel> { it.supplierPriceBookFreshnessMillis() }
+                    .thenBy { it.updatedAtMillis }
+                    .thenBy { it.createdAtMillis }
+                    .thenBy { it.id }
+            )
+        }
+        .sortedWith(
+            compareByDescending<SupplierGoodsPriceDataModel> {
+                it.supplierPriceBookFreshnessMillis()
+            }.thenBy { it.supplierPriceBookIdentity() }
+        )
+
+/**
+ * Counts Store × Supplier × Product offer relationships that still need a usable positive price.
+ * Required relationships without a row and legacy non-positive rows are counted once each; malformed
+ * historical rows remain visible as independent repair work rather than disappearing silently.
+ */
+fun supplierGoodsOfferPriceGapCount(
+    requiredRelationshipKeys: Set<String>,
+    prices: List<SupplierGoodsPriceDataModel>
+): Int {
+    val normalizedPrices = prices.normalizedSupplierGoodsPriceBook()
+    val requiredKeys = requiredRelationshipKeys
+        .map { it.trim().lowercase() }
+        .filter { it.isNotBlank() }
+        .toSet()
+    val usableKeys = normalizedPrices
+        .asSequence()
+        .filter { it.supplyPrice.hasPositiveSupplierDeskPrice() }
+        .mapNotNull { it.supplierGoodsOfferRelationshipKey() }
+        .toSet()
+    val invalidKeys = normalizedPrices
+        .asSequence()
+        .filterNot { it.supplyPrice.hasPositiveSupplierDeskPrice() }
+        .mapNotNull { it.supplierGoodsOfferRelationshipKey() }
+        .toSet()
+    val malformedInvalidCount = normalizedPrices.count {
+        !it.supplyPrice.hasPositiveSupplierDeskPrice() &&
+                it.supplierGoodsOfferRelationshipKey() == null
+    }
+    return ((requiredKeys - usableKeys) + (invalidKeys - usableKeys)).size +
+            malformedInvalidCount
+}
+
+fun List<SupplierGoodsPriceDataModel>.upsertSupplierGoodsPriceByIdentity(
+    price: SupplierGoodsPriceDataModel
+): List<SupplierGoodsPriceDataModel> {
+    val incomingIdentity = price.supplierPriceBookIdentity()
+    return (
+        listOf(price) + filterNot { existing ->
+            (existing.id.isNotBlank() && existing.id.trim().equals(price.id.trim(), ignoreCase = true)) ||
+                    existing.supplierPriceBookIdentity() == incomingIdentity
+        }
+    ).normalizedSupplierGoodsPriceBook()
+}
+
+@Volatile
+private var supplierNetworkSessionEpoch: Long = 0L
+
+private fun currentSupplierNetworkUserScope(): String {
+    val userId = userAccountState.payloadValue?.id.orEmpty().trim().lowercase()
+    return if (userId.isBlank()) "" else "$supplierNetworkSessionEpoch|$userId"
+}
+
+private fun supplierNetworkUserScopeIsCurrent(expectedScope: String): Boolean =
+    expectedScope.isNotBlank() && currentSupplierNetworkUserScope() == expectedScope
+
+private fun invalidateSupplierNetworkSessionScope() {
+    // The exact value is not business data; it is only a generation marker. Any change invalidates
+    // reads started before logout, even if the same account signs in again immediately.
+    supplierNetworkSessionEpoch = if (supplierNetworkSessionEpoch == Long.MAX_VALUE) {
+        0L
+    } else {
+        supplierNetworkSessionEpoch + 1L
+    }
+}
+
 val supplierGoodsPricesState =
     MutableDataStateFlow<List<SupplierGoodsPriceDataModel>>(GlobalScope)
 
@@ -4887,22 +5018,66 @@ val supplierPartnershipContractsState =
 val supplierModeDashboardState =
     MutableDataStateFlow<SupplierModeDashboardDataModel>(GlobalScope)
 
-private val getSupplierGoodsPricesMutex = Mutex()
-private val getMySupplierGoodsPricesMutex = Mutex()
-private val upsertSupplierGoodsPriceMutex = Mutex()
+private val supplierGoodsPriceReadCoordinator =
+    SingleFlightRequestCoordinator<String, DataState<List<SupplierGoodsPriceDataModel>>>()
+// Reads and writes share one operation mutex so a slower read response cannot overwrite a newer
+// offer mutation, and two queued saves cannot build their local state from the same stale snapshot.
+private val supplierGoodsPriceOperationMutex = Mutex()
 
-private val getSupplierOrdersMutex = Mutex()
-private val getSupplierModeDashboardMutex = Mutex()
-private val addSupplierOrderMutex = Mutex()
-private val updateSupplierOrderMutex = Mutex()
-private val updateSupplierOrdersStatusMutex = Mutex()
-private val deleteSupplierOrderMutex = Mutex()
-private val receiveSupplierOrderMutex = Mutex()
-private val getSupplierContractsMutex = Mutex()
-private val upsertSupplierContractMutex = Mutex()
-private val acceptSupplierContractMutex = Mutex()
-private val declineSupplierContractMutex = Mutex()
-private val archiveSupplierContractMutex = Mutex()
+private val supplierOrderReadCoordinator =
+    SingleFlightRequestCoordinator<String, DataState<List<SupplierOrderWithLinesDataModel>>>()
+// Supplier-order reads and mutations share one operation mutex. A slower GET must never overwrite
+// a newer response, packing transition, dispatch transition, cancellation, or Store receipt.
+private val supplierOrderOperationMutex = Mutex()
+private val supplierDashboardReadCoordinator =
+    SingleFlightRequestCoordinator<String, DataState<SupplierModeDashboardDataModel>>()
+private const val SUPPLIER_DASHBOARD_RECENT_SUCCESS_WINDOW_MILLIS = 2_000L
+private const val SUPPLIER_DASHBOARD_SCOPE_ALL = "all"
+
+private val supplierDashboardCacheMutex = Mutex()
+private val supplierDashboardCacheByScope = mutableMapOf<String, SupplierModeDashboardDataModel>()
+private val supplierDashboardLastSuccessAtMillisByScope = mutableMapOf<String, Long>()
+private var supplierDashboardVisibleScopeKey: String = ""
+private val supplierContractReadCoordinator =
+    SingleFlightRequestCoordinator<String, DataState<List<SupplierPartnershipContractDataModel>>>()
+// Contract reads and mutations share one operation mutex. A slow scoped GET must not overwrite a
+// newer proposal/accept/decline result, and two lifecycle actions must never race each other.
+private val supplierContractOperationMutex = Mutex()
+
+private suspend fun emitSupplierContractsAndAwait(
+    state: DataState.Success<List<SupplierPartnershipContractDataModel>>
+) {
+    supplierPartnershipContractsState.emit(state)
+    // MutableDataStateFlow applies emissions on its own coroutine. Keep the contract operation lock
+    // until the exact list is visible so a queued read/mutation cannot rebuild from stale state.
+    supplierPartnershipContractsState.payload.first { current -> current == state.payload }
+}
+
+private fun logSupplierContractDiagnostic(message: String) {
+    println("AITA supplier contracts: $message")
+}
+
+private suspend fun emitSupplierDashboardAndAwait(
+    state: DataState.Success<SupplierModeDashboardDataModel>
+) {
+    supplierModeDashboardState.emit(state)
+    // The dashboard soft-cache must never become "fresh" before its matching payload is visible.
+    // Otherwise an immediate realtime echo could return the previous dashboard from the cache.
+    supplierModeDashboardState.payload.first { current -> current == state.payload }
+}
+
+private fun refreshSupplierDashboardAfterContractMutationIfNeeded() {
+    if (appModeState.value == APP_MODE_SUPPLIER || appModeState.value == APP_MODE_MANUFACTURER) {
+        getSupplierModeDashboard(force = true)
+    }
+}
+
+private val supplierWorkspaceRefreshScheduleMutex = Mutex()
+// The throttle belongs to an account + Supplier identity scope. Switching identities must never
+// reuse the previous identity's 15-second freshness window and leave the new workspace stale.
+private var supplierWorkspaceRefreshScopeKey: String = ""
+private var supplierWorkspaceLastBaseRefreshAtMillis: Long = 0L
+private var supplierWorkspaceLastContractsRefreshAtMillis: Long = 0L
 
 val securitySessionsState = MutableDataStateFlow<List<SecuritySessionDataModel>>(GlobalScope)
 val securitySessionHistoryState = MutableDataStateFlow<List<SecuritySessionHistoryDataModel>>(GlobalScope)
@@ -4911,50 +5086,106 @@ private val getSecuritySessionHistoryMutex = Mutex()
 private val revokeSecuritySessionMutex = Mutex()
 private val revokeOtherSecuritySessionsMutex = Mutex()
 
+private suspend fun emitSupplierGoodsPricesAndAwait(
+    state: DataState.Success<List<SupplierGoodsPriceDataModel>>
+) {
+    supplierGoodsPricesState.emit(state)
+    // MutableDataStateFlow applies emissions on its own coroutine. Wait until the payload is visible
+    // before releasing the operation mutex; otherwise a queued operation could lose the prior save.
+    supplierGoodsPricesState.payload.first { current -> current == state.payload }
+}
+
 fun getSupplierGoodsPrices(
     storeId: String,
     onCompleted: ((DataState<List<SupplierGoodsPriceDataModel>>) -> Unit)? = null
 ) {
-    if (!getSupplierGoodsPricesMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
-            getSupplierGoodsPricesMutex.withLock {
+    val cleanStoreId = storeId.trim()
+    val requestUserScope = currentSupplierNetworkUserScope()
+    if (requestUserScope.isBlank()) return
+    val requestKey = "$requestUserScope|store:${cleanStoreId.lowercase()}"
+    GlobalScope.launch(Dispatchers.ourIo) {
+        val result = supplierGoodsPriceReadCoordinator.run(requestKey) {
+            supplierGoodsPriceOperationMutex.withLock {
                 val response = networkRequest<List<SupplierGoodsPriceDataModel>, Unit>(
                     method = HttpMethod.Get,
                     endpointUrl = globalAppConfigurationState.payloadValue.getSupplierGoodsPricesPath.first,
-                    headers = mapOf("store_id" to storeId)
+                    headers = mapOf("store_id" to cleanStoreId)
                 )
 
-                if (response.negative || response.payload == null) {
+                if (!supplierNetworkUserScopeIsCurrent(requestUserScope)) {
+                    DataState.Empty()
+                } else if (response.negative || response.payload == null) {
                     postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
+                    DataState.Empty(response.message)
                 } else {
-                    supplierGoodsPricesState.emit(DataState.Success(response.payload, response.message))
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                    val normalizedStoreId = cleanStoreId.lowercase()
+                    val scopedPrices = response.payload
+                        .filter { price -> price.storeId.trim().lowercase() == normalizedStoreId }
+                        .normalizedSupplierGoodsPriceBook()
+                    val mergedPrices = (
+                        supplierGoodsPricesState.payloadValue.orEmpty().filterNot { price ->
+                            price.storeId.trim().lowercase() == normalizedStoreId
+                        } + scopedPrices
+                    ).normalizedSupplierGoodsPriceBook()
+                    emitSupplierGoodsPricesAndAwait(DataState.Success(mergedPrices, response.message))
+                    DataState.Success(scopedPrices, response.message)
                 }
             }
         }
+        if (supplierNetworkUserScopeIsCurrent(requestUserScope)) onCompleted?.invoke(result)
+    }
 }
 
 fun getMySupplierGoodsPrices(
+    supplierId: String? = effectiveActiveSupplierProfileId(),
     onCompleted: ((DataState<List<SupplierGoodsPriceDataModel>>) -> Unit)? = null
 ) {
-    if (!getMySupplierGoodsPricesMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
-            getMySupplierGoodsPricesMutex.withLock {
+    val cleanSupplierId = normalizeSupplierProfileIdentityId(supplierId).orEmpty()
+    val requestUserScope = currentSupplierNetworkUserScope()
+    if (requestUserScope.isBlank()) return
+    val requestKey = if (cleanSupplierId.isBlank()) {
+        "$requestUserScope|my"
+    } else {
+        "$requestUserScope|supplier:$cleanSupplierId"
+    }
+    GlobalScope.launch(Dispatchers.ourIo) {
+        val result = supplierGoodsPriceReadCoordinator.run(requestKey) {
+            supplierGoodsPriceOperationMutex.withLock {
                 val response = networkRequest<List<SupplierGoodsPriceDataModel>, Unit>(
                     method = HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.getMySupplierGoodsPricesPath.first
+                    endpointUrl = globalAppConfigurationState.payloadValue.getMySupplierGoodsPricesPath.first,
+                    headers = buildMap {
+                        cleanSupplierId.takeIf { it.isNotBlank() }?.let { put("supplier_id", it) }
+                    }
                 )
 
-                if (response.negative || response.payload == null) {
+                if (!supplierNetworkUserScopeIsCurrent(requestUserScope)) {
+                    DataState.Empty()
+                } else if (response.negative || response.payload == null) {
                     postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
+                    DataState.Empty(response.message)
                 } else {
-                    supplierGoodsPricesState.emit(DataState.Success(response.payload, response.message))
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                    val scopedPrices = response.payload
+                        .filter { price -> price.matchesSupplierProfileFocus(cleanSupplierId.takeIf { it.isNotBlank() }) }
+                        .normalizedSupplierGoodsPriceBook()
+                    if (cleanSupplierId.isBlank()) {
+                        DataState.Success(scopedPrices, response.message).also { state ->
+                            emitSupplierGoodsPricesAndAwait(state)
+                        }
+                    } else {
+                        val mergedPrices = (
+                            supplierGoodsPricesState.payloadValue.orEmpty().filterNot { price ->
+                                price.matchesSupplierProfileFocus(cleanSupplierId)
+                            } + scopedPrices
+                        ).normalizedSupplierGoodsPriceBook()
+                        emitSupplierGoodsPricesAndAwait(DataState.Success(mergedPrices, response.message))
+                        DataState.Success(scopedPrices, response.message)
+                    }
                 }
             }
         }
+        if (supplierNetworkUserScopeIsCurrent(requestUserScope)) onCompleted?.invoke(result)
+    }
 }
 
 fun upsertSupplierGoodsPrice(
@@ -4962,7 +5193,8 @@ fun upsertSupplierGoodsPrice(
     onCompleted: ((DataState<SupplierGoodsPriceDataModel>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            upsertSupplierGoodsPriceMutex.withLock {
+        val result: DataState<SupplierGoodsPriceDataModel> = try {
+            supplierGoodsPriceOperationMutex.withLock {
                 val response = networkRequest<SupplierGoodsPriceDataModel, SupplierGoodsPriceDataModel>(
                     method = HttpMethod.Post,
                     endpointUrl = globalAppConfigurationState.payloadValue.upsertSupplierGoodsPricePath.first,
@@ -4971,21 +5203,43 @@ fun upsertSupplierGoodsPrice(
 
                 if (response.negative || response.payload == null) {
                     postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
+                    DataState.Empty(response.message)
                 } else {
-                    supplierGoodsPricesState.emit(
-                        DataState.Success(
-                            supplierGoodsPricesState.payloadValue
-                                .orEmpty()
-                                .upsertById(response.payload),
-                            response.message
-                        )
+                    val nextPriceBookState = DataState.Success(
+                        supplierGoodsPricesState.payloadValue
+                            .orEmpty()
+                            .upsertSupplierGoodsPriceByIdentity(response.payload),
+                        response.message
                     )
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                    refreshSupplierModeWorkspaceIfActive(includeContracts = false)
+                    emitSupplierGoodsPricesAndAwait(nextPriceBookState)
+                    DataState.Success(response.payload, response.message)
                 }
             }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (throwable: Throwable) {
+            logNetworkAttempt(
+                "supplier price upsert failed unexpectedly: ${networkFailureSummary(throwable)}"
+            )
+            val message = localizedStringResourceMessage(
+                id = 2331,
+                main = "Could not save this offer",
+                ru = "Не удалось сохранить предложение",
+                kk = "Ұсынысты сақтау мүмкін болмады"
+            )
+            postInAppNotification(message, NotificationType.Negative)
+            DataState.Empty(message)
         }
+
+        if (result is DataState.Success &&
+            (appModeState.value == APP_MODE_SUPPLIER || appModeState.value == APP_MODE_MANUFACTURER)
+        ) {
+            // The mutation response already updates the price book. Only the derived dashboard needs
+            // one refresh; do not immediately re-read the entire price book.
+            getSupplierModeDashboard(force = true)
+        }
+        onCompleted?.invoke(result)
+    }
 }
 
 @kotlinx.serialization.Serializable
@@ -5000,6 +5254,12 @@ data class SupplierContractPriceTermDataModel(
     val scheduleText: List<LocalizedStringDataModel> = emptyList(),
     val note: List<LocalizedStringDataModel> = emptyList(),
     val isActive: Boolean = true
+)
+
+@kotlinx.serialization.Serializable
+data class SupplierContractRevisionActionRequestDataModel(
+    val contractId: String = "",
+    val revision: Int = 0
 )
 
 @kotlinx.serialization.Serializable
@@ -5041,6 +5301,125 @@ data class SupplierPartnershipContractDataModel(
     fun requiresSupplierAcceptance(): Boolean = status == SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER
 }
 
+
+fun String.isPendingSupplierContractStatus(): Boolean =
+    this == SUPPLIER_CONTRACT_STATUS_PENDING_STORE ||
+            this == SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER
+
+fun SupplierPartnershipContractDataModel.requiresAcceptanceFrom(actorSide: String): Boolean =
+    isActive && when (actorSide.trim().lowercase()) {
+        SUPPLIER_CONTRACT_SIDE_STORE -> status == SUPPLIER_CONTRACT_STATUS_PENDING_STORE
+        SUPPLIER_CONTRACT_SIDE_SUPPLIER -> status == SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER
+        else -> false
+    }
+
+fun SupplierPartnershipContractDataModel.waitsForOtherContractSide(actorSide: String): Boolean =
+    isActive && status.isPendingSupplierContractStatus() && !requiresAcceptanceFrom(actorSide)
+
+fun SupplierPartnershipContractDataModel.canBeDeclinedByContractParty(): Boolean =
+    isActive && status.isPendingSupplierContractStatus()
+
+fun SupplierPartnershipContractDataModel.canBeArchivedByContractParty(): Boolean =
+    isActive && (status == SUPPLIER_CONTRACT_STATUS_ACTIVE || status == SUPPLIER_CONTRACT_STATUS_DECLINED)
+
+/**
+ * Returns whether this live agreement actually covers any of the supplied goods. A malformed
+ * goods-scoped agreement with no goods never expands into a partnership-wide agreement.
+ */
+fun SupplierPartnershipContractDataModel.coversSupplierSupplyGoods(
+    goodsItemIds: Collection<String>
+): Boolean {
+    if (!isActive) return false
+
+    return when (scopeType) {
+        SUPPLIER_CONTRACT_SCOPE_PARTNERSHIP -> true
+        SUPPLIER_CONTRACT_SCOPE_GOODS_ITEM,
+        SUPPLIER_CONTRACT_SCOPE_GOODS_GROUP -> {
+            val contractGoods = this.goodsItemIds
+                .asSequence()
+                .map { it.trim().lowercase() }
+                .filter { it.isNotBlank() }
+                .toSet()
+            contractGoods.isNotEmpty() && goodsItemIds
+                .asSequence()
+                .map { it.trim().lowercase() }
+                .filter { it.isNotBlank() }
+                .any { it in contractGoods }
+        }
+        else -> false
+    }
+}
+
+/**
+ * Only a live pending proposal can block a supply action. Declined and archived proposals are
+ * historical decisions, while active agreements remain informative without blocking movement.
+ */
+fun SupplierPartnershipContractDataModel.blocksSupplierSupplyForGoods(
+    goodsItemIds: Collection<String>
+): Boolean = status.isPendingSupplierContractStatus() && coversSupplierSupplyGoods(goodsItemIds)
+
+/**
+ * A scoped read replaces only that read scope. This prevents a Store-side contract request from
+ * erasing Supplier-mode contracts for unrelated Stores, while a full Supplier-mode read remains
+ * authoritative for the complete payload it requested.
+ */
+fun List<SupplierPartnershipContractDataModel>.mergedWithSupplierContractRead(
+    incoming: List<SupplierPartnershipContractDataModel>,
+    storeId: String? = null,
+    supplierId: String? = null
+): List<SupplierPartnershipContractDataModel> {
+    val cleanStoreId = storeId.orEmpty().trim().lowercase()
+    val cleanSupplierId = supplierId.orEmpty().trim().lowercase()
+    val preserved = if (cleanStoreId.isBlank() && cleanSupplierId.isBlank()) {
+        emptyList()
+    } else {
+        filterNot { contract ->
+            val storeMatches = cleanStoreId.isBlank() ||
+                    contract.storeId.trim().lowercase() == cleanStoreId
+            val supplierMatches = cleanSupplierId.isBlank() ||
+                    contract.supplierId.trim().lowercase() == cleanSupplierId
+            storeMatches && supplierMatches
+        }
+    }
+
+    val keyed = linkedMapOf<String, SupplierPartnershipContractDataModel>()
+    val anonymous = mutableListOf<SupplierPartnershipContractDataModel>()
+    (preserved + incoming).forEach { contract ->
+        val key = contract.id.trim().lowercase()
+        if (key.isBlank()) {
+            anonymous += contract
+        } else {
+            val current = keyed[key]
+            if (current == null ||
+                contract.revision > current.revision ||
+                (contract.revision == current.revision &&
+                        maxOf(contract.updatedAtMillis, contract.createdAtMillis) >=
+                        maxOf(current.updatedAtMillis, current.createdAtMillis))
+            ) {
+                keyed[key] = contract
+            }
+        }
+    }
+
+    return (keyed.values + anonymous)
+        .sortedWith(
+            compareByDescending<SupplierPartnershipContractDataModel> {
+                maxOf(it.updatedAtMillis, it.createdAtMillis)
+            }.thenByDescending { it.revision }
+                .thenBy { it.id }
+        )
+}
+
+/**
+ * Replaces one locally cached agreement only when the incoming revision is at least as fresh as the
+ * copy already observed (for example through realtime). A late mutation response must not roll a
+ * newer revision back on this client.
+ */
+fun List<SupplierPartnershipContractDataModel>.upsertSupplierContractByRevision(
+    incoming: SupplierPartnershipContractDataModel
+): List<SupplierPartnershipContractDataModel> =
+    mergedWithSupplierContractRead(incoming = this + incoming)
+
 @kotlinx.serialization.Serializable
 data class SupplierOrderWithLinesDataModel(
     val order: SupplierOrderDataModel,
@@ -5055,7 +5434,7 @@ data class SupplierOrderStatusUpdateRequestDataModel(
 )
 
 fun PriceDataModel?.hasPositiveSupplierDeskPrice(): Boolean =
-    this?.price?.toMoneyDouble()?.let { amount -> amount > 0.0 } == true
+    this?.price?.toMoneyDouble()?.let { amount -> amount.isFinite() && amount > 0.0 } == true
 
 fun SupplierOrderLineDataModel.supplierDeskAcceptedQuantityTotal(): Double? =
     supplierAcceptedQuantity?.total?.coerceAtLeast(0.0)
@@ -5105,6 +5484,31 @@ fun SupplierOrderWithLinesDataModel.hasSupplierResponseGapsForSupplierDesk(): Bo
             cleanLines.any { line -> !line.hasCompleteSupplierResponseLineForSupplierDesk() }
 }
 
+/**
+ * One canonical definition shared by Store receiving, Supplier Orders, Customers, Insights and the
+ * server dashboard. Keeping this in shared code prevents each screen from quietly inventing its own
+ * interpretation of an open or actionable supplier order.
+ */
+fun SupplierOrderStatusDataModel.isClosedForSupplierDesk(): Boolean =
+    this == SupplierOrderStatusDataModel.Delivered || this == SupplierOrderStatusDataModel.Cancelled
+
+fun SupplierOrderStatusDataModel.needsSupplierActionForSupplierDesk(
+    hasResponseGaps: Boolean
+): Boolean = !isClosedForSupplierDesk() &&
+        (this == SupplierOrderStatusDataModel.Sent ||
+                this == SupplierOrderStatusDataModel.SeenBySupplier ||
+                this == SupplierOrderStatusDataModel.IssueReported ||
+                hasResponseGaps)
+
+fun SupplierOrderDataModel.needsSupplierActionForSupplierDesk(
+    activeLines: List<SupplierOrderLineDataModel>
+): Boolean = isActive && status.needsSupplierActionForSupplierDesk(
+    SupplierOrderWithLinesDataModel(this, activeLines).hasSupplierResponseGapsForSupplierDesk()
+)
+
+fun SupplierOrderWithLinesDataModel.needsSupplierActionForSupplierDesk(): Boolean =
+    order.needsSupplierActionForSupplierDesk(lines)
+
 @kotlinx.serialization.Serializable
 data class SupplierDashboardStatusBucketDataModel(
     val status: SupplierOrderStatusDataModel = SupplierOrderStatusDataModel.Draft,
@@ -5136,8 +5540,18 @@ data class SupplierDashboardPartnerDataModel(
     val storeAddressTextSnapshot: String = "",
     val orderCount: Int = 0,
     val openOrderCount: Int = 0,
+    val actionRequiredOrderCount: Int = 0,
+    val readyToPackOrderCount: Int = 0,
+    val packedOrderCount: Int = 0,
+    val inDeliveryOrderCount: Int = 0,
+    val partiallyDeliveredOrderCount: Int = 0,
+    val overdueOrderCount: Int = 0,
     val deliveredOrderCount: Int = 0,
     val issueOrderCount: Int = 0,
+    val catalogSkuCount: Int = 0,
+    val savedOfferCount: Int = 0,
+    val validOfferCount: Int = 0,
+    val priceGapCount: Int = 0,
     val latestStatus: SupplierOrderStatusDataModel = SupplierOrderStatusDataModel.Draft,
     val latestActivityMillis: Long = 0L,
     val activeContractCount: Int = 0,
@@ -5154,7 +5568,12 @@ data class SupplierDashboardProfileDataModel(
     val openOrderCount: Int = 0,
     val actionRequiredOrderCount: Int = 0,
     val catalogSkuCount: Int = 0,
+    val savedOfferCount: Int = 0,
+    val stockBatchCount: Int = 0,
+    val commercialHistoryCount: Int = 0,
     val partnerCount: Int = 0,
+    val activeContractCount: Int = 0,
+    val pendingContractCount: Int = 0,
     val latestActivityMillis: Long = 0L
 )
 
@@ -5206,6 +5625,8 @@ data class SupplierDashboardDispatchRunDataModel(
     val orderIds: List<String> = emptyList(),
     val packableOrderIds: List<String> = emptyList(),
     val dispatchableOrderIds: List<String> = emptyList(),
+    val inDeliveryOrderIds: List<String> = emptyList(),
+    val issueOrderIds: List<String> = emptyList(),
     val attentionOrderIds: List<String> = emptyList(),
     val contractBlockedOrderIds: List<String> = emptyList(),
     val statusMix: List<SupplierDashboardStatusBucketDataModel> = emptyList(),
@@ -5675,125 +6096,336 @@ data class SupplierModeDashboardDataModel(
     val recoveryDesk: SupplierDashboardRecoveryDeskDataModel = SupplierDashboardRecoveryDeskDataModel()
 )
 
+private suspend fun emitSupplierOrderSnapshotAndAwait(
+    orders: List<SupplierOrderDataModel>,
+    lines: List<SupplierOrderLineDataModel>,
+    message: List<LocalizedStringDataModel>? = null
+) {
+    supplierOrdersState.emit(DataState.Success(orders, message))
+    supplierOrderLinesState.emit(DataState.Success(lines, message))
+    // MutableDataStateFlow applies emissions on its own coroutine. Keep the operation lock until
+    // both matching payloads are visible so a queued read or mutation cannot rebuild from stale data.
+    supplierOrdersState.payload.first { current -> current == orders }
+    supplierOrderLinesState.payload.first { current -> current == lines }
+}
+
 fun getSupplierOrders(
     storeId: String,
     onCompleted: ((DataState<List<SupplierOrderWithLinesDataModel>>) -> Unit)? = null
 ) {
-    if (!getSupplierOrdersMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
-            getSupplierOrdersMutex.withLock {
+    val cleanStoreId = storeId.trim()
+    val requestUserScope = currentSupplierNetworkUserScope()
+    if (requestUserScope.isBlank()) return
+    val requestKey = "$requestUserScope|store:${cleanStoreId.lowercase()}"
+    GlobalScope.launch(Dispatchers.ourIo) {
+        val result = supplierOrderReadCoordinator.run(requestKey) {
+            supplierOrderOperationMutex.withLock {
                 val response = networkRequest<List<SupplierOrderWithLinesDataModel>, Unit>(
                     method = HttpMethod.Get,
                     endpointUrl = globalAppConfigurationState.payloadValue.getSupplierOrdersPath.first,
-                    headers = mapOf("store_id" to storeId)
+                    headers = mapOf("store_id" to cleanStoreId)
                 )
-
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    supplierOrdersState.emit(
-                        DataState.Success(response.payload.map { it.order }, response.message)
-                    )
-                    supplierOrderLinesState.emit(
-                        DataState.Success(response.payload.flatMap { it.lines }, response.message)
-                    )
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+                applySupplierOrderReadResponse(
+                    response = response,
+                    scope = SupplierOrderReadScope(storeId = cleanStoreId),
+                    expectedUserScope = requestUserScope
+                )
             }
         }
+        if (supplierNetworkUserScopeIsCurrent(requestUserScope)) onCompleted?.invoke(result)
+    }
 }
 
 fun getSupplierOrdersForSupplier(
     supplierId: String,
     onCompleted: ((DataState<List<SupplierOrderWithLinesDataModel>>) -> Unit)? = null
 ) {
-    if (!getSupplierOrdersMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
-            getSupplierOrdersMutex.withLock {
+    val cleanSupplierId = supplierId.trim()
+    val requestUserScope = currentSupplierNetworkUserScope()
+    if (requestUserScope.isBlank()) return
+    val requestKey = "$requestUserScope|supplier:${cleanSupplierId.lowercase()}"
+    GlobalScope.launch(Dispatchers.ourIo) {
+        val result = supplierOrderReadCoordinator.run(requestKey) {
+            supplierOrderOperationMutex.withLock {
                 val response = networkRequest<List<SupplierOrderWithLinesDataModel>, Unit>(
                     method = HttpMethod.Get,
                     endpointUrl = globalAppConfigurationState.payloadValue.getSupplierOrdersPath.first,
-                    headers = mapOf("supplier_id" to supplierId)
+                    headers = mapOf("supplier_id" to cleanSupplierId)
                 )
-
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    supplierOrdersState.emit(
-                        DataState.Success(response.payload.map { it.order }, response.message)
-                    )
-                    supplierOrderLinesState.emit(
-                        DataState.Success(response.payload.flatMap { it.lines }, response.message)
-                    )
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+                applySupplierOrderReadResponse(
+                    response = response,
+                    scope = SupplierOrderReadScope(supplierId = cleanSupplierId),
+                    expectedUserScope = requestUserScope
+                )
             }
         }
+        if (supplierNetworkUserScopeIsCurrent(requestUserScope)) onCompleted?.invoke(result)
+    }
 }
 
 fun getMySupplierSideOrders(
     onCompleted: ((DataState<List<SupplierOrderWithLinesDataModel>>) -> Unit)? = null
 ) {
-    if (!getSupplierOrdersMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
-            getSupplierOrdersMutex.withLock {
+    val requestUserScope = currentSupplierNetworkUserScope()
+    if (requestUserScope.isBlank()) return
+    GlobalScope.launch(Dispatchers.ourIo) {
+        val result = supplierOrderReadCoordinator.run("$requestUserScope|my") {
+            supplierOrderOperationMutex.withLock {
                 val response = networkRequest<List<SupplierOrderWithLinesDataModel>, Unit>(
                     method = HttpMethod.Get,
                     endpointUrl = globalAppConfigurationState.payloadValue.getSupplierOrdersPath.first
                 )
-
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    supplierOrdersState.emit(
-                        DataState.Success(response.payload.map { it.order }, response.message)
-                    )
-                    supplierOrderLinesState.emit(
-                        DataState.Success(response.payload.flatMap { it.lines }, response.message)
-                    )
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+                applySupplierOrderReadResponse(
+                    response = response,
+                    scope = SupplierOrderReadScope(replaceAll = true),
+                    expectedUserScope = requestUserScope
+                )
             }
         }
+        if (supplierNetworkUserScopeIsCurrent(requestUserScope)) onCompleted?.invoke(result)
+    }
+}
+
+private data class SupplierOrderReadScope(
+    val storeId: String = "",
+    val supplierId: String = "",
+    val replaceAll: Boolean = false
+) {
+    private val normalizedStoreId: String = storeId.trim().lowercase()
+    private val normalizedSupplierId: String = supplierId.trim().lowercase()
+
+    fun contains(order: SupplierOrderDataModel): Boolean {
+        if (replaceAll) return true
+        if (normalizedStoreId.isBlank() && normalizedSupplierId.isBlank()) return false
+
+        val storeMatches = normalizedStoreId.isBlank() ||
+                order.storeId.trim().lowercase() == normalizedStoreId
+        val supplierMatches = normalizedSupplierId.isBlank() ||
+                order.supplierId.trim().lowercase() == normalizedSupplierId
+        return storeMatches && supplierMatches
+    }
+}
+
+private fun List<SupplierOrderLineDataModel>.distinctSupplierOrderLinesByStableId(): List<SupplierOrderLineDataModel> {
+    val seenIds = mutableSetOf<String>()
+    return filter { line ->
+        val cleanId = line.id.trim().lowercase()
+        // A proper server row always has an ID. Preserve every malformed legacy row without an ID
+        // instead of accidentally merging two genuinely separate goods lines by a weak fallback key.
+        cleanId.isBlank() || seenIds.add(cleanId)
+    }
+}
+
+private suspend fun applySupplierOrderReadResponse(
+    response: ResponseDataModel<List<SupplierOrderWithLinesDataModel>>,
+    scope: SupplierOrderReadScope,
+    expectedUserScope: String
+): DataState<List<SupplierOrderWithLinesDataModel>> {
+    if (!supplierNetworkUserScopeIsCurrent(expectedUserScope)) {
+        return DataState.Empty()
+    }
+    if (response.negative || response.payload == null) {
+        postInAppNotification(response.message, NotificationType.Negative)
+        return DataState.Empty(response.message)
+    }
+
+    // A scoped Store/Supplier read replaces only that commercial scope. Otherwise opening one Store
+    // could erase another Store's cached orders or the Supplier workspace while both modes share the
+    // same state flows. The unscoped "my Supplier side" read remains authoritative for its payload.
+    val scopedBundles = response.payload
+        .filter { bundle -> scope.contains(bundle.order) }
+        .distinctBy { bundle -> bundle.order.id.trim().lowercase() }
+    val incomingOrders = scopedBundles.map { it.order }
+    val incomingLines = scopedBundles
+        .flatMap { it.lines }
+        .distinctSupplierOrderLinesByStableId()
+
+    if (scope.replaceAll) {
+        emitSupplierOrderSnapshotAndAwait(
+            orders = incomingOrders,
+            lines = incomingLines,
+            message = response.message
+        )
+    } else {
+        val existingOrders = supplierOrdersState.payloadValue.orEmpty()
+        val replacedOrderIds = (
+            existingOrders.asSequence().filter(scope::contains).map { it.id } +
+                    incomingOrders.asSequence().map { it.id }
+            )
+            .map { it.trim().lowercase() }
+            .filter { it.isNotBlank() }
+            .toSet()
+        val nextOrders = (
+            existingOrders.filterNot(scope::contains) + incomingOrders
+            ).distinctBy { order -> order.id.trim().lowercase() }
+        val nextLines = (
+            supplierOrderLinesState.payloadValue.orEmpty().filterNot { line ->
+                line.orderId.trim().lowercase() in replacedOrderIds
+            } + incomingLines
+            ).distinctSupplierOrderLinesByStableId()
+        emitSupplierOrderSnapshotAndAwait(
+            orders = nextOrders,
+            lines = nextLines,
+            message = response.message
+        )
+    }
+
+    return DataState.Success(scopedBundles, response.message)
 }
 
 fun getSupplierModeDashboard(
+    force: Boolean = false,
+    supplierId: String? = effectiveActiveSupplierProfileId(),
+    publishToSharedState: Boolean = true,
     onCompleted: ((DataState<SupplierModeDashboardDataModel>) -> Unit)? = null
 ) {
-    if (!getSupplierModeDashboardMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
-            getSupplierModeDashboardMutex.withLock {
-                val response = networkRequest<SupplierModeDashboardDataModel, Unit>(
-                    method = HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.getSupplierDashboardPath.first
-                )
+    val cleanSupplierId = normalizeSupplierProfileIdentityId(supplierId)
+    val currentUserScope = currentSupplierNetworkUserScope()
+    val scopeKey = "$currentUserScope|${cleanSupplierId ?: SUPPLIER_DASHBOARD_SCOPE_ALL}"
 
-                if (response.negative || response.payload == null) {
-                    onCompleted?.invoke(DataState.Empty(response.message))
+    if (currentUserScope.isBlank()) return
+
+    GlobalScope.launch(Dispatchers.ourIo) {
+        if (!supplierNetworkUserScopeIsCurrent(currentUserScope)) return@launch
+        var cachedDashboard: SupplierModeDashboardDataModel? = null
+        var cachedAtMillis = 0L
+
+        // Scope switching is serialized with result publication. A late response for Supplier A
+        // therefore cannot flash over Supplier B after the user changes the active identity.
+        var scopeStillCurrent = true
+        supplierDashboardCacheMutex.withLock {
+            if (!supplierNetworkUserScopeIsCurrent(currentUserScope)) {
+                scopeStillCurrent = false
+                return@withLock
+            }
+            if (publishToSharedState) supplierDashboardVisibleScopeKey = scopeKey
+            cachedDashboard = supplierDashboardCacheByScope[scopeKey]
+            cachedAtMillis = supplierDashboardLastSuccessAtMillisByScope[scopeKey] ?: 0L
+            val cached = cachedDashboard
+            if (publishToSharedState) {
+                if (cached != null) {
+                    emitSupplierDashboardAndAwait(DataState.Success(cached))
                 } else {
-                    supplierModeDashboardState.emit(DataState.Success(response.payload, response.message))
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                    supplierModeDashboardState.emit(DataState.Empty())
+                    supplierModeDashboardState.payload.first { current -> current == null }
                 }
             }
         }
+        if (!scopeStillCurrent) return@launch
+
+        val now = getCurrentTimeMillis()
+        if (
+            !force &&
+            cachedDashboard != null &&
+            cachedAtMillis > 0L &&
+            now >= cachedAtMillis &&
+            now - cachedAtMillis < SUPPLIER_DASHBOARD_RECENT_SUCCESS_WINDOW_MILLIS
+        ) {
+            if (supplierNetworkUserScopeIsCurrent(currentUserScope)) {
+                onCompleted?.invoke(DataState.Success(cachedDashboard!!))
+            }
+            return@launch
+        }
+
+        val result = supplierDashboardReadCoordinator.run(scopeKey) {
+            val response = networkRequest<SupplierModeDashboardDataModel, Unit>(
+                method = HttpMethod.Get,
+                endpointUrl = globalAppConfigurationState.payloadValue.getSupplierDashboardPath.first,
+                headers = buildMap {
+                    cleanSupplierId?.let { put("supplier_id", it) }
+                }
+            )
+
+            if (!supplierNetworkUserScopeIsCurrent(currentUserScope)) {
+                DataState.Empty()
+            } else if (response.negative || response.payload == null) {
+                DataState.Empty(response.message)
+            } else {
+                val state = DataState.Success(response.payload, response.message)
+                supplierDashboardCacheMutex.withLock {
+                    if (supplierNetworkUserScopeIsCurrent(currentUserScope)) {
+                        supplierDashboardCacheByScope[scopeKey] = response.payload
+                        supplierDashboardLastSuccessAtMillisByScope[scopeKey] = getCurrentTimeMillis()
+                    }
+                }
+                state
+            }
+        }
+
+        // Publication is caller-specific and therefore happens after the single-flight coordinator.
+        // If a background/non-publishing consumer started the shared request first, a visible caller
+        // joining that same request still needs to publish the result into the shared dashboard state.
+        if (
+            publishToSharedState &&
+            result is DataState.Success &&
+            supplierNetworkUserScopeIsCurrent(currentUserScope)
+        ) {
+            supplierDashboardCacheMutex.withLock {
+                if (
+                    supplierNetworkUserScopeIsCurrent(currentUserScope) &&
+                    supplierDashboardVisibleScopeKey == scopeKey
+                ) {
+                    emitSupplierDashboardAndAwait(result)
+                }
+            }
+        }
+        if (supplierNetworkUserScopeIsCurrent(currentUserScope)) onCompleted?.invoke(result)
+    }
 }
 
-fun refreshSupplierModeWorkspace(includeContracts: Boolean = false) {
-    getSuppliers()
-    getMySupplierSideOrders()
-    getMySupplierGoodsPrices()
-    getSupplierModeDashboard()
-    if (includeContracts) {
-        getSupplierContracts()
+fun refreshSupplierModeWorkspace(
+    includeContracts: Boolean = false,
+    force: Boolean = false
+) {
+    GlobalScope.launch(Dispatchers.ourIo) {
+        supplierWorkspaceRefreshScheduleMutex.withLock {
+            val currentUserId = userAccountState.payloadValue?.id.orEmpty().trim()
+            val currentUserScope = currentSupplierNetworkUserScope()
+            if (currentUserId.isBlank() || currentUserScope.isBlank()) return@withLock
+            val focusedSupplierId = effectiveActiveSupplierProfileId()
+            val refreshScopeKey = buildString {
+                append(currentUserScope)
+                append('|')
+                append(normalizeSupplierProfileIdentityId(focusedSupplierId) ?: SUPPLIER_DASHBOARD_SCOPE_ALL)
+            }
+            if (supplierWorkspaceRefreshScopeKey != refreshScopeKey) {
+                supplierWorkspaceRefreshScopeKey = refreshScopeKey
+                supplierWorkspaceLastBaseRefreshAtMillis = 0L
+                supplierWorkspaceLastContractsRefreshAtMillis = 0L
+            }
+
+            val nowMillis = getCurrentTimeMillis()
+            val decision = supplierWorkspaceRefreshDecision(
+                nowMillis = nowMillis,
+                lastBaseRefreshAtMillis = supplierWorkspaceLastBaseRefreshAtMillis,
+                lastContractsRefreshAtMillis = supplierWorkspaceLastContractsRefreshAtMillis,
+                includeContracts = includeContracts,
+                force = force
+            )
+
+            if (decision.refreshBaseWorkspace) {
+                supplierWorkspaceLastBaseRefreshAtMillis = nowMillis
+                getSuppliers()
+                if (focusedSupplierId.isNullOrBlank()) {
+                    getMySupplierSideOrders()
+                } else {
+                    getSupplierOrdersForSupplier(focusedSupplierId)
+                }
+                getMySupplierGoodsPrices(focusedSupplierId)
+                getSupplierModeDashboard(force = force, supplierId = focusedSupplierId)
+            }
+
+            if (decision.refreshContracts) {
+                supplierWorkspaceLastContractsRefreshAtMillis = nowMillis
+                getSupplierContracts(supplierId = focusedSupplierId)
+            }
+        }
     }
 }
 
 private fun refreshSupplierModeWorkspaceIfActive(includeContracts: Boolean = false) {
     if (appModeState.value == APP_MODE_SUPPLIER || appModeState.value == APP_MODE_MANUFACTURER) {
-        refreshSupplierModeWorkspace(includeContracts = includeContracts)
+        refreshSupplierModeWorkspace(includeContracts = includeContracts, force = true)
     }
 }
 
@@ -5802,7 +6434,7 @@ fun addSupplierOrder(
     onCompleted: ((DataState<SupplierOrderWithLinesDataModel>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            addSupplierOrderMutex.withLock {
+            supplierOrderOperationMutex.withLock {
                 val response = networkRequest<SupplierOrderWithLinesDataModel, SupplierOrderWithLinesDataModel>(
                     method = HttpMethod.Post,
                     endpointUrl = globalAppConfigurationState.payloadValue.addSupplierOrderPath.first,
@@ -5813,23 +6445,16 @@ fun addSupplierOrder(
                     postInAppNotification(response.message, NotificationType.Negative)
                     onCompleted?.invoke(DataState.Empty(response.message))
                 } else {
-                    supplierOrdersState.emit(
-                        DataState.Success(
-                            supplierOrdersState.payloadValue.orEmpty().upsertById(response.payload.order),
-                            response.message
-                        )
+                    emitSupplierOrderSnapshotAndAwait(
+                        orders = supplierOrdersState.payloadValue.orEmpty().upsertById(response.payload.order),
+                        lines = supplierOrderLinesState.payloadValue.orEmpty()
+                            .filterNot { line ->
+                                line.orderId.trim().equals(response.payload.order.id.trim(), ignoreCase = true)
+                            } + response.payload.lines,
+                        message = response.message
                     )
 
-                    supplierOrderLinesState.emit(
-                        DataState.Success(
-                            supplierOrderLinesState.payloadValue.orEmpty()
-                                .filterNot { line -> response.payload.lines.any { it.id == line.id } } +
-                                    response.payload.lines,
-                            response.message
-                        )
-                    )
-
-                    getSupplierModeDashboard()
+                    getSupplierModeDashboard(force = true)
                     postInAppNotification(response.message, NotificationType.Positive)
                     onCompleted?.invoke(DataState.Success(response.payload, response.message))
                 }
@@ -5842,7 +6467,7 @@ fun updateSupplierOrder(
     onCompleted: ((DataState<SupplierOrderWithLinesDataModel>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            updateSupplierOrderMutex.withLock {
+            supplierOrderOperationMutex.withLock {
                 val response = networkRequest<SupplierOrderWithLinesDataModel, SupplierOrderWithLinesDataModel>(
                     method = HttpMethod.Put,
                     endpointUrl = globalAppConfigurationState.payloadValue.updateSupplierOrderPath.first,
@@ -5853,20 +6478,15 @@ fun updateSupplierOrder(
                     postInAppNotification(response.message, NotificationType.Negative)
                     onCompleted?.invoke(DataState.Empty(response.message))
                 } else {
-                    supplierOrdersState.emit(
-                        DataState.Success(
-                            supplierOrdersState.payloadValue.orEmpty().upsertById(response.payload.order),
-                            response.message
-                        )
+                    emitSupplierOrderSnapshotAndAwait(
+                        orders = supplierOrdersState.payloadValue.orEmpty().upsertById(response.payload.order),
+                        lines = supplierOrderLinesState.payloadValue.orEmpty()
+                            .filterNot { line ->
+                                line.orderId.trim().equals(response.payload.order.id.trim(), ignoreCase = true)
+                            } + response.payload.lines,
+                        message = response.message
                     )
-                    supplierOrderLinesState.emit(
-                        DataState.Success(
-                            supplierOrderLinesState.payloadValue.orEmpty()
-                                .filterNot { line -> line.orderId == response.payload.order.id } + response.payload.lines,
-                            response.message
-                        )
-                    )
-                    getSupplierModeDashboard()
+                    getSupplierModeDashboard(force = true)
                     postInAppNotification(response.message, NotificationType.Positive)
                     onCompleted?.invoke(DataState.Success(response.payload, response.message))
                 }
@@ -5878,60 +6498,72 @@ private suspend fun emitSupplierOrderBundlesFromServerResponse(
     bundles: List<SupplierOrderWithLinesDataModel>,
     message: List<LocalizedStringDataModel>?
 ) {
-    val changedOrderIds = bundles.map { it.order.id }.filter { it.isNotBlank() }.toSet()
-    supplierOrdersState.emit(
-        DataState.Success(
-            supplierOrdersState.payloadValue.orEmpty()
-                .filterNot { it.id in changedOrderIds } + bundles.map { it.order },
-            message
-        )
-    )
-    supplierOrderLinesState.emit(
-        DataState.Success(
-            supplierOrderLinesState.payloadValue.orEmpty()
-                .filterNot { line -> line.orderId in changedOrderIds } + bundles.flatMap { it.lines },
-            message
-        )
+    val changedOrderIds = bundles
+        .map { it.order.id.trim().lowercase() }
+        .filter { it.isNotBlank() }
+        .toSet()
+    emitSupplierOrderSnapshotAndAwait(
+        orders = supplierOrdersState.payloadValue.orEmpty()
+            .filterNot { it.id.trim().lowercase() in changedOrderIds } + bundles.map { it.order },
+        lines = supplierOrderLinesState.payloadValue.orEmpty()
+            .filterNot { line -> line.orderId.trim().lowercase() in changedOrderIds } + bundles.flatMap { it.lines },
+        message = message
     )
 }
 
-fun updateSupplierOrdersSupplierStatus(
-    orderBundles: List<SupplierOrderWithLinesDataModel>,
-    status: SupplierOrderStatusDataModel,
-    comment: String? = null,
-    onCompleted: ((Int) -> Unit)? = null
+data class SupplierOrderStatusUpdateOutcome(
+    val requestedOrderIds: List<String> = emptyList(),
+    val updatedOrderIds: List<String> = emptyList(),
+    val message: List<LocalizedStringDataModel>? = null,
+    val negative: Boolean = false
 ) {
-    updateSupplierOrdersSupplierStatusByIds(
-        orderIds = orderBundles.map { it.order.id },
-        status = status,
-        comment = comment,
-        onCompleted = onCompleted
-    )
+    val skippedOrderIds: List<String>
+        get() {
+            val updated = updatedOrderIds.map { it.trim().lowercase() }.filter { it.isNotBlank() }.toSet()
+            return requestedOrderIds.filter { it.trim().lowercase() !in updated }
+        }
+
+    val requestedCount: Int get() = requestedOrderIds.size
+    val updatedCount: Int get() = updatedOrderIds.size
+    val skippedCount: Int get() = skippedOrderIds.size
+    val partial: Boolean get() = !negative && updatedCount > 0 && skippedCount > 0
 }
 
-fun updateSupplierOrdersSupplierStatusByIds(
+private fun supplierOrderStatusPartialMessage(
+    updatedCount: Int,
+    requestedCount: Int
+): List<LocalizedStringDataModel> = localizedStringResourceMessage(
+    id = 2443,
+    main = "Updated $updatedCount of $requestedCount orders. Review the remaining orders before continuing.",
+    ru = "Обновлено заказов: $updatedCount из $requestedCount. Проверьте оставшиеся заказы перед продолжением.",
+    kk = "$requestedCount тапсырыстың $updatedCount жаңартылды. Жалғастырмас бұрын қалған тапсырыстарды тексеріңіз."
+)
+
+suspend fun updateSupplierOrdersSupplierStatusByIdsAwait(
     orderIds: List<String>,
     status: SupplierOrderStatusDataModel,
-    comment: String? = null,
-    onCompleted: ((Int) -> Unit)? = null
-) {
+    comment: String? = null
+): SupplierOrderStatusUpdateOutcome {
     val cleanOrderIds = orderIds
         .map { it.trim() }
         .filter { it.isNotBlank() }
-        .distinct()
+        .distinctBy { it.lowercase() }
 
     if (cleanOrderIds.isEmpty()) {
-        onCompleted?.invoke(0)
-        return
+        return SupplierOrderStatusUpdateOutcome(
+            requestedOrderIds = emptyList(),
+            message = localizedStringResourceMessage(
+                id = 2444,
+                main = "No supplier orders were selected",
+                ru = "Заказы поставщику не выбраны",
+                kk = "Жеткізуші тапсырыстары таңдалмады"
+            ),
+            negative = true
+        )
     }
 
-    if (updateSupplierOrdersStatusMutex.isLocked) {
-        onCompleted?.invoke(0)
-        return
-    }
-
-    GlobalScope.launch(Dispatchers.ourIo) {
-        updateSupplierOrdersStatusMutex.withLock {
+    return supplierOrderOperationMutex.withLock {
+        try {
             val response = networkRequest<List<SupplierOrderWithLinesDataModel>, SupplierOrderStatusUpdateRequestDataModel>(
                 method = HttpMethod.Put,
                 endpointUrl = globalAppConfigurationState.payloadValue.updateSupplierOrdersStatusPath.first,
@@ -5943,33 +6575,121 @@ fun updateSupplierOrdersSupplierStatusByIds(
             )
 
             if (response.negative || response.payload == null) {
-                postInAppNotification(
-                    response.message ?: localizedStringResourceMessage(
+                SupplierOrderStatusUpdateOutcome(
+                    requestedOrderIds = cleanOrderIds,
+                    updatedOrderIds = emptyList(),
+                    message = response.message ?: localizedStringResourceMessage(
                         id = 1575,
                         main = "Could not update supplier dispatch lane",
                         ru = "Не удалось обновить маршрут поставщика",
                         kk = "Жеткізуші жеткізу бағытын жаңарту мүмкін болмады"
                     ),
-                    NotificationType.Negative
+                    negative = true
                 )
-                onCompleted?.invoke(0)
             } else {
-                emitSupplierOrderBundlesFromServerResponse(response.payload, response.message)
-                postInAppNotification(
-                    response.message ?: localizedStringResourceMessage(
-                        id = 1574,
-                        main = "Supplier dispatch lane updated",
-                        ru = "Маршрут поставщика обновлён",
-                        kk = "Жеткізуші жеткізу бағыты жаңартылды"
-                    ),
-                    NotificationType.Positive,
-                    transient = true
-                )
-                getMySupplierSideOrders()
-                getSupplierModeDashboard()
-                onCompleted?.invoke(response.payload.size)
+                val requestedIdsByKey = cleanOrderIds.associateBy { it.lowercase() }
+                val updatedBundles = response.payload
+                    .filter { bundle -> bundle.order.id.trim().lowercase() in requestedIdsByKey }
+                    .distinctBy { bundle -> bundle.order.id.trim().lowercase() }
+                if (updatedBundles.isEmpty()) {
+                    SupplierOrderStatusUpdateOutcome(
+                        requestedOrderIds = cleanOrderIds,
+                        updatedOrderIds = emptyList(),
+                        message = response.message ?: localizedStringResourceMessage(
+                            id = 1575,
+                            main = "Could not update supplier dispatch lane",
+                            ru = "Не удалось обновить маршрут поставщика",
+                            kk = "Жеткізуші жеткізу бағытын жаңарту мүмкін болмады"
+                        ),
+                        negative = true
+                    )
+                } else {
+                    emitSupplierOrderBundlesFromServerResponse(updatedBundles, response.message)
+                    getSupplierModeDashboard(force = true)
+
+                    val updatedIds = updatedBundles.mapNotNull { bundle ->
+                        requestedIdsByKey[bundle.order.id.trim().lowercase()]
+                    }
+                    val partial = updatedIds.size < cleanOrderIds.size
+                    SupplierOrderStatusUpdateOutcome(
+                        requestedOrderIds = cleanOrderIds,
+                        updatedOrderIds = updatedIds,
+                        message = when {
+                            // The client knows the complete selection, including any IDs beyond a
+                            // server-side batch cap. Prefer that exact count over a generic success
+                            // response so a partial bulk action is never presented as complete.
+                            partial -> supplierOrderStatusPartialMessage(updatedIds.size, cleanOrderIds.size)
+                            else -> response.message ?: localizedStringResourceMessage(
+                                id = 1574,
+                                main = "Supplier dispatch lane updated",
+                                ru = "Маршрут поставщика обновлён",
+                                kk = "Жеткізуші жеткізу бағыты жаңартылды"
+                            )
+                        },
+                        negative = false
+                    )
+                }
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (throwable: Throwable) {
+            println("AITA supplier dispatch: status update failed: ${throwable.message ?: throwable::class.simpleName}")
+            SupplierOrderStatusUpdateOutcome(
+                requestedOrderIds = cleanOrderIds,
+                updatedOrderIds = emptyList(),
+                message = localizedStringResourceMessage(
+                    id = 2445,
+                    main = "Could not update the selected delivery orders",
+                    ru = "Не удалось обновить выбранные заказы доставки",
+                    kk = "Таңдалған жеткізу тапсырыстарын жаңарту мүмкін болмады"
+                ),
+                negative = true
+            )
         }
+    }
+}
+
+fun updateSupplierOrdersSupplierStatus(
+    orderBundles: List<SupplierOrderWithLinesDataModel>,
+    status: SupplierOrderStatusDataModel,
+    comment: String? = null,
+    onCompleted: ((Int) -> Unit)? = null,
+    onOutcome: ((SupplierOrderStatusUpdateOutcome) -> Unit)? = null
+) {
+    updateSupplierOrdersSupplierStatusByIds(
+        orderIds = orderBundles.map { it.order.id },
+        status = status,
+        comment = comment,
+        onCompleted = onCompleted,
+        onOutcome = onOutcome
+    )
+}
+
+fun updateSupplierOrdersSupplierStatusByIds(
+    orderIds: List<String>,
+    status: SupplierOrderStatusDataModel,
+    comment: String? = null,
+    onCompleted: ((Int) -> Unit)? = null,
+    onOutcome: ((SupplierOrderStatusUpdateOutcome) -> Unit)? = null
+) {
+    GlobalScope.launch(Dispatchers.ourIo) {
+        val outcome = updateSupplierOrdersSupplierStatusByIdsAwait(
+            orderIds = orderIds,
+            status = status,
+            comment = comment
+        )
+        val notificationType = when {
+            outcome.negative -> NotificationType.Negative
+            outcome.partial -> NotificationType.Neutral
+            else -> NotificationType.Positive
+        }
+        postInAppNotification(
+            outcome.message,
+            notificationType,
+            transient = !outcome.negative
+        )
+        onCompleted?.invoke(outcome.updatedCount)
+        onOutcome?.invoke(outcome)
     }
 }
 
@@ -5978,7 +6698,7 @@ fun deleteSupplierOrder(
     onCompleted: ((DataState<String>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            deleteSupplierOrderMutex.withLock {
+            supplierOrderOperationMutex.withLock {
                 val response = networkRequest<String, String>(
                     method = HttpMethod.Delete,
                     endpointUrl = globalAppConfigurationState.payloadValue.deleteSupplierOrdersPath.first,
@@ -5989,19 +6709,16 @@ fun deleteSupplierOrder(
                     postInAppNotification(response.message, NotificationType.Negative)
                     onCompleted?.invoke(DataState.Empty(response.message))
                 } else {
-                    supplierOrdersState.emit(
-                        DataState.Success(
-                            supplierOrdersState.payloadValue.orEmpty().filterNot { it.id == orderId },
-                            response.message
-                        )
+                    emitSupplierOrderSnapshotAndAwait(
+                        orders = supplierOrdersState.payloadValue.orEmpty().filterNot {
+                            it.id.trim().equals(orderId.trim(), ignoreCase = true)
+                        },
+                        lines = supplierOrderLinesState.payloadValue.orEmpty().filterNot {
+                            it.orderId.trim().equals(orderId.trim(), ignoreCase = true)
+                        },
+                        message = response.message
                     )
-                    supplierOrderLinesState.emit(
-                        DataState.Success(
-                            supplierOrderLinesState.payloadValue.orEmpty().filterNot { it.orderId == orderId },
-                            response.message
-                        )
-                    )
-                    getSupplierModeDashboard()
+                    getSupplierModeDashboard(force = true)
                     postInAppNotification(response.message, NotificationType.Positive)
                     onCompleted?.invoke(DataState.Success(orderId, response.message))
                 }
@@ -6014,7 +6731,7 @@ fun receiveSupplierOrder(
     onCompleted: ((DataState<SupplierOrderWithLinesDataModel>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            receiveSupplierOrderMutex.withLock {
+            supplierOrderOperationMutex.withLock {
                 val response = networkRequest<SupplierOrderWithLinesDataModel, ReceiveSupplierOrderRequestDataModel>(
                     method = HttpMethod.Post,
                     endpointUrl = globalAppConfigurationState.payloadValue.receiveSupplierOrderPath.first,
@@ -6025,21 +6742,16 @@ fun receiveSupplierOrder(
                     postInAppNotification(response.message, NotificationType.Negative)
                     onCompleted?.invoke(DataState.Empty(response.message))
                 } else {
-                    supplierOrdersState.emit(
-                        DataState.Success(
-                            supplierOrdersState.payloadValue.orEmpty().upsertById(response.payload.order),
-                            response.message
-                        )
-                    )
-                    supplierOrderLinesState.emit(
-                        DataState.Success(
-                            supplierOrderLinesState.payloadValue.orEmpty()
-                                .filterNot { line -> line.orderId == response.payload.order.id } + response.payload.lines,
-                            response.message
-                        )
+                    emitSupplierOrderSnapshotAndAwait(
+                        orders = supplierOrdersState.payloadValue.orEmpty().upsertById(response.payload.order),
+                        lines = supplierOrderLinesState.payloadValue.orEmpty()
+                            .filterNot { line ->
+                                line.orderId.trim().equals(response.payload.order.id.trim(), ignoreCase = true)
+                            } + response.payload.lines,
+                        message = response.message
                     )
                     response.payload.order.storeId.takeIf { it.isNotBlank() }?.let { getStockBatches(it) }
-                    getSupplierModeDashboard()
+                    getSupplierModeDashboard(force = true)
                     postInAppNotification(response.message, NotificationType.Positive)
                     onCompleted?.invoke(DataState.Success(response.payload, response.message))
                 }
@@ -6053,28 +6765,62 @@ fun getSupplierContracts(
     supplierId: String? = null,
     onCompleted: ((DataState<List<SupplierPartnershipContractDataModel>>) -> Unit)? = null
 ) {
-    if (!getSupplierContractsMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
-            getSupplierContractsMutex.withLock {
-                val headers = buildMap {
-                    storeId?.takeIf { it.isNotBlank() }?.let { put("store_id", it) }
-                    supplierId?.takeIf { it.isNotBlank() }?.let { put("supplier_id", it) }
-                }
-                val response = networkRequest<List<SupplierPartnershipContractDataModel>, Unit>(
-                    method = HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.getSupplierContractsPath.first,
-                    headers = headers
-                )
+    val cleanStoreId = storeId.orEmpty().trim().lowercase()
+    val cleanSupplierId = supplierId.orEmpty().trim().lowercase()
+    val requestUserScope = currentSupplierNetworkUserScope()
+    if (requestUserScope.isBlank()) return
+    val requestKey = "$requestUserScope|store=$cleanStoreId|supplier=$cleanSupplierId"
+    GlobalScope.launch(Dispatchers.ourIo) {
+        val result = try {
+            supplierContractReadCoordinator.run(requestKey) {
+                supplierContractOperationMutex.withLock {
+                    val headers = buildMap {
+                        cleanStoreId.takeIf { it.isNotBlank() }?.let { put("store_id", it) }
+                        cleanSupplierId.takeIf { it.isNotBlank() }?.let { put("supplier_id", it) }
+                    }
+                    val response = networkRequest<List<SupplierPartnershipContractDataModel>, Unit>(
+                        method = HttpMethod.Get,
+                        endpointUrl = globalAppConfigurationState.payloadValue.getSupplierContractsPath.first,
+                        headers = headers
+                    )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    supplierPartnershipContractsState.emit(DataState.Success(response.payload, response.message))
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                    if (!supplierNetworkUserScopeIsCurrent(requestUserScope)) {
+                        DataState.Empty()
+                    } else if (response.negative || response.payload == null) {
+                        postInAppNotification(response.message, NotificationType.Negative)
+                        DataState.Empty(response.message)
+                    } else {
+                        val mergedContracts = supplierPartnershipContractsState.payloadValue
+                            .orEmpty()
+                            .mergedWithSupplierContractRead(
+                                incoming = response.payload,
+                                storeId = cleanStoreId,
+                                supplierId = cleanSupplierId
+                            )
+                        DataState.Success(mergedContracts, response.message).also { state ->
+                            emitSupplierContractsAndAwait(state)
+                        }
+                    }
                 }
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (throwable: Throwable) {
+            if (!supplierNetworkUserScopeIsCurrent(requestUserScope)) {
+                return@launch
+            }
+            logSupplierContractDiagnostic("Supplier contracts read failed: ${throwable.message ?: throwable::class.simpleName}")
+            val message = localizedStringResourceMessage(
+                id = 2408,
+                main = "Could not load supplier contracts",
+                ru = "Не удалось загрузить договоры с поставщиками",
+                kk = "Жеткізуші келісімдерін жүктеу мүмкін болмады"
+            )
+            postInAppNotification(message, NotificationType.Negative)
+            DataState.Empty(message)
         }
+        if (supplierNetworkUserScopeIsCurrent(requestUserScope)) onCompleted?.invoke(result)
+    }
 }
 
 fun upsertSupplierContract(
@@ -6082,7 +6828,8 @@ fun upsertSupplierContract(
     onCompleted: ((DataState<SupplierPartnershipContractDataModel>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            upsertSupplierContractMutex.withLock {
+        val result = try {
+            supplierContractOperationMutex.withLock {
                 val response = networkRequest<SupplierPartnershipContractDataModel, SupplierPartnershipContractDataModel>(
                     method = HttpMethod.Post,
                     endpointUrl = globalAppConfigurationState.payloadValue.upsertSupplierContractPath.first,
@@ -6091,110 +6838,194 @@ fun upsertSupplierContract(
 
                 if (response.negative || response.payload == null) {
                     postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
+                    DataState.Empty(response.message)
                 } else {
-                    supplierPartnershipContractsState.emit(
+                    emitSupplierContractsAndAwait(
                         DataState.Success(
-                            supplierPartnershipContractsState.payloadValue.orEmpty().upsertById(response.payload),
+                            supplierPartnershipContractsState.payloadValue.orEmpty()
+                                .upsertSupplierContractByRevision(response.payload),
                             response.message
                         )
                     )
-                    getSupplierModeDashboard()
+                    refreshSupplierDashboardAfterContractMutationIfNeeded()
                     postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                    DataState.Success(response.payload, response.message)
                 }
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (throwable: Throwable) {
+            logSupplierContractDiagnostic("Supplier contract save failed: ${throwable.message ?: throwable::class.simpleName}")
+            val message = localizedStringResourceMessage(
+                id = 2409,
+                main = "Could not save supplier contract",
+                ru = "Не удалось сохранить договор с поставщиком",
+                kk = "Жеткізуші келісімін сақтау мүмкін болмады"
+            )
+            postInAppNotification(message, NotificationType.Negative)
+            DataState.Empty(message)
         }
+        onCompleted?.invoke(result)
+    }
 }
 
 fun acceptSupplierContract(
     contractId: String,
+    revision: Int,
     onCompleted: ((DataState<SupplierPartnershipContractDataModel>) -> Unit)? = null
 ) {
-    GlobalScope.launch(Dispatchers.ourIo) {
-            acceptSupplierContractMutex.withLock {
-                val response = networkRequest<SupplierPartnershipContractDataModel, String>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.acceptSupplierContractPath.first,
-                    body = contractId
-                )
-
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    supplierPartnershipContractsState.emit(
-                        DataState.Success(
-                            supplierPartnershipContractsState.payloadValue.orEmpty().upsertById(response.payload),
-                            response.message
-                        )
-                    )
-                    getSupplierModeDashboard()
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
-            }
-        }
+    mutateSupplierContract(
+        contractId = contractId,
+        revision = revision,
+        endpointUrl = globalAppConfigurationState.payloadValue.acceptSupplierContractPath.first,
+        diagnosticAction = "accept",
+        onCompleted = onCompleted
+    )
 }
 
 fun declineSupplierContract(
     contractId: String,
+    revision: Int,
     onCompleted: ((DataState<SupplierPartnershipContractDataModel>) -> Unit)? = null
 ) {
+    mutateSupplierContract(
+        contractId = contractId,
+        revision = revision,
+        endpointUrl = globalAppConfigurationState.payloadValue.declineSupplierContractPath.first,
+        diagnosticAction = "decline",
+        onCompleted = onCompleted
+    )
+}
+
+private fun mutateSupplierContract(
+    contractId: String,
+    revision: Int,
+    endpointUrl: String,
+    diagnosticAction: String,
+    onCompleted: ((DataState<SupplierPartnershipContractDataModel>) -> Unit)?
+) {
+    val cleanContractId = contractId.trim()
+    if (cleanContractId.isBlank() || revision <= 0) {
+        val message = localizedStringResourceMessage(
+            id = 2410,
+            main = "Supplier contract is missing",
+            ru = "Договор с поставщиком не найден",
+            kk = "Жеткізуші келісімі табылмады"
+        )
+        onCompleted?.invoke(DataState.Empty(message))
+        return
+    }
+
     GlobalScope.launch(Dispatchers.ourIo) {
-            declineSupplierContractMutex.withLock {
-                val response = networkRequest<SupplierPartnershipContractDataModel, String>(
+        val result = try {
+            supplierContractOperationMutex.withLock {
+                val response = networkRequest<
+                    SupplierPartnershipContractDataModel,
+                    SupplierContractRevisionActionRequestDataModel
+                >(
                     method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.declineSupplierContractPath.first,
-                    body = contractId
+                    endpointUrl = endpointUrl,
+                    body = SupplierContractRevisionActionRequestDataModel(
+                        contractId = cleanContractId,
+                        revision = revision
+                    )
                 )
 
                 if (response.negative || response.payload == null) {
                     postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
+                    DataState.Empty(response.message)
                 } else {
-                    supplierPartnershipContractsState.emit(
+                    emitSupplierContractsAndAwait(
                         DataState.Success(
-                            supplierPartnershipContractsState.payloadValue.orEmpty().upsertById(response.payload),
+                            supplierPartnershipContractsState.payloadValue.orEmpty()
+                                .upsertSupplierContractByRevision(response.payload),
                             response.message
                         )
                     )
-                    getSupplierModeDashboard()
+                    refreshSupplierDashboardAfterContractMutationIfNeeded()
                     postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                    DataState.Success(response.payload, response.message)
                 }
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (throwable: Throwable) {
+            logSupplierContractDiagnostic("Supplier contract $diagnosticAction failed: ${throwable.message ?: throwable::class.simpleName}")
+            val message = localizedStringResourceMessage(
+                id = 2411,
+                main = "Could not update supplier contract",
+                ru = "Не удалось обновить договор с поставщиком",
+                kk = "Жеткізуші келісімін жаңарту мүмкін болмады"
+            )
+            postInAppNotification(message, NotificationType.Negative)
+            DataState.Empty(message)
         }
+        onCompleted?.invoke(result)
+    }
 }
 
 fun archiveSupplierContract(
     contractId: String,
+    revision: Int,
     onCompleted: ((DataState<String>) -> Unit)? = null
 ) {
+    val cleanContractId = contractId.trim()
+    if (cleanContractId.isBlank() || revision <= 0) {
+        val message = localizedStringResourceMessage(
+            id = 2410,
+            main = "Supplier contract is missing",
+            ru = "Договор с поставщиком не найден",
+            kk = "Жеткізуші келісімі табылмады"
+        )
+        onCompleted?.invoke(DataState.Empty(message))
+        return
+    }
+
     GlobalScope.launch(Dispatchers.ourIo) {
-            archiveSupplierContractMutex.withLock {
-                val response = networkRequest<String, String>(
+        val result = try {
+            supplierContractOperationMutex.withLock {
+                val response = networkRequest<String, SupplierContractRevisionActionRequestDataModel>(
                     method = HttpMethod.Post,
                     endpointUrl = globalAppConfigurationState.payloadValue.archiveSupplierContractPath.first,
-                    body = contractId
+                    body = SupplierContractRevisionActionRequestDataModel(
+                        contractId = cleanContractId,
+                        revision = revision
+                    )
                 )
 
                 if (response.negative || response.payload == null) {
                     postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
+                    DataState.Empty(response.message)
                 } else {
-                    supplierPartnershipContractsState.emit(
+                    val archivedId = response.payload.trim()
+                    emitSupplierContractsAndAwait(
                         DataState.Success(
-                            supplierPartnershipContractsState.payloadValue.orEmpty().filterNot { it.id == response.payload },
+                            supplierPartnershipContractsState.payloadValue.orEmpty().filterNot { contract ->
+                                contract.id.trim().equals(archivedId, ignoreCase = true)
+                            },
                             response.message
                         )
                     )
-                    getSupplierModeDashboard()
+                    refreshSupplierDashboardAfterContractMutationIfNeeded()
                     postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                    DataState.Success(response.payload, response.message)
                 }
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (throwable: Throwable) {
+            logSupplierContractDiagnostic("Supplier contract archive failed: ${throwable.message ?: throwable::class.simpleName}")
+            val message = localizedStringResourceMessage(
+                id = 2411,
+                main = "Could not update supplier contract",
+                ru = "Не удалось обновить договор с поставщиком",
+                kk = "Жеткізуші келісімін жаңарту мүмкін болмады"
+            )
+            postInAppNotification(message, NotificationType.Negative)
+            DataState.Empty(message)
         }
+        onCompleted?.invoke(result)
+    }
 }
 
 private fun <T> List<T>.upsertById(
@@ -6253,8 +7084,9 @@ const val CLOUD_TRANSPORT_STATUS_UNAVAILABLE = -1
 internal const val REALTIME_ACCESS_TOKEN_REFRESH_SKEW_MILLIS = 60_000L
 
 private const val DEFAULT_AITA_SERVER_URL = "https://aita-api.bogdan-dond.uk.workers.dev"
-private const val DEFAULT_AITA_FALLBACK_SERVER_URLS = "https://api.aita.kz"
-private const val DEFAULT_AITA_BOOTSTRAP_URLS = "https://aita-api.bogdan-dond.uk.workers.dev/.well-known/aita-server.json,https://bootstrap.aita.kz/.well-known/aita-server.json,https://api.aita.kz/.well-known/aita-server.json"
+private const val CANONICAL_AITA_PUBLIC_SERVER_HOST = "aita-api.bogdan-dond.uk.workers.dev"
+private const val DEFAULT_AITA_FALLBACK_SERVER_URLS = ""
+private const val DEFAULT_AITA_BOOTSTRAP_URLS = ""
 private const val AITA_BOOTSTRAP_SERVER_URL_REFRESH_INTERVAL_MILLIS = 300_000L
 private const val AITA_BOOTSTRAP_SERVER_URL_FAILURE_BACKOFF_MILLIS = 45_000L
 private const val AITA_BOOTSTRAP_SERVER_URL_CACHE_MAX_AGE_MILLIS = 1_209_600_000L
@@ -6283,9 +7115,9 @@ private val lastKnownGoodServerUrlMutex = Mutex()
 @Volatile
 private var currentNetworkRequestCandidateServerUrlsMemory: List<String> = emptyList()
 
-// CommonMain.kt and server/config/app/global.json remain the visible source of truth. Bootstrap and
-// last-known-good memory may select another verified public alias of the same AITA origin, but stale
-// cached/server-published addresses are never allowed to displace the checked-in primary by themselves.
+// CommonMain.kt and server/config/app/global.json remain the visible source of truth. Automatic
+// production discovery is locked to one workers.dev gateway. Every non-canonical public value from
+// old caches, global.json files, bootstrap payloads, or environment variables is discarded before networking.
 @Volatile
 private var clientVisibleServerUrlFilesOnly: Boolean = true
 
@@ -7712,6 +8544,7 @@ fun init() {
         // server URL can overwrite the last working local server URL before the app has a chance
         // to use it, making the client appear to never reach the backend.
         loadCachedApplicationData()
+        startSupplierIdentityFocus()
         startAppCacheCollectors()
         loadTransactionCartUiState()
         initializeLocalBranchNetwork()
@@ -8064,8 +8897,8 @@ fun setAppSizeMode(sizeModeId: Long, syncServer: Boolean = true) {
 
 fun setAppMode(modeId: Int) {
     val safeModeId = normalizeAppModePreference(modeId)
+    appModeState.value = safeModeId
     GlobalScope.launch(Dispatchers.ourIo) {
-        appModeState.emit(safeModeId)
         putLocalKv(KEY_APP_MODE, safeModeId.toString())
     }
 }
@@ -9429,7 +10262,7 @@ internal suspend fun ensureCachedGlobalConfigurationPrimedForNetwork() {
         getJsonCache<GlobalAppConfigurationDataModel>(CACHE_GLOBAL_CONFIG)?.let { cachedConfiguration ->
             val currentConfiguration = globalAppConfigurationState.payloadValue
             val cachedLastKnownGoodServerUrl = cachedLastKnownGoodServerUrlOrNull()
-            val runtimeOverrideNormalized = normalizedHttpServerUrlOrNull(runtimeClientServerUrlOverride)
+            val runtimeOverrideNormalized = normalizedExplicitAitaServerUrlOrNull(runtimeClientServerUrlOverride)
             // Cached global configuration is still useful for paths and resource IDs. Its embedded server
             // URL is not authoritative: only an explicit runtime override, a recently verified alias, or
             // the checked-in visible configuration may anchor this installation.
@@ -9514,18 +10347,23 @@ private fun looksLikeLocalDevelopmentHostWithoutPort(authority: String): Boolean
         else -> cleanAuthority
     }
 
-    if (host.equals("localhost", ignoreCase = true)) return true
-    if (host == "::1") return true
-    if (host == "10.0.2.2") return true
-    if (host == "127.0.0.1") return true
-    if (host.startsWith("192.168.")) return true
-    if (host.startsWith("10.")) return true
+    val normalizedHost = host.lowercase()
+    if (normalizedHost == "localhost") return true
+    if (normalizedHost == "::1") return true
+    if (normalizedHost == "10.0.2.2") return true
+    if (normalizedHost == "127.0.0.1") return true
+    if (normalizedHost.startsWith("192.168.")) return true
+    if (normalizedHost.startsWith("10.")) return true
+    if (':' in normalizedHost && (normalizedHost.startsWith("fc") || normalizedHost.startsWith("fd"))) return true
+    if (normalizedHost.endsWith(".local") || normalizedHost.endsWith(".ts.net")) return true
+    if ('.' !in normalizedHost && ':' !in normalizedHost) return true
 
-    val parts = host.split('.')
+    val parts = normalizedHost.split('.')
     if (parts.size == 4 && parts.all { part -> part.toIntOrNull()?.let { it in 0..255 } == true }) {
         val first = parts[0].toIntOrNull() ?: return false
         val second = parts[1].toIntOrNull() ?: return false
         if (first == 172 && second in 16..31) return true
+        if (first == 100 && second in 64..127) return true
     }
 
     return false
@@ -9588,9 +10426,54 @@ fun normalizedHttpServerUrlOrNull(raw: String?): String? {
     }.getOrNull()
 }
 
-fun normalizedClientServerUrlOverride(raw: String?, currentRaw: String?): String? {
+private fun normalizedServerUrlHostOrNull(normalizedUrl: String): String? = runCatching {
+    Url(normalizedUrl).host.trim().lowercase()
+}.getOrNull()
+
+/**
+ * Automatic production discovery is intentionally locked to the registrar-independent Worker.
+ * Explicit localhost/LAN overrides remain available for development, but every non-canonical
+ * public endpoint is discarded before it can be revived by cached or server-published data.
+ */
+@PublishedApi
+internal fun normalizedAutomaticAitaServerUrlOrNull(raw: String?): String? {
     val normalized = normalizedHttpServerUrlOrNull(raw) ?: return null
-    val currentNormalized = normalizedHttpServerUrlOrNull(currentRaw)
+    return normalized.takeIf {
+        normalizedServerUrlHostOrNull(it) == CANONICAL_AITA_PUBLIC_SERVER_HOST
+    }
+}
+
+private fun isLocalOrPrivateAitaDevelopmentHost(host: String): Boolean {
+    val normalizedHost = host.trim().lowercase()
+    if (normalizedHost.isBlank()) return false
+    if (looksLikeLocalDevelopmentHostWithoutPort(normalizedHost)) return true
+    if (normalizedHost == "::1") return true
+    if (':' in normalizedHost && (normalizedHost.startsWith("fc") || normalizedHost.startsWith("fd"))) return true
+    if (normalizedHost.endsWith(".local") || normalizedHost.endsWith(".ts.net")) return true
+    if ('.' !in normalizedHost && ':' !in normalizedHost) return true
+
+    val ipv4Parts = normalizedHost.split('.')
+    if (ipv4Parts.size == 4 && ipv4Parts.all { part -> part.toIntOrNull()?.let { it in 0..255 } == true }) {
+        val first = ipv4Parts[0].toInt()
+        val second = ipv4Parts[1].toInt()
+        // Tailscale allocates addresses from 100.64.0.0/10.
+        if (first == 100 && second in 64..127) return true
+    }
+    return false
+}
+
+@PublishedApi
+internal fun normalizedExplicitAitaServerUrlOrNull(raw: String?): String? {
+    val normalized = normalizedHttpServerUrlOrNull(raw) ?: return null
+    val host = normalizedServerUrlHostOrNull(normalized) ?: return null
+    return normalized.takeIf {
+        host == CANONICAL_AITA_PUBLIC_SERVER_HOST || isLocalOrPrivateAitaDevelopmentHost(host)
+    }
+}
+
+fun normalizedClientServerUrlOverride(raw: String?, currentRaw: String?): String? {
+    val normalized = normalizedExplicitAitaServerUrlOrNull(raw) ?: return null
+    val currentNormalized = normalizedExplicitAitaServerUrlOrNull(currentRaw)
     return normalized.takeIf { it != currentNormalized }
 }
 
@@ -9633,12 +10516,15 @@ private fun parseClientBootstrapUrls(raw: String?): List<String> = raw
     ?.split(Regex("[,\n\r\t ]+"))
     .orEmpty()
     .mapNotNull(::normalizedHttpAbsoluteUrlOrNull)
+    .filter { bootstrapUrl ->
+        normalizedServerUrlHostOrNull(bootstrapUrl) == CANONICAL_AITA_PUBLIC_SERVER_HOST
+    }
     .distinct()
 
 private fun parseClientServerUrls(raw: String?): List<String> = raw
     ?.split(Regex("[,\n\r\t ]+"))
     .orEmpty()
-    .mapNotNull(::normalizedHttpServerUrlOrNull)
+    .mapNotNull(::normalizedAutomaticAitaServerUrlOrNull)
     .distinct()
 
 private fun configuredClientBootstrapUrls(): List<String> =
@@ -9762,48 +10648,46 @@ private suspend fun cachedBootstrapServerUrlCandidatesOrEmpty(
     }
 
     return (listOf(cache.serverUrl) + cache.serverCandidates)
-        .mapNotNull(::normalizedHttpServerUrlOrNull)
+        .mapNotNull(::normalizedAutomaticAitaServerUrlOrNull)
         .distinct()
 }
 
 private suspend fun cachedLastKnownGoodServerUrlOrNull(
     nowMillis: Long = getCurrentTimeMillis()
-): String? {
-    val memory = lastKnownGoodServerUrlMemory
-    val memoryAgeMillis = nowMillis - lastKnownGoodServerUrlVerifiedAtMillis
-    if (memory != null && lastKnownGoodServerUrlVerifiedAtMillis > 0L &&
-        memoryAgeMillis in 0L..AITA_LAST_KNOWN_GOOD_SERVER_URL_CACHE_MAX_AGE_MILLIS
+): String? = lastKnownGoodServerUrlMutex.withLock {
+    val lockedMemory = lastKnownGoodServerUrlMemory
+    val lockedNormalized = lockedMemory?.let(::normalizedAutomaticAitaServerUrlOrNull)
+    val lockedMemoryAgeMillis = nowMillis - lastKnownGoodServerUrlVerifiedAtMillis
+    if (lockedNormalized != null && lastKnownGoodServerUrlVerifiedAtMillis > 0L &&
+        lockedMemoryAgeMillis in 0L..AITA_LAST_KNOWN_GOOD_SERVER_URL_CACHE_MAX_AGE_MILLIS
     ) {
-        return memory
+        return@withLock lockedNormalized
     }
 
-    return lastKnownGoodServerUrlMutex.withLock {
-        val lockedMemory = lastKnownGoodServerUrlMemory
-        val lockedMemoryAgeMillis = nowMillis - lastKnownGoodServerUrlVerifiedAtMillis
-        if (lockedMemory != null && lastKnownGoodServerUrlVerifiedAtMillis > 0L &&
-            lockedMemoryAgeMillis in 0L..AITA_LAST_KNOWN_GOOD_SERVER_URL_CACHE_MAX_AGE_MILLIS
-        ) {
-            return@withLock lockedMemory
-        }
-
-        val cache = getJsonCache<AitaLastKnownGoodServerUrlCacheDataModel>(CACHE_LAST_KNOWN_GOOD_SERVER_URL)
-        val normalized = cache?.serverUrl?.let(::normalizedHttpServerUrlOrNull)
-        val cacheAgeMillis = nowMillis - (cache?.verifiedAtMillis ?: 0L)
-        if (normalized == null || cache == null || cache.verifiedAtMillis <= 0L ||
-            cacheAgeMillis !in 0L..AITA_LAST_KNOWN_GOOD_SERVER_URL_CACHE_MAX_AGE_MILLIS
-        ) {
-            lastKnownGoodServerUrlMemory = null
-            lastKnownGoodServerUrlVerifiedAtMillis = 0L
-            lastKnownGoodServerUrlPersistedAtMillis = 0L
-            if (cache != null) deleteJsonCache(CACHE_LAST_KNOWN_GOOD_SERVER_URL)
-            return@withLock null
-        }
-
-        lastKnownGoodServerUrlMemory = normalized
-        lastKnownGoodServerUrlVerifiedAtMillis = cache.verifiedAtMillis
-        lastKnownGoodServerUrlPersistedAtMillis = cache.verifiedAtMillis
-        normalized
+    if (lockedMemory != null && lockedNormalized == null) {
+        lastKnownGoodServerUrlMemory = null
+        lastKnownGoodServerUrlVerifiedAtMillis = 0L
+        lastKnownGoodServerUrlPersistedAtMillis = 0L
+        deleteJsonCache(CACHE_LAST_KNOWN_GOOD_SERVER_URL)
     }
+
+    val cache = getJsonCache<AitaLastKnownGoodServerUrlCacheDataModel>(CACHE_LAST_KNOWN_GOOD_SERVER_URL)
+    val normalized = cache?.serverUrl?.let(::normalizedAutomaticAitaServerUrlOrNull)
+    val cacheAgeMillis = nowMillis - (cache?.verifiedAtMillis ?: 0L)
+    if (normalized == null || cache == null || cache.verifiedAtMillis <= 0L ||
+        cacheAgeMillis !in 0L..AITA_LAST_KNOWN_GOOD_SERVER_URL_CACHE_MAX_AGE_MILLIS
+    ) {
+        lastKnownGoodServerUrlMemory = null
+        lastKnownGoodServerUrlVerifiedAtMillis = 0L
+        lastKnownGoodServerUrlPersistedAtMillis = 0L
+        if (cache != null) deleteJsonCache(CACHE_LAST_KNOWN_GOOD_SERVER_URL)
+        return@withLock null
+    }
+
+    lastKnownGoodServerUrlMemory = normalized
+    lastKnownGoodServerUrlVerifiedAtMillis = cache.verifiedAtMillis
+    lastKnownGoodServerUrlPersistedAtMillis = cache.verifiedAtMillis
+    normalized
 }
 
 private suspend fun resolveCurrentServerUrlCandidatesFromBootstrapIfConfigured(
@@ -9858,6 +10742,8 @@ private suspend fun resolveCurrentServerUrlCandidatesFromBootstrapIfConfigured(
                     }
                     val rawBody = response.bodyAsText()
                     val normalizedServerUrls = decodeBootstrapServerUrlCandidates(rawBody)
+                        .mapNotNull(::normalizedAutomaticAitaServerUrlOrNull)
+                        .distinct()
 
                     if (response.status.isSuccess() && normalizedServerUrls.isNotEmpty()) {
                         bootstrapServerUrlCandidatesMemory = normalizedServerUrls
@@ -9893,7 +10779,7 @@ private suspend fun resolveCurrentServerUrlCandidatesFromBootstrapIfConfigured(
 }
 
 fun setRuntimeClientServerUrlOverride(raw: String?) {
-    val normalized = normalizedHttpServerUrlOrNull(raw)
+    val normalized = normalizedExplicitAitaServerUrlOrNull(raw)
     runtimeClientServerUrlOverride = normalized
     if (normalized == null) return
 
@@ -9914,7 +10800,7 @@ fun setHiddenClientServerUrlResolutionEnabled(enabled: Boolean) {
 fun currentRuntimeClientServerUrlOverride(): String? = runtimeClientServerUrlOverride
 
 fun setClientServerUrlFromUserInput(raw: String, refreshNow: Boolean = true): Boolean {
-    val normalized = normalizedHttpServerUrlOrNull(raw)
+    val normalized = normalizedExplicitAitaServerUrlOrNull(raw)
     if (normalized == null) {
         postInAppNotification(
             localizedStringResourceMessage(
@@ -9929,6 +10815,7 @@ fun setClientServerUrlFromUserInput(raw: String, refreshNow: Boolean = true): Bo
         return false
     }
 
+    runtimeClientServerUrlOverride = normalized
     GlobalScope.launch(Dispatchers.ourIo) {
         val currentConfiguration = globalAppConfigurationState.payloadValue
         globalAppConfigurationState.emit(
@@ -9950,8 +10837,8 @@ fun setClientServerUrlFromUserInput(raw: String, refreshNow: Boolean = true): Bo
 
 @PublishedApi
 internal fun currentServerUrlIsDefaultOrBlank(): Boolean {
-    val current = normalizedHttpServerUrlOrNull(globalAppConfigurationState.payloadValue.serverUrl.first)
-    val default = normalizedHttpServerUrlOrNull(DEFAULT_AITA_SERVER_URL)
+    val current = normalizedAutomaticAitaServerUrlOrNull(globalAppConfigurationState.payloadValue.serverUrl.first)
+    val default = normalizedAutomaticAitaServerUrlOrNull(DEFAULT_AITA_SERVER_URL)
     return current == null || current == default
 }
 
@@ -9960,12 +10847,24 @@ internal fun chooseClientServerUrlPair(
     current: Pair<String, String>,
     incoming: Pair<String, String>
 ): Pair<String, String> {
-    val currentNormalized = normalizedHttpServerUrlOrNull(current.first)
-    val incomingNormalized = normalizedHttpServerUrlOrNull(incoming.first) ?: return current
-    return when {
-        currentNormalized == null -> Pair(incomingNormalized, incoming.second)
-        currentNormalized == incomingNormalized -> current
-        else -> current
+    val currentAutomatic = normalizedAutomaticAitaServerUrlOrNull(current.first)
+    val currentExplicit = normalizedExplicitAitaServerUrlOrNull(current.first)
+
+    // A deliberate localhost/LAN/Tailscale override wins over server-published production config.
+    if (currentExplicit != null && currentAutomatic == null) {
+        return Pair(currentExplicit, current.second)
+    }
+
+    val incomingAutomatic = normalizedAutomaticAitaServerUrlOrNull(incoming.first)
+    val canonical = normalizedAutomaticAitaServerUrlOrNull(DEFAULT_AITA_SERVER_URL)
+        ?: error("AITA canonical public server URL is invalid")
+    val selected = incomingAutomatic ?: currentAutomatic ?: canonical
+    val selectedVersion = if (incomingAutomatic != null) incoming.second else current.second
+
+    return if (currentAutomatic == selected && current.first == selected) {
+        current
+    } else {
+        Pair(selected, selectedVersion)
     }
 }
 
@@ -9973,78 +10872,44 @@ internal fun chooseClientServerUrlPair(
 internal suspend fun resolvedServerUrlCandidates(explicitServerUrl: String? = null): List<String> {
     ensureCachedGlobalConfigurationPrimedForNetwork()
 
-    val explicitNormalized = normalizedHttpServerUrlOrNull(explicitServerUrl)
+    val explicitNormalized = normalizedExplicitAitaServerUrlOrNull(explicitServerUrl)
     if (explicitNormalized != null) {
         currentNetworkRequestCandidateServerUrlsMemory = listOf(explicitNormalized)
         return listOf(explicitNormalized)
     }
 
-    val runtimeOverrideNormalized = normalizedHttpServerUrlOrNull(runtimeClientServerUrlOverride)
+    val runtimeOverrideNormalized = normalizedExplicitAitaServerUrlOrNull(runtimeClientServerUrlOverride)
     if (runtimeOverrideNormalized != null) {
         currentNetworkRequestCandidateServerUrlsMemory = listOf(runtimeOverrideNormalized)
         return listOf(runtimeOverrideNormalized)
     }
 
-    val automaticAliasBeforeLookup = lastKnownGoodServerUrlMemory?.let(::normalizedHttpServerUrlOrNull)
-    val lastKnownGood = cachedLastKnownGoodServerUrlOrNull()
-    // A recent proven alias should make normal requests immediate. Discovery is fetched synchronously
-    // only when no working alias is known; if that alias later fails it is removed and the next request
-    // re-enters the full bootstrap chain.
-    val bootstrapCandidates = if (lastKnownGood != null) {
-        bootstrapServerUrlCandidatesMemory.ifEmpty { cachedBootstrapServerUrlCandidatesOrEmpty() }
-    } else {
-        resolveCurrentServerUrlCandidatesFromBootstrapIfConfigured()
-    }
-    val cachedBootstrapCandidates = if (bootstrapCandidates.isEmpty()) {
-        cachedBootstrapServerUrlCandidatesOrEmpty()
-    } else {
-        emptyList()
-    }
-    val defaultNormalized = normalizedHttpServerUrlOrNull(DEFAULT_AITA_SERVER_URL)
-    val fallbackCandidates = configuredClientFallbackServerUrls()
-    val currentConfiguredNormalized = normalizedHttpServerUrlOrNull(globalAppConfigurationState.payloadValue.serverUrl.first)
-    val automaticAdoptedAlias = lastKnownGood ?: automaticAliasBeforeLookup
-    val currentCustomCandidate = currentConfiguredNormalized?.takeIf { current ->
-        current != defaultNormalized && current != automaticAdoptedAlias
-    }
-    val cachedConfiguredNormalized = if (!clientVisibleServerUrlFilesOnly) {
-        runCatching {
-            getJsonCache<GlobalAppConfigurationDataModel>(CACHE_GLOBAL_CONFIG)?.serverUrl?.first
-        }.getOrNull()?.let(::normalizedHttpServerUrlOrNull)
-    } else {
-        null
-    }
-
-    val normalizedCandidates = buildList {
-        // A deliberate in-app server choice must outrank older automatic reachability memory.
-        currentCustomCandidate?.let(::add)
-        lastKnownGood?.let(::add)
-        addAll(bootstrapCandidates)
-        defaultNormalized?.let(::add)
-        currentConfiguredNormalized?.let(::add)
-        addAll(cachedBootstrapCandidates)
-        cachedConfiguredNormalized?.let(::add)
-        addAll(fallbackCandidates)
-        add(DEFAULT_AITA_SERVER_URL)
-    }
-        .mapNotNull(::normalizedHttpServerUrlOrNull)
-        .distinct()
-        .ifEmpty { listOf(DEFAULT_AITA_SERVER_URL) }
+    // Purge retired aliases left by older client versions, then use exactly one automatic endpoint.
+    cachedLastKnownGoodServerUrlOrNull()
+    val canonical = normalizedAutomaticAitaServerUrlOrNull(DEFAULT_AITA_SERVER_URL)
+        ?: error("AITA canonical public server URL is invalid")
+    val normalizedCandidates = listOf(canonical)
 
     val previousCandidates = currentNetworkRequestCandidateServerUrlsMemory
     currentNetworkRequestCandidateServerUrlsMemory = normalizedCandidates
     if (previousCandidates != normalizedCandidates) {
-        logNetworkAttempt("server URL candidates = ${normalizedCandidates.joinToString()}")
+        logNetworkAttempt("server URL = $canonical")
     }
     return normalizedCandidates
 }
 
 @PublishedApi
 internal suspend fun rememberReachableServerUrl(serverUrl: String) {
-    val normalized = normalizedHttpServerUrlOrNull(serverUrl) ?: return
+    val runtimeOverrideNormalized = normalizedExplicitAitaServerUrlOrNull(runtimeClientServerUrlOverride)
+    val candidate = normalizedExplicitAitaServerUrlOrNull(serverUrl) ?: return
+    val normalized = when {
+        runtimeOverrideNormalized != null && candidate == runtimeOverrideNormalized -> candidate
+        runtimeOverrideNormalized == null -> normalizedAutomaticAitaServerUrlOrNull(candidate)
+        else -> null
+    } ?: return
+
     val now = getCurrentTimeMillis()
-    currentNetworkRequestCandidateServerUrlsMemory =
-        (listOf(normalized) + currentNetworkRequestCandidateServerUrlsMemory).distinct()
+    currentNetworkRequestCandidateServerUrlsMemory = listOf(normalized)
 
     lastKnownGoodServerUrlMutex.withLock {
         val shouldPersist = lastKnownGoodServerUrlMemory != normalized ||
@@ -10063,11 +10928,8 @@ internal suspend fun rememberReachableServerUrl(serverUrl: String) {
         }
     }
 
-    val runtimeOverrideNormalized = normalizedHttpServerUrlOrNull(runtimeClientServerUrlOverride)
-    if (runtimeOverrideNormalized != null && runtimeOverrideNormalized != normalized) return
-
     val currentConfiguration = globalAppConfigurationState.payloadValue
-    val currentNormalized = normalizedHttpServerUrlOrNull(currentConfiguration.serverUrl.first)
+    val currentNormalized = normalizedExplicitAitaServerUrlOrNull(currentConfiguration.serverUrl.first)
     if (currentNormalized != normalized) {
         globalAppConfigurationState.emit(
             DataState.Success(
@@ -10080,14 +10942,14 @@ internal suspend fun rememberReachableServerUrl(serverUrl: String) {
 
 @PublishedApi
 internal suspend fun forgetReachableServerUrlCandidate(serverUrl: String) {
-    val normalized = normalizedHttpServerUrlOrNull(serverUrl) ?: return
+    val normalized = normalizedExplicitAitaServerUrlOrNull(serverUrl) ?: return
     currentNetworkRequestCandidateServerUrlsMemory =
         currentNetworkRequestCandidateServerUrlsMemory.filterNot { normalizedHttpServerUrlOrNull(it) == normalized }
 
     var removedRememberedAlias = false
     lastKnownGoodServerUrlMutex.withLock {
         val cached = getJsonCache<AitaLastKnownGoodServerUrlCacheDataModel>(CACHE_LAST_KNOWN_GOOD_SERVER_URL)
-        val cachedNormalized = cached?.serverUrl?.let(::normalizedHttpServerUrlOrNull)
+        val cachedNormalized = cached?.serverUrl?.let(::normalizedAutomaticAitaServerUrlOrNull)
         if (lastKnownGoodServerUrlMemory == normalized || cachedNormalized == normalized) {
             lastKnownGoodServerUrlMemory = null
             lastKnownGoodServerUrlVerifiedAtMillis = 0L
@@ -10097,8 +10959,8 @@ internal suspend fun forgetReachableServerUrlCandidate(serverUrl: String) {
         }
     }
 
-    if (removedRememberedAlias && normalizedHttpServerUrlOrNull(runtimeClientServerUrlOverride) == null) {
-        val defaultNormalized = normalizedHttpServerUrlOrNull(DEFAULT_AITA_SERVER_URL) ?: return
+    if (removedRememberedAlias && normalizedExplicitAitaServerUrlOrNull(runtimeClientServerUrlOverride) == null) {
+        val defaultNormalized = normalizedAutomaticAitaServerUrlOrNull(DEFAULT_AITA_SERVER_URL) ?: return
         val currentConfiguration = globalAppConfigurationState.payloadValue
         if (normalizedHttpServerUrlOrNull(currentConfiguration.serverUrl.first) == normalized && normalized != defaultNormalized) {
             globalAppConfigurationState.emit(
@@ -10261,6 +11123,7 @@ internal fun cloudEndpointRequiresAuthentication(endpointUrl: String): Boolean {
 
     return when {
         endpoint == "auth/session" -> true
+        endpoint.startsWith("auth/security/") -> true
         endpoint.startsWith("auth/") -> false
         endpoint.startsWith("config/") -> false
         endpoint.startsWith("res/") -> false
@@ -12717,7 +13580,7 @@ private suspend fun loadCachedApplicationData() {
     getJsonCache<GlobalAppConfigurationDataModel>(CACHE_GLOBAL_CONFIG)?.let {
         val currentConfiguration = globalAppConfigurationState.payloadValue
         val cachedLastKnownGoodServerUrl = cachedLastKnownGoodServerUrlOrNull()
-        val runtimeOverrideNormalized = normalizedHttpServerUrlOrNull(runtimeClientServerUrlOverride)
+        val runtimeOverrideNormalized = normalizedExplicitAitaServerUrlOrNull(runtimeClientServerUrlOverride)
         val anchoredServerUrl = when {
             runtimeOverrideNormalized != null -> Pair(runtimeOverrideNormalized, currentConfiguration.serverUrl.second)
             cachedLastKnownGoodServerUrl != null -> Pair(cachedLastKnownGoodServerUrl, currentConfiguration.serverUrl.second)
@@ -12801,19 +13664,14 @@ private fun startAppCacheCollectors() {
             if (clientVisibleServerUrlFilesOnly) {
                 putJsonCache(CACHE_GLOBAL_CONFIG, nextConfiguration)
             } else {
-                val existingCached = getJsonCache<GlobalAppConfigurationDataModel>(CACHE_GLOBAL_CONFIG)
-                val runtimeOverrideNormalized = normalizedHttpServerUrlOrNull(runtimeClientServerUrlOverride)
-                val nextNormalized = normalizedHttpServerUrlOrNull(nextConfiguration.serverUrl.first)
-                val defaultNormalized = normalizedHttpServerUrlOrNull(DEFAULT_AITA_SERVER_URL)
-                val existingNonDefault = existingCached?.serverUrl?.takeIf { cachedPair ->
-                    val cachedNormalized = normalizedHttpServerUrlOrNull(cachedPair.first)
-                    cachedNormalized != null && cachedNormalized != defaultNormalized
-                }
-                val serverUrlForCache = when {
-                    runtimeOverrideNormalized != null -> Pair(runtimeOverrideNormalized, nextConfiguration.serverUrl.second)
-                    existingNonDefault != null && (nextNormalized == null || nextNormalized == defaultNormalized) -> existingNonDefault
-                    else -> nextConfiguration.serverUrl
-                }
+                val runtimeOverrideNormalized = normalizedExplicitAitaServerUrlOrNull(runtimeClientServerUrlOverride)
+                val canonicalNormalized = normalizedAutomaticAitaServerUrlOrNull(nextConfiguration.serverUrl.first)
+                    ?: normalizedAutomaticAitaServerUrlOrNull(DEFAULT_AITA_SERVER_URL)
+                    ?: error("AITA canonical public server URL is invalid")
+                val serverUrlForCache = Pair(
+                    runtimeOverrideNormalized ?: canonicalNormalized,
+                    nextConfiguration.serverUrl.second
+                )
                 putJsonCache(CACHE_GLOBAL_CONFIG, nextConfiguration.copy(serverUrl = serverUrlForCache))
             }
         }
@@ -12930,6 +13788,48 @@ private fun cleanRealtimeReason(reason: String?): String = reason
     ?.lowercase()
     ?: "unknown"
 
+private fun String.isSupplierRealtimeEntity(): Boolean =
+    this == "suppliers" ||
+            startsWith("suppliers/") ||
+            this == "supplierorders" ||
+            startsWith("supplierorders/") ||
+            this == "suppliergoodsprices" ||
+            startsWith("suppliergoodsprices/") ||
+            this == "suppliercontracts" ||
+            startsWith("suppliercontracts/")
+
+private fun String.isSupplierProfileRealtimeEntity(): Boolean =
+    this == "suppliers" ||
+            this == "suppliers/add" ||
+            this == "suppliers/update" ||
+            this == "suppliers/delete" ||
+            startsWith("suppliers/profiles")
+
+internal fun supplierRealtimeEntityChangesProfiles(entity: String?): Boolean =
+    cleanRealtimeEntity(entity).isSupplierProfileRealtimeEntity()
+
+internal fun realtimeUpdateIsRelevantToCurrentContext(
+    entity: String?,
+    updateStoreId: String?,
+    activeStoreId: String?,
+    appMode: Int
+): Boolean {
+    val cleanUpdateStoreId = updateStoreId.orEmpty().trim()
+    if (cleanUpdateStoreId.isBlank()) return true
+
+    val cleanEntity = cleanRealtimeEntity(entity)
+    if (
+        cleanEntity.isSupplierRealtimeEntity() &&
+        (appMode == APP_MODE_SUPPLIER || appMode == APP_MODE_MANUFACTURER)
+    ) {
+        // A Supplier workspace spans several partner Stores, so its Store-specific commercial
+        // events remain relevant even when no Store is selected as the Store-mode workspace.
+        return true
+    }
+
+    return activeStoreId.orEmpty().trim().equals(cleanUpdateStoreId, ignoreCase = true)
+}
+
 private fun rememberRealtimeUpdateIdLocked(updateId: String?): Boolean {
     val cleanId = updateId?.trim()?.takeIf { it.isNotBlank() } ?: return true
     if (cleanId in realtimeRecentUpdateIdSet) return false
@@ -12970,6 +13870,14 @@ private fun refreshEverythingFromServerAfterRealtimeUpdate() {
     getMyWorkerRequests()
     getUserFinanceDashboard()
     getSubscriptionPlans()
+    if (appModeState.value == APP_MODE_SUPPLIER || appModeState.value == APP_MODE_MANUFACTURER) {
+        val focusedSupplierId = effectiveActiveSupplierProfileId()
+        if (focusedSupplierId.isNullOrBlank()) getMySupplierSideOrders()
+        else getSupplierOrdersForSupplier(focusedSupplierId)
+        getMySupplierGoodsPrices(focusedSupplierId)
+        getSupplierContracts(supplierId = focusedSupplierId)
+        getSupplierModeDashboard(supplierId = focusedSupplierId)
+    }
 
     activeStoreIdState.value?.let { storeId ->
         getStock(storeId)
@@ -13001,7 +13909,44 @@ private fun refreshRealtimeEntitiesFromServer(entities: Set<String>) {
     if (anyEntityMatches("config")) getGlobalAppConfiguration(loadAll = false)
     if (anyEntityMatches("user", "auth")) getUser(forceLogOut = false)
     if (anyEntityMatches("stores")) getStores()
-    if (anyEntityMatches("suppliers", "suppliergoodsprices")) getSuppliers()
+
+    // Profile mutations and dashboard invalidations share the `suppliers/...` namespace, but they
+    // are different resources. A dashboard-only event must not trigger an unnecessary supplier-list
+    // GET. Profile edits only reload identities; commercial dashboard data is unchanged by a name or
+    // contact edit, while add/delete focus changes are reconciled by SupplierIdentityFocus when needed.
+    val supplierProfilesChanged = cleanEntities.any(::supplierRealtimeEntityChangesProfiles)
+    if (supplierProfilesChanged) getSuppliers()
+
+    val supplierOrdersChanged = anyEntityMatches("supplierorders")
+    val supplierPricesChanged = anyEntityMatches("suppliergoodsprices")
+    val supplierContractsChanged = anyEntityMatches("suppliercontracts")
+    val supplierDashboardChanged = anyEntityMatches("suppliers/dashboard")
+    val supplierModeActive = appModeState.value == APP_MODE_SUPPLIER ||
+            appModeState.value == APP_MODE_MANUFACTURER
+
+    if (supplierModeActive) {
+        val focusedSupplierId = effectiveActiveSupplierProfileId()
+        if (supplierOrdersChanged) {
+            if (focusedSupplierId.isNullOrBlank()) getMySupplierSideOrders()
+            else getSupplierOrdersForSupplier(focusedSupplierId)
+        }
+        if (supplierPricesChanged) getMySupplierGoodsPrices(focusedSupplierId)
+        if (supplierContractsChanged) getSupplierContracts(supplierId = focusedSupplierId)
+        if (
+            supplierOrdersChanged ||
+            supplierPricesChanged ||
+            supplierContractsChanged ||
+            supplierDashboardChanged
+        ) {
+            getSupplierModeDashboard(supplierId = focusedSupplierId)
+        }
+    } else {
+        activeStoreId?.let { storeId ->
+            if (supplierOrdersChanged) getSupplierOrders(storeId)
+            if (supplierPricesChanged) getSupplierGoodsPrices(storeId)
+            if (supplierContractsChanged) getSupplierContracts(storeId = storeId)
+        }
+    }
     if (anyEntityMatches("generic")) {
         getGenericGoodsCategories()
         refreshGenericGoodsItems(limit = 200)
@@ -13352,7 +14297,16 @@ fun startRealtimeUpdates() {
                                 val update = runCatching {
                                     jsonBase.decodeFromString<RealtimeUpdateDataModel>(text)
                                 }.getOrNull()
-                                if (update != null && update.type != "connected") {
+                                if (
+                                    update != null &&
+                                    update.type != "connected" &&
+                                    realtimeUpdateIsRelevantToCurrentContext(
+                                        entity = update.entity,
+                                        updateStoreId = update.storeId,
+                                        activeStoreId = activeStoreIdState.value,
+                                        appMode = appModeState.value
+                                    )
+                                ) {
                                     scheduleRealtimeRefresh(
                                         reason = update.reason ?: update.entity,
                                         entity = update.entity,
@@ -15456,6 +16410,7 @@ fun logOutUser() {
         }
 
         try {
+            invalidateSupplierNetworkSessionScope()
             val tokenSnapshot = getStoredUserAuthTokens?.invoke()
             val refreshToken = tokenSnapshot?.refreshToken
             val activeWorkshiftBeforeLogout = activeWorkshiftState.payloadValue
@@ -15513,6 +16468,23 @@ fun logOutUser() {
             stockState.emit(DataState.Empty())
             stockBatchesState.emit(DataState.Empty())
             transactionsState.emit(DataState.Empty())
+            suppliersState.emit(DataState.Empty())
+            supplierGoodsPricesState.emit(DataState.Empty())
+            supplierOrdersState.emit(DataState.Empty())
+            supplierOrderLinesState.emit(DataState.Empty())
+            supplierPartnershipContractsState.emit(DataState.Empty())
+            supplierModeDashboardState.emit(DataState.Empty())
+            clearSupplierIdentityFocusForLogout()
+            supplierDashboardCacheMutex.withLock {
+                supplierDashboardCacheByScope.clear()
+                supplierDashboardLastSuccessAtMillisByScope.clear()
+                supplierDashboardVisibleScopeKey = ""
+            }
+            supplierWorkspaceRefreshScheduleMutex.withLock {
+                supplierWorkspaceRefreshScopeKey = ""
+                supplierWorkspaceLastBaseRefreshAtMillis = 0L
+                supplierWorkspaceLastContractsRefreshAtMillis = 0L
+            }
             securitySessionsState.emit(DataState.Empty())
             securitySessionHistoryState.emit(DataState.Empty())
             activeWorkshiftState.emit(DataState.Empty())
@@ -15753,6 +16725,7 @@ fun forceLogOutUser(
     postMessage: Boolean = false
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
+        invalidateSupplierNetworkSessionScope()
         stopRealtimeUpdates()
         setStoredUserAuthTokens?.invoke(null)
         clearCloudAuthRequestMemory(null)
@@ -15769,6 +16742,23 @@ fun forceLogOutUser(
         stockItemBranchAvailabilityState.emit(DataState.Empty())
         stockBatchMoveResultState.emit(DataState.Empty())
         transactionsState.emit(DataState.Empty())
+        suppliersState.emit(DataState.Empty())
+        supplierGoodsPricesState.emit(DataState.Empty())
+        supplierOrdersState.emit(DataState.Empty())
+        supplierOrderLinesState.emit(DataState.Empty())
+        supplierPartnershipContractsState.emit(DataState.Empty())
+        supplierModeDashboardState.emit(DataState.Empty())
+        clearSupplierIdentityFocusForLogout()
+        supplierDashboardCacheMutex.withLock {
+            supplierDashboardCacheByScope.clear()
+            supplierDashboardLastSuccessAtMillisByScope.clear()
+            supplierDashboardVisibleScopeKey = ""
+        }
+        supplierWorkspaceRefreshScheduleMutex.withLock {
+            supplierWorkspaceRefreshScopeKey = ""
+            supplierWorkspaceLastBaseRefreshAtMillis = 0L
+            supplierWorkspaceLastContractsRefreshAtMillis = 0L
+        }
         debtorsState.emit(DataState.Empty())
         securitySessionsState.emit(DataState.Empty())
         securitySessionHistoryState.emit(DataState.Empty())
@@ -16536,25 +17526,38 @@ fun setActiveStoreId(
 
 val suppliersState = MutableDataStateFlow<List<SupplierDataModel>>(GlobalScope)
 
-private val getSuppliersMutex = Mutex()
-private val addSupplierMutex = Mutex()
-private val updateSupplierMutex = Mutex()
-private val deleteSupplierMutex = Mutex()
+private val supplierProfilesReadCoordinator =
+    SingleFlightRequestCoordinator<String, DataState<List<SupplierDataModel>>>()
+private val supplierProfileOperationMutex = Mutex()
 
 fun getSuppliers() {
-    if (!getSuppliersMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
-            getSuppliersMutex.withLock {
+    val requestUserScope = currentSupplierNetworkUserScope()
+    if (requestUserScope.isBlank()) return
+
+    GlobalScope.launch(Dispatchers.ourIo) {
+        supplierProfilesReadCoordinator.run(requestUserScope) {
+            supplierProfileOperationMutex.withLock {
+                if (!supplierNetworkUserScopeIsCurrent(requestUserScope)) return@withLock DataState.Empty()
                 val response = networkRequest<List<SupplierDataModel>, Unit>(
                     HttpMethod.Get,
                     endpointUrl = globalAppConfigurationState.payloadValue.getSuppliersPath.first
                 )
 
-                if (!response.negative) {
-                    suppliersState.emit(DataState.Success(response.payload!!, response.message))
+                if (!supplierNetworkUserScopeIsCurrent(requestUserScope)) {
+                    DataState.Empty()
+                } else if (response.negative || response.payload == null) {
+                    DataState.Empty(response.message)
+                } else {
+                    DataState.Success(response.payload, response.message).also {
+                        suppliersState.emit(it)
+                        // Keep the operation lock until the exact authoritative payload is visible.
+                        // A queued mutation can then build on this state instead of racing an older GET.
+                        suppliersState.payload.first { current -> current == response.payload }
+                    }
                 }
             }
         }
+    }
 }
 
 
@@ -16562,74 +17565,99 @@ fun addSupplier(
     supplier: SupplierDataModel,
     onCompleted: ((DataState<SupplierDataModel>) -> Unit)? = null
 ) {
-    GlobalScope.launch(Dispatchers.ourIo) {
-            addSupplierMutex.withLock {
-                val response = networkRequest<SupplierDataModel, SupplierDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.addSupplierPath.first,
-                    body = supplier
-                )
+    val requestUserScope = currentSupplierNetworkUserScope()
+    if (requestUserScope.isBlank()) return
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    val supplier = response.payload!!
-                    suppliersState.emit(DataState.Success(suppliersState.payloadValue.orEmpty().upsertById(supplier), response.message))
-                    refreshSupplierModeWorkspaceIfActive(includeContracts = true)
-                    onCompleted?.invoke(DataState.Success(supplier, response.message))
-                }
+    GlobalScope.launch(Dispatchers.ourIo) {
+        supplierProfileOperationMutex.withLock {
+            if (!supplierNetworkUserScopeIsCurrent(requestUserScope)) return@withLock
+            val response = networkRequest<SupplierDataModel, SupplierDataModel>(
+                method = HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.addSupplierPath.first,
+                body = supplier
+            )
+            if (!supplierNetworkUserScopeIsCurrent(requestUserScope)) return@withLock
+
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                val savedSupplier = response.payload!!
+                suppliersState.emit(DataState.Success(suppliersState.payloadValue.orEmpty().upsertById(savedSupplier), response.message))
+                // Profile mutations already publish the authoritative profile locally. A first-profile
+                // focus change is reconciled by SupplierIdentityFocus and owns the one scoped workspace
+                // refresh; editing another identity does not need to reload orders/prices/contracts.
+                onCompleted?.invoke(DataState.Success(savedSupplier, response.message))
             }
         }
+    }
 }
 
 fun updateSupplier(
     supplier: SupplierDataModel,
     onCompleted: ((DataState<SupplierDataModel>) -> Unit)? = null
 ) {
-    GlobalScope.launch(Dispatchers.ourIo) {
-            updateSupplierMutex.withLock {
-                val response = networkRequest<SupplierDataModel, SupplierDataModel>(
-                    method = HttpMethod.Put,
-                    endpointUrl = globalAppConfigurationState.payloadValue.updateSupplierPath.first,
-                    body = supplier
-                )
+    val requestUserScope = currentSupplierNetworkUserScope()
+    if (requestUserScope.isBlank()) return
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    val supplier = response.payload!!
-                    suppliersState.emit(DataState.Success(suppliersState.payloadValue.orEmpty().upsertById(supplier), response.message))
-                    refreshSupplierModeWorkspaceIfActive(includeContracts = true)
-                    onCompleted?.invoke(DataState.Success(supplier, response.message))
-                }
+    GlobalScope.launch(Dispatchers.ourIo) {
+        supplierProfileOperationMutex.withLock {
+            if (!supplierNetworkUserScopeIsCurrent(requestUserScope)) return@withLock
+            val response = networkRequest<SupplierDataModel, SupplierDataModel>(
+                method = HttpMethod.Put,
+                endpointUrl = globalAppConfigurationState.payloadValue.updateSupplierPath.first,
+                body = supplier
+            )
+            if (!supplierNetworkUserScopeIsCurrent(requestUserScope)) return@withLock
+
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                val savedSupplier = response.payload!!
+                suppliersState.emit(DataState.Success(suppliersState.payloadValue.orEmpty().upsertById(savedSupplier), response.message))
+                // Profile mutations already publish the authoritative profile locally. A first-profile
+                // focus change is reconciled by SupplierIdentityFocus and owns the one scoped workspace
+                // refresh; editing another identity does not need to reload orders/prices/contracts.
+                onCompleted?.invoke(DataState.Success(savedSupplier, response.message))
             }
         }
+    }
 }
 
 fun deleteSupplier(
     supplierId: String,
     onCompleted: ((DataState<String>) -> Unit)? = null
 ) {
-    GlobalScope.launch(Dispatchers.ourIo) {
-            deleteSupplierMutex.withLock {
-                val response = networkRequest<String, String>(
-                    method = HttpMethod.Delete,
-                    endpointUrl = globalAppConfigurationState.payloadValue.deleteSupplierPath.first,
-                    body = supplierId
-                )
+    val requestUserScope = currentSupplierNetworkUserScope()
+    if (requestUserScope.isBlank()) return
 
-                if (response.negative) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    suppliersState.emit(DataState.Success(suppliersState.payloadValue.orEmpty().filterNot { it.id == supplierId }, response.message))
-                    refreshSupplierModeWorkspaceIfActive(includeContracts = true)
-                    onCompleted?.invoke(DataState.Success(supplierId, response.message))
-                }
+    GlobalScope.launch(Dispatchers.ourIo) {
+        supplierProfileOperationMutex.withLock {
+            if (!supplierNetworkUserScopeIsCurrent(requestUserScope)) return@withLock
+            val response = networkRequest<String, String>(
+                method = HttpMethod.Delete,
+                endpointUrl = globalAppConfigurationState.payloadValue.deleteSupplierPath.first,
+                body = supplierId
+            )
+            if (!supplierNetworkUserScopeIsCurrent(requestUserScope)) return@withLock
+
+            if (response.negative) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                suppliersState.emit(
+                    DataState.Success(
+                        suppliersState.payloadValue.orEmpty().filterNot { it.id.equals(supplierId, ignoreCase = true) },
+                        response.message
+                    )
+                )
+                // Deletion is restricted server-side to an unused identity. If the deleted profile was
+                // focused, SupplierIdentityFocus reconciles the selection and performs one scoped refresh.
+                onCompleted?.invoke(DataState.Success(supplierId, response.message))
             }
         }
+    }
 }
 
 fun getGenericGoodsItems(
@@ -18868,6 +19896,7 @@ data class RealtimeUpdateDataModel(
     val type: String = "changed",
     val entity: String = "all",
     val storeId: String? = null,
+    val userId: String? = null,
     val reason: String? = null,
     val createdAtMillis: Long = 0L
 )
@@ -19037,19 +20066,33 @@ abstract class StateHost {
     val state = _state.asStateFlow()
 
     suspend fun setState(pair: Pair<String, String>) {
-        _state.emit(
-            _state.value.toMutableMap().apply {
+        _state.update { current ->
+            current.toMutableMap().apply {
                 this[pair.first] = pair.second
             }
-        )
+        }
+    }
+
+    /**
+     * Applies related navigation values in one StateFlow emission. Screens that both persist and
+     * adopt navigation state must never observe a half-written search/filter/sort combination.
+     * MutableStateFlow.update also prevents a simultaneous unrelated state write from being lost.
+     */
+    suspend fun setStates(vararg pairs: Pair<String, String>) {
+        if (pairs.isEmpty()) return
+        _state.update { current ->
+            current.toMutableMap().apply {
+                pairs.forEach { (key, value) -> this[key] = value }
+            }
+        }
     }
 
     suspend fun removeState(key: String) {
-        _state.emit(
-            _state.value.toMutableMap().apply {
+        _state.update { current ->
+            current.toMutableMap().apply {
                 remove(key)
             }
-        )
+        }
     }
 }
 

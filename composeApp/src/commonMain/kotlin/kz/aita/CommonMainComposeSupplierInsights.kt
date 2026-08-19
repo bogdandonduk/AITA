@@ -1691,9 +1691,20 @@ internal fun AppConfiguration.SupplierInsightsScreen() {
     val lines by supplierOrderLinesState.payload.collectAsState()
     val contracts by supplierPartnershipContractsState.payload.collectAsState()
     val supplierDashboard by supplierModeDashboardState.payload.collectAsState()
+    val activeSupplierProfileId by activeSupplierProfileIdState.collectAsState()
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var backorderWaveFilter by rememberSaveable { mutableStateOf("all") }
     val coroutineScope = rememberCoroutineScope()
+
+    val localProfiles = stateValues.suppliers.orEmpty()
+        .supplierProfilesOwnedBy(stateValues.userAccount?.id)
+    val focusedSupplierId = resolveSupplierProfileFocus(activeSupplierProfileId, localProfiles)
+    val identityPresentation = buildSupplierIdentityPresentation(
+        localProfiles = localProfiles,
+        dashboard = supplierDashboard,
+        activeSupplierId = focusedSupplierId,
+        localProfilesLoaded = stateValues.suppliers != null
+    )
 
     LaunchedEffect(stateValues.userAccount?.id) {
         if (stateValues.userAccount != null) {
@@ -1701,12 +1712,25 @@ internal fun AppConfiguration.SupplierInsightsScreen() {
         }
     }
 
-    val activeOrders = remember(orders) { orders.orEmpty().filter { it.isActive && it.status != SupplierOrderStatusDataModel.Draft } }
+    LaunchedEffect(focusedSupplierId) {
+        searchQuery = ""
+        backorderWaveFilter = "all"
+    }
+
+    val activeOrders = remember(orders, focusedSupplierId) {
+        orders.orEmpty()
+            .supplierOrdersForIdentity(focusedSupplierId)
+            .filter { it.isActive && it.status != SupplierOrderStatusDataModel.Draft }
+    }
     val activeLines = remember(lines, activeOrders) {
         val activeOrderIds = activeOrders.map { it.id }.toSet()
         lines.orEmpty().filter { line -> line.isActive && line.orderId in activeOrderIds }
     }
-    val activeContracts = remember(contracts) { contracts.orEmpty().filter { it.isActive } }
+    val activeContracts = remember(contracts, focusedSupplierId) {
+        contracts.orEmpty()
+            .supplierContractsForIdentity(focusedSupplierId)
+            .filter { it.isActive }
+    }
     val radarItems = remember(activeOrders, activeLines, stateValues.appLanguage) {
         buildSupplierDemandRadarItems(activeOrders, activeLines)
     }
@@ -1744,12 +1768,21 @@ internal fun AppConfiguration.SupplierInsightsScreen() {
             waveMatches && (normalizedSearch.isBlank() || supplierBackorderSearchKey(item).contains(normalizedSearch))
         }
     }
-    val openOrdersCount = supplierDashboard?.openOrderCount ?: activeOrders.count { !it.status.isSupplierOrderClosed() }
-    val attentionCount = supplierDashboard?.actionRequiredOrderCount ?: activeOrders.count { it.status == SupplierOrderStatusDataModel.Sent || it.status == SupplierOrderStatusDataModel.SeenBySupplier || it.status == SupplierOrderStatusDataModel.IssueReported }
+    val activeLinesByOrder = remember(activeLines) { activeLines.groupBy { it.orderId } }
+    val openOrdersCount = supplierDashboard?.openOrderCount ?: activeOrders.count {
+        !it.status.isClosedForSupplierDesk()
+    }
+    val attentionCount = supplierDashboard?.actionRequiredOrderCount ?: activeOrders.count { order ->
+        order.needsSupplierActionForSupplierDesk(activeLinesByOrder[order.id].orEmpty())
+    }
     val pendingContractCount = supplierDashboard?.pendingContractCount ?: activeContracts.count { it.status == SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER || it.status == SUPPLIER_CONTRACT_STATUS_PENDING_STORE }
     val activeContractCount = supplierDashboard?.activeContractCount ?: activeContracts.count { it.status == SUPPLIER_CONTRACT_STATUS_ACTIVE }
     val guardedOpenOrdersCount = termsGuardItems.sumOf { it.affectedOpenOrders }
-    val supplierProfileCount = supplierDashboard?.supplierIds?.size ?: 0
+    val supplierProfileCount = if (focusedSupplierId.isNullOrBlank()) {
+        identityPresentation.profileCount
+    } else {
+        identityPresentation.profileCount.coerceAtMost(1)
+    }
     val manufacturerBridgeCount = manufacturerBridgeItems.size
     val manufacturerBridgePriority = manufacturerBridgeItems.maxOfOrNull { it.priorityScore } ?: 0
     val backorderWatchCount = backorderWatchItems.size
@@ -1776,6 +1809,44 @@ internal fun AppConfiguration.SupplierInsightsScreen() {
             verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
             contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
         ) {
+            if (identityPresentation.profileCount == 0) {
+                item(key = "supplier-insights-profile-empty") {
+                    SupplierProfileIdentityCard(
+                        dashboard = supplierDashboard,
+                        compact = true,
+                        includeContractsOnRefresh = true
+                    )
+                }
+            } else {
+                item(key = "supplier-insights-identity") {
+                    SupplierOrdersWorkspaceHeader(
+                        profileTitle = identityPresentation.title,
+                        profileSubtitle = identityPresentation.subtitle,
+                        onCreateProfile = {
+                            coroutineScope.launch {
+                                openSupplierProfileEditor(NavigationScreenModel.Supplier.Analytics.Main.route)
+                            }
+                        },
+                        onRefresh = {
+                            refreshSupplierModeWorkspace(includeContracts = true, force = true)
+                        },
+                        identityPresentation = identityPresentation,
+                        onIdentitySelected = { supplierId ->
+                            searchQuery = ""
+                            backorderWaveFilter = "all"
+                            coroutineScope.launch {
+                                setActiveSupplierProfileId(supplierId)
+                                postInAppNotification(
+                                    localizedStringResource(2489, "Supplier identity changed"),
+                                    NotificationType.Positive,
+                                    transient = true
+                                )
+                            }
+                        }
+                    )
+                }
+            }
+
             item {
                 Column(
                     modifier = Modifier
@@ -1911,7 +1982,7 @@ internal fun AppConfiguration.SupplierInsightsScreen() {
                     SimpleTextInput(
                         modifier = Modifier.fillMaxWidth(),
                         value = searchQuery,
-                        placeholder = localizedStringResource(216, "Search"),
+                        placeholder = stateValues.stringSearchByAnyData,
                         leadingIconPath = stateValues.drawablePathIconSearch,
                         onValueChange = { searchQuery = it }
                     )
@@ -1940,11 +2011,16 @@ internal fun AppConfiguration.SupplierInsightsScreen() {
                             )
                             actionButton(
                                 modifier = Modifier.fillMaxWidth(),
-                                text = localizedStringResource(1550, "Open partner CRM"),
+                                text = localizedStringResource(1453, "Partner stores"),
                                 iconPath = stateValues.drawablePathIconSupplierPartners,
                                 iconRes = stateValues.drawableResIconSupplierPartners.value,
                                 confirmationRequired = false,
-                                onClick = { coroutineScope.launch { Navigation.goMain(NavigationScreenModel.Supplier.Customers.Main) } }
+                                onClick = {
+                                    coroutineScope.launch {
+                                        seedSupplierCustomersNavigation(searchQuery = searchQuery)
+                                        Navigation.goMain(NavigationScreenModel.Supplier.Customers.Main)
+                                    }
+                                }
                             )
                         }
                     } else {
@@ -1975,11 +2051,16 @@ internal fun AppConfiguration.SupplierInsightsScreen() {
                             )
                             actionButton(
                                 modifier = Modifier.weight(1f),
-                                text = localizedStringResource(1550, "Open partner CRM"),
+                                text = localizedStringResource(1453, "Partner stores"),
                                 iconPath = stateValues.drawablePathIconSupplierPartners,
                                 iconRes = stateValues.drawableResIconSupplierPartners.value,
                                 confirmationRequired = false,
-                                onClick = { coroutineScope.launch { Navigation.goMain(NavigationScreenModel.Supplier.Customers.Main) } }
+                                onClick = {
+                                    coroutineScope.launch {
+                                        seedSupplierCustomersNavigation(searchQuery = searchQuery)
+                                        Navigation.goMain(NavigationScreenModel.Supplier.Customers.Main)
+                                    }
+                                }
                             )
                         }
                     }
@@ -2189,6 +2270,7 @@ internal fun AppConfiguration.SupplierScreen() {
         is NavigationScreenModel.Supplier.Dispatch -> SupplierDispatchScreen()
         is NavigationScreenModel.Supplier.Customers -> SupplierCustomersScreen()
         is NavigationScreenModel.Supplier.Analytics -> SupplierInsightsScreen()
+        is NavigationScreenModel.Supplier.Identity -> SupplierProfilesScreen()
         else -> SupplierOrdersInboxScreen()
     }
 }
@@ -2576,4 +2658,3 @@ internal fun AppConfiguration.StockAddEditOrdersTab(
         goodsItem = goodsItem
     )
 }
-

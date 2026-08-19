@@ -1,4 +1,5 @@
 // THIS IS build.gradle of composeApp module
+import com.android.build.api.dsl.ApplicationExtension
 import org.gradle.api.tasks.Delete
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
@@ -8,39 +9,51 @@ import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
-    alias(libs.plugins.androidApplication)
+    alias(libs.plugins.androidApplication) apply false
     alias(libs.plugins.kotlinSerialization)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
-    alias(libs.plugins.hilt)
-    alias(libs.plugins.ksp)
+    alias(libs.plugins.hilt) apply false
+    alias(libs.plugins.ksp) apply false
 }
 
-java {
-    toolchain { languageVersion.set(JavaLanguageVersion.of(21)) }
+val aitaWebOnlyBuild = providers.gradleProperty("aita.webOnly")
+    .map { value -> value.equals("true", ignoreCase = true) }
+    .orElse(false)
+    .get()
+
+if (!aitaWebOnlyBuild) {
+    pluginManager.apply("com.android.application")
+    pluginManager.apply("com.google.dagger.hilt.android")
+    pluginManager.apply("com.google.devtools.ksp")
 }
 
 kotlin {
-    androidTarget {
-        @OptIn(ExperimentalKotlinGradlePluginApi::class)
-        compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_11)
-        }
+    if (!aitaWebOnlyBuild) {
+        jvmToolchain(21)
     }
-
-    listOf(
-        iosX64(),
-        iosArm64(),
-        iosSimulatorArm64()
-    ).forEach { iosTarget ->
-        iosTarget.binaries.framework {
-            baseName = "ComposeApp"
-            isStatic = true
-            linkerOpts.addAll(listOf("-framework", "AVFoundation", "-framework", "Speech"))
+    if (!aitaWebOnlyBuild) {
+        androidTarget {
+            @OptIn(ExperimentalKotlinGradlePluginApi::class)
+            compilerOptions {
+                jvmTarget.set(JvmTarget.JVM_11)
+            }
         }
-    }
 
-    jvm()
+        listOf(
+            iosX64(),
+            iosArm64(),
+            iosSimulatorArm64()
+        ).forEach { iosTarget ->
+            iosTarget.binaries.framework {
+                baseName = "ComposeApp"
+                isStatic = true
+                linkerOpts.addAll(listOf("-framework", "AVFoundation", "-framework", "Speech"))
+            }
+        }
+
+        jvm()
+    }
 
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
@@ -52,7 +65,6 @@ kotlin {
                 outputFileName = "composeApp.js"
                 devServer = (devServer ?: KotlinWebpackConfig.DevServer()).apply {
                     static = (static ?: mutableListOf()).apply {
-                        // Serve sources to debug inside browser
                         add(rootDirPath)
                         add(projectDirPath)
                     }
@@ -63,46 +75,15 @@ kotlin {
     }
 
     sourceSets {
-        androidMain.dependencies {
-            implementation(libs.androidx.datastore.preferences)
-
-            implementation(libs.sqlDelightAndroidDriver)
-
-            implementation(libs.androidx.core.ktx)
-
-            implementation(libs.hilt.android)
-
-            implementation(libs.kamel.fetcher.resources.android)
-            implementation(compose.preview)
-            implementation(libs.androidx.activity.compose)
-            implementation(libs.androidx.camera.core)
-            implementation(libs.androidx.camera.camera2)
-            implementation(libs.androidx.camera.lifecycle)
-            implementation(libs.androidx.camera.view)
-            implementation(libs.mlkit.barcode.scanning)
-        }
         commonMain.dependencies {
             implementation(libs.kotlinx.datetime)
-
             implementation(libs.kotlinx.serialization.json)
-//            implementation(libs.kamel.image.default)
-
             implementation(libs.kamel.image)
             implementation("io.ktor:ktor-client-core:${property("ktor.version")}")
             implementation("io.ktor:ktor-http:${property("ktor.version")}")
-//            implementation(libs.kamel.fetcher.ktor)
-            // Note: When using `kamel-image` a ktor engine is not included.
-            // To fetch remote images you also must ensure you add your own
-            // ktor engine for each target.
-
-            // optional modules (choose what you need and add them to your kamel config)
             implementation(libs.kamel.decoder.image.bitmap)
-//            implementation(libs.kamel.decoder.image.bitmap.resizing) // android only right now
             implementation(libs.kamel.decoder.image.vector)
-//            implementation(libs.kamel.decoder.svg.batik)
             implementation(libs.kamel.decoder.svg.std)
-//            implementation(libs.kamel.decoder.animated.image) // .gif support
-
             implementation(compose.runtime)
             implementation(compose.foundation)
             implementation(compose.material3)
@@ -111,64 +92,80 @@ kotlin {
             implementation(compose.components.uiToolingPreview)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
-
             implementation(projects.shared)
-
         }
+
         commonTest.dependencies {
             implementation(libs.kotlin.test)
         }
-        iosMain.dependencies {
-            implementation(libs.kamel.fetcher.ktor)
-        }
+
         wasmJsMain.dependencies {
             implementation(libs.kotlinx.browser)
         }
-        jvmMain.dependencies {
-            implementation(libs.java.keyring)
 
-            implementation(libs.kamel.decoder.svg.batik)
+        if (!aitaWebOnlyBuild) {
+            getByName("androidMain").dependencies {
+                implementation(libs.androidx.datastore.preferences)
+                implementation(libs.sqlDelightAndroidDriver)
+                implementation(libs.androidx.core.ktx)
+                implementation(libs.hilt.android)
+                implementation(libs.kamel.fetcher.resources.android)
+                implementation(compose.preview)
+                implementation(libs.androidx.activity.compose)
+                implementation(libs.androidx.camera.core)
+                implementation(libs.androidx.camera.camera2)
+                implementation(libs.androidx.camera.lifecycle)
+                implementation(libs.androidx.camera.view)
+                implementation(libs.mlkit.barcode.scanning)
+            }
 
-            implementation(libs.kamel.fetcher.resources.jvm)
-            implementation(compose.desktop.currentOs)
-            implementation(libs.kotlinx.coroutinesSwing)
+            getByName("iosMain").dependencies {
+                implementation(libs.kamel.fetcher.ktor)
+            }
+
+            getByName("jvmMain").dependencies {
+                implementation(libs.java.keyring)
+                implementation(libs.kamel.decoder.svg.batik)
+                implementation(libs.kamel.fetcher.resources.jvm)
+                implementation(compose.desktop.currentOs)
+                implementation(libs.kotlinx.coroutinesSwing)
+            }
         }
     }
 }
 
-dependencies {
-    add("kspAndroid", libs.hilt.android.compiler)
-}
-
-android {
-    namespace = "kz.aita"
-    compileSdk = libs.versions.android.compileSdk.get().toInt()
-
-    defaultConfig {
-        applicationId = "kz.aita"
-        minSdk = libs.versions.android.minSdk.get().toInt()
-        targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "1.0"
+if (!aitaWebOnlyBuild) {
+    dependencies {
+        add("kspAndroid", libs.hilt.android.compiler)
+        add("debugImplementation", compose.uiTooling)
     }
-    packaging {
-        resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+
+    extensions.configure<ApplicationExtension> {
+        namespace = "kz.aita"
+        compileSdk = libs.versions.android.compileSdk.get().toInt()
+
+        defaultConfig {
+            applicationId = "kz.aita"
+            minSdk = libs.versions.android.minSdk.get().toInt()
+            targetSdk = libs.versions.android.targetSdk.get().toInt()
+            versionCode = 1
+            versionName = "1.0"
+        }
+        packaging {
+            resources {
+                excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            }
+        }
+        buildTypes {
+            getByName("release") {
+                isMinifyEnabled = false
+            }
+        }
+        compileOptions {
+            sourceCompatibility = JavaVersion.VERSION_11
+            targetCompatibility = JavaVersion.VERSION_11
         }
     }
-    buildTypes {
-        getByName("release") {
-            isMinifyEnabled = false
-        }
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-}
-
-dependencies {
-    debugImplementation(compose.uiTooling)
 }
 
 val misplacedCommonAndroidVectorDrawables = fileTree(
@@ -197,94 +194,65 @@ tasks.configureEach {
     }
 }
 
-compose.desktop {
-    application {
-        mainClass = "kz.aita.JvmMainComposeKt"
+if (!aitaWebOnlyBuild) {
+    compose.desktop {
+        application {
+            mainClass = "kz.aita.JvmMainComposeKt"
 
-        nativeDistributions {
-            // Only the formats you need:
-            targetFormats(TargetFormat.Msi, TargetFormat.Exe, TargetFormat.Deb, TargetFormat.Dmg)
-            modules(
-                "java.sql",
-                "java.logging",
-                "java.xml",
-                "java.desktop",
-                "java.datatransfer",
-                "java.prefs",
-                "java.management",
-                "java.naming",
-                "jdk.crypto.ec",
-                "jdk.charsets",
-                "jdk.unsupported"
-            )
-            // MSI requires a 3-part numeric version:
-            packageVersion = "1.0.0"
+            nativeDistributions {
+                targetFormats(TargetFormat.Msi, TargetFormat.Exe, TargetFormat.Deb, TargetFormat.Dmg)
+                modules(
+                    "java.sql",
+                    "java.logging",
+                    "java.xml",
+                    "java.desktop",
+                    "java.datatransfer",
+                    "java.prefs",
+                    "java.management",
+                    "java.naming",
+                    "jdk.crypto.ec",
+                    "jdk.charsets",
+                    "jdk.unsupported"
+                )
+                packageVersion = "1.0.0"
+                packageName = "AITA"
+                description = "AITA"
+                vendor = "AITA"
 
-            // MSI metadata:
-            packageName = "AITA"
-            description = "AITA"
-            vendor = "AITA"
-
-            // Windows-specific:
-            windows {
-                // Use a proper .ico; path must exist:
-                iconFile.set(project.file("src/jvmMain/resources/drawable/app_icon.ico"))
-                // Optional but nice:
-                console = false
-                // perUserInstall = true
-                // upgradeUuid = "YOUR-STABLE-GUID-HERE" // keep stable across releases
-            }
-            macOS {
-                iconFile.set(project.file("src/jvmMain/resources/drawable/app_icon.icns"))
-            }
-            linux {
-                iconFile.set(project.file("src/jvmMain/resources/drawable/app_icon.png"))
+                windows {
+                    iconFile.set(project.file("src/jvmMain/resources/drawable/app_icon.ico"))
+                    console = false
+                }
+                macOS {
+                    iconFile.set(project.file("src/jvmMain/resources/drawable/app_icon.icns"))
+                }
+                linux {
+                    iconFile.set(project.file("src/jvmMain/resources/drawable/app_icon.png"))
+                }
             }
         }
-
-//    nativeDistributions {
-//      targetFormats(TargetFormat.Exe, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Dmg)
-//
-//      windows {
-//        iconFile.set(project.file("src/jvmMain/resources/drawable/app_icon.png"))
-//        // optional:
-//        // shortcut = true
-//        // menu = true
-//        // menuGroup = "AITA"
-//        // console = false  // see section 2 below
-//      }
-//      macOS {
-//        iconFile.set(project.file("src/jvmMain/resources/drawable/app_icon.png"))
-//      }
-//      linux {
-//        iconFile.set(project.file("src/jvmMain/resources/drawable/app_icon.png"))
-//      }
-//    }
-    }
-}
-
-afterEvaluate {
-    // Collect every generate*Resource* task in this module (debug/release/common/main)
-    val resourceGen = tasks.matching {
-        it.name.startsWith("generate") && it.name.contains("Resource")
-    }
-    // Also the common res class task used by compose-resources
-    val composeRes = tasks.matching { it.name == "generateComposeResClass" }
-    val resourcePackaging = tasks.matching { task ->
-        task.name.contains("resource", ignoreCase = true) ||
-            task.name.contains("resclass", ignoreCase = true)
     }
 
-    resourceGen.configureEach { dependsOn(removeMisplacedCommonAndroidVectorDrawables) }
-    composeRes.configureEach { dependsOn(removeMisplacedCommonAndroidVectorDrawables) }
-    resourcePackaging.configureEach { dependsOn(removeMisplacedCommonAndroidVectorDrawables) }
-
-    // Apply to *all* Android KSP tasks (debug/release, etc.)
-    tasks.matching { it.name.startsWith("ksp") && it.name.endsWith("KotlinAndroid") }
-        .configureEach {
-            dependsOn(resourceGen)
-            dependsOn(composeRes)
-            mustRunAfter(resourceGen)
-            mustRunAfter(composeRes)
+    afterEvaluate {
+        val resourceGen = tasks.matching {
+            it.name.startsWith("generate") && it.name.contains("Resource")
         }
+        val composeRes = tasks.matching { it.name == "generateComposeResClass" }
+        val resourcePackaging = tasks.matching { task ->
+            task.name.contains("resource", ignoreCase = true) ||
+                task.name.contains("resclass", ignoreCase = true)
+        }
+
+        resourceGen.configureEach { dependsOn(removeMisplacedCommonAndroidVectorDrawables) }
+        composeRes.configureEach { dependsOn(removeMisplacedCommonAndroidVectorDrawables) }
+        resourcePackaging.configureEach { dependsOn(removeMisplacedCommonAndroidVectorDrawables) }
+
+        tasks.matching { it.name.startsWith("ksp") && it.name.endsWith("KotlinAndroid") }
+            .configureEach {
+                dependsOn(resourceGen)
+                dependsOn(composeRes)
+                mustRunAfter(resourceGen)
+                mustRunAfter(composeRes)
+            }
+    }
 }

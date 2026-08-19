@@ -45,9 +45,7 @@ if $rollback; then
   "${sudo_cmd[@]}" systemctl start aita-server.service
 else
   if $build; then
-    [[ -x "$project_root/gradlew" ]] || aita_die "Gradle wrapper is missing under $project_root"
-    aita_require_java21 >/dev/null
-    (cd "$project_root" && ./gradlew :server:buildFatJar --no-configuration-cache)
+    bash "$SCRIPT_DIR/build-aita-server.sh" --project-root "$project_root"
   fi
 
   source_jar="$project_root/server/build/libs/aita-server-all.jar"

@@ -6,7 +6,12 @@ COPY gradlew gradle.properties settings.gradle.kts settings-server.gradle.kts bu
 COPY shared ./shared
 COPY server ./server
 
-RUN chmod +x ./gradlew && ./gradlew --settings-file settings-server.gradle.kts --no-daemon :server:buildFatJar
+RUN chmod +x ./gradlew && ./gradlew \
+    --settings-file settings-server.gradle.kts \
+    -Paita.serverOnly=true \
+    --no-daemon \
+    --no-configuration-cache \
+    :server:buildFatJar
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app
