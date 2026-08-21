@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>NSCameraUsageDescription</key>
+    <string>AITA uses the camera to scan barcodes in transactions.</string>
+</dict>
+<dict>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>AITA uses the microphone to fill focused text fields by voice.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>AITA uses speech recognition to turn your voice into text inside focused fields.</string>
+</dict>
+</plist>
+

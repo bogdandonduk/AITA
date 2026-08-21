@@ -1,0 +1,1157 @@
+{
+  "message": null,
+  "negative": false,
+  "payload": {
+    "realtimeUpdatesPath": "rt/updates",
+    "appName": {
+      "first": "AITA",
+      "second": "0"
+    },
+    "serverUrl": {
+      "first": "https://aita-api.bogdan-dond.uk.workers.dev",
+      "second": "1"
+    },
+    "globalAppConfigurationPath": {
+      "first": "config/global",
+      "second": "2"
+    },
+    "logInPath": {
+      "first": "auth/logIn",
+      "second": "3"
+    },
+    "signUpPath": {
+      "first": "auth/signUp",
+      "second": "4"
+    },
+    "refreshPath": {
+      "first": "auth/refresh",
+      "second": "5"
+    },
+    "logOutPath": {
+      "first": "auth/logOut",
+      "second": "6"
+    },
+    "connectionCheckPath": {
+      "first": "auth/ping",
+      "second": "1147"
+    },
+    "getSecuritySessionsPath": {
+      "first": "security/sessions/get",
+      "second": "44"
+    },
+    "getSecuritySessionHistoryPath": {
+      "first": "security/sessions/history",
+      "second": "104"
+    },
+    "revokeSecuritySessionPath": {
+      "first": "security/sessions/revoke",
+      "second": "45"
+    },
+    "revokeOtherSecuritySessionsPath": {
+      "first": "security/sessions/revokeOthers",
+      "second": "46"
+    },
+    "getUserPath": {
+      "first": "user/get",
+      "second": "7"
+    },
+    "updateUserPath": {
+      "first": "user/update",
+      "second": "8"
+    },
+    "updateUserPreferencesPath": {
+      "first": "user/preferences/update",
+      "second": "95"
+    },
+    "getStoresPath": {
+      "first": "stores/get",
+      "second": "9"
+    },
+    "addStoresPath": {
+      "first": "stores/add",
+      "second": "10"
+    },
+    "updateStoresPath": {
+      "first": "stores/update",
+      "second": "11"
+    },
+    "deleteStoresPath": {
+      "first": "stores/delete",
+      "second": "12"
+    },
+    "getStockPath": {
+      "first": "stock/get",
+      "second": "13"
+    },
+    "getStockItemHistoryPath": {
+      "first": "stock/history/get",
+      "second": "1330"
+    },
+    "getParentStoreStockPath": {
+      "first": "stock/parent/get",
+      "second": "1212"
+    },
+    "addGoodsItemPath": {
+      "first": "stock/add",
+      "second": "14"
+    },
+    "updateGoodsItemPath": {
+      "first": "stock/update",
+      "second": "15"
+    },
+    "deleteGoodsItemPath": {
+      "first": "stock/delete",
+      "second": "16"
+    },
+    "getStockBatchesPath": {
+      "first": "stockBatches/get",
+      "second": "17"
+    },
+    "addStockBatchPath": {
+      "first": "stockBatches/add",
+      "second": "18"
+    },
+    "updateStockBatchPath": {
+      "first": "stockBatches/update",
+      "second": "19"
+    },
+    "deleteStockBatchPath": {
+      "first": "stockBatches/delete",
+      "second": "20"
+    },
+    "getGenericGoodsItemsPath": {
+      "first": "generic/goodsItems/get",
+      "second": "21"
+    },
+    "getGenericGoodsCategoriesPath": {
+      "first": "generic/goodsCategories/get",
+      "second": "22"
+    },
+    "getSuppliersPath": {
+      "first": "suppliers/get",
+      "second": "23"
+    },
+    "stringResourcesPath": {
+      "first": "res/string",
+      "second": "24"
+    },
+    "dimensionResourcesPath": {
+      "first": "res/dimension",
+      "second": "25"
+    },
+    "colorResourcesPath": {
+      "first": "res/color",
+      "second": "26"
+    },
+    "drawableResourcesConfigurationPath": {
+      "first": "res/drawableConfig",
+      "second": "27"
+    },
+    "drawableResourcesPath": {
+      "first": "res/drawable",
+      "second": "28"
+    },
+    "getTransactionsPath": {
+      "first": "transactions/get",
+      "second": "29"
+    },
+    "completeTransactionPath": {
+      "first": "transactions/complete",
+      "second": "30"
+    },
+    "getDebtorsPath": {
+      "first": "debtors/get",
+      "second": "39"
+    },
+    "addDebtorPath": {
+      "first": "debtors/add",
+      "second": "40"
+    },
+    "updateDebtorPath": {
+      "first": "debtors/update",
+      "second": "41"
+    },
+    "deleteDebtorPath": {
+      "first": "debtors/delete",
+      "second": "42"
+    },
+    "payDebtorDebtPath": {
+      "first": "debtors/pay",
+      "second": "43"
+    },
+    "getSupplierGoodsPricesPath": {
+      "first": "supplierGoodsPrices/get",
+      "second": "31"
+    },
+    "getMySupplierGoodsPricesPath": {
+      "first": "supplierGoodsPrices/my",
+      "second": "1685"
+    },
+    "upsertSupplierGoodsPricePath": {
+      "first": "supplierGoodsPrices/upsert",
+      "second": "32"
+    },
+    "getSupplierOrdersPath": {
+      "first": "supplierOrders/get",
+      "second": "34"
+    },
+    "addSupplierOrderPath": {
+      "first": "supplierOrders/add",
+      "second": "35"
+    },
+    "updateSupplierOrderPath": {
+      "first": "supplierOrders/update",
+      "second": "36"
+    },
+    "deleteSupplierOrdersPath": {
+      "first": "supplierOrders/delete",
+      "second": "37"
+    },
+    "receiveSupplierOrderPath": {
+      "first": "supplierOrders/receive",
+      "second": "38"
+    },
+    "getSupplierDashboardPath": {
+      "first": "supplierOrders/dashboard",
+      "second": "1616"
+    },
+    "getSupplierContractsPath": {
+      "first": "supplierContracts/get",
+      "second": "1479"
+    },
+    "upsertSupplierContractPath": {
+      "first": "supplierContracts/upsert",
+      "second": "1480"
+    },
+    "acceptSupplierContractPath": {
+      "first": "supplierContracts/accept",
+      "second": "1481"
+    },
+    "declineSupplierContractPath": {
+      "first": "supplierContracts/decline",
+      "second": "1482"
+    },
+    "archiveSupplierContractPath": {
+      "first": "supplierContracts/archive",
+      "second": "1483"
+    },
+    "companyForms": [
+      {
+        "id": "0",
+        "name": [
+          {
+            "language": "main",
+            "value": "TOO"
+          },
+          {
+            "language": "en",
+            "value": "TOO"
+          },
+          {
+            "language": "ru",
+            "value": "TOO"
+          },
+          {
+            "language": "kk",
+            "value": "TOO"
+          }
+        ],
+        "parameters": [
+          {
+            "name": [
+              {
+                "language": "main",
+                "value": "BIN"
+              },
+              {
+                "language": "en",
+                "value": "BIN"
+              },
+              {
+                "language": "ru",
+                "value": "БИН"
+              },
+              {
+                "language": "kk",
+                "value": "БИН"
+              }
+            ],
+            "value": "",
+            "length": 12,
+            "number": true,
+            "nonLetterSymbolsEnabled": false
+          }
+        ]
+      }
+    ],
+    "countries": [
+      {
+        "locale": "kz",
+        "language": "kk",
+        "name": [
+          {
+            "language": "en",
+            "value": "Kazakhstan"
+          },
+          {
+            "language": "ru",
+            "value": "Казахстан"
+          },
+          {
+            "language": "kk",
+            "value": "Казакстан"
+          }
+        ],
+        "flagDrawablePath": "png/flag_kz.png",
+        "cities": [
+          {
+            "name": [
+              {
+                "language": "en",
+                "value": "Astana"
+              },
+              {
+                "language": "ru",
+                "value": "Астана"
+              },
+              {
+                "language": "kk",
+                "value": "Астана"
+              }
+            ],
+            "centerLatitude": 51.1667,
+            "centerLongitude": 71.4333,
+            "swLatitude": 51.023,
+            "swLongitude": 71.266,
+            "neLatitude": 51.250071,
+            "neLongitude": 71.55
+          },
+          {
+            "name": [
+              {
+                "language": "en",
+                "value": "Almaty"
+              },
+              {
+                "language": "ru",
+                "value": "Алматы"
+              },
+              {
+                "language": "kk",
+                "value": "Алматы"
+              }
+            ],
+            "centerLatitude": 43.2775,
+            "centerLongitude": 76.8936,
+            "swLatitude": 43.0975,
+            "swLongitude": 76.795,
+            "neLatitude": 43.36,
+            "neLongitude": 77.08
+          }
+        ],
+        "phoneNumberCode": "7",
+        "phoneNumberSize": 10,
+        "currencies": [
+          {
+            "code": "KZT",
+            "symbol": "₸",
+            "name": [
+              {
+                "language": "main",
+                "value": "Tenge"
+              },
+              {
+                "language": "en",
+                "value": "Tenge"
+              },
+              {
+                "language": "ru",
+                "value": "Тенге"
+              },
+              {
+                "language": "kk",
+                "value": "Tеңге"
+              }
+            ]
+          }
+        ],
+        "cashlessPaymentOptions": [
+          {
+            "id": "0",
+            "name": [
+              {
+                "language": "main",
+                "value": "Card"
+              },
+              {
+                "language": "en",
+                "value": "Card"
+              },
+              {
+                "language": "ru",
+                "value": "Карта"
+              },
+              {
+                "language": "kk",
+                "value": "Карта"
+              }
+            ]
+          },
+          {
+            "id": "1",
+            "name": [
+              {
+                "language": "main",
+                "value": "QR"
+              },
+              {
+                "language": "en",
+                "value": "QR"
+              },
+              {
+                "language": "ru",
+                "value": "QR"
+              },
+              {
+                "language": "kk",
+                "value": "QR"
+              }
+            ]
+          },
+          {
+            "id": "2",
+            "name": [
+              {
+                "language": "main",
+                "value": "Kaspi RED"
+              },
+              {
+                "language": "en",
+                "value": "Kaspi RED"
+              },
+              {
+                "language": "ru",
+                "value": "Каспи RED"
+              },
+              {
+                "language": "kk",
+                "value": "Каспи RED"
+              }
+            ]
+          },
+          {
+            "id": "3",
+            "name": [
+              {
+                "language": "main",
+                "value": "Rakhmet"
+              },
+              {
+                "language": "en",
+                "value": "Rakhmet"
+              },
+              {
+                "language": "ru",
+                "value": "Рахмет"
+              },
+              {
+                "language": "kk",
+                "value": "Рахмет"
+              }
+            ]
+          }
+        ],
+        "preferredCashlessPaymentOptionId": "1"
+      },
+      {
+        "locale": "tj",
+        "language": "tj",
+        "name": [
+          {
+            "language": "en",
+            "value": "Tajikistan"
+          },
+          {
+            "language": "ru",
+            "value": "Таджикистан"
+          },
+          {
+            "language": "kk",
+            "value": "Тәжікстан"
+          }
+        ],
+        "flagDrawablePath": "png/flag_tj.png",
+        "cities": [
+          {
+            "name": [
+              {
+                "language": "en",
+                "value": "Dushanbe"
+              },
+              {
+                "language": "ru",
+                "value": "Душанбе"
+              },
+              {
+                "language": "kk",
+                "value": "Душанбе"
+              }
+            ],
+            "centerLatitude": 38.5606,
+            "centerLongitude": 68.7778,
+            "swLatitude": 38.495,
+            "swLongitude": 68.68,
+            "neLatitude": 38.61,
+            "neLongitude": 68.88
+          },
+          {
+            "name": [
+              {
+                "language": "en",
+                "value": "Khujand"
+              },
+              {
+                "language": "ru",
+                "value": "Худжанд"
+              },
+              {
+                "language": "kk",
+                "value": "Худжанд"
+              }
+            ],
+            "centerLatitude": 40.2894,
+            "centerLongitude": 69.627,
+            "swLatitude": 40.256,
+            "swLongitude": 69.59,
+            "neLatitude": 40.305,
+            "neLongitude": 69.73
+          }
+        ],
+        "phoneNumberCode": "992",
+        "phoneNumberSize": 9,
+        "currencies": [
+          {
+            "code": "TJS",
+            "symbol": "SM",
+            "name": [
+              {
+                "language": "main",
+                "value": "Somoni"
+              },
+              {
+                "language": "en",
+                "value": "Somoni"
+              },
+              {
+                "language": "ru",
+                "value": "Cом"
+              },
+              {
+                "language": "kk",
+                "value": "Cом"
+              }
+            ]
+          }
+        ],
+        "cashlessPaymentOptions": [
+          {
+            "id": "0",
+            "name": [
+              {
+                "language": "main",
+                "value": "Card"
+              },
+              {
+                "language": "en",
+                "value": "Card"
+              },
+              {
+                "language": "ru",
+                "value": "Карта"
+              },
+              {
+                "language": "kk",
+                "value": "Карта"
+              }
+            ]
+          }
+        ],
+        "preferredCashlessPaymentOptionId": "0"
+      }
+    ],
+    "languages": [
+      {
+        "language": "en",
+        "name": [
+          {
+            "language": "en",
+            "value": "English"
+          },
+          {
+            "language": "ru",
+            "value": "Английский"
+          },
+          {
+            "language": "kk",
+            "value": "Ағылшынша"
+          }
+        ],
+        "flagDrawablePath": "png/flag_en.png"
+      },
+      {
+        "language": "ru",
+        "name": [
+          {
+            "language": "en",
+            "value": "Russian"
+          },
+          {
+            "language": "ru",
+            "value": "Русский"
+          },
+          {
+            "language": "kk",
+            "value": "Орысша"
+          }
+        ],
+        "flagDrawablePath": "png/flag_ru.png"
+      },
+      {
+        "language": "kk",
+        "name": [
+          {
+            "language": "en",
+            "value": "Kazakh"
+          },
+          {
+            "language": "ru",
+            "value": "Казахский"
+          },
+          {
+            "language": "kk",
+            "value": "Қазақша"
+          }
+        ],
+        "flagDrawablePath": "png/flag_kz.png"
+      }
+    ],
+    "themes": [
+      {
+        "id": 0,
+        "name": [
+          {
+            "language": "en",
+            "value": "Light"
+          },
+          {
+            "language": "ru",
+            "value": "Светлая"
+          },
+          {
+            "language": "kk",
+            "value": "Жарық"
+          }
+        ]
+      },
+      {
+        "id": 1,
+        "name": [
+          {
+            "language": "en",
+            "value": "Dark"
+          },
+          {
+            "language": "ru",
+            "value": "Темная"
+          },
+          {
+            "language": "kk",
+            "value": "Қараңғы"
+          }
+        ]
+      }
+    ],
+    "goodsItemsQuantityUnits": [
+      {
+        "id": "0",
+        "immutableUnitName": [
+          {
+            "language": "en",
+            "value": "pc."
+          },
+          {
+            "language": "ru",
+            "value": "шт."
+          },
+          {
+            "language": "kk",
+            "value": "шт."
+          }
+        ],
+        "total": 1.0,
+        "pricedAmount": 1.0,
+        "roundTotal": true
+      },
+      {
+        "id": "1",
+        "immutableUnitName": [
+          {
+            "language": "en",
+            "value": "kg."
+          },
+          {
+            "language": "ru",
+            "value": "кг."
+          },
+          {
+            "language": "kk",
+            "value": "кг."
+          }
+        ],
+        "total": 1.0,
+        "pricedAmount": 1.0,
+        "roundTotal": false
+      }
+    ],
+    "deleteSupplierGoodsPricesPath": {
+      "first": "supplierGoodsPrices/delete",
+      "second": "33"
+    },
+    "getCashRegisterPath": {
+      "first": "cashRegister/get",
+      "second": "49"
+    },
+    "extractCashRegisterPath": {
+      "first": "cashRegister/extract",
+      "second": "50"
+    },
+    "getStoreWorkersPath": {
+      "first": "workers/store/get",
+      "second": "51"
+    },
+    "getMyWorkerMembershipsPath": {
+      "first": "workers/my/get",
+      "second": "52"
+    },
+    "getIncomingWorkerRequestsPath": {
+      "first": "workers/requests/incoming",
+      "second": "53"
+    },
+    "getMyWorkerRequestsPath": {
+      "first": "workers/requests/my",
+      "second": "54"
+    },
+    "getStoreWorkerRoleTemplatesPath": {
+      "first": "workers/roleTemplates/get",
+      "second": "1248"
+    },
+    "upsertStoreWorkerRoleTemplatePath": {
+      "first": "workers/roleTemplates/upsert",
+      "second": "1249"
+    },
+    "deleteStoreWorkerRoleTemplatePath": {
+      "first": "workers/roleTemplates/delete",
+      "second": "1250"
+    },
+    "requestStoreEmploymentPath": {
+      "first": "workers/request",
+      "second": "55"
+    },
+    "acceptStoreEmploymentPath": {
+      "first": "workers/accept",
+      "second": "56"
+    },
+    "declineStoreEmploymentPath": {
+      "first": "workers/decline",
+      "second": "57"
+    },
+    "updateStoreWorkerPermissionsPath": {
+      "first": "workers/updatePermissions",
+      "second": "58"
+    },
+    "updateMyWorkerPasswordPath": {
+      "first": "workers/my/password",
+      "second": "103"
+    },
+    "inviteStoreWorkerPath": {
+      "first": "workers/invite",
+      "second": "65"
+    },
+    "acceptStoreWorkerInvitationPath": {
+      "first": "workers/invitations/accept",
+      "second": "66"
+    },
+    "declineStoreWorkerInvitationPath": {
+      "first": "workers/invitations/decline",
+      "second": "67"
+    },
+    "legalIdFormats": [
+      {
+        "id": "kz_bin",
+        "countryLocales": [
+          "kz"
+        ],
+        "name": [
+          {
+            "language": "main",
+            "value": "BIN"
+          },
+          {
+            "language": "en",
+            "value": "BIN"
+          },
+          {
+            "language": "ru",
+            "value": "БИН"
+          },
+          {
+            "language": "kk",
+            "value": "БИН"
+          }
+        ],
+        "label": [
+          {
+            "language": "main",
+            "value": "Business Identification Number"
+          },
+          {
+            "language": "en",
+            "value": "Business Identification Number"
+          },
+          {
+            "language": "ru",
+            "value": "Бизнес-идентификационный номер"
+          },
+          {
+            "language": "kk",
+            "value": "Бизнес сәйкестендіру нөмірі"
+          }
+        ],
+        "placeholder": [
+          {
+            "language": "main",
+            "value": "12 digits"
+          },
+          {
+            "language": "en",
+            "value": "12 digits"
+          },
+          {
+            "language": "ru",
+            "value": "12 цифр"
+          },
+          {
+            "language": "kk",
+            "value": "12 сан"
+          }
+        ],
+        "required": true,
+        "length": 12,
+        "minLength": null,
+        "maxLength": null,
+        "digitsOnly": true,
+        "regex": "^[0-9]{12}$"
+      },
+      {
+        "id": "tj_tin",
+        "countryLocales": [
+          "tj"
+        ],
+        "name": [
+          {
+            "language": "main",
+            "value": "TIN"
+          },
+          {
+            "language": "en",
+            "value": "TIN"
+          },
+          {
+            "language": "ru",
+            "value": "ИНН / РМА"
+          },
+          {
+            "language": "kk",
+            "value": "СТН / РМА"
+          }
+        ],
+        "label": [
+          {
+            "language": "main",
+            "value": "Taxpayer Identification Number"
+          },
+          {
+            "language": "en",
+            "value": "Taxpayer Identification Number"
+          },
+          {
+            "language": "ru",
+            "value": "Идентификационный номер налогоплательщика"
+          },
+          {
+            "language": "kk",
+            "value": "Салық төлеушінің сәйкестендіру нөмірі"
+          }
+        ],
+        "placeholder": [
+          {
+            "language": "main",
+            "value": "9 digits"
+          },
+          {
+            "language": "en",
+            "value": "9 digits"
+          },
+          {
+            "language": "ru",
+            "value": "9 цифр"
+          },
+          {
+            "language": "kk",
+            "value": "9 сан"
+          }
+        ],
+        "required": true,
+        "length": 9,
+        "minLength": null,
+        "maxLength": null,
+        "digitsOnly": true,
+        "regex": "^[0-9]{9}$"
+      }
+    ],
+    "getStockItemBranchAvailabilityPath": {
+      "first": "stockBatches/branchAvailability",
+      "second": "73"
+    },
+    "moveStockBatchPath": {
+      "first": "stockBatches/move",
+      "second": "74"
+    },
+    "decideStockBatchMovePath": {
+      "first": "stockBatches/decideMove",
+      "second": "74"
+    },
+    "getUserFinanceDashboardPath": {
+      "first": "finance/dashboard",
+      "second": "77"
+    },
+    "createTopUpPaymentPath": {
+      "first": "finance/topup/create",
+      "second": "78"
+    },
+    "confirmDevelopmentTopUpPath": {
+      "first": "finance/topup/confirmDevelopment",
+      "second": "79"
+    },
+    "getSubscriptionPlansPath": {
+      "first": "subscriptions/plans",
+      "second": "80"
+    },
+    "getStoreSubscriptionPath": {
+      "first": "subscriptions/store/get",
+      "second": "81"
+    },
+    "updateStoreSubscriptionPath": {
+      "first": "subscriptions/store/update",
+      "second": "82"
+    },
+    "pagingDefaultPageSize": 40,
+    "pagingMaxPageSize": 200,
+    "paymentProviders": [
+      {
+        "id": "kaspi_invoice",
+        "name": [
+          {
+            "language": "main",
+            "value": "Kaspi invoice"
+          },
+          {
+            "language": "en",
+            "value": "Kaspi invoice"
+          },
+          {
+            "language": "ru",
+            "value": "Счёт Kaspi"
+          },
+          {
+            "language": "kk",
+            "value": "Kaspi шоты"
+          }
+        ],
+        "countryLocales": [
+          "kz"
+        ],
+        "currencyCodes": [
+          "KZT"
+        ],
+        "enabled": false,
+        "sandbox": true,
+        "apiKeyEnvironmentVariable": "AITA_KASPI_API_KEY",
+        "webhookSecretEnvironmentVariable": "AITA_KASPI_WEBHOOK_SECRET",
+        "description": [
+          {
+            "language": "main",
+            "value": "Prepared integration placeholder. Real API call is disabled until merchant credentials are connected."
+          },
+          {
+            "language": "ru",
+            "value": "Заготовка интеграции. Реальный вызов API отключён до подключения данных мерчанта."
+          },
+          {
+            "language": "kk",
+            "value": "Интеграция дайындығы. Мерчант деректері қосылғанша нақты API шақыруы өшірулі."
+          }
+        ]
+      },
+      {
+        "id": "manual_development",
+        "name": [
+          {
+            "language": "main",
+            "value": "Manual development top-up"
+          },
+          {
+            "language": "en",
+            "value": "Manual development top-up"
+          },
+          {
+            "language": "ru",
+            "value": "Тестовое ручное пополнение"
+          },
+          {
+            "language": "kk",
+            "value": "Қолмен тест толтыру"
+          }
+        ],
+        "countryLocales": [],
+        "currencyCodes": [],
+        "enabled": true,
+        "sandbox": true,
+        "apiKeyEnvironmentVariable": "",
+        "webhookSecretEnvironmentVariable": "",
+        "description": []
+      }
+    ],
+    "subscriptionPlans": [
+      {
+        "id": "standard_monthly_kzt",
+        "name": [
+          {
+            "language": "main",
+            "value": "Standard"
+          },
+          {
+            "language": "en",
+            "value": "Standard"
+          },
+          {
+            "language": "ru",
+            "value": "Стандартный"
+          },
+          {
+            "language": "kk",
+            "value": "Стандартты"
+          }
+        ],
+        "description": [
+          {
+            "language": "main",
+            "value": "3 branches, 21 workers, 1000 stock items"
+          },
+          {
+            "language": "en",
+            "value": "3 branches, 21 workers, 1000 stock items"
+          },
+          {
+            "language": "ru",
+            "value": "3 филиала, 21 сотрудник, 1000 товаров на складе"
+          },
+          {
+            "language": "kk",
+            "value": "3 филиал, 21 қызметкер, қоймада 1000 тауар"
+          }
+        ],
+        "priceMinor": 799000,
+        "currencyCode": "KZT",
+        "periodUnit": "month",
+        "periodCount": 1,
+        "maxBranches": 3,
+        "maxWorkers": 21,
+        "maxStockItems": 1000,
+        "isActive": true
+      }
+    ],
+    "addSupplierPath": {
+      "first": "suppliers/add",
+      "second": "83"
+    },
+    "updateSupplierPath": {
+      "first": "suppliers/update",
+      "second": "84"
+    },
+    "deleteSupplierPath": {
+      "first": "suppliers/delete",
+      "second": "85"
+    },
+    "getCurrentWorkshiftPath": {
+      "first": "workshifts/current",
+      "second": "86"
+    },
+    "startWorkshiftPath": {
+      "first": "workshifts/start",
+      "second": "87"
+    },
+    "endWorkshiftPath": {
+      "first": "workshifts/end",
+      "second": "88"
+    },
+    "getOperationLogsPath": {
+      "first": "logs/get",
+      "second": "92"
+    },
+    "getStoreAnalyticsPath": {
+      "first": "analytics/store/get",
+      "second": "94"
+    },
+    "getSupportTicketsPath": {
+      "first": "support/tickets/get",
+      "second": "96"
+    },
+    "createSupportTicketPath": {
+      "first": "support/tickets/create",
+      "second": "97"
+    },
+    "closeSupportTicketPath": {
+      "first": "support/tickets/close",
+      "second": "98"
+    },
+    "reopenSupportTicketPath": {
+      "first": "support/tickets/reopen",
+      "second": "99"
+    },
+    "getSupportMessagesPath": {
+      "first": "support/messages/get",
+      "second": "100"
+    },
+    "sendSupportMessagePath": {
+      "first": "support/messages/send",
+      "second": "101"
+    },
+    "markSupportMessagesReadPath": {
+      "first": "support/messages/read",
+      "second": "102"
+    },
+    "removeStoreWorkerPath": {
+      "first": "workers/remove",
+      "second": "105"
+    },
+    "confirmStoreWorkerRemovalPath": {
+      "first": "workers/removal/confirm",
+      "second": "106"
+    },
+    "declineStoreWorkerRemovalPath": {
+      "first": "workers/removal/decline",
+      "second": "107"
+    }
+  }
+}

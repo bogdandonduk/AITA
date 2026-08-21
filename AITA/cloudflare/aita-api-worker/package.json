@@ -1,0 +1,15 @@
+{
+  "name": "aita-api-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy --config wrangler.jsonc",
+    "deploy:dry": "wrangler deploy --dry-run --config wrangler.jsonc",
+    "dev": "wrangler dev --config wrangler.jsonc",
+    "tail": "wrangler tail --config wrangler.jsonc"
+  },
+  "devDependencies": {
+    "wrangler": "4.118.0"
+  }
+}

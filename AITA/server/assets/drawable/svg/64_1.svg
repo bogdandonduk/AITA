@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <rect x="3.2" y="5.4" width="14.8" height="13.4" rx="2.6" fill="#3B4658" stroke="#F8F4EE" stroke-width="1.55"/>
+  <path d="M6 8.5h8.7" stroke="#F8F4EE" stroke-width="1.15" stroke-linecap="round" opacity="0.7"/>
+  <path d="M6.1 11v5.1M8 11v5.1M10.4 11v5.1M11.8 11v5.1M14.4 11v5.1" stroke="#F8F4EE" stroke-width="1.35" stroke-linecap="round"/>
+  <path d="M7 17.2h7.4" stroke="#F8F4EE" stroke-width="1" stroke-linecap="round" opacity="0.6"/>
+  <circle cx="17.4" cy="6.6" r="3.2" fill="#263244" stroke="#F8F4EE" stroke-width="1.45"/>
+  <path d="M16.1 5.9c.45-.65 1.35-.92 2.08-.48.38.23.64.58.75.97M18.8 7.4c-.46.67-1.39.92-2.1.47a1.8 1.8 0 0 1-.74-.97" fill="none" stroke="#4ECDC4" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M19.1 5.2v1.25h-1.25M15.9 8.6V7.35h1.25" fill="none" stroke="#4ECDC4" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M20.2 12.2l.42.9.9.42-.9.42-.42.9-.42-.9-.9-.42.9-.42.42-.9Z" fill="#FF8A80"/>
+  <path d="M4.7 3.1l.32.68.68.32-.68.32-.32.68-.32-.68-.68-.32.68-.32.32-.68Z" fill="#FFD166"/>
+</svg>

@@ -1,0 +1,13 @@
+[Unit]
+Description=Run AITA latest PostgreSQL backup every five minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=5min
+RandomizedDelaySec=20s
+AccuracySec=15s
+Persistent=true
+Unit=aita-backup.service
+
+[Install]
+WantedBy=timers.target

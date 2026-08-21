@@ -1,0 +1,8 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="96dp" android:height="96dp" android:viewportWidth="96" android:viewportHeight="96">
+    <path android:pathData="M21 10 H57 L74 27 V77 Q74 84 67 84 H28 Q21 84 21 77 Z" android:fillColor="#2A3B45" android:strokeColor="#F5F1E9" android:strokeWidth="5" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+    <path android:pathData="M57 10 V25 Q57 29 61 29 H74" android:fillColor="#244A5D" android:strokeColor="#F5F1E9" android:strokeWidth="5" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+    <path android:pathData="M48 32 V59" android:fillColor="#00000000" android:strokeColor="#FF9292" android:strokeWidth="7" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+    <path android:pathData="M36 49 L48 61 L60 49" android:fillColor="#00000000" android:strokeColor="#FF9292" android:strokeWidth="7" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+    <path android:pathData="M33 70 H63" android:fillColor="#00000000" android:strokeColor="#7ED8FF" android:strokeWidth="6" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+    <path android:pathData="M 65.000 72.000 C 65.000 67.582 68.582 64.000 73.000 64.000 C 77.418 64.000 81.000 67.582 81.000 72.000 C 81.000 76.418 77.418 80.000 73.000 80.000 C 68.582 80.000 65.000 76.418 65.000 72.000 Z" android:fillColor="#FFC65D" android:strokeColor="#F5F1E9" android:strokeWidth="3" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+</vector>

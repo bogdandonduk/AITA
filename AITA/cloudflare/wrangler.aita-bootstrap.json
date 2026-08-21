@@ -1,0 +1,14 @@
+{
+  "name": "aita-bootstrap",
+  "main": "aita-bootstrap-worker.js",
+  "compatibility_date": "2026-07-17",
+  "workers_dev": true,
+  "preview_urls": false,
+  "vars": {
+    "AITA_RELEASE_VERSION": "",
+    "AITA_BOOTSTRAP_SEQUENCE": "1"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

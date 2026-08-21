@@ -1,0 +1,21 @@
+[Unit]
+Description=AITA local and public health check
+After=aita-server.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=aita
+Group=aita
+EnvironmentFile=/etc/aita/aita-prod.env
+ExecStart=/usr/local/lib/aita/healthcheck-aita.sh
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6

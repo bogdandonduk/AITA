@@ -1,0 +1,13 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="96dp" android:height="96dp" android:viewportWidth="96" android:viewportHeight="96">
+    <path android:fillColor="#F4FFF7" android:pathData="M29,12h38a20,20 0,0 1,20 20v30a20,20 0,0 1,-20 20h-38a20,20 0,0 1,-20 -20v-30a20,20 0,0 1,20 -20z"/>
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#9BE7C0" android:strokeWidth="7" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M18,62C26,52 34,54 42,44C51,33 61,31 78,32"/>
+    <path android:fillColor="#4FA3FF" android:strokeColor="#0B6B5C" android:strokeWidth="4" android:pathData="M29,38h23a8,8 0,0 1,8 8v8a8,8 0,0 1,-8 8h-23a8,8 0,0 1,-8 -8v-8a8,8 0,0 1,8 -8z"/>
+    <path android:fillColor="#44C08A" android:strokeColor="#0B6B5C" android:strokeWidth="4" android:strokeLineJoin="round" android:pathData="M60,45L72,45L79,54L79,62L60,62Z"/>
+    <path android:fillColor="#FFFFFF" android:strokeColor="#0B6B5C" android:strokeWidth="4" android:pathData="M32,58a8,8 0,1 0,0.1 0M68,58a8,8 0,1 0,0.1 0"/>
+    <path android:fillColor="#FF8A3D" android:pathData="M32,63a3,3 0,1 0,0.1 0M68,63a3,3 0,1 0,0.1 0"/>
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#FFFFFF" android:strokeWidth="4" android:strokeLineCap="round" android:pathData="M27,46L48,46M27,54L42,54"/>
+    <path android:fillColor="#FFD166" android:strokeColor="#0B6B5C" android:strokeWidth="4" android:strokeLineJoin="round" android:pathData="M69,26C69,20 74,16 79,16C84,16 88,20 88,25C88,34 79,41 79,41C79,41 69,34 69,26Z"/>
+    <path android:fillColor="#0B6B5C" android:pathData="M79,22a3,3 0,1 0,0.1 0"/>
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#44C08A" android:strokeWidth="5" android:strokeLineCap="round" android:pathData="M13,26L33,26"/>
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#66B8FF" android:strokeWidth="4" android:strokeLineCap="round" android:pathData="M15,31L28,31"/>
+</vector>
