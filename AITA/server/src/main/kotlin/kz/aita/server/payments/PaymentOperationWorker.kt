@@ -34,12 +34,14 @@ class PaymentOperationWorker(
 
     fun start(): Job = scope.launch {
         while (isActive) {
-            val claim = runCatching { repository.claimBatch(workerId, batchSize) }
-            if (claim.isFailure) {
+            val batch = try {
+                repository.claimBatch(workerId, batchSize)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Throwable) {
                 delay(idleDelay)
                 continue
             }
-            val batch = claim.getOrThrow()
             if (batch.isEmpty()) {
                 delay(idleDelay)
                 continue

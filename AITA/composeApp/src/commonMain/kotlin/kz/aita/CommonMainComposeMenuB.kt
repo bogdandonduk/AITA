@@ -458,8 +458,8 @@ fun AppConfiguration.MenuDevicesScreen() {
     val labelPrinters by labelPrinterDevicesState.collectAsState()
     val configuredLabelPrinterId by configuredLabelPrinterDeviceIdState.collectAsState()
     val configuredLabelPrinterProtocol by configuredLabelPrinterProtocolState.collectAsState()
-    var refreshingReceiptPrinters by rememberSaveable { mutableStateOf(false) }
-    var refreshingLabelPrinters by rememberSaveable { mutableStateOf(false) }
+    var refreshingReceiptPrinters by remember { mutableStateOf(false) }
+    var refreshingLabelPrinters by remember { mutableStateOf(false) }
 
     val refreshButtonText = localizedStringResource(1259, "Refresh printers")
     val refreshSuccessText = localizedStringResource(1270, "Receipt printers refreshed")

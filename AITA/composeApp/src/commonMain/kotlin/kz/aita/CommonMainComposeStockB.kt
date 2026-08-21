@@ -476,8 +476,8 @@ fun AppConfiguration.StockBatchEditor(
     val suppliers = stateValues.suppliers.orEmpty()
     var showSupplierAddSheet by rememberSaveable(goodsItem.id, existingBatch?.id) { mutableStateOf(false) }
     var applyPromotionsToSameSupplier by rememberSaveable(goodsItem.id, existingBatch?.id) { mutableStateOf(false) }
-    var isSavingBatch by rememberSaveable(goodsItem.id, existingBatch?.id ?: "new", draftStateKey ?: "batch") { mutableStateOf(false) }
-    var saveError by rememberSaveable(goodsItem.id, existingBatch?.id ?: "new", draftStateKey ?: "batch") { mutableStateOf<String?>(null) }
+    var isSavingBatch by remember(goodsItem.id, existingBatch?.id ?: "new", draftStateKey ?: "batch") { mutableStateOf(false) }
+    var saveError by remember(goodsItem.id, existingBatch?.id ?: "new", draftStateKey ?: "batch") { mutableStateOf<String?>(null) }
     var returnPriceOverrideManuallyEdited by rememberSaveable(goodsItem.id, existingBatch?.id ?: "new") {
         mutableStateOf(
             existingBatch?.let { batch ->

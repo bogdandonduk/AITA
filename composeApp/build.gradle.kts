@@ -1,11 +1,17 @@
 // THIS IS build.gradle of composeApp module
 import com.android.build.api.dsl.ApplicationExtension
+import com.google.common.jimfs.Configuration.windows
+import com.sun.imageio.plugins.jpeg.JPEG.vendor
 import org.gradle.api.tasks.Delete
+import org.gradle.declarative.dsl.schema.FqName.Empty.packageName
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig
+import java.lang.System.console
+import java.lang.module.ModuleFinder.compose
+import java.net.InetAddress.getByName
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)

@@ -14,8 +14,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -270,6 +272,10 @@ internal fun AppConfiguration.SupplierProfileEditorContent(
 ) {
     val editorKey = supplierProfileEditorStableKey(editedSupplier?.id, editorSessionKey)
     val coroutineScope = rememberCoroutineScope()
+    val operationGate = remember(editorKey) { SupplierWorkspaceOperationGate() }
+    DisposableEffect(operationGate) {
+        onDispose { operationGate.invalidate() }
+    }
     var supplierName by rememberSaveable(editorKey) {
         mutableStateOf(
             editedSupplier?.name?.extractLocalizedString("main")
@@ -280,7 +286,7 @@ internal fun AppConfiguration.SupplierProfileEditorContent(
     var supplierEmail by rememberSaveable(editorKey) {
         mutableStateOf(editedSupplier?.emails.orEmpty().firstOrNull().orEmpty())
     }
-    var isSaving by rememberSaveable(editorKey) { mutableStateOf(false) }
+    var isSaving by remember(editorKey) { mutableStateOf(false) }
 
     val phoneStateKey = supplierProfileEditorPhoneStateKey(editedSupplier?.id, editorSessionKey)
     val phoneContent = countrySelectionPhoneNumberTextField(
@@ -293,6 +299,7 @@ internal fun AppConfiguration.SupplierProfileEditorContent(
 
     val cancelEditor = {
         if (!isSaving) {
+            operationGate.invalidate()
             coroutineScope.launch {
                 stateHost.removeState(phoneStateKey)
                 onCancel()
@@ -364,8 +371,10 @@ internal fun AppConfiguration.SupplierProfileEditorContent(
         }
 
         isSaving = true
+        val operationTicket = operationGate.begin(editedSupplier?.id, "profile.save")
         val completed: (DataState<SupplierDataModel>) -> Unit = { result ->
             coroutineScope.launch {
+                if (!operationGate.isCurrent(operationTicket)) return@launch
                 isSaving = false
                 if (result is DataState.Success) {
                     stateHost.removeState(phoneStateKey)

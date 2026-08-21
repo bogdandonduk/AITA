@@ -1706,19 +1706,19 @@ fun AppConfiguration.genericTextField(
     }
     val voicePermissionRequestText = voiceInputPermissionTexts(this)
 
-    var isVoiceListening by rememberSaveable(textFieldIdentityKey) {
+    var isVoiceListening by remember(textFieldIdentityKey) {
         mutableStateOf(false)
     }
 
-    var voiceLevel by rememberSaveable(textFieldIdentityKey) {
+    var voiceLevel by remember(textFieldIdentityKey) {
         mutableStateOf(0f)
     }
 
-    var voiceStatusText by rememberSaveable(textFieldIdentityKey) {
+    var voiceStatusText by remember(textFieldIdentityKey) {
         mutableStateOf("")
     }
 
-    var successHighlightActive by rememberSaveable(textFieldIdentityKey) {
+    var successHighlightActive by remember(textFieldIdentityKey) {
         mutableStateOf(false)
     }
 
@@ -5738,13 +5738,13 @@ fun AppConfiguration.actionButton(
 
     val actionButtonScope = rememberCoroutineScope()
     val activeNetworkOperations by activeNetworkOperationsState.collectAsState()
-    var autoLoadingActive by rememberSaveable {
+    var autoLoadingActive by remember {
         mutableStateOf(false)
     }
-    var autoLoadingStartNetworkOperations by rememberSaveable {
+    var autoLoadingStartNetworkOperations by remember {
         mutableStateOf<Int?>(null)
     }
-    var autoLoadingNetworkObserved by rememberSaveable {
+    var autoLoadingNetworkObserved by remember {
         mutableStateOf(false)
     }
 
