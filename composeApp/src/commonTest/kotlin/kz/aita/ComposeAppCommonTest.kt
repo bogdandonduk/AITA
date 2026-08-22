@@ -33,12 +33,29 @@ class ComposeAppCommonTest {
     }
 
     @Test
-    fun currentReleaseOffersStoreAndSupplierWithoutTrappingLegacyModes() {
-        assertTrue(appModeIsAvailableInCurrentRelease(APP_MODE_STORE, APP_MODE_STORE))
-        assertTrue(appModeIsAvailableInCurrentRelease(APP_MODE_SUPPLIER, APP_MODE_STORE))
-        assertFalse(appModeIsAvailableInCurrentRelease(APP_MODE_BUYER, APP_MODE_STORE))
-        assertFalse(appModeIsAvailableInCurrentRelease(APP_MODE_MANUFACTURER, APP_MODE_STORE))
-        assertTrue(appModeIsAvailableInCurrentRelease(APP_MODE_MANUFACTURER, APP_MODE_MANUFACTURER))
+    fun restoredMainDestinationMustMatchCurrentMode() {
+        appModeState.value = APP_MODE_STORE
+        assertEquals(
+            NavigationScreenModel.Transaction.MainSale.route,
+            listOf(NavigationScreenModel.Supplier.Orders.Main.route).toPersistentMainStack().single().route
+        )
+
+        appModeState.value = APP_MODE_SUPPLIER
+        assertEquals(
+            NavigationScreenModel.Supplier.Orders.Main.route,
+            listOf(NavigationScreenModel.Transaction.MainSale.route).toPersistentMainStack().single().route
+        )
+    }
+
+    @Test
+    fun appModePickerOffersEveryWorkspaceFromEveryCurrentMode() {
+        listOf(APP_MODE_STORE, APP_MODE_BUYER, APP_MODE_SUPPLIER, APP_MODE_MANUFACTURER).forEach { currentMode ->
+            assertTrue(appModeIsAvailableInCurrentRelease(APP_MODE_STORE, currentMode))
+            assertTrue(appModeIsAvailableInCurrentRelease(APP_MODE_BUYER, currentMode))
+            assertTrue(appModeIsAvailableInCurrentRelease(APP_MODE_SUPPLIER, currentMode))
+            assertTrue(appModeIsAvailableInCurrentRelease(APP_MODE_MANUFACTURER, currentMode))
+        }
+        assertFalse(appModeIsAvailableInCurrentRelease(Int.MIN_VALUE, APP_MODE_STORE))
     }
 
     @Test

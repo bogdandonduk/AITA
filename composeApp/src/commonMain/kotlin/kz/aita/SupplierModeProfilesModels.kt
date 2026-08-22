@@ -138,3 +138,97 @@ internal fun SupplierModeDashboardDataModel.withoutSupplierProfileSnapshot(
         }
     )
 }
+
+internal enum class SupplierWorkspaceReadinessNextStep {
+    CreateProfile,
+    CompleteProfile,
+    ReviewOrders,
+    BuildCatalog,
+    ConnectStores,
+    ReviewAgreements,
+    OpenInsights
+}
+
+internal data class SupplierWorkspaceReadinessUiModel(
+    val profileCount: Int,
+    val readyProfileCount: Int,
+    val setupIssueCount: Int,
+    val openOrderCount: Int,
+    val catalogSkuCount: Int,
+    val partnerCount: Int,
+    val liveAgreementCount: Int,
+    val readinessPercent: Int,
+    val nextStep: SupplierWorkspaceReadinessNextStep,
+    val targetSupplierId: String?
+)
+
+internal fun buildSupplierWorkspaceReadiness(
+    items: List<SupplierProfileWorkspaceItemUiModel>,
+    activeSupplierId: String?
+): SupplierWorkspaceReadinessUiModel {
+    if (items.isEmpty()) {
+        return SupplierWorkspaceReadinessUiModel(
+            profileCount = 0,
+            readyProfileCount = 0,
+            setupIssueCount = 0,
+            openOrderCount = 0,
+            catalogSkuCount = 0,
+            partnerCount = 0,
+            liveAgreementCount = 0,
+            readinessPercent = 0,
+            nextStep = SupplierWorkspaceReadinessNextStep.CreateProfile,
+            targetSupplierId = null
+        )
+    }
+
+    val normalizedActive = normalizeSupplierProfileIdentityId(activeSupplierId)
+    val focusedItem = normalizedActive?.let { activeId ->
+        items.firstOrNull { normalizeSupplierProfileIdentityId(it.supplier.id) == activeId }
+    } ?: items.singleOrNull()
+    val incompleteItem = when {
+        focusedItem != null && !focusedItem.ready -> focusedItem
+        else -> items.firstOrNull { !it.ready }
+    }
+    val actionScope = focusedItem?.let(::listOf) ?: items
+
+    val completedReadinessChecks = items.sumOf { item ->
+        listOf(
+            item.ready,
+            item.catalogSkuCount > 0 || item.savedOfferCount > 0,
+            item.partnerCount > 0,
+            item.liveAgreementCount > 0
+        ).count { it }
+    }
+    val readinessPercent = ((completedReadinessChecks * 100.0) / (items.size * 4.0))
+        .toInt()
+        .coerceIn(0, 100)
+
+    val scopedOpenOrders = actionScope.sumOf { it.openOrderCount }
+    val scopedCatalogSkuCount = actionScope.sumOf { it.catalogSkuCount + it.savedOfferCount }
+    val scopedPartnerCount = actionScope.sumOf { it.partnerCount }
+    val scopedAgreementCount = actionScope.sumOf { it.liveAgreementCount }
+    val nextStep = when {
+        incompleteItem != null -> SupplierWorkspaceReadinessNextStep.CompleteProfile
+        scopedOpenOrders > 0 -> SupplierWorkspaceReadinessNextStep.ReviewOrders
+        scopedCatalogSkuCount <= 0 -> SupplierWorkspaceReadinessNextStep.BuildCatalog
+        scopedPartnerCount <= 0 -> SupplierWorkspaceReadinessNextStep.ConnectStores
+        scopedAgreementCount <= 0 -> SupplierWorkspaceReadinessNextStep.ReviewAgreements
+        else -> SupplierWorkspaceReadinessNextStep.OpenInsights
+    }
+
+    return SupplierWorkspaceReadinessUiModel(
+        profileCount = items.size,
+        readyProfileCount = items.count { it.ready },
+        setupIssueCount = items.sumOf { it.readinessIssues.size },
+        openOrderCount = items.sumOf { it.openOrderCount },
+        catalogSkuCount = items.sumOf { it.catalogSkuCount + it.savedOfferCount },
+        partnerCount = items.sumOf { it.partnerCount },
+        liveAgreementCount = items.sumOf { it.liveAgreementCount },
+        readinessPercent = readinessPercent,
+        nextStep = nextStep,
+        targetSupplierId = when (nextStep) {
+            SupplierWorkspaceReadinessNextStep.CompleteProfile -> incompleteItem?.supplier?.id
+            else -> focusedItem?.supplier?.id
+        }
+    )
+}

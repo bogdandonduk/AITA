@@ -3,7 +3,7 @@ package kz.aita.server
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import io.ktor.server.auth.authenticate
-import io.ktor.server.request.origin
+import io.ktor.server.plugins.origin
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
@@ -1234,7 +1234,11 @@ suspend fun resolveAdvancedAuthUser(identifier: String): UUID? {
     }
 }
 
-fun Route.installAitaAdvancedAuthenticationRoutes(tokenService: TokenService, backgroundScope: CoroutineScope) {
+fun Route.installAitaAdvancedAuthenticationRoutes(
+    tokenService: TokenService,
+    backgroundScope: CoroutineScope,
+    application: Application
+) {
     val service = AdvancedAuthRuntime.get(tokenService, application)
     service.startEmailWorker(backgroundScope)
 

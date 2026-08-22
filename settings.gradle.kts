@@ -1,6 +1,3 @@
-rootProject.name = "AITA"
-enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
-
 pluginManagement {
     repositories {
         google {
@@ -13,6 +10,10 @@ pluginManagement {
         mavenCentral()
         gradlePluginPortal()
     }
+}
+
+plugins {
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
 dependencyResolutionManagement {
@@ -28,8 +29,39 @@ dependencyResolutionManagement {
     }
 }
 
-plugins {
-    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
+rootProject.name = "AITA"
+enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
+
+// Fail with one precise explanation if a complete AITA repository was extracted inside
+// another AITA repository. That layout makes IntelliJ sync the stale outer build while the
+// repaired project sits unused in a child directory.
+val childGradleRoots = listOf(
+    rootDir.resolve("AITA/settings.gradle.kts"),
+    rootDir.resolve("AITA/settings.gradle"),
+).filter { it.isFile }
+check(childGradleRoots.isEmpty()) {
+    "Nested AITA Gradle project detected: ${childGradleRoots.joinToString()}. " +
+        "Close IntelliJ, move this repository to an empty standalone directory, and open the " +
+        "directory that directly contains settings.gradle.kts."
+}
+
+val parentGradleRoot = rootDir.parentFile?.let { parent ->
+    listOf(parent.resolve("settings.gradle.kts"), parent.resolve("settings.gradle"))
+        .firstOrNull { it.isFile }
+}
+check(parentGradleRoot == null) {
+    "AITA is nested inside another Gradle root at $parentGradleRoot. " +
+        "Move AITA to a standalone directory before syncing it."
+}
+
+val requiredModuleBuildFiles = listOf(
+    rootDir.resolve("composeApp/build.gradle.kts"),
+    rootDir.resolve("shared/build.gradle.kts"),
+    rootDir.resolve("server/build.gradle.kts"),
+)
+check(requiredModuleBuildFiles.all { it.isFile }) {
+    "Incomplete AITA project root. Open the directory that directly contains settings.gradle.kts, " +
+        "composeApp, shared, server, and gradlew."
 }
 
 fun enabledGradleFlag(name: String): Boolean =

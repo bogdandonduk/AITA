@@ -1,6 +1,7 @@
 // THIS IS Server.kt - in ktor server module of kmp compose app
 
 package kz.aita.server
+import kz.aita.server.security.AitaTokenLifetimeRules
 
 import at.favre.lib.crypto.bcrypt.BCrypt
 import com.auth0.jwt.JWT
@@ -3083,7 +3084,6 @@ data class JwtConfig(
 )
 
 private const val MIN_ACCESS_TOKEN_TTL_MILLIS = 15L * 60L * 1000L
-private const val LEGACY_ACCESS_TOKEN_EXPIRY_COMPATIBILITY_SECONDS = 10L * 365L * 24L * 60L * 60L
 private val REFRESH_SESSION_NEVER_EXPIRES_AT: Instant = Instant.parse("9999-12-31T23:59:59Z")
 private val REFRESH_SESSION_NEVER_EXPIRES_AT_MILLIS: Long = REFRESH_SESSION_NEVER_EXPIRES_AT.toEpochMilli()
 
@@ -3129,7 +3129,7 @@ fun Application.configureJwtAuth() {
         JWT.require(Algorithm.HMAC256(cfg.secret))    // HS256 with our secret
           .withIssuer(cfg.issuer)                     // Must match issuer
           .withAudience(cfg.audience)                 // Must match audience
-          .acceptExpiresAt(LEGACY_ACCESS_TOKEN_EXPIRY_COMPATIBILITY_SECONDS)
+          .acceptExpiresAt(AitaTokenLifetimeRules.CLOCK_SKEW_SECONDS)
           .build()
       )
 
@@ -3137,16 +3137,32 @@ fun Application.configureJwtAuth() {
         val sessionId = runCatching { UUID.fromString(cred.payload.getClaim("sessionId").asString()) }.getOrNull()
           ?: return@validate null
 
+        val subjectId = runCatching { UUID.fromString(cred.subject) }.getOrNull()
+          ?: return@validate null
+        if (!AitaTokenLifetimeRules.payloadIsAcceptable(cred.payload.expiresAt, cred.payload.issuedAt)) {
+          return@validate null
+        }
+
         val ok = newSuspendedTransaction(aitaServerIoContext) {
           val row = RefreshSessions
             .selectAll()
             .where { RefreshSessions.id eq sessionId }
             .limit(1)
-            .singleOrNull()
+            .singleOrNull() ?: return@newSuspendedTransaction false
 
-          row != null && row[RefreshSessions.revokedAt] == null && cred.payload.issuer == cfg.issuer && cred.payload.audience.contains(
-            cfg.audience
-          ) && cred.subject != null
+          val sessionActive = row[RefreshSessions.userId] == subjectId &&
+            row[RefreshSessions.revokedAt] == null &&
+            row[RefreshSessions.expiresAt].isAfter(Instant.now())
+          if (!sessionActive) return@newSuspendedTransaction false
+
+          val accountActive = Users
+            .selectAll()
+            .where { (Users.id eq subjectId) and (Users.isActive eq true) }
+            .limit(1)
+            .any()
+
+          accountActive && cred.payload.issuer == cfg.issuer &&
+            cred.payload.audience.contains(cfg.audience)
         }
 
         if (ok) JWTPrincipal(cred.payload) else null
@@ -3184,6 +3200,7 @@ class TokenService(private val cfg: JwtConfig) {
       .withAudience(cfg.audience)
       .withSubject(userId.toString())
       .withIssuedAt(Date.from(instant))
+      .withExpiresAt(Date.from(AitaTokenLifetimeRules.accessExpiresAt(instant)))
       .withClaim("sessionId", sessionId.toString())
       .sign(algorithm)
   }
@@ -4685,7 +4702,7 @@ private data class ResolvedStockBatchSupplierLink(
   val supplierOrderId: UUID?
 )
 
-private fun resolveStockBatchSupplierLinkInsideTransaction(
+private fun Transaction.resolveStockBatchSupplierLinkInsideTransaction(
   storeId: UUID,
   rawSupplierId: String?,
   rawSupplierOrderId: String?
@@ -4775,7 +4792,7 @@ private fun RoutingCall.matchesAnyInventoryContextStoreIdInsideTransaction(userI
   return activeStoreId == null || storeIds.any { storesShareInventoryRootInsideTransaction(activeStoreId, it) }
 }
 
-private suspend inline fun <reified T : Any> RoutingCall.receiveAita(): T {
+internal suspend inline fun <reified T : Any> RoutingCall.receiveAita(): T {
   return withAitaServerRuntimeClassLoader("receive:${request.httpMethod.value}:${request.path()}:${T::class.qualifiedName}") {
     runCatching { receive<T>() }.getOrElse { throwable ->
       if (throwable.isClassLoadingFailure()) {
@@ -6788,7 +6805,7 @@ private fun applyCashRegisterTransactionEventInsideTransaction(
   now: Long
 ) {
   val roundedAmount = kotlin.math.floor(cashAmount * 100.0) / 100.0
-  if (roundedAmount <= 0.0) return
+  if (!roundedAmount.isFinite() || roundedAmount <= 0.0) return
 
   val eventType = when (transactionType) {
     "purchase" -> CASH_REGISTER_EVENT_SALE_CASH_IN
@@ -8183,7 +8200,7 @@ private fun supplierModeDashboardInsideTransaction(
   val requestedQuantityTotal = responseCandidateLines.sumOf { line -> line.requestedQuantity.total.coerceAtLeast(0.0) }.roundMoney()
   val acceptedQuantityTotal = responseCandidateLines.sumOf { line -> (line.supplierDeskAcceptedQuantityTotal() ?: 0.0).coerceAtLeast(0.0) }.roundMoney()
   val responseProgressPercent = if (responseCandidateLines.isEmpty()) 0 else (((answeredLineCount * 100.0) / responseCandidateLines.size) + 0.5).toInt().coerceIn(0, 100)
-  val acceptedVsRequestedPercent = if (requestedQuantityTotal <= 0.000001) 0 else (((acceptedQuantityTotal * 100.0) / requestedQuantityTotal) + 0.5).toInt().coerceIn(0, 999)
+  val acceptedVsRequestedPercent = if (!requestedQuantityTotal.isFinite() || requestedQuantityTotal <= 0.000001) 0 else (((acceptedQuantityTotal * 100.0) / requestedQuantityTotal) + 0.5).toInt().coerceIn(0, 999)
   val responseReadyOrders = openBundles.filter { bundle ->
     bundle.order.status in responseReadyStatuses && bundle.hasCompleteSupplierResponseForSupplierDesk()
   }
@@ -8348,7 +8365,7 @@ private fun supplierModeDashboardInsideTransaction(
           val order = ordersById[line.orderId] ?: return@amountLine null
           val targetGoodsItemId = supplierBridgeTargetGoodsItemId(line)
           val quantity = line.supplierDeskPhysicalQuantityTotal()
-          if (quantity <= 0.0) return@amountLine null
+          if (!quantity.isFinite() || quantity <= 0.0) return@amountLine null
           val price = listOfNotNull(
             line.supplierOfferedSupplyPrice,
             line.expectedSupplyPrice
@@ -8781,7 +8798,7 @@ private fun supplierModeDashboardInsideTransaction(
         val requestedQuantityTotal = itemLines.sumOf { line -> line.requestedQuantity.total.coerceAtLeast(0.0) }.roundMoney()
         val acceptedQuantityTotal = itemLines.sumOf { line -> (line.supplierDeskAcceptedQuantityTotal() ?: 0.0).coerceAtLeast(0.0) }.roundMoney()
         val missingQuantityTotal = (requestedQuantityTotal - acceptedQuantityTotal).coerceAtLeast(0.0).roundMoney()
-        if (missingQuantityTotal <= 0.000001) return@backorderItem null
+        if (!missingQuantityTotal.isFinite() || missingQuantityTotal <= 0.000001) return@backorderItem null
         val partialLineCount = supplierDashboardChunk {
           itemLines.count { line ->
             val requested = line.requestedQuantity.total.coerceAtLeast(0.0)
@@ -15826,15 +15843,17 @@ private fun SupplierPartnershipContractDataModel.cleanForContractStorageInsideTr
   val cleanPriceTerms = priceTerms
     .mapNotNull { it.cleanContractPriceTerm(validGoodsIds) }
     .map { term ->
+      val supplyPrice = term.supplyPrice
+      val suggestedSalePrice = term.suggestedSalePrice
       term.copy(
-        supplyPrice = term.supplyPrice?.copy(
-          price = term.supplyPrice.price.trim(),
-          currency = term.supplyPrice.currency.trim().uppercase().ifBlank { "KZT" },
+        supplyPrice = supplyPrice?.copy(
+          price = supplyPrice.price.trim(),
+          currency = supplyPrice.currency.trim().uppercase().ifBlank { "KZT" },
           supplierId = supplierId.toString()
         ),
-        suggestedSalePrice = term.suggestedSalePrice?.copy(
-          price = term.suggestedSalePrice.price.trim(),
-          currency = term.suggestedSalePrice.currency.trim().uppercase().ifBlank { "KZT" },
+        suggestedSalePrice = suggestedSalePrice?.copy(
+          price = suggestedSalePrice.price.trim(),
+          currency = suggestedSalePrice.currency.trim().uppercase().ifBlank { "KZT" },
           supplierId = supplierId.toString()
         )
       )
@@ -16086,7 +16105,7 @@ private fun supplierProfileValidationMessage(
   else -> null
 }
 
-private fun lockSupplierProfileInsideTransaction(supplierId: UUID) {
+private fun Transaction.lockSupplierProfileInsideTransaction(supplierId: UUID) {
   val lockIdentity = "supplier-profile:$supplierId".replace("'", "''")
   exec("SELECT pg_advisory_xact_lock(hashtextextended('$lockIdentity', 0))")
 }
@@ -17543,7 +17562,7 @@ private fun subtractStockForTransactionLineInsideTransaction(
   val activeShelfBatchId = itemRow[StockItems.activeShelfBatchId]
   val quantityToSubtract = requestedQuantity.coerceAtLeast(0.0)
 
-  if (quantityToSubtract <= 0.0) return true
+  if (!quantityToSubtract.isFinite() || quantityToSubtract <= 0.0) return true
 
   val batches = activeStockBatchesForGoodsItemInsideTransaction(
     storeId = storeId,
@@ -17571,7 +17590,7 @@ private fun subtractStockForTransactionLineInsideTransaction(
     val taken = kotlin.math.min(currentTotal, remaining)
     val nextTotal = (currentTotal - taken).coerceAtLeast(0.0)
     val nextQuantity = currentQuantity.copy(total = nextTotal)
-    val nextStatus = if (nextTotal <= 0.000001) {
+    val nextStatus = if (!nextTotal.isFinite() || nextTotal <= 0.000001) {
       StockBatchStatusDataModel.SoldOut.name
     } else {
       batch[StockBatchesV2.status]
@@ -17626,7 +17645,7 @@ private fun addStockForTransactionLineInsideTransaction(
     ?: ""
   val returnedNoStockBatchNote = "aita_returned_no_stock_batch"
 
-  if (quantityToAdd <= 0.0) return true
+  if (!quantityToAdd.isFinite() || quantityToAdd <= 0.0) return true
 
   val candidateBatches = activeStockBatchesForGoodsItemInsideTransaction(
     storeId = storeId,
@@ -18309,7 +18328,7 @@ fun Application.module() {
   routing {
         // Store-scoped payment integration management and advanced account authentication.
         installAitaPaymentManagementRoutes()
-        installAitaAdvancedAuthenticationRoutes(tokenService, backgroundScope)
+        installAitaAdvancedAuthenticationRoutes(tokenService, backgroundScope, this@module)
 
     get("/healthz") {
       call.respondText(
@@ -18739,7 +18758,7 @@ fun Application.module() {
 
           if (advancedAuthSecondFactorEnabled(user[Users.id])) {
             return@post call.genericResponseNoPayload(
-              status = HttpStatusCode.PreconditionRequired,
+              status = HttpStatusCode(428, "Precondition Required"),
               message = simpleMessage(
                 main = "Two-factor authentication is enabled. Use the updated AITA login screen.",
                 en = "Two-factor authentication is enabled. Use the updated AITA login screen.",
@@ -20304,7 +20323,7 @@ fun Application.module() {
               total = sourceQuantity.withTotalValue(request.quantity.total).total
             )
 
-            if (moveQuantity.total <= 0.0 || sourceQuantity.total + 0.000001 < moveQuantity.total)
+            if (!moveQuantity.total.isFinite() || moveQuantity.total <= 0.0 || sourceQuantity.total + 0.000001 < moveQuantity.total)
               return@newSuspendedTransaction null
 
             val now = System.currentTimeMillis()
@@ -20319,7 +20338,7 @@ fun Application.module() {
             val remainingQuantity = sourceQuantity.copy(
               total = sourceQuantity.withTotalValue(sourceQuantity.total - moveQuantity.total).total
             )
-            val sourceNextStatus = if (remainingQuantity.total <= 0.0) {
+            val sourceNextStatus = if (!remainingQuantity.total.isFinite() || remainingQuantity.total <= 0.0) {
               StockBatchStatusDataModel.SoldOut.name
             } else {
               sourceBatchRow[StockBatchesV2.status]
@@ -23685,7 +23704,7 @@ fun Application.module() {
                 .singleOrNull()
                 ?: return@forEach
               val quantity = received.receivedQuantity.copy(total = received.receivedQuantity.total.coerceAtLeast(0.0))
-              if (quantity.total <= 0.0) return@forEach
+              if (!quantity.total.isFinite() || quantity.total <= 0.0) return@forEach
 
               val batchId = UUID.randomUUID()
               val shelfPriority = StockBatchesV2
@@ -24553,7 +24572,7 @@ fun Application.module() {
               return@newSuspendedTransaction null
             }
 
-            if (amount <= 0.0) {
+            if (!amount.isFinite() || amount <= 0.0) {
               failureMessage = simpleMessage(
                 main = "Amount must be greater than zero",
                 ru = "Сумма должна быть больше нуля",

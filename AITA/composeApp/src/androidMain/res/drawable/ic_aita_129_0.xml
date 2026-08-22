@@ -1,9 +1,0 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="96dp" android:height="96dp" android:viewportWidth="96" android:viewportHeight="96">
-    <path android:pathData="M25 8 H69 Q73 8 73 12 V38 H25 Z" android:fillColor="#FFF9EC" android:strokeColor="#26343D" android:strokeWidth="5" android:strokeLineCap="round" android:strokeLineJoin="round"/>
-    <path android:pathData="M14 31 H82 Q88 31 88 38 V65 Q88 71 82 71 H14 Q8 71 8 65 V38 Q8 31 14 31 Z" android:fillColor="#2B87B8" android:strokeColor="#26343D" android:strokeWidth="5" android:strokeLineCap="round" android:strokeLineJoin="round"/>
-    <path android:pathData="M23 55 H73 V83 L67 88 L61 83 L55 88 L49 83 L43 88 L37 83 L31 88 L23 83 Z" android:fillColor="#FFF9EC" android:strokeColor="#26343D" android:strokeWidth="5" android:strokeLineCap="round" android:strokeLineJoin="round"/>
-    <path android:pathData="M32 66 H64" android:fillColor="#00000000" android:strokeColor="#80929D" android:strokeWidth="4" android:strokeLineCap="round" android:strokeLineJoin="round"/>
-    <path android:pathData="M32 76 H58" android:fillColor="#00000000" android:strokeColor="#80929D" android:strokeWidth="4" android:strokeLineCap="round" android:strokeLineJoin="round"/>
-    <path android:pathData="M 67.000 45.000 C 67.000 42.239 69.239 40.000 72.000 40.000 C 74.761 40.000 77.000 42.239 77.000 45.000 C 77.000 47.761 74.761 50.000 72.000 50.000 C 69.239 50.000 67.000 47.761 67.000 45.000 Z" android:fillColor="#30AE7D" android:strokeColor="#26343D" android:strokeWidth="2.5" android:strokeLineCap="round" android:strokeLineJoin="round"/>
-    <path android:pathData="M21 42 H58" android:fillColor="#00000000" android:strokeColor="#26343D" android:strokeWidth="5" android:strokeLineCap="round" android:strokeLineJoin="round"/>
-</vector>

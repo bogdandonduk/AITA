@@ -38368,6 +38368,321 @@
           "value": "Профиль жойылуда…"
         }
       ]
+    },
+    {
+      "id": 2519,
+      "values": [
+        {
+          "language": "main",
+          "value": "Supplier workspace readiness"
+        },
+        {
+          "language": "en",
+          "value": "Supplier workspace readiness"
+        },
+        {
+          "language": "ru",
+          "value": "Готовность рабочего пространства поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші жұмыс кеңістігінің дайындығы"
+        }
+      ]
+    },
+    {
+      "id": 2520,
+      "values": [
+        {
+          "language": "main",
+          "value": "A calm checklist for getting this Supplier desk ready."
+        },
+        {
+          "language": "en",
+          "value": "A calm checklist for getting this Supplier desk ready."
+        },
+        {
+          "language": "ru",
+          "value": "Спокойный чек-лист готовности рабочего места поставщика."
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші жұмыс орнын дайындауға арналған түсінікті тексеру тізімі."
+        }
+      ]
+    },
+    {
+      "id": 2521,
+      "values": [
+        {
+          "language": "main",
+          "value": "Complete profile"
+        },
+        {
+          "language": "en",
+          "value": "Complete profile"
+        },
+        {
+          "language": "ru",
+          "value": "Завершить профиль"
+        },
+        {
+          "language": "kk",
+          "value": "Профильді аяқтау"
+        }
+      ]
+    },
+    {
+      "id": 2522,
+      "values": [
+        {
+          "language": "main",
+          "value": "Review open orders"
+        },
+        {
+          "language": "en",
+          "value": "Review open orders"
+        },
+        {
+          "language": "ru",
+          "value": "Проверить открытые заказы"
+        },
+        {
+          "language": "kk",
+          "value": "Ашық тапсырыстарды тексеру"
+        }
+      ]
+    },
+    {
+      "id": 2523,
+      "values": [
+        {
+          "language": "main",
+          "value": "Build supplier catalog"
+        },
+        {
+          "language": "en",
+          "value": "Build supplier catalog"
+        },
+        {
+          "language": "ru",
+          "value": "Наполнить каталог поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші каталогын толтыру"
+        }
+      ]
+    },
+    {
+      "id": 2524,
+      "values": [
+        {
+          "language": "main",
+          "value": "Connect partner stores"
+        },
+        {
+          "language": "en",
+          "value": "Connect partner stores"
+        },
+        {
+          "language": "ru",
+          "value": "Подключить магазины-партнёры"
+        },
+        {
+          "language": "kk",
+          "value": "Серіктес дүкендерді қосу"
+        }
+      ]
+    },
+    {
+      "id": 2525,
+      "values": [
+        {
+          "language": "main",
+          "value": "Review agreements"
+        },
+        {
+          "language": "en",
+          "value": "Review agreements"
+        },
+        {
+          "language": "ru",
+          "value": "Проверить договоры"
+        },
+        {
+          "language": "kk",
+          "value": "Келісімдерді тексеру"
+        }
+      ]
+    },
+    {
+      "id": 2526,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open supplier insights"
+        },
+        {
+          "language": "en",
+          "value": "Open supplier insights"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть аналитику поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші талдауын ашу"
+        }
+      ]
+    },
+    {
+      "id": 2527,
+      "values": [
+        {
+          "language": "main",
+          "value": "Create the business identity stores will order from."
+        },
+        {
+          "language": "en",
+          "value": "Create the business identity stores will order from."
+        },
+        {
+          "language": "ru",
+          "value": "Создайте бизнес-профиль, у которого магазины будут делать заказы."
+        },
+        {
+          "language": "kk",
+          "value": "Дүкендер тапсырыс беретін бизнес профильді жасаңыз."
+        }
+      ]
+    },
+    {
+      "id": 2528,
+      "values": [
+        {
+          "language": "main",
+          "value": "Finish the selected profile’s contacts and setup checks."
+        },
+        {
+          "language": "en",
+          "value": "Finish the selected profile’s contacts and setup checks."
+        },
+        {
+          "language": "ru",
+          "value": "Заполните контакты выбранного профиля и устраните замечания настройки."
+        },
+        {
+          "language": "kk",
+          "value": "Таңдалған профильдің байланыстарын толтырып, баптау ескертулерін түзетіңіз."
+        }
+      ]
+    },
+    {
+      "id": 2529,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open Store orders are waiting for a clear Supplier response."
+        },
+        {
+          "language": "en",
+          "value": "Open Store orders are waiting for a clear Supplier response."
+        },
+        {
+          "language": "ru",
+          "value": "Открытые заказы магазинов ждут понятного ответа поставщика."
+        },
+        {
+          "language": "kk",
+          "value": "Ашық дүкен тапсырыстары жеткізушінің нақты жауабын күтуде."
+        }
+      ]
+    },
+    {
+      "id": 2530,
+      "values": [
+        {
+          "language": "main",
+          "value": "Add reusable offers so Stores can order with less manual work."
+        },
+        {
+          "language": "en",
+          "value": "Add reusable offers so Stores can order with less manual work."
+        },
+        {
+          "language": "ru",
+          "value": "Добавьте повторно используемые предложения, чтобы магазинам было проще заказывать."
+        },
+        {
+          "language": "kk",
+          "value": "Дүкендер аз қол жұмысымен тапсырыс беруі үшін қайта пайдаланылатын ұсыныстар қосыңыз."
+        }
+      ]
+    },
+    {
+      "id": 2531,
+      "values": [
+        {
+          "language": "main",
+          "value": "Build the partner Store workspace around this Supplier identity."
+        },
+        {
+          "language": "en",
+          "value": "Build the partner Store workspace around this Supplier identity."
+        },
+        {
+          "language": "ru",
+          "value": "Сформируйте пространство магазинов-партнёров для этого профиля поставщика."
+        },
+        {
+          "language": "kk",
+          "value": "Осы жеткізуші профилі үшін серіктес дүкендер кеңістігін қалыптастырыңыз."
+        }
+      ]
+    },
+    {
+      "id": 2532,
+      "values": [
+        {
+          "language": "main",
+          "value": "Record delivery, payment, and product terms with partner Stores."
+        },
+        {
+          "language": "en",
+          "value": "Record delivery, payment, and product terms with partner Stores."
+        },
+        {
+          "language": "ru",
+          "value": "Зафиксируйте условия доставки, оплаты и товаров с магазинами-партнёрами."
+        },
+        {
+          "language": "kk",
+          "value": "Серіктес дүкендермен жеткізу, төлем және тауар шарттарын бекітіңіз."
+        }
+      ]
+    },
+    {
+      "id": 2533,
+      "values": [
+        {
+          "language": "main",
+          "value": "The core Supplier workspace is ready. Review performance and next actions."
+        },
+        {
+          "language": "en",
+          "value": "The core Supplier workspace is ready. Review performance and next actions."
+        },
+        {
+          "language": "ru",
+          "value": "Основное пространство поставщика готово. Проверьте показатели и следующие действия."
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізушінің негізгі кеңістігі дайын. Көрсеткіштер мен келесі әрекеттерді тексеріңіз."
+        }
+      ]
     }
   ]
 }

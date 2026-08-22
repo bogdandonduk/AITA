@@ -281,14 +281,16 @@ internal fun AppConfiguration.storeVerifiedAddressPicker(
         }
     }
 
-    LaunchedEffect(query, countryCode, stateValues.appLanguage, selectedMatchesQuery) {
+    val aitaLatestAddressOwner0 = rememberAitaLatestUiRequestOwner()
+    LaunchedEffect(query, countryCode, stateValues.appLanguage, selectedMatchesQuery) {        val aitaLatestAddressTicket0 = aitaLatestAddressOwner0.begin()
+
         if (selectedMatchesQuery || query.length < 3) {
             state.suggestions = emptyList()
             state.isSuggesting = false
             return@LaunchedEffect
         }
         delay(340)
-        state.isSuggesting = true
+        if (aitaLatestAddressOwner0.owns(aitaLatestAddressTicket0)) state.isSuggesting = true
         state.providerMessage = null
         try {
             val response = suggestStoreAddresses(
@@ -298,33 +300,35 @@ internal fun AppConfiguration.storeVerifiedAddressPicker(
                 limit = 8
             )
             if (query == textField.value.text.trim().replace(Regex("\\s+"), " ")) {
-                state.suggestions = response.payload.orEmpty()
+                if (aitaLatestAddressOwner0.owns(aitaLatestAddressTicket0)) state.suggestions = response.payload.orEmpty()
                 state.providerMessage = if (response.negative) {
                     response.message?.extractLocalizedString(stateValues.appLanguage)
                         ?: localizedStringResource(2306, "Could not load address suggestions")
                 } else if (response.payload.orEmpty().isEmpty()) {
                     localizedStringResource(2307, "No matching addresses found")
                 } else null
-                state.isSuggesting = false
+                if (aitaLatestAddressOwner0.owns(aitaLatestAddressTicket0)) state.isSuggesting = false
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Throwable) {
             if (query == textField.value.text.trim().replace(Regex("\\s+"), " ")) {
-                state.suggestions = emptyList()
+                if (aitaLatestAddressOwner0.owns(aitaLatestAddressTicket0)) state.suggestions = emptyList()
                 state.providerMessage = localizedStringResource(2306, "Could not load address suggestions")
-                state.isSuggesting = false
+                if (aitaLatestAddressOwner0.owns(aitaLatestAddressTicket0)) state.isSuggesting = false
             }
         }
     }
 
     val selectedLocation = state.selectedLocation
+    val aitaLatestAddressOwner1 = rememberAitaLatestUiRequestOwner()
     LaunchedEffect(
         selectedLocation?.providerObjectId,
         selectedLocation?.providerRevision,
         stateValues.appLanguage,
         stateValues.appThemeId
-    ) {
+    ) {        val aitaLatestAddressTicket1 = aitaLatestAddressOwner1.begin()
+
         val location = selectedLocation ?: run {
             state.mapPreview = null
             state.mapPreviewFailed = false
@@ -337,13 +341,13 @@ internal fun AppConfiguration.storeVerifiedAddressPicker(
                 language = stateValues.appLanguage,
                 darkTheme = normalizeAppThemePreference(stateValues.appThemeId) == 1L
             )
-            state.mapPreview = response.payload
-            state.mapPreviewFailed = response.negative || response.payload == null
+            if (aitaLatestAddressOwner1.owns(aitaLatestAddressTicket1)) state.mapPreview = response.payload
+            if (aitaLatestAddressOwner1.owns(aitaLatestAddressTicket1)) state.mapPreviewFailed = response.negative || response.payload == null
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Throwable) {
-            state.mapPreview = null
-            state.mapPreviewFailed = true
+            if (aitaLatestAddressOwner1.owns(aitaLatestAddressTicket1)) state.mapPreview = null
+            if (aitaLatestAddressOwner1.owns(aitaLatestAddressTicket1)) state.mapPreviewFailed = true
         }
     }
 

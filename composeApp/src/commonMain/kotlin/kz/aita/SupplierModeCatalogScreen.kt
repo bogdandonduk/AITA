@@ -3,11 +3,9 @@ package kz.aita
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.align
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
@@ -81,9 +79,11 @@ internal fun AppConfiguration.SupplierCatalogScreen() {
         }
     }
 
-    LaunchedEffect(searchQuery, filterId, sortId) {
+    val aitaLatestCatalogueOwner0 = rememberAitaLatestUiRequestOwner()
+    LaunchedEffect(searchQuery, filterId, sortId) {        val aitaLatestCatalogueTicket0 = aitaLatestCatalogueOwner0.begin()
+
         delay(250L)
-        seedSupplierCatalogNavigation(
+        if (aitaLatestCatalogueOwner0.owns(aitaLatestCatalogueTicket0)) seedSupplierCatalogNavigation(
             searchQuery = searchQuery,
             filterId = filterId,
             sortId = sortId

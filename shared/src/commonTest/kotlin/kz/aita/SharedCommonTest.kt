@@ -20,6 +20,16 @@ class SharedCommonTest {
     }
 
     @Test
+    fun unavailableHealthProbeBackoffIsBounded() {
+        assertEquals(15_000L, cloudConnectionUnavailableProbeDelayMillis(0))
+        assertEquals(30_000L, cloudConnectionUnavailableProbeDelayMillis(1))
+        assertEquals(60_000L, cloudConnectionUnavailableProbeDelayMillis(2))
+        assertEquals(120_000L, cloudConnectionUnavailableProbeDelayMillis(3))
+        assertEquals(120_000L, cloudConnectionUnavailableProbeDelayMillis(99))
+        assertEquals(15_000L, cloudConnectionUnavailableProbeDelayMillis(-5))
+    }
+
+    @Test
     fun resolvedAddressUsesLocalizedSnapshotsAndCoordinatesAsIdentity() {
         val location = LocationDataModel(
             name = "Astana, Dostyk Street, 1",

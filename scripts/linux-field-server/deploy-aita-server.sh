@@ -4,6 +4,15 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/aita-linux-common.sh"
 
+aita_require_command flock
+aita_require_command sha256sum
+aita_require_command unzip
+
+deploy_state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/aita"
+mkdir -p "$deploy_state_dir"
+exec 9>"$deploy_state_dir/deploy.lock"
+flock -n 9 || aita_die "Another AITA deployment is already running for $(id -un)"
+
 project_root="$(pwd)"
 build=false
 backup=false
@@ -34,6 +43,20 @@ fi
 current_jar=/opt/aita/app/aita-server-all.jar
 previous_jar=/opt/aita/app/aita-server-all.previous.jar
 
+verify_server_jar() {
+  local jar="${1:?Server JAR path is required}"
+  [[ -s "$jar" ]] || aita_die "Server fat JAR is missing or empty: $jar"
+  local size
+  size="$(stat -c '%s' "$jar")"
+  ((size >= 1024 * 1024)) || aita_die "Server JAR is suspiciously small ($size bytes): $jar"
+  unzip -tqq "$jar" || aita_die "Server JAR is not a valid ZIP/JAR: $jar"
+  unzip -Z1 "$jar" | grep -qx 'kz/aita/server/ServerKt.class' ||
+    aita_die "Server JAR does not contain kz/aita/server/ServerKt.class: $jar"
+  unzip -p "$jar" META-INF/MANIFEST.MF | tr -d '\r' |
+    grep -Eq '^Main-Class:[[:space:]]*kz\.aita\.server\.ServerKt[[:space:]]*$' ||
+    aita_die "Server JAR manifest does not point to kz.aita.server.ServerKt: $jar"
+}
+
 if $rollback; then
   [[ -f "$previous_jar" ]] || aita_die "No previous JAR is available at $previous_jar"
   aita_info "WARNING: a JAR rollback does not reverse Flyway migrations. Confirm schema compatibility before continuing."
@@ -50,6 +73,7 @@ else
 
   source_jar="$project_root/server/build/libs/aita-server-all.jar"
   [[ -r "$source_jar" ]] || aita_die "Fat JAR is missing: $source_jar (run with --build)"
+  verify_server_jar "$source_jar"
 
   if $backup; then
     "${sudo_cmd[@]}" systemctl start --wait aita-backup.service
@@ -60,6 +84,7 @@ else
   "${sudo_cmd[@]}" install -o aita -g aita -m 0640 "$source_jar" "$stage"
   staged_checksum="$("${sudo_cmd[@]}" sha256sum "$stage" | awk '{print $1}')"
   [[ "$checksum" == "$staged_checksum" ]] || aita_die "Staged JAR checksum mismatch"
+  "${sudo_cmd[@]}" unzip -tqq "$stage" || aita_die "Staged server JAR integrity check failed"
 
   "${sudo_cmd[@]}" systemctl stop aita-server.service || true
   if "${sudo_cmd[@]}" test -f "$current_jar"; then

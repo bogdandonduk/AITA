@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
-  <path d="M3.8 19.95V9.2l4.25 2.3V8.9l4.35 2.55V8.85l4.1 2.35V19.95H3.8Z" fill="#253142" stroke="#F8FAFC" stroke-width="1.35" stroke-linejoin="round"/>
-  <path d="M16.5 19.95V5.15h2.95v14.8H16.5Z" fill="#36465C" stroke="#F8FAFC" stroke-width="1.35" stroke-linejoin="round"/>
-  <path d="M6.1 14.15h2.15v2.1H6.1v-2.1ZM10.2 14.15h2.15v2.1H10.2v-2.1Z" fill="#67D7FF" stroke="#F8FAFC" stroke-width=".9" stroke-linejoin="round"/>
-  <path d="M17.95 3.15c1.15.2 1.9.85 2.05 1.78.12.72-.18 1.32-.55 1.74" fill="none" stroke="#57E3B5" stroke-width="1.25" stroke-linecap="round"/>
-  <path d="M14.8 14.65a2.45 2.45 0 1 0 0 .01" fill="#21483F" stroke="#F8FAFC" stroke-width="1.15"/>
-  <path d="M14.8 12.2v-1.05M14.8 18.15V17.1M12.35 14.65H11.3M18.3 14.65h-1.05M13.05 12.9l-.75-.75M17.3 17.15l-.75-.75M16.55 12.9l.75-.75M12.3 17.15l.75-.75" fill="none" stroke="#F8FAFC" stroke-width="1.0" stroke-linecap="round"/>
-  <path d="M5.05 5.35l.38.82.82.38-.82.38-.38.82-.38-.82-.82-.38.82-.38.38-.82Z" fill="#FF8FAB"/>
-</svg>

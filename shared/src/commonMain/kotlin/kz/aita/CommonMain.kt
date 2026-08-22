@@ -3209,7 +3209,7 @@ fun addGoodsItemToTransactionCart(
         roundTotal = deltaQuantity.roundTotal
     )
 
-    if (normalizedDeltaQuantity.total <= 0.0)
+    if (!normalizedDeltaQuantity.total.isFinite() || normalizedDeltaQuantity.total <= 0.0)
         return
 
     if (existing == null) {
@@ -7136,6 +7136,11 @@ private fun normalizeAppModePreference(modeId: Int?): Int = when (modeId) {
 }
 
 val appModeState = MutableStateFlow(APP_MODE_STORE)
+
+private val appInitializationStartedState = MutableStateFlow(false)
+
+internal fun beginAitaInitializationOnce(): Boolean =
+    appInitializationStartedState.compareAndSet(expect = false, update = true)
 val globalAppConfigurationState = MutableDataStateFlowNonNull(
     coroutineScope = GlobalScope,
     initial = GlobalAppConfigurationDataModel(
@@ -7875,11 +7880,13 @@ private const val CLOUD_CONNECTION_HEALTH_CHECK_REALTIME_CONNECTED_INTERVAL_MILL
 private const val CLOUD_CONNECTION_HEALTH_CHECK_AUTH_REQUIRED_INTERVAL_MILLIS = 60_000L
 private const val CLOUD_CONNECTION_HEALTH_CHECK_UNKNOWN_INTERVAL_MILLIS = 10_000L
 private const val CLOUD_CONNECTION_HEALTH_CHECK_UNAVAILABLE_INTERVAL_MILLIS = 15_000L
+private const val CLOUD_CONNECTION_HEALTH_CHECK_UNAVAILABLE_MAX_INTERVAL_MILLIS = 120_000L
 private const val CLOUD_CONNECTION_HEALTH_CHECK_BUSY_DEFER_MILLIS = 10_000L
 private const val CLOUD_CONNECTION_HEALTH_CHECK_TIMEOUT_MILLIS = 20_000L
 private const val CLOUD_CONNECTION_AUTH_REFRESH_SUPPRESSION_AFTER_TRANSPORT_FAILURE_MILLIS = 15_000L
-private const val CLOUD_CONNECTION_PRESENTATION_OFFLINE_SETTLE_MILLIS = 45_000L
-private const val CLOUD_CONNECTION_PRESENTATION_RECOVERY_SETTLE_MILLIS = 12_000L
+private const val CLOUD_CONNECTION_PRESENTATION_INITIAL_OFFLINE_SETTLE_MILLIS = 3_000L
+private const val CLOUD_CONNECTION_PRESENTATION_OFFLINE_SETTLE_MILLIS = 8_000L
+private const val CLOUD_CONNECTION_PRESENTATION_RECOVERY_SETTLE_MILLIS = 3_000L
 private const val CLOUD_CONNECTION_PRESENTATION_INITIAL_REACHABLE_SETTLE_MILLIS = 1_000L
 @Volatile
 private var cloudTransportLastUnavailableAtMillis: Long = 0L
@@ -8076,6 +8083,7 @@ val storesState = MutableDataStateFlow<List<StoreDataModel>>(GlobalScope)
 val activeStoreIdState = MutableStateFlow<String?>(null)
 
 val getStoresMutex = Mutex()
+private val storesRefreshPendingState = MutableStateFlow(false)
 val addStoreMutex = Mutex()
 val updateStoreMutex = Mutex()
 val deleteStoreMutex = Mutex()
@@ -8539,6 +8547,11 @@ fun List<CountryDataModel>.getFirstCurrencyByCountry(locale: String): CurrencyDa
 }
 
 fun init() {
+    if (!beginAitaInitializationOnce()) {
+        logCloudConnectionDiagnostic("AITA init ignored: initialization is already active")
+        return
+    }
+
     GlobalScope.launch(Dispatchers.ourIo) {
         // Load persisted configuration before starting collectors. Otherwise the initial bundled
         // server URL can overwrite the last working local server URL before the app has a chance
@@ -11107,7 +11120,7 @@ internal fun cloudResponseCanMarkReachable(
     return true
 }
 
-private const val AITA_NETWORK_VERBOSE_LOGS = true
+private const val AITA_NETWORK_VERBOSE_LOGS = false
 
 @PublishedApi
 internal fun logNetworkAttempt(message: String) {
@@ -14083,11 +14096,19 @@ private fun cancelRealtimeUpdatesSocketAfterReachabilityFailure() {
     realtimeUpdatesConnectedState.value = false
 }
 
+@PublishedApi
+internal fun cloudConnectionUnavailableProbeDelayMillis(unavailableRound: Int): Long {
+    val exponent = unavailableRound.coerceIn(0, 3)
+    return (CLOUD_CONNECTION_HEALTH_CHECK_UNAVAILABLE_INTERVAL_MILLIS * (1L shl exponent))
+        .coerceAtMost(CLOUD_CONNECTION_HEALTH_CHECK_UNAVAILABLE_MAX_INTERVAL_MILLIS)
+}
+
 fun startCloudConnectionHealthMonitor() {
     if (cloudConnectionHealthMonitorJob?.isActive == true) return
 
     cloudConnectionHealthMonitorJob = GlobalScope.launch(Dispatchers.ourIo) {
         delay(1_500L)
+        var unavailableRound = 0
 
         while (isActive) {
             val configuredServerUrl = globalAppConfigurationState.payloadValue.serverUrl.first
@@ -14147,6 +14168,7 @@ fun startCloudConnectionHealthMonitor() {
             )
 
             if (serverAvailable) {
+                unavailableRound = 0
                 // /auth/ping is deliberately public: it proves only that the AITA transport is alive.
                 // It must never clear a grounded expired-session state merely because local tokens exist.
                 markCloudTransportReachableForNotifications(
@@ -14172,10 +14194,23 @@ fun startCloudConnectionHealthMonitor() {
             }
 
             val delayMillis = when (cloudTransportStatusState.value) {
-                CLOUD_TRANSPORT_STATUS_REACHABLE -> CLOUD_CONNECTION_HEALTH_CHECK_REACHABLE_INTERVAL_MILLIS
-                CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED -> CLOUD_CONNECTION_HEALTH_CHECK_AUTH_REQUIRED_INTERVAL_MILLIS
-                CLOUD_TRANSPORT_STATUS_UNAVAILABLE -> CLOUD_CONNECTION_HEALTH_CHECK_UNAVAILABLE_INTERVAL_MILLIS
-                else -> CLOUD_CONNECTION_HEALTH_CHECK_UNKNOWN_INTERVAL_MILLIS
+                CLOUD_TRANSPORT_STATUS_REACHABLE -> {
+                    unavailableRound = 0
+                    CLOUD_CONNECTION_HEALTH_CHECK_REACHABLE_INTERVAL_MILLIS
+                }
+                CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED -> {
+                    unavailableRound = 0
+                    CLOUD_CONNECTION_HEALTH_CHECK_AUTH_REQUIRED_INTERVAL_MILLIS
+                }
+                CLOUD_TRANSPORT_STATUS_UNAVAILABLE -> {
+                    cloudConnectionUnavailableProbeDelayMillis(unavailableRound).also {
+                        unavailableRound = (unavailableRound + 1).coerceAtMost(3)
+                    }
+                }
+                else -> {
+                    unavailableRound = 0
+                    CLOUD_CONNECTION_HEALTH_CHECK_UNKNOWN_INTERVAL_MILLIS
+                }
             }
             delay(delayMillis)
         }
@@ -14630,7 +14665,7 @@ private val notificationPopupTransientById = mutableMapOf<String, Boolean>()
 private val dismissedNotificationPopupKeysUntil = mutableMapOf<String, Long>()
 
 @Volatile
-private var cloudTransportReachableForNotifications = true
+private var cloudTransportReachableForNotifications = false
 @Volatile
 private var cloudTransportFailureNotificationPending = false
 @Volatile
@@ -14642,12 +14677,12 @@ private var cloudSessionRefreshRequiredForNotifications = false
 @Volatile
 private var cloudSessionRefreshNotificationPostedForCurrentRequirement = false
 
-private const val CLOUD_TRANSPORT_FAILURE_CONFIRMATION_MIN_SIGNALS = 3
-private const val CLOUD_TRANSPORT_FAILURE_CONFIRMATION_MIN_SIGNALS_WHILE_HEALTHY = 4
-private const val CLOUD_TRANSPORT_FAILURE_CONFIRMATION_WINDOW_MILLIS = 24_000L
-private const val CLOUD_TRANSPORT_FAILURE_CONFIRMATION_WINDOW_WHILE_HEALTHY_MILLIS = 60_000L
-private const val CLOUD_TRANSPORT_FAILURE_MIN_SIGNAL_SPACING_MILLIS = 8_000L
-private const val CLOUD_TRANSPORT_FAILURE_MIN_SIGNAL_SPACING_WHILE_HEALTHY_MILLIS = 15_000L
+private const val CLOUD_TRANSPORT_FAILURE_CONFIRMATION_MIN_SIGNALS = 2
+private const val CLOUD_TRANSPORT_FAILURE_CONFIRMATION_MIN_SIGNALS_WHILE_HEALTHY = 3
+private const val CLOUD_TRANSPORT_FAILURE_CONFIRMATION_WINDOW_MILLIS = 8_000L
+private const val CLOUD_TRANSPORT_FAILURE_CONFIRMATION_WINDOW_WHILE_HEALTHY_MILLIS = 20_000L
+private const val CLOUD_TRANSPORT_FAILURE_MIN_SIGNAL_SPACING_MILLIS = 6_000L
+private const val CLOUD_TRANSPORT_FAILURE_MIN_SIGNAL_SPACING_WHILE_HEALTHY_MILLIS = 8_000L
 private const val CLOUD_TRANSPORT_FAILURE_SIGNAL_RESET_MILLIS = 180_000L
 private const val CLOUD_TRANSPORT_RECOVERY_CONFIRMATION_MIN_SIGNALS = 3
 private const val CLOUD_TRANSPORT_RECOVERY_CONFIRMATION_WINDOW_MILLIS = 8_000L
@@ -14993,6 +15028,9 @@ private fun scheduleCloudTransportPresentationStatus(rawStatus: Int, reason: Str
 
     val transition = reserveCloudConnectionPresentationTransition(nextPresentationStatus) ?: return
     val settleMillis = when {
+        nextPresentationStatus == CLOUD_TRANSPORT_STATUS_UNAVAILABLE &&
+                transition.displayedStatus == CLOUD_TRANSPORT_STATUS_UNKNOWN ->
+            CLOUD_CONNECTION_PRESENTATION_INITIAL_OFFLINE_SETTLE_MILLIS
         nextPresentationStatus == CLOUD_TRANSPORT_STATUS_UNAVAILABLE ->
             CLOUD_CONNECTION_PRESENTATION_OFFLINE_SETTLE_MILLIS
         transition.displayedStatus == CLOUD_TRANSPORT_STATUS_UNAVAILABLE &&
@@ -15034,15 +15072,17 @@ private fun scheduleCloudTransportPresentationStatus(rawStatus: Int, reason: Str
 }
 
 private fun setCloudTransportStatusForDiagnostics(nextStatus: Int, reason: String) {
-    val previousStatus = cloudTransportStatusState.value
-    if (previousStatus != nextStatus) {
+    while (true) {
+        val previousStatus = cloudTransportStatusState.value
+        if (previousStatus == nextStatus) break
+        if (!cloudTransportStatusState.compareAndSet(previousStatus, nextStatus)) continue
         logCloudConnectionDiagnostic(
             "status ${cloudTransportStatusName(previousStatus)} -> ${cloudTransportStatusName(nextStatus)} " +
                     "reason=$reason realtime=${realtimeUpdatesConnectedState.value} " +
                     "hasTokens=${getStoredUserAuthTokens?.invoke() != null} activeStore=${activeStoreIdState.value.orEmpty()}"
         )
+        break
     }
-    cloudTransportStatusState.value = nextStatus
     scheduleCloudTransportPresentationStatus(nextStatus, reason)
 }
 
@@ -15111,18 +15151,17 @@ private fun recordCloudTransportFailureSignalForNotifications(reason: String = "
     val elapsed = (now - updated.firstSignalAtMillis).coerceAtLeast(0L)
     val confirmed = updated.signalCount >= requiredSignals && elapsed >= requiredWindow
 
-    if (!confirmed) {
+    if (!confirmed && updated.lastCountedSignalAtMillis == now) {
         val minimumSpacing = if (updated.startedWhileGroundedHealthy) {
             CLOUD_TRANSPORT_FAILURE_MIN_SIGNAL_SPACING_WHILE_HEALTHY_MILLIS
         } else {
             CLOUD_TRANSPORT_FAILURE_MIN_SIGNAL_SPACING_MILLIS
         }
-        val coalescedBurst = now - updated.lastCountedSignalAtMillis in 1 until minimumSpacing
         logCloudConnectionDiagnostic(
             "transport failure signal held for confirmation reason=$reason " +
                     "signals=${updated.signalCount}/$requiredSignals elapsed=${elapsed}ms/${requiredWindow}ms " +
-                    "minimumSpacing=${minimumSpacing}ms coalescedBurst=$coalescedBurst " +
-                    "realtime=${realtimeUpdatesConnectedState.value} status=${cloudTransportStatusName(cloudTransportStatusState.value)}"
+                    "minimumSpacing=${minimumSpacing}ms realtime=${realtimeUpdatesConnectedState.value} " +
+                    "status=${cloudTransportStatusName(cloudTransportStatusState.value)}"
         )
     }
 
@@ -15154,7 +15193,7 @@ private fun recordCloudTransportRecoverySignalForNotifications(reason: String = 
     val confirmed = updated.signalCount >= CLOUD_TRANSPORT_RECOVERY_CONFIRMATION_MIN_SIGNALS &&
             elapsed >= CLOUD_TRANSPORT_RECOVERY_CONFIRMATION_WINDOW_MILLIS
 
-    if (!confirmed) {
+    if (!confirmed && updated.lastCountedSignalAtMillis == now) {
         logCloudConnectionDiagnostic(
             "transport recovery signal held for confirmation reason=$reason " +
                     "signals=${updated.signalCount}/$CLOUD_TRANSPORT_RECOVERY_CONFIRMATION_MIN_SIGNALS " +
@@ -15217,8 +15256,7 @@ internal fun markCloudTransportReachableForNotifications(
     authRefreshRequired: Boolean? = null,
     forceRecovery: Boolean = false
 ): Boolean {
-    val wasUnavailable = !cloudTransportReachableForNotifications ||
-            cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_UNAVAILABLE
+    val wasUnavailable = cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_UNAVAILABLE
 
     if (wasUnavailable && !forceRecovery) {
         // Even one authoritative server response is enough to stop a pending visual outage. Raw
@@ -17293,6 +17331,45 @@ suspend fun requestStoreAddressMapPreview(
     )
 )
 
+internal fun List<StoreDataModel>.withoutStoreOrBranch(storeId: String): List<StoreDataModel> {
+    val cleanId = storeId.trim()
+    if (cleanId.isBlank()) return this
+    return mapNotNull { store ->
+        if (store.id == cleanId) {
+            null
+        } else {
+            store.copy(branches = store.branches.withoutStoreOrBranch(cleanId))
+        }
+    }
+}
+
+internal fun List<StoreDataModel>.upsertStoreOrBranch(saved: StoreDataModel): List<StoreDataModel> {
+    val cleanId = saved.id.trim()
+    if (cleanId.isBlank()) return this
+
+    val existing = findStoreOrBranch(cleanId)
+    val preservedChildren = if (saved.branches.isEmpty()) existing?.branches.orEmpty() else saved.branches
+    val authoritative = saved.copy(branches = preservedChildren)
+    val withoutOldCopy = withoutStoreOrBranch(cleanId)
+    val parentId = authoritative.parentStoreId?.trim().orEmpty()
+
+    if (parentId.isBlank()) return withoutOldCopy + authoritative
+
+    var inserted = false
+    fun insertIntoParent(store: StoreDataModel): StoreDataModel {
+        if (store.id == parentId) {
+            inserted = true
+            return store.copy(branches = store.branches + authoritative)
+        }
+        return store.copy(branches = store.branches.map(::insertIntoParent))
+    }
+
+    val reconciled = withoutOldCopy.map(::insertIntoParent)
+    // If the parent is not in the current partial cache, do not misrepresent the branch as a
+    // top-level Store. The authoritative getStores() refresh will place it correctly.
+    return if (inserted) reconciled else withoutOldCopy
+}
+
 private fun List<StoreDataModel>.mergeRefreshedStores(
     refreshedStores: List<StoreDataModel>
 ): List<StoreDataModel> {
@@ -17342,16 +17419,20 @@ fun refreshStoreAddressLocalizations(
 }
 
 fun getStores() {
-    if (!getStoresMutex.isLocked)
-        GlobalScope.launch(Dispatchers.ourIo) {
-            getStoresMutex.withLock {
+    storesRefreshPendingState.value = true
+    if (!getStoresMutex.tryLock()) return
+
+    GlobalScope.launch(Dispatchers.ourIo) {
+        try {
+            do {
+                storesRefreshPendingState.value = false
                 val response = networkRequest<List<StoreDataModel>, Unit>(
                     HttpMethod.Get,
                     endpointUrl = globalAppConfigurationState.payloadValue.getStoresPath.first
                 )
 
-                if (!response.negative) {
-                    val stores = response.payload!!
+                if (!response.negative && response.payload != null) {
+                    val stores = response.payload
                     storesState.emit(DataState.Success(stores, response.message))
                     refreshStoreAddressLocalizations(
                         storeIds = stores.flattenStoresWithBranches()
@@ -17366,12 +17447,17 @@ fun getStores() {
 
                         activeStoreIdState.value == null -> {
                             val settableStores = stores.settableActiveStores()
-                            if (!activeStoreExplicitNoneIsSet() && settableStores.size == 1) setActiveStoreId(settableStores.first().id)
+                            if (!activeStoreExplicitNoneIsSet() && settableStores.size == 1) {
+                                setActiveStoreId(settableStores.first().id)
+                            }
                         }
                     }
                 }
-            }
+            } while (storesRefreshPendingState.value)
+        } finally {
+            getStoresMutex.unlock()
         }
+    }
 }
 
 fun addStore(store: StoreDataModel, onCompleted: ((DataState<StoreDataModel>) -> Unit)?) {
@@ -17392,16 +17478,7 @@ fun addStore(store: StoreDataModel, onCompleted: ((DataState<StoreDataModel>) ->
 
                     storesState.emit(
                         DataState.Success(
-                            mutableListOf<StoreDataModel>().also { newList ->
-                                (storesState.value.value as? DataState.Success)?.payload?.run {
-                                    newList.addAll(this)
-                                }
-
-                                storesState.payloadValue?.indexOfFirst { it.id == response.payload!!.id }?.takeIf { it != -1 }
-                                    ?.let { index ->
-                                        newList[index] = response.payload!!
-                                    } ?: newList.add(response.payload!!)
-                            }
+                            storesState.payloadValue.orEmpty().upsertStoreOrBranch(response.payload!!)
                         )
                     )
 
@@ -17431,18 +17508,10 @@ fun updateStore(store: StoreDataModel, onCompleted: ((DataState<StoreDataModel>)
 
                     storesState.emit(
                         DataState.Success(
-                            mutableListOf<StoreDataModel>().also { newList ->
-                                (storesState.value.value as? DataState.Success)?.payload?.run {
-                                    newList.addAll(this)
-                                }
-
-                                newList.indexOfFirst { item -> item.id == store.id }
-                                    .takeIf { index -> index != -1 }?.let { index ->
-                                        newList[index] = response.payload!!
-                                    }
-                            }
+                            storesState.payloadValue.orEmpty().upsertStoreOrBranch(response.payload!!)
                         )
                     )
+                    getStores()
 
                     onCompleted?.invoke(DataState.Success(response.payload!!))
                 }
@@ -17465,16 +17534,11 @@ fun deleteStore(store: StoreDataModel, onCompleted: ((DataState<Unit>) -> Unit)?
                 } else {
                     postInAppNotification(response.message, NotificationType.Positive)
 
-                    val removedIds = buildSet {
-                        add(store.id)
-                        store.branches.forEach { add(it.id) }
-                    }
+                    val removedIds = listOf(store).flattenStoresWithBranches().map { it.id }.toSet()
 
                     storesState.emit(
                         DataState.Success(
-                            storesState.payloadValue
-                                .orEmpty()
-                                .filterNot { it.id in removedIds || (it.parentStoreId?.let { parentId -> parentId in removedIds } == true) }
+                            storesState.payloadValue.orEmpty().withoutStoreOrBranch(store.id)
                         )
                     )
 
@@ -17489,38 +17553,74 @@ fun deleteStore(store: StoreDataModel, onCompleted: ((DataState<Unit>) -> Unit)?
         }
 }
 
+private val activeStoreSelectionGenerationState = MutableStateFlow(0L)
+
+private fun nextActiveStoreSelectionGeneration(): Long {
+    while (true) {
+        val current = activeStoreSelectionGenerationState.value
+        val next = if (current == Long.MAX_VALUE) 1L else current + 1L
+        if (activeStoreSelectionGenerationState.compareAndSet(current, next)) return next
+    }
+}
+
+private fun activeStoreSelectionGenerationIsCurrent(generation: Long): Boolean =
+    activeStoreSelectionGenerationState.value == generation
+
 fun setActiveStoreId(
     id: String?,
     syncServer: Boolean = true
 ) {
+    val normalizedId = id?.trim()?.takeIf { it.isNotBlank() }
+    val previousId = activeStoreIdState.value?.trim()?.takeIf { it.isNotBlank() }
+    if (normalizedId == previousId) return
+
+    val generation = nextActiveStoreSelectionGeneration()
     GlobalScope.launch(Dispatchers.ourIo) {
-        val normalizedId = id?.takeIf { it.isNotBlank() }
         val explicitNone = normalizedId == null && syncServer
+        val previousExplicitNone = activeStoreExplicitNoneIsSet()
+
         putLocalKv(KEY_ACTIVE_STORE_ID, normalizedId)
         putLocalKv(KEY_ACTIVE_STORE_EXPLICIT_NONE, if (explicitNone) "1" else null)
         activeStoreIdState.emit(normalizedId)
         logCloudConnectionDiagnostic(
-            "active store set local id=${normalizedId.orEmpty()} syncServer=$syncServer explicitNone=$explicitNone"
+            "active store set local id=${normalizedId.orEmpty()} syncServer=$syncServer explicitNone=$explicitNone generation=$generation"
         )
 
-        if (syncServer && getStoredUserAuthTokens?.invoke() != null) {
-            val response = networkRequest<Unit, String>(
-                method = HttpMethod.Put,
-                endpointUrl = "stores/active",
-                body = normalizedId.orEmpty()
-            )
+        if (!syncServer || getStoredUserAuthTokens?.invoke() == null) return@launch
 
-            if (response.negative) {
-                postInAppNotification(response.message, NotificationType.Negative, transient = false)
-            } else {
-                (userAccountState.payloadValue)?.let { account ->
-                    val updated = account.copy(activeStoreId = normalizedId)
-                    userAccountState.emit(DataState.Success(updated))
-                    setStoredUserAccountDataModel?.invoke(updated)
-                }
-                logCloudConnectionDiagnostic("active store synced to server id=${normalizedId.orEmpty()}")
-            }
+        val response = networkRequest<Unit, String>(
+            method = HttpMethod.Put,
+            endpointUrl = "stores/active",
+            body = normalizedId.orEmpty()
+        )
+
+        // A slower A→B response must never mutate or roll back the later B selection.
+        if (!activeStoreSelectionGenerationIsCurrent(generation)) {
+            logCloudConnectionDiagnostic(
+                "active store sync ignored as stale generation=$generation id=${normalizedId.orEmpty()}"
+            )
+            return@launch
         }
+
+        if (response.negative) {
+            putLocalKv(KEY_ACTIVE_STORE_ID, previousId)
+            putLocalKv(KEY_ACTIVE_STORE_EXPLICIT_NONE, if (previousExplicitNone) "1" else null)
+            activeStoreIdState.emit(previousId)
+            postInAppNotification(response.message, NotificationType.Negative, transient = false)
+            logCloudConnectionDiagnostic(
+                "active store sync rolled back id=${normalizedId.orEmpty()} previous=${previousId.orEmpty()} generation=$generation"
+            )
+            return@launch
+        }
+
+        userAccountState.payloadValue?.let { account ->
+            val updated = account.copy(activeStoreId = normalizedId)
+            userAccountState.emit(DataState.Success(updated))
+            setStoredUserAccountDataModel?.invoke(updated)
+        }
+        logCloudConnectionDiagnostic(
+            "active store synced to server id=${normalizedId.orEmpty()} generation=$generation"
+        )
     }
 }
 

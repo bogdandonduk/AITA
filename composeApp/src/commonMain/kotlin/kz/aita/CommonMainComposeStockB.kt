@@ -476,8 +476,8 @@ fun AppConfiguration.StockBatchEditor(
     val suppliers = stateValues.suppliers.orEmpty()
     var showSupplierAddSheet by rememberSaveable(goodsItem.id, existingBatch?.id) { mutableStateOf(false) }
     var applyPromotionsToSameSupplier by rememberSaveable(goodsItem.id, existingBatch?.id) { mutableStateOf(false) }
-    var isSavingBatch by rememberSaveable(goodsItem.id, existingBatch?.id ?: "new", draftStateKey ?: "batch") { mutableStateOf(false) }
-    var saveError by rememberSaveable(goodsItem.id, existingBatch?.id ?: "new", draftStateKey ?: "batch") { mutableStateOf<String?>(null) }
+    var isSavingBatch by remember(goodsItem.id, existingBatch?.id ?: "new", draftStateKey ?: "batch") { mutableStateOf(false) }
+    var saveError by remember(goodsItem.id, existingBatch?.id ?: "new", draftStateKey ?: "batch") { mutableStateOf<String?>(null) }
     var returnPriceOverrideManuallyEdited by rememberSaveable(goodsItem.id, existingBatch?.id ?: "new") {
         mutableStateOf(
             existingBatch?.let { batch ->
@@ -4332,14 +4332,16 @@ internal fun AppConfiguration.GlobalGoodsSelectionBottomSheet(
         }
         val selectedCategoryKey = remember(selectedCategoryIds) { selectedCategoryIds.sorted().joinToString("|") }
 
-        LaunchedEffect(cleanQuery, selectedCategoryKey) {
+        val aitaLatestCatalogueOwner0 = rememberAitaLatestUiRequestOwner()
+        LaunchedEffect(cleanQuery, selectedCategoryKey) {            val aitaLatestCatalogueTicket0 = aitaLatestCatalogueOwner0.begin()
+
             pickerPage = 0
             serverLoadedItems = emptyList()
             serverEndReached = false
             loading = true
             try {
                 delay(220)
-                getGenericGoodsItems(
+                if (aitaLatestCatalogueOwner0.owns(aitaLatestCatalogueTicket0)) getGenericGoodsItems(
                     query = cleanQuery.takeIf { it.length >= 2 },
                     categoryIds = selectedCategoryIds.toList(),
                     limit = pickerPageSize,
@@ -4348,11 +4350,11 @@ internal fun AppConfiguration.GlobalGoodsSelectionBottomSheet(
                     appendToSharedState = true
                 ).collect { state ->
                     val payload = (state as? DataState.Success)?.payload.orEmpty()
-                    serverLoadedItems = payload
+                    if (aitaLatestCatalogueOwner0.owns(aitaLatestCatalogueTicket0)) serverLoadedItems = payload
                     serverEndReached = state is DataState.Empty || payload.size < pickerPageSize
                 }
             } finally {
-                loading = false
+                if (aitaLatestCatalogueOwner0.owns(aitaLatestCatalogueTicket0)) loading = false
             }
         }
 

@@ -1,5 +1,6 @@
 package kz.aita
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
@@ -53,6 +54,9 @@ internal class SingleFlightRequestCoordinator<Key, Result> {
         if (ownsRequest) {
             try {
                 deferred.complete(request())
+            } catch (cancelled: CancellationException) {
+                deferred.cancel(cancelled)
+                throw cancelled
             } catch (throwable: Throwable) {
                 deferred.completeExceptionally(throwable)
             } finally {

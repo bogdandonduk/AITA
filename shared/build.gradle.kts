@@ -1,4 +1,5 @@
 // THIS IS build.gradle of shared module
+import app.cash.sqldelight.gradle.SqlDelightDatabase
 import com.android.build.api.dsl.LibraryExtension
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
@@ -37,12 +38,12 @@ if (aitaFullApplicationBuild) {
 }
 
 sqldelight {
-    databases {
-        create("AppDatabase") {
-            packageName.set("kz.aita")
-            generateAsync.set(true)
-        }
-    }
+    // Keep the SQLDelight database type explicit. This avoids the Gradle Kotlin DSL/IDE
+    // choosing the generic polymorphic-container create<T>() overload and then failing
+    // to infer T, while preserving the same AppDatabase configuration.
+    val appDatabase: SqlDelightDatabase = databases.create("AppDatabase")
+    appDatabase.packageName.set("kz.aita")
+    appDatabase.generateAsync.set(true)
 }
 
 kotlin {
@@ -86,6 +87,11 @@ kotlin {
             }
         }
     }
+
+    // Materialize the standard intermediate source sets (including iosMain) before
+    // configuring them below. This remains safe in server-only and web-only builds:
+    // the template creates only the groups supported by the targets declared above.
+    applyDefaultHierarchyTemplate()
 
     sourceSets {
         all {
@@ -187,7 +193,15 @@ kotlin {
                 implementation("io.ktor:ktor-client-android:${property("ktor.version")}")
             }
 
-            getByName("iosMain").dependencies {
+            // Do not eagerly require an accessor that may not yet exist during conditional
+            // target configuration. Reuse or create iosMain, then attach every declared iOS target.
+            val iosMainSourceSet = maybeCreate("iosMain").apply {
+                dependsOn(getByName("commonMain"))
+            }
+            listOf("iosX64Main", "iosArm64Main", "iosSimulatorArm64Main").forEach { sourceSetName ->
+                findByName(sourceSetName)?.dependsOn(iosMainSourceSet)
+            }
+            iosMainSourceSet.dependencies {
                 implementation(libs.sqlDelightNativeDriver)
                 implementation("io.ktor:ktor-client-darwin:${property("ktor.version")}")
             }

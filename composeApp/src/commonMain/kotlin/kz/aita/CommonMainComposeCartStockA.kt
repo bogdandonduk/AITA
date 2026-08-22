@@ -4908,7 +4908,7 @@ internal fun AppConfiguration.QuickSupplierAddBottomSheet(
 ) {
     var supplierName by rememberSaveable { mutableStateOf("") }
     var supplierEmail by rememberSaveable { mutableStateOf("") }
-    var isSaving by rememberSaveable { mutableStateOf(false) }
+    var isSaving by remember { mutableStateOf(false) }
     val quickSupplierPhoneStateHost = remember { object : StateHost() {} }
     val coroutineScope = rememberCoroutineScope()
 

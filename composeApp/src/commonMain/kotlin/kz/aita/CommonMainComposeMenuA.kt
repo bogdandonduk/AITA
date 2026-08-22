@@ -1364,7 +1364,7 @@ internal fun AppConfiguration.WorkerMembershipCard(
     val permissions = permissionsFromSerialized(permissionsText).ifEmpty {
         if (editable) defaultAssignablePermissionsForRole(roleId) else normalizeStorePermissionIds(worker.permissions.ifEmpty { defaultStorePermissionsForRole(roleId) })
     }
-    var selfWorkshiftPasswordSaving by rememberSaveable(worker.id) { mutableStateOf(false) }
+    var selfWorkshiftPasswordSaving by remember(worker.id) { mutableStateOf(false) }
     val roleOptions = workerRoleOptions(roleTemplates)
     val storeName = worker.storeName.extractLocalizedString(stateValues.appLanguage).orEmpty()
     val contactLine = listOf(worker.userPublicId, worker.phoneNumber.asDisplayPhoneNumber(), worker.email)

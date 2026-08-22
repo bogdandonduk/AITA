@@ -1,17 +1,11 @@
 // THIS IS build.gradle of composeApp module
 import com.android.build.api.dsl.ApplicationExtension
-import com.google.common.jimfs.Configuration.windows
-import com.sun.imageio.plugins.jpeg.JPEG.vendor
 import org.gradle.api.tasks.Delete
-import org.gradle.declarative.dsl.schema.FqName.Empty.packageName
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig
-import java.lang.System.console
-import java.lang.module.ModuleFinder.compose
-import java.net.InetAddress.getByName
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -80,6 +74,11 @@ kotlin {
         binaries.executable()
     }
 
+    // Materialize the standard intermediate source sets (including iosMain) before
+    // configuring them below. Conditional target registration otherwise allows an eager
+    // getByName("iosMain") lookup to run before the hierarchy has been created.
+    applyDefaultHierarchyTemplate()
+
     sourceSets {
         commonMain.dependencies {
             implementation(libs.kotlinx.datetime)
@@ -125,7 +124,16 @@ kotlin {
                 implementation(libs.mlkit.barcode.scanning)
             }
 
-            getByName("iosMain").dependencies {
+            // Keep the shared iOS source set available even when Gradle sync evaluates this
+            // conditional target block before the default hierarchy has materialized its accessors.
+            // The explicit target wiring is idempotent when the hierarchy template already created it.
+            val iosMainSourceSet = maybeCreate("iosMain").apply {
+                dependsOn(getByName("commonMain"))
+            }
+            listOf("iosX64Main", "iosArm64Main", "iosSimulatorArm64Main").forEach { sourceSetName ->
+                findByName(sourceSetName)?.dependsOn(iosMainSourceSet)
+            }
+            iosMainSourceSet.dependencies {
                 implementation(libs.kamel.fetcher.ktor)
             }
 

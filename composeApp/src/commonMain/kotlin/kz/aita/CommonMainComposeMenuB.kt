@@ -458,8 +458,8 @@ fun AppConfiguration.MenuDevicesScreen() {
     val labelPrinters by labelPrinterDevicesState.collectAsState()
     val configuredLabelPrinterId by configuredLabelPrinterDeviceIdState.collectAsState()
     val configuredLabelPrinterProtocol by configuredLabelPrinterProtocolState.collectAsState()
-    var refreshingReceiptPrinters by rememberSaveable { mutableStateOf(false) }
-    var refreshingLabelPrinters by rememberSaveable { mutableStateOf(false) }
+    var refreshingReceiptPrinters by remember { mutableStateOf(false) }
+    var refreshingLabelPrinters by remember { mutableStateOf(false) }
 
     val refreshButtonText = localizedStringResource(1259, "Refresh printers")
     val refreshSuccessText = localizedStringResource(1270, "Receipt printers refreshed")
@@ -2228,9 +2228,12 @@ internal fun AppConfiguration.appModeOptions(): List<AppModeOptionUiModel> = lis
 )
 
 internal fun appModeIsAvailableInCurrentRelease(optionModeId: Int, currentModeId: Int): Boolean =
-    optionModeId == APP_MODE_STORE ||
-            optionModeId == APP_MODE_SUPPLIER ||
-            optionModeId == currentModeId
+    optionModeId in setOf(
+        APP_MODE_STORE,
+        APP_MODE_BUYER,
+        APP_MODE_SUPPLIER,
+        APP_MODE_MANUFACTURER
+    )
 
 internal fun AppConfiguration.availableAppModeOptions(currentModeId: Int): List<AppModeOptionUiModel> =
     appModeOptions().filter { option -> appModeIsAvailableInCurrentRelease(option.modeId, currentModeId) }

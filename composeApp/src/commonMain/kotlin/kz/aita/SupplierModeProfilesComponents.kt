@@ -14,8 +14,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -270,6 +272,10 @@ internal fun AppConfiguration.SupplierProfileEditorContent(
 ) {
     val editorKey = supplierProfileEditorStableKey(editedSupplier?.id, editorSessionKey)
     val coroutineScope = rememberCoroutineScope()
+    val operationGate = remember(editorKey) { SupplierWorkspaceOperationGate() }
+    DisposableEffect(operationGate) {
+        onDispose { operationGate.invalidate() }
+    }
     var supplierName by rememberSaveable(editorKey) {
         mutableStateOf(
             editedSupplier?.name?.extractLocalizedString("main")
@@ -280,7 +286,7 @@ internal fun AppConfiguration.SupplierProfileEditorContent(
     var supplierEmail by rememberSaveable(editorKey) {
         mutableStateOf(editedSupplier?.emails.orEmpty().firstOrNull().orEmpty())
     }
-    var isSaving by rememberSaveable(editorKey) { mutableStateOf(false) }
+    var isSaving by remember(editorKey) { mutableStateOf(false) }
 
     val phoneStateKey = supplierProfileEditorPhoneStateKey(editedSupplier?.id, editorSessionKey)
     val phoneContent = countrySelectionPhoneNumberTextField(
@@ -293,6 +299,7 @@ internal fun AppConfiguration.SupplierProfileEditorContent(
 
     val cancelEditor = {
         if (!isSaving) {
+            operationGate.invalidate()
             coroutineScope.launch {
                 stateHost.removeState(phoneStateKey)
                 onCancel()
@@ -364,8 +371,10 @@ internal fun AppConfiguration.SupplierProfileEditorContent(
         }
 
         isSaving = true
+        val operationTicket = operationGate.begin(editedSupplier?.id, "profile.save")
         val completed: (DataState<SupplierDataModel>) -> Unit = { result ->
             coroutineScope.launch {
+                if (!operationGate.isCurrent(operationTicket)) return@launch
                 isSaving = false
                 if (result is DataState.Success) {
                     stateHost.removeState(phoneStateKey)
@@ -469,5 +478,177 @@ internal fun AppConfiguration.SupplierProfileEditorContent(
                 )
             }
         }
+    }
+}
+
+@Composable
+internal fun AppConfiguration.SupplierWorkspaceReadinessCard(
+    summary: SupplierWorkspaceReadinessUiModel,
+    onNextStep: () -> Unit
+) {
+    val actionText = when (summary.nextStep) {
+        SupplierWorkspaceReadinessNextStep.CreateProfile -> localizedStringResource(2492, "Add profile")
+        SupplierWorkspaceReadinessNextStep.CompleteProfile -> localizedStringResource(2521, "Complete profile")
+        SupplierWorkspaceReadinessNextStep.ReviewOrders -> localizedStringResource(2522, "Review open orders")
+        SupplierWorkspaceReadinessNextStep.BuildCatalog -> localizedStringResource(2523, "Build supplier catalog")
+        SupplierWorkspaceReadinessNextStep.ConnectStores -> localizedStringResource(2524, "Connect partner stores")
+        SupplierWorkspaceReadinessNextStep.ReviewAgreements -> localizedStringResource(2525, "Review agreements")
+        SupplierWorkspaceReadinessNextStep.OpenInsights -> localizedStringResource(2526, "Open supplier insights")
+    }
+    val helperText = when (summary.nextStep) {
+        SupplierWorkspaceReadinessNextStep.CreateProfile ->
+            localizedStringResource(2527, "Create the business identity stores will order from.")
+        SupplierWorkspaceReadinessNextStep.CompleteProfile ->
+            localizedStringResource(2528, "Finish the selected profile’s contacts and setup checks.")
+        SupplierWorkspaceReadinessNextStep.ReviewOrders ->
+            localizedStringResource(2529, "Open Store orders are waiting for a clear Supplier response.")
+        SupplierWorkspaceReadinessNextStep.BuildCatalog ->
+            localizedStringResource(2530, "Add reusable offers so Stores can order with less manual work.")
+        SupplierWorkspaceReadinessNextStep.ConnectStores ->
+            localizedStringResource(2531, "Build the partner Store workspace around this Supplier identity.")
+        SupplierWorkspaceReadinessNextStep.ReviewAgreements ->
+            localizedStringResource(2532, "Record delivery, payment, and product terms with partner Stores.")
+        SupplierWorkspaceReadinessNextStep.OpenInsights ->
+            localizedStringResource(2533, "The core Supplier workspace is ready. Review performance and next actions.")
+    }
+    val actionIconPath = when (summary.nextStep) {
+        SupplierWorkspaceReadinessNextStep.CreateProfile -> stateValues.drawablePathIconAdd
+        SupplierWorkspaceReadinessNextStep.CompleteProfile -> stateValues.drawablePathIconEdit
+        SupplierWorkspaceReadinessNextStep.ReviewOrders -> stateValues.drawablePathIconClipboard
+        SupplierWorkspaceReadinessNextStep.BuildCatalog -> stateValues.drawablePathIconSupplierCatalog
+        SupplierWorkspaceReadinessNextStep.ConnectStores -> stateValues.drawablePathIconSupplierPartners
+        SupplierWorkspaceReadinessNextStep.ReviewAgreements -> stateValues.drawablePathIconSupplierContracts
+        SupplierWorkspaceReadinessNextStep.OpenInsights -> stateValues.drawablePathIconSupplierDemandRadar
+    }
+    val actionIconRes = when (summary.nextStep) {
+        SupplierWorkspaceReadinessNextStep.CreateProfile -> stateValues.drawableResIconAdd.value
+        SupplierWorkspaceReadinessNextStep.CompleteProfile -> stateValues.drawableResIconEdit.value
+        SupplierWorkspaceReadinessNextStep.ReviewOrders -> stateValues.drawableResIconClipboard.value
+        SupplierWorkspaceReadinessNextStep.BuildCatalog -> stateValues.drawableResIconSupplierCatalog.value
+        SupplierWorkspaceReadinessNextStep.ConnectStores -> stateValues.drawableResIconSupplierPartners.value
+        SupplierWorkspaceReadinessNextStep.ReviewAgreements -> stateValues.drawableResIconSupplierContracts.value
+        SupplierWorkspaceReadinessNextStep.OpenInsights -> stateValues.drawableResIconSupplierDemandRadar.value
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.AccentColor.copy(alpha = 0.07f))
+            .border(
+                stateValues.unfocusedBorderWidth,
+                stateValues.AccentColor.copy(alpha = 0.55f),
+                RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .padding(stateValues.marginTextFieldGroup),
+        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CpImage(
+                    modifier = Modifier.size(26.dp),
+                    url = stateValues.drawablePathIconSupplierDemandRadar,
+                    fallbackRes = stateValues.drawableResIconSupplierDemandRadar.value,
+                    contentDescription = localizedStringResource(2519, "Supplier workspace readiness"),
+                    tintColor = stateValues.AccentColor
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                androidx.compose.material3.Text(
+                    text = localizedStringResource(2519, "Supplier workspace readiness"),
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.titleTextSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                androidx.compose.material3.Text(
+                    text = localizedStringResource(2520, "A calm checklist for getting this Supplier desk ready."),
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            SupplierCatalogChip(text = "${summary.readinessPercent}%")
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(7.dp)
+                .clip(RoundedCornerShape(100.dp))
+                .background(stateValues.PlaceholderTextColor.copy(alpha = 0.18f))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth((summary.readinessPercent / 100f).coerceIn(0f, 1f))
+                    .height(7.dp)
+                    .clip(RoundedCornerShape(100.dp))
+                    .background(stateValues.AccentColor)
+            )
+        }
+
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                Box(modifier = Modifier.weight(1f)) {
+                    SupplierCatalogChip(
+                        text = "${localizedStringResource(2493, "Profile ready")}: ${summary.readyProfileCount}/${summary.profileCount}"
+                    )
+                }
+                Box(modifier = Modifier.weight(1f)) {
+                    SupplierCatalogChip(
+                        text = "${localizedStringResource(1337, "Orders")}: ${summary.openOrderCount}"
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                Box(modifier = Modifier.weight(1f)) {
+                    SupplierCatalogChip(
+                        text = "${localizedStringResource(1338, "Catalog")}: ${summary.catalogSkuCount}"
+                    )
+                }
+                Box(modifier = Modifier.weight(1f)) {
+                    SupplierCatalogChip(
+                        text = "${localizedStringResource(1453, "Partner stores")}: ${summary.partnerCount}"
+                    )
+                }
+            }
+        }
+
+        androidx.compose.material3.Text(
+            text = helperText,
+            color = stateValues.PlaceholderTextColor,
+            fontSize = stateValues.smallTextSize
+        )
+
+        actionButton(
+            modifier = Modifier.fillMaxWidth(),
+            text = actionText,
+            iconPath = actionIconPath,
+            iconRes = actionIconRes,
+            confirmationRequired = false,
+            onClick = onNextStep
+        )
     }
 }

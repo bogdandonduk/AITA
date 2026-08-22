@@ -288,7 +288,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
     )
     // A process-restored request is no longer running, so loading state must never be persisted.
     var isSavingStockItem by remember(stockAddEditDraftIdentity) { mutableStateOf(false) }
-    var stockSaveError by rememberSaveable(stockAddEditDraftIdentity) { mutableStateOf<String?>(null) }
+    var stockSaveError by remember(stockAddEditDraftIdentity) { mutableStateOf<String?>(null) }
 
     suspend fun resetStockEditorToFreshAdd(clearCurrentDraft: Boolean) {
         // Stop the persistence effect before rotating the editor identity. Otherwise a recomposition can
@@ -1479,11 +1479,11 @@ fun AppConfiguration.BarcodeTextInput(
     onGeneratedBarcode: ((String) -> Unit)? = null,
     onValueChange: (String) -> Unit
 ): GenericTextFieldContent {
-    var localScannerVisible by rememberSaveable { mutableStateOf(false) }
-    var cameraPermissionDialogState by rememberSaveable { mutableStateOf<PlatformPermissionState?>(null) }
-    var lastCameraBarcode by rememberSaveable { mutableStateOf("") }
-    var lastCameraBarcodeMillis by rememberSaveable { mutableStateOf(0L) }
-    var barcodeFillHighlightPulseKey by rememberSaveable { mutableStateOf(0) }
+    var localScannerVisible by remember { mutableStateOf(false) }
+    var cameraPermissionDialogState by remember { mutableStateOf<PlatformPermissionState?>(null) }
+    var lastCameraBarcode by remember { mutableStateOf("") }
+    var lastCameraBarcodeMillis by remember { mutableStateOf(0L) }
+    var barcodeFillHighlightPulseKey by remember { mutableStateOf(0) }
     val cameraPermissionRequestText = cameraPermissionTexts(this)
 
     val cameraAvailable = platformSupportsCameraBarcodeScanner() && barcodeCameraScannerContent != null
@@ -2346,11 +2346,11 @@ fun AppConfiguration.searchTextField(
         modifier = modifier
     ) {
         val cameraScannerAvailable = barcodeCamScanner && platformSupportsCameraBarcodeScanner() && barcodeCameraScannerContent != null
-        var barcodeCamScannerVisible by rememberSaveable { mutableStateOf(false) }
-        var cameraPermissionDialogState by rememberSaveable { mutableStateOf<PlatformPermissionState?>(null) }
-        var lastCameraBarcode by rememberSaveable { mutableStateOf("") }
-        var lastCameraBarcodeMillis by rememberSaveable { mutableStateOf(0L) }
-        var barcodeFillHighlightPulseKey by rememberSaveable { mutableStateOf(0) }
+        var barcodeCamScannerVisible by remember { mutableStateOf(false) }
+        var cameraPermissionDialogState by remember { mutableStateOf<PlatformPermissionState?>(null) }
+        var lastCameraBarcode by remember { mutableStateOf("") }
+        var lastCameraBarcodeMillis by remember { mutableStateOf(0L) }
+        var barcodeFillHighlightPulseKey by remember { mutableStateOf(0) }
         val cameraPermissionRequestText = cameraPermissionTexts(appConfiguration)
 
         LaunchedEffect(cameraScannerAvailable) {
@@ -3375,11 +3375,12 @@ internal fun NavigationScreenModel.isMainScreenCompatibleWithAppMode(modeId: Int
 }
 
 internal fun List<String>?.toPersistentMainStack(): List<NavigationScreenModel> {
+    val modeId = appModeState.value
     val restoredCurrent = orEmpty()
         .mapNotNull { persistentAppRouteToScreen(it) }
         .filterNot { it.route == NavigationScreenModel.Splash.route }
-        .lastOrNull()
-        ?: defaultMainScreenForAppMode(appModeState.value)
+        .lastOrNull { it.isMainScreenCompatibleWithAppMode(modeId) }
+        ?: defaultMainScreenForAppMode(modeId)
 
     return listOf(restoredCurrent)
 }

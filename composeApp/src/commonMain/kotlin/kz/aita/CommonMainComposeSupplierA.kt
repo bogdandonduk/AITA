@@ -2036,7 +2036,7 @@ internal fun AppConfiguration.supplierManufacturerBridgeQuantityText(
     total: Double,
     unitId: String?
 ): String {
-    if (total <= 0.0) return "0"
+    if (!total.isFinite() || total <= 0.0) return "0"
     val unit = stateValues.globalAppConfiguration.goodsItemsQuantityUnits
         .find { it.id == unitId }
         ?: stateValues.globalAppConfiguration.goodsItemsQuantityUnits.firstOrNull()

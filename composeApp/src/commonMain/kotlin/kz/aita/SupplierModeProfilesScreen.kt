@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
@@ -80,6 +79,7 @@ internal fun AppConfiguration.SupplierProfilesScreen() {
         usageCheckFailed = profileUsageCheckFailed,
         activeSupplierId = focusedSupplierId
     )
+    val workspaceReadiness = buildSupplierWorkspaceReadiness(items, focusedSupplierId)
 
     val editorOpen = navigationState[SUPPLIER_PROFILE_EDITOR_OPEN_STATE_KEY] == "1"
     val editedSupplierId = navigationState[SUPPLIER_PROFILE_EDITOR_ID_STATE_KEY].orEmpty()
@@ -152,6 +152,41 @@ internal fun AppConfiguration.SupplierProfilesScreen() {
                 NotificationType.Neutral,
                 transient = true
             )
+        }
+    }
+
+    val openReadinessNextStep: () -> Unit = {
+        coroutineScope.launch {
+            when (workspaceReadiness.nextStep) {
+                SupplierWorkspaceReadinessNextStep.CreateProfile -> {
+                    NavigationScreenModel.Supplier.Identity.Main.setStates(
+                        SUPPLIER_PROFILE_EDITOR_OPEN_STATE_KEY to "1",
+                        SUPPLIER_PROFILE_EDITOR_ID_STATE_KEY to "",
+                        SUPPLIER_PROFILE_EDITOR_SESSION_STATE_KEY to getCurrentTimeMillis().toString()
+                    )
+                }
+                SupplierWorkspaceReadinessNextStep.CompleteProfile -> {
+                    val targetSupplierId = workspaceReadiness.targetSupplierId.orEmpty()
+                    if (targetSupplierId.isNotBlank()) {
+                        setActiveSupplierProfileId(targetSupplierId)
+                        NavigationScreenModel.Supplier.Identity.Main.setStates(
+                            SUPPLIER_PROFILE_EDITOR_OPEN_STATE_KEY to "1",
+                            SUPPLIER_PROFILE_EDITOR_ID_STATE_KEY to targetSupplierId,
+                            SUPPLIER_PROFILE_EDITOR_SESSION_STATE_KEY to getCurrentTimeMillis().toString()
+                        )
+                    }
+                }
+                SupplierWorkspaceReadinessNextStep.ReviewOrders ->
+                    Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
+                SupplierWorkspaceReadinessNextStep.BuildCatalog ->
+                    Navigation.goMain(NavigationScreenModel.Supplier.Catalog.Main)
+                SupplierWorkspaceReadinessNextStep.ConnectStores ->
+                    Navigation.goMain(NavigationScreenModel.Supplier.Customers.Main)
+                SupplierWorkspaceReadinessNextStep.ReviewAgreements ->
+                    Navigation.goMain(NavigationScreenModel.Supplier.Contracts.Main)
+                SupplierWorkspaceReadinessNextStep.OpenInsights ->
+                    Navigation.goMain(NavigationScreenModel.Supplier.Analytics.Main)
+            }
         }
     }
 
@@ -285,6 +320,15 @@ internal fun AppConfiguration.SupplierProfilesScreen() {
                             }
                         )
                     }
+                }
+            }
+
+            if (items.isNotEmpty()) {
+                item {
+                    SupplierWorkspaceReadinessCard(
+                        summary = workspaceReadiness,
+                        onNextStep = openReadinessNextStep
+                    )
                 }
             }
 

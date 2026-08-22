@@ -233,7 +233,7 @@ internal object YandexAddressService {
         "print_address" to 1,
         "attrs" to "uri",
         "highlight" to 0,
-        "ll" to if (hasUserPosition) "$userLongitude,$userLatitude" else null
+        "ull" to if (hasUserPosition) "$userLongitude,$userLatitude" else null
       )
     )
 

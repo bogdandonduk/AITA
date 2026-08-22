@@ -14,8 +14,13 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.Cache
+import okhttp3.ConnectionSpec
+import okhttp3.Dns
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.TlsVersion
 import java.io.File
+import java.net.Inet4Address
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.io.IOException
@@ -134,8 +139,54 @@ actual var cacheDirPath: String = ""
 actual val Dispatchers.ourIo: CoroutineDispatcher
     get() = Dispatchers.IO
 
+private enum class AitaDesktopNetworkProfile {
+    Modern,
+    CloudflareCompatibility
+}
+
+private fun configuredAitaDesktopNetworkProfile(): AitaDesktopNetworkProfile {
+    val configured = sequenceOf(
+        System.getProperty("aita.desktop.network.profile"),
+        System.getenv("AITA_DESKTOP_NETWORK_PROFILE")
+    )
+        .mapNotNull { value -> value?.trim()?.lowercase(Locale.ROOT)?.takeIf { it.isNotBlank() } }
+        .firstOrNull()
+
+    return when (configured) {
+        "modern", "default", "auto-modern" -> AitaDesktopNetworkProfile.Modern
+        "compat", "compatibility", "cloudflare", "tls12", "http1" ->
+            AitaDesktopNetworkProfile.CloudflareCompatibility
+        else -> if (currentJvmDesktopPlatformName() == "jvm-macos") {
+            // Some macOS/JVM network paths accept the browser ClientHello but reject OkHttp's
+            // modern TLS/ALPN negotiation before an HTTP request reaches Cloudflare. TLS 1.2 and
+            // HTTP/1.1 are still fully supported by the public gateway and form a conservative
+            // compatibility baseline. The environment/property override above can restore defaults.
+            AitaDesktopNetworkProfile.CloudflareCompatibility
+        } else {
+            AitaDesktopNetworkProfile.Modern
+        }
+    }
+}
+
+private object AitaIpv4PreferredDns : Dns {
+    override fun lookup(hostname: String) = Dns.SYSTEM.lookup(hostname)
+        .sortedBy { address -> if (address is Inet4Address) 0 else 1 }
+}
+
 private fun buildAitaOkHttpClient(): OkHttpClient {
+    val profile = configuredAitaDesktopNetworkProfile()
     val builder = OkHttpClient.Builder()
+        .dns(AitaIpv4PreferredDns)
+        .retryOnConnectionFailure(true)
+
+    if (profile == AitaDesktopNetworkProfile.CloudflareCompatibility) {
+        val tls12Spec = ConnectionSpec.Builder(ConnectionSpec.MODERN_TLS)
+            .tlsVersions(TlsVersion.TLS_1_2)
+            .build()
+        builder.connectionSpecs(listOf(tls12Spec, ConnectionSpec.CLEARTEXT))
+        builder.protocols(listOf(Protocol.HTTP_1_1))
+    }
+
     runCatching {
         cacheDirPath
             .trim()
@@ -147,6 +198,11 @@ private fun buildAitaOkHttpClient(): OkHttpClient {
     }.onFailure { throwable ->
         System.err.println("AITA desktop HTTP cache initialization failed: ${throwable.message}")
     }
+
+    println(
+        "AITA desktop network profile: ${profile.name.lowercase(Locale.ROOT)} " +
+                "(override with AITA_DESKTOP_NETWORK_PROFILE=modern|compat)"
+    )
     return builder.build()
 }
 
