@@ -10,7 +10,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
@@ -230,12 +231,19 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard() {
                                     modifier = Modifier.fillMaxWidth()
                                 )
                             }
-                            OutlinedTextField(
+                            aitaFormTextField(
                                 modifier = Modifier.fillMaxWidth(),
                                 value = setupCode,
-                                onValueChange = { setupCode = it.filter(Char::isDigit).take(6) },
-                                singleLine = true,
-                                label = { Text(authUiText("Authenticator code", "Код аутентификатора", "Аутентификатор коды")) }
+                                onValueChange = { setupCode = it },
+                                titleText = authUiText("Authenticator code", "Код аутентификатора", "Аутентификатор коды"),
+                                placeholderText = "000000",
+                                identityKey = "account-authenticator-setup-code",
+                                enabled = !loading,
+                                keyboardType = KeyboardType.NumberPassword,
+                                imeAction = ImeAction.Done,
+                                leadingIconPath = stateValues.drawablePathIconSecurity,
+                                sensitive = true,
+                                onTransformValue = { it.filter(Char::isDigit).take(6) }
                             )
                             actionButton(
                                 modifier = Modifier.fillMaxWidth(),
@@ -325,12 +333,17 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard() {
                                     phoneAction = if (tabs.id == "remove") AitaPhoneAliasAction.REMOVE else AitaPhoneAliasAction.ADD_OR_REPLACE
                                 }
                                 if (phoneAction == AitaPhoneAliasAction.ADD_OR_REPLACE) {
-                                    OutlinedTextField(
+                                    aitaFormTextField(
                                         modifier = Modifier.fillMaxWidth(),
                                         value = phoneAlias,
                                         onValueChange = { phoneAlias = it },
-                                        singleLine = true,
-                                        label = { Text(authUiText("Phone login alias", "Номер для входа", "Кіру телефон нөмірі")) }
+                                        titleText = authUiText("Phone login alias", "Номер для входа", "Кіру телефон нөмірі"),
+                                        placeholderText = authUiText("Enter a phone number", "Введите номер телефона", "Телефон нөмірін енгізіңіз"),
+                                        identityKey = "account-phone-login-alias",
+                                        enabled = !loading,
+                                        keyboardType = KeyboardType.Phone,
+                                        imeAction = ImeAction.Next,
+                                        leadingIconPath = stateValues.drawablePathIconPhone
                                     )
                                 }
                                 SensitiveAuthConfirmationFields(
@@ -361,12 +374,19 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard() {
                                     }
                                 }
                             } else {
-                                OutlinedTextField(
+                                aitaFormTextField(
                                     modifier = Modifier.fillMaxWidth(),
                                     value = phoneCode,
-                                    onValueChange = { phoneCode = it.filter(Char::isDigit).take(6) },
-                                    singleLine = true,
-                                    label = { Text(authUiText("Email confirmation code", "Код подтверждения из письма", "Email растау коды")) }
+                                    onValueChange = { phoneCode = it },
+                                    titleText = authUiText("Email confirmation code", "Код подтверждения из письма", "Email растау коды"),
+                                    placeholderText = "000000",
+                                    identityKey = "account-phone-email-confirmation-code",
+                                    enabled = !loading,
+                                    keyboardType = KeyboardType.NumberPassword,
+                                    imeAction = ImeAction.Done,
+                                    leadingIconPath = stateValues.drawablePathIconEmail,
+                                    sensitive = true,
+                                    onTransformValue = { it.filter(Char::isDigit).take(6) }
                                 )
                                 actionButton(
                                     modifier = Modifier.fillMaxWidth(),
@@ -417,21 +437,32 @@ private fun AppConfiguration.SensitiveAuthConfirmationFields(
     onPasswordChange: (String) -> Unit,
     onSecondFactorChange: (String) -> Unit
 ) {
-    OutlinedTextField(
+    aitaFormTextField(
         modifier = Modifier.fillMaxWidth(),
         value = currentPassword,
         onValueChange = onPasswordChange,
-        singleLine = true,
-        label = { Text(authUiText("Current password", "Текущий пароль", "Ағымдағы құпия сөз")) },
-        visualTransformation = PasswordVisualTransformation()
+        titleText = authUiText("Current password", "Текущий пароль", "Ағымдағы құпия сөз"),
+        placeholderText = stateValues.stringEnterPassword,
+        identityKey = "account-security-current-password",
+        keyboardType = KeyboardType.Password,
+        imeAction = if (secondFactorRequired) ImeAction.Next else ImeAction.Done,
+        leadingIconPath = stateValues.drawablePathIconPassword,
+        password = true,
+        sensitive = true
     )
     if (secondFactorRequired) {
-        OutlinedTextField(
+        aitaFormTextField(
             modifier = Modifier.fillMaxWidth(),
             value = secondFactor,
             onValueChange = onSecondFactorChange,
-            singleLine = true,
-            label = { Text(authUiText("Authenticator or recovery code", "Код аутентификатора или резервный код", "Аутентификатор немесе қалпына келтіру коды")) }
+            titleText = authUiText("Authenticator or recovery code", "Код аутентификатора или резервный код", "Аутентификатор немесе қалпына келтіру коды"),
+            placeholderText = authUiText("Enter a current code", "Введите действующий код", "Ағымдағы кодты енгізіңіз"),
+            identityKey = "account-security-second-factor",
+            keyboardType = KeyboardType.Ascii,
+            imeAction = ImeAction.Done,
+            leadingIconPath = stateValues.drawablePathIconSecurity,
+            sensitive = true,
+            onTransformValue = { it.take(64) }
         )
     }
 }

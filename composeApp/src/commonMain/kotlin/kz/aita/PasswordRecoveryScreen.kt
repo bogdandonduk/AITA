@@ -1,11 +1,11 @@
 package kz.aita
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 
 /** Sensitive password values are intentionally owned by the caller with remember, never rememberSaveable. */
 @Composable
@@ -27,21 +27,34 @@ internal fun AppConfiguration.PasswordRecoveryNewPasswordContent(
             color = stateValues.PlaceholderTextColor,
             fontSize = stateValues.smallTextSize
         )
-        OutlinedTextField(
+        aitaFormTextField(
             modifier = Modifier.fillMaxWidth(),
             value = newPassword,
             onValueChange = onNewPasswordChange,
-            singleLine = true,
-            label = { Text(authUiText("New password", "Новый пароль", "Жаңа құпия сөз")) },
-            visualTransformation = PasswordVisualTransformation()
+            titleText = authUiText("New password", "Новый пароль", "Жаңа құпия сөз"),
+            placeholderText = stateValues.stringEnterPassword,
+            identityKey = "password-recovery-new-password",
+            enabled = !busy,
+            keyboardType = KeyboardType.Password,
+            imeAction = ImeAction.Next,
+            leadingIconPath = stateValues.drawablePathIconPassword,
+            password = true,
+            sensitive = true
         )
-        OutlinedTextField(
+        aitaFormTextField(
             modifier = Modifier.fillMaxWidth(),
             value = repeatedPassword,
             onValueChange = onRepeatedPasswordChange,
-            singleLine = true,
-            label = { Text(authUiText("Repeat password", "Повторите пароль", "Құпия сөзді қайталаңыз")) },
-            visualTransformation = PasswordVisualTransformation()
+            titleText = authUiText("Repeat password", "Повторите пароль", "Құпия сөзді қайталаңыз"),
+            placeholderText = stateValues.stringRepeatPassword,
+            identityKey = "password-recovery-repeated-password",
+            enabled = !busy,
+            keyboardType = KeyboardType.Password,
+            imeAction = ImeAction.Go,
+            onImeAction = onSubmit,
+            leadingIconPath = stateValues.drawablePathIconPassword,
+            password = true,
+            sensitive = true
         )
         actionButton(
             modifier = Modifier.fillMaxWidth(),

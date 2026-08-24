@@ -2,8 +2,6 @@ package kz.aita
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -12,8 +10,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
@@ -48,7 +44,6 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
     var busy by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf("") }
     var infoText by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         val response = AitaAdvancedAuthenticationClient.capabilities()
@@ -102,6 +97,59 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
             } finally {
                 busy = false
             }
+        }
+    }
+
+    fun submitPasswordLogin() {
+        if (identifier.isBlank() || password.isBlank()) return
+        runAction {
+            val response = AitaAdvancedAuthenticationClient.passwordLogin(
+                AitaPasswordLoginRequestDataModel(identifier, password, buildCurrentClientDeviceInfo())
+            )
+            response.payload?.let { consumeFlow(it) } ?: run { errorText = authResponseText(response) }
+        }
+    }
+
+    fun requestSignInCode() {
+        if (identifier.isBlank()) return
+        runAction {
+            val response = AitaAdvancedAuthenticationClient.requestLoginCode(
+                AitaEmailCodeRequestDataModel(identifier, stateValues.appLanguage, buildCurrentClientDeviceInfo())
+            )
+            response.payload?.let { consumeFlow(it) } ?: run { errorText = authResponseText(response) }
+        }
+    }
+
+    fun requestRecoveryCode() {
+        if (identifier.isBlank()) return
+        runAction {
+            val response = AitaAdvancedAuthenticationClient.requestPasswordRecovery(
+                AitaEmailCodeRequestDataModel(identifier, stateValues.appLanguage, buildCurrentClientDeviceInfo())
+            )
+            response.payload?.let { consumeFlow(it) } ?: run { errorText = authResponseText(response) }
+        }
+    }
+
+    fun submitEmailCode() {
+        if (code.length != 6) return
+        runAction {
+            val request = AitaEmailCodeVerifyRequestDataModel(flowId, code, buildCurrentClientDeviceInfo())
+            val response = if (mode == AitaLoginMode.RECOVERY) {
+                AitaAdvancedAuthenticationClient.verifyPasswordRecovery(request)
+            } else {
+                AitaAdvancedAuthenticationClient.verifyLoginCode(request)
+            }
+            response.payload?.let { consumeFlow(it) } ?: run { errorText = authResponseText(response) }
+        }
+    }
+
+    fun submitTotpCode() {
+        if (code.isBlank()) return
+        runAction {
+            val response = AitaAdvancedAuthenticationClient.completeTotpLogin(
+                AitaTotpLoginRequestDataModel(flowId, code, buildCurrentClientDeviceInfo())
+            )
+            response.payload?.let { consumeFlow(it) } ?: run { errorText = authResponseText(response) }
         }
     }
 
@@ -166,38 +214,38 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                 ) {
                     when (currentStep) {
                         AitaLoginStep.PRIMARY -> {
-                            OutlinedTextField(
+                            aitaFormTextField(
                                 modifier = Modifier.fillMaxWidth(),
                                 value = identifier,
                                 onValueChange = { identifier = it; errorText = "" },
-                                singleLine = true,
-                                label = { Text(authUiText("Email or phone number", "Email или номер телефона", "Email немесе телефон нөмірі")) },
-                                placeholder = { Text(authUiText("Enter your email or phone", "Введите email или телефон", "Email немесе телефонды енгізіңіз")) },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = if (mode == AitaLoginMode.PASSWORD) ImeAction.Next else ImeAction.Go)
+                                titleText = authUiText("Email or phone number", "Email или номер телефона", "Email немесе телефон нөмірі"),
+                                placeholderText = authUiText("Enter your email or phone", "Введите email или телефон", "Email немесе телефонды енгізіңіз"),
+                                identityKey = "advanced-auth-login-identifier",
+                                keyboardType = KeyboardType.Email,
+                                imeAction = if (mode == AitaLoginMode.PASSWORD) ImeAction.Next else ImeAction.Go,
+                                onImeAction = when (mode) {
+                                    AitaLoginMode.EMAIL_CODE -> ::requestSignInCode
+                                    AitaLoginMode.RECOVERY -> ::requestRecoveryCode
+                                    AitaLoginMode.PASSWORD -> null
+                                },
+                                leadingIconPath = stateValues.drawablePathIconUserAccount,
+                                autoFocus = true
                             )
 
                             if (mode == AitaLoginMode.PASSWORD) {
-                                OutlinedTextField(
+                                aitaFormTextField(
                                     modifier = Modifier.fillMaxWidth(),
                                     value = password,
                                     onValueChange = { password = it; errorText = "" },
-                                    singleLine = true,
-                                    label = { Text(stateValues.stringPassword) },
-                                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                                    trailingIcon = {
-                                        TextButton(onClick = { passwordVisible = !passwordVisible }) {
-                                            Text(if (passwordVisible) authUiText("Hide", "Скрыть", "Жасыру") else authUiText("Show", "Показать", "Көрсету"))
-                                        }
-                                    },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Go),
-                                    keyboardActions = KeyboardActions(onGo = {
-                                        if (identifier.isNotBlank() && password.isNotBlank()) runAction {
-                                            val response = AitaAdvancedAuthenticationClient.passwordLogin(
-                                                AitaPasswordLoginRequestDataModel(identifier, password, buildCurrentClientDeviceInfo())
-                                            )
-                                            response.payload?.let { consumeFlow(it) } ?: run { errorText = authResponseText(response) }
-                                        }
-                                    })
+                                    titleText = stateValues.stringPassword,
+                                    placeholderText = stateValues.stringEnterPassword,
+                                    identityKey = "advanced-auth-login-password",
+                                    keyboardType = KeyboardType.Password,
+                                    imeAction = ImeAction.Go,
+                                    onImeAction = ::submitPasswordLogin,
+                                    leadingIconPath = stateValues.drawablePathIconPassword,
+                                    password = true,
+                                    sensitive = true
                                 )
                                 actionButton(
                                     modifier = Modifier.fillMaxWidth(),
@@ -205,14 +253,7 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                                     enabled = !busy && identifier.isNotBlank() && password.isNotBlank(),
                                     loading = busy,
                                     loadingText = stateValues.stringLoggingIn
-                                ) {
-                                    runAction {
-                                        val response = AitaAdvancedAuthenticationClient.passwordLogin(
-                                            AitaPasswordLoginRequestDataModel(identifier, password, buildCurrentClientDeviceInfo())
-                                        )
-                                        response.payload?.let { consumeFlow(it) } ?: run { errorText = authResponseText(response) }
-                                    }
-                                }
+                                ) { submitPasswordLogin() }
                             } else {
                                 Text(
                                     text = authUiText(
@@ -229,14 +270,7 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                                     text = authUiText("Send sign-in code", "Отправить код входа", "Кіру кодын жіберу"),
                                     enabled = !busy && identifier.isNotBlank(),
                                     loading = busy
-                                ) {
-                                    runAction {
-                                        val response = AitaAdvancedAuthenticationClient.requestLoginCode(
-                                            AitaEmailCodeRequestDataModel(identifier, stateValues.appLanguage, buildCurrentClientDeviceInfo())
-                                        )
-                                        response.payload?.let { consumeFlow(it) } ?: run { errorText = authResponseText(response) }
-                                    }
-                                }
+                                ) { requestSignInCode() }
                             }
                         }
 
@@ -250,30 +284,26 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                                 color = stateValues.PlaceholderTextColor,
                                 textAlign = TextAlign.Center
                             )
-                            OutlinedTextField(
+                            aitaFormTextField(
                                 modifier = Modifier.fillMaxWidth(),
                                 value = code,
-                                onValueChange = { code = it.filter(Char::isDigit).take(6); errorText = "" },
-                                singleLine = true,
-                                label = { Text(authUiText("Six-digit code", "Шестизначный код", "Алты таңбалы код")) },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Go)
+                                onValueChange = { code = it; errorText = "" },
+                                titleText = authUiText("Six-digit code", "Шестизначный код", "Алты таңбалы код"),
+                                placeholderText = "000000",
+                                identityKey = "advanced-auth-email-code",
+                                keyboardType = KeyboardType.NumberPassword,
+                                imeAction = ImeAction.Go,
+                                onImeAction = ::submitEmailCode,
+                                leadingIconPath = stateValues.drawablePathIconSecurity,
+                                sensitive = true,
+                                onTransformValue = { it.filter(Char::isDigit).take(6) }
                             )
                             actionButton(
                                 modifier = Modifier.fillMaxWidth(),
                                 text = authUiText("Confirm code", "Подтвердить код", "Кодты растау"),
                                 enabled = !busy && code.length == 6,
                                 loading = busy
-                            ) {
-                                runAction {
-                                    val request = AitaEmailCodeVerifyRequestDataModel(flowId, code, buildCurrentClientDeviceInfo())
-                                    val response = if (mode == AitaLoginMode.RECOVERY) {
-                                        AitaAdvancedAuthenticationClient.verifyPasswordRecovery(request)
-                                    } else {
-                                        AitaAdvancedAuthenticationClient.verifyLoginCode(request)
-                                    }
-                                    response.payload?.let { consumeFlow(it) } ?: run { errorText = authResponseText(response) }
-                                }
-                            }
+                            ) { submitEmailCode() }
                             TextButton(enabled = !busy, onClick = {
                                 runAction {
                                     val request = AitaEmailCodeResendRequestDataModel(flowId, stateValues.appLanguage)
@@ -301,27 +331,26 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                                 color = stateValues.PlaceholderTextColor,
                                 textAlign = TextAlign.Center
                             )
-                            OutlinedTextField(
+                            aitaFormTextField(
                                 modifier = Modifier.fillMaxWidth(),
                                 value = code,
-                                onValueChange = { code = it.take(32); errorText = "" },
-                                singleLine = true,
-                                label = { Text(authUiText("Authenticator or recovery code", "Код аутентификатора или резервный код", "Аутентификатор немесе қалпына келтіру коды")) },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Go)
+                                onValueChange = { code = it; errorText = "" },
+                                titleText = authUiText("Authenticator or recovery code", "Код аутентификатора или резервный код", "Аутентификатор немесе қалпына келтіру коды"),
+                                placeholderText = authUiText("Enter a current code", "Введите действующий код", "Ағымдағы кодты енгізіңіз"),
+                                identityKey = "advanced-auth-totp-or-recovery-code",
+                                keyboardType = KeyboardType.Ascii,
+                                imeAction = ImeAction.Go,
+                                onImeAction = ::submitTotpCode,
+                                leadingIconPath = stateValues.drawablePathIconSecurity,
+                                sensitive = true,
+                                onTransformValue = { it.take(32) }
                             )
                             actionButton(
                                 modifier = Modifier.fillMaxWidth(),
                                 text = authUiText("Complete sign-in", "Завершить вход", "Кіруді аяқтау"),
                                 enabled = !busy && code.isNotBlank(),
                                 loading = busy
-                            ) {
-                                runAction {
-                                    val response = AitaAdvancedAuthenticationClient.completeTotpLogin(
-                                        AitaTotpLoginRequestDataModel(flowId, code, buildCurrentClientDeviceInfo())
-                                    )
-                                    response.payload?.let { consumeFlow(it) } ?: run { errorText = authResponseText(response) }
-                                }
-                            }
+                            ) { submitTotpCode() }
                         }
 
                         AitaLoginStep.NEW_PASSWORD -> PasswordRecoveryNewPasswordContent(
@@ -402,14 +431,7 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                     text = authUiText("Send recovery code", "Отправить код восстановления", "Қалпына келтіру кодын жіберу"),
                     enabled = !busy && identifier.isNotBlank(),
                     loading = busy
-                ) {
-                    runAction {
-                        val response = AitaAdvancedAuthenticationClient.requestPasswordRecovery(
-                            AitaEmailCodeRequestDataModel(identifier, stateValues.appLanguage, buildCurrentClientDeviceInfo())
-                        )
-                        response.payload?.let { consumeFlow(it) } ?: run { errorText = authResponseText(response) }
-                    }
-                }
+                ) { requestRecoveryCode() }
                 TextButton(enabled = !busy, onClick = { resetSensitiveState(AitaLoginMode.PASSWORD) }) {
                     Text(authUiText("Back to sign in", "Назад ко входу", "Кіруге қайту"))
                 }

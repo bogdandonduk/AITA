@@ -24,7 +24,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -35,7 +34,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import kz.aita.payments.management.PaymentIntegrationDeleteRequest
 import kz.aita.payments.management.PaymentIntegrationSecretPatchRequest
@@ -361,35 +361,55 @@ private fun PaymentIntegrationEditorDialog(
                 if (!capabilityEnabled) {
                     Text(strings.kaspiContractRequired, color = MaterialTheme.colorScheme.error)
                 }
-                OutlinedTextField(
-                    value = displayName,
-                    onValueChange = { displayName = it.take(160) },
-                    label = { Text(strings.displayName) },
-                    enabled = !busy && capabilityEnabled,
-                    singleLine = true,
+                AppConfiguration.aitaFormTextField(
                     modifier = Modifier.fillMaxWidth(),
+                    value = displayName,
+                    onValueChange = { displayName = it },
+                    titleText = strings.displayName,
+                    placeholderText = strings.displayName,
+                    identityKey = "payment-integration-${provider.name}-${environment.name}-display-name",
+                    enabled = !busy && capabilityEnabled,
+                    keyboardType = KeyboardType.Text,
+                    imeAction = ImeAction.Next,
+                    leadingIconPath = AppConfiguration.stateValues.drawablePathIconEdit,
+                    onTransformValue = { it.take(160) }
                 )
                 if (provider == PaymentManagedProvider.WEBKASSA) {
-                    OutlinedTextField(
+                    AppConfiguration.aitaFormTextField(
+                        modifier = Modifier.fillMaxWidth(),
                         value = cashboxNumber,
-                        onValueChange = { cashboxNumber = it.take(128) },
-                        label = { Text(strings.cashboxNumber) },
+                        onValueChange = { cashboxNumber = it },
+                        titleText = strings.cashboxNumber,
+                        placeholderText = strings.cashboxNumber,
+                        identityKey = "payment-integration-${provider.name}-${environment.name}-cashbox-number",
                         enabled = !busy && capabilityEnabled,
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
+                        keyboardType = KeyboardType.Ascii,
+                        imeAction = ImeAction.Next,
+                        leadingIconPath = AppConfiguration.stateValues.drawablePathIconReceipt,
+                        onTransformValue = { it.take(128) }
                     )
-                    OutlinedTextField(
+                    AppConfiguration.aitaFormTextField(
+                        modifier = Modifier.fillMaxWidth(),
                         value = token,
-                        onValueChange = { token = it.take(16_384); clearToken = false },
-                        label = { Text(strings.apiToken) },
-                        supportingText = {
-                            if (existing?.configuredSecretKeys?.contains("apiToken") == true) Text(strings.tokenAlreadySaved)
-                        },
-                        visualTransformation = PasswordVisualTransformation(),
+                        onValueChange = { token = it; clearToken = false },
+                        titleText = strings.apiToken,
+                        placeholderText = strings.apiToken,
+                        identityKey = "payment-integration-${provider.name}-${environment.name}-api-token",
                         enabled = !busy && capabilityEnabled && !clearToken,
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Done,
+                        leadingIconPath = AppConfiguration.stateValues.drawablePathIconSecurity,
+                        password = true,
+                        sensitive = true,
+                        onTransformValue = { it.take(16_384) }
                     )
+                    if (existing?.configuredSecretKeys?.contains("apiToken") == true) {
+                        Text(
+                            strings.tokenAlreadySaved,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     if (existing?.configuredSecretKeys?.contains("apiToken") == true) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Checkbox(

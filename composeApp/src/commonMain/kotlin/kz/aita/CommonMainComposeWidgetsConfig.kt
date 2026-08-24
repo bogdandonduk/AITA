@@ -1506,6 +1506,7 @@ fun AppConfiguration.genericTextField(
     singleLine: Boolean = true,
     adaptiveMultiline: Boolean = false,
     valueInitial: String? = null,
+    retainTextAcrossRecreation: Boolean = true,
 
     textSize: TextUnit = stateValues.textSize,
     textColor: Color = stateValues.TextColor,
@@ -1586,9 +1587,16 @@ fun AppConfiguration.genericTextField(
         ?: stateKey
         ?: listOf(titleText, placeholderText, leadingIconPath.orEmpty()).joinToString("|")
 
-    var textFieldValue by rememberSaveable(textFieldIdentityKey, stateSaver = TextFieldValue.Saver) {
-        mutableStateOf(TextFieldValue(initialTextFieldText, selection = initialTextFieldMeta.selection))
+    val textFieldValueState: MutableState<TextFieldValue> = if (retainTextAcrossRecreation) {
+        rememberSaveable(textFieldIdentityKey, stateSaver = TextFieldValue.Saver) {
+            mutableStateOf(TextFieldValue(initialTextFieldText, selection = initialTextFieldMeta.selection))
+        }
+    } else {
+        remember(textFieldIdentityKey) {
+            mutableStateOf(TextFieldValue(initialTextFieldText, selection = initialTextFieldMeta.selection))
+        }
     }
+    var textFieldValue by textFieldValueState
 
     var persistentTextDraftLoaded by rememberSaveable(textFieldIdentityKey, persistentTextDraftKey ?: "no_persistent_text_draft") {
         mutableStateOf(false)
@@ -2445,6 +2453,87 @@ fun AppConfiguration.genericTextField(
     }
 
     return content
+}
+
+/**
+ * Controlled AITA-styled form field used by newer screens that own their values directly.
+ * Sensitive values deliberately opt out of saveable text state while retaining the same
+ * tactile field shell, iconography, focus motion, selection colors and password affordances
+ * as the rest of AITA's established form system.
+ */
+@Composable
+internal fun AppConfiguration.aitaFormTextField(
+    modifier: Modifier = Modifier,
+    value: String,
+    onValueChange: (String) -> Unit,
+    titleText: String,
+    placeholderText: String = titleText,
+    identityKey: String,
+    enabled: Boolean = true,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    imeAction: ImeAction = ImeAction.Next,
+    onImeAction: (() -> Unit)? = null,
+    leadingIconPath: String? = null,
+    password: Boolean = false,
+    sensitive: Boolean = password,
+    showClearButton: Boolean = true,
+    autoFocus: Boolean = false,
+    onTransformValue: ((String) -> String)? = null
+): GenericTextFieldContent {
+    var revealPassword by remember(identityKey) { mutableStateOf(false) }
+    val effectiveTextColor = if (enabled) stateValues.TextColor else stateValues.DisabledColor
+
+    return genericTextField(
+        modifier = modifier,
+        titleText = titleText,
+        identityKey = identityKey,
+        enabled = enabled,
+        valueInitial = value,
+        retainTextAcrossRecreation = !sensitive,
+        textColor = effectiveTextColor,
+        titleTextColor = effectiveTextColor,
+        placeholderText = placeholderText,
+        placeholderTextColor = if (enabled) stateValues.PlaceholderTextColor else stateValues.DisabledColor,
+        focusedBorderColor = if (enabled) stateValues.AccentColor else stateValues.DisabledColor,
+        unfocusedBorderColor = effectiveTextColor,
+        keyboardType = keyboardType,
+        imeWithAction = ImeWithAction(imeAction, onImeAction),
+        leadingIconPath = leadingIconPath,
+        trailingIconExtraPath = if (password && enabled) {
+            if (revealPassword) stateValues.drawablePathIconEyeHide else stateValues.drawablePathIconEyeShow
+        } else {
+            null
+        },
+        trailingIconExtraContentDescription = titleText,
+        trailingIconExtraOnClick = if (password && enabled) {
+            { revealPassword = !revealPassword }
+        } else {
+            null
+        },
+        enableVoiceInput = false,
+        visualTransformation = if (password && !revealPassword) {
+            {
+                getPasswordTransformedTextWithSelectionFocusTextColor(
+                    it,
+                    stateValues.AccentTextColor
+                )
+            }
+        } else {
+            {
+                getTransformedTextWithSelectionFocusTextColor(
+                    it,
+                    stateValues.AccentTextColor
+                )
+            }
+        },
+        showClearButton = showClearButton && enabled,
+        autoFocus = autoFocus,
+        onTransformValue = onTransformValue,
+        onValueChange = { newValue, applyChange ->
+            onValueChange(newValue)
+            applyChange()
+        }
+    )
 }
 
 class GenericTextFieldContent(
