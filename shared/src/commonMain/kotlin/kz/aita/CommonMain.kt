@@ -7083,8 +7083,8 @@ const val CLOUD_TRANSPORT_STATUS_UNAVAILABLE = -1
 @PublishedApi
 internal const val REALTIME_ACCESS_TOKEN_REFRESH_SKEW_MILLIS = 60_000L
 
-private const val DEFAULT_AITA_SERVER_URL = "https://aita-api.bogdan-dond.uk.workers.dev"
-private const val CANONICAL_AITA_PUBLIC_SERVER_HOST = "aita-api.bogdan-dond.uk.workers.dev"
+private const val DEFAULT_AITA_SERVER_URL = "https://aita-api.bogdan-donduk.workers.dev"
+private const val CANONICAL_AITA_PUBLIC_SERVER_HOST = "aita-api.bogdan-donduk.workers.dev"
 private const val DEFAULT_AITA_FALLBACK_SERVER_URLS = ""
 private const val DEFAULT_AITA_BOOTSTRAP_URLS = ""
 private const val AITA_BOOTSTRAP_SERVER_URL_REFRESH_INTERVAL_MILLIS = 300_000L
@@ -7872,11 +7872,15 @@ val tokenRefreshMutex = Mutex()
 private val authRefreshNetworkMutex = Mutex()
 private val cloudSessionValidationMutex = Mutex()
 private val manualCloudConnectionRefreshMutex = Mutex()
+private val cloudConnectionRecoveryMutex = Mutex()
 private const val AUTH_REFRESH_NON_AUTH_FAILURE_GRACE_MILLIS = 5_000L
 private const val AUTH_REFRESH_SUCCESS_CACHE_MILLIS = 30_000L
 private const val CLOUD_SESSION_VALIDATION_FAILURE_CACHE_MILLIS = 10_000L
 private const val CLOUD_CONNECTION_HEALTH_CHECK_REACHABLE_INTERVAL_MILLIS = 30_000L
 private const val CLOUD_CONNECTION_HEALTH_CHECK_REALTIME_CONNECTED_INTERVAL_MILLIS = 60_000L
+private const val CLOUD_CONNECTION_HEALTH_CHECK_REALTIME_SANITY_INTERVAL_MILLIS = 5 * 60_000L
+private const val CLOUD_CONNECTION_HEALTH_CHECK_LONG_PAUSE_MILLIS = 90_000L
+private const val CLOUD_CONNECTION_HEALTH_MONITOR_EXCEPTION_RETRY_MILLIS = 5_000L
 private const val CLOUD_CONNECTION_HEALTH_CHECK_AUTH_REQUIRED_INTERVAL_MILLIS = 60_000L
 private const val CLOUD_CONNECTION_HEALTH_CHECK_UNKNOWN_INTERVAL_MILLIS = 10_000L
 private const val CLOUD_CONNECTION_HEALTH_CHECK_UNAVAILABLE_INTERVAL_MILLIS = 15_000L
@@ -13551,6 +13555,11 @@ private fun realtimeRefreshingMessage(): List<LocalizedStringDataModel> = locali
 
 private var appCacheCollectorsStarted = false
 private var cloudConnectionHealthMonitorJob: Job? = null
+private var cloudConnectionRecoveryJob: Job? = null
+private var cloudConnectionReconciliationJob: Job? = null
+private var manualCloudConnectionRefreshJob: Job? = null
+@Volatile
+private var manualCloudConnectionRefreshGeneration: Long = 0L
 private var realtimeUpdatesJob: Job? = null
 private var realtimeRefreshJob: Job? = null
 private val realtimeRefreshMutex = Mutex()
@@ -14103,116 +14112,363 @@ internal fun cloudConnectionUnavailableProbeDelayMillis(unavailableRound: Int): 
         .coerceAtMost(CLOUD_CONNECTION_HEALTH_CHECK_UNAVAILABLE_MAX_INTERVAL_MILLIS)
 }
 
+private data class CloudConnectionRecoveryResult(
+    val success: Boolean,
+    val transportAvailable: Boolean,
+    val hasLocalAccount: Boolean,
+    val response: ResponseDataModel<Unit>
+)
+
+private fun unavailableCloudConnectionResponse(): ResponseDataModel<Unit> = ResponseDataModel(
+    message = localizedStringResourceMessage(
+        id = 1140,
+        main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
+        ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
+        kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
+    ),
+    payload = null,
+    negative = true,
+    httpStatusCode = null,
+    transportFailure = true
+)
+
+/**
+ * Restores only the transport/session path needed to call AITA again. Potentially slow cache,
+ * outbox and entity reconciliation is deliberately launched separately so neither the health
+ * monitor nor the user-facing Connect action can be trapped behind a large synchronization pass.
+ */
+private suspend fun recoverCloudConnectionFast(
+    reason: String,
+    knownReachabilityResponse: ResponseDataModel<Unit>? = null,
+    forceRejectedRefreshRetry: Boolean = false,
+    forcePresentationRecovery: Boolean = false,
+    forceRealtimeRestart: Boolean = false
+): CloudConnectionRecoveryResult = cloudConnectionRecoveryMutex.withLock {
+    val probeResponse = knownReachabilityResponse ?: withTimeoutOrNull(
+        CLOUD_CONNECTION_HEALTH_CHECK_TIMEOUT_MILLIS
+    ) {
+        cloudConnectionProbeRequest(reason)
+    } ?: unavailableCloudConnectionResponse()
+
+    if (probeResponse.negative) {
+        cancelRealtimeUpdatesSocketAfterReachabilityFailure()
+        markCloudTransportUnavailableForNotifications(
+            forceConfirmation = forcePresentationRecovery,
+            reason = "${reason}_probe"
+        )
+        return@withLock CloudConnectionRecoveryResult(
+            success = false,
+            transportAvailable = false,
+            hasLocalAccount = false,
+            response = probeResponse
+        )
+    }
+
+    markCloudTransportReachableForNotifications(
+        authenticated = false,
+        authRefreshRequired = null,
+        forceRecovery = forcePresentationRecovery
+    )
+
+    val hasLocalAccount = runCatching { getStoredUserAuthTokens?.invoke() != null }
+        .onFailure { throwable ->
+            logCloudConnectionDiagnostic(
+                "connection recovery could not read local auth state: ${throwable.message ?: throwable}"
+            )
+        }
+        .getOrDefault(false)
+
+    if (!hasLocalAccount) {
+        return@withLock CloudConnectionRecoveryResult(
+            success = true,
+            transportAvailable = true,
+            hasLocalAccount = false,
+            response = probeResponse
+        )
+    }
+
+    val validation = ensureCloudSessionReadyForProtectedRequest(
+        forceRejectedRefreshRetry = forceRejectedRefreshRetry
+    )
+    if (validation.negative) {
+        if (validation.transportFailure) {
+            cancelRealtimeUpdatesSocketAfterReachabilityFailure()
+            markCloudTransportUnavailableForNotifications(
+                forceConfirmation = forcePresentationRecovery,
+                reason = "${reason}_auth_validation_transport"
+            )
+        } else {
+            stopRealtimeUpdates()
+        }
+        return@withLock CloudConnectionRecoveryResult(
+            success = false,
+            transportAvailable = !validation.transportFailure,
+            hasLocalAccount = true,
+            response = validation
+        )
+    }
+
+    markCloudTransportReachableForNotifications(
+        authenticated = true,
+        authRefreshRequired = false,
+        forceRecovery = forcePresentationRecovery
+    )
+
+    if (
+        forceRealtimeRestart ||
+        realtimeUpdatesJob?.isActive != true ||
+        !realtimeUpdatesConnectedState.value
+    ) {
+        restartRealtimeUpdates()
+    }
+
+    CloudConnectionRecoveryResult(
+        success = true,
+        transportAvailable = true,
+        hasLocalAccount = true,
+        response = probeResponse
+    )
+}
+
+private suspend fun runCloudConnectionReconciliationStep(
+    name: String,
+    block: suspend () -> Unit
+) {
+    try {
+        block()
+    } catch (throwable: Throwable) {
+        if (throwable is CancellationException) throw throwable
+        logCloudConnectionDiagnostic(
+            "connection reconciliation step=$name failed ${throwable.message ?: throwable}"
+        )
+    }
+}
+
+private fun launchCloudConnectionReconciliation(
+    reason: String,
+    forceBroadRefresh: Boolean
+) {
+    if (cloudConnectionReconciliationJob?.isActive == true) {
+        GlobalScope.launch(Dispatchers.ourIo) {
+            runCatching {
+                scheduleRealtimeRefresh(
+                    reason = reason,
+                    entity = "all",
+                    force = forceBroadRefresh
+                )
+            }.onFailure { throwable ->
+                if (throwable is CancellationException) throw throwable
+                logCloudConnectionDiagnostic(
+                    "connection reconciliation refresh merge failed ${throwable.message ?: throwable}"
+                )
+            }
+        }
+        return
+    }
+
+    cloudConnectionReconciliationJob = GlobalScope.launch(Dispatchers.ourIo) {
+        val thisJob = coroutineContext[Job]
+        try {
+            if (!currentCloudSessionIsReadyForBackgroundSync()) return@launch
+
+            runCloudConnectionReconciliationStep("session_cleanups") {
+                syncPendingSessionCleanupsToServerNow()
+            }
+            runCloudConnectionReconciliationStep("notifications") {
+                syncPendingNotificationsToServerNow()
+            }
+            runCloudConnectionReconciliationStep("local_outbox") {
+                syncLocalNetworkOperationsToCloudNow()
+            }
+            runCloudConnectionReconciliationStep("account") {
+                getUser(forceLogOut = false, applyServerActiveStore = false)
+            }
+            runCloudConnectionReconciliationStep("entities") {
+                scheduleRealtimeRefresh(
+                    reason = reason,
+                    entity = "all",
+                    force = forceBroadRefresh
+                )
+            }
+        } finally {
+            if (cloudConnectionReconciliationJob === thisJob) {
+                cloudConnectionReconciliationJob = null
+            }
+        }
+    }
+}
+
+private fun launchAutomaticCloudConnectionRecovery(
+    knownReachabilityResponse: ResponseDataModel<Unit>,
+    forceRealtimeRestart: Boolean
+) {
+    if (cloudConnectionRecoveryJob?.isActive == true) return
+
+    cloudConnectionRecoveryJob = GlobalScope.launch(Dispatchers.ourIo) {
+        val thisJob = coroutineContext[Job]
+        try {
+            val result = recoverCloudConnectionFast(
+                reason = "automatic_reconnect",
+                knownReachabilityResponse = knownReachabilityResponse,
+                forceRealtimeRestart = forceRealtimeRestart
+            )
+            if (result.success && result.hasLocalAccount) {
+                launchCloudConnectionReconciliation(
+                    reason = "connection_sync",
+                    forceBroadRefresh = false
+                )
+            }
+        } catch (throwable: Throwable) {
+            if (throwable is CancellationException) throw throwable
+            logCloudConnectionDiagnostic(
+                "automatic connection recovery failed ${throwable.message ?: throwable}"
+            )
+        } finally {
+            if (cloudConnectionRecoveryJob === thisJob) {
+                cloudConnectionRecoveryJob = null
+            }
+        }
+    }
+}
+
 fun startCloudConnectionHealthMonitor() {
     if (cloudConnectionHealthMonitorJob?.isActive == true) return
 
     cloudConnectionHealthMonitorJob = GlobalScope.launch(Dispatchers.ourIo) {
+        val thisJob = coroutineContext[Job]
         delay(1_500L)
         var unavailableRound = 0
+        var lastMonitorIterationAtMillis = getCurrentTimeMillis()
+        var lastRealtimeSanityProbeAtMillis = 0L
 
-        while (isActive) {
-            val configuredServerUrl = globalAppConfigurationState.payloadValue.serverUrl.first
-            val hasConfiguredServerUrl = normalizedHttpServerUrlOrNull(configuredServerUrl) != null
+        try {
+            while (isActive) {
+                try {
+                    val iterationStartedAt = getCurrentTimeMillis()
+                    val resumedAfterLongPause =
+                        iterationStartedAt - lastMonitorIterationAtMillis >= CLOUD_CONNECTION_HEALTH_CHECK_LONG_PAUSE_MILLIS
+                    lastMonitorIterationAtMillis = iterationStartedAt
 
-            if (!hasConfiguredServerUrl) {
-                delay(CLOUD_CONNECTION_HEALTH_CHECK_UNKNOWN_INTERVAL_MILLIS)
-                continue
-            }
+                    val configuredServerUrl = globalAppConfigurationState.payloadValue.serverUrl.first
+                    val hasConfiguredServerUrl = normalizedHttpServerUrlOrNull(configuredServerUrl) != null
 
-            if (realtimeUpdatesConnectedState.value) {
-                // An open authenticated WebSocket is stronger and cheaper reachability evidence than
-                // a synthetic /auth/ping. Do not poll in parallel with a healthy realtime channel.
-                getStoredUserAuthTokens?.invoke()?.accessToken?.let(::markCloudAccessTokenValidated)
-                markCloudTransportReachableForNotifications(
-                    authenticated = true,
-                    authRefreshRequired = false
-                )
-                delay(CLOUD_CONNECTION_HEALTH_CHECK_REALTIME_CONNECTED_INTERVAL_MILLIS)
-                continue
-            }
-
-            val foregroundNetworkOperations = activeNetworkOperationsState.value
-            if (
-                foregroundNetworkOperations > 0 &&
-                cloudTransportStatusState.value != CLOUD_TRANSPORT_STATUS_UNAVAILABLE
-            ) {
-                // On a slow uplink, a parallel ping competes with the user's real request and can
-                // manufacture its own timeout. Real API calls already report reachability evidence,
-                // so defer the synthetic probe while useful traffic is in flight. Failed requests
-                // still feed the same grounded failure quorum and therefore cannot hide an outage.
-                logCloudConnectionDiagnostic(
-                    "health probe deferred activeNetworkOperations=$foregroundNetworkOperations " +
-                            "status=${cloudTransportStatusName(cloudTransportStatusState.value)}"
-                )
-                delay(CLOUD_CONNECTION_HEALTH_CHECK_BUSY_DEFER_MILLIS)
-                continue
-            }
-
-            val hasLocalAccount = getStoredUserAuthTokens?.invoke() != null
-            val probeStartedAt = getCurrentTimeMillis()
-            logCloudConnectionDiagnostic(
-                "health probe start server=$configuredServerUrl status=${cloudTransportStatusName(cloudTransportStatusState.value)} " +
-                        "realtime=${realtimeUpdatesConnectedState.value} hasTokens=$hasLocalAccount"
-            )
-            val response = cloudConnectionHealthProbeMutex.withLock {
-                withTimeoutOrNull(CLOUD_CONNECTION_HEALTH_CHECK_TIMEOUT_MILLIS) {
-                    cloudConnectionProbeRequest("health")
-                }
-            }
-
-            val serverAvailable = response != null && !response.negative
-            logCloudConnectionDiagnostic(
-                "health probe result available=$serverAvailable http=${response?.httpStatusCode ?: -1} " +
-                        "negative=${response?.negative} transportFailure=${response?.transportFailure} " +
-                        "elapsed=${getCurrentTimeMillis() - probeStartedAt}ms"
-            )
-
-            if (serverAvailable) {
-                unavailableRound = 0
-                // /auth/ping is deliberately public: it proves only that the AITA transport is alive.
-                // It must never clear a grounded expired-session state merely because local tokens exist.
-                markCloudTransportReachableForNotifications(
-                    authenticated = false,
-                    authRefreshRequired = null
-                )
-
-                if (hasLocalAccount) {
-                    if (realtimeUpdatesJob?.isActive != true) {
-                        startRealtimeUpdates()
+                    if (!hasConfiguredServerUrl) {
+                        delay(CLOUD_CONNECTION_HEALTH_CHECK_UNKNOWN_INTERVAL_MILLIS)
+                        continue
                     }
-                    if (currentCloudSessionIsReadyForBackgroundSync()) {
-                        syncPendingSessionCleanupsToServerNow()
-                        syncPendingNotificationsToServerNow()
-                        syncLocalNetworkOperationsToCloudNow()
-                    }
-                }
-            } else if (markCloudTransportUnavailableForNotifications(reason = "health_probe")) {
-                // A confirmed outage is represented by the persistent grounded banner only.
-                // Automatic connection popups are deliberately suppressed because they are noisy on
-                // slow links and can outlive the short network wobble that produced them.
-                cancelRealtimeUpdatesSocketAfterReachabilityFailure()
-            }
 
-            val delayMillis = when (cloudTransportStatusState.value) {
-                CLOUD_TRANSPORT_STATUS_REACHABLE -> {
-                    unavailableRound = 0
-                    CLOUD_CONNECTION_HEALTH_CHECK_REACHABLE_INTERVAL_MILLIS
-                }
-                CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED -> {
-                    unavailableRound = 0
-                    CLOUD_CONNECTION_HEALTH_CHECK_AUTH_REQUIRED_INTERVAL_MILLIS
-                }
-                CLOUD_TRANSPORT_STATUS_UNAVAILABLE -> {
-                    cloudConnectionUnavailableProbeDelayMillis(unavailableRound).also {
-                        unavailableRound = (unavailableRound + 1).coerceAtMost(3)
+                    val realtimeReportedConnected = realtimeUpdatesConnectedState.value
+                    val realtimeSanityProbeDue =
+                        resumedAfterLongPause ||
+                            iterationStartedAt - lastRealtimeSanityProbeAtMillis >=
+                            CLOUD_CONNECTION_HEALTH_CHECK_REALTIME_SANITY_INTERVAL_MILLIS
+
+                    if (realtimeReportedConnected && !realtimeSanityProbeDue) {
+                        // A recently observed authenticated WebSocket is stronger and cheaper evidence
+                        // than another synthetic ping. A periodic sanity probe, and an immediate probe
+                        // after a long sleep/pause, still protect against half-open sockets.
+                        getStoredUserAuthTokens?.invoke()?.accessToken?.let(::markCloudAccessTokenValidated)
+                        markCloudTransportReachableForNotifications(
+                            authenticated = true,
+                            authRefreshRequired = false
+                        )
+                        delay(CLOUD_CONNECTION_HEALTH_CHECK_REALTIME_CONNECTED_INTERVAL_MILLIS)
+                        continue
                     }
-                }
-                else -> {
-                    unavailableRound = 0
-                    CLOUD_CONNECTION_HEALTH_CHECK_UNKNOWN_INTERVAL_MILLIS
+
+                    if (realtimeReportedConnected) {
+                        lastRealtimeSanityProbeAtMillis = iterationStartedAt
+                    }
+
+                    val foregroundNetworkOperations = activeNetworkOperationsState.value
+                    if (
+                        foregroundNetworkOperations > 0 &&
+                        cloudTransportStatusState.value != CLOUD_TRANSPORT_STATUS_UNAVAILABLE &&
+                        !resumedAfterLongPause
+                    ) {
+                        // Real user requests already provide grounded transport evidence. Avoid making
+                        // a synthetic probe compete with useful foreground traffic on a slow uplink.
+                        logCloudConnectionDiagnostic(
+                            "health probe deferred activeNetworkOperations=$foregroundNetworkOperations " +
+                                "status=${cloudTransportStatusName(cloudTransportStatusState.value)}"
+                        )
+                        delay(CLOUD_CONNECTION_HEALTH_CHECK_BUSY_DEFER_MILLIS)
+                        continue
+                    }
+
+                    val hasLocalAccount = runCatching { getStoredUserAuthTokens?.invoke() != null }
+                        .getOrDefault(false)
+                    val probeStartedAt = getCurrentTimeMillis()
+                    logCloudConnectionDiagnostic(
+                        "health probe start server=$configuredServerUrl " +
+                            "status=${cloudTransportStatusName(cloudTransportStatusState.value)} " +
+                            "realtime=$realtimeReportedConnected hasTokens=$hasLocalAccount " +
+                            "resumedAfterPause=$resumedAfterLongPause"
+                    )
+                    val response = cloudConnectionHealthProbeMutex.withLock {
+                        withTimeoutOrNull(CLOUD_CONNECTION_HEALTH_CHECK_TIMEOUT_MILLIS) {
+                            cloudConnectionProbeRequest("health")
+                        }
+                    }
+
+                    val serverAvailable = response != null && !response.negative
+                    logCloudConnectionDiagnostic(
+                        "health probe result available=$serverAvailable http=${response?.httpStatusCode ?: -1} " +
+                            "negative=${response?.negative} transportFailure=${response?.transportFailure} " +
+                            "elapsed=${getCurrentTimeMillis() - probeStartedAt}ms"
+                    )
+
+                    if (serverAvailable) {
+                        unavailableRound = 0
+                        markCloudTransportReachableForNotifications(
+                            authenticated = realtimeReportedConnected && !resumedAfterLongPause,
+                            authRefreshRequired = if (realtimeReportedConnected && !resumedAfterLongPause) false else null
+                        )
+
+                        if (hasLocalAccount && (!realtimeReportedConnected || resumedAfterLongPause)) {
+                            launchAutomaticCloudConnectionRecovery(
+                                knownReachabilityResponse = response!!,
+                                forceRealtimeRestart = resumedAfterLongPause
+                            )
+                        }
+                    } else if (markCloudTransportUnavailableForNotifications(reason = "health_probe")) {
+                        cancelRealtimeUpdatesSocketAfterReachabilityFailure()
+                    }
+
+                    val delayMillis = when (cloudTransportStatusState.value) {
+                        CLOUD_TRANSPORT_STATUS_REACHABLE -> {
+                            unavailableRound = 0
+                            CLOUD_CONNECTION_HEALTH_CHECK_REACHABLE_INTERVAL_MILLIS
+                        }
+                        CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED -> {
+                            unavailableRound = 0
+                            CLOUD_CONNECTION_HEALTH_CHECK_AUTH_REQUIRED_INTERVAL_MILLIS
+                        }
+                        CLOUD_TRANSPORT_STATUS_UNAVAILABLE -> {
+                            cloudConnectionUnavailableProbeDelayMillis(unavailableRound).also {
+                                unavailableRound = (unavailableRound + 1).coerceAtMost(3)
+                            }
+                        }
+                        else -> {
+                            unavailableRound = 0
+                            CLOUD_CONNECTION_HEALTH_CHECK_UNKNOWN_INTERVAL_MILLIS
+                        }
+                    }
+                    delay(delayMillis)
+                } catch (throwable: Throwable) {
+                    if (throwable is CancellationException) throw throwable
+                    // A single cache, token, callback, or reconciliation exception must never kill the
+                    // only monitor capable of bringing an unattended client back online.
+                    logCloudConnectionDiagnostic(
+                        "health monitor iteration failed ${throwable.message ?: throwable}"
+                    )
+                    delay(CLOUD_CONNECTION_HEALTH_MONITOR_EXCEPTION_RETRY_MILLIS)
                 }
             }
-            delay(delayMillis)
+        } finally {
+            if (cloudConnectionHealthMonitorJob === thisJob) {
+                cloudConnectionHealthMonitorJob = null
+            }
         }
     }
 }
@@ -14424,100 +14680,77 @@ fun startRealtimeUpdates() {
     }
 }
 fun refreshCloudConnectionManually() {
-    if (manualCloudConnectionRefreshMutex.isLocked) return
+    manualCloudConnectionRefreshGeneration += 1L
+    val generation = manualCloudConnectionRefreshGeneration
+    val previousManualJob = manualCloudConnectionRefreshJob
+    previousManualJob?.cancel()
 
-    GlobalScope.launch(Dispatchers.ourIo) {
-        manualCloudConnectionRefreshMutex.withLock {
-            cloudConnectionManualRefreshInProgressState.emit(true)
+    manualCloudConnectionRefreshJob = GlobalScope.launch(Dispatchers.ourIo) {
+        val thisJob = coroutineContext[Job]
+        try {
+            // A second press supersedes a stale manual attempt instead of being silently ignored.
+            // The old implementation simply returned while its mutex was locked, which made the
+            // top-right Connect action appear permanently dead after a stalled synchronization.
+            withTimeoutOrNull(5_000L) {
+                previousManualJob?.cancelAndJoin()
+            }
 
-            try {
+            manualCloudConnectionRefreshMutex.withLock {
+                if (generation != manualCloudConnectionRefreshGeneration) return@withLock
+                cloudConnectionManualRefreshInProgressState.emit(true)
+
+                val previousMonitorJob = cloudConnectionHealthMonitorJob
+                cloudConnectionHealthMonitorJob = null
+                previousMonitorJob?.cancelAndJoin()
+
+                cloudConnectionRecoveryJob?.cancelAndJoin()
+                cloudConnectionRecoveryJob = null
+
                 logCloudConnectionDiagnostic(
                     "manual refresh start server=${globalAppConfigurationState.payloadValue.serverUrl.first}"
                 )
-                val response = cloudConnectionProbeRequest("manual")
-                logCloudConnectionDiagnostic(
-                    "manual refresh ping result negative=${response.negative} http=${response.httpStatusCode} " +
-                            "transportFailure=${response.transportFailure}"
+
+                val result = recoverCloudConnectionFast(
+                    reason = "manual",
+                    forceRejectedRefreshRetry = true,
+                    forcePresentationRecovery = true,
+                    forceRealtimeRestart = true
                 )
 
-                if (response.negative) {
-                    cancelRealtimeUpdatesSocketAfterReachabilityFailure()
-                    markCloudTransportUnavailableForNotifications(
-                        forceConfirmation = true,
-                        reason = "manual_probe"
-                    )
+                logCloudConnectionDiagnostic(
+                    "manual refresh result success=${result.success} " +
+                        "transportAvailable=${result.transportAvailable} " +
+                        "hasLocalAccount=${result.hasLocalAccount} " +
+                        "http=${result.response.httpStatusCode}"
+                )
+
+                if (!result.success) {
                     postInAppNotification(
-                        response.message ?: localizedStringResourceMessage(
-                            id = 1140,
-                            main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
-                            ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
-                            kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
-                        ),
-                        NotificationType.Negative,
-                        transient = true
+                        result.response.message ?: if (result.transportAvailable) {
+                            cloudSessionExpiredMessage()
+                        } else {
+                            localizedStringResourceMessage(
+                                id = 1140,
+                                main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
+                                ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
+                                kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
+                            )
+                        },
+                        if (result.transportAvailable) NotificationType.Neutral else NotificationType.Negative,
+                        transient = !result.transportAvailable
                     )
                     return@withLock
                 }
 
-                // The public probe established transport only. For a local account, deliberately run
-                // one authenticated validation and allow one manual retry of a previously rejected
-                // refresh token. No background caller gets this force-retry privilege.
-                markCloudTransportReachableForNotifications(
-                    authenticated = false,
-                    authRefreshRequired = null,
-                    forceRecovery = true
-                )
-
-                val hasLocalAccount = getStoredUserAuthTokens?.invoke() != null
-                if (hasLocalAccount) {
-                    val validation = ensureCloudSessionReadyForProtectedRequest(
-                        forceRejectedRefreshRetry = true
+                if (result.hasLocalAccount) {
+                    launchCloudConnectionReconciliation(
+                        reason = "manual_reconnect",
+                        forceBroadRefresh = true
                     )
-                    if (validation.negative) {
-                        if (validation.transportFailure) {
-                            cancelRealtimeUpdatesSocketAfterReachabilityFailure()
-                            markCloudTransportUnavailableForNotifications(
-                                forceConfirmation = true,
-                                reason = "manual_auth_validation_transport"
-                            )
-                        }
-                        postInAppNotification(
-                            validation.message ?: if (validation.transportFailure) {
-                                localizedStringResourceMessage(
-                                    id = 1140,
-                                    main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
-                                    ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
-                                    kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
-                                )
-                            } else {
-                                cloudSessionExpiredMessage()
-                            },
-                            if (validation.transportFailure) NotificationType.Negative else NotificationType.Neutral,
-                            transient = validation.transportFailure
-                        )
-                        return@withLock
-                    }
-                }
-
-                markCloudTransportReachableForNotifications(
-                    authenticated = hasLocalAccount,
-                    authRefreshRequired = if (hasLocalAccount) false else null,
-                    forceRecovery = true
-                )
-                syncPendingSessionCleanupsToServerNow()
-
-                if (hasLocalAccount) {
-                    getUser(forceLogOut = false, applyServerActiveStore = false)
-                    if (currentCloudSessionIsReadyForBackgroundSync()) {
-                        syncPendingNotificationsToServerNow()
-                        syncLocalNetworkOperationsToCloudNow()
-                        scheduleRealtimeRefresh(reason = "manual_reconnect", entity = "all", force = true)
-                        restartRealtimeUpdates()
-                    }
                 }
 
                 postInAppNotification(
-                    response.message ?: localizedStringResourceMessage(
+                    result.response.message ?: localizedStringResourceMessage(
                         id = 1138,
                         main = "Server connection available",
                         ru = "Сервер доступен",
@@ -14525,36 +14758,43 @@ fun refreshCloudConnectionManually() {
                     ),
                     NotificationType.Positive
                 )
-            } catch (throwable: Throwable) {
-                if (throwable is CancellationException) throw throwable
-                logCloudConnectionDiagnostic(
-                    "manual refresh failed ${throwable.message ?: throwable.toString()}"
-                )
-                cancelRealtimeUpdatesSocketAfterReachabilityFailure()
-                markCloudTransportUnavailableForNotifications(
-                    forceConfirmation = true,
-                    reason = "manual_refresh_exception"
-                )
-                postInAppNotification(
-                    localizedStringResourceMessage(
-                        id = 1140,
-                        main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
-                        ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
-                        kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
-                    ),
-                    NotificationType.Negative,
-                    transient = true
-                )
-            } finally {
+            }
+        } catch (throwable: Throwable) {
+            if (throwable is CancellationException) throw throwable
+            logCloudConnectionDiagnostic(
+                "manual refresh failed ${throwable.message ?: throwable}"
+            )
+            cancelRealtimeUpdatesSocketAfterReachabilityFailure()
+            markCloudTransportUnavailableForNotifications(
+                forceConfirmation = true,
+                reason = "manual_refresh_exception"
+            )
+            postInAppNotification(
+                localizedStringResourceMessage(
+                    id = 1140,
+                    main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
+                    ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
+                    kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
+                ),
+                NotificationType.Negative,
+                transient = true
+            )
+        } finally {
+            if (generation == manualCloudConnectionRefreshGeneration) {
+                startCloudConnectionHealthMonitor()
                 logCloudConnectionDiagnostic(
                     "manual refresh finish status=${cloudTransportStatusName(cloudTransportStatusState.value)} " +
-                            "realtime=${realtimeUpdatesConnectedState.value}"
+                        "realtime=${realtimeUpdatesConnectedState.value}"
                 )
                 cloudConnectionManualRefreshInProgressState.emit(false)
+                if (manualCloudConnectionRefreshJob === thisJob) {
+                    manualCloudConnectionRefreshJob = null
+                }
             }
         }
     }
 }
+
 fun upsertCart(
     id: String,
     transactionTypeIndex: Int,

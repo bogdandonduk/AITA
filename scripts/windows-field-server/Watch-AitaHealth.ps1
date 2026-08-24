@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$LocalUrl = 'http://127.0.0.1:8080',
-    [string]$PublicUrl = 'https://aita-api.bogdan-dond.uk.workers.dev',
+    [string]$PublicUrl = 'https://aita-api.bogdan-donduk.workers.dev',
     [ValidateRange(5, 3600)]
     [int]$IntervalSeconds = 15,
     [ValidateRange(2, 120)]

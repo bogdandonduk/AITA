@@ -38683,6 +38683,363 @@
           "value": "Жеткізушінің негізгі кеңістігі дайын. Көрсеткіштер мен келесі әрекеттерді тексеріңіз."
         }
       ]
+    },
+    {
+      "id": 2534,
+      "values": [
+        {
+          "language": "main",
+          "value": "Current app mode"
+        },
+        {
+          "language": "en",
+          "value": "Current app mode"
+        },
+        {
+          "language": "ru",
+          "value": "Текущий режим приложения"
+        },
+        {
+          "language": "kk",
+          "value": "Қолданбаның ағымдағы режимі"
+        }
+      ]
+    },
+    {
+      "id": 2535,
+      "values": [
+        {
+          "language": "main",
+          "value": "Switch mode"
+        },
+        {
+          "language": "en",
+          "value": "Switch mode"
+        },
+        {
+          "language": "ru",
+          "value": "Сменить режим"
+        },
+        {
+          "language": "kk",
+          "value": "Режимді ауыстыру"
+        }
+      ]
+    },
+    {
+      "id": 2536,
+      "values": [
+        {
+          "language": "main",
+          "value": "Choose the workspace that matches what you are doing now."
+        },
+        {
+          "language": "en",
+          "value": "Choose the workspace that matches what you are doing now."
+        },
+        {
+          "language": "ru",
+          "value": "Выберите рабочее пространство под текущую задачу."
+        },
+        {
+          "language": "kk",
+          "value": "Қазіргі жұмысыңызға сәйкес жұмыс кеңістігін таңдаңыз."
+        }
+      ]
+    },
+    {
+      "id": 2537,
+      "values": [
+        {
+          "language": "main",
+          "value": "Partner portfolio health"
+        },
+        {
+          "language": "en",
+          "value": "Partner portfolio health"
+        },
+        {
+          "language": "ru",
+          "value": "Состояние портфеля партнёров"
+        },
+        {
+          "language": "kk",
+          "value": "Серіктестер портфелінің күйі"
+        }
+      ]
+    },
+    {
+      "id": 2538,
+      "values": [
+        {
+          "language": "main",
+          "value": "Commercial coverage"
+        },
+        {
+          "language": "en",
+          "value": "Commercial coverage"
+        },
+        {
+          "language": "ru",
+          "value": "Коммерческое покрытие"
+        },
+        {
+          "language": "kk",
+          "value": "Коммерциялық қамту"
+        }
+      ]
+    },
+    {
+      "id": 2539,
+      "values": [
+        {
+          "language": "main",
+          "value": "Ready partnerships"
+        },
+        {
+          "language": "en",
+          "value": "Ready partnerships"
+        },
+        {
+          "language": "ru",
+          "value": "Готовые партнёрства"
+        },
+        {
+          "language": "kk",
+          "value": "Дайын серіктестіктер"
+        }
+      ]
+    },
+    {
+      "id": 2540,
+      "values": [
+        {
+          "language": "main",
+          "value": "Without an active agreement"
+        },
+        {
+          "language": "en",
+          "value": "Without an active agreement"
+        },
+        {
+          "language": "ru",
+          "value": "Без активного договора"
+        },
+        {
+          "language": "kk",
+          "value": "Белсенді келісімсіз"
+        }
+      ]
+    },
+    {
+      "id": 2541,
+      "values": [
+        {
+          "language": "main",
+          "value": "Without a usable offer"
+        },
+        {
+          "language": "en",
+          "value": "Without a usable offer"
+        },
+        {
+          "language": "ru",
+          "value": "Без готового предложения"
+        },
+        {
+          "language": "kk",
+          "value": "Қолдануға дайын ұсыныссыз"
+        }
+      ]
+    },
+    {
+      "id": 2542,
+      "values": [
+        {
+          "language": "main",
+          "value": "Review partner attention"
+        },
+        {
+          "language": "en",
+          "value": "Review partner attention"
+        },
+        {
+          "language": "ru",
+          "value": "Проверить важные отношения"
+        },
+        {
+          "language": "kk",
+          "value": "Назар қажет серіктестерді тексеру"
+        }
+      ]
+    },
+    {
+      "id": 2543,
+      "values": [
+        {
+          "language": "main",
+          "value": "Build missing offers"
+        },
+        {
+          "language": "en",
+          "value": "Build missing offers"
+        },
+        {
+          "language": "ru",
+          "value": "Добавить недостающие предложения"
+        },
+        {
+          "language": "kk",
+          "value": "Жетіспейтін ұсыныстарды қосу"
+        }
+      ]
+    },
+    {
+      "id": 2544,
+      "values": [
+        {
+          "language": "main",
+          "value": "Complete partner agreements"
+        },
+        {
+          "language": "en",
+          "value": "Complete partner agreements"
+        },
+        {
+          "language": "ru",
+          "value": "Завершить договоры с партнёрами"
+        },
+        {
+          "language": "kk",
+          "value": "Серіктес келісімдерін аяқтау"
+        }
+      ]
+    },
+    {
+      "id": 2545,
+      "values": [
+        {
+          "language": "main",
+          "value": "Open Supplier insights"
+        },
+        {
+          "language": "en",
+          "value": "Open Supplier insights"
+        },
+        {
+          "language": "ru",
+          "value": "Открыть аналитику поставщика"
+        },
+        {
+          "language": "kk",
+          "value": "Жеткізуші аналитикасын ашу"
+        }
+      ]
+    },
+    {
+      "id": 2546,
+      "values": [
+        {
+          "language": "main",
+          "value": "Every partner has an active agreement and a usable offer."
+        },
+        {
+          "language": "en",
+          "value": "Every partner has an active agreement and a usable offer."
+        },
+        {
+          "language": "ru",
+          "value": "У каждого партнёра есть активный договор и готовое предложение."
+        },
+        {
+          "language": "kk",
+          "value": "Әр серіктесте белсенді келісім және қолдануға дайын ұсыныс бар."
+        }
+      ]
+    },
+    {
+      "id": 2547,
+      "values": [
+        {
+          "language": "main",
+          "value": "Prioritize relationships that may block orders or deliveries."
+        },
+        {
+          "language": "en",
+          "value": "Prioritize relationships that may block orders or deliveries."
+        },
+        {
+          "language": "ru",
+          "value": "Сначала разберите отношения, которые могут задержать заказы или доставки."
+        },
+        {
+          "language": "kk",
+          "value": "Алдымен тапсырысқа немесе жеткізуге кедергі келтіруі мүмкін қатынастарды қараңыз."
+        }
+      ]
+    },
+    {
+      "id": 2548,
+      "values": [
+        {
+          "language": "main",
+          "value": "Refresh relationship data"
+        },
+        {
+          "language": "en",
+          "value": "Refresh relationship data"
+        },
+        {
+          "language": "ru",
+          "value": "Обновить данные отношений"
+        },
+        {
+          "language": "kk",
+          "value": "Қатынас деректерін жаңарту"
+        }
+      ]
+    },
+    {
+      "id": 2549,
+      "values": [
+        {
+          "language": "main",
+          "value": "AITA is still checking offers and agreements before recommending commercial work."
+        },
+        {
+          "language": "en",
+          "value": "AITA is still checking offers and agreements before recommending commercial work."
+        },
+        {
+          "language": "ru",
+          "value": "AITA ещё проверяет предложения и договоры, прежде чем рекомендовать коммерческие действия."
+        },
+        {
+          "language": "kk",
+          "value": "AITA коммерциялық әрекеттерді ұсынбас бұрын ұсыныстар мен келісімдерді әлі тексеріп жатыр."
+        }
+      ]
+    },
+    {
+      "id": 2550,
+      "values": [
+        {
+          "language": "main",
+          "value": "Still checking"
+        },
+        {
+          "language": "en",
+          "value": "Still checking"
+        },
+        {
+          "language": "ru",
+          "value": "Ещё проверяем"
+        },
+        {
+          "language": "kk",
+          "value": "Әлі тексерілуде"
+        }
+      ]
     }
   ]
 }

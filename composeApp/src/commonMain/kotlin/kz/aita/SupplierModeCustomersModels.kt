@@ -161,7 +161,9 @@ internal data class SupplierPartnerUiModel(
     val brief: String,
     val orderDetailsLoaded: Boolean = true,
     val priceDetailsLoaded: Boolean = true,
-    val contractDetailsLoaded: Boolean = true
+    val contractDetailsLoaded: Boolean = true,
+    val offerReadinessKnown: Boolean = true,
+    val agreementReadinessKnown: Boolean = true
 ) {
     val hasActiveWork: Boolean
         get() = openOrderCount > 0
@@ -192,6 +194,82 @@ internal data class SupplierPartnerUiModel(
 
     val navigationSearchQuery: String
         get() = storeId.ifBlank { publicId }.ifBlank { title }
+}
+
+internal enum class SupplierPartnerPortfolioNextStep {
+    REVIEW_ATTENTION,
+    REFRESH_RELATIONSHIP_DATA,
+    BUILD_OFFERS,
+    COMPLETE_AGREEMENTS,
+    OPEN_INSIGHTS,
+}
+
+internal data class SupplierPartnerPortfolioHealthUiModel(
+    val partnerCount: Int,
+    val commerciallyReadyCount: Int,
+    val attentionCount: Int,
+    val missingActiveAgreementCount: Int,
+    val missingUsableOfferCount: Int,
+    val readinessUnknownCount: Int,
+    val coveragePercent: Int,
+    val nextStep: SupplierPartnerPortfolioNextStep,
+) {
+    val coverageIsFinal: Boolean
+        get() = readinessUnknownCount == 0
+}
+
+/**
+ * Commercial readiness is intentionally derived only from authoritative relationship evidence
+ * already loaded by the Supplier workspace. An active agreement and at least one currently usable
+ * offer are both required. A zero count is not treated as "missing" until either the detailed list
+ * or the matching dashboard partner snapshot has arrived; otherwise a partial initial load could
+ * tell the Supplier to recreate an agreement or offer that already exists.
+ *
+ * Operational attention remains independent and keeps the highest action priority, so a known urgent
+ * order still surfaces even while commercial-readiness details are being refreshed.
+ */
+internal fun buildSupplierPartnerPortfolioHealth(
+    partners: List<SupplierPartnerUiModel>,
+): SupplierPartnerPortfolioHealthUiModel {
+    val partnerCount = partners.size
+    val commerciallyReadyCount = partners.count { partner ->
+        partner.activeContractCount > 0 && partner.validOfferCount > 0
+    }
+    val attentionCount = partners.count { it.hasAttention }
+    val missingActiveAgreementCount = partners.count { partner ->
+        partner.activeContractCount <= 0 && partner.agreementReadinessKnown
+    }
+    val missingUsableOfferCount = partners.count { partner ->
+        partner.validOfferCount <= 0 && partner.offerReadinessKnown
+    }
+    val readinessUnknownCount = partners.count { partner ->
+        (partner.activeContractCount <= 0 && !partner.agreementReadinessKnown) ||
+                (partner.validOfferCount <= 0 && !partner.offerReadinessKnown)
+    }
+    val coveragePercent = if (partnerCount == 0) {
+        0
+    } else {
+        ((commerciallyReadyCount * 100) + (partnerCount / 2)) / partnerCount
+    }.coerceIn(0, 100)
+
+    val nextStep = when {
+        attentionCount > 0 -> SupplierPartnerPortfolioNextStep.REVIEW_ATTENTION
+        readinessUnknownCount > 0 -> SupplierPartnerPortfolioNextStep.REFRESH_RELATIONSHIP_DATA
+        missingUsableOfferCount > 0 -> SupplierPartnerPortfolioNextStep.BUILD_OFFERS
+        missingActiveAgreementCount > 0 -> SupplierPartnerPortfolioNextStep.COMPLETE_AGREEMENTS
+        else -> SupplierPartnerPortfolioNextStep.OPEN_INSIGHTS
+    }
+
+    return SupplierPartnerPortfolioHealthUiModel(
+        partnerCount = partnerCount,
+        commerciallyReadyCount = commerciallyReadyCount,
+        attentionCount = attentionCount,
+        missingActiveAgreementCount = missingActiveAgreementCount,
+        missingUsableOfferCount = missingUsableOfferCount,
+        readinessUnknownCount = readinessUnknownCount,
+        coveragePercent = coveragePercent,
+        nextStep = nextStep,
+    )
 }
 
 private fun SupplierGoodsPriceDataModel.supplierPartnerActivityMillis(): Long =
@@ -704,7 +782,9 @@ internal fun AppConfiguration.buildSupplierPartnerItems(
                 brief = brief,
                 orderDetailsLoaded = hasCompleteOrderDetails,
                 priceDetailsLoaded = hasPriceDetails,
-                contractDetailsLoaded = hasContractDetails
+                contractDetailsLoaded = hasContractDetails,
+                offerReadinessKnown = hasPriceDetails || groupDashboard != null,
+                agreementReadinessKnown = hasContractDetails || groupDashboard != null
             )
         }
         .sortedForSupplierCustomers(SUPPLIER_CUSTOMERS_SORT_ACTION)

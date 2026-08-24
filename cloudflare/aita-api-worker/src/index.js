@@ -8,8 +8,8 @@ const FAVICON_PATHS = new Set(["/favicon.svg", "/favicon.ico"]);
 const ROBOTS_PATH = "/robots.txt";
 const BODYLESS_METHODS = new Set(["GET", "HEAD"]);
 const BOOTSTRAP_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
-const GATEWAY_VERSION = "2026-08-12";
-const CANONICAL_PUBLIC_ORIGIN = "https://aita-api.bogdan-dond.uk.workers.dev";
+const GATEWAY_VERSION = "2026-08-22";
+const CANONICAL_PUBLIC_ORIGIN = "https://aita-api.bogdan-donduk.workers.dev";
 
 function commonSecurityHeaders(extra = {}) {
   return {

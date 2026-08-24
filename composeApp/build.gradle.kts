@@ -1,6 +1,7 @@
 // THIS IS build.gradle of composeApp module
 import com.android.build.api.dsl.ApplicationExtension
 import org.gradle.api.tasks.Delete
+import org.gradle.api.tasks.JavaExec
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
@@ -21,6 +22,20 @@ val aitaWebOnlyBuild = providers.gradleProperty("aita.webOnly")
     .map { value -> value.equals("true", ignoreCase = true) }
     .orElse(false)
     .get()
+
+val aitaMacDesktopHost = System.getProperty("os.name")
+    .orEmpty()
+    .contains("mac", ignoreCase = true)
+
+// Native packages already use packageName = AITA. These arguments also give Gradle/IntelliJ
+// desktop debug launches the same macOS menu-bar and Dock identity instead of JvmMainCompose.
+tasks.withType<JavaExec>().configureEach {
+    if (aitaMacDesktopHost) {
+        jvmArgs("-Xdock:name=AITA")
+        systemProperty("apple.awt.application.name", "AITA")
+        systemProperty("com.apple.mrj.application.apple.menu.about.name", "AITA")
+    }
+}
 
 if (!aitaWebOnlyBuild) {
     pluginManager.apply("com.android.application")

@@ -5802,6 +5802,115 @@ internal fun AppConfiguration.SupplierWorkspaceMenuTile() {
 }
 
 @Composable
+internal fun AppConfiguration.AppModeQuickSwitchMenuTile() {
+    val coroutineScope = rememberCoroutineScope()
+    val currentMode = appModeOptions().firstOrNull { option ->
+        option.modeId == stateValues.appModeId
+    }
+    val modeTitle = currentMode?.title ?: stateValues.stringAppMode
+    val modeSubtitle = currentMode?.subtitle
+        ?: localizedStringResource(2536, "Choose the workspace that matches what you are doing now.")
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(
+                start = stateValues.marginTextField,
+                end = stateValues.marginTextField,
+                top = stateValues.marginTextField
+            )
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.AccentColor.copy(alpha = 0.10f))
+            .border(
+                stateValues.focusedBorderWidth,
+                stateValues.AccentColor.copy(alpha = 0.75f),
+                RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .aitaClickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple(color = stateValues.AccentColor)
+            ) {
+                coroutineScope.launch {
+                    Navigation.Menu.go(
+                        NavigationScreenModel.Menu.AppMode,
+                        stateValues.isNarrowScreen
+                    )
+                }
+            }
+            .padding(stateValues.marginTextFieldGroup),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(50.dp)
+                .clip(RoundedCornerShape(stateValues.cornerRadius))
+                .background(stateValues.AccentColor.copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center
+        ) {
+            CpImage(
+                modifier = Modifier.size(34.dp),
+                url = currentMode?.iconPath ?: stateValues.drawablePathIconSwitch,
+                fallbackRes = currentMode?.iconRes ?: stateValues.drawableResIconSwitch.value,
+                contentDescription = modeTitle,
+                tintColor = null
+            )
+        }
+
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = localizedStringResource(2534, "Current app mode"),
+                color = stateValues.PlaceholderTextColor,
+                fontSize = stateValues.smallTextSize,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = modeTitle,
+                color = stateValues.AccentColor,
+                fontSize = stateValues.accentTextSize,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = modeSubtitle,
+                color = stateValues.TextColor,
+                fontSize = stateValues.smallTextSize,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            CpImage(
+                modifier = Modifier.size(26.dp),
+                url = stateValues.drawablePathIconSwitch,
+                fallbackRes = stateValues.drawableResIconSwitch.value,
+                contentDescription = localizedStringResource(2535, "Switch mode"),
+                tintColor = stateValues.AccentColor
+            )
+            Text(
+                text = localizedStringResource(2535, "Switch mode"),
+                color = stateValues.AccentColor,
+                fontSize = stateValues.smallTextSize,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
 fun AppConfiguration.MenuListScreen() {
     Column(
         modifier = Modifier
@@ -5827,13 +5936,21 @@ fun AppConfiguration.MenuListScreen() {
             modifier = Modifier
                 .weight(1f)
         ) {
+            item(key = "app-mode-quick-switch") {
+                AppModeQuickSwitchMenuTile()
+            }
+
             if (stateValues.appModeId == APP_MODE_SUPPLIER || stateValues.appModeId == APP_MODE_MANUFACTURER) {
                 item {
                     SupplierWorkspaceMenuTile()
                 }
             }
 
-            items(filteredMenuDestinations()) { model ->
+            items(
+                filteredMenuDestinations().filterNot { model ->
+                    model == NavigationScreenModel.Menu.AppMode
+                }
+            ) { model ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()

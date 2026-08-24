@@ -156,15 +156,7 @@ private fun configuredAitaDesktopNetworkProfile(): AitaDesktopNetworkProfile {
         "modern", "default", "auto-modern" -> AitaDesktopNetworkProfile.Modern
         "compat", "compatibility", "cloudflare", "tls12", "http1" ->
             AitaDesktopNetworkProfile.CloudflareCompatibility
-        else -> if (currentJvmDesktopPlatformName() == "jvm-macos") {
-            // Some macOS/JVM network paths accept the browser ClientHello but reject OkHttp's
-            // modern TLS/ALPN negotiation before an HTTP request reaches Cloudflare. TLS 1.2 and
-            // HTTP/1.1 are still fully supported by the public gateway and form a conservative
-            // compatibility baseline. The environment/property override above can restore defaults.
-            AitaDesktopNetworkProfile.CloudflareCompatibility
-        } else {
-            AitaDesktopNetworkProfile.Modern
-        }
+        else -> AitaDesktopNetworkProfile.Modern
     }
 }
 
@@ -176,10 +168,10 @@ private object AitaIpv4PreferredDns : Dns {
 private fun buildAitaOkHttpClient(): OkHttpClient {
     val profile = configuredAitaDesktopNetworkProfile()
     val builder = OkHttpClient.Builder()
-        .dns(AitaIpv4PreferredDns)
         .retryOnConnectionFailure(true)
 
     if (profile == AitaDesktopNetworkProfile.CloudflareCompatibility) {
+        builder.dns(AitaIpv4PreferredDns)
         val tls12Spec = ConnectionSpec.Builder(ConnectionSpec.MODERN_TLS)
             .tlsVersions(TlsVersion.TLS_1_2)
             .build()

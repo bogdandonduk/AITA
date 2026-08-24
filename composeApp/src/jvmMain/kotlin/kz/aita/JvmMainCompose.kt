@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.awt.Desktop
 import java.awt.GraphicsEnvironment
+import java.awt.Taskbar
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 import java.io.File
@@ -29,6 +30,7 @@ import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import javax.crypto.Cipher
+import javax.imageio.ImageIO
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 import javax.print.DocFlavor
@@ -69,6 +71,28 @@ private fun desktopPlatformDisplayName(): String = when (desktopOsFamily) {
     DesktopOsFamily.MacOS -> "macOS"
     DesktopOsFamily.Linux -> "Linux"
     DesktopOsFamily.Other -> "Desktop JVM"
+}
+
+private fun configureDesktopApplicationIdentity() {
+    // Set these before Compose/AWT creates the first native window. This keeps direct Kotlin-main
+    // launches and Gradle debug runs visually aligned with packaged AITA applications.
+    System.setProperty("apple.awt.application.name", "AITA")
+    System.setProperty("com.apple.mrj.application.apple.menu.about.name", "AITA")
+
+    if (desktopOsFamily != DesktopOsFamily.MacOS) return
+
+    runCatching {
+        if (!Taskbar.isTaskbarSupported()) return@runCatching
+        val taskbar = Taskbar.getTaskbar()
+        if (!taskbar.isSupported(Taskbar.Feature.ICON_IMAGE)) return@runCatching
+        val iconStream = Thread.currentThread().contextClassLoader
+            .getResourceAsStream("drawable/app_icon.png")
+            ?: return@runCatching
+        val iconImage = iconStream.use(ImageIO::read) ?: return@runCatching
+        taskbar.iconImage = iconImage
+    }.onFailure { throwable ->
+        System.err.println("AITA desktop icon could not be applied: ${throwable.message}")
+    }
 }
 
 private fun desktopUserHome(): File = File(
@@ -1395,6 +1419,8 @@ fun loadOrCreateKey(account: String): ByteArray {
 }
 
 fun main() {
+    configureDesktopApplicationIdentity()
+
     val cacheRoot = desktopAitaCacheRootDir()
     val dataRoot = desktopAitaDataRootDir()
     cacheDirPath = cacheRoot.absolutePath

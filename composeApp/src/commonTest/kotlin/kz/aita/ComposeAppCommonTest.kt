@@ -7,6 +7,51 @@ import kotlin.test.assertTrue
 
 class ComposeAppCommonTest {
 
+    private fun supplierPortfolioPartner(
+        key: String,
+        activeContractCount: Int = 0,
+        validOfferCount: Int = 0,
+        attentionOrderCount: Int = 0,
+        offerReadinessKnown: Boolean = true,
+        agreementReadinessKnown: Boolean = true,
+    ): SupplierPartnerUiModel = SupplierPartnerUiModel(
+        partnerKey = key,
+        storeId = "store-$key",
+        publicId = "public-$key",
+        title = "Store $key",
+        address = "",
+        supplierIds = listOf("supplier-1"),
+        supplierTitles = listOf("Supplier"),
+        orders = emptyList(),
+        lines = emptyList(),
+        prices = emptyList(),
+        contracts = emptyList(),
+        orderCount = 0,
+        openOrderCount = 0,
+        attentionOrderCount = attentionOrderCount,
+        readyToPackOrderCount = 0,
+        packedOrderCount = 0,
+        inDeliveryOrderCount = 0,
+        partiallyDeliveredOrderCount = 0,
+        overdueOrderCount = 0,
+        deliveredOrderCount = 0,
+        issueOrderCount = 0,
+        activeContractCount = activeContractCount,
+        pendingSupplierContractCount = 0,
+        pendingStoreContractCount = 0,
+        savedOfferCount = validOfferCount,
+        validOfferCount = validOfferCount,
+        priceGapCount = 0,
+        connectedProductCount = validOfferCount,
+        latestStatus = null,
+        latestActivityMillis = 0L,
+        actionId = "",
+        searchKey = key,
+        brief = "",
+        offerReadinessKnown = offerReadinessKnown,
+        agreementReadinessKnown = agreementReadinessKnown,
+    )
+
     @Test
     fun example() {
         assertEquals(3, 1 + 2)
@@ -56,6 +101,96 @@ class ComposeAppCommonTest {
             assertTrue(appModeIsAvailableInCurrentRelease(APP_MODE_MANUFACTURER, currentMode))
         }
         assertFalse(appModeIsAvailableInCurrentRelease(Int.MIN_VALUE, APP_MODE_STORE))
+    }
+
+    @Test
+    fun supplierPartnerPortfolioCoverageRequiresAgreementAndUsableOffer() {
+        val summary = buildSupplierPartnerPortfolioHealth(
+            listOf(
+                supplierPortfolioPartner("ready", activeContractCount = 1, validOfferCount = 2),
+                supplierPortfolioPartner("missing-offer", activeContractCount = 1),
+                supplierPortfolioPartner("missing-agreement", validOfferCount = 1),
+            )
+        )
+
+        assertEquals(3, summary.partnerCount)
+        assertEquals(1, summary.commerciallyReadyCount)
+        assertEquals(1, summary.missingUsableOfferCount)
+        assertEquals(1, summary.missingActiveAgreementCount)
+        assertEquals(33, summary.coveragePercent)
+        assertTrue(summary.coverageIsFinal)
+        assertEquals(0, summary.readinessUnknownCount)
+        assertEquals(SupplierPartnerPortfolioNextStep.BUILD_OFFERS, summary.nextStep)
+    }
+
+    @Test
+    fun supplierPartnerPortfolioPrioritizesOperationalAttention() {
+        val summary = buildSupplierPartnerPortfolioHealth(
+            listOf(
+                supplierPortfolioPartner(
+                    "attention",
+                    activeContractCount = 1,
+                    validOfferCount = 1,
+                    attentionOrderCount = 1,
+                )
+            )
+        )
+
+        assertEquals(100, summary.coveragePercent)
+        assertEquals(1, summary.attentionCount)
+        assertEquals(SupplierPartnerPortfolioNextStep.REVIEW_ATTENTION, summary.nextStep)
+    }
+
+    @Test
+    fun supplierPartnerPortfolioOpensInsightsWhenCommercialCoverageIsComplete() {
+        val summary = buildSupplierPartnerPortfolioHealth(
+            listOf(
+                supplierPortfolioPartner("north", activeContractCount = 1, validOfferCount = 1),
+                supplierPortfolioPartner("south", activeContractCount = 2, validOfferCount = 3),
+            )
+        )
+
+        assertEquals(100, summary.coveragePercent)
+        assertEquals(2, summary.commerciallyReadyCount)
+        assertTrue(summary.coverageIsFinal)
+        assertEquals(SupplierPartnerPortfolioNextStep.OPEN_INSIGHTS, summary.nextStep)
+    }
+
+    @Test
+    fun supplierPartnerPortfolioDoesNotInventMissingCommercialDataDuringPartialLoad() {
+        val summary = buildSupplierPartnerPortfolioHealth(
+            listOf(
+                supplierPortfolioPartner(
+                    key = "pending-evidence",
+                    offerReadinessKnown = false,
+                    agreementReadinessKnown = false,
+                )
+            )
+        )
+
+        assertEquals(0, summary.missingUsableOfferCount)
+        assertEquals(0, summary.missingActiveAgreementCount)
+        assertEquals(1, summary.readinessUnknownCount)
+        assertFalse(summary.coverageIsFinal)
+        assertEquals(SupplierPartnerPortfolioNextStep.REFRESH_RELATIONSHIP_DATA, summary.nextStep)
+    }
+
+    @Test
+    fun supplierPartnerPortfolioStillPrioritizesKnownAttentionWhileReadinessLoads() {
+        val summary = buildSupplierPartnerPortfolioHealth(
+            listOf(
+                supplierPortfolioPartner(
+                    key = "urgent-pending-evidence",
+                    attentionOrderCount = 1,
+                    offerReadinessKnown = false,
+                    agreementReadinessKnown = false,
+                )
+            )
+        )
+
+        assertEquals(1, summary.attentionCount)
+        assertEquals(1, summary.readinessUnknownCount)
+        assertEquals(SupplierPartnerPortfolioNextStep.REVIEW_ATTENTION, summary.nextStep)
     }
 
     @Test

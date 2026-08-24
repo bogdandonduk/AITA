@@ -83,12 +83,12 @@ class SharedCommonTest {
             """
             {
               "serverUrl": {
-                "first": "https://aita-api.bogdan-dond.uk.workers.dev/",
+                "first": "https://aita-api.bogdan-donduk.workers.dev/",
                 "second": "1"
               },
               "serverCandidates": [
                 {
-                  "url": "https://aita-api.bogdan-dond.uk.workers.dev",
+                  "url": "https://aita-api.bogdan-donduk.workers.dev",
                   "priority": 100,
                   "supportsRealtime": true,
                   "role": "primary-domainless"
@@ -104,7 +104,7 @@ class SharedCommonTest {
 
         assertEquals(
             listOf(
-                "https://aita-api.bogdan-dond.uk.workers.dev",
+                "https://aita-api.bogdan-donduk.workers.dev",
                 "https://legacy-public.example",
                 "https://secondary.example.com"
             ),
@@ -131,9 +131,10 @@ class SharedCommonTest {
 
     @Test
     fun nonCanonicalPublicEndpointsCannotBecomeClientRequestCandidates() {
-        val primary = Pair("https://aita-api.bogdan-dond.uk.workers.dev", "1")
+        val primary = Pair("https://aita-api.bogdan-donduk.workers.dev", "1")
         val blank = Pair("", "1")
         val nonCanonicalUrls = listOf(
+            "https://aita-api.bogdan-dond.uk.workers.dev",
             "https://legacy-public.example",
             "https://other-public.example/stock/get",
             "https://bootstrap-public.example/.well-known/aita-server.json"
@@ -153,7 +154,7 @@ class SharedCommonTest {
 
     @Test
     fun canonicalGatewayAndLocalDevelopmentOverridesRemainAvailable() {
-        val canonical = "https://aita-api.bogdan-dond.uk.workers.dev"
+        val canonical = "https://aita-api.bogdan-donduk.workers.dev"
 
         assertEquals(canonical, normalizedAutomaticAitaServerUrlOrNull("$canonical/healthz"))
         assertEquals(canonical, normalizedExplicitAitaServerUrlOrNull(canonical))

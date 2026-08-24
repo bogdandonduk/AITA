@@ -95,18 +95,23 @@ internal fun AppConfiguration.SupplierCustomersScreen() {
         )
     }
 
+    // Preserve null as "not loaded yet". Collapsing it to an empty list would make the partner
+    // builder treat absent order/offer/contract payloads as authoritative zeroes, suppress dashboard
+    // partners, and briefly recommend recreating commercial records that may already exist.
     val focusedOrders = remember(orders, focusedSupplierId) {
-        orders.orEmpty().supplierOrdersForIdentity(focusedSupplierId)
+        orders?.supplierOrdersForIdentity(focusedSupplierId)
     }
-    val focusedOrderIds = remember(focusedOrders) { focusedOrders.map { it.id }.toSet() }
+    val focusedOrderIds = remember(focusedOrders) {
+        focusedOrders.orEmpty().map { it.id }.toSet()
+    }
     val focusedLines = remember(lines, focusedOrderIds) {
-        lines.orEmpty().filter { it.orderId in focusedOrderIds }
+        lines?.filter { it.orderId in focusedOrderIds }
     }
     val focusedPrices = remember(supplierPrices, focusedSupplierId) {
-        supplierPrices.orEmpty().supplierPricesForIdentity(focusedSupplierId)
+        supplierPrices?.supplierPricesForIdentity(focusedSupplierId)
     }
     val focusedContracts = remember(contracts, focusedSupplierId) {
-        contracts.orEmpty().supplierContractsForIdentity(focusedSupplierId)
+        contracts?.supplierContractsForIdentity(focusedSupplierId)
     }
 
     val relationshipDataPending = orders == null &&
@@ -144,6 +149,9 @@ internal fun AppConfiguration.SupplierCustomersScreen() {
     }
     val selectedPartner = selectedPartnerKey?.let { key ->
         partnerItems.firstOrNull { it.partnerKey == key }
+    }
+    val partnerPortfolioHealth = remember(partnerItems) {
+        buildSupplierPartnerPortfolioHealth(partnerItems)
     }
 
     LaunchedEffect(selectedPartnerKey, partnerItems.map { it.partnerKey }) {
@@ -255,6 +263,42 @@ internal fun AppConfiguration.SupplierCustomersScreen() {
                             searchQuery = ""
                             filterId = metric.filterId
                             selectedPartnerKey = null
+                        }
+                    }
+
+                    if (partnerItems.isNotEmpty()) {
+                        item(key = "partner-portfolio-health") {
+                            SupplierPartnerPortfolioHealthCard(
+                                summary = partnerPortfolioHealth,
+                                onNextStep = {
+                                    selectedPartnerKey = null
+                                    when (partnerPortfolioHealth.nextStep) {
+                                        SupplierPartnerPortfolioNextStep.REVIEW_ATTENTION -> {
+                                            searchQuery = ""
+                                            filterId = SUPPLIER_CUSTOMERS_FILTER_ATTENTION
+                                            sortId = SUPPLIER_CUSTOMERS_SORT_ACTION
+                                        }
+                                        SupplierPartnerPortfolioNextStep.REFRESH_RELATIONSHIP_DATA -> {
+                                            refreshSupplierModeWorkspace(includeContracts = true, force = true)
+                                        }
+                                        SupplierPartnerPortfolioNextStep.BUILD_OFFERS -> {
+                                            coroutineScope.launch {
+                                                Navigation.goMain(NavigationScreenModel.Supplier.Catalog.Main)
+                                            }
+                                        }
+                                        SupplierPartnerPortfolioNextStep.COMPLETE_AGREEMENTS -> {
+                                            coroutineScope.launch {
+                                                Navigation.goMain(NavigationScreenModel.Supplier.Contracts.Main)
+                                            }
+                                        }
+                                        SupplierPartnerPortfolioNextStep.OPEN_INSIGHTS -> {
+                                            coroutineScope.launch {
+                                                Navigation.goMain(NavigationScreenModel.Supplier.Analytics.Main)
+                                            }
+                                        }
+                                    }
+                                }
+                            )
                         }
                     }
 

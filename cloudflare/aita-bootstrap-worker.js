@@ -1,4 +1,4 @@
-const DEFAULT_SERVER_URL = "https://aita-api.bogdan-dond.uk.workers.dev";
+const DEFAULT_SERVER_URL = "https://aita-api.bogdan-donduk.workers.dev";
 const BOOTSTRAP_PATHS = new Set([
   "/.well-known/aita-server.json",
   "/config/server",

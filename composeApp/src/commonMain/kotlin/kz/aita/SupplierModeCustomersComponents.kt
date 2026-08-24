@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
@@ -29,6 +30,205 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.DrawableResource
+
+@Composable
+internal fun AppConfiguration.SupplierPartnerPortfolioHealthCard(
+    summary: SupplierPartnerPortfolioHealthUiModel,
+    onNextStep: () -> Unit,
+) {
+    val actionText = when (summary.nextStep) {
+        SupplierPartnerPortfolioNextStep.REVIEW_ATTENTION ->
+            localizedStringResource(2542, "Review partner attention")
+        SupplierPartnerPortfolioNextStep.REFRESH_RELATIONSHIP_DATA ->
+            localizedStringResource(2548, "Refresh relationship data")
+        SupplierPartnerPortfolioNextStep.BUILD_OFFERS ->
+            localizedStringResource(2543, "Build missing offers")
+        SupplierPartnerPortfolioNextStep.COMPLETE_AGREEMENTS ->
+            localizedStringResource(2544, "Complete partner agreements")
+        SupplierPartnerPortfolioNextStep.OPEN_INSIGHTS ->
+            localizedStringResource(2545, "Open Supplier insights")
+    }
+    val description = when (summary.nextStep) {
+        SupplierPartnerPortfolioNextStep.REVIEW_ATTENTION ->
+            localizedStringResource(2547, "Prioritize relationships that may block orders or deliveries.")
+        SupplierPartnerPortfolioNextStep.REFRESH_RELATIONSHIP_DATA ->
+            localizedStringResource(2549, "AITA is still checking offers and agreements before recommending commercial work.")
+        SupplierPartnerPortfolioNextStep.BUILD_OFFERS ->
+            localizedStringResource(2530, "Add reusable offers so Stores can order with less manual work.")
+        SupplierPartnerPortfolioNextStep.COMPLETE_AGREEMENTS ->
+            localizedStringResource(2532, "Record delivery, payment, and product terms with partner Stores.")
+        SupplierPartnerPortfolioNextStep.OPEN_INSIGHTS ->
+            localizedStringResource(2546, "Every partner has an active agreement and a usable offer.")
+    }
+    val actionIconPath = when (summary.nextStep) {
+        SupplierPartnerPortfolioNextStep.REVIEW_ATTENTION -> stateValues.drawablePathIconResponse
+        SupplierPartnerPortfolioNextStep.REFRESH_RELATIONSHIP_DATA -> stateValues.drawablePathIconRefresh
+        SupplierPartnerPortfolioNextStep.BUILD_OFFERS -> stateValues.drawablePathIconSupplierCatalog
+        SupplierPartnerPortfolioNextStep.COMPLETE_AGREEMENTS -> stateValues.drawablePathIconSupplierContracts
+        SupplierPartnerPortfolioNextStep.OPEN_INSIGHTS -> stateValues.drawablePathIconSupplierDemandRadar
+    }
+    val actionIconRes = when (summary.nextStep) {
+        SupplierPartnerPortfolioNextStep.REVIEW_ATTENTION -> stateValues.drawableResIconResponse.value
+        SupplierPartnerPortfolioNextStep.REFRESH_RELATIONSHIP_DATA -> stateValues.drawableResIconRefresh.value
+        SupplierPartnerPortfolioNextStep.BUILD_OFFERS -> stateValues.drawableResIconSupplierCatalog.value
+        SupplierPartnerPortfolioNextStep.COMPLETE_AGREEMENTS -> stateValues.drawableResIconSupplierContracts.value
+        SupplierPartnerPortfolioNextStep.OPEN_INSIGHTS -> stateValues.drawableResIconSupplierDemandRadar.value
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .border(
+                stateValues.unfocusedBorderWidth,
+                stateValues.PlaceholderTextColor,
+                RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .padding(stateValues.marginTextFieldGroup),
+        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(46.dp)
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.AccentColor.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CpImage(
+                    modifier = Modifier.size(30.dp),
+                    url = stateValues.drawablePathIconSupplierPartners,
+                    fallbackRes = stateValues.drawableResIconSupplierPartners.value,
+                    contentDescription = localizedStringResource(2537, "Partner portfolio health"),
+                    tintColor = stateValues.AccentColor
+                )
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    text = localizedStringResource(2537, "Partner portfolio health"),
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.accentTextSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = localizedStringResource(2538, "Commercial coverage"),
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            SupplierCatalogChip(
+                text = if (summary.coverageIsFinal) {
+                    "${summary.coveragePercent}%"
+                } else {
+                    localizedStringResource(2550, "Still checking")
+                },
+                color = when {
+                    !summary.coverageIsFinal -> stateValues.PlaceholderTextColor
+                    summary.coveragePercent == 100 -> stateValues.OkayColor
+                    else -> stateValues.AccentColor
+                }
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .clip(RoundedCornerShape(stateValues.cornerRadius))
+                .background(stateValues.DisabledColor.copy(alpha = 0.35f))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth((summary.coveragePercent / 100f).coerceIn(0f, 1f))
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(
+                        when {
+                            !summary.coverageIsFinal -> stateValues.PlaceholderTextColor
+                            summary.coveragePercent == 100 -> stateValues.OkayColor
+                            else -> stateValues.AccentColor
+                        }
+                    )
+            )
+        }
+
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(horizontal = 1.dp)
+        ) {
+            item(key = "ready") {
+                SupplierCatalogChip(
+                    text = "${localizedStringResource(2539, "Ready partnerships")}: ${summary.commerciallyReadyCount}",
+                    color = stateValues.OkayColor
+                )
+            }
+            item(key = "attention") {
+                SupplierCatalogChip(
+                    text = "${localizedStringResource(1371, "Needs attention")}: ${summary.attentionCount}",
+                    color = if (summary.attentionCount > 0) stateValues.BorderlineBadColor else stateValues.PlaceholderTextColor
+                )
+            }
+            if (summary.readinessUnknownCount > 0) {
+                item(key = "unknown") {
+                    SupplierCatalogChip(
+                        text = "${localizedStringResource(2550, "Still checking")}: ${summary.readinessUnknownCount}",
+                        color = stateValues.PlaceholderTextColor
+                    )
+                }
+            }
+            if (summary.coverageIsFinal || summary.missingActiveAgreementCount > 0) {
+                item(key = "agreement") {
+                    SupplierCatalogChip(
+                        text = "${localizedStringResource(2540, "Without an active agreement")}: ${summary.missingActiveAgreementCount}",
+                        color = if (summary.missingActiveAgreementCount > 0) stateValues.AccentColor else stateValues.PlaceholderTextColor
+                    )
+                }
+            }
+            if (summary.coverageIsFinal || summary.missingUsableOfferCount > 0) {
+                item(key = "offer") {
+                    SupplierCatalogChip(
+                        text = "${localizedStringResource(2541, "Without a usable offer")}: ${summary.missingUsableOfferCount}",
+                        color = if (summary.missingUsableOfferCount > 0) stateValues.AccentColor else stateValues.PlaceholderTextColor
+                    )
+                }
+            }
+        }
+
+        Text(
+            text = description,
+            color = stateValues.TextColor,
+            fontSize = stateValues.smallTextSize,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        actionButton(
+            modifier = Modifier.fillMaxWidth(),
+            text = actionText,
+            iconPath = actionIconPath,
+            iconRes = actionIconRes,
+            confirmationRequired = false,
+            autoLoading = false,
+            onClick = onNextStep
+        )
+    }
+}
 
 @Composable
 internal fun AppConfiguration.SupplierCustomersFilterPanel(
