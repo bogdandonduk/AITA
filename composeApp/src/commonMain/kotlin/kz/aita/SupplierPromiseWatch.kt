@@ -1,6 +1,7 @@
 package kz.aita
 
 import kotlinx.datetime.Instant
+import kotlin.time.ExperimentalTime
 
 internal const val SUPPLIER_PROMISE_WATCH_WINDOW_MILLIS: Long = 24L * 60L * 60L * 1_000L
 
@@ -100,6 +101,7 @@ internal fun <T> buildSupplierPromiseWatch(
     )
 }
 
+@OptIn(ExperimentalTime::class)
 internal fun supplierPromiseEpochMillis(value: Any?): Long? = when (value) {
     null -> null
     is Number -> value.toLong()
