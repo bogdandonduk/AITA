@@ -67,6 +67,7 @@ private class AitaFlowTestEnvironment {
     var nextDeletedStoreId: String? = null
     var nextWorkerRequestResponse: StoreWorkerRequestDataModel? = null
     var nextWorkerMembershipResponse: StoreWorkerDataModel? = null
+    var nextWorkerRemovalRequestResponse: StoreWorkerRequestDataModel? = null
     var nextRemovedWorkerResponse: StoreWorkerDataModel? = null
     var nextWorkshiftResponse: WorkshiftDataModel? = null
     var nextGoodsItemResponse: GoodsItemDataModel? = null
@@ -734,10 +735,15 @@ class AitaSharedAndroidInstrumentedFlowTest {
             firstName = "Dauren",
             lastName = "Worker"
         )
+        val employmentOffer = employmentRequest.copy(
+            status = WORKER_REQUEST_STATUS_INVITED,
+            roleId = WORKER_ROLE_STANDARD,
+            permissions = STANDARD_STORE_PERMISSION_IDS
+        )
         environment.incomingWorkerRequests = listOf(employmentRequest)
         incomingWorkerRequestsState.emit(DataState.Success(listOf(employmentRequest)))
-        environment.nextWorkerMembershipResponse = acceptedWorker
-        val acceptEmploymentCallback = CompletableDeferred<DataState<StoreWorkerDataModel>>()
+        environment.nextWorkerRequestResponse = employmentOffer
+        val acceptEmploymentCallback = CompletableDeferred<DataState<StoreWorkerRequestDataModel>>()
         acceptStoreEmploymentRequest(
             storeId = AITA_FLOW_SOURCE_STORE_ID,
             requestId = employmentRequest.id,
@@ -746,9 +752,20 @@ class AitaSharedAndroidInstrumentedFlowTest {
             workerPassword = "WorkerPass123!"
         ) { acceptEmploymentCallback.complete(it) }
 
-        assertEquals(acceptedWorker.id, requireAitaFlowSuccess(acceptEmploymentCallback).payload.id)
-        waitUntilAitaFlowCondition { storeWorkerMembershipsState.payloadValue?.any { it.id == acceptedWorker.id } == true }
+        assertEquals(employmentOffer.id, requireAitaFlowSuccess(acceptEmploymentCallback).payload.id)
+        assertEquals(WORKER_REQUEST_STATUS_INVITED, requireAitaFlowSuccess(acceptEmploymentCallback).payload.status)
+        waitUntilAitaFlowCondition { incomingWorkerRequestsState.payloadValue?.firstOrNull { it.id == employmentOffer.id }?.status == WORKER_REQUEST_STATUS_INVITED }
+        assertTrue(storeWorkerMembershipsState.payloadValue.orEmpty().none { it.id == acceptedWorker.id })
         assertTrue(environment.requests.any { it.method == "POST" && it.path == "workers/accept" && it.storeIdHeader == AITA_FLOW_SOURCE_STORE_ID })
+
+        environment.myWorkerRequests = listOf(employmentOffer)
+        environment.nextWorkerMembershipResponse = acceptedWorker
+        val acceptEmploymentOfferCallback = CompletableDeferred<DataState<StoreWorkerDataModel>>()
+        acceptMyStoreWorkerInvitation(employmentOffer.id, "Accepted employment offer") { acceptEmploymentOfferCallback.complete(it) }
+
+        assertEquals(acceptedWorker.id, requireAitaFlowSuccess(acceptEmploymentOfferCallback).payload.id)
+        waitUntilAitaFlowCondition { myWorkerMembershipsState.payloadValue?.any { it.id == acceptedWorker.id } == true }
+        assertTrue(environment.requests.any { it.method == "POST" && it.path == "workers/invitations/accept" })
 
         val declinedEmployment = aitaTestWorkerRequest(
             id = "declined-employment-flow",
@@ -875,13 +892,31 @@ class AitaSharedAndroidInstrumentedFlowTest {
         waitUntilAitaFlowCondition { activeWorkshiftState.payloadValue == null }
         assertTrue(environment.requests.any { it.method == "POST" && it.path == "workshifts/end" && it.storeIdHeader == AITA_FLOW_SOURCE_STORE_ID })
 
-        environment.nextRemovedWorkerResponse = updatedWorker.copy(isActive = false)
-        val removeWorkerCallback = CompletableDeferred<DataState<StoreWorkerDataModel>>()
+        val removalRequest = aitaTestWorkerRequest(
+            id = "worker-removal-request-flow",
+            storeId = AITA_FLOW_SOURCE_STORE_ID,
+            requesterUserId = updatedWorker.userId,
+            requesterPublicId = updatedWorker.userPublicId,
+            direction = WORKER_REQUEST_DIRECTION_STORE_REMOVAL_TO_USER,
+            status = WORKER_REQUEST_STATUS_PENDING,
+            roleId = updatedWorker.roleId,
+            permissions = updatedWorker.permissions
+        )
+        environment.nextWorkerRemovalRequestResponse = removalRequest
+        val removeWorkerCallback = CompletableDeferred<DataState<StoreWorkerRequestDataModel>>()
         removeStoreWorker(AITA_FLOW_SOURCE_STORE_ID, updatedWorker.id, "Cleanup after test") { removeWorkerCallback.complete(it) }
 
-        assertEquals(updatedWorker.id, requireAitaFlowSuccess(removeWorkerCallback).payload.id)
-        waitUntilAitaFlowCondition { storeWorkerMembershipsState.payloadValue.orEmpty().none { it.id == updatedWorker.id } }
+        assertEquals(removalRequest.id, requireAitaFlowSuccess(removeWorkerCallback).payload.id)
+        assertTrue(storeWorkerMembershipsState.payloadValue.orEmpty().any { it.id == updatedWorker.id })
         assertTrue(environment.requests.any { it.method == "POST" && it.path == "workers/remove" && it.storeIdHeader == AITA_FLOW_SOURCE_STORE_ID })
+
+        environment.nextRemovedWorkerResponse = updatedWorker.copy(isActive = false)
+        val confirmRemovalCallback = CompletableDeferred<DataState<StoreWorkerDataModel>>()
+        acceptMyStoreWorkerRemovalRequest(removalRequest.id, "Removal confirmed") { confirmRemovalCallback.complete(it) }
+
+        assertEquals(updatedWorker.id, requireAitaFlowSuccess(confirmRemovalCallback).payload.id)
+        waitUntilAitaFlowCondition { storeWorkerMembershipsState.payloadValue.orEmpty().none { it.id == updatedWorker.id } }
+        assertTrue(environment.requests.any { it.method == "POST" && it.path == "workers/removal/confirm" })
     }
 
     @Test
@@ -1689,9 +1724,13 @@ private fun buildAitaFlowMockClient(environment: AitaFlowTestEnvironment): HttpC
                 aitaTestSuccessEnvelope(workerRequest)
             }
             "workers/accept" -> {
-                val worker = environment.nextWorkerMembershipResponse ?: aitaTestWorkerMembership(id = "server-accepted-worker")
-                environment.workerMemberships = environment.workerMemberships.upsertAitaTestWorker(worker)
-                aitaTestSuccessEnvelope(worker)
+                val workerRequest = environment.nextWorkerRequestResponse ?: aitaTestWorkerRequest(
+                    id = "server-employment-offer",
+                    status = WORKER_REQUEST_STATUS_INVITED
+                )
+                environment.incomingWorkerRequests = environment.incomingWorkerRequests.upsertAitaTestWorkerRequest(workerRequest)
+                environment.myWorkerRequests = environment.myWorkerRequests.upsertAitaTestWorkerRequest(workerRequest)
+                aitaTestSuccessEnvelope(workerRequest)
             }
             "workers/decline" -> {
                 val workerRequest = environment.nextWorkerRequestResponse ?: aitaTestWorkerRequest(
@@ -1726,7 +1765,19 @@ private fun buildAitaFlowMockClient(environment: AitaFlowTestEnvironment): HttpC
                 aitaTestSuccessEnvelope(worker)
             }
             "workers/remove" -> {
-                val worker = environment.nextRemovedWorkerResponse ?: environment.workerMemberships.firstOrNull()?.copy(isActive = false) ?: aitaTestWorkerMembership(id = "server-removed-worker", isActive = false)
+                val workerRequest = environment.nextWorkerRemovalRequestResponse ?: aitaTestWorkerRequest(
+                    id = "server-worker-removal-request",
+                    direction = WORKER_REQUEST_DIRECTION_STORE_REMOVAL_TO_USER,
+                    status = WORKER_REQUEST_STATUS_PENDING
+                )
+                environment.incomingWorkerRequests = environment.incomingWorkerRequests.upsertAitaTestWorkerRequest(workerRequest)
+                environment.myWorkerRequests = environment.myWorkerRequests.upsertAitaTestWorkerRequest(workerRequest)
+                aitaTestSuccessEnvelope(workerRequest)
+            }
+            "workers/removal/confirm" -> {
+                val worker = environment.nextRemovedWorkerResponse
+                    ?: environment.workerMemberships.firstOrNull()?.copy(isActive = false)
+                    ?: aitaTestWorkerMembership(id = "server-removed-worker", isActive = false)
                 environment.workerMemberships = environment.workerMemberships.filterNot { it.id == worker.id }
                 environment.myWorkerMemberships = environment.myWorkerMemberships.filterNot { it.id == worker.id }
                 aitaTestSuccessEnvelope(worker)
