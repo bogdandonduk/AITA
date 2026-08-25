@@ -39,6 +39,7 @@ class PaymentOperationWorker(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Throwable) {
+                if (_ is kotlinx.coroutines.CancellationException) throw _
                 delay(idleDelay)
                 continue
             }
@@ -53,6 +54,7 @@ class PaymentOperationWorker(
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (throwable: Throwable) {
+                    if (throwable is kotlinx.coroutines.CancellationException) throw throwable
                     ProviderOperationExecutionResult(
                         successful = false,
                         retryable = true,

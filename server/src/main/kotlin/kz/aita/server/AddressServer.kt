@@ -152,6 +152,7 @@ internal object YandexAddressService {
     } catch (throwable: AddressProviderException) {
       throw throwable
     } catch (throwable: Throwable) {
+        if (throwable is kotlinx.coroutines.CancellationException) throw throwable
       throw AddressProviderException(
         message = "Could not reach Yandex Maps: ${throwable.message.orEmpty()}",
         cause = throwable

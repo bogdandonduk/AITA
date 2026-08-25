@@ -86,6 +86,7 @@ class JdkProviderHttpTransport(
                 retryable = true,
             )
         } catch (throwable: Exception) {
+            if (throwable is kotlinx.coroutines.CancellationException) throw throwable
             throw ProviderTransportException(
                 providerCode = "transport_failure",
                 message = throwable.message ?: "Provider request failed.",

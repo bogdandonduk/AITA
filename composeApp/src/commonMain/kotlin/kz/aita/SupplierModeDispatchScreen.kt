@@ -246,6 +246,21 @@ internal fun AppConfiguration.SupplierDispatchScreen() {
             }
         )
 
+        val supplierPromiseNowEpochMillis1 = rememberSupplierLiveNow {
+            kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
+        }
+        val supplierPromiseWatch1 = androidx.compose.runtime.remember(
+            filteredRuns,
+            supplierPromiseNowEpochMillis1,
+        ) {
+            buildSupplierPromiseWatch(
+                values = filteredRuns,
+                nowEpochMillis = supplierPromiseNowEpochMillis1,
+                promisedAt = { it.earliestDueAtMillis },
+                isTerminal = { false },
+                stableKey = { it.serverRunId },
+            )
+        }
         LazyColumn(
             modifier = Modifier
                 .weight(1f)
@@ -376,7 +391,7 @@ internal fun AppConfiguration.SupplierDispatchScreen() {
                         }
 
                         else -> {
-                            items(filteredRuns, key = { it.key }) { run ->
+                            items(supplierPromiseWatch1.prioritized, key = { it.key }) { run ->
                                 SupplierDispatchRunCompactCard(
                                     run = run,
                                     onOpen = {

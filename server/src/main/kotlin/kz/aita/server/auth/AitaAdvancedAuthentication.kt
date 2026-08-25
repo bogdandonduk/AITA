@@ -975,6 +975,7 @@ private class AitaAdvancedAuthService(
                 } catch (cancel: CancellationException) {
                     throw cancel
                 } catch (throwable: Throwable) {
+                    if (throwable is kotlinx.coroutines.CancellationException) throw throwable
                     application.environment.log.error("AITA authentication email worker failed", throwable)
                     delay(5_000L)
                 }
@@ -1103,6 +1104,7 @@ private class AitaAdvancedAuthService(
                 else -> EmailResult(false, errorCode = "RESEND_HTTP_$status", retry = false)
             }
         } catch (throwable: Throwable) {
+            if (throwable is kotlinx.coroutines.CancellationException) throw throwable
             application.environment.log.warn("Authentication email delivery transport failure: ${throwable::class.simpleName}")
             EmailResult(false, errorCode = "RESEND_TRANSPORT", retry = true)
         }

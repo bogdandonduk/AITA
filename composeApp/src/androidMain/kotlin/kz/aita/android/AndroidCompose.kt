@@ -1305,6 +1305,7 @@ suspend fun getEncryptedValue(key: String): String? {
 
         plain.decodeToString()
     } catch (throwable: Throwable) {
+        if (throwable is kotlinx.coroutines.CancellationException) throw throwable
         AITA.get().tokensDataStore.edit { it.remove(preferencesKey) }
         throwable.printStackTrace()
 

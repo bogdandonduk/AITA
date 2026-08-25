@@ -875,6 +875,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
 ////                }
 ////            }
 ////          } catch (thr: Throwable) {
+    if (thr is kotlinx.coroutines.CancellationException) throw thr
 ////            thr.printStackTrace()
 ////          }
 ////        }

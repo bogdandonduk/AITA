@@ -1800,6 +1800,21 @@ internal fun AppConfiguration.SupplierInsightsScreen() {
             iconRes = stateValues.drawableResIconSupplierDemandRadar.value
         )
 
+        val supplierPromiseNowEpochMillis2 = rememberSupplierLiveNow {
+            kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
+        }
+        val supplierPromiseWatch2 = androidx.compose.runtime.remember(
+            visibleTermsGuardItems,
+            supplierPromiseNowEpochMillis2,
+        ) {
+            buildSupplierPromiseWatch(
+                values = visibleTermsGuardItems,
+                nowEpochMillis = supplierPromiseNowEpochMillis2,
+                promisedAt = { it.earliestDueAtMillis },
+                isTerminal = { false },
+                stableKey = { it.backorderId },
+            )
+        }
         LazyColumn(
             modifier = Modifier
                 .weight(1f)
@@ -2093,7 +2108,7 @@ internal fun AppConfiguration.SupplierInsightsScreen() {
                     )
                 }
             } else {
-                items(visibleTermsGuardItems, key = { it.contract.id }) { item ->
+                items(supplierPromiseWatch2.prioritized, key = { it.contract.id }) { item ->
                     SupplierTermsGuardCard(item)
                 }
             }

@@ -58,6 +58,7 @@ internal class SingleFlightRequestCoordinator<Key, Result> {
                 deferred.cancel(cancelled)
                 throw cancelled
             } catch (throwable: Throwable) {
+                if (throwable is kotlinx.coroutines.CancellationException) throw throwable
                 deferred.completeExceptionally(throwable)
             } finally {
                 withContext(NonCancellable) {

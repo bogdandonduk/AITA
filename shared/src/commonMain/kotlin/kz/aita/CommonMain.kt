@@ -6806,6 +6806,7 @@ fun getSupplierContracts(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (throwable: Throwable) {
+            if (throwable is kotlinx.coroutines.CancellationException) throw throwable
             if (!supplierNetworkUserScopeIsCurrent(requestUserScope)) {
                 return@launch
             }
@@ -12119,6 +12120,7 @@ private suspend inline fun <reified T> putJsonCache(key: String, value: T) {
     try {
         putLocalKv(CACHE_PREFIX + key, jsonBase.encodeToString(value))
     } catch (_: Throwable) {
+        if (_ is kotlinx.coroutines.CancellationException) throw _
     }
 }
 
@@ -12126,6 +12128,7 @@ private suspend inline fun <reified T> getJsonCache(key: String): T? {
     return try {
         getLocalKv(CACHE_PREFIX + key)?.let { jsonBase.decodeFromString<T>(it) }
     } catch (_: Throwable) {
+        if (_ is kotlinx.coroutines.CancellationException) throw _
         null
     }
 }
@@ -12134,6 +12137,7 @@ private suspend fun deleteJsonCache(key: String) {
     try {
         deleteLocalKv(CACHE_PREFIX + key)
     } catch (_: Throwable) {
+        if (_ is kotlinx.coroutines.CancellationException) throw _
     }
 }
 
@@ -13115,6 +13119,7 @@ private suspend fun handleLocalNetworkOperation(operation: LocalNetworkQueuedOpe
             else -> localNetworkEnvelope("ack", operation = operation, accepted = false, error = "Unsupported local operation")
         }
     } catch (throwable: Throwable) {
+        if (throwable is kotlinx.coroutines.CancellationException) throw throwable
         localNetworkEnvelope("ack", operation = operation, accepted = false, error = throwable.message ?: "Local operation failed")
     }
 }

@@ -29,6 +29,7 @@ class PaymentOperationCoordinator {
             deferred.complete(Result.success(value as Any?))
             return value
         } catch (throwable: Throwable) {
+            if (throwable is kotlinx.coroutines.CancellationException) throw throwable
             deferred.complete(Result.failure(throwable))
             throw throwable
         } finally {
