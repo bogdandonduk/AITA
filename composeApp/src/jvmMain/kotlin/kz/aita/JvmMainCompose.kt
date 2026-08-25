@@ -44,6 +44,7 @@ private val rng = SecureRandom()
 private val fallbackEncryptionKeys = ConcurrentHashMap<String, ByteArray>()
 
 private const val JVM_SECURE_STORE_DIR = "secure"
+private const val JVM_SECRET_DELETED_SENTINEL = "AITA_SECRET_DELETED_V1"
 
 private const val DESKTOP_DIAGNOSTIC_LOG_FILE_NAME = "aita-desktop.log"
 private const val DESKTOP_DIAGNOSTIC_LOG_MAX_BYTES = 8L * 1024L * 1024L
@@ -663,6 +664,13 @@ private fun readJvmSecret(account: String): String? {
         .firstOrNull { Files.isRegularFile(it.toPath(), LinkOption.NOFOLLOW_LINKS) }
     val fallbackValue = readJvmSecretFile(fallbackFile)
     if (fallbackValue != null) {
+        // Deletion must be durable even if the OS keyring is temporarily unavailable. Without this
+        // marker, a failed Keychain delete can revive the older token on the next macOS launch.
+        if (fallbackValue == JVM_SECRET_DELETED_SENTINEL) {
+            deleteJvmKeyringSecret(account)
+            return null
+        }
+
         // A fallback file means a previous keyring write was unavailable. Treat that newer durable
         // value as authoritative instead of accidentally reviving a stale keyring entry. When the
         // keyring recovers, migrate the fallback and remove it only after a confirmed write.
@@ -685,7 +693,12 @@ private fun writeJvmSecret(account: String, value: String): Boolean {
 }
 
 private fun deleteJvmSecret(account: String) {
-    runCatching { secureStoreFile(account)?.let { Files.deleteIfExists(it.toPath()) } }
+    // Write the newer logical deletion before touching Keychain. The marker wins on the next read if
+    // macOS rejects or delays keyring deletion, so a logged-out session cannot come back to life.
+    val tombstoneWritten = writeJvmSecretFile(account, JVM_SECRET_DELETED_SENTINEL)
+    if (!tombstoneWritten) {
+        runCatching { secureStoreFile(account)?.let { Files.deleteIfExists(it.toPath()) } }
+    }
     runCatching { legacySecureStoreFile(account)?.let { Files.deleteIfExists(it.toPath()) } }
     deleteJvmKeyringSecret(account)
 }

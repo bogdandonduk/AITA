@@ -7869,6 +7869,7 @@ val cacheSize = 4000L * 1024 * 1024
 val cacheMaxAgeSec = 30 * 24 * 3600
 
 val tokenRefreshMutex = Mutex()
+private val authSessionMutationMutex = Mutex()
 private val authRefreshNetworkMutex = Mutex()
 private val cloudSessionValidationMutex = Mutex()
 private val manualCloudConnectionRefreshMutex = Mutex()
@@ -7912,6 +7913,8 @@ private var validatedCloudAccessTokenMemory: String? = null
 private var cloudSessionValidationFailureMemory: CloudSessionValidationFailureMemory? = null
 @Volatile
 private var successfulAuthRefreshMemory: SuccessfulAuthRefreshMemory? = null
+@Volatile
+private var authenticatedSessionGeneration: Long = 0L
 
 private data class CloudSessionValidationFailureMemory(
     val accessToken: String,
@@ -8040,19 +8043,25 @@ var httpClient =
                     withContext(Dispatchers.ourIo) {
                         tokenRefreshMutex.withLock {
                             val current = getStoredUserAuthTokens?.invoke() ?: return@withLock null
+                            val sessionGeneration = currentAuthenticatedSessionGeneration()
                             if (rejectedAuthRefreshTokenMatches(current.refreshToken)) {
                                 markCloudSessionNeedsRefreshForNotifications()
                                 return@withLock null
                             }
 
-                            val refreshResponse = refreshAuthTokensWithServerFallback(current.refreshToken)
+                            val refreshResponse = refreshAuthTokensWithServerFallback(
+                                refreshToken = current.refreshToken,
+                                expectedSessionGeneration = sessionGeneration
+                            )
                             val refreshedTokens = refreshResponse.payload
                             when {
                                 refreshedTokens != null -> {
-                                    clearAuthRefreshNonAuthFailure()
-                                    setStoredUserAuthTokens?.invoke(refreshedTokens)
-                                    markCloudAccessTokenValidated(refreshedTokens.accessToken)
-                                    markCloudTransportReachableForNotifications(authenticated = true, authRefreshRequired = false)
+                                    val installed = installRefreshedAuthenticatedSession(
+                                        expectedGeneration = sessionGeneration,
+                                        expectedRefreshToken = current.refreshToken,
+                                        tokenPair = refreshedTokens
+                                    )
+                                    if (!installed) return@withLock null
                                     BearerTokens(refreshedTokens.accessToken, refreshedTokens.refreshToken)
                                 }
 
@@ -10266,6 +10275,21 @@ private const val CACHE_TRANSACTION_CART_SCROLL_STATES = "transaction_cart_scrol
 private const val CACHE_PENDING_SESSION_CLEANUPS = "pending_session_cleanups"
 private const val CACHE_PENDING_WORKSHIFT_ENDS = "pending_workshift_ends"
 
+private val AUTHENTICATED_ACCOUNT_CACHE_KEYS = listOf(
+    CACHE_USER,
+    CACHE_STORES,
+    CACHE_SUPPLIERS,
+    CACHE_NOTIFICATIONS,
+    CACHE_SECURITY_SESSIONS,
+    CACHE_SECURITY_SESSION_HISTORY,
+    CACHE_MY_WORKER_MEMBERSHIPS,
+    CACHE_MY_WORKER_REQUESTS,
+    CACHE_USER_FINANCE_DASHBOARD,
+)
+
+private fun hasStoredAuthenticatedSession(): Boolean =
+    runCatching { getStoredUserAuthTokens?.invoke() != null }.getOrDefault(false)
+
 private var cachedGlobalConfigurationPrimedForNetwork = false
 private val cachedGlobalConfigurationPrimeMutex = Mutex()
 
@@ -11235,6 +11259,78 @@ internal fun clearCloudAuthRequestMemory(tokens: TokenPair? = null) {
     validatedCloudAccessTokenMemory = tokens?.accessToken?.takeIf { it.isNotBlank() }
 }
 
+private fun advanceAuthenticatedSessionGenerationLocked(): Long {
+    authenticatedSessionGeneration = if (authenticatedSessionGeneration == Long.MAX_VALUE) 1L else authenticatedSessionGeneration + 1L
+    return authenticatedSessionGeneration
+}
+
+@PublishedApi
+internal fun currentAuthenticatedSessionGeneration(): Long = authenticatedSessionGeneration
+
+@PublishedApi
+internal fun authenticatedSessionGenerationIsCurrent(expectedGeneration: Long): Boolean =
+    authenticatedSessionGeneration == expectedGeneration && getStoredUserAuthTokens?.invoke() != null
+
+private fun authenticatedSessionRefreshIsCurrent(
+    expectedGeneration: Long,
+    expectedRefreshToken: String
+): Boolean {
+    val current = getStoredUserAuthTokens?.invoke() ?: return false
+    return authenticatedSessionGeneration == expectedGeneration &&
+            current.refreshToken == expectedRefreshToken
+}
+
+@PublishedApi
+internal suspend fun installAuthenticatedSession(tokenPair: TokenPair): Long =
+    authSessionMutationMutex.withLock {
+        val generation = advanceAuthenticatedSessionGenerationLocked()
+        setStoredUserAuthTokens?.invoke(tokenPair)
+        clearCloudAuthRequestMemory(tokenPair)
+        markCloudAccessTokenValidated(tokenPair.accessToken)
+        clearCloudSessionRefreshRequirementForNotifications(CLOUD_TRANSPORT_STATUS_REACHABLE)
+        markCloudTransportReachableForNotifications(
+            authenticated = true,
+            authRefreshRequired = false
+        )
+        httpClient.authProvider<BearerAuthProvider>()?.clearToken()
+        generation
+    }
+
+@PublishedApi
+internal suspend fun installRefreshedAuthenticatedSession(
+    expectedGeneration: Long,
+    expectedRefreshToken: String,
+    tokenPair: TokenPair
+): Boolean = authSessionMutationMutex.withLock {
+    if (!authenticatedSessionRefreshIsCurrent(expectedGeneration, expectedRefreshToken)) {
+        return@withLock false
+    }
+    setStoredUserAuthTokens?.invoke(tokenPair)
+    clearAuthRefreshNonAuthFailure()
+    clearCloudAuthRequestMemory(tokenPair)
+    markCloudAccessTokenValidated(tokenPair.accessToken)
+    clearCloudSessionRefreshRequirementForNotifications(CLOUD_TRANSPORT_STATUS_REACHABLE)
+    markCloudTransportReachableForNotifications(
+        authenticated = true,
+        authRefreshRequired = false
+    )
+    httpClient.authProvider<BearerAuthProvider>()?.clearToken()
+    true
+}
+
+@PublishedApi
+internal suspend fun clearAuthenticatedSessionStorage(): TokenPair? =
+    authSessionMutationMutex.withLock {
+        val tokenSnapshot = getStoredUserAuthTokens?.invoke()
+        advanceAuthenticatedSessionGenerationLocked()
+        setStoredUserAuthTokens?.invoke(null)
+        clearCloudAuthRequestMemory(null)
+        setStoredUserAccountDataModel?.invoke(null)
+        clearCloudSessionRefreshRequirementForNotifications(CLOUD_TRANSPORT_STATUS_UNKNOWN)
+        httpClient.authProvider<BearerAuthProvider>()?.clearToken()
+        tokenSnapshot
+    }
+
 @PublishedApi
 internal fun rememberRejectedAuthRefreshToken(
     refreshToken: String,
@@ -11659,9 +11755,13 @@ private suspend fun performAuthTokenRefreshNetworkRequest(
 @PublishedApi
 internal suspend fun refreshAuthTokensWithServerFallback(
     refreshToken: String,
-    forceRejectedRetry: Boolean = false
+    forceRejectedRetry: Boolean = false,
+    expectedSessionGeneration: Long? = null
 ): ResponseDataModel<TokenPair> {
     if (refreshToken.isBlank()) return cloudSessionExpiredResponse()
+    if (expectedSessionGeneration != null && !authenticatedSessionGenerationIsCurrent(expectedSessionGeneration)) {
+        return cloudSessionExpiredResponse()
+    }
 
     recentSuccessfulAuthRefreshResponse(refreshToken)?.let { return it }
 
@@ -11670,6 +11770,9 @@ internal suspend fun refreshAuthTokensWithServerFallback(
     }
 
     return authRefreshNetworkMutex.withLock {
+        if (expectedSessionGeneration != null && !authenticatedSessionGenerationIsCurrent(expectedSessionGeneration)) {
+            return@withLock cloudSessionExpiredResponse()
+        }
         recentSuccessfulAuthRefreshResponse(refreshToken)?.let { return@withLock it }
 
         if (!forceRejectedRetry && rejectedAuthRefreshTokenMatches(refreshToken)) {
@@ -11677,6 +11780,9 @@ internal suspend fun refreshAuthTokensWithServerFallback(
         }
 
         val response = performAuthTokenRefreshNetworkRequest(refreshToken)
+        if (expectedSessionGeneration != null && !authenticatedSessionGenerationIsCurrent(expectedSessionGeneration)) {
+            return@withLock cloudSessionExpiredResponse()
+        }
         val refreshedTokens = response.payload
         when {
             refreshedTokens != null -> {
@@ -11707,6 +11813,7 @@ internal suspend fun refreshStoredAuthTokensOnceForNetworkRetry(
     forceRejectedRetry: Boolean = false
 ): Boolean = tokenRefreshMutex.withLock {
     val current = getStoredUserAuthTokens?.invoke() ?: return@withLock false
+    val sessionGeneration = currentAuthenticatedSessionGeneration()
 
     if (!forceRejectedRetry && rejectedAuthRefreshTokenMatches(current.refreshToken)) {
         markCloudSessionNeedsRefreshForNotifications()
@@ -11721,16 +11828,16 @@ internal suspend fun refreshStoredAuthTokensOnceForNetworkRetry(
 
     val refreshResponse = refreshAuthTokensWithServerFallback(
         refreshToken = current.refreshToken,
-        forceRejectedRetry = forceRejectedRetry
+        forceRejectedRetry = forceRejectedRetry,
+        expectedSessionGeneration = sessionGeneration
     )
 
     refreshResponse.payload?.let { refreshedTokens ->
-        clearAuthRefreshNonAuthFailure()
-        setStoredUserAuthTokens?.invoke(refreshedTokens)
-        markCloudAccessTokenValidated(refreshedTokens.accessToken)
-        httpClient.authProvider<BearerAuthProvider>()?.clearToken()
-        markCloudTransportReachableForNotifications(authenticated = true, authRefreshRequired = false)
-        return@withLock true
+        return@withLock installRefreshedAuthenticatedSession(
+            expectedGeneration = sessionGeneration,
+            expectedRefreshToken = current.refreshToken,
+            tokenPair = refreshedTokens
+        )
     }
 
     when {
@@ -12027,6 +12134,18 @@ private suspend fun deleteJsonCache(key: String) {
     try {
         deleteLocalKv(CACHE_PREFIX + key)
     } catch (_: Throwable) {
+    }
+}
+
+private suspend fun clearAuthenticatedAccountCaches() {
+    AUTHENTICATED_ACCOUNT_CACHE_KEYS.forEach { key ->
+        deleteJsonCache(key)
+    }
+}
+
+private suspend inline fun <reified T> putAuthenticatedJsonCache(key: String, value: T) {
+    if (hasStoredAuthenticatedSession()) {
+        putJsonCache(key, value)
     }
 }
 
@@ -13628,15 +13747,46 @@ private suspend fun loadCachedApplicationData() {
     getJsonCache<List<StylizedDrawablePathsGroupDataModel>>(CACHE_DRAWABLES)?.let {
         drawablesState.emit(DataState.Success(it, cacheMessage()))
     }
-    getJsonCache<UserAccountDataModel>(CACHE_USER)?.let {
-        userAccountState.emit(DataState.Success(it, cacheMessage()))
+
+    // Account data may be shown offline only while a durable authenticated session still exists.
+    // Older builds left JSON account caches behind on logout; hydrating those without tokens made
+    // desktop relaunch appear logged in even after Keychain credentials had been removed.
+    val hasAuthenticatedSession = hasStoredAuthenticatedSession()
+    if (hasAuthenticatedSession) {
+        getJsonCache<UserAccountDataModel>(CACHE_USER)?.let {
+            userAccountState.emit(DataState.Success(it, cacheMessage()))
+        }
+        getJsonCache<List<StoreDataModel>>(CACHE_STORES)?.let {
+            storesState.emit(DataState.Success(it, cacheMessage()))
+        }
+        getJsonCache<List<SupplierDataModel>>(CACHE_SUPPLIERS)?.let {
+            suppliersState.emit(DataState.Success(it, cacheMessage()))
+        }
+        getJsonCache<List<NotificationDataModel>>(CACHE_NOTIFICATIONS)?.let {
+            notificationsState.emit(DataState.Success(it, cacheMessage()))
+        }
+        getJsonCache<List<SecuritySessionDataModel>>(CACHE_SECURITY_SESSIONS)?.let {
+            securitySessionsState.emit(DataState.Success(it, cacheMessage()))
+        }
+        getJsonCache<List<SecuritySessionHistoryDataModel>>(CACHE_SECURITY_SESSION_HISTORY)?.let {
+            securitySessionHistoryState.emit(DataState.Success(it, cacheMessage()))
+        }
+        getJsonCache<List<StoreWorkerDataModel>>(CACHE_MY_WORKER_MEMBERSHIPS)?.let {
+            myWorkerMembershipsState.emit(DataState.Success(it, cacheMessage()))
+        }
+        getJsonCache<List<StoreWorkerRequestDataModel>>(CACHE_MY_WORKER_REQUESTS)?.let {
+            myWorkerRequestsState.emit(DataState.Success(it, cacheMessage()))
+        }
+        getJsonCache<UserFinanceDashboardDataModel>(CACHE_USER_FINANCE_DASHBOARD)?.let {
+            userFinanceDashboardState.emit(DataState.Success(it, cacheMessage()))
+            userWalletState.emit(DataState.Success(it.wallet, cacheMessage()))
+            userWalletLedgerState.emit(DataState.Success(it.ledger, cacheMessage()))
+            paymentIntentsState.emit(DataState.Success(it.paymentIntents, cacheMessage()))
+        }
+    } else {
+        clearAuthenticatedAccountCaches()
     }
-    getJsonCache<List<StoreDataModel>>(CACHE_STORES)?.let {
-        storesState.emit(DataState.Success(it, cacheMessage()))
-    }
-    getJsonCache<List<SupplierDataModel>>(CACHE_SUPPLIERS)?.let {
-        suppliersState.emit(DataState.Success(it, cacheMessage()))
-    }
+
     getJsonCache<List<GenericGoodsCategoryDataModel>>(CACHE_GENERIC_GOODS_CATEGORIES)?.let {
         genericGoodsCategoriesState.emit(DataState.Success(it, cacheMessage()))
         categoriesState.emit(DataState.Success(it, cacheMessage()))
@@ -13644,36 +13794,17 @@ private suspend fun loadCachedApplicationData() {
     getJsonCache<List<GenericGoodsItemDataModel>>(CACHE_GENERIC_GOODS_ITEMS)?.let {
         genericGoodsItemsState.emit(DataState.Success(it, cacheMessage()))
     }
-    getJsonCache<List<NotificationDataModel>>(CACHE_NOTIFICATIONS)?.let {
-        notificationsState.emit(DataState.Success(it, cacheMessage()))
-    }
-    getJsonCache<List<SecuritySessionDataModel>>(CACHE_SECURITY_SESSIONS)?.let {
-        securitySessionsState.emit(DataState.Success(it, cacheMessage()))
-    }
-    getJsonCache<List<SecuritySessionHistoryDataModel>>(CACHE_SECURITY_SESSION_HISTORY)?.let {
-        securitySessionHistoryState.emit(DataState.Success(it, cacheMessage()))
-    }
-    getJsonCache<List<StoreWorkerDataModel>>(CACHE_MY_WORKER_MEMBERSHIPS)?.let {
-        myWorkerMembershipsState.emit(DataState.Success(it, cacheMessage()))
-    }
-    getJsonCache<List<StoreWorkerRequestDataModel>>(CACHE_MY_WORKER_REQUESTS)?.let {
-        myWorkerRequestsState.emit(DataState.Success(it, cacheMessage()))
-    }
-    getJsonCache<UserFinanceDashboardDataModel>(CACHE_USER_FINANCE_DASHBOARD)?.let {
-        userFinanceDashboardState.emit(DataState.Success(it, cacheMessage()))
-        userWalletState.emit(DataState.Success(it.wallet, cacheMessage()))
-        userWalletLedgerState.emit(DataState.Success(it.ledger, cacheMessage()))
-        paymentIntentsState.emit(DataState.Success(it.paymentIntents, cacheMessage()))
-    }
     getJsonCache<List<StoreSubscriptionPlanDataModel>>(CACHE_SUBSCRIPTION_PLANS)?.let { cachedPlans ->
         val allowedPlanIds = defaultStoreSubscriptionPlans().map { it.id }.toSet()
         val visiblePlans = cachedPlans.filter { it.id in allowedPlanIds }.ifEmpty { defaultStoreSubscriptionPlans() }
         subscriptionPlansState.emit(DataState.Success(visiblePlans, cacheMessage()))
     }
 
-    getLocalKv(KEY_ACTIVE_STORE_ID)?.takeIf { it.isNotBlank() }?.let { storeId ->
-        activeStoreIdState.emit(storeId)
-        loadCachedStoreScopedData(storeId)
+    if (hasAuthenticatedSession) {
+        getLocalKv(KEY_ACTIVE_STORE_ID)?.takeIf { it.isNotBlank() }?.let { storeId ->
+            activeStoreIdState.emit(storeId)
+            loadCachedStoreScopedData(storeId)
+        }
     }
 }
 
@@ -13702,72 +13833,72 @@ private fun startAppCacheCollectors() {
     GlobalScope.launch(Dispatchers.ourIo) { dimensionsState.payload.collect { it?.let { putJsonCache(CACHE_DIMENSIONS, it) } } }
     GlobalScope.launch(Dispatchers.ourIo) { colorsState.payload.collect { it?.let { putJsonCache(CACHE_COLORS, it) } } }
     GlobalScope.launch(Dispatchers.ourIo) { drawablesState.payload.collect { it?.let { putJsonCache(CACHE_DRAWABLES, it) } } }
-    GlobalScope.launch(Dispatchers.ourIo) { userAccountState.payload.collect { it?.let { putJsonCache(CACHE_USER, it) } } }
-    GlobalScope.launch(Dispatchers.ourIo) { storesState.payload.collect { it?.let { putJsonCache(CACHE_STORES, it) } } }
-    GlobalScope.launch(Dispatchers.ourIo) { suppliersState.payload.collect { it?.let { putJsonCache(CACHE_SUPPLIERS, it) } } }
+    GlobalScope.launch(Dispatchers.ourIo) { userAccountState.payload.collect { it?.let { putAuthenticatedJsonCache(CACHE_USER, it) } } }
+    GlobalScope.launch(Dispatchers.ourIo) { storesState.payload.collect { it?.let { putAuthenticatedJsonCache(CACHE_STORES, it) } } }
+    GlobalScope.launch(Dispatchers.ourIo) { suppliersState.payload.collect { it?.let { putAuthenticatedJsonCache(CACHE_SUPPLIERS, it) } } }
     GlobalScope.launch(Dispatchers.ourIo) { genericGoodsCategoriesState.payload.collect { it?.let { putJsonCache(CACHE_GENERIC_GOODS_CATEGORIES, it) } } }
     GlobalScope.launch(Dispatchers.ourIo) { genericGoodsItemsState.payload.collect { it?.let { putJsonCache(CACHE_GENERIC_GOODS_ITEMS, it) } } }
-    GlobalScope.launch(Dispatchers.ourIo) { notificationsState.payload.collect { it?.let { putJsonCache(CACHE_NOTIFICATIONS, it) } } }
-    GlobalScope.launch(Dispatchers.ourIo) { securitySessionsState.payload.collect { it?.let { putJsonCache(CACHE_SECURITY_SESSIONS, it) } } }
-    GlobalScope.launch(Dispatchers.ourIo) { securitySessionHistoryState.payload.collect { it?.let { putJsonCache(CACHE_SECURITY_SESSION_HISTORY, it) } } }
-    GlobalScope.launch(Dispatchers.ourIo) { myWorkerMembershipsState.payload.collect { it?.let { putJsonCache(CACHE_MY_WORKER_MEMBERSHIPS, it) } } }
-    GlobalScope.launch(Dispatchers.ourIo) { myWorkerRequestsState.payload.collect { it?.let { putJsonCache(CACHE_MY_WORKER_REQUESTS, it) } } }
-    GlobalScope.launch(Dispatchers.ourIo) { userFinanceDashboardState.payload.collect { it?.let { putJsonCache(CACHE_USER_FINANCE_DASHBOARD, it) } } }
+    GlobalScope.launch(Dispatchers.ourIo) { notificationsState.payload.collect { it?.let { putAuthenticatedJsonCache(CACHE_NOTIFICATIONS, it) } } }
+    GlobalScope.launch(Dispatchers.ourIo) { securitySessionsState.payload.collect { it?.let { putAuthenticatedJsonCache(CACHE_SECURITY_SESSIONS, it) } } }
+    GlobalScope.launch(Dispatchers.ourIo) { securitySessionHistoryState.payload.collect { it?.let { putAuthenticatedJsonCache(CACHE_SECURITY_SESSION_HISTORY, it) } } }
+    GlobalScope.launch(Dispatchers.ourIo) { myWorkerMembershipsState.payload.collect { it?.let { putAuthenticatedJsonCache(CACHE_MY_WORKER_MEMBERSHIPS, it) } } }
+    GlobalScope.launch(Dispatchers.ourIo) { myWorkerRequestsState.payload.collect { it?.let { putAuthenticatedJsonCache(CACHE_MY_WORKER_REQUESTS, it) } } }
+    GlobalScope.launch(Dispatchers.ourIo) { userFinanceDashboardState.payload.collect { it?.let { putAuthenticatedJsonCache(CACHE_USER_FINANCE_DASHBOARD, it) } } }
     GlobalScope.launch(Dispatchers.ourIo) { subscriptionPlansState.payload.collect { it?.let { putJsonCache(CACHE_SUBSCRIPTION_PLANS, it) } } }
 
     GlobalScope.launch(Dispatchers.ourIo) {
         operationLogsState.payload.collect { payload ->
             val storeId = activeStoreIdState.value
-            if (!storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("operation_logs", storeId), payload)
+            if (hasStoredAuthenticatedSession() && !storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("operation_logs", storeId), payload)
         }
     }
 
     GlobalScope.launch(Dispatchers.ourIo) {
         stockState.payload.collect { payload ->
             val storeId = activeStoreIdState.value
-            if (!storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("stock", storeId), payload)
+            if (hasStoredAuthenticatedSession() && !storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("stock", storeId), payload)
         }
     }
     GlobalScope.launch(Dispatchers.ourIo) {
         stockBatchesState.payload.collect { payload ->
             val storeId = activeStoreIdState.value
-            if (!storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("stock_batches", storeId), payload)
+            if (hasStoredAuthenticatedSession() && !storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("stock_batches", storeId), payload)
         }
     }
     GlobalScope.launch(Dispatchers.ourIo) {
         transactionsState.payload.collect { payload ->
             val storeId = activeStoreIdState.value
-            if (!storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("transactions", storeId), payload)
+            if (hasStoredAuthenticatedSession() && !storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("transactions", storeId), payload)
         }
     }
     GlobalScope.launch(Dispatchers.ourIo) {
         debtorsState.payload.collect { payload ->
             val storeId = activeStoreIdState.value
-            if (!storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("debtors", storeId), payload)
+            if (hasStoredAuthenticatedSession() && !storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("debtors", storeId), payload)
         }
     }
     GlobalScope.launch(Dispatchers.ourIo) {
         cashRegisterState.payload.collect { payload ->
             val storeId = activeStoreIdState.value
-            if (!storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("cash_register", storeId), payload)
+            if (hasStoredAuthenticatedSession() && !storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("cash_register", storeId), payload)
         }
     }
     GlobalScope.launch(Dispatchers.ourIo) {
         cashRegisterEventsState.payload.collect { payload ->
             val storeId = activeStoreIdState.value
-            if (!storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("cash_register_events", storeId), payload)
+            if (hasStoredAuthenticatedSession() && !storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("cash_register_events", storeId), payload)
         }
     }
     GlobalScope.launch(Dispatchers.ourIo) {
         storeWorkerMembershipsState.payload.collect { payload ->
             val storeId = activeStoreIdState.value
-            if (!storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("store_workers", storeId), payload)
+            if (hasStoredAuthenticatedSession() && !storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("store_workers", storeId), payload)
         }
     }
     GlobalScope.launch(Dispatchers.ourIo) {
         incomingWorkerRequestsState.payload.collect { payload ->
             val storeId = activeStoreIdState.value
-            if (!storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("incoming_worker_requests", storeId), payload)
+            if (hasStoredAuthenticatedSession() && !storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("incoming_worker_requests", storeId), payload)
         }
     }
 }
@@ -16545,12 +16676,7 @@ fun logInUser(userAuthLogIn: UserAuthLogInDataModel, serverUrlOverride: String? 
                     transient = false
                 )
             } else {
-                setStoredUserAuthTokens?.invoke(response.payload)
-                clearCloudAuthRequestMemory(response.payload)
-                markCloudAccessTokenValidated(response.payload.accessToken)
-                clearCloudSessionRefreshRequirementForNotifications(CLOUD_TRANSPORT_STATUS_REACHABLE)
-                markCloudTransportReachableForNotifications(authenticated = true)
-                httpClient.authProvider<BearerAuthProvider>()?.clearToken()
+                installAuthenticatedSession(response.payload)
                 clearTransientOrNeutralInAppNotifications()
                 postInAppNotificationNow(
                     localizedStringResourceMessage(
@@ -16629,12 +16755,7 @@ fun signUpUser(userAuthSignUp: UserAuthSignUpDataModel, serverUrlOverride: Strin
                     transient = false
                 )
             } else {
-                setStoredUserAuthTokens?.invoke(response.payload)
-                clearCloudAuthRequestMemory(response.payload)
-                markCloudAccessTokenValidated(response.payload.accessToken)
-                clearCloudSessionRefreshRequirementForNotifications(CLOUD_TRANSPORT_STATUS_REACHABLE)
-                markCloudTransportReachableForNotifications(authenticated = true)
-                httpClient.authProvider<BearerAuthProvider>()?.clearToken()
+                installAuthenticatedSession(response.payload)
                 clearTransientOrNeutralInAppNotifications()
                 postInAppNotificationNow(
                     localizedStringResourceMessage(
@@ -16671,6 +16792,81 @@ fun signUpUser(userAuthSignUp: UserAuthSignUpDataModel, serverUrlOverride: Strin
     }
 }
 
+private suspend fun clearAuthenticatedAccountRuntimeState() {
+    clearAuthenticatedAccountCaches()
+    userAccountState.emit(DataState.Empty())
+    storesState.emit(DataState.Empty())
+    activeStoreIdState.emit(null)
+
+    stockState.emit(DataState.Empty())
+    parentStoreStockState.emit(DataState.Empty())
+    stockBatchesState.emit(DataState.Empty())
+    stockItemBranchAvailabilityState.emit(DataState.Empty())
+    stockBatchMoveResultState.emit(DataState.Empty())
+    transactionsState.emit(DataState.Empty())
+    latestTransactionReceiptSnapshotState.emit(null)
+    completeTransactionInProgressState.emit(false)
+
+    suppliersState.emit(DataState.Empty())
+    supplierGoodsPricesState.emit(DataState.Empty())
+    supplierOrdersState.emit(DataState.Empty())
+    supplierOrderLinesState.emit(DataState.Empty())
+    supplierPartnershipContractsState.emit(DataState.Empty())
+    supplierModeDashboardState.emit(DataState.Empty())
+    clearSupplierIdentityFocusForLogout()
+    supplierDashboardCacheMutex.withLock {
+        supplierDashboardCacheByScope.clear()
+        supplierDashboardLastSuccessAtMillisByScope.clear()
+        supplierDashboardVisibleScopeKey = ""
+    }
+    supplierWorkspaceRefreshScheduleMutex.withLock {
+        supplierWorkspaceRefreshScopeKey = ""
+        supplierWorkspaceLastBaseRefreshAtMillis = 0L
+        supplierWorkspaceLastContractsRefreshAtMillis = 0L
+    }
+
+    debtorsState.emit(DataState.Empty())
+    userFinanceDashboardState.emit(DataState.Empty())
+    userWalletState.emit(DataState.Empty())
+    userWalletLedgerState.emit(DataState.Empty())
+    paymentIntentsState.emit(DataState.Empty())
+    activeStoreSubscriptionState.emit(DataState.Empty())
+    activeStoreSubscriptionChargesState.emit(DataState.Empty())
+
+    securitySessionsState.emit(DataState.Empty())
+    securitySessionHistoryState.emit(DataState.Empty())
+    storeWorkersState.emit(DataState.Empty())
+    storeWorkerMembershipsState.emit(DataState.Empty())
+    myWorkerMembershipsState.emit(DataState.Empty())
+    incomingWorkerRequestsState.emit(DataState.Empty())
+    myWorkerRequestsState.emit(DataState.Empty())
+    storeWorkerRoleTemplatesState.emit(DataState.Empty())
+    activeWorkshiftState.emit(DataState.Empty())
+    workshiftLoginInProgressState.emit(false)
+    operationLogsState.emit(DataState.Empty())
+    stockItemHistoryState.emit(DataState.Empty())
+    storeAnalyticsDashboardState.emit(DataState.Empty())
+
+    cashRegisterAmountState.emit(0.0)
+    cashRegisterState.emit(DataState.Empty())
+    cashRegisterEventsState.emit(DataState.Empty())
+    cashRegisterExtractionsState.emit(DataState.Empty())
+
+    notificationsState.emit(DataState.Empty())
+    notificationPopupMutex.withLock {
+        notificationPopupJobs.values.forEach { it.cancel() }
+        notificationPopupJobs.clear()
+        serverNotificationPopupIds.clear()
+    }
+    latestInAppNotificationState.emit(null)
+    activeInAppNotificationsState.emit(emptyList())
+
+    supportTicketsState.emit(DataState.Empty())
+    supportMessagesState.emit(DataState.Empty())
+    activeSupportTicketIdState.emit(null)
+    supportMessageSendingState.emit(false)
+}
+
 fun logOutUser() {
     GlobalScope.launch(Dispatchers.ourIo) {
         if (!logOutUserMutex.tryLock()) {
@@ -16689,7 +16885,7 @@ fun logOutUser() {
 
         try {
             invalidateSupplierNetworkSessionScope()
-            val tokenSnapshot = getStoredUserAuthTokens?.invoke()
+            val tokenSnapshot = clearAuthenticatedSessionStorage()
             val refreshToken = tokenSnapshot?.refreshToken
             val activeWorkshiftBeforeLogout = activeWorkshiftState.payloadValue
                 ?.takeIf { it.isActive && it.endedAtMillis == null }
@@ -16724,12 +16920,7 @@ fun logOutUser() {
             // Logout must never trap the cashier inside account screen. Local logout is immediate;
             // server refresh-session revoke is best-effort and can fail silently when the server token is already expired.
             stopRealtimeUpdates()
-            setStoredUserAuthTokens?.invoke(null)
-            clearCloudAuthRequestMemory(null)
-            setStoredUserAccountDataModel?.invoke(null)
             setActiveStoreId(null, syncServer = false)
-            clearCloudSessionRefreshRequirementForNotifications(CLOUD_TRANSPORT_STATUS_UNKNOWN)
-            httpClient.authProvider<BearerAuthProvider>()?.clearToken()
 
             if (!refreshToken.isNullOrBlank()) {
                 enqueuePendingSessionCleanup(
@@ -16740,38 +16931,7 @@ fun logOutUser() {
                 )
             }
 
-            userAccountState.emit(DataState.Empty())
-            storesState.emit(DataState.Empty())
-            activeStoreIdState.emit(null)
-            stockState.emit(DataState.Empty())
-            stockBatchesState.emit(DataState.Empty())
-            transactionsState.emit(DataState.Empty())
-            suppliersState.emit(DataState.Empty())
-            supplierGoodsPricesState.emit(DataState.Empty())
-            supplierOrdersState.emit(DataState.Empty())
-            supplierOrderLinesState.emit(DataState.Empty())
-            supplierPartnershipContractsState.emit(DataState.Empty())
-            supplierModeDashboardState.emit(DataState.Empty())
-            clearSupplierIdentityFocusForLogout()
-            supplierDashboardCacheMutex.withLock {
-                supplierDashboardCacheByScope.clear()
-                supplierDashboardLastSuccessAtMillisByScope.clear()
-                supplierDashboardVisibleScopeKey = ""
-            }
-            supplierWorkspaceRefreshScheduleMutex.withLock {
-                supplierWorkspaceRefreshScopeKey = ""
-                supplierWorkspaceLastBaseRefreshAtMillis = 0L
-                supplierWorkspaceLastContractsRefreshAtMillis = 0L
-            }
-            securitySessionsState.emit(DataState.Empty())
-            securitySessionHistoryState.emit(DataState.Empty())
-            activeWorkshiftState.emit(DataState.Empty())
-            supportTicketsState.emit(DataState.Empty())
-            supportMessagesState.emit(DataState.Empty())
-            activeSupportTicketIdState.emit(null)
-            supportMessageSendingState.emit(false)
-            latestInAppNotificationState.emit(null)
-            activeInAppNotificationsState.emit(emptyList())
+            clearAuthenticatedAccountRuntimeState()
 
             val response = if (!refreshToken.isNullOrBlank()) {
                 val revokeResponse = networkRequest<Unit, LogoutCleanupRequestDataModel>(
@@ -16825,16 +16985,22 @@ fun logOutUser() {
 
 fun getUser(forceLogOut: Boolean = true, applyServerActiveStore: Boolean = true) {
     GlobalScope.launch(Dispatchers.ourIo) {
+        val sessionGeneration = currentAuthenticatedSessionGeneration()
         if (getStoredUserAuthTokens?.invoke() != null)
             getUserAccountMutex.withLock {
+                if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) return@withLock
                 getStoredUserAccountDataModel?.invoke()?.run {
-                    userAccountState.emit(DataState.Success(this))
+                    if (authenticatedSessionGenerationIsCurrent(sessionGeneration)) {
+                        userAccountState.emit(DataState.Success(this))
+                    }
                 }
 
                 val response = networkRequest<UserAccountDataModel, Unit>(
                     HttpMethod.Get,
                     endpointUrl = globalAppConfigurationState.payloadValue.getUserPath.first
                 )
+
+                if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) return@withLock
 
                 if (response.negative) {
                     when {
@@ -17004,56 +17170,10 @@ fun forceLogOutUser(
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
         invalidateSupplierNetworkSessionScope()
+        clearAuthenticatedSessionStorage()
         stopRealtimeUpdates()
-        setStoredUserAuthTokens?.invoke(null)
-        clearCloudAuthRequestMemory(null)
-        setStoredUserAccountDataModel?.invoke(null)
         setActiveStoreId(null, syncServer = false)
-        clearCloudSessionRefreshRequirementForNotifications(CLOUD_TRANSPORT_STATUS_UNKNOWN)
-        httpClient.authProvider<BearerAuthProvider>()?.clearToken()
-
-        userAccountState.emit(DataState.Empty())
-        storesState.emit(DataState.Empty())
-        activeStoreIdState.emit(null)
-        stockState.emit(DataState.Empty())
-        stockBatchesState.emit(DataState.Empty())
-        stockItemBranchAvailabilityState.emit(DataState.Empty())
-        stockBatchMoveResultState.emit(DataState.Empty())
-        transactionsState.emit(DataState.Empty())
-        suppliersState.emit(DataState.Empty())
-        supplierGoodsPricesState.emit(DataState.Empty())
-        supplierOrdersState.emit(DataState.Empty())
-        supplierOrderLinesState.emit(DataState.Empty())
-        supplierPartnershipContractsState.emit(DataState.Empty())
-        supplierModeDashboardState.emit(DataState.Empty())
-        clearSupplierIdentityFocusForLogout()
-        supplierDashboardCacheMutex.withLock {
-            supplierDashboardCacheByScope.clear()
-            supplierDashboardLastSuccessAtMillisByScope.clear()
-            supplierDashboardVisibleScopeKey = ""
-        }
-        supplierWorkspaceRefreshScheduleMutex.withLock {
-            supplierWorkspaceRefreshScopeKey = ""
-            supplierWorkspaceLastBaseRefreshAtMillis = 0L
-            supplierWorkspaceLastContractsRefreshAtMillis = 0L
-        }
-        debtorsState.emit(DataState.Empty())
-        securitySessionsState.emit(DataState.Empty())
-        securitySessionHistoryState.emit(DataState.Empty())
-        storeWorkerMembershipsState.emit(DataState.Empty())
-        activeWorkshiftState.emit(DataState.Empty())
-        operationLogsState.emit(DataState.Empty())
-        stockItemHistoryState.emit(DataState.Empty())
-        storeAnalyticsDashboardState.emit(DataState.Empty())
-        cashRegisterState.emit(DataState.Empty())
-        cashRegisterEventsState.emit(DataState.Empty())
-        userFinanceDashboardState.emit(DataState.Empty())
-        activeStoreSubscriptionState.emit(DataState.Empty())
-        activeStoreSubscriptionChargesState.emit(DataState.Empty())
-        notificationPopupJobs.values.forEach { it.cancel() }
-        notificationPopupJobs.clear()
-        latestInAppNotificationState.emit(null)
-        activeInAppNotificationsState.emit(emptyList())
+        clearAuthenticatedAccountRuntimeState()
 
         if (postMessage) {
             postInAppNotification(

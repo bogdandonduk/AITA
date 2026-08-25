@@ -2326,6 +2326,8 @@ fun AppConfiguration.BarcodeCameraScannerFallbackPane(
 fun AppConfiguration.searchTextField(
     modifier: Modifier = Modifier,
     valueInitial: String? = null,
+    retainTextAcrossRecreation: Boolean = true,
+    persistTextDraft: Boolean = true,
     stateHost: StateHost?,
     stateKey: String?,
     isFocusedInitial: Boolean = false,
@@ -2437,6 +2439,8 @@ fun AppConfiguration.searchTextField(
 
         textFieldContent = genericTextField(
             valueInitial = valueInitial,
+            retainTextAcrossRecreation = retainTextAcrossRecreation,
+            persistTextDraft = persistTextDraft,
             stateHost = stateHost,
             stateKey = stateKey,
             isFocusedInitial = isFocusedInitial,
@@ -2547,17 +2551,24 @@ fun AppConfiguration.repeatedPasswordTextFieldGroup(
     passwordPlaceholderText: String? = null,
     repeatPasswordTitleText: String? = null,
     repeatPasswordPlaceholderText: String? = null,
-    imeWithAction: ImeWithAction? = null
+    imeWithAction: ImeWithAction? = null,
+    retainTextAcrossRecreation: Boolean = false,
+    persistTextDraft: Boolean = false
 ): Pair<GenericTextFieldContent, GenericTextFieldContent> {
 
-    var showPassword by rememberSaveable {
-        mutableStateOf(false)
+    val showPasswordState = if (retainTextAcrossRecreation) {
+        rememberSaveable(stateKey, repeatedStateKey) { mutableStateOf(false) }
+    } else {
+        remember(stateKey, repeatedStateKey) { mutableStateOf(false) }
     }
+    var showPassword by showPasswordState
 
     val passwordTextFieldContent = genericTextField(
         modifier = modifier,
         stateHost = stateHost,
         stateKey = stateKey,
+        retainTextAcrossRecreation = retainTextAcrossRecreation,
+        persistTextDraft = persistTextDraft,
         titleText = passwordTitleText ?: stateValues.stringPassword,
         placeholderText = passwordPlaceholderText ?: stateValues.stringEnterPassword,
         leadingIconPath = stateValues.drawablePathIconPassword,
@@ -2597,6 +2608,8 @@ fun AppConfiguration.repeatedPasswordTextFieldGroup(
         modifier = modifier,
         stateHost = stateHost,
         stateKey = repeatedStateKey,
+        retainTextAcrossRecreation = retainTextAcrossRecreation,
+        persistTextDraft = persistTextDraft,
         titleText = repeatPasswordTitleText ?: stateValues.stringRepeatPassword,
         placeholderText = repeatPasswordPlaceholderText ?: stateValues.stringRepeatPassword,
         leadingIconPath = stateValues.drawablePathIconPassword,
@@ -2636,17 +2649,24 @@ fun AppConfiguration.passwordTextField(
     stateKey: String,
     contentInvalidText: String? = null,
     imeWithAction: ImeWithAction? = null,
-    onContentValidityCheck: ((String) -> Boolean)? = null
+    onContentValidityCheck: ((String) -> Boolean)? = null,
+    retainTextAcrossRecreation: Boolean = false,
+    persistTextDraft: Boolean = false
 ): GenericTextFieldContent {
 
-    var showPassword by rememberSaveable {
-        mutableStateOf(false)
+    val showPasswordState = if (retainTextAcrossRecreation) {
+        rememberSaveable(stateKey) { mutableStateOf(false) }
+    } else {
+        remember(stateKey) { mutableStateOf(false) }
     }
+    var showPassword by showPasswordState
 
     return genericTextField(
         modifier = modifier,
         stateHost = stateHost,
         stateKey = stateKey,
+        retainTextAcrossRecreation = retainTextAcrossRecreation,
+        persistTextDraft = persistTextDraft,
         titleText = titleText ?: stateValues.stringPassword,
         placeholderText = placeholderText ?: stateValues.stringEnterPassword,
         leadingIconPath = stateValues.drawablePathIconPassword,

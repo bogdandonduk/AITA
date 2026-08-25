@@ -2481,6 +2481,12 @@ fun AppConfiguration.MenuAppModeScreen() {
                 }
             }
 
+            if (stateValues.appModeId == APP_MODE_SUPPLIER || stateValues.appModeId == APP_MODE_MANUFACTURER) {
+                item(key = "app-mode-supplier-workspace-overview") {
+                    SupplierWorkspaceMenuTile()
+                }
+            }
+
         }
     }
 }

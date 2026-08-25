@@ -123,11 +123,6 @@ object AitaAdvancedAuthenticationClient {
 }
 
 suspend fun adoptAdvancedAuthenticationTokens(tokenPair: TokenPair) {
-    setStoredUserAuthTokens?.invoke(tokenPair)
-    clearCloudAuthRequestMemory(tokenPair)
-    markCloudAccessTokenValidated(tokenPair.accessToken)
-    clearCloudSessionRefreshRequirementForNotifications(CLOUD_TRANSPORT_STATUS_REACHABLE)
-    markCloudTransportReachableForNotifications(authenticated = true)
-    httpClient.authProvider<BearerAuthProvider>()?.clearToken()
+    installAuthenticatedSession(tokenPair)
     getUser(forceLogOut = false)
 }

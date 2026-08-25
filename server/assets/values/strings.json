@@ -39040,6 +39040,174 @@
           "value": "Әлі тексерілуде"
         }
       ]
+    },
+    {
+      "id": 2551,
+      "values": [
+        {
+          "language": "main",
+          "value": "Next best move"
+        },
+        {
+          "language": "en",
+          "value": "Next best move"
+        },
+        {
+          "language": "ru",
+          "value": "Следующий лучший шаг"
+        },
+        {
+          "language": "kk",
+          "value": "Келесі ең тиімді қадам"
+        }
+      ]
+    },
+    {
+      "id": 2552,
+      "values": [
+        {
+          "language": "main",
+          "value": "Resolve the orders that need a reply or may block delivery."
+        },
+        {
+          "language": "en",
+          "value": "Resolve the orders that need a reply or may block delivery."
+        },
+        {
+          "language": "ru",
+          "value": "Разберите заказы, которые ждут ответа или могут задержать доставку."
+        },
+        {
+          "language": "kk",
+          "value": "Жауап күткен немесе жеткізуді кідіртуі мүмкін тапсырыстарды реттеңіз."
+        }
+      ]
+    },
+    {
+      "id": 2553,
+      "values": [
+        {
+          "language": "main",
+          "value": "This Store is waiting for you to review a proposed agreement."
+        },
+        {
+          "language": "en",
+          "value": "This Store is waiting for you to review a proposed agreement."
+        },
+        {
+          "language": "ru",
+          "value": "Этот магазин ждёт, когда вы рассмотрите предложенное соглашение."
+        },
+        {
+          "language": "kk",
+          "value": "Бұл дүкен ұсынылған келісімді қарауыңызды күтіп отыр."
+        }
+      ]
+    },
+    {
+      "id": 2554,
+      "values": [
+        {
+          "language": "main",
+          "value": "Prepare ready orders while their promised delivery window is protected."
+        },
+        {
+          "language": "en",
+          "value": "Prepare ready orders while their promised delivery window is protected."
+        },
+        {
+          "language": "ru",
+          "value": "Подготовьте готовые заказы, пока сохраняется обещанное окно доставки."
+        },
+        {
+          "language": "kk",
+          "value": "Уәде етілген жеткізу уақыты сақталып тұрғанда дайын тапсырыстарды әзірлеңіз."
+        }
+      ]
+    },
+    {
+      "id": 2555,
+      "values": [
+        {
+          "language": "main",
+          "value": "Move packed orders into delivery and keep the Store informed."
+        },
+        {
+          "language": "en",
+          "value": "Move packed orders into delivery and keep the Store informed."
+        },
+        {
+          "language": "ru",
+          "value": "Передайте упакованные заказы в доставку и держите магазин в курсе."
+        },
+        {
+          "language": "kk",
+          "value": "Буып-түйілген тапсырыстарды жеткізуге өткізіп, дүкенді хабардар етіп отырыңыз."
+        }
+      ]
+    },
+    {
+      "id": 2556,
+      "values": [
+        {
+          "language": "main",
+          "value": "Follow active deliveries until every quantity is resolved."
+        },
+        {
+          "language": "en",
+          "value": "Follow active deliveries until every quantity is resolved."
+        },
+        {
+          "language": "ru",
+          "value": "Следите за активными доставками, пока не будет подтверждено каждое количество."
+        },
+        {
+          "language": "kk",
+          "value": "Әрбір мөлшер шешілгенше белсенді жеткізулерді бақылаңыз."
+        }
+      ]
+    },
+    {
+      "id": 2557,
+      "values": [
+        {
+          "language": "main",
+          "value": "Review this partner’s open orders and keep the relationship moving."
+        },
+        {
+          "language": "en",
+          "value": "Review this partner’s open orders and keep the relationship moving."
+        },
+        {
+          "language": "ru",
+          "value": "Просмотрите открытые заказы этого партнёра и поддерживайте движение сотрудничества."
+        },
+        {
+          "language": "kk",
+          "value": "Осы серіктестің ашық тапсырыстарын қарап, ынтымақтастықты алға жылжытыңыз."
+        }
+      ]
+    },
+    {
+      "id": 2558,
+      "values": [
+        {
+          "language": "main",
+          "value": "This relationship is commercially ready and has no urgent work."
+        },
+        {
+          "language": "en",
+          "value": "This relationship is commercially ready and has no urgent work."
+        },
+        {
+          "language": "ru",
+          "value": "Коммерческая связь готова, срочных задач нет."
+        },
+        {
+          "language": "kk",
+          "value": "Коммерциялық байланыс дайын, шұғыл жұмыс жоқ."
+        }
+      ]
     }
   ]
 }

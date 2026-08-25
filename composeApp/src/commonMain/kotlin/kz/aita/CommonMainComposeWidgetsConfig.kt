@@ -1507,6 +1507,7 @@ fun AppConfiguration.genericTextField(
     adaptiveMultiline: Boolean = false,
     valueInitial: String? = null,
     retainTextAcrossRecreation: Boolean = true,
+    persistTextDraft: Boolean = true,
 
     textSize: TextUnit = stateValues.textSize,
     textColor: Color = stateValues.TextColor,
@@ -1567,7 +1568,7 @@ fun AppConfiguration.genericTextField(
     }
 
     val stateValue = state?.get(stateKey)
-    val persistentTextDraftKey = if (shouldPersistUiTextDraft(keyboardType, stateKey)) {
+    val persistentTextDraftKey = if (persistTextDraft && shouldPersistUiTextDraft(keyboardType, stateKey)) {
         persistentUiDraftKey(stateHost, stateKey)
     } else {
         null
@@ -1598,9 +1599,16 @@ fun AppConfiguration.genericTextField(
     }
     var textFieldValue by textFieldValueState
 
-    var persistentTextDraftLoaded by rememberSaveable(textFieldIdentityKey, persistentTextDraftKey ?: "no_persistent_text_draft") {
-        mutableStateOf(false)
+    val persistentTextDraftLoadedState = if (retainTextAcrossRecreation && persistTextDraft) {
+        rememberSaveable(textFieldIdentityKey, persistentTextDraftKey ?: "no_persistent_text_draft") {
+            mutableStateOf(false)
+        }
+    } else {
+        remember(textFieldIdentityKey, persistentTextDraftKey ?: "no_persistent_text_draft") {
+            mutableStateOf(false)
+        }
     }
+    var persistentTextDraftLoaded by persistentTextDraftLoadedState
 
     var pendingPersistentTextDraft by remember(persistentTextDraftKey) { mutableStateOf<String?>(null) }
     var pendingPersistentTextDraftVersion by remember(persistentTextDraftKey) { mutableStateOf(0) }
@@ -2490,6 +2498,7 @@ internal fun AppConfiguration.aitaFormTextField(
         enabled = enabled,
         valueInitial = value,
         retainTextAcrossRecreation = !sensitive,
+        persistTextDraft = !sensitive,
         textColor = effectiveTextColor,
         titleTextColor = effectiveTextColor,
         placeholderText = placeholderText,
@@ -2634,8 +2643,13 @@ fun AppConfiguration.emailTextField(
     modifier: Modifier = Modifier,
     stateHost: StateHost,
     stateKey: String,
+    identityKey: String? = null,
     valueInitial: String? = null,
+    retainTextAcrossRecreation: Boolean = true,
+    persistTextDraft: Boolean = true,
+    autoFocus: Boolean = true,
     imeWithAction: ImeWithAction? = null,
+    onValueChange: ((String, () -> Unit) -> Unit)? = null,
 ): GenericTextFieldContent {
 
     return genericTextField(
@@ -2644,6 +2658,10 @@ fun AppConfiguration.emailTextField(
         titleText = stateValues.stringEmail,
         stateHost = stateHost,
         stateKey = stateKey,
+        identityKey = identityKey,
+        retainTextAcrossRecreation = retainTextAcrossRecreation,
+        persistTextDraft = persistTextDraft,
+        autoFocus = autoFocus,
         placeholderText = stateValues.stringEnterEmailAddress,
         leadingIconPath = stateValues.drawablePathIconEmail,
         keyboardType = KeyboardType.Email,
@@ -2651,7 +2669,8 @@ fun AppConfiguration.emailTextField(
         contentInvalidText = stateValues.stringEmailMustBe,
         onContentValidityCheck = {
             it.checkAsEmail()
-        }
+        },
+        onValueChange = onValueChange
     )
 }
 
@@ -3129,6 +3148,8 @@ data class DomainSelectionTextFieldGroupItemContent(
 fun AppConfiguration.domainSelectionTextField(
     modifier: Modifier = Modifier,
     valueInitial: String? = null,
+    retainTextAcrossRecreation: Boolean = true,
+    persistTextDraft: Boolean = true,
     titleText: String = "",
     stateHost: StateHost? = null,
     stateKey: String? = null,
@@ -3156,11 +3177,16 @@ fun AppConfiguration.domainSelectionTextField(
     singleLine: Boolean = true,
     adaptiveMultiline: Boolean = false,
     isFocusedInitial: Boolean = false,
+    autoFocus: Boolean = true,
+    retainSelectionAcrossRecreation: Boolean = true,
+    persistSelectionDraft: Boolean = true,
     secondaryDomainsShowId: Boolean = true,
     secondaryDomainsShowName: Boolean = true,
     contentInvalidText: String? = null,
     onContentValidityCheck: ((String, String, String?) -> Boolean)? = null,
     onFilterValue: ((String, String, String?) -> Boolean)? = null,
+    onSelectedDomainChange: ((String) -> Unit)? = null,
+    onSelectedSecondaryDomainChange: ((String?) -> Unit)? = null,
     onValueChange: ((String, String, String?, () -> Unit) -> Unit)? = null
 ): DomainSelectionTextFieldContent {
     val primaryDomainIdsKey = remember(domains) { domains.joinToString("|") { it.id } }
@@ -3168,12 +3194,27 @@ fun AppConfiguration.domainSelectionTextField(
     val domainFieldIdentityKey = identityKey
         ?: stateKey
         ?: listOf(titleText, placeholderText, primaryDomainIdsKey, secondaryDomainIdsKey).joinToString("|")
-    val persistentSelectedDomainKey = persistentUiDraftKey(stateHost, stateKey, "selected-domain")
-    val persistentSelectedSecondaryDomainKey = persistentUiDraftKey(stateHost, stateKey, "selected-secondary-domain")
-
-    var selectedId by rememberSaveable(domainFieldIdentityKey, primaryDomainIdsKey) {
-        mutableStateOf(lockedDomainId ?: selectedInitial)
+    val persistentSelectedDomainKey = if (persistSelectionDraft) {
+        persistentUiDraftKey(stateHost, stateKey, "selected-domain")
+    } else {
+        null
     }
+    val persistentSelectedSecondaryDomainKey = if (persistSelectionDraft) {
+        persistentUiDraftKey(stateHost, stateKey, "selected-secondary-domain")
+    } else {
+        null
+    }
+
+    val selectedIdState = if (retainSelectionAcrossRecreation) {
+        rememberSaveable(domainFieldIdentityKey, primaryDomainIdsKey) {
+            mutableStateOf(lockedDomainId ?: selectedInitial)
+        }
+    } else {
+        remember(domainFieldIdentityKey, primaryDomainIdsKey) {
+            mutableStateOf(lockedDomainId ?: selectedInitial)
+        }
+    }
+    var selectedId by selectedIdState
 
     LaunchedEffect(persistentSelectedDomainKey, lockedDomainId, primaryDomainIdsKey) {
         if (lockedDomainId != null) return@LaunchedEffect
@@ -3205,6 +3246,7 @@ fun AppConfiguration.domainSelectionTextField(
         domains.find { it.id.equals(selectedId, true) }?.run {
             selected = this
         }
+        onSelectedDomainChange?.invoke(selectedId)
     }
 
     LaunchedEffect(selectedInitial, lockedDomainId, persistentSelectedDomainKey) {
@@ -3220,9 +3262,16 @@ fun AppConfiguration.domainSelectionTextField(
         }
     }
 
-    var selectedSecondaryId by rememberSaveable(domainFieldIdentityKey, secondaryDomainIdsKey) {
-        mutableStateOf(lockedSecondaryDomainId ?: selectedSecondaryInitial)
+    val selectedSecondaryIdState = if (retainSelectionAcrossRecreation) {
+        rememberSaveable(domainFieldIdentityKey, secondaryDomainIdsKey) {
+            mutableStateOf(lockedSecondaryDomainId ?: selectedSecondaryInitial)
+        }
+    } else {
+        remember(domainFieldIdentityKey, secondaryDomainIdsKey) {
+            mutableStateOf(lockedSecondaryDomainId ?: selectedSecondaryInitial)
+        }
     }
+    var selectedSecondaryId by selectedSecondaryIdState
 
     LaunchedEffect(persistentSelectedSecondaryDomainKey, lockedSecondaryDomainId, secondaryDomainIdsKey) {
         if (lockedSecondaryDomainId != null) return@LaunchedEffect
@@ -3249,6 +3298,7 @@ fun AppConfiguration.domainSelectionTextField(
         secondaryDomains?.find { it.id.equals(selectedSecondaryId, true) }?.run {
             selectedSecondary = this
         }
+        onSelectedSecondaryDomainChange?.invoke(selectedSecondaryId)
     }
 
     LaunchedEffect(selectedSecondaryInitial, lockedSecondaryDomainId, persistentSelectedSecondaryDomainKey) {
@@ -3312,9 +3362,12 @@ fun AppConfiguration.domainSelectionTextField(
                     )
             }
 
-        var isFocused by rememberSaveable(domainFieldIdentityKey) {
-            mutableStateOf(isFocusedInitial)
+        val isFocusedState = if (retainTextAcrossRecreation) {
+            rememberSaveable(domainFieldIdentityKey) { mutableStateOf(isFocusedInitial) }
+        } else {
+            remember(domainFieldIdentityKey) { mutableStateOf(isFocusedInitial) }
         }
+        var isFocused by isFocusedState
 
         Column(
             modifier = Modifier
@@ -3343,6 +3396,8 @@ fun AppConfiguration.domainSelectionTextField(
                                 .fillMaxWidth(),
                             stateHost = stateHost,
                             stateKey = stateKey?.let { "${it}_secondary_domain_search" },
+                            retainTextAcrossRecreation = retainTextAcrossRecreation,
+                            persistTextDraft = persistTextDraft,
                             focusedBorderWidth = 0.dp,
                             unfocusedBorderWidth = 0.dp,
                             focusedBorderColor = Color.Transparent,
@@ -3413,8 +3468,11 @@ fun AppConfiguration.domainSelectionTextField(
                 stateHost = stateHost,
                 stateKey = stateKey,
                 identityKey = domainFieldIdentityKey,
+                retainTextAcrossRecreation = retainTextAcrossRecreation,
+                persistTextDraft = persistTextDraft,
                 placeholderText = placeholderText,
                 isFocusedInitial = isFocusedInitial,
+                autoFocus = autoFocus,
                 leadingIcon = selectedSecondary?.run {
                     {
                         selectableDomainWidget(
@@ -3508,6 +3566,8 @@ fun AppConfiguration.domainSelectionTextField(
                                 .fillMaxWidth(),
                             stateHost = stateHost,
                             stateKey = stateKey?.let { "${it}_domain_search" },
+                            retainTextAcrossRecreation = retainTextAcrossRecreation,
+                            persistTextDraft = persistTextDraft,
                             focusedBorderWidth = 0.dp,
                             unfocusedBorderWidth = 0.dp,
                             focusedBorderColor = Color.Transparent,
@@ -5495,14 +5555,23 @@ internal fun List<CountryDataModel>.withTajikistanFallback(): List<CountryDataMo
 
 @Composable
 fun AppConfiguration.countrySelectionPhoneNumberTextField(
+    modifier: Modifier = Modifier,
     countries: List<CountryDataModel> = stateValues.globalAppConfiguration.countries.withTajikistanFallback(),
     valueInitial: String? = null,
     stateHost: StateHost,
     stateKey: String,
+    identityKey: String? = null,
     lockedId: String? = null,
     titleText: String = stateValues.stringPhoneNumber,
     placeholderText: String = stateValues.stringEnterPhoneNumber,
-    imeWithAction: ImeWithAction? = null
+    imeWithAction: ImeWithAction? = null,
+    retainTextAcrossRecreation: Boolean = true,
+    persistTextDraft: Boolean = true,
+    retainSelectionAcrossRecreation: Boolean = true,
+    persistSelectionDraft: Boolean = true,
+    autoFocus: Boolean = true,
+    onSelectedCountryCodeChange: ((String?) -> Unit)? = null,
+    onValueChange: ((String, String, String?, () -> Unit) -> Unit)? = null
 ): DomainSelectionTextFieldContent {
     val phoneCountries = countries.withTajikistanFallback()
     val detectedCountry = valueInitial?.removePrefix("+")?.let { normalized ->
@@ -5518,6 +5587,7 @@ fun AppConfiguration.countrySelectionPhoneNumberTextField(
         ?: defaultCountry?.let { "+${it.phoneNumberCode}" }
 
     return domainSelectionTextField(
+        modifier = modifier,
         domains = emptyList(),
         secondaryDomains = phoneCountries
             .sortedWith(
@@ -5548,6 +5618,12 @@ fun AppConfiguration.countrySelectionPhoneNumberTextField(
         titleText = titleText,
         stateHost = stateHost,
         stateKey = stateKey,
+        identityKey = identityKey,
+        retainTextAcrossRecreation = retainTextAcrossRecreation,
+        persistTextDraft = persistTextDraft,
+        retainSelectionAcrossRecreation = retainSelectionAcrossRecreation,
+        persistSelectionDraft = persistSelectionDraft,
+        autoFocus = autoFocus,
         placeholderText = placeholderText,
         keyboardType = KeyboardType.Phone,
         imeWithAction = imeWithAction,
@@ -5561,7 +5637,9 @@ fun AppConfiguration.countrySelectionPhoneNumberTextField(
             countries.withTajikistanFallback().find { "+${it.phoneNumberCode}" == selectedSecondaryId }?.run {
                 text.filterAsPhoneNumber(this)
             } == true
-        }
+        },
+        onSelectedSecondaryDomainChange = onSelectedCountryCodeChange,
+        onValueChange = onValueChange
     )
 }
 

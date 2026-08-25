@@ -219,6 +219,116 @@ internal data class SupplierPartnerPortfolioHealthUiModel(
 }
 
 /**
+ * A single relationship-level recommendation keeps the Partner Store detail operational rather than
+ * becoming a passive dossier. The ordering deliberately protects live commercial work first, then
+ * resolves relationship readiness, and only then falls back to analytics.
+ */
+internal enum class SupplierPartnerNextAction {
+    RESOLVE_ORDER_ATTENTION,
+    REVIEW_AGREEMENT_REQUEST,
+    PACK_READY_ORDERS,
+    DISPATCH_PACKED_ORDERS,
+    FOLLOW_ACTIVE_DELIVERY,
+    COMPLETE_OFFER_PRICES,
+    REFRESH_RELATIONSHIP_DATA,
+    BUILD_USABLE_OFFER,
+    COMPLETE_ACTIVE_AGREEMENT,
+    REVIEW_OPEN_ORDERS,
+    OPEN_INSIGHTS,
+}
+
+internal data class SupplierPartnerNextActionUiModel(
+    val action: SupplierPartnerNextAction,
+    val affectedCount: Int,
+    val urgent: Boolean,
+)
+
+internal fun buildSupplierPartnerNextAction(
+    partner: SupplierPartnerUiModel,
+): SupplierPartnerNextActionUiModel = when {
+    partner.issueOrderCount > 0 || partner.overdueOrderCount > 0 || partner.attentionOrderCount > 0 ->
+        SupplierPartnerNextActionUiModel(
+            action = SupplierPartnerNextAction.RESOLVE_ORDER_ATTENTION,
+            affectedCount = maxOf(
+                partner.issueOrderCount,
+                partner.overdueOrderCount,
+                partner.attentionOrderCount,
+            ),
+            urgent = true,
+        )
+
+    partner.pendingSupplierContractCount > 0 ->
+        SupplierPartnerNextActionUiModel(
+            action = SupplierPartnerNextAction.REVIEW_AGREEMENT_REQUEST,
+            affectedCount = partner.pendingSupplierContractCount,
+            urgent = true,
+        )
+
+    partner.readyToPackOrderCount > 0 ->
+        SupplierPartnerNextActionUiModel(
+            action = SupplierPartnerNextAction.PACK_READY_ORDERS,
+            affectedCount = partner.readyToPackOrderCount,
+            urgent = false,
+        )
+
+    partner.packedOrderCount > 0 ->
+        SupplierPartnerNextActionUiModel(
+            action = SupplierPartnerNextAction.DISPATCH_PACKED_ORDERS,
+            affectedCount = partner.packedOrderCount,
+            urgent = false,
+        )
+
+    partner.inDeliveryOrderCount > 0 || partner.partiallyDeliveredOrderCount > 0 ->
+        SupplierPartnerNextActionUiModel(
+            action = SupplierPartnerNextAction.FOLLOW_ACTIVE_DELIVERY,
+            affectedCount = partner.inDeliveryOrderCount + partner.partiallyDeliveredOrderCount,
+            urgent = false,
+        )
+
+    partner.priceGapCount > 0 ->
+        SupplierPartnerNextActionUiModel(
+            action = SupplierPartnerNextAction.COMPLETE_OFFER_PRICES,
+            affectedCount = partner.priceGapCount,
+            urgent = false,
+        )
+
+    !partner.offerReadinessKnown || !partner.agreementReadinessKnown ->
+        SupplierPartnerNextActionUiModel(
+            action = SupplierPartnerNextAction.REFRESH_RELATIONSHIP_DATA,
+            affectedCount = 0,
+            urgent = false,
+        )
+
+    partner.validOfferCount <= 0 ->
+        SupplierPartnerNextActionUiModel(
+            action = SupplierPartnerNextAction.BUILD_USABLE_OFFER,
+            affectedCount = 0,
+            urgent = false,
+        )
+
+    partner.activeContractCount <= 0 ->
+        SupplierPartnerNextActionUiModel(
+            action = SupplierPartnerNextAction.COMPLETE_ACTIVE_AGREEMENT,
+            affectedCount = 0,
+            urgent = false,
+        )
+
+    partner.openOrderCount > 0 ->
+        SupplierPartnerNextActionUiModel(
+            action = SupplierPartnerNextAction.REVIEW_OPEN_ORDERS,
+            affectedCount = partner.openOrderCount,
+            urgent = false,
+        )
+
+    else ->
+        SupplierPartnerNextActionUiModel(
+            action = SupplierPartnerNextAction.OPEN_INSIGHTS,
+            affectedCount = 0,
+            urgent = false,
+        )
+}
+
+/**
  * Commercial readiness is intentionally derived only from authoritative relationship evidence
  * already loaded by the Supplier workspace. An active agreement and at least one currently usable
  * offer are both required. A zero count is not treated as "missing" until either the detailed list

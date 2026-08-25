@@ -383,7 +383,12 @@ internal fun AppConfiguration.SupplierCustomersScreen() {
                     }
                 } else {
                     item(key = "supplier-partner-detail-${selectedPartner.partnerKey}") {
-                        SupplierPartnerDetail(partner = selectedPartner)
+                        SupplierPartnerDetail(
+                            partner = selectedPartner,
+                            onRefreshRelationshipData = {
+                                refreshSupplierModeWorkspace(includeContracts = true, force = true)
+                            },
+                        )
                     }
                 }
             }

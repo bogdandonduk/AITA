@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -17,6 +16,7 @@ import kz.aita.auth.*
 
 private enum class AitaLoginMode { PASSWORD, EMAIL_CODE, RECOVERY }
 private enum class AitaLoginStep { PRIMARY, EMAIL_CODE, TOTP, NEW_PASSWORD, COMPLETE }
+private enum class AitaLoginIdentifierType { PHONE, EMAIL }
 
 internal fun AppConfiguration.authUiText(en: String, ru: String, kk: String): String = when {
     stateValues.appLanguage.lowercase().startsWith("ru") -> ru
@@ -31,9 +31,23 @@ internal fun AppConfiguration.authResponseText(response: ResponseDataModel<*>): 
 @Composable
 internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
     var capabilities by remember { mutableStateOf(AitaAuthCapabilitiesDataModel()) }
-    var mode by rememberSaveable { mutableStateOf(AitaLoginMode.PASSWORD) }
+    var mode by remember { mutableStateOf(AitaLoginMode.PASSWORD) }
     var step by remember { mutableStateOf(AitaLoginStep.PRIMARY) }
-    var identifier by rememberSaveable { mutableStateOf("") }
+    var identifierType by remember { mutableStateOf(AitaLoginIdentifierType.PHONE) }
+    val transientLoginState = remember { object : StateHost() {} }
+    val loginCountries = remember(stateValues.globalAppConfiguration.countries) {
+        stateValues.globalAppConfiguration.countries.withTajikistanFallback()
+    }
+    val defaultPhoneCountryCode = remember(loginCountries) {
+        loginCountries.firstOrNull { it.locale.equals("kz", ignoreCase = true) }
+            ?.phoneNumberCode
+            ?: loginCountries.firstOrNull { it.phoneNumberCode == "7" }?.phoneNumberCode
+            ?: loginCountries.firstOrNull()?.phoneNumberCode
+            ?: "7"
+    }.let { "+$it" }
+    var phoneCountryCode by remember(defaultPhoneCountryCode) { mutableStateOf(defaultPhoneCountryCode) }
+    var phoneLocalNumber by remember { mutableStateOf("") }
+    var emailAddress by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
     var flowId by remember { mutableStateOf("") }
@@ -48,6 +62,14 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
     LaunchedEffect(Unit) {
         val response = AitaAdvancedAuthenticationClient.capabilities()
         response.payload?.let { capabilities = it }
+    }
+
+    fun resolvedIdentifier(): String {
+        val raw = when (identifierType) {
+            AitaLoginIdentifierType.PHONE -> phoneCountryCode + phoneLocalNumber
+            AitaLoginIdentifierType.EMAIL -> emailAddress
+        }
+        return normalizeAitaLoginIdentifier(raw)?.value.orEmpty()
     }
 
     fun resetSensitiveState(targetMode: AitaLoginMode = mode) {
@@ -67,6 +89,8 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
     suspend fun consumeFlow(flow: AitaAuthFlowDataModel) {
         flow.tokenPair?.takeIf { it.accessToken.isNotBlank() && it.refreshToken.isNotBlank() }?.let {
             adoptAdvancedAuthenticationTokens(it)
+            phoneLocalNumber = ""
+            emailAddress = ""
             password = ""
             code = ""
             resetTicket = ""
@@ -101,6 +125,7 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
     }
 
     fun submitPasswordLogin() {
+        val identifier = resolvedIdentifier()
         if (identifier.isBlank() || password.isBlank()) return
         runAction {
             val response = AitaAdvancedAuthenticationClient.passwordLogin(
@@ -111,6 +136,7 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
     }
 
     fun requestSignInCode() {
+        val identifier = resolvedIdentifier()
         if (identifier.isBlank()) return
         runAction {
             val response = AitaAdvancedAuthenticationClient.requestLoginCode(
@@ -121,6 +147,7 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
     }
 
     fun requestRecoveryCode() {
+        val identifier = resolvedIdentifier()
         if (identifier.isBlank()) return
         runAction {
             val response = AitaAdvancedAuthenticationClient.requestPasswordRecovery(
@@ -195,6 +222,7 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                 val selected = tabRowWidget(
                     modifier = Modifier.fillMaxWidth(),
                     selectedIndexInitial = if (mode == AitaLoginMode.PASSWORD) "password" else "code",
+                    persistSelection = false,
                     tabs = listOf(
                         TabContent("password", authUiText("Password", "Пароль", "Құпия сөз")),
                         TabContent("code", authUiText("Email code", "Код из письма", "Email коды"))
@@ -206,6 +234,33 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                 }
             }
 
+            if (step == AitaLoginStep.PRIMARY) {
+                val selectedIdentifierType = tabRowWidget(
+                    modifier = Modifier.fillMaxWidth(),
+                    selectedIndexInitial = when (identifierType) {
+                        AitaLoginIdentifierType.PHONE -> "phone"
+                        AitaLoginIdentifierType.EMAIL -> "email"
+                    },
+                    persistSelection = false,
+                    tabs = listOf(
+                        TabContent("phone", stateValues.stringPhoneNumber),
+                        TabContent("email", stateValues.stringEmail)
+                    )
+                )
+                LaunchedEffect(selectedIdentifierType.id) {
+                    val newType = if (selectedIdentifierType.id == "email") {
+                        AitaLoginIdentifierType.EMAIL
+                    } else {
+                        AitaLoginIdentifierType.PHONE
+                    }
+                    if (newType != identifierType) {
+                        identifierType = newType
+                        errorText = ""
+                        infoText = ""
+                    }
+                }
+            }
+
             AnimatedContent(targetState = step, label = "advancedAuthStep") { currentStep ->
                 Column(
                     modifier = Modifier.fillMaxWidth(),
@@ -214,23 +269,58 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                 ) {
                     when (currentStep) {
                         AitaLoginStep.PRIMARY -> {
-                            aitaFormTextField(
-                                modifier = Modifier.fillMaxWidth(),
-                                value = identifier,
-                                onValueChange = { identifier = it; errorText = "" },
-                                titleText = authUiText("Email or phone number", "Email или номер телефона", "Email немесе телефон нөмірі"),
-                                placeholderText = authUiText("Enter your email or phone", "Введите email или телефон", "Email немесе телефонды енгізіңіз"),
-                                identityKey = "advanced-auth-login-identifier",
-                                keyboardType = KeyboardType.Email,
-                                imeAction = if (mode == AitaLoginMode.PASSWORD) ImeAction.Next else ImeAction.Go,
-                                onImeAction = when (mode) {
-                                    AitaLoginMode.EMAIL_CODE -> ::requestSignInCode
-                                    AitaLoginMode.RECOVERY -> ::requestRecoveryCode
-                                    AitaLoginMode.PASSWORD -> null
-                                },
-                                leadingIconPath = stateValues.drawablePathIconUserAccount,
-                                autoFocus = true
-                            )
+                            val identifierImeAction = when (mode) {
+                                AitaLoginMode.PASSWORD -> ImeWithAction(ImeAction.Next)
+                                AitaLoginMode.EMAIL_CODE -> ImeWithAction(ImeAction.Go, ::requestSignInCode)
+                                AitaLoginMode.RECOVERY -> ImeWithAction(ImeAction.Go, ::requestRecoveryCode)
+                            }
+
+                            when (identifierType) {
+                                AitaLoginIdentifierType.PHONE -> {
+                                    countrySelectionPhoneNumberTextField(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        countries = loginCountries,
+                                        valueInitial = phoneLocalNumber,
+                                        stateHost = transientLoginState,
+                                        stateKey = "advanced_auth_login_phone",
+                                        identityKey = "advanced-auth-login-phone",
+                                        imeWithAction = identifierImeAction,
+                                        retainTextAcrossRecreation = false,
+                                        persistTextDraft = false,
+                                        retainSelectionAcrossRecreation = false,
+                                        persistSelectionDraft = false,
+                                        autoFocus = true,
+                                        onSelectedCountryCodeChange = { selectedCode ->
+                                            selectedCode?.takeIf { it.isNotBlank() }?.let { phoneCountryCode = it }
+                                        },
+                                        onValueChange = { value, _, selectedCode, applyChange ->
+                                            phoneLocalNumber = value
+                                            selectedCode?.takeIf { it.isNotBlank() }?.let { phoneCountryCode = it }
+                                            errorText = ""
+                                            applyChange()
+                                        }
+                                    )
+                                }
+
+                                AitaLoginIdentifierType.EMAIL -> {
+                                    emailTextField(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        stateHost = transientLoginState,
+                                        stateKey = "advanced_auth_login_email",
+                                        identityKey = "advanced-auth-login-email",
+                                        valueInitial = emailAddress,
+                                        retainTextAcrossRecreation = false,
+                                        persistTextDraft = false,
+                                        autoFocus = true,
+                                        imeWithAction = identifierImeAction,
+                                        onValueChange = { value, applyChange ->
+                                            emailAddress = value
+                                            errorText = ""
+                                            applyChange()
+                                        }
+                                    )
+                                }
+                            }
 
                             if (mode == AitaLoginMode.PASSWORD) {
                                 aitaFormTextField(
@@ -250,7 +340,7 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                                 actionButton(
                                     modifier = Modifier.fillMaxWidth(),
                                     text = stateValues.stringLogIn,
-                                    enabled = !busy && identifier.isNotBlank() && password.isNotBlank(),
+                                    enabled = !busy && resolvedIdentifier().isNotBlank() && password.isNotBlank(),
                                     loading = busy,
                                     loadingText = stateValues.stringLoggingIn
                                 ) { submitPasswordLogin() }
@@ -268,7 +358,7 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                                 actionButton(
                                     modifier = Modifier.fillMaxWidth(),
                                     text = authUiText("Send sign-in code", "Отправить код входа", "Кіру кодын жіберу"),
-                                    enabled = !busy && identifier.isNotBlank(),
+                                    enabled = !busy && resolvedIdentifier().isNotBlank(),
                                     loading = busy
                                 ) { requestSignInCode() }
                             }
@@ -429,7 +519,7 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                 actionButton(
                     modifier = Modifier.fillMaxWidth(),
                     text = authUiText("Send recovery code", "Отправить код восстановления", "Қалпына келтіру кодын жіберу"),
-                    enabled = !busy && identifier.isNotBlank(),
+                    enabled = !busy && resolvedIdentifier().isNotBlank(),
                     loading = busy
                 ) { requestRecoveryCode() }
                 TextButton(enabled = !busy, onClick = { resetSensitiveState(AitaLoginMode.PASSWORD) }) {

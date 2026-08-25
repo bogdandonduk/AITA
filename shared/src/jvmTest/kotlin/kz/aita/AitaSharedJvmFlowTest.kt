@@ -188,6 +188,14 @@ class AitaSharedJvmFlowTest {
     fun logoutClearsLocalAuthAndQueuesServerCleanup() = runBlocking {
         environment.storedTokens = aitaTestTokenPair("logout")
         environment.storedAccount = aitaTestUserAccount()
+        val item = aitaTestGoodsItem(id = "logout-item")
+        parentStoreStockState.emit(DataState.Success(listOf(item)))
+        stockItemBranchAvailabilityState.emit(DataState.Success(aitaTestAvailability()))
+        debtorsState.emit(DataState.Success(listOf(aitaTestDebtor(id = "logout-debtor"))))
+        storeWorkerMembershipsState.emit(DataState.Success(listOf(aitaTestWorkerMembership(id = "logout-worker"))))
+        myWorkerMembershipsState.emit(DataState.Success(listOf(aitaTestWorkerMembership(id = "logout-my-worker"))))
+        notificationsState.emit(DataState.Success(listOf(aitaTestNotification(id = "logout-notification"))))
+        latestTransactionReceiptSnapshotState.emit(aitaTestReceiptSnapshot(id = "logout-receipt"))
 
         logOutUser()
 
@@ -196,7 +204,50 @@ class AitaSharedJvmFlowTest {
 
         assertNull(environment.storedTokens)
         assertNull(environment.storedAccount)
+        assertNull(parentStoreStockState.payloadValue)
+        assertNull(stockItemBranchAvailabilityState.payloadValue)
+        assertNull(debtorsState.payloadValue)
+        assertNull(storeWorkerMembershipsState.payloadValue)
+        assertNull(myWorkerMembershipsState.payloadValue)
+        assertNull(notificationsState.payloadValue)
+        assertNull(latestTransactionReceiptSnapshotState.value)
         assertTrue(environment.requests.any { it.method == "DELETE" && it.path == "auth/logOut" })
+    }
+
+    @Test
+    fun lateRefreshCannotRestoreTokensAfterLogoutInvalidatesTheLogicalSession() = runBlocking {
+        val originalTokens = aitaTestTokenPair("race-original")
+        val lateTokens = aitaTestTokenPair("race-late")
+        environment.storedTokens = originalTokens
+        val generationBeforeLogout = currentAuthenticatedSessionGeneration()
+
+        val logoutSnapshot = clearAuthenticatedSessionStorage()
+        val installed = installRefreshedAuthenticatedSession(
+            expectedGeneration = generationBeforeLogout,
+            expectedRefreshToken = originalTokens.refreshToken,
+            tokenPair = lateTokens,
+        )
+
+        assertEquals(originalTokens, logoutSnapshot)
+        assertFalse(installed)
+        assertNull(environment.storedTokens)
+    }
+
+    @Test
+    fun currentRefreshCanRotateTokensInsideTheSameLogicalSession() = runBlocking {
+        val originalTokens = aitaTestTokenPair("rotate-original")
+        val refreshedTokens = aitaTestTokenPair("rotate-refreshed")
+        val generation = installAuthenticatedSession(originalTokens)
+
+        val installed = installRefreshedAuthenticatedSession(
+            expectedGeneration = generation,
+            expectedRefreshToken = originalTokens.refreshToken,
+            tokenPair = refreshedTokens,
+        )
+
+        assertTrue(installed)
+        assertEquals(refreshedTokens, environment.storedTokens)
+        assertEquals(generation, currentAuthenticatedSessionGeneration())
     }
 
     @Test

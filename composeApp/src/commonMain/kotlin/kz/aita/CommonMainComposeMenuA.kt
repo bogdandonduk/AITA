@@ -5940,12 +5940,6 @@ fun AppConfiguration.MenuListScreen() {
                 AppModeQuickSwitchMenuTile()
             }
 
-            if (stateValues.appModeId == APP_MODE_SUPPLIER || stateValues.appModeId == APP_MODE_MANUFACTURER) {
-                item {
-                    SupplierWorkspaceMenuTile()
-                }
-            }
-
             items(
                 filteredMenuDestinations().filterNot { model ->
                     model == NavigationScreenModel.Menu.AppMode

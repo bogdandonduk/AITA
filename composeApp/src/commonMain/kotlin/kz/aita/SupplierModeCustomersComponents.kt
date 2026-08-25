@@ -681,39 +681,88 @@ private fun AppConfiguration.SupplierCustomerMiniMetric(
 }
 
 @Composable
-internal fun AppConfiguration.SupplierPartnerDetail(partner: SupplierPartnerUiModel) {
+internal fun AppConfiguration.SupplierPartnerDetail(
+    partner: SupplierPartnerUiModel,
+    onRefreshRelationshipData: () -> Unit,
+) {
     val coroutineScope = rememberCoroutineScope()
     val linesByOrder = remember(partner.lines) { partner.lines.groupBy { it.orderId } }
+    val nextAction = remember(partner) { buildSupplierPartnerNextAction(partner) }
 
-    fun openOrders() {
+    fun openOrders(
+        statusFilter: String = "all",
+        dueFilter: String = "all",
+    ) {
         coroutineScope.launch {
-            seedSupplierOrdersInboxNavigation(searchQuery = partner.navigationSearchQuery)
+            seedSupplierOrdersInboxNavigation(
+                searchQuery = partner.navigationSearchQuery,
+                dueFilter = dueFilter,
+                statusFilter = statusFilter,
+            )
             Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
         }
     }
 
-    fun openCatalog() {
+    fun openCatalog(filterId: String = SUPPLIER_CATALOG_FILTER_ALL) {
         coroutineScope.launch {
             seedSupplierCatalogNavigation(
                 searchQuery = partner.navigationSearchQuery,
-                filterId = SUPPLIER_CATALOG_FILTER_ALL,
+                filterId = filterId,
                 sortId = SUPPLIER_CATALOG_SORT_ACTION
             )
             Navigation.goMain(NavigationScreenModel.Supplier.Catalog.Main)
         }
     }
 
-    fun openContracts() {
+    fun openContracts(statusFilter: String = SUPPLIER_CONTRACT_FILTER_ALL) {
         coroutineScope.launch {
-            seedSupplierContractsNavigation(searchQuery = partner.navigationSearchQuery)
+            seedSupplierContractsNavigation(
+                searchQuery = partner.navigationSearchQuery,
+                statusFilter = statusFilter,
+            )
             Navigation.goMain(NavigationScreenModel.Supplier.Contracts.Main)
         }
     }
 
-    fun openDispatch() {
+    fun openDispatch(laneFilter: String = SUPPLIER_DISPATCH_FILTER_ALL) {
         coroutineScope.launch {
-            seedSupplierDispatchNavigation(searchQuery = partner.navigationSearchQuery)
+            seedSupplierDispatchNavigation(
+                searchQuery = partner.navigationSearchQuery,
+                laneFilter = laneFilter,
+            )
             Navigation.goMain(NavigationScreenModel.Supplier.Dispatch.Main)
+        }
+    }
+
+    fun openInsights() {
+        coroutineScope.launch {
+            Navigation.goMain(NavigationScreenModel.Supplier.Analytics.Main)
+        }
+    }
+
+    fun executeNextAction() {
+        when (nextAction.action) {
+            SupplierPartnerNextAction.RESOLVE_ORDER_ATTENTION ->
+                openOrders(statusFilter = "needs_attention")
+            SupplierPartnerNextAction.REVIEW_AGREEMENT_REQUEST ->
+                openContracts(statusFilter = SUPPLIER_CONTRACT_FILTER_WAITING_ME)
+            SupplierPartnerNextAction.PACK_READY_ORDERS ->
+                openDispatch(laneFilter = SUPPLIER_DISPATCH_FILTER_READY_TO_PACK)
+            SupplierPartnerNextAction.DISPATCH_PACKED_ORDERS ->
+                openDispatch(laneFilter = SUPPLIER_DISPATCH_FILTER_READY_TO_DISPATCH)
+            SupplierPartnerNextAction.FOLLOW_ACTIVE_DELIVERY ->
+                openDispatch(laneFilter = SUPPLIER_DISPATCH_FILTER_IN_DELIVERY)
+            SupplierPartnerNextAction.COMPLETE_OFFER_PRICES,
+            SupplierPartnerNextAction.BUILD_USABLE_OFFER ->
+                openCatalog(filterId = SUPPLIER_CATALOG_FILTER_MISSING_PRICE)
+            SupplierPartnerNextAction.REFRESH_RELATIONSHIP_DATA ->
+                onRefreshRelationshipData()
+            SupplierPartnerNextAction.COMPLETE_ACTIVE_AGREEMENT ->
+                openContracts()
+            SupplierPartnerNextAction.REVIEW_OPEN_ORDERS ->
+                openOrders(statusFilter = "open")
+            SupplierPartnerNextAction.OPEN_INSIGHTS ->
+                openInsights()
         }
     }
 
@@ -722,11 +771,15 @@ internal fun AppConfiguration.SupplierPartnerDetail(partner: SupplierPartnerUiMo
         verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
     ) {
         SupplierCustomerOverviewCard(partner)
+        SupplierPartnerNextActionCard(
+            nextAction = nextAction,
+            onClick = ::executeNextAction,
+        )
         SupplierCustomerActionGrid(
-            onOrders = ::openOrders,
-            onCatalog = ::openCatalog,
-            onContracts = ::openContracts,
-            onDispatch = ::openDispatch
+            onOrders = { openOrders() },
+            onCatalog = { openCatalog() },
+            onContracts = { openContracts() },
+            onDispatch = { openDispatch() }
         )
         SupplierCustomerWorkCard(partner)
         SupplierCustomerCommercialCard(partner)
@@ -748,6 +801,160 @@ internal fun AppConfiguration.SupplierPartnerDetail(partner: SupplierPartnerUiMo
                     transient = true
                 )
             }
+        )
+    }
+}
+
+@Composable
+private fun AppConfiguration.SupplierPartnerNextActionCard(
+    nextAction: SupplierPartnerNextActionUiModel,
+    onClick: () -> Unit,
+) {
+    val actionText = when (nextAction.action) {
+        SupplierPartnerNextAction.RESOLVE_ORDER_ATTENTION ->
+            localizedStringResource(2542, "Review partner attention")
+        SupplierPartnerNextAction.REVIEW_AGREEMENT_REQUEST,
+        SupplierPartnerNextAction.COMPLETE_ACTIVE_AGREEMENT ->
+            localizedStringResource(2544, "Complete partner agreements")
+        SupplierPartnerNextAction.PACK_READY_ORDERS,
+        SupplierPartnerNextAction.DISPATCH_PACKED_ORDERS,
+        SupplierPartnerNextAction.FOLLOW_ACTIVE_DELIVERY ->
+            localizedStringResource(2381, "Open dispatch")
+        SupplierPartnerNextAction.COMPLETE_OFFER_PRICES,
+        SupplierPartnerNextAction.BUILD_USABLE_OFFER ->
+            localizedStringResource(2543, "Build missing offers")
+        SupplierPartnerNextAction.REFRESH_RELATIONSHIP_DATA ->
+            localizedStringResource(2548, "Refresh relationship data")
+        SupplierPartnerNextAction.REVIEW_OPEN_ORDERS ->
+            localizedStringResource(1465, "View partner orders")
+        SupplierPartnerNextAction.OPEN_INSIGHTS ->
+            localizedStringResource(2545, "Open Supplier insights")
+    }
+    val description = when (nextAction.action) {
+        SupplierPartnerNextAction.RESOLVE_ORDER_ATTENTION ->
+            localizedStringResource(2552, "Resolve the orders that need a reply or may block delivery.")
+        SupplierPartnerNextAction.REVIEW_AGREEMENT_REQUEST ->
+            localizedStringResource(2553, "This Store is waiting for you to review a proposed agreement.")
+        SupplierPartnerNextAction.PACK_READY_ORDERS ->
+            localizedStringResource(2554, "Prepare ready orders while their promised delivery window is protected.")
+        SupplierPartnerNextAction.DISPATCH_PACKED_ORDERS ->
+            localizedStringResource(2555, "Move packed orders into delivery and keep the Store informed.")
+        SupplierPartnerNextAction.FOLLOW_ACTIVE_DELIVERY ->
+            localizedStringResource(2556, "Follow active deliveries until every quantity is resolved.")
+        SupplierPartnerNextAction.COMPLETE_OFFER_PRICES,
+        SupplierPartnerNextAction.BUILD_USABLE_OFFER ->
+            localizedStringResource(2530, "Add reusable offers so Stores can order with less manual work.")
+        SupplierPartnerNextAction.REFRESH_RELATIONSHIP_DATA ->
+            localizedStringResource(2549, "AITA is still checking offers and agreements before recommending commercial work.")
+        SupplierPartnerNextAction.COMPLETE_ACTIVE_AGREEMENT ->
+            localizedStringResource(2532, "Record delivery, payment, and product terms with partner Stores.")
+        SupplierPartnerNextAction.REVIEW_OPEN_ORDERS ->
+            localizedStringResource(2557, "Review this partner’s open orders and keep the relationship moving.")
+        SupplierPartnerNextAction.OPEN_INSIGHTS ->
+            localizedStringResource(2558, "This relationship is commercially ready and has no urgent work.")
+    }
+    val iconPath = when (nextAction.action) {
+        SupplierPartnerNextAction.RESOLVE_ORDER_ATTENTION -> stateValues.drawablePathIconResponse
+        SupplierPartnerNextAction.REVIEW_AGREEMENT_REQUEST,
+        SupplierPartnerNextAction.COMPLETE_ACTIVE_AGREEMENT -> stateValues.drawablePathIconSupplierContracts
+        SupplierPartnerNextAction.PACK_READY_ORDERS -> stateValues.drawablePathIconStock
+        SupplierPartnerNextAction.DISPATCH_PACKED_ORDERS,
+        SupplierPartnerNextAction.FOLLOW_ACTIVE_DELIVERY -> stateValues.drawablePathIconSupplierDispatch
+        SupplierPartnerNextAction.COMPLETE_OFFER_PRICES,
+        SupplierPartnerNextAction.BUILD_USABLE_OFFER -> stateValues.drawablePathIconSupplierCatalog
+        SupplierPartnerNextAction.REFRESH_RELATIONSHIP_DATA -> stateValues.drawablePathIconRefresh
+        SupplierPartnerNextAction.REVIEW_OPEN_ORDERS -> stateValues.drawablePathIconAppModeSupplier
+        SupplierPartnerNextAction.OPEN_INSIGHTS -> stateValues.drawablePathIconSupplierDemandRadar
+    }
+    val iconRes = when (nextAction.action) {
+        SupplierPartnerNextAction.RESOLVE_ORDER_ATTENTION -> stateValues.drawableResIconResponse.value
+        SupplierPartnerNextAction.REVIEW_AGREEMENT_REQUEST,
+        SupplierPartnerNextAction.COMPLETE_ACTIVE_AGREEMENT -> stateValues.drawableResIconSupplierContracts.value
+        SupplierPartnerNextAction.PACK_READY_ORDERS -> stateValues.drawableResIconStock.value
+        SupplierPartnerNextAction.DISPATCH_PACKED_ORDERS,
+        SupplierPartnerNextAction.FOLLOW_ACTIVE_DELIVERY -> stateValues.drawableResIconSupplierDispatch.value
+        SupplierPartnerNextAction.COMPLETE_OFFER_PRICES,
+        SupplierPartnerNextAction.BUILD_USABLE_OFFER -> stateValues.drawableResIconSupplierCatalog.value
+        SupplierPartnerNextAction.REFRESH_RELATIONSHIP_DATA -> stateValues.drawableResIconRefresh.value
+        SupplierPartnerNextAction.REVIEW_OPEN_ORDERS -> stateValues.drawableResIconAppModeSupplier.value
+        SupplierPartnerNextAction.OPEN_INSIGHTS -> stateValues.drawableResIconSupplierDemandRadar.value
+    }
+    val accent = if (nextAction.urgent) stateValues.BorderlineBadColor else stateValues.AccentColor
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(accent.copy(alpha = 0.08f))
+            .border(
+                if (nextAction.urgent) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
+                accent,
+                RoundedCornerShape(stateValues.cornerRadius),
+            )
+            .padding(stateValues.marginTextFieldGroup),
+        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(accent.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                CpImage(
+                    modifier = Modifier.size(28.dp),
+                    url = iconPath,
+                    fallbackRes = iconRes,
+                    contentDescription = actionText,
+                    tintColor = accent,
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = localizedStringResource(2551, "Next best move"),
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.accentTextSize,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = if (nextAction.affectedCount > 0) {
+                        "$actionText • ${nextAction.affectedCount}"
+                    } else {
+                        actionText
+                    },
+                    color = accent,
+                    fontSize = stateValues.smallTextSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+
+        Text(
+            text = description,
+            color = stateValues.TextColor,
+            fontSize = stateValues.smallTextSize,
+        )
+
+        actionButton(
+            modifier = Modifier.fillMaxWidth(),
+            text = actionText,
+            iconPath = iconPath,
+            iconRes = iconRes,
+            confirmationRequired = false,
+            autoLoading = false,
+            enabledColor = accent,
+            onClick = onClick,
         )
     }
 }

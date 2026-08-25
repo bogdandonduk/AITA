@@ -194,6 +194,76 @@ class ComposeAppCommonTest {
     }
 
     @Test
+    fun supplierPartnerNextActionProtectsLiveOrderWorkBeforeCommercialHousekeeping() {
+        val partner = supplierPortfolioPartner(
+            key = "urgent",
+            activeContractCount = 0,
+            validOfferCount = 0,
+            attentionOrderCount = 2,
+        ).copy(
+            readyToPackOrderCount = 3,
+            priceGapCount = 5,
+        )
+        val recommendation = buildSupplierPartnerNextAction(partner)
+        assertEquals(SupplierPartnerNextAction.RESOLVE_ORDER_ATTENTION, recommendation.action)
+        assertEquals(2, recommendation.affectedCount)
+        assertTrue(recommendation.urgent)
+    }
+
+    @Test
+    fun supplierPartnerNextActionWalksOrdersThroughPackingDispatchAndDelivery() {
+        val commerciallyReady = supplierPortfolioPartner(
+            key = "workflow",
+            activeContractCount = 1,
+            validOfferCount = 1,
+        )
+        assertEquals(
+            SupplierPartnerNextAction.PACK_READY_ORDERS,
+            buildSupplierPartnerNextAction(commerciallyReady.copy(readyToPackOrderCount = 1)).action
+        )
+        assertEquals(
+            SupplierPartnerNextAction.DISPATCH_PACKED_ORDERS,
+            buildSupplierPartnerNextAction(commerciallyReady.copy(packedOrderCount = 1)).action
+        )
+        assertEquals(
+            SupplierPartnerNextAction.FOLLOW_ACTIVE_DELIVERY,
+            buildSupplierPartnerNextAction(commerciallyReady.copy(inDeliveryOrderCount = 1)).action
+        )
+    }
+
+    @Test
+    fun supplierPartnerNextActionDoesNotInventCommercialGapsWhileEvidenceLoads() {
+        val recommendation = buildSupplierPartnerNextAction(
+            supplierPortfolioPartner(
+                key = "loading",
+                offerReadinessKnown = false,
+                agreementReadinessKnown = false,
+            )
+        )
+        assertEquals(SupplierPartnerNextAction.REFRESH_RELATIONSHIP_DATA, recommendation.action)
+        assertFalse(recommendation.urgent)
+    }
+
+    @Test
+    fun supplierPartnerNextActionFinishesOfferThenAgreementBeforeOpeningInsights() {
+        val missingBoth = supplierPortfolioPartner("commercial")
+        val missingAgreement = supplierPortfolioPartner("agreement", validOfferCount = 1)
+        val ready = supplierPortfolioPartner("ready", activeContractCount = 1, validOfferCount = 1)
+        assertEquals(
+            SupplierPartnerNextAction.BUILD_USABLE_OFFER,
+            buildSupplierPartnerNextAction(missingBoth).action
+        )
+        assertEquals(
+            SupplierPartnerNextAction.COMPLETE_ACTIVE_AGREEMENT,
+            buildSupplierPartnerNextAction(missingAgreement).action
+        )
+        assertEquals(
+            SupplierPartnerNextAction.OPEN_INSIGHTS,
+            buildSupplierPartnerNextAction(ready).action
+        )
+    }
+
+    @Test
     fun supplierInboxAttentionFilterMatchesItsMetric() {
         assertTrue(supplierOrderNeedsAttentionInInbox(SupplierOrderStatusDataModel.Sent, hasResponseGaps = false))
         assertTrue(supplierOrderNeedsAttentionInInbox(SupplierOrderStatusDataModel.SeenBySupplier, hasResponseGaps = false))

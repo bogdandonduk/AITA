@@ -486,6 +486,11 @@ internal fun AppConfiguration.AuthPreferencesChooser(
 @Composable
 fun AppConfiguration.UserAuthSignUpScreen(
 ) {
+    // Credentials and personally identifying sign-up data must live only for this visible form.
+    // AITA normally restores form drafts, but restoring an abandoned registration after relaunch
+    // would expose phone/email/password data on a shared device.
+    val transientSignUpState = remember { object : StateHost() {} }
+
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -535,15 +540,23 @@ fun AppConfiguration.UserAuthSignUpScreen(
             }
 
             val phoneNumberTextFieldContent = countrySelectionPhoneNumberTextField(
-                stateHost = NavigationScreenModel.UserAuth.SignUp,
-                stateKey = NavigationScreenModel.KEY_STATE_PHONE_NUMBER
+                stateHost = transientSignUpState,
+                stateKey = NavigationScreenModel.KEY_STATE_PHONE_NUMBER,
+                identityKey = "user-auth-sign-up-phone",
+                retainTextAcrossRecreation = false,
+                persistTextDraft = false,
+                retainSelectionAcrossRecreation = false,
+                persistSelectionDraft = false
             )
 
             Spacer(modifier = Modifier.height(innerSpace))
 
             val emailTextFieldContent = emailTextField(
-                stateHost = NavigationScreenModel.UserAuth.SignUp,
+                stateHost = transientSignUpState,
                 stateKey = NavigationScreenModel.KEY_STATE_EMAIL,
+                identityKey = "user-auth-sign-up-email",
+                retainTextAcrossRecreation = false,
+                persistTextDraft = false
             )
 
             Spacer(modifier = Modifier.height(innerSpace))
@@ -553,8 +566,11 @@ fun AppConfiguration.UserAuthSignUpScreen(
                 placeholderText = stateValues.stringEnterFirstName,
                 leadingIconPath = stateValues.drawablePathIconPerson,
                 contentInvalidText = stateValues.stringFirstNameCannotBeEmptyOrJustWhitespaces,
-                stateHost = NavigationScreenModel.UserAuth.SignUp,
+                stateHost = transientSignUpState,
                 stateKey = NavigationScreenModel.KEY_STATE_FIRST_NAME,
+                identityKey = "user-auth-sign-up-first-name",
+                retainTextAcrossRecreation = false,
+                persistTextDraft = false,
                 onContentValidityCheck = {
                     it.checkAsPersonName()
                 },
@@ -570,8 +586,11 @@ fun AppConfiguration.UserAuthSignUpScreen(
                 placeholderText = stateValues.stringEnterLastName,
                 leadingIconPath = stateValues.drawablePathIconPerson,
                 contentInvalidText = stateValues.stringLastNameCannotBeEmptyOrJustWhitespaces,
-                stateHost = NavigationScreenModel.UserAuth.SignUp,
+                stateHost = transientSignUpState,
                 stateKey = NavigationScreenModel.KEY_STATE_LAST_NAME,
+                identityKey = "user-auth-sign-up-last-name",
+                retainTextAcrossRecreation = false,
+                persistTextDraft = false,
                 onContentValidityCheck = {
                     it.checkAsPersonName()
                 },
@@ -583,9 +602,11 @@ fun AppConfiguration.UserAuthSignUpScreen(
             Spacer(modifier = Modifier.height(innerSpace))
 
             val (passwordTextFieldContent, repeatedPasswordTextFieldContent) = repeatedPasswordTextFieldGroup(
-                stateHost = NavigationScreenModel.UserAuth.SignUp,
+                stateHost = transientSignUpState,
                 stateKey = "new_password",
                 repeatedStateKey = "repeated_password",
+                retainTextAcrossRecreation = false,
+                persistTextDraft = false
             )
 
             Spacer(modifier = Modifier.height(outerSpace))
